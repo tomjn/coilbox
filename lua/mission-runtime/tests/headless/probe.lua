@@ -22,7 +22,7 @@ function gadget:GetInfo()
 		desc = "Drives a fixture mission and checks the runtime in a real engine",
 		author = "coilbox",
 		date = "2026",
-		license = "MIT",
+		license = "MIT or GNU GPL, v2 or later",
 		-- Behind the runtime, which is itself behind the game, so every check
 		-- reads the frame after everyone else has finished with it.
 		layer = 2000,

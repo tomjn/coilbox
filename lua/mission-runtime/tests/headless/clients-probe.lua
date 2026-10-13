@@ -24,7 +24,7 @@ function gadget:GetInfo()
 		desc = "Watches three clients decide what a mission aimed at one of them",
 		author = "coilbox",
 		date = "2026",
-		license = "MIT",
+		license = "MIT or GNU GPL, v2 or later",
 		-- Behind the runtime, which is at 1000, so the wrappers below are in place
 		-- before it is asked to do anything and its calls are the ones counted.
 		layer = 2000,

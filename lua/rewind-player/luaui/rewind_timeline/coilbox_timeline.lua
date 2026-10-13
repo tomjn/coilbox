@@ -22,8 +22,8 @@
 -- The look follows Slate, the interface in luaui/slate of
 -- Recoil-Game-Archive/xta-springrts: a dark translucent panel with a thin
 -- light border, rounded corners, and buttons that are a faint wash of white.
--- Slate is GPL v2 or later and this is MIT, so the colours and proportions are
--- its and every line here was written for coilbox.
+-- The colours and proportions are Slate's and every line here was written for
+-- coilbox.
 --
 -- The engine is handed in as a table, and nothing here reaches for a global of
 -- it, so the tests run the same file on a stand-in.

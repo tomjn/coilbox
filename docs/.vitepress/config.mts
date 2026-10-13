@@ -201,7 +201,7 @@ export default defineConfig({
     socialLinks: [{ icon: "github", link: "https://github.com/tomjn/coilbox" }],
     footer: {
       message:
-        "MIT-licensed. Bundles pr-downloader (GPL-2.0-or-later, © the Spring/Recoil authors).",
+        "MIT-licensed, and the Lua that runs in the engine is MIT or GPL-2.0-or-later. Bundles pr-downloader (GPL-2.0-or-later, © the Spring/Recoil authors).",
       copyright: "Coilbox",
     },
     search: { provider: "local" },

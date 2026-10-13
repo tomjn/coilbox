@@ -933,4 +933,4 @@ The scripts are in `/Users/tomjn/dev/coilbox-rewind-bench/track-format/` on the 
 - `rotprec.py` measures rotation rounding.
 - `example.py` builds the worked example and reads it back.
 
-The benchmark files are BAR-Rewind's output. BAR-Rewind is GPL-2.0 and coilbox is MIT. The scripts read the files by the section table the spike documented and by the values in them. BAR-Rewind's source was not read, and nothing on this page describes its layout.
+The benchmark files are BAR-Rewind's output. The scripts read the files by the section table the spike documented and by the values in them. BAR-Rewind's source was not read, and nothing on this page describes its layout.

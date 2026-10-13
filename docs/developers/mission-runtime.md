@@ -47,6 +47,10 @@ Coilbox never reports what it meant to write. After installing it evaluates `mis
 
 The tests under `lua/mission-runtime/tests/` are deliberately outside the three folders you bundle, and are never installed.
 
+#### Licence
+
+The runtime is offered under the MIT licence or the GNU General Public License version 2 or any later version, at your choice. Each runtime file names this in its `license` field. The notice and the GPL text are in [`lua/LICENSE.md`](https://github.com/tomjn/coilbox/blob/main/lua/LICENSE.md) and `lua/COPYING` in the coilbox repository. Coilbox does not yet write them into your game, so copy them in if you want them to travel with your archive.
+
 #### Missions your game ships
 
 `missions/` holds the runtime's own `runtime.lua`, and one folder per mission your game ships:

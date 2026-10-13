@@ -16,7 +16,7 @@ function gadget:GetInfo()
 		desc = "Creates one moving unit and ends the match at a fixed frame",
 		author = "coilbox",
 		date = "2026",
-		license = "MIT",
+		license = "MIT or GNU GPL, v2 or later",
 		layer = 2000,
 		enabled = true,
 	}

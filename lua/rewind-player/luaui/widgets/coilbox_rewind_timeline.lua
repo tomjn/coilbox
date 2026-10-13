@@ -25,7 +25,7 @@ function widget:GetInfo()
 		desc = "Seeks, reverses and changes the speed of a replay being played back.",
 		author = "coilbox",
 		date = "2026",
-		license = "MIT",
+		license = "MIT or GNU GPL, v2 or later",
 		layer = -math.huge,
 		enabled = true,
 	}

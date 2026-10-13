@@ -159,7 +159,7 @@ function gadget:GetInfo()
 		name = "Coilbox replay logger",
 		desc = "Records unit events and the final totals of a replay to a file",
 		author = "coilbox",
-		license = "MIT",
+		license = "MIT or GNU GPL, v2 or later",
 		-- Late, so a position is read after the game's own gadgets have had
 		-- their turn at the same event.
 		layer = 2000,
