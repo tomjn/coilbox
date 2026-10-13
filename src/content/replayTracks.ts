@@ -1,6 +1,10 @@
 import { useSetting } from "@picoframe/frame";
 import { useEffect, useSyncExternalStore } from "react";
-import { contentReplayTracks, type StoredReplayTrack } from "./bindings";
+import {
+  contentReplayTracks,
+  type RecordingCost,
+  type StoredReplayTrack,
+} from "./bindings";
 
 /**
  * Recorded tracks on the frontend (#3786): the tracks on disk by game id, to
@@ -32,6 +36,7 @@ const noUsage: TrackUsage = { totalBytes: 0, defaultBudgetBytes: null };
 
 let tracks: Tracks = new Map();
 let usage: TrackUsage = noUsage;
+let costs: readonly RecordingCost[] = [];
 let started = false;
 const listeners = new Set<() => void>();
 
@@ -46,9 +51,11 @@ export async function refreshStoredTracks(): Promise<void> {
       tracks: list,
       totalBytes,
       defaultBudgetBytes,
+      recordingCosts,
     } = await contentReplayTracks(undefined);
     tracks = new Map(list.map((t) => [t.gameId, t]));
     usage = { totalBytes, defaultBudgetBytes };
+    costs = recordingCosts ?? [];
     emit();
   } catch {
     // No bridge, or the folder could not be read. What is on screen stays.
@@ -68,6 +75,7 @@ function subscribe(cb: () => void): () => void {
 
 const readTracks = () => tracks;
 const readUsage = () => usage;
+const readCosts = () => costs;
 
 /**
  * Every track on disk by game id, kept current. Join it to replays by
@@ -83,6 +91,16 @@ export function useStoredTracks(): Tracks {
 export function useTrackUsage(): TrackUsage {
   useEffect(start, []);
   return useSyncExternalStore(subscribe, readUsage, readUsage);
+}
+
+/**
+ * What recordings made on this machine have cost (#3788), kept current
+ * alongside {@link useStoredTracks}. It is what the estimate on the replay page
+ * goes by.
+ */
+export function useRecordingCosts(): readonly RecordingCost[] {
+  useEffect(start, []);
+  return useSyncExternalStore(subscribe, readCosts, readCosts);
 }
 
 /**
@@ -109,6 +127,7 @@ export function useTrackBudget(): {
 export function resetReplayTracksForTests(): void {
   tracks = new Map();
   usage = noUsage;
+  costs = [];
   started = false;
   emit();
 }
@@ -117,8 +136,10 @@ export function resetReplayTracksForTests(): void {
 export function seedReplayTracksForTests(
   seed: StoredReplayTrack[],
   defaultBudgetBytes: number | null = null,
+  recordingCosts: RecordingCost[] = [],
 ): void {
   started = true;
+  costs = recordingCosts;
   tracks = new Map(seed.map((t) => [t.gameId, t]));
   usage = {
     totalBytes: seed.reduce((sum, t) => sum + t.sizeBytes, 0),

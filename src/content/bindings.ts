@@ -1569,6 +1569,24 @@ export interface StoredReplayTrack {
 }
 
 /**
+ * What one recording cost on this machine (#3788), kept so the replay page can
+ * estimate the next one. `millis` runs from the job starting to the track being
+ * stored, so it includes the thinning, and it is what the running build
+ * measured.
+ */
+export interface RecordingCost {
+  /** The match it was of. Recording it again replaces the entry. */
+  gameId: string;
+  /** The game the replay was recorded on, as the replay names it. */
+  game: string;
+  /** The match's length in frames. */
+  frames: number;
+  millis: number;
+  /** The track's size on disk in bytes. */
+  trackBytes: number;
+}
+
+/**
  * Every track on disk, to join to replay records by `gameId`. This is how the
  * library knows which replays have a track: the answer changes when a track is
  * stored or removed, so it is asked for and never stored in a `StatRecord`.
@@ -1584,6 +1602,8 @@ export const contentReplayTracks = defineCommand<
     totalBytes: number;
     /** The disk budget used until the user sets one (#3787), in bytes. */
     defaultBudgetBytes: number;
+    /** What recordings made on this machine cost (#3788). */
+    recordingCosts: RecordingCost[];
   }
 >("coilbox-content", "content_replay_tracks");
 
