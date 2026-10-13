@@ -36,7 +36,7 @@
 use std::collections::{HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use picoframe_core::CliResult;
 use serde::Serialize;
@@ -46,6 +46,7 @@ use tauri::{AppHandle, Emitter, Manager, Runtime, State};
 use coilbox_track_thin::{thin_dump_cancellable, ThinError, ThinOptions, ThinReport};
 
 use super::super::def_sets;
+use super::super::recording_costs;
 use super::super::track_budget;
 use super::super::track_store;
 use super::divergence::Disagreement;
@@ -893,6 +894,7 @@ fn work(shared: &Arc<Shared>) {
             (id, spec, control)
         };
         shared.announce();
+        let began = Instant::now();
 
         // Never twice: it may have been analysed or recorded since it was
         // queued.
@@ -929,6 +931,9 @@ fn work(shared: &Arc<Shared>) {
         };
         // Whatever happened, the dump goes before the job is over.
         drop(dump);
+        if matches!(recorded, Recorded::Stored) {
+            keep_cost(shared, &spec, &result, began.elapsed());
+        }
         {
             let mut state = shared.lock();
             let running = state.running.take().expect("this worker's job");
@@ -956,6 +961,34 @@ fn work(shared: &Arc<Shared>) {
         }
         shared.changed.notify_all();
         shared.announce();
+    }
+}
+
+/// Keep what a stored recording cost, for the page's estimate (#3788). The
+/// time runs from the job starting, so it includes the thinning. Failing to
+/// keep it loses the estimate and nothing else, so it is logged.
+fn keep_cost(
+    shared: &Shared,
+    spec: &JobSpec,
+    result: &Option<Result<AnalysisRun, String>>,
+    took: Duration,
+) {
+    let Some(Ok(run)) = result else { return };
+    let Ok(track_bytes) = track_store::track_path(&shared.tracks, &spec.game_id)
+        .and_then(|path| std::fs::metadata(path).map_err(|e| e.to_string()))
+        .map(|meta| meta.len())
+    else {
+        return;
+    };
+    let cost = recording_costs::Cost {
+        game_id: spec.game_id.clone(),
+        game: run.report.recorded_game.clone(),
+        frames: u64::from(spec.match_seconds) * divergence::FRAMES_PER_SECOND.unsigned_abs() as u64,
+        millis: took.as_millis() as u64,
+        track_bytes,
+    };
+    if let Err(e) = recording_costs::record(&shared.tracks, cost) {
+        eprintln!("replay recording: {e}");
     }
 }
 
@@ -1425,6 +1458,8 @@ mod tests {
         /// Thin it for real. Every dump the fake engine leaves is a small whole
         /// one.
         Real,
+        /// Wait this long, then thin it for real.
+        Slow(Duration),
         /// Write half a track and fail.
         Fail,
         /// Write half a track and go on until cancelled.
@@ -1623,6 +1658,10 @@ mod tests {
             let script = *self.thin_script.lock().unwrap();
             match script {
                 ThinScript::Real => thin_dump_cancellable(dump, track, options, cancelled),
+                ThinScript::Slow(wait) => {
+                    std::thread::sleep(wait);
+                    thin_dump_cancellable(dump, track, options, cancelled)
+                }
                 ThinScript::Fail => {
                     std::fs::write(track, b"half a track").unwrap();
                     Err(ThinError::Dump("the recording is damaged".into()))
@@ -2813,6 +2852,59 @@ mod tests {
         world.until_idle();
 
         assert_eq!(files_in(&world.tracks()), track_files(&[ID]));
+    }
+
+    /// What a recording cost is kept for the page's estimate (#3788): the
+    /// match's length in frames, the game it was recorded on and the track's
+    /// size.
+    #[test]
+    fn a_recording_keeps_what_it_cost() {
+        let world = World::new(Script::Finish(AnalysisStatus::Reproduced));
+
+        world.record(ID);
+        world.until_idle();
+
+        let costs = recording_costs::list(&world.tracks());
+        assert_eq!(costs.len(), 1, "{costs:?}");
+        assert_eq!(costs[0].game_id, ID);
+        assert_eq!(costs[0].game, "Some Game 1.0");
+        assert_eq!(
+            costs[0].frames,
+            50 * u64::from(divergence::FRAMES_PER_SECOND.unsigned_abs())
+        );
+        assert_eq!(costs[0].track_bytes, track_size(&world, ID));
+    }
+
+    /// The time includes the thinning: a recording whose thinning takes a
+    /// while costs at least that while.
+    #[test]
+    fn the_time_a_recording_cost_includes_the_thinning() {
+        let world = World::new(Script::Finish(AnalysisStatus::Reproduced));
+        world
+            .engine
+            .set_thin(ThinScript::Slow(Duration::from_millis(200)));
+
+        world.record(ID);
+        world.until_idle();
+
+        let costs = recording_costs::list(&world.tracks());
+        assert!(costs[0].millis >= 200, "{costs:?}");
+    }
+
+    #[test]
+    fn a_recording_that_made_no_track_keeps_no_cost() {
+        for (script, thin) in [
+            (Script::Finish(AnalysisStatus::Diverged), ThinScript::Real),
+            (Script::Finish(AnalysisStatus::Reproduced), ThinScript::Fail),
+        ] {
+            let world = World::new(script);
+            world.engine.set_thin(thin);
+
+            world.record(ID);
+            world.until_idle();
+
+            assert_eq!(recording_costs::list(&world.tracks()), Vec::new());
+        }
     }
 
     /// The player asked for the recording, so it is kept and the rest go.

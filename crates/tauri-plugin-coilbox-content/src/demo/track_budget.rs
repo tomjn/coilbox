@@ -120,6 +120,8 @@ pub struct Overview {
     pub tracks: Vec<StoredTrack>,
     pub total_bytes: u64,
     pub default_budget_bytes: u64,
+    /// What recordings made on this machine cost, for the page's estimate.
+    pub recording_costs: Vec<super::recording_costs::Cost>,
 }
 
 /// The tracks in `dir`, with their total.
@@ -129,6 +131,7 @@ pub fn overview(dir: &Path) -> Overview {
         total_bytes: tracks.iter().map(|t| t.size_bytes).sum(),
         tracks,
         default_budget_bytes: DEFAULT_BUDGET_BYTES,
+        recording_costs: super::recording_costs::list(dir),
     }
 }
 
@@ -422,6 +425,32 @@ mod tests {
         assert_eq!(json["totalBytes"], a + b);
         assert_eq!(json["defaultBudgetBytes"], DEFAULT_BUDGET_BYTES);
         assert_eq!(json["tracks"].as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn the_overview_carries_what_recordings_cost() {
+        let dir = tempfile::tempdir().unwrap();
+        let tracks = dir.path().join("tracks");
+        super::super::recording_costs::record(
+            &tracks,
+            super::super::recording_costs::Cost {
+                game_id: id(1),
+                game: "Some Game 1".into(),
+                frames: 900,
+                millis: 4000,
+                track_bytes: 120,
+            },
+        )
+        .unwrap();
+
+        let json = serde_json::to_value(overview(&tracks)).unwrap();
+
+        let costs = json["recordingCosts"].as_array().unwrap();
+        assert_eq!(costs.len(), 1);
+        assert_eq!(costs[0]["frames"], 900);
+        assert_eq!(costs[0]["millis"], 4000);
+        assert_eq!(costs[0]["trackBytes"], 120);
+        assert_eq!(costs[0]["game"], "Some Game 1");
     }
 
     #[test]
