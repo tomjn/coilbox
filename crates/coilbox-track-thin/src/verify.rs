@@ -413,8 +413,10 @@ impl<R: Read + Seek> Sink for Verifier<R> {
                 )));
             }
 
-            let curve = PoseCurve { radius };
             for (piece, sample) in &e.pieces {
+                let curve = PoseCurve {
+                    reach: sample.reach,
+                };
                 // A piece with no track in a window is at rest for all of it.
                 let rest = [PoseKey {
                     frame,

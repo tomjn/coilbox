@@ -355,31 +355,221 @@ fn a_unit_crossing_a_window_edge_reads_the_same_from_both_windows() {
     assert_eq!(before, after);
 }
 
+/// A sixteenth of a turn in the track's angle steps is 4,096.
+const TURN: f64 = 65_536.0;
+
+fn steps(radians: f32) -> f64 {
+    radians as f64 / std::f64::consts::TAU * TURN
+}
+
+/// The pose track of the piece with this name, if the unit has one.
+fn pose_track<'a>(
+    read: &'a Read,
+    unit: &'a coilbox_track::Unit,
+    name: &str,
+) -> Option<&'a coilbox_track::PoseTrack> {
+    let names = &read
+        .info
+        .posed_pieces
+        .iter()
+        .find(|p| p.unit_def == unit.unit_def)?
+        .pieces;
+    unit.poses.iter().find(|p| names[p.piece as usize] == name)
+}
+
 #[test]
 fn a_piece_that_holds_and_then_turns_keeps_the_moment_it_starts() {
     let mut scene = Scene::new(300);
     scene.unit(1, 1, 0, 300, |_| At::place(100.0, 0.0, 100.0));
-    // The recorder writes a piece when its matrix changes, so the turret has
-    // a row on the first frame and none until it starts to turn.
-    scene
-        .frame(0)
-        .poses
-        .push(piece_row(1, 2, 0.0, [0.0, 5.0, 0.0]));
+    // The recorder writes a piece when its matrix changes, so the turret and
+    // the base above it have a row on the first frame, and the turret has
+    // none after that until it starts to turn.
+    let rows = |angle: f32| piece_rows(1, &[Set::default(), Set::turn(0.0, angle, 0.0)]);
+    scene.frame(0).poses.extend(rows(0.0));
     for f in (153..=300).step_by(3) {
-        scene
-            .frame(f)
-            .poses
-            .push(piece_row(1, 2, (f - 150) as f32 * 0.01, [0.0, 5.0, 0.0]));
+        scene.frame(f).poses.push(rows((f - 150) as f32 * 0.01)[0]);
     }
     let (report, read) = thin(&scene);
     let unit = read.unit(0, 1);
+    // The base never left its rest pose, so it has no track.
     assert_eq!(unit.poses.len(), 1);
-    assert_eq!(frames(&unit.poses[0].keys), [0, 150, 300]);
-    assert_eq!(unit.poses[0].keys[1].offsets, [0, 40, 0]);
-    assert_eq!(read.info.posed_pieces.len(), 1);
-    assert_eq!(read.info.posed_pieces[0].pieces, ["turret"]);
-    assert_eq!(report.samples.poses, 51);
+    assert_eq!(read.info.posed_pieces[0].pieces, ["turret", "base"]);
+    let turret = pose_track(&read, unit, "turret").unwrap();
+    assert_eq!(frames(&turret.keys), [0, 150, 300]);
+    // The turret sits 5 elmos up in the model, which is where it rests.
+    assert_eq!(turret.keys[1].offsets, [0, 0, 0]);
+    assert_eq!(turret.keys[1].angles, [0, 0, 0]);
+    let end = turret.keys[2].angles;
+    assert_eq!((end[0], end[2]), (0, 0));
+    assert!((end[1] as f64 - steps(1.5)).abs() <= 1.0, "{end:?}");
+    assert_eq!(report.samples.poses, 52);
     assert_eq!(report.kept.pose, 3);
+}
+
+#[test]
+fn a_barrel_that_stays_put_on_a_turning_turret_has_no_keys() {
+    let mut scene = Scene::new(300);
+    scene.unit(1, 1, 0, 300, |_| At::place(100.0, 0.0, 100.0));
+    // The turret swings. The barrel and the flare ride on it, so each has a
+    // new matrix in the unit's model space on every sample.
+    let rows = |f: u32| {
+        let swing = 1.2 * (f as f32 / 25.0).sin();
+        piece_rows(
+            1,
+            &[
+                Set::default(),
+                Set::turn(0.0, swing, 0.0),
+                Set::default(),
+                Set::default(),
+            ],
+        )
+    };
+    scene.frame(0).poses.extend(rows(0));
+    for f in (3..=300).step_by(3) {
+        // Every piece but the base, which did not move.
+        scene.frame(f).poses.extend(&rows(f)[..3]);
+    }
+    let (report, read) = thin(&scene);
+    let unit = read.unit(0, 1);
+    assert!(pose_track(&read, unit, "turret").unwrap().keys.len() > 3);
+    assert!(pose_track(&read, unit, "barrel").is_none());
+    assert!(pose_track(&read, unit, "flare").is_none());
+    assert_eq!(unit.poses.len(), 1);
+    assert_eq!(report.kept.pose_tracks, 1);
+    assert!(report.worst_error() <= 0.5, "{}", report.worst_error());
+}
+
+#[test]
+fn a_barrel_that_recoils_on_a_turned_turret_is_keyed_by_its_own_move() {
+    let mut scene = Scene::new(300);
+    scene.unit(1, 1, 0, 300, |_| At::place(100.0, 0.0, 100.0));
+    // The turret is turned and stays there. The barrel slides 2 elmos back
+    // along its own length between frames 30 and 60, and is tipped up a
+    // little all the while.
+    let rows = |f: u32| {
+        let back = -2.0 * (f.clamp(30, 60) - 30) as f32 / 30.0;
+        piece_rows(
+            1,
+            &[
+                Set::default(),
+                Set::turn(0.0, 0.7, 0.0),
+                Set {
+                    turn: [-0.2, 0.0, 0.0],
+                    moved: [0.0, 0.0, back],
+                },
+            ],
+        )
+    };
+    scene.frame(0).poses.extend(rows(0));
+    for f in (33..=60).step_by(3) {
+        scene.frame(f).poses.push(rows(f)[0]);
+    }
+    let (_, read) = thin(&scene);
+    let unit = read.unit(0, 1);
+    let barrel = pose_track(&read, unit, "barrel").unwrap();
+    assert_eq!(frames(&barrel.keys), [0, 30, 60]);
+    // An eighth of an elmo to a step, so 2 elmos back is 16 steps.
+    assert_eq!(
+        barrel.keys.iter().map(|k| k.offsets).collect::<Vec<_>>(),
+        [[0, 0, 0], [0, 0, 0], [0, 0, -16]]
+    );
+    for key in &barrel.keys {
+        assert_eq!((key.angles[1], key.angles[2]), (0, 0));
+        assert!((key.angles[0] as f64 - steps(-0.2)).abs() <= 1.0);
+    }
+    let turret = pose_track(&read, unit, "turret").unwrap();
+    assert_eq!(frames(&turret.keys), [0]);
+    assert_eq!(turret.keys[0].offsets, [0, 0, 0]);
+}
+
+#[test]
+fn a_piece_that_spins_keeps_its_whole_turns() {
+    let mut scene = Scene::new(300);
+    scene.unit(1, 1, 0, 300, |_| At::place(100.0, 0.0, 100.0));
+    // Two and a half turns at an even rate, a fortieth of a turn a sample.
+    let rows = |f: u32| {
+        let angle = std::f32::consts::TAU * f as f32 / 120.0;
+        piece_rows(1, &[Set::default(), Set::turn(0.0, angle, 0.0)])
+    };
+    scene.frame(0).poses.extend(rows(0));
+    for f in (3..=300).step_by(3) {
+        scene.frame(f).poses.push(rows(f)[0]);
+    }
+    let (_, read) = thin(&scene);
+    let unit = read.unit(0, 1);
+    let turret = pose_track(&read, unit, "turret").unwrap();
+    let last = turret.keys.last().unwrap();
+    assert_eq!(last.frame, 300);
+    assert!(
+        (last.angles[1] as f64 - 2.5 * TURN).abs() <= 2.0,
+        "{last:?}"
+    );
+    // Half way through it has made a turn and a quarter, and is not back
+    // where it began.
+    let q = quantiser(&read);
+    let (angles, _) = coilbox_track::pose_at(&turret.keys, &q, 150).unwrap();
+    assert!((angles[1] - 1.25 * TURN).abs() <= 2.0, "{angles:?}");
+}
+
+#[test]
+fn a_piece_with_no_geometry_is_weighted_by_its_units_radius() {
+    let mut scene = Scene::new(300);
+    scene.unit_defs[1].1 = 85.0;
+    for (unit, def) in [(1, 1), (2, 2)] {
+        scene.unit(unit, def, 0, 300, |_| {
+            At::place(100.0 * unit as f32, 0.0, 100.0)
+        });
+        // The flare swings on its own, with nothing below it to move.
+        let rows = |f: u32| {
+            let swing = 0.3 * (f as f32 / 40.0).sin();
+            let mut set = [Set::default(); 4];
+            set[3] = Set::turn(0.0, swing, 0.0);
+            piece_rows(unit, &set)
+        };
+        scene.frame(0).poses.extend(rows(0));
+        for f in (3..=300).step_by(3) {
+            scene.frame(f).poses.push(rows(f)[0]);
+        }
+    }
+    let (report, read) = thin(&scene);
+    let keys = |id| {
+        let unit = read.unit(0, id);
+        pose_track(&read, unit, "flare").unwrap().keys.len()
+    };
+    // The tank's radius is 10 elmos and the tower's is 85.
+    assert!(keys(1) >= 3, "{}", keys(1));
+    assert!(keys(2) > keys(1), "{} against {}", keys(2), keys(1));
+    assert!(report.worst_error() <= 0.5, "{}", report.worst_error());
+}
+
+#[test]
+fn a_model_format_that_can_bake_a_rest_rotation_is_named() {
+    let mut scene = Scene::new(30);
+    scene.unit(1, 1, 0, 30, |_| At::place(100.0, 0.0, 100.0));
+    scene
+        .frame(0)
+        .poses
+        .extend(piece_rows(1, &[Set::default(), Set::turn(0.0, 0.5, 0.0)]));
+    let (report, _) = thin(&scene);
+    assert!(report.unread_rest_rotations.is_empty());
+
+    scene.model_type = "dae".into();
+    let (report, _) = thin(&scene);
+    // The tower has the same model and no posed piece.
+    assert_eq!(report.unread_rest_rotations, ["tank"]);
+}
+
+#[test]
+fn a_piece_posed_before_its_parent_is_refused() {
+    let mut scene = Scene::new(30);
+    scene.unit(1, 1, 0, 30, |_| At::place(100.0, 0.0, 100.0));
+    let rows = piece_rows(1, &[Set::default(), Set::default()]);
+    // The turret alone, with no row for the base.
+    scene.frame(0).poses.push(rows[0]);
+    let dir = tempfile::tempdir().unwrap();
+    let (dump, track) = scene.write(dir.path());
+    let error = thin_dump(&dump, &track, &ThinOptions::default()).unwrap_err();
+    assert!(error.to_string().contains("its parent"), "{error}");
 }
 
 #[test]
@@ -475,4 +665,16 @@ fn a_dump_with_no_unit_radii_is_refused() {
     let (dump, track) = scene.write(dir.path());
     let error = thin_dump(&dump, &track, &ThinOptions::default()).unwrap_err();
     assert!(error.to_string().contains("unitRadii"), "{error}");
+}
+
+#[test]
+fn a_dump_whose_piece_trees_have_no_rest_offsets_is_refused() {
+    let mut scene = Scene::new(30);
+    scene.unit(1, 1, 0, 30, |_| At::place(100.0, 0.0, 100.0));
+    scene.rest = false;
+    let dir = tempfile::tempdir().unwrap();
+    let (dump, track) = scene.write(dir.path());
+    let error = thin_dump(&dump, &track, &ThinOptions::default()).unwrap_err();
+    assert!(error.to_string().contains("offsets"), "{error}");
+    assert!(!track.exists());
 }

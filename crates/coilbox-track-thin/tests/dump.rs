@@ -173,11 +173,30 @@ fn a_piece_of_a_real_recording_reads() {
     assert_eq!(header.teams.len(), 3);
     assert!(header.teams[2].gaia && header.teams[1].ai.is_some());
 
-    let trees = blocks
+    let trees: Vec<_> = blocks
         .iter()
-        .filter(|b| matches!(b, Block::Pieces(_)))
-        .count();
-    assert_eq!(trees, 2);
+        .filter_map(|b| match b {
+            Block::Pieces(tree) => Some(tree),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(trees.len(), 2);
+    // What the model says about each piece at rest, one entry a piece.
+    let walker = trees[0];
+    assert_eq!(walker.pieces.len(), 25);
+    assert_eq!(walker.pieces[8], "turret");
+    assert_eq!(walker.parents[8], 1);
+    assert_eq!(walker.model_type.as_deref(), Some("s3o"));
+    let offsets = walker.offsets.as_ref().unwrap();
+    assert_eq!(offsets.len(), 25);
+    assert_eq!(offsets[0], [0.0, 24.2, 0.0]);
+    let bounds = walker.bounds.as_ref().unwrap();
+    assert_eq!(bounds.len(), 25);
+    // A piece with geometry has a box of six numbers and one without has
+    // none. `firepoint1` is where the barrel fires from.
+    assert_eq!(bounds[8].len(), 6);
+    assert_eq!(walker.pieces[10], "firepoint1");
+    assert!(bounds[10].is_empty());
     let frames: Vec<&Frame> = blocks
         .iter()
         .filter_map(|b| match b {

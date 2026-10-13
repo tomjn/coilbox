@@ -48,7 +48,8 @@ pub struct ThinOptions {
     /// Frames in a window of the track.
     pub window_length: u32,
     /// Goes in the track's header. It changes when the recorder would produce
-    /// different keys from the same replay.
+    /// different keys from the same replay. 2 is the first with pose keys
+    /// relative to the parent piece (issue #3783).
     pub recorder_version: u16,
     /// The replay's game id, for the track's header. The dump does not have
     /// it.
@@ -66,7 +67,7 @@ impl Default for ThinOptions {
         Self {
             tolerance: 0.5,
             window_length: 900,
-            recorder_version: 1,
+            recorder_version: 2,
             game_id: [0; 16],
             rotation_bits: None,
         }
@@ -79,7 +80,8 @@ pub struct SampleCounts {
     /// Unit samples, with each unit's created row and its destroyed row where
     /// those give a pose no sample does.
     pub units: u64,
-    /// Piece pose rows.
+    /// Piece poses relative to the parent: one for each piece pose row, and
+    /// one for a piece whose parent has a row on a frame when it has none.
     pub poses: u64,
     /// Projectile rows.
     pub projectiles: u64,
@@ -146,6 +148,12 @@ pub struct CheckReport {
     /// window's edge counts, and so does a unit in each window it is in.
     pub written: KeyCounts,
     pub worst: WorstErrors,
+    /// The names of the unit definitions with posed pieces whose model is in
+    /// a format that can give a piece a rest rotation. The engine does not
+    /// tell Lua that rotation, so the pose angles of these units hold it as
+    /// well as what a script set, and are not what to pass to `Turn`. A `3do`
+    /// or `s3o` model has none.
+    pub unread_rest_rotations: Vec<String>,
 }
 
 impl CheckReport {
@@ -169,6 +177,8 @@ pub struct ThinReport {
     /// See [`CheckReport::written`].
     pub written: KeyCounts,
     pub worst: WorstErrors,
+    /// See [`CheckReport::unread_rest_rotations`].
+    pub unread_rest_rotations: Vec<String>,
 }
 
 impl ThinReport {
@@ -236,7 +246,7 @@ fn replay(path: &Path, q: Quantiser, sink: &mut dyn Sink) -> Result<Rest> {
     while let Some(block) = reader.next_block()? {
         match (block, &mut interpreter) {
             (Block::Header(h), _) => interpreter = Some(Interpreter::new(*h, q)?),
-            (Block::Pieces(tree), Some(i)) => i.pieces(tree),
+            (Block::Pieces(tree), Some(i)) => i.pieces(tree)?,
             (Block::Frame(frame), Some(i)) => i.frame(sink, &frame)?,
             (Block::Frame(_) | Block::Pieces(_), None) => {
                 return Err(ThinError::Dump(
@@ -284,6 +294,7 @@ fn check<R: Read + Seek>(dump: &Path, track: R, weighting_length: f32) -> Result
         samples,
         written,
         worst,
+        unread_rest_rotations: rest.unread_rest_rotations,
     })
 }
 
@@ -367,5 +378,6 @@ pub fn thin_dump(dump: &Path, track: &Path, options: &ThinOptions) -> Result<Thi
         kept,
         written: checked.written,
         worst: checked.worst,
+        unread_rest_rotations: checked.unread_rest_rotations,
     })
 }
