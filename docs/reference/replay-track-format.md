@@ -2,7 +2,7 @@
 
 A track is a recording of where everything was during one replay: units, the pieces they aim with, projectiles, features, terrain and build queues. Coilbox records it in one headless run of the replay and plays it back with time going in either direction.
 
-This page is the design of format version 1. It is written so that a second person can write a reader from it. The Rust crate `crates/coilbox-track` (issue #3781) reads and writes it. The engine side is the two milestones after "Replay rewind: record a match".
+This page is the design of format version 1. It is written so that a second person can write a reader from it. The Rust crate `crates/coilbox-track` (issue #3781) reads and writes it. `crates/coilbox-track-thin` (issue #3782) makes a track from the recorder's raw dump. The engine side is the two milestones after "Replay rewind: record a match".
 
 A track file has the extension `.cbtrack`. The same file is read by coilbox and by Lua inside the engine, so there is no export step and no second copy on disk.
 
@@ -53,7 +53,7 @@ Chunks start on 64 byte blocks so that Lua can address them. A block number belo
 | 16 | `u32` | last frame recorded |
 | 20 | `u32` | window length in frames, 1 to 65,535, so that an offset in a window fits 16 bits |
 | 24 | `u32` | number of windows |
-| 28 | `f32` | tolerance in elmos. No recorded sample is further than this from the track. The only float in the file |
+| 28 | `f32` | tolerance in elmos. No recorded sample is further than this from the track, measured as [the tolerance](#what-the-tolerance-measures) says. The only float in the file |
 | 32 | `u8` | position shift. The position step is 1 elmo divided by 2 to this power |
 | 33 | `u8` | velocity shift. The velocity step is 1 elmo per frame divided by 2 to this power |
 | 34 | `u8` | rotation bits, 8 to 16 |
@@ -299,6 +299,10 @@ A writer refuses a key whose reference is not in the window it is written into, 
 
 The engine reports build power as a count out of 15 (`MASK_BITS` in `rts/Sim/Misc/NanoPieceCache.h`). A writer stores that count times 17.
 
+A target that stops existing is followed by a key of kind 0 on the frame after its last. The engine goes on answering with a dead unit's id until the weapon picks again, so a recording does not say the target has gone, and without the key a later window would start with a target that is not in it.
+
+Kind 129 needs a position. The engine does not tell Lua where a builder is terraforming, and the recorder has a place only for a builder whose own order names one. A builder that is helping another terraform is written as kind 0.
+
 ### Pose tracks
 
 A pose track is one aiming piece of one unit. Issue #3783 turns what the recorder saw into three turn angles and three offsets relative to the parent piece. They are the values a unit script passes to `Turn` and `Move` for that piece.
@@ -341,7 +345,7 @@ One entry for each projectile that exists at any frame of the window.
 | --- | --- | --- |
 | 80 | `u32` | serial number, counting from 0 in order of first appearance in the match |
 | 81 | `u16` | weapon definition, or 65,535 for a projectile that has none |
-| 82 | `u8` | team |
+| 82 | `u8` | team, or 255 for none. A piece of debris can have none |
 | 83 | `u8` | flags. Bit 0: it existed before this window. Bit 1: it exists after this window |
 | 84 | `u16` | the unit that fired it, as an index in this window's units, or 65,535. A unit that is not in the window counts as none |
 | 85 | `u16` | offset of the first frame in this window at which it exists |
@@ -422,9 +426,23 @@ A reader that holds a whole track as one Lua string can only address the first 1
 
 - For each curve and each window the unit or projectile exists in, copy the keys that fall in the window. If no key sits on the first offset at which it exists in the window, work out the curve's value there and add it as a key, unless the first copied key rounds to the same value. Do the same at the last offset. A transform curve and a status curve always have at least one key. A projectile always has a key at both ends.
 - A reader must get the same value for any frame of a window from that window alone as it would from the whole curve. The added keys are what make that true.
-- The check in issue #3782, that no dropped sample is further from the track than the tolerance, runs against the rounded values a reader will see. It does not run against the values before rounding.
+- The check in issue #3782, that no dropped sample is further from the track than the tolerance, runs against the rounded values a reader will see. It does not run against the values before rounding. `coilbox-track-thin` reads each window of the file it has made and measures every recorded sample against what the reader's curve functions give from that window's keys.
+- A recorded sample that falls on a window's edge is kept as a key. When none falls on an edge, the samples either side of it are kept. Then no window has a value between two samples that was worked out from the curve and rounded a second time, which could put a sample up to one position rounding, 0.108 elmo, further from the track than thinning measured.
+- Of three keys in a row with the same value, the middle one is left out, for every curve that runs in a straight line between keys. A unit that stands still for the whole match has one transform key, and the keys above give it one in each window.
 - A value that does not fit is an error, not a silent wrap. That covers a position, a velocity, an offset, a height and every value a column stores, including a difference from the key before. Nothing is clamped except health and build progress, which go to the range 0 to 65,535 as the status keys say.
 - Any zlib level reads the same. Level 9 was 1.6% smaller than level 6 on the larger benchmark.
+
+## What the tolerance measures
+
+The header's tolerance is one distance in elmos. How far a recorded sample is from the track depends on what was sampled.
+
+- A unit. The distance between the recorded position and the track's, plus the unit's radius times the angle in radians between the recorded rotation and the track's. No point within the radius of the unit's centre is further than that from where it was recorded, so one tolerance holds at a unit's centre and at the end of its barrel. The radius is the unit definition's, `UnitDefs[id].radius`, which the recorder writes in the dump's header.
+- A piece. The same, with the piece's offset and rotation and the radius of the unit it belongs to.
+- A projectile. The distance between the recorded position and the cubic's. Velocity is not measured.
+- Health and build progress. These are fractions and not distances, so the header's tolerance does not apply. A sample is within one step of the 65,535 a fraction is stored in.
+- Flags, targets, build queues, teams, and the frames a unit or a projectile exists on have no tolerance. The track has what was recorded or it is wrong.
+
+A track that is further from a recorded sample than its tolerance is a failed recording. `coilbox-track-thin` writes no file for one and names the sample.
 
 ## Choosing the steps and the window length
 
@@ -451,7 +469,7 @@ At one eighth of an elmo a 16 bit difference reaches 4,095 elmos. The largest mo
 
 ### Rotation bits
 
-Rule: the smallest width at which rounding cannot move a point at the unit's edge further than a quarter of the tolerance. Rounding turns a unit by at most `sqrt(6) / (2^(bits - 1) - 1)` radians. The writer multiplies that by the largest length that issue #3782 weights rotation by, and picks the smallest width that keeps the result within a quarter of the tolerance.
+Rule: the smallest width at which rounding cannot move a point at the unit's edge further than a quarter of the tolerance. Rounding turns a unit by at most `sqrt(6) / (2^(bits - 1) - 1)` radians. The writer multiplies that by the largest radius of any unit in the match, since a unit's radius is the length issue #3782 weights its rotation by, and picks the smallest width that keeps the result within a quarter of the tolerance. A unit definition that the game has and the match does not use is not counted: the largest radius of any definition is 150 elmos in BAR and 228 in Splinter Faction.
 
 Measured over every transform key of the larger benchmark, with the unit's radius as the length:
 
@@ -464,6 +482,19 @@ Measured over every transform key of the larger benchmark, with the unit's radiu
 | 16 | 0.000055 | 0.000075 | 0.0016 |
 
 The largest unit radius is 85 elmos in the larger benchmark and 130 in the smaller. The rule gives 12 bits for the first and 13 for the second. Going from 11 bits to 12 cost 98,240 bytes on the larger benchmark, and from 12 to 13 cost 95,424.
+
+Rotation rounding costs almost no keys. Issue #3782 thinned both recordings at each width, with everything else the same. 16 bits is the widest the format has and stands in for no rounding.
+
+| Bits | BAR transform keys kept | Against 16 bits | BAR track in bytes | Splinter Faction transform keys kept | Splinter Faction track in bytes |
+| --- | --- | --- | --- | --- | --- |
+| 10 | 368,826 | +0.35% | 7,418,391 | 29,120 | 330,729 |
+| 11 | 367,992 | +0.12% | 7,532,759 | 29,070 | 338,071 |
+| 12 | 367,658 | +0.03% | 7,646,679 | 29,040 | 345,159 |
+| 13 | 367,554 | +0.00% | 7,755,287 | 29,044 | 352,362 |
+| 14 | 367,518 | -0.01% | 7,863,639 | 29,040 | 358,714 |
+| 16 | 367,547 | | 8,079,063 | 29,042 | 371,924 |
+
+Each bit from 10 to 14 costs between 108,352 and 114,368 bytes on the BAR track and saves at most 834 keys, so size alone favours a narrow width, as it does for the position step. The quarter rule is what keeps the width up.
 
 ### Velocity step
 
@@ -638,7 +669,7 @@ BAR-Rewind's README gives 108 MB for a 53 minute match. If the BAR multiple held
 ### What will move these figures
 
 - Projectiles as cubics, issue #3784. A throwaway thinner run on the raw projectile samples kept 54,426 keys with the cubic against 146,192 with straight lines for BAR, and 1,759 against 5,836 for Splinter Faction. With those keys the BAR track is 4,342,656 bytes, 8.56 times smaller than the benchmark file, and the Splinter Faction track is 261,824 bytes, 22.79 times smaller.
-- The thinning of issue #3782 is not the benchmark's, and will keep a different number of keys.
+- The thinning of issue #3782 is not the benchmark's, and keeps a different number of keys. The next section has what it kept.
 - The poses of issue #3783 are not the benchmark's. This projection uses the six values the benchmark stores for each pose key.
 - A target curve for each weapon, issue #3790. The benchmark records one weapon for each unit.
 
@@ -653,6 +684,64 @@ BAR's pose keys are mostly the same thing: 90.32% fall while the unit is moving 
 Why the recorder treats leg pieces as aiming pieces was not looked at.
 
 The format does nothing special for this and does not need to. A walk cycle repeats, and zlib is good at repeats. The pose columns compress 74 times for Splinter Faction, from 1,782,490 bytes to 23,935, and 8 times for BAR, from 6,426,272 to 787,232. Poses are 58.80% of the Splinter Faction benchmark file and 8.8% of its projected track.
+
+## Measured with the thinning of issue #3782
+
+`coilbox-track-thin` made a track from a recording of each benchmark replay by coilbox's own recorder, at a tolerance of 0.5 elmo, on 13 October 2026. Every recorded sample was then measured against the file. These are real files and not projections.
+
+The recordings are `bar-3.dump`, 661,354,318 bytes, and `sf-3.dump`, 23,124,566 bytes. They are new recordings of the two benchmark replays, made because thinning needs each unit's radius and the dumps before them did not have it.
+
+"Kept" is what thinning kept over the whole match. "Written" is what the file holds, counted over every window, so it has the keys added at window edges and counts a unit once for each window it is in.
+
+| | BAR kept | BAR written | Splinter Faction kept | Splinter Faction written |
+| --- | --- | --- | --- | --- |
+| Units, or unit entries | 1,368 | 24,619 | 57 | 829 |
+| Transform keys | 367,658 | 389,965 | 29,044 | 29,730 |
+| Status keys | 35,855 | 58,043 | 2,181 | 2,919 |
+| Target tracks and keys | 664 and 23,215 | 3,769 and 26,984 | 24 and 1,580 | 83 and 1,663 |
+| Pose tracks and keys | 4,312 and 1,503,679 | 50,689 and 1,546,293 | 245 and 136,116 | 3,828 and 139,388 |
+| Build queue keys and items | 1,508 and 1,168 | 3,296 and 3,511 | 38 and 72 | 60 and 105 |
+| Projectiles and keys | 20,609 and 54,654 | 21,113 and 55,158 | 627 and 1,769 | 631 and 1,773 |
+| Features | 637 | 637 | 173 | 173 |
+| Terrain rows | 271,409 | 155,859 | 4,939 | 4,311 |
+
+The samples they were thinned from: 6,998,315 unit samples, 4,332,299 piece rows and 480,653 projectile rows for BAR, and 233,770, 149,811 and 26,859 for Splinter Faction.
+
+| | BAR | Splinter Faction |
+| --- | --- | --- |
+| Track | 7,646,679 bytes | 352,362 bytes |
+| Projected above | 4,805,376 bytes | 287,232 bytes |
+| BAR-Rewind's file for the same match | 37,187,696 bytes, 4.86 times the track | 5,965,824 bytes, 16.93 times the track |
+| Main chunks | 7,404,163 bytes, from 32,181,872 | 340,490 bytes, from 2,636,620 |
+| Terrain chunks | 220,569 bytes | 6,452 bytes |
+| Largest main chunk, decompressed | 937,916 bytes | 319,548 bytes |
+| Furthest unit sample from the track | 0.49999689 elmo | 0.49989960 elmo |
+| Furthest piece sample | 0.49999757 elmo | 0.49999905 elmo |
+| Furthest projectile sample | 0.49983939 elmo | 0.49954246 elmo |
+| Furthest health or build progress sample, in steps of 1/65,535 | 0.996 | 0.566 |
+| Time to scan, thin, check and write, on an Apple M1 Pro | 10.16 s | 0.80 s |
+| Peak memory, the maximum resident set size from `/usr/bin/time -l` | 193,036,288 bytes | 32,358,400 bytes |
+
+Each section's columns compressed on their own, as in the projection:
+
+| Section | BAR | BAR projected | Splinter Faction | Splinter Faction projected |
+| --- | --- | --- | --- | --- |
+| Unit entries | 49,209 | 175,366 | 1,985 | 6,753 |
+| Transform keys | 2,368,079 | 2,224,426 | 189,619 | 183,972 |
+| Status keys | 86,555 | 92,222 | 3,570 | 4,170 |
+| Target keys | 52,009 | 64,854 | 1,627 | 2,648 |
+| Pose keys | 3,780,198 | 811,962 | 90,374 | 25,156 |
+| Build queue keys and items | 16,408 | 29,604 | 404 | 963 |
+| Projectile entries and keys | 693,276 | 1,173,798 | 22,938 | 48,327 |
+
+### Where the real figures differ from the projection
+
+- Poses are the whole of it. The BAR track is 2,841,303 bytes over its projection, and its pose columns alone are 2,968,236 bytes over theirs. The Splinter Faction track is 65,130 bytes over, and its pose columns 65,218. Thinning kept 1,503,679 pose keys for BAR where the benchmark's own thinning kept 422,060.
+- The poses in these tracks are a stand-in. Issue #3783 turns a piece's recorded matrix into turn angles and an offset relative to its parent. Until it lands, a pose key holds the piece's rotation and position in the unit's model space. Why that keeps three and a half times the keys was not measured. Two things would do it. In model space a piece moves whenever any piece above it does. And a piece's turn is multiplied by the whole unit's radius, which asks more of a small piece than the benchmark's thinning may have.
+- Transform keys are 6.5% over for BAR and 3.1% over for Splinter Faction. The projection used the benchmark's keys, which were thinned by another program to a rule this page does not have.
+- Projectiles are thinned against the cubic, since that is what a reader draws, so they are already at the size issue #3784 was expected to bring: 54,654 keys for BAR where a throwaway thinner kept 54,426, and 1,769 where it kept 1,759.
+- Terrain is 70,489 bytes over for BAR. Coilbox's recorder writes more terrain rows than the benchmark's did, 271,409 against 168,736, because it also reads the whole heightmap once a window.
+- The largest BAR window decompresses to 937,916 bytes. The window length of 900 frames was chosen so that the largest stayed under the engine's second buffer of 524,288 bytes, and with these poses it does not. The pose columns are 23,084,538 of the 32,181,872 bytes before compression. This needs looking at again when #3783 has landed.
 
 ## Savings considered and rejected
 
@@ -682,9 +771,8 @@ The issue's guide was a 12 byte transform key before compression. This design's 
 ## Not measured
 
 - The time the engine's Lua takes to decompress and unpack a window. A test widget that loads a window of the BAR projection would measure it.
-- How many more keys thinning keeps because of rotation rounding. The table above gives the rounding error, not its effect on key counts. Issue #3782 can measure it by thinning with and without rounding.
 - A human BAR match, and a full Splinter Faction match. The spike could not record either.
-- Sizes with the thinning of #3782 and the poses of #3783, which do not exist yet.
+- Sizes with the poses of #3783, which do not exist yet. [Measured with the thinning of issue #3782](#measured-with-the-thinning-of-issue-3782) has the sizes with a stand-in for them.
 - Why terrain rows differ between runs.
 
 ## How the measurements were made
