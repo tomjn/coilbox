@@ -256,7 +256,15 @@ fn expected_lua(bytes: &[u8]) -> String {
             let queue: Vec<String> = u
                 .queue
                 .iter()
-                .map(|i| format!("{{{}, {}, {}, {}}}", i.unit_def, i.x, i.z, i.facing))
+                .map(|i| {
+                    format!(
+                        "{{{}, {}, {}, {}}}",
+                        i.unit_def,
+                        num(q.position_value(i.x)),
+                        num(q.position_value(i.z)),
+                        i.facing
+                    )
+                })
                 .collect();
             writeln!(
                 o,
