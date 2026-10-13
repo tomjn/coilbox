@@ -213,92 +213,10 @@ do
 end
 
 -- Every engine name the Lua uses has a row. The names are read out of the
--- source, with the comments and the strings taken out.
+-- source, with the comments and the strings taken out (scan.lua).
 
-local function sourceOf(path)
-	local file = assert(io.open(path, "rb"))
-	local source = file:read("*a")
-	file:close()
-	return source
-end
-
-local function strip(source)
-	local out, i, n = {}, 1, #source
-	while i <= n do
-		local c = source:sub(i, i)
-		if c == "-" and source:sub(i, i + 1) == "--" then
-			i = source:find("\n", i, true) or n + 1
-		elseif c == '"' or c == "'" then
-			local j = i + 1
-			while j <= n do
-				local d = source:sub(j, j)
-				if d == "\\" then
-					j = j + 2
-				elseif d == c then
-					break
-				else
-					j = j + 1
-				end
-			end
-			i = j + 1
-			out[#out + 1] = '""'
-		else
-			out[#out + 1] = c
-			i = i + 1
-		end
-	end
-	return table.concat(out)
-end
-
---- The engine names a file of Lua uses, as a set.
-local function usedBy(path)
-	local code = strip(sourceOf(path)):gsub("%f[%w_]vfs%.", "VFS.")
-	local found = {}
-	for _, root in ipairs({ "Spring", "VFS", "Game", "CMD", "gl", "GL" }) do
-		for member in code:gmatch("%f[%w_]" .. root .. "%.([%w_]+)") do
-			if not (root == "Spring" and member == "MoveCtrl") then
-				found[root .. "." .. member] = true
-			end
-		end
-	end
-	for member in code:gmatch("%f[%w_]MoveCtrl%.([%w_]+)") do
-		found["Spring.MoveCtrl." .. member] = true
-	end
-	if code:find("%f[%w_]SendToUnsynced%f[^%w_]") then
-		found.SendToUnsynced = true
-	end
-	return found
-end
-
-local function filesUnder(dir)
-	local list = {}
-	local pipe = io.popen('find "' .. dir .. '" -name "*.lua" | sort')
-	for line in pipe:lines() do
-		list[#list + 1] = line
-	end
-	pipe:close()
-	return list
-end
-
-local function setOf(...)
-	local set = {}
-	for _, list in ipairs({ ... }) do
-		for _, item in ipairs(list) do
-			set[item] = true
-		end
-	end
-	return set
-end
-
-local function callsOf(rows)
-	local list = {}
-	for _, row in ipairs(rows) do
-		for _, call in ipairs(row.calls) do
-			list[#list + 1] = call
-		end
-	end
-	return list
-end
+local Scan = dofile(here .. "/scan.lua")
+local usedBy, filesUnder, setOf, callsOf = Scan.usedBy, Scan.filesUnder, Scan.setOf, Scan.callsOf
 
 do
 	local allowed = setOf(callsOf(Table.SYNCED), callsOf(Table.UNSYNCED), Table.ASSUMED, Table.REPLACED)
