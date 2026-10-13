@@ -305,9 +305,23 @@ Kind 129 needs a position. The engine does not tell Lua where a builder is terra
 
 ### Pose tracks
 
-A pose track is one aiming piece of one unit. Issue #3783 turns what the recorder saw into three turn angles and three offsets relative to the parent piece. They are the values a unit script passes to `Turn` and `Move` for that piece.
+A pose track is one aiming piece of one unit. It holds what a unit script set on the piece: three turn angles and three offsets, both relative to the piece's parent. They are the values a Lua unit script passes to `Turn` and `Move` for that piece, and gets back from `GetPieceRotation` and `GetPieceTranslation`.
 
 Column 11 says how many tracks each unit has. A track that is missing means the piece is at rest for the whole window, with all six values 0.
+
+The engine places a piece in its parent's space in two steps (`S3DModelPiece::ComposeTransform` in `rts/Rendering/Models/3DModelPiece.cpp`, at the commit named above):
+
+1. It moves the piece to the model's rest offset for it plus the three offsets.
+2. It turns the piece about its own origin by the three angles: about z first, then about x, then about y, each about the parent's axes. That is `CQuaternion::FromEulerYPR` in `rts/System/Quaternion.cpp`. As matrices that act on a column it is `Ry * Rx * Rz`, where each is the usual right handed turn about that axis.
+
+A piece's place in the unit's model space is its parent's, then those two steps. `Spring.GetUnitPieceMatrix` gives that as a matrix, and it is what the recorder writes. `coilbox-track-thin` (issue #3783) takes the parent's matrix off, takes the rest offset off the translation, and takes the rotation apart into the three angles.
+
+A reader sets the six values on the piece and gets the recorded pose. Four things to know:
+
+- A COB script's own numbers are not these. The engine negates a COB turn about z and a COB move along x before it sets them (`CCobInstance::Turn` and `Move` in `rts/Sim/Units/Scripts/CobInstance.h`). The track holds the values after that.
+- A rotation has two sets of three angles, `(x, y, z)` and `(half a turn - x, y + half a turn, z + half a turn)`, and each angle can be any number of whole turns further on. The writer picks the set nearest the sample before, so the angles of two keys in a row are never far apart unless the piece turned that far. The engine itself keeps each angle between 0 and one turn, so a key's angles are the same rotation as the script's and not always the same numbers.
+- When the angle about x is a quarter turn, the rotation depends on the angles about y and z only through their difference or their sum. The writer keeps the angle about z it had on the sample before.
+- A model in a format that bakes a rest rotation into a piece, which Assimp and glTF models can do, has that rotation between the two steps, and the engine has no Lua call that reads it. For such a model the angles hold the rest rotation and the script's turn together. They still give the recorded pose when composed as above, and they are not what to pass to `Turn`. `3do` and `s3o` models have no rest rotation, and every unit with a posed piece in the two benchmark matches has one of those. `coilbox-track-thin` reports the unit definitions this applies to.
 
 | Id | Type | Column |
 | --- | --- | --- |
@@ -437,7 +451,8 @@ A reader that holds a whole track as one Lua string can only address the first 1
 The header's tolerance is one distance in elmos. How far a recorded sample is from the track depends on what was sampled.
 
 - A unit. The distance between the recorded position and the track's, plus the unit's radius times the angle in radians between the recorded rotation and the track's. No point within the radius of the unit's centre is further than that from where it was recorded, so one tolerance holds at a unit's centre and at the end of its barrel. The radius is the unit definition's, `UnitDefs[id].radius`, which the recorder writes in the dump's header.
-- A piece. The same, with the piece's offset and rotation and the radius of the unit it belongs to.
+- A piece. The distance between the recorded offset and the track's, plus the piece's reach times the angle in radians between the recorded rotation and the track's. Both are relative to the piece's parent, as a pose key is. The reach is how far the model's geometry gets from the piece's origin, counting the piece's own geometry and that of every piece below it, with all of them at rest. So no point of that geometry is further than the tolerance from where a script's values for this piece put it. A piece with no geometry on it or below it, such as the point a barrel fires from, has no reach of its own and takes the unit's radius. The recorder writes each piece's rest offset and the box round its geometry in the dump's piece tree.
+- A piece is measured against its parent and not against the unit. A barrel on a sleeve on a turret is drawn with the error of all three, so in the unit's model space a point on it can be up to three tolerances from where it was recorded. How far the pieces of the benchmark tracks are in model space was not measured.
 - A projectile. The distance between the recorded position and the cubic's. Velocity is not measured.
 - Health and build progress. These are fractions and not distances, so the header's tolerance does not apply. A sample is within one step of the 65,535 a fraction is stored in.
 - Flags, targets, build queues, teams, and the frames a unit or a projectile exists on have no tolerance. The track has what was recorded or it is wrong.
@@ -670,7 +685,7 @@ BAR-Rewind's README gives 108 MB for a 53 minute match. If the BAR multiple held
 
 - Projectiles as cubics, issue #3784. A throwaway thinner run on the raw projectile samples kept 54,426 keys with the cubic against 146,192 with straight lines for BAR, and 1,759 against 5,836 for Splinter Faction. With those keys the BAR track is 4,342,656 bytes, 8.56 times smaller than the benchmark file, and the Splinter Faction track is 261,824 bytes, 22.79 times smaller.
 - The thinning of issue #3782 is not the benchmark's, and keeps a different number of keys. The next section has what it kept.
-- The poses of issue #3783 are not the benchmark's. This projection uses the six values the benchmark stores for each pose key.
+- The poses of issue #3783 are not the benchmark's. This projection uses the six values the benchmark stores for each pose key. [Measured with the poses of issue #3783](#measured-with-the-poses-of-issue-3783) has what they came to.
 - A target curve for each weapon, issue #3790. The benchmark records one weapon for each unit.
 
 ### Where Splinter Faction's pose keys went
@@ -688,6 +703,8 @@ The format does nothing special for this and does not need to. A walk cycle repe
 ## Measured with the thinning of issue #3782
 
 `coilbox-track-thin` made a track from a recording of each benchmark replay by coilbox's own recorder, at a tolerance of 0.5 elmo, on 13 October 2026. Every recorded sample was then measured against the file. These are real files and not projections.
+
+The poses in these two tracks were a stand-in: each piece's rotation and position in the unit's model space. The next section has the same two matches with the poses this page describes, and those are the figures to use.
 
 The recordings are `bar-3.dump`, 661,354,318 bytes, and `sf-3.dump`, 23,124,566 bytes. They are new recordings of the two benchmark replays, made because thinning needs each unit's radius and the dumps before them did not have it.
 
@@ -737,11 +754,63 @@ Each section's columns compressed on their own, as in the projection:
 ### Where the real figures differ from the projection
 
 - Poses are the whole of it. The BAR track is 2,841,303 bytes over its projection, and its pose columns alone are 2,968,236 bytes over theirs. The Splinter Faction track is 65,130 bytes over, and its pose columns 65,218. Thinning kept 1,503,679 pose keys for BAR where the benchmark's own thinning kept 422,060.
-- The poses in these tracks are a stand-in. Issue #3783 turns a piece's recorded matrix into turn angles and an offset relative to its parent. Until it lands, a pose key holds the piece's rotation and position in the unit's model space. Why that keeps three and a half times the keys was not measured. Two things would do it. In model space a piece moves whenever any piece above it does. And a piece's turn is multiplied by the whole unit's radius, which asks more of a small piece than the benchmark's thinning may have.
+- The poses in these tracks are a stand-in: a pose key holds the piece's rotation and position in the unit's model space. In model space a piece moves whenever any piece above it does, and that is why it keeps three and a half times the keys. The next section measured it.
 - Transform keys are 6.5% over for BAR and 3.1% over for Splinter Faction. The projection used the benchmark's keys, which were thinned by another program to a rule this page does not have.
 - Projectiles are thinned against the cubic, since that is what a reader draws, so they are already at the size issue #3784 was expected to bring: 54,654 keys for BAR where a throwaway thinner kept 54,426, and 1,769 where it kept 1,759.
 - Terrain is 70,489 bytes over for BAR. Coilbox's recorder writes more terrain rows than the benchmark's did, 271,409 against 168,736, because it also reads the whole heightmap once a window.
-- The largest BAR window decompresses to 937,916 bytes. The window length of 900 frames was chosen so that the largest stayed under the engine's second buffer of 524,288 bytes, and with these poses it does not. The pose columns are 23,084,538 of the 32,181,872 bytes before compression. This needs looking at again when #3783 has landed.
+- The largest BAR window decompresses to 937,916 bytes. The window length of 900 frames was chosen so that the largest stayed under the engine's second buffer of 524,288 bytes, and with these poses it does not. The pose columns are 23,084,538 of the 32,181,872 bytes before compression. With the poses of #3783 it is 454,968 bytes.
+
+## Measured with the poses of issue #3783
+
+Both replays were recorded again on 13 October 2026, as `bar-4.dump`, 661,462,501 bytes, and `sf-4.dump`, 23,140,583 bytes, because the piece trees of the dumps before them had no rest offsets. `coilbox-track-thin` made a track from each at a tolerance of 0.5 elmo, with each pose relative to its parent piece. Nothing else about the thinning changed, and every key count but the poses is the same as in the section above.
+
+| | BAR before | BAR after | Splinter Faction before | Splinter Faction after |
+| --- | --- | --- | --- | --- |
+| Pose keys kept | 1,503,679 | 470,973 | 136,116 | 124,271 |
+| Pose tracks kept | 4,312 | 2,148 | 245 | 105 |
+| Pose tracks and keys written | 50,689 and 1,546,293 | 14,847 and 480,861 | 3,828 and 139,388 | 1,273 and 125,204 |
+| Pose columns before compression | 23,084,538 bytes | 7,154,666 bytes | 2,058,616 bytes | 1,788,500 bytes |
+| Pose columns compressed on their own | 3,780,198 bytes | 875,757 bytes | 90,374 bytes | 28,377 bytes |
+| Track | 7,646,679 bytes | 4,713,582 bytes | 352,362 bytes | 289,328 bytes |
+| Projected above | 4,805,376 bytes | | 287,232 bytes | |
+| BAR-Rewind's file, as a multiple of the track | 4.86 | 7.89 | 16.93 | 20.62 |
+| Main chunks | 7,404,163 bytes, from 32,181,872 | 4,470,488 bytes, from 16,251,884 | 340,490 bytes, from 2,636,620 | 277,633 bytes, from 2,366,536 |
+| Largest main chunk, decompressed | 937,916 bytes | 454,968 bytes | 319,548 bytes | 290,592 bytes |
+| Furthest piece sample | 0.49999757 elmo | 0.5 elmo | 0.49999905 elmo | 0.49999905 elmo |
+| Furthest unit sample | 0.49999689 elmo | 0.49999689 elmo | 0.49989960 elmo | 0.49989960 elmo |
+| Time to scan, thin, check and write, on an Apple M1 Pro | 10.16 s | 7.57 s | 0.80 s | 0.71 s |
+| Peak memory, the maximum resident set size from `/usr/bin/time -l` | 193,036,288 bytes | 156,663,808 bytes | 32,358,400 bytes | 31,932,416 bytes |
+
+The piece samples thinned are 4,332,308 for BAR and 149,812 for Splinter Faction. That is the dump's 4,332,299 and 149,811 piece rows, and 9 and 1 more for a piece whose parent has a row on a frame when it has none.
+
+What the figures say:
+
+- The BAR track is now 91,794 bytes under its projection, and the Splinter Faction track 2,096 bytes over. The spike's thinning kept 422,060 and 125,284 pose keys for the same matches, against 470,973 and 124,271 here.
+- The largest BAR window is back under the engine's second buffer of 524,288 bytes, by 69,320 bytes. So the window length stays at 900 frames. The buffer is not a limit: `zlib::inflate` in `rts/System/StringUtil.cpp` doubles its buffer and decompresses again from the start until the result fits, so a window over 524,288 bytes costs a third pass and still reads. A longer or busier match than this one will go over.
+- Taking the parent off is the whole of the saving. A pose track that never leaves rest is not written, which is what halves the tracks: most watched pieces sit between a muzzle and the root and are never moved by a script.
+- Weighting a piece's turn by its reach and not by the unit's radius saved nothing. With the unit's radius in its place the same two dumps keep 467,736 and 119,631 pose keys, which is 3,237 and 4,640 fewer. The pieces with the most keys are the ones a walk moves, the root and the hips, and their reach is more than the unit's radius because a model is larger than the radius its definition gives. The reach is kept because it is the length that makes the tolerance true of the geometry.
+- A spin is kept as a spin. The largest angle in a window of the BAR track is 543,810 steps, 8.30 turns, on the `fan` of `corsnap`. In the Splinter Faction track it is 27,045 steps, 0.41 of a turn, on a turret.
+
+### Which pieces the pose keys are on
+
+Most of what is left is not aiming. Counted over the keys written to each track, by what the unit was doing at the key's frame:
+
+| | BAR | Splinter Faction |
+| --- | --- | --- |
+| Pose keys written | 480,861 | 125,204 |
+| While the unit is moving or turning | 445,476, 92.64% | 124,416, 99.37% |
+| While it stands still and a weapon has a target | 16,912, 3.52% | 277, 0.22% |
+| While it stands still and no weapon has a target | 18,473, 3.84% | 511, 0.41% |
+| On a piece of a unit definition that has under 1% of its keys while standing still with a target | 371,271, 77.21%, on 73 of 206 pieces | 123,931, 98.98%, on 6 of 10 pieces |
+| Keys whose three offsets are all 0 | 314,880, 65.48% | 94,451, 75.44% |
+
+A unit counts as moving or turning at a frame when the track gives it a different position or rotation 3 frames before and 3 frames after.
+
+The track cannot say which script turned a piece, so "a piece no weapon turns" is read here as one that has under 1% of its keys while its unit stands still with a target. A weapon aims whether or not its unit is moving, and a walk does not, so a piece that only a walk moves has almost no such keys: a leg settling after a stop is all there is. The 1% line is a choice made for this table and nothing in the code uses it.
+
+In Splinter Faction the four pieces `rthigh`, `rfoot`, `pelvis` and `rleg` of `fedstorm` hold 123,774 of the 125,204 keys, and its `turret` and `barrel1` hold 1,140. In BAR the pieces named `base`, `pelvis` and `torso` hold 276,748 of the 480,861, and the pieces named `turret` hold 21,173.
+
+Whether to record such pieces at all is issue #3941.
 
 ## Savings considered and rejected
 
@@ -772,7 +841,8 @@ The issue's guide was a 12 byte transform key before compression. This design's 
 
 - The time the engine's Lua takes to decompress and unpack a window. A test widget that loads a window of the BAR projection would measure it.
 - A human BAR match, and a full Splinter Faction match. The spike could not record either.
-- Sizes with the poses of #3783, which do not exist yet. [Measured with the thinning of issue #3782](#measured-with-the-thinning-of-issue-3782) has the sizes with a stand-in for them.
+- How far a piece is from where it was recorded in the unit's model space, where the errors of the pieces above it add to its own.
+- A model with a baked rest rotation. Neither benchmark game has one.
 - Why terrain rows differ between runs.
 
 ## How the measurements were made
