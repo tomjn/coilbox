@@ -461,6 +461,19 @@ do
 	t.same("and is gone", world.projectileCount(), 0)
 end
 
+do
+	-- A bolt that moves on its first frame only, which a step at 2x passes.
+	local close = { weapon = BOLT, first = 101, last = 108, at = flight(101, { 0, 5, 0 }, { 0, -10, 20 }, 101.5) }
+	local world, player = setup({ last = 400, projectiles = { close } })
+	send(player, "pause")
+	seek(world, player, 100)
+	send(player, "speed 2")
+	send(player, "play 1")
+	run(world, player, 6)
+	t.same("a bolt that stops inside the step it is born in still lands", #world.explosions, 1)
+	t.same("and is made once", world.spawned, 1)
+end
+
 -- The sound a weapon fires with.
 
 do

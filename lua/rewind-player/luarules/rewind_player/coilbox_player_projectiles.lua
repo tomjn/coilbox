@@ -397,11 +397,28 @@ function Projectiles:birth(w, p, t, step, watched)
 		if id then
 			Spring.SetProjectileDamages(id, 0, self.noDamage)
 		end
-	elseif watched and last < t and w.projectileFlags[p] < 2 then
-		-- Its whole life is inside this step, so it is never in the air on a
-		-- frame. It is created where the track last has it and let go at once.
+	elseif watched then
+		-- A shot whose flight is over before this step is, so that it is never
+		-- in the air on a frame: its whole life is inside the step, or it is a
+		-- bolt that has stopped already. It is created where the track last has
+		-- it moving and let go at once.
 		local serial = w.projectileSerial[p]
-		if not self.idOf[serial] and not self.spent[serial] and w:sampleProjectile(p, last, s) then
+		if self.idOf[serial] or self.spent[serial] then
+			return
+		end
+		local at
+		if last < t then
+			at = w.projectileFlags[p] < 2 and last or nil
+		elseif self.stops[d] and w:sampleProjectile(p, t, s) and s[4] * s[4] + s[5] * s[5] + s[6] * s[6] < self.stopped then
+			at = math.ceil(t) - 1
+			while at >= first and w:sampleProjectile(p, at, s) and s[4] * s[4] + s[5] * s[5] + s[6] * s[6] < self.stopped do
+				at = at - 1
+			end
+			if at < first then
+				at = nil
+			end
+		end
+		if at and w:sampleProjectile(p, at, s) then
 			local id = self:create(w, p, d, serial, s[1], s[2], s[3], s[4], s[5], s[6])
 			if id then
 				self:release(serial, id, d, s[1], s[2], s[3], s[4], s[5], s[6])
