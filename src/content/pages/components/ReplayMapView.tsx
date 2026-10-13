@@ -1,6 +1,12 @@
 import { Button } from "@picoframe/frame";
 import { Loader2 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { Slider } from "@/components/ui/slider";
 import { formatDuration } from "@/lib/format";
 import type { DemoInfo, ReplayTrackHeader } from "../../bindings";
@@ -374,17 +380,18 @@ function RecordedMatchCanvas({
   };
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div
+      // As wide as the card lets it be, and never taller than most of the
+      // window, so a tall map still fits with its controls. What is said about
+      // the picture is held to the picture's width.
+      style={{ width: `min(100%, 44rem, 70vh * ${mapX} / ${mapZ})` }}
+      className="flex flex-col gap-1.5"
+    >
       <div
         ref={groundRef}
         data-map-ground
-        // As wide as the card lets it be, and never taller than most of the
-        // window, so a tall map still fits with its controls.
-        style={{
-          aspectRatio: `${mapX} / ${mapZ}`,
-          width: `min(100%, 44rem, 70vh * ${mapX} / ${mapZ})`,
-        }}
-        className="relative overflow-hidden rounded-md border border-border/50 bg-[#0d1117]"
+        style={{ aspectRatio: `${mapX} / ${mapZ}` }}
+        className="relative w-full overflow-hidden rounded-md border border-border/50 bg-[#0d1117]"
       >
         {minimapUrl && (
           // Dimmed, so a team colour stands out from ground of the same hue.
@@ -446,7 +453,7 @@ function RecordedMatchCanvas({
  * Sets the time, until the timeline of #3808 replaces it. It does nothing but
  * move the clock: no play, no reverse, no keys of its own beyond the slider's.
  *
- * Its own state is the knob's place, so dragging renders this and not the map.
+ * It reads the clock, so moving the time renders this and not the map.
  */
 function TemporaryTimeSlider({
   header,
@@ -455,7 +462,7 @@ function TemporaryTimeSlider({
   header: ReplayTrackHeader;
   clock: ReplayClock;
 }) {
-  const [frame, setFrame] = useState(clock.frame);
+  const frame = useSyncExternalStore(clock.subscribe, () => clock.frame);
   const seconds = (frame - header.firstFrame) / header.framesPerSecond;
   return (
     <div className="flex items-center gap-3">
@@ -470,7 +477,6 @@ function TemporaryTimeSlider({
           // Dragging back is time going backward, which the track follows by
           // holding the window before this one.
           clock.set(next, next < clock.frame ? -1 : 1);
-          setFrame(next);
         }}
       />
       <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
