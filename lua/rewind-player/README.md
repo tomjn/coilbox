@@ -1,6 +1,6 @@
 # Rewind player
 
-The rewind player plays a replay track back inside the engine, with time going in either direction (issue #3794). This folder holds its first part, the Lua that reads a track (issue #3792). It does not create units or draw anything. The gadget that does is not built yet and will include these files.
+The rewind player plays a replay track back inside the engine, with time going in either direction (issue #3794). This folder holds its first part, the Lua that reads a track (issue #3792). It does not create units or draw anything. The gadget in `luarules/gadgets/coilbox_rewind_player.lua` is a stand-in that only logs the track's header. The real one (issue #3794) replaces it and includes these files.
 
 A track is the file `crates/coilbox-track` writes, in the format `docs/reference/replay-track-format.md` describes. The format was designed so that the engine's Lua can read the file as it is, so there is no export step and no second copy on disk.
 
@@ -31,6 +31,22 @@ end
 ```
 
 Where the generated game keeps the track is `Fetch.PATH`, which is `coilbox_rewind/track.cbtrack`. Issue #3793 puts it there.
+
+## The playback game
+
+Coilbox writes a game called `coilbox-replay-playback.sdd` under the content root's `games/` for each playback, and replaces it every time (`crates/tauri-plugin-coilbox-content/src/demo/playback.rs`). It depends on the game the replay was recorded on and holds:
+
+- every `.lua` file under `luarules/` and `luaui/` in this folder, at the same path
+- the track at `coilbox_rewind/track.cbtrack`, as a hard link to the stored file, or a copy where the filesystem refuses a link
+- a `modinfo.lua`
+
+The list of files is made by `crates/tauri-plugin-coilbox-content/build.rs` when coilbox is built, so a gadget added under `luarules/gadgets/` or a widget under `luaui/widgets/` ships with no change to the Rust. A file with another extension, and `tests/`, stay out. A new file is picked up by the next build.
+
+The start script has one spectator, no players or AIs, and every team's `teamleader` is that spectator. Team and ally team numbers are the replay's own. Mod options and map options are the replay's. The script sets `recorddemo=0`. The engine adds the Gaia team, so read its number from the engine and do not assume it.
+
+Nothing in the base game is switched off. The base game's own gadgets run, so a game that creates starting units or ends the match when a team has no units will do that during playback.
+
+`contentReplayPlaybackLaunch` in `src/content/bindings.ts` writes the game and script and launches the engine.
 
 ## Fetching bytes
 
