@@ -34,7 +34,7 @@
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use coilbox_track::{TrackReader, FORMAT_VERSION};
+use coilbox_track::TrackReader;
 use coilbox_track_thin::RECORDER_VERSION;
 use serde::Serialize;
 use tauri::{AppHandle, Runtime};
@@ -118,6 +118,7 @@ fn inspect(path: &Path, game_id: &str) -> Option<TrackState> {
 }
 
 /// The state of a match's track, or None when there is none.
+#[allow(dead_code)] // Called by #3785 and #3788, which is not built yet.
 pub fn state(dir: &Path, game_id: &str) -> Result<Option<TrackState>, String> {
     let path = track_path(dir, game_id)?;
     match std::fs::metadata(&path) {
@@ -134,6 +135,7 @@ pub fn state(dir: &Path, game_id: &str) -> Result<Option<TrackState>, String> {
 /// current track for `game_id`, or nothing is stored and the earlier track,
 /// if any, stays. Returns the size of the file stored. The temporary file is
 /// removed whatever happens.
+#[allow(dead_code)] // Called by #3785, which is not built yet.
 pub fn store<E: std::fmt::Display>(
     dir: &Path,
     game_id: &str,
@@ -183,6 +185,7 @@ pub fn remove(dir: &Path, game_id: &str) -> Result<bool, String> {
 
 /// Record that a match's track was just watched, so a budget removes it last.
 /// A match with no track is left alone.
+#[allow(dead_code)] // Called by #3787, which is not built yet.
 pub fn mark_watched(dir: &Path, game_id: &str) -> Result<(), String> {
     let file = match std::fs::File::options()
         .write(true)
@@ -262,7 +265,7 @@ pub(crate) async fn content_replay_tracks<R: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use coilbox_track::{Settings, Track};
+    use coilbox_track::{Settings, Track, FORMAT_VERSION};
 
     const ID: &str = "00112233445566778899aabbccddeeff";
     const OTHER: &str = "ffeeddccbbaa99887766554433221100";

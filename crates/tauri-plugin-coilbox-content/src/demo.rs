@@ -48,7 +48,7 @@ pub(crate) mod match_setup;
 mod orders;
 pub(crate) mod retarget;
 pub(crate) mod stream;
-pub(crate) mod track_store;
+pub mod track_store;
 pub mod unit_orders;
 
 /// Folders under a write dir that hold client demos. The engine writes to
@@ -545,6 +545,7 @@ pub fn is_listed_replay(path: &Path, roots: &[PathBuf]) -> bool {
 /// nothing until its game ends and a running game's file looks exactly like
 /// one left by a crash. A game started outside coilbox cannot be seen from
 /// here, which is why the page warns about it.
+#[allow(clippy::too_many_arguments)]
 pub fn delete_listed_replays(
     paths: &[PathBuf],
     apply: bool,

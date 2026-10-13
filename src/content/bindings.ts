@@ -323,6 +323,8 @@ export interface ReplayFile {
   /** A zero byte file: a recording that did not finish, or one still being
    * written. The engine writes a replay only when its game ends. */
   unfinished?: boolean;
+  /** The match's game id, absent for a remix or a replay without a usable one. */
+  gameId?: string;
 }
 
 /**
