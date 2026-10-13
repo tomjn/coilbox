@@ -898,6 +898,48 @@ mod tests {
         assert_eq!(h.features.last, [150, 150]);
     }
 
+    /// A track holds each team's resources and a game's rules parameters from
+    /// recorder version 4 (issue #3982). The map view draws neither, so the
+    /// header and every window it is sent are what they are without them, and
+    /// the TypeScript reader needs no change.
+    #[test]
+    fn team_resources_in_a_track_change_nothing_the_map_view_is_sent() {
+        use coilbox_track::{value_code, ValueKey, ValueTrack, NO_TEAM};
+        let plain = track(ID, RECORDER_VERSION);
+        let mut with = plain.clone();
+        with.settings.value_tolerance = 0.5;
+        with.settings.value_fraction = 1.0 / 1024.0;
+        with.info.team_params = vec!["supplyUsed".into()];
+        with.info.game_params = vec!["wave".into()];
+        for (team, code) in [
+            (0, value_code::HELD),
+            (1, value_code::ENERGY + value_code::STORAGE),
+            (1, value_code::PARAMETER),
+            (NO_TEAM, value_code::PARAMETER),
+        ] {
+            with.values.push(ValueTrack {
+                team,
+                code,
+                keys: vec![ValueKey::new(0, 1028.5), ValueKey::new(90, 87.0)],
+            });
+        }
+        let (plain, with) = (plain.to_bytes().unwrap(), with.to_bytes().unwrap());
+        assert_ne!(plain, with);
+
+        let header = |bytes: &[u8]| {
+            let mut reader = open_checked(Cursor::new(bytes.to_vec()), ID).unwrap();
+            serde_json::to_value(header_view(&mut reader, ID).unwrap()).unwrap()
+        };
+        assert_eq!(header(&plain), header(&with));
+        for k in 0..3 {
+            assert_eq!(
+                read_window(Cursor::new(plain.clone()), ID, k).unwrap(),
+                read_window(Cursor::new(with.clone()), ID, k).unwrap(),
+                "window {k}"
+            );
+        }
+    }
+
     #[test]
     fn a_track_with_no_footprints_is_not_drawn_with_guessed_sizes() {
         let mut track = track(ID, RECORDER_VERSION);

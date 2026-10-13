@@ -155,6 +155,108 @@ fn spec(f: &Frame) -> FrameSpec {
             .iter()
             .map(|r| [r.x as f32, r.z as f32, r.before, r.after])
             .collect(),
+        team_held: f
+            .team_held
+            .iter()
+            .map(|r| [r.team as f32, r.metal, r.energy])
+            .collect(),
+        team_economy: f
+            .team_economy
+            .iter()
+            .map(|r| {
+                let mut row = [0.0; 17];
+                row[0] = r.team as f32;
+                row[1..9].copy_from_slice(&r.metal);
+                row[9..17].copy_from_slice(&r.energy);
+                row
+            })
+            .collect(),
+        team_params: f
+            .params
+            .iter()
+            .filter_map(|r| Some([r.team? as f32, r.param as f32, r.value]))
+            .collect(),
+        game_params: f
+            .params
+            .iter()
+            .filter(|r| r.team.is_none())
+            .map(|r| [r.param as f32, r.value])
+            .collect(),
+    }
+}
+
+/// The four sections of issue #3982, written by the helper from the README's
+/// layout and read back by the crate's reader.
+#[test]
+fn team_resources_and_rules_parameters_read_as_they_were_written() {
+    let mut scene = Scene::new(2);
+    scene.params = Some((vec!["supplyUsed".into()], vec!["wave".into(), "day".into()]));
+    scene.held(1, 0, 1028.5, 400.0);
+    scene.economy(
+        1,
+        1,
+        [1100.0, 7.25, 9.125, 7.0, 0.99, 1.0, 2.0, 3.0],
+        [2000.0, 23.125, 100.0, 23.0, 0.5, 4.0, 5.0, 6.0],
+    );
+    scene.frame(2).team_params.push([1.0, 1.0, 30.0]);
+    scene.frame(2).game_params.push([2.0, 0.25]);
+    let bytes = scene.bytes();
+    let (blocks, _) = blocks(&bytes);
+
+    let Block::Header(header) = &blocks[0] else {
+        panic!("the first block is not the header");
+    };
+    assert_eq!(header.team_params, ["supplyUsed"]);
+    assert_eq!(header.game_params, ["wave", "day"]);
+    let frames: Vec<&Frame> = blocks
+        .iter()
+        .filter_map(|b| match b {
+            Block::Frame(f) => Some(&**f),
+            _ => None,
+        })
+        .collect();
+    let held = &frames[1].team_held[0];
+    assert_eq!((held.team, held.metal, held.energy), (0, 1028.5, 400.0));
+    let economy = &frames[1].team_economy[0];
+    assert_eq!(economy.team, 1);
+    assert_eq!(
+        economy.metal,
+        [1100.0, 7.25, 9.125, 7.0, 0.99, 1.0, 2.0, 3.0]
+    );
+    assert_eq!(economy.energy[0], 2000.0);
+    assert_eq!(economy.energy[7], 6.0);
+    let params = &frames[2].params;
+    assert_eq!(
+        (params[0].team, params[0].param, params[0].value),
+        (Some(1), 1, 30.0)
+    );
+    assert_eq!(
+        (params[1].team, params[1].param, params[1].value),
+        (None, 2, 0.25)
+    );
+    // And back to the rows they were written from.
+    for f in &frames {
+        assert_eq!(
+            spec(f),
+            scene.frames.get(&f.frame).cloned().unwrap_or_default(),
+            "frame {}",
+            f.frame
+        );
+    }
+}
+
+/// The real recording was made before the recorder wrote them, and has none.
+#[test]
+fn a_dump_from_before_team_resources_has_no_parameter_lists_and_no_rows() {
+    let (blocks, _) = blocks(FRAGMENT);
+    let Block::Header(header) = &blocks[0] else {
+        panic!("the first block is not the header");
+    };
+    assert!(header.team_params.is_empty() && header.game_params.is_empty());
+    for block in &blocks {
+        if let Block::Frame(f) = block {
+            assert!(f.team_held.is_empty() && f.team_economy.is_empty() && f.params.is_empty());
+        }
     }
 }
 

@@ -1,6 +1,6 @@
-//! Prints what the projectile and target sections of a track cost, and what
-//! the track would cost if a unit's weapons after the first had no target
-//! tracks.
+//! Prints what the projectile, target and team number sections of a track
+//! cost, what the track would cost if a unit's weapons after the first had no
+//! target tracks, and what it would cost with no team numbers.
 //!
 //! ```sh
 //! cargo run --release -p coilbox-track-thin --example section_bytes -- <track>
@@ -22,6 +22,9 @@ const TARGETS: [u16; 10] = [10, 40, 41, 42, 43, 44, 45, 46, 47, 48];
 /// 80 to 100 are the projectiles: their entries, times, positions and
 /// velocities.
 const PROJECTILES: std::ops::RangeInclusive<u16> = 80..=100;
+/// 104 to 108 are the numbers of the teams and of the game: resources and
+/// rules parameters.
+const VALUES: std::ops::RangeInclusive<u16> = 104..=108;
 
 fn only(chunk: &Chunk, ids: impl Iterator<Item = u16>) -> Chunk {
     let mut out = Chunk::new();
@@ -33,6 +36,7 @@ fn only(chunk: &Chunk, ids: impl Iterator<Item = u16>) -> Chunk {
             Some(Column::S16(v)) => out.set_s16(id, v.clone()),
             Some(Column::U32(v)) => out.set_u32(id, v.clone()),
             Some(Column::S32(v)) => out.set_s32(id, v.clone()),
+            Some(Column::F32(v)) => out.set_f32_bits(id, v.clone()),
         }
     }
     out
@@ -71,15 +75,29 @@ fn main() {
     let mut targets_first_only = Sum::default();
     let (mut tracks, mut keys) = (0u64, 0u64);
     let (mut tracks_after_first, mut keys_after_first) = (0u64, 0u64);
+    let mut values = Sum::default();
+    let mut whole_without_values = Sum::default();
+    let (mut value_tracks, mut value_keys) = (0u64, 0u64);
+    // Keys by what the number is: the code, with a rules parameter as 256.
+    let mut value_keys_by_code = std::collections::BTreeMap::<u16, u64>::new();
 
     for k in 0..windows {
         whole_in_file += reader.window_entries()[k].main.length as u64;
         let chunk = reader.window_chunk(k).expect("reads");
         projectiles.add(size(&only(&chunk, PROJECTILES)));
         targets.add(size(&only(&chunk, TARGETS.into_iter())));
+        values.add(size(&only(&chunk, VALUES)));
 
         let mut window: Window = reader.window(k).expect("reads");
         whole.add(size(&window.to_chunk().expect("writes again")));
+        for track in &window.values {
+            value_tracks += 1;
+            value_keys += track.keys.len() as u64;
+            *value_keys_by_code.entry(track.code.min(256)).or_default() += track.keys.len() as u64;
+        }
+        let mut bare = window.clone();
+        bare.values.clear();
+        whole_without_values.add(size(&bare.to_chunk().expect("writes again")));
         for unit in &mut window.units {
             for track in &unit.unit.targets {
                 tracks += 1;
@@ -121,5 +139,21 @@ fn main() {
     println!(
         "  main chunks with the first weapon only     {} bytes compressed",
         whole_first_only.packed
+    );
+    println!(
+        "  team and game number columns               {} bytes before compression, {} compressed on their own",
+        values.plain, values.packed
+    );
+    println!("  their tracks, keys, over every window      {value_tracks}, {value_keys}");
+    for (code, keys) in value_keys_by_code {
+        println!("    keys of code {code:<3}                         {keys}");
+    }
+    println!(
+        "  main chunks without them                   {} bytes before compression, {} compressed",
+        whole_without_values.plain, whole_without_values.packed
+    );
+    println!(
+        "  main chunks with them                      {} bytes before compression, {} compressed",
+        whole.plain, whole.packed
     );
 }

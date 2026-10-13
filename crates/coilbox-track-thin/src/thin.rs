@@ -24,6 +24,11 @@ pub(crate) struct Rules {
     pub q: Quantiser,
     /// In elmos.
     pub tolerance: f64,
+    /// In metal or energy, and as a fraction of the sample, for the numbers
+    /// of a team that are not kept exactly. See
+    /// [`coilbox_track::value_allowance`].
+    pub value_tolerance: f32,
+    pub value_fraction: f32,
     pub first_frame: u32,
     pub window_length: u32,
 }
@@ -222,6 +227,8 @@ mod tests {
         Rules {
             q: Quantiser::new(3, 11, 12).unwrap(),
             tolerance: 0.5,
+            value_tolerance: 0.5,
+            value_fraction: 0.0,
             first_frame: 100,
             window_length: 900,
         }
