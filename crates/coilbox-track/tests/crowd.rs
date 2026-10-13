@@ -64,7 +64,10 @@ fn a_crowd_of_real_definitions_is_written() {
     }
     let defs: Vec<u16> = defs.into_iter().collect();
     let teams: Vec<u8> = teams.into_iter().collect();
-    assert!(!places.is_empty() && !defs.is_empty(), "the source has no units");
+    assert!(
+        !places.is_empty() && !defs.is_empty(),
+        "the source has no units"
+    );
 
     let mut track = Track::new(Settings {
         recorder_version: h.recorder_version,

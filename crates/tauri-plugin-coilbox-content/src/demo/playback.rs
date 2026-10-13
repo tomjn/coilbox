@@ -2852,7 +2852,11 @@ end
         for l in &stops {
             assert_eq!(field(l, "shown"), field(l, "frame"), "{l}");
             assert_eq!(field(l, "engine_units"), field(l, "track_units"), "{l}");
-            assert_eq!(field(l, "engine_features"), field(l, "track_features"), "{l}");
+            assert_eq!(
+                field(l, "engine_features"),
+                field(l, "track_features"),
+                "{l}"
+            );
             assert!(number(l, "place") <= 0.01, "{l}");
             assert_eq!(number(l, "wrong_build_state"), 0.0, "{l}");
         }
