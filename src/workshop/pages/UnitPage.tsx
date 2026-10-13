@@ -73,6 +73,7 @@
  * one game's edits must never reach another's (issue #2664). Opening a project
  * is opening its game, so the two cannot meet.
  */
+
 import { Button, buttonVariants, cn } from "@picoframe/frame";
 import {
   ArrowLeft,
@@ -127,6 +128,7 @@ import {
 import { UnitIcon } from "@/content/pages/components/UnitIcon";
 import { buildTechForest } from "@/content/techForest";
 import { useLegoProjects } from "@/lego/projects";
+import { withoutGeneratedGames } from "@/lib/generatedGames";
 import {
   armorClassesOf,
   armorClassOf,
@@ -552,6 +554,7 @@ export default function UnitPage() {
 
   const games = scan.data?.games ?? [];
   const gameName = project?.gameName ?? params.get("game") ?? "";
+  const pickableGames = withoutGeneratedGames(games, gameName);
 
   /**
    * The unit editor's own query, from the last time Units was open, so going
@@ -2498,7 +2501,7 @@ export default function UnitPage() {
           open={renaming}
           onOpenChange={setRenaming}
           project={project}
-          games={games}
+          games={pickableGames}
           scanning={scan.loading}
           existing={projects}
           onSubmit={(details) => {
@@ -2535,7 +2538,7 @@ export default function UnitPage() {
           open={regenerateOpen}
           onOpenChange={setRegenerateOpen}
           project={project}
-          games={games}
+          games={pickableGames}
           projects={projects}
           enginePath={selected?.enginePath}
           dataDir={selected?.rootPath}
