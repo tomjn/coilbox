@@ -123,6 +123,12 @@ export function useTrackBudget(): {
   };
 }
 
+/**
+ * The tracks as last read, outside React. For a caller that has just awaited
+ * {@link refreshStoredTracks} and needs the answer that read gave.
+ */
+export const storedTracksNow = (): Tracks => tracks;
+
 /** For tests: forget everything. */
 export function resetReplayTracksForTests(): void {
   tracks = new Map();

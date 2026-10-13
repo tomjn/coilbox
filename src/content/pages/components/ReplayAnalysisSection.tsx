@@ -614,17 +614,22 @@ function Substitution({
  * only while the popover is open, so the limit on disk space is not followed
  * while it is shut.
  */
-function Confirmation({
+export function Confirmation({
   estimate,
   ownBytes,
   onCancel,
   onStart,
+  heading = "Analyse and record this replay?",
+  startLabel = "Start",
 }: {
   estimate: Estimate;
   /** What the replay's own track takes now, which a new one replaces. */
   ownBytes: number;
   onCancel: () => void;
   onStart: () => void;
+  /** Left out, it asks about the section's own run. */
+  heading?: string;
+  startLabel?: string;
 }) {
   const usage = useTrackUsage();
   const { budgetBytes } = useTrackBudget();
@@ -637,7 +642,7 @@ function Confirmation({
   return (
     <>
       <div className="flex flex-col gap-1.5">
-        <h3 className="text-sm font-medium">Analyse and record this replay?</h3>
+        <h3 className="text-sm font-medium">{heading}</h3>
         <p className="text-xs text-muted-foreground">
           This runs the game once, without a window.
         </p>
@@ -668,7 +673,7 @@ function Confirmation({
           Cancel
         </Button>
         <Button type="button" size="sm" onClick={onStart}>
-          Start
+          {startLabel}
         </Button>
       </div>
     </>
@@ -913,7 +918,7 @@ function Disagreements({ stored }: { stored: StoredReplayAnalysis }) {
   );
 }
 
-const FAILURE_WORDS: Record<ReplayAnalysisFailure["reason"], string> = {
+export const FAILURE_WORDS: Record<ReplayAnalysisFailure["reason"], string> = {
   tookTooLong: "The playback took too long and was stopped.",
   engineFailed: "The engine stopped before the match ended.",
   couldNotRun: "The analysis and recording could not be run.",
