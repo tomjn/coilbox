@@ -898,6 +898,7 @@ export default function ReplayDetailPage() {
               info={info}
               enginePath={selected?.enginePath}
               dataDir={selected?.rootPath}
+              replayPath={replay?.path ?? ""}
             />
 
             {/* Match statistics in spirit, so it takes the build orders' gate (#1179). */}

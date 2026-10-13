@@ -50,10 +50,10 @@ import {
 } from "./replayTimeWindow";
 import { useReplayUnits } from "./useReplayUnits";
 
-type ReadStatus = "idle" | "loading" | "failed" | "done";
+export type ReadStatus = "idle" | "loading" | "failed" | "done";
 
 /** One read of some kinds of an analysis's events, made while `wanted`. */
-function useEventRead(
+export function useEventRead(
   state: EventState,
   kinds: readonly string[],
   wanted: boolean,
