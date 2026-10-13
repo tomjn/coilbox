@@ -16,6 +16,18 @@
 -- The game's adapter can hide a unit definition, which is then never created,
 -- and can ask to be told when a unit is created and put in place (issue #3799).
 --
+-- The engine heals a unit by itself, and nothing in the engine switches that
+-- off for one unit (issue #3986). CUnit::SlowUpdate adds `autoHeal`, and
+-- `idleAutoHeal` once the unit has rested `idleTime` frames, to the health of a
+-- unit that has less than its maximum. It does that after the gadgets' GameFrame
+-- and before their GameFramePost, and nothing about it reaches a gadget. The
+-- definitions that hold the numbers cannot be changed from Lua, and a game's
+-- `gamedata/defs.lua` is one file that a depending game can only replace. So for
+-- the stretch between the player's frame and its post frame, a wounded unit's
+-- maximum is its health, and the engine finds nothing to heal. A builder's
+-- repair stops on the same test (CUnit::AddBuildPower). `Units:afterSim` gives
+-- the maximum back, so nothing else sees it, and checks health once more.
+--
 -- Three things the engine or the base game does to a unit are undone here and
 -- not prevented, because nothing can prevent them:
 --
@@ -37,6 +49,10 @@ Units.__index = Units
 --- The steps health and build progress are stored in (the format page's status
 -- keys). One more than the decay is the least the stage can add to it.
 local STEPS = 65535
+
+--- The line for health that moved with nothing to hear of. A game's own
+-- gadget that heals belongs in the game's adapter.
+local HEALTH_MOVED = "the health of a unit of the track changed with no damage to hear of, by a gadget of the game or by something the player does not stop, and the player set it again. Later ones are not logged. A game's adapter can switch off a gadget that heals"
 
 --- `context` is the player's (see coilbox_player.lua). `rotation` is
 -- coilbox_player_rotation.lua.
@@ -85,6 +101,11 @@ function M.new(context, rotation)
 		-- when the engine has to be told again.
 		maxHealth = {},
 		health = {},
+		-- A wounded unit whose maximum is its health until the frame is over,
+		-- with the maximum it has to be given back and the health it was held at.
+		held = {},
+		fullHealth = {},
+		holdAt = {},
 		on = {},
 		nanoframe = {},
 		-- Serial numbers that could not be created, so they are not tried on every
@@ -109,6 +130,9 @@ function Units:forget(serial, unitID)
 	self.serialOf[unitID] = nil
 	self.maxHealth[serial] = nil
 	self.health[serial] = nil
+	self.held[serial] = nil
+	self.fullHealth[serial] = nil
+	self.holdAt[serial] = nil
 	self.on[serial] = nil
 	self.nanoframe[serial] = nil
 end
@@ -166,6 +190,50 @@ function Units:damaged(unitID)
 	local serial = self.serialOf[unitID]
 	if serial then
 		self.health[serial] = nil
+		self.context.report("unit damaged", "a unit of the track was damaged, past the gadget that gives every hit no damage, so another gadget of the game overruled it. The player sets its health again. Later ones are not logged")
+	end
+end
+
+--- Makes the maximum of a wounded unit its health, so that the engine's own
+-- healing in the rest of the frame has nothing to heal.
+function Units:hold(serial, unitID)
+	local health = self.health[serial]
+	if not health or health >= 1 then
+		return
+	end
+	local Spring = self.Spring
+	local now, max = Spring.GetUnitHealth(unitID)
+	if not now or now >= max then
+		return
+	end
+	self.fullHealth[serial] = max
+	self.holdAt[serial] = now
+	self.held[serial] = true
+	Spring.SetUnitMaxHealth(unitID, now)
+end
+
+--- Gives a held unit its maximum back.
+function Units:release(serial, unitID)
+	self.held[serial] = false
+	self.Spring.SetUnitMaxHealth(unitID, self.fullHealth[serial])
+end
+
+--- The end of a simulation frame, after the engine has healed what it could.
+-- Every held unit has its maximum back and the health it was held at. Anything
+-- that moved it in the meantime is put right.
+function Units:afterSim()
+	local Spring, held, holdAt = self.Spring, self.held, self.holdAt
+	for serial, unitID in next, self.unitOf do
+		if held[serial] then
+			self:release(serial, unitID)
+			local now = Spring.GetUnitHealth(unitID)
+			if now ~= holdAt[serial] then
+				local arg = self.healthArg
+				arg.health = holdAt[serial]
+				Spring.SetUnitHealth(unitID, arg)
+				self.context.report("health moved", HEALTH_MOVED)
+			end
+		end
 	end
 end
 
@@ -331,10 +399,12 @@ function Units:applyStatus(w, i, serial, unitID, t)
 		self.nanoframe[serial] = false
 		self.health[serial] = health
 	elseif self.health[serial] ~= health or Spring.GetUnitHealth(unitID) ~= health * maxHealth then
-		-- The second test is for health that moved with no damage to hear of: the
-		-- engine heals an idle unit and a base game gadget can set health, and
-		-- while the track's value stands still, as it does when paused, nothing
-		-- else would put it back.
+		-- The second test is for health that moved with no damage to hear of: a
+		-- base game gadget can set health, and while the track's value stands
+		-- still, as it does when paused, nothing else would put it back.
+		if self.health[serial] == health then
+			self.context.report("health moved", HEALTH_MOVED)
+		end
 		local arg = self.healthArg
 		arg.health = health * maxHealth
 		Spring.SetUnitHealth(unitID, arg)
@@ -361,7 +431,7 @@ function Units:place(t, clock)
 	if not w then
 		return
 	end
-	local unitOf, failed = self.unitOf, self.failed
+	local unitOf, failed, held = self.unitOf, self.failed, self.held
 	local transform, status = self.transform, self.status
 	local MoveCtrl, euler = self.MoveCtrl, self.euler
 	local placed = self.context.hooks.unitPlaced
@@ -372,6 +442,9 @@ function Units:place(t, clock)
 			local unitID = unitOf[serial]
 			if (unitID or not failed[serial]) and w:sampleTransform(i, t, transform) and w:sampleStatus(i, t, status) then
 				local made = not unitID
+				if unitID and held[serial] then
+					self:release(serial, unitID)
+				end
 				if made then
 					unitID = self:create(w, i, serial, status[2] < 1, t)
 				end
@@ -379,6 +452,9 @@ function Units:place(t, clock)
 					unitID = self:applyStatus(w, i, serial, unitID, t)
 				end
 				if unitID then
+					if not self.nanoframe[serial] then
+						self:hold(serial, unitID)
+					end
 					MoveCtrl.SetPosition(unitID, transform[1], transform[2], transform[3])
 					MoveCtrl.SetRotation(unitID, euler(transform[4], transform[5], transform[6], transform[7]))
 					if made and placed then

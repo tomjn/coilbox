@@ -20,6 +20,10 @@
 -- a nanoframe, except on an engine from before 2025.03.9, where a finished unit
 -- stays finished (`world.oldEngine`).
 --
+-- Spring.SetUnitMaxHealth holds the maximum to at least 0.1 and health to the
+-- maximum. `world.heal` is the engine's own healing, which a test runs between
+-- the player's frame and its post frame, where the engine does it.
+--
 -- Spring.MoveCtrl.SetPosition and SetRotation do nothing for a unit that is not
 -- under move control (ParseScriptMoveType).
 --
@@ -311,6 +315,31 @@ function M.new(options)
 				found.beingBuilt, found.build = false, 1
 			elseif not world.oldEngine then
 				found.beingBuilt = true
+			end
+		end
+	end
+
+	--- LuaSyncedCtrl::SetUnitMaxHealth: the maximum is at least 0.1, and health
+	-- is held to it.
+	function Spring.SetUnitMaxHealth(id, value)
+		local found = unit(id)
+		if not found then
+			return
+		end
+		found.maxHealthSets = (found.maxHealthSets or 0) + 1
+		found.maxHealth = math.max(0.1, value)
+		found.health = math.min(found.maxHealth, found.health)
+	end
+
+	--- The engine's own healing of a unit, which CUnit::SlowUpdate does in the
+	-- middle of a simulation frame: after the gadgets' GameFrame and before
+	-- their GameFramePost, and only for a unit with health below its maximum
+	-- that is not under construction (autoHeal and idleAutoHeal). A unit's
+	-- repair by a builder stops on the same test, in CUnit::AddBuildPower.
+	function world.heal(amount)
+		for _, found in next, world.units do
+			if not found.dead and not found.beingBuilt and found.health < found.maxHealth then
+				found.health = math.min(found.maxHealth, found.health + amount)
 			end
 		end
 	end
