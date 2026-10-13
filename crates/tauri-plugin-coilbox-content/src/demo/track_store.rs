@@ -213,7 +213,7 @@ pub fn remove(dir: &Path, game_id: &str) -> Result<bool, String> {
 
 /// Record that a match's track was just watched, so a budget removes it last.
 /// A match with no track is left alone.
-#[allow(dead_code)] // Called by #3787, which is not built yet.
+#[allow(dead_code)] // Called when playback starts, which is not built yet.
 pub fn mark_watched(dir: &Path, game_id: &str) -> Result<(), String> {
     let file = match std::fs::File::options()
         .write(true)
@@ -271,8 +271,10 @@ pub fn stored_for_replay(dir: &Path, replay: &Path) -> Option<(String, u64)> {
 
 /// `content_replay_tracks`: every track on disk, for the library to join to
 /// its replays by game id. Each entry has its `state`, `sizeBytes` and
-/// `lastWatchedMs`. The answer changes when a track is stored or removed, so
-/// it is asked for and never kept in a `StatRecord`.
+/// `lastWatchedMs`. The answer also has `totalBytes`, what they take together,
+/// and `defaultBudgetBytes`, the disk budget used until the user sets one. It
+/// changes when a track is stored or removed, so it is asked for and never kept
+/// in a `StatRecord`.
 ///
 /// A remix shares its original's game id and has no track of its own, so a
 /// caller joining by id leaves remixed replays out.
@@ -284,8 +286,8 @@ pub(crate) async fn content_replay_tracks<R: Runtime>(
         Ok(dir) => dir,
         Err(e) => return picoframe_core::CliResult::err(e),
     };
-    match tauri::async_runtime::spawn_blocking(move || list(&dir)).await {
-        Ok(tracks) => picoframe_core::CliResult::ok(serde_json::json!({ "tracks": tracks })),
+    match tauri::async_runtime::spawn_blocking(move || super::track_budget::overview(&dir)).await {
+        Ok(overview) => picoframe_core::CliResult::ok(serde_json::json!(overview)),
         Err(e) => picoframe_core::CliResult::err(format!("replay tracks task failed: {e}")),
     }
 }

@@ -91,7 +91,11 @@ describe("the stored tracks", () => {
     render(<ReplayTrackBadge gameId={ID} />);
     expect(screen.getByText("Track recorded")).toBeTruthy();
 
-    listTracks.mockResolvedValue({ tracks: [] });
+    listTracks.mockResolvedValue({
+      tracks: [],
+      totalBytes: 0,
+      defaultBudgetBytes: 1,
+    });
     await act(async () => {
       await refreshStoredTracks();
     });

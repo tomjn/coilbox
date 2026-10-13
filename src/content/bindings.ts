@@ -1578,8 +1578,23 @@ export interface StoredReplayTrack {
  */
 export const contentReplayTracks = defineCommand<
   undefined,
-  { tracks: StoredReplayTrack[] }
+  {
+    tracks: StoredReplayTrack[];
+    /** What the tracks take together, stale ones included, in bytes. */
+    totalBytes: number;
+    /** The disk budget used until the user sets one (#3787), in bytes. */
+    defaultBudgetBytes: number;
+  }
 >("coilbox-content", "content_replay_tracks");
+
+/**
+ * Remove every track (#3787), leaving the replays alone. Call
+ * `refreshStoredTracks` afterwards so every replay's badge goes.
+ */
+export const contentReplayTracksClear = defineCommand<
+  undefined,
+  { cleared: { removed: number; freedBytes: number; kept: number } }
+>("coilbox-content", "content_replay_tracks_clear");
 
 /** Delete what is stored for one match, leaving the replay alone. */
 export const contentReplayAnalysisDelete = defineCommand<

@@ -87,7 +87,11 @@ describe("DeleteReplayButton", () => {
       analysisDeleted: false,
       trackDeleted: true,
     });
-    listTracks.mockResolvedValue({ tracks: [] });
+    listTracks.mockResolvedValue({
+      tracks: [],
+      totalBytes: 0,
+      defaultBudgetBytes: 1,
+    });
     await open();
     await screen.findByText(/recorded track/i);
     const buttons = screen.getAllByRole("button", { name: /delete/i });
