@@ -2,7 +2,7 @@
 
 mod common;
 
-use coilbox_track::{transform_at, Quantiser};
+use coilbox_track::{projectile_at, transform_at, Quantiser};
 use coilbox_track_thin::{check_track, thin_dump, ThinError, ThinOptions, ThinReport};
 use common::*;
 
@@ -211,6 +211,119 @@ fn a_projectile_id_is_a_new_projectile_when_it_was_gone_or_is_not_the_same() {
     for p in &read.windows[0].projectiles {
         assert_eq!(p.projectile.keys.len(), 2);
     }
+}
+
+#[test]
+fn a_shell_under_constant_gravity_keeps_two_keys_and_is_within_tolerance_everywhere() {
+    let mut scene = Scene::new(200);
+    scene.unit(1, 1, 0, 200, |_| At::place(100.0, 0.0, 100.0));
+    // Fired forward at 8 elmos a frame along x and up at 6, with its upward
+    // speed falling by 0.2 elmos a frame every frame, for 90 frames.
+    let (from, to, gravity) = (10u32, 100u32, -0.2f32);
+    let flight = |f: u32| {
+        let t = (f - from) as f32;
+        (
+            [
+                100.0 + 8.0 * t,
+                5.0 + 6.0 * t + 0.5 * gravity * t * t,
+                100.0,
+            ],
+            [8.0, 6.0 + gravity * t, 0.0],
+        )
+    };
+    scene.projectile(9, 1, 1, from, to, flight);
+    let (report, read) = thin(&scene);
+
+    let projectiles = &read.windows[0].projectiles;
+    assert_eq!(projectiles.len(), 1);
+    let keys = &projectiles[0].projectile.keys;
+    assert_eq!(frames(keys), [from, to]);
+    assert_eq!(report.kept.projectile, 2);
+
+    // Every recorded frame, not only the ones thinning dropped.
+    let q = quantiser(&read);
+    let mut worst = 0.0f64;
+    for f in from..=to {
+        let (p, _) = projectile_at(keys, &q, f).unwrap();
+        let (recorded, _) = flight(f);
+        let off = (0..3)
+            .map(|i| (p[i] - recorded[i] as f64).powi(2))
+            .sum::<f64>()
+            .sqrt();
+        worst = worst.max(off);
+    }
+    assert!(
+        worst <= 0.5,
+        "furthest recorded frame is {worst} elmos away"
+    );
+    assert!(report.worst_error() <= 0.5, "{}", report.worst_error());
+}
+
+#[test]
+fn a_missile_that_changes_direction_keeps_a_key_at_the_turn() {
+    let mut scene = Scene::new(200);
+    scene.unit(1, 1, 0, 200, |_| At::place(100.0, 0.0, 100.0));
+    // Flies along x at 6 elmos a frame, and on frame 60 is flying along z at
+    // 6 elmos a frame, with nothing in between.
+    let turn = 60u32;
+    let flight = |f: u32| {
+        if f <= turn {
+            ([100.0 + 6.0 * f as f32, 50.0, 100.0], [6.0, 0.0, 0.0])
+        } else {
+            (
+                [
+                    100.0 + 6.0 * turn as f32,
+                    50.0,
+                    100.0 + 6.0 * (f - turn) as f32,
+                ],
+                [0.0, 0.0, 6.0],
+            )
+        }
+    };
+    scene.projectile(9, 1, 1, 20, 100, flight);
+    let (report, read) = thin(&scene);
+
+    let keys = &read.windows[0].projectiles[0].projectile.keys;
+    // Without a key at the turn, one cubic from the first frame to the last
+    // cuts the corner by tens of elmos. The velocity changes between frame 60
+    // and frame 61, so the curve needs a key on each side of the change.
+    let kept = frames(keys);
+    assert!(kept.contains(&turn), "{kept:?}");
+    assert!(kept.contains(&(turn + 1)), "{kept:?}");
+    let q = quantiser(&read);
+    let (at, _) = projectile_at(keys, &q, turn).unwrap();
+    assert_eq!(at, [460.0, 50.0, 100.0]);
+    assert!(report.worst_error() <= 0.5, "{}", report.worst_error());
+}
+
+#[test]
+fn a_velocity_the_position_does_not_follow_is_reported_and_does_not_fail_the_track() {
+    let mut scene = Scene::new(100);
+    scene.unit(1, 1, 0, 100, |_| At::place(100.0, 0.0, 100.0));
+    // A beam, as the benchmark recordings have them: it stays where it was
+    // fired from, and the engine gives it a velocity along the beam.
+    scene.projectile(9, 1, 1, 10, 16, |_| {
+        ([100.0, 50.0, 100.0], [0.0, 0.0, 600.0])
+    });
+    // A shell that moves as fast as its velocity says.
+    scene.projectile(10, 1, 1, 10, 16, |f| {
+        (
+            [100.0, 50.0, 100.0 + 6.0 * (f - 10) as f32],
+            [0.0, 0.0, 6.0],
+        )
+    });
+    let (report, read) = thin(&scene);
+    assert!(report.worst_error() <= 0.5, "{}", report.worst_error());
+
+    let velocity = report.worst.projectile_velocity.as_ref().unwrap();
+    // Two keys with the same position and velocity, two frames apart, hold
+    // the position half way between them. The slope there is -0.5 of the
+    // velocity at the keys, so the recorded 600 is 900 away from it.
+    assert!((velocity.error - 900.0).abs() < 0.01, "{velocity}");
+    assert_eq!(velocity.what, "projectile 0");
+    // The shell's velocity is followed by its two keys and does not count.
+    let shell = &read.windows[0].projectiles[1].projectile;
+    assert_eq!(frames(&shell.keys), [10, 16]);
 }
 
 #[test]

@@ -88,6 +88,7 @@ fn main() -> ExitCode {
         ("piece", &report.worst.pose),
         ("projectile", &report.worst.projectile),
         ("health or build", &report.worst.status),
+        ("projectile velocity", &report.worst.projectile_velocity),
     ] {
         match worst {
             Some(w) => println!("  {label:16} {w}"),
