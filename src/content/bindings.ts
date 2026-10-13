@@ -1701,9 +1701,9 @@ export type ReplayTrackWindowAnswer =
  * replaced on every launch). `game` names another installed version of the
  * replay's game to depend on when the exact one is not installed. Rejects, with
  * the reason, for a replay with no current track, a remix and a replay of the
- * playback game. The game gets no way to start from a chosen frame yet.
- *
- * Nothing in the UI calls it yet (#3803 and #3809 add the buttons).
+ * playback game. `startFrame` is the frame to open on, a whole number the
+ * player holds inside the track, and `paused` opens on the player's own pause.
+ * Without them the game opens on the track's first frame, playing.
  */
 export const contentReplayPlaybackLaunch = defineCommand<
   {
@@ -1713,6 +1713,8 @@ export const contentReplayPlaybackLaunch = defineCommand<
     runId: string;
     onEvent: Channel<LaunchEvent>;
     game?: string;
+    startFrame?: number;
+    paused?: boolean;
   },
   LaunchOutcome
 >("coilbox-content", "content_replay_playback_launch");
