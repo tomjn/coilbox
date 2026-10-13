@@ -1,14 +1,9 @@
 import { Button } from "@picoframe/frame";
 import { Play } from "lucide-react";
-import { useState } from "react";
 import { usePlay } from "../../../play/PlayProvider";
 import type { ReplayWatch } from "../../replayEngine";
-import { useReplayUserState } from "../../replayUserState";
-import {
-  isBlocked,
-  launchBlockedReason,
-  useWatchTarget,
-} from "./useWatchTarget";
+import { useWatchReplay } from "./useWatchReplay";
+import { isBlocked, launchBlockedReason } from "./useWatchTarget";
 
 /**
  * Launch the engine to watch a replay, on the engine the replay was recorded on
@@ -35,36 +30,12 @@ export function WatchButton({
   /** `replayDependencyBlock`: why the replay's game cannot run, or null. */
   dependencyBlock?: string | null;
 }) {
-  const resolveTarget = useWatchTarget(engineVersion, watch);
-  const { running, launchReplay } = usePlay();
-  const userState = useReplayUserState();
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function onWatch() {
-    if (isBlocked(watch) || dependencyBlock) return;
-    setPending(true);
-    setError(null);
-    try {
-      const target = await resolveTarget();
-      if (!target) return;
-      // Watching a replay marks it watched (keyed by filename, as the list is).
-      const filename = replayPath.split(/[\\/]/).pop();
-      if (filename) userState.setWatched(filename, true);
-      const res = await launchReplay({
-        demoPath: replayPath,
-        executable: target.executable,
-        dataDir: target.dataDir,
-      });
-      if (res.exitCode && res.exitCode !== 0) {
-        setError(`Engine exited with code ${res.exitCode}.`);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setPending(false);
-    }
-  }
+  const { running } = usePlay();
+  const {
+    watchReplay: onWatch,
+    pending,
+    error,
+  } = useWatchReplay(replayPath, engineVersion, watch, dependencyBlock);
 
   const title =
     launchBlockedReason(watch, dependencyBlock) ??
