@@ -213,7 +213,6 @@ pub fn remove(dir: &Path, game_id: &str) -> Result<bool, String> {
 
 /// Record that a match's track was just watched, so a budget removes it last.
 /// A match with no track is left alone.
-#[allow(dead_code)] // Called when playback starts, which is not built yet.
 pub fn mark_watched(dir: &Path, game_id: &str) -> Result<(), String> {
     let file = match std::fs::File::options()
         .write(true)

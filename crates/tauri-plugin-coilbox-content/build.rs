@@ -42,6 +42,8 @@ const COMMANDS: &[&str] = &[
     "content_replay_analysis_delete",
     "content_replay_tracks",
     "content_replay_tracks_clear",
+    "content_replay_track_header",
+    "content_replay_track_window",
     "content_unit_def_set",
     "content_unit_def_set_store",
     "content_unit_def_sets_usage",
