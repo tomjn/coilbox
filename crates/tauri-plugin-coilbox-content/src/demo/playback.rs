@@ -1461,6 +1461,26 @@ end
         })
     }
 
+    /// The engine's log as text. A game can log bytes that are not UTF-8, as
+    /// Balanced Annihilation 15.9.8 does, and a log read as a string would
+    /// then come back empty.
+    fn read_log(log: &Path) -> String {
+        String::from_utf8_lossy(&std::fs::read(log).unwrap_or_default()).into_owned()
+    }
+
+    /// A copy of a folder and everything in it.
+    fn copy_folder(from: &Path, to: &Path) {
+        std::fs::create_dir_all(to).unwrap();
+        for entry in std::fs::read_dir(from).unwrap().flatten() {
+            let target = to.join(entry.file_name());
+            if entry.path().is_dir() {
+                copy_folder(&entry.path(), &target);
+            } else {
+                std::fs::copy(entry.path(), target).unwrap();
+            }
+        }
+    }
+
     /// Launches the headless engine on a prepared playback and reads its log
     /// until `done` says the lines are in. Gives whether it timed out, the log
     /// and how many replays the engine wrote.
@@ -1484,7 +1504,7 @@ end
                 log: &log,
                 timeout: prepared.wait,
                 on_poll: &|| {
-                    if done(&std::fs::read_to_string(&log).unwrap_or_default()) {
+                    if done(&read_log(&log)) {
                         control.cancel();
                     }
                 },
@@ -1492,10 +1512,17 @@ end
             &control,
         )
         .expect("the engine launches");
-        let output = std::fs::read_to_string(&log).unwrap_or_default();
+        let output = read_log(&log);
         // For a person to read afterwards, since the folder is removed.
         if let Some(keep) = var("COILBOX_PLAYBACK_LOG") {
             let _ = std::fs::copy(&log, keep);
+        }
+        // The game and its script, for a person to open in an engine with a
+        // window, which is the only way to see anything the playback draws.
+        if let Some(keep) = var("COILBOX_PLAYBACK_KEEP_GAME") {
+            let keep = PathBuf::from(keep);
+            copy_folder(&prepared.game_dir, &keep.join(FOLDER));
+            std::fs::copy(&prepared.script, keep.join("script.txt")).unwrap();
         }
         let written = std::fs::read_dir(write_dir.join("demos"))
             .map(|d| d.flatten().count())
@@ -1516,7 +1543,8 @@ end
     /// playback to depend on, for a replay recorded on a scratch game whose own
     /// gadgets would play over the track. `COILBOX_PLAYBACK_SECONDS` is how long to wait
     /// for the log lines (default 120). `COILBOX_PLAYBACK_LOG` is a path to copy
-    /// the engine's output to. The engine is the headless one in
+    /// the engine's output to. `COILBOX_PLAYBACK_KEEP_GAME` is a folder to copy
+    /// the playback game and its script to. The engine is the headless one in
     /// `COILBOX_ANALYSIS_ENGINE_DIR`, since a window cannot be checked here.
     #[test]
     #[ignore = "needs an engine, a game, a map and a replay recorded with them"]
