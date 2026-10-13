@@ -59,8 +59,9 @@ M.PARAMS = {
 	settled = "coilbox_rewind_settled",
 }
 
---- A Lua message that sets the most units made or removed in a frame, and the
--- text it starts with. The gadget's unsynced half sends it.
+--- The Lua message that sets the most units made in a frame and the most
+-- removed, as two whole numbers after the text. The gadget's unsynced half sends
+-- it, for example `coilbox_rewind_budget:40 30`.
 M.BUDGET = "coilbox_rewind_budget:"
 
 --- The mod options the player reads.
@@ -73,6 +74,14 @@ M.OPTIONS = {
 
 local Player = {}
 Player.__index = Player
+
+--- The whole number of 1 or more that `text` holds, or nil.
+local function whole(text)
+	local n = tonumber(text)
+	if n and n >= 1 and n < math.huge and n == math.floor(n) then
+		return n
+	end
+end
 
 --- Sets a parameter when its value has changed since it was last set.
 local function publish(self, name, value)
@@ -92,7 +101,8 @@ local function publishClock(self)
 end
 
 --- A player of `track`, or nil and the reason. `options.budget` is the most
--- units a frame makes or removes, and without it there is no limit. `options.modOptions` is what
+-- units a frame makes and the most it removes, and without it there is no
+-- limit. `options.modOptions` is what
 -- `Spring.GetModOptions` gave and `options.log` takes a line for the engine's
 -- log. `options.adapter` is the game's adapter as coilbox_player_adapter.lua
 -- reads it, or nil for a game with none, and `options.adapterWhy` is the reason
@@ -252,20 +262,21 @@ function Player:settled()
 	return not self.clock.pending and not self.units.unsettled and not self.projectiles.unsettled
 end
 
---- How many units the last frame made or removed.
+--- How many units the last frame made, and how many it removed.
 function Player:worked()
-	return self.units.worked
+	return self.units.made, self.units.removed
 end
 
 --- A Lua message. True when it was the player's, done or refused, and false
 -- when it was somebody else's.
 function Player:message(text)
 	if text:sub(1, #M.BUDGET) == M.BUDGET then
-		local count = tonumber(text:sub(#M.BUDGET + 1))
-		if count and count >= 1 and count < math.huge and count == math.floor(count) then
-			self.units:setBudget(count)
+		local make, remove = text:match("^(%S+) (%S+)$", #M.BUDGET + 1)
+		make, remove = whole(make), whole(remove)
+		if make and remove then
+			self.units:setBudget(make, remove)
 		else
-			self.log("the message \"" .. text .. "\" was refused: the budget is a whole number of 1 or more")
+			self.log("the message \"" .. text .. "\" was refused: the budget is two whole numbers of 1 or more, the most units made and the most removed in a frame")
 		end
 		return true
 	end

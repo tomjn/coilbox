@@ -96,14 +96,14 @@ do
 
 	seek(player, 150)
 	t.same("a seek says the world is not settled before the frame that shows it", world.params[SETTLED], 0)
-	local counts, flags, worked = {}, {}, {}
+	local counts, flags, made = {}, {}, {}
 	for n = 1, 5 do
 		player:frame()
-		counts[n], flags[n], worked[n] = world.unitCount(), world.params[SETTLED], player.units.worked
+		counts[n], flags[n], made[n] = world.unitCount(), world.params[SETTLED], player.units.made
 	end
 	t.same("a frame makes at most the budget", table.concat(counts, " "), "3 6 9 10 10")
 	t.same("the player says it is not settled until the last is made", table.concat(flags, " "), "0 0 0 1 1")
-	t.same("the units stage says how many it made or removed in each frame", table.concat(worked, " "), "3 3 3 1 0")
+	t.same("the units stage says how many it made in each frame", table.concat(made, " "), "3 3 3 1 0")
 	t.same("every unit has been made once", world.nextUnit - 100, 10)
 end
 
@@ -148,6 +148,14 @@ do
 	local _, lastRemove = span(world, "remove")
 	local firstCreate = span(world, "create")
 	t.check("no unit is made before every unit that goes has gone", lastRemove and firstCreate and lastRemove < firstCreate, table.concat(world.events, ", "))
+	t.same("and every unit the seek removed went quietly, in the later frames too", span(world, "explode"), nil)
+	local removals = 0
+	for _, event in ipairs(world.events) do
+		if event:find("^remove") then
+			removals = removals + 1
+		end
+	end
+	t.same("all eight went", removals, 8)
 	t.same("only the second row is there", world.unitNamed("plant") ~= nil and world.unitNamed("tank") == nil, true)
 end
 
@@ -231,23 +239,51 @@ do
 	t.same("and the frame that shows it settles it", world.params[SETTLED], 1)
 end
 
+-- Making and removing have a budget each.
+
+do
+	local units = append(row(6, 0, 100, 0), row(6, 101, 300, 1))
+	local world, player = setup({ last = 400, units = units }, 3)
+	player:message("coilbox_rewind:pause")
+	player:message("coilbox_rewind_budget:4 2")
+	seek(player, 50)
+	player:frame()
+	t.same("a frame makes as many as the make budget", world.unitCount(), 4)
+	t.same("and says so", table.concat({ player:worked() }, " "), "4 0")
+	player:frame()
+	t.same("then the rest", world.unitCount(), 6)
+	seek(player, 200)
+	local counts, removed, made = {}, {}, {}
+	for n = 1, 5 do
+		player:frame()
+		counts[n], removed[n], made[n] = world.unitCount(), player.units.removed, player.units.made
+	end
+	t.same("a frame removes as many as the remove budget", table.concat(removed, " "), "2 2 2 0 0")
+	t.same("the frame that removes the last has no room to make", table.concat(made, " "), "0 0 0 4 2")
+	t.same("so the count goes down and then up", table.concat(counts, " "), "4 2 0 4 6")
+
+	seek(player, 50)
+	player:frame()
+	t.same("a frame that uses its whole removal budget makes nothing", table.concat({ player:worked() }, " "), "0 2")
+end
+
 -- The count arrives as a message.
 
 do
 	local world, player = setup({ last = 600, units = row(6, 100, 400) })
 	player:message("coilbox_rewind:pause")
-	t.same("the budget message is the player's", player:message("coilbox_rewind_budget:2"), true)
+	t.same("the budget message is the player's", player:message("coilbox_rewind_budget:2 3"), true)
 	seek(player, 150)
 	player:frame()
 	t.same("it limits the frame", world.unitCount(), 2)
-	player:message("coilbox_rewind_budget:4")
+	player:message("coilbox_rewind_budget:4 4")
 	player:frame()
 	t.same("a new count applies to the next frame", world.unitCount(), 6)
 	local before = #world.lines
-	for _, bad in ipairs({ "x", "0", "-3", "1.5", "", "nan", "inf" }) do
-		t.same("the message with " .. bad .. " is the player's", player:message("coilbox_rewind_budget:" .. bad), true)
+	for _, bad in ipairs({ "x 4", "0 4", "4 -3", "1.5 4", "", "4", "nan 4", "4 inf", "4 4 4" }) do
+		t.same("the message with \"" .. bad .. "\" is the player's", player:message("coilbox_rewind_budget:" .. bad), true)
 	end
-	t.same("each is refused and logged", #world.lines - before, 7)
+	t.same("each is refused and logged", #world.lines - before, 9)
 	t.check("the line says why", world.lines[#world.lines]:find("budget", 1, true) ~= nil, world.lines[#world.lines])
 	seek(player, 0)
 	player:frame()
@@ -256,7 +292,7 @@ do
 	seek(player, 150)
 	player:frame()
 	t.same("a refused count changes nothing", world.unitCount(), 4)
-	t.same("a message for somebody else is not taken", player:message("coilbox_rewind_budgets:2"), false)
+	t.same("a message for somebody else is not taken", player:message("coilbox_rewind_budgets:2 2"), false)
 end
 
 -- A shot whose unit is not made yet waits for it.

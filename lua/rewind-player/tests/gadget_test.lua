@@ -122,17 +122,18 @@ do
 	t.same("and all of the features", #w.Spring.GetAllFeatures(), 5)
 	t.same("the unsynced half is told when the work starts and ends", w.sent, 2)
 	t.same("by the name it listens for", w.sentName, "coilbox_rewind_work")
-	t.same("with how many units the frame made", w.sentWorked, 1)
+	t.same("with how many units the frame made", w.sentMade, 1)
+	t.same("and removed", w.sentRemoved, 0)
 	t.same("the frame is published", w.params.coilbox_rewind_frame, h.firstFrame)
 	t.same("the world is not settled yet", w.params.coilbox_rewind_settled, 0)
 	local frame = settle(gadget, w, 2)
 	t.same("a few frames later it makes the track's first frame", w.unitCount(), 3)
 	t.same("and is settled", w.params.coilbox_rewind_settled, 1)
-	t.same("the last of them made one", w.sentWorked, 1)
+	t.same("the last of them made one", w.sentMade, 1)
 
 	t.same("a message for the player is taken", gadget:RecvLuaMsg("coilbox_rewind:seek 800", 0), true)
 	t.same("a message for something else is not", gadget:RecvLuaMsg("somebody:else", 0), false)
-	t.same("the budget message is the player's", gadget:RecvLuaMsg("coilbox_rewind_budget:50", 0), true)
+	t.same("the budget message is the player's", gadget:RecvLuaMsg("coilbox_rewind_budget:50 50", 0), true)
 	frame = settle(gadget, w, frame + 1)
 	t.same("the seek is where the next frame is", w.params.coilbox_rewind_frame, 800)
 	t.same("with the units of that frame", w.unitCount(), 4)
@@ -261,42 +262,62 @@ do
 	t.check("to a fraction of a millisecond", lines[1]:find("took 34.5 ms", 1, true) ~= nil, lines[1])
 end
 
--- The unsynced half works out how many units a frame may make or remove
--- (issue #3988). It is sent back as a message to the synced half, which has no
--- clock. Half a simulation frame is 16.7 ms.
+-- The unsynced half works out how many units a frame may make and how many it
+-- may remove (issue #3988). It is sent back as a message to the synced half,
+-- which has no clock. Half a simulation frame is 16.7 ms.
 
 do
 	local lines, clock = {}, { now = 0 }
 	local gadget = unsynced(PLAYER, lines, clock)
 	local frame = 0
-	local function work(milliseconds, worked)
+	local function work(milliseconds, made, removed)
 		frame = frame + 1
 		gadget:RecvFromSynced("coilbox_rewind_work", 0, frame)
 		clock.now = clock.now + milliseconds
-		gadget:RecvFromSynced("coilbox_rewind_work", 1, frame, worked)
+		gadget:RecvFromSynced("coilbox_rewind_work", 1, frame, made, removed or 0)
 	end
 	local function said()
-		return table.concat(clock.messages, " ")
+		return table.concat(clock.messages, " | ")
+	end
+	local function last()
+		return clock.messages[#clock.messages]
 	end
 	work(5, 0)
 	t.same("a frame that made and removed nothing says nothing", #clock.messages, 0)
 	work(1, 1)
-	t.same("a unit a millisecond fits 16 in half a frame, but the budget at most doubles from one", said(), "coilbox_rewind_budget:2")
+	t.same("a unit a millisecond fits 16 in half a frame, but the budget at most doubles from one", last(), "coilbox_rewind_budget:2 1")
 	work(2, 2)
 	work(4, 4)
 	work(8, 8)
-	t.same("each frame of a seek doubles it", said(), "coilbox_rewind_budget:2 coilbox_rewind_budget:4 coilbox_rewind_budget:8 coilbox_rewind_budget:16")
+	t.same("each frame of a seek doubles it", said(), "coilbox_rewind_budget:2 1 | coilbox_rewind_budget:4 1 | coilbox_rewind_budget:8 1 | coilbox_rewind_budget:16 1")
 	work(16, 16)
 	t.same("a budget that does not change is not sent again", #clock.messages, 4)
 	work(48, 16)
-	t.same("a frame that took 3 ms a unit cuts it to 5", clock.messages[5], "coilbox_rewind_budget:5")
+	t.same("a frame that took 3 ms a unit cuts it to 5", last(), "coilbox_rewind_budget:5 1")
 	t.same("and the slow frame is logged as before", #lines, 1)
 	work(0.5, 5)
-	t.same("a cheap frame of a few units cannot more than double it", clock.messages[6], "coilbox_rewind_budget:10")
+	t.same("a cheap frame of a few units cannot more than double it", last(), "coilbox_rewind_budget:10 1")
 	work(0, 10)
-	t.same("a frame the timer read as no time at all does not divide by nothing", clock.messages[7], "coilbox_rewind_budget:20")
+	t.same("a frame the timer read as no time at all does not divide by nothing", last(), "coilbox_rewind_budget:20 1")
 	work(60, 2)
-	t.same("a budget is never below one", clock.messages[8], "coilbox_rewind_budget:1")
+	t.same("a budget is never below one", last(), "coilbox_rewind_budget:1 1")
+	work(8, 40)
+	t.same("a budget is never more than twice what the last frame made", last(), "coilbox_rewind_budget:80 1")
+	local sent = #clock.messages
+	work(0.3, 3)
+	t.same("the few cheap units that end a seek leave it", #clock.messages, sent)
+	work(3, 3)
+	t.same("so do a few dear ones that still fit in half a frame", #clock.messages, sent)
+	work(20, 3)
+	t.same("a few that took longer than half a frame cut it, even when they did not use it all", last(), "coilbox_rewind_budget:2 1")
+
+	work(2, 0, 4)
+	t.same("a frame of removals sets the removal budget and leaves the other", last(), "coilbox_rewind_budget:2 8")
+	sent = #clock.messages
+	work(5, 5, 5)
+	t.same("a frame that did both says what neither costs, so changes neither", #clock.messages, sent)
+	work(0.4, 0, 8)
+	t.same("a removal budget moves on removals alone", last(), "coilbox_rewind_budget:2 16")
 end
 
 -- The guard.

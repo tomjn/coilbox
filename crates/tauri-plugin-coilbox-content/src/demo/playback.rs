@@ -2806,6 +2806,62 @@ end
         assert!(errors.is_empty(), "{errors:#?}");
     }
 
+    /// Seeks across a whole match against a real engine (issue #3988). The
+    /// driver's seeks plan goes from the first frame to the last ten seconds,
+    /// back, to the end, back, and again, and waits each time for the player
+    /// to say the world has caught up. A seek that needs many units made or
+    /// removed is spread over frames, so the engine has to have the track's
+    /// units and features at each stop, no frame's work may have taken longer
+    /// than a simulation frame, and no Lua may have raised.
+    ///
+    /// Give it a replay of a whole match in `COILBOX_ANALYSIS_REPLAY`, with
+    /// the variables the tests above read. `COILBOX_PLAYBACK_TRACK` names a
+    /// track to play instead of the one recorded from the replay, for a match
+    /// with more units than any replay has: `crates/coilbox-track/tests/crowd.rs`
+    /// makes one from the recorded track. A machine doing other work can fail
+    /// this on a slow frame that is not the player's.
+    #[test]
+    #[ignore = "needs an engine, Splinter Faction, a map and a replay of a whole match on them"]
+    fn a_seek_across_a_whole_match_settles_in_frames_that_fit() {
+        let Some(prepared) = prepared(false) else {
+            return;
+        };
+        prepared.rewrite(REWIND_PLAYER_ADAPTERS);
+        if let Some(track) = var("COILBOX_PLAYBACK_TRACK") {
+            // The recorded track is a hard link to the stored one.
+            let at = prepared.game_dir.join("coilbox_rewind/track.cbtrack");
+            std::fs::remove_file(&at).unwrap();
+            std::fs::copy(track, &at).unwrap();
+        }
+        let output = driven(&prepared, "driver_seeks.lua");
+        for l in lines_with(&output, &["REWIND_DRIVER ", "COILBOX_REWIND_PLAYER"]) {
+            eprintln!("{l}");
+        }
+        let driver = driver_lines(&output);
+        assert!(!driver.iter().any(|l| l.starts_with("lost ")), "{driver:?}");
+        let settles: Vec<&&str> = driver
+            .iter()
+            .filter(|l| l.starts_with("seek_settle "))
+            .collect();
+        let stops: Vec<&&str> = driver.iter().filter(|l| l.starts_with("seeks ")).collect();
+        assert_eq!(settles.len(), 8, "{driver:?}");
+        assert_eq!(stops.len(), 8, "{driver:?}");
+        for l in &settles {
+            assert_eq!(field(l, "settled"), "1", "{l}");
+        }
+        for l in &stops {
+            assert_eq!(field(l, "shown"), field(l, "frame"), "{l}");
+            assert_eq!(field(l, "engine_units"), field(l, "track_units"), "{l}");
+            assert_eq!(field(l, "engine_features"), field(l, "track_features"), "{l}");
+            assert!(number(l, "place") <= 0.01, "{l}");
+            assert_eq!(number(l, "wrong_build_state"), 0.0, "{l}");
+        }
+        let slow = lines_with(&output, &["slow frame:"]);
+        assert!(slow.is_empty(), "{slow:#?}");
+        let errors = lua_errors(&output);
+        assert!(errors.is_empty(), "{errors:#?}");
+    }
+
     /// The widget that presses the timeline's keys in the engine. It is
     /// written into the game folder for the test below and is not part of the
     /// game.

@@ -217,10 +217,13 @@ local function lookAtDeathGround()
 	deathCount = 0
 end
 
---- Seeks, waits for the player to show the frame, and lets the engine settle.
+--- Seeks, waits for the player to show the frame and say that the world has
+-- caught up (a seek can take several frames, issue #3988), and lets the engine
+-- settle.
 local function seekTo(frame)
 	send("seek " .. frame)
 	push("await", frame)
+	push("settled")
 	push("wait", SETTLE)
 end
 
@@ -858,6 +861,7 @@ local function matchPlan()
 	send("speed 32")
 	send("play 1")
 	push("await", last, whole)
+	push("settled")
 	push("wait", SETTLE)
 	push("run", function()
 		measure("played_forward", last)
@@ -865,6 +869,7 @@ local function matchPlan()
 	end)
 	send("reverse")
 	push("await", first, whole)
+	push("settled")
 	push("wait", SETTLE)
 	push("run", function()
 		measure("played_backward", first)
@@ -1061,6 +1066,7 @@ local function plan()
 	send("play 1")
 	send("speed 32")
 	push("await", last)
+	push("settled")
 	push("wait", SETTLE)
 	push("run", function()
 		measure("played_to_end", last)

@@ -28,10 +28,11 @@
 --
 -- The same timing sets how much a seek may do in one frame (issue #3988). A
 -- seek can need hundreds of units made or removed, at a cost for each that only
--- the engine knows. The synced half says how many it made or removed in the
--- frame, the unsynced half works out how many fit in half a simulation frame
--- and sends that back as a Lua message, and the player does no more than that
--- in a frame until it hears another. The player starts at one.
+-- the engine knows. The synced half says how many it made and how many it
+-- removed in the frame, the unsynced half works out how many of each fit in half
+-- a simulation frame and sends that back as a Lua message, and the player does
+-- no more than that in a frame until it hears another. The player starts at one
+-- of each. The message reaches the synced half about two frames later.
 --
 -- The base game's own gadgets still run, except those the game's adapter
 -- switches off (issue #3799). !coilbox_rewind_guard.lua stops the rest killing a
@@ -215,24 +216,47 @@ else
 	local started
 	local lastLine
 	local slow, worst = 0, 0
-	-- How many units a frame may make or remove, as last sent.
-	local budget = FIRST_BUDGET
+	-- How many units a frame may make and remove, as last sent.
+	local makeBudget, removeBudget = FIRST_BUDGET, FIRST_BUDGET
 
-	--- A frame made or removed `worked` units in `took` milliseconds. Each took
-	-- that long with the rest of the frame's work counted in, which only makes it
-	-- more, so the budget errs low. It at most doubles in a frame, because a few
-	-- units say little about the next many, and it is never below one.
-	local function retune(took, worked)
-		local each = math.max(took / worked, 0.001)
-		local wanted = math.floor(TARGET / each)
-		local count = math.max(1, math.min(wanted, 2 * math.max(worked, budget)))
-		if count ~= budget then
-			budget = count
-			Spring.SendLuaRulesMsg(BUDGET .. count)
+	--- The budget after a frame in which `count` units took `took` milliseconds,
+	-- for a budget that was `budget`. Each took that long with the rest of the
+	-- frame's work counted in, which only makes it more, so what fits in `TARGET`
+	-- errs low. A frame that used the whole budget sets it to what fits, at least
+	-- one and at most twice what the frame did. The cost of a few units says
+	-- little about the next many, since the cost of a unit moves with how many
+	-- there are. A frame that used less of the budget leaves it alone unless it
+	-- took longer than `TARGET`, and then cuts it. The last frame of a seek has
+	-- few units and a rest of the frame that is dear beside them, and says little.
+	-- So a seek starts with the budget the last one ended on and doubles it each
+	-- frame while the cost allows.
+	local function fit(took, count, budget)
+		local wanted = math.floor(TARGET / math.max(took / count, 0.001))
+		if count >= budget then
+			return math.max(1, math.min(wanted, 2 * count))
+		elseif took > TARGET then
+			return math.max(1, math.min(wanted, budget))
+		end
+		return budget
+	end
+
+	--- A frame made `made` units and removed `removed` in `took` milliseconds.
+	-- Making costs the engine something other than removing, so only a frame that
+	-- did one of them says what that one costs.
+	local function retune(took, made, removed)
+		local make, remove = makeBudget, removeBudget
+		if made > 0 and removed == 0 then
+			make = fit(took, made, makeBudget)
+		elseif removed > 0 and made == 0 then
+			remove = fit(took, removed, removeBudget)
+		end
+		if make ~= makeBudget or remove ~= removeBudget then
+			makeBudget, removeBudget = make, remove
+			Spring.SendLuaRulesMsg(BUDGET .. make .. " " .. remove)
 		end
 	end
 
-	function gadget:RecvFromSynced(name, phase, frame, worked)
+	function gadget:RecvFromSynced(name, phase, frame, made, removed)
 		if name ~= WORK then
 			return false
 		end
@@ -245,8 +269,8 @@ else
 		end
 		local took = Spring.DiffTimers(clock(), started, true, micros)
 		started = nil
-		if worked and worked > 0 then
-			retune(took, worked)
+		if made and removed and made + removed > 0 then
+			retune(took, made, removed)
 		end
 		if took <= LIMIT then
 			return true
