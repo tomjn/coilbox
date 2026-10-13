@@ -47,6 +47,8 @@ To count what a dump holds:
 luajit lua/rewind-recorder/tests/dump_summary.lua <dump>
 ```
 
+`scripts/rewind-headless.sh` does the whole route in one command: it plays a short scripted match, records it, thins the dump and checks the counts and one unit's position against known values. It needs an engine and Splinter Faction, and says which version its values are for.
+
 `tests/dump.lua` is a reader written from this page. It is the reference for a second reader.
 
 To turn a dump into a track and print what was kept:
