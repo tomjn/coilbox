@@ -16,7 +16,7 @@ export type Direction = 1 | -1;
  * in both, and this gives the later, except at the track's last frame, which
  * has no later window. A frame past the end is in the last window and one
  * before the start is in the first. The arithmetic of `window_of_frame` in
- * `crates/coilbox-track/src/header.rs`, whose comment says the earlier.
+ * `crates/coilbox-track/src/header.rs`.
  */
 export function windowOfFrame(g: WindowGeometry, frame: number): number {
   const k = Math.floor(Math.max(frame - g.firstFrame, 0) / g.windowLength);

@@ -157,8 +157,8 @@ impl Header {
     }
 
     /// The window that holds `frame`. A frame on a boundary is in two
-    /// windows, and this gives the earlier. A frame past the end is in the
-    /// last window and one before the start is in the first.
+    /// windows, and this gives the later. A frame at the end or past it is in
+    /// the last window and one before the start is in the first.
     pub fn window_of_frame(&self, frame: u32) -> u32 {
         let k = frame.saturating_sub(self.first_frame) / self.window_length;
         k.min(self.window_count - 1)
