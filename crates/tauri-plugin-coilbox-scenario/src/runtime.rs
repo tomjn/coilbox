@@ -17,7 +17,8 @@ use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager, Runtime};
 
 /// The trees a game vendors. `tests/` and `README.md` sit outside them on
-/// purpose and are never installed.
+/// purpose and are never installed. The licence notice is written beside them
+/// (see [`NOTICE_DIR`]).
 const VENDORED: [&str; 3] = ["luarules", "luaui", "missions"];
 
 /// The version marker and capability table, relative to the game root.
@@ -27,6 +28,24 @@ pub const MARKER: &str = "missions/runtime.lua";
 /// game's file, never coilbox's: it is the one thing under `missions/` that an
 /// install does not write and an update does not touch.
 pub const EXTENSIONS: &str = "missions/extensions.lua";
+
+/// The folder at a game's root that holds the licence notice for coilbox's Lua
+/// (issue #3998). The name carries `coilbox` so it reads as coilbox's, and it
+/// cannot collide with a game's own `LICENSE` or `COPYING`, which sit at the
+/// root. The folder is coilbox's outright: an install rewrites every file in it
+/// and removes any other.
+const NOTICE_DIR: &str = "coilbox-licence";
+
+/// What goes in [`NOTICE_DIR`], as the file name in the game and its contents.
+/// The contents are embedded from the files in the repo, so the licence texts are
+/// copied byte for byte and the same bytes are written from a dev run and a
+/// packaged one. `GAME-NOTICE.md` is the notice worded for a game archive, where
+/// `lua/LICENSE.md` points at a repository root that a game does not have.
+const NOTICE_FILES: [(&str, &[u8]); 3] = [
+    ("NOTICE.md", include_bytes!("../../../lua/GAME-NOTICE.md")),
+    ("LICENSE-MIT", include_bytes!("../../../LICENSE")),
+    ("COPYING", include_bytes!("../../../lua/COPYING")),
+];
 
 /// Where the runtime can sit inside the resource directory, in the order we take
 /// them. The Windows installer moves it into `.coilbox\resources` so the install
@@ -176,7 +195,36 @@ pub fn install(src: &Path, dest: &Path) -> Result<Vec<String>, String> {
                 .map_err(|e| format!("could not remove {}: {e}", stale.display()))?;
         }
     }
+    install_notice(dest)?;
     Ok(written)
+}
+
+/// Write the licence notice into `dest`, and drop any file an older notice left
+/// in the folder. Not part of the list [`install`] returns, which is the runtime's
+/// files.
+///
+/// Every game that takes the runtime takes this, the generated test games
+/// included: the install is one call, and a copy in a folder that never leaves
+/// the machine does no harm.
+fn install_notice(dest: &Path) -> Result<(), String> {
+    let dir = resolve_case(dest, Path::new(NOTICE_DIR));
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("could not create {}: {e}", dir.display()))?;
+    for (name, bytes) in NOTICE_FILES {
+        let to = dir.join(name);
+        std::fs::write(&to, bytes).map_err(|e| format!("could not write {}: {e}", to.display()))?;
+    }
+    if let Ok(entries) = std::fs::read_dir(&dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let path = entry.path();
+            if path.is_file() && !NOTICE_FILES.iter().any(|(own, _)| OsStr::new(own) == name) {
+                std::fs::remove_file(&path)
+                    .map_err(|e| format!("could not remove {}: {e}", path.display()))?;
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Every directory in `root` that is a spelling of the vendored tree `tree`,
@@ -501,6 +549,135 @@ mod tests {
         assert!(!game.path().join("tests").exists());
         assert!(!game.path().join("README.md").exists());
         assert!(!game.path().join("missions/.DS_Store").exists());
+    }
+
+    /// The repo file a game's copy is made from, read at test time so the
+    /// comparison is against the file on disk and not against the embedded bytes.
+    fn repo_file(rel: &str) -> Vec<u8> {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join(rel);
+        std::fs::read(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
+    }
+
+    /// The three files an install writes beside the runtime, and the repo file
+    /// each is a copy of.
+    const NOTICE_COPIES: [(&str, &str); 3] = [
+        ("coilbox-licence/NOTICE.md", "lua/GAME-NOTICE.md"),
+        ("coilbox-licence/LICENSE-MIT", "LICENSE"),
+        ("coilbox-licence/COPYING", "lua/COPYING"),
+    ];
+
+    #[test]
+    fn a_fresh_install_writes_the_notice_and_both_licence_texts() {
+        let src = source_tree();
+        let game = tempfile::tempdir().expect("tempdir");
+
+        install(src.path(), game.path()).expect("install");
+
+        for (rel, from) in NOTICE_COPIES {
+            assert_eq!(
+                std::fs::read(game.path().join(rel)).unwrap_or_else(|e| panic!("{rel}: {e}")),
+                repo_file(from),
+                "{rel} is not a copy of {from}"
+            );
+        }
+    }
+
+    #[test]
+    fn an_upgrade_from_an_install_without_the_notice_adds_it() {
+        let src = source_tree();
+        let game = tempfile::tempdir().expect("tempdir");
+        install(src.path(), game.path()).expect("install");
+        std::fs::remove_dir_all(game.path().join("coilbox-licence")).expect("remove");
+
+        install(src.path(), game.path()).expect("upgrade");
+
+        for (rel, from) in NOTICE_COPIES {
+            assert_eq!(
+                std::fs::read(game.path().join(rel)).expect(rel),
+                repo_file(from)
+            );
+        }
+    }
+
+    #[test]
+    fn an_upgrade_replaces_a_notice_that_has_changed() {
+        let src = source_tree();
+        let game = tempfile::tempdir().expect("tempdir");
+        install(src.path(), game.path()).expect("install");
+        for (rel, _) in NOTICE_COPIES {
+            std::fs::write(game.path().join(rel), "an older notice").expect("write");
+        }
+
+        install(src.path(), game.path()).expect("upgrade");
+
+        for (rel, from) in NOTICE_COPIES {
+            assert_eq!(
+                std::fs::read(game.path().join(rel)).expect(rel),
+                repo_file(from)
+            );
+        }
+    }
+
+    /// The folder is coilbox's, so a file an older notice shipped and this one
+    /// does not goes, and the game's own licence files at its root stay.
+    #[test]
+    fn an_upgrade_drops_a_stale_notice_file_and_keeps_the_games_own_licence() {
+        let src = source_tree();
+        let game = tempfile::tempdir().expect("tempdir");
+        install(src.path(), game.path()).expect("install");
+        let stale = game.path().join("coilbox-licence/OLD-NOTICE.md");
+        std::fs::write(&stale, "from an older coilbox").expect("write");
+        let own_licence = game.path().join("LICENSE");
+        std::fs::write(&own_licence, "the game's licence").expect("write");
+        let own_copying = game.path().join("COPYING");
+        std::fs::write(&own_copying, "the game's GPL").expect("write");
+
+        install(src.path(), game.path()).expect("upgrade");
+
+        assert!(!stale.exists());
+        assert_eq!(
+            std::fs::read_to_string(&own_licence).expect("read"),
+            "the game's licence"
+        );
+        assert_eq!(
+            std::fs::read_to_string(&own_copying).expect("read"),
+            "the game's GPL"
+        );
+    }
+
+    /// Only the three trees are the runtime's, so the notice folder is neither
+    /// listed as a runtime file nor seen as a second spelling of a tree.
+    #[test]
+    fn the_notice_is_not_a_runtime_file() {
+        let src = source_tree();
+        let game = tempfile::tempdir().expect("tempdir");
+        let written = install(src.path(), game.path()).expect("install");
+
+        assert!(written
+            .iter()
+            .all(|file| !file.starts_with("coilbox-licence")));
+        assert!(vendored_files(game.path())
+            .iter()
+            .all(|rel| !key(rel).starts_with("coilbox-licence")));
+        assert!(duplicates(src.path(), game.path()).is_empty());
+    }
+
+    /// The game's copy names the licence the same way `lua/LICENSE.md` does, so
+    /// the two cannot drift apart on what is offered.
+    #[test]
+    fn the_games_notice_names_the_same_licence_as_the_repo_notice() {
+        let spdx = |bytes: Vec<u8>| {
+            String::from_utf8(bytes)
+                .expect("utf8")
+                .lines()
+                .find(|line| line.starts_with("SPDX-License-Identifier:"))
+                .map(str::to_string)
+        };
+        let repo = spdx(repo_file("lua/LICENSE.md"));
+        assert!(repo.is_some());
+        assert_eq!(spdx(repo_file("lua/GAME-NOTICE.md")), repo);
     }
 
     #[test]

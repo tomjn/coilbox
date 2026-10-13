@@ -1,0 +1,22 @@
+# Licence of the coilbox Lua in this game
+
+SPDX-License-Identifier: MIT OR GPL-2.0-or-later
+
+Coilbox wrote the Lua files named `coilbox_*`, the Lua under `luarules/mission_runtime/`, and `missions/runtime.lua`. Coilbox installed them into this game. They are not the game's own files, and this notice does not cover the rest of the game.
+
+These files are offered under either of two licences, at your choice:
+
+- the MIT licence, the text of which is in [LICENSE-MIT](LICENSE-MIT) beside this file
+- the GNU General Public License, version 2 or any later version, the text of which is in [COPYING](COPYING) beside this file
+
+Each gadget and widget names this in its `GetInfo` table:
+
+```lua
+license = "MIT or GNU GPL, v2 or later",
+```
+
+The Lua runs inside the Recoil engine and calls its Lua API. Recoil is licensed under the GNU General Public License, version 2 or any later version. Offering the Lua under the GPL as well as the MIT licence keeps it compatible with the engine's licence.
+
+The last paragraph of `LICENSE-MIT` mentions `lua/LICENSE.md`. That is a file in the coilbox source repository, https://github.com/tomjn/coilbox, and this notice is the copy for a game.
+
+Coilbox wrote this folder when it installed the mission runtime, and writes it again on each install. Edits to the files in this folder are replaced. This file states how the code is offered. It is not legal advice.
