@@ -449,6 +449,9 @@ function M.new(options)
 			vz = speed[3],
 			-- The speed it was created with, which a laser keeps for its length.
 			speedf = math.sqrt(speed[1] ^ 2 + speed[2] ^ 2 + speed[3] ^ 2),
+			dx = 0,
+			dy = 0,
+			dz = 0,
 			endX = target[1],
 			endY = target[2],
 			endZ = target[3],
@@ -461,6 +464,10 @@ function M.new(options)
 			damages = damages,
 			moves = 0,
 		}
+		local made = world.projectiles[id]
+		if made.speedf > 0 then
+			made.dx, made.dy, made.dz = speed[1] / made.speedf, speed[2] / made.speedf, speed[3] / made.speedf
+		end
 		world.spawned = world.spawned + 1
 		event("spawn", id)
 		return id
@@ -497,6 +504,19 @@ function M.new(options)
 			return
 		end
 		found.vx, found.vy, found.vz = x, y, z
+		local length = math.sqrt(x * x + y * y + z * z)
+		if length > 0 then
+			found.dx, found.dy, found.dz = x / length, y / length, z / length
+		end
+	end
+
+	--- The way a projectile points, which follows its velocity and keeps the
+	-- last one when that is nothing (CProjectile::SetVelocityAndSpeed).
+	function Spring.GetProjectileDirection(id)
+		local found = projectile(id)
+		if found then
+			return found.dx, found.dy, found.dz
+		end
 	end
 
 	function Spring.SetProjectileTimeToLive(id, ttl)

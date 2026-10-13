@@ -12,10 +12,10 @@
 -- - Move control only stops the engine moving a projectile. On every frame the
 --   engine still looks for a hit from where the projectile is to where its
 --   speed would take it, and takes one that is under the ground to have hit
---   it. So a held shot is given a speed no longer than the track's tolerance,
---   which keeps its direction and reaches nothing, and is kept above the
---   ground. A track has a shot under the ground on its last frame, because
---   that is the frame the engine found the hit on.
+--   it. So a held shot is given a speed of one position step, which keeps its
+--   direction and reaches nothing, is kept above the ground, and is held
+--   short of where its flight ends. A track has a shot under the ground on its
+--   last frame, because that is the frame the engine found the hit on.
 -- - That is also all a shot needs to land. Played forward at near the match's
 --   own speed, a shot on its last frame is put where the track last has it at
 --   the speed the track has, and let go. The engine finds the hit the match
@@ -160,12 +160,13 @@ function M.new(context, units, clock)
 		turn = turn,
 		-- The frame a weapon last sounded on, by unit and weapon.
 		soundAt = {},
-		-- How far a held shot's speed reaches, and how far a shot is at most
-		-- wrong by. A speed below it is a shot standing still.
-		hold = header.tolerance,
+		-- How far a shot is at most from where the match had it. A shot slower
+		-- than that in a frame is standing still.
+		tolerance = header.tolerance,
 		stopped = header.tolerance * header.tolerance,
-		-- How far above the ground a held shot is kept: the least distance the
-		-- track tells apart.
+		-- The speed a held shot is given, and how far above the ground it is
+		-- kept: the least distance the track tells apart.
+		hold = header.positionStep,
 		lift = header.positionStep,
 		window = nil,
 		from = 1,
@@ -184,6 +185,8 @@ function M.new(context, units, clock)
 		stamp = {},
 		-- The serial number an engine id is for.
 		serialOf = {},
+		-- How fast a bolt last flew, by serial number.
+		flown = {},
 		-- Shots the engine has ended or has been handed, which are not made again
 		-- until a jump, a turn or the next window.
 		spent = {},
@@ -203,6 +206,7 @@ function Projectiles:forget(serial, id)
 	self.state[serial] = nil
 	self.born[serial] = nil
 	self.stamp[serial] = nil
+	self.flown[serial] = nil
 end
 
 --- Whether the engine's projectile `id` is still the one created for `serial`.
@@ -434,13 +438,32 @@ function Projectiles:steer(w, p, d, t, step, watched)
 	local moving = speed >= self.stopped
 	local stops = self.stops[d]
 	if not id then
+		local cx, cy, cz = vx, vy, vz
 		if stops and not moving then
-			-- A bolt that has hit has no direction left to be created with.
-			return
+			-- A bolt that has hit has no direction left, and it is drawn along
+			-- one. The track's last frame before `t` on which it moves has it.
+			local a = self.ahead
+			local back = math.ceil(t) - 1
+			local first = w.projectileFirstFrame[p]
+			while back >= first and w:sampleProjectile(p, back, a) and a[4] * a[4] + a[5] * a[5] + a[6] * a[6] < self.stopped do
+				back = back - 1
+			end
+			if back < first then
+				return
+			end
+			cx, cy, cz = a[4], a[5], a[6]
 		end
-		id = self:create(w, p, d, serial, x, y, z, vx, vy, vz)
+		id = self:create(w, p, d, serial, x, y, z, cx, cy, cz)
 		if not id then
 			return
+		end
+		if stops and not moving then
+			-- Created at the speed it flew at, which the engine keeps for its
+			-- length, and held from here with one that reaches nothing.
+			local flew = math.sqrt(cx * cx + cy * cy + cz * cz)
+			self.flown[serial] = flew
+			local scale = self.hold / flew
+			self.Spring.SetProjectileVelocity(id, cx * scale, cy * scale, cz * scale)
 		end
 	end
 
@@ -454,22 +477,68 @@ function Projectiles:steer(w, p, d, t, step, watched)
 			return
 		end
 		if stops and moving then
-			-- A bolt lands on the frame before the track has it standing still.
+			-- A bolt lands on the last whole frame before the track has it standing
+			-- still, which is the frame the engine found the hit on.
 			local a = self.ahead
 			local to = t + step
 			if to > last then
 				to = last
 			end
 			if w:sampleProjectile(p, to, a) and a[4] * a[4] + a[5] * a[5] + a[6] * a[6] < self.stopped then
-				self:release(serial, id, d, x, y, z, vx, vy, vz)
+				local before = math.ceil(to) - 1
+				local first = w.projectileFirstFrame[p]
+				while before >= first and w:sampleProjectile(p, before, a) and a[4] * a[4] + a[5] * a[5] + a[6] * a[6] < self.stopped do
+					before = before - 1
+				end
+				if before >= first then
+					self:release(serial, id, d, a[1], a[2], a[3], a[4], a[5], a[6])
+				else
+					self:release(serial, id, d, x, y, z, vx, vy, vz)
+				end
 				return
 			end
 		end
 	end
 
-	-- Held. The engine takes a projectile under the ground, or in the water
-	-- when its weapon is not one for the water, to have hit it.
+	-- Held. Where a shot ends it is on what it hit, or about to be, and the
+	-- engine takes a projectile that reaches or is inside something to have hit
+	-- it. So a shot on its last frame is held the track's tolerance short of
+	-- where the track has it, which is how far the playback's units can be from
+	-- the match's. A bolt stops on the frame it hits, on what it hit, so from
+	-- the frame before it stops it is held a frame of its flight short.
 	local Spring = self.Spring
+	local last = w.projectileLastFrame[p]
+	local back = 0
+	if stops then
+		local flown = self.flown
+		local ending = not moving
+		if moving then
+			flown[serial] = math.sqrt(speed)
+			local a = self.ahead
+			local to = t + 1
+			if to > last then
+				to = last
+			end
+			ending = w:sampleProjectile(p, to, a) and a[4] * a[4] + a[5] * a[5] + a[6] * a[6] < self.stopped
+		end
+		if ending then
+			back = flown[serial]
+		end
+	elseif moving and t > last - 1 and w.projectileFlags[p] < 2 then
+		back = self.tolerance
+	end
+	if back > 0 then
+		if moving then
+			local scale = back / math.sqrt(speed)
+			x, y, z = x - vx * scale, y - vy * scale, z - vz * scale
+		else
+			-- It keeps the direction it was last held with.
+			local dx, dy, dz = Spring.GetProjectileDirection(id)
+			x, y, z = x - dx * back, y - dy * back, z - dz * back
+		end
+	end
+	-- The same goes for one under the ground, or in the water when its weapon
+	-- is not one for the water.
 	local floor = Spring.GetGroundHeight(x, z)
 	if floor < 0 and not self.wet[d] then
 		floor = 0
