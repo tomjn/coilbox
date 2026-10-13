@@ -1,14 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { Loader2 } from "lucide-react";
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
-import { Slider } from "@/components/ui/slider";
-import { formatDuration } from "@/lib/format";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router";
 import type { DemoInfo, ReplayTrackHeader } from "../../bindings";
 import { useUnitsyncMinimap } from "../../config";
 import { createReplayClock, type ReplayClock } from "../../replayMapView/clock";
@@ -18,11 +11,24 @@ import {
   type MapViewStatus,
 } from "../../replayMapView/loop";
 import { teamStyles } from "../../replayMapView/paint";
+import { createPlayback, type Playback } from "../../replayMapView/playback";
+import { TIMELINE_KEYS } from "../../replayMapView/timelineKeys";
+import {
+  type MarkGroup,
+  toFrameParam,
+  urlFrame,
+} from "../../replayMapView/timelineMarks";
 import { teamLabel } from "../../replaySideLabel";
 import type { ReplayTrackError, ReplayTrackHandle } from "../../replayTrack";
 import { useReplayTrack } from "../../replayTrack";
 import { useStoredTracks } from "../../replayTracks";
+import { useReplayTimelineMarks } from "../../useReplayTimelineMarks";
 import { plural } from "./ReplayAnalysisSection";
+import {
+  performAction,
+  ReplayPlaybackBar,
+  timelineKeyHandler,
+} from "./ReplayPlaybackBar";
 import { RECORDING_SECTION_ID } from "./ReplayRecordingSection";
 import { SectionHelp } from "./SectionHelp";
 
@@ -49,16 +55,18 @@ interface Named {
  * one, or one that cannot be read, says so and leads to the recording section
  * above it, which has the button that records the replay again.
  *
- * The time comes from a {@link ReplayClock} this section owns. For now a plain
- * slider sets it. The timeline of #3808 replaces the slider and drives the same
- * clock, so nothing in the view changes when it does.
+ * The time comes from a {@link ReplayClock} this section owns. The timeline
+ * under the map (#3808) sets it, and the view draws whatever the clock says.
  */
 export function ReplayMapViewSection({
   info,
   enginePath,
   dataDir,
+  replayPath,
 }: {
   info: DemoInfo;
+  /** The replay file, whose chat and leavers are marks on the timeline. */
+  replayPath: string;
   /** For the map's picture. Without them the units are on plain ground. */
   enginePath: string | undefined;
   dataDir: string | undefined;
@@ -94,6 +102,8 @@ export function ReplayMapViewSection({
           track.handle.header.mapSize[0] > 0 &&
           track.handle.header.mapSize[1] > 0 ? (
             <RecordedMatch
+              info={info}
+              replayPath={replayPath}
               handle={track.handle}
               mapName={info.mapName}
               minimapUrl={minimap.url}
@@ -181,6 +191,26 @@ function Legend({ header }: { header: ReplayTrackHeader }) {
         Point at a unit to name it. Click one to keep it named, and click the
         ground to let it go.
       </p>
+      <p>
+        Under the map, the knob sets the time and the buttons play the match
+        forward or in reverse, at the speed beside them. A tall bar is a unit
+        destroyed, a dot is chat and a diamond is a player leaving, taken from
+        the replay and its analysis. Marks that would touch are drawn as one,
+        larger, and clicking it goes to the earliest event in it. A replay that
+        has not been analysed has no kills. The address holds the time, so a
+        link opens at that moment.
+      </p>
+      <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5">
+        {TIMELINE_KEYS.map((row) => (
+          <div key={row.show} className="contents">
+            <dt className="font-medium">{row.show}</dt>
+            <dd>{row.does}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="text-muted-foreground">
+        The keys work while focus is in the map or the timeline.
+      </p>
       <ul className="flex flex-col gap-1">
         {header.teams.map((team) => (
           <li key={team.id} className="flex items-center gap-1.5">
@@ -205,37 +235,134 @@ function ownerWords(header: ReplayTrackHeader, teamId: number): string {
   return `${owner}${team.isAi ? " (AI)" : ""}, ${teamLabel(team.allyTeam)}`;
 }
 
-/** The map, the canvas over it, and the control that sets the time. */
+/** The address's name for the time, in frames of the track. */
+const TIME_PARAM = "frame";
+
+/**
+ * The map, the canvas over it, and the timeline that sets the time.
+ *
+ * The time is kept in the page's address as `?frame=`. A link opens at that
+ * frame, held inside the match. The address is replaced, never added to, and
+ * only when playing stops or a seek ends.
+ *
+ * Keys act while focus is anywhere in here and nowhere else. A text field, and
+ * a control that keeps a key for itself, keep it.
+ */
 function RecordedMatch({
+  info,
+  replayPath,
   handle,
   mapName,
   minimapUrl,
 }: {
+  info: DemoInfo;
+  replayPath: string;
   handle: ReplayTrackHandle;
   mapName: string;
   minimapUrl: string | null;
 }) {
   const { header } = handle;
-  const clock = useMemo(
-    () => createReplayClock(header.firstFrame),
-    [header.firstFrame],
+  const [params, setParams] = useSearchParams();
+  // Read once, when the match is opened. The address follows the time after.
+  const [opened] = useState(() =>
+    urlFrame(params.get(TIME_PARAM), {
+      first: header.firstFrame,
+      last: header.lastFrame,
+    }),
   );
+  const clock = useMemo(
+    () => createReplayClock(opened ?? header.firstFrame),
+    [header.firstFrame, opened],
+  );
+
+  const setParamsRef = useRef(setParams);
+  setParamsRef.current = setParams;
+  const [playback, setPlayback] = useState<Playback | null>(null);
+  useEffect(() => {
+    const made = createPlayback({
+      clock,
+      header,
+      env: {
+        requestFrame: (callback) => requestAnimationFrame(callback),
+        cancelFrame: (id) => cancelAnimationFrame(id),
+      },
+      onSettled: (frame) =>
+        setParamsRef.current(
+          (was) => {
+            const next = new URLSearchParams(was);
+            next.set(TIME_PARAM, toFrameParam(frame));
+            return next;
+          },
+          { replace: true },
+        ),
+    });
+    setPlayback(made);
+    return () => {
+      made.dispose();
+      setPlayback(null);
+    };
+  }, [clock, header]);
+
+  const marks = useReplayTimelineMarks(info, replayPath);
+  const groupsRef = useRef<readonly MarkGroup[]>([]);
+  const [status, setStatus] = useState<MapViewStatus>({ kind: "ready" });
+
+  const onKeyDown = useMemo(
+    () =>
+      playback
+        ? timelineKeyHandler((action) =>
+            performAction(action, {
+              playback,
+              clock,
+              header,
+              groups: groupsRef.current,
+            }),
+          )
+        : undefined,
+    [playback, clock, header],
+  );
+
   return (
-    <>
+    // biome-ignore lint/a11y/useSemanticElements: a box that holds the map and the bar, which a fieldset would restyle.
+    <div
+      role="group"
+      aria-label="Recorded match"
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: the one place keyboard focus lands to use the timeline's keys on the map and the bar together.
+      tabIndex={0}
+      onKeyDown={onKeyDown}
+      className="flex flex-col gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
       <RecordedMatchCanvas
         handle={handle}
         clock={clock}
         mapName={mapName}
         minimapUrl={minimapUrl}
+        onStatus={setStatus}
       />
-      <TemporaryTimeSlider header={header} clock={clock} />
+      {playback && onKeyDown && (
+        <div
+          style={{
+            width: `min(100%, 44rem, 70vh * ${header.mapSize[0]} / ${header.mapSize[1]})`,
+          }}
+        >
+          <ReplayPlaybackBar
+            header={header}
+            clock={clock}
+            playback={playback}
+            marks={marks}
+            groupsRef={groupsRef}
+            loading={status.kind === "loading"}
+            onKeyDown={onKeyDown}
+          />
+        </div>
+      )}
       {!minimapUrl && (
         <p className="text-xs text-muted-foreground">
           A picture of this map is not available, so the match is drawn on plain
           ground.
         </p>
       )}
-    </>
+    </div>
   );
 }
 
@@ -252,11 +379,14 @@ function RecordedMatchCanvas({
   clock,
   mapName,
   minimapUrl,
+  onStatus,
 }: {
   handle: ReplayTrackHandle;
   clock: ReplayClock;
   mapName: string;
   minimapUrl: string | null;
+  /** Tells the timeline when the picture is waiting for a window. */
+  onStatus: (status: MapViewStatus) => void;
 }) {
   const { header } = handle;
   const [mapX, mapZ] = header.mapSize;
@@ -265,6 +395,8 @@ function RecordedMatchCanvas({
   const countsRef = useRef<HTMLParagraphElement | null>(null);
   const viewRef = useRef<MapView | null>(null);
   const [status, setStatus] = useState<MapViewStatus>({ kind: "ready" });
+  const onStatusRef = useRef(onStatus);
+  onStatusRef.current = onStatus;
   const [pointed, setPointed] = useState<Named | null>(null);
   const [chosen, setChosen] = useState<Named | null>(null);
 
@@ -295,7 +427,10 @@ function RecordedMatchCanvas({
         requestFrame: (callback) => requestAnimationFrame(callback),
         cancelFrame: (id) => cancelAnimationFrame(id),
       },
-      onStatus: setStatus,
+      onStatus: (next) => {
+        setStatus(next);
+        onStatusRef.current(next);
+      },
       onPainted: (_frame, counts) => {
         if (!countsRef.current) return;
         countsRef.current.textContent = [
@@ -445,43 +580,6 @@ function RecordedMatchCanvas({
             : ""}
         </p>
       </div>
-    </div>
-  );
-}
-
-/**
- * Sets the time, until the timeline of #3808 replaces it. It does nothing but
- * move the clock: no play, no reverse, no keys of its own beyond the slider's.
- *
- * It reads the clock, so moving the time renders this and not the map.
- */
-function TemporaryTimeSlider({
-  header,
-  clock,
-}: {
-  header: ReplayTrackHeader;
-  clock: ReplayClock;
-}) {
-  const frame = useSyncExternalStore(clock.subscribe, () => clock.frame);
-  const seconds = (frame - header.firstFrame) / header.framesPerSecond;
-  return (
-    <div className="flex items-center gap-3">
-      <Slider
-        aria-label="Time in the match"
-        className="max-w-[44rem]"
-        min={header.firstFrame}
-        max={header.lastFrame}
-        step={1}
-        value={[frame]}
-        onValueChange={([next]) => {
-          // Dragging back is time going backward, which the track follows by
-          // holding the window before this one.
-          clock.set(next, next < clock.frame ? -1 : 1);
-        }}
-      />
-      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-        {formatDuration(seconds)}
-      </span>
     </div>
   );
 }

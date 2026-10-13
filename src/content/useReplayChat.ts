@@ -42,6 +42,8 @@ export function useReplayChat(replayPath: string) {
   } | null>(null);
 
   useEffect(() => {
+    // An empty path is a page that has no replay file yet: nothing to read.
+    if (!replayPath) return;
     let cancelled = false;
     readChat(replayPath).then(
       (data) => {

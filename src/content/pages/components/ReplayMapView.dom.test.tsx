@@ -17,14 +17,23 @@ import {
   render,
   screen,
 } from "@testing-library/react";
+import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
+  ChatLine,
   DemoInfo,
   ReplayTrackFault,
   ReplayTrackHeader,
+  StoredReplayAnalysis,
   StoredReplayTrack,
+  TimelineEvent,
 } from "../../bindings";
 import fixture from "../../fixtures/replay-track-window.json";
+import {
+  resetReplayAnalysisForTests,
+  seedReplayAnalysisForTests,
+} from "../../replayAnalysis";
+import { resetReplayEventReadsForTests } from "../../replayEventRead";
 import { recordingContext } from "../../replayMapView/testTrack";
 import { ReplayTrackError } from "../../replayTrack/fault";
 import {
@@ -77,6 +86,14 @@ vi.mock("../../config", () => ({
   useUnitsyncMinimap: () => ({ url: MINIMAP, loading: false }),
 }));
 
+/** What the replay file holds, and what the analysis logged. */
+let CHAT: {
+  messages: ChatLine[];
+  incomplete: boolean;
+  events: TimelineEvent[];
+};
+let LOGGED: { kind: string; frame: number }[] = [];
+
 vi.mock("../../bindings", async () => {
   const actual =
     await vi.importActual<Record<string, unknown>>("../../bindings");
@@ -85,6 +102,10 @@ vi.mock("../../bindings", async () => {
     contentReplayTracks: async () => {
       throw new Error("seeded in the test");
     },
+    contentDemoChat: async () => CHAT,
+    contentReplayAnalysisEvents: async (args: { kinds?: string[] }) => ({
+      events: LOGGED.filter((e) => !args.kinds || args.kinds.includes(e.kind)),
+    }),
   };
 });
 
@@ -111,10 +132,16 @@ const raf = {
   waiting: new Map<number, FrameRequestCallback>(),
   next: 1,
   asked: 0,
-  run() {
+  /** The stamp of the last run: animation frames never go back in time. */
+  last: 0,
+  run(
+    this: { last: number; waiting: Map<number, FrameRequestCallback> },
+    stamp = this.last,
+  ) {
+    this.last = stamp;
     const due = [...this.waiting.values()];
     this.waiting.clear();
-    for (const cb of due) cb(0);
+    for (const cb of due) cb(stamp);
   },
 };
 
@@ -130,7 +157,12 @@ beforeEach(() => {
   MINIMAP = "asset://minimap.png";
   hidden = false;
   onScreen = undefined;
+  CHAT = { messages: [], incomplete: false, events: [] };
+  LOGGED = [];
+  resetReplayAnalysisForTests();
+  resetReplayEventReadsForTests();
   raf.waiting.clear();
+  raf.last = 0;
   raf.asked = 0;
   ctx = recordingContext();
   resetReplayTracksForTests();
@@ -194,11 +226,42 @@ async function settle() {
   }
 }
 
-async function show(state: StoredReplayTrack["state"] | null = "current") {
-  if (state) seedReplayTracksForTests([track(state)]);
-  const view = render(
-    <ReplayMapViewSection info={info} enginePath="/engine" dataDir="/data" />,
+/** Every navigation the router made, to tell a replace from a push. */
+const navigations: { action: string; search: string }[] = [];
+
+function mount(url: string, remixed = false) {
+  const router = createMemoryRouter(
+    [
+      {
+        path: "*",
+        element: (
+          <ReplayMapViewSection
+            info={{ ...info, remixed } as DemoInfo}
+            enginePath="/engine"
+            dataDir="/data"
+            replayPath="/replays/a.sdfz"
+          />
+        ),
+      },
+    ],
+    { initialEntries: [url] },
   );
+  router.subscribe((state) => {
+    navigations.push({
+      action: state.historyAction,
+      search: state.location.search,
+    });
+  });
+  return { router, ...render(<RouterProvider router={router} />) };
+}
+
+async function show(
+  state: StoredReplayTrack["state"] | null = "current",
+  url = "/replay",
+) {
+  if (state) seedReplayTracksForTests([track(state)]);
+  navigations.length = 0;
+  const view = mount(url);
   await settle();
   return view;
 }
@@ -223,13 +286,7 @@ describe("when there is nothing to draw", () => {
 
   it("shows nothing for a remix, which has no track of its own", async () => {
     seedReplayTracksForTests([track("current")]);
-    const { container } = render(
-      <ReplayMapViewSection
-        info={{ ...info, remixed: true } as DemoInfo}
-        enginePath="/engine"
-        dataDir="/data"
-      />,
-    );
+    const { container } = mount("/replay", true);
     await settle();
     expect(container.innerHTML).toBe("");
   });
@@ -498,5 +555,553 @@ describe("a current track", () => {
     // The walk reached the view's own components and its canvas.
     expect(components).toBeGreaterThan(3);
     expect(found).toEqual([]);
+  });
+});
+
+// ---- the timeline (#3808) ---------------------------------------------------
+
+import type { ReplayClock } from "../../replayMapView/clock";
+
+const hook = () =>
+  (
+    canvas() as unknown as {
+      __replayMapView: {
+        clock: ReplayClock;
+        handle: { heldWindows(): number[] };
+      };
+    }
+  ).__replayMapView;
+const clockFrame = () => hook().clock.frame;
+const view = () => screen.getByRole("group", { name: "Recorded match" });
+
+/** Runs animation frames at a time stamp, as the browser would. */
+async function frameAt(stamp: number) {
+  await act(async () => {
+    raf.run(stamp);
+  });
+}
+
+const click = (name: string | RegExp) =>
+  act(async () => {
+    fireEvent.click(screen.getByRole("button", { name }));
+  });
+
+const key = (
+  target: Element,
+  name: string,
+  init: Partial<KeyboardEventInit> = {},
+) => fireEvent.keyDown(target, { key: name, ...init });
+
+/**
+ * Where the last picture put each unit, as the centre of its outline: the mean
+ * of the four corners the painter walked.
+ */
+function drawnCentres(): [number, number][] {
+  const calls = ctx.calls;
+  const from = calls.map((c) => c.op).lastIndexOf("clearRect");
+  const centres: [number, number][] = [];
+  let corners: number[][] = [];
+  for (const call of calls.slice(from)) {
+    if (call.op === "moveTo") corners = [call.args];
+    else if (call.op === "lineTo") corners.push(call.args);
+    else if (call.op === "closePath" && corners.length === 4) {
+      centres.push([
+        corners.reduce((n, c) => n + c[0], 0) / 4,
+        corners.reduce((n, c) => n + c[1], 0) / 4,
+      ]);
+    }
+  }
+  return centres;
+}
+
+/** Where the fixture puts a unit at a frame, on the 1,024 pixel canvas. */
+function fixtureCentre(serial: number, frame: number): [number, number] {
+  const at = fixture.transform.find(
+    (t) => t.serial === serial && t.frame === frame,
+  );
+  if (!at) throw new Error(`the fixture has no unit ${serial} at ${frame}`);
+  return [at.x * 0.125, at.z * 0.125];
+}
+
+describe("the timeline's controls", () => {
+  it("names the knob, which is what a screen reader lands on", async () => {
+    await show();
+    const knob = screen.getByRole("slider", { name: "Time in the match" });
+    expect(knob.getAttribute("aria-valuenow")).toBe("0");
+    expect(knob.getAttribute("aria-valuetext")).toBe("0:00");
+  });
+
+  it("names every control, and gives the icon buttons a tooltip name", async () => {
+    await show();
+    for (const name of ["Play", "Play in reverse"]) {
+      screen.getByRole("button", { name });
+    }
+    screen.getByRole("combobox", { name: "Playback speed" });
+    expect(screen.getByTestId("match-clock").textContent).toBe("0:00 / 0:05");
+  });
+
+  it("lists the keys in the section's help", async () => {
+    await show();
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: "About the recorded match" }),
+      );
+    });
+    screen.getByText("Play or pause");
+    screen.getByText("Back 1 second");
+    screen.getByText("Go to the next mark");
+  });
+});
+
+describe("opening a link with a time", () => {
+  it("shows that moment: the clock, the knob and the units", async () => {
+    await show("current", "/replay?frame=60");
+    expect(clockFrame()).toBe(60);
+    expect(
+      screen
+        .getByRole("slider", { name: "Time in the match" })
+        .getAttribute("aria-valuenow"),
+    ).toBe("60");
+    expect(screen.getByTestId("match-clock").textContent).toBe("0:02 / 0:05");
+    const [x, z] = fixtureCentre(0, 60);
+    const centres = drawnCentres();
+    expect(centres).toHaveLength(2);
+    expect(centres.some(([cx, cz]) => Math.hypot(cx - x, cz - z) < 1e-3)).toBe(
+      true,
+    );
+    // Opening is not a seek: the address is left as it came.
+    expect(navigations).toEqual([]);
+  });
+
+  it.each([
+    ["9999", 150],
+    ["-20", 0],
+    ["soon", 0],
+    ["", 0],
+  ])("holds a time of %j to the match, at frame %j", async (value, frame) => {
+    await show("current", `/replay?frame=${value}`);
+    expect(clockFrame()).toBe(frame);
+  });
+
+  it("does nothing for a replay with no track", async () => {
+    const { container } = await show(null, "/replay?frame=60");
+    expect(container.innerHTML).toBe("");
+    expect(navigations).toEqual([]);
+  });
+});
+
+describe("playing", () => {
+  it("advances by elapsed time times speed times the track's frames per second", async () => {
+    await show("current", "/replay?frame=20");
+    await click("Play");
+    await frameAt(5000);
+    await frameAt(6000);
+    expect(clockFrame()).toBe(50);
+    expect(hook().clock.direction).toBe(1);
+
+    // The speed control and the key say the same thing.
+    key(view(), "=");
+    await settle();
+    screen.getByRole("combobox", { name: "Playback speed" });
+    expect(
+      screen.getByRole("combobox", { name: "Playback speed" }).textContent,
+    ).toContain("2x");
+    await frameAt(6500);
+    expect(clockFrame()).toBe(80);
+  });
+
+  it("stops at the last frame, asks for no more frames, and replaces the address once", async () => {
+    await show("current", "/replay?frame=100");
+    await click("Play");
+    await frameAt(0);
+    await frameAt(500);
+    await frameAt(600_000);
+    expect(clockFrame()).toBe(150);
+    await settle();
+    screen.getByRole("button", { name: "Play" });
+    expect(raf.waiting.size).toBe(0);
+    expect(navigations).toEqual([{ action: "REPLACE", search: "?frame=150" }]);
+  });
+
+  it("stops the loop when paused", async () => {
+    await show();
+    await click("Play");
+    await frameAt(0);
+    await frameAt(1000);
+    expect(clockFrame()).toBe(30);
+    await click("Pause");
+    await settle();
+    expect(raf.waiting.size).toBe(0);
+    await frameAt(9000);
+    expect(clockFrame()).toBe(30);
+  });
+
+  it("plays in reverse, moving units backward along their paths", async () => {
+    await show("current", "/replay?frame=90");
+    const [x90, z90] = fixtureCentre(0, 90);
+    expect(
+      drawnCentres().some(([cx, cz]) => Math.hypot(cx - x90, cz - z90) < 1e-3),
+    ).toBe(true);
+
+    await click("Play in reverse");
+    await frameAt(10_000);
+    await frameAt(11_000);
+    // A second of real time at 1x is 30 frames of the track.
+    expect(clockFrame()).toBe(60);
+    // The direction the view is given, so it holds the window before.
+    expect(hook().clock.direction).toBe(-1);
+
+    await click("Pause");
+    await settle();
+    expect(hook().handle.heldWindows()).toEqual([0, 1]);
+    const [x60, z60] = fixtureCentre(0, 60);
+    expect(x60).toBeLessThan(x90);
+    expect(
+      drawnCentres().some(([cx, cz]) => Math.hypot(cx - x60, cz - z60) < 1e-3),
+    ).toBe(true);
+  });
+
+  it("stops at the first frame when playing in reverse", async () => {
+    await show("current", "/replay?frame=20");
+    await click("Play in reverse");
+    await frameAt(0);
+    await frameAt(60_000);
+    expect(clockFrame()).toBe(0);
+    expect(hook().clock.direction).toBe(-1);
+    await settle();
+    expect(raf.waiting.size).toBe(0);
+    screen.getByRole("button", { name: "Play in reverse" });
+  });
+
+  it("stops when the document is hidden, and does not jump ahead when it returns", async () => {
+    await show();
+    await click("Play");
+    await frameAt(0);
+    await frameAt(1000);
+    expect(clockFrame()).toBe(30);
+
+    hidden = true;
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    screen.getByRole("button", { name: "Play" });
+    await frameAt(900_000);
+    expect(clockFrame()).toBe(30);
+
+    hidden = false;
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await frameAt(1_800_000);
+    expect(clockFrame()).toBe(30);
+  });
+
+  it("cancels its animation frame when the component unmounts", async () => {
+    const { unmount } = await show();
+    await click("Play");
+    await frameAt(0);
+    expect(raf.waiting.size).toBeGreaterThan(0);
+    unmount();
+    expect(raf.waiting.size).toBe(0);
+  });
+});
+
+describe("dragging the knob", () => {
+  const dragTo = (x: number) =>
+    fireEvent.pointerMove(knobRoot(), { clientX: x, pointerId: 1 });
+  const knobRoot = () =>
+    document.querySelector("[data-slot='slider']") as HTMLElement;
+
+  beforeEach(() => {
+    const held = new Set<number>();
+    vi.spyOn(Element.prototype, "setPointerCapture").mockImplementation(
+      (id) => void held.add(id),
+    );
+    vi.spyOn(Element.prototype, "hasPointerCapture").mockImplementation((id) =>
+      held.has(id),
+    );
+    vi.spyOn(Element.prototype, "releasePointerCapture").mockImplementation(
+      (id) => void held.delete(id),
+    );
+  });
+
+  it("calls clock.set for each pointer move before the move returns", async () => {
+    await show();
+    const set = vi.spyOn(hook().clock, "set");
+    fireEvent.pointerDown(knobRoot(), {
+      clientX: 0,
+      pointerId: 1,
+      button: 0,
+    });
+    for (const [i, x] of [256, 512, 768].entries()) {
+      dragTo(x);
+      // Not after a settle: the clock has moved already.
+      const lastTarget = set.mock.calls[set.mock.calls.length - 1][0];
+      expect(set.mock.calls.length).toBeGreaterThanOrEqual(i + 1);
+      expect(lastTarget).toBe(Math.round((x / 1024) * 150));
+    }
+    expect(clockFrame()).toBe(Math.round((768 / 1024) * 150));
+  });
+
+  it("keeps the knob under the pointer while the window it asks for is loading", async () => {
+    HELD = new Set([2]);
+    await show();
+    fireEvent.pointerDown(knobRoot(), { clientX: 0, pointerId: 1, button: 0 });
+    dragTo(1024);
+    await settle();
+    expect(
+      screen
+        .getByRole("slider", { name: "Time in the match" })
+        .getAttribute("aria-valuenow"),
+    ).toBe("150");
+    // The picture is the last one, and the view says it is loading.
+    screen.getByRole("status", { name: "Loading this part of the match" });
+  });
+
+  it("stops a match that is playing, and leaves the address alone until the drag ends", async () => {
+    await show();
+    await click("Play");
+    await frameAt(0);
+    fireEvent.pointerDown(knobRoot(), { clientX: 0, pointerId: 1, button: 0 });
+    dragTo(256);
+    dragTo(512);
+    screen.getByRole("button", { name: "Play" });
+    expect(navigations).toEqual([]);
+
+    fireEvent.pointerUp(knobRoot(), { clientX: 512, pointerId: 1 });
+    await settle();
+    expect(navigations).toEqual([
+      { action: "REPLACE", search: `?frame=${Math.round((512 / 1024) * 150)}` },
+    ]);
+  });
+});
+
+describe("the address", () => {
+  it("is replaced and not added to, only when playing stops and not on a tick", async () => {
+    await show("current", "/replay?other=1&frame=10");
+    await click("Play");
+    for (const stamp of [0, 100, 200, 300, 400, 500]) await frameAt(stamp);
+    expect(navigations).toEqual([]);
+
+    await click("Pause");
+    expect(navigations).toHaveLength(1);
+    expect(navigations[0].action).toBe("REPLACE");
+    // 500 ms at 1x is 15 frames from frame 10, and the rest of the address stays.
+    expect(navigations[0].search).toBe("?other=1&frame=25");
+  });
+});
+
+describe("the keys", () => {
+  it("each does its job while focus is in the view", async () => {
+    await show("current", "/replay?frame=60");
+    const v = view();
+
+    key(v, "ArrowRight");
+    expect(clockFrame()).toBe(90);
+    key(v, "ArrowLeft");
+    expect(clockFrame()).toBe(60);
+    key(v, "ArrowRight", { shiftKey: true });
+    expect(clockFrame()).toBe(150);
+    key(v, "ArrowLeft", { shiftKey: true });
+    expect(clockFrame()).toBe(0);
+    key(v, ".");
+    expect(clockFrame()).toBe(1);
+    key(v, ",");
+    expect(clockFrame()).toBe(0);
+    key(v, "End");
+    expect(clockFrame()).toBe(150);
+    key(v, "Home");
+    expect(clockFrame()).toBe(0);
+
+    // Speed: down and up the list.
+    key(v, "=");
+    key(v, "+", { shiftKey: true });
+    await settle();
+    expect(
+      screen.getByRole("combobox", { name: "Playback speed" }).textContent,
+    ).toContain("4x");
+    key(v, "-");
+    await settle();
+    expect(
+      screen.getByRole("combobox", { name: "Playback speed" }).textContent,
+    ).toContain("2x");
+
+    // Space plays and pauses, R plays the other way.
+    key(v, " ");
+    await settle();
+    screen.getByRole("button", { name: "Pause" });
+    key(v, " ");
+    await settle();
+    screen.getByRole("button", { name: "Play" });
+    key(v, "r");
+    await settle();
+    expect(hook().clock.direction).toBe(-1);
+    // The reverse button is the one that now says Pause.
+    screen.getByRole("button", { name: "Play" });
+    key(v, "r");
+    await settle();
+    screen.getByRole("button", { name: "Play in reverse" });
+  });
+
+  it("does not act on a key from a text field, or from outside the view", async () => {
+    await show("current", "/replay?frame=60");
+    const field = document.createElement("input");
+    field.type = "text";
+    view().append(field);
+    key(field, "ArrowRight");
+    key(field, " ");
+    key(field, "End");
+    expect(clockFrame()).toBe(60);
+    screen.getByRole("button", { name: "Play" });
+
+    key(document.body, "ArrowRight");
+    key(document.body, " ");
+    expect(clockFrame()).toBe(60);
+    screen.getByRole("button", { name: "Play" });
+    field.remove();
+  });
+
+  it("leaves Space to a button that has focus", async () => {
+    await show("current", "/replay?frame=60");
+    key(screen.getByRole("button", { name: "Play in reverse" }), " ");
+    await settle();
+    // The button's own click would have started it. The key did not.
+    screen.getByRole("button", { name: "Play" });
+    expect(raf.waiting.size).toBe(0);
+  });
+
+  it("does not take a key held with a command modifier", async () => {
+    await show("current", "/replay?frame=60");
+    key(view(), "ArrowRight", { metaKey: true });
+    key(view(), "r", { ctrlKey: true });
+    expect(clockFrame()).toBe(60);
+  });
+
+  it("steps one second from the knob and not also by its own step", async () => {
+    await show("current", "/replay?frame=60");
+    key(
+      screen.getByRole("slider", { name: "Time in the match" }),
+      "ArrowRight",
+    );
+    expect(clockFrame()).toBe(90);
+  });
+});
+
+describe("marks on the bar", () => {
+  const analysed = () =>
+    seedReplayAnalysisForTests({
+      analyses: [
+        {
+          gameId: ID,
+          state: "current",
+          analysedAtMs: 1,
+          loggerVersion: 1,
+        } as unknown as StoredReplayAnalysis,
+      ],
+    });
+  const kills = (frames: number[]) =>
+    frames.map((frame) => ({ kind: "unit_destroyed", frame }));
+  const line = (frame: number, text: string) =>
+    ({
+      frame,
+      time: 0,
+      player: 0,
+      playerName: "Ann",
+      text,
+      system: false,
+    }) as unknown as ChatLine;
+  const group = (name: string) => screen.queryByRole("group", { name });
+
+  it("has no marks and says nothing about it when the replay has no events", async () => {
+    LOGGED = kills([30, 100]);
+    await show();
+    expect(group("Kills")).toBeNull();
+    expect(group("Chat")).toBeNull();
+    expect(group("Players leaving")).toBeNull();
+    expect(screen.queryByText(/analys/i)).toBeNull();
+  });
+
+  it("marks kills from the analysis, chat and players leaving from the file, in lanes of their own", async () => {
+    analysed();
+    LOGGED = kills([100]);
+    CHAT = {
+      messages: [line(45, "gl hf")],
+      incomplete: false,
+      events: [
+        {
+          type: "playerLeft",
+          frame: 120,
+          time: 4,
+          player: 1,
+          playerName: "Bot",
+          reason: { kind: "left" },
+        } as unknown as TimelineEvent,
+      ],
+    };
+    await show();
+    const kill = screen.getByRole("button", { name: /Unit destroyed, 0:03/ });
+    screen.getByRole("button", { name: /Chat, 0:01: Ann: gl hf/ });
+    screen.getByRole("button", { name: /Bot left the game, 0:04/ });
+    expect(group("Kills")?.contains(kill)).toBe(true);
+
+    await act(async () => {
+      fireEvent.click(kill);
+    });
+    expect(clockFrame()).toBe(100);
+    expect(navigations).toEqual([{ action: "REPLACE", search: "?frame=100" }]);
+  });
+
+  it("goes to a mark's event from the keyboard", async () => {
+    analysed();
+    LOGGED = kills([30, 100]);
+    await show();
+    key(view(), "]");
+    expect(clockFrame()).toBe(30);
+    key(view(), "]");
+    expect(clockFrame()).toBe(100);
+    key(view(), "[");
+    expect(clockFrame()).toBe(30);
+  });
+
+  it("merges marks that fall in one column into one with a count, that seeks to the earliest", async () => {
+    analysed();
+    // 1,024 pixels of bar in columns of 8 is 128 columns over 150 frames, so
+    // three kills at one frame share a column and one at 140 has its own.
+    LOGGED = kills([30, 30, 30, 140]);
+    await show();
+    const merged = screen.getByRole("button", {
+      name: "3 units destroyed from 0:01",
+    });
+    expect(group("Kills")?.querySelectorAll("button")).toHaveLength(2);
+    await act(async () => {
+      fireEvent.click(merged);
+    });
+    expect(clockFrame()).toBe(30);
+  });
+
+  it("draws no more than a mark for each column however many kills there are", async () => {
+    analysed();
+    LOGGED = kills(Array.from({ length: 5000 }, (_, i) => i % 151));
+    await show();
+    const buttons = Array.from(
+      group("Kills")?.querySelectorAll("button") ?? [],
+    );
+    // 1,024 pixels in columns of 8 is 128 columns.
+    expect(buttons.length).toBeGreaterThan(0);
+    expect(buttons.length).toBeLessThanOrEqual(128);
+    const counted = buttons.reduce((n, b) => {
+      const m = /^(\d+) units/.exec(b.getAttribute("aria-label") ?? "");
+      return n + (m ? Number(m[1]) : 1);
+    }, 0);
+    expect(counted).toBe(5000);
+  });
+
+  it("leaves a remix with no kills of its own", async () => {
+    analysed();
+    LOGGED = kills([30]);
+    seedReplayTracksForTests([track("current")]);
+    mount("/replay", true);
+    await settle();
+    expect(document.querySelector("canvas")).toBeNull();
   });
 });

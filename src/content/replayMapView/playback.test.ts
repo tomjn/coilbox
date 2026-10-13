@@ -197,13 +197,14 @@ describe("seeking", () => {
     expect(clock.frame).toBe(45);
   });
 
-  it("stops playing when the knob is dragged", () => {
-    const { playback } = make(60);
+  it("stops playing when the knob is dragged, and leaves settling to the end of the drag", () => {
+    const { playback, onSettled } = make(60);
     playback.play();
     raf.run(0);
     playback.seek(10, { settle: false, pause: true });
     expect(playback.getSnapshot().playing).toBe(false);
     expect(raf.waiting.size).toBe(0);
+    expect(onSettled).not.toHaveBeenCalled();
   });
 });
 

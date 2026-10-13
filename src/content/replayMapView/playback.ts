@@ -83,12 +83,12 @@ export function createPlayback({
     if (pending === null) pending = env.requestFrame(tick);
   };
 
-  const stop = () => {
+  const stop = (settle = true) => {
     if (!state.playing) return;
     cancel();
     lastStamp = null;
     change({ playing: false });
-    onSettled(clock.frame);
+    if (settle) onSettled(clock.frame);
   };
 
   function tick(stamp: number) {
@@ -137,12 +137,12 @@ export function createPlayback({
       change({ playing: true, direction });
       schedule();
     },
-    pause: stop,
+    pause: () => stop(),
     reverse() {
       playback.play(state.direction === 1 ? -1 : 1);
     },
     seek(frame, { settle = true, pause = false } = {}) {
-      if (pause) stop();
+      if (pause) stop(false);
       const target = hold(frame);
       const way =
         target === clock.frame

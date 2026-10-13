@@ -9,6 +9,8 @@ export type MarkLane = "kills" | "chat" | "left";
 export interface PlacedMark {
   lane: MarkLane;
   frame: number;
+  /** What the event was, in words, when it is worth saying alone. */
+  text?: string;
 }
 
 /** The marks of one lane that share a column of the bar. */
@@ -18,6 +20,8 @@ export interface MarkGroup {
   /** The earliest frame in the group, which is where a click seeks to. */
   frame: number;
   count: number;
+  /** The words of the earliest event in the group. */
+  text?: string;
 }
 
 /**
@@ -35,7 +39,7 @@ export function groupMarks(
   if (columns <= 0) return [];
   const length = range.last - range.first;
   const groups = new Map<string, MarkGroup>();
-  for (const { lane, frame } of marks) {
+  for (const { lane, frame, text } of marks) {
     if (frame < range.first || frame > range.last) continue;
     const column =
       length <= 0
@@ -48,9 +52,12 @@ export function groupMarks(
     const held = groups.get(key);
     if (held) {
       held.count++;
-      if (frame < held.frame) held.frame = frame;
+      if (frame < held.frame) {
+        held.frame = frame;
+        held.text = text;
+      }
     } else {
-      groups.set(key, { lane, column, frame, count: 1 });
+      groups.set(key, { lane, column, frame, count: 1, text });
     }
   }
   return [...groups.values()].sort(
