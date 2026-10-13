@@ -61,11 +61,6 @@ pub fn read_budget(path: &Path) -> u64 {
     budget_from_settings(std::fs::read_to_string(path).ok().as_deref())
 }
 
-/// What every track on disk takes, stale ones included.
-pub fn total_bytes(dir: &Path) -> u64 {
-    track_store::list(dir).iter().map(|t| t.size_bytes).sum()
-}
-
 /// Which tracks to remove to bring `tracks` within `budget`, in the order to
 /// remove them.
 ///
@@ -384,7 +379,7 @@ mod tests {
     #[test]
     fn the_total_is_the_size_of_the_files_on_disk() {
         let dir = tempfile::tempdir().unwrap();
-        assert_eq!(total_bytes(dir.path()), 0);
+        assert_eq!(overview(dir.path()).total_bytes, 0);
         let small = put_track(dir.path(), 1, 10, 0);
         let large = put_track(dir.path(), 2, 3000, 0);
         // A stale file takes space too, and so does one that is not a track.
@@ -405,7 +400,7 @@ mod tests {
                     .len()
             })
             .sum();
-        assert_eq!(total_bytes(dir.path()), on_disk);
+        assert_eq!(overview(dir.path()).total_bytes, on_disk);
         assert_ne!(
             small, large,
             "the sizes differ, so this is a test of something"
@@ -422,7 +417,6 @@ mod tests {
 
         assert_eq!(overview.tracks.len(), 2);
         assert_eq!(overview.total_bytes, a + b);
-        assert_eq!(overview.total_bytes, total_bytes(dir.path()));
         assert_eq!(overview.default_budget_bytes, DEFAULT_BUDGET_BYTES);
         let json = serde_json::to_value(&overview).unwrap();
         assert_eq!(json["totalBytes"], a + b);
@@ -441,7 +435,7 @@ mod tests {
         let removed = enforce(dir.path(), None, b + c, &none());
         assert_eq!(removed, vec![id(1)]);
         assert_eq!(left(dir.path()), vec![id(2), id(3)]);
-        assert_eq!(total_bytes(dir.path()), b + c);
+        assert_eq!(overview(dir.path()).total_bytes, b + c);
         assert!(a > 0);
     }
 
@@ -495,7 +489,7 @@ mod tests {
             }
         );
         assert!(left(dir.path()).is_empty());
-        assert_eq!(total_bytes(dir.path()), 0);
+        assert_eq!(overview(dir.path()).total_bytes, 0);
         assert!(dir.path().join("notes.txt").exists(), "not a track");
     }
 
