@@ -43,6 +43,9 @@ import { plural, roughly } from "./ReplayAnalysisSection";
 
 type Check = Awaited<ReturnType<typeof contentAnalysisCheck>>;
 
+/** The section's id, so the map view of a track can lead back to it (#3807). */
+export const RECORDING_SECTION_ID = "rewind-recording";
+
 /** How many disagreeing figures are listed before the rest go behind a disclosure. */
 const FIGURES_SHOWN = 4;
 
@@ -184,7 +187,11 @@ export function ReplayRecordingSection({
   const offered = !hidden && (failed || track?.state !== "current");
 
   return (
-    <section className="flex flex-col gap-2" aria-label="Recording">
+    <section
+      id={RECORDING_SECTION_ID}
+      className="flex flex-col gap-2"
+      aria-label="Recording"
+    >
       <h2 className="text-sm font-medium">Rewind recording</h2>
       <div className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card p-3 text-sm">
         {job.state === "queued" ? (

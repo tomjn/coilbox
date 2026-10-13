@@ -60,6 +60,7 @@ import { ReplayAnalysisSection } from "./components/ReplayAnalysisSection";
 import { ReplayBuildOrders } from "./components/ReplayBuildOrders";
 import { ReplayChat } from "./components/ReplayChat";
 import { ReplayMap } from "./components/ReplayMap";
+import { ReplayMapViewSection } from "./components/ReplayMapView";
 import { ReplayRecordingSection } from "./components/ReplayRecordingSection";
 import { ReplayRoster } from "./components/ReplayRoster";
 import { ReplaySetPicker } from "./components/ReplaySetPicker";
@@ -890,6 +891,14 @@ export default function ReplayDetailPage() {
                 dependencyBlock={dependencyBlock}
               />
             )}
+
+            {/* The track the section above records, drawn (#3807). It shows
+             * itself only when the replay has one. */}
+            <ReplayMapViewSection
+              info={info}
+              enginePath={selected?.enginePath}
+              dataDir={selected?.rootPath}
+            />
 
             {/* Match statistics in spirit, so it takes the build orders' gate (#1179). */}
             {replay && !isProfileHidden("analytics.matchStats") && (
