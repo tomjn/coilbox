@@ -327,7 +327,17 @@ fn the_fixture_holds_what_the_seed_builds_and_expected_lua_holds_what_the_reader
     // zlib the writer links, so compare what they read back as.
     let mut a = TrackReader::open(Cursor::new(committed.clone())).unwrap();
     let mut b = TrackReader::open(Cursor::new(fresh)).unwrap();
-    assert_eq!(a.header(), b.header(), "the headers differ");
+    // Where the info and features chunks are depends on their compressed size.
+    let without_extents = |h: &Header| Header {
+        info: Extent::default(),
+        features: Extent::default(),
+        ..h.clone()
+    };
+    assert_eq!(
+        without_extents(a.header()),
+        without_extents(b.header()),
+        "the headers differ"
+    );
     assert_eq!(a.info().unwrap(), b.info().unwrap(), "the info differs");
     assert_eq!(a.features().unwrap(), b.features().unwrap());
     for k in 0..a.header().window_count as usize {
