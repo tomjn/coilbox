@@ -35,7 +35,6 @@ permissions = [
   "allow-content-analysis-cancel",
   "allow-content-analysis-engine-output",
   "allow-content-analysis-dismiss",
-  "allow-content-recording-enqueue",
   "allow-content-replay-analyses",
   "allow-content-replay-analysis",
   "allow-content-replay-analysis-events",
