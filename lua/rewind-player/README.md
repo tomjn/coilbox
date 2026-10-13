@@ -260,11 +260,102 @@ The unsynced half of the gadget times each frame's work and logs when it took lo
 COILBOX_REWIND_PLAYER slow frame: the work of frame 4521 took 41.0 ms, and a simulation frame lasts 33.3 ms. 3 slow since the last line, the slowest 52.0 ms
 ```
 
-After a line, slow frames are counted and not logged for 30 frames. Synced Lua has no clock, so the synced half calls `SendToUnsynced("coilbox_rewind_work", 0, frame)` before the work and with a 1 after it, and the unsynced half reads `Spring.GetTimer`, which gave whole milliseconds in these runs. Measured in four runs of the real engine run below, on a track of 5 units and 30 features, 460 frames each: a mean between 0.087 and 0.117 ms, and a slowest frame between 3 and 13 ms, which was the first frame every time.
+After a line, slow frames are counted and not logged for 30 frames. Synced Lua has no clock, so the synced half calls `SendToUnsynced("coilbox_rewind_work", 0, frame)` before the work and with a 1 after it, and the unsynced half reads `Spring.GetTimerMicros` where the engine has it, which is 2025.01.1 and later, and `Spring.GetTimer` otherwise, which gave whole milliseconds in the runs below. Measured in four runs of the real engine run below, on a track of 5 units and 30 features, 460 frames each: a mean between 0.087 and 0.117 ms, and a slowest frame between 3 and 13 ms, which was the first frame every time.
 
 A whole match of 23,091 frames with up to 54 units, in the run [In a real engine](#in-a-real-engine) describes, over 2,236 frames of work: a mean of 0.305 ms and a slowest frame of 27 ms without the projectiles stage, and 0.321 ms and 26 ms with it. The slowest is a seek that creates the match's units. The shots plan, 13,929 frames of mostly play through the fight, had a mean of 0.220 ms and a slowest frame of 26 ms. None of those runs logged a slow frame. Two earlier runs of the shots plan logged one each, of 36 ms on a seek and of 59 ms in the middle of play, on a frame where the log shows nothing else happening. The timer reads the wall clock, so another process taking the processor shows up as a slow frame, and whether that is what those two were is not known.
 
-In an engine with a window the first seek from the start of that match to its last minutes took 39 and 41 ms in two runs, and logged the line. Timed stage by stage in the second: 33.3 ms for the units, 6.2 for the terrain, 1.5 for the projectiles and 0.1 for the features. The same seek later in the run took 20.3 ms for the units. Issue #3988 is about it.
+In an engine with a window the first seek from the start of that match to its last minutes took 39 and 41 ms in two runs, and logged the line. Timed stage by stage in the second: 33.3 ms for the units, 6.2 for the terrain, 1.5 for the projectiles and 0.1 for the features. The same seek later in the run took 20.3 ms for the units. That was issue #3988, and [A seek over frames](#a-seek-over-frames) is what became of it.
+
+### A seek over frames
+
+A seek can need hundreds of units made or removed, and in Splinter Faction the engine takes 0.2 to 0.5 ms for each. Before issue #3988 the units stage did all of them in the frame the seek was shown in, so a seek across 400 units took 130 to 166 ms of one frame in a window and 120 to 215 ms in a headless engine. The stage now does a seek over as many frames as the engine's time allows.
+
+- A frame makes at most `makeBudget` units and removes at most `removeBudget`. Making and removing have a budget each, because they cost the engine different amounts.
+- While a removal is left, nothing is made. The frame that does the last removal makes as many as the rest of its share allows. A removal uses `1 / removeBudget` of a frame's share, a creation `1 / makeBudget`, and a frame has one share. So removals still come before creations, now across frames as well as across stages.
+- A unit that is in the track both before and after the seek is put where the track has it at the time shown from the first frame. The units that go are removed over the first frames and the units that arrive are made over the frames after. Features, the ground and the shots whose shooter is in the world are the time shown from the first frame.
+- A unit a seek removes goes quietly in every frame it takes, as it did when a seek was one frame.
+- A seek that arrives while another settles needs nothing special. Every frame works out what the track has at the time shown from nothing, so the units the new time does not have are removed first and the ones it has are made.
+- Play goes on while a seek settles. The clock moves in every frame, and a unit made late is put where the track has it at the time of the frame it is made in.
+- A shot waits for its shooter. A shot made before its unit would have no owner for good, so the projectiles stage leaves a shot whose shooter is in the track and not yet made, and makes it in the frame the shooter is there if it is still in the air.
+- The adapter's `unitPlaced` hook is called when a unit is made, which can be several frames after the seek.
+- `coilbox_rewind_settled` is 0 from a seek's message until the world is the track at `coilbox_rewind_frame`, and 0 before the first frame. A test or a widget that waits for a seek waits for the frame and then for this.
+
+#### How many a frame
+
+The player cannot time itself, because synced Lua has no clock. The synced half of the gadget tells the unsynced half, which has one, how many units the frame made and how many it removed. The unsynced half works out how many of each fit in half a simulation frame, 16.7 ms, and sends the two numbers back as a `coilbox_rewind_budget:` message. Half, because the rest of the frame is the engine's own simulation and drawing, and the slow frame line is what says whether that left enough. The rules are `fit` and `retune` in `luarules/gadgets/coilbox_rewind_player.lua`:
+
+- Both budgets start at one.
+- A frame that used the whole of a budget sets it to what fits in half a frame at the cost per unit that frame showed, with the rest of the frame's work counted in so that it errs low. The new budget is at least one and at most twice what the frame did.
+- A frame that used less of a budget leaves it alone, unless the frame took longer than half a frame, and then cuts it.
+- A frame that made and removed nothing sets both back to one. What a unit costs moves with how many there are, from 0.28 to 0.5 ms to make and from 0.13 to 0.37 ms to remove in a headless run as the count went from none to 400 and from 400 to none. So the budget a seek ended on is wrong for the start of the next, and a first version that kept it logged frames of 33 to 58 ms.
+- A frame that did both changes neither, because it says what neither costs.
+
+The message reaches the synced half 2 to 5 frames later in the windowed runs below, and up to 22 frames later in a headless run on a machine doing other work. A budget therefore doubles every few frames, and a seek of 400 units took 17 to 24 frames to settle in the windowed runs, and 38 the first time. No count of units is written in the code. The only numbers are half a frame, one to start from and a doubling.
+
+The player makes its units in the order of the window's list, so which units appear first is not chosen.
+
+#### Measured
+
+The engine was `2026.07.01-102-g6e5c5a0` with Splinter Faction, on a Mac with other work running, so the load average was 3 to 6 in these runs. A window was 1,280 by 720. The timers were microseconds. Each stage is timed on its own by a scratch patch that is not in the repository, and every figure is the slowest frame of the seek in milliseconds. A seek is from the first frame to frame 22,791, the last ten seconds of the match. "Later" is the second such seek in the same run. One run of each, so a figure carries the noise of one.
+
+The whole match is the 23,091 frame match of [In a real engine](#in-a-real-engine), which has 53 units at frame 22,791. The crowd is described below, with 400 units from frame 300 on.
+
+| Track | Engine | Player | Seek | Frames to settle | Terrain | Features | Units | Projectiles | Slowest frame | Slow frame lines |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| whole match | headless | before | first | - | 2.54 | 0.08 | 22.80 | 0.06 | 25.49 | 0 |
+| whole match | headless | before | later | - | 2.37 | 0.07 | 19.37 | 0.04 | 21.85 | |
+| whole match | headless | after | first | 8 | 2.62 | 0.08 | 6.82 | 0.07 | 9.55 | 0 |
+| whole match | headless | after | later | 7 | 2.52 | 0.09 | 6.38 | 0.04 | 8.16 | |
+| whole match | window | before | first | - | 6.89 | 0.08 | 22.29 | 0.06 | 29.33 | 0 |
+| whole match | window | before | later | - | 2.58 | 0.08 | 16.84 | 0.05 | 19.55 | |
+| whole match | window | after | first | 26 | 8.11 | 0.08 | 7.19 | 0.06 | 15.41 | 0 |
+| whole match | window | after | later | 7 | 2.50 | 0.08 | 5.54 | 0.05 | 8.16 | |
+| crowd of 400 | headless | before | first | - | 2.60 | 0.07 | 166.61 | 0.01 | 169.30 | 3 |
+| crowd of 400 | headless | before | later | - | 2.45 | 0.08 | 172.27 | 0.01 | 174.81 | |
+| crowd of 400 | headless | after | first | 15 | 2.46 | 0.09 | 18.50 | 0.02 | 18.56 | 0 |
+| crowd of 400 | headless | after | later | 16 | 2.45 | 0.10 | 19.09 | 0.01 | 19.15 | |
+| crowd of 400 | window | before | first | - | 4.40 | 0.08 | 161.16 | 0.01 | 165.65 | 3 |
+| crowd of 400 | window | before | later | - | 2.48 | 0.08 | 150.63 | 0.01 | 153.20 | |
+| crowd of 400 | window | after | first | 38 | 3.88 | 0.09 | 21.35 | 0.01 | 21.38 | 0 |
+| crowd of 400 | window | after | later | 20 | 2.61 | 0.09 | 22.51 | 0.01 | 22.60 | |
+
+The slow frame lines are for the whole run of eight seeks, which also go back to the first frame and to the last, and not for the one row. There is no figure for frames to settle before the change, since the world was whole in the frame the seek was shown in. The slowest frame in all eight seeks of the windowed crowd run was 27.2 ms, and of the windowed whole match run 15.4 ms. Going back to the first frame removed 400 units in one frame of 141.45 ms before, and over 24 frames with a slowest of 13.56 ms after.
+
+The whole match run today did not reproduce the issue's 39 and 41 ms. The first windowed seek before the change took 29.3 ms, with the units at 22.3 ms where the issue measured 33.3. The issue's runs were on a different day and nobody else's load is known. What the table shows for the whole match is that the first seek is now 15.4 ms, and that its units stage went from 22.3 to 7.2 ms.
+
+##### The crowd
+
+No replay on the machine that wrote this has more than 54 units at once, and Beyond All Reason is not installed. `crates/coilbox-track/tests/crowd.rs` builds a track from the recorded track of the whole match. It keeps the match's info, features and terrain, drops the projectiles, and writes 400 units of the 13 unit definitions the match used, taken in turn, standing still at places where the match's units stood, in rings of eight 40 elmos apart round each place, at the height of the place. Half exist from 300 frames in and half from the middle of the match, to the last frame. None exists at the first frame, so the first seek makes all of them and the first time of each definition is in it. The units are not Beyond All Reason's, and a Beyond All Reason match has more kinds of unit than 13.
+
+```sh
+COILBOX_CROWD_SOURCE=whole-match.cbtrack COILBOX_CROWD_OUT=crowd.cbtrack COILBOX_CROWD_UNITS=400 \
+  cargo test -p coilbox-track --test crowd -- --ignored --nocapture
+COILBOX_PLAYBACK_TRACK=crowd.cbtrack  # then run the test below, with the variables of the whole match tests
+```
+
+The ignored test `a_seek_across_a_whole_match_settles_in_frames_that_fit` plays eight seeks across a match with the driver's seeks plan, waits for `coilbox_rewind_settled` after each, and checks that the engine has the track's units and features at each stop and that the log has no slow frame line and no Lua error. It passed on the whole match and on the crowd of 400 in a headless engine. `COILBOX_PLAYBACK_TRACK` names a track to play instead of the one recorded from the replay.
+
+#### Where it stops holding
+
+The same seeks on crowds of 1,000 and 2,000 units in a headless engine, with the player after the change:
+
+| Units | Frames to settle | Slowest frame of the units stage | Slow frame lines |
+| --- | --- | --- | --- |
+| 400 | 12 to 16 | 19.09 ms | 0 |
+| 1,000 | 37 to 55 | 43.35 ms | 1 of 43.4 ms |
+| 2,000 | 122 to 175 | 30.46 ms | 0 |
+
+A seek of 2,000 units takes 4 to 6 seconds to show. Each frame with every unit in place and nothing to do costs 1.0 ms at 400 units, 2.3 ms at 1,000 and 4.8 ms at 2,000, the median of the units stage, so about 2.4 microseconds for each unit in the world. That cost is not spread and is in every frame of play. At that rate it reaches half a frame at about 7,000 units, which is arithmetic on three points and has not been run. The one slow frame at 1,000 units is one frame of 43.4 ms in a run whose other seeks had no frame over 24.6 ms. It looks like the single slow frames that the machine's other work causes, which two earlier runs of the shots test found, and one run is all there is, so it is not shown to be that. The acceptance of issue #3988 holds in the runs above for a crowd of 400 in a window, and in a headless engine for 1,000 and 2,000 with that one frame in 1,000 as an exception. It was not run in a window above 400.
+
+Two stages have no budget. The features stage took 1.0 ms to make the match's 162 features in the first frame, and the terrain stage took 2.4 to 8.1 ms for the match's changes to the ground. A match with thousands of features has not been timed.
+
+#### The first time of a definition
+
+The first unit of a definition costs more than the next ones. In the first windowed crowd run, before the change, with the 13 definitions the first seek made, the first unit of `fedcommander_up1` took 8.00 ms against a median of 0.46 ms for the later ones, `f1landfac` 2.34 against 0.39 and `fedmetalextractor_up1` 0.94 against 0.33. The other ten were within 0.25 ms of their later median. Summed over the 13 definitions the extra was 10.3 ms, which is the gap the issue saw between 33.3 and about 20 ms. The median of all later creations was 0.36 ms.
+
+The engine already loads every model while the game loads (`PreloadModels` in `rts/Rendering/WorldDrawer.cpp`, on by default, which calls `SolidObjectDef::PreloadModel` for every unit, feature and weapon definition), so the cost is not the model. What it is was not measured. `Spring.PreloadUnitDefModel(unitDefID)` exists in unsynced Lua (`rts/Lua/LuaUnsyncedCtrl.cpp`, since 2015) and does the same thing for one definition, so it adds nothing unless a player has switched `PreloadModels` off.
+
+The player does not create one unit of every definition while the game loads, which the issue suggested. The extra was 10.3 ms in all for 13 definitions, once. With a budget of one, then two, then four, the first units of a seek are few, and in the crowd all 13 definitions were among the first 15 units, made in frames of one, two, four and eight. A unit made and destroyed at load would also run the base game's gadgets for a unit that is not in the track.
 
 ### What the base game does
 

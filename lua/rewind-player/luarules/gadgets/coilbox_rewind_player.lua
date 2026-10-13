@@ -242,10 +242,11 @@ else
 	-- Making costs the engine something other than removing, so only a frame that
 	-- did one of them says what that one costs. A frame that did neither ends a
 	-- seek, and the budgets go back to one. What a unit costs moves with how many
-	-- there are, from 0.28 to 0.5 ms to make in the runs of issue #3988 as the
-	-- count went from none to 400, and from 0.12 to 0.33 ms to remove, so what
-	-- one seek ended on is not safe for the start of the next. Each starts from
-	-- one and doubles each frame while the cost allows.
+	-- there are, from 0.28 to 0.5 ms to make and from 0.13 to 0.37 ms to remove
+	-- in a headless run of issue #3988 as the count went from none to 400 and
+	-- from 400 to none, so what one seek ended on is not safe for the start of
+	-- the next. Each starts from one and doubles each frame while the cost
+	-- allows.
 	local function retune(took, made, removed)
 		local make, remove = makeBudget, removeBudget
 		if made + removed == 0 then
