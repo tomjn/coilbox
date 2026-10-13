@@ -30,6 +30,7 @@ import { BulkDeleteReplaysPanel } from "./components/BulkDeleteReplaysPanel";
 import { DeleteEngineButton } from "./components/DeleteEngineButton";
 import { ReclaimCachesButton } from "./components/ReclaimCachesButton";
 import { ReclaimSpaceButton } from "./components/ReclaimSpaceButton";
+import { ReplayTracksStorage } from "./components/ReplayTracksStorage";
 
 const msg = (e: unknown): string =>
   e instanceof Error ? e.message : String(e);
@@ -146,10 +147,13 @@ export default function StorageSection() {
 
   if (roots.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-10 text-center">
-        <p className="text-sm text-muted-foreground">
-          No content folders to measure yet. Add one in Content folders.
-        </p>
+      <div className="space-y-8">
+        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-10 text-center">
+          <p className="text-sm text-muted-foreground">
+            No content folders to measure yet. Add one in Content folders.
+          </p>
+        </div>
+        <ReplayTracksStorage />
       </div>
     );
   }
@@ -204,6 +208,8 @@ export default function StorageSection() {
           <ReclaimCachesButton />
         </div>
       </section>
+
+      <ReplayTracksStorage />
 
       <ReplayUnitLists />
     </div>

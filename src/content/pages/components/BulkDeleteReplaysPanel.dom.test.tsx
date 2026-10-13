@@ -102,7 +102,11 @@ describe("BulkDeleteReplaysPanel", () => {
     deleteReplays
       .mockResolvedValueOnce(summary(false, { tracks: 1, trackBytes: 2048 }))
       .mockResolvedValueOnce(summary(true, { tracks: 1, trackBytes: 2048 }));
-    listTracks.mockResolvedValue({ tracks: [] });
+    listTracks.mockResolvedValue({
+      tracks: [],
+      totalBytes: 0,
+      defaultBudgetBytes: 1,
+    });
     await openConfirm();
     await screen.findByText(/recorded track/);
     const buttons = screen.getAllByRole("button", { name: /^delete/i });
