@@ -29,6 +29,10 @@ M.FEATURES_CREATED = 9
 M.FEATURES_DESTROYED = 10
 M.PROJECTILES = 11
 M.TERRAIN = 12
+M.TEAM_RESOURCES = 13
+M.TEAM_ECONOMY = 14
+M.TEAM_PARAMS = 15
+M.GAME_PARAMS = 16
 
 --- How many numbers one row of each section holds. Build queues are the one
 -- section whose rows vary: a unit, a count, then four numbers for each item.
@@ -44,6 +48,10 @@ M.ROW = {
 	[M.FEATURES_DESTROYED] = 1,
 	[M.PROJECTILES] = 10,
 	[M.TERRAIN] = 4,
+	[M.TEAM_RESOURCES] = 3,
+	[M.TEAM_ECONOMY] = 17,
+	[M.TEAM_PARAMS] = 3,
+	[M.GAME_PARAMS] = 2,
 }
 
 local u32 = ffi.typeof("uint32_t[1]")

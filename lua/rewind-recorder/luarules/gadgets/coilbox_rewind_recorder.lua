@@ -71,11 +71,15 @@ local FEATURES_CREATED = 9
 local FEATURES_DESTROYED = 10
 local PROJECTILES = 11
 local TERRAIN = 12
+local TEAM_RESOURCES = 13
+local TEAM_ECONOMY = 14
+local TEAM_PARAMS = 15
+local GAME_PARAMS = 16
 
 function gadget:GetInfo()
 	return {
 		name = "Coilbox rewind recorder",
-		desc = "Writes every unit, feature, projectile and terrain change of a replay to a file",
+		desc = "Writes every unit, feature, projectile, terrain change and team's resources of a replay to a file",
 		author = "coilbox",
 		license = "MIT or GNU GPL, v2 or later",
 		-- After the replay logger, and late for the same reason: a position is
@@ -170,6 +174,9 @@ local GetProjectileTeamID = Spring.GetProjectileTeamID
 local GetProjectileOwnerID = Spring.GetProjectileOwnerID
 local GetGroundHeight = Spring.GetGroundHeight
 local GetGroundOrigHeight = Spring.GetGroundOrigHeight
+local GetTeamResources = Spring.GetTeamResources
+local GetTeamRulesParam = Spring.GetTeamRulesParam
+local GetGameRulesParam = Spring.GetGameRulesParam
 local PackF32 = VFS.PackF32
 local PackU32 = VFS.PackU32
 
@@ -905,6 +912,108 @@ local function sampleTerrain()
 end
 
 --------------------------------------------------------------------------------
+-- Teams (issue #3982).
+--
+-- What a team holds changes on most frames, and is two numbers. The rest of
+-- what the engine keeps for a team is sixteen: storage, share level, and the
+-- pull, income, expense, sent, received and excess that the engine adds up
+-- over 30 frames and then shows for the next 30 (CTeam::ResetResourceState and
+-- CTeam::SlowUpdate in rts/Sim/Misc/Team.cpp). So the two are separate
+-- sections, each written for a team when something in it differs from what was
+-- last written for that team. A team starts as holding nothing, so one that
+-- never has anything is never written.
+--
+-- A game keeps numbers of its own as rules parameters: supply, research
+-- points. The request names the ones to keep, from the game's playback
+-- adapter, and each is written when it changes. A parameter can also hold
+-- text or a boolean, or be taken away. Only a number is written, and a reader
+-- holds the last one.
+--------------------------------------------------------------------------------
+
+-- The teams of the match, as the header lists them.
+local teamList = {}
+-- team -> what was last written for it: 1 and 2 are metal and energy held,
+-- 3 to 18 the economy row, and `params` the parameters by their place in
+-- the request's list.
+local teamHeld = {}
+local teamParamNames, gameParamNames = {}, {}
+local gameParamsHeld = {}
+
+local economy, economyCount = {}, 0
+local teamParams, teamParamCount = {}, 0
+local gameParams, gameParamCount = {}, 0
+-- The sixteen numbers of one team's economy as just read.
+local now = {}
+
+-- A number the dump can hold. The engine can answer with one that is not a
+-- number, and it never compares equal to itself.
+local function number(value)
+	if value ~= value then
+		return 0
+	end
+	return value
+end
+
+local function sampleTeams()
+	local at = open(TEAM_RESOURCES)
+	for index = 1, #teamList do
+		local teamID = teamList[index]
+		local held = teamHeld[teamID]
+		-- current, storage, pull, income, expense, share, sent, received, excess.
+		local metal, ms, mp, mi, me, mh, mt, mr, mx = GetTeamResources(teamID, "metal")
+		local energy, es, ep, ei, ee, eh, et, er, ex = GetTeamResources(teamID, "energy")
+		if type(mx) == "number" and type(ex) == "number" then
+			metal, energy = number(metal), number(energy)
+			if held[1] ~= metal or held[2] ~= energy then
+				held[1], held[2] = metal, energy
+				out[n + 1], out[n + 2], out[n + 3] = teamID, metal, energy
+				n = n + 3
+			end
+			now[1], now[2], now[3], now[4], now[5], now[6], now[7], now[8] = ms, mp, mi, me, mh, mt, mr, mx
+			now[9], now[10], now[11], now[12], now[13], now[14], now[15], now[16] = es, ep, ei, ee, eh, et, er, ex
+			local changed = false
+			for value = 1, 16 do
+				local read = number(now[value])
+				if held[2 + value] ~= read then
+					held[2 + value] = read
+					changed = true
+				end
+			end
+			if changed then
+				economy[economyCount + 1] = teamID
+				for value = 1, 16 do
+					economy[economyCount + 1 + value] = held[2 + value]
+				end
+				economyCount = economyCount + 17
+			end
+		end
+		local params = held.params
+		for param = 1, #teamParamNames do
+			local value = GetTeamRulesParam(teamID, teamParamNames[param])
+			if type(value) == "number" and value == value and params[param] ~= value then
+				params[param] = value
+				teamParams[teamParamCount + 1], teamParams[teamParamCount + 2] = teamID, param
+				teamParams[teamParamCount + 3] = value
+				teamParamCount = teamParamCount + 3
+			end
+		end
+	end
+	close(at)
+	for param = 1, #gameParamNames do
+		local value = GetGameRulesParam(gameParamNames[param])
+		if type(value) == "number" and value == value and gameParamsHeld[param] ~= value then
+			gameParamsHeld[param] = value
+			gameParams[gameParamCount + 1], gameParams[gameParamCount + 2] = param, value
+			gameParamCount = gameParamCount + 2
+		end
+	end
+	section(TEAM_ECONOMY, economy, economyCount)
+	section(TEAM_PARAMS, teamParams, teamParamCount)
+	section(GAME_PARAMS, gameParams, gameParamCount)
+	economyCount, teamParamCount, gameParamCount = 0, 0, 0
+end
+
+--------------------------------------------------------------------------------
 -- A frame.
 --------------------------------------------------------------------------------
 
@@ -938,6 +1047,7 @@ local function writeFrame(frame, last)
 		end
 		sampleTerrain()
 	end
+	sampleTeams()
 
 	out[n + 1] = nil
 	local payload = PackF32(out)
@@ -1074,6 +1184,12 @@ local function header()
 	local teams = {}
 	for _, teamID in ipairs(Spring.GetTeamList() or {}) do
 		teams[#teams + 1] = teamLine(teamID, gaia)
+		teamList[#teamList + 1] = teamID
+		local held = { params = {} }
+		for value = 1, 18 do
+			held[value] = 0
+		end
+		teamHeld[teamID] = held
 	end
 	return '{"format":' .. whole(FORMAT_VERSION)
 		.. ',"engine":' .. quote(engine or "")
@@ -1094,7 +1210,22 @@ local function header()
 		.. ',"unitFootprints":' .. footprints(UnitDefs)
 		.. ',"featureDefs":' .. names(FeatureDefs, 1)
 		.. ',"weaponDefs":' .. names(WeaponDefs, 0)
+		.. ',"teamParams":' .. quoted(teamParamNames)
+		.. ',"gameParams":' .. quoted(gameParamNames)
 		.. "}"
+end
+
+-- The names in a list of the request, leaving out anything that is not text.
+local function paramNames(list)
+	local found = {}
+	if type(list) == "table" then
+		for index = 1, #list do
+			if type(list[index]) == "string" then
+				found[#found + 1] = list[index]
+			end
+		end
+	end
+	return found
 end
 
 function gadget:Initialize()
@@ -1107,6 +1238,8 @@ function gadget:Initialize()
 	if type(request.lastFrame) == "number" then
 		lastFrame = request.lastFrame
 	end
+	teamParamNames = paramNames(request.teamParams)
+	gameParamNames = paramNames(request.gameParams)
 
 	local opened, reason = io.open(DUMP_FILE, "wb")
 	if not opened then
