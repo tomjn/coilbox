@@ -39,6 +39,7 @@ permissions = [
   "allow-content-replay-analysis",
   "allow-content-replay-analysis-events",
   "allow-content-replay-analysis-delete",
+  "allow-content-replay-tracks",
   "allow-content-unit-def-set",
   "allow-content-unit-def-set-store",
   "allow-content-unit-def-sets-usage",

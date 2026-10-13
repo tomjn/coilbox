@@ -48,6 +48,7 @@ pub(crate) mod match_setup;
 mod orders;
 pub(crate) mod retarget;
 pub(crate) mod stream;
+pub(crate) mod track_store;
 pub mod unit_orders;
 
 /// Folders under a write dir that hold client demos. The engine writes to
@@ -358,6 +359,10 @@ pub struct DeleteSummary {
     /// them, and what those files free. Not counted in `deleted` or `bytes`.
     pub analyses: u64,
     pub analysis_bytes: u64,
+    /// The same for recorded tracks (issue #3786): how many of the deleted
+    /// replays had a stored track, and what those files free.
+    pub tracks: u64,
+    pub track_bytes: u64,
 }
 
 /// Delete a batch of replays, returning how many went and what they freed.
@@ -372,6 +377,11 @@ pub struct DeleteSummary {
 /// `analyses` is the folder stored analyses are kept in. A replay's analysis
 /// is found by the game id in its header.
 ///
+/// `tracks` is the folder recorded tracks are kept in, and a track goes by the
+/// same rule as an analysis: it is found by the game id in the header and goes
+/// only when no replay of that match is left, so the preview and the real run
+/// count the same.
+///
 /// `library` is every replay in the library as its canonical path and game id
 /// (see [`library_game_ids`]). An analysis goes only when no replay in it with
 /// that game id is left once the batch is gone, so deleting one of two copies
@@ -383,6 +393,7 @@ pub fn delete_replays(
     paths: &[PathBuf],
     apply: bool,
     analyses: Option<&Path>,
+    tracks: Option<&Path>,
     library: &[(PathBuf, String)],
 ) -> DeleteSummary {
     let mut out = DeleteSummary {
@@ -392,6 +403,7 @@ pub fn delete_replays(
     // The matches whose analysis may go, with its size, and the files that went
     // or would go.
     let mut candidates: std::collections::BTreeMap<String, u64> = Default::default();
+    let mut track_candidates: std::collections::BTreeMap<String, u64> = Default::default();
     let mut gone: std::collections::HashSet<PathBuf> = Default::default();
     // Every match a deleted replay belonged to, whether or not it was analysed.
     let mut matches: std::collections::BTreeSet<String> = Default::default();
@@ -411,6 +423,7 @@ pub fn delete_replays(
         // Read before the replay goes, because the key is inside it.
         let analysis = analyses.and_then(|dir| analysis::store::stored_for_replay(dir, path));
         let key = analyses.and_then(|_| analysis::store::replay_key(path).ok());
+        let track = tracks.and_then(|dir| track_store::stored_for_replay(dir, path));
         let canonical = std::fs::canonicalize(path).unwrap_or_else(|_| path.clone());
         if apply {
             if let Err(e) = std::fs::remove_file(path) {
@@ -424,7 +437,32 @@ pub fn delete_replays(
         if let Some((game_id, size)) = analysis {
             candidates.insert(game_id, size);
         }
+        if let Some((game_id, size)) = track {
+            track_candidates.insert(game_id, size);
+        }
         matches.extend(key);
+    }
+    if let Some(dir) = tracks {
+        for (game_id, size) in track_candidates {
+            if library
+                .iter()
+                .any(|(path, id)| *id == game_id && !gone.contains(path))
+            {
+                continue;
+            }
+            if apply {
+                match track_store::remove(dir, &game_id) {
+                    Ok(true) => {}
+                    Ok(false) => continue,
+                    Err(e) => {
+                        out.skipped.push(format!("track {game_id}: {e}"));
+                        continue;
+                    }
+                }
+            }
+            out.tracks += 1;
+            out.track_bytes += size;
+        }
     }
     let Some(dir) = analyses else {
         return out;
@@ -511,6 +549,7 @@ pub fn delete_listed_replays(
     paths: &[PathBuf],
     apply: bool,
     analyses: Option<&Path>,
+    tracks: Option<&Path>,
     library: &[(PathBuf, String)],
     roots: &[PathBuf],
     only_unfinished: bool,
@@ -542,7 +581,7 @@ pub fn delete_listed_replays(
         }
         allowed.push(path.clone());
     }
-    let mut out = delete_replays(&allowed, apply, analyses, library);
+    let mut out = delete_replays(&allowed, apply, analyses, tracks, library);
     out.skipped.extend(refused);
     out
 }
@@ -2387,8 +2426,8 @@ pub(crate) async fn content_rewrite_demo(
 
 /// `content_delete_replay`, delete one replay file. `path` must be a `.sdfz`/`.sdf`
 /// path from `content_list_replays` (guarded against deleting anything else).
-/// The replay's stored analysis goes with it, and `analysisDeleted` says
-/// whether there was one.
+/// The replay's stored analysis and track go with it, and `analysisDeleted` and
+/// `trackDeleted` say whether there was one.
 #[tauri::command]
 pub(crate) async fn content_delete_replay<R: Runtime>(
     app: AppHandle<R>,
@@ -2400,6 +2439,7 @@ pub(crate) async fn content_delete_replay<R: Runtime>(
         return CliResult::err("not a replay file".to_string());
     }
     let analyses = analysis::store::app_store_dir(&app).ok();
+    let tracks = track_store::app_store_dir(&app).ok();
     let library = match tauri::async_runtime::spawn_blocking({
         let app = app.clone();
         move || library_game_ids(&app)
@@ -2413,6 +2453,7 @@ pub(crate) async fn content_delete_replay<R: Runtime>(
         &[p],
         true,
         analyses.as_deref(),
+        tracks.as_deref(),
         &library,
         &library_roots(),
         only_unfinished.unwrap_or(false),
@@ -2422,14 +2463,18 @@ pub(crate) async fn content_delete_replay<R: Runtime>(
         let reason = summary.skipped.first().cloned().unwrap_or_default();
         return CliResult::err(format!("delete failed: {reason}"));
     }
-    CliResult::ok(json!({ "ok": true, "analysisDeleted": summary.analyses > 0 }))
+    CliResult::ok(json!({
+        "ok": true,
+        "analysisDeleted": summary.analyses > 0,
+        "trackDeleted": summary.tracks > 0,
+    }))
 }
 
 /// `content_delete_replays`: delete a batch of replays, for the storage screen's
 /// bulk cleanup (issue #386). Each path is guarded the same way
 /// `content_delete_replay` guards its one, and a path that fails is skipped with a
 /// reason rather than aborting the batch. `apply=false` sizes the batch without
-/// deleting. The summary counts the stored analyses that go with the replays.
+/// deleting. The summary counts the stored analyses and tracks that go with the replays.
 /// See [`delete_replays`].
 #[tauri::command]
 pub(crate) async fn content_delete_replays<R: Runtime>(
@@ -2440,12 +2485,14 @@ pub(crate) async fn content_delete_replays<R: Runtime>(
 ) -> CliResult {
     let paths: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
     let analyses = analysis::store::app_store_dir(&app).ok();
+    let tracks = track_store::app_store_dir(&app).ok();
     match tauri::async_runtime::spawn_blocking(move || {
         let library = library_game_ids(&app);
         delete_listed_replays(
             &paths,
             apply,
             analyses.as_deref(),
+            tracks.as_deref(),
             &library,
             &library_roots(),
             only_unfinished.unwrap_or(false),
@@ -4268,7 +4315,7 @@ mod tests {
         std::fs::write(&a, b"1234").unwrap();
         std::fs::write(&b, b"123").unwrap();
 
-        let summary = delete_replays(&[a.clone(), b.clone()], false, None, &[]);
+        let summary = delete_replays(&[a.clone(), b.clone()], false, None, None, &[]);
         assert!(!summary.applied);
         assert_eq!(summary.deleted, 2);
         assert_eq!(summary.bytes, 7);
@@ -4290,6 +4337,7 @@ mod tests {
         let summary = delete_replays(
             &[replay.clone(), other.clone(), dir.join("gone.sdf")],
             true,
+            None,
             None,
             &[],
         );
@@ -4345,6 +4393,7 @@ mod tests {
             &[shared.clone(), inside.clone()],
             false,
             None,
+            None,
             &[],
             &roots,
             true,
@@ -4356,6 +4405,7 @@ mod tests {
         let done = delete_listed_replays(
             &[shared.clone(), inside.clone()],
             true,
+            None,
             None,
             &[],
             &roots,
@@ -4380,6 +4430,7 @@ mod tests {
             &[shared.clone(), inside.clone()],
             true,
             None,
+            None,
             &[],
             &[root],
             true,
@@ -4400,6 +4451,7 @@ mod tests {
         let out = delete_listed_replays(
             std::slice::from_ref(&real),
             true,
+            None,
             None,
             &[],
             &[root],
@@ -4429,6 +4481,7 @@ mod tests {
         let out = delete_listed_replays(
             &[stray.clone(), sneaky],
             true,
+            None,
             None,
             &[],
             &[root],
