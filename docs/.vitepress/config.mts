@@ -106,6 +106,7 @@ export default defineConfig({
             { text: "Battle presets", link: "/players/presets" },
             { text: "Galactic conquest", link: "/players/conquest" },
             { text: "Warpath", link: "/players/warpath" },
+            { text: "Replay rewind", link: "/players/replay-rewind" },
           ],
         },
         {
@@ -162,6 +163,15 @@ export default defineConfig({
         {
           text: "Units",
           items: [{ text: "Unit builder", link: "/developers/lego-builder" }],
+        },
+        {
+          text: "Replays",
+          items: [
+            {
+              text: "Replay rewind for your game",
+              link: "/developers/replay-rewind",
+            },
+          ],
         },
       ],
       "/staff/": [
