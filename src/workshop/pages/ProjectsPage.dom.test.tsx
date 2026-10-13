@@ -241,6 +241,27 @@ describe("ProjectsPage", () => {
     expect(screen.getByText(`editor ${made.id}`)).toBeTruthy();
   });
 
+  it("does not offer a game coilbox generated for itself when starting a project", () => {
+    mockScanGames = [
+      GAME,
+      {
+        ...GAME_2,
+        name: "Replay playback",
+        primaryArchive: {
+          name: "coilbox-replay-playback.sdd",
+          path: "/data/games/coilbox-replay-playback.sdd",
+        },
+      },
+    ];
+    show();
+    fireEvent.click(screen.getByRole("button", { name: /New project/ }));
+    fireEvent.click(screen.getByLabelText("Game for the new project"));
+    expect(screen.getByRole("button", { name: GAME.name })).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: "Replay playback" }),
+    ).toBeNull();
+  });
+
   it("says the scan failed, not that no games are installed, when Init failed", () => {
     mockScanError = "no space left on device";
     show();
