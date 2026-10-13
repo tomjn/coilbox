@@ -37,6 +37,7 @@ import {
   useUnitsyncScan,
 } from "../config";
 import { refreshStoredAnalyses } from "../replayAnalysis";
+import { otherGameVersion } from "../replayAnalysisOffer";
 import {
   type ReplayEngineNotice,
   replayDependencyBlock,
@@ -641,6 +642,15 @@ export default function ReplayDetailPage() {
     info && answered && !scan.loading
       ? replayDependencyBlock(info.gameType, answered.games)
       : null;
+  // The playback depends on the replay's game, or on another installed version
+  // of it when its own is missing, as an analysis does (#3869).
+  const playbackGame =
+    info && answered && !scan.loading && missingGame
+      ? otherGameVersion(info.gameType, answered.games)
+      : null;
+  const playbackBlock = playbackGame
+    ? replayDependencyBlock(playbackGame.name, answered?.games ?? [])
+    : dependencyBlock;
   const missingMap =
     info?.mapName && answered && !scan.loading
       ? !answered.maps.some((m) => m.name === info.mapName)
@@ -886,6 +896,9 @@ export default function ReplayDetailPage() {
               enginePath={selected?.enginePath}
               dataDir={selected?.rootPath}
               replayPath={replay?.path ?? ""}
+              watch={engine.watch}
+              dependencyBlock={playbackBlock}
+              game={playbackGame?.name}
             />
 
             {/* Match statistics in spirit, so it takes the build orders' gate (#1179). */}

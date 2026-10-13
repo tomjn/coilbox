@@ -33,6 +33,7 @@ import {
   resetReplayAnalysisForTests,
   seedReplayAnalysisForTests,
 } from "../../replayAnalysis";
+import type { ReplayWatch } from "../../replayEngine";
 import { resetReplayEventReadsForTests } from "../../replayEventRead";
 import { recordingContext } from "../../replayMapView/testTrack";
 import { ReplayTrackError } from "../../replayTrack/fault";
@@ -111,6 +112,34 @@ vi.mock("../../bindings", async () => {
 
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: async () => {} }));
 
+/** What the open-in-engine button reaches for: the running state, the launch
+ *  and the engine the replay page resolves for Watch. */
+let RUNNING = false;
+let LAUNCH: (opts: Record<string, unknown>) => Promise<unknown>;
+const launches: Record<string, unknown>[] = [];
+vi.mock("../../../play/PlayProvider", () => ({
+  usePlay: () => ({
+    running: RUNNING,
+    launchReplayPlayback: (opts: Record<string, unknown>) => LAUNCH(opts),
+  }),
+}));
+vi.mock("../../../play/LaunchContentProvider", () => ({
+  useLaunchContent: () => ({
+    ensureContent: async () => ({
+      ready: true,
+      target: { executable: "/downloaded/spring", dataDir: "/downloaded" },
+    }),
+  }),
+}));
+vi.mock("../../../play/config", () => ({
+  useReplayTarget: () => ({
+    resolved: {
+      matched: true,
+      target: { executable: "/engine/spring", dataDir: "/data" },
+    },
+  }),
+}));
+
 const { ReplayMapViewSection } = await import("./ReplayMapView");
 const { ANALYSIS_ACTION_ATTRIBUTE, ANALYSIS_SECTION_ID } = await import(
   "../../replayAnalysis"
@@ -120,6 +149,7 @@ const info = {
   gameId: ID,
   mapName: "Test Map",
   remixed: false,
+  engineVersion: "105.1.1-2511-g4d1de6d",
 } as unknown as DemoInfo;
 
 const track = (state: StoredReplayTrack["state"]): StoredReplayTrack => ({
@@ -147,12 +177,26 @@ const raf = {
   },
 };
 
+/** What the page hands the section about launching. */
+let WATCH: ReplayWatch;
+let BLOCK: string | null;
+let GAME: string | undefined;
+
 let ctx: ReturnType<typeof recordingContext>;
 let onScreen: ((entries: { isIntersecting: boolean }[]) => void) | undefined;
 let hidden = false;
 
 beforeEach(() => {
   HEADER_ANSWER = HEADER;
+  RUNNING = false;
+  launches.length = 0;
+  LAUNCH = async (opts) => {
+    launches.push(opts);
+    return { exitCode: 0, signal: null };
+  };
+  WATCH = { kind: "recorded" };
+  BLOCK = null;
+  GAME = undefined;
   HELD = new Set();
   held.length = 0;
   headerReads.length = 0;
@@ -242,6 +286,9 @@ function mount(url: string, remixed = false) {
             enginePath="/engine"
             dataDir="/data"
             replayPath="/replays/a.sdfz"
+            watch={WATCH}
+            dependencyBlock={BLOCK}
+            game={GAME}
           />
         ),
       },
@@ -1107,5 +1154,118 @@ describe("marks on the bar", () => {
     mount("/replay", true);
     await settle();
     expect(document.querySelector("canvas")).toBeNull();
+  });
+});
+
+describe("opening the engine at the moment shown", () => {
+  const open = () => screen.getByRole("button", { name: "Open in engine" });
+  const setClock = (frame: number) =>
+    act(async () => {
+      hook().clock.set(frame);
+    });
+
+  it("launches the playback paused at the clock's frame, rounded", async () => {
+    await show("current", "/replay?frame=20");
+    await setClock(87.6);
+    fireEvent.click(open());
+    await settle();
+    expect(launches).toEqual([
+      {
+        replayPath: "/replays/a.sdfz",
+        executable: "/engine/spring",
+        dataDir: "/data",
+        game: undefined,
+        startFrame: 88,
+        paused: true,
+      },
+    ]);
+  });
+
+  it("reads the clock and not the address, which lags", async () => {
+    const { router } = await show("current", "/replay?frame=20");
+    await setClock(61);
+    // The address still holds the frame the page opened at.
+    expect(router.state.location.search).toBe("?frame=20");
+    fireEvent.click(open());
+    await settle();
+    expect(launches[0]?.startFrame).toBe(61);
+  });
+
+  it("rounds down below the half", async () => {
+    await show("current", "/replay?frame=20");
+    await setClock(40.4);
+    fireEvent.click(open());
+    await settle();
+    expect(launches[0]?.startFrame).toBe(40);
+  });
+
+  it("names another installed version of the game when the page does", async () => {
+    GAME = "Some Game 1.1";
+    await show("current", "/replay?frame=20");
+    fireEvent.click(open());
+    await settle();
+    expect(launches[0]?.game).toBe("Some Game 1.1");
+  });
+
+  it("is unavailable while a game is running, and says so", async () => {
+    RUNNING = true;
+    await show("current", "/replay?frame=20");
+    const button = open() as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    expect(button.title).toBe("A game is already running.");
+    fireEvent.click(button);
+    await settle();
+    expect(launches).toEqual([]);
+  });
+
+  it("is unavailable when the replay's game cannot run", async () => {
+    BLOCK = "This game needs another archive.";
+    await show("current", "/replay?frame=20");
+    const button = open() as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    expect(button.title).toBe("This game needs another archive.");
+  });
+
+  it("is unavailable when no engine can run the replay", async () => {
+    WATCH = { kind: "none" };
+    await show("current", "/replay?frame=20");
+    expect((open() as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("shows the reason when the launch is refused", async () => {
+    LAUNCH = async () => {
+      throw new Error(
+        "this replay has no track yet, so it has to be recorded first",
+      );
+    };
+    await show("current", "/replay?frame=20");
+    fireEvent.click(open());
+    await settle();
+    screen.getByText(/has no track yet/);
+    // The button is usable again for another try.
+    expect((open() as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("shows a refusal that is not an Error", async () => {
+    LAUNCH = async () => {
+      throw "a game is already running";
+    };
+    await show("current", "/replay?frame=20");
+    fireEvent.click(open());
+    await settle();
+    screen.getByText("a game is already running");
+  });
+
+  it("says when the engine exits with a code", async () => {
+    LAUNCH = async () => ({ exitCode: 3, signal: null });
+    await show("current", "/replay?frame=20");
+    fireEvent.click(open());
+    await settle();
+    screen.getByText("Engine exited with code 3.");
+  });
+
+  it("is not there when the track is not shown", async () => {
+    await show("stale");
+    expect(screen.queryByRole("button", { name: "Open in engine" })).toBeNull();
   });
 });
