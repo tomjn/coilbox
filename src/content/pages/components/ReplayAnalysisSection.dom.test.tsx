@@ -531,8 +531,7 @@ describe("a replay in the queue", () => {
             record: true,
             disagreements: [
               {
-                figure: "metalProduced",
-                team: 0,
+                figure: "gameSeconds",
                 recorded: "1500",
                 observed: "1750",
               },

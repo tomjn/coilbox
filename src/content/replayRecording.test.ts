@@ -208,8 +208,7 @@ describe("a replay's recording job", () => {
   it("carries the figures that disagreed for a diverged run", () => {
     const disagreements = [
       {
-        figure: "metalProduced",
-        team: 0,
+        figure: "gameSeconds",
         recorded: "1500",
         observed: "1750",
         difference: 250,
