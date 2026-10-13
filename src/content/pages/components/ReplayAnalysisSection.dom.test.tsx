@@ -362,13 +362,13 @@ describe("a replay that has not been analysed or recorded", () => {
 
     expect(said).toContain("Time: about 3 minutes");
     expect(said).toContain("Track size: about 2.0 MB");
-    expect(said).toContain("Estimated from 1 earlier run of this game");
+    expect(said).toContain("Estimated from 1 earlier recording of this game");
     cleanup();
     show();
     const helped = help();
     expect(helped).toContain("Expect about 3 minutes.");
     expect(helped).toContain(
-      "The estimate goes by the 1 run of this game this computer has finished.",
+      "The estimate goes by the 1 recording of this game this computer has finished.",
     );
   });
 

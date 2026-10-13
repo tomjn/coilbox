@@ -485,7 +485,7 @@ function AnalysisHelp({
             faster than the match did.
             {estimate && ` Expect about ${roughly(estimate.seconds)}.`}
             {estimate &&
-              ` The estimate goes by the ${plural(estimate.runs, "run", "runs")} of this game this computer has finished.`}{" "}
+              ` The estimate goes by the ${plural(estimate.runs, "recording", "recordings")} of this game this computer has finished.`}{" "}
             The engine and the game the replay used must be installed. The
             result is kept, so this happens once.
           </p>
@@ -649,8 +649,8 @@ function Confirmation({
         </p>
         <p className="text-xs text-muted-foreground">
           {estimate
-            ? `Estimated from ${plural(estimate.runs, "earlier run", "earlier runs")} of this game on this computer.`
-            : "Nothing of this game has been run on this computer yet."}
+            ? `Estimated from ${plural(estimate.runs, "earlier recording", "earlier recordings")} of this game on this computer.`
+            : "Nothing of this game has been recorded on this computer yet."}
         </p>
         {effect === "removesOlder" && (
           <p className="text-xs text-amber-700 dark:text-amber-400">
