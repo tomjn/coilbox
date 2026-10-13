@@ -355,7 +355,7 @@ Column 12 says how many keys each unit has. A unit with none has an empty queue 
 | 72 | `u16` | time |
 | 73 | `u8` | for each key, the number of items in the queue |
 | 74 | `u16` | for each item, the unit definition |
-| 75, 76 | `s32` | for each item, position x and z, plain |
+| 75, 76 | `s32` | for each item, position x and z in position steps, plain |
 | 77 | `u8` | for each item, the facing, 0 to 3 |
 
 A queue holds until the next key.
@@ -443,7 +443,7 @@ To give every value at frame `f`:
 5. A feature exists when its first and last frame say so.
 6. For terrain, apply the rows between the frame last shown and `f`.
 
-A reader that holds a whole track as one Lua string can only address the first 16,777,216 bytes of it exactly. Past that it needs `io`, with `file:seek` to the block and `file:read` of the length.
+A reader that holds a whole track as one Lua string can only address the first 16,777,216 bytes of it exactly. Past that it needs `io`, with `file:seek` to the block and `file:read` of the length. The Lua reader in `lua/rewind-player` takes the way bytes are fetched as a function, so a player can pick either.
 
 ## Rules for a writer
 
