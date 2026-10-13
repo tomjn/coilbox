@@ -49,7 +49,9 @@ const VERSION: &str = "1";
 pub const TRACK_PATH: &str = "coilbox_rewind/track.cbtrack";
 
 /// The one spectator's name, and the name the script gives as the local player.
-const SPECTATOR: &str = "Coilbox playback";
+/// It has no space, because the engine's client replaces one with an underscore
+/// when it connects, and the connection then matches no player in the script.
+const SPECTATOR: &str = "CoilboxPlayback";
 
 /// The file the start script is written to, in the app's `play` folder.
 const SCRIPT_FILE: &str = "replay-playback.txt";
@@ -1103,5 +1105,213 @@ mod tests {
 
         assert!(!dir.join("stale.lua").exists());
         assert!(dir.join(TRACK_PATH).exists());
+    }
+
+    /// A gadget that says what the engine made of the script, because the
+    /// engine's own log does not name the colours or the team leaders. It is
+    /// written into the game folder after the launch is prepared and is not
+    /// part of the game.
+    const PROBE: &str = r#"
+function gadget:GetInfo()
+	return { name = "probe", layer = -1000, enabled = true }
+end
+if gadgetHandler:IsSyncedCode() then
+	function gadget:Initialize()
+		Spring.Echo("PROBE map " .. Game.mapName)
+		Spring.Echo("PROBE game " .. Game.gameName .. " " .. Game.gameVersion)
+		Spring.Echo("PROBE gaia " .. Spring.GetGaiaTeamID())
+		for _, team in ipairs(Spring.GetTeamList()) do
+			local _, leader, dead, ai, side, ally = Spring.GetTeamInfo(team, false)
+			Spring.Echo(string.format("PROBE team %d ally %d leader %d dead %s ai %s side %s", team, ally, leader, tostring(dead), tostring(ai), side))
+		end
+		local players, spectators = 0, 0
+		for _, player in ipairs(Spring.GetPlayerList()) do
+			local _, _, spectator = Spring.GetPlayerInfo(player, false)
+			players = players + 1
+			if spectator then
+				spectators = spectators + 1
+			end
+		end
+		Spring.Echo("PROBE players " .. players .. " spectators " .. spectators)
+	end
+else
+	-- Team colours are only readable from the unsynced half.
+	function gadget:Initialize()
+		for _, team in ipairs(Spring.GetTeamList()) do
+			local r, g, b = Spring.GetTeamColor(team)
+			Spring.Echo(string.format("PROBE colour team %d %.3f %.3f %.3f", team, r, g, b))
+		end
+	end
+end
+"#;
+
+    /// The whole route against a real engine, a real game and a real replay:
+    /// the replay is recorded into a track, the playback game and its script
+    /// are written for it, and the engine is launched on them. The engine's log
+    /// then has to show the replay's map, its teams with their colours, one
+    /// spectator, the stand-in gadget's line about the track, and no replay
+    /// written.
+    ///
+    /// Reads the same variables as the analysis tests, and does nothing without
+    /// them. `COILBOX_PLAYBACK_GAME` names another installed game for the
+    /// playback to depend on, for a replay recorded on a scratch game whose own
+    /// gadgets would play over the track. `COILBOX_PLAYBACK_SECONDS` is how long to wait
+    /// for the log lines (default 120). `COILBOX_PLAYBACK_LOG` is a path to copy
+    /// the engine's output to. The engine is the headless one in
+    /// `COILBOX_ANALYSIS_ENGINE_DIR`, since a window cannot be checked here.
+    #[test]
+    #[ignore = "needs an engine, a game, a map and a replay recorded with them"]
+    fn a_real_replay_is_played_back_in_the_engine() {
+        use super::super::analysis::launch::{headless_binary, run_headless, Launch, RunControl};
+        use super::super::analysis::{
+            analyse_replay, run_timeout, AnalysisRequest, AnalysisStatus,
+        };
+        use coilbox_track_thin::{thin_dump_cancellable, ThinOptions};
+
+        let var = |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
+        let (Some(replay), Some(engine_dir), Some(data_dirs)) = (
+            var("COILBOX_ANALYSIS_REPLAY"),
+            var("COILBOX_ANALYSIS_ENGINE_DIR"),
+            var("COILBOX_ANALYSIS_DATA_DIRS"),
+        ) else {
+            eprintln!(
+                "did nothing: set COILBOX_ANALYSIS_REPLAY, COILBOX_ANALYSIS_ENGINE_DIR and \
+                 COILBOX_ANALYSIS_DATA_DIRS to run it"
+            );
+            return;
+        };
+        let replay = PathBuf::from(replay);
+        let engine_dir = PathBuf::from(engine_dir);
+        let data_dirs: Vec<PathBuf> = data_dirs
+            .split(coilbox_proc::DATADIR_SEP)
+            .map(PathBuf::from)
+            .collect();
+        let stand_in = var("COILBOX_PLAYBACK_GAME");
+        let wait = std::time::Duration::from_secs(
+            var("COILBOX_PLAYBACK_SECONDS")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(120),
+        );
+        let dir = tempfile::tempdir().unwrap();
+
+        // 1. Record the replay into a track, the way the queue does.
+        let game_id = store::replay_key(&replay).unwrap();
+        let raw = read_header_and_script(&replay).unwrap();
+        let dump = dir.path().join("recording.dump");
+        let tracks = dir.path().join("tracks");
+        let run = analyse_replay(
+            &AnalysisRequest {
+                replay: replay.clone(),
+                engine_dir: engine_dir.clone(),
+                data_dirs: data_dirs.clone(),
+                game: None,
+                game_short_name: None,
+                scratch_root: dir.path().join("scratch"),
+                timeout: run_timeout(raw.game_time),
+                record: Some(dump.clone()),
+            },
+            &RunControl::default(),
+            &|_| {},
+        )
+        .expect("the recording run");
+        assert_eq!(run.report.status, AnalysisStatus::Reproduced);
+        track_store::store(&tracks, &game_id, |track| {
+            thin_dump_cancellable(
+                &dump,
+                track,
+                &ThinOptions {
+                    game_id: track_store::id_bytes(&game_id).unwrap(),
+                    ..ThinOptions::default()
+                },
+                &|| false,
+            )
+            .map(|_| ())
+        })
+        .expect("a track is stored");
+
+        // 2. Write the playback game and its start script.
+        let content = dir.path().join("content");
+        std::fs::create_dir_all(&content).unwrap();
+        let datadirs = data_dirs
+            .iter()
+            .map(|d| d.to_string_lossy())
+            .collect::<Vec<_>>()
+            .join(&coilbox_proc::DATADIR_SEP.to_string());
+        let script = prepare(
+            &Prepare {
+                replay: &replay,
+                tracks: &tracks,
+                content_root: &content,
+                game: stand_in.as_deref(),
+                script_dir: &dir.path().join("play"),
+            },
+            |game| {
+                tauri_plugin_coilbox_unitsync::game_short_name_blocking(
+                    &engine_dir.to_string_lossy(),
+                    &datadirs,
+                    game,
+                )
+            },
+        )
+        .expect("the playback is prepared");
+        let game_dir = content.join("games").join(FOLDER);
+        std::fs::write(game_dir.join("luarules/gadgets/probe.lua"), PROBE).unwrap();
+
+        // 3. Launch the engine on it and read its log until the lines are in.
+        let write_dir = dir.path().join("write");
+        let log = dir.path().join("engine.log");
+        let control = RunControl::default();
+        let mut dirs = vec![content.clone()];
+        dirs.extend(data_dirs.iter().cloned());
+        let exit = run_headless(
+            &Launch {
+                engine: &headless_binary(&engine_dir),
+                demo: &script,
+                write_dir: &write_dir,
+                config: &dir.path().join("engine.cfg"),
+                pid_file: &dir.path().join("engine.pid"),
+                data_dirs: &dirs,
+                log: &log,
+                timeout: wait,
+                on_poll: &|| {
+                    let text = std::fs::read_to_string(&log).unwrap_or_default();
+                    if text.contains("PROBE players") && text.contains("COILBOX_REWIND_PLAYER") {
+                        control.cancel();
+                    }
+                },
+            },
+            &control,
+        )
+        .expect("the engine launches");
+        let output = std::fs::read_to_string(&log).unwrap_or_default();
+        // For a person to read afterwards, since the folder is removed.
+        if let Some(keep) = var("COILBOX_PLAYBACK_LOG") {
+            let _ = std::fs::copy(&log, keep);
+        }
+        let lines: Vec<&str> = output
+            .lines()
+            .filter(|l| l.contains("PROBE ") || l.contains("COILBOX_REWIND_PLAYER"))
+            .collect();
+        eprintln!("exit: {exit:?}\n{}", lines.join("\n"));
+        eprintln!("script:\n{}", std::fs::read_to_string(&script).unwrap());
+
+        assert!(
+            !exit.timed_out,
+            "the log never showed the lines. Log:\n{output}"
+        );
+        assert!(output.contains("PROBE players 1 spectators 1"), "{output}");
+        // The track reached the game, through the reader.
+        assert!(
+            lines
+                .iter()
+                .any(|l| l.contains("COILBOX_REWIND_PLAYER track frames")),
+            "{output}"
+        );
+        // No replay of the playback was written.
+        let demos = write_dir.join("demos");
+        let written = std::fs::read_dir(&demos)
+            .map(|d| d.flatten().count())
+            .unwrap_or(0);
+        assert_eq!(written, 0, "the playback wrote a replay");
     }
 }
