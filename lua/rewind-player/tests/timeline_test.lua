@@ -341,6 +341,30 @@ do
 	t.check("in a panel of its own", e.shapes > without, e.shapes .. " against " .. without)
 end
 
+-- When playback refuses to start there is no player, and the note is all there
+-- is to show (issue #3802).
+
+do
+	local note = "Playback needs engine 105.0 or later: no Spring.CreateUnit"
+	local e = engine(params())
+	e.params.coilbox_rewind_first_frame = nil
+	e.params.coilbox_rewind_note = note
+	local tl = timeline(e)
+	tl:draw()
+	t.check("with no player the note is drawn", e.texts[note])
+	t.check("and nothing else is", e.texts["1x"] == nil and e.texts["?"] == nil)
+	t.check("inside the view", e.box.x1 >= 0 and e.box.x2 <= 1920 and e.box.y1 >= 0 and e.box.y2 <= 1080)
+	t.same("the timeline takes no press", tl:mousePress(960, 40, 1), false)
+	t.same("and is not above anything", tl:isAbove(960, 40), false)
+	e.params.coilbox_rewind_note = ""
+	e.clear()
+	tl:draw()
+	t.same("an empty note takes it away, and nothing is drawn", next(e.texts), nil)
+	e.params.coilbox_rewind_first_frame = 600
+	tl:draw()
+	t.check("the timeline comes back with a player", e.texts["1x"])
+end
+
 -- Where it sits: bottom centre, and inside the view at any size.
 
 do

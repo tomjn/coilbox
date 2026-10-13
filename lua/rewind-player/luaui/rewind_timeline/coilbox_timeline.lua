@@ -296,13 +296,24 @@ function Timeline:send(text)
 end
 
 --- Reads the player's parameters. Gives false when there is no player, which
--- is a game with no track or a bad one.
+-- is a game with no track or a bad one, or an engine too old to play on. The
+-- note is read all the same, since that engine is what it says.
 function Timeline:read()
 	local get = self.Spring.GetGameRulesParam
 	local P = M.PARAMS
 	local first = get(P.first)
 	if type(first) ~= "number" then
 		self.present = false
+		local said = get(P.note)
+		if type(said) ~= "string" or said == "" then
+			said = nil
+		end
+		if said ~= self.note then
+			self.note = said
+			if self.scale then
+				self:layout()
+			end
+		end
 		return false
 	end
 	local last = get(P.last)
@@ -929,10 +940,14 @@ local function drawHelp(self, mx, my)
 	text(self, "Reset keys", (reset.x1 + reset.x2) / 2, (reset.y1 + reset.y2) / 2, self.smallSize, LOOK.text, "cx")
 end
 
---- Draws the timeline, from `widget:DrawScreen`. Nothing is drawn in a game
--- with no player.
+--- Draws the timeline, from `widget:DrawScreen`. In a game with no player only
+-- the note is drawn, when there is one.
 function Timeline:draw()
-	if not self.scale or not self:read() then
+	if not self.scale then
+		return
+	end
+	local present = self:read()
+	if not present and not self.note then
 		return
 	end
 	local gl, rects = self.gl, self.rects
@@ -944,6 +959,10 @@ function Timeline:draw()
 		local note = rects.note
 		panel(self, note)
 		text(self, self.note, (note.x1 + note.x2) / 2, (note.y1 + note.y2) / 2, self.smallSize, LOOK.warn, "cx")
+	end
+	if not present then
+		gl.Color(1, 1, 1, 1)
+		return
 	end
 	panel(self, rects.panel)
 	drawBar(self)
