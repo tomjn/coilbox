@@ -17,8 +17,9 @@
 --
 -- `clock` is coilbox_player_clock.lua's: `clock.jumped` says the frame was
 -- reached by a seek or a step and not by play, and `clock.direction` and
--- `clock.speed` say how it is playing. Projectiles, aim poses and animation
--- (issues #3795 to #3797) are stages to add to the list in `M.new`.
+-- `clock.speed` say how it is playing, and `clock:watched()` whether it is
+-- forward at near the match's own speed. Aim poses and animation (issues #3796
+-- and #3797) are stages to add to the list in `M.new`.
 --
 -- What a stage is given is the context: the track, its info and features, the
 -- engine's tables, `teamOf` and `report`. A stage takes the engine from the
@@ -35,6 +36,7 @@ local Rotation = VFS.Include(MODULES .. "coilbox_player_rotation.lua")
 local Terrain = VFS.Include(MODULES .. "coilbox_player_terrain.lua")
 local Features = VFS.Include(MODULES .. "coilbox_player_features.lua")
 local Units = VFS.Include(MODULES .. "coilbox_player_units.lua")
+local Projectiles = VFS.Include(MODULES .. "coilbox_player_projectiles.lua")
 local Adapter = VFS.Include(MODULES .. "coilbox_player_adapter.lua")
 
 local M = {}
@@ -166,6 +168,7 @@ function M.new(track, options)
 	local terrain = Terrain.new(context, Reader)
 	local featureStage = Features.new(context, Rotation)
 	local units = Units.new(context, Rotation)
+	local projectiles = Projectiles.new(context, units, Clock)
 
 	local self = setmetatable({
 		Spring = Spring,
@@ -177,9 +180,10 @@ function M.new(track, options)
 		terrain = terrain,
 		features = featureStage,
 		units = units,
+		projectiles = projectiles,
 		-- In the order they run. Terrain moves the ground before anything is put
-		-- on it.
-		stages = { terrain, featureStage, units },
+		-- on it, and a shot's owner is a unit.
+		stages = { terrain, featureStage, units, projectiles },
 		afterFrame = hooks.afterFrame,
 		published = {},
 	}, Player)

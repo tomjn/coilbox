@@ -26,6 +26,13 @@
 -- Spring.SetHeightMap raises outside Spring.SetHeightMapFunc, and takes x and z
 -- in elmos, which it divides by 8 and cuts to a whole number.
 --
+-- Spring.SpawnProjectile gives nothing for a weapon definition the engine does
+-- not have and raises when its second argument is not a table. The calls that
+-- set something on a projectile do nothing for an id that is not one. Setting
+-- a place or a velocity does not need move control, which only stops the
+-- engine moving the projectile itself. `world.simulate` is the engine's own
+-- frame for them, from rts/Sim/Projectiles.
+--
 -- Nothing a gadget calls on every frame allocates here, so a test can count
 -- what the gadget itself allocates.
 
@@ -68,6 +75,39 @@ function M.new(options)
 		local copy = { id = id, name = def.name }
 		featureDefs[id], featureDefNames[def.name] = copy, copy
 	end
+	-- A weapon definition is given as the engine's WeaponDefs has it: `type`,
+	-- `selfExplode`, `soundTrigger`, `salvoSize`, `salvoDelay`, `range`,
+	-- `intensity`, `waterWeapon` and `fireSound` as a list of `{ name, volume }`.
+	local weaponDefs, weaponDefNames = {}, {}
+	for id, def in ipairs(options.weaponDefs or {}) do
+		local copy = { id = id }
+		for key, value in pairs(def) do
+			copy[key] = value
+		end
+		weaponDefs[id], weaponDefNames[def.name] = copy, copy
+	end
+	world.projectiles = {}
+	world.explosions = {}
+	world.sounds = {}
+	world.soundCount = 0
+	world.spawned = 0
+	-- Calls that set something on a projectile the engine no longer has. The
+	-- engine ignores them, and the id may by then be another projectile's.
+	world.staleCalls = 0
+	world.armorTypes = 3
+	local lastProjectile = 9000
+	--- The id the next projectile gets. A test replaces it to hand out an id
+	-- again, as the engine does.
+	function world.nextProjectile()
+		lastProjectile = lastProjectile + 1
+		return lastProjectile
+	end
+	--- The ground's height at a place. A test replaces it.
+	function world.ground()
+		return 0
+	end
+	local ZERO = { 0, 0, 0 }
+
 	local teamList = options.teams or { { id = 0, allyTeam = 0 }, { id = 1, allyTeam = 1 }, { id = 2, allyTeam = 2 } }
 	for _, team in ipairs(teamList) do
 		world.teams[team.id] = { id = team.id, allyTeam = team.allyTeam, dead = false, limit = team.limit or 1000, count = 0 }
@@ -378,6 +418,239 @@ function M.new(options)
 		end
 	end
 
+	-- Projectiles.
+
+	local function projectile(id)
+		return world.projectiles[id]
+	end
+
+	function Spring.SpawnProjectile(def, params)
+		local found = weaponDefs[def]
+		if not found then
+			return nil
+		end
+		if type(params) ~= "table" then
+			error("[SpawnProjectile] argument 2 must be a table!", 2)
+		end
+		local at, speed, target = params.pos or ZERO, params.speed or ZERO, params["end"] or ZERO
+		local id = world.nextProjectile()
+		local damages = { craterMult = found.craterMult or 1, craterBoost = 0, impulseFactor = 1, impulseBoost = 0 }
+		for armor = 0, world.armorTypes - 1 do
+			damages[armor] = found.damage or 100
+		end
+		world.projectiles[id] = {
+			id = id,
+			def = found,
+			x = at[1],
+			y = at[2],
+			z = at[3],
+			vx = speed[1],
+			vy = speed[2],
+			vz = speed[3],
+			-- The speed it was created with, which a laser keeps for its length.
+			speedf = math.sqrt(speed[1] ^ 2 + speed[2] ^ 2 + speed[3] ^ 2),
+			endX = target[1],
+			endY = target[2],
+			endZ = target[3],
+			team = params.team or world.gaia,
+			owner = params.owner or -1,
+			ttl = math.floor(params.ttl or 0),
+			startAlpha = params.startAlpha or 0,
+			endAlpha = params.endAlpha or 1,
+			moveCtrl = false,
+			damages = damages,
+			moves = 0,
+		}
+		world.spawned = world.spawned + 1
+		event("spawn", id)
+		return id
+	end
+
+	function Spring.DeleteProjectile(id)
+		if projectile(id) then
+			world.projectiles[id] = nil
+			event("delete", id)
+		end
+	end
+
+	function Spring.SetProjectileMoveControl(id, enable)
+		local found = projectile(id)
+		if found then
+			found.moveCtrl = enable == true
+		end
+	end
+
+	function Spring.SetProjectilePosition(id, x, y, z)
+		local found = projectile(id)
+		if not found then
+			world.staleCalls = world.staleCalls + 1
+			return
+		end
+		found.x, found.y, found.z = x, y, z
+		found.moves = found.moves + 1
+	end
+
+	function Spring.SetProjectileVelocity(id, x, y, z)
+		local found = projectile(id)
+		if not found then
+			world.staleCalls = world.staleCalls + 1
+			return
+		end
+		found.vx, found.vy, found.vz = x, y, z
+	end
+
+	function Spring.SetProjectileTimeToLive(id, ttl)
+		local found = projectile(id)
+		if found then
+			found.ttl = math.floor(ttl)
+		end
+	end
+
+	function Spring.GetProjectileTimeToLive(id)
+		local found = projectile(id)
+		if found then
+			return found.ttl
+		end
+	end
+
+	--- The table form only takes string keys, and a string that reads as a
+	-- number is an armour type (SetSingleDynDamagesKey).
+	function Spring.SetProjectileDamages(id, _, values)
+		local found = projectile(id)
+		if not found then
+			return
+		end
+		for key, value in pairs(values) do
+			if type(key) == "string" then
+				found.damages[tonumber(key) or key] = value
+			end
+		end
+	end
+
+	function Spring.GetGroundHeight(x, z)
+		return world.ground(x, z)
+	end
+
+	function Spring.PlaySoundFile(name, volume, x, y, z, channel)
+		local n = world.soundCount + 1
+		world.soundCount = n
+		world.sounds[n] = { name = name, volume = volume, x = x, y = y, z = z, channel = channel }
+		return true
+	end
+
+	--- An explosion at a place, as CWeaponProjectile::Explode makes one.
+	local function explode(found, x, y, z, why)
+		local n = #world.explosions + 1
+		local worst = 0
+		for armor = 0, world.armorTypes - 1 do
+			worst = math.max(worst, found.damages[armor])
+		end
+		world.explosions[n] = {
+			id = found.id,
+			def = found.def.name,
+			x = x,
+			y = y,
+			z = z,
+			why = why,
+			damage = worst,
+			crater = found.damages.craterMult > 0,
+			impulse = found.damages.impulseFactor ~= 0 or found.damages.impulseBoost ~= 0,
+		}
+		if found.def.type == "LaserCannon" then
+			-- CLaserProjectile::CollisionCommon: it stops and fades.
+			found.vx, found.vy, found.vz, found.hit = 0, 0, 0, true
+		else
+			world.projectiles[found.id] = nil
+		end
+	end
+
+	--- One frame of the engine's projectiles, after the gadgets' GameFrame:
+	-- CProjectileHandler::CheckCollisions and then every projectile's Update,
+	-- for the kinds the tests use. A hit is looked for from where a projectile
+	-- is to where its speed takes it, and move control does not switch that
+	-- off. The ground is a test of the place alone.
+	function world.simulate()
+		for id, found in next, world.projectiles do
+			local kind = found.def.type
+			local hitscan = kind == "BeamLaser" or kind == "LightningCannon"
+			if not hitscan and not found.hit then
+				if found.y < world.ground(found.x, found.z) then
+					explode(found, found.x, world.ground(found.x, found.z), found.z, "ground")
+				else
+					local target = world.target
+					if target then
+						-- The nearest the path comes to the target's middle.
+						local dx, dy, dz = target.x - found.x, target.y - found.y, target.z - found.z
+						local along = 0
+						local length = found.vx ^ 2 + found.vy ^ 2 + found.vz ^ 2
+						if length > 0 then
+							along = math.max(0, math.min(1, (dx * found.vx + dy * found.vy + dz * found.vz) / length))
+						end
+						local nx, ny, nz = found.x + found.vx * along, found.y + found.vy * along, found.z + found.vz * along
+						if (target.x - nx) ^ 2 + (target.y - ny) ^ 2 + (target.z - nz) ^ 2 <= target.radius ^ 2 then
+							explode(found, nx, ny, nz, "target")
+						end
+					end
+				end
+			end
+			found = world.projectiles[id]
+			-- A piece of debris has no time to live, and a test puts one in by hand.
+			if found and found.ttl then
+				if not found.moveCtrl and not hitscan then
+					found.x, found.y, found.z = found.x + found.vx, found.y + found.vy, found.z + found.vz
+				end
+				found.ttl = found.ttl - 1
+				if hitscan then
+					if found.ttl <= 0 then
+						world.projectiles[id] = nil
+					end
+				elseif kind == "Cannon" then
+					if found.ttl == 0 then
+						explode(found, found.x, found.y, found.z, "ttl")
+					end
+				elseif kind == "LaserCannon" then
+					-- CLaserProjectile::Update, for a bolt with laserHardStop. It
+					-- stops when its time to live had run out before this frame, grows
+					-- by the speed it was created with while it moves, shrinks by it
+					-- once stopped, and is gone when nothing is left of it.
+					if found.ttl < 0 then
+						found.vx, found.vy, found.vz = 0, 0, 0
+					end
+					if found.vx == 0 and found.vy == 0 and found.vz == 0 then
+						found.length = math.max((found.length or 0) - found.speedf, 0)
+						if found.length <= 0.01 then
+							world.projectiles[id] = nil
+						end
+					else
+						found.length = math.min((found.length or 0) + found.speedf, (found.def.duration or 0.1) * found.speedf * 30)
+					end
+				elseif kind == "MissileLauncher" then
+					if found.ttl <= 0 and found.def.selfExplode then
+						explode(found, found.x, found.y, found.z, "ttl")
+					end
+				end
+			end
+		end
+	end
+
+	--- How many projectiles the engine has.
+	function world.projectileCount()
+		local n = 0
+		for _ in next, world.projectiles do
+			n = n + 1
+		end
+		return n
+	end
+
+	--- The one projectile of a weapon definition name, or nil when there is none.
+	function world.projectileNamed(name)
+		for _, found in next, world.projectiles do
+			if found.def.name == name then
+				return found
+			end
+		end
+	end
+
 	-- The heightmap.
 
 	function Spring.SetHeightMapFunc(fn, ...)
@@ -421,11 +694,13 @@ function M.new(options)
 		UnitDefNames = unitDefNames,
 		UnitDefs = unitDefs,
 		FeatureDefNames = featureDefNames,
-		WeaponDefNames = {},
+		WeaponDefNames = weaponDefNames,
 		CMD = { ONOFF = 85 },
 		Game = {
 			gameSpeed = 30,
 			squareSize = SQUARE,
+			-- Names and numbers both ways, numbered from 0 (LuaConstGame.cpp).
+			armorTypes = { [0] = "default", [1] = "tanks", [2] = "ships", default = 0, tanks = 1, ships = 2 },
 			constructionDecay = options.constructionDecay == true,
 			constructionDecaySpeed = 0.03,
 		},
