@@ -37,6 +37,7 @@ pub mod log;
 pub mod queue;
 pub mod store;
 
+use super::playback::adapter;
 use divergence::Disagreement;
 use launch::{EngineExit, RunControl};
 use log::{EventCounts, LogHeader};
@@ -375,23 +376,52 @@ fn analyse_with(
     // short name, so the engine fills `Game.gameShortName` from the game it
     // loads. The analysis game takes the base game's, or a gadget that branches
     // on it plays a different match (issue #3943).
-    let short_name = match &request.game_short_name {
-        Some(name) => name.clone(),
-        None => tauri_plugin_coilbox_unitsync::game_short_name_blocking(
-            &request.engine_dir.to_string_lossy(),
-            &request
-                .data_dirs
-                .iter()
-                .map(|dir| dir.to_string_lossy())
-                .collect::<Vec<_>>()
-                .join(&coilbox_proc::DATADIR_SEP.to_string()),
-            &base_game,
-        )
-        .map_err(|e| format!("could not read the short name of {base_game}: {e}"))?,
+    //
+    // A run that records also needs the game's playback adapter, which names
+    // the rules parameters the recorder keeps (issue #3982). It is chosen as a
+    // playback chooses it, from the game's own archive and then from the ones
+    // coilbox ships, so the recorder keeps what the player will set.
+    let engine_dir = request.engine_dir.to_string_lossy();
+    let datadirs = request
+        .data_dirs
+        .iter()
+        .map(|dir| dir.to_string_lossy())
+        .collect::<Vec<_>>()
+        .join(&coilbox_proc::DATADIR_SEP.to_string());
+    let unread = |e: String| format!("could not read the short name of {base_game}: {e}");
+    let shipped = super::playback::REWIND_PLAYER_ADAPTERS;
+    let (short_name, chosen) = match (&request.game_short_name, &request.record) {
+        // The caller knows the game and not its version or its archive, so
+        // only a shipped adapter for every version of it can apply.
+        (Some(name), Some(_)) => (
+            name.clone(),
+            Some(adapter::choose(Ok(None), shipped, name, None)),
+        ),
+        (Some(name), None) => (name.clone(), None),
+        (None, Some(_)) => {
+            let installed = super::playback::installed_game(&engine_dir, &datadirs, &base_game)
+                .map_err(unread)?;
+            let chosen = adapter::choose(
+                installed.own_adapter,
+                shipped,
+                &installed.short_name,
+                installed.version.as_deref(),
+            );
+            (installed.short_name, Some(chosen))
+        }
+        (None, None) => (
+            tauri_plugin_coilbox_unitsync::game_short_name_blocking(
+                &engine_dir,
+                &datadirs,
+                &base_game,
+            )
+            .map_err(unread)?,
+            None,
+        ),
     };
 
-    let recording = match &request.record {
-        Some(_) => Some(recording_for(&request.replay)?),
+    let recording = match chosen {
+        Some(chosen) => Some(recording_for(&request.replay, chosen.adapter.as_ref())?),
         None => None,
     };
 
@@ -486,13 +516,21 @@ fn analyse_with(
     })
 }
 
-/// What the recorder is told about a replay: where its stream ends.
-fn recording_for(replay: &Path) -> Result<game::Recording, String> {
+/// What the recorder is told about a replay: where its stream ends, and the
+/// rules parameters the game's adapter names, when it has one.
+fn recording_for(
+    replay: &Path,
+    adapter: Option<&adapter::Adapter>,
+) -> Result<game::Recording, String> {
     let last_frame = super::stream::read_stream(replay)?.last_frame;
     if last_frame == crate::model::PREGAME_FRAME {
         return Err("this replay holds no frames, so there is nothing to record".into());
     }
-    Ok(game::Recording { last_frame })
+    Ok(game::Recording {
+        last_frame,
+        team_params: adapter.map(|a| a.team_params.clone()).unwrap_or_default(),
+        game_params: adapter.map(|a| a.game_params.clone()).unwrap_or_default(),
+    })
 }
 
 /// Move the recorder's file out of the scratch folder, which is about to be
@@ -572,6 +610,8 @@ mod tests {
         replay: PathBuf,
         /// Where a run is asked to leave a recording, when it is asked.
         record: Option<PathBuf>,
+        /// The short name the caller says the replay's game has.
+        short_name: String,
     }
 
     impl World {
@@ -584,6 +624,7 @@ mod tests {
                 dir,
                 replay: replay_path,
                 record: None,
+                short_name: "some_game".to_string(),
             }
         }
 
@@ -614,7 +655,7 @@ mod tests {
                     engine_dir: self.dir.path().join("engine"),
                     data_dirs: vec![self.dir.path().join("content")],
                     game: game.map(str::to_string),
-                    game_short_name: Some("some_game".to_string()),
+                    game_short_name: Some(self.short_name.clone()),
                     scratch_root: self.scratch_root(),
                     timeout,
                     record: self.record.clone(),
@@ -886,6 +927,39 @@ mod tests {
         );
         // Moved, not copied: the scratch folder is gone and the file is not.
         assert_eq!(world.leftovers(), Vec::<String>::new());
+    }
+
+    /// The recorder keeps the rules parameters that the game's playback adapter
+    /// names, so a recording of a game with an adapter asks for them, and one
+    /// of a game with none asks for none (issue #3982).
+    #[test]
+    fn a_recording_asks_for_the_rules_parameters_the_games_adapter_names() {
+        let request_for = |short_name: &str| {
+            let mut world = World::new(replay_with_frames());
+            world.record = Some(world.dir.path().join("match.dump"));
+            world.short_name = short_name.to_string();
+            let body = format!(
+                "{}{}{}",
+                writes(FIXTURE),
+                witnesses_the_game(&world),
+                records("a dump")
+            );
+            world.analyse(&body, LONG).unwrap();
+            std::fs::read_to_string(world.witness().join("request.lua")).unwrap()
+        };
+
+        let splinter_faction = request_for("SF");
+        assert!(
+            splinter_faction
+                .contains("teamParams = {\"supplyUsed\", \"supplyMax\", \"researchPoints\"},"),
+            "{splinter_faction}"
+        );
+        assert!(
+            splinter_faction.contains("gameParams = {},"),
+            "{splinter_faction}"
+        );
+        let other = request_for("some_game");
+        assert!(other.contains("teamParams = {},"), "{other}");
     }
 
     /// The run every analysis has made so far: no recorder in the game, and a
