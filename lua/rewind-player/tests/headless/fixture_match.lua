@@ -15,7 +15,7 @@ function gadget:GetInfo()
 		desc = "A short match with a construction, a death, a wreck and a change of ground",
 		author = "coilbox",
 		date = "2026",
-		license = "MIT",
+		license = "MIT or GNU GPL, v2 or later",
 		layer = 2000,
 		enabled = true,
 	}

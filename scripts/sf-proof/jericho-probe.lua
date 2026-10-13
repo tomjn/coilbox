@@ -19,7 +19,7 @@ function gadget:GetInfo()
 		desc = "Plays Silence the Jericho on SplinterFaction and reads the result",
 		author = "coilbox",
 		date = "2026",
-		license = "MIT",
+		license = "MIT or GNU GPL, v2 or later",
 		-- Behind the runtime (1000) and behind SplinterFaction's own gadgets, so
 		-- every reading is of a frame everyone else has finished with.
 		layer = 3000,

@@ -34,7 +34,7 @@ function widget:GetInfo()
 		desc = "Place a base blueprint from your coilbox library, or save one",
 		author = "coilbox",
 		date = "2026",
-		license = "MIT",
+		license = "MIT or GNU GPL, v2 or later",
 		layer = 0,
 		enabled = true,
 	}

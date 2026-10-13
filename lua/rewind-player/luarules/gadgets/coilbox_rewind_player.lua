@@ -32,7 +32,7 @@ function gadget:GetInfo()
 		desc = "Plays a replay track back: units, features, terrain and shots at any time, in either direction.",
 		author = "coilbox",
 		date = "2026",
-		license = "MIT",
+		license = "MIT or GNU GPL, v2 or later",
 		layer = 0,
 		enabled = true,
 	}

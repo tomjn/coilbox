@@ -77,7 +77,7 @@ function gadget:GetInfo()
 		name = "Coilbox rewind recorder",
 		desc = "Writes every unit, feature, projectile and terrain change of a replay to a file",
 		author = "coilbox",
-		license = "MIT",
+		license = "MIT or GNU GPL, v2 or later",
 		-- After the replay logger, and late for the same reason: a position is
 		-- read after the game's own gadgets have had their turn.
 		layer = 2001,

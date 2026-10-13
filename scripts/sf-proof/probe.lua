@@ -22,7 +22,7 @@ function gadget:GetInfo()
 		desc = "Reads what the vendored runtime did to a real game's start",
 		author = "coilbox",
 		date = "2026",
-		license = "MIT",
+		license = "MIT or GNU GPL, v2 or later",
 		-- Behind the runtime (1000), which is itself behind SplinterFaction's own
 		-- gadgets, so every reading is of a frame everyone else has finished with.
 		layer = 3000,

@@ -26,7 +26,7 @@ function gadget:GetInfo()
 		desc = "Reads what a mission shipped inside a packaged game did",
 		author = "coilbox",
 		date = "2026",
-		license = "MIT",
+		license = "MIT or GNU GPL, v2 or later",
 		-- Behind the runtime (1000), which is itself behind Splinter Faction's own
 		-- gadgets, so every reading is of a frame everyone else has finished with.
 		layer = 3000,

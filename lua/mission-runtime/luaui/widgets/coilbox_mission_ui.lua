@@ -46,7 +46,7 @@ function widget:GetInfo()
 		desc = "Objectives, dialogue and debrief for a coilbox scenario",
 		author = "coilbox",
 		date = "2026",
-		license = "MIT",
+		license = "MIT or GNU GPL, v2 or later",
 		layer = 0,
 		enabled = true,
 	}

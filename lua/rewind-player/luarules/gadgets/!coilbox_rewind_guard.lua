@@ -27,7 +27,7 @@ function gadget:GetInfo()
 		desc = "Keeps the base game from killing a team or ending the match during playback.",
 		author = "coilbox",
 		date = "2026",
-		license = "MIT",
+		license = "MIT or GNU GPL, v2 or later",
 		layer = 0,
 		enabled = true,
 	}

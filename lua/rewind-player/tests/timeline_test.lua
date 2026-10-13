@@ -605,7 +605,7 @@ do
 	local info = widget:GetInfo()
 	t.same("the widget names itself", info.name, "Coilbox rewind timeline")
 	t.same("it is on unless the player turns it off", info.enabled, true)
-	t.same("it is MIT", info.license, "MIT")
+	t.same("it offers MIT or GPL", info.license, "MIT or GNU GPL, v2 or later")
 
 	t.same("before it starts a key is left alone", widget:KeyPress(CODES.space, NONE, false), false)
 	widget:SetConfigData({ keys = { toggle = { { key = "p" } } } })
