@@ -1,0 +1,15 @@
+[package]
+name = "coilbox-track-thin"
+version = "0.0.0"
+description = "Turns the rewind recorder's raw dump into a replay track: reads the dump as a stream, drops the samples a track can do without, checks every sample against the track it wrote, and writes the file through coilbox-track."
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+coilbox-track = { path = "../coilbox-track" }
+# The dump's header, piece tree and end blocks are JSON text.
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

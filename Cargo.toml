@@ -15,6 +15,7 @@ members = [
   "crates/coilbox-unitpatch",
   "crates/coilbox-tdf",
   "crates/coilbox-track",
+  "crates/coilbox-track-thin",
   "crates/coilbox-gamebackup",
   "crates/coilbox-bos2lua",
   "crates/coilbox-unitpose",

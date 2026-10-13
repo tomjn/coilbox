@@ -1,6 +1,6 @@
 # Rewind recorder
 
-The rewind recorder is a gadget that writes down where everything was on every frame of a replay, while coilbox plays the replay back headless. It is the first step of replay rewind (issue #3780). What it writes is a raw dump. Issue #3782 thins the dump and issue #3781 writes the result as a track, in the format `docs/reference/replay-track-format.md` describes.
+The rewind recorder is a gadget that writes down where everything was on every frame of a replay, while coilbox plays the replay back headless. It is the first step of replay rewind (issue #3780). What it writes is a raw dump. `crates/coilbox-track-thin` thins the dump (issue #3782) and `crates/coilbox-track` writes the result as a track (issue #3781), in the format `docs/reference/replay-track-format.md` describes.
 
 This page is for whoever reads the dump. It has the byte layout, what each number means, and what the recorder cannot know.
 
@@ -48,6 +48,12 @@ luajit lua/rewind-recorder/tests/dump_summary.lua <dump>
 ```
 
 `tests/dump.lua` is a reader written from this page. It is the reference for a second reader.
+
+To turn a dump into a track and print what was kept:
+
+```sh
+cargo run --release -p coilbox-track-thin --example thin_dump -- <dump> <track>
+```
 
 ## Byte layout
 

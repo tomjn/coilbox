@@ -955,6 +955,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "coilbox-track-thin"
+version = "0.0.0"
+dependencies = [
+ "coilbox-track",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "coilbox-unitpatch"
 version = "0.0.0"
 dependencies = [
