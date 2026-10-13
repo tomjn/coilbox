@@ -398,6 +398,8 @@ The format does three things about it.
 - The rules above remove the differences that are only noise: rows that round to nothing, and a height before that does not follow from the row before.
 - It does not promise that two recordings have the same terrain rows. A test compares the heights a track ends with, not its rows.
 
+Coilbox's own recorder, issue #3780, listens there, and its rows differ from run to run for that reason: two recordings of the larger benchmark match had 272,135 and 271,996 terrain rows. It also reads the whole heightmap on the first frame, on every 900th frame and at the end, so the ground at those frames is the same in every recording. `lua/rewind-recorder/README.md` has the detail.
+
 ## Reading a frame
 
 To give every value at frame `f`:
