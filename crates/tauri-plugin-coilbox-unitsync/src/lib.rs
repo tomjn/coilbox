@@ -2199,9 +2199,14 @@ fn text_in_archive_output(out: &str, archive: &str, file: &str) -> Result<Option
     if out["truncated"].as_bool() == Some(true) {
         return Err(format!("{file} in {archive} is too large to read"));
     }
-    if errors
-        .iter()
-        .any(|e| e.starts_with("could not read member"))
+    // A file the archive does not hold comes back as an empty binary file with
+    // no error, because the worker's preview replaces the member's own error
+    // with unitsync's. A text file is never answered as binary.
+    let missing = out["size"].as_u64() == Some(0) && out["kind"].as_str() == Some("binary");
+    if missing
+        || errors
+            .iter()
+            .any(|e| e.starts_with("could not read member"))
     {
         return Ok(None);
     }
@@ -2468,6 +2473,14 @@ mod tests {
     #[test]
     fn a_file_the_archive_does_not_hold_is_none() {
         let out = r#"{"kind":"binary","size":0,"truncated":false,"errors":["could not read member f.lua"]}"#;
+        assert_eq!(text_in_archive_output(out, "a.sdz", "f.lua"), Ok(None));
+    }
+
+    /// What the worker gave for a missing file in SplinterFaction_0.1.89.sdz:
+    /// it drops the member error and leaves an empty binary file.
+    #[test]
+    fn the_answer_a_real_worker_gives_for_a_missing_file_is_none() {
+        let out = r#"{"kind":"binary","size":0,"truncated":false,"errors":[]}"#;
         assert_eq!(text_in_archive_output(out, "a.sdz", "f.lua"), Ok(None));
     }
 
