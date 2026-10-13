@@ -2340,6 +2340,11 @@ end
     /// Launches the prepared playback with the driver in it and the file that
     /// asks it for one of its plans, and gives the engine's log.
     fn driven(prepared: &Prepared, plan: &str) -> String {
+        driven_with(prepared, plan, "return true\n")
+    }
+
+    /// The same, with what the file that asks for the plan returns.
+    fn driven_with(prepared: &Prepared, plan: &str, contents: &str) -> String {
         std::fs::write(
             prepared
                 .game_dir
@@ -2356,7 +2361,7 @@ end
         .unwrap();
         std::fs::write(
             prepared.game_dir.join("coilbox_rewind").join(plan),
-            "return true\n",
+            contents,
         )
         .unwrap();
         let (timed_out, output, written) =
@@ -2609,6 +2614,187 @@ end
         assert_eq!(field(teams, "game_over"), "0", "{teams}");
 
         let errors = lua_errors(&adapted);
+        assert!(errors.is_empty(), "{errors:#?}");
+    }
+
+    /// Team resources against a real engine and a recorded match (issue
+    /// #3982). The replay is recorded into a track and the playback launched
+    /// twice, with a driver gadget that seeks to the frames in
+    /// `COILBOX_PLAYBACK_RESOURCE_FRAMES` (numbers with commas between them) and
+    /// to eight more across the match, forward and then backward, holds one of
+    /// them paused for 600 frames and plays 300 frames each way. It reads the
+    /// engine's numbers at the start of a frame, before the player's work,
+    /// which is what a widget drew of the frame before.
+    ///
+    /// 1. With the track marked as recorder version 3, which is a track with
+    ///    no resources to the player. The engine's numbers are the playback's
+    ///    own economy, and they are not the match's.
+    /// 2. With the track as it is. What every team holds and can store is the
+    ///    track's at every frame looked at, to the last bit of the number the
+    ///    engine holds, and stays so while paused and while playing either
+    ///    way. Income, expense and pull are the track's, or the playback's own
+    ///    where that is the larger. Every rules parameter the adapter names
+    ///    and the match had set is the track's.
+    ///
+    /// The track is within its header's tolerance of the recording, which
+    /// `coilbox-track-thin` checks sample by sample when it writes one.
+    #[test]
+    #[ignore = "needs an engine, a game, a map and a replay of a whole match on them"]
+    fn the_teams_resources_are_the_matchs_in_the_engine() {
+        let Some(prepared) = prepared(false) else {
+            return;
+        };
+        let frames = var("COILBOX_PLAYBACK_RESOURCE_FRAMES").unwrap_or_default();
+        let plan = format!("return {{ {frames} }}\n");
+        let resources = |driver: &[&str], label: &str| -> Vec<String> {
+            driver
+                .iter()
+                .filter(|l| l.starts_with(&format!("resources {label} ")))
+                .map(|l| l.to_string())
+                .collect()
+        };
+        let report = |name: &str, output: &str| {
+            for l in lines_with(output, &["REWIND_DRIVER ", "COILBOX_REWIND_PLAYER"]) {
+                eprintln!("{name}: {l}");
+            }
+            eprintln!("{name}: Lua errors: {:#?}", lua_errors(output));
+        };
+
+        // 1. A track the player takes as having no resources.
+        let inside = prepared.game_dir.join(TRACK_PATH);
+        let mut track = std::fs::read(&inside).unwrap();
+        assert_eq!(
+            u16::from_le_bytes([track[8], track[9]]),
+            coilbox_track_thin::RECORDER_VERSION
+        );
+        track[8..10].copy_from_slice(&3u16.to_le_bytes());
+        // The file in the game is a link to the stored track, so it is
+        // replaced and not written through.
+        std::fs::remove_file(&inside).unwrap();
+        std::fs::write(&inside, &track).unwrap();
+        let before = driven_with(&prepared, "driver_resources.lua", &plan);
+        report("before", &before);
+        // At least once and not once: see `driver_lines` for why a line can be
+        // there twice.
+        assert!(
+            count(
+                &before,
+                "COILBOX_REWIND_PLAYER the track is from recorder version 3"
+            ) >= 1
+        );
+        let before_driver = driver_lines(&before);
+        let own = resources(&before_driver, "forward");
+        assert!(
+            own.iter().any(|l| number(l, "held_off") > 1.0),
+            "the playback's own economy already was the match's, so the run shows nothing"
+        );
+
+        // 2. The track as it was recorded.
+        prepared.rewrite(REWIND_PLAYER_ADAPTERS);
+        let after = driven_with(&prepared, "driver_resources.lua", &plan);
+        report("after", &after);
+        let driver = driver_lines(&after);
+        let line = |start: &str| {
+            *driver
+                .iter()
+                .find(|l| l.starts_with(start))
+                .unwrap_or_else(|| panic!("no driver line starting {start}"))
+        };
+        let start = line("start ");
+        assert_eq!(
+            number(start, "recorder"),
+            f64::from(coilbox_track_thin::RECORDER_VERSION)
+        );
+        let (tolerance, fraction) = (
+            number(start, "resource_tolerance") as f32,
+            number(start, "resource_fraction") as f32,
+        );
+        assert!(!driver.iter().any(|l| l.starts_with("lost ")), "{driver:?}");
+
+        let has_excess = count(
+            &after,
+            "this engine has no Spring.AddTeamResourceExcessStats",
+        ) == 0;
+        let seen = resources(&driver, "forward");
+        assert_eq!(
+            seen.len(),
+            own.len(),
+            "the two runs looked at different frames"
+        );
+        assert!(seen.len() >= 16, "{seen:?}");
+        for (l, was) in seen.iter().zip(&own) {
+            assert_eq!(field(l, "frame"), field(was, "frame"));
+            assert_eq!(number(l, "held_off"), 0.0, "{l}");
+            assert_eq!(field(l, "share"), field(l, "track_share"), "{l}");
+            // The engine's sums only go up, so a number is the track's or the
+            // playback's own, whichever is the larger.
+            for key in ["income", "expense"] {
+                let wanted = number(l, &format!("track_{key}"));
+                let allowed = coilbox_track::value_allowance(tolerance, fraction, wanted);
+                let got = number(l, key);
+                assert!(got >= wanted - allowed, "{key} is under the track's: {l}");
+                assert!(
+                    got <= wanted.max(number(was, key)) + allowed,
+                    "{key} is over the track's and the playback's own: {l}\n{was}"
+                );
+            }
+            let pull = number(l, "track_pull");
+            let allowed = coilbox_track::value_allowance(tolerance, fraction, pull);
+            assert!(number(l, "pull") >= pull - allowed, "{l}");
+            // What a team wasted is the track's on an engine that has the call
+            // that sets it. The player gives a team room for the playback's
+            // own income during a frame, so the playback wastes nothing itself.
+            if has_excess {
+                let wasted = number(l, "track_excess");
+                let allowed = coilbox_track::value_allowance(tolerance, fraction, wasted);
+                assert!(
+                    (number(l, "excess") - wasted).abs() <= allowed,
+                    "the excess is not the track's: {l}"
+                );
+            }
+        }
+        let params: Vec<&&str> = driver
+            .iter()
+            .filter(|l| l.starts_with("team_param ") || l.starts_with("game_param "))
+            .collect();
+        assert_eq!(
+            params.is_empty(),
+            number(start, "team_params") + number(start, "game_params") == 0.0,
+            "{params:?}"
+        );
+        for l in &params {
+            assert_eq!(number(l, "off"), 0.0, "{l}");
+        }
+
+        let back: Vec<&&str> = driver
+            .iter()
+            .filter(|l| l.starts_with("seek_back "))
+            .collect();
+        assert!(back.len() >= 7, "{back:?}");
+        for l in &back {
+            assert_eq!(number(l, "held_off"), 0.0, "{l}");
+        }
+        let held = line("held_resources ");
+        assert_eq!(number(held, "frames"), 600.0, "{held}");
+        assert_eq!(number(held, "held_off"), 0.0, "{held}");
+        for way in ["forward", "backward"] {
+            let played = line(&format!("played_resources way={way} "));
+            assert_eq!(number(played, "frames"), 300.0, "{played}");
+            assert_eq!(number(played, "held_off"), 0.0, "{played}");
+            let (from, to) = (number(played, "from"), number(played, "to"));
+            assert!(
+                if way == "forward" {
+                    to > from
+                } else {
+                    to < from
+                },
+                "{played}"
+            );
+        }
+
+        let teams = line("teams ");
+        assert_eq!(field(teams, "dead"), "0", "{teams}");
+        let errors = lua_errors(&after);
         assert!(errors.is_empty(), "{errors:#?}");
     }
 

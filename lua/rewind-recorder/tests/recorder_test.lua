@@ -751,6 +751,133 @@ do
 end
 
 --------------------------------------------------------------------------------
+-- Team resources (issue #3982): what each team holds, on every frame it
+-- changes, and the rest of what the engine keeps for a team when that changes.
+--------------------------------------------------------------------------------
+
+do
+	local engine = newEngine(with())
+	engine.teams[0] = {
+		-- current, storage, pull, income, expense, share, sent, received, excess.
+		metal = { 1028.5, 1100, 7.25, 9.125, 7, 0.99, 0, 0, 0 },
+		energy = { 400, 2000, 23.125, 100, 23.125, 0.5, 1.5, 2.5, 3.5 },
+	}
+	engine.step() -- frame 0
+	local held = engine.rows(0, dump.TEAM_RESOURCES)
+	same("a team that holds something is written on the first frame, and one that holds nothing is not", #held, 1)
+	check("what a team holds is its metal and its energy", rowIs(held[1], { 0, 1028.5, 400 }), show(held[1]))
+	local economy = engine.rows(0, dump.TEAM_ECONOMY)
+	same("the rest of a team's economy is written once for it", #economy, 1)
+	check("the economy row is storage, pull, income, expense, share, sent, received and excess, for metal and then energy",
+		rowIs(economy[1], { 0, 1100, 7.25, 9.125, 7, 0.99, 0, 0, 0, 2000, 23.125, 100, 23.125, 0.5, 1.5, 2.5, 3.5 }),
+		show(economy[1]))
+
+	engine.step() -- frame 1
+	same("what has not changed is not written again", #engine.rows(1, dump.TEAM_RESOURCES), 0)
+	same("and neither is the economy", #engine.rows(1, dump.TEAM_ECONOMY), 0)
+
+	engine.teams[0].metal[1] = 1029
+	engine.step() -- frame 2
+	check("metal that changed is written on the next frame, whatever its number",
+		rowIs(engine.rows(2, dump.TEAM_RESOURCES)[1], { 0, 1029, 400 }), show(engine.rows(2, dump.TEAM_RESOURCES)[1]))
+	same("the economy did not change with it", #engine.rows(2, dump.TEAM_ECONOMY), 0)
+
+	engine.teams[0].energy[5] = 30
+	engine.teams[1] = { metal = { 5 }, energy = {} }
+	engine.step() -- frame 3
+	local rows = engine.rows(3, dump.TEAM_RESOURCES)
+	same("a second team is written when it first holds something", #rows, 1)
+	check("with its own number", rowIs(rows[1], { 1, 5, 0 }), show(rows[1]))
+	economy = engine.rows(3, dump.TEAM_ECONOMY)
+	same("one changed number writes that team's economy again", #economy, 1)
+	same("with the new number in its place, the energy spent", economy[1][13], 30)
+	same("and the team's own number first", economy[1][1], 0)
+
+	-- A value that is not a number would never compare equal to itself, so it
+	-- would be written on every frame, and a reader could do nothing with it.
+	engine.teams[1].metal[1] = 0 / 0
+	engine.step() -- frame 4
+	check("metal that is not a number is written as nothing held",
+		rowIs(engine.rows(4, dump.TEAM_RESOURCES)[1], { 1, 0, 0 }), show(engine.rows(4, dump.TEAM_RESOURCES)[1]))
+	engine.step() -- frame 5
+	same("and once", #engine.rows(5, dump.TEAM_RESOURCES), 0)
+	same("no error is logged for any of it", #engine.logs, 0)
+end
+
+-- A team the engine will not answer for.
+do
+	local engine = newEngine(with({ teams = { 0, 1 } }))
+	engine.teams[7] = { metal = { 50 }, energy = { 60 } }
+	engine.runTo(3)
+	local rows = 0
+	for frame = 0, 3 do
+		rows = rows + #engine.rows(frame, dump.TEAM_RESOURCES) + #engine.rows(frame, dump.TEAM_ECONOMY)
+	end
+	same("a team that is not in the engine's list is not asked about", rows, 0)
+end
+
+--------------------------------------------------------------------------------
+-- Rules parameters: the ones the request names, when they change.
+--------------------------------------------------------------------------------
+
+do
+	local engine = newEngine(with({
+		request = { lastFrame = 1000, teamParams = { "supplyUsed", "researchPoints", 7 }, gameParams = { "wave" } },
+	}))
+	local header = engine.read().blocks[1].json
+	same("the header lists the team parameters asked for, and leaves out a name that is not text",
+		table.concat(header.teamParams, " "), "supplyUsed researchPoints")
+	same("and the game parameters", table.concat(header.gameParams, " "), "wave")
+
+	engine.teams[0] = { params = { supplyUsed = 3, other = 9 } }
+	engine.step() -- frame 0
+	local rows = engine.rows(0, dump.TEAM_PARAMS)
+	same("a parameter that is set is written, and one the request does not name is not", #rows, 1)
+	check("as the team, the parameter's place in the header's list and the value", rowIs(rows[1], { 0, 1, 3 }), show(rows[1]))
+	same("a game parameter that is not set is not written", #engine.rows(0, dump.GAME_PARAMS), 0)
+
+	engine.step() -- frame 1
+	same("a parameter that has not changed is not written again", #engine.rows(1, dump.TEAM_PARAMS), 0)
+
+	engine.teams[0].params.researchPoints = 216.5
+	engine.teams[1] = { params = { supplyUsed = 30 } }
+	engine.gameParams.wave = 4
+	engine.step() -- frame 2
+	rows = engine.rows(2, dump.TEAM_PARAMS)
+	same("each parameter that changed is a row", #rows, 2)
+	check("the second parameter of the first team", rowIs(rows[1], { 0, 2, 216.5 }), show(rows[1]))
+	check("the first parameter of the second team", rowIs(rows[2], { 1, 1, 30 }), show(rows[2]))
+	check("a game parameter is its place in the list and its value",
+		rowIs(engine.rows(2, dump.GAME_PARAMS)[1], { 1, 4 }), show(engine.rows(2, dump.GAME_PARAMS)[1]))
+
+	-- A parameter can hold text, and a game can take one away.
+	engine.teams[0].params.supplyUsed = "many"
+	engine.teams[1].params.supplyUsed = nil
+	engine.gameParams.wave = true
+	engine.step() -- frame 3
+	same("a parameter that is not a number is not written", #engine.rows(3, dump.TEAM_PARAMS), 0)
+	same("and neither is a game parameter that is not one", #engine.rows(3, dump.GAME_PARAMS), 0)
+	engine.teams[0].params.supplyUsed = 3
+	engine.step() -- frame 4
+	same("a parameter that is a number again, and the one last written, is not news",
+		#engine.rows(4, dump.TEAM_PARAMS), 0)
+	engine.teams[0].params.supplyUsed = 4
+	engine.step() -- frame 5
+	check("and one that differs is", rowIs(engine.rows(5, dump.TEAM_PARAMS)[1], { 0, 1, 4 }))
+end
+
+-- A request that names none.
+do
+	local engine = newEngine(with())
+	local header = engine.read().blocks[1].json
+	same("with no parameters asked for the header lists none", #header.teamParams + #header.gameParams, 0)
+	engine.teams[0] = { params = { supplyUsed = 3 } }
+	engine.gameParams.wave = 1
+	engine.runTo(2)
+	same("and none is written", #engine.rows(0, dump.TEAM_PARAMS) + #engine.rows(0, dump.GAME_PARAMS), 0)
+end
+
+--------------------------------------------------------------------------------
 -- Frames, progress and the end.
 --------------------------------------------------------------------------------
 

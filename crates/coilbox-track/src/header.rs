@@ -56,6 +56,23 @@ pub struct Settings {
     pub sample_interval: u8,
     /// The replay's game id, copied from the replay header.
     pub game_id: [u8; 16],
+    /// In metal or energy. With `value_fraction`, how far a recorded sample of
+    /// what a team holds, pulls, makes, spends, sends, receives or wastes may
+    /// be from the track: see [`value_allowance`]. 0 in a track that holds no
+    /// team resources.
+    pub value_tolerance: f32,
+    /// The same as a fraction of the sample itself, for a team with a great
+    /// deal of something.
+    pub value_fraction: f32,
+}
+
+/// How far a recorded sample of a team's resource may be from the track: the
+/// resource tolerance, or the resource fraction of the sample's own size when
+/// that is more. A bar is drawn as a share of its storage and a number is read
+/// to a few figures, so a team holding 50,000 is allowed more than one
+/// holding 50.
+pub fn value_allowance(tolerance: f32, fraction: f32, sample: f64) -> f64 {
+    (tolerance as f64).max(fraction as f64 * sample.abs())
 }
 
 impl Default for Settings {
@@ -75,6 +92,8 @@ impl Default for Settings {
             rotation_bits: 12,
             sample_interval: 0,
             game_id: [0; 16],
+            value_tolerance: 0.0,
+            value_fraction: 0.0,
         }
     }
 }
@@ -102,6 +121,13 @@ impl Settings {
             return Err(TrackError::invalid(
                 "the tolerance must be a number that is not negative",
             ));
+        }
+        for value in [self.value_tolerance, self.value_fraction] {
+            if !value.is_finite() || value < 0.0 {
+                return Err(TrackError::invalid(
+                    "the resource tolerance and fraction must be numbers that are not negative",
+                ));
+            }
         }
         check_limit(|| "the last frame".into(), self.last_frame as i64)?;
         Ok(())
@@ -149,9 +175,19 @@ pub struct Header {
     pub projectile_count: u32,
     pub feature_count: u32,
     pub game_id: [u8; 16],
+    /// See [`Settings::value_tolerance`]. 0 in a track written before
+    /// recorder version 4, where these bytes were reserved.
+    pub value_tolerance: f32,
+    /// See [`Settings::value_fraction`].
+    pub value_fraction: f32,
 }
 
 impl Header {
+    /// How far a recorded sample of a team's resource may be from this track.
+    pub fn value_allowance(&self, sample: f64) -> f64 {
+        value_allowance(self.value_tolerance, self.value_fraction, sample)
+    }
+
     pub fn quantiser(&self) -> Result<Quantiser> {
         Quantiser::new(self.position_shift, self.velocity_shift, self.rotation_bits)
     }
@@ -193,6 +229,8 @@ impl Header {
         b[56..60].copy_from_slice(&self.projectile_count.to_le_bytes());
         b[60..64].copy_from_slice(&self.feature_count.to_le_bytes());
         b[64..80].copy_from_slice(&self.game_id);
+        b[80..84].copy_from_slice(&self.value_tolerance.to_le_bytes());
+        b[84..88].copy_from_slice(&self.value_fraction.to_le_bytes());
         b
     }
 
@@ -249,6 +287,8 @@ impl Header {
             projectile_count: u32_at(56),
             feature_count: u32_at(60),
             game_id: b[64..80].try_into().unwrap(),
+            value_tolerance: f32::from_le_bytes(b[80..84].try_into().unwrap()),
+            value_fraction: f32::from_le_bytes(b[84..88].try_into().unwrap()),
         };
         h.check()?;
         Ok(h)

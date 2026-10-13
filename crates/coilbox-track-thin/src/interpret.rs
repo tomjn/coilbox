@@ -10,9 +10,10 @@ use crate::dump::{BuilderWork, DumpHeader, Frame, PieceTree, UnitPose, WeaponTar
 use crate::error::{Result, ThinError};
 use crate::pose::{self, ModelSample, PieceSample};
 use coilbox_track::{
-    quaternion_from_front_up, Feature, Info, PosedPieces, Quantiser, Team, TerrainRow,
+    quaternion_from_front_up, value_code, Feature, Info, PosedPieces, Quantiser, Team, TerrainRow,
+    NO_TEAM,
 };
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// A unit on one frame.
 #[derive(Debug, Clone, Copy)]
@@ -109,6 +110,11 @@ pub(crate) trait Sink {
         velocity: [f64; 3],
     ) -> Result<()>;
     fn projectile_end(&mut self, serial: u32, last_frame: u32) -> Result<()>;
+    /// One number of a team's, or of the game's when `team` is
+    /// [`coilbox_track::NO_TEAM`], on one frame. `code` is the track's code
+    /// for what it is. Every number that has a value comes on every frame, in
+    /// order of team and then code, after everything else of the frame.
+    fn value(&mut self, team: u8, code: u16, frame: u32, value: f32) -> Result<()>;
 }
 
 /// The names a track lists, in the order they were first used, and the index
@@ -232,6 +238,10 @@ pub(crate) struct Interpreter {
     live_features: HashMap<u32, usize>,
     features: Vec<FeatureSeen>,
     terrain: Vec<TerrainRow>,
+    /// Each number of each team as the dump last gave it, by team and code.
+    /// A resource is 0 until its first row, so every team has all eighteen
+    /// from the first frame. A rules parameter has no value until its first.
+    values: BTreeMap<(u8, u16), f32>,
     next_unit: u32,
     next_projectile: u32,
     first_frame: Option<u32>,
@@ -316,11 +326,25 @@ impl Interpreter {
             .iter()
             .map(|f| Ok([elmos(f[0])?, elmos(f[1])?]))
             .collect::<Result<Vec<_>>>()?;
+        let mut values = BTreeMap::new();
+        for team in &header.teams {
+            if team.team == NO_TEAM {
+                return Err(ThinError::Dump(format!(
+                    "the dump has a team {NO_TEAM}, which the track uses for no team"
+                )));
+            }
+            for resource in [0, value_code::ENERGY] {
+                for code in value_code::HELD..=value_code::EXCESS {
+                    values.insert((team.team, resource + code), 0.0);
+                }
+            }
+        }
         Ok(Self {
             header,
             radii,
             footprints,
             q,
+            values,
             rigs: HashMap::new(),
             unit_defs: Names::default(),
             weapon_defs: Names::default(),
@@ -859,7 +883,63 @@ impl Interpreter {
                 after: self.q.position(row.after as f64)?,
             });
         }
+
+        // Team resources and rules parameters. A row is a change, and the
+        // number holds until the next, so each is passed on for every frame.
+        for row in &block.team_held {
+            let team = self.team(row.team, frame)?;
+            self.set_value(team, value_code::HELD, row.metal);
+            self.set_value(team, value_code::ENERGY + value_code::HELD, row.energy);
+        }
+        for row in &block.team_economy {
+            let team = self.team(row.team, frame)?;
+            for (i, code) in (value_code::STORAGE..=value_code::EXCESS).enumerate() {
+                self.set_value(team, code, row.metal[i]);
+                self.set_value(team, value_code::ENERGY + code, row.energy[i]);
+            }
+        }
+        for row in &block.params {
+            let (team, names) = match row.team {
+                Some(team) => (self.team(team, frame)?, self.header.team_params.len()),
+                None => (NO_TEAM, self.header.game_params.len()),
+            };
+            let index = row
+                .param
+                .checked_sub(1)
+                .filter(|i| (*i as usize) < names)
+                .and_then(|i| u16::try_from(i).ok())
+                .and_then(|i| value_code::PARAMETER.checked_add(i))
+                .ok_or_else(|| {
+                    ThinError::Dump(format!(
+                        "frame {frame} has rules parameter {}, and the dump's header names {names}",
+                        row.param
+                    ))
+                })?;
+            self.set_value(team, index, row.value);
+        }
+        for ((team, code), value) in &self.values {
+            sink.value(*team, *code, frame, *value)?;
+        }
         Ok(())
+    }
+
+    /// A team of the dump's as the track stores it.
+    fn team(&self, team: u32, frame: u32) -> Result<u8> {
+        u8::try_from(team)
+            .ok()
+            .filter(|team| self.header.teams.iter().any(|t| t.team == *team))
+            .ok_or_else(|| {
+                ThinError::Dump(format!(
+                    "frame {frame} has resources for team {team}, which the dump's header does not list"
+                ))
+            })
+    }
+
+    /// The engine's numbers are floats, and one that is not a number, or has
+    /// no end, is nothing a bar can draw. It is taken as nothing held.
+    fn set_value(&mut self, team: u8, code: u16, value: f32) {
+        let value = if value.is_finite() { value } else { 0.0 };
+        self.values.insert((team, code), value);
     }
 
     /// Ends everything that is still there on the last frame.
@@ -969,6 +1049,8 @@ impl Interpreter {
                 })
                 .collect(),
             map_size: [h.map_size_x, h.map_size_z],
+            team_params: h.team_params.clone(),
+            game_params: h.game_params.clone(),
         };
         Ok(Rest {
             first_frame,

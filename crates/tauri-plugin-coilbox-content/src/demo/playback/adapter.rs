@@ -1,7 +1,12 @@
 //! A game's playback adapter (issue #3799): a small Lua file that says which of
 //! the base game's gadgets and widgets to switch off during playback, which unit
-//! and feature definitions to leave out, and optionally what to do when the
+//! and feature definitions to leave out, which of the game's rules parameters
+//! to record and set back (issue #3982), and optionally what to do when the
 //! player places a unit.
+//!
+//! The rules parameters are the one part a recording reads as well as a
+//! playback: `analysis.rs` chooses the adapter the same way before it records,
+//! and names the parameters in the recorder's request.
 //!
 //! This module reads the data in it, matches it to a game, picks which one a
 //! launch uses and works out the files that switch things off. The hooks are
@@ -114,6 +119,10 @@ pub struct Adapter {
     pub units: Vec<String>,
     /// Feature definition names to skip.
     pub features: Vec<String>,
+    /// Team rules parameters the recorder keeps and the player sets back.
+    pub team_params: Vec<String>,
+    /// Game rules parameters the recorder keeps and the player sets back.
+    pub game_params: Vec<String>,
 }
 
 /// The keys of an adapter. `hooks` is the player's and is dropped before this
@@ -128,6 +137,10 @@ struct Raw {
     widgets: List,
     units: List,
     features: List,
+    #[serde(rename = "teamParams")]
+    team_params: List,
+    #[serde(rename = "gameParams")]
+    game_params: List,
 }
 
 #[derive(Deserialize, Default)]
@@ -224,6 +237,19 @@ fn names(kind: &str, list: &[String]) -> Result<(), String> {
     }
 }
 
+/// A list of rules parameters: names, each once. The recorder and the player
+/// know a parameter by its place in the list, so a name twice would be two
+/// parameters writing one.
+fn params(kind: &str, list: &[String]) -> Result<(), String> {
+    names(kind, list)?;
+    for (at, name) in list.iter().enumerate() {
+        if list[..at].contains(name) {
+            return Err(format!("{kind} names {name:?} twice"));
+        }
+    }
+    Ok(())
+}
+
 fn bound(which: &str, text: &Option<String>) -> Result<Option<Version>, String> {
     match text {
         None => Ok(None),
@@ -251,6 +277,8 @@ impl Adapter {
         files("widgets", "luaui/widgets/", &raw.widgets.0)?;
         names("units", &raw.units.0)?;
         names("features", &raw.features.0)?;
+        params("teamParams", &raw.team_params.0)?;
+        params("gameParams", &raw.game_params.0)?;
         let versions = raw.versions.unwrap_or_default();
         let (min, max) = (bound("min", &versions.min)?, bound("max", &versions.max)?);
         if let (Some(min), Some(max)) = (&min, &max) {
@@ -271,6 +299,8 @@ impl Adapter {
             widgets: raw.widgets.0,
             units: raw.units.0,
             features: raw.features.0,
+            team_params: raw.team_params.0,
+            game_params: raw.game_params.0,
         })
     }
 
@@ -478,6 +508,36 @@ mod tests {
         assert_eq!(adapter.widgets, ["gui_bars.lua"]);
         assert_eq!(adapter.units, ["armcom_start"]);
         assert_eq!(adapter.features, ["rock"]);
+    }
+
+    /// The numbers a game keeps for itself, which the recorder keeps and the
+    /// player sets back (issue #3982).
+    #[test]
+    fn an_adapter_names_the_rules_parameters_to_keep() {
+        let adapter = Adapter::parse(
+            "return { teamParams = { 'supplyUsed', 'researchPoints' }, gameParams = { 'wave' } }",
+        )
+        .unwrap();
+
+        assert_eq!(adapter.team_params, ["supplyUsed", "researchPoints"]);
+        assert_eq!(adapter.game_params, ["wave"]);
+        assert!(Adapter::parse(FULL).unwrap().team_params.is_empty());
+    }
+
+    #[test]
+    fn a_rules_parameter_has_a_name_and_is_named_once() {
+        for source in [
+            "return { teamParams = { '' } }",
+            "return { gameParams = { ' ' } }",
+            "return { teamParams = { 4 } }",
+            "return { teamParams = 'supplyUsed' }",
+            "return { teamParams = { 'a', 'a' } }",
+            "return { gameParams = { 'wave', 'wave' } }",
+        ] {
+            assert!(Adapter::parse(source).is_err(), "{source}");
+        }
+        // The same name for a team and for the game is two parameters.
+        assert!(Adapter::parse("return { teamParams = { 'a' }, gameParams = { 'a' } }").is_ok());
     }
 
     #[test]
@@ -896,6 +956,13 @@ mod tests {
                 ]
             );
             assert!(adapter.units.is_empty() && adapter.features.is_empty());
+            // The numbers on the game's resource bar that are not the
+            // engine's: its supply and its research points (issue #3982).
+            assert_eq!(
+                adapter.team_params,
+                ["supplyUsed", "supplyMax", "researchPoints"]
+            );
+            assert!(adapter.game_params.is_empty());
         }
         for other in ["BYAR", "MF", "BA"] {
             assert_eq!(choose(Ok(None), shipped, other, Some("1")), Chosen::none());

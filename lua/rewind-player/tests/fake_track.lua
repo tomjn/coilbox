@@ -31,6 +31,17 @@ function Window:sampleStatus(i, frame, out)
 	return true
 end
 
+--- As the reader's: the track of one number of a team, or nil, and its value at
+-- a frame. A value's `at(frame)` gives nil for a rules parameter that is not
+-- set yet.
+function Window:valueOf(team, code)
+	return self.track.valueIndex[team * 65536 + code]
+end
+
+function Window:sampleValue(v, frame)
+	return self.track.values[v].at(frame)
+end
+
 function Window:projectileExistsAt(p, frame)
 	self.track.projectileLooks = self.track.projectileLooks + 1
 	return frame >= self.projectileFirstFrame[p] and frame <= self.projectileLastFrame[p]
@@ -228,7 +239,10 @@ end
 -- `weaponDefs` and `featureDefs`, `teams` as a list of team ids, and `units`,
 -- `projectiles`, `features` and `terrain` rows of
 -- `{ frame, x, z, before, after }`. `tolerance` and `positionStep` are the
--- header's, 0.5 and 0.125 without them.
+-- header's, 0.5 and 0.125 without them. `values` are the numbers of the teams,
+-- each `{ team, code, at }` with `at` a number or a function of the frame, and
+-- `teamParams` and `gameParams` the names of the rules parameters among them.
+-- `recorderVersion` is 4 without one, the first that records them.
 function M.new(spec)
 	local first, last, length = spec.first or 0, spec.last, spec.windowLength or 900
 	local teams = {}
@@ -256,8 +270,25 @@ function M.new(spec)
 			rotation = one.rotation or { 0, 0, 0, 1 },
 		}
 	end
+	local values, valueIndex = {}, {}
+	for i, one in ipairs(spec.values or {}) do
+		local at = one.at
+		values[i] = {
+			team = one.team,
+			code = one.code,
+			at = type(at) == "function" and at or function()
+				return at
+			end,
+		}
+		valueIndex[one.team * 65536 + one.code] = i
+	end
 	return setmetatable({
+		values = values,
+		valueIndex = valueIndex,
 		header = {
+			recorderVersion = spec.recorderVersion or 4,
+			resourceTolerance = 0.5,
+			resourceFraction = 1 / 1024,
 			firstFrame = first,
 			lastFrame = last,
 			windowLength = length,
@@ -275,6 +306,8 @@ function M.new(spec)
 			weaponDefs = spec.weaponDefs or {},
 			featureDefs = spec.featureDefs or {},
 			teams = teams,
+			teamParams = spec.teamParams or {},
+			gameParams = spec.gameParams or {},
 		},
 		units = units,
 		projectiles = projectiles,

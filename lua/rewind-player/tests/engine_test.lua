@@ -55,7 +55,8 @@ local function rootsOf(env)
 	return { Spring = env.Spring, VFS = env.VFS, Game = env.Game, CMD = env.CMD, SendToUnsynced = rawget(env, "SendToUnsynced") }
 end
 
-local HOOK = "return { name = 'Probe', hooks = { started = function() Spring.Echo('hook ran') end } }"
+local HOOK = "return { name = 'Probe', hooks = { started = function() Spring.Echo('hook ran') end }, "
+	.. "teamParams = { 'supplyUsed', 'researchPoints' }, gameParams = { 'wave' } }"
 
 --- A world, the synced half of the gadget in it, and the environment it runs in.
 -- `removed` is a call the engine does not have.
@@ -89,14 +90,20 @@ end
 -- the first frame to the last, a seek, backward, and seeks to frames with units
 -- under construction, shots in the air and ground changes. Gives whether
 -- nothing raised, and the error when something did.
-local function play(gadget)
+local function play(gadget, w)
 	return pcall(function()
 		gadget:Initialize()
-		local n = 0
+		-- A frame in the engine's order, with the teams summed up between the
+		-- gadget's two call-ins.
+		local function frame(n)
+			gadget:GameFrame(n)
+		end
+		local function post(n)
+			gadget:GameFramePost(n)
+		end
 		local function frames(count)
 			for _ = 1, count do
-				n = n + 1
-				gadget:GameFrame(n)
+				w.step(frame, post)
 			end
 		end
 		frames(2100)
@@ -156,6 +163,18 @@ local OBSERVE = {
 	sound = function(w)
 		return w.soundCount
 	end,
+	resources = function(w)
+		return w.resourceSets + w.shareSets
+	end,
+	resourceRates = function(w)
+		return w.resourceFeeds
+	end,
+	resourceExcess = function(w)
+		return w.excessAdds
+	end,
+	teamParams = function(w)
+		return w.teamParamSets
+	end,
 	workTiming = function(w)
 		return w.sent
 	end,
@@ -167,7 +186,17 @@ local OBSERVE = {
 }
 
 --- The features that work only while another does.
-local NEEDS = { shotHandover = "shots", sound = "shots", featureTurn = "features" }
+local NEEDS = {
+	shotHandover = "shots",
+	sound = "shots",
+	featureTurn = "features",
+	-- Adding to a team's income takes its storage out of the way first, and the
+	-- excess is read with the call that reads the income.
+	resourceRates = "resources",
+	resourceExcess = "resourceRates",
+	-- The adapter names the rules parameters.
+	teamParams = "adapter",
+}
 
 --- A line the gadget logged that starts with `start`, after its prefix.
 local function logged(w, start)
@@ -255,7 +284,7 @@ end
 
 do
 	local w, gadget = scene()
-	local ok, err = play(gadget)
+	local ok, err = play(gadget, w)
 	t.check("with every call there the player plays the whole track", ok, err)
 	t.same("and says nothing about the engine", logged(w, "this engine"), nil)
 	t.same("with no note", w.params[NOTE], nil)
@@ -294,7 +323,7 @@ for _, row in ipairs(Table.SYNCED) do
 	for _, call in ipairs(row.calls) do
 		local label = "without " .. call
 		local w, gadget = scene(call)
-		local ok, err = play(gadget)
+		local ok, err = play(gadget, w)
 		t.check(label .. " the gadget raises nothing", ok, err)
 		if row.required then
 			local line = logged(w, "cannot play: this engine has no " .. call)

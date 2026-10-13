@@ -24,6 +24,15 @@ pub struct FrameSpec {
     pub features_destroyed: Vec<f32>,
     pub projectiles: Vec<[f32; 10]>,
     pub terrain: Vec<[f32; 4]>,
+    /// A team, its metal and its energy.
+    pub team_held: Vec<[f32; 3]>,
+    /// A team, then storage, pull, income, expense, share, sent, received and
+    /// excess, for metal and then energy.
+    pub team_economy: Vec<[f32; 17]>,
+    /// A team, a parameter's number from 1, and its value.
+    pub team_params: Vec<[f32; 3]>,
+    /// A parameter's number from 1, and its value.
+    pub game_params: Vec<[f32; 2]>,
 }
 
 fn section(out: &mut Vec<f32>, code: u32, numbers: Vec<f32>) {
@@ -56,6 +65,10 @@ pub fn frame_payload(frame: u32, f: &FrameSpec) -> Vec<u8> {
     section(&mut n, 10, f.features_destroyed.clone());
     section(&mut n, 11, flat(&f.projectiles));
     section(&mut n, 12, flat(&f.terrain));
+    section(&mut n, 13, flat(&f.team_held));
+    section(&mut n, 14, flat(&f.team_economy));
+    section(&mut n, 15, flat(&f.team_params));
+    section(&mut n, 16, flat(&f.game_params));
     n.iter().flat_map(|v| v.to_le_bytes()).collect()
 }
 
@@ -179,6 +192,9 @@ pub struct Scene {
     pub rest: bool,
     /// The format of every model.
     pub model_type: String,
+    /// The rules parameters the header names. `None` leaves both lists out of
+    /// the header, as a dump from before issue #3982.
+    pub params: Option<(Vec<String>, Vec<String>)>,
 }
 
 /// Every model: a base, a turret 5 elmos up from it, a barrel 2 up and 3
@@ -206,7 +222,25 @@ impl Scene {
             ended: true,
             rest: true,
             model_type: "s3o".into(),
+            params: None,
         }
+    }
+
+    /// What team `team` holds from block `frame` on.
+    pub fn held(&mut self, frame: u32, team: u32, metal: f32, energy: f32) {
+        self.frame(frame)
+            .team_held
+            .push([team as f32, metal, energy]);
+    }
+
+    /// The rest of team `team`'s economy from block `frame` on: storage, pull,
+    /// income, expense, share, sent, received and excess.
+    pub fn economy(&mut self, frame: u32, team: u32, metal: [f32; 8], energy: [f32; 8]) {
+        let mut row = [0.0; 17];
+        row[0] = team as f32;
+        row[1..9].copy_from_slice(&metal);
+        row[9..17].copy_from_slice(&energy);
+        self.frame(frame).team_economy.push(row);
     }
 
     pub fn frame(&mut self, frame: u32) -> &mut FrameSpec {
@@ -282,6 +316,9 @@ impl Scene {
                 .map(|(_, _, f)| format!("[{},{}]", f[0], f[1]))
                 .collect();
             radii += &format!(",\"unitFootprints\":[{}]", footprints.join(","));
+        }
+        if let Some((team, game)) = &self.params {
+            radii += &format!(",\"teamParams\":{team:?},\"gameParams\":{game:?}");
         }
         format!(
             concat!(

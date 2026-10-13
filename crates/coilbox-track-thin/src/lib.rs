@@ -46,10 +46,23 @@ use std::path::Path;
 /// a track gains something a reader depends on, since an older track lacks it.
 /// 2 is the first with pose keys relative to the parent piece (issue #3783).
 /// 3 is the first with a footprint for each unit definition, which the map
-/// view sizes its marks from (issue #3807).
+/// view sizes its marks from (issue #3807). 4 is the first with each team's
+/// resources and the rules parameters a game's adapter names, which playback
+/// sets in the engine (issue #3982).
 ///
 /// The writer's default and the app's stale check both read this constant.
-pub const RECORDER_VERSION: u16 = 3;
+pub const RECORDER_VERSION: u16 = 4;
+
+/// The resource tolerance a track made today has: the furthest a recorded
+/// sample of what a team holds, pulls, makes, spends, sends, receives or
+/// wastes may be from the track, in metal or energy.
+/// `docs/reference/replay-track-format.md` has what it was measured to cost.
+pub const VALUE_TOLERANCE: f32 = 0.5;
+
+/// The resource fraction a track made today has: a sample may also be this
+/// share of its own size from the track, when that is more than the
+/// tolerance.
+pub const VALUE_FRACTION: f32 = 1.0 / 1024.0;
 
 /// What a caller chooses about the track.
 #[derive(Debug, Clone, PartialEq)]
@@ -73,6 +86,10 @@ pub struct ThinOptions {
     /// recorder ran in. In an analysis run that is a generated game, so the
     /// caller names the game the replay was recorded on.
     pub game: Option<String>,
+    /// In metal or energy. See [`VALUE_TOLERANCE`].
+    pub value_tolerance: f32,
+    /// See [`VALUE_FRACTION`].
+    pub value_fraction: f32,
 }
 
 impl Default for ThinOptions {
@@ -86,6 +103,8 @@ impl Default for ThinOptions {
             game_id: [0; 16],
             rotation_bits: None,
             game: None,
+            value_tolerance: VALUE_TOLERANCE,
+            value_fraction: VALUE_FRACTION,
         }
     }
 }
@@ -101,6 +120,9 @@ pub struct SampleCounts {
     pub poses: u64,
     /// Projectile rows.
     pub projectiles: u64,
+    /// The numbers of the teams and of the game: one for each number that
+    /// has a value on each frame, since a number holds between two rows.
+    pub values: u64,
 }
 
 /// How many keys of each kind.
@@ -121,9 +143,18 @@ pub struct KeyCounts {
     pub projectile: u64,
     pub features: u64,
     pub terrain_rows: u64,
+    /// The tracks of team and game numbers, or track entries when counted
+    /// over a file's windows.
+    pub value_tracks: u64,
+    pub value: u64,
 }
 
 impl KeyCounts {
+    fn add_value(&mut self, v: &coilbox_track::ValueTrack) {
+        self.value_tracks += 1;
+        self.value += v.keys.len() as u64;
+    }
+
     fn add_unit(&mut self, u: &coilbox_track::Unit) {
         self.units += 1;
         self.transform += u.transform.len() as u64;
@@ -148,6 +179,7 @@ impl KeyCounts {
         for p in &w.projectiles {
             self.add_projectile(&p.projectile);
         }
+        w.values.iter().for_each(|v| self.add_value(v));
     }
 }
 
@@ -326,6 +358,16 @@ fn check<R: Read + Seek>(
             worst: w.clone(),
         });
     }
+    if let Some(w) = worst
+        .value
+        .as_ref()
+        .filter(|w| w.error > worst.value_allowed)
+    {
+        return Err(ThinError::OverTolerance {
+            tolerance: worst.value_allowed,
+            worst: w.clone(),
+        });
+    }
     Ok(CheckReport {
         header,
         weighting_length,
@@ -394,17 +436,25 @@ pub fn thin_dump_cancellable(
             .unwrap_or_else(|| settings::rotation_bits(tolerance, scan.largest_radius as f64)),
         sample_interval: scan.header.unit_frames as u8,
         game_id: options.game_id,
+        value_tolerance: options.value_tolerance,
+        value_fraction: options.value_fraction,
     };
     let q = settings.quantiser()?;
 
     let mut thinner = build::Thinner::new(thin::Rules {
         q,
         tolerance,
+        value_tolerance: options.value_tolerance,
+        value_fraction: options.value_fraction,
         first_frame: scan.first_frame,
         window_length: options.window_length,
     });
     let rest = replay(dump, q, &mut thinner, options.game.as_deref(), cancelled)?;
-    let (units, projectiles, _) = thinner.finish();
+    let build::Thinned {
+        units,
+        projectiles,
+        values,
+    } = thinner.finish()?;
 
     let mut kept = KeyCounts {
         features: rest.features.len() as u64,
@@ -413,6 +463,7 @@ pub fn thin_dump_cancellable(
     };
     units.iter().for_each(|u| kept.add_unit(u));
     projectiles.iter().for_each(|p| kept.add_projectile(p));
+    values.iter().for_each(|v| kept.add_value(v));
 
     let bytes = Track {
         settings,
@@ -421,6 +472,7 @@ pub fn thin_dump_cancellable(
         units,
         projectiles,
         terrain: rest.terrain,
+        values,
     }
     .to_bytes()?;
 

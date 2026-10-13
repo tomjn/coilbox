@@ -50,6 +50,14 @@ pub struct DumpHeader {
     pub feature_defs: Vec<String>,
     /// Entry `n`, counting from 0, is definition id `n`.
     pub weapon_defs: Vec<String>,
+    /// The team rules parameters the recorder was asked to keep. Entry `n`,
+    /// counting from 1, is parameter number `n`. A dump made before issue
+    /// #3982 has none.
+    #[serde(default)]
+    pub team_params: Vec<String>,
+    /// The game rules parameters the recorder was asked to keep.
+    #[serde(default)]
+    pub game_params: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -214,6 +222,34 @@ pub struct TerrainChange {
     pub after: f32,
 }
 
+/// What a team holds, written when either number changes.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TeamHeld {
+    pub team: u32,
+    pub metal: f32,
+    pub energy: f32,
+}
+
+/// The rest of what the engine keeps for a team, written when any of it
+/// changes.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TeamEconomy {
+    pub team: u32,
+    /// Storage, pull, income, expense, share level, sent, received and excess.
+    pub metal: [f32; 8],
+    pub energy: [f32; 8],
+}
+
+/// A rules parameter that changed.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ParamRow {
+    /// `None` for a game rules parameter.
+    pub team: Option<u32>,
+    /// From 1, a position in the header's list of names.
+    pub param: u32,
+    pub value: f32,
+}
+
 /// One frame block, cut into its sections.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Frame {
@@ -230,6 +266,10 @@ pub struct Frame {
     pub features_destroyed: Vec<u32>,
     pub projectiles: Vec<ProjectileRow>,
     pub terrain: Vec<TerrainChange>,
+    pub team_held: Vec<TeamHeld>,
+    pub team_economy: Vec<TeamEconomy>,
+    /// Team rules parameters, then game rules parameters.
+    pub params: Vec<ParamRow>,
 }
 
 #[derive(Debug, Clone)]
@@ -467,6 +507,45 @@ impl Frame {
                             z: id(r[1], "a heightmap z", frame)?,
                             before: r[2],
                             after: r[3],
+                        });
+                    }
+                }
+                13 => {
+                    for r in rows(v, 3, code, frame)? {
+                        out.team_held.push(TeamHeld {
+                            team: id(r[0], "a team", frame)?,
+                            metal: r[1],
+                            energy: r[2],
+                        });
+                    }
+                }
+                14 => {
+                    for r in rows(v, 17, code, frame)? {
+                        let (mut metal, mut energy) = ([0.0; 8], [0.0; 8]);
+                        metal.copy_from_slice(&r[1..9]);
+                        energy.copy_from_slice(&r[9..17]);
+                        out.team_economy.push(TeamEconomy {
+                            team: id(r[0], "a team", frame)?,
+                            metal,
+                            energy,
+                        });
+                    }
+                }
+                15 => {
+                    for r in rows(v, 3, code, frame)? {
+                        out.params.push(ParamRow {
+                            team: Some(id(r[0], "a team", frame)?),
+                            param: id(r[1], "a team parameter's number", frame)?,
+                            value: r[2],
+                        });
+                    }
+                }
+                16 => {
+                    for r in rows(v, 2, code, frame)? {
+                        out.params.push(ParamRow {
+                            team: None,
+                            param: id(r[0], "a game parameter's number", frame)?,
+                            value: r[1],
                         });
                     }
                 }

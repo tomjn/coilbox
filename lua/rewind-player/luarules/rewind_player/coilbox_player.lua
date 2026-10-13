@@ -19,7 +19,8 @@
 -- reached by a seek or a step and not by play, and `clock.direction` and
 -- `clock.speed` say how it is playing, and `clock:watched()` whether it is
 -- forward at near the match's own speed. Aim poses and animation (issues #3796
--- and #3797) are stages to add to the list in `M.new`.
+-- and #3797) are stages to add to the list in `M.new`. A stage can also have
+-- `stage:afterSim()`, which runs when the frame is over (GameFramePost).
 --
 -- What a stage is given is the context: the track, its info and features, the
 -- engine's tables, `teamOf` and `report`. A stage takes the engine from the
@@ -37,10 +38,14 @@ local Terrain = VFS.Include(MODULES .. "coilbox_player_terrain.lua")
 local Features = VFS.Include(MODULES .. "coilbox_player_features.lua")
 local Units = VFS.Include(MODULES .. "coilbox_player_units.lua")
 local Projectiles = VFS.Include(MODULES .. "coilbox_player_projectiles.lua")
+local Resources = VFS.Include(MODULES .. "coilbox_player_resources.lua")
 local Adapter = VFS.Include(MODULES .. "coilbox_player_adapter.lua")
 local Engine = VFS.Include(MODULES .. "coilbox_player_engine.lua")
 
 local M = {}
+
+--- The first recorder version whose tracks have the teams' resources.
+local RESOURCES_SINCE = 4
 
 --- The game rules parameters the player publishes. All are numbers.
 M.PARAMS = {
@@ -89,7 +94,7 @@ end
 --- A stage that does nothing, for one whose engine calls are missing. It takes
 -- the engine's call-ins too, since the player hands them to every stage.
 local OFF = {}
-for _, name in ipairs({ "resync", "remove", "place", "created", "destroyed" }) do
+for _, name in ipairs({ "resync", "remove", "place", "created", "destroyed", "afterSim" }) do
 	OFF[name] = function() end
 end
 
@@ -206,6 +211,17 @@ function M.new(track, options)
 		units:setBudget(options.budget)
 	end
 	local projectiles = on.shots and Projectiles.new(context, units, Clock) or OFF
+	-- A track from before recorder version 4 has no team's resources in it.
+	local resources = OFF
+	if (header.recorderVersion or 0) >= RESOURCES_SINCE then
+		resources = Resources.new(context, Reader)
+	else
+		log(
+			"the track is from recorder version "
+				.. tostring(header.recorderVersion)
+				.. ", which did not record the teams' resources, so the resource bars show the playback's own economy. A new recording of the replay has them"
+		)
+	end
 
 	local self = setmetatable({
 		Spring = Spring,
@@ -218,9 +234,11 @@ function M.new(track, options)
 		features = featureStage,
 		units = units,
 		projectiles = projectiles,
+		resources = resources,
 		-- In the order they run. Terrain moves the ground before anything is put
-		-- on it, and a shot's owner is a unit.
-		stages = { terrain, featureStage, units, projectiles },
+		-- on it, and a shot's owner is a unit. Resources come last, after every
+		-- unit the game's own gadgets count has been made or taken away.
+		stages = { terrain, featureStage, units, projectiles, resources },
 		afterFrame = hooks.afterFrame,
 		published = {},
 	}, Player)
@@ -271,6 +289,7 @@ end
 -- the units (GameFramePost).
 function Player:framePost()
 	self.units:afterSim()
+	self.resources:afterSim()
 end
 
 --- Whether the world is the track at the time shown: no seek is waiting to be

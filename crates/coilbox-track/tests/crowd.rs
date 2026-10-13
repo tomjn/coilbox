@@ -81,6 +81,10 @@ fn a_crowd_of_real_definitions_is_written() {
         rotation_bits: h.rotation_bits,
         sample_interval: h.sample_interval,
         game_id: h.game_id,
+        // The crowd has no team's numbers, and keeps what the source says of
+        // how close they would be.
+        value_tolerance: h.value_tolerance,
+        value_fraction: h.value_fraction,
     });
     track.info = info;
     track.info.writer = "coilbox-track tests crowd".into();

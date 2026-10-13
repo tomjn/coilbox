@@ -44,6 +44,10 @@ local NAMES = {
 	[dump.FEATURES_DESTROYED] = "features destroyed",
 	[dump.PROJECTILES] = "projectile rows",
 	[dump.TERRAIN] = "terrain rows",
+	[dump.TEAM_RESOURCES] = "team resource rows",
+	[dump.TEAM_ECONOMY] = "team economy rows",
+	[dump.TEAM_PARAMS] = "team parameter rows",
+	[dump.GAME_PARAMS] = "game parameter rows",
 }
 
 local header, ending
@@ -156,9 +160,11 @@ line("ended", ending and (ending.reason .. " at frame " .. ending.frame) or "no 
 line("winners", ending and table.concat(ending.winners, " ") or "")
 line("cut short inside a block", tostring(truncated))
 line("piece trees", trees)
-for code = 1, 12 do
+for code = 1, 16 do
 	line(NAMES[code], rows[code] or 0)
 end
+line("team parameters asked for", header and table.concat(header.teamParams or {}, " ") or "")
+line("game parameters asked for", header and table.concat(header.gameParams or {}, " ") or "")
 line("build queue items", queueItems)
 local teams = {}
 for team in pairs(createdByTeam) do
