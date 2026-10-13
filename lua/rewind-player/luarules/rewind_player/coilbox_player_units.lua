@@ -26,6 +26,15 @@
 -- what is wanted at `t` from nothing, so a seek that arrives while another
 -- settles needs no special care.
 --
+-- Which units a seek makes first follows the viewer (issue #4008). The gadget's
+-- unsynced half sends the place on the ground the camera looks at, and the four
+-- corners of the view on the ground when it has them. While a seek settles, the
+-- units still to be made are put in order once: those inside the corners first,
+-- and within each group the nearest the camera's place first. The order is
+-- worked out again when a new view arrives, when another seek does and when
+-- the window changes, and never in a frame of play. With no view the order is
+-- the window's list.
+--
 -- The game's adapter can hide a unit definition, which is then never created,
 -- and can ask to be told when a unit is created and put in place (issue #3799).
 --
@@ -139,6 +148,25 @@ function M.new(context, rotation)
 		-- Whether a seek's removals are still being done, which go quietly in
 		-- every frame they take.
 		seeking = false,
+		-- Whether a seek's units are still being made. It is what the view's
+		-- order is for, so that a frame of play never sorts.
+		arriving = false,
+		-- Where the viewer looks: the camera's place on the ground, and the
+		-- corners of the view on the ground, which `cornered` says are there.
+		-- `viewed` is whether any of it is.
+		viewed = false,
+		cornered = false,
+		view = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+		-- The units still to be made, as places in the window's lists, in the
+		-- order to make them, with how many there are and whether the order has
+		-- to be worked out again. `far` is a unit's distance from the camera's
+		-- place, squared, and `inside` whether it is within the view's corners.
+		order = {},
+		orderCount = 0,
+		orderStale = true,
+		far = {},
+		inside = {},
+		nearer = nil,
 		creating = false,
 		destroying = false,
 		lostReported = false,
@@ -148,6 +176,51 @@ function M.new(context, rotation)
 		buildArg = { health = 0, build = 0 },
 		onArg = { 0 },
 	}, Units)
+end
+
+--- Where the viewer looks, from the gadget's unsynced half: the camera's place
+-- on the ground, and the four corners of the view on the ground in order round
+-- it, or nothing for those when a corner is in the sky. With no `x` there is
+-- no view, and units are made in the order of the window's list.
+function Units:setView(x, z, corners)
+	self.viewed = x ~= nil
+	self.cornered = corners ~= nil
+	local view = self.view
+	if x then
+		view[1], view[2] = x, z
+	end
+	if corners then
+		for i = 1, 8 do
+			view[i + 2] = corners[i]
+		end
+	end
+	self.orderStale = true
+end
+
+--- Whether a place is within the corners of the view. Without corners every
+-- place is.
+function Units:inView(x, z)
+	if not self.cornered then
+		return true
+	end
+	local view = self.view
+	-- The corners go round the view one way, so a place inside is on the same
+	-- side of all four edges.
+	local side = 0
+	for i = 0, 3 do
+		local ax, az = view[3 + i * 2], view[4 + i * 2]
+		local j = (i + 1) % 4
+		local bx, bz = view[3 + j * 2], view[4 + j * 2]
+		local cross = (bx - ax) * (z - az) - (bz - az) * (x - ax)
+		if cross ~= 0 then
+			if side == 0 then
+				side = cross > 0 and 1 or -1
+			elseif (cross > 0) ~= (side > 0) then
+				return false
+			end
+		end
+	end
+	return true
 end
 
 --- Sets the most units made in a frame and the most removed, each at least one.
@@ -273,6 +346,8 @@ end
 -- it has, and what could not be created is tried again.
 function Units:resync()
 	self.seeking = true
+	self.arriving = true
+	self.orderStale = true
 	local Spring = self.Spring
 	local failed = self.failed
 	for serial in next, failed do
@@ -300,6 +375,8 @@ local function index(self, w)
 		indexOf[serials[i]] = i
 	end
 	self.window = w
+	-- The order is of places in the window's lists.
+	self.orderStale = true
 end
 
 --- Takes away every unit that is not in the track at `t`. This runs for every
@@ -484,6 +561,77 @@ function Units:applyStatus(w, i, serial, unitID, t)
 	return unitID
 end
 
+--- Puts unit `i` of window `w` where the track has it at `t`, with its status,
+-- and creates it first when `unitID` is nil. The transform and the status are
+-- sampled here.
+function Units:put(w, i, serial, unitID, t, clock)
+	local transform, status = self.transform, self.status
+	if not (w:sampleTransform(i, t, transform) and w:sampleStatus(i, t, status)) then
+		return
+	end
+	local made = not unitID
+	if unitID and self.held[serial] then
+		self:release(serial, unitID)
+	end
+	if made then
+		unitID = self:create(w, i, serial, status[2] < 1, t)
+	end
+	if unitID then
+		unitID = self:applyStatus(w, i, serial, unitID, t)
+	end
+	if unitID then
+		if not self.nanoframe[serial] then
+			self:hold(serial, unitID)
+		end
+		self.MoveCtrl.SetPosition(unitID, transform[1], transform[2], transform[3])
+		self.MoveCtrl.SetRotation(unitID, self.euler(transform[4], transform[5], transform[6], transform[7]))
+		local placed = self.context.hooks.unitPlaced
+		if made and placed then
+			placed(unitID, self.defID[w.unitDef[i] + 1], t, clock)
+		end
+	end
+end
+
+--- Works out the order to make the units still to come in: those inside the
+-- view's corners first, and the nearest the camera's place first.
+function Units:sortPending(w, t)
+	local order, far, inside = self.order, self.far, self.inside
+	local unitOf, failed, defID = self.unitOf, self.failed, self.defID
+	local transform, view = self.transform, self.view
+	local cx, cz = view[1], view[2]
+	local serials = w.unitSerial
+	local n = 0
+	for i = 1, w.unitCount do
+		local serial = serials[i]
+		if not unitOf[serial] and not failed[serial] and defID[w.unitDef[i] + 1] and w:unitExistsAt(i, t) and w:sampleTransform(i, t, transform) then
+			n = n + 1
+			order[n] = i
+			local dx, dz = transform[1] - cx, transform[3] - cz
+			far[i] = dx * dx + dz * dz
+			inside[i] = self:inView(transform[1], transform[3])
+		end
+	end
+	for k = n + 1, self.orderCount do
+		order[k] = nil
+	end
+	self.orderCount = n
+	if not self.nearer then
+		-- Made once. Two units as far are in the order of the window's list, so
+		-- that the order is the same every time.
+		self.nearer = function(a, b)
+			if inside[a] ~= inside[b] then
+				return inside[a]
+			end
+			if far[a] ~= far[b] then
+				return far[a] < far[b]
+			end
+			return a < b
+		end
+	end
+	table.sort(order, self.nearer)
+	self.orderStale = false
+end
+
 --- Creates every unit of the track at `t` that is not there, as far as the
 -- budget goes, and puts each one where the track has it. A unit the budget
 -- leaves is made on a later frame, where the track has it then.
@@ -494,43 +642,52 @@ function Units:place(t, clock)
 		return
 	end
 	local makeBudget, removeBudget, defID = self.makeBudget, self.removeBudget, self.defID
-	local unitOf, failed, held = self.unitOf, self.failed, self.held
-	local transform, status = self.transform, self.status
-	local MoveCtrl, euler = self.MoveCtrl, self.euler
-	local placed = self.context.hooks.unitPlaced
+	local unitOf, failed = self.unitOf, self.failed
 	local serials = w.unitSerial
+	-- While a seek's units arrive and the viewer's place is known, a unit to be
+	-- made waits for the walk in the view's order below.
+	local sorted = self.arriving and self.viewed
+	local waiting = 0
 	for i = 1, w.unitCount do
 		if w:unitExistsAt(i, t) then
 			local serial = serials[i]
 			local unitID = unitOf[serial]
-			if not unitID and not failed[serial] and defID[w.unitDef[i] + 1] and (self.removing or self.removed / removeBudget + self.made / makeBudget >= 1) then
+			if not unitID and not failed[serial] and defID[w.unitDef[i] + 1] and (sorted or self.removing or self.removed / removeBudget + self.made / makeBudget >= 1) then
 				-- Nothing is made while a removal is left, and what the frame has
 				-- removed uses up its share of the time. A definition the game lacks
 				-- costs nothing, so it is not held back.
 				self.unsettled = true
-			elseif (unitID or not failed[serial]) and w:sampleTransform(i, t, transform) and w:sampleStatus(i, t, status) then
-				local made = not unitID
-				if unitID and held[serial] then
-					self:release(serial, unitID)
-				end
-				if made then
-					unitID = self:create(w, i, serial, status[2] < 1, t)
-				end
-				if unitID then
-					unitID = self:applyStatus(w, i, serial, unitID, t)
-				end
-				if unitID then
-					if not self.nanoframe[serial] then
-						self:hold(serial, unitID)
-					end
-					MoveCtrl.SetPosition(unitID, transform[1], transform[2], transform[3])
-					MoveCtrl.SetRotation(unitID, euler(transform[4], transform[5], transform[6], transform[7]))
-					if made and placed then
-						placed(unitID, self.defID[w.unitDef[i] + 1], t, clock)
-					end
-				end
+				waiting = waiting + 1
+			elseif unitID or not failed[serial] then
+				self:put(w, i, serial, unitID, t, clock)
 			end
 		end
+	end
+	if sorted and waiting > 0 and not self.removing then
+		if self.orderStale then
+			self:sortPending(w, t)
+		end
+		local order = self.order
+		for k = 1, self.orderCount do
+			if self.removed / removeBudget + self.made / makeBudget >= 1 then
+				break
+			end
+			local i = order[k]
+			local serial = serials[i]
+			if not unitOf[serial] and not failed[serial] and w:unitExistsAt(i, t) then
+				self:put(w, i, serial, nil, t, clock)
+				waiting = waiting - 1
+			end
+		end
+		-- A unit that play brought in since the order was worked out is not in
+		-- it, so the order is worked out again for the next frame.
+		if waiting > 0 and self.removed / removeBudget + self.made / makeBudget < 1 then
+			self.orderStale = true
+		end
+		self.unsettled = waiting > 0
+	end
+	if not self.unsettled then
+		self.arriving = false
 	end
 end
 
