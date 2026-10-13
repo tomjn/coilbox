@@ -50,7 +50,7 @@ M.PARAMS = {
 }
 
 --- Where the playback game keeps its marks, when it has any: a Lua file that
--- returns a list of `{ frame = n }`.
+-- returns a list of `{ frame = n }`. Nothing writes it yet (issue #3978).
 M.MARKS_PATH = "coilbox_rewind/marks.lua"
 
 --- What one arrow press moves, and what one with Shift held moves. The replay
