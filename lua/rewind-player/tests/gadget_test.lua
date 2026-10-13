@@ -75,9 +75,10 @@ do
 	w.gadget = gadget
 	t.same("it names itself", gadget:GetInfo().name, "Coilbox rewind player")
 	gadget:Initialize()
-	t.same("it logs one line", #w.lines, 1)
+	t.same("it logs the adapter and the track", #w.lines, 2)
+	t.same("a game with no adapter file says it loaded none", w.lines[1], "COILBOX_REWIND_PLAYER adapter loaded: none")
 	local h, info = expected.header, expected.info
-	local line = w.lines[1]
+	local line = w.lines[2]
 	t.check("the line is the player's", line:find("^COILBOX_REWIND_PLAYER ") ~= nil, line)
 	t.check("the line has the frame range", line:find("track frames " .. h.firstFrame .. " to " .. h.lastFrame .. ",", 1, true) ~= nil, line)
 	t.check("the line has the window count", line:find("windows " .. h.windowCount .. ",", 1, true) ~= nil, line)
@@ -109,6 +110,47 @@ do
 	t.same("a unit the base game creates is gone on the next frame", w.unitCount(), 4)
 	w.Spring.KillTeam(1)
 	t.check("a team that dies is logged", w.lines[#w.lines]:find("team 1 died", 1, true) ~= nil, w.lines[#w.lines])
+end
+
+-- The player reads the adapter the playback game holds (issue #3799).
+
+do
+	local w = world()
+	local gadget = synced(PLAYER, w, {
+		[TRACK] = bytes,
+		["coilbox_rewind/adapter.lua"] = "return { name = 'Test game', units = { 'armpw' }, features = { 'rock' },"
+			.. " hooks = { afterFrame = function() Spring.Echo('hook ran') end } }",
+	})
+	w.gadget = gadget
+	gadget:Initialize()
+	t.check("the adapter is named in the log", w.lines[1]:find("COILBOX_REWIND_PLAYER adapter loaded: Test game.", 1, true) == 1, w.lines[1])
+	gadget:GameFrame(1)
+	t.same("a hidden definition is not created", w.unitNamed("armpw"), nil)
+	t.same("the others are", w.unitCount(), 2)
+	t.same("a skipped feature is not created", #w.Spring.GetAllFeatures(), 0)
+	t.same("the hook ran with the gadget's environment", w.lines[#w.lines], "hook ran")
+end
+
+do
+	local w = world()
+	local gadget = synced(PLAYER, w, { [TRACK] = bytes, ["coilbox_rewind/adapter.lua"] = "return { problem = 'it was not for this game' }" })
+	gadget:Initialize()
+	t.same(
+		"an adapter coilbox could not use is logged with its reason",
+		w.lines[1],
+		"COILBOX_REWIND_PLAYER adapter loaded: none. it was not for this game"
+	)
+	gadget:GameFrame(1)
+	t.same("and the match still plays", w.unitCount(), 3)
+end
+
+do
+	local w = world()
+	local gadget = synced(PLAYER, w, { [TRACK] = bytes, ["coilbox_rewind/adapter.lua"] = "error('broken')" })
+	gadget:Initialize()
+	t.check("an adapter file that raises is logged", w.lines[1]:find("adapter loaded: none. the adapter file raised", 1, true) ~= nil, w.lines[1])
+	gadget:GameFrame(1)
+	t.same("and the match still plays", w.unitCount(), 3)
 end
 
 -- A game with no track, or a bad one.

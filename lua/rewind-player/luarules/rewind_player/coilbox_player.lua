@@ -35,6 +35,7 @@ local Rotation = VFS.Include(MODULES .. "coilbox_player_rotation.lua")
 local Terrain = VFS.Include(MODULES .. "coilbox_player_terrain.lua")
 local Features = VFS.Include(MODULES .. "coilbox_player_features.lua")
 local Units = VFS.Include(MODULES .. "coilbox_player_units.lua")
+local Adapter = VFS.Include(MODULES .. "coilbox_player_adapter.lua")
 
 local M = {}
 
@@ -82,7 +83,9 @@ end
 
 --- A player of `track`, or nil and the reason. `options.modOptions` is what
 -- `Spring.GetModOptions` gave and `options.log` takes a line for the engine's
--- log.
+-- log. `options.adapter` is the game's adapter as coilbox_player_adapter.lua
+-- reads it, or nil for a game with none, and `options.adapterWhy` is the reason
+-- when there is none because the game's could not be used.
 function M.new(track, options)
 	local header = track.header
 	local info, why = track:info()
@@ -130,7 +133,23 @@ function M.new(track, options)
 		clock.playing = false
 	end
 
+	-- The hooks the adapter has, each guarded so that one that raises is
+	-- reported and switched off and does not take the player down. A table with
+	-- no hooks in it when the adapter has none.
+	local hooks = {
+		unitPlaced = Adapter.guarded(options.adapter, "unitPlaced", report),
+		afterFrame = Adapter.guarded(options.adapter, "afterFrame", report),
+	}
+	log(Adapter.describe(options.adapter, options.adapterWhy))
+	if options.adapter then
+		for _, name in ipairs(options.adapter.unknownHooks) do
+			log("the adapter has a hook called " .. name .. " that is not a function the player calls, so it is never called")
+		end
+	end
+
 	local context = {
+		adapter = options.adapter,
+		hooks = hooks,
 		track = track,
 		info = info,
 		features = features,
@@ -160,6 +179,7 @@ function M.new(track, options)
 		-- In the order they run. Terrain moves the ground before anything is put
 		-- on it.
 		stages = { terrain, featureStage, units },
+		afterFrame = hooks.afterFrame,
 		published = {},
 	}, Player)
 
@@ -193,6 +213,9 @@ function Player:frame()
 	end
 	for i = 1, #stages do
 		stages[i]:place(t, clock)
+	end
+	if self.afterFrame then
+		self.afterFrame(t, clock)
 	end
 	publishClock(self)
 end
