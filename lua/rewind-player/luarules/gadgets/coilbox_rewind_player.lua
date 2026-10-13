@@ -224,12 +224,10 @@ else
 	-- frame's work counted in, which only makes it more, so what fits in `TARGET`
 	-- errs low. A frame that used the whole budget sets it to what fits, at least
 	-- one and at most twice what the frame did. The cost of a few units says
-	-- little about the next many, since the cost of a unit moves with how many
-	-- there are. A frame that used less of the budget leaves it alone unless it
-	-- took longer than `TARGET`, and then cuts it. The last frame of a seek has
-	-- few units and a rest of the frame that is dear beside them, and says little.
-	-- So a seek starts with the budget the last one ended on and doubles it each
-	-- frame while the cost allows.
+	-- little about the next many. A frame that used less of the budget leaves it
+	-- alone unless it took longer than `TARGET`, and then cuts it. The last frame
+	-- of a seek has few units and a rest of the frame that is dear beside them,
+	-- and says little.
 	local function fit(took, count, budget)
 		local wanted = math.floor(TARGET / math.max(took / count, 0.001))
 		if count >= budget then
@@ -242,10 +240,17 @@ else
 
 	--- A frame made `made` units and removed `removed` in `took` milliseconds.
 	-- Making costs the engine something other than removing, so only a frame that
-	-- did one of them says what that one costs.
+	-- did one of them says what that one costs. A frame that did neither ends a
+	-- seek, and the budgets go back to one. What a unit costs moves with how many
+	-- there are, from 0.28 to 0.5 ms to make in the runs of issue #3988 as the
+	-- count went from none to 400, and from 0.12 to 0.33 ms to remove, so what
+	-- one seek ended on is not safe for the start of the next. Each starts from
+	-- one and doubles each frame while the cost allows.
 	local function retune(took, made, removed)
 		local make, remove = makeBudget, removeBudget
-		if made > 0 and removed == 0 then
+		if made + removed == 0 then
+			make, remove = FIRST_BUDGET, FIRST_BUDGET
+		elseif made > 0 and removed == 0 then
 			make = fit(took, made, makeBudget)
 		elseif removed > 0 and made == 0 then
 			remove = fit(took, removed, removeBudget)
@@ -269,7 +274,7 @@ else
 		end
 		local took = Spring.DiffTimers(clock(), started, true, micros)
 		started = nil
-		if made and removed and made + removed > 0 then
+		if made and removed then
 			retune(took, made, removed)
 		end
 		if took <= LIMIT then

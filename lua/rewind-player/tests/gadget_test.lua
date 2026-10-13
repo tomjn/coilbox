@@ -318,6 +318,11 @@ do
 	t.same("a frame that did both says what neither costs, so changes neither", #clock.messages, sent)
 	work(0.4, 0, 8)
 	t.same("a removal budget moves on removals alone", last(), "coilbox_rewind_budget:2 16")
+	work(1, 0, 0)
+	t.same("a frame with nothing to do sends both back to one, since what a unit costs moves with how many there are", last(), "coilbox_rewind_budget:1 1")
+	sent = #clock.messages
+	work(1, 0, 0)
+	t.same("and says so once", #clock.messages, sent)
 end
 
 -- The guard.
