@@ -222,6 +222,7 @@ return {
 	features = { "grave_marker" },
 
 	hooks = {
+		started = function() end,
 		unitPlaced = function(unitID, unitDefID, t, clock) end,
 		afterFrame = function(t, clock) end,
 	},
@@ -341,7 +342,7 @@ What a whole match did with no adapter, on engine `2026.07.01-102-g6e5c5a0`, and
 
 With `game_spawn.lua` off, a team would keep the engine's own storage of 1,000,000 and the resource bars would read 0/1000000. The adapter's `started` hook gives each team what that gadget gave it: the `startmetal` and `startenergy` of the team or of the mod options, and 1000 of each when neither says.
 
-What stays, because it tells a viewer about the match: the resource bars, the tooltip with a unit's description, the minimap, the players list, health bars, build progress and its time left, the metal and geothermal spot markers, and the game's own effects, lights and weather. Two things stay for want of a way to take them out:
+What stays, because it tells a viewer about the match: the resource bars, the tooltip with a unit's description, the minimap, the players list, health bars, build progress and its time left, the metal and geothermal spot markers, and the game's own effects, lights and weather. Two things stay for want of a way to take them out (issue #3983):
 
 - The menu at the top right is one widget, `gui_static_menu.lua`, with Settings, Keybinds, Economy, Graph, Log and Quit in it, so it stays whole. Its Resign button sends the engine's `spectator` command, which does nothing for somebody who already is one.
 - The build menu and order buttons of a selected unit, `gui_static_buildordermenu.lua`. A spectator's orders go nowhere. Switched off, the engine's own command menu takes its place and `game_buildHotkeys.lua` raises, both seen in a window.
@@ -579,6 +580,8 @@ SFInitialSettingsVersion = 1
 MaxTextureAtlasSizeX = 8192
 MaxTextureAtlasSizeY = 8192
 ```
+
+Without the first line, the Initial Settings widget reloads the engine four seconds after it loads, which is what every headless run above does, since each has a settings file of its own. The match has no countdown to wait behind, so a driver starts, is cut off at about frame 100 and starts again, and the tests read what it said from its last start.
 
 A scripted screenshot can hang this engine for good. `CBitmap::Save` logs while it holds the bitmap lock, and the info console, updating on the main thread, holds its own lock while it wraps a new line and loads any character its font does not have yet, which takes the bitmap lock. The font has ASCII from the start. Splinter Faction logs an em dash and an arrow in its first frames. Echo both before the first screenshot, wait until the game's start has logged, and keep any line of your own a second away from a screenshot.
 

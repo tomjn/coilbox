@@ -1900,6 +1900,20 @@ end
         "/../../lua/rewind-player/tests/headless/playback_driver.lua"
     ));
 
+    /// What the driver said, from the last time it started. Splinter Faction's
+    /// Initial Settings widget reloads the engine four seconds after a settings
+    /// file it has not seen is first read, which a scratch run's is, and the
+    /// match has no countdown to wait behind, so the driver starts, is cut off
+    /// and starts again.
+    fn driver_lines(output: &str) -> Vec<&str> {
+        let all: Vec<&str> = output
+            .lines()
+            .filter_map(|l| l.split_once("REWIND_DRIVER ").map(|(_, rest)| rest))
+            .collect();
+        let last = all.iter().rposition(|l| l.starts_with("start "));
+        all[last.unwrap_or(0)..].to_vec()
+    }
+
     /// The value of `key=` in a line of the driver's.
     fn field<'a>(line: &'a str, key: &str) -> &'a str {
         line.split_whitespace()
@@ -2004,10 +2018,7 @@ end
 
         let (timed_out, output, written) =
             launch(&prepared, &|text| text.contains("REWIND_DRIVER done"));
-        let driver: Vec<&str> = output
-            .lines()
-            .filter_map(|l| l.split_once("REWIND_DRIVER ").map(|(_, rest)| rest))
-            .collect();
+        let driver = driver_lines(&output);
         let player: Vec<&str> = output
             .lines()
             .filter(|l| l.contains("COILBOX_REWIND_PLAYER"))
@@ -2413,8 +2424,13 @@ end
         for gadget in gadgets {
             assert!(count(&plain, gadget) >= 1, "{gadget} did not load");
         }
-        assert_eq!(count(&plain, stranger), 1, "the base game spawned nothing");
-        assert_eq!(count(&plain, kill), 1, "the base game never asked");
+        // At least once and not once: see `driver_lines` for why a line can be
+        // there twice.
+        assert!(
+            count(&plain, stranger) >= 1,
+            "the base game spawned nothing"
+        );
+        assert!(count(&plain, kill) >= 1, "the base game never asked");
 
         // 2. The adapter coilbox ships.
         prepared.rewrite(REWIND_PLAYER_ADAPTERS);
@@ -2435,10 +2451,7 @@ end
         assert_eq!(count(&adapted, over), 0, "the match was asked to end");
         assert_eq!(count(&adapted, "COILBOX_REWIND_PLAYER team "), 0);
 
-        let driver: Vec<&str> = adapted
-            .lines()
-            .filter_map(|l| l.split_once("REWIND_DRIVER ").map(|(_, rest)| rest))
-            .collect();
+        let driver = driver_lines(&adapted);
         let line = |start: &str| {
             *driver
                 .iter()
