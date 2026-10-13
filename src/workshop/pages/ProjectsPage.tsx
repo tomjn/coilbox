@@ -25,6 +25,7 @@
  * game yet and the list must not wait 23 seconds to offer a button. The editor
  * fills it in the first time it opens the project against a game it can read.
  */
+
 import { Button, Input, useDrawer, useSetting } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Plus, Search, SlidersHorizontal, Upload } from "lucide-react";
@@ -47,6 +48,7 @@ import { importContainerFile } from "@/deeplink/bindings";
 import { useImportParam } from "@/deeplink/useImportParam";
 import { nextDrawerKey } from "@/general/drawerKey";
 import { useRecordHubImport } from "@/hub/imports";
+import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { useCheckpoints } from "../checkpoints";
 import { forgetEditHistory } from "../history";
 import {
@@ -141,7 +143,10 @@ export default function ProjectsPage() {
   const navigate = useNavigate();
   const { selected } = useScanTargetSelection();
   const scan = useUnitsyncScan(selected?.enginePath, selected?.rootPath);
-  const games = useMemo(() => scan.data?.games ?? [], [scan.data]);
+  const games = useMemo(
+    () => withoutGeneratedGames(scan.data?.games ?? []),
+    [scan.data],
+  );
   const { headers: gameHeaders } = useUnitsyncGameHeaders(
     selected?.enginePath,
     selected?.rootPath,

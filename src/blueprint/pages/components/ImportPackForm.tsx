@@ -23,11 +23,11 @@ import { Button } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { FolderOpen } from "lucide-react";
 import { useMemo, useState } from "react";
-
 import { identify } from "@/container/container";
 import { useUnitsyncGameHeaders, useUnitsyncScan } from "@/content/config";
 import { ErrorBanner } from "@/content/pages/components/states";
 import { useGameUnits } from "@/content/useGameUnits";
+import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { usePreferredTarget } from "@/play/config";
 import { GamePickerPanel } from "@/play/pages/components/GamePickerPanel";
 import { barFormat } from "../../bar";
@@ -76,7 +76,10 @@ export function ImportPackForm({
   const { records } = useBlueprintLibrary();
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
-  const installed = useMemo(() => scan.data?.games ?? [], [scan.data]);
+  const installed = useMemo(
+    () => withoutGeneratedGames(scan.data?.games ?? []),
+    [scan.data],
+  );
   const { headers: gameHeaders } = useUnitsyncGameHeaders(
     target?.enginePath,
     target?.dataDir,

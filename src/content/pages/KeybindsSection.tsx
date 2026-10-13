@@ -1,6 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
+import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { useImportParam } from "../../deeplink/useImportParam";
 import { useSkirmishDraft } from "../../play/drafts";
 import { GamePickerField } from "../../play/pages/components/GamePickerButton";
@@ -55,7 +56,10 @@ export default function KeybindsSection() {
   const configDir = engineConfigDir(engineConfig?.configPath) ?? rootPath;
 
   const scan = useUnitsyncScan(enginePath, rootPath);
-  const games = useMemo(() => scan.data?.games ?? [], [scan.data]);
+  const games = useMemo(
+    () => withoutGeneratedGames(scan.data?.games ?? []),
+    [scan.data],
+  );
   const { headers: gameHeaders } = useUnitsyncGameHeaders(enginePath, rootPath);
   const [draft] = useSkirmishDraft();
   const [gameName, setGameName] = useState("");

@@ -47,6 +47,7 @@ import {
 import { gameForIdentity } from "@/content/useGameUnits";
 import { useImportParam } from "@/deeplink/useImportParam";
 import { useRecordHubImport } from "@/hub/imports";
+import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { notify } from "@/notify/notify";
 import { usePreferredTarget } from "@/play/config";
 import { GamePickerField } from "@/play/pages/components/GamePickerButton";
@@ -78,7 +79,10 @@ export default function BlueprintsPage() {
   const { records, loading, error } = useBlueprintLibrary();
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
-  const installed = useMemo(() => scan.data?.games ?? [], [scan.data]);
+  const installed = useMemo(
+    () => withoutGeneratedGames(scan.data?.games ?? []),
+    [scan.data],
+  );
   const { headers: gameHeaders } = useUnitsyncGameHeaders(
     target?.enginePath,
     target?.dataDir,

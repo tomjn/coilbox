@@ -12,6 +12,7 @@ const REASON = "no space left on device";
 
 const h = vi.hoisted(() => ({
   scan: { data: null as unknown, error: null as string | null, loading: false },
+  offered: [] as { name: string }[],
 }));
 
 vi.mock("../config", () => ({
@@ -36,7 +37,10 @@ vi.mock("../../play/drafts", () => ({
   useSkirmishDraft: () => [{ gameName: "" }],
 }));
 vi.mock("../../play/pages/components/GamePickerButton", () => ({
-  GamePickerField: () => null,
+  GamePickerField: ({ games }: { games: { name: string }[] }) => {
+    h.offered = games;
+    return null;
+  },
 }));
 vi.mock("./components/BrowserToolbar", () => ({
   BrowserToolbar: () => null,
@@ -78,5 +82,28 @@ describe("KeybindsSection with a failed scan", () => {
     };
     renderSection();
     expect(screen.queryByText(/The scan failed/)).toBeNull();
+  });
+
+  it("does not offer a game coilbox generated for itself", () => {
+    const game = (name: string, archive: string) => ({
+      name,
+      primaryArchive: { name: archive, path: `/data/games/${archive}` },
+      dependencyArchives: [],
+      info: {},
+    });
+    h.scan = {
+      data: {
+        maps: [],
+        errors: [],
+        games: [
+          game("Real Game", "realgame.sdd"),
+          game("Replay playback", "coilbox-replay-playback.sdd"),
+        ],
+      },
+      error: null,
+      loading: false,
+    };
+    renderSection();
+    expect(h.offered.map((g) => g.name)).toEqual(["Real Game"]);
   });
 });

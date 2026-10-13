@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
 import type { GameItem } from "@/content/bindings";
 import { useUnitsyncScan } from "@/content/config";
+import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { usePreferredTarget } from "@/play/config";
 import {
   type GamePictures,
@@ -47,7 +48,10 @@ export function GamePicturesControl({
 }) {
   const { target } = usePreferredTarget();
   const { data: scan } = useUnitsyncScan(target?.enginePath, target?.dataDir);
-  const games = useMemo(() => gameOptions(scan?.games ?? []), [scan]);
+  const games = useMemo(
+    () => gameOptions(withoutGeneratedGames(scan?.games ?? [])),
+    [scan],
+  );
   const [only, setOnly] = useState(ALL_GAMES);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<PictureSweepProgress | null>(null);

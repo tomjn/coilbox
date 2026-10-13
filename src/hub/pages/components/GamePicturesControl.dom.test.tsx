@@ -48,12 +48,25 @@ vi.mock("@/content/config", () => ({
       games: [
         {
           name: "Tech Annihilation 1.2",
+          primaryArchive: { name: "techa.sdz" },
           info: { name: "Tech Annihilation", shortname: "TechA" },
         },
-        { name: "Balanced Annihilation V15", info: { shortname: "ba" } },
+        {
+          name: "Balanced Annihilation V15",
+          primaryArchive: { name: "ba15.sdz" },
+          info: { shortname: "ba" },
+        },
         // A second install of one game is one option.
-        { name: "Balanced Annihilation V14", info: { shortname: "BA" } },
-        { name: "No shortname", info: {} },
+        {
+          name: "Balanced Annihilation V14",
+          primaryArchive: { name: "ba14.sdz" },
+          info: { shortname: "BA" },
+        },
+        {
+          name: "No shortname",
+          primaryArchive: { name: "none.sdz" },
+          info: {},
+        },
       ],
     },
   }),
