@@ -5,6 +5,7 @@
 local here = arg[0]:match("^(.*)/[^/]+$") or "."
 local t = dofile(here .. "/support.lua")
 local Engine = dofile(here .. "/engine.lua")
+local Unsynced = dofile(here .. "/unsynced.lua")
 
 local expected = dofile(t.FIXTURES .. "expected.lua")
 local bytes = t.read(t.FIXTURES .. "small.cbtrack")
@@ -48,10 +49,12 @@ local function synced(file, w, files, without)
 	return env.gadget, returned
 end
 
---- The same as the unsynced half. `clock` is a table whose `now` is the time
--- in milliseconds that the timers read. With `micros` set the engine has
--- `Spring.GetTimerMicros`, and the timers read microseconds. The messages the
--- gadget sends are collected in `clock.messages`.
+--- The same as the unsynced half, on the stand-in of unsynced.lua. `clock` is a
+-- table whose `now` is the time in milliseconds that the timers read. With
+-- `micros` set the engine has `Spring.GetTimerMicros`, and the timers read
+-- microseconds. The messages the gadget sends are collected in
+-- `clock.messages`, and the view's in `clock.views`. The third value is the
+-- stand-in.
 local function unsynced(file, lines, clock)
 	local env = t.unsyncedEnv()
 	env.gadget = {}
@@ -64,35 +67,9 @@ local function unsynced(file, lines, clock)
 	env.VFS.Include = function(path)
 		return t.load(assert(path:match("^luarules/rewind_player/(.+)$"), path), env)
 	end
-	env.Spring = {
-		Echo = function(line)
-			lines[#lines + 1] = line
-		end,
-		GetTimer = function()
-			return clock.now
-		end,
-		DiffTimers = function(a, b, milliseconds, fromMicroseconds)
-			assert(milliseconds == true, "the gadget did not ask for milliseconds")
-			if clock.micros then
-				assert(fromMicroseconds == true, "the gadget read microsecond timers as milliseconds")
-				return (a - b) / 1000
-			end
-			return a - b
-		end,
-		SendLuaRulesMsg = function(text)
-			clock.messages[#clock.messages + 1] = text
-		end,
-	}
-	clock.messages = clock.messages or {}
-	-- Calls an older engine lacks.
-	for name in pairs(clock.without or {}) do
-		env.Spring[name] = nil
-	end
-	if clock.micros then
-		env.Spring.GetTimerMicros = function()
-			return clock.now * 1000
-		end
-	end
+	local e = Unsynced.new(clock)
+	e.lines = lines
+	env.Spring, env.gl, env.GL = e.Spring, e.gl, e.GL
 	local chunk = assert(loadfile(GADGETS .. file))
 	setfenv(chunk, env)
 	local returned = chunk()
@@ -102,7 +79,7 @@ local function unsynced(file, lines, clock)
 			table.remove(lines, i)
 		end
 	end
-	return env.gadget, returned
+	return env.gadget, returned, e
 end
 
 local PLAYER = "coilbox_rewind_player.lua"
@@ -416,6 +393,120 @@ do
 	plain:GameFrame(1)
 	t.same("without SendToUnsynced a seek is shown in one frame", w.unitCount(), 3)
 	t.same("and settled", w.params.coilbox_rewind_settled, 1)
+end
+
+-- The synced half asks its unsynced half for an arrival effect (issue #4009),
+-- and the unsynced half draws it.
+
+--- The arrival effects the synced half asked for, which the stand-in keeps
+-- among the world's events.
+local function arrived(w)
+	local list = {}
+	for _, event in ipairs(w.events) do
+		if event:find("^arrive ") then
+			list[#list + 1] = event
+		end
+	end
+	return list
+end
+
+do
+	local w = world()
+	local gadget = synced(PLAYER, w, { [TRACK] = bytes })
+	w.gadget = gadget
+	gadget:Initialize()
+	gadget:GameFrame(1)
+	t.same("the frame that shows a seek asks for no effect", #arrived(w), 0)
+	settle(gadget, w, 2)
+	local asked = arrived(w)
+	t.same("the two units made in the frames after it are asked for", #asked, 2)
+	local id, x, y, z, team = asked[1]:match("^arrive (%S+) (%S+) (%S+) (%S+) (%S+)$")
+	local unit = w.units[tonumber(id)]
+	t.check("each with its id, a place and its team", unit ~= nil and tonumber(x) and tonumber(y) and tonumber(z) and tonumber(team) == unit.team, asked[1])
+	t.same("and they do not count as timing a frame", w.sentName, "coilbox_rewind_work")
+end
+
+do
+	local w = world()
+	local plain = synced(PLAYER, w, { [TRACK] = bytes }, "SendToUnsynced")
+	w.gadget = plain
+	plain:Initialize()
+	local ok, err = pcall(function()
+		for frame = 1, 5 do
+			plain:GameFrame(frame)
+		end
+	end)
+	t.check("without SendToUnsynced no effect can be asked for, and nothing raises", ok and #arrived(w) == 0, err)
+end
+
+do
+	local lines, clock = {}, { now = 0 }
+	local gadget, _, e = unsynced(PLAYER, lines, clock)
+	e.radius[104] = 25
+	e.colours[1] = { 0, 1, 0 }
+	t.same("the unsynced half has a world draw", type(gadget.DrawWorld), "function")
+	gadget:DrawWorld()
+	t.same("which draws nothing while no unit arrives", e.vertices, 0)
+	t.same("the unsynced half takes an arrival", gadget:RecvFromSynced("coilbox_rewind_arrive", 104, 500, 10, 700, 1), true)
+	clock.now = clock.now + 100
+	gadget:DrawWorld()
+	t.check("and draws its effect", e.vertices > 0, e.vertices)
+	t.check("round the unit", e.box.x1 < 500 and e.box.x2 > 500 and e.box.z1 < 700 and e.box.z2 > 700)
+	local sum = e.colourSum
+	t.check("in the team's colour", sum[2] > sum[1] and sum[2] > sum[3], table.concat(sum, " "))
+	e.clear()
+	clock.now = clock.now + 5000
+	gadget:DrawWorld()
+	t.same("five seconds on it is gone", e.vertices, 0)
+	t.same("and nothing was logged", #lines, 0)
+end
+
+-- The unsynced half tells the player where the camera looks (issue #4008).
+
+do
+	local lines, clock = {}, { now = 0 }
+	local gadget, _, e = unsynced(PLAYER, lines, clock)
+	local frame = 0
+	local function work()
+		frame = frame + 1
+		gadget:RecvFromSynced("coilbox_rewind_work", 0, frame)
+		gadget:RecvFromSynced("coilbox_rewind_work", 1, frame, 0, 0)
+	end
+	t.same("nothing is sent before a frame", #clock.views, 0)
+	work()
+	t.same("the first frame sends the view", #clock.views, 1)
+	t.check("as the message the player takes", clock.views[1]:find("^coilbox_rewind_view:4000 3000 ") ~= nil, clock.views[1])
+	work()
+	t.same("a camera that stands still sends it once", #clock.views, 1)
+	e.camera.x = 6000
+	work()
+	t.same("a camera that moves sends it again", #clock.views, 2)
+	t.same("a frame looks at the camera once", e.traces, 15)
+	t.same("and the budget's messages are as before", #clock.messages, 0)
+
+	-- The player takes it.
+	local w = world()
+	local synced1 = synced(PLAYER, w, { [TRACK] = bytes })
+	w.gadget = synced1
+	synced1:Initialize()
+	t.same("the synced half takes the view", synced1:RecvLuaMsg(clock.views[2], 0), true)
+	t.same("with nothing logged about it", #w.lines, 2)
+end
+
+do
+	-- With no way to send a message there is no view to send.
+	local lines, clock = {}, { now = 0, without = { SendLuaRulesMsg = true } }
+	local gadget, _, e = unsynced(PLAYER, lines, clock)
+	gadget:RecvFromSynced("coilbox_rewind_work", 0, 1)
+	gadget:RecvFromSynced("coilbox_rewind_work", 1, 1, 0, 0)
+	t.same("without Spring.SendLuaRulesMsg the camera is not looked at", e.traces, 0)
+
+	-- With no timer the effect has no clock.
+	local lines2, clock2 = {}, { now = 0, without = { GetTimer = true } }
+	local blind, _, e2 = unsynced(PLAYER, lines2, clock2)
+	e2.radius[104] = 25
+	t.same("without a timer an arrival is still taken", blind:RecvFromSynced("coilbox_rewind_arrive", 104, 500, 10, 700, 1), true)
+	t.same("and there is no world draw", blind.DrawWorld, nil)
 end
 
 -- The guard.

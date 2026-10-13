@@ -381,8 +381,13 @@ end
 
 -- The unsynced half of the gadget.
 
+local Unsynced = dofile(here .. "/unsynced.lua")
+
 local function unsyncedScene(removed)
-	local lines, clock = {}, { now = 0 }
+	-- An engine without the microsecond timer reads whole milliseconds.
+	local clock = { now = 0, micros = removed ~= "Spring.GetTimerMicros" }
+	local e = Unsynced.new(clock)
+	local lines = e.lines
 	local env = t.unsyncedEnv()
 	env.gadget = {}
 	env.gadgetHandler = {
@@ -391,27 +396,7 @@ local function unsyncedScene(removed)
 		end,
 	}
 	env.Game = { gameSpeed = 30 }
-	env.Spring = {
-		Echo = function(line)
-			lines[#lines + 1] = line
-		end,
-		GetTimer = function()
-			return clock.now
-		end,
-		GetTimerMicros = function()
-			return clock.now * 1000
-		end,
-		DiffTimers = function(a, b, _, fromMicroseconds)
-			if fromMicroseconds then
-				return (a - b) / 1000
-			end
-			return a - b
-		end,
-		SendLuaRulesMsg = function(text)
-			clock.messages[#clock.messages + 1] = text
-		end,
-	}
-	clock.messages = {}
+	env.Spring, env.gl, env.GL = e.Spring, e.gl, e.GL
 	env.VFS.Include = function(path)
 		local file = assert(path:match("^luarules/rewind_player/(.+)$"), path)
 		return t.load(file, env)
@@ -422,7 +407,7 @@ local function unsyncedScene(removed)
 	local chunk = assert(loadfile(GADGET))
 	setfenv(chunk, env)
 	chunk()
-	return env.gadget, lines, clock
+	return env.gadget, lines, clock, e
 end
 
 do
@@ -432,6 +417,8 @@ do
 	clock.now = clock.now + 50
 	gadget:RecvFromSynced("coilbox_rewind_work", 1, 1)
 	t.same("and times a slow frame", #lines, 1)
+	t.same("and sends the view", #clock.views, 1)
+	t.same("and has a world draw for the arrival effect", type(gadget.DrawWorld), "function")
 end
 
 for _, row in ipairs(Table.UNSYNCED) do
@@ -440,6 +427,9 @@ for _, row in ipairs(Table.UNSYNCED) do
 		local ok, gadget, lines, clock = pcall(unsyncedScene, call)
 		t.check(label .. " the gadget loads", ok, gadget)
 		if ok then
+			-- The view needs a way to send it, and the effect needs a clock.
+			local viewOff = row.id == "view" or row.id == "budgetMessage"
+			local effectOff = row.id == "arrivalEffect" or row.id == "workTimingLine"
 			local line = lines[1]
 			t.check(label .. " it logs one line that starts with the prefix", #lines == 1 and line:sub(1, #PREFIX) == PREFIX, table.concat(lines, " | "))
 			t.check(label .. " naming the call", line ~= nil and line:find("this engine has no " .. call, 1, true) ~= nil, line)
@@ -450,6 +440,9 @@ for _, row in ipairs(Table.UNSYNCED) do
 				gadget:RecvFromSynced("coilbox_rewind_work", 1, 1)
 			end)
 			t.check(label .. " a frame's work is taken and raises nothing", fine)
+			t.same(label .. " the view is " .. (viewOff and "not sent" or "still sent"), #clock.views, viewOff and 0 or 1)
+			t.same(label .. " the arrival effect is " .. (effectOff and "not drawn" or "still drawn"), type(gadget.DrawWorld), effectOff and "nil" or "function")
+			t.same(label .. " a unit that arrives is taken and raises nothing", pcall(gadget.RecvFromSynced, gadget, "coilbox_rewind_arrive", 7, 0, 0, 0, 0), true)
 			-- A row that leaves the slow frame line on still logs a slow frame.
 			local more = 0
 			for _, l in ipairs(lines) do

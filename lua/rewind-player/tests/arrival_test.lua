@@ -259,4 +259,228 @@ do
 	t.same("300 frames of play after it allocate nothing", after - before, 0)
 end
 
+-- The unsynced half. Both modules take the engine as a table.
+
+local Unsynced = dofile(here .. "/unsynced.lua")
+local View = t.load("coilbox_player_view.lua", t.unsyncedEnv())
+local Arrival = t.load("coilbox_player_arrival.lua", t.unsyncedEnv())
+
+-- The view: the place in the middle of the screen and the four corners, on the
+-- ground, as a message for the player.
+
+do
+	local e = Unsynced.new()
+	local view = View.new(e.Spring)
+	t.same("the view's message is the one the player takes", View.MESSAGE, "coilbox_rewind_view:")
+	t.same("the first look sends the middle and the four corners, going round", view:poll(), "coilbox_rewind_view:4000 3000 3200 3450 4799 3450 4799 2551 3200 2551")
+	t.same("a look takes five rays", e.traces, 5)
+	t.same("a camera that has not moved sends nothing", view:poll(), nil)
+
+	-- The camera is 2,000 above the place it looks at, and a move counts when it
+	-- is more than a share of that.
+	local step = 2000 * View.SHARE
+	e.camera.x = 4000 + step - 1
+	t.same("a move of less than the share of the camera's distance sends nothing", view:poll(), nil)
+	e.camera.x = 4000 + step + 1
+	local sent = view:poll()
+	t.check("a move of more than that sends the view again", sent ~= nil and sent:find("^coilbox_rewind_view:4126 3000 ") ~= nil, sent)
+	t.same("and then nothing until the next", view:poll(), nil)
+
+	e.camera.wide, e.camera.deep = 800, 450
+	sent = view:poll()
+	t.check("a camera that zooms in on the same place sends the new corners", sent ~= nil and sent:find(" 3726 3225 ", 1, true) ~= nil, sent)
+end
+
+-- A corner that looks past the edge of the map is where its ray meets the level
+-- of the middle. A corner that looks at the sky is nowhere, and the view is
+-- then the middle alone.
+
+do
+	local e = Unsynced.new()
+	local view = View.new(e.Spring)
+	local flat = e.trace
+	e.trace = function(sx, sy, level)
+		if sx > 1000 and sy > 600 then
+			return "sky", { 0, 0, 0, 9000, level, 500 }
+		end
+		local kind, place = flat(sx, sy)
+		place[2] = 40
+		return kind, place
+	end
+	local sent = view:poll()
+	t.check("a corner off the map is where its ray meets the level of the middle", sent ~= nil and sent:find(" 9000 500 ", 1, true) ~= nil, sent)
+
+	e.trace = function(sx, sy, level)
+		if sy > 600 then
+			-- The plane is behind the camera, which the engine gives as a place
+			-- that is not on the plane.
+			return "sky", { 0, 0, 0, 4000, 2001, 3000 }
+		end
+		return flat(sx, sy)
+	end
+	t.same("a view with a corner in the sky is its middle alone", view:poll(), "coilbox_rewind_view:4000 3000")
+	t.same("and is not sent twice", view:poll(), nil)
+
+	e.trace = function()
+		return "sky", { 0, 0, 0, 0, 0, 0 }
+	end
+	t.same("a camera that looks at the sky has no view", view:poll(), "coilbox_rewind_view:none")
+	t.same("which is said once", view:poll(), nil)
+	e.trace = flat
+	t.check("and a camera that looks at the ground again has one", (view:poll() or ""):find("^coilbox_rewind_view:4000 3000 3200 ") ~= nil)
+end
+
+-- The player takes what the view sends.
+
+do
+	local e = Unsynced.new()
+	local view = View.new(e.Spring)
+	local world, player = setup({ last = 600, units = row(2, 100, 400) }, 2)
+	local before = #world.lines
+	t.same("the player takes the view's message", player:message(view:poll()), true)
+	e.trace = function()
+		return "sky", { 0, 0, 0, 0, 0, 0 }
+	end
+	t.same("and the one for no view", player:message(view:poll()), true)
+	t.same("and refuses neither", #world.lines, before)
+end
+
+-- The effect.
+
+local function effects(e)
+	local seconds = 0
+	local arrival = Arrival.new({
+		Spring = e.Spring,
+		gl = e.gl,
+		GL = e.GL,
+		seconds = function()
+			return seconds
+		end,
+	})
+	return arrival, function(to)
+		seconds = to
+	end
+end
+
+do
+	local e = Unsynced.new()
+	local arrival, at = effects(e)
+	e.radius[7] = 20
+	e.colours[1] = { 1, 0, 0 }
+
+	arrival:draw()
+	t.same("with no unit arriving a draw does nothing", #e.state + e.vertices, 0)
+
+	arrival:add(7, 1000, 50, 2000, 1)
+	t.same("a unit that arrives has an effect", arrival.count, 1)
+	at(Arrival.LIFE / 2)
+	arrival:draw()
+	t.check("half way through its life it is drawn", e.vertices > 0, e.vertices)
+	local box = e.box
+	local reach = 20 * Arrival.REACH
+	t.check(
+		"round the unit, no farther out than the module says an effect reaches",
+		box.x1 >= 1000 - reach and box.x2 <= 1000 + reach and box.z1 >= 2000 - reach and box.z2 <= 2000 + reach and box.y1 >= 50 - reach and box.y2 <= 50 + reach,
+		table.concat({ box.x1, box.x2, box.y1, box.y2, box.z1, box.z2 }, " ")
+	)
+	t.check("and not all at one point", box.x2 - box.x1 > 20 and box.y2 - box.y1 > 20)
+	local sum = e.colourSum
+	t.check("mostly in the team's colour", sum[1] > sum[2] and sum[1] > sum[3], table.concat(sum, " "))
+	t.same("with no texture bound, and the depth test on and nothing written to depth", table.concat(e.state, ", ", 1, 3), "Texture false, DepthTest true, DepthMask false")
+	t.same("it leaves the engine's blending as it found it", e.state[#e.state - 2], "Blending " .. e.GL.SRC_ALPHA .. " " .. e.GL.ONE_MINUS_SRC_ALPHA)
+	t.same("and the depth written again", e.state[#e.state - 1], "DepthMask true")
+	t.same("and the colour white", e.state[#e.state], "Color 1 1 1 1")
+	local wide = box.x2 - box.x1
+
+	-- A unit twice the size has an effect twice the size.
+	local e2 = Unsynced.new()
+	local arrival2, at2 = effects(e2)
+	e2.radius[7] = 40
+	e2.colours[1] = { 1, 0, 0 }
+	arrival2:add(7, 1000, 50, 2000, 1)
+	at2(Arrival.LIFE / 2)
+	arrival2:draw()
+	t.near("a unit twice the size has an effect twice as wide", e2.box.x2 - e2.box.x1, wide * 2, 1e-6)
+
+	e.clear()
+	at(Arrival.LIFE + 0.01)
+	arrival:draw()
+	t.same("after its life it is gone", arrival.count, 0)
+	t.same("and nothing is drawn for it", e.vertices, 0)
+end
+
+do
+	local e = Unsynced.new()
+	local arrival, at = effects(e)
+	e.colours[0] = { 0, 0, 1 }
+	arrival:add(9, 0, 0, 0, 0)
+	t.same("a unit the engine cannot size has no effect", arrival.count, 0)
+	e.radius[9] = 10
+	arrival:add(9, 0, 0, 0, 5)
+	t.same("a unit of a team with no colour has one", arrival.count, 1)
+	local ok, err = pcall(function()
+		at(0.1)
+		arrival:draw()
+	end)
+	t.check("and is drawn", ok and e.vertices > 0, err)
+
+	-- No more than the most at once: the ones that arrive past it have none.
+	for id = 100, 100 + Arrival.MOST + 20 do
+		e.radius[id] = 10
+		arrival:add(id, id, 0, 0, 0)
+	end
+	t.same("there are never more than the most at once", arrival.count, Arrival.MOST)
+	at(Arrival.LIFE + 1)
+	arrival:draw()
+	t.same("and all are gone when their lives are over", arrival.count, 0)
+	arrival:add(100, 0, 0, 0, 0)
+	t.same("so that a later unit has one again", arrival.count, 1)
+end
+
+-- A camera looking straight down, or along the ground, draws finite quads.
+
+do
+	for _, direction in ipairs({ { 0, -1, 0 }, { 1, 0, 0 }, { 0.6, -0.5, 0.62 } }) do
+		local e = Unsynced.new()
+		e.camera.direction = direction
+		local arrival, at = effects(e)
+		e.radius[7] = 20
+		arrival:add(7, 0, 0, 0, 0)
+		at(0.2)
+		local ok, err = pcall(arrival.draw, arrival)
+		t.check("a camera looking along " .. table.concat(direction, ",") .. " draws", ok and e.vertices > 0, err)
+	end
+end
+
+-- Drawing allocates nothing.
+
+do
+	local e = Unsynced.new()
+	local arrival, at = effects(e)
+	for id = 1, 20 do
+		e.radius[id] = 10 + id
+		arrival:add(id, id * 50, 0, 0, 0)
+	end
+	local function draws()
+		for n = 1, 300 do
+			at(n / 300 * Arrival.LIFE * 0.9)
+			arrival:draw()
+		end
+	end
+	draws()
+	e.state = {}
+	local kept = e.state
+	-- The stand-in's list of state calls grows, and that is the stand-in's.
+	local nothing = function() end
+	e.gl.Blending, e.gl.DepthTest, e.gl.DepthMask, e.gl.Texture, e.gl.Color = nothing, nothing, nothing, nothing, nothing
+	collectgarbage()
+	collectgarbage("stop")
+	local before = collectgarbage("count")
+	draws()
+	local grew = collectgarbage("count") - before
+	collectgarbage("restart")
+	t.same("300 draws of twenty effects allocate nothing", grew, 0)
+	t.same("and the stand-in's list was left alone", #kept, 0)
+end
+
 t.report()
