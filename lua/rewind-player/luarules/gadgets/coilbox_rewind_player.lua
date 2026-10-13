@@ -67,12 +67,28 @@ local BUDGET = "coilbox_rewind_budget:"
 
 if gadgetHandler:IsSyncedCode() then
 	local player
+	-- What the engine has, from coilbox_player_engine.lua.
+	local engine
 
 	local function log(text)
 		Spring.Echo(PREFIX .. text)
 	end
 
 	function gadget:Initialize()
+		-- What the engine has comes first: the modules below take calls from it as
+		-- they load, and a missing one would stop them with an error.
+		local Engine = VFS.Include("luarules/rewind_player/coilbox_player_engine.lua")
+		engine = Engine.check({ Spring = Spring, VFS = VFS, Game = Game, CMD = CMD, SendToUnsynced = SendToUnsynced }, Engine.SYNCED)
+		for _, line in ipairs(engine.lines) do
+			log(line)
+		end
+		if engine.note and Spring.SetGameRulesParam then
+			Spring.SetGameRulesParam(Engine.NOTE_PARAM, engine.note)
+		end
+		if engine.refused then
+			return
+		end
+
 		local Track = VFS.Include("luarules/rewind_player/coilbox_track.lua")
 		local Fetch = VFS.Include("luarules/rewind_player/coilbox_track_fetch.lua")
 		local Player = VFS.Include("luarules/rewind_player/coilbox_player.lua")
@@ -90,10 +106,18 @@ if gadgetHandler:IsSyncedCode() then
 		end
 		-- The game's adapter, which coilbox wrote into the playback game. Its
 		-- gadgets and widgets were switched off before the engine started.
-		local adapter, adapterWhy = Adapter.load(VFS)
+		local adapter, adapterWhy
+		if engine.on.adapter then
+			adapter, adapterWhy = Adapter.load(VFS)
+		else
+			adapterWhy = "the engine has no VFS.FileExists"
+		end
 		local made, madeWhy = Player.new(track, {
+			engine = engine,
 			modOptions = Spring.GetModOptions(),
-			budget = FIRST_BUDGET,
+			-- Without SendToUnsynced nothing times the work, so nothing sets a budget
+			-- and a seek is shown in one frame, as before issue #3988.
+			budget = engine.on.workTiming and FIRST_BUDGET or nil,
 			log = log,
 			adapter = adapter,
 			adapterWhy = adapterWhy,
@@ -125,9 +149,13 @@ if gadgetHandler:IsSyncedCode() then
 		if not player then
 			return
 		end
-		SendToUnsynced(WORK, 0, frame)
+		if engine.on.workTiming then
+			SendToUnsynced(WORK, 0, frame)
+		end
 		player:frame()
-		SendToUnsynced(WORK, 1, frame, player:worked())
+		if engine.on.workTiming then
+			SendToUnsynced(WORK, 1, frame, player:worked())
+		end
 	end
 
 	function gadget:RecvLuaMsg(message)
@@ -195,9 +223,16 @@ if gadgetHandler:IsSyncedCode() then
 		end
 	end
 else
+	-- What this half needs from the engine, from coilbox_player_engine.lua.
+	local Engine = VFS.Include("luarules/rewind_player/coilbox_player_engine.lua")
+	local engine = Engine.check({ Spring = Spring, Game = Game }, Engine.UNSYNCED)
+	for _, line in ipairs(engine.lines) do
+		Spring.Echo(PREFIX .. line)
+	end
+
 	-- How long one simulation frame lasts, in milliseconds. Work that takes
 	-- longer than this cannot keep up with the match's own speed.
-	local LIMIT = 1000 / Game.gameSpeed
+	local LIMIT = Game.gameSpeed and 1000 / Game.gameSpeed
 
 	-- After a line, slow frames are counted and not logged for a second of
 	-- frames, so a run of them does not make itself slower.
@@ -206,12 +241,14 @@ else
 	-- Half a frame is what a seek's work aims at. The rest of the frame is the
 	-- engine's own simulation and drawing, and the slow frame line is what says
 	-- whether that left enough.
-	local TARGET = LIMIT / 2
+	local TARGET = LIMIT and LIMIT / 2
 
-	-- Microseconds where the engine has them, which it does from 2025.01.1. The
+	-- Microseconds where the engine has them, which it does from 2025.01.6. The
 	-- other timer gives whole milliseconds.
-	local micros = Spring.GetTimerMicros ~= nil
-	local clock = Spring.GetTimerMicros or Spring.GetTimer
+	local micros = engine.on.microTimer
+	local clock = micros and Spring.GetTimerMicros or Spring.GetTimer
+	-- Whether the player has been told there is no budget to wait for.
+	local toldNone = false
 
 	local started
 	local lastLine
@@ -266,6 +303,15 @@ else
 		if name ~= WORK then
 			return false
 		end
+		if not engine.on.workTimingLine then
+			-- Nothing here can time a frame, so no budget will come. The player is
+			-- told once to stop waiting for one.
+			if not toldNone and engine.on.budgetMessage then
+				toldNone = true
+				Spring.SendLuaRulesMsg(BUDGET .. "none")
+			end
+			return true
+		end
 		if phase == 0 then
 			started = clock()
 			return true
@@ -275,7 +321,7 @@ else
 		end
 		local took = Spring.DiffTimers(clock(), started, true, micros)
 		started = nil
-		if made and removed then
+		if made and removed and engine.on.budgetMessage then
 			retune(took, made, removed)
 		end
 		if took <= LIMIT then

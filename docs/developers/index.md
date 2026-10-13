@@ -27,4 +27,8 @@ Most of the tools here are hidden until you turn on Advanced mode in Settings > 
 
 - [Unit builder](lego-builder.md). Assemble a unit from textured parts, animate it from a preset and write it into a game.
 
+## Replays
+
+- [Replay rewind for your game](replay-rewind.md). Write an adapter that switches off what fights a recording, bundle it in your archive, and read what the player logs.
+
 The [reference](../reference/index.md) section has the route list a profile points at and the file formats these tools read and write.

@@ -16,11 +16,13 @@ The player holds a time `t`, a frame of the track that can be a fraction. On eve
 | `luarules/gadgets/!coilbox_rewind_guard.lua` | stops the base game killing a team or ending the match |
 | `luarules/rewind_player/coilbox_player.lua` | the player: the clock, the list of stages, the published state |
 | `luarules/rewind_player/coilbox_player_clock.lua` | the time and the messages that change it. It touches nothing in the engine |
+| `luarules/rewind_player/coilbox_player_engine.lua` | the table of engine calls the player needs, and the check of it ([Engine calls](#engine-calls)) |
 | `luarules/rewind_player/coilbox_player_terrain.lua`, `coilbox_player_features.lua`, `coilbox_player_units.lua`, `coilbox_player_projectiles.lua` | the four stages |
 | `luarules/rewind_player/coilbox_player_rotation.lua` | a track's rotation as the pitch, yaw and roll the engine takes |
 | `luarules/rewind_player/coilbox_player_adapter.lua` | reads the game's adapter, and guards its hooks |
 | `luaui/widgets/coilbox_rewind_timeline.lua` | the timeline widget: the engine's call-ins for drawing, keys and the pointer |
 | `luaui/rewind_timeline/coilbox_timeline.lua` | the timeline: where everything is, what a key or a press sends, and the drawing. It takes the engine as a table, so the tests run it |
+| `luaui/rewind_timeline/coilbox_timeline_engine.lua` | the widget's own table of engine calls, in the same shape |
 
 It runs in synced Lua, because creating a unit is synced. It moves only on simulation frames, and a paused engine runs none. So the player's own pause is what holds `t`, and the engine has to be left running for a seek to show.
 
@@ -145,7 +147,9 @@ A mark draws as a tick above the bar. Marks that fall in one column of the bar, 
 
 #### The note
 
-`coilbox_rewind_note` is one more game rules parameter. When it holds a string that is not empty, the timeline shows it in a small panel above itself. The player does not set it yet. It is where issue #3802 says which features an older engine has switched off: `Spring.SetGameRulesParam("coilbox_rewind_note", text)` from the gadget is all that takes.
+`coilbox_rewind_note` is one more game rules parameter. When it holds a string that is not empty, the timeline shows it in a small panel above itself. The gadget sets it once, when it loads, from the check of the engine's calls ([Engine calls](#engine-calls)). It says either what is switched off on this engine or why playback did not start. It is set with `Spring.SetGameRulesParam("coilbox_rewind_note", text)`, and it is left unset when there is nothing to say.
+
+When playback does not start there is no player, so none of the other parameters is set. The timeline then draws the note and nothing else.
 
 #### How a game comes to load it
 
@@ -173,17 +177,98 @@ stage:place(t, clock)   -- create what is missing and put everything in place
 
 `clock.jumped` says the frame was reached by a seek or a step and not by play, and `clock.direction` and `clock.speed` say how it is playing. `clock:watched()` is true for a frame of play forward at 0.5x, 1x or 2x, which is when a death, an impact and a sound are shown. A stage is made with the context, a table that has the track, its `info` and `features`, the engine's `Spring`, `Game`, `CMD` and definition tables, `teamOf(team)` and `report(key, text)`. Take the engine from the context and not from a global, so that the tests can hand the stage a stand-in.
 
-Three rules a stage has to keep:
+Four rules a stage has to keep:
 
 - A frame of play allocates nothing. Synced Lua cannot collect garbage fast enough for a table for each key at 30 frames a second. Sample into tables made once, write to the tables handed to the engine and make them once, and walk a table with `next` and not `pairs`, since synced `pairs` makes a closure for each call. `tests/player_test.lua` counts what 300 frames of play allocate, and it has to stay 0.
 - Look a definition up by name, once, when the stage is made. `report` a name the game does not have and skip what uses it. `report(key, text)` logs a line the first time it is given a key.
 - Let the engine choose ids, and map the track's serial numbers to them. A destroyed unit's id cannot be asked for again at once.
+- A new stage adds the engine calls it uses to the table in `coilbox_player_engine.lua` ([Engine calls](#engine-calls)), and does not call one that its row says is off. A test fails for a call that has no row.
 
 A stage that can leave work for the next frame sets `stage.unsettled` to true in the frame it does. The player publishes `coilbox_rewind_settled` as 0 while a seek is waiting to be shown or any stage is unsettled. Only the units stage and the projectiles stage do. The units stage makes at most `makeBudget` units in a frame and removes at most `removeBudget`, and a creation waits for every removal. The projectiles stage leaves a shot whose shooter the units stage has yet to make.
 
 The units stage has, by serial number, `unitOf[serial]` for the engine's unit id and `indexOf[serial]` for the unit's place in the current window's lists. `player.units` is the stage. The projectiles stage has `idOf[serial]` for the engine's projectile id of a shot it is holding, and is `player.projectiles`.
 
 Weapons never fire, because the units stage calls `Spring.SetUnitUseWeapons(unitID, false, false)` on every unit it creates. That also stops a weapon aiming. A stage that wants the engine to aim a unit has to give that back.
+
+### Engine calls
+
+A replay is played on the engine it was recorded on, and that engine can be old. A call the player uses that an old engine lacks would be a Lua error part way through a match. `luarules/rewind_player/coilbox_player_engine.lua` is the one table of every engine call the player depends on, in rows, and the gadget checks it as it loads, before it loads any module that takes a call from the engine.
+
+A row names the calls (`calls`), the feature that hangs on them (`feature`), how it is checked (`how`), whether the player can work without it (`required`), the oldest engine tag read that has the calls (`since`), what happens without them (`without`) and whether a viewer can tell (`visible`). The file's header describes each field.
+
+- A row with a call missing that is not `required` switches off that one feature, and the rest plays. The gadget logs one line for it: `COILBOX_REWIND_PLAYER this engine has no Spring.SetHeightMapFunc. Switched off: ground changes. The ground stays as the map has it. Engine 105.0 and later have it`.
+- A row that is `required` with a call missing stops playback. The gadget does nothing else: no player is made, damage is left alone, wrecks are left to the engine and no message is taken. It logs `COILBOX_REWIND_PLAYER cannot play: this engine has no Spring.CreateUnit. It is needed for creating and placing units. Engine 105.0 and later have it`, one line for each row.
+- `how` is `presence` when having the calls is the whole check. It is `behaviour` for a call that exists on every engine read and acts differently on some. A presence check cannot tell those apart, so the row says where the player checks what the call did, and the player checks it where it already uses the call.
+
+| Row | Calls | Required | Without it | In the note |
+| --- | --- | --- | --- | --- |
+| `track` | `VFS.UnpackU8`, `UnpackU16`, `UnpackS16`, `UnpackU32`, `UnpackS32`, `UnpackF32`, `VFS.ZlibDecompress`, `VFS.LoadFile` | yes | no playback | the engine to use |
+| `world` | `Spring.GetModOptions`, `GetGaiaTeamID`, `GetTeamList`, `GetAllyTeamList`, `SetGameRulesParam` | yes | no playback | the engine to use |
+| `units` | `Spring.CreateUnit`, `DestroyUnit`, `ValidUnitID`, `GetUnitIsDead`, `GetAllUnits`, `GetUnitHealth`, `SetUnitHealth`, `SetUnitMaxHealth`, `Spring.MoveCtrl.Enable`, `SetPosition`, `SetRotation`, `Game.constructionDecay`, `Game.constructionDecaySpeed` | yes | no playback | the engine to use |
+| `terrain` | `Spring.SetHeightMapFunc`, `SetHeightMap`, `Game.squareSize` | no | the terrain stage does nothing | ground changes |
+| `features` | `Spring.CreateFeature`, `DestroyFeature`, `ValidFeatureID`, `GetAllFeatures` | no | the features stage does nothing | wrecks and rocks |
+| `featureTurn` | `Spring.SetFeatureRotation` | no | features are not turned | feature turns |
+| `sight` | `Spring.SetGlobalLos` | no | the fog of war stays | full sight |
+| `holdFire` | `Spring.SetUnitUseWeapons` | no | units may fire. They do no damage | holding fire |
+| `onOff` | `Spring.GetUnitIsActive`, `Spring.GiveOrderToUnit`, `CMD.ONOFF` | no | units keep the state they were made in | unit on and off |
+| `rebuild` (behaviour) | `Spring.GetUnitIsStunned` | no | a building seeked back to its construction can show as finished | construction after a seek |
+| `shots` | `Spring.SpawnProjectile`, `SetProjectileMoveControl`, `SetProjectileDamages`, `SetProjectilePosition`, `SetProjectileVelocity`, `GetProjectileTimeToLive`, `GetProjectileDirection`, `DeleteProjectile`, `GetGroundHeight`, `Game.armorTypes` | no | the projectiles stage does nothing | shots |
+| `shotHandover` | `Spring.SetProjectileTimeToLive`, from `2025.03.9` | no | `Projectiles:release` keeps the shot under move control for the engine's one look | nothing |
+| `sound` | `Spring.PlaySoundFile`, `Game.gameSpeed` | no | weapons fire without a sound | nothing |
+| `workTiming` | `SendToUnsynced` | no | the slow frame line is not logged, and a seek is shown in one frame because no budget is worked out | nothing |
+| `adapter` | `VFS.FileExists` | no | no adapter is read | the game adapter |
+
+Every row has `since = "105.0"` except `shotHandover`. That is the oldest tag read, not a claim about an older engine. `105.0`, `105.1.1`, `2025.01.6` and `2026.07.04` were read for this table in `rts/Lua` of `~/dev/RecoilEngine`, and the spike on issue #3791 read ten tags and found `Spring.SetProjectileTimeToLive` registered from `2025.03.9` only. In `2025.01.6` the function's body is in `LuaSyncedCtrl.cpp` and nothing registers it.
+
+#### What the note says
+
+The gadget sets `coilbox_rewind_note` once, as it loads ([The note](#the-note)). A feature a viewer cannot tell is missing (`visible = false`) is logged and not put in the note, because a note that names something nobody would have noticed is noise. The `shotHandover` row is one: an engine without the call still shows every shot and still lands the ones that hit something. A missing fire sound and a missing frame timer are the others.
+
+- One feature off: `Switched off on this engine: ground changes`
+- Several: `Switched off on this engine: ground changes, wrecks and rocks, shots`
+- More than three: the first three, then `and 2 more`. The panel is one line wide as the text.
+- Playback refused: `Playback needs engine 105.0 or later: no Spring.CreateUnit`. With several calls missing it names the first and counts the others: `... and 3 more`. The log has a line for each.
+- Nothing a viewer can see: no note.
+
+Required rows are the ones the units stage cannot work without: it creates, places, destroys and heals units, and the clock and teams are what it is made from. Terrain, features, shots and the rest are things a match can be watched without.
+
+#### Adding a row
+
+A new stage adds its calls to the table in the commit that adds the stage. For a call the stage uses:
+
+1. Add a row to `M.SYNCED` in `coilbox_player_engine.lua` with every field. A call in the unsynced half of the gadget goes in `M.UNSYNCED`. Name a call by the dotted path from a global the gadget hands over (`Spring`, `VFS`, `Game`, `CMD` and `SendToUnsynced`). A different global needs adding to the roots table the gadget passes to `check` in `gadget:Initialize` as well.
+2. Read `context.on.<id>` in the stage when it is made, and do not call what the row says is off. If the whole stage depends on it, make the stage in `Player.new` only when `on.<id>` is true, as the terrain, features and projectiles stages are. A stage that is off is the table `OFF`, which does nothing.
+3. If the calls exist on every engine but act differently on some, set `how = "behaviour"`, say in `where` how the stage checks, report it with `context.report` when it finds the older behaviour, and add the check to `BEHAVIOUR` in `tests/engine_test.lua`. A behaviour row with no entry there fails the test.
+4. Run `luajit lua/rewind-player/tests/engine_test.lua`. For every call of every row it takes the call out of the engine stand-in, plays the fixture track forward, backward and across seeks, and asserts that nothing raises, the log line and the note are right (or that a required call stops playback), and that the other features still work. To also assert that the feature is off, add an entry to `OBSERVE` in that file, a function that gives a number that is above 0 on a full run and 0 when the feature is off. A call the fixture track cannot show, as with `onOff`, gets a test of its own.
+
+The same test reads the source of every file under `luarules/` and fails for an engine call with no row, and for a row whose call nothing uses.
+
+Calls that are not engine functions come into a row too, when the stage reads them: `Game.squareSize` is a row member as `Spring.SetHeightMap` is. A call-in the engine may not make, such as `GameFramePost` before `105.1.1-2590`, cannot be found by looking at a global. Its row is `how = "behaviour"`, with the calls the stage makes in `calls` and the check, which is whether the call-in has arrived after a few frames, in `where`.
+
+`Spring.SetUnitPieceMatrix`, `Spring.SetUnitDirection`, `Spring.SetFeatureDirection` and `Spring.GetFeatureDirection` are on every engine read and changed what they do. The player does not use them, and `M.AVOID` in the table says why. A test fails if the source uses one. A stage that needs one adds a row and checks its behaviour.
+
+Rows for the guard gadget's `Spring.KillTeam` and `Spring.GameOver` are not needed. The guard replaces them and does not call them (`M.REPLACED`).
+
+#### The widget
+
+The timeline widget uses `gl`, `GL` and the unsynced `Spring`, which the synced gadget cannot look at. It has a second, small table of its own in `luaui/rewind_timeline/coilbox_timeline_engine.lua`, with rows in the same shape and a `check` copied from the gadget's, since a widget cannot reach a file under `luarules/`. The widget checks it in `widget:Initialize`:
+
+- `drawing`, `player` and `keys` are required. A widget missing one logs `COILBOX_REWIND_TIMELINE cannot start: this engine has no gl.Rect. It is needed for drawing the timeline. Engine 105.0 and later have it` and does not start. The player goes on playing.
+- `marks` is optional. Without `VFS.FileExists` or `VFS.ZIP` the timeline starts with no marks and logs a line.
+
+A widget cannot set a game rules parameter, so the widget has no note. An engine too old for the player's own calls shows the gadget's note through this widget. An engine too old for the widget's calls shows nothing on screen and has the line in the log.
+
+The unsynced half of the gadget has three rows in `M.UNSYNCED`:
+
+- `workTimingLine` needs `Spring.GetTimer`, `Spring.DiffTimers` and `Game.gameSpeed`. Without one it logs a line, takes no timings and sends the player `coilbox_rewind_budget:none` once, which takes the limit off the units stage, so a seek is shown in one frame as it was before issue #3988.
+- `microTimer` needs `Spring.GetTimerMicros`, from `2025.01.6`. Without it a frame is timed in whole milliseconds with `Spring.GetTimer`, and the budgets are coarser.
+- `budgetMessage` needs `Spring.SendLuaRulesMsg`. Without it no budget can be sent, so the budgets stay at one unit made and one removed in a frame. A seek of many units then takes that many frames to show and shows correctly, and a viewer can notice, so the note names it. The synced half cannot tell, which is why this is not a fall back to no limit.
+
+Without `SendToUnsynced` the synced half has no timing at all and starts with no budget, so a seek is shown in one frame.
+
+#### What has run
+
+No engine was run for this table. No engine before `2025.03.9` is installed, so every older path is tested on the stand-in in `tests/engine.lua` with a call taken out of it, and none has run in an engine. The stand-in has `world.oldEngine` for the `SetUnitHealth` behaviour, and the tests take `Spring.SetProjectileTimeToLive` out for the rest. That shows the logic, the log lines and the note. It does not show what an old engine does with the calls that are left.
 
 ### Projectiles
 
@@ -728,6 +813,7 @@ luajit lua/rewind-player/tests/projectiles_test.lua
 luajit lua/rewind-player/tests/settle_test.lua
 luajit lua/rewind-player/tests/gadget_test.lua
 luajit lua/rewind-player/tests/adapter_test.lua
+luajit lua/rewind-player/tests/engine_test.lua
 luajit lua/rewind-player/tests/timeline_test.lua
 ```
 
@@ -743,6 +829,7 @@ luajit lua/rewind-player/tests/timeline_test.lua
 - `settle_test.lua` checks a seek that needs more units than a frame may make or remove: that it settles over several frames, that removals use their own budget and come first, that a second seek while one settles starts again, that play goes on while it settles and units made late stand where the track has them now, what `coilbox_rewind_settled` says and when, the budget message and the ones it refuses, that a shot waits for its shooter, and that 300 frames of play with a budget allocate nothing.
 - `gadget_test.lua` loads the two gadgets the way the engine does. That includes the gadget's answers of no damage for units and for features, its post frame, and the unsynced half's working out of the two budgets from the time a frame's work took.
 - `adapter_test.lua` checks how the player reads an adapter, that it never creates a hidden unit or skipped feature and says nothing about either, that each hook is called with the right arguments and a hook that raises is switched off, the log line, and that 60 frames of play with hooks allocate nothing.
+- `engine_test.lua` is made from the engine table ([Engine calls](#engine-calls)). For every call of every row it takes the call out of the stand-in and plays the fixture track, and it checks the table against the source with `tests/scan.lua`. The widget's table is tested the same way in `timeline_test.lua`.
 - `timeline_test.lua` checks the timeline on a stand-in for `Spring` and `gl`: the message for every key, that a key with Ctrl, Alt or Meta is left alone, the frame a drag seeks to at both ends and between, the time and speed shown, that everything drawn is inside views from 640 by 480 to 3840 by 2160, moving the panel, changing a key, marks, and that 300 draws allocate nothing. It also loads the widget file the way a handler does.
 
 `tests/support.lua` is the stand-in for the reader. Its `VFS.Unpack*` and `VFS.ZlibDecompress` follow the engine source, round what they return to a 32 bit float, and raise for a position or count a float could not hold. The zlib is the system's, through LuaJIT's FFI. Its synced environment has no `io`, so a reader that reached for it would fail the tests.

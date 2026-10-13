@@ -22,8 +22,20 @@ end
 
 --- A gadget file run as the synced half of a gadget of `w`. Gives the gadget
 -- and what the file returned.
-local function synced(file, w, files)
+local function synced(file, w, files, without)
 	local env = Engine.env(t, w, files)
+	if without then
+		-- A global the engine lacks is nil here, where the environment raises.
+		local meta = getmetatable(env)
+		local base = meta.__index
+		meta.__index = function(e, key)
+			if key == without then
+				return nil
+			end
+			return base(e, key)
+		end
+		rawset(env, without, nil)
+	end
 	env.gadget = {}
 	env.gadgetHandler = {
 		IsSyncedCode = function()
@@ -49,6 +61,9 @@ local function unsynced(file, lines, clock)
 		end,
 	}
 	env.Game = { gameSpeed = 30 }
+	env.VFS.Include = function(path)
+		return t.load(assert(path:match("^luarules/rewind_player/(.+)$"), path), env)
+	end
 	env.Spring = {
 		Echo = function(line)
 			lines[#lines + 1] = line
@@ -69,6 +84,10 @@ local function unsynced(file, lines, clock)
 		end,
 	}
 	clock.messages = clock.messages or {}
+	-- Calls an older engine lacks.
+	for name in pairs(clock.without or {}) do
+		env.Spring[name] = nil
+	end
 	if clock.micros then
 		env.Spring.GetTimerMicros = function()
 			return clock.now * 1000
@@ -77,6 +96,12 @@ local function unsynced(file, lines, clock)
 	local chunk = assert(loadfile(GADGETS .. file))
 	setfenv(chunk, env)
 	local returned = chunk()
+	-- The line about a timer an older engine lacks is checked in engine_test.lua.
+	for i = #lines, 1, -1 do
+		if lines[i]:find("this engine has no Spring.GetTimerMicros", 1, true) then
+			table.remove(lines, i)
+		end
+	end
 	return env.gadget, returned
 end
 
@@ -323,6 +348,74 @@ do
 	sent = #clock.messages
 	work(1, 0, 0)
 	t.same("and says so once", #clock.messages, sent)
+end
+
+-- When a budget cannot be worked out (issue #3988): what the engine lacks, and
+-- what the player does about it.
+
+do
+	-- No timer: nothing here can time a frame, so the player is told once that
+	-- no budget will come, and a seek is shown in one frame as it was before.
+	local lines, clock = {}, { now = 0, without = { GetTimer = true } }
+	local gadget = unsynced(PLAYER, lines, clock)
+	gadget:RecvFromSynced("coilbox_rewind_work", 0, 1)
+	gadget:RecvFromSynced("coilbox_rewind_work", 1, 1, 5, 0)
+	gadget:RecvFromSynced("coilbox_rewind_work", 0, 2)
+	gadget:RecvFromSynced("coilbox_rewind_work", 1, 2, 5, 0)
+	t.same("with no timer the player is told there is no budget, once", table.concat(clock.messages, "|"), "coilbox_rewind_budget:none")
+
+	local w = world()
+	local synced1 = synced(PLAYER, w, { [TRACK] = bytes })
+	w.gadget = synced1
+	synced1:Initialize()
+	synced1:GameFrame(1)
+	t.same("the player starts with a budget of one unit", w.unitCount(), 1)
+	synced1:RecvLuaMsg("coilbox_rewind_budget:none", 0)
+	synced1:RecvLuaMsg("coilbox_rewind:seek 800", 0)
+	synced1:GameFrame(2)
+	t.same("and without a budget shows the seek in one frame", w.unitCount(), 4)
+	t.same("settled", w.params.coilbox_rewind_settled, 1)
+end
+
+do
+	-- No message: nothing can be sent, the budget stays at one unit made and one
+	-- removed in a frame, and a seek still shows correctly, one unit a frame.
+	local lines, clock = {}, { now = 0, without = { SendLuaRulesMsg = true } }
+	local gadget = unsynced(PLAYER, lines, clock)
+	local ok = pcall(function()
+		for frame = 1, 5 do
+			gadget:RecvFromSynced("coilbox_rewind_work", 0, frame)
+			clock.now = clock.now + 1
+			gadget:RecvFromSynced("coilbox_rewind_work", 1, frame, frame, 0)
+		end
+	end)
+	t.same("with no way to send a message the unsynced half raises nothing", ok, true)
+	t.same("and says so once, with no slow frame line since the frames were quick", #lines, 1)
+	t.check("naming the call", lines[1]:find("this engine has no Spring.SendLuaRulesMsg", 1, true) ~= nil, lines[1])
+
+	local w = world()
+	local plain = synced(PLAYER, w, { [TRACK] = bytes })
+	w.gadget = plain
+	plain:Initialize()
+	plain:GameFrame(1)
+	local frames = 1
+	while w.params.coilbox_rewind_settled ~= 1 and frames < 50 do
+		frames = frames + 1
+		plain:GameFrame(frames)
+	end
+	t.same("a seek of three units settles at one unit a frame", frames, 3)
+	t.same("with all three there", w.unitCount(), 3)
+end
+
+do
+	-- No SendToUnsynced: nothing times the work, so there is no budget at all.
+	local w = world()
+	local plain = synced(PLAYER, w, { [TRACK] = bytes }, "SendToUnsynced")
+	w.gadget = plain
+	plain:Initialize()
+	plain:GameFrame(1)
+	t.same("without SendToUnsynced a seek is shown in one frame", w.unitCount(), 3)
+	t.same("and settled", w.params.coilbox_rewind_settled, 1)
 end
 
 -- The guard.

@@ -167,7 +167,9 @@ function Features:create(i, t)
 		)
 		return
 	end
-	Spring.SetFeatureRotation(featureID, self.euler(turn[1], turn[2], turn[3], turn[4]))
+	if self.context.on.featureTurn then
+		Spring.SetFeatureRotation(featureID, self.euler(turn[1], turn[2], turn[3], turn[4]))
+	end
 	self.featureOf[i] = featureID
 	self.indexOf[featureID] = i
 end

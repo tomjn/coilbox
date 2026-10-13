@@ -1,0 +1,605 @@
+-- The engine capability table (issue #3802): every call the player needs from
+-- the engine, what hangs on it, and what the player does on an engine without
+-- it. The tests here are made from the table, so a row added to it is tested
+-- without a line written here.
+--
+-- Nothing here runs an engine. An engine before 2025.03.9 is not installed, so
+-- the older paths are tested against the stand-in in engine.lua with a call
+-- taken out of it.
+
+local here = arg[0]:match("^(.*)/[^/]+$") or "."
+local t = dofile(here .. "/support.lua")
+local Engine = dofile(here .. "/engine.lua")
+local Fake = dofile(here .. "/fake_track.lua")
+
+local expected = dofile(t.FIXTURES .. "expected.lua")
+local bytes = t.read(t.FIXTURES .. "small.cbtrack")
+
+local ROOT = t.root()
+local GADGET = ROOT .. "/luarules/gadgets/coilbox_rewind_player.lua"
+local TRACK = "coilbox_rewind/track.cbtrack"
+local ADAPTER = "coilbox_rewind/adapter.lua"
+local PREFIX = "COILBOX_REWIND_PLAYER "
+local NOTE = "coilbox_rewind_note"
+
+local Table = t.load("coilbox_player_engine.lua", t.syncedEnv())
+
+--- A call taken out of a gadget's environment, by its dotted name. A top level
+-- name reads as nil afterwards, as it does in the engine, and not as an error.
+local function remove(env, name)
+	local parts = {}
+	for part in name:gmatch("[^.]+") do
+		parts[#parts + 1] = part
+	end
+	if #parts == 1 then
+		local meta = getmetatable(env)
+		local base = meta.__index
+		meta.__index = function(e, key)
+			if key == name then
+				return nil
+			end
+			return base(e, key)
+		end
+		rawset(env, name, nil)
+		return
+	end
+	local holder = rawget(env, parts[1])
+	for i = 2, #parts - 1 do
+		holder = holder[parts[i]]
+	end
+	holder[parts[#parts]] = nil
+end
+
+--- The engine's globals the synced rows name, as the gadget hands them over.
+local function rootsOf(env)
+	return { Spring = env.Spring, VFS = env.VFS, Game = env.Game, CMD = env.CMD, SendToUnsynced = rawget(env, "SendToUnsynced") }
+end
+
+local HOOK = "return { name = 'Probe', hooks = { started = function() Spring.Echo('hook ran') end } }"
+
+--- A world, the synced half of the gadget in it, and the environment it runs in.
+-- `removed` is a call the engine does not have.
+local function scene(removed)
+	local w = Engine.new({
+		unitDefs = { { name = "armcom" }, { name = "armpw" }, { name = "armsolar" } },
+		featureDefs = { { name = "rock" } },
+		weaponDefs = {
+			{ name = "laser", type = "LaserCannon", fireSound = { { name = "zap", volume = 1 } } },
+			{ name = "missile", type = "MissileLauncher" },
+		},
+	})
+	local env = Engine.env(t, w, { [TRACK] = bytes, [ADAPTER] = HOOK })
+	if removed then
+		remove(env, removed)
+	end
+	env.gadget = {}
+	env.gadgetHandler = {
+		IsSyncedCode = function()
+			return true
+		end,
+	}
+	local chunk = assert(loadfile(GADGET))
+	setfenv(chunk, env)
+	chunk()
+	w.gadget = env.gadget
+	return w, env.gadget, env
+end
+
+--- Starts the gadget and plays the track: forward at the match's own speed from
+-- the first frame to the last, a seek, backward, and seeks to frames with units
+-- under construction, shots in the air and ground changes. Gives whether
+-- nothing raised, and the error when something did.
+local function play(gadget)
+	return pcall(function()
+		gadget:Initialize()
+		local n = 0
+		local function frames(count)
+			for _ = 1, count do
+				n = n + 1
+				gadget:GameFrame(n)
+			end
+		end
+		frames(2100)
+		gadget:RecvLuaMsg("coilbox_rewind:seek 800", 0)
+		frames(5)
+		gadget:RecvLuaMsg("coilbox_rewind:play -1", 0)
+		frames(400)
+		for _, frame in ipairs({ 514, 733, 1155, 1300, 100 }) do
+			gadget:RecvLuaMsg("coilbox_rewind:seek " .. frame, 0)
+			frames(3)
+		end
+	end)
+end
+
+local function count(list, test)
+	local n = 0
+	for _, item in pairs(list) do
+		if test(item) then
+			n = n + 1
+		end
+	end
+	return n
+end
+
+--- What a feature does to the world, so that a run without its call can be told
+-- from one with it. A feature with no entry is tested without this.
+local OBSERVE = {
+	terrain = function(w)
+		return w.heightMapCalls or 0
+	end,
+	features = function(w)
+		return count(w.events, function(event)
+			return event:find("^feature ") ~= nil
+		end)
+	end,
+	featureTurn = function(w)
+		return count(w.features, function(feature)
+			return feature.pitch ~= 0 or feature.yaw ~= 0 or feature.roll ~= 0
+		end)
+	end,
+	sight = function(w)
+		return count(w.los, function()
+			return true
+		end)
+	end,
+	holdFire = function(w)
+		return count(w.units, function(unit)
+			return unit.useWeapons == false
+		end)
+	end,
+	shots = function(w)
+		return w.spawned
+	end,
+	shotHandover = function(w)
+		return w.ttlSets or 0
+	end,
+	sound = function(w)
+		return w.soundCount
+	end,
+	workTiming = function(w)
+		return w.sent
+	end,
+	adapter = function(w)
+		return count(w.lines, function(line)
+			return line == "hook ran"
+		end)
+	end,
+}
+
+--- The features that work only while another does.
+local NEEDS = { shotHandover = "shots", sound = "shots", featureTurn = "features" }
+
+--- A line the gadget logged that starts with `start`, after its prefix.
+local function logged(w, start)
+	for _, line in ipairs(w.lines) do
+		if line:sub(1, #PREFIX + #start) == PREFIX .. start then
+			return line
+		end
+	end
+end
+
+-- The table itself.
+
+do
+	local seen = {}
+	for _, scope in ipairs({ "synced", "unsynced" }) do
+		local rows = scope == "synced" and Table.SYNCED or Table.UNSYNCED
+		t.check("the " .. scope .. " table has rows", #rows > 0)
+		local ids = {}
+		for _, row in ipairs(rows) do
+			local label = scope .. " row " .. tostring(row.id)
+			t.check(label .. " has an id nobody else has", type(row.id) == "string" and not ids[row.id])
+			ids[row.id] = true
+			t.check(label .. " names the calls it needs", type(row.calls) == "table" and #row.calls > 0)
+			t.check(label .. " says how it is checked", row.how == "presence" or row.how == "behaviour", row.how)
+			t.check(label .. " says whether it is required", type(row.required) == "boolean")
+			t.check(label .. " names the feature", type(row.feature) == "string" and row.feature ~= "")
+			t.check(label .. " says what happens without it", type(row.without) == "string" and row.without ~= "")
+			t.check(label .. " names the engine that has it", type(row.since) == "string" and row.since ~= "")
+			t.check(label .. " says where it is used", type(row.used) == "string" and row.used ~= "")
+			t.check(label .. " says whether a viewer can see it missing", type(row.visible) == "boolean")
+			if row.how == "behaviour" then
+				t.check(label .. " says where its behaviour is checked", type(row.where) == "string" and row.where ~= "")
+			end
+			if row.required then
+				t.check(label .. " is required, so nothing is shown in the note for it", row.visible == false)
+			end
+			for _, call in ipairs(row.calls) do
+				t.check(call .. " is in one row of its scope only", not seen[scope .. call])
+				seen[scope .. call] = true
+			end
+		end
+	end
+end
+
+-- Every engine name the Lua uses has a row. The names are read out of the
+-- source, with the comments and the strings taken out (scan.lua).
+
+local Scan = dofile(here .. "/scan.lua")
+local usedBy, filesUnder, setOf, callsOf = Scan.usedBy, Scan.filesUnder, Scan.setOf, Scan.callsOf
+
+do
+	local allowed = setOf(callsOf(Table.SYNCED), callsOf(Table.UNSYNCED), Table.ASSUMED, Table.REPLACED)
+	local used = {}
+	local files = filesUnder(ROOT .. "/luarules")
+	t.check("the source scan found the player's files", #files >= 10, #files)
+	for _, path in ipairs(files) do
+		for name in pairs(usedBy(path)) do
+			used[name] = true
+			t.check(path:match("[^/]+$") .. " uses " .. name .. ", which has a row", allowed[name], "add " .. name .. " to the table in coilbox_player_engine.lua")
+		end
+	end
+	for _, row in ipairs(Table.SYNCED) do
+		for _, call in ipairs(row.calls) do
+			t.check(call .. " has a row and the player uses it", used[call], "the row " .. row.id .. " is out of date")
+		end
+	end
+	for _, row in ipairs(Table.UNSYNCED) do
+		for _, call in ipairs(row.calls) do
+			t.check(call .. " has a row and the player uses it", used[call], "the row " .. row.id .. " is out of date")
+		end
+	end
+	for _, item in ipairs(Table.AVOID) do
+		t.check(item.call .. " is a call the player must not use", not used[item.call] and type(item.why) == "string" and item.why ~= "")
+	end
+end
+
+-- With every call there, the player loads, plays and says nothing about the engine.
+
+local CONTROL = {}
+local function alive(list)
+	return count(list, function(item)
+		return not item.dead
+	end)
+end
+
+do
+	local w, gadget = scene()
+	local ok, err = play(gadget)
+	t.check("with every call there the player plays the whole track", ok, err)
+	t.same("and says nothing about the engine", logged(w, "this engine"), nil)
+	t.same("with no note", w.params[NOTE], nil)
+	CONTROL.units = alive(w.units)
+	for id, observe in pairs(OBSERVE) do
+		CONTROL[id] = observe(w)
+		t.check("the run sees " .. id .. " at work, so a run without it can be told apart", CONTROL[id] > 0, CONTROL[id])
+	end
+end
+
+--- The note a set of optional rows switched off gives.
+local function noteOf(rows)
+	local names = {}
+	for _, row in ipairs(rows) do
+		if row.visible then
+			names[#names + 1] = row.feature
+		end
+	end
+	if #names == 0 then
+		return nil
+	end
+	local shown = {}
+	for i = 1, math.min(3, #names) do
+		shown[i] = names[i]
+	end
+	local text = "Switched off on this engine: " .. table.concat(shown, ", ")
+	if #names > 3 then
+		text = text .. " and " .. (#names - 3) .. " more"
+	end
+	return text
+end
+
+-- A call taken out, one at a time.
+
+for _, row in ipairs(Table.SYNCED) do
+	for _, call in ipairs(row.calls) do
+		local label = "without " .. call
+		local w, gadget = scene(call)
+		local ok, err = play(gadget)
+		t.check(label .. " the gadget raises nothing", ok, err)
+		if row.required then
+			local line = logged(w, "cannot play: this engine has no " .. call)
+			t.check(label .. " the log line starts with the gadget's prefix and names the call", line ~= nil, table.concat(w.lines, " | "))
+			t.check(label .. " it names the engine that has it", line ~= nil and line:find("Engine " .. row.since .. " and later have it", 1, true) ~= nil, line)
+			if call ~= "Spring.SetGameRulesParam" then
+				t.same(label .. " the timeline's note says so", w.params[NOTE], "Playback needs engine " .. row.since .. " or later: no " .. call)
+			end
+			t.same(label .. " nothing is made", alive(w.units) + alive(w.features), 0)
+			t.same(label .. " no frame is timed", w.sent, 0)
+			t.same(label .. " damage is left alone", gadget:UnitPreDamaged(100, 1, 0, 500), nil)
+			t.same(label .. " the engine may leave wrecks", gadget:AllowFeatureCreation(1, 0, 0, 0, 0), true)
+			t.same(label .. " no message is taken", gadget:RecvLuaMsg("coilbox_rewind:play", 0), false)
+		else
+			local line = logged(w, "this engine has no " .. call)
+			t.check(label .. " the log line names the call", line ~= nil, table.concat(w.lines, " | "))
+			t.check(label .. " and says " .. row.feature .. " is switched off", line ~= nil and line:find("Switched off: " .. row.feature .. ".", 1, true) ~= nil, line)
+			t.check(label .. " and what happens", line ~= nil and line:find(row.without, 1, true) ~= nil, line)
+			t.check(label .. " and which engine has it", line ~= nil and line:find("Engine " .. row.since .. " and later have it", 1, true) ~= nil, line)
+			t.same(label .. " the note", w.params[NOTE], noteOf({ row }))
+			local observe = OBSERVE[row.id]
+			if observe then
+				t.same(label .. " " .. row.id .. " does nothing", observe(w), 0)
+			end
+			for id, observeOther in pairs(OBSERVE) do
+				if id ~= row.id and NEEDS[id] ~= row.id then
+					t.check(label .. " " .. id .. " still works", observeOther(w) > 0, id)
+				end
+			end
+			t.same(label .. " the units are still played", alive(w.units), CONTROL.units)
+		end
+	end
+end
+
+-- Several calls out at once give one note, and a note stays short.
+
+do
+	local function rowOf(id)
+		for _, row in ipairs(Table.SYNCED) do
+			if row.id == id then
+				return row
+			end
+		end
+	end
+	local function without(ids)
+		local w = Engine.new({})
+		local env = Engine.env(t, w, {})
+		for _, id in ipairs(ids) do
+			for _, call in ipairs(rowOf(id).calls) do
+				remove(env, call)
+			end
+		end
+		return Table.check(rootsOf(env), Table.SYNCED)
+	end
+
+	local none = without({})
+	t.same("nothing missing switches nothing off", #none.lines, 0)
+	t.same("and gives no note", none.note, nil)
+	t.same("and does not refuse", none.refused, false)
+	for _, row in ipairs(Table.SYNCED) do
+		t.same("with nothing missing " .. row.id .. " is on", none.on[row.id], true)
+	end
+
+	local one = without({ "terrain" })
+	t.same("terrain gone gives its name", one.note, "Switched off on this engine: " .. rowOf("terrain").feature)
+	t.same("and the other rows stay on", one.on.features and one.on.shots, true)
+
+	local quiet = without({ "shotHandover", "sound", "workTiming" })
+	t.same("features a viewer cannot see missing give no note", quiet.note, nil)
+	t.check("but each is logged", #quiet.lines == 3, #quiet.lines)
+
+	local mixed = without({ "shotHandover", "terrain" })
+	t.same("a feature nobody can see is left out of a note with others", mixed.note, noteOf({ rowOf("terrain") }))
+
+	local many = without({ "terrain", "features", "sight", "holdFire", "shots" })
+	t.same("a long list is cut to three names and a count", many.note, noteOf({ rowOf("terrain"), rowOf("features"), rowOf("sight"), rowOf("holdFire"), rowOf("shots") }))
+	t.check("which ends in the count", many.note:find("and 2 more$") ~= nil, many.note)
+
+	local both = without({ "units", "track", "terrain" })
+	t.same("several required calls missing refuse", both.refused, true)
+	t.check("the note names the first and counts the rest", both.note:find("^Playback needs engine .+: no .+ and %d+ more$") ~= nil, both.note)
+	t.same("each is logged", #both.lines, 3)
+end
+
+-- The unsynced half of the gadget.
+
+local function unsyncedScene(removed)
+	local lines, clock = {}, { now = 0 }
+	local env = t.unsyncedEnv()
+	env.gadget = {}
+	env.gadgetHandler = {
+		IsSyncedCode = function()
+			return false
+		end,
+	}
+	env.Game = { gameSpeed = 30 }
+	env.Spring = {
+		Echo = function(line)
+			lines[#lines + 1] = line
+		end,
+		GetTimer = function()
+			return clock.now
+		end,
+		GetTimerMicros = function()
+			return clock.now * 1000
+		end,
+		DiffTimers = function(a, b, _, fromMicroseconds)
+			if fromMicroseconds then
+				return (a - b) / 1000
+			end
+			return a - b
+		end,
+		SendLuaRulesMsg = function(text)
+			clock.messages[#clock.messages + 1] = text
+		end,
+	}
+	clock.messages = {}
+	env.VFS.Include = function(path)
+		local file = assert(path:match("^luarules/rewind_player/(.+)$"), path)
+		return t.load(file, env)
+	end
+	if removed then
+		remove(env, removed)
+	end
+	local chunk = assert(loadfile(GADGET))
+	setfenv(chunk, env)
+	chunk()
+	return env.gadget, lines, clock
+end
+
+do
+	local gadget, lines, clock = unsyncedScene()
+	t.same("with every call there the unsynced half logs nothing as it loads", #lines, 0)
+	gadget:RecvFromSynced("coilbox_rewind_work", 0, 1)
+	clock.now = clock.now + 50
+	gadget:RecvFromSynced("coilbox_rewind_work", 1, 1)
+	t.same("and times a slow frame", #lines, 1)
+end
+
+for _, row in ipairs(Table.UNSYNCED) do
+	for _, call in ipairs(row.calls) do
+		local label = "unsynced, without " .. call
+		local ok, gadget, lines, clock = pcall(unsyncedScene, call)
+		t.check(label .. " the gadget loads", ok, gadget)
+		if ok then
+			local line = lines[1]
+			t.check(label .. " it logs one line that starts with the prefix", #lines == 1 and line:sub(1, #PREFIX) == PREFIX, table.concat(lines, " | "))
+			t.check(label .. " naming the call", line ~= nil and line:find("this engine has no " .. call, 1, true) ~= nil, line)
+			t.check(label .. " and what happens", line ~= nil and line:find(row.without, 1, true) ~= nil, line)
+			local fine = pcall(function()
+				gadget:RecvFromSynced("coilbox_rewind_work", 0, 1)
+				clock.now = clock.now + 50
+				gadget:RecvFromSynced("coilbox_rewind_work", 1, 1)
+			end)
+			t.check(label .. " a frame's work is taken and raises nothing", fine)
+			-- A row that leaves the slow frame line on still logs a slow frame.
+			local more = 0
+			for _, l in ipairs(lines) do
+				if not l:find(PREFIX .. "slow frame:", 1, true) then
+					more = more + 1
+				end
+			end
+			t.same(label .. " and nothing more is logged", more, 1)
+		end
+	end
+end
+
+-- Rows checked by behaviour. Each runs the player on an engine that behaves the
+-- older way, or on one without the call the check needs.
+
+local BEHAVIOUR = {}
+
+--- A line a player logged that holds `needle`.
+local function said(w, needle)
+	for _, line in ipairs(w.lines) do
+		if line:find(needle, 1, true) then
+			return line
+		end
+	end
+end
+
+--- A player of a track with a building that is finished at frame 250 and half
+-- built at frame 150, and the world it plays in. `engine` is what the table
+-- says of the engine, or nothing for an engine with every call.
+local function plantScene(oldEngine, engine)
+	local w = Engine.new({ unitDefs = { { name = "plant", health = 4000, buildTime = 500 } } })
+	w.oldEngine = oldEngine
+	local env = Engine.env(t, w)
+	local Player = t.load("coilbox_player.lua", env)
+	local track = Fake.new({
+		last = 400,
+		unitDefs = { "plant" },
+		units = { {
+			first = 100,
+			last = 400,
+			at = { 8, 2, 8 },
+			status = function(frame)
+				return 1, math.min(1, (frame - 100) / 100), 0
+			end,
+		} },
+	})
+	local player = assert(Player.new(track, {
+		modOptions = {},
+		engine = engine,
+		log = function(text)
+			w.lines[#w.lines + 1] = text
+		end,
+	}))
+	w.gadget = {
+		UnitCreated = function(_, unitID)
+			player:unitCreated(unitID)
+		end,
+		UnitDestroyed = function(_, unitID)
+			player:unitDestroyed(unitID)
+		end,
+	}
+	local function seek(frame)
+		player:message("coilbox_rewind:seek " .. frame)
+		player:frame()
+	end
+	player:message("coilbox_rewind:pause")
+	seek(250)
+	seek(150)
+	return w
+end
+
+BEHAVIOUR.rebuild = function()
+	local newer = plantScene(false)
+	local plant = newer.unitNamed("plant")
+	t.same("rebuild: an engine that can turn a unit back into a nanoframe does", plant.beingBuilt, true)
+	t.same("and the player says nothing about it", said(newer, "this engine keeps a finished unit finished"), nil)
+
+	local older = plantScene(true)
+	plant = older.unitNamed("plant")
+	t.same("rebuild: an engine that keeps a finished unit finished has the unit made again as a nanoframe", plant.beingBuilt, true)
+	local line = said(older, "this engine keeps a finished unit finished")
+	t.check("and the player says so", line ~= nil, table.concat(older.lines, " | "))
+	t.check("naming the engine that does not need it", line ~= nil and line:find("2025.03.9", 1, true) ~= nil, line)
+
+	-- Without the call the check asks with, the player trusts the engine.
+	local w = Engine.new({})
+	local env = Engine.env(t, w, {})
+	remove(env, "Spring.GetUnitIsStunned")
+	local engine = Table.check(rootsOf(env), Table.SYNCED)
+	t.same("rebuild: without the call it asks with, the row is off", engine.on.rebuild, false)
+	local blind = plantScene(true, engine)
+	t.same("rebuild: and an older engine leaves the unit finished", blind.unitNamed("plant").beingBuilt, false)
+end
+
+-- A row the fixture track cannot show, because it has no unit that is switched
+-- on. A switchable unit is on for the whole of a made-up track, and what the
+-- engine did to it is read back.
+
+do
+	local function radar(engine)
+		local w = Engine.new({ unitDefs = { { name = "radar", health = 200, onoffable = true } } })
+		local env = Engine.env(t, w)
+		local Player = t.load("coilbox_player.lua", env)
+		local player = assert(Player.new(
+			Fake.new({
+				last = 100,
+				unitDefs = { "radar" },
+				units = { { first = 0, last = 100, status = function() return 1, 1, 1 end } },
+			}),
+			{
+				modOptions = {},
+				engine = engine,
+				log = function(text)
+					w.lines[#w.lines + 1] = text
+				end,
+			}
+		))
+		player:frame()
+		player:frame()
+		return w
+	end
+
+	t.same("a switchable unit the track has on is switched on", radar().unitNamed("radar").active, true)
+	local onOff
+	for _, row in ipairs(Table.SYNCED) do
+		if row.id == "onOff" then
+			onOff = row
+		end
+	end
+	for _, call in ipairs(onOff.calls) do
+		local w = Engine.new({})
+		local env = Engine.env(t, w, {})
+		remove(env, call)
+		local engine = Table.check(rootsOf(env), Table.SYNCED)
+		t.same("without " .. call .. " on and off is off", engine.on.onOff, false)
+		local ok, err = pcall(radar, engine)
+		t.check("without " .. call .. " the player raises nothing", ok, err)
+		if ok then
+			t.same("without " .. call .. " the unit is left as it was made", err.unitNamed("radar").active, false)
+		end
+	end
+end
+
+for _, row in ipairs(Table.SYNCED) do
+	if row.how == "behaviour" then
+		t.check("the behaviour row " .. row.id .. " has a test of its behaviour", BEHAVIOUR[row.id] ~= nil, "add one to BEHAVIOUR in engine_test.lua")
+		if BEHAVIOUR[row.id] then
+			BEHAVIOUR[row.id]()
+		end
+	end
+end
+
+t.report()

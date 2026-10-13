@@ -341,6 +341,30 @@ do
 	t.check("in a panel of its own", e.shapes > without, e.shapes .. " against " .. without)
 end
 
+-- When playback refuses to start there is no player, and the note is all there
+-- is to show (issue #3802).
+
+do
+	local note = "Playback needs engine 105.0 or later: no Spring.CreateUnit"
+	local e = engine(params())
+	e.params.coilbox_rewind_first_frame = nil
+	e.params.coilbox_rewind_note = note
+	local tl = timeline(e)
+	tl:draw()
+	t.check("with no player the note is drawn", e.texts[note])
+	t.check("and nothing else is", e.texts["1x"] == nil and e.texts["?"] == nil)
+	t.check("inside the view", e.box.x1 >= 0 and e.box.x2 <= 1920 and e.box.y1 >= 0 and e.box.y2 <= 1080)
+	t.same("the timeline takes no press", tl:mousePress(960, 40, 1), false)
+	t.same("and is not above anything", tl:isAbove(960, 40), false)
+	e.params.coilbox_rewind_note = ""
+	e.clear()
+	tl:draw()
+	t.same("an empty note takes it away, and nothing is drawn", next(e.texts), nil)
+	e.params.coilbox_rewind_first_frame = 600
+	tl:draw()
+	t.check("the timeline comes back with a player", e.texts["1x"])
+end
+
 -- Where it sits: bottom centre, and inside the view at any size.
 
 do
@@ -626,6 +650,144 @@ do
 	t.check("its place is handed back to be saved", type(saved.x) == "number" and type(saved.y) == "number")
 	widget:ViewResize()
 	t.same("a resize that names no size asks the engine", widget:IsAbove(5, 5), false)
+end
+
+-- What the widget needs from the engine (issue #3802). The table is the
+-- widget's own, since the synced gadget cannot look at `gl` or the unsynced
+-- `Spring`. The tests are made from it as the gadget's are.
+
+do
+	local Scan = dofile(here .. "/scan.lua")
+	local PREFIX = "COILBOX_REWIND_TIMELINE "
+	local ENGINE = t.root() .. "/luaui/rewind_timeline/coilbox_timeline_engine.lua"
+	local chunk = assert(loadfile(ENGINE))
+	setfenv(chunk, t.unsyncedEnv())
+	local Table = chunk()
+
+	local ids = {}
+	for _, row in ipairs(Table.ROWS) do
+		local label = "widget row " .. tostring(row.id)
+		t.check(label .. " has an id nobody else has", type(row.id) == "string" and not ids[row.id])
+		ids[row.id] = true
+		t.check(label .. " names its calls", type(row.calls) == "table" and #row.calls > 0)
+		t.check(label .. " says how it is checked", row.how == "presence" or row.how == "behaviour")
+		t.check(label .. " says whether it is required", type(row.required) == "boolean")
+		t.check(label .. " says what it is for, what happens without it and where", row.feature and row.without and row.used and true)
+		t.check(label .. " names the engine that has it", type(row.since) == "string")
+	end
+
+	-- Every engine name the widget uses has a row, and every row is used.
+	local allowed = Scan.setOf(Scan.callsOf(Table.ROWS), Table.ASSUMED)
+	local used = {}
+	local files = Scan.filesUnder(t.root() .. "/luaui")
+	t.check("the scan found the widget's files", #files >= 2, #files)
+	for _, path in ipairs(files) do
+		for name in pairs(Scan.usedBy(path)) do
+			used[name] = true
+			t.check(path:match("[^/]+$") .. " uses " .. name .. ", which has a row", allowed[name], "add " .. name .. " to coilbox_timeline_engine.lua")
+		end
+	end
+	for _, call in ipairs(Scan.callsOf(Table.ROWS)) do
+		t.check(call .. " has a row and the widget uses it", used[call])
+	end
+
+	local function removeFrom(env, name)
+		local parts = {}
+		for part in name:gmatch("[^.]+") do
+			parts[#parts + 1] = part
+		end
+		local holder = rawget(env, parts[1])
+		for i = 2, #parts - 1 do
+			holder = holder[parts[i]]
+		end
+		holder[parts[#parts]] = nil
+	end
+
+	--- The widget file, loaded as a handler loads it, on an engine without
+	-- `removed`. Gives the widget, the stand-in engine and the lines logged.
+	local MARKS = { ["coilbox_rewind/marks.lua"] = function()
+		return { { frame = 1000 } }
+	end }
+	local function widgetScene(removed)
+		local e = engine(params(), MARKS)
+		local lines = {}
+		local env = t.unsyncedEnv()
+		env.widget = {}
+		env.Spring = e.Spring
+		env.Spring.GetViewGeometry = function()
+			return 1920, 1080
+		end
+		env.Spring.Echo = function(line)
+			lines[#lines + 1] = line
+		end
+		env.gl, env.GL = e.gl, e.GL
+		env.VFS = {
+			ZIP = "z",
+			FileExists = e.VFS.FileExists,
+			Include = function(path, _, mode)
+				assert(mode == env.VFS.ZIP, "the widget reads its module from somewhere other than the game")
+				if MARKS[path] then
+					return MARKS[path]()
+				end
+				local module = assert(loadfile(t.root() .. "/" .. path))
+				setfenv(module, env)
+				return module()
+			end,
+		}
+		if removed then
+			removeFrom(env, removed)
+		end
+		local file = assert(loadfile(WIDGET))
+		setfenv(file, env)
+		file()
+		return env.widget, e, lines
+	end
+
+	do
+		local widget, e, lines = widgetScene()
+		widget:Initialize()
+		widget:DrawScreen()
+		t.same("with every call there the widget logs nothing", #lines, 0)
+		t.check("and draws", e.shapes > 0)
+		t.same("and marks are on", widget:KeyPress(CODES["]"], NONE, false), true)
+		t.same("so the mark key seeks to the mark", e.sent[1], "coilbox_rewind:seek 1000")
+	end
+
+	for _, row in ipairs(Table.ROWS) do
+		for _, call in ipairs(row.calls) do
+			local label = "widget without " .. call
+			local widget, e, lines = widgetScene(call)
+			local ok, err = pcall(function()
+				widget:Initialize()
+				widget:DrawScreen()
+				widget:ViewResize(1280, 720)
+				widget:DrawScreen()
+				widget:KeyPress(CODES.space, NONE, false)
+				widget:IsAbove(960, 40)
+				widget:MousePress(960, 40, 1)
+				widget:MouseRelease()
+			end)
+			t.check(label .. " raises nothing", ok, err)
+			local line = lines[1]
+			t.same(label .. " logs one line", #lines, 1)
+			t.check(label .. " starting with the widget's prefix", line ~= nil and line:sub(1, #PREFIX) == PREFIX, line)
+			t.check(label .. " naming the call", line ~= nil and line:find("this engine has no " .. call, 1, true) ~= nil, line)
+			t.check(label .. " and the engine that has it", line ~= nil and line:find("Engine " .. row.since .. " and later have it", 1, true) ~= nil, line)
+			if row.required then
+				t.check(label .. " the line says it cannot start", line ~= nil and line:find("cannot start", 1, true) ~= nil, line)
+				t.same(label .. " nothing is drawn", e.shapes, 0)
+				t.same(label .. " a key is left to the game", widget:KeyPress(CODES.space, NONE, false), false)
+				t.same(label .. " the pointer is not over it", widget:IsAbove(960, 40), false)
+				t.same(label .. " nothing is sent to the player", #e.sent, 0)
+			else
+				t.check(label .. " the line says " .. row.feature .. " is switched off", line ~= nil and line:find("Switched off: " .. row.feature .. ".", 1, true) ~= nil, line)
+				t.check(label .. " the timeline still draws", e.shapes > 0)
+				if row.id == "marks" then
+					t.same(label .. " the mark key is left to the game", widget:KeyPress(CODES["]"], NONE, false), false)
+				end
+			end
+		end
+	end
 end
 
 t.report()

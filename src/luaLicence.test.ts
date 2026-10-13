@@ -74,4 +74,17 @@ describe("the licence the Lua declares", () => {
     expect(notice).toContain("MIT OR GPL-2.0-or-later");
     expect(existsSync(join(REPO, "lua", "COPYING"))).toBe(true);
   });
+
+  it("has a notice for a game that names the same licence and the files beside it", () => {
+    const repo = readFileSync(join(REPO, "lua", "LICENSE.md"), "utf8");
+    const game = readFileSync(join(REPO, "lua", "GAME-NOTICE.md"), "utf8");
+    const spdx = (text: string) =>
+      text.match(/^SPDX-License-Identifier:.*$/m)?.[0];
+    expect(spdx(repo)).toBeDefined();
+    expect(spdx(game)).toBe(spdx(repo));
+    expect(game).toContain(`license = "${LICENCE}"`);
+    expect(game).toContain("(LICENSE-MIT)");
+    expect(game).toContain("(COPYING)");
+    expect(existsSync(join(REPO, "LICENSE"))).toBe(true);
+  });
 });

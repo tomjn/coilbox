@@ -38,6 +38,7 @@ local Features = VFS.Include(MODULES .. "coilbox_player_features.lua")
 local Units = VFS.Include(MODULES .. "coilbox_player_units.lua")
 local Projectiles = VFS.Include(MODULES .. "coilbox_player_projectiles.lua")
 local Adapter = VFS.Include(MODULES .. "coilbox_player_adapter.lua")
+local Engine = VFS.Include(MODULES .. "coilbox_player_engine.lua")
 
 local M = {}
 
@@ -61,7 +62,9 @@ M.PARAMS = {
 
 --- The Lua message that sets the most units made in a frame and the most
 -- removed, as two whole numbers after the text. The gadget's unsynced half sends
--- it, for example `coilbox_rewind_budget:40 30`.
+-- it, for example `coilbox_rewind_budget:40 30`. `coilbox_rewind_budget:none`
+-- says that no budget will come, because the unsynced half cannot time a frame,
+-- and takes the limit off.
 M.BUDGET = "coilbox_rewind_budget:"
 
 --- The mod options the player reads.
@@ -81,6 +84,13 @@ local function whole(text)
 	if n and n >= 1 and n < math.huge and n == math.floor(n) then
 		return n
 	end
+end
+
+--- A stage that does nothing, for one whose engine calls are missing. It takes
+-- the engine's call-ins too, since the player hands them to every stage.
+local OFF = {}
+for _, name in ipairs({ "resync", "remove", "place", "created", "destroyed" }) do
+	OFF[name] = function() end
 end
 
 --- Sets a parameter when its value has changed since it was last set.
@@ -106,7 +116,9 @@ end
 -- `Spring.GetModOptions` gave and `options.log` takes a line for the engine's
 -- log. `options.adapter` is the game's adapter as coilbox_player_adapter.lua
 -- reads it, or nil for a game with none, and `options.adapterWhy` is the reason
--- when there is none because the game's could not be used.
+-- when there is none because the game's could not be used. `options.engine` is
+-- what coilbox_player_engine.lua's `check` gave for the engine, which says what
+-- is switched off. Without it every feature is on.
 function M.new(track, options)
 	local header = track.header
 	local info, why = track:info()
@@ -169,7 +181,9 @@ function M.new(track, options)
 		end
 	end
 
+	local on = options.engine and options.engine.on or Engine.ALL_ON
 	local context = {
+		on = on,
 		adapter = options.adapter,
 		hooks = hooks,
 		track = track,
@@ -184,13 +198,14 @@ function M.new(track, options)
 		teamOf = teamOf,
 		report = report,
 	}
-	local terrain = Terrain.new(context, Reader)
-	local featureStage = Features.new(context, Rotation)
+	-- A stage whose calls the engine lacks is the one that does nothing.
+	local terrain = on.terrain and Terrain.new(context, Reader) or OFF
+	local featureStage = on.features and Features.new(context, Rotation) or OFF
 	local units = Units.new(context, Rotation)
 	if options.budget then
 		units:setBudget(options.budget)
 	end
-	local projectiles = Projectiles.new(context, units, Clock)
+	local projectiles = on.shots and Projectiles.new(context, units, Clock) or OFF
 
 	local self = setmetatable({
 		Spring = Spring,
@@ -212,8 +227,10 @@ function M.new(track, options)
 
 	-- Every ally team sees the whole map, so nothing the track shows is hidden
 	-- from a view that follows one of them.
-	for _, allyTeam in ipairs(Spring.GetAllyTeamList()) do
-		Spring.SetGlobalLos(allyTeam, true)
+	if on.sight then
+		for _, allyTeam in ipairs(Spring.GetAllyTeamList()) do
+			Spring.SetGlobalLos(allyTeam, true)
+		end
 	end
 
 	local P = M.PARAMS
@@ -271,6 +288,10 @@ end
 -- when it was somebody else's.
 function Player:message(text)
 	if text:sub(1, #M.BUDGET) == M.BUDGET then
+		if text == M.BUDGET .. "none" then
+			self.units:setBudget(math.huge)
+			return true
+		end
 		local make, remove = text:match("^(%S+) (%S+)$", #M.BUDGET + 1)
 		make, remove = whole(make), whole(remove)
 		if make and remove then

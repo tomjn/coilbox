@@ -389,7 +389,9 @@ function Units:create(w, i, serial, nanoframe, t)
 	self.MoveCtrl.Enable(unitID)
 	-- Weapons never fire. This also stops them aiming, which issue #3796 sets
 	-- from the track.
-	Spring.SetUnitUseWeapons(unitID, false, false)
+	if self.context.on.holdFire then
+		Spring.SetUnitUseWeapons(unitID, false, false)
+	end
 	local _, maxHealth = Spring.GetUnitHealth(unitID)
 	self.unitOf[serial] = unitID
 	self.serialOf[unitID] = serial
@@ -423,8 +425,14 @@ function Units:applyStatus(w, i, serial, unitID, t)
 		arg.health, arg.build = health * maxHealth, build
 		Spring.SetUnitHealth(unitID, arg)
 		if not self.nanoframe[serial] then
-			local _, _, beingBuilt = Spring.GetUnitIsStunned(unitID)
+			-- The engine is trusted when it cannot be asked.
+			local beingBuilt = true
+			if self.context.on.rebuild then
+				local _, _, building = Spring.GetUnitIsStunned(unitID)
+				beingBuilt = building
+			end
 			if not beingBuilt then
+				self.context.report("rebuild", "this engine keeps a finished unit finished when its build progress is set below 1, so the player destroys such a unit and creates it again. Engine 2025.03.9 and later do not need this. Later ones are not logged")
 				self:destroy(serial, unitID, false)
 				unitID = self:create(w, i, serial, true, t)
 				if not unitID then
@@ -465,7 +473,7 @@ function Units:applyStatus(w, i, serial, unitID, t)
 
 	-- A unit under construction cannot be switched on, so this waits for it.
 	local on = status[3] % 2
-	if self.on[serial] ~= on then
+	if self.context.on.onOff and self.on[serial] ~= on then
 		self.on[serial] = on
 		if (Spring.GetUnitIsActive(unitID) and 1 or 0) ~= on then
 			local arg = self.onArg
