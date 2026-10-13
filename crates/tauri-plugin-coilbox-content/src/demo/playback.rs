@@ -1800,4 +1800,111 @@ end
         assert!(errors.is_empty(), "{errors:#?}");
         assert_eq!(written, 0, "the playback wrote a replay");
     }
+
+    /// The widget that presses the timeline's keys in the engine. It is
+    /// written into the game folder for the test below and is not part of the
+    /// game.
+    const TIMELINE_PROBE: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../lua/rewind-player/tests/headless/timeline_probe.lua"
+    ));
+
+    /// The timeline widget against a real engine and a real game's widget
+    /// handler (issue #3798). The game's handler has to load the widget out of
+    /// the playback game and turn it on with nothing asked of the game, and
+    /// every key and a press on the bar have to change what the player
+    /// publishes, which is the message going the whole way round.
+    ///
+    /// `scripts/rewind-playback-headless.sh` runs this, and it reads the
+    /// variables the tests above do.
+    ///
+    /// The engine is headless, so the widget draws nothing. A draw that does
+    /// not raise is all this shows about how it looks.
+    #[test]
+    #[ignore = "needs an engine, a game, a map and a replay recorded with them"]
+    fn the_timeline_drives_the_player_in_the_engine() {
+        let Some(prepared) = prepared(true) else {
+            return;
+        };
+        std::fs::write(
+            prepared
+                .game_dir
+                .join("luaui/widgets/coilbox_rewind_timeline_probe.lua"),
+            TIMELINE_PROBE,
+        )
+        .unwrap();
+
+        let (timed_out, output, _) =
+            launch(&prepared, &|text| text.contains("TIMELINE_PROBE done"));
+        let probe: Vec<&str> = output
+            .lines()
+            .filter_map(|l| l.split_once("TIMELINE_PROBE ").map(|(_, rest)| rest))
+            .collect();
+        for l in &probe {
+            eprintln!("timeline {l}");
+        }
+        assert!(!timed_out, "the probe never finished. Log:\n{output}");
+        let line = |start: &str| {
+            *probe
+                .iter()
+                .find(|l| l.starts_with(start))
+                .unwrap_or_else(|| panic!("no probe line starting {start}"))
+        };
+
+        // The game's own handler loaded the widget and it reads the player.
+        let loaded = line("loaded=");
+        assert_eq!(field(loaded, "loaded"), "1", "{loaded}");
+        let (first, last) = (number(loaded, "first"), number(loaded, "last"));
+        assert!(last > first, "{loaded}");
+
+        // Every key was taken, and its message arrived.
+        let after = |step: &str| {
+            let l = line(&format!("{step} "));
+            assert_eq!(field(l, "taken"), "1", "{l}");
+            assert_eq!(field(l, "arrived"), "1", "{l}");
+            l
+        };
+        assert_eq!(field(after("toggle"), "playing"), "1");
+        assert_eq!(field(after("pause"), "playing"), "0");
+        assert_eq!(number(after("end"), "frame"), last);
+        assert_eq!(number(after("home"), "frame"), first);
+        assert_eq!(number(after("right"), "frame"), first + 30.0);
+        assert_eq!(number(after("shift_right"), "frame"), first + 330.0);
+        assert_eq!(number(after("shift_left"), "frame"), first + 30.0);
+        assert_eq!(number(after("left"), "frame"), first);
+        assert_eq!(number(after("full_stop"), "frame"), first + 1.0);
+        assert_eq!(number(after("comma"), "frame"), first);
+        assert_eq!(number(after("minus"), "speed"), 0.5);
+        assert_eq!(number(after("equals"), "speed"), 1.0);
+        assert_eq!(number(after("plus"), "speed"), 2.0);
+
+        // A key held with Ctrl is left alone and changes nothing.
+        let held = line("ctrl_space ");
+        assert_eq!(field(held, "taken"), "0", "{held}");
+        assert_eq!(field(held, "playing"), "0", "{held}");
+
+        // A press on the middle of the bar seeks to the middle of the track.
+        let drag = after("drag");
+        assert_eq!(
+            number(drag, "frame"),
+            (first + (last - first) / 2.0 + 0.5).floor(),
+            "{drag}"
+        );
+        let reverse = after("reverse");
+        assert_eq!(field(reverse, "direction"), "-1", "{reverse}");
+        assert_eq!(field(reverse, "playing"), "1", "{reverse}");
+
+        // The handler still has the widget, which it drops when one raises,
+        // and it was asked to draw in between.
+        let still = line("still_loaded=");
+        assert_eq!(field(still, "still_loaded"), "1", "{still}");
+        assert_eq!(field(still, "config"), "table", "{still}");
+        assert!(number(still, "draws") >= 1.0, "{still}");
+        let errors: Vec<&str> = output
+            .lines()
+            .filter(|l| l.to_lowercase().contains("error"))
+            .filter(|l| l.contains("coilbox_") || l.contains("Coilbox rewind"))
+            .collect();
+        assert!(errors.is_empty(), "{errors:#?}");
+    }
 }
