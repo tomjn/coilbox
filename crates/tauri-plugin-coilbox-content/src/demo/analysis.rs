@@ -17,6 +17,10 @@
 //!    events back only when they agree. See [`divergence`].
 //! 7. Delete the scratch folder, whatever happened.
 //!
+//! A run that is asked to record also carries the rewind recorder, a second
+//! gadget that writes where everything was on every frame (issue #3780). Its
+//! file is moved out of the scratch folder before that is deleted.
+//!
 //! The replay itself is read and never written, and nothing is written under a
 //! content folder or beside the replay.
 
@@ -101,6 +105,24 @@ pub struct AnalysisRun {
     /// Every line the logger wrote, in order and as it wrote them. Only for a
     /// run that reproduced the match.
     pub events: Option<Vec<String>>,
+    /// What became of the recording, for a run that was asked for one.
+    pub recording: Option<RecordingOutcome>,
+}
+
+/// What became of the recording a run was asked to make.
+///
+/// A recording is kept however the run ended, because a run that was stopped
+/// still leaves a file that reads up to the frame it stopped at. Whether it is
+/// a recording of the match is the report's `status` to say: one from a run
+/// that diverged is of a game nobody played.
+#[derive(Clone, Debug, PartialEq)]
+pub enum RecordingOutcome {
+    /// The recorder's file, moved to where the request asked.
+    Kept { path: PathBuf, bytes: u64 },
+    /// The recorder wrote no file: it did not load, or could not open one.
+    NotWritten,
+    /// The recorder wrote a file and it could not be moved out of scratch.
+    NotKept(String),
 }
 
 /// What a run needs.
@@ -119,6 +141,9 @@ pub struct AnalysisRequest {
     pub scratch_root: PathBuf,
     /// How long the engine may run before it is killed.
     pub timeout: Duration,
+    /// Where to leave the rewind recorder's file. `None` runs without the
+    /// recorder. A file already there is replaced.
+    pub record: Option<PathBuf>,
 }
 
 /// One run's scratch folder, removed when this is dropped, which is on every
@@ -339,13 +364,18 @@ fn analyse_with(
         ));
     }
 
+    let recording = match &request.record {
+        Some(_) => Some(recording_for(&request.replay)?),
+        None => None,
+    };
+
     let scratch = Scratch::create(&request.scratch_root)?;
     let data = scratch.dir.join("data");
     let write_dir = scratch.dir.join("write");
     let demo = scratch.dir.join("replay.sdfz");
     let engine_log = scratch.dir.join("engine.log");
 
-    game::write_game(&data, &base_game, logger)?;
+    game::write_game(&data, &base_game, logger, recording.as_ref())?;
     super::retarget::write_retargeted(&request.replay, &demo, &game::gametype())?;
 
     // The scratch folder first, so nothing in a content folder can stand in
@@ -401,6 +431,10 @@ fn analyse_with(
         }
     };
     let reproduced = status == AnalysisStatus::Reproduced;
+    let recording = request
+        .record
+        .as_deref()
+        .map(|to| keep_recording(&write_dir.join(game::RECORDING_FILE), to));
 
     Ok(AnalysisRun {
         report: AnalysisReport {
@@ -422,7 +456,47 @@ fn analyse_with(
             },
         },
         events: reproduced.then_some(parsed.raw),
+        recording,
     })
+}
+
+/// What the recorder is told about a replay: where its stream ends.
+fn recording_for(replay: &Path) -> Result<game::Recording, String> {
+    let last_frame = super::stream::read_stream(replay)?.last_frame;
+    if last_frame == crate::model::PREGAME_FRAME {
+        return Err("this replay holds no frames, so there is nothing to record".into());
+    }
+    Ok(game::Recording { last_frame })
+}
+
+/// Move the recorder's file out of the scratch folder, which is about to be
+/// deleted.
+fn keep_recording(written: &Path, to: &Path) -> RecordingOutcome {
+    if !written.is_file() {
+        return RecordingOutcome::NotWritten;
+    }
+    let moved = (|| {
+        if let Some(parent) = to.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("could not create {}: {e}", parent.display()))?;
+        }
+        // A rename is free and a copy of a long match is not, so the copy is
+        // only for a destination on another volume, which a rename refuses.
+        if std::fs::rename(written, to).is_err() {
+            std::fs::copy(written, to)
+                .map_err(|e| format!("could not move the recording to {}: {e}", to.display()))?;
+        }
+        std::fs::metadata(to)
+            .map(|meta| meta.len())
+            .map_err(|e| format!("could not read {}: {e}", to.display()))
+    })();
+    match moved {
+        Ok(bytes) => RecordingOutcome::Kept {
+            path: to.to_path_buf(),
+            bytes,
+        },
+        Err(reason) => RecordingOutcome::NotKept(reason),
+    }
 }
 
 /// The wall clock, in milliseconds since the Unix epoch.
@@ -470,6 +544,8 @@ mod tests {
     struct World {
         dir: tempfile::TempDir,
         replay: PathBuf,
+        /// Where a run is asked to leave a recording, when it is asked.
+        record: Option<PathBuf>,
     }
 
     impl World {
@@ -481,6 +557,7 @@ mod tests {
             World {
                 dir,
                 replay: replay_path,
+                record: None,
             }
         }
 
@@ -513,6 +590,7 @@ mod tests {
                     game: game.map(str::to_string),
                     scratch_root: self.scratch_root(),
                     timeout,
+                    record: self.record.clone(),
                 },
                 &RunControl::default(),
                 &|_| {},
@@ -698,6 +776,202 @@ mod tests {
         assert!(run.events.is_none());
     }
 
+    /// The frame the fixture replay's stream ends on, for the runs that record.
+    const LAST_FRAME: usize = 1500;
+
+    /// The fixture replay with frames in its stream, which a run that records
+    /// needs: the recorder is told where the stream ends.
+    fn replay_with_frames() -> Vec<u8> {
+        use super::super::stream::fixture::Packets;
+        let trailer = fixture_trailer();
+        let frames = Packets::default().keyframe(0).newframes(LAST_FRAME).bytes();
+        DemoFixture {
+            script: SCRIPT.into(),
+            stream: stream_with_game_data(SCRIPT, &frames),
+            winning_ally_teams: vec![0],
+            team_samples: trailer.teams.into_iter().map(|t| t.samples).collect(),
+            team_stat_period: 16,
+            game_time: FIXTURE_SECONDS as i32,
+            ..Default::default()
+        }
+        .gzipped()
+    }
+
+    /// A fake engine that copies the analysis game's files to the witness
+    /// folder: the list of them, and the recorder's request when there is one.
+    fn witnesses_the_game(world: &World) -> String {
+        format!(
+            "mkdir -p '{w}'\n\
+             game=\"${{SPRING_DATADIR%%:*}}/games/{folder}\"\n\
+             (cd \"$game\" && find . -type f | sort) > '{w}/files'\n\
+             cp \"$game/luarules/configs/coilbox_rewind_request.lua\" '{w}/request.lua' 2>/dev/null\n",
+            w = world.witness().display(),
+            folder = game::FOLDER,
+        )
+    }
+
+    /// A fake engine that writes `bytes` as the recorder's file.
+    fn records(bytes: &str) -> String {
+        format!(
+            "printf '%s' '{bytes}' > \"$write/{}\"\n",
+            game::RECORDING_FILE
+        )
+    }
+
+    #[test]
+    fn a_run_asked_to_record_carries_the_recorder_and_keeps_its_file() {
+        let mut world = World::new(replay_with_frames());
+        let to = world.dir.path().join("recordings").join("match.dump");
+        world.record = Some(to.clone());
+        let body = format!(
+            "{}{}{}",
+            writes(FIXTURE),
+            witnesses_the_game(&world),
+            records("a dump")
+        );
+
+        let run = world.analyse(&body, LONG).unwrap();
+
+        assert_eq!(run.report.status, AnalysisStatus::Reproduced);
+        assert_eq!(
+            run.recording,
+            Some(RecordingOutcome::Kept {
+                path: to.clone(),
+                bytes: 6
+            })
+        );
+        assert_eq!(std::fs::read_to_string(&to).unwrap(), "a dump");
+        let files = std::fs::read_to_string(world.witness().join("files")).unwrap();
+        assert_eq!(
+            files.lines().collect::<Vec<_>>(),
+            vec![
+                "./luarules/configs/coilbox_rewind_request.lua",
+                "./luarules/gadgets/coilbox_replay_logger.lua",
+                "./luarules/gadgets/coilbox_rewind_recorder.lua",
+                "./modinfo.lua"
+            ]
+        );
+        // The recorder is told where the replay's stream ends.
+        let request = std::fs::read_to_string(world.witness().join("request.lua")).unwrap();
+        assert!(
+            request.contains(&format!("lastFrame = {LAST_FRAME},")),
+            "{request}"
+        );
+        // Moved, not copied: the scratch folder is gone and the file is not.
+        assert_eq!(world.leftovers(), Vec::<String>::new());
+    }
+
+    /// The run every analysis has made so far: no recorder in the game, and a
+    /// file of the recorder's name is not looked for.
+    #[test]
+    fn a_run_not_asked_to_record_carries_no_recorder() {
+        let world = World::new(replay_with_frames());
+        let body = format!(
+            "{}{}{}",
+            writes(FIXTURE),
+            witnesses_the_game(&world),
+            records("stray")
+        );
+
+        let run = world.analyse(&body, LONG).unwrap();
+
+        assert_eq!(run.report.status, AnalysisStatus::Reproduced);
+        assert_eq!(run.recording, None);
+        let files = std::fs::read_to_string(world.witness().join("files")).unwrap();
+        assert_eq!(
+            files.lines().collect::<Vec<_>>(),
+            vec![
+                "./luarules/gadgets/coilbox_replay_logger.lua",
+                "./modinfo.lua"
+            ]
+        );
+        assert!(!world.witness().join("request.lua").exists());
+    }
+
+    /// The recorder takes itself out when it cannot open its file. The run it
+    /// shares is still a good analysis.
+    #[test]
+    fn a_recorder_that_wrote_nothing_does_not_fail_the_run() {
+        let mut world = World::new(replay_with_frames());
+        world.record = Some(world.dir.path().join("match.dump"));
+
+        let run = world.analyse(&writes(FIXTURE), LONG).unwrap();
+
+        assert_eq!(run.report.status, AnalysisStatus::Reproduced);
+        assert_eq!(run.events.as_ref().unwrap().len(), 24);
+        assert_eq!(run.recording, Some(RecordingOutcome::NotWritten));
+        assert!(!world.dir.path().join("match.dump").exists());
+    }
+
+    /// The recorder flushes every frame so that a run that is stopped leaves
+    /// what it had. That is only worth anything if the file outlives scratch.
+    #[test]
+    fn a_recording_is_kept_from_a_run_that_was_cut_short() {
+        let mut world = World::new(replay_with_frames());
+        let to = world.dir.path().join("match.dump");
+        world.record = Some(to.clone());
+        let cut = FIXTURE.rfind("{\"kind\":\"game_over\"").unwrap();
+        let body = format!(
+            "{}{}exec sleep 600",
+            writes(&FIXTURE[..cut]),
+            records("half a dump")
+        );
+
+        let run = world.analyse(&body, SHORT).unwrap();
+
+        assert_eq!(run.report.status, AnalysisStatus::Incomplete);
+        assert!(run.report.exit.timed_out);
+        assert_eq!(
+            run.recording,
+            Some(RecordingOutcome::Kept {
+                path: to.clone(),
+                bytes: 11
+            })
+        );
+        assert_eq!(std::fs::read_to_string(&to).unwrap(), "half a dump");
+        assert_eq!(world.leftovers(), Vec::<String>::new());
+    }
+
+    /// A recording that cannot be put where it was asked for is reported, and
+    /// the analysis it came with is still handed back.
+    #[test]
+    fn a_recording_that_cannot_be_moved_is_reported_and_the_run_stands() {
+        let mut world = World::new(replay_with_frames());
+        // A file where the destination's folder would have to be.
+        let blocker = world.dir.path().join("blocker");
+        std::fs::write(&blocker, b"").unwrap();
+        world.record = Some(blocker.join("match.dump"));
+        let body = format!("{}{}", writes(FIXTURE), records("a dump"));
+
+        let run = world.analyse(&body, LONG).unwrap();
+
+        assert_eq!(run.report.status, AnalysisStatus::Reproduced);
+        assert!(run.events.is_some());
+        match run.recording {
+            Some(RecordingOutcome::NotKept(reason)) => {
+                assert!(reason.contains("could not create"), "{reason}")
+            }
+            other => panic!("expected the recording not to be kept, got {other:?}"),
+        }
+        assert_eq!(world.leftovers(), Vec::<String>::new());
+    }
+
+    /// The recorder has to be told where the replay ends, so a replay with no
+    /// frames in it is refused before anything runs.
+    #[test]
+    fn a_replay_with_no_frames_is_not_recorded() {
+        let mut world = World::new(replay_bytes());
+        world.record = Some(world.dir.path().join("match.dump"));
+
+        let err = world
+            .analyse(&format!("touch '{}'", world.witness().display()), LONG)
+            .unwrap_err();
+
+        assert!(err.contains("holds no frames"), "{err}");
+        assert!(!world.witness().exists());
+        assert!(!world.scratch_root().exists());
+    }
+
     /// Success, divergence, a crash and a kill all leave the scratch root as
     /// empty as an error before the engine ran does.
     #[test]
@@ -820,6 +1094,7 @@ mod tests {
                 game: None,
                 scratch_root: world.scratch_root(),
                 timeout: LONG,
+                record: None,
             },
             &RunControl::default(),
             &|_| {},
@@ -859,6 +1134,7 @@ mod tests {
                 game: None,
                 scratch_root: world.scratch_root(),
                 timeout: LONG,
+                record: None,
             },
             &RunControl::default(),
             &|progress| {
@@ -1010,7 +1286,7 @@ end
         let scratch = tempfile::tempdir().unwrap();
         let data = scratch.path().join("data");
         let write_dir = scratch.path().join("write");
-        let game = game::write_game(&data, &base_game, game::LOGGER).unwrap();
+        let game = game::write_game(&data, &base_game, game::LOGGER, None).unwrap();
         std::fs::write(
             game.join("luarules/gadgets/coilbox_scratch_match_end.lua"),
             QUIT_GADGET,
@@ -1114,6 +1390,8 @@ end
     /// - `COILBOX_ANALYSIS_KEEP`: a folder to leave the run's lines in, as
     ///   `events.jsonl`, and the file the store would write, so both can be
     ///   measured. Nothing is kept from a run that diverged.
+    /// - `COILBOX_ANALYSIS_RECORD`: a file to leave the rewind recorder's dump
+    ///   in. The run then carries the recorder, and must still reproduce.
     ///
     /// The scratch folder is a temporary directory, never the app's own cache.
     #[test]
@@ -1137,6 +1415,7 @@ end
         let perturbed = substitute
             .as_ref()
             .filter(|_| var("COILBOX_ANALYSIS_LOGGER_READS").is_none());
+        let record = var("COILBOX_ANALYSIS_RECORD").map(PathBuf::from);
         let replay = PathBuf::from(replay);
         let before = hash_of(&replay);
         let scratch = tempfile::tempdir().unwrap();
@@ -1163,6 +1442,7 @@ end
                 game: None,
                 scratch_root: scratch.path().to_path_buf(),
                 timeout: Duration::from_secs(timeout.parse().expect("seconds")),
+                record: record.clone(),
             },
             &RunControl::default(),
             &|_| {},
@@ -1171,6 +1451,16 @@ end
         .expect("the run");
 
         eprintln!("{}", serde_json::to_string_pretty(&run.report).unwrap());
+        eprintln!("recording: {:?}", run.recording);
+        match (&record, &run.recording) {
+            (Some(to), Some(RecordingOutcome::Kept { path, bytes })) => {
+                assert_eq!(path, to);
+                assert_eq!(std::fs::metadata(to).unwrap().len(), *bytes);
+                assert!(*bytes > 0, "the recording is empty");
+            }
+            (None, None) => {}
+            other => panic!("the recording was not kept: {other:?}"),
+        }
         assert_eq!(hash_of(&replay), before, "the replay was changed");
         for (path, hash, modified) in settings {
             assert_eq!(hash_of(&path), hash, "{} was changed", path.display());

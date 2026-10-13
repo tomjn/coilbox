@@ -10,7 +10,8 @@
 //! What it must not hold matters as much. A depending archive mounts above its
 //! base, so a unit, weapon or feature definition in here would join the base
 //! game's and move the definition ids every recorded event is keyed by. The
-//! tests pin the file list to the two files written here.
+//! tests pin the file list to the files written here: two, and two more for a
+//! run that records.
 //!
 //! The game keeps a name, short name and version of its own. It has to have its
 //! own name, because the name is what the rewritten replay points at, and the
@@ -42,6 +43,37 @@ const LOGGER_PATH: &str = "luarules/gadgets/coilbox_replay_logger.lua";
 /// The file the logger writes, relative to the engine's write directory. The
 /// same name is in the gadget, and a test holds the two together.
 pub const EVENTS_FILE: &str = "coilbox-replay-events.jsonl";
+
+/// The rewind recorder, the second gadget, which goes in only for a run that
+/// asks for a recording (issue #3780).
+pub const RECORDER: &str =
+    include_str!("../../../../../lua/rewind-recorder/luarules/gadgets/coilbox_rewind_recorder.lua");
+
+const RECORDER_PATH: &str = "luarules/gadgets/coilbox_rewind_recorder.lua";
+
+/// Where the recorder looks for its request. The same path is in the gadget,
+/// and a test holds the two together.
+const RECORDER_REQUEST_PATH: &str = "luarules/configs/coilbox_rewind_request.lua";
+
+/// The file the recorder writes, relative to the engine's write directory. The
+/// same name is in the gadget, and a test holds the two together.
+pub const RECORDING_FILE: &str = "coilbox-rewind.dump";
+
+/// What a run that records tells the recorder.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Recording {
+    /// The last frame in the replay's stream. The recorder ends its file
+    /// there, because a replay of a match that crashed never reaches game over.
+    pub last_frame: i32,
+}
+
+/// The recorder's request file: a Lua table.
+fn recorder_request(recording: &Recording) -> String {
+    format!(
+        "-- Asks the coilbox rewind recorder to record this run.\nreturn {{\n  lastFrame = {},\n}}\n",
+        recording.last_frame
+    )
+}
 
 /// What a start script has to name to launch the analysis game. The engine
 /// builds an archive's name as its `name`, a space, and its `version`.
@@ -98,13 +130,28 @@ pub fn modinfo(base_game: &str) -> String {
 /// `logger` is the gadget to carry, which is [`LOGGER`] for every caller but
 /// the test that perturbs the simulation on purpose to prove the divergence
 /// check notices.
-pub fn write_game(data_dir: &Path, base_game: &str, logger: &str) -> Result<PathBuf, String> {
+///
+/// `recording` adds the rewind recorder and its request. Without it neither
+/// file is written, so a run that does not record plays the game it always did.
+pub fn write_game(
+    data_dir: &Path,
+    base_game: &str,
+    logger: &str,
+    recording: Option<&Recording>,
+) -> Result<PathBuf, String> {
     if base_game.trim().is_empty() {
         return Err("the replay names no game to depend on".into());
     }
     let dir = data_dir.join("games").join(FOLDER);
     write_file(&dir.join("modinfo.lua"), &modinfo(base_game))?;
     write_file(&dir.join(LOGGER_PATH), logger)?;
+    if let Some(recording) = recording {
+        write_file(&dir.join(RECORDER_PATH), RECORDER)?;
+        write_file(
+            &dir.join(RECORDER_REQUEST_PATH),
+            &recorder_request(recording),
+        )?;
+    }
     Ok(dir)
 }
 
@@ -134,7 +181,7 @@ mod tests {
     #[test]
     fn the_game_is_a_modinfo_and_one_gadget_and_nothing_else() {
         let data = tempfile::tempdir().expect("tempdir");
-        let dir = write_game(data.path(), "Some Game 1.0", LOGGER).expect("write");
+        let dir = write_game(data.path(), "Some Game 1.0", LOGGER, None).expect("write");
 
         assert_eq!(dir, data.path().join("games").join(FOLDER));
         // No units, weapons, features or gamedata: anything of that kind would
@@ -145,10 +192,47 @@ mod tests {
         );
     }
 
+    /// A run that records carries two more files: the recorder and what it was
+    /// asked. Still no definitions of any kind.
+    #[test]
+    fn a_recording_adds_the_recorder_and_its_request_and_nothing_else() {
+        let data = tempfile::tempdir().expect("tempdir");
+        let recording = Recording { last_frame: 23200 };
+        let dir =
+            write_game(data.path(), "Some Game 1.0", LOGGER, Some(&recording)).expect("write");
+
+        assert_eq!(
+            files(&dir),
+            vec![
+                "luarules/configs/coilbox_rewind_request.lua",
+                "luarules/gadgets/coilbox_replay_logger.lua",
+                "luarules/gadgets/coilbox_rewind_recorder.lua",
+                "modinfo.lua"
+            ]
+        );
+        let written = std::fs::read_to_string(dir.join(RECORDER_PATH)).expect("read");
+        assert_eq!(written, RECORDER);
+        assert!(written.contains("Coilbox rewind recorder"));
+        let request = std::fs::read_to_string(dir.join(RECORDER_REQUEST_PATH)).expect("read");
+        assert!(
+            request.contains("return {\n  lastFrame = 23200,\n}"),
+            "{request}"
+        );
+    }
+
+    /// The recorder reads its request and writes its file by names of its own
+    /// choosing. This side writes the one and reads the other by the same
+    /// names, so they are held together here.
+    #[test]
+    fn the_recorder_reads_the_request_and_writes_the_file_this_side_names() {
+        assert!(RECORDER.contains(&format!("local REQUEST_FILE = \"{RECORDER_REQUEST_PATH}\"")));
+        assert!(RECORDER.contains(&format!("local DUMP_FILE = \"{RECORDING_FILE}\"")));
+    }
+
     #[test]
     fn the_gadget_written_is_the_one_in_the_repository() {
         let data = tempfile::tempdir().expect("tempdir");
-        let dir = write_game(data.path(), "Some Game 1.0", LOGGER).expect("write");
+        let dir = write_game(data.path(), "Some Game 1.0", LOGGER, None).expect("write");
 
         let written = std::fs::read_to_string(dir.join(LOGGER_PATH)).expect("read");
         assert_eq!(written, LOGGER);
@@ -183,7 +267,7 @@ mod tests {
     #[test]
     fn a_replay_that_names_no_game_is_refused() {
         let data = tempfile::tempdir().expect("tempdir");
-        assert!(write_game(data.path(), "  ", LOGGER).is_err());
+        assert!(write_game(data.path(), "  ", LOGGER, None).is_err());
     }
 
     /// The folder has to be one no real game could have, held to the same shape
