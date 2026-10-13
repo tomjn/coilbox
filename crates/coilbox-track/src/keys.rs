@@ -233,6 +233,10 @@ pub struct Info {
     /// The name and version of the program that wrote the file.
     pub writer: String,
     pub unit_defs: Vec<String>,
+    /// Each unit definition's footprint in elmos, in the order of `unit_defs`:
+    /// its size across the unit, then along the way it faces. Empty in a track
+    /// written before recorder version 3, which has none.
+    pub unit_footprints: Vec<[u16; 2]>,
     pub weapon_defs: Vec<String>,
     pub feature_defs: Vec<String>,
     pub posed_pieces: Vec<PosedPieces>,

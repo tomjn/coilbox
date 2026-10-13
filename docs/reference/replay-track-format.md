@@ -82,7 +82,12 @@ The header size is a minimum. A later writer may add fields after byte 96, so a 
 
 A change that adds a column or a header field keeps version 1, because readers skip what they do not know. A change to the meaning of anything on this page is a new version.
 
-The recorder version is separate. It changes when the recorder would produce different keys from the same replay. Issue #3786 uses it to mark a track as stale.
+The recorder version is separate. It changes when the recorder would produce different keys from the same replay, and when a track gains something a reader depends on. Issue #3786 uses it to mark a track as stale, and a stale track is recorded again.
+
+| Recorder version | What changed |
+| --- | --- |
+| 2 | Pose keys are relative to the parent piece (issue #3783) |
+| 3 | The info chunk has a footprint for each unit definition, columns 181 and 182 (issue #3807). The format version is still 1, because a column was added and nothing changed its meaning |
 
 ## Window index
 
@@ -182,10 +187,14 @@ One chunk, read once. A list of strings is two columns: the length of each strin
 | 176, 177 | strings | side name of each team |
 | 178, 179 | strings | leader name of each team |
 | 180 | `u32` | two values, the map's size along x and z in elmos |
+| 181 | `u16` | for each unit definition, the size of its footprint across the unit, in elmos |
+| 182 | `u16` | for each unit definition, the size of its footprint along the way the unit faces, in elmos |
 
 Every other chunk refers to a definition by its index in these lists, counting from 0. A definition is stored by name because its id changes between builds of a game (issue #1176). A piece is stored by name for the same reason.
 
 Only the definitions and pieces the track uses are listed. A writer may list more.
+
+A footprint is the ground a unit takes up, and it is what the map view on the replay page sizes a unit's mark from (issue #3807). Columns 181 and 182 are in the order of the unit definition names. They are the engine's `xsize` and `zsize` for the definition, each times 8. The engine counts both in heightmap squares, a square is 8 elmos (`SQUARE_SIZE` in `rts/Sim/Misc/GlobalConstants.h`), and `xsize` is twice the definition's `footprintX` (`rts/Sim/Units/UnitDef.cpp`). A track written before recorder version 3 has neither column. A reader that needs a footprint treats such a track as stale and does not guess one.
 
 The text of a definition is not stored. The game the track is played back in has it. The benchmark files spend 3,101,936 and 1,123,360 bytes on definitions and map data as text. The info chunks measured here are 2,130 and 619 bytes.
 

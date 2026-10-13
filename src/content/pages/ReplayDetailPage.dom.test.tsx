@@ -207,4 +207,25 @@ describe("ReplayDetailPage", () => {
     expect(screen.queryByText("Track out of date")).toBeNull();
     expect(screen.queryByText(/^Recorded\. The track takes/)).toBeNull();
   });
+
+  it("has the map view of a recorded track under the recording section, and not without a track (#3807)", () => {
+    const gameId = "00112233445566778899aabbccddeeff";
+    FILE = "a.sdfz";
+    INFO = { ...LOADED_INFO, gameId };
+
+    const bare = renderAt("a.sdfz");
+    expect(screen.queryByRole("region", { name: "Recorded match" })).toBeNull();
+    bare.unmount();
+
+    seedReplayTracksForTests([
+      { gameId, sizeBytes: 1, lastWatchedMs: 1, state: "current" },
+    ]);
+    renderAt("a.sdfz");
+    const recording = screen.getByRole("region", { name: "Recording" });
+    const view = screen.getByRole("region", { name: "Recorded match" });
+    expect(
+      recording.compareDocumentPosition(view) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
 });

@@ -162,13 +162,16 @@ fn row<const N: usize>(head: &[f32], pose: &[f32; 13]) -> [f32; N] {
 pub const UNIT_FRAMES: u32 = 3;
 
 /// A match to write as a dump. Unit definition 1 is `tank` with a radius of
-/// 10 elmos and definition 2 is `tower`, whose radius a test may set.
+/// 10 elmos and definition 2 is `tower`, whose radius a test may set. The
+/// third value is the definition's footprint in heightmap squares.
 pub struct Scene {
     pub last_frame: u32,
-    pub unit_defs: Vec<(String, f32)>,
+    pub unit_defs: Vec<(String, f32, [u32; 2])>,
     pub frames: BTreeMap<u32, FrameSpec>,
     /// Left out of the header when false, as a dump from before issue #3782.
     pub radii: bool,
+    /// Left out of the header when false, as a dump from before issue #3807.
+    pub footprints: bool,
     /// Left out when false, as a run that was stopped.
     pub ended: bool,
     /// Left out of the piece trees when false, as a dump from before issue
@@ -193,9 +196,13 @@ impl Scene {
     pub fn new(last_frame: u32) -> Self {
         Self {
             last_frame,
-            unit_defs: vec![("tank".into(), 10.0), ("tower".into(), 85.0)],
+            unit_defs: vec![
+                ("tank".into(), 10.0, [4, 6]),
+                ("tower".into(), 85.0, [12, 10]),
+            ],
             frames: BTreeMap::new(),
             radii: true,
+            footprints: true,
             ended: true,
             rest: true,
             model_type: "s3o".into(),
@@ -256,14 +263,26 @@ impl Scene {
         let names: Vec<String> = self
             .unit_defs
             .iter()
-            .map(|(n, _)| format!("\"{n}\""))
+            .map(|(n, _, _)| format!("\"{n}\""))
             .collect();
-        let radii: Vec<String> = self.unit_defs.iter().map(|(_, r)| r.to_string()).collect();
-        let radii = if self.radii {
+        let radii: Vec<String> = self
+            .unit_defs
+            .iter()
+            .map(|(_, r, _)| r.to_string())
+            .collect();
+        let mut radii = if self.radii {
             format!(",\"unitRadii\":[{}]", radii.join(","))
         } else {
             String::new()
         };
+        if self.footprints {
+            let footprints: Vec<String> = self
+                .unit_defs
+                .iter()
+                .map(|(_, _, f)| format!("[{},{}]", f[0], f[1]))
+                .collect();
+            radii += &format!(",\"unitFootprints\":[{}]", footprints.join(","));
+        }
         format!(
             concat!(
                 "{{\"format\":1,\"engine\":\"2026.01.0 test\",\"game\":\"Test Game\",",

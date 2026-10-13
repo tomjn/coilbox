@@ -204,6 +204,34 @@ fn the_info_and_features_round_trip() {
 }
 
 #[test]
+fn each_unit_definition_keeps_its_footprint() {
+    let track = random_track(9, 3, 40, 4);
+    let info = open(&track).info().unwrap();
+    assert_eq!(info.unit_defs, ["armcom", "armpw", "armsolar"]);
+    assert_eq!(info.unit_footprints, [[32, 32], [32, 48], [80, 64]]);
+}
+
+#[test]
+fn a_track_written_with_no_footprints_reads_as_having_none() {
+    let mut track = random_track(9, 3, 40, 4);
+    track.info.unit_footprints.clear();
+    let info = open(&track).info().unwrap();
+    assert_eq!(info.unit_defs.len(), 3);
+    assert!(info.unit_footprints.is_empty());
+}
+
+#[test]
+fn footprints_that_do_not_pair_with_the_names_are_refused() {
+    let mut track = random_track(9, 3, 40, 4);
+    track.info.unit_footprints.pop();
+    let error = track.to_bytes().unwrap_err().to_string();
+    assert!(
+        error.contains("2 footprints") && error.contains("3 unit definitions"),
+        "{error}"
+    );
+}
+
+#[test]
 fn terrain_rows_follow_the_height_the_writer_last_wrote() {
     let mut track = Track::new(settings(0, 200, 100));
     let row = |frame, before, after| TerrainRow {

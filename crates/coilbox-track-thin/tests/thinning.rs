@@ -944,6 +944,42 @@ fn a_dump_with_no_unit_radii_is_refused() {
 }
 
 #[test]
+fn a_dump_with_no_unit_footprints_is_refused() {
+    let mut scene = Scene::new(30);
+    scene.unit(1, 1, 0, 30, |_| At::place(100.0, 0.0, 100.0));
+    scene.footprints = false;
+    let dir = tempfile::tempdir().unwrap();
+    let (dump, track) = scene.write(dir.path());
+    let error = thin_dump(&dump, &track, &ThinOptions::default()).unwrap_err();
+    assert!(error.to_string().contains("unitFootprints"), "{error}");
+    assert!(!track.exists());
+}
+
+#[test]
+fn a_footprint_too_large_for_the_track_is_refused() {
+    let mut scene = Scene::new(30);
+    scene.unit(1, 1, 0, 30, |_| At::place(100.0, 0.0, 100.0));
+    // 8,192 squares of 8 elmos is 65,536 elmos, one more than a column holds.
+    scene.unit_defs[0].2 = [8192, 4];
+    let dir = tempfile::tempdir().unwrap();
+    let (dump, track) = scene.write(dir.path());
+    let error = thin_dump(&dump, &track, &ThinOptions::default()).unwrap_err();
+    assert!(error.to_string().contains("footprint"), "{error}");
+}
+
+#[test]
+fn the_track_has_the_footprint_of_each_unit_definition_it_names_in_elmos() {
+    let mut scene = Scene::new(60);
+    // The tower is heard of first, so it is the track's definition 0.
+    scene.unit(1, 2, 0, 60, |_| At::place(900.0, 0.0, 900.0));
+    scene.unit(2, 1, 30, 60, |_| At::place(100.0, 0.0, 100.0));
+    let (_, read) = thin(&scene);
+    assert_eq!(read.info.unit_defs, ["tower", "tank"]);
+    // The dump gives heightmap squares, each 8 elmos.
+    assert_eq!(read.info.unit_footprints, [[96, 80], [32, 48]]);
+}
+
+#[test]
 fn a_dump_whose_piece_trees_have_no_rest_offsets_is_refused() {
     let mut scene = Scene::new(30);
     scene.unit(1, 1, 0, 30, |_| At::place(100.0, 0.0, 100.0));

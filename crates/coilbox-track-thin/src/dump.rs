@@ -42,6 +42,10 @@ pub struct DumpHeader {
     /// Each unit definition's radius in elmos, in the order of `unit_defs`.
     /// A dump made before issue #3782 has none.
     pub unit_radii: Option<Vec<f32>>,
+    /// Each unit definition's footprint, in the order of `unit_defs`: the
+    /// engine's `xsize` and `zsize`, which count heightmap squares of
+    /// `square_size` elmos. A dump made before issue #3807 has none.
+    pub unit_footprints: Option<Vec<[u32; 2]>>,
     /// Entry `n`, counting from 1, is definition id `n`.
     pub feature_defs: Vec<String>,
     /// Entry `n`, counting from 0, is definition id `n`.

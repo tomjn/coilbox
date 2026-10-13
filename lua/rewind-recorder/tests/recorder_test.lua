@@ -84,9 +84,9 @@ end
 
 local DEFS = {
 	unitDefs = {
-		{ name = "tank", weapons = { {}, {} }, radius = 21.5, modeltype = "s3o" },
-		{ name = "builder", weapons = {}, isBuilder = true, isMobileBuilder = true, radius = 12 },
-		{ name = "factory", weapons = {}, isBuilder = true, radius = 48 },
+		{ name = "tank", weapons = { {}, {} }, radius = 21.5, modeltype = "s3o", xsize = 4, zsize = 6 },
+		{ name = "builder", weapons = {}, isBuilder = true, isMobileBuilder = true, radius = 12, xsize = 2, zsize = 2 },
+		{ name = "factory", weapons = {}, isBuilder = true, radius = 48, xsize = 12, zsize = 10 },
 		{ name = "wall", weapons = {} },
 	},
 	featureDefs = { { name = "tree" }, { name = "wreck" } },
@@ -137,6 +137,12 @@ do
 	same("unit definitions are listed from id 1", table.concat(header.unitDefs, " "), "tank builder factory wall")
 	same("each unit definition's radius is listed beside its name, and 0 for one that has none",
 		table.concat(header.unitRadii, " "), "21.5 12 48 0")
+	local footprints = {}
+	for i, footprint in ipairs(header.unitFootprints or {}) do
+		footprints[i] = footprint[1] .. "x" .. footprint[2]
+	end
+	same("each unit definition's footprint in heightmap squares is listed beside its name, and 0 for one that has none",
+		table.concat(footprints, " "), "4x6 2x2 12x10 0x0")
 	same("feature definitions are listed from id 1", table.concat(header.featureDefs, " "), "tree wreck")
 	same("weapon definitions are listed from id 0", table.concat(header.weaponDefs, " "), "nothing cannon laser")
 	same("every team is listed", #header.teams, 3)

@@ -207,6 +207,9 @@ pub struct HeaderView {
     /// Along x and z, in elmos.
     pub map_size: [u32; 2],
     pub unit_defs: Vec<String>,
+    /// Each unit definition's footprint in elmos, in the order of `unit_defs`:
+    /// across the unit, then along the way it faces.
+    pub unit_footprints: Vec<[u16; 2]>,
     pub weapon_defs: Vec<String>,
     pub feature_defs: Vec<String>,
     pub teams: Vec<TeamView>,
@@ -258,6 +261,18 @@ pub fn header_view<R: Read + Seek>(
     let info = reader.info().map_err(fault_of)?;
     let features = reader.features().map_err(fault_of)?;
     let q = reader.quantiser().map_err(fault_of)?;
+    // The thinner writes a footprint for every definition from recorder
+    // version 3, so a current track without them came from somewhere else. The
+    // map view sizes its marks from them and has nothing to fall back on.
+    if info.unit_footprints.len() != info.unit_defs.len() {
+        return Err(Fault::Unreadable {
+            message: format!(
+                "it has {} footprints for {} unit definitions",
+                info.unit_footprints.len(),
+                info.unit_defs.len()
+            ),
+        });
+    }
     let h = reader.header();
     let mut columns = FeatureColumns::default();
     for f in &features {
@@ -291,6 +306,7 @@ pub fn header_view<R: Read + Seek>(
         writer: info.writer,
         map_size: info.map_size,
         unit_defs: info.unit_defs,
+        unit_footprints: info.unit_footprints,
         weapon_defs: info.weapon_defs,
         feature_defs: info.feature_defs,
         teams: info
@@ -623,6 +639,7 @@ mod tests {
             map: "Test Map".into(),
             writer: "track_view tests".into(),
             unit_defs: vec!["armcom".into(), "armpw".into()],
+            unit_footprints: vec![[32, 48], [16, 16]],
             weapon_defs: vec!["laser".into()],
             feature_defs: vec!["armmex_dead".into()],
             teams: vec![
@@ -865,6 +882,7 @@ mod tests {
         assert_eq!(h.game, "Test Game 1");
         assert_eq!(h.map_size, [8192, 6144]);
         assert_eq!(h.unit_defs, ["armcom", "armpw"]);
+        assert_eq!(h.unit_footprints, [[32, 48], [16, 16]]);
         assert_eq!(h.weapon_defs, ["laser"]);
         assert_eq!(h.feature_defs, ["armmex_dead"]);
         assert_eq!(h.teams.len(), 2);
@@ -878,6 +896,17 @@ mod tests {
         assert_eq!(h.features.z, [300.25, 0.0]);
         assert_eq!(h.features.first, [40, 0]);
         assert_eq!(h.features.last, [150, 150]);
+    }
+
+    #[test]
+    fn a_track_with_no_footprints_is_not_drawn_with_guessed_sizes() {
+        let mut track = track(ID, RECORDER_VERSION);
+        track.info.unit_footprints.clear();
+        let mut reader = open_checked(Cursor::new(track.to_bytes().unwrap()), ID).unwrap();
+        let Err(Fault::Unreadable { message }) = header_view(&mut reader, ID) else {
+            panic!("a track with no footprints gave a header");
+        };
+        assert!(message.contains("footprint"), "{message}");
     }
 
     #[test]
@@ -1177,7 +1206,29 @@ mod tests {
             .into_iter()
             .map(|f| json!({ "frame": f, "window": reader.header().window_of_frame(f) }))
             .collect();
+        // How many units and projectiles are alive at each frame, counted from
+        // the window that holds it, for the map view's tests (issue #3807).
+        let mut alive = vec![];
+        for f in frames {
+            let window = reader
+                .window(reader.header().window_of_frame(f) as usize)
+                .unwrap();
+            let units = window
+                .units
+                .iter()
+                .filter(|u| (u.unit.first_frame..=u.unit.last_frame).contains(&f))
+                .count();
+            let projectiles = window
+                .projectiles
+                .iter()
+                .filter(|p| (p.projectile.first_frame..=p.projectile.last_frame).contains(&f))
+                .count();
+            alive.push(json!({ "frame": f, "units": units, "projectiles": projectiles }));
+        }
+        let header = header_view(&mut reader, ID).unwrap();
         let fixture = json!({
+            "header": header,
+            "alive": alive,
             "layoutVersion": LAYOUT_VERSION,
             "rotationBits": q.rotation_bits(),
             "geometry": {
