@@ -87,6 +87,35 @@ pub fn modinfo(base_game: &str, short_name: &str) -> String {
     .join("\n")
 }
 
+/// The mod option the player reads for the frame to open on.
+const START_FRAME_OPTION: &str = "coilbox_rewind_start_frame";
+
+/// The mod option the player reads for opening paused.
+const START_PAUSED_OPTION: &str = "coilbox_rewind_start_paused";
+
+/// Where the player opens. The default is the track's first frame, playing.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Opening {
+    /// The frame to open on. The player holds it inside the track.
+    pub frame: Option<u32>,
+    /// Open on the player's own pause. The engine keeps running.
+    pub paused: bool,
+}
+
+impl Opening {
+    /// The mod options that say it, in the start script's `[modoptions]`.
+    fn options(&self) -> Vec<(&'static str, String)> {
+        let mut options = Vec::new();
+        if let Some(frame) = self.frame {
+            options.push((START_FRAME_OPTION, frame.to_string()));
+        }
+        if self.paused {
+            options.push((START_PAUSED_OPTION, "1".to_string()));
+        }
+        options
+    }
+}
+
 /// The children of `section` named `prefix` and a number, in number order.
 fn numbered<'a>(section: &'a Section, prefix: &str) -> Vec<(i32, &'a Section)> {
     let mut found: Vec<(i32, &Section)> = section
@@ -169,7 +198,11 @@ fn is_rebuilt(name: &str) -> bool {
 /// is not a player or an AI. What it drops: the players, the AIs and each
 /// team's `luaai`, because nobody plays and no team is controlled. Every team's
 /// `teamleader` becomes the one spectator.
-pub fn start_script(replay_script: &str) -> Result<String, String> {
+///
+/// `opening` adds the player's two mod options. The replay's own values for
+/// those keys are dropped whether or not `opening` sets them, since they are
+/// the player's and a replay has no business moving where it opens.
+pub fn start_script(replay_script: &str, opening: &Opening) -> Result<String, String> {
     let game = find_game(&parse_tdf(replay_script));
     let map = game
         .get("mapname")
@@ -217,10 +250,18 @@ pub fn start_script(replay_script: &str) -> Result<String, String> {
     for (index, ally_team) in &ally_teams {
         write_section(&mut out, &format!("allyteam{index}"), ally_team, &[], &[]);
     }
+    let options = opening.options();
+    let extra: Vec<(&str, &str)> = options.iter().map(|(k, v)| (*k, v.as_str())).collect();
+    let skip = [START_FRAME_OPTION, START_PAUSED_OPTION];
     for (name, section) in &game.children {
-        if !is_rebuilt(name) {
+        if name == "modoptions" {
+            write_section(&mut out, name, section, &skip, &extra);
+        } else if !is_rebuilt(name) {
             write_section(&mut out, name, section, &[], &[]);
         }
+    }
+    if !extra.is_empty() && game.child("modoptions").is_none() {
+        write_section(&mut out, "modoptions", &Section::default(), &[], &extra);
     }
     out.push_str("}\n");
     Ok(out)
@@ -328,6 +369,8 @@ pub struct Prepare<'a> {
     pub game: Option<&'a str>,
     /// Where the start script goes.
     pub script_dir: &'a Path,
+    /// Where the player opens.
+    pub opening: Opening,
 }
 
 /// Write the playback game and its start script for a replay, and return the
@@ -359,7 +402,7 @@ pub fn prepare(
         }
         None => return Err("this replay has no track yet, so it has to be recorded first".into()),
     }
-    let script = start_script(&raw.script)?;
+    let script = start_script(&raw.script, &request.opening)?;
     let base_game = request
         .game
         .map(str::trim)
@@ -394,7 +437,9 @@ pub fn prepare(
 /// `runId` and `onEvent` are the play launch's: the run goes in the same
 /// registry, so it is refused while any game is running, and `play_cancel`
 /// ends it. `game` names another installed version of the replay's game to
-/// depend on when the exact one is not installed.
+/// depend on when the exact one is not installed. `startFrame` is the frame to
+/// open on, held inside the track, and `paused` opens on the player's own
+/// pause. Without them the player opens on the track's first frame, playing.
 ///
 /// It rejects, with the reason, for a replay with no current track, a remix, a
 /// replay of the playback game and an engine that is not there. The game folder
@@ -408,7 +453,13 @@ pub(crate) async fn content_replay_playback_launch<R: Runtime>(
     run_id: String,
     on_event: Channel<LaunchEvent>,
     game: Option<String>,
+    start_frame: Option<u32>,
+    paused: Option<bool>,
 ) -> CliResult {
+    let opening = Opening {
+        frame: start_frame,
+        paused: paused.unwrap_or(false),
+    };
     let tracks = match track_store::app_store_dir(&app) {
         Ok(dir) => dir,
         Err(e) => return CliResult::err(e),
@@ -436,6 +487,7 @@ pub(crate) async fn content_replay_playback_launch<R: Runtime>(
                     tracks: &tracks,
                     content_root: &content_root,
                     game: game.as_deref(),
+                    opening,
                     script_dir: &script_dir,
                 },
                 |base| {
@@ -483,7 +535,7 @@ mod tests {
 
     #[test]
     fn the_script_has_one_spectator_and_no_players_or_ais() {
-        let game = parsed(&start_script(REPLAY_SCRIPT).unwrap());
+        let game = parsed(&start_script(REPLAY_SCRIPT, &Opening::default()).unwrap());
 
         let players = numbered(&game, "player");
         assert_eq!(players.len(), 1);
@@ -497,7 +549,7 @@ mod tests {
 
     #[test]
     fn every_team_is_led_by_the_spectator_and_has_no_ai() {
-        let game = parsed(&start_script(REPLAY_SCRIPT).unwrap());
+        let game = parsed(&start_script(REPLAY_SCRIPT, &Opening::default()).unwrap());
 
         for (index, team) in numbered(&game, "team") {
             assert_eq!(team.get("teamleader"), Some("0"), "team {index}");
@@ -507,7 +559,7 @@ mod tests {
 
     #[test]
     fn team_numbers_and_ally_teams_are_the_replays_own() {
-        let game = parsed(&start_script(REPLAY_SCRIPT).unwrap());
+        let game = parsed(&start_script(REPLAY_SCRIPT, &Opening::default()).unwrap());
 
         let teams = numbered(&game, "team");
         assert_eq!(
@@ -531,7 +583,7 @@ mod tests {
             [team0]\n{\nallyteam=0;\nteamleader=0;\n}\n\
             [team3]\n{\nallyteam=2;\nteamleader=2;\n}\n\
             [allyteam0]\n{\nnumallies=0;\n}\n[allyteam2]\n{\nnumallies=0;\n}\n}\n";
-        let game = parsed(&start_script(script).unwrap());
+        let game = parsed(&start_script(script, &Opening::default()).unwrap());
 
         assert_eq!(
             numbered(&game, "team")
@@ -557,14 +609,14 @@ mod tests {
     fn the_counts_never_fall_below_the_sections_that_are_there() {
         let script = "[game]\n{\nmapname=M;\ngametype=G 1;\nnumteams=1;\n\
             [team0]\n{\nallyteam=0;\n}\n[team1]\n{\nallyteam=1;\n}\n}\n";
-        let game = parsed(&start_script(script).unwrap());
+        let game = parsed(&start_script(script, &Opening::default()).unwrap());
 
         assert_eq!(game.get("numteams"), Some("2"));
     }
 
     #[test]
     fn colours_sides_and_start_positions_carry_over() {
-        let game = parsed(&start_script(REPLAY_SCRIPT).unwrap());
+        let game = parsed(&start_script(REPLAY_SCRIPT, &Opening::default()).unwrap());
         let teams = numbered(&game, "team");
 
         assert_eq!(teams[0].1.get("rgbcolor"), Some("0.9 0.24 0.2"));
@@ -578,7 +630,7 @@ mod tests {
     #[test]
     fn mod_options_and_map_options_carry_over() {
         let original = parsed(REPLAY_SCRIPT);
-        let game = parsed(&start_script(REPLAY_SCRIPT).unwrap());
+        let game = parsed(&start_script(REPLAY_SCRIPT, &Opening::default()).unwrap());
 
         for section in ["modoptions", "mapoptions"] {
             let before = original.child(section).unwrap();
@@ -593,8 +645,100 @@ mod tests {
     }
 
     #[test]
+    fn a_start_frame_and_paused_are_mod_options() {
+        let opening = Opening {
+            frame: Some(550),
+            paused: true,
+        };
+        let game = parsed(&start_script(REPLAY_SCRIPT, &opening).unwrap());
+        let options = game.child("modoptions").unwrap();
+
+        assert_eq!(options.get("coilbox_rewind_start_frame"), Some("550"));
+        assert_eq!(options.get("coilbox_rewind_start_paused"), Some("1"));
+        // The replay's own options are still there.
+        assert_eq!(options.get("deathmode"), Some("com"));
+    }
+
+    #[test]
+    fn a_frame_without_paused_opens_playing() {
+        let opening = Opening {
+            frame: Some(0),
+            paused: false,
+        };
+        let game = parsed(&start_script(REPLAY_SCRIPT, &opening).unwrap());
+        let options = game.child("modoptions").unwrap();
+
+        assert_eq!(options.get("coilbox_rewind_start_frame"), Some("0"));
+        assert_eq!(options.get("coilbox_rewind_start_paused"), None);
+    }
+
+    #[test]
+    fn paused_without_a_frame_opens_on_the_first_frame_paused() {
+        let opening = Opening {
+            frame: None,
+            paused: true,
+        };
+        let game = parsed(&start_script(REPLAY_SCRIPT, &opening).unwrap());
+        let options = game.child("modoptions").unwrap();
+
+        assert_eq!(options.get("coilbox_rewind_start_frame"), None);
+        assert_eq!(options.get("coilbox_rewind_start_paused"), Some("1"));
+    }
+
+    #[test]
+    fn without_an_opening_neither_key_is_there() {
+        let game = parsed(&start_script(REPLAY_SCRIPT, &Opening::default()).unwrap());
+        let options = game.child("modoptions").unwrap();
+
+        assert_eq!(options.get("coilbox_rewind_start_frame"), None);
+        assert_eq!(options.get("coilbox_rewind_start_paused"), None);
+        assert_eq!(options.keys.len(), 4);
+    }
+
+    #[test]
+    fn a_replay_without_mod_options_still_gets_the_keys() {
+        let script = "[game]\n{\n[team0]\n{\nallyteam=0;\n}\nmapname=M;\ngametype=G 1;\n}\n";
+        let opening = Opening {
+            frame: Some(9),
+            paused: true,
+        };
+        let game = parsed(&start_script(script, &opening).unwrap());
+        let options = game.child("modoptions").unwrap();
+
+        assert_eq!(options.get("coilbox_rewind_start_frame"), Some("9"));
+        assert_eq!(options.get("coilbox_rewind_start_paused"), Some("1"));
+        // Without an opening, no empty section appears.
+        let plain = parsed(&start_script(script, &Opening::default()).unwrap());
+        assert!(plain.child("modoptions").is_none());
+    }
+
+    #[test]
+    fn a_replays_own_keys_cannot_shadow_the_opening() {
+        let script = REPLAY_SCRIPT.replace(
+            "[modoptions]\n{\n",
+            "[modoptions]\n{\ncoilbox_rewind_start_frame=1;\ncoilbox_rewind_start_paused=1;\n",
+        );
+        let opening = Opening {
+            frame: Some(550),
+            paused: false,
+        };
+        let text = start_script(&script, &opening).unwrap();
+        let options = parsed(&text);
+        let options = options.child("modoptions").unwrap();
+
+        assert_eq!(options.get("coilbox_rewind_start_frame"), Some("550"));
+        // Its paused key is dropped, not carried, when ours is unset.
+        assert_eq!(options.get("coilbox_rewind_start_paused"), None);
+        assert_eq!(text.matches("coilbox_rewind_start_frame").count(), 1);
+
+        // The same holds with no opening at all.
+        let text = start_script(&script, &Opening::default()).unwrap();
+        assert!(!text.contains("coilbox_rewind_start"), "{text}");
+    }
+
+    #[test]
     fn the_game_and_map_are_named_and_no_demo_is_recorded() {
-        let game = parsed(&start_script(REPLAY_SCRIPT).unwrap());
+        let game = parsed(&start_script(REPLAY_SCRIPT, &Opening::default()).unwrap());
 
         assert_eq!(game.get("gametype"), Some("Coilbox replay playback 1"));
         assert_eq!(game.get("mapname"), Some("All That Glitters v2.2.3"));
@@ -606,7 +750,7 @@ mod tests {
     /// the playback, so it takes the fixed type the spike ran with.
     #[test]
     fn nobody_is_asked_for_a_start_position() {
-        let game = parsed(&start_script(REPLAY_SCRIPT).unwrap());
+        let game = parsed(&start_script(REPLAY_SCRIPT, &Opening::default()).unwrap());
 
         assert_eq!(game.get("startpostype"), Some("1"));
     }
@@ -614,7 +758,7 @@ mod tests {
     /// The replay's address is not the playback's.
     #[test]
     fn the_replays_network_keys_are_not_carried() {
-        let script = start_script(REPLAY_SCRIPT).unwrap();
+        let script = start_script(REPLAY_SCRIPT, &Opening::default()).unwrap();
 
         assert!(!script.contains("hostip"), "{script}");
         assert!(!script.contains("hostport"), "{script}");
@@ -623,8 +767,8 @@ mod tests {
     #[test]
     fn the_same_replay_gives_the_same_script() {
         assert_eq!(
-            start_script(REPLAY_SCRIPT).unwrap(),
-            start_script(REPLAY_SCRIPT).unwrap()
+            start_script(REPLAY_SCRIPT, &Opening::default()).unwrap(),
+            start_script(REPLAY_SCRIPT, &Opening::default()).unwrap()
         );
     }
 
@@ -632,7 +776,7 @@ mod tests {
     /// the one the spike ran: a `[game]` block with sections inside it.
     #[test]
     fn the_script_is_a_game_block() {
-        let script = start_script(REPLAY_SCRIPT).unwrap();
+        let script = start_script(REPLAY_SCRIPT, &Opening::default()).unwrap();
 
         assert!(script.starts_with("[game]\n{\n"), "{script}");
         assert!(script.ends_with("}\n"), "{script}");
@@ -640,7 +784,7 @@ mod tests {
 
     #[test]
     fn nothing_assumes_where_gaia_is() {
-        let script = start_script(REPLAY_SCRIPT).unwrap();
+        let script = start_script(REPLAY_SCRIPT, &Opening::default()).unwrap();
 
         assert!(!script.to_lowercase().contains("gaia"), "{script}");
         assert_eq!(parsed(&script).get("numteams"), Some("2"));
@@ -648,9 +792,13 @@ mod tests {
 
     #[test]
     fn a_replay_with_no_map_or_no_teams_gives_no_script() {
-        assert!(start_script("[game]\n{\n[team0]\n{\nallyteam=0;\n}\n}\n").is_err());
-        assert!(start_script("[game]\n{\nmapname=M;\n}\n").is_err());
-        assert!(start_script("").is_err());
+        assert!(start_script(
+            "[game]\n{\n[team0]\n{\nallyteam=0;\n}\n}\n",
+            &Opening::default()
+        )
+        .is_err());
+        assert!(start_script("[game]\n{\nmapname=M;\n}\n", &Opening::default()).is_err());
+        assert!(start_script("", &Opening::default()).is_err());
     }
 
     /// Tables inside a section survive, such as a restriction list.
@@ -658,7 +806,7 @@ mod tests {
     fn a_table_inside_a_section_is_kept() {
         let script = "[game]\n{\nmapname=M;\n[team0]\n{\nallyteam=0;\n}\n\
             [restrict]\n{\n[unit0]\n{\nunitname=armcom;\nlimit=0;\n}\n}\n}\n";
-        let game = parsed(&start_script(script).unwrap());
+        let game = parsed(&start_script(script, &Opening::default()).unwrap());
 
         let unit = game.child("restrict").unwrap().child("unit0").unwrap();
         assert_eq!(unit.get("unitname"), Some("armcom"));
@@ -964,6 +1112,7 @@ mod tests {
                     tracks: &self.tracks,
                     content_root: &self.root,
                     game,
+                    opening: Opening::default(),
                     script_dir: &self.scripts,
                 },
                 |_| Ok("SHORT".to_string()),
@@ -995,6 +1144,33 @@ mod tests {
     }
 
     #[test]
+    fn a_launch_passes_its_opening_to_the_script() {
+        let world = World::new(REPLAY_SCRIPT);
+        world.record(RECORDER_VERSION);
+
+        let script = prepare(
+            &Prepare {
+                replay: &world.replay,
+                tracks: &world.tracks,
+                content_root: &world.root,
+                game: None,
+                script_dir: &world.scripts,
+                opening: Opening {
+                    frame: Some(40),
+                    paused: true,
+                },
+            },
+            |_| Ok("SHORT".to_string()),
+        )
+        .unwrap();
+
+        let game = parsed(&std::fs::read_to_string(&script).unwrap());
+        let options = game.child("modoptions").unwrap();
+        assert_eq!(options.get("coilbox_rewind_start_frame"), Some("40"));
+        assert_eq!(options.get("coilbox_rewind_start_paused"), Some("1"));
+    }
+
+    #[test]
     fn another_installed_version_of_the_game_can_stand_in() {
         let world = World::new(REPLAY_SCRIPT);
         world.record(RECORDER_VERSION);
@@ -1006,6 +1182,7 @@ mod tests {
                 tracks: &world.tracks,
                 content_root: &world.root,
                 game: Some(" SplinterFaction 0.1.89 "),
+                opening: Opening::default(),
                 script_dir: &world.scripts,
             },
             |game| {
@@ -1057,6 +1234,7 @@ mod tests {
                 tracks: &world.tracks,
                 content_root: &world.root,
                 game: None,
+                opening: Opening::default(),
                 script_dir: &world.scripts,
             },
             |_| Err("not installed".into()),
@@ -1163,8 +1341,10 @@ end
 
     /// Records the replay named by the environment into a track, the way the
     /// queue does, and prepares its playback. `None` when the variables are not
-    /// set, which is every run but one made on purpose.
-    fn prepared() -> Option<Prepared> {
+    /// set, which is every run but one made on purpose. With `in_the_middle`
+    /// the launch asks for the track's middle frame, paused, through
+    /// [`Opening`], the way the replay page's button does (issue #3809).
+    fn prepared(in_the_middle: bool) -> Option<Prepared> {
         use super::super::analysis::launch::RunControl;
         use super::super::analysis::{
             analyse_replay, run_timeout, AnalysisRequest, AnalysisStatus,
@@ -1239,12 +1419,24 @@ end
             .map(|d| d.to_string_lossy())
             .collect::<Vec<_>>()
             .join(&coilbox_proc::DATADIR_SEP.to_string());
+        let opening = if in_the_middle {
+            let track = std::fs::read(track_store::track_path(&tracks, &game_id).unwrap()).unwrap();
+            let word = |at: usize| u32::from_le_bytes(track[at..at + 4].try_into().unwrap());
+            let (first, last) = (word(12), word(16));
+            Opening {
+                frame: Some(first + (last - first) / 2),
+                paused: true,
+            }
+        } else {
+            Opening::default()
+        };
         let script = prepare(
             &Prepare {
                 replay: &replay,
                 tracks: &tracks,
                 content_root: &content,
                 game: stand_in.as_deref(),
+                opening,
                 script_dir: &dir.path().join("play"),
             },
             |game| {
@@ -1328,7 +1520,7 @@ end
     #[test]
     #[ignore = "needs an engine, a game, a map and a replay recorded with them"]
     fn a_real_replay_is_played_back_in_the_engine() {
-        let Some(prepared) = prepared() else {
+        let Some(prepared) = prepared(false) else {
             return;
         };
         std::fs::write(prepared.game_dir.join("luarules/gadgets/probe.lua"), PROBE).unwrap();
@@ -1428,7 +1620,7 @@ end
     #[test]
     #[ignore = "needs an engine, a game, a map and a replay recorded with them"]
     fn a_real_track_is_played_at_any_time() {
-        let Some(prepared) = prepared() else {
+        let Some(prepared) = prepared(true) else {
             return;
         };
         std::fs::write(
@@ -1456,24 +1648,18 @@ end
         let word = |at: usize| u32::from_le_bytes(track[at..at + 4].try_into().unwrap());
         let (first, last) = (word(12), word(16));
 
-        // Open in the middle of the match, paused, the way #3809 will ask.
+        // The launch asked for the middle of the match, paused, through the
+        // arguments the replay page's button passes (issue #3809).
         let middle = first + (last - first) / 2;
         let script = std::fs::read_to_string(&prepared.script).unwrap();
-        let options = format!(
-            "\t\tcoilbox_rewind_start_frame={middle};\n\t\tcoilbox_rewind_start_paused=1;\n"
+        assert!(
+            script.contains(&format!("coilbox_rewind_start_frame={middle};")),
+            "{script}"
         );
-        let opening = "\t[modoptions]\n\t{\n";
-        let script = match script.find(opening) {
-            Some(at) => {
-                let at = at + opening.len();
-                format!("{}{options}{}", &script[..at], &script[at..])
-            }
-            None => {
-                let end = script.rfind('}').unwrap();
-                format!("{}{opening}{options}\t}}\n}}\n", &script[..end])
-            }
-        };
-        std::fs::write(&prepared.script, script).unwrap();
+        assert!(
+            script.contains("coilbox_rewind_start_paused=1;"),
+            "{script}"
+        );
 
         let (timed_out, output, written) =
             launch(&prepared, &|text| text.contains("REWIND_DRIVER done"));
