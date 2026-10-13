@@ -1,8 +1,11 @@
 // @vitest-environment happy-dom
 
 /**
- * What the replay page says about analysis in each state, and what its buttons
- * reach (#1157, #1158).
+ * What the replay page says about analysing and recording a replay in each
+ * state, and what its buttons reach (#1157, #1158, #3788, #3962).
+ *
+ * One section and one button make the analysis and the track, so nothing here
+ * can ask for the engine to run twice for one replay.
  *
  * The real section and the real frontend store, with the plugin commands
  * replaced. happy-dom does no layout, so nothing here says how it looks.
@@ -17,12 +20,15 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const MIB = 1024 * 1024;
+
 const EMPTY_QUEUE = {
   running: null,
   queued: [],
   waitingForGame: false,
   failures: [],
   stored: 0,
+  tracks: 0,
 };
 
 /** What each command was handed, in order. */
@@ -38,6 +44,18 @@ let CHECK: {
 let ENGINES: { path: string; version: string; syncVersion?: string }[] = [];
 /** What `content_analysis_engine_output` answers. Null is a job not running. */
 let ENGINE_OUTPUT: string[] | null = null;
+/** What `content_analysis_enqueue` answers, or throws when it is an Error. */
+let ENQUEUE: string | Error = "queued";
+
+// The frame's `useSetting`, held in memory.
+vi.mock("@picoframe/frame", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@picoframe/frame")>();
+  const { useState } = await import("react");
+  return {
+    ...actual,
+    useSetting: (_key: string, fallback: unknown) => useState(fallback),
+  };
+});
 
 vi.mock("@picoframe/plugin-sdk", () => ({
   defineCommand:
@@ -49,7 +67,8 @@ vi.mock("@picoframe/plugin-sdk", () => ({
         case "content_state_load":
           return { state: { roots: [{ path: "/data", engines: ENGINES }] } };
         case "content_analysis_enqueue":
-          return { outcome: "queued", queue: EMPTY_QUEUE };
+          if (ENQUEUE instanceof Error) throw ENQUEUE;
+          return { outcome: ENQUEUE, queue: EMPTY_QUEUE };
         case "content_replay_analyses":
           return { analyses: [] };
         case "content_analysis_engine_output":
@@ -65,6 +84,19 @@ vi.mock("@picoframe/plugin-sdk", () => ({
     },
 }));
 
+// The tracks are seeded, so the command that reads them answers nothing new.
+vi.mock("../../bindings", async () => {
+  const actual =
+    await vi.importActual<Record<string, unknown>>("../../bindings");
+  return {
+    ...actual,
+    contentReplayTracks: async () => {
+      called.push({ command: "content_replay_tracks", args: undefined });
+      throw new Error("seeded in the test");
+    },
+  };
+});
+
 vi.mock("@tauri-apps/api/event", () => ({
   listen: async () => () => {},
 }));
@@ -78,17 +110,25 @@ vi.mock("../../../profile/profile", async (orig) => ({
 import type {
   DemoInfo,
   GameItem,
+  RecordingCost,
+  ReplayAnalysisFailure,
   ReplayAnalysisRunningJob,
   StoredReplayAnalysis,
+  StoredReplayTrack,
 } from "../../bindings";
 import { resetContentState } from "../../contentState";
 import {
   resetReplayAnalysisForTests,
   seedReplayAnalysisForTests,
 } from "../../replayAnalysis";
+import {
+  resetReplayTracksForTests,
+  seedReplayTracksForTests,
+} from "../../replayTracks";
 import { ReplayAnalysisSection } from "./ReplayAnalysisSection";
 
 const ID = "a0a1a2a3a4a5a6a7a8a9aaabacadaeaf";
+const OTHER = "b0b1b2b3b4b5b6b7b8b9babbbcbdbebf";
 const PATH = "/replays/match.sdfz";
 const TARGET = { enginePath: "/engines/2026", dataDir: "/data" };
 
@@ -158,7 +198,37 @@ function job(
     frame: 11535,
     lastFrame: 23070,
     cancelling: false,
-    record: false,
+    ...over,
+  };
+}
+
+const track = (over: Partial<StoredReplayTrack> = {}): StoredReplayTrack => ({
+  gameId: ID,
+  state: "current",
+  sizeBytes: MIB,
+  lastWatchedMs: 1,
+  ...over,
+});
+
+/** A past run of a match as long as INFO's: 23,070 frames in 3 minutes. */
+const pastRun = (over: Partial<RecordingCost> = {}): RecordingCost => ({
+  gameId: OTHER,
+  game: "Some Game 1.0",
+  frames: 23_070,
+  millis: 180_000,
+  trackBytes: 2 * MIB,
+  ...over,
+});
+
+function failure(
+  over: Partial<ReplayAnalysisFailure> = {},
+): ReplayAnalysisFailure {
+  return {
+    gameId: ID,
+    name: "match.sdfz",
+    reason: "engineFailed",
+    message: "the engine exited with status 1",
+    logExcerpt: [],
     ...over,
   };
 }
@@ -181,33 +251,63 @@ function show(
 
 /** The section's help entry, opened. Why and how long are said there. */
 const help = () => {
-  fireEvent.click(screen.getByRole("button", { name: "About the analysis" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "About the analysis and recording" }),
+  );
   return screen.getByRole("dialog").textContent ?? "";
 };
 const commands = () => called.map((c) => c.command);
-const analyseButton = () =>
-  screen.getByRole("button", { name: "Analyse this replay" });
+const region = () =>
+  screen.getByRole("region", { name: "Analysis and recording" }).textContent ??
+  "";
+const FRESH = "Analyse and record this replay";
+const analyseButton = (name: string | RegExp = FRESH) =>
+  screen.getByRole("button", { name });
+/** The confirmation, opened: what the run will cost, before it starts. */
+async function openConfirmation(name: string | RegExp = FRESH) {
+  await waitFor(() =>
+    expect(analyseButton(name)).toHaveProperty("disabled", false),
+  );
+  fireEvent.click(analyseButton(name));
+  return (await screen.findByRole("dialog")).textContent ?? "";
+}
+/** Press the button and answer the confirmation, which is what starts a run. */
+async function start(name: string | RegExp = FRESH) {
+  await openConfirmation(name);
+  fireEvent.click(screen.getByRole("button", { name: "Start" }));
+  await waitFor(() => expect(commands()).toContain("content_analysis_enqueue"));
+}
+const enqueued = () =>
+  called.find((c) => c.command === "content_analysis_enqueue")?.args;
 
 beforeEach(() => {
   called.length = 0;
   HIDE = [];
-  CHECK = { cannot: null, gameId: ID, matchSeconds: 769, headless: [] };
+  CHECK = {
+    cannot: null,
+    gameId: ID,
+    matchSeconds: 769,
+    headless: [TARGET.enginePath],
+  };
   ENGINES = [];
   ENGINE_OUTPUT = null;
+  ENQUEUE = "queued";
   resetContentState();
   resetReplayAnalysisForTests();
   seedReplayAnalysisForTests({});
+  resetReplayTracksForTests();
+  seedReplayTracksForTests([]);
 });
 
 afterEach(() => {
   cleanup();
 });
 
-describe("a replay that has not been analysed", () => {
+describe("a replay that has not been analysed or recorded", () => {
   it("says what pressing the button will do in the help and not in the section", async () => {
     show();
 
-    const text = screen.getByRole("region", { name: "Analysis" }).textContent;
+    const text = region();
     expect(text).not.toContain("plays this match back");
     expect(text).not.toContain("The result is kept only if");
     expect(text).not.toContain("The match is 12:49 long");
@@ -216,6 +316,7 @@ describe("a replay that has not been analysed", () => {
     expect(said).toContain(
       "Analysing plays the match back in the game's engine on this computer",
     );
+    expect(said).toContain("The same playback records the whole match");
     expect(said).toContain(
       "The result is kept only if the playback matches the recorded match",
     );
@@ -230,65 +331,265 @@ describe("a replay that has not been analysed", () => {
     );
   });
 
-  it("promises no duration until this computer has finished a run", () => {
+  it("is one section with one button, and says nothing of a track it has no reason to", async () => {
     show();
-    expect(
-      screen.getByRole("region", { name: "Analysis" }).textContent,
-    ).not.toMatch(/expect about|about \d+ (second|minute)/i);
-  });
 
-  it("estimates from this computer's own runs once there are some, and says how many", () => {
-    seedReplayAnalysisForTests({
-      analyses: [
-        stored({
-          gameId: "b".repeat(32),
-          matchSeconds: 769,
-          wallSeconds: 24.5,
-        }),
-      ],
-    });
-    show();
-    expect(
-      screen.getByRole("region", { name: "Analysis" }).textContent,
-    ).toContain("About 25 seconds");
-    // The page carries the figure as a label and no sentence around it.
-    expect(
-      screen.getByRole("region", { name: "Analysis" }).textContent,
-    ).not.toContain("Expect about");
-    const said = help();
-    expect(said).toContain("Expect about 25 seconds.");
-    expect(said).toContain(
-      "The estimate goes by the 1 analysis this computer has finished.",
-    );
-  });
-
-  it("starts nothing by being shown", async () => {
-    show();
+    expect(screen.getAllByRole("region")).toHaveLength(1);
+    expect(region()).not.toContain("Not recorded");
     await waitFor(() =>
       expect(analyseButton()).toHaveProperty("disabled", false),
     );
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "",
+      FRESH,
+    ]);
+  });
+
+  it("says the game runs once, without a window, before anything starts", async () => {
+    show();
+
+    const said = await openConfirmation();
+
+    expect(said).toContain("This runs the game once, without a window");
     expect(commands()).not.toContain("content_analysis_enqueue");
   });
 
-  it("asks for a run with the engine and folder a replay launch would use", async () => {
+  it("estimates the time and the track's size from runs of this game on this computer", async () => {
+    seedReplayTracksForTests([], null, [pastRun()]);
     show();
-    await waitFor(() =>
-      expect(analyseButton()).toHaveProperty("disabled", false),
-    );
 
-    fireEvent.click(analyseButton());
+    const said = await openConfirmation();
 
-    await waitFor(() =>
-      expect(commands()).toContain("content_analysis_enqueue"),
+    expect(said).toContain("Time: about 3 minutes");
+    expect(said).toContain("Track size: about 2.0 MB");
+    expect(said).toContain("Estimated from 1 earlier recording of this game");
+    cleanup();
+    show();
+    const helped = help();
+    expect(helped).toContain("Expect about 3 minutes.");
+    expect(helped).toContain(
+      "The estimate goes by the 1 recording of this game this computer has finished.",
     );
+  });
+
+  it("scales the estimate to the replay's length", async () => {
+    // Twice the frames of INFO took twice as long and came out twice as big.
+    seedReplayTracksForTests([], null, [
+      pastRun({ frames: 46_140, millis: 360_000, trackBytes: 4 * MIB }),
+    ]);
+    show();
+
+    const said = await openConfirmation();
+
+    expect(said).toContain("Time: about 3 minutes");
+    expect(said).toContain("Track size: about 2.0 MB");
+  });
+
+  it("says the time and size are unknown when nothing has been run, or only other games", async () => {
+    seedReplayTracksForTests([], null, [pastRun({ game: "Another Game 3" })]);
+    show();
+
+    const said = await openConfirmation();
+
+    expect(said).toContain("Time: unknown");
+    expect(said).toContain("Track size: unknown");
+    expect(said).not.toMatch(/about \d/);
+    expect(region()).not.toMatch(/expect about/i);
+  });
+
+  it("warns that older tracks will be removed when the new one will not fit the limit", async () => {
+    // 2 MB is stored, the limit is 3 MB and the new track is about 2 MB.
+    seedReplayTracksForTests(
+      [track({ gameId: OTHER, sizeBytes: 2 * MIB })],
+      3 * MIB,
+      [pastRun()],
+    );
+    show();
+
+    const said = await openConfirmation();
+
+    expect(said).toContain(
+      "Older tracks will be removed to stay within the 3.0 MB limit",
+    );
+  });
+
+  it("says nothing about the limit when the track fits, or when there is no size to go by", async () => {
+    seedReplayTracksForTests([], 10 * MIB, [pastRun()]);
+    show();
+    expect(await openConfirmation()).not.toMatch(/removed|limit/);
+    cleanup();
+
+    seedReplayTracksForTests(
+      [track({ gameId: OTHER, sizeBytes: 5 * MIB })],
+      3 * MIB,
+    );
+    show();
+    expect(await openConfirmation()).not.toMatch(/removed|limit/);
+  });
+
+  it("says a track larger than the whole limit keeps only itself", async () => {
+    seedReplayTracksForTests([], MIB, [pastRun()]);
+    show();
+
+    const said = await openConfirmation();
+
+    expect(said).toContain("larger than the whole 1.0 MB limit");
+  });
+
+  it("starts nothing by being shown, or until the confirmation is answered", async () => {
+    show();
+    await openConfirmation();
+    expect(commands()).not.toContain("content_analysis_enqueue");
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(commands()).not.toContain("content_analysis_enqueue");
+  });
+
+  it("asks once, for one run, with the engine and folder a replay launch would use", async () => {
+    show();
+
+    await start();
+
     expect(
-      called.find((c) => c.command === "content_analysis_enqueue")?.args,
-    ).toEqual({
+      called.filter((c) => c.command === "content_analysis_enqueue"),
+    ).toHaveLength(1);
+    expect(enqueued()).toEqual({
       replayPath: PATH,
       enginePath: "/engines/2026",
       dataDir: "/data",
       force: false,
     });
+  });
+
+  it("shows a refusal from the command", async () => {
+    ENQUEUE = new Error("no headless engine in /engines/2026");
+    show();
+
+    await start();
+
+    await screen.findByText(/no headless engine in/);
+  });
+
+  it("says a replay already in the queue is", async () => {
+    ENQUEUE = "alreadyQueued";
+    show();
+
+    await start();
+
+    await screen.findByText("This replay is already in the queue.");
+  });
+
+  it("says a replay that is already done is, and reads both stores again", async () => {
+    ENQUEUE = "alreadyDone";
+    show();
+    called.length = 0;
+
+    await start();
+
+    await screen.findByText("This replay is already analysed and recorded.");
+    expect(commands()).toContain("content_replay_analyses");
+    expect(commands()).toContain("content_replay_tracks");
+  });
+});
+
+/**
+ * One run makes both, and a replay can still end up with one: tracks go when
+ * the limit on disk space is reached, and an analysis can be deleted by itself.
+ */
+describe("a replay with only one of the two (#3962)", () => {
+  it("offers to record a replay that is analysed and has no track, and replaces the analysis", async () => {
+    seedReplayAnalysisForTests({ analyses: [stored()] });
+    show();
+
+    expect(region()).toContain("Analysed. 57 units made");
+    expect(region()).toContain("Not recorded for rewind.");
+    await start("Record this replay");
+
+    expect(enqueued()).toMatchObject({ force: true });
+  });
+
+  it("offers to analyse a replay that is recorded and has no analysis", async () => {
+    seedReplayTracksForTests([track()]);
+    show();
+
+    expect(region()).toContain("Recorded for rewind. The track takes 1.0 MB.");
+    expect(region()).not.toContain("Analysed.");
+    await start("Analyse this replay");
+
+    expect(enqueued()).toMatchObject({ force: true });
+  });
+
+  it("offers one new run for a current analysis whose track is out of date", async () => {
+    seedReplayAnalysisForTests({ analyses: [stored()] });
+    seedReplayTracksForTests([track({ state: "stale" })]);
+    show();
+
+    expect(region()).toContain("The recorded track is out of date");
+    await start("Analyse and record again");
+
+    expect(enqueued()).toMatchObject({ force: true });
+  });
+
+  it("does not count the replay's own track against the limit when it is replaced", async () => {
+    // Its 4 MB track is all that is stored, the limit is 5 MB and the new one
+    // is about 2 MB.
+    seedReplayTracksForTests(
+      [track({ state: "stale", sizeBytes: 4 * MIB })],
+      5 * MIB,
+      [pastRun()],
+    );
+    show();
+
+    const said = await openConfirmation("Analyse and record again");
+
+    expect(said).not.toMatch(/removed|limit/);
+  });
+
+  it("offers nothing more once it has both", () => {
+    seedReplayAnalysisForTests({ analyses: [stored()] });
+    seedReplayTracksForTests([track()]);
+    show();
+
+    expect(region()).toContain("Analysed.");
+    expect(region()).toContain("Recorded for rewind.");
+    expect(
+      screen.queryByRole("button", { name: /Analyse|Record|Try/ }),
+    ).toBeNull();
+  });
+
+  it("says the run that made the analysis could not make the track, once", () => {
+    seedReplayAnalysisForTests({
+      analyses: [stored()],
+      queue: {
+        failures: [
+          failure({
+            reason: "thinFailed",
+            message: "the recording is damaged",
+          }),
+        ],
+      },
+    });
+    show();
+
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    const said = screen.getByRole("alert").textContent;
+    expect(said).toContain("The recording could not be made into a track.");
+    expect(said).toContain("The recording is damaged. No track was made.");
+    expect(region()).toContain("Analysed.");
+    expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+  });
+
+  it("says an earlier track is kept when the new one could not be made", () => {
+    seedReplayTracksForTests([track()]);
+    seedReplayAnalysisForTests({
+      queue: { failures: [failure({ reason: "thinFailed", message: "bad" })] },
+    });
+    show();
+
+    expect(screen.getByRole("alert").textContent).toContain(
+      "Bad. The earlier track was kept.",
+    );
   });
 });
 
@@ -305,7 +606,18 @@ describe("a replay that cannot be analysed", () => {
     await screen.findByText(/never recorded a game over/);
     expect(analyseButton()).toHaveProperty("disabled", true);
     fireEvent.click(analyseButton());
+    expect(screen.queryByRole("button", { name: "Start" })).toBeNull();
     expect(commands()).not.toContain("content_analysis_enqueue");
+  });
+
+  it("says an engine with no headless build cannot play it back", async () => {
+    CHECK = { ...CHECK, headless: [] };
+    show();
+
+    await screen.findByText(
+      "Engine 2026.07.01 has no headless build, which the playback needs.",
+    );
+    expect(analyseButton()).toHaveProperty("disabled", true);
   });
 
   it("names the engine, the game and the map that are not installed", async () => {
@@ -317,7 +629,7 @@ describe("a replay that cannot be analysed", () => {
     expect(analyseButton()).toHaveProperty("disabled", true);
   });
 
-  it("gives a remix no analysis, even its original's", async () => {
+  it("gives a remix no analysis and no track, even its original's", async () => {
     CHECK = {
       cannot: "remix",
       gameId: null,
@@ -325,10 +637,12 @@ describe("a replay that cannot be analysed", () => {
       headless: [],
     };
     seedReplayAnalysisForTests({ analyses: [stored()] });
+    seedReplayTracksForTests([track()]);
     show({ info: { ...INFO, remixed: true } as DemoInfo });
 
     await screen.findByText(/This is a remix/);
     expect(screen.queryByText(/^Analysed\./)).toBeNull();
+    expect(region()).not.toContain("Recorded for rewind");
     expect(analyseButton()).toHaveProperty("disabled", true);
   });
 });
@@ -336,9 +650,10 @@ describe("a replay that cannot be analysed", () => {
 describe("a replay with something stored", () => {
   it("shows when it was analysed, with what, and the counts, and offers no second run", () => {
     seedReplayAnalysisForTests({ analyses: [stored()] });
+    seedReplayTracksForTests([track()]);
     show();
 
-    const text = screen.getByRole("region", { name: "Analysis" }).textContent;
+    const text = region();
     expect(text).toContain("Analysed. 57 units made, 54 finished and 22 lost.");
     expect(text).toContain(
       "with Some Game 1.0 on engine 2026.07.01 (Headless)",
@@ -375,16 +690,9 @@ describe("a replay with something stored", () => {
     expect(
       screen.getByText(/made by an earlier version of coilbox/),
     ).toBeTruthy();
-    const again = screen.getByRole("button", { name: "Analyse again" });
-    await waitFor(() => expect(again).toHaveProperty("disabled", false));
-    fireEvent.click(again);
+    await start("Analyse and record again");
 
-    await waitFor(() =>
-      expect(commands()).toContain("content_analysis_enqueue"),
-    );
-    expect(
-      called.find((c) => c.command === "content_analysis_enqueue")?.args,
-    ).toMatchObject({ force: true });
+    expect(enqueued()).toMatchObject({ force: true });
   });
 
   it("says a diverged playback did not reproduce the match, names the figures and the usual reason", async () => {
@@ -410,7 +718,7 @@ describe("a replay with something stored", () => {
 
     // The statistic's name arrives with the metric registry.
     await screen.findByText(/Units beamed in for team 0/);
-    const text = screen.getByRole("region", { name: "Analysis" }).textContent;
+    const text = region();
     expect(text).toContain("did not reproduce the recorded match");
     expect(text).not.toContain(
       "is not exactly the one the match was played on",
@@ -422,6 +730,9 @@ describe("a replay with something stored", () => {
       "Who won: the replay recorded 0, the playback gave 1.",
     );
     expect(text).not.toContain("units made");
+    // The stored analysis is what says it, and it says it once.
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(text).not.toContain("Not recorded for rewind");
     expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
   });
 });
@@ -494,19 +805,9 @@ describe("a replay in the queue", () => {
     expect(screen.queryByRole("progressbar")).toBeNull();
   });
 
-  it("says a recording is a recording, with the same bar and cancel", () => {
-    seedReplayAnalysisForTests({ queue: { running: job({ record: true }) } });
-    show();
-
-    expect(screen.getByText(/Recording the match\. Frame/)).toBeTruthy();
-    expect(screen.queryByText(/Playing the match back/)).toBeNull();
-    expect(screen.getByRole("progressbar")).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Cancel/ })).toBeTruthy();
-  });
-
-  it("shows the thinning of a recording as a stage, and draws no bar for it", () => {
+  it("shows the making of the track as a stage, and draws no bar for it", () => {
     seedReplayAnalysisForTests({
-      queue: { running: job({ record: true, phase: "thinning" }) },
+      queue: { running: job({ phase: "thinning" }) },
     });
     show();
 
@@ -517,35 +818,31 @@ describe("a replay in the queue", () => {
     expect(screen.getByRole("button", { name: /Cancel/ })).toBeTruthy();
   });
 
-  it("says no track was made when a recording diverged, and what disagreed is the stored analysis's to show", () => {
+  it("shows one job, with one bar and one cancel, and no offer beside it", () => {
     seedReplayAnalysisForTests({
-      queue: {
-        failures: [
-          {
-            gameId: ID,
-            name: "match.sdfz",
-            reason: "diverged",
-            message:
-              "the playback did not reproduce the recorded match, so no track was made from it",
-            logExcerpt: [],
-            record: true,
-            disagreements: [
-              {
-                figure: "gameSeconds",
-                recorded: "1500",
-                observed: "1750",
-              },
-            ],
-          },
-        ],
-      },
+      queue: { running: job() },
+      analyses: [stored()],
     });
     show();
 
-    const text = screen.getByRole("alert").textContent;
-    expect(text).toContain("The recording did not reproduce the match.");
-    expect(text).toContain("No track was made.");
-    expect(text).not.toContain("Nothing was stored.");
+    expect(screen.getAllByRole("progressbar")).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Cancel" })).toHaveLength(1);
+    expect(
+      screen.queryByRole("button", { name: /Analyse|Record|Try/ }),
+    ).toBeNull();
+  });
+
+  it("stops offering the cancel once it has been asked for", () => {
+    seedReplayAnalysisForTests({
+      queue: { running: job({ cancelling: true }) },
+    });
+    show();
+
+    expect(screen.getByText(/Stopping/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Cancel" })).toHaveProperty(
+      "disabled",
+      true,
+    );
   });
 
   it("says how many are ahead of a queued one", () => {
@@ -554,14 +851,12 @@ describe("a replay in the queue", () => {
       gameId: "b".repeat(32),
       name: "b.sdfz",
       replayPath: "/b",
-      record: false,
     };
     const mine = {
       id: 4,
       gameId: ID,
       name: "match.sdfz",
       replayPath: PATH,
-      record: false,
     };
     seedReplayAnalysisForTests({
       queue: {
@@ -571,9 +866,7 @@ describe("a replay in the queue", () => {
     });
     show();
 
-    expect(
-      screen.getByText("Queued, with 1 analysis ahead of it."),
-    ).toBeTruthy();
+    expect(screen.getByText("Queued, with 1 replay ahead of it.")).toBeTruthy();
   });
 
   it("says it is waiting for the game when one is running", () => {
@@ -582,7 +875,6 @@ describe("a replay in the queue", () => {
       gameId: ID,
       name: "match.sdfz",
       replayPath: PATH,
-      record: false,
     };
     seedReplayAnalysisForTests({
       queue: { queued: [mine], waitingForGame: true },
@@ -607,8 +899,6 @@ describe("a run that failed", () => {
             message: "the playback did not finish in the time allowed",
             limitSeconds: 1069,
             logExcerpt: [],
-            record: false,
-            disagreements: [],
           },
         ],
       },
@@ -634,8 +924,6 @@ describe("a run that failed", () => {
             message:
               "the engine exited with status 3 before the replay logger loaded",
             logExcerpt: ["GAME-section missing"],
-            record: false,
-            disagreements: [],
           },
         ],
       },
@@ -662,6 +950,16 @@ describe("a distribution that hides analytics.run", () => {
     const { container } = show();
     expect(container.textContent).toBe("");
     expect(commands()).toEqual([]);
+  });
+
+  it("still shows a track that exists, with no way to make an analysis", () => {
+    seedReplayTracksForTests([track()]);
+    show();
+
+    expect(region()).toContain("Recorded for rewind.");
+    expect(
+      screen.queryByRole("button", { name: /Analyse|Record|Try/ }),
+    ).toBeNull();
   });
 
   it("still shows a stored analysis, with no way to run another", () => {
@@ -696,20 +994,18 @@ describe("a replay whose engine is not installed (#3869)", () => {
 
   function withEngines(headless: { path: string }[] = [OLD, NEW]) {
     ENGINES = [OLD, NEW, NO_HEADLESS];
-    CHECK = { ...CHECK, headless: headless.map((e) => e.path) };
+    CHECK = {
+      ...CHECK,
+      headless: [TARGET.enginePath, ...headless.map((e) => e.path)],
+    };
   }
-
-  const region = () =>
-    screen.getByRole("region", { name: "Analysis" }).textContent ?? "";
-  const enqueued = () =>
-    called.find((c) => c.command === "content_analysis_enqueue")?.args;
 
   it("says which engine recorded it, which will be used, and when the result is kept", async () => {
     withEngines();
     show({ target: null });
 
     await screen.findByRole("button", {
-      name: "Analyse with 2026.07.04-46-g04f42e2 macos_integration",
+      name: "Analyse and record with 2026.07.04-46-g04f42e2 macos_integration",
     });
     expect(region()).toContain(
       "This replay was recorded on engine 2026.07.01, which is not installed.",
@@ -734,7 +1030,7 @@ describe("a replay whose engine is not installed (#3869)", () => {
   it("offers only engines that can run headless, newest first", async () => {
     withEngines();
     show({ target: null });
-    await screen.findByRole("button", { name: /^Analyse with/ });
+    await screen.findByRole("button", { name: /^Analyse and record with/ });
 
     fireEvent.click(screen.getByRole("combobox", { name: "Engine to use" }));
     const options = (await screen.findAllByRole("option")).map(
@@ -746,13 +1042,11 @@ describe("a replay whose engine is not installed (#3869)", () => {
   it("runs nothing until the button is pressed, then asks for the chosen engine and its folder", async () => {
     withEngines();
     show({ target: null });
-    const button = await screen.findByRole("button", { name: /^Analyse with/ });
-    await waitFor(() => expect(button).toHaveProperty("disabled", false));
+    await screen.findByRole("button", { name: /^Analyse and record with/ });
     expect(enqueued()).toBeUndefined();
 
-    fireEvent.click(button);
+    await start(/^Analyse and record with/);
 
-    await waitFor(() => expect(enqueued()).toBeDefined());
     expect(enqueued()).toEqual({
       replayPath: PATH,
       enginePath: NEW.path,
@@ -804,13 +1098,11 @@ describe("a replay whose engine is not installed (#3869)", () => {
       installedGames: games,
     });
 
-    const button = await screen.findByRole("button", { name: /^Analyse with/ });
+    await screen.findByRole("button", { name: /^Analyse and record with/ });
     expect(region()).toContain(
       "The game this replay was recorded on, Some Game 1.0, is not installed. The analysis will use Some Game 1.2, another version of it.",
     );
-    await waitFor(() => expect(button).toHaveProperty("disabled", false));
-    fireEvent.click(button);
-    await waitFor(() => expect(enqueued()).toBeDefined());
+    await start(/^Analyse and record with/);
     expect(enqueued()).toMatchObject({ game: "Some Game 1.2" });
   });
 
@@ -881,9 +1173,6 @@ describe("a replay whose engine is not installed (#3869)", () => {
 });
 
 describe("a stored analysis made with another engine (#3869)", () => {
-  const region = () =>
-    screen.getByRole("region", { name: "Analysis" }).textContent ?? "";
-
   it("says a different engine was used, and that the events are kept because the match matched", () => {
     seedReplayAnalysisForTests({
       analyses: [

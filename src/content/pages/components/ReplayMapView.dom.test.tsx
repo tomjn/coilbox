@@ -112,7 +112,9 @@ vi.mock("../../bindings", async () => {
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: async () => {} }));
 
 const { ReplayMapViewSection } = await import("./ReplayMapView");
-const { RECORDING_SECTION_ID } = await import("./ReplayRecordingSection");
+const { ANALYSIS_ACTION_ATTRIBUTE, ANALYSIS_SECTION_ID } = await import(
+  "../../replayAnalysis"
+);
 
 const info = {
   gameId: ID,
@@ -291,12 +293,14 @@ describe("when there is nothing to draw", () => {
     expect(container.innerHTML).toBe("");
   });
 
-  it("says a stale track is not shown, does not read it, and leads to the recording section", async () => {
-    // The recording section, as the page has it above the view.
+  it("says a stale track is not shown, does not read it, and leads to the button that records", async () => {
+    // The analysis and recording section, as the page has it above the view:
+    // its help button, then the button that asks for a run.
     const section = document.createElement("section");
-    section.id = RECORDING_SECTION_ID;
+    section.id = ANALYSIS_SECTION_ID;
     const record = document.createElement("button");
-    section.append(record);
+    record.setAttribute(ANALYSIS_ACTION_ATTRIBUTE, "");
+    section.append(document.createElement("button"), record);
     document.body.append(section);
 
     await show("stale");

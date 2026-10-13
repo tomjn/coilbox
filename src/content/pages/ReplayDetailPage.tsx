@@ -61,7 +61,6 @@ import { ReplayBuildOrders } from "./components/ReplayBuildOrders";
 import { ReplayChat } from "./components/ReplayChat";
 import { ReplayMap } from "./components/ReplayMap";
 import { ReplayMapViewSection } from "./components/ReplayMapView";
-import { ReplayRecordingSection } from "./components/ReplayRecordingSection";
 import { ReplayRoster } from "./components/ReplayRoster";
 import { ReplaySetPicker } from "./components/ReplaySetPicker";
 import { StaleRemixNotice } from "./components/StaleRemixNotice";
@@ -855,8 +854,9 @@ export default function ReplayDetailPage() {
               <ReplayBuildOrders info={info} replayPath={replay.path} />
             )}
 
-            {/* Opt in, one replay at a time (#1157). The section gates itself on
-             * `analytics.run`, and still shows an analysis that is already stored. */}
+            {/* Opt in, one replay at a time (#1157). One run makes the analysis
+             * and the track (#3962). The section gates itself on
+             * `analytics.run`, and still shows what is already stored. */}
             {replay && (
               <ReplayAnalysisSection
                 replayPath={replay.path}
@@ -876,19 +876,6 @@ export default function ReplayDetailPage() {
                     onMapDownloaded={onMapDownloaded}
                   />
                 }
-              />
-            )}
-
-            {/* The same queue as the analysis, so it sits with it (#3788). The
-             * section gates itself on `analytics.run`. */}
-            {replay && (
-              <ReplayRecordingSection
-                replayPath={replay.path}
-                info={info}
-                target={resolved?.matched ? resolved.target : null}
-                missingGame={missingGame}
-                missingMap={missingMap}
-                dependencyBlock={dependencyBlock}
               />
             )}
 

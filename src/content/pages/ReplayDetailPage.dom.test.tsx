@@ -194,7 +194,9 @@ describe("ReplayDetailPage", () => {
 
     seedReplayTracksForTests([{ ...track, state: "current" }]);
     const first = renderAt("a.sdfz");
-    expect(screen.queryByText(/^Recorded\. The track takes/)).not.toBeNull();
+    expect(
+      screen.queryByText(/^Recorded for rewind\. The track takes/),
+    ).not.toBeNull();
     // The list's badge is not repeated on the page.
     expect(screen.queryByText("Track recorded")).toBeNull();
     first.unmount();
@@ -205,10 +207,12 @@ describe("ReplayDetailPage", () => {
       screen.queryByText(/The recorded track is out of date/),
     ).not.toBeNull();
     expect(screen.queryByText("Track out of date")).toBeNull();
-    expect(screen.queryByText(/^Recorded\. The track takes/)).toBeNull();
+    expect(
+      screen.queryByText(/^Recorded for rewind\. The track takes/),
+    ).toBeNull();
   });
 
-  it("has the map view of a recorded track under the recording section, and not without a track (#3807)", () => {
+  it("has the map view of a recorded track under the one section that analyses and records, and not without a track (#3807, #3962)", () => {
     const gameId = "00112233445566778899aabbccddeeff";
     FILE = "a.sdfz";
     INFO = { ...LOADED_INFO, gameId };
@@ -221,7 +225,10 @@ describe("ReplayDetailPage", () => {
       { gameId, sizeBytes: 1, lastWatchedMs: 1, state: "current" },
     ]);
     renderAt("a.sdfz");
-    const recording = screen.getByRole("region", { name: "Recording" });
+    expect(screen.queryByRole("region", { name: "Recording" })).toBeNull();
+    const recording = screen.getByRole("region", {
+      name: "Analysis and recording",
+    });
     const view = screen.getByRole("region", { name: "Recorded match" });
     expect(
       recording.compareDocumentPosition(view) &

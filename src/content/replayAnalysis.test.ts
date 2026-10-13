@@ -41,10 +41,7 @@ vi.mock("../profile/profile", async (orig) => ({
   getProfile: () => ({ version: 1, hide: HIDE }),
 }));
 
-import type {
-  ReplayAnalysisRunningJob,
-  StoredReplayAnalysis,
-} from "./bindings";
+import type { ReplayAnalysisRunningJob } from "./bindings";
 import {
   analysisBlockers,
   analysisPercent,
@@ -53,7 +50,6 @@ import {
   cancelAnalysis,
   disagreementInWords,
   dismissAnalysisFailure,
-  estimateAnalysisSeconds,
   requestAnalysis,
 } from "./replayAnalysis";
 
@@ -62,38 +58,6 @@ const ARGS = {
   enginePath: "/engines/1",
   dataDir: "/data",
 };
-
-function stored(over: Partial<StoredReplayAnalysis>): StoredReplayAnalysis {
-  return {
-    state: "current",
-    sizeBytes: 2526,
-    kind: "analysis",
-    storeFormat: 1,
-    outcome: "reproduced",
-    gameId: "a".repeat(32),
-    loggerFormat: 1,
-    loggerVersion: 1,
-    engine: "2026.07.01",
-    game: "Some Game 1.0",
-    map: "Some Map",
-    analysedAtMs: 0,
-    matchSeconds: 600,
-    wallSeconds: 30,
-    counts: {
-      header: 1,
-      gameStart: 1,
-      unitCreated: 57,
-      unitFinished: 54,
-      unitDestroyed: 22,
-      unitGiven: 0,
-      startUnitPosition: 0,
-      gameOver: 1,
-      unknown: 0,
-    },
-    disagreements: [],
-    ...over,
-  };
-}
 
 function running(
   over: Partial<ReplayAnalysisRunningJob>,
@@ -109,7 +73,6 @@ function running(
     frame: 1500,
     lastFrame: 3000,
     cancelling: false,
-    record: false,
     ...over,
   };
 }
@@ -229,6 +192,15 @@ describe("why a replay cannot be analysed", () => {
     ).toEqual(["The map is not installed."]);
   });
 
+  it("says when the replay's own engine is installed with no headless build", () => {
+    expect(analysisBlockers({ ...installed, engineHeadless: false })).toEqual([
+      "Engine 2026.07.01 has no headless build, which the playback needs.",
+    ]);
+    expect(analysisBlockers({ ...installed, engineHeadless: true })).toEqual(
+      [],
+    );
+  });
+
   it("lets what the replay is outrank what is installed", () => {
     expect(
       analysisBlockers({
@@ -238,40 +210,6 @@ describe("why a replay cannot be analysed", () => {
         missingGame: true,
       }),
     ).toHaveLength(1);
-  });
-});
-
-describe("the estimate", () => {
-  it("is nothing until this machine has finished a run", () => {
-    expect(estimateAnalysisSeconds([], 600)).toBeNull();
-  });
-
-  it("comes from this machine's own runs, and says how many", () => {
-    // 30s for 600s and 90s for 1800s: a twentieth of the match's length.
-    const runs = [
-      stored({ matchSeconds: 600, wallSeconds: 30 }),
-      stored({ matchSeconds: 1800, wallSeconds: 90 }),
-    ];
-    expect(estimateAnalysisSeconds(runs, 1200)).toEqual({
-      seconds: 60,
-      runs: 2,
-    });
-  });
-
-  it("counts a diverged run, which played the whole match too", () => {
-    const runs = [
-      stored({ state: "diverged", outcome: "diverged", wallSeconds: 60 }),
-    ];
-    expect(estimateAnalysisSeconds(runs, 600)).toEqual({
-      seconds: 60,
-      runs: 1,
-    });
-  });
-
-  it("leaves out a record with no times in it", () => {
-    expect(
-      estimateAnalysisSeconds([stored({ wallSeconds: 0 })], 600),
-    ).toBeNull();
   });
 });
 
@@ -299,7 +237,7 @@ describe("progress", () => {
   it("shows the thinning of a recording as a stage with no bar", () => {
     // The engine has finished, so the frame is where the playback ended. A bar
     // at that frame would sit full while the track is being made.
-    const thinning = running({ phase: "thinning", frame: 3000, record: true });
+    const thinning = running({ phase: "thinning", frame: 3000 });
     expect(analysisPercent(thinning)).toBe(0);
     expect(analysisProgressLabel(thinning)).toBe("Making the track");
     expect(analysisProgressLabel({ ...thinning, cancelling: true })).toBe(

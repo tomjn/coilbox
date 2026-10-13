@@ -20,7 +20,8 @@ import { refreshStoredTracks } from "./replayTracks";
 /**
  * Replay analysis on the frontend (#1157, #1158): the queue as every window
  * sees it, the stored analyses to join to replays by game id, and the only
- * way a run is asked for.
+ * way a run is asked for. A run also records the match as a track (#3962), so
+ * there is one way to ask and the engine plays a replay once for both.
  *
  * The queue lives in Rust and outlives any page. This module asks for it once
  * and then follows `ANALYSIS_QUEUE_EVENT`, so a page opened while a run is
@@ -32,8 +33,17 @@ import { refreshStoredTracks } from "./replayTracks";
  * refuses. Analyses that are already stored are still read.
  */
 
-/** The analysis section's element id, so another section can point at it. */
+/**
+ * The element id of the section that analyses and records a replay, so another
+ * section can point at it.
+ */
 export const ANALYSIS_SECTION_ID = "replay-analysis";
+
+/**
+ * Marks the button in that section that asks for a run, so another section can
+ * send focus to it. The section's first button is its help.
+ */
+export const ANALYSIS_ACTION_ATTRIBUTE = "data-analysis-action";
 
 /** Whether this distribution hides the analysis run. */
 export function analysisRunHidden(): boolean {
@@ -68,14 +78,6 @@ function setQueue(next: ReplayAnalysisQueue): void {
   // A run stored or replaced something, so the list is out of date.
   if (storeChanged) void refreshStoredAnalyses();
   if (tracksChanged) void refreshStoredTracks();
-}
-
-/**
- * Take a queue that a command answered with. For the call that asks for a
- * recording, which shares this queue.
- */
-export function acceptQueue(next: ReplayAnalysisQueue): void {
-  setQueue(next);
 }
 
 /** Read the stored analyses again. Called after anything that changes them. */
@@ -134,9 +136,12 @@ export function useStoredAnalyses(): Analyses {
 }
 
 /**
- * Ask for a replay to be analysed. The one place the enqueue command is
- * called, and it refuses when the distribution hides the run. Call it only
- * from a press of the button for that replay.
+ * Ask for a replay to be analysed and recorded. The one place the enqueue
+ * command is called, and it refuses when the distribution hides the run. Call
+ * it only from a press of the button for that replay.
+ *
+ * Answers `queued`, `alreadyQueued`, or `alreadyDone` for a match whose
+ * analysis and track are both current when `force` is not set.
  */
 export async function requestAnalysis(args: {
   replayPath: string;
@@ -145,13 +150,16 @@ export async function requestAnalysis(args: {
   /** Another installed version of the replay's game, in place of its own. */
   game?: string;
   force?: boolean;
-}): Promise<"queued" | "alreadyQueued" | "alreadyAnalysed"> {
+}): Promise<"queued" | "alreadyQueued" | "alreadyDone"> {
   if (analysisRunHidden()) {
     throw new Error("Replay analysis is turned off in this distribution.");
   }
   const { outcome, queue: next } = await contentAnalysisEnqueue(args);
   setQueue(next);
-  if (outcome === "alreadyAnalysed") void refreshStoredAnalyses();
+  if (outcome === "alreadyDone") {
+    void refreshStoredAnalyses();
+    void refreshStoredTracks();
+  }
   return outcome;
 }
 
@@ -212,6 +220,11 @@ export function analysisBlockers(facts: {
   /** The exact engine the replay was recorded on is installed. */
   engineInstalled: boolean;
   /**
+   * That engine has a headless build, which is the only kind that can play a
+   * match back without a window. Left out, it reads as yes.
+   */
+  engineHeadless?: boolean;
+  /**
    * How many other installed engines the analysis could use instead, and how
    * many engines are installed at all, for saying which is the problem. Left
    * out, they read as none.
@@ -251,6 +264,10 @@ export function analysisBlockers(facts: {
       facts.installedEngines
         ? `${which}, and none of the engines that are installed can run an analysis, which needs one with a headless build.`
         : `${which}, and no other engine is installed.`,
+    );
+  } else if (facts.engineInstalled && facts.engineHeadless === false) {
+    blockers.push(
+      `Engine ${facts.engineVersion} has no headless build, which the playback needs.`,
     );
   }
   if (facts.missingGame && !facts.otherGame) {
@@ -294,32 +311,6 @@ export function differenceNote(a: StoredReplayAnalysis): string | null {
       : "The playback still matched the recorded match exactly, so the events are kept.",
   );
   return said.join(" ");
-}
-
-/**
- * How long this machine's own finished runs suggest an analysis of a match
- * will take, or null when it has finished none.
- *
- * Nothing is promised from elsewhere. The figure is the playback time of every
- * stored run on this computer over the length of the matches they played,
- * applied to this match, and it comes with how many runs that is.
- */
-export function estimateAnalysisSeconds(
-  stored: Iterable<StoredReplayAnalysis>,
-  matchSeconds: number,
-): { seconds: number; runs: number } | null {
-  let wall = 0;
-  let played = 0;
-  let runs = 0;
-  for (const a of stored) {
-    if (a.wallSeconds > 0 && a.matchSeconds > 0) {
-      wall += a.wallSeconds;
-      played += a.matchSeconds;
-      runs += 1;
-    }
-  }
-  if (runs === 0 || matchSeconds <= 0) return null;
-  return { seconds: Math.round((wall / played) * matchSeconds), runs };
 }
 
 /** How far a running analysis has got, as a share of the match from 0 to 100. */

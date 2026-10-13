@@ -4,6 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import type { DemoInfo, ReplayTrackHeader } from "../../bindings";
 import { useUnitsyncMinimap } from "../../config";
+import {
+  ANALYSIS_ACTION_ATTRIBUTE,
+  ANALYSIS_SECTION_ID,
+} from "../../replayAnalysis";
 import { createReplayClock, type ReplayClock } from "../../replayMapView/clock";
 import {
   createMapView,
@@ -29,11 +33,10 @@ import {
   ReplayPlaybackBar,
   timelineKeyHandler,
 } from "./ReplayPlaybackBar";
-import { RECORDING_SECTION_ID } from "./ReplayRecordingSection";
 import { SectionHelp } from "./SectionHelp";
 
-/** Said under the recording section, which has already said the track is out
- *  of date. This says what that means here. */
+/** Said under the analysis and recording section, which has already said the
+ *  track is out of date. This says what that means here. */
 const STALE_WORDS =
   "The track has to be recorded again before the match can be shown here.";
 
@@ -52,8 +55,9 @@ interface Named {
  * track with no engine and none of the game's Lua.
  *
  * It is shown when the replay has a track. A current track is drawn. A stale
- * one, or one that cannot be read, says so and leads to the recording section
- * above it, which has the button that records the replay again.
+ * one, or one that cannot be read, says so and leads to the analysis and
+ * recording section above it, which has the button that records the replay
+ * again.
  *
  * The time comes from a {@link ReplayClock} this section owns. The timeline
  * under the map (#3808) sets it, and the view draws whatever the clock says.
@@ -158,9 +162,11 @@ function NotShown({ words }: { words: string }) {
         variant="outline"
         size="sm"
         onClick={() => {
-          const section = document.getElementById(RECORDING_SECTION_ID);
+          const section = document.getElementById(ANALYSIS_SECTION_ID);
           section?.scrollIntoView({ block: "nearest" });
-          section?.querySelector("button")?.focus();
+          section
+            ?.querySelector<HTMLElement>(`[${ANALYSIS_ACTION_ATTRIBUTE}]`)
+            ?.focus();
         }}
       >
         Go to recording

@@ -19,16 +19,15 @@
 //!   diverged is stored without. See [`store`]. Anything else is not a fact
 //!   about the replay, so it is kept only here, as the last failure for that
 //!   match this session, for the page to show.
-//! - A match with a current analysis is not run again unless the job says to.
-//! - A job can also ask for the match to be recorded as a track (issue #3785).
-//!   Every run carries the logger, because its figures are what decides whether
-//!   the run played the match that was recorded, so recording adds the rewind
-//!   recorder to a run that happens anyway. A replay asked for as an analysis
-//!   and as a recording while it waits is one job, and one that is already
-//!   running cannot be given the recorder, so the recording follows it. After
-//!   the engine exits a run that reproduced the match has its dump thinned into
-//!   a track, as a stage of its own that can be cancelled. The dump is deleted
-//!   however the run ended.
+//! - Every job also records the match as a track (issues #3785 and #3962), so
+//!   one run of the engine makes the analysis and the track. The logger's
+//!   figures are what decides whether the run played the match that was
+//!   recorded, and the rewind recorder rides in the same run. After the engine
+//!   exits a run that reproduced the match has its dump thinned into a track,
+//!   as a stage of its own that can be cancelled. The dump is deleted however
+//!   the run ended.
+//! - A match with a current analysis and a current track is not run again
+//!   unless the job says to. One with only one of the two is run for both.
 //!
 //! This is separate from the play launch's `RunRegistry` on purpose. That one
 //! refuses a second game. This one queues.
@@ -49,7 +48,6 @@ use super::super::def_sets;
 use super::super::recording_costs;
 use super::super::track_budget;
 use super::super::track_store;
-use super::divergence::Disagreement;
 use super::launch::RunControl;
 use super::RecordingOutcome;
 use super::{
@@ -76,7 +74,7 @@ const RECORDINGS_DIR: &str = "replay-recording";
 
 const EXIT_TIDY_WAIT: Duration = Duration::from_secs(2);
 
-/// One replay to analyse.
+/// One replay to analyse and record.
 #[derive(Clone, Debug)]
 pub struct JobSpec {
     pub replay: PathBuf,
@@ -90,22 +88,20 @@ pub struct JobSpec {
     /// The replay's file name, for a list to show.
     pub name: String,
     pub match_seconds: u32,
-    /// Run even though a current analysis or track is stored. Only a person
-    /// asking for a new one sets it.
+    /// Run even though a current analysis and track are stored. Only a person
+    /// asking for new ones sets it.
     pub force: bool,
-    /// Also record the match as a track. See [`track_store`].
-    pub record: bool,
 }
 
 /// What runs the engine, and what knows whether a game is being played. A seam
 /// so the queue's rules can be tested with neither.
 pub trait Engine: Send + Sync + 'static {
-    /// `record_to` is where the recorder's dump is to be left, for a job that
-    /// records, and the queue deletes it afterwards.
+    /// `record_to` is where the recorder's dump is to be left, and the queue
+    /// deletes it afterwards.
     fn run(
         &self,
         job: &JobSpec,
-        record_to: Option<&Path>,
+        record_to: &Path,
         control: &RunControl,
         on_poll: &dyn Fn(RunProgress),
     ) -> Result<AnalysisRun, String>;
@@ -135,7 +131,7 @@ impl Engine for HeadlessEngine {
     fn run(
         &self,
         job: &JobSpec,
-        record_to: Option<&Path>,
+        record_to: &Path,
         control: &RunControl,
         on_poll: &dyn Fn(RunProgress),
     ) -> Result<AnalysisRun, String> {
@@ -151,7 +147,7 @@ impl Engine for HeadlessEngine {
                 game_short_name: None,
                 scratch_root: self.scratch_root.clone(),
                 timeout: run_timeout(job.match_seconds),
-                record: record_to.map(Path::to_path_buf),
+                record: Some(record_to.to_path_buf()),
             },
             control,
             on_poll,
@@ -174,9 +170,6 @@ pub enum FailureReason {
     EngineFailed,
     /// The run could not be started, or its result could not be stored.
     CouldNotRun,
-    /// The playback finished and did not reproduce the match, so a recording
-    /// of it would be of a game nobody played.
-    Diverged,
     /// The playback was good and its recording could not be made into a track.
     ThinFailed,
 }
@@ -195,11 +188,6 @@ pub struct Failure {
     pub limit_seconds: Option<u64>,
     /// What the engine said: its fatal lines, or its last lines.
     pub log_excerpt: Vec<String>,
-    /// The job was a recording, so the page words it as one.
-    pub record: bool,
-    /// Every figure the playback and the replay disagree on, for a run that
-    /// diverged. Empty for every other reason.
-    pub disagreements: Vec<Disagreement>,
 }
 
 /// The job that is running.
@@ -217,8 +205,6 @@ pub struct RunningJob {
     pub last_frame: i32,
     /// A cancel has been asked for and the run is on its way out.
     pub cancelling: bool,
-    /// The job records the match as a track.
-    pub record: bool,
 }
 
 /// A job that is waiting its turn.
@@ -229,7 +215,6 @@ pub struct QueuedJob {
     pub game_id: String,
     pub name: String,
     pub replay_path: String,
-    pub record: bool,
 }
 
 /// The whole queue, as a page shows it.
@@ -250,22 +235,16 @@ pub struct QueueSnapshot {
     pub tracks: u64,
 }
 
-/// What asking for an analysis or a recording came to.
+/// What asking for a replay to be analysed and recorded came to.
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum Enqueued {
     Queued,
     /// That match is already queued or running.
     AlreadyQueued,
-    /// That match has a current analysis and the job did not ask for a new
-    /// one. Nothing was queued.
-    AlreadyAnalysed,
-    /// That match has a current track and the job did not ask for a new one.
-    /// Nothing was queued.
-    AlreadyRecorded,
-    /// The match was waiting as an analysis and is now a recording too. It is
-    /// still one job, so the engine runs once.
-    Joined,
+    /// That match has a current analysis and a current track, and the job did
+    /// not ask for new ones. Nothing was queued.
+    AlreadyDone,
 }
 
 struct Job {
@@ -312,7 +291,6 @@ impl QueueState {
                 frame: running.progress.frame,
                 last_frame: running.progress.last_frame,
                 cancelling: running.cancelling,
-                record: running.job.spec.record,
             }),
             queued: self
                 .queued
@@ -322,7 +300,6 @@ impl QueueState {
                     game_id: job.spec.game_id.clone(),
                     name: job.spec.name.clone(),
                     replay_path: job.spec.replay.to_string_lossy().into_owned(),
-                    record: job.spec.record,
                 })
                 .collect(),
             waiting_for_game: self.waiting_for_game,
@@ -332,16 +309,13 @@ impl QueueState {
         }
     }
 
-    /// Whether a job for this match, waiting or running, already does what
-    /// `spec` asks. A recording also makes the analysis, so it covers a
-    /// request for one. An analysis does not cover a request to record.
-    fn covers(&self, spec: &JobSpec) -> bool {
-        let does = |held: &JobSpec| held.game_id == spec.game_id && (held.record || !spec.record);
-        self.queued.iter().any(|job| does(&job.spec))
+    /// Whether a job for this match is already waiting or running.
+    fn holds(&self, game_id: &str) -> bool {
+        self.queued.iter().any(|job| job.spec.game_id == game_id)
             || self
                 .running
                 .as_ref()
-                .is_some_and(|running| does(&running.job.spec))
+                .is_some_and(|running| running.job.spec.game_id == game_id)
     }
 }
 
@@ -372,15 +346,13 @@ struct Shared {
 }
 
 impl Shared {
-    /// Whether there is nothing for this job to do: the track it records is
-    /// current, or for a job that does not record, the analysis is.
+    /// Whether there is nothing for this job to do: the analysis and the
+    /// track are both current. A match with only one of them is run again,
+    /// because one run makes both.
     fn is_current(&self, spec: &JobSpec) -> bool {
-        if spec.record {
-            track_store::state(&self.tracks, &spec.game_id)
+        store::is_current(&self.analyses, &spec.game_id)
+            && track_store::state(&self.tracks, &spec.game_id)
                 .is_ok_and(|state| state == Some(track_store::TrackState::Current))
-        } else {
-            store::is_current(&self.analyses, &spec.game_id)
-        }
     }
 
     fn lock(&self) -> MutexGuard<'_, QueueState> {
@@ -435,59 +407,35 @@ impl AnalysisQueue {
         self.0.lock().snapshot()
     }
 
-    /// Ask for a replay to be analysed, or recorded as well when the spec says
-    /// so.
+    /// Ask for a replay to be analysed and recorded.
     pub fn enqueue(&self, spec: JobSpec) -> Result<Enqueued, String> {
         // Looked up before the lock is taken: it reads a file.
         let current = !spec.force && self.0.is_current(&spec);
-        let mut joined = false;
         {
             let mut state = self.0.lock();
             if state.closed {
                 return Err("coilbox is closing".into());
             }
-            if state.covers(&spec) {
+            if state.holds(&spec.game_id) {
                 return Ok(Enqueued::AlreadyQueued);
             }
             if current {
-                return Ok(if spec.record {
-                    Enqueued::AlreadyRecorded
-                } else {
-                    Enqueued::AlreadyAnalysed
-                });
+                return Ok(Enqueued::AlreadyDone);
             }
             // Asking again is the answer to the last failure.
             state.failures.retain(|f| f.game_id != spec.game_id);
-            // A recording asked for while the analysis of that replay waits
-            // gives the waiting job the recorder, so the engine runs once.
-            // (One that is already running cannot be changed, so a job of its
-            // own is queued behind it.)
-            if let Some(waiting) = state
-                .queued
-                .iter_mut()
-                .find(|job| job.spec.game_id == spec.game_id)
-            {
-                waiting.spec.record |= spec.record;
-                waiting.spec.force |= spec.force;
-                joined = true;
-            } else {
-                state.next_id += 1;
-                let id = state.next_id;
-                state.queued.push_back(Job { id, spec });
-                if !state.working {
-                    state.working = true;
-                    let shared = self.0.clone();
-                    std::thread::spawn(move || work(&shared));
-                }
+            state.next_id += 1;
+            let id = state.next_id;
+            state.queued.push_back(Job { id, spec });
+            if !state.working {
+                state.working = true;
+                let shared = self.0.clone();
+                std::thread::spawn(move || work(&shared));
             }
         }
         self.0.changed.notify_all();
         self.0.announce();
-        Ok(if joined {
-            Enqueued::Joined
-        } else {
-            Enqueued::Queued
-        })
+        Ok(Enqueued::Queued)
     }
 
     /// Cancel one job. A queued one is dropped. A running one has its engine
@@ -623,8 +571,6 @@ fn make_failure(
         log_excerpt: run
             .map(|run| run.report.log_excerpt.clone())
             .unwrap_or_default(),
-        record: job.record,
-        disagreements: Vec::new(),
     }
 }
 
@@ -719,11 +665,12 @@ fn settle(
     )
 }
 
-/// What became of the track a recording job was to make.
+/// What became of the track a job was to make.
 enum Recorded {
     Stored,
-    /// Nothing to keep and nothing to say: it was cancelled, or the engine run
-    /// failed and [`settle`] has said so.
+    /// Nothing to keep and nothing to say: it was cancelled, the engine run
+    /// failed and [`settle`] has said so, or the playback diverged and the
+    /// stored analysis says so.
     Nothing,
     Failed(Failure),
 }
@@ -756,19 +703,13 @@ fn record_track(
     };
     match report.status {
         AnalysisStatus::Reproduced => {}
-        AnalysisStatus::Diverged => {
-            let mut failure = make_failure(
-                spec,
-                FailureReason::Diverged,
-                "the playback did not reproduce the recorded match, so no track was made from it"
-                    .into(),
-                Some(run),
-            );
-            failure.disagreements = report.disagreements.clone();
-            return Recorded::Failed(failure);
+        // A dump of a playback that diverged is of a game nobody played. The
+        // analysis [`settle`] stored says it diverged and how, so there is no
+        // failure to add. An engine that failed or ran out of time is
+        // [`settle`]'s to report too.
+        AnalysisStatus::Diverged | AnalysisStatus::Incomplete | AnalysisStatus::LoggerNotLoaded => {
+            return Recorded::Nothing
         }
-        // The engine failed or ran out of time, which [`settle`] reports.
-        AnalysisStatus::Incomplete | AnalysisStatus::LoggerNotLoaded => return Recorded::Nothing,
     }
     match &run.recording {
         Some(RecordingOutcome::Kept { .. }) => {}
@@ -896,7 +837,7 @@ fn work(shared: &Arc<Shared>) {
         shared.announce();
         let began = Instant::now();
 
-        // Never twice: it may have been analysed or recorded since it was
+        // Never twice: it may have been analysed and recorded since it was
         // queued.
         let dump = DumpFile(
             shared
@@ -906,12 +847,9 @@ fn work(shared: &Arc<Shared>) {
         let result = if !spec.force && shared.is_current(&spec) {
             None
         } else {
-            Some(shared.engine.run(
-                &spec,
-                spec.record.then_some(&*dump.0),
-                &control,
-                &|progress| on_poll(shared, job_id, &control, progress),
-            ))
+            Some(shared.engine.run(&spec, &dump.0, &control, &|progress| {
+                on_poll(shared, job_id, &control, progress)
+            }))
         };
 
         let preempted = shared
@@ -924,9 +862,7 @@ fn work(shared: &Arc<Shared>) {
             Some(result) => settle(&shared.analyses, &spec, result, preempted),
         };
         let recorded = match &result {
-            Some(Ok(run)) if spec.record => {
-                record_track(shared, job_id, &spec, &control, run, &dump.0)
-            }
+            Some(Ok(run)) => record_track(shared, job_id, &spec, &control, run, &dump.0),
             _ => Recorded::Nothing,
         };
         // Whatever happened, the dump goes before the job is over.
@@ -1191,27 +1127,27 @@ pub fn job_for(
             .unwrap_or_default(),
         match_seconds,
         force,
-        record: false,
     })
 }
 
 const NO_QUEUE: &str = "replay analysis is not available: the app's folders could not be resolved";
 
-/// `content_analysis_enqueue`: ask for a replay to be analysed. This is the
-/// only command that leads to an engine being run for an analysis, and it is
+/// `content_analysis_enqueue`: ask for a replay to be analysed and recorded as
+/// a track, in one run of the engine (issues #1157, #3785 and #3962). This is
+/// the only command that leads to an engine being run for either, and it is
 /// only ever called because a person pressed the button for that replay.
 ///
 /// `replayPath` is a `ReplayFile.path`. `enginePath` is the `Engine.path` of
 /// the engine the replay was recorded with and `dataDir` the content folder it
 /// plays from, resolved the way a replay launch resolves them. Every other
 /// content folder coilbox knows is offered to the engine too. `force` asks for
-/// a run of a match that already has a current analysis.
+/// a run of a match that already has a current analysis and track.
 ///
 /// Answers `{ outcome, queue }`, where `outcome` is `queued`, `alreadyQueued`
-/// or `alreadyAnalysed`. It rejects, with the reason, for a replay that cannot
-/// be analysed: a remix, one with no game id, one with no recorded game over,
-/// or an engine folder with no headless engine in it. The time limit is not
-/// the caller's to choose: see `run_timeout`.
+/// or `alreadyDone`. It rejects, with the reason, for a replay that cannot be
+/// analysed: a remix, one with no game id, one with no recorded game over, or
+/// an engine folder with no headless engine in it. The time limit is not the
+/// caller's to choose: see `run_timeout`.
 #[tauri::command]
 pub(crate) async fn content_analysis_enqueue<R: Runtime>(
     app: AppHandle<R>,
@@ -1220,58 +1156,6 @@ pub(crate) async fn content_analysis_enqueue<R: Runtime>(
     data_dir: String,
     game: Option<String>,
     force: Option<bool>,
-) -> CliResult {
-    enqueue_command(
-        app,
-        replay_path,
-        engine_path,
-        data_dir,
-        game,
-        force.unwrap_or(false),
-        false,
-    )
-    .await
-}
-
-/// `content_recording_enqueue`: ask for a replay to be recorded as a track
-/// that can be played back and rewound (issue #3785). The arguments are those
-/// of `content_analysis_enqueue`, and so is the answer, with two more
-/// outcomes: `alreadyRecorded` for a match whose track is current and `joined`
-/// for a replay waiting as an analysis that is now a recording as well.
-///
-/// The job joins the analysis queue. It is cancelled with
-/// `content_analysis_cancel`, its state is in the queue's snapshot, and a run
-/// that ends without a track says why in the snapshot's `failures`. Nothing
-/// starts it but a person asking for that replay by name.
-#[tauri::command]
-pub(crate) async fn content_recording_enqueue<R: Runtime>(
-    app: AppHandle<R>,
-    replay_path: String,
-    engine_path: String,
-    data_dir: String,
-    game: Option<String>,
-    force: Option<bool>,
-) -> CliResult {
-    enqueue_command(
-        app,
-        replay_path,
-        engine_path,
-        data_dir,
-        game,
-        force.unwrap_or(false),
-        true,
-    )
-    .await
-}
-
-async fn enqueue_command<R: Runtime>(
-    app: AppHandle<R>,
-    replay_path: String,
-    engine_path: String,
-    data_dir: String,
-    game: Option<String>,
-    force: bool,
-    record: bool,
 ) -> CliResult {
     let Some(queue) = app.try_state::<AnalysisQueue>().map(|q| q.inner().clone()) else {
         return CliResult::err(NO_QUEUE);
@@ -1289,9 +1173,9 @@ async fn enqueue_command<R: Runtime>(
             Path::new(&engine_path),
             data_dirs,
             game,
-            force,
+            force.unwrap_or(false),
         )?;
-        let outcome = queue.enqueue(JobSpec { record, ..spec })?;
+        let outcome = queue.enqueue(spec)?;
         Ok::<_, String>((outcome, queue.snapshot()))
     })
     .await;
@@ -1491,8 +1375,7 @@ mod tests {
 
         /// What the recorder leaves when the run ends: nothing, half a file
         /// from a run that was stopped, or a whole dump.
-        fn leave_dump(&self, to: Option<&Path>, whole: bool) -> Option<RecordingOutcome> {
-            let to = to?;
+        fn leave_dump(&self, to: &Path, whole: bool) -> Option<RecordingOutcome> {
             if !self.recorder_writes.load(Ordering::SeqCst) {
                 return Some(RecordingOutcome::NotWritten);
             }
@@ -1577,7 +1460,7 @@ mod tests {
         fn run(
             &self,
             job: &JobSpec,
-            record_to: Option<&Path>,
+            record_to: &Path,
             control: &RunControl,
             on_poll: &dyn Fn(RunProgress),
         ) -> Result<AnalysisRun, String> {
@@ -1729,10 +1612,6 @@ mod tests {
             self.dir.path().join("recordings")
         }
 
-        fn record(&self, game_id: &str) -> Enqueued {
-            self.queue.enqueue(record_job(game_id, false)).unwrap()
-        }
-
         fn ask(&self, game_id: &str) -> Enqueued {
             self.queue.enqueue(job(game_id, false)).unwrap()
         }
@@ -1790,14 +1669,6 @@ mod tests {
             name: format!("{game_id}.sdfz"),
             match_seconds: 50,
             force,
-            record: false,
-        }
-    }
-
-    fn record_job(game_id: &str, force: bool) -> JobSpec {
-        JobSpec {
-            record: true,
-            ..job(game_id, force)
         }
     }
 
@@ -1939,7 +1810,7 @@ mod tests {
         world.until_idle();
         assert_eq!(world.started(), 1);
 
-        assert_eq!(world.ask(ID), Enqueued::AlreadyAnalysed);
+        assert_eq!(world.ask(ID), Enqueued::AlreadyDone);
         world.until_idle();
         assert_eq!(world.started(), 1, "the engine ran a second time");
 
@@ -2470,8 +2341,8 @@ mod tests {
         assert_eq!(json["failures"][0]["gameId"], ID);
         assert!(json["failures"][0]["limitSeconds"].is_u64());
         assert_eq!(
-            serde_json::to_value(Enqueued::AlreadyAnalysed).unwrap(),
-            "alreadyAnalysed"
+            serde_json::to_value(Enqueued::AlreadyDone).unwrap(),
+            "alreadyDone"
         );
     }
 
@@ -2520,7 +2391,7 @@ mod tests {
     fn recording_a_replay_ends_with_one_track_and_no_dump_left_behind() {
         let world = World::new(Script::Finish(AnalysisStatus::Reproduced));
 
-        assert_eq!(world.record(ID), Enqueued::Queued);
+        assert_eq!(world.ask(ID), Enqueued::Queued);
         let idle = world.until_idle();
 
         assert_eq!(world.started(), 1);
@@ -2545,9 +2416,8 @@ mod tests {
     #[test]
     fn cancelling_a_recording_part_way_leaves_no_files() {
         let world = World::new(Script::UntilCancelled);
-        world.record(ID);
+        world.ask(ID);
         let busy = world.until_playing(1);
-        assert!(busy.running.as_ref().unwrap().record);
         assert_eq!(
             files_in(&world.recordings()).len(),
             1,
@@ -2570,8 +2440,8 @@ mod tests {
     fn two_recordings_run_one_after_the_other_and_never_together() {
         let world = World::new(Script::UntilReleased);
 
-        world.record(ID);
-        world.record(OTHER);
+        world.ask(ID);
+        world.ask(OTHER);
         let busy = world.until("the first job running", |s| s.running.is_some());
         assert_eq!(busy.running.as_ref().unwrap().game_id, ID);
         assert_eq!(busy.queued.len(), 1);
@@ -2595,7 +2465,7 @@ mod tests {
     fn a_diverged_recording_stores_no_track_and_marks_the_replay_diverged() {
         let world = World::new(Script::Finish(AnalysisStatus::Diverged));
 
-        world.record(ID);
+        world.ask(ID);
         let idle = world.until_idle();
 
         assert_eq!(files_in(&world.tracks()), Vec::<String>::new());
@@ -2606,13 +2476,11 @@ mod tests {
         // replay's page already shows.
         let stored = store::read(&world.analyses(), ID).unwrap().expect("marked");
         assert_eq!(stored.state, store::AnalysisState::Diverged);
-        // And what the person who asked is told.
-        assert_eq!(idle.failures.len(), 1);
-        let failure = &idle.failures[0];
-        assert_eq!(failure.reason, FailureReason::Diverged);
-        assert!(failure.record);
-        assert_eq!(failure.disagreements.len(), 1);
-        assert_eq!(failure.disagreements[0].figure, "metalProduced");
+        // The mark says what disagreed, so the queue has no failure to add
+        // and the page says it once.
+        assert_eq!(stored.provenance.disagreements.len(), 1);
+        assert_eq!(stored.provenance.disagreements[0].figure, "metalProduced");
+        assert!(idle.failures.is_empty(), "{:?}", idle.failures);
     }
 
     /// An earlier track is the only copy until the new one is whole.
@@ -2623,7 +2491,7 @@ mod tests {
         world.engine.set_thin(ThinScript::Fail);
 
         assert_eq!(
-            world.queue.enqueue(record_job(ID, true)).unwrap(),
+            world.queue.enqueue(job(ID, true)).unwrap(),
             Enqueued::Queued
         );
         let idle = world.until_idle();
@@ -2646,69 +2514,39 @@ mod tests {
         );
     }
 
-    /// The recorder is a second gadget in the same game, so a replay that
-    /// needs both an analysis and a track is simulated once.
+    /// One run makes the analysis and the track, so a match with only the
+    /// analysis is run for both (issue #3962). Tracks go when the disk budget
+    /// is reached or a person clears them, and the analysis stays.
     #[test]
-    fn an_analysis_and_a_recording_of_one_replay_that_has_not_started_run_the_engine_once() {
-        let world = World::new(Script::UntilReleased);
-        world.ask(OTHER);
-        world.until("the first job running", |s| s.running.is_some());
-        assert_eq!(world.ask(ID), Enqueued::Queued);
-
-        assert_eq!(world.record(ID), Enqueued::Joined);
-
-        let waiting = world.queue.snapshot();
-        assert_eq!(waiting.queued.len(), 1, "one job for the replay");
-        assert!(waiting.queued[0].record);
-        // Asking again for either is asking for what is already there.
-        assert_eq!(world.record(ID), Enqueued::AlreadyQueued);
-        assert_eq!(world.ask(ID), Enqueued::AlreadyQueued);
-
-        world.engine.release.store(true, Ordering::SeqCst);
-        let idle = world.until_idle();
-
-        assert_eq!(world.started(), 2, "OTHER once and ID once");
-        assert!(store::is_current(&world.analyses(), ID));
-        assert_eq!(files_in(&world.tracks()), vec![format!("{ID}.cbtrack")]);
-        assert_eq!(idle.tracks, 1);
-    }
-
-    /// A run that is already going cannot be given the recorder. The recording
-    /// follows it, as a job of its own, and a recording that is going covers a
-    /// request for the analysis it makes anyway.
-    #[test]
-    fn a_recording_asked_for_while_an_analysis_runs_follows_it() {
-        let world = World::new(Script::UntilReleased);
+    fn a_match_with_an_analysis_and_no_track_is_run_again_for_both() {
+        let world = World::new(Script::Finish(AnalysisStatus::Reproduced));
         world.ask(ID);
-        world.until("the analysis running", |s| s.running.is_some());
+        world.until_idle();
+        track_store::remove(&world.tracks(), ID).expect("the track goes");
+        assert!(store::is_current(&world.analyses(), ID));
 
-        assert_eq!(world.record(ID), Enqueued::Queued);
-        assert_eq!(world.ask(ID), Enqueued::AlreadyQueued);
-        let busy = world.queue.snapshot();
-        assert!(!busy.running.as_ref().unwrap().record);
-        assert_eq!(busy.queued.len(), 1);
-        assert!(busy.queued[0].record);
-
-        world.engine.release.store(true, Ordering::SeqCst);
-        let idle = world.until_idle();
+        assert_eq!(world.ask(ID), Enqueued::Queued);
+        let idle = world.until("a second track", |s| s.tracks == 2);
 
         assert_eq!(world.started(), 2);
-        assert_eq!(world.engine.most_at_once.load(Ordering::SeqCst), 1);
-        assert_eq!(idle.tracks, 1);
+        assert_eq!(idle.stored, 2);
+        assert_eq!(files_in(&world.tracks()), vec![format!("{ID}.cbtrack")]);
+        assert_eq!(world.ask(ID), Enqueued::AlreadyDone);
     }
 
+    /// The reverse: a person deleted the analysis and kept the track.
     #[test]
-    fn an_analysis_asked_for_while_a_recording_runs_is_already_covered() {
-        let world = World::new(Script::UntilReleased);
-        world.record(ID);
-        let busy = world.until("the recording running", |s| s.running.is_some());
-        assert!(busy.running.unwrap().record);
-
-        assert_eq!(world.ask(ID), Enqueued::AlreadyQueued);
-
-        world.engine.release.store(true, Ordering::SeqCst);
+    fn a_match_with_a_track_and_no_analysis_is_run_again_for_both() {
+        let world = World::new(Script::Finish(AnalysisStatus::Reproduced));
+        world.ask(ID);
         world.until_idle();
-        assert_eq!(world.started(), 1);
+        store::delete(&world.analyses(), ID).expect("the analysis goes");
+
+        assert_eq!(world.ask(ID), Enqueued::Queued);
+        let idle = world.until("a second stored run", |s| s.stored == 2);
+
+        assert_eq!(world.started(), 2);
+        assert_eq!(idle.tracks, 2);
         assert!(store::is_current(&world.analyses(), ID));
     }
 
@@ -2720,10 +2558,7 @@ mod tests {
         let earlier = store_earlier_track(&world, ID);
         world.engine.set_thin(ThinScript::UntilCancelled);
 
-        world
-            .queue
-            .enqueue(record_job(ID, true))
-            .expect("asking again");
+        world.queue.enqueue(job(ID, true)).expect("asking again");
         let thinning = world.until("the thinning", |s| {
             s.running
                 .as_ref()
@@ -2776,7 +2611,7 @@ mod tests {
     /// Record a match with no limit, and say how big its track is. Takes the
     /// track away again, so the folder is as it was.
     fn measure_a_track(world: &World, game_id: &str) -> u64 {
-        world.record(game_id);
+        world.ask(game_id);
         world.until_idle();
         let size = track_size(world, game_id);
         assert!(track_store::remove(&world.tracks(), game_id).unwrap());
@@ -2789,13 +2624,13 @@ mod tests {
     #[test]
     fn recording_a_second_track_with_room_for_less_than_two_removes_the_first() {
         let world = World::new(Script::Finish(AnalysisStatus::Reproduced));
-        world.record(ID);
+        world.ask(ID);
         world.until_idle();
         let one = track_size(&world, ID);
         assert_eq!(files_in(&world.tracks()), track_files(&[ID]));
 
         world.budget.store(one + one / 2, Ordering::SeqCst);
-        world.record(OTHER);
+        world.ask(OTHER);
         let idle = world.until_idle();
 
         assert!(track_size(&world, OTHER) <= one + one / 2);
@@ -2814,7 +2649,7 @@ mod tests {
         world.budget.store(0, Ordering::SeqCst);
         world.engine.set_thin(ThinScript::Fail);
 
-        world.record(THIRD);
+        world.ask(THIRD);
         let idle = world.until_idle();
 
         assert_eq!(files_in(&world.tracks()), track_files(&[ID, OTHER]));
@@ -2829,7 +2664,7 @@ mod tests {
         store_earlier_track(&world, ID);
         world.budget.store(0, Ordering::SeqCst);
 
-        world.record(OTHER);
+        world.ask(OTHER);
         world.until_idle();
 
         assert_eq!(files_in(&world.tracks()), track_files(&[ID]));
@@ -2842,7 +2677,7 @@ mod tests {
         world.budget.store(0, Ordering::SeqCst);
         world.engine.set_thin(ThinScript::UntilCancelled);
 
-        world.record(OTHER);
+        world.ask(OTHER);
         let thinning = world.until("the thinning", |s| {
             s.running
                 .as_ref()
@@ -2861,7 +2696,7 @@ mod tests {
     fn a_recording_keeps_what_it_cost() {
         let world = World::new(Script::Finish(AnalysisStatus::Reproduced));
 
-        world.record(ID);
+        world.ask(ID);
         world.until_idle();
 
         let costs = recording_costs::list(&world.tracks());
@@ -2884,7 +2719,7 @@ mod tests {
             .engine
             .set_thin(ThinScript::Slow(Duration::from_millis(200)));
 
-        world.record(ID);
+        world.ask(ID);
         world.until_idle();
 
         let costs = recording_costs::list(&world.tracks());
@@ -2900,7 +2735,7 @@ mod tests {
             let world = World::new(script);
             world.engine.set_thin(thin);
 
-            world.record(ID);
+            world.ask(ID);
             world.until_idle();
 
             assert_eq!(recording_costs::list(&world.tracks()), Vec::new());
@@ -2915,7 +2750,7 @@ mod tests {
         store_earlier_track(&world, THIRD);
         world.budget.store(1, Ordering::SeqCst);
 
-        world.record(ID);
+        world.ask(ID);
         let idle = world.until_idle();
 
         assert!(track_size(&world, ID) > 1);
@@ -2938,7 +2773,7 @@ mod tests {
         );
         world.budget.store(new, Ordering::SeqCst);
 
-        world.record(ID);
+        world.ask(ID);
         world.until_idle();
 
         assert_eq!(files_in(&world.tracks()), track_files(&[ID]));
@@ -2949,14 +2784,14 @@ mod tests {
     #[test]
     fn recording_a_replay_again_does_not_count_its_old_track_twice() {
         let world = World::new(Script::Finish(AnalysisStatus::Reproduced));
-        world.record(ID);
+        world.ask(ID);
         world.until_idle();
         let new = track_size(&world, ID);
         let other = store_earlier_track(&world, OTHER).len() as u64;
         world.budget.store(new + other, Ordering::SeqCst);
 
         assert_eq!(
-            world.queue.enqueue(record_job(ID, true)).unwrap(),
+            world.queue.enqueue(job(ID, true)).unwrap(),
             Enqueued::Queued
         );
         let idle = world.until_idle();
@@ -2988,7 +2823,7 @@ mod tests {
         );
         world.budget.store(new + current, Ordering::SeqCst);
 
-        world.record(ID);
+        world.ask(ID);
         world.until_idle();
 
         assert_eq!(files_in(&world.tracks()), track_files(&[ID, OTHER]));
@@ -2999,7 +2834,7 @@ mod tests {
     #[test]
     fn a_recording_shows_the_playback_and_then_the_thinning_as_a_stage_of_its_own() {
         let world = World::new(Script::UntilReleased);
-        world.record(ID);
+        world.ask(ID);
         world.until_playing(1);
 
         world.engine.release.store(true, Ordering::SeqCst);
@@ -3027,25 +2862,6 @@ mod tests {
         assert_eq!(phases[thinning].1, phases[playing].1);
     }
 
-    #[test]
-    fn a_track_that_is_current_is_not_recorded_again_unless_asked() {
-        let world = World::new(Script::Finish(AnalysisStatus::Reproduced));
-        world.record(ID);
-        world.until_idle();
-        assert_eq!(world.started(), 1);
-
-        assert_eq!(world.record(ID), Enqueued::AlreadyRecorded);
-        world.until_idle();
-        assert_eq!(world.started(), 1, "the engine ran a second time");
-
-        assert_eq!(
-            world.queue.enqueue(record_job(ID, true)).unwrap(),
-            Enqueued::Queued
-        );
-        world.until("a second track", |s| s.tracks == 2);
-        assert_eq!(world.started(), 2);
-    }
-
     /// A recorder that wrote nothing leaves nothing to thin. Saying so beats
     /// a job that ends with no track and no word.
     #[test]
@@ -3053,7 +2869,7 @@ mod tests {
         let world = World::new(Script::Finish(AnalysisStatus::Reproduced));
         world.engine.recorder_writes.store(false, Ordering::SeqCst);
 
-        world.record(ID);
+        world.ask(ID);
         let idle = world.until_idle();
 
         assert_eq!(files_in(&world.tracks()), Vec::<String>::new());
@@ -3096,27 +2912,18 @@ mod tests {
     }
 
     #[test]
-    fn a_recording_job_says_what_it_is_in_the_snapshot_json() {
+    fn the_recording_words_in_the_snapshot_json_are_camel_case() {
         let world = World::new(Script::UntilReleased);
-        world.record(ID);
-        world.ask(OTHER);
+        world.ask(ID);
         let busy = world.until("the recording running", |s| s.running.is_some());
         let json = serde_json::to_value(&busy).unwrap();
 
-        assert_eq!(json["running"]["record"], true);
-        assert_eq!(json["queued"][0]["record"], false);
         assert_eq!(json["tracks"], 0);
         for (value, word) in [
             (serde_json::to_value(RunPhase::Thinning), "thinning"),
-            (serde_json::to_value(FailureReason::Diverged), "diverged"),
             (
                 serde_json::to_value(FailureReason::ThinFailed),
                 "thinFailed",
-            ),
-            (serde_json::to_value(Enqueued::Joined), "joined"),
-            (
-                serde_json::to_value(Enqueued::AlreadyRecorded),
-                "alreadyRecorded",
             ),
         ] {
             assert_eq!(value.unwrap(), word);
@@ -3134,7 +2941,7 @@ mod tests {
         fn run(
             &self,
             job: &JobSpec,
-            record_to: Option<&Path>,
+            record_to: &Path,
             control: &RunControl,
             on_poll: &dyn Fn(RunProgress),
         ) -> Result<AnalysisRun, String> {
@@ -3312,10 +3119,7 @@ mod tests {
         assert_eq!(store::list(&analyses).len(), 1);
 
         // Never twice.
-        assert_eq!(
-            queue.enqueue(spec.clone()).unwrap(),
-            Enqueued::AlreadyAnalysed
-        );
+        assert_eq!(queue.enqueue(spec.clone()).unwrap(), Enqueued::AlreadyDone);
         wait_idle("the second ask");
         assert_eq!(
             runs.load(Ordering::SeqCst),
@@ -3403,11 +3207,8 @@ mod tests {
             || u64::MAX,
             move |snapshot: &QueueSnapshot| listener.lock().unwrap().push(snapshot.clone()),
         );
-        let spec = JobSpec {
-            record: true,
-            ..job_for(&replay, Path::new(&engine_dir), data_dirs, None, false)
-                .expect("a replay that can be analysed")
-        };
+        let spec = job_for(&replay, Path::new(&engine_dir), data_dirs, None, false)
+            .expect("a replay that can be analysed");
         let game_id = store::replay_key(&replay).unwrap();
         let limit = run_timeout(spec.match_seconds);
 
@@ -3432,7 +3233,7 @@ mod tests {
         assert_eq!(files_in(&tracks), vec![format!("{game_id}.cbtrack")]);
         assert_eq!(files_in(&recordings), Vec::<String>::new());
         assert_eq!(files_in(&scratch_root), Vec::<String>::new());
-        // A record only run shows the playback moving and then the thinning.
+        // The run shows the playback moving and then the thinning.
         let phases: Vec<(RunPhase, i32)> = heard
             .lock()
             .unwrap()
