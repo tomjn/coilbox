@@ -14,6 +14,7 @@
       "!**/*.css",
       "!catalog.json",
       "!scripts/data",
+      "!src/content/fixtures/replay-track-window.json",
       "!src/dev/tauri-mcp-bridge.ts"
     ]
   },
