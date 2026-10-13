@@ -24,6 +24,12 @@
 //! The Lua it carries is whatever is under `lua/rewind-player/luarules/` and
 //! `luaui/` when coilbox is built. `build.rs` lists those files, so the gadget
 //! (#3794) and the timeline widget (#3798) are added by adding files there.
+//!
+//! The game also carries the base game's adapter (issue #3799, see [`adapter`]):
+//! the one the base game ships in its own archive, else one of coilbox's in
+//! `lua/rewind-player/adapters/`, else none. A gadget or widget it names is
+//! switched off by a file at the same path in this game, which a depending
+//! game's files take precedence over.
 
 use std::path::{Path, PathBuf};
 

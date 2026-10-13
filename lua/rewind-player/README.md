@@ -1,6 +1,6 @@
 # Rewind player
 
-The rewind player plays a replay track back inside the engine, with time going in either direction. This folder holds the Lua that reads a track (issue #3792) and the gadget that makes the world match it (issue #3794): units, features and terrain at any time. It does not yet place projectiles, pose aiming pieces or animate units (issues #3795 to #3797). The control on screen is a widget, the timeline (issue #3798).
+The rewind player plays a replay track back inside the engine, with time going in either direction. This folder holds the Lua that reads a track (issue #3792) and the gadget that makes the world match it (issue #3794): units, features and terrain at any time. It does not yet place projectiles, pose aiming pieces or animate units (issues #3795 to #3797). The control on screen is a widget, the timeline (issue #3798). What a game switches off or hides during playback is its adapter (issue #3799).
 
 A track is the file `crates/coilbox-track` writes, in the format `docs/reference/replay-track-format.md` describes. The format was designed so that the engine's Lua can read the file as it is, so there is no export step and no second copy on disk.
 
@@ -18,6 +18,7 @@ The player holds a time `t`, a frame of the track that can be a fraction. On eve
 | `luarules/rewind_player/coilbox_player_clock.lua` | the time and the messages that change it. It touches nothing in the engine |
 | `luarules/rewind_player/coilbox_player_terrain.lua`, `coilbox_player_features.lua`, `coilbox_player_units.lua` | the three stages |
 | `luarules/rewind_player/coilbox_player_rotation.lua` | a track's rotation as the pitch, yaw and roll the engine takes |
+| `luarules/rewind_player/coilbox_player_adapter.lua` | reads the game's adapter, and guards its hooks |
 | `luaui/widgets/coilbox_rewind_timeline.lua` | the timeline widget: the engine's call-ins for drawing, keys and the pointer |
 | `luaui/rewind_timeline/coilbox_timeline.lua` | the timeline: where everything is, what a key or a press sends, and the drawing. It takes the engine as a table, so the tests run it |
 
@@ -191,9 +192,9 @@ After a line, slow frames are counted and not logged for 30 frames. Synced Lua h
 
 ### What the base game does
 
-Nothing in the base game is switched off. Issue #3799 is the place for that. Until then the player undoes what it can and says what it cannot, each in one line of the log:
+A game's adapter ([Game adapters](#game-adapters)) is where a game says what to switch off. For a game with no adapter, and for what an adapter leaves, the player undoes what it can and says what it cannot, each in one line of the log:
 
-- The base game takes an empty team for a beaten one. Splinter Faction's `game_end.lua` calls `Spring.KillTeam`, and the engine creates nothing on a dead team again. The guard gadget replaces `Spring.KillTeam` and `Spring.GameOver` as its file loads, and logs the first ask of each. It has to load before the gadget it guards against, because `game_end.lua` copies both calls into locals as it loads. Gadget files load in the order the engine's `VFS.DirList` sorts them, and the guard's name starts with `!`, which sorts before every letter, digit and underscore. A gadget whose file sorts before that, or anything outside the gadgets, keeps the real call. A team that dies anyway is logged.
+- The base game takes an empty team for a beaten one. Splinter Faction's `game_end.lua` and `game_team_com_ends.lua` call `Spring.KillTeam`, and the engine creates nothing on a dead team again. The guard gadget replaces `Spring.KillTeam` and `Spring.GameOver` as its file loads, and logs the first ask of each. It has to load before the gadget it guards against, because `game_end.lua` copies both calls into locals as it loads. Gadget files load in the order the engine's `VFS.DirList` sorts them, and the guard's name starts with `!`, which sorts before every letter, digit and underscore. A gadget whose file sorts before that, or anything outside the gadgets, keeps the real call. A team that dies anyway is logged.
 - `Spring.CreateUnit` gives nothing, with no error, for a dead team or one at its unit limit. That is logged once for each team, and the unit is tried again after the next seek and not on every frame.
 - A unit or a feature that the track does not have is removed on the next frame. That covers the map's own features, a unit the game spawns and a feature a base game gadget creates, as Splinter Faction's `unit_deathContainerSpawn.lua` does where a unit dies.
 - A unit or a feature of the track that something else destroys is made again on the next frame.
@@ -204,6 +205,122 @@ Nothing in the base game is switched off. Issue #3799 is the place for that. Unt
 A track's team is the same number in the game, because the start script carries the replay's teams. A team the game does not have as a team of its own is Gaia, read from `Spring.GetGaiaTeamID()`.
 
 Not handled: on an engine before `2025.03.9` a finished unit cannot be turned back into a nanoframe, so the stage destroys it and creates it again as one. That path has only run on the stand-in, since no such engine is installed here.
+
+## Game adapters
+
+An adapter is a small Lua file for one game. It says what the game does that fights a recording, so the player stays the same for every game. Without an adapter nothing is switched off, nothing is hidden and the match still plays.
+
+```lua
+return {
+	name = "Splinter Faction",
+	shortname = "SF",
+	versions = { min = "0.1.80", max = "0.1.99" },
+
+	gadgets = { "game_end.lua", "game_team_com_ends.lua" },
+	widgets = { "gui_static_resourcebar.lua" },
+	units = { "armcom_start" },
+	features = { "grave_marker" },
+
+	hooks = {
+		unitPlaced = function(unitID, unitDefID, t, clock) end,
+		afterFrame = function(t, clock) end,
+	},
+}
+```
+
+Every key is optional except `shortname` in an adapter that coilbox ships. A key that is not in this table is refused, so a misspelling cannot switch nothing off without saying so.
+
+| Key | Value | Does |
+| --- | --- | --- |
+| `name` | text | the name the log line shows. `unnamed` without it |
+| `shortname` | text | the game's `shortname` from its `modinfo.lua`, compared without regard to case. Used to match a shipped adapter to a game, and ignored in a game's own |
+| `versions` | `{ min = "...", max = "..." }` | the versions a shipped adapter is for, both ends included, either end optional. Without it every version matches |
+| `gadgets` | list of file names | gadgets to switch off, as paths inside `luarules/gadgets/`, such as `game_end.lua` or `sub/folder/other.lua` |
+| `widgets` | list of file names | widgets to switch off, as paths inside `luaui/widgets/` |
+| `units` | list of names | unit definitions the player never creates |
+| `features` | list of names | feature definitions the player never creates |
+| `hooks` | table of functions | see [Hooks](#hooks) |
+
+The file is run by `coilbox-springlua`, the sandboxed Spring Lua evaluator that reads a game's other config, so the lists can be worked out in Lua. It has no `io`, no `os` and no way to read another file. Coilbox reads everything but `hooks` from it before the engine starts, and the player reads the same file again in the engine, for `units`, `features` and `hooks`.
+
+### Where an adapter lives
+
+- Coilbox ships adapters in `lua/rewind-player/adapters/`. A file there is picked up by the next build and needs no change to the Rust, the way a gadget under `luarules/gadgets/` is.
+- A game can ship its own at `coilbox_rewind/adapter.lua` in its primary archive. Coilbox reads it through unitsync, from the archive of the version being played, and not from archives that game depends on.
+
+A game's own adapter wins. It applies whatever its `shortname` and `versions` say, since it is in the archive of the version being played. If it cannot be used, because it does not run or has a key that is not in the table, the launch carries on with a shipped adapter if one matches and with none otherwise, and the player's log line says why.
+
+Of the shipped adapters, the first in file name order that matches wins. Give two adapters for one game ranges that do not overlap.
+
+Whichever adapter is chosen, the playback game holds it at `coilbox_rewind/adapter.lua`, written on every launch, which is where the player reads it. When no adapter applies, that file returns `false`, and so a file at that path in the base game never reaches the player.
+
+### Matching
+
+A shipped adapter matches a game when its `shortname` equals the game's, without regard to case, and the game's version is inside `versions`.
+
+A version is the numbers it starts with. Coilbox skips whatever comes before the first digit, reads numbers joined by single dots, and stops at anything else. Numbers are compared one at a time, and a missing number counts as 0.
+
+| The game declares | Is read as |
+| --- | --- |
+| `0.1.89` | 0.1.89 |
+| `V15.9.8` | 15.9.8 |
+| `v2.58` | 2.58 |
+| `stable-8405` | 8405 |
+| `test-30922-8064a43` | 30922 |
+| `1.7 (Beta 10.1)` | 1.7 |
+| `$VERSION`, `KRE $VERSION`, nothing | no version |
+
+An adapter with a `versions` range is for no game that has no version. A game folder under development declares `$VERSION`, so only an adapter without `versions`, or the game's own, applies to it. `min` and `max` are read the same way, and one with no number in it is refused. `max = "0.1"` means up to 0.1.0, so write `max = "0.1.99"` for every 0.1 release.
+
+### What switching off does
+
+For each name in `gadgets` and `widgets`, coilbox writes a file at that path in the playback game, `luarules/gadgets/<name>` or `luaui/widgets/<name>`. A depending game's file takes precedence over the same path in the game it depends on, and the engine's file names are not case sensitive, so the base game's file is never read. The shadow is a comment and `return false`.
+
+The handlers read for this treat a file that returns `false` as one that asked not to be loaded, and load nothing for it. Those are the engine's own gadget and widget handlers, Splinter Faction's (run in the engine, see [In a real engine](#in-a-real-engine)) and THIS's widget handler. Beyond All Reason's has not been read or run here. An empty file is not the same:
+
+- Splinter Faction's gadget handler loads it as a gadget with nothing in it, and the log still lists the gadget.
+- Splinter Faction's widget handler refuses it with `Failed to load: <file>  (no GetInfo() call)`.
+
+Coilbox does not write a shadow over one of its own files, and refuses an adapter that names one.
+
+### Hide and skip
+
+The player never creates a unit of a definition in `units` or a feature of one in `features`. Names are compared without regard to case. The track still has them, so a seek has no effect on them, and the log has no line about a name the game lacks, since leaving them out is the point. A name that is in the list and not in the track is harmless. A unit the base game creates by itself, and a feature it creates, are still removed on the next frame as before.
+
+### Hooks
+
+A hook is an optional function in `hooks`. The player calls these and no others, and logs a name in `hooks` that is not one of them or is not a function, since it is most likely a misspelling. A hook that raises is logged once and not called again, and the player carries on.
+
+| Hook | Called | Arguments |
+| --- | --- | --- |
+| `unitPlaced` | after the player created a unit and put it in place, and again for a unit made again after a seek | the engine's unit id, the unit definition's engine id, the track frame, the clock |
+| `afterFrame` | at the end of every simulation frame, after every stage | the track frame, the clock |
+
+The clock is the player's, and a hook only reads it. `clock.jumped` says the frame was reached by a seek or a step, `clock.direction` is 1 or -1 and `clock.speed` is how many frames of the track a simulation frame covers.
+
+A hook runs in synced Lua, in the gadget's environment, and a frame of play allocates nothing in the player, so a hook that is called every frame should not either. These are the only hook points. They are the smallest set that issues #3797 (a build spray effect that reads a builder's recorded work), #3801 (a warp in effect for a unit that appears) and #3804 (replacing ghost drawing) are known to need, and a hook point is added by the issue that needs one.
+
+### The log line
+
+The player logs which adapter it has, once, when it starts:
+
+```
+COILBOX_REWIND_PLAYER adapter loaded: Splinter Faction. 2 gadgets and 1 widgets are switched off by the playback game, 1 unit definitions are hidden, 1 feature definitions are skipped, hooks: afterFrame, unitPlaced
+COILBOX_REWIND_PLAYER adapter loaded: none
+COILBOX_REWIND_PLAYER adapter loaded: none. the game's own adapter could not be used: the adapter is not in the format: unknown field `gadget`, expected one of ...
+```
+
+A gadget that an adapter switches off is not in the engine's `Loaded SYNCED gadget:` lines, and a line the player or the guard logged because of it does not appear.
+
+### Writing one for a game
+
+1. Play a recorded match with no adapter and read the `COILBOX_REWIND_PLAYER` lines. Each says something the base game did that the track does not have. Then list the gadgets in the engine's log, `Loaded SYNCED gadget:  <name>  <file>.lua`, and read the ones that end a game, spawn units or kill teams.
+2. Put the file names in `gadgets` and `widgets`, and the definitions in `units` and `features`.
+3. For a game coilbox ships an adapter for, add `lua/rewind-player/adapters/<anything>.lua` with a `shortname` and, if it only holds for some releases, `versions`. For a game's own, add `coilbox_rewind/adapter.lua` to the archive.
+4. Run `cargo test -p tauri-plugin-coilbox-content`. It reads every shipped adapter and fails on one with a key that is not in the table, a file name that is not a `.lua` file inside its folder, or no `shortname`.
+5. Run `scripts/rewind-playback-headless.sh` and read the log for the same lines. `lua/rewind-player/tests/headless/fixture_adapter.lua` is an adapter that the run uses, and `tests/headless/adapter_probe.lua` is a widget that says what was loaded and created.
+
+The team guard and the player's removal of units and features that the track does not have stay in place, whatever an adapter says. An adapter makes them unnecessary for a game, and they are the safety net for a game with none.
 
 ## Where the reader runs
 
@@ -238,12 +355,13 @@ Coilbox writes a game called `coilbox-replay-playback.sdd` under the content roo
 - every `.lua` file under `luarules/` and `luaui/` in this folder, at the same path
 - the track at `coilbox_rewind/track.cbtrack`, as a hard link to the stored file, or a copy where the filesystem refuses a link
 - a `modinfo.lua`
+- the game's adapter at `coilbox_rewind/adapter.lua`, and a file for each gadget and widget it switches off ([Game adapters](#game-adapters))
 
 The list of files is made by `crates/tauri-plugin-coilbox-content/build.rs` when coilbox is built, so a gadget added under `luarules/gadgets/` or a widget under `luaui/widgets/` ships with no change to the Rust. A file with another extension, and `tests/`, stay out. A new file is picked up by the next build.
 
 The start script has one spectator, no players or AIs, and every team's `teamleader` is that spectator. Team and ally team numbers are the replay's own. Mod options and map options are the replay's. The script sets `recorddemo=0`. The engine adds the Gaia team, so read its number from the engine and do not assume it.
 
-Nothing in the base game is switched off. The base game's own gadgets run, so a game that creates starting units or ends the match when a team has no units will try to during playback. [What the base game does](#what-the-base-game-does) has what the player does about it.
+The base game's own gadgets run, except those the game's adapter switches off. A game with no adapter that creates starting units or ends the match when a team has no units will try to during playback. [What the base game does](#what-the-base-game-does) has what the player does about it.
 
 `contentReplayPlaybackLaunch` in `src/content/bindings.ts` writes the game and script and launches the engine.
 
@@ -341,6 +459,7 @@ luajit lua/rewind-player/tests/clock_test.lua
 luajit lua/rewind-player/tests/rotation_test.lua
 luajit lua/rewind-player/tests/player_test.lua
 luajit lua/rewind-player/tests/gadget_test.lua
+luajit lua/rewind-player/tests/adapter_test.lua
 luajit lua/rewind-player/tests/timeline_test.lua
 ```
 
@@ -353,6 +472,7 @@ luajit lua/rewind-player/tests/timeline_test.lua
 - `rotation_test.lua` checks the pitch, yaw and roll against the engine's own matrix arithmetic, in doubles and with every result rounded to a float.
 - `player_test.lua` checks the stages on tracks made from a table (`tests/fake_track.lua`): what is alive at a time, removal before creation, a seek back past a construction, play in both directions, a missing definition, a nil from `Spring.CreateUnit`, terrain forward and back, and that a frame of play allocates nothing.
 - `gadget_test.lua` loads the two gadgets the way the engine does.
+- `adapter_test.lua` checks how the player reads an adapter, that it never creates a hidden unit or skipped feature and says nothing about either, that each hook is called with the right arguments and a hook that raises is switched off, the log line, and that 60 frames of play with hooks allocate nothing.
 - `timeline_test.lua` checks the timeline on a stand-in for `Spring` and `gl`: the message for every key, that a key with Ctrl, Alt or Meta is left alone, the frame a drag seeks to at both ends and between, the time and speed shown, that everything drawn is inside views from 640 by 480 to 3840 by 2160, moving the panel, changing a key, marks, and that 300 draws allocate nothing. It also loads the widget file the way a handler does.
 
 `tests/support.lua` is the stand-in for the reader. Its `VFS.Unpack*` and `VFS.ZlibDecompress` follow the engine source, round what they return to a 32 bit float, and raise for a position or count a float could not hold. The zlib is the system's, through LuaJIT's FFI. Its synced environment has no `io`, so a reader that reached for it would fail the tests.
@@ -382,6 +502,8 @@ What it shows, on engine `2026.07.01-102-g6e5c5a0` and SplinterFaction 0.1.89:
 - Splinter Faction's widget handler loads the timeline and turns it on. Space, End, Home, the arrows with and without Shift, Comma, Full stop, Minus, Equals, Plus and R each change the parameter they should, a press on the middle of the bar seeks to the middle frame, and Space with Ctrl is left alone and changes nothing. The handler still has the widget at the end, having asked it to draw 200 times in the run these lines come from.
 
 The timeline's test also passed, run by hand with `COILBOX_PLAYBACK_GAME` naming the game, on Metal Factions v2.58, Balanced Annihilation V15.9.8 and THIS, with the Splinter Faction track. Those games have none of the track's units, so the world stays empty, and it is their widget handlers that the run is about. XTA 9.65 does not load on this engine: it stops on a model before any Lua runs.
+
+A third test, `an_adapter_switches_things_off_in_the_engine`, launches the playback three times on Splinter Faction 0.1.89 with a probe widget (`tests/headless/adapter_probe.lua`) that reports at frame 320 of the track. With no adapter shipped, `game_end.lua` and `game_team_com_ends.lua` load, the guard logs that a team was asked to be killed, the widget `gui_static_resourcebar.lua` is one of 110 loaded, and the engine has 2 `lozscorpion`. With a fixture adapter (`tests/headless/fixture_adapter.lua`) that names the two gadgets, the widget and `lozscorpion`, neither gadget is in the log, no team is asked to be killed, the widget is one of 109, no `lozscorpion` exists and the other units are as before, no error names a shadowed file, and both hooks logged that they ran. A third launch with the shadow files emptied shows what an empty file does (see [What switching off does](#what-switching-off-does)). Switching off `game_end.lua` alone did not stop the team being asked to be killed, which is why the fixture names both gadgets.
 
 What it cannot show: anything on screen. A headless engine draws nothing, so how a unit, a death or the changed ground looks has not been seen by anybody.
 
