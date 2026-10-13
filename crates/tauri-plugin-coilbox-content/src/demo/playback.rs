@@ -445,6 +445,7 @@ pub fn prepare(
 /// replay of the playback game and an engine that is not there. The game folder
 /// is not touched while another game is running.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn content_replay_playback_launch<R: Runtime>(
     app: AppHandle<R>,
     replay_path: String,
