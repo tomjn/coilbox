@@ -2,7 +2,7 @@
 
 mod common;
 
-use coilbox_track::{projectile_at, transform_at, Quantiser};
+use coilbox_track::{projectile_at, transform_at, Quantiser, TrackReader};
 use coilbox_track_thin::{check_track, thin_dump, ThinError, ThinOptions, ThinReport};
 use common::*;
 
@@ -102,6 +102,107 @@ fn a_weapon_target_is_kept_only_when_it_changes() {
     assert_eq!(second.keys[1].kind, 128);
     assert_eq!(second.keys[1].position, [2480, 44, 960]);
     assert_eq!(report.kept.target, 3);
+}
+
+#[test]
+fn two_weapons_aimed_at_different_targets_each_have_a_target_curve() {
+    let mut scene = Scene::new(300);
+    scene.unit(1, 1, 0, 300, |_| At::place(100.0, 0.0, 100.0));
+    scene.unit(2, 1, 0, 300, |_| At::place(300.0, 0.0, 100.0));
+    scene.unit(3, 1, 0, 300, |_| At::place(500.0, 0.0, 100.0));
+    scene.projectile(9, 1, 2, 40, 60, |f| {
+        ([300.0 + f as f32, 40.0, 100.0], [1.0, 0.0, 0.0])
+    });
+    // Weapon 1 takes unit 2 and lets go of it on frame 120.
+    scene.frame(30).targets.push([1.0, 1.0, 1.0, 2.0, 0.0, 0.0]);
+    scene
+        .frame(120)
+        .targets
+        .push([1.0, 1.0, 0.0, 0.0, 0.0, 0.0]);
+    // Weapon 2 takes unit 3, then the projectile, which is gone after frame
+    // 60, then a place.
+    scene.frame(35).targets.push([1.0, 2.0, 1.0, 3.0, 0.0, 0.0]);
+    scene.frame(45).targets.push([1.0, 2.0, 3.0, 9.0, 0.0, 0.0]);
+    scene
+        .frame(90)
+        .targets
+        .push([1.0, 2.0, 2.0, 700.0, 12.0, 160.0]);
+
+    let dir = tempfile::tempdir().unwrap();
+    let (dump, path) = scene.write(dir.path());
+    let report = thin_dump(&dump, &path, &ThinOptions::default()).unwrap();
+    let read = read_track(&path);
+    let unit = read.unit(0, 1);
+
+    assert_eq!(unit.targets.len(), 2);
+    assert_eq!(report.kept.target_tracks, 2);
+    let (first, second) = (&unit.targets[0], &unit.targets[1]);
+    assert_eq!((first.weapon, second.weapon), (1, 2));
+    // Each track starts with the key a window starts with, no target.
+    assert_eq!(frames(&first.keys), [0, 30, 120]);
+    assert_eq!(
+        first.keys.iter().map(|k| k.kind).collect::<Vec<_>>(),
+        [0, 1, 0]
+    );
+    assert_eq!(frames(&second.keys), [0, 35, 45, 61, 90]);
+    assert_eq!(
+        second.keys.iter().map(|k| k.kind).collect::<Vec<_>>(),
+        [0, 1, 4, 0, 128]
+    );
+    // Neither track's keys name what the other's do.
+    let engine_id = |key: &coilbox_track::TargetKey| {
+        read.windows[0].units[key.reference as usize].unit.engine_id
+    };
+    assert_eq!(engine_id(&first.keys[1]), 2);
+    assert_eq!(engine_id(&second.keys[1]), 3);
+    let projectile = &read.windows[0].projectiles[second.keys[2].reference as usize];
+    assert_eq!(projectile.projectile.first_frame, 40);
+    // A weapon aimed at a place keeps the place.
+    assert_eq!(second.keys[4].position, [5600, 96, 1280]);
+
+    // A reader that asks for frame 50 gets both weapons' targets, and for
+    // frame 100 the first weapon's unit and the second weapon's place.
+    let mut reader = TrackReader::open(std::fs::File::open(&path).unwrap()).unwrap();
+    let held_by = |frame: u32, reader: &mut TrackReader<std::fs::File>| {
+        let state = reader.sample(frame).unwrap();
+        let unit = state.units.iter().find(|u| u.engine_id == 1).unwrap();
+        unit.targets
+            .iter()
+            .map(|t| (t.weapon, t.kind))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(held_by(50, &mut reader), [(1, 1), (2, 4)]);
+    assert_eq!(held_by(100, &mut reader), [(1, 1), (2, 128)]);
+    assert_eq!(held_by(150, &mut reader), [(1, 0), (2, 128)]);
+}
+
+#[test]
+fn a_unit_with_one_weapon_costs_one_target_track_and_a_weapon_without_a_target_none() {
+    let aimed = |scene: &mut Scene| {
+        scene.unit(1, 1, 0, 300, |_| At::place(100.0, 0.0, 100.0));
+        scene.unit(2, 1, 0, 300, |_| At::place(300.0, 0.0, 100.0));
+        scene.frame(30).targets.push([1.0, 1.0, 1.0, 2.0, 0.0, 0.0]);
+    };
+    // Unit 1 has the one weapon. Unit 3 has a second weapon that the
+    // recorder has said has no target.
+    let mut with = Scene::new(300);
+    aimed(&mut with);
+    with.unit(3, 1, 0, 300, |_| At::place(500.0, 0.0, 100.0));
+    with.frame(10).targets.push([3.0, 2.0, 0.0, 0.0, 0.0, 0.0]);
+    let mut without = Scene::new(300);
+    aimed(&mut without);
+    without.unit(3, 1, 0, 300, |_| At::place(500.0, 0.0, 100.0));
+
+    let (report, read) = thin(&with);
+    assert_eq!(read.unit(0, 1).targets.len(), 1);
+    assert_eq!(read.unit(0, 1).targets[0].weapon, 1);
+    assert!(read.unit(0, 3).targets.is_empty());
+    assert_eq!(report.kept.target_tracks, 1);
+    assert_eq!(report.written.target_tracks, 1);
+
+    // The second weapon adds nothing to the file.
+    let (bare, _) = thin(&without);
+    assert_eq!(report.bytes, bare.bytes);
 }
 
 #[test]

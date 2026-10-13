@@ -816,7 +816,7 @@ Whether to record such pieces at all is issue #3941.
 
 Nothing in the thinning changed for these two issues. `coilbox-track-thin` made a track from `bar-4.dump` and `sf-4.dump` again on 13 October 2026, and each came out byte for byte the same as the track of the section above: 4,713,582 bytes for BAR and 289,328 for Splinter Faction. So the largest BAR window is still 454,968 bytes decompressed.
 
-The section sizes below are from the `section_bytes` example in `coilbox-track-thin`. It reads each window's main chunk, puts the columns of one section in a chunk of its own, compresses it at level 9 and adds up the windows. The earlier tables on this page that say "compressed on their own" came from scripts that are not in the repository, and this method does not give the same figure for the projectile and target sections: 722,410 bytes for BAR projectiles here, where the section for #3782 has 693,276. Compare the figures in this section with each other and not with those.
+The section sizes below are from the `section_bytes` example in `coilbox-track-thin`. It reads each window's main chunk, puts the columns of one section in a chunk of its own, compresses it at level 9 and adds up the windows. It also writes each window again from its keys, and gets the same bytes as the file has: 4,470,488 for BAR and 277,633 for Splinter Faction. The earlier tables on this page that say "compressed on their own" came from scripts that are not in the repository, and this method does not give the same figure for the projectile and target sections: 722,410 bytes for BAR projectiles here, where the section for #3782 has 693,276. Compare the figures in this section with each other and not with those.
 
 ### Projectiles
 
@@ -856,6 +856,27 @@ Splinter Faction is well under half an elmo a frame. BAR is not, and the cause i
 Two keys with the same position and velocity are not flat between them. The curve swings away from the position and is back on it half way between the keys, whatever the gap. The slope there is -0.5 of the velocity at the keys, so a dropped frame in the middle is 1.5 times the velocity away. Position is right and velocity is not.
 
 No bound was added. A bound is only worth having if it comes from what playback does with the velocity, and playback does not exist yet. The nearest ground is that a velocity error that lasts one frame moves a projectile by that distance, which would make 0.5 elmo per frame the limit. BAR is over that limit at 11,798 checks, and the ones looked at were projectiles that a velocity does not move, so the limit would force keys for no reason that can be named yet. Velocity is stored and read back, and its worst error is reported.
+
+### Target tracks for every weapon
+
+Before issue #3790 a unit had target tracks for its first weapon and for builder work. Now it has one for each weapon that had a target in the window. The "before" figures are what the file would hold without the tracks for weapon 2 and above. They come from taking those tracks out of each window as read and writing the window again, so they are the file as it would have been if the recorder had stopped at the first weapon. Builder work is weapon 0 and stays. The target columns are 10, which counts each unit's tracks, and 40 to 48.
+
+| | BAR | Splinter Faction |
+| --- | --- | --- |
+| Target tracks and keys written, with every weapon | 3,769 and 26,984 | 83 and 1,663 |
+| Of them for a weapon after the first | 324 and 2,027 | 0 and 0 |
+| Target columns before compression, first weapon only | 243,780 bytes | 16,712 bytes |
+| Target columns before compression, every weapon | 261,000 bytes | 16,712 bytes |
+| Target columns compressed on their own, first weapon only | 66,240 bytes | 3,755 bytes |
+| Target columns compressed on their own, every weapon | 69,946 bytes | 3,755 bytes |
+| Main chunks compressed, first weapon only | 4,466,579 bytes | 277,633 bytes |
+| Main chunks compressed, every weapon | 4,470,488 bytes | 277,633 bytes |
+
+Weapons after the first cost the BAR track 3,909 bytes of main chunks, which is 0.08% of its 4,713,582. They cost the Splinter Faction track nothing, since none of its units had a target on a second weapon.
+
+The file stores each chunk in whole blocks of 64 bytes, so the difference in the size of the file can be up to 63 bytes a window different from the difference in main chunks. The track as it is, 4,713,582 and 289,328 bytes, is the "after".
+
+A unit with one weapon has one target track, and a second weapon that never had a target has none. The tests `a_unit_with_one_weapon_costs_one_target_track_and_a_weapon_without_a_target_none` and `two_weapons_aimed_at_different_targets_each_have_a_target_curve` in `coilbox-track-thin` check both. The second also covers a weapon aimed at a projectile and at a position, which neither benchmark recording has.
 
 ## Savings considered and rejected
 
