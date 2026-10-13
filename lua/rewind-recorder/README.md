@@ -108,10 +108,20 @@ Every definition id in a frame block is the id this run's engine gave. The ids c
 ### Piece tree block
 
 ```json
-{"def": 12, "pieces": ["base", "turret", "barrel"], "parents": [0, 1, 2]}
+{"def": 12, "pieces": ["base", "turret", "flare"], "parents": [0, 1, 2], "modelType": "s3o",
+ "offsets": [[0, 0, 0], [0, 10, -2.5], [0, 3, 14]],
+ "bounds": [[-8, 0, -12, 8, 10, 12], [-5, 0, -5, 5, 4, 5], []]}
 ```
 
 `def` is a unit definition id. `pieces` are the piece names in the engine's order, so a piece number in a frame block is a position in this list counting from 1. `parents` gives each piece's parent as a piece number, and 0 for the root.
+
+The other three fields are what the model says about each piece before a script moves it. The thinning of issue #3783 needs them to turn a piece row into the turn and the move a script set, and it refuses a dump whose trees have no `offsets`.
+
+- `offsets` has each piece's rest offset from its parent in elmos, x, y and z. It is `offset` from `Spring.GetUnitPieceInfo`, the value a script's `Move` adds to.
+- `bounds` has the box round each piece's own geometry, in the piece's own space: the least x, y and z, then the greatest. A piece with no geometry has an empty list.
+- `modelType` is the extension of the model's file in lower case, from the unit definition's `modeltype`, and an empty string when the definition has none.
+
+The engine gives a piece of an Assimp or glTF model a rest rotation, and Lua has no call that reads it (`bakedTransform` in `rts/Rendering/Models/3DModelPiece.hpp`). A `3do` or `s3o` piece has none. So for any other `modelType` a reader cannot tell a script's turn from the model's own.
 
 ### End block
 
