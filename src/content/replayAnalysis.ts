@@ -15,6 +15,7 @@ import {
   type ReplayDisagreement,
   type StoredReplayAnalysis,
 } from "./bindings";
+import { refreshStoredTracks } from "./replayTracks";
 
 /**
  * Replay analysis on the frontend (#1157, #1158): the queue as every window
@@ -45,6 +46,7 @@ const EMPTY_QUEUE: ReplayAnalysisQueue = {
   waitingForGame: false,
   failures: [],
   stored: 0,
+  tracks: 0,
 };
 
 type Analyses = ReadonlyMap<string, StoredReplayAnalysis>;
@@ -60,10 +62,20 @@ function emit(): void {
 
 function setQueue(next: ReplayAnalysisQueue): void {
   const storeChanged = next.stored !== queue.stored;
+  const tracksChanged = next.tracks !== queue.tracks;
   queue = next;
   emit();
   // A run stored or replaced something, so the list is out of date.
   if (storeChanged) void refreshStoredAnalyses();
+  if (tracksChanged) void refreshStoredTracks();
+}
+
+/**
+ * Take a queue that a command answered with. For the call that asks for a
+ * recording, which shares this queue.
+ */
+export function acceptQueue(next: ReplayAnalysisQueue): void {
+  setQueue(next);
 }
 
 /** Read the stored analyses again. Called after anything that changes them. */
@@ -322,6 +334,7 @@ export function analysisPercent(job: ReplayAnalysisRunningJob): number {
 /** What a running analysis is doing, in a few words. */
 export function analysisProgressLabel(job: ReplayAnalysisRunningJob): string {
   if (job.cancelling) return "Stopping";
+  if (job.phase === "thinning") return "Making the track";
   if (job.phase === "starting") return "Starting the engine";
   if (job.phase === "loading") return "Loading the match";
   // The header holds whole seconds, so the last event can land past it.

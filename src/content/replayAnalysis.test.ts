@@ -22,6 +22,7 @@ vi.mock("@picoframe/plugin-sdk", () => ({
             waitingForGame: false,
             failures: [],
             stored: 0,
+            tracks: 0,
           },
         };
       }
@@ -108,6 +109,7 @@ function running(
     frame: 1500,
     lastFrame: 3000,
     cancelling: false,
+    record: false,
     ...over,
   };
 }
@@ -292,6 +294,17 @@ describe("progress", () => {
     const over = running({ frame: 3021 });
     expect(analysisPercent(over)).toBe(100);
     expect(analysisProgressLabel(over)).toBe("Frame 3,000 of 3,000");
+  });
+
+  it("shows the thinning of a recording as a stage with no bar", () => {
+    // The engine has finished, so the frame is where the playback ended. A bar
+    // at that frame would sit full while the track is being made.
+    const thinning = running({ phase: "thinning", frame: 3000, record: true });
+    expect(analysisPercent(thinning)).toBe(0);
+    expect(analysisProgressLabel(thinning)).toBe("Making the track");
+    expect(analysisProgressLabel({ ...thinning, cancelling: true })).toBe(
+      "Stopping",
+    );
   });
 
   it("says a cancelled run is stopping", () => {

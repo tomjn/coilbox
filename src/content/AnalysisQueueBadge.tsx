@@ -35,16 +35,35 @@ export default function AnalysisQueueBadge() {
   const jobs = (running ? 1 : 0) + queued.length;
   if (jobs === 0 && failures.length === 0) return null;
 
+  // A recording is an analysis with the recorder added, and is worded as a
+  // recording once every job in the queue is one.
+  const recordings =
+    (running?.record ? 1 : 0) + queued.filter((job) => job.record).length;
+  const verb =
+    recordings === 0
+      ? "Analysing"
+      : recordings === jobs
+        ? "Recording"
+        : "Analysing and recording";
+  const failed = failures.filter((f) => f.record).length;
   const label =
     jobs === 0
-      ? failures.length === 1
-        ? "1 analysis failed"
-        : `${failures.length} analyses failed`
+      ? failed === 0
+        ? failures.length === 1
+          ? "1 analysis failed"
+          : `${failures.length} analyses failed`
+        : failed === failures.length
+          ? failures.length === 1
+            ? "1 recording failed"
+            : `${failures.length} recordings failed`
+          : failures.length === 1
+            ? "1 run failed"
+            : `${failures.length} runs failed`
       : waitingForGame
-        ? "Analysis paused"
+        ? `${verb === "Analysing" ? "Analysis" : "Recording"} paused`
         : jobs === 1
-          ? "Analysing 1 replay"
-          : `Analysing ${jobs} replays`;
+          ? `${verb} 1 replay`
+          : `${verb} ${jobs} replays`;
 
   return (
     <Popover>
@@ -74,7 +93,7 @@ export default function AnalysisQueueBadge() {
             <Row
               name={running.name}
               note={analysisProgressLabel(running)}
-              cancelLabel={`Cancel the analysis of ${running.name}`}
+              cancelLabel={`Cancel the ${running.record ? "recording" : "analysis"} of ${running.name}`}
               disabled={running.cancelling}
               onCancel={() => void cancelAnalysis(running.id).catch(() => {})}
             />
@@ -92,7 +111,7 @@ export default function AnalysisQueueBadge() {
             key={job.id}
             name={job.name}
             note="Queued"
-            cancelLabel={`Cancel the analysis of ${job.name}`}
+            cancelLabel={`Cancel the ${job.record ? "recording" : "analysis"} of ${job.name}`}
             onCancel={() => void cancelAnalysis(job.id).catch(() => {})}
           />
         ))}
@@ -101,7 +120,7 @@ export default function AnalysisQueueBadge() {
             key={failure.gameId}
             name={failure.name}
             note="Failed. Open the replay to see why."
-            cancelLabel={`Dismiss the failed analysis of ${failure.name}`}
+            cancelLabel={`Dismiss the failed ${failure.record ? "recording" : "analysis"} of ${failure.name}`}
             onCancel={() =>
               void dismissAnalysisFailure(failure.gameId).catch(() => {})
             }
