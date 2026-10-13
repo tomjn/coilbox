@@ -1172,6 +1172,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             demo::analysis::store::content_replay_analysis_events,
             demo::analysis::store::content_replay_analysis_delete,
             demo::track_store::content_replay_tracks,
+            demo::playback::content_replay_playback_launch,
             demo::track_budget::content_replay_tracks_clear,
             demo::track_view::content_replay_track_header,
             demo::track_view::content_replay_track_window,

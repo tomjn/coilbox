@@ -83,7 +83,7 @@ pub fn gametype() -> String {
 }
 
 /// A Lua string literal holding `text`.
-fn lua_string(text: &str) -> String {
+pub(crate) fn lua_string(text: &str) -> String {
     let mut out = String::with_capacity(text.len() + 2);
     out.push('"');
     for c in text.chars() {

@@ -43,6 +43,7 @@ const COMMANDS: &[&str] = &[
     "content_replay_tracks_clear",
     "content_replay_track_header",
     "content_replay_track_window",
+    "content_replay_playback_launch",
     "content_unit_def_set",
     "content_unit_def_set_store",
     "content_unit_def_sets_usage",
@@ -88,6 +89,55 @@ const COMMANDS: &[&str] = &[
     "branding_image",
 ];
 
+/// The trees of `lua/rewind-player/` that go into the playback game, relative to
+/// it. The tests and the README beside them stay out.
+const PLAYER_TREES: &[&str] = &["luarules", "luaui"];
+
+/// Every `.lua` file under `dir`, as a path relative to `root` with forward
+/// slashes, collected in `found`.
+fn collect_lua(root: &std::path::Path, dir: &std::path::Path, found: &mut Vec<String>) {
+    println!("cargo:rerun-if-changed={}", dir.display());
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_lua(root, &path, found);
+        } else if path.extension().is_some_and(|ext| ext == "lua") {
+            let rel = path.strip_prefix(root).expect("under the root");
+            found.push(rel.to_string_lossy().replace('\\', "/"));
+        }
+    }
+}
+
+/// Write `$OUT_DIR/rewind_player_files.rs`, a list of every file the playback
+/// game carries and its contents, read from `lua/rewind-player/` (issue #3793).
+/// A gadget or widget added there is picked up by the next build, so the Rust
+/// side never lists them.
+fn embed_rewind_player() {
+    let root = std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("manifest dir"))
+        .join("../../lua/rewind-player");
+    let root = root.canonicalize().expect("lua/rewind-player is there");
+    let mut found = Vec::new();
+    for tree in PLAYER_TREES {
+        collect_lua(&root, &root.join(tree), &mut found);
+    }
+    found.sort();
+    let mut out = String::from("pub const REWIND_PLAYER_FILES: &[(&str, &str)] = &[\n");
+    for rel in &found {
+        out.push_str(&format!(
+            "    ({rel:?}, include_str!({:?})),\n",
+            root.join(rel).to_string_lossy()
+        ));
+    }
+    out.push_str("];\n");
+    let dest = std::path::PathBuf::from(std::env::var("OUT_DIR").expect("out dir"))
+        .join("rewind_player_files.rs");
+    std::fs::write(&dest, out).expect("write the list of player files");
+}
+
 fn main() {
+    embed_rewind_player();
     tauri_plugin::Builder::new(COMMANDS).build();
 }

@@ -46,6 +46,7 @@ pub(crate) mod def_sets;
 pub mod map_grids;
 pub(crate) mod match_setup;
 mod orders;
+pub(crate) mod playback;
 pub mod recording_costs;
 pub(crate) mod retarget;
 pub(crate) mod stream;
