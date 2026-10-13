@@ -378,6 +378,14 @@ do
 	player:unitDamaged(radar.id)
 	player:frame()
 	t.same("damage that got through is put right on the next frame", radar.health, 50)
+
+	-- Something healed it and nothing said so: the engine heals an idle unit,
+	-- and Splinter Faction's regeneration gadget sets health once a second. The
+	-- track's value stands still while paused, so only the engine's own value
+	-- can show it.
+	radar.health = 180
+	player:frame()
+	t.same("health that rose with no damage is put right on the next frame", radar.health, 50)
 end
 
 -- A definition the installed game does not have.

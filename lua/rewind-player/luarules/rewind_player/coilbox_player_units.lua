@@ -327,7 +327,11 @@ function Units:applyStatus(w, i, serial, unitID, t)
 		Spring.SetUnitHealth(unitID, arg)
 		self.nanoframe[serial] = false
 		self.health[serial] = health
-	elseif self.health[serial] ~= health then
+	elseif self.health[serial] ~= health or Spring.GetUnitHealth(unitID) ~= health * maxHealth then
+		-- The second test is for health that moved with no damage to hear of: the
+		-- engine heals an idle unit and a base game gadget can set health, and
+		-- while the track's value stands still, as it does when paused, nothing
+		-- else would put it back.
 		local arg = self.healthArg
 		arg.health = health * maxHealth
 		Spring.SetUnitHealth(unitID, arg)
