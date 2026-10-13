@@ -16,6 +16,10 @@
 # 5. Runs the_timeline_drives_the_player_in_the_engine on it, in which a probe
 #    widget presses the timeline widget's keys and its bar inside the game's
 #    own widget handler (issue #3798).
+# 6. Runs an_adapter_switches_things_off_in_the_engine on it, which launches the
+#    playback three times, with no adapter, with a fixture adapter that
+#    switches off two Splinter Faction gadgets and a widget, and with the files
+#    that stand in for them emptied (issue #3799).
 #
 # The match is generated every run, not committed as a replay, because a replay
 # only plays back against the exact game version it was recorded on.
@@ -183,7 +187,7 @@ playback() { # what, test name, log name, blocks to move the track by or nothing
       cargo nextest run -p tauri-plugin-coilbox-content --run-ignored only --no-capture \
       -E "test($2)"
   ) >"$log" 2>&1; then
-    grep -E '^(seek |construction |terrain |play |death |explosions |played_past_death |played_to_end |after_empty |teams |long_string |work |options |the track is |timeline )' "$log" | sed 's/^/  /' || true
+    grep -E '^(seek |construction |terrain |play |death |explosions |played_past_death |played_to_end |after_empty |teams |long_string |work |options |the track is |timeline |no adapter: |adapter: |empty shadows: )' "$log" | sed 's/^/  /' || true
     grep -E 'COILBOX_REWIND_PLAYER ' "$log" | sed 's/^.*COILBOX_REWIND_PLAYER /  player: /' || true
     echo "  ok"
   else
@@ -198,6 +202,7 @@ playback "playing the track back and seeking about" a_real_track_is_played_at_an
 playback "the same with the track moved past 16,777,216 bytes" a_real_track_is_played_at_any_time moved 300000
 playback "the playback game and its start script" a_real_replay_is_played_back_in_the_engine game
 playback "the timeline widget's keys and its bar" the_timeline_drives_the_player_in_the_engine timeline
+playback "a game's adapter, switching off what it names" an_adapter_switches_things_off_in_the_engine adapter
 
 echo
 if [ "$failures" -eq 0 ]; then

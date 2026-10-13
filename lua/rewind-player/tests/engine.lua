@@ -441,7 +441,7 @@ end
 --- The environment a synced gadget of this world runs in: the reader's globals
 -- from support.lua, the world's, and a `VFS.Include` that loads the player's
 -- own modules into the same environment, as the engine's does when it is given
--- none.
+-- none. `files` are the files the game holds besides those modules, by path.
 function M.env(t, world, files)
 	local env = t.syncedEnv({ files = files })
 	for name, value in pairs(world.globals) do
@@ -449,8 +449,19 @@ function M.env(t, world, files)
 	end
 	env.VFS.Include = function(path)
 		local file = path:match("^luarules/rewind_player/(.+)$")
-		assert(file, "something included " .. path)
-		return t.load(file, env)
+		if file then
+			return t.load(file, env)
+		end
+		-- A file the test put in the game, run in the environment of its caller
+		-- as the engine's is.
+		local source = files and files[path]
+		assert(source, "something included " .. path)
+		local chunk = assert(loadstring(source, path))
+		setfenv(chunk, env)
+		return chunk()
+	end
+	env.VFS.FileExists = function(path)
+		return files ~= nil and files[path] ~= nil
 	end
 	return env
 end

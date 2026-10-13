@@ -13,6 +13,9 @@
 -- the tables handed to the engine are made once and written to, and the units
 -- are walked with `next`, because synced `pairs` makes a closure for each call.
 --
+-- The game's adapter can hide a unit definition, which is then never created,
+-- and can ask to be told when a unit is created and put in place (issue #3799).
+--
 -- Three things the engine or the base game does to a unit are undone here and
 -- not prevented, because nothing can prevent them:
 --
@@ -46,8 +49,14 @@ function M.new(context, rotation)
 	local Spring, Game = context.Spring, context.Game
 	local names = context.info.unitDefs
 	local defID, floor = {}, {}
+	-- Definitions the game's adapter hides are treated as ones the game does not
+	-- have, without the line about it, since leaving them out is the point.
+	local hidden = context.adapter and context.adapter.hiddenUnits
 	for i = 1, #names do
 		local def = context.UnitDefNames[names[i]]
+		if hidden and hidden[names[i]:lower()] then
+			def = nil
+		end
 		defID[i] = def and def.id or false
 		-- What one pass of decay takes off progress, and off health as a part of
 		-- the maximum.
@@ -55,7 +64,7 @@ function M.new(context, rotation)
 		if def and Game.constructionDecay then
 			floor[i] = 1 / math.max(0.001, def.buildTime * Game.constructionDecaySpeed) + 1 / STEPS
 		end
-		if not def then
+		if not def and not (hidden and hidden[names[i]:lower()]) then
 			context.report("unit " .. names[i], "the game has no unit called " .. names[i] .. ", so the track's units of that kind are left out")
 		end
 	end
@@ -340,7 +349,7 @@ end
 
 --- Creates every unit of the track at `t` that is not there, and puts each one
 -- where the track has it.
-function Units:place(t)
+function Units:place(t, clock)
 	local w = self.window
 	if not w then
 		return
@@ -348,13 +357,15 @@ function Units:place(t)
 	local unitOf, failed = self.unitOf, self.failed
 	local transform, status = self.transform, self.status
 	local MoveCtrl, euler = self.MoveCtrl, self.euler
+	local placed = self.context.hooks.unitPlaced
 	local serials = w.unitSerial
 	for i = 1, w.unitCount do
 		if w:unitExistsAt(i, t) then
 			local serial = serials[i]
 			local unitID = unitOf[serial]
 			if (unitID or not failed[serial]) and w:sampleTransform(i, t, transform) and w:sampleStatus(i, t, status) then
-				if not unitID then
+				local made = not unitID
+				if made then
 					unitID = self:create(w, i, serial, status[2] < 1, t)
 				end
 				if unitID then
@@ -363,6 +374,9 @@ function Units:place(t)
 				if unitID then
 					MoveCtrl.SetPosition(unitID, transform[1], transform[2], transform[3])
 					MoveCtrl.SetRotation(unitID, euler(transform[4], transform[5], transform[6], transform[7]))
+					if made and placed then
+						placed(unitID, self.defID[w.unitDef[i] + 1], t, clock)
+					end
 				end
 			end
 		end

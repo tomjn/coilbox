@@ -24,10 +24,17 @@ local NO_TEAM = 255
 function M.new(context, rotation)
 	local names = context.info.featureDefs
 	local defID = {}
+	-- Definitions the game's adapter skips are treated as ones the game does not
+	-- have, without the line about it, since leaving them out is the point.
+	local skipped = context.adapter and context.adapter.skippedFeatures
 	for i = 1, #names do
 		local def = context.FeatureDefNames[names[i]]
+		local skip = skipped and skipped[names[i]:lower()]
+		if skip then
+			def = nil
+		end
 		defID[i] = def and def.id or false
-		if not def then
+		if not def and not skip then
 			context.report("feature " .. names[i], "the game has no feature called " .. names[i] .. ", so the track's features of that kind are left out")
 		end
 	end

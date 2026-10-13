@@ -2103,6 +2103,119 @@ pub fn game_short_name_blocking(
     short_name_in_scan(&out, game)
 }
 
+/// What the scan says about an installed game, for matching an adapter to it
+/// (issue #3799).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct InstalledGame {
+    /// The modinfo `shortname`.
+    pub short_name: String,
+    /// The modinfo `version`, when the game declares one.
+    pub version: Option<String>,
+    /// The game's own archive, as unitsync names it, which is what a read of a
+    /// file inside the game is asked for by.
+    pub archive: String,
+}
+
+/// The installed game named `game`, as [`game_short_name_blocking`] finds it, with
+/// its version and archive too. Blocking, and one scan.
+pub fn installed_game_blocking(
+    engine_path: &str,
+    data_dir: &str,
+    game: &str,
+) -> Result<InstalledGame, String> {
+    let (bin, libpath, engine_dir) = prepare(engine_path)?;
+    let args = build_args(&libpath.to_string_lossy(), data_dir);
+    let envs = loader_envs(&engine_dir, data_dir);
+    let out = run_worker_blocking(bin, args, envs, SCAN_TIMEOUT, "installed game".into(), None)?;
+    installed_game_in_scan(&out, game)
+}
+
+/// The entry for the game named `game` in the scan's output.
+fn installed_game_in_scan(scan: &str, game: &str) -> Result<InstalledGame, String> {
+    let scan: serde_json::Value =
+        serde_json::from_str(scan).map_err(|e| format!("the scan did not read as JSON: {e}"))?;
+    let entry = scan["games"]
+        .as_array()
+        .and_then(|games| games.iter().find(|g| g["name"].as_str() == Some(game)))
+        .ok_or_else(|| format!("no installed game is named {game:?}"))?;
+    let text = |value: &serde_json::Value| {
+        value
+            .as_str()
+            .map(str::trim)
+            .filter(|text| !text.is_empty())
+            .map(str::to_string)
+    };
+    Ok(InstalledGame {
+        short_name: text(&entry["info"]["shortname"])
+            .ok_or_else(|| format!("the game {game:?} declares no short name in its modinfo"))?,
+        version: text(&entry["info"]["version"]),
+        archive: text(&entry["primaryArchive"]["name"])
+            .ok_or_else(|| format!("the scan names no archive for the game {game:?}"))?,
+    })
+}
+
+/// A text file inside the archive `archive`, or `None` when the archive holds
+/// no such file. Blocking.
+///
+/// It reads through the worker's archive preview, which gives text files up to
+/// its preview cap, so a file past that is an error and not a truncated read.
+pub fn archive_text_blocking(
+    engine_path: &str,
+    data_dir: &str,
+    archive: &str,
+    file: &str,
+) -> Result<Option<String>, String> {
+    let (bin, libpath, engine_dir) = prepare(engine_path)?;
+    let args = build_archive_file_args(&libpath.to_string_lossy(), data_dir, archive, file, false);
+    let envs = loader_envs(&engine_dir, data_dir);
+    let out = run_worker_blocking(
+        bin,
+        args,
+        envs,
+        MINIMAP_TIMEOUT,
+        "archive text".into(),
+        None,
+    )?;
+    text_in_archive_output(&out, archive, file)
+}
+
+/// The text in the worker's answer to a read of one archive file.
+fn text_in_archive_output(out: &str, archive: &str, file: &str) -> Result<Option<String>, String> {
+    let out: serde_json::Value = serde_json::from_str(out)
+        .map_err(|e| format!("the archive read did not come back as JSON: {e}"))?;
+    if let Some(text) = out["text"].as_str() {
+        return Ok(Some(text.to_string()));
+    }
+    let errors: Vec<&str> = out["errors"]
+        .as_array()
+        .map(|errors| errors.iter().filter_map(|e| e.as_str()).collect())
+        .unwrap_or_default();
+    if errors
+        .iter()
+        .any(|e| e.starts_with("could not open archive"))
+    {
+        return Err(format!("could not open the archive {archive}"));
+    }
+    if out["truncated"].as_bool() == Some(true) {
+        return Err(format!("{file} in {archive} is too large to read"));
+    }
+    // A file the archive does not hold comes back as an empty binary file with
+    // no error, because the worker's preview replaces the member's own error
+    // with unitsync's. A text file is never answered as binary.
+    let missing = out["size"].as_u64() == Some(0) && out["kind"].as_str() == Some("binary");
+    if missing
+        || errors
+            .iter()
+            .any(|e| e.starts_with("could not read member"))
+    {
+        return Ok(None);
+    }
+    Err(format!(
+        "{file} in {archive} did not read as text: {}",
+        errors.join("; ")
+    ))
+}
+
 /// The `shortname` in the scan's entry for the game named `game`.
 fn short_name_in_scan(scan: &str, game: &str) -> Result<String, String> {
     let scan: serde_json::Value =
@@ -2318,6 +2431,69 @@ mod tests {
         {"name":"Beyond All Reason test-1","info":{"shortname":" BYAR "}},
         {"name":"No Short 1","info":{"name":"No Short 1"}}
     ],"errors":[]}"#;
+
+    const SCAN_WITH_ARCHIVES: &str = r#"{"maps":[],"games":[
+        {"name":"Splinter 0.1.89","primaryArchive":{"name":"Splinter_0.1.89.sdz"},
+         "info":{"shortname":" SF ","version":"0.1.89"}},
+        {"name":"Dev","primaryArchive":{"name":"Dev.sdd"},"info":{"shortname":"SF","version":"  "}},
+        {"name":"No Archive","info":{"shortname":"NA"}}
+    ],"errors":[]}"#;
+
+    #[test]
+    fn an_installed_game_has_a_short_name_a_version_and_an_archive() {
+        let game = installed_game_in_scan(SCAN_WITH_ARCHIVES, "Splinter 0.1.89").unwrap();
+        assert_eq!(game.short_name, "SF");
+        assert_eq!(game.version.as_deref(), Some("0.1.89"));
+        assert_eq!(game.archive, "Splinter_0.1.89.sdz");
+    }
+
+    #[test]
+    fn a_blank_version_is_no_version() {
+        let game = installed_game_in_scan(SCAN_WITH_ARCHIVES, "Dev").unwrap();
+        assert_eq!(game.version, None);
+    }
+
+    #[test]
+    fn a_game_with_no_archive_or_not_installed_is_an_error() {
+        let none = installed_game_in_scan(SCAN_WITH_ARCHIVES, "No Archive").unwrap_err();
+        assert!(none.contains("no archive"), "{none}");
+        let absent = installed_game_in_scan(SCAN_WITH_ARCHIVES, "Absent").unwrap_err();
+        assert!(absent.contains("no installed game"), "{absent}");
+    }
+
+    #[test]
+    fn a_text_file_in_an_archive_is_its_text() {
+        let out = r#"{"kind":"text","text":"return {}","size":9,"truncated":false,"errors":[]}"#;
+        assert_eq!(
+            text_in_archive_output(out, "a.sdz", "f.lua"),
+            Ok(Some("return {}".to_string()))
+        );
+    }
+
+    #[test]
+    fn a_file_the_archive_does_not_hold_is_none() {
+        let out = r#"{"kind":"binary","size":0,"truncated":false,"errors":["could not read member f.lua"]}"#;
+        assert_eq!(text_in_archive_output(out, "a.sdz", "f.lua"), Ok(None));
+    }
+
+    /// What the worker gave for a missing file in SplinterFaction_0.1.89.sdz:
+    /// it drops the member error and leaves an empty binary file.
+    #[test]
+    fn the_answer_a_real_worker_gives_for_a_missing_file_is_none() {
+        let out = r#"{"kind":"binary","size":0,"truncated":false,"errors":[]}"#;
+        assert_eq!(text_in_archive_output(out, "a.sdz", "f.lua"), Ok(None));
+    }
+
+    #[test]
+    fn an_archive_that_will_not_open_or_a_file_too_large_is_an_error() {
+        let closed = r#"{"kind":"binary","size":0,"truncated":false,"errors":["could not open archive a.sdz"]}"#;
+        let err = text_in_archive_output(closed, "a.sdz", "f.lua").unwrap_err();
+        assert!(err.contains("could not open the archive a.sdz"), "{err}");
+        let large = r#"{"kind":"binary","size":900000,"truncated":true,"errors":[]}"#;
+        let err = text_in_archive_output(large, "a.sdz", "f.lua").unwrap_err();
+        assert!(err.contains("too large"), "{err}");
+        assert!(text_in_archive_output("nope", "a.sdz", "f.lua").is_err());
+    }
 
     #[test]
     fn a_game_s_short_name_is_read_from_the_scan_entry_with_its_name() {

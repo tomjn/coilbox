@@ -18,8 +18,9 @@
 -- and not a message, so it costs no frame), and the unsynced half logs a line
 -- when it took longer than one simulation frame lasts.
 --
--- The base game's own gadgets still run. !coilbox_rewind_guard.lua stops them
--- killing a team or ending the match.
+-- The base game's own gadgets still run, except those the game's adapter
+-- switches off (issue #3799). !coilbox_rewind_guard.lua stops the rest killing a
+-- team or ending the match.
 --
 -- Change this in the coilbox repository under lua/rewind-player/.
 
@@ -51,6 +52,7 @@ if gadgetHandler:IsSyncedCode() then
 		local Track = VFS.Include("luarules/rewind_player/coilbox_track.lua")
 		local Fetch = VFS.Include("luarules/rewind_player/coilbox_track_fetch.lua")
 		local Player = VFS.Include("luarules/rewind_player/coilbox_player.lua")
+		local Adapter = VFS.Include("luarules/rewind_player/coilbox_player_adapter.lua")
 
 		local fetch, why = Fetch.fromVFS()
 		if not fetch then
@@ -62,7 +64,15 @@ if gadgetHandler:IsSyncedCode() then
 			log("failed: " .. tostring(openWhy))
 			return
 		end
-		local made, madeWhy = Player.new(track, { modOptions = Spring.GetModOptions(), log = log })
+		-- The game's adapter, which coilbox wrote into the playback game. Its
+		-- gadgets and widgets were switched off before the engine started.
+		local adapter, adapterWhy = Adapter.load(VFS)
+		local made, madeWhy = Player.new(track, {
+			modOptions = Spring.GetModOptions(),
+			log = log,
+			adapter = adapter,
+			adapterWhy = adapterWhy,
+		})
 		if not made then
 			log("failed: " .. tostring(madeWhy))
 			return
