@@ -22,6 +22,7 @@ use std::path::Path;
 
 use serde::Serialize;
 use serde_json::Value;
+use tauri::{AppHandle, Runtime};
 
 use super::track_store::{self, StoredTrack, TrackState};
 
@@ -116,6 +117,26 @@ pub fn enforce(
         .collect()
 }
 
+/// What the settings page reads: every track, what they take together and the
+/// limit used when the user has not set one.
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Overview {
+    pub tracks: Vec<StoredTrack>,
+    pub total_bytes: u64,
+    pub default_budget_bytes: u64,
+}
+
+/// The tracks in `dir`, with their total.
+pub fn overview(dir: &Path) -> Overview {
+    let tracks = track_store::list(dir);
+    Overview {
+        total_bytes: tracks.iter().map(|t| t.size_bytes).sum(),
+        tracks,
+        default_budget_bytes: DEFAULT_BUDGET_BYTES,
+    }
+}
+
 /// What clearing the tracks did.
 #[derive(Serialize, Default, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -138,6 +159,24 @@ pub fn clear(dir: &Path, in_use: &HashSet<String>) -> Cleared {
         }
     }
     cleared
+}
+
+/// `content_replay_tracks_clear`: remove every track. Answers how many were
+/// removed and how much space that freed. The replays are left alone, and any
+/// of them can be recorded again.
+#[tauri::command]
+pub(crate) async fn content_replay_tracks_clear<R: Runtime>(
+    app: AppHandle<R>,
+) -> picoframe_core::CliResult {
+    let dir = match track_store::app_store_dir(&app) {
+        Ok(dir) => dir,
+        Err(e) => return picoframe_core::CliResult::err(e),
+    };
+    // Nothing plays a track yet, so none is in use.
+    match tauri::async_runtime::spawn_blocking(move || clear(&dir, &HashSet::new())).await {
+        Ok(cleared) => picoframe_core::CliResult::ok(serde_json::json!({ "cleared": cleared })),
+        Err(e) => picoframe_core::CliResult::err(format!("clearing the tracks failed: {e}")),
+    }
 }
 
 #[cfg(test)]
@@ -371,6 +410,24 @@ mod tests {
             small, large,
             "the sizes differ, so this is a test of something"
         );
+    }
+
+    #[test]
+    fn the_overview_totals_the_listed_tracks_and_carries_the_default() {
+        let dir = tempfile::tempdir().unwrap();
+        let a = put_track(dir.path(), 1, 10, 0);
+        let b = put_track(dir.path(), 2, 3000, 0);
+
+        let overview = overview(dir.path());
+
+        assert_eq!(overview.tracks.len(), 2);
+        assert_eq!(overview.total_bytes, a + b);
+        assert_eq!(overview.total_bytes, total_bytes(dir.path()));
+        assert_eq!(overview.default_budget_bytes, DEFAULT_BUDGET_BYTES);
+        let json = serde_json::to_value(&overview).unwrap();
+        assert_eq!(json["totalBytes"], a + b);
+        assert_eq!(json["defaultBudgetBytes"], DEFAULT_BUDGET_BYTES);
+        assert_eq!(json["tracks"].as_array().unwrap().len(), 2);
     }
 
     #[test]
