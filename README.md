@@ -208,7 +208,9 @@ offered to users who have none yet (or from the Maps download page):
 
 ## Licensing
 
-Coilbox's own code is MIT. It bundles **`pr-downloader`**, which is licensed
+Coilbox's own code is MIT. The Lua under `lua/`, which runs inside the engine, is
+offered under the MIT licence or the GNU General Public License version 2 or any
+later version, at your choice. See [lua/LICENSE.md](lua/LICENSE.md). Coilbox bundles **`pr-downloader`**, which is licensed
 **GPL-2.0-or-later** (© the Spring/Recoil authors). `pr-downloader` is invoked as a
 separate process (a sidecar), i.e. mere aggregation — but redistributing the
 binary carries the GPL obligation to make its corresponding source available. The
