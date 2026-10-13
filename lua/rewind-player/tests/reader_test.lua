@@ -294,6 +294,94 @@ do
 	t.same("seek to a frame in the loaded window does not load another", trk:seek(boundary + 3), after)
 end
 
+-- The projectiles that can exist at a frame, found by a search on the first
+-- frame, against a walk of the whole list.
+
+--- What is wrong with a window's ranges at `frame`, or nil. Every projectile
+-- alive there has to be inside `projectileRange`, and in a window that is in
+-- order `projectilesBorn` has to give the ones born on the frame and no other.
+local function rangeProblem(w, frame, tally)
+	local from, to = w:projectileRange(frame)
+	tally.widest = math.max(tally.widest, to - from + 1)
+	local first, lastBorn = w:projectilesBorn(frame - 1, frame)
+	for p = 1, w.projectileCount do
+		if w:projectileExistsAt(p, frame) then
+			tally.alive = tally.alive + 1
+			if p < from or p > to then
+				return "frame " .. frame .. " has projectile " .. p .. " outside the range " .. from .. " to " .. to
+			end
+		end
+		local born = w.projectileFirstFrame[p] == frame
+		if born then
+			tally.born = tally.born + 1
+			if p < first or p > lastBorn then
+				return "frame " .. frame .. " has projectile " .. p .. ", born on it, outside the births " .. first .. " to " .. lastBorn
+			end
+		elseif w.projectileOrdered and p >= first and p <= lastBorn then
+			return "frame " .. frame .. " has projectile " .. p .. " among the births, and it was not born on it"
+		end
+	end
+end
+
+do
+	-- The fixture comes from a writer that keeps no order, so this is the
+	-- reader saying so and giving the whole list.
+	local trk = opened()
+	local tally = { widest = 0, alive = 0, born = 0 }
+	local problem
+	local outOfOrder = 0
+	for k = 0, h.windowCount - 1 do
+		local w = assert(trk:loadWindow(k))
+		local longest, ordered = 0, true
+		for p = 1, w.projectileCount do
+			longest = math.max(longest, w.projectileLastFrame[p] - w.projectileFirstFrame[p])
+			if p > 1 and w.projectileFirstFrame[p] < w.projectileFirstFrame[p - 1] then
+				ordered = false
+			end
+		end
+		outOfOrder = outOfOrder + (ordered and 0 or 1)
+		problem = problem or (w.projectileLongest ~= longest and "window " .. k .. " has a longest life of " .. longest .. ", not " .. w.projectileLongest)
+		problem = problem or (w.projectileOrdered ~= ordered and "window " .. k .. " is wrong about its order")
+		for frame = w.startFrame, w.endFrame do
+			problem = problem or rangeProblem(w, frame, tally)
+		end
+	end
+	t.check("every window knows its longest life and whether it is in order of birth", problem == nil, problem)
+	t.check("the fixture has windows out of order, and their range is the whole list (" .. tally.alive .. " alive)", outOfOrder > 0 and tally.alive > 0, outOfOrder)
+
+	-- A window in order of birth, as coilbox's writer makes them: 400
+	-- projectiles over 900 frames, 12 of them carried in from the window before.
+	local w = setmetatable({ projectileFirstFrame = {}, projectileLastFrame = {}, projectileCount = 400, projectileOrdered = true, projectileLongest = 0 }, getmetatable(assert(trk:loadWindow(0))))
+	local state = 3795
+	local function random(n)
+		state = (state * 1103515245 + 12345) % 2147483648
+		return state % n
+	end
+	local births = {}
+	for p = 1, 400 do
+		births[p] = p <= 12 and 1800 or 1800 + random(900)
+	end
+	table.sort(births)
+	for p = 1, 400 do
+		local last = math.min(2700, births[p] + random(p % 50 == 0 and 300 or 40))
+		w.projectileFirstFrame[p], w.projectileLastFrame[p] = births[p], last
+		w.projectileLongest = math.max(w.projectileLongest, last - births[p])
+	end
+	tally = { widest = 0, alive = 0, born = 0 }
+	problem = nil
+	for frame = 1790, 2710 do
+		problem = problem or rangeProblem(w, frame, tally)
+	end
+	t.check("in a window in order the range holds every projectile alive at a frame (" .. tally.alive .. " alive, " .. tally.born .. " births)", problem == nil and tally.alive > 0 and tally.born == 400, problem)
+	t.check("and is narrower than the list (" .. tally.widest .. " of 400 at its widest)", tally.widest < 400, tally.widest)
+	local from, to = w:projectileRange(1700)
+	t.check("before the first of them the range is empty", from > to, from .. " to " .. to)
+	w.projectileOrdered = false
+	from, to = w:projectileRange(2000)
+	t.same("out of order the range is the whole list, from", from, 1)
+	t.same("to", to, 400)
+end
+
 -- Errors. A bad part is an error for that part, and the rest still reads.
 
 local function corrupted(data, from, to, replacement)

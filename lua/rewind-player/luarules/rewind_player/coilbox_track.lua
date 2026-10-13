@@ -470,11 +470,21 @@ local function decodeWindow(chunk, index, header)
 	w.projectileShooter = shooters
 	firsts = exactly(column(chunk, 85, 2), n, 85)
 	lasts = exactly(column(chunk, 86, 2), n, 86)
+	-- Whether the entries are in the order they were born in, which is what lets
+	-- `projectileRange` search them, and the longest any of them lasts here.
+	local ordered, longest = true, 0
 	for i = 1, n do
 		firsts[i] = start + firsts[i]
 		lasts[i] = start + lasts[i]
+		if i > 1 and firsts[i] < firsts[i - 1] then
+			ordered = false
+		end
+		if lasts[i] - firsts[i] > longest then
+			longest = lasts[i] - firsts[i]
+		end
 	end
 	w.projectileFirstFrame, w.projectileLastFrame = firsts, lasts
+	w.projectileOrdered, w.projectileLongest = ordered, longest
 	local projectileCount = exactly(column(chunk, 87, 2), n, 87)
 	local projectileFirst
 	projectileFirst, total = layout(projectileCount, n)
@@ -687,6 +697,66 @@ function Window:sampleQueue(i, frame)
 	local a = locate(self, self.queueTime, first, first + n - 1, self.queueCursor[i], frame)
 	self.queueCursor[i] = a
 	return self.queueItemFirst[a], self.queueItemCount[a]
+end
+
+--- The first position in the projectiles whose first frame is `frame` or
+-- later, or one past the end. Only for a window whose entries are in order.
+local function bornFrom(self, frame)
+	local firsts = self.projectileFirstFrame
+	local lo, hi = 1, self.projectileCount + 1
+	while lo < hi do
+		local mid = math.floor((lo + hi) / 2)
+		if firsts[mid] < frame then
+			lo = mid + 1
+		else
+			hi = mid
+		end
+	end
+	return lo
+end
+
+--- The first position in the projectiles whose first frame is after `frame`,
+-- or one past the end.
+local function bornAfter(self, frame)
+	local firsts = self.projectileFirstFrame
+	local lo, hi = 1, self.projectileCount + 1
+	while lo < hi do
+		local mid = math.floor((lo + hi) / 2)
+		if firsts[mid] <= frame then
+			lo = mid + 1
+		else
+			hi = mid
+		end
+	end
+	return lo
+end
+
+--- The positions `from, to` between which every projectile that exists at
+-- `frame` lies, found by two searches on the first frame and no walk of the
+-- list. Not every position between them exists at `frame`, so ask
+-- `projectileExistsAt`. `from` is past `to` when there can be none.
+--
+-- A projectile that exists at `frame` was born at or before it, and no earlier
+-- than the longest life in the window before it. A writer is not held to
+-- writing the entries in the order they were born in, though coilbox's does,
+-- and for a window that is not, this gives the whole list.
+function Window:projectileRange(frame)
+	if not self.projectileOrdered then
+		return 1, self.projectileCount
+	end
+	return bornFrom(self, frame - self.projectileLongest), bornAfter(self, frame) - 1
+end
+
+--- The positions `from, to` of the projectiles whose first frame is after
+-- `after` and no later than `frame`, in a window whose entries are in order.
+-- In one that is not, the whole list, so check the first frame of each. An
+-- entry with bit 0 of its flags set was born in an earlier window, whatever its
+-- first frame here.
+function Window:projectilesBorn(after, frame)
+	if not self.projectileOrdered then
+		return 1, self.projectileCount
+	end
+	return bornAfter(self, after), bornAfter(self, frame) - 1
 end
 
 --- Projectile `p` at `frame`, written to `out` as x, y, z in elmos then the
