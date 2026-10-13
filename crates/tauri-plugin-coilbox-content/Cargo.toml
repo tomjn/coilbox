@@ -31,6 +31,8 @@ tauri-plugin-coilbox-scenario = { path = "../tauri-plugin-coilbox-scenario" }
 tauri-plugin-coilbox-play = { path = "../tauri-plugin-coilbox-play" }
 # Reads the short name of the game an analysis depends on (issue #3943).
 tauri-plugin-coilbox-unitsync = { path = "../tauri-plugin-coilbox-unitsync" }
+# Reads the data half of a game's playback adapter, which is Lua (issue #3799).
+coilbox-springlua = { path = "../coilbox-springlua" }
 # Reads a track's header, and says which recorder version is current, for the
 # replay track store (issue #3786).
 coilbox-track = { path = "../coilbox-track" }

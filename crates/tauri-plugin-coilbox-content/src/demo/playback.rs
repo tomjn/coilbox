@@ -37,6 +37,9 @@ use super::track_store::{self, TrackState};
 use super::{find_game, index_suffix, parse_tdf, read_header_and_script, Section};
 
 include!(concat!(env!("OUT_DIR"), "/rewind_player_files.rs"));
+include!(concat!(env!("OUT_DIR"), "/rewind_player_adapters.rs"));
+
+pub(crate) mod adapter;
 
 /// The game's folder name under a content root's `games/`.
 pub const FOLDER: &str = "coilbox-replay-playback.sdd";
@@ -310,16 +313,25 @@ pub fn game_dir(content_root: &Path) -> Result<PathBuf, String> {
 /// earlier launch left, and return its folder and how the track was placed.
 ///
 /// `base_game` is the game to depend on and `short_name` its short name.
-/// `track` is the stored `.cbtrack`, which is read and never written.
+/// `track` is the stored `.cbtrack`, which is read and never written. `chosen`
+/// is the game's adapter: it is written at [`adapter::PATH`], and a file that
+/// stands in for each gadget and widget it switches off is written over the
+/// base game's, since a depending game's files take precedence.
 pub fn write_game(
     content_root: &Path,
     base_game: &str,
     short_name: &str,
     track: &Path,
+    chosen: &adapter::Chosen,
 ) -> Result<(PathBuf, Placed), String> {
-    write_game_with(content_root, base_game, short_name, track, |from, to| {
-        std::fs::hard_link(from, to)
-    })
+    write_game_with(
+        content_root,
+        base_game,
+        short_name,
+        track,
+        chosen,
+        |from, to| std::fs::hard_link(from, to),
+    )
 }
 
 fn write_game_with(
@@ -327,6 +339,7 @@ fn write_game_with(
     base_game: &str,
     short_name: &str,
     track: &Path,
+    chosen: &adapter::Chosen,
     link: impl FnOnce(&Path, &Path) -> std::io::Result<()>,
 ) -> Result<(PathBuf, Placed), String> {
     if base_game.trim().is_empty() {
@@ -353,6 +366,10 @@ fn write_game_with(
     for (rel, contents) in REWIND_PLAYER_FILES {
         write(rel, contents)?;
     }
+    write(adapter::PATH, &chosen.text)?;
+    for rel in chosen.adapter.iter().flat_map(adapter::Adapter::shadows) {
+        write(&rel, adapter::SHADOW)?;
+    }
     let placed = link_or_copy(track, &dir.join(TRACK_PATH), link)?;
     Ok((dir, placed))
 }
@@ -371,17 +388,31 @@ pub struct Prepare<'a> {
     pub script_dir: &'a Path,
     /// Where the player opens.
     pub opening: Opening,
+    /// The adapters coilbox ships, as file names and sources. A launch passes
+    /// [`REWIND_PLAYER_ADAPTERS`].
+    pub adapters: &'a [(&'a str, &'a str)],
+}
+
+/// What a launch needs to know about the game the playback depends on.
+pub struct BaseGame {
+    /// The game's short name, which only the engine's archive scan knows.
+    pub short_name: String,
+    /// The game's version, when it declares one.
+    pub version: Option<String>,
+    /// The adapter the game holds at [`adapter::PATH`] in its own archive, when
+    /// it holds one, or why it could not be read.
+    pub own_adapter: Result<Option<String>, String>,
 }
 
 /// Write the playback game and its start script for a replay, and return the
 /// script's path. Refuses a replay with no current track, a remix (which has
 /// no track of its own) and a replay of the playback game itself.
 ///
-/// `short_name` answers the short name of a game, which only the engine's
-/// archive scan knows.
+/// `lookup` answers what the engine's archive scan knows about the game being
+/// depended on, which is its short name, version and adapter.
 pub fn prepare(
     request: &Prepare,
-    short_name: impl FnOnce(&str) -> Result<String, String>,
+    lookup: impl FnOnce(&str) -> Result<BaseGame, String>,
 ) -> Result<PathBuf, String> {
     let game_id = store::replay_key(request.replay)?;
     let raw = read_header_and_script(request.replay)?;
@@ -408,13 +439,20 @@ pub fn prepare(
         .map(str::trim)
         .filter(|game| !game.is_empty())
         .map_or(recorded, str::to_string);
-    let short = short_name(&base_game)
+    let installed = lookup(&base_game)
         .map_err(|e| format!("could not read the short name of {base_game}: {e}"))?;
+    let chosen = adapter::choose(
+        installed.own_adapter,
+        request.adapters,
+        &installed.short_name,
+        installed.version.as_deref(),
+    );
     write_game(
         request.content_root,
         &base_game,
-        &short,
+        &installed.short_name,
         &track_store::track_path(request.tracks, &game_id)?,
+        &chosen,
     )?;
     std::fs::create_dir_all(request.script_dir)
         .map_err(|e| format!("could not create {}: {e}", request.script_dir.display()))?;
@@ -425,6 +463,24 @@ pub fn prepare(
     // launch does not depend on it.
     let _ = track_store::mark_watched(request.tracks, &game_id);
     Ok(path)
+}
+
+/// What the engine's scan says about the game the playback depends on, and the
+/// adapter that game holds in its own archive (issue #3799).
+pub fn installed_game(engine_dir: &str, datadirs: &str, game: &str) -> Result<BaseGame, String> {
+    let installed =
+        tauri_plugin_coilbox_unitsync::installed_game_blocking(engine_dir, datadirs, game)?;
+    let own_adapter = tauri_plugin_coilbox_unitsync::archive_text_blocking(
+        engine_dir,
+        datadirs,
+        &installed.archive,
+        adapter::PATH,
+    );
+    Ok(BaseGame {
+        short_name: installed.short_name,
+        version: installed.version,
+        own_adapter,
+    })
 }
 
 /// `content_replay_playback_launch`: write the playback game and its start
@@ -490,14 +546,9 @@ pub(crate) async fn content_replay_playback_launch<R: Runtime>(
                     game: game.as_deref(),
                     opening,
                     script_dir: &script_dir,
+                    adapters: REWIND_PLAYER_ADAPTERS,
                 },
-                |base| {
-                    tauri_plugin_coilbox_unitsync::game_short_name_blocking(
-                        &engine_dir,
-                        &datadirs,
-                        base,
-                    )
-                },
+                |base| installed_game(&engine_dir, &datadirs, base),
             )
         },
     )
@@ -816,6 +867,19 @@ mod tests {
 
     // ---- the game folder -------------------------------------------------
 
+    fn none() -> adapter::Chosen {
+        adapter::Chosen::none()
+    }
+
+    /// A game that holds no adapter of its own.
+    fn base(short_name: &str) -> BaseGame {
+        BaseGame {
+            short_name: short_name.into(),
+            version: Some("1.0".into()),
+            own_adapter: Ok(None),
+        }
+    }
+
     fn files(dir: &Path) -> Vec<String> {
         fn walk(root: &Path, dir: &Path, out: &mut Vec<String>) {
             for entry in std::fs::read_dir(dir).expect("read_dir").flatten() {
@@ -854,7 +918,8 @@ mod tests {
     fn the_game_is_the_modinfo_the_player_and_the_track_and_no_definitions() {
         let root = tempfile::tempdir().unwrap();
         let track = a_track(root.path(), "track");
-        let (dir, _) = write_game(root.path(), "Some Game 1.0", "some_game", &track).unwrap();
+        let (dir, _) =
+            write_game(root.path(), "Some Game 1.0", "some_game", &track, &none()).unwrap();
 
         assert_eq!(dir, root.path().join("games").join(FOLDER));
         let written = files(&dir);
@@ -883,7 +948,8 @@ mod tests {
     fn what_is_written_is_what_the_repository_holds() {
         let root = tempfile::tempdir().unwrap();
         let track = a_track(root.path(), "track");
-        let (dir, _) = write_game(root.path(), "Some Game 1.0", "some_game", &track).unwrap();
+        let (dir, _) =
+            write_game(root.path(), "Some Game 1.0", "some_game", &track, &none()).unwrap();
 
         for (rel, contents) in REWIND_PLAYER_FILES {
             assert_eq!(&std::fs::read_to_string(dir.join(rel)).unwrap(), contents);
@@ -942,7 +1008,7 @@ mod tests {
         use std::os::unix::fs::MetadataExt;
         let root = tempfile::tempdir().unwrap();
         let track = a_track(root.path(), "the track");
-        let (dir, placed) = write_game(root.path(), "G 1", "g", &track).unwrap();
+        let (dir, placed) = write_game(root.path(), "G 1", "g", &track, &none()).unwrap();
 
         assert_eq!(placed, Placed::Linked);
         let inside = dir.join(TRACK_PATH);
@@ -958,7 +1024,7 @@ mod tests {
     fn a_refused_link_falls_back_to_a_copy() {
         let root = tempfile::tempdir().unwrap();
         let track = a_track(root.path(), "the track");
-        let (dir, placed) = write_game_with(root.path(), "G 1", "g", &track, |_, _| {
+        let (dir, placed) = write_game_with(root.path(), "G 1", "g", &track, &none(), |_, _| {
             Err(std::io::Error::other("cross-device link"))
         })
         .unwrap();
@@ -979,7 +1045,7 @@ mod tests {
     fn a_link_that_left_a_partial_file_is_replaced_by_the_copy() {
         let root = tempfile::tempdir().unwrap();
         let track = a_track(root.path(), "the whole track");
-        let (dir, placed) = write_game_with(root.path(), "G 1", "g", &track, |_, to| {
+        let (dir, placed) = write_game_with(root.path(), "G 1", "g", &track, &none(), |_, to| {
             std::fs::write(to, "part")?;
             Err(std::io::Error::other("refused"))
         })
@@ -996,7 +1062,8 @@ mod tests {
     fn a_track_that_is_not_there_is_an_error() {
         let root = tempfile::tempdir().unwrap();
 
-        let err = write_game(root.path(), "G 1", "g", &root.path().join("none")).unwrap_err();
+        let err =
+            write_game(root.path(), "G 1", "g", &root.path().join("none"), &none()).unwrap_err();
         assert!(err.contains("could not copy the track"), "{err}");
     }
 
@@ -1006,14 +1073,14 @@ mod tests {
     fn the_game_is_cleared_and_written_again_on_every_launch() {
         let root = tempfile::tempdir().unwrap();
         let first = a_track(root.path(), "first track");
-        let (dir, _) = write_game(root.path(), "Old Game 1", "old", &first).unwrap();
+        let (dir, _) = write_game(root.path(), "Old Game 1", "old", &first, &none()).unwrap();
         std::fs::write(dir.join("stale.lua"), "left behind").unwrap();
         std::fs::create_dir_all(dir.join("units")).unwrap();
         std::fs::write(dir.join("units/stale.lua"), "left behind").unwrap();
         let second = root.path().join("second.cbtrack");
         std::fs::write(&second, "second track").unwrap();
 
-        let (again, _) = write_game(root.path(), "New Game 2", "new", &second).unwrap();
+        let (again, _) = write_game(root.path(), "New Game 2", "new", &second, &none()).unwrap();
 
         assert_eq!(again, dir);
         assert!(!dir.join("stale.lua").exists());
@@ -1033,7 +1100,7 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let track = a_track(root.path(), "t");
 
-        assert!(write_game(root.path(), "  ", "x", &track).is_err());
+        assert!(write_game(root.path(), "  ", "x", &track, &none()).is_err());
         assert!(!root.path().join("games").exists());
     }
 
@@ -1115,8 +1182,9 @@ mod tests {
                     game,
                     opening: Opening::default(),
                     script_dir: &self.scripts,
+                    adapters: &[],
                 },
-                |_| Ok("SHORT".to_string()),
+                |_| Ok(base("SHORT")),
             )
         }
     }
@@ -1156,12 +1224,13 @@ mod tests {
                 content_root: &world.root,
                 game: None,
                 script_dir: &world.scripts,
+                adapters: &[],
                 opening: Opening {
                     frame: Some(40),
                     paused: true,
                 },
             },
-            |_| Ok("SHORT".to_string()),
+            |_| Ok(base("SHORT")),
         )
         .unwrap();
 
@@ -1185,10 +1254,11 @@ mod tests {
                 game: Some(" SplinterFaction 0.1.89 "),
                 opening: Opening::default(),
                 script_dir: &world.scripts,
+                adapters: &[],
             },
             |game| {
                 *asked.borrow_mut() = game.to_string();
-                Ok("SF".into())
+                Ok(base("SF"))
             },
         )
         .unwrap();
@@ -1237,6 +1307,7 @@ mod tests {
                 game: None,
                 opening: Opening::default(),
                 script_dir: &world.scripts,
+                adapters: &[],
             },
             |_| Err("not installed".into()),
         )
@@ -1284,6 +1355,196 @@ mod tests {
 
         assert!(!dir.join("stale.lua").exists());
         assert!(dir.join(TRACK_PATH).exists());
+    }
+
+    // ---- the game's adapter ----------------------------------------------
+
+    const FIXTURE_ADAPTER: &str = "return { name = 'Fixture', shortname = 'SHORT', \
+        versions = { min = '1.0', max = '1.9' }, \
+        gadgets = { 'game_end.lua', 'sub/inner.lua' }, widgets = { 'gui_bars.lua' }, \
+        units = { 'armcom' } }";
+
+    fn chosen(text: &str) -> adapter::Chosen {
+        adapter::choose(Ok(None), &[("fixture.lua", text)], "SHORT", Some("1.5"))
+    }
+
+    #[test]
+    fn what_the_adapter_names_is_shadowed_by_a_file_that_asks_not_to_load() {
+        let root = tempfile::tempdir().unwrap();
+        let track = a_track(root.path(), "track");
+        let (dir, _) =
+            write_game(root.path(), "G 1", "g", &track, &chosen(FIXTURE_ADAPTER)).unwrap();
+
+        for shadow in [
+            "luarules/gadgets/game_end.lua",
+            "luarules/gadgets/sub/inner.lua",
+            "luaui/widgets/gui_bars.lua",
+        ] {
+            assert_eq!(
+                std::fs::read_to_string(dir.join(shadow)).unwrap(),
+                adapter::SHADOW,
+                "{shadow}"
+            );
+        }
+        // Only what is named, and the player is still there.
+        let written = files(&dir);
+        assert!(!written
+            .iter()
+            .any(|f| f == "luarules/gadgets/game_over.lua"));
+        assert!(written
+            .iter()
+            .any(|f| f == "luarules/gadgets/coilbox_rewind_player.lua"));
+    }
+
+    #[test]
+    fn the_adapter_in_use_is_written_where_the_player_reads_it() {
+        let root = tempfile::tempdir().unwrap();
+        let track = a_track(root.path(), "track");
+        let (dir, _) =
+            write_game(root.path(), "G 1", "g", &track, &chosen(FIXTURE_ADAPTER)).unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(dir.join(adapter::PATH)).unwrap(),
+            FIXTURE_ADAPTER
+        );
+    }
+
+    #[test]
+    fn with_no_adapter_nothing_is_shadowed_and_the_default_is_written() {
+        let root = tempfile::tempdir().unwrap();
+        let track = a_track(root.path(), "track");
+        let (dir, _) = write_game(root.path(), "G 1", "g", &track, &none()).unwrap();
+
+        let written = files(&dir);
+        assert!(written.iter().any(|f| f == adapter::PATH));
+        let expected: Vec<String> = REWIND_PLAYER_FILES
+            .iter()
+            .map(|(rel, _)| rel.to_string())
+            .chain([
+                "modinfo.lua".to_string(),
+                TRACK_PATH.to_string(),
+                adapter::PATH.to_string(),
+            ])
+            .collect();
+        let mut expected = expected;
+        expected.sort();
+        assert_eq!(written, expected);
+        assert!(std::fs::read_to_string(dir.join(adapter::PATH))
+            .unwrap()
+            .trim_end()
+            .ends_with("return false"));
+    }
+
+    #[test]
+    fn a_shadow_from_an_earlier_launch_does_not_outlive_it() {
+        let root = tempfile::tempdir().unwrap();
+        let track = a_track(root.path(), "track");
+        let (dir, _) =
+            write_game(root.path(), "G 1", "g", &track, &chosen(FIXTURE_ADAPTER)).unwrap();
+        assert!(dir.join("luarules/gadgets/game_end.lua").exists());
+
+        write_game(root.path(), "G 1", "g", &track, &none()).unwrap();
+
+        assert!(!dir.join("luarules/gadgets/game_end.lua").exists());
+        assert!(!dir.join("luaui/widgets/gui_bars.lua").exists());
+    }
+
+    fn prepared_with(world: &World, shipped: &[(&str, &str)], base: BaseGame) -> PathBuf {
+        prepare(
+            &Prepare {
+                replay: &world.replay,
+                tracks: &world.tracks,
+                content_root: &world.root,
+                game: None,
+                opening: Opening::default(),
+                script_dir: &world.scripts,
+                adapters: shipped,
+            },
+            |_| Ok(base),
+        )
+        .unwrap()
+    }
+
+    fn shadowed(world: &World) -> bool {
+        world
+            .root
+            .join("games")
+            .join(FOLDER)
+            .join("luarules/gadgets/game_end.lua")
+            .exists()
+    }
+
+    fn played(world: &World) -> String {
+        std::fs::read_to_string(world.root.join("games").join(FOLDER).join(adapter::PATH)).unwrap()
+    }
+
+    #[test]
+    fn a_launch_uses_the_shipped_adapter_of_a_game_in_its_range() {
+        let world = World::new(REPLAY_SCRIPT);
+        world.record(RECORDER_VERSION);
+
+        prepared_with(&world, &[("fixture.lua", FIXTURE_ADAPTER)], base("short"));
+
+        assert!(shadowed(&world));
+        assert_eq!(played(&world), FIXTURE_ADAPTER);
+    }
+
+    #[test]
+    fn a_launch_for_a_version_outside_the_range_switches_nothing_off() {
+        let world = World::new(REPLAY_SCRIPT);
+        world.record(RECORDER_VERSION);
+        let mut game = base("SHORT");
+        game.version = Some("2.0".into());
+
+        prepared_with(&world, &[("fixture.lua", FIXTURE_ADAPTER)], game);
+
+        assert!(!shadowed(&world));
+        assert!(played(&world).trim_end().ends_with("return false"));
+    }
+
+    #[test]
+    fn a_launch_for_a_game_with_no_adapter_still_gets_its_game_and_script() {
+        let world = World::new(REPLAY_SCRIPT);
+        world.record(RECORDER_VERSION);
+
+        let script = prepared_with(&world, &[("fixture.lua", FIXTURE_ADAPTER)], base("OTHER"));
+
+        assert!(!shadowed(&world));
+        assert!(script.exists());
+        assert!(world
+            .root
+            .join("games")
+            .join(FOLDER)
+            .join(TRACK_PATH)
+            .exists());
+    }
+
+    #[test]
+    fn a_games_own_adapter_wins_over_the_one_coilbox_ships() {
+        let world = World::new(REPLAY_SCRIPT);
+        world.record(RECORDER_VERSION);
+        let own = "return { name = 'Own', gadgets = { 'own_gadget.lua' } }";
+        let mut game = base("SHORT");
+        game.own_adapter = Ok(Some(own.into()));
+
+        prepared_with(&world, &[("fixture.lua", FIXTURE_ADAPTER)], game);
+
+        let dir = world.root.join("games").join(FOLDER);
+        assert_eq!(played(&world), own);
+        assert!(dir.join("luarules/gadgets/own_gadget.lua").exists());
+        assert!(!shadowed(&world));
+    }
+
+    #[test]
+    fn a_games_own_adapter_that_cannot_be_read_does_not_stop_the_launch() {
+        let world = World::new(REPLAY_SCRIPT);
+        world.record(RECORDER_VERSION);
+        let mut game = base("OTHER");
+        game.own_adapter = Err("could not open the archive".into());
+
+        prepared_with(&world, &[], game);
+
+        assert!(played(&world).contains("could not open the archive"));
     }
 
     /// A gadget that says what the engine made of the script, because the
@@ -1439,14 +1700,9 @@ end
                 game: stand_in.as_deref(),
                 opening,
                 script_dir: &dir.path().join("play"),
+                adapters: REWIND_PLAYER_ADAPTERS,
             },
-            |game| {
-                tauri_plugin_coilbox_unitsync::game_short_name_blocking(
-                    &engine_dir.to_string_lossy(),
-                    &datadirs,
-                    game,
-                )
-            },
+            |game| installed_game(&engine_dir.to_string_lossy(), &datadirs, game),
         )
         .expect("the playback is prepared");
         let game_dir = content.join("games").join(FOLDER);

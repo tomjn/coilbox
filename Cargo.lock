@@ -6377,6 +6377,7 @@ dependencies = [
  "coilbox-gamebackup",
  "coilbox-portable",
  "coilbox-proc",
+ "coilbox-springlua",
  "coilbox-tdf",
  "coilbox-track",
  "coilbox-track-thin",

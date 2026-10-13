@@ -137,7 +137,41 @@ fn embed_rewind_player() {
     std::fs::write(&dest, out).expect("write the list of player files");
 }
 
+/// Write `$OUT_DIR/rewind_player_adapters.rs`, the adapters coilbox ships with the
+/// app, read from `lua/rewind-player/adapters/` (issue #3799). Each is a file
+/// name and its contents, in file name order. A game's adapter is added by adding
+/// a file there.
+fn embed_adapters() {
+    let root = std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("manifest dir"))
+        .join("../../lua/rewind-player/adapters");
+    println!("cargo:rerun-if-changed={}", root.display());
+    let mut found: Vec<(String, std::path::PathBuf)> = std::fs::read_dir(&root)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.is_file() && path.extension().is_some_and(|ext| ext == "lua"))
+        .map(|path| {
+            let name = path.file_name().expect("a file name").to_string_lossy();
+            (name.into_owned(), path.canonicalize().expect("a path"))
+        })
+        .collect();
+    found.sort();
+    let mut out = String::from("pub const REWIND_PLAYER_ADAPTERS: &[(&str, &str)] = &[\n");
+    for (name, path) in &found {
+        out.push_str(&format!(
+            "    ({name:?}, include_str!({:?})),\n",
+            path.to_string_lossy()
+        ));
+    }
+    out.push_str("];\n");
+    let dest = std::path::PathBuf::from(std::env::var("OUT_DIR").expect("out dir"))
+        .join("rewind_player_adapters.rs");
+    std::fs::write(&dest, out).expect("write the list of adapters");
+}
+
 fn main() {
     embed_rewind_player();
+    embed_adapters();
     tauri_plugin::Builder::new(COMMANDS).build();
 }
