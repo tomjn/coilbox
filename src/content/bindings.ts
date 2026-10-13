@@ -1616,6 +1616,125 @@ export const contentReplayTracksClear = defineCommand<
   { cleared: { removed: number; freedBytes: number; kept: number } }
 >("coilbox-content", "content_replay_tracks_clear");
 
+/** A team in a track's info chunk (#3806). */
+export interface ReplayTrackTeam {
+  id: number;
+  allyTeam: number;
+  isAi: boolean;
+  /** Red, green and blue, 0 to 255. */
+  colour: [number, number, number];
+  side: string;
+  leader: string;
+}
+
+/**
+ * What a track says about itself (#3806). `features` is one array for each
+ * field, and a feature exists at frame `f` when `first[i] <= f <= last[i]`.
+ * Its `team` is 255 for none and `x` and `z` are elmos.
+ *
+ * The track holds no footprint or radius for a unit definition, so the map view
+ * cannot size a mark from this. See `src/content/replayTrack/`.
+ */
+export interface ReplayTrackHeader {
+  gameId: string;
+  formatVersion: number;
+  recorderVersion: number;
+  framesPerSecond: number;
+  firstFrame: number;
+  lastFrame: number;
+  /** `lastFrame - firstFrame`. */
+  lengthFrames: number;
+  windowLength: number;
+  windowCount: number;
+  /** In elmos. */
+  tolerance: number;
+  positionShift: number;
+  velocityShift: number;
+  rotationBits: number;
+  unitCount: number;
+  projectileCount: number;
+  featureCount: number;
+  engineVersion: string;
+  game: string;
+  map: string;
+  writer: string;
+  /** The map's size along x and z, in elmos. */
+  mapSize: [number, number];
+  /** A unit's `def` in a window indexes this. */
+  unitDefs: string[];
+  weaponDefs: string[];
+  featureDefs: string[];
+  teams: ReplayTrackTeam[];
+  features: {
+    def: number[];
+    team: number[];
+    x: number[];
+    z: number[];
+    first: number[];
+    last: number[];
+  };
+}
+
+/**
+ * Why a track or a window could not be read (#3806). The kind is what the page
+ * tells apart:
+ *
+ * - `missing`: no track for this replay.
+ * - `stale`: another recorder version made it. Offer to record again.
+ * - `otherGame`: the file in this replay's place is for another game.
+ * - `unknownFormat`: a layout this build does not read.
+ * - `unreadable`: the header, index or info could not be read.
+ * - `corruptWindow`: one window is bad and every other still reads.
+ * - `noSuchWindow`: the index is past the track's last window.
+ * - `io`: the file could not be opened or read.
+ */
+export type ReplayTrackFault =
+  | { kind: "missing" }
+  | { kind: "stale"; recorderVersion: number; current: number }
+  | { kind: "otherGame" }
+  | { kind: "unknownFormat"; field: string; found: string; expected: string }
+  | { kind: "unreadable"; message: string }
+  | { kind: "corruptWindow"; window: number; message: string }
+  | { kind: "noSuchWindow"; window: number; windowCount: number }
+  | { kind: "io"; message: string };
+
+/** A fault arrives as data in a successful answer, so the kinds stay apart. */
+export type ReplayTrackHeaderAnswer =
+  | { ok: true; header: ReplayTrackHeader }
+  | { ok: false; fault: ReplayTrackFault };
+
+export type ReplayTrackWindowAnswer =
+  | {
+      ok: true;
+      window: number;
+      startFrame: number;
+      endFrame: number;
+      /** The bytes sent down `onWindow`. */
+      byteLength: number;
+    }
+  | { ok: false; fault: ReplayTrackFault };
+
+/**
+ * Read a replay's track header (#3806) and mark the track watched. Call it
+ * through `src/content/replayTrack/`.
+ */
+export const contentReplayTrackHeader = defineCommand<
+  { gameId: string },
+  ReplayTrackHeaderAnswer
+>("coilbox-content", "content_replay_track_header");
+
+/**
+ * Read one window of a track (#3806). The window's bytes arrive on `onWindow`
+ * as one `ArrayBuffer`, and the answer says what was sent. Nothing is sent when
+ * the answer is a fault. Give every call its own channel: a channel handed to a
+ * second command stops delivering. Call it through
+ * `src/content/replayTrack/`.
+ */
+export const contentReplayTrackWindow = defineCommand<
+  { gameId: string; window: number; onWindow: Channel<ArrayBuffer> },
+  ReplayTrackWindowAnswer
+>("coilbox-content", "content_replay_track_window");
+
 /** Delete what is stored for one match, leaving the replay alone. */
 export const contentReplayAnalysisDelete = defineCommand<
   { gameId: string },

@@ -42,6 +42,8 @@ permissions = [
   "allow-content-replay-analysis-delete",
   "allow-content-replay-tracks",
   "allow-content-replay-tracks-clear",
+  "allow-content-replay-track-header",
+  "allow-content-replay-track-window",
   "allow-content-unit-def-set",
   "allow-content-unit-def-set-store",
   "allow-content-unit-def-sets-usage",

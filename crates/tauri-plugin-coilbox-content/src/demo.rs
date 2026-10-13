@@ -51,6 +51,7 @@ pub(crate) mod retarget;
 pub(crate) mod stream;
 pub mod track_budget;
 pub mod track_store;
+pub mod track_view;
 pub mod unit_orders;
 
 /// Folders under a write dir that hold client demos. The engine writes to
