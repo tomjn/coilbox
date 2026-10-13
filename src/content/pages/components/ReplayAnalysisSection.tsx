@@ -69,12 +69,12 @@ function when(ms: number): string {
   });
 }
 
-function plural(n: number, one: string, many: string): string {
+export function plural(n: number, one: string, many: string): string {
   return `${n.toLocaleString()} ${n === 1 ? one : many}`;
 }
 
 /** A length of time in words, to the nearest sensible unit. */
-function roughly(seconds: number): string {
+export function roughly(seconds: number): string {
   if (seconds < 90)
     return plural(Math.max(1, Math.round(seconds)), "second", "seconds");
   return plural(Math.round(seconds / 60), "minute", "minutes");
