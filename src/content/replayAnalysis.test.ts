@@ -127,6 +127,15 @@ describe("why a replay cannot be analysed", () => {
     expect(rest).toEqual([]);
   });
 
+  it("says a replay of the playback game has no match of its own", () => {
+    const [reason, ...rest] = analysisBlockers({
+      ...installed,
+      cannot: "playbackGame",
+    });
+    expect(reason).toMatch(/replay playback game/);
+    expect(rest).toEqual([]);
+  });
+
   it("sends a remix back to its original", () => {
     expect(analysisBlockers({ ...installed, cannot: "remix" })[0]).toMatch(
       /Analyse the original/,

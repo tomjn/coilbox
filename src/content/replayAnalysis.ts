@@ -215,7 +215,14 @@ export function seedReplayAnalysisForTests(seed: {
 /** What stops a replay being analysed, each as a sentence to show. */
 export function analysisBlockers(facts: {
   /** `contentAnalysisCheck`'s answer, or undefined while it is being asked. */
-  cannot: "remix" | "noGameId" | "noGameOver" | "unreadable" | null | undefined;
+  cannot:
+    | "remix"
+    | "noGameId"
+    | "noGameOver"
+    | "playbackGame"
+    | "unreadable"
+    | null
+    | undefined;
   engineVersion: string;
   /** The exact engine the replay was recorded on is installed. */
   engineInstalled: boolean;
@@ -251,6 +258,10 @@ export function analysisBlockers(facts: {
     case "noGameId":
       return [
         "This replay has no game id, so there is nothing to file an analysis under.",
+      ];
+    case "playbackGame":
+      return [
+        "This replay was recorded on the replay playback game. It has no match of its own to record.",
       ];
     case "unreadable":
       return ["This file does not read as a replay."];

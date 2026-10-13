@@ -1,6 +1,7 @@
 import { defineCommand } from "@picoframe/plugin-sdk";
 import type { Channel } from "@tauri-apps/api/core";
 import type { DownloadProgress } from "../downloads/bindings";
+import type { LaunchEvent, LaunchOutcome } from "../play/bindings";
 import { gameArchivePath, gameRefs, mapHint, mapRefs } from "./scanHints";
 
 /**
@@ -1380,6 +1381,8 @@ export const contentAnalysisEnqueue = defineCommand<
  * - `remix`: a remix keeps its original's recorded result, so there is nothing
  *   of its own to check a run against.
  * - `noGameOver`: the match was quit before a game over was recorded.
+ * - `playbackGame`: the replay was recorded on the replay playback game, which
+ *   has no match of its own to record (#3793).
  * - `noGameId`: the header holds no id to file a result under.
  * - `unreadable`: the file does not read as a replay.
  *
@@ -1390,7 +1393,13 @@ export const contentAnalysisEnqueue = defineCommand<
 export const contentAnalysisCheck = defineCommand<
   { replayPath: string; enginePaths?: string[] },
   {
-    cannot: "remix" | "noGameId" | "noGameOver" | "unreadable" | null;
+    cannot:
+      | "remix"
+      | "noGameId"
+      | "noGameOver"
+      | "playbackGame"
+      | "unreadable"
+      | null;
     gameId: string | null;
     matchSeconds: number;
     headless: string[];
@@ -1680,6 +1689,33 @@ export type ReplayTrackWindowAnswer =
       byteLength: number;
     }
   | { ok: false; fault: ReplayTrackFault };
+
+/**
+ * Write the playback game and its start script for a replay, and launch the
+ * engine on it (#3793). Resolves when the engine exits, like `playLaunchReplay`,
+ * and goes in the same run registry: it is refused while any game is running,
+ * and `playCancel` with the same `runId` ends it.
+ *
+ * `executable` is the engine the replay was recorded on and `dataDir` the
+ * content folder the game is written under (`games/coilbox-replay-playback.sdd`,
+ * replaced on every launch). `game` names another installed version of the
+ * replay's game to depend on when the exact one is not installed. Rejects, with
+ * the reason, for a replay with no current track, a remix and a replay of the
+ * playback game. The game gets no way to start from a chosen frame yet.
+ *
+ * Nothing in the UI calls it yet (#3803 and #3809 add the buttons).
+ */
+export const contentReplayPlaybackLaunch = defineCommand<
+  {
+    replayPath: string;
+    executable: string;
+    dataDir: string;
+    runId: string;
+    onEvent: Channel<LaunchEvent>;
+    game?: string;
+  },
+  LaunchOutcome
+>("coilbox-content", "content_replay_playback_launch");
 
 /**
  * Read a replay's track header (#3806) and mark the track watched. Call it
