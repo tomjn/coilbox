@@ -948,6 +948,13 @@ name = "coilbox-thumb-cache"
 version = "0.0.0"
 
 [[package]]
+name = "coilbox-track"
+version = "0.0.0"
+dependencies = [
+ "flate2",
+]
+
+[[package]]
 name = "coilbox-unitpatch"
 version = "0.0.0"
 dependencies = [
