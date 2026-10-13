@@ -33,7 +33,7 @@
 //! This is separate from the play launch's `RunRegistry` on purpose. That one
 //! refuses a second game. This one queues.
 
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::time::Duration;
@@ -46,6 +46,7 @@ use tauri::{AppHandle, Emitter, Manager, Runtime, State};
 use coilbox_track_thin::{thin_dump_cancellable, ThinError, ThinOptions, ThinReport};
 
 use super::super::def_sets;
+use super::super::track_budget;
 use super::super::track_store;
 use super::divergence::Disagreement;
 use super::launch::RunControl;
@@ -354,6 +355,9 @@ struct Shared {
     /// Where a recorder's dump is left until it has been thinned. Outside a
     /// run's scratch folder, which is deleted before the dump is read.
     recordings: PathBuf,
+    /// How many bytes tracks may use, asked for each time a track is stored so
+    /// a change in settings takes effect on the next recording.
+    track_budget: Box<dyn Fn() -> u64 + Send + Sync>,
     /// Told about every change, outside the state's lock.
     listener: Listener,
     /// Held from taking a snapshot to the listener having it, so two changes
@@ -410,6 +414,7 @@ impl AnalysisQueue {
         analyses: PathBuf,
         tracks: PathBuf,
         recordings: PathBuf,
+        track_budget: impl Fn() -> u64 + Send + Sync + 'static,
         listener: impl Fn(&QueueSnapshot) + Send + Sync + 'static,
     ) -> Self {
         AnalysisQueue(Arc::new(Shared {
@@ -417,6 +422,7 @@ impl AnalysisQueue {
             analyses,
             tracks,
             recordings,
+            track_budget: Box::new(track_budget),
             listener: Box::new(listener),
             announcing: Mutex::new(()),
             state: Mutex::new(QueueState::default()),
@@ -790,7 +796,18 @@ fn record_track(
             .map(|_| ())
     });
     match stored {
-        Ok(_) => Recorded::Stored,
+        Ok(_) => {
+            // Only now that the track is whole and in place, so a recording
+            // that fails never costs the only copy of an earlier track.
+            // Nothing plays a track yet, so none is in use.
+            track_budget::enforce(
+                &shared.tracks,
+                Some(&spec.game_id),
+                (shared.track_budget)(),
+                &HashSet::new(),
+            );
+            Recorded::Stored
+        }
         // The store removed the half-written track.
         Err(_) if control.was_cancelled() => Recorded::Nothing,
         Err(message) => Recorded::Failed(make_failure(
@@ -1033,6 +1050,7 @@ pub(crate) fn manage<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     let analyses = store::app_store_dir(app)?;
     let tracks = track_store::app_store_dir(app)?;
     let recordings = coilbox_portable::cache_dir(app)?.join(RECORDINGS_DIR);
+    let settings = coilbox_portable::settings_file(app)?;
     {
         let scratch_root = scratch_root.clone();
         let recordings = recordings.clone();
@@ -1049,6 +1067,7 @@ pub(crate) fn manage<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
         analyses,
         tracks,
         recordings,
+        move || track_budget::read_budget(&settings),
         move |snapshot| {
             let _ = handle.emit(QUEUE_EVENT, snapshot);
         },
@@ -1360,7 +1379,7 @@ mod tests {
     use super::*;
     use coilbox_track::{Settings, Track, TrackReader};
     use coilbox_track_thin::{thin_dump_cancellable, ThinError, ThinOptions, ThinReport};
-    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
     use std::time::Instant;
 
     const OTHER: &str = "00000000000000000000000000000002";
@@ -1630,6 +1649,8 @@ mod tests {
         engine: Arc<FakeEngine>,
         queue: AnalysisQueue,
         heard: Arc<Mutex<Vec<QueueSnapshot>>>,
+        /// The disk budget for tracks, in bytes. No limit until a test sets one.
+        budget: Arc<AtomicU64>,
     }
 
     impl World {
@@ -1638,11 +1659,14 @@ mod tests {
             let engine = FakeEngine::new(script);
             let heard = Arc::new(Mutex::new(Vec::new()));
             let listener = heard.clone();
+            let budget = Arc::new(AtomicU64::new(u64::MAX));
+            let limit = budget.clone();
             let queue = AnalysisQueue::new(
                 engine.clone(),
                 dir.path().join("analyses"),
                 dir.path().join("tracks"),
                 dir.path().join("recordings"),
+                move || limit.load(Ordering::SeqCst),
                 move |snapshot: &QueueSnapshot| listener.lock().unwrap().push(snapshot.clone()),
             );
             World {
@@ -1650,6 +1674,7 @@ mod tests {
                 engine,
                 queue,
                 heard,
+                budget,
             }
         }
 
@@ -2416,13 +2441,17 @@ mod tests {
     /// A whole track for a match, as the writer makes it, to stand in for one
     /// made earlier.
     fn earlier_track(game_id: &str) -> Vec<u8> {
+        earlier_track_from(game_id, coilbox_track_thin::RECORDER_VERSION)
+    }
+
+    fn earlier_track_from(game_id: &str, recorder_version: u16) -> Vec<u8> {
         let mut id = [0u8; 16];
         for (i, byte) in id.iter_mut().enumerate() {
             *byte = u8::from_str_radix(&game_id[i * 2..i * 2 + 2], 16).unwrap();
         }
         let mut track = Track::new(Settings {
             game_id: id,
-            recorder_version: coilbox_track_thin::RECORDER_VERSION,
+            recorder_version,
             last_frame: 90,
             ..Settings::default()
         });
@@ -2680,6 +2709,199 @@ mod tests {
         assert_eq!(world.started(), 1);
     }
 
+    // ---- the disk budget for tracks (issue #3787) ----
+
+    fn track_size(world: &World, game_id: &str) -> u64 {
+        std::fs::metadata(track_store::track_path(&world.tracks(), game_id).unwrap())
+            .unwrap()
+            .len()
+    }
+
+    /// Set when a stored track was last watched.
+    fn watched_at(world: &World, game_id: &str, when: std::time::SystemTime) {
+        std::fs::File::options()
+            .write(true)
+            .open(track_store::track_path(&world.tracks(), game_id).unwrap())
+            .unwrap()
+            .set_modified(when)
+            .unwrap();
+    }
+
+    /// The names the tracks of these matches are stored under, sorted.
+    fn track_files(game_ids: &[&str]) -> Vec<String> {
+        let mut names: Vec<String> = game_ids.iter().map(|id| format!("{id}.cbtrack")).collect();
+        names.sort();
+        names
+    }
+
+    /// Record a match with no limit, and say how big its track is. Takes the
+    /// track away again, so the folder is as it was.
+    fn measure_a_track(world: &World, game_id: &str) -> u64 {
+        world.record(game_id);
+        world.until_idle();
+        let size = track_size(world, game_id);
+        assert!(track_store::remove(&world.tracks(), game_id).unwrap());
+        size
+    }
+
+    /// Acceptance: with room for less than two tracks, recording a second
+    /// removes the first. The limit is read again for each recording, so it is
+    /// the lowered one that is applied.
+    #[test]
+    fn recording_a_second_track_with_room_for_less_than_two_removes_the_first() {
+        let world = World::new(Script::Finish(AnalysisStatus::Reproduced));
+        world.record(ID);
+        world.until_idle();
+        let one = track_size(&world, ID);
+        assert_eq!(files_in(&world.tracks()), track_files(&[ID]));
+
+        world.budget.store(one + one / 2, Ordering::SeqCst);
+        world.record(OTHER);
+        let idle = world.until_idle();
+
+        assert!(track_size(&world, OTHER) <= one + one / 2);
+        assert_eq!(files_in(&world.tracks()), track_files(&[OTHER]));
+        assert_eq!(idle.tracks, 2);
+        assert!(idle.failures.is_empty(), "{:?}", idle.failures);
+    }
+
+    /// An earlier track may be the only copy. Nothing is removed for a
+    /// recording that does not end in a stored track.
+    #[test]
+    fn a_recording_whose_thinning_fails_removes_no_track_to_make_room() {
+        let world = World::new(Script::Finish(AnalysisStatus::Reproduced));
+        store_earlier_track(&world, ID);
+        store_earlier_track(&world, OTHER);
+        world.budget.store(0, Ordering::SeqCst);
+        world.engine.set_thin(ThinScript::Fail);
+
+        world.record(THIRD);
+        let idle = world.until_idle();
+
+        assert_eq!(files_in(&world.tracks()), track_files(&[ID, OTHER]));
+        assert_eq!(idle.tracks, 0);
+        assert_eq!(idle.failures.len(), 1);
+        assert_eq!(idle.failures[0].reason, FailureReason::ThinFailed);
+    }
+
+    #[test]
+    fn a_recording_that_diverged_removes_no_track_to_make_room() {
+        let world = World::new(Script::Finish(AnalysisStatus::Diverged));
+        store_earlier_track(&world, ID);
+        world.budget.store(0, Ordering::SeqCst);
+
+        world.record(OTHER);
+        world.until_idle();
+
+        assert_eq!(files_in(&world.tracks()), track_files(&[ID]));
+    }
+
+    #[test]
+    fn a_recording_cancelled_in_the_thinning_removes_no_track_to_make_room() {
+        let world = World::new(Script::Finish(AnalysisStatus::Reproduced));
+        store_earlier_track(&world, ID);
+        world.budget.store(0, Ordering::SeqCst);
+        world.engine.set_thin(ThinScript::UntilCancelled);
+
+        world.record(OTHER);
+        let thinning = world.until("the thinning", |s| {
+            s.running
+                .as_ref()
+                .is_some_and(|r| r.phase == RunPhase::Thinning)
+        });
+        assert!(world.queue.cancel(thinning.running.unwrap().id));
+        world.until_idle();
+
+        assert_eq!(files_in(&world.tracks()), track_files(&[ID]));
+    }
+
+    /// The player asked for the recording, so it is kept and the rest go.
+    #[test]
+    fn a_track_larger_than_the_whole_budget_is_kept_and_every_other_track_goes() {
+        let world = World::new(Script::Finish(AnalysisStatus::Reproduced));
+        store_earlier_track(&world, OTHER);
+        store_earlier_track(&world, THIRD);
+        world.budget.store(1, Ordering::SeqCst);
+
+        world.record(ID);
+        let idle = world.until_idle();
+
+        assert!(track_size(&world, ID) > 1);
+        assert_eq!(files_in(&world.tracks()), track_files(&[ID]));
+        assert_eq!(idle.tracks, 1);
+        assert!(idle.failures.is_empty(), "{:?}", idle.failures);
+    }
+
+    /// The new track is the oldest by time here, because the other track is
+    /// marked as watched an hour from now.
+    #[test]
+    fn the_track_just_recorded_is_never_the_one_removed_to_make_room_for_it() {
+        let world = World::new(Script::Finish(AnalysisStatus::Reproduced));
+        let new = measure_a_track(&world, ID);
+        store_earlier_track(&world, OTHER);
+        watched_at(
+            &world,
+            OTHER,
+            std::time::SystemTime::now() + Duration::from_secs(3600),
+        );
+        world.budget.store(new, Ordering::SeqCst);
+
+        world.record(ID);
+        world.until_idle();
+
+        assert_eq!(files_in(&world.tracks()), track_files(&[ID]));
+    }
+
+    /// Recording a replay again replaces its track, so the old one is not
+    /// counted as well as the new.
+    #[test]
+    fn recording_a_replay_again_does_not_count_its_old_track_twice() {
+        let world = World::new(Script::Finish(AnalysisStatus::Reproduced));
+        world.record(ID);
+        world.until_idle();
+        let new = track_size(&world, ID);
+        let other = store_earlier_track(&world, OTHER).len() as u64;
+        world.budget.store(new + other, Ordering::SeqCst);
+
+        assert_eq!(
+            world.queue.enqueue(record_job(ID, true)).unwrap(),
+            Enqueued::Queued
+        );
+        let idle = world.until_idle();
+
+        assert_eq!(idle.tracks, 2);
+        assert_eq!(files_in(&world.tracks()), track_files(&[ID, OTHER]));
+    }
+
+    /// A stale track cannot be played, so it goes before a current one that
+    /// was watched longer ago.
+    #[test]
+    fn a_stale_track_is_removed_before_a_current_one_watched_longer_ago() {
+        let world = World::new(Script::Finish(AnalysisStatus::Reproduced));
+        let new = measure_a_track(&world, ID);
+        let current = store_earlier_track(&world, OTHER).len() as u64;
+        watched_at(
+            &world,
+            OTHER,
+            std::time::SystemTime::now() - Duration::from_secs(7200),
+        );
+        std::fs::write(
+            track_store::track_path(&world.tracks(), THIRD).unwrap(),
+            earlier_track_from(THIRD, coilbox_track_thin::RECORDER_VERSION - 1),
+        )
+        .unwrap();
+        assert_eq!(
+            track_store::state(&world.tracks(), THIRD).unwrap(),
+            Some(track_store::TrackState::Stale)
+        );
+        world.budget.store(new + current, Ordering::SeqCst);
+
+        world.record(ID);
+        world.until_idle();
+
+        assert_eq!(files_in(&world.tracks()), track_files(&[ID, OTHER]));
+    }
+
     /// Progress is the frame the playback has reached, and the thinning after
     /// it is a stage of its own and not a bar stuck at the end.
     #[test]
@@ -2883,6 +3105,7 @@ mod tests {
             analyses.clone(),
             dir.path().join("tracks"),
             dir.path().join("recordings"),
+            || u64::MAX,
             move |snapshot: &QueueSnapshot| listener.lock().unwrap().push(snapshot.clone()),
         );
         let spec = job_for(
@@ -3085,6 +3308,7 @@ mod tests {
             analyses.clone(),
             tracks.clone(),
             recordings.clone(),
+            || u64::MAX,
             move |snapshot: &QueueSnapshot| listener.lock().unwrap().push(snapshot.clone()),
         );
         let spec = JobSpec {
