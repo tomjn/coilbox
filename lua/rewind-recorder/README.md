@@ -1,6 +1,6 @@
 # Rewind recorder
 
-The rewind recorder is a gadget that writes down where everything was on every frame of a replay, while coilbox plays the replay back headless. It is the first step of replay rewind (issue #3780). What it writes is a raw dump. Issue #3782 thins the dump and issue #3781 writes the result as a track, in the format `docs/reference/replay-track-format.md` describes.
+The rewind recorder is a gadget that writes down where everything was on every frame of a replay, while coilbox plays the replay back headless. It is the first step of replay rewind (issue #3780). What it writes is a raw dump. `crates/coilbox-track-thin` thins the dump (issue #3782) and `crates/coilbox-track` writes the result as a track (issue #3781), in the format `docs/reference/replay-track-format.md` describes.
 
 This page is for whoever reads the dump. It has the byte layout, what each number means, and what the recorder cannot know.
 
@@ -49,6 +49,12 @@ luajit lua/rewind-recorder/tests/dump_summary.lua <dump>
 
 `tests/dump.lua` is a reader written from this page. It is the reference for a second reader.
 
+To turn a dump into a track and print what was kept:
+
+```sh
+cargo run --release -p coilbox-track-thin --example thin_dump -- <dump> <track>
+```
+
 ## Byte layout
 
 Every multi-byte value is in the byte order of the machine that recorded, because the engine's `VFS.PackU32` and `VFS.PackF32` copy memory and do not swap. x86-64 and arm64 are both little endian.
@@ -91,6 +97,7 @@ One JSON object.
 | `terrain` | `false` when the recorder could not listen for heightmap changes, so the dump holds none. `true` otherwise |
 | `teams` | one object for each team, Gaia included |
 | `unitDefs` | unit definition names. Entry `n`, counting from 1, is definition id `n` |
+| `unitRadii` | each unit definition's radius in elmos, in the order of `unitDefs`. A dump made before issue #3782 has none, and the thinning refuses it |
 | `featureDefs` | feature definition names. Entry `n`, counting from 1, is definition id `n` |
 | `weaponDefs` | weapon definition names. Entry `n`, counting from 0, is definition id `n` |
 

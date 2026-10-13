@@ -134,55 +134,9 @@ impl Quantiser {
     }
 
     /// The rotation that turns a unit's resting front `(0, 0, 1)` and up
-    /// `(0, 1, 0)` into the given front and up. `right = up x front`, and the
-    /// rotation matrix has right, up and front for its columns.
+    /// `(0, 1, 0)` into the given front and up, in the smallest three form.
     pub fn rotation_from_front_up(&self, front: [f64; 3], up: [f64; 3]) -> Rotation {
-        let right = [
-            up[1] * front[2] - up[2] * front[1],
-            up[2] * front[0] - up[0] * front[2],
-            up[0] * front[1] - up[1] * front[0],
-        ];
-        // m[row][column].
-        let m = [
-            [right[0], up[0], front[0]],
-            [right[1], up[1], front[1]],
-            [right[2], up[2], front[2]],
-        ];
-        let trace = m[0][0] + m[1][1] + m[2][2];
-        let q = if trace > 0.0 {
-            let s = (trace + 1.0).sqrt() * 2.0;
-            [
-                (m[2][1] - m[1][2]) / s,
-                (m[0][2] - m[2][0]) / s,
-                (m[1][0] - m[0][1]) / s,
-                0.25 * s,
-            ]
-        } else if m[0][0] > m[1][1] && m[0][0] > m[2][2] {
-            let s = (1.0 + m[0][0] - m[1][1] - m[2][2]).sqrt() * 2.0;
-            [
-                0.25 * s,
-                (m[0][1] + m[1][0]) / s,
-                (m[0][2] + m[2][0]) / s,
-                (m[2][1] - m[1][2]) / s,
-            ]
-        } else if m[1][1] > m[2][2] {
-            let s = (1.0 + m[1][1] - m[0][0] - m[2][2]).sqrt() * 2.0;
-            [
-                (m[0][1] + m[1][0]) / s,
-                0.25 * s,
-                (m[1][2] + m[2][1]) / s,
-                (m[0][2] - m[2][0]) / s,
-            ]
-        } else {
-            let s = (1.0 + m[2][2] - m[0][0] - m[1][1]).sqrt() * 2.0;
-            [
-                (m[0][2] + m[2][0]) / s,
-                (m[1][2] + m[2][1]) / s,
-                0.25 * s,
-                (m[1][0] - m[0][1]) / s,
-            ]
-        };
-        self.rotation(q)
+        self.rotation(quaternion_from_front_up(front, up))
     }
 
     /// A fraction from 0 to 1, as health and build progress are stored.
@@ -194,6 +148,61 @@ impl Quantiser {
 
     pub fn fraction_value(&self, n: u16) -> f64 {
         n as f64 / FRACTION_FULL as f64
+    }
+}
+
+/// The quaternion `(x, y, z, w)` that turns a unit's resting front `(0, 0, 1)`
+/// and up `(0, 1, 0)` into the given front and up, before any rounding.
+/// `right = up x front`, and the rotation matrix has right, up and front for
+/// its columns.
+///
+/// The thinning of issue #3782 measures a recorded sample against the track
+/// with this, since the sample is what was recorded and not what was stored.
+pub fn quaternion_from_front_up(front: [f64; 3], up: [f64; 3]) -> [f64; 4] {
+    let right = [
+        up[1] * front[2] - up[2] * front[1],
+        up[2] * front[0] - up[0] * front[2],
+        up[0] * front[1] - up[1] * front[0],
+    ];
+    // m[row][column].
+    let m = [
+        [right[0], up[0], front[0]],
+        [right[1], up[1], front[1]],
+        [right[2], up[2], front[2]],
+    ];
+    let trace = m[0][0] + m[1][1] + m[2][2];
+    if trace > 0.0 {
+        let s = (trace + 1.0).sqrt() * 2.0;
+        [
+            (m[2][1] - m[1][2]) / s,
+            (m[0][2] - m[2][0]) / s,
+            (m[1][0] - m[0][1]) / s,
+            0.25 * s,
+        ]
+    } else if m[0][0] > m[1][1] && m[0][0] > m[2][2] {
+        let s = (1.0 + m[0][0] - m[1][1] - m[2][2]).sqrt() * 2.0;
+        [
+            0.25 * s,
+            (m[0][1] + m[1][0]) / s,
+            (m[0][2] + m[2][0]) / s,
+            (m[2][1] - m[1][2]) / s,
+        ]
+    } else if m[1][1] > m[2][2] {
+        let s = (1.0 + m[1][1] - m[0][0] - m[2][2]).sqrt() * 2.0;
+        [
+            (m[0][1] + m[1][0]) / s,
+            0.25 * s,
+            (m[1][2] + m[2][1]) / s,
+            (m[0][2] - m[2][0]) / s,
+        ]
+    } else {
+        let s = (1.0 + m[2][2] - m[0][0] - m[1][1]).sqrt() * 2.0;
+        [
+            (m[0][2] + m[2][0]) / s,
+            (m[1][2] + m[2][1]) / s,
+            0.25 * s,
+            (m[1][0] - m[0][1]) / s,
+        ]
     }
 }
 
