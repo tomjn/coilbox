@@ -3,7 +3,9 @@
 mod common;
 
 use coilbox_track::{projectile_at, transform_at, Quantiser, TrackReader};
-use coilbox_track_thin::{check_track, thin_dump, ThinError, ThinOptions, ThinReport};
+use coilbox_track_thin::{
+    check_track, thin_dump, thin_dump_cancellable, ThinError, ThinOptions, ThinReport,
+};
 use common::*;
 
 /// Thins a scene and reads the track back.
@@ -516,6 +518,66 @@ fn a_track_over_its_own_tolerance_is_refused_and_names_the_worst_offender() {
         }
         other => panic!("expected a refusal, got {other:?}"),
     }
+}
+
+#[test]
+fn a_game_named_in_the_options_is_the_game_the_track_says() {
+    let mut scene = Scene::new(300);
+    scene.unit(7, 1, 0, 300, |_| At::place(100.0, 0.0, 100.0));
+    let dir = tempfile::tempdir().unwrap();
+    let (dump, track) = scene.write(dir.path());
+
+    // The dump says "Test Game 1.0", which is the game the recorder ran in. In
+    // the app that is a generated game, not the one the replay was played on.
+    thin_dump(&dump, &track, &ThinOptions::default()).unwrap();
+    assert_eq!(read_track(&track).info.game, "Test Game 1.0");
+
+    let named = ThinOptions {
+        game: Some("Splinter Faction 0.1.86".into()),
+        ..ThinOptions::default()
+    };
+    thin_dump(&dump, &track, &named).unwrap();
+    assert_eq!(read_track(&track).info.game, "Splinter Faction 0.1.86");
+}
+
+#[test]
+fn thinning_that_is_cancelled_stops_and_writes_no_track() {
+    let mut scene = Scene::new(300);
+    scene.unit(7, 1, 0, 300, |_| At::place(100.0, 0.0, 100.0));
+    let dir = tempfile::tempdir().unwrap();
+    let (dump, track) = scene.write(dir.path());
+
+    let result = thin_dump_cancellable(&dump, &track, &ThinOptions::default(), &|| true);
+
+    assert!(matches!(result, Err(ThinError::Cancelled)), "{result:?}");
+    assert!(!track.exists());
+
+    // Cancelled part way: the check is made as the dump is read, not once.
+    let reads = std::cell::Cell::new(0);
+    let result = thin_dump_cancellable(&dump, &track, &ThinOptions::default(), &|| {
+        reads.set(reads.get() + 1);
+        reads.get() > 100
+    });
+    assert!(matches!(result, Err(ThinError::Cancelled)), "{result:?}");
+    assert!(!track.exists());
+}
+
+#[test]
+fn thinning_that_is_not_cancelled_asks_and_finishes() {
+    let mut scene = Scene::new(300);
+    scene.unit(7, 1, 0, 300, |_| At::place(100.0, 0.0, 100.0));
+    let dir = tempfile::tempdir().unwrap();
+    let (dump, track) = scene.write(dir.path());
+
+    let asked = std::cell::Cell::new(0);
+    thin_dump_cancellable(&dump, &track, &ThinOptions::default(), &|| {
+        asked.set(asked.get() + 1);
+        false
+    })
+    .unwrap();
+
+    assert!(asked.get() > 0);
+    assert!(track.exists());
 }
 
 #[test]
