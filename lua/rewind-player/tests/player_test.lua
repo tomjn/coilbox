@@ -409,6 +409,146 @@ do
 	t.same("health that rose with no damage is put right on the next frame", radar.health, 50)
 end
 
+-- The engine heals a unit in the middle of a simulation frame, after the
+-- gadgets' GameFrame and before their GameFramePost (CUnit::SlowUpdate), and
+-- only a unit with health below its maximum. The player makes the maximum the
+-- health for that stretch, so the engine has nothing to heal (issue #3986).
+
+do
+	local world, player = setup({
+		last = 300,
+		unitDefs = NAMES,
+		units = {
+			{
+				first = 0,
+				last = 300,
+				def = 2,
+				status = function()
+					return 0.25, 1, 1
+				end,
+			},
+			{
+				first = 0,
+				last = 300,
+				def = 0,
+				status = function()
+					return 1, 1, 1
+				end,
+			},
+			{
+				first = 0,
+				last = 300,
+				def = 1,
+				status = function()
+					return 0.5, 0.5, 1
+				end,
+			},
+		},
+	})
+	player:message("coilbox_rewind:pause")
+	player:frame()
+	local radar, tank, plant = world.unitNamed("radar"), world.unitNamed("tank"), world.unitNamed("plant")
+	t.same("a wounded unit has the track's health", radar.health, 50)
+
+	world.heal(30)
+	t.same("the engine's healing in the rest of the frame changes nothing", radar.health, 50)
+	t.same("because until the frame is over the unit's maximum is its health", radar.maxHealth, 50)
+	player:framePost()
+	t.same("the maximum is back when the frame is over", radar.maxHealth, 200)
+	t.same("and the health is the track's", radar.health, 50)
+	t.same("the player had nothing to say about it", said(world, "with no damage to hear of"), 0)
+
+	for _ = 1, 40 do
+		player:frame()
+		world.heal(30)
+		player:framePost()
+	end
+	t.same("forty frames of healing later it is still the track's", radar.health, 50)
+	t.same("a unit at full health keeps its maximum all the time", tank.maxHealthSets, nil)
+	t.same("a unit under construction does too, since the engine does not heal it", plant.maxHealthSets, nil)
+
+	-- A frame with no post frame before it, which the engine does not do, still
+	-- gives the unit its maximum back before the next frame sets health.
+	player:frame()
+	t.same("a unit still held at the end of a frame is held in the next", radar.maxHealth, 50)
+	player:message("coilbox_rewind:seek 10")
+	player:frame()
+	t.same("and nothing in the way of the player's own health", radar.health, 50)
+	player:framePost()
+	t.same("with its maximum back after", radar.maxHealth, 200)
+
+	-- Holding a unit and giving it back allocates nothing.
+	player:message("coilbox_rewind:play")
+	player:frame()
+	player:framePost()
+	collectgarbage()
+	collectgarbage("stop")
+	local before = collectgarbage("count")
+	for _ = 1, 200 do
+		player:frame()
+		world.heal(30)
+		player:framePost()
+	end
+	local after = collectgarbage("count")
+	collectgarbage("restart")
+	t.same("200 frames of holding a wounded unit allocate nothing", after - before, 0)
+	t.same("and it kept the track's health", radar.health, 50)
+end
+
+-- A game's gadget that heals before the player's frame, and anything else that
+-- moves health during the frame, are put right and said once.
+
+do
+	local world, player = setup({
+		last = 300,
+		unitDefs = NAMES,
+		units = {
+			{
+				first = 0,
+				last = 300,
+				def = 2,
+				status = function()
+					return 0.25, 1, 1
+				end,
+			},
+		},
+	})
+	player:message("coilbox_rewind:pause")
+	player:frame()
+	local radar = world.unitNamed("radar")
+	player:framePost()
+
+	-- Splinter Faction's regeneration gadget, which runs before the player.
+	radar.health = 180
+	radar.maxHealth = 200
+	player:frame()
+	t.same("health a gadget raised before the player's frame is put right", radar.health, 50)
+	t.same("and said once", said(world, "with no damage to hear of"), 1)
+	player:framePost()
+
+	radar.health = 190
+	player:frame()
+	player:framePost()
+	t.same("and the next time is not said again", said(world, "with no damage to hear of"), 1)
+
+	-- Something that got past the held maximum, down.
+	player:frame()
+	radar.health = 10
+	player:framePost()
+	t.same("health that fell during the frame is put right by its end", radar.health, 50)
+	t.same("with the maximum back", radar.maxHealth, 200)
+
+	-- A unit the base game destroyed between the frame and the post frame.
+	player:frame()
+	world.Spring.DestroyUnit(radar.id, false, true)
+	player:framePost()
+	player:frame()
+	player:framePost()
+	t.same("a unit lost in the middle of a frame is made again", world.unitCount(), 1)
+	t.same("with the track's health", world.unitNamed("radar").health, 50)
+	t.same("and its own maximum", world.unitNamed("radar").maxHealth, 200)
+end
+
 -- A definition the installed game does not have.
 
 do
@@ -745,6 +885,7 @@ do
 	local before = collectgarbage("count")
 	for _ = 1, 300 do
 		player:frame()
+		player:framePost()
 	end
 	local after = collectgarbage("count")
 	collectgarbage("restart")
@@ -758,6 +899,7 @@ do
 	before = collectgarbage("count")
 	for _ = 1, 250 do
 		player:frame()
+		player:framePost()
 	end
 	after = collectgarbage("count")
 	collectgarbage("restart")

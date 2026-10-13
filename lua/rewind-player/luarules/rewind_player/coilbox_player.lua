@@ -243,6 +243,12 @@ function Player:frame()
 	publishClock(self)
 end
 
+--- The end of a simulation frame, after the engine has done its own work on
+-- the units (GameFramePost).
+function Player:framePost()
+	self.units:afterSim()
+end
+
 --- A Lua message. True when it was the player's, done or refused, and false
 -- when it was somebody else's.
 function Player:message(text)

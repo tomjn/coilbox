@@ -94,11 +94,20 @@ function gadget:Initialize()
 	end
 end
 
+-- The explosions the track's weapons did not make, which in a playback are a
+-- unit's death. The ground round each is looked at on the next frame, to see
+-- whether the engine's crater left the ground anywhere but where the track has
+-- it (issue #3987).
+local deathExplosions, deathCount = {}, 0
+
 function gadget:Explosion(weaponDefID, x, y, z)
 	explosions = explosions + 1
 	if shotWeapons[weaponDefID] then
 		impactCount = impactCount + 1
 		impacts[impactCount] = { def = weaponDefID, x = x, y = y, z = z, ground = Spring.GetGroundHeight(x, z), frame = Spring.GetGameRulesParam("coilbox_rewind_frame") }
+	else
+		deathCount = deathCount + 1
+		deathExplosions[deathCount] = { def = weaponDefID, x = x, z = z }
 	end
 end
 
@@ -119,6 +128,12 @@ end
 -- The same for features: hits by the track's weapons that the engine worked
 -- out some damage for, and hits by anything else, which is a unit's death.
 local featureShotDamage, featureOtherDamage = 0, 0
+-- Hits on a feature by anything but the track's weapons that did some damage
+-- in the end, which the engine only tells of when no gadget took it away.
+-- `featureOtherDamage` is what the engine worked out before any gadget was
+-- asked, so it says a death's explosion reached a feature, and this says it
+-- hurt it.
+local featureDoneDamage = 0
 
 function gadget:FeaturePreDamaged(_, _, _, damage, weaponDefID)
 	if damage ~= 0 then
@@ -127,6 +142,12 @@ function gadget:FeaturePreDamaged(_, _, _, damage, weaponDefID)
 		else
 			featureOtherDamage = featureOtherDamage + 1
 		end
+	end
+end
+
+function gadget:FeatureDamaged(_, _, _, damage, weaponDefID)
+	if damage ~= 0 and not (weaponDefID and shotWeapons[weaponDefID]) then
+		featureDoneDamage = featureDoneDamage + 1
 	end
 end
 
@@ -144,6 +165,54 @@ end
 
 local function param(name)
 	return Spring.GetGameRulesParam(PARAM .. name)
+end
+
+--- The height the track has a corner of the ground at `frame`: the last row
+-- that touches it, or the map's own.
+local function trackGround(corner, frame, x, z)
+	local size = Game.squareSize
+	local height = Spring.GetGroundOrigHeight(corner.x * size, corner.z * size)
+	for k = 0, track:windowOf(frame) do
+		local rows = assert(track:terrain(k))
+		for i = 1, rows.count do
+			if rows.frame[i] <= frame and rows.x[i] == corner.x and rows.z[i] == corner.z then
+				height = rows.after[i]
+			end
+		end
+	end
+	return height
+end
+
+--- Says, for each explosion since the last call, how far the ground round it is
+-- from the track's.
+local function lookAtDeathGround()
+	if deathCount == 0 then
+		return
+	end
+	local size, frame = Game.squareSize, param("frame")
+	for n = 1, deathCount do
+		local explosion = deathExplosions[n]
+		local def = WeaponDefs[explosion.def]
+		local reach = math.max(def.craterAreaOfEffect or 0, def.damageAreaOfEffect or 0, 16)
+		local worst, changed, looked = 0, 0, 0
+		for dx = -3, 3 do
+			for dz = -3, 3 do
+				local corner = {
+					x = math.floor((explosion.x + dx * reach / 3) / size + 0.5),
+					z = math.floor((explosion.z + dz * reach / 3) / size + 0.5),
+				}
+				local actual = Spring.GetGroundHeight(corner.x * size, corner.z * size)
+				looked = looked + 1
+				if math.abs(actual - Spring.GetGroundOrigHeight(corner.x * size, corner.z * size)) > 0.001 then
+					changed = changed + 1
+				end
+				worst = math.max(worst, math.abs(actual - trackGround(corner, frame, corner.x, corner.z)))
+			end
+		end
+		say(string.format("death_ground weapon=%s frame=%s crater_mult=%s crater_aoe=%.1f damage_aoe=%.1f looked=%d changed_from_map=%d off_worst=%.3f", def.name, tostring(frame), tostring(def.damages and def.damages.craterMult), def.craterAreaOfEffect or 0, def.damageAreaOfEffect or 0, looked, changed, worst))
+		deathExplosions[n] = nil
+	end
+	deathCount = 0
 end
 
 --- Seeks, waits for the player to show the frame, and lets the engine settle.
@@ -396,6 +465,7 @@ local function ending()
 		end
 	end
 	say("teams dead=" .. dead .. " of=" .. #Spring.GetTeamList() .. " game_over=" .. (Spring.IsGameOver() and 1 or 0))
+	say(string.format("deaths explosions=%d feature_hits_by_deaths=%d feature_damage_by_deaths=%d", explosions, featureOtherDamage, featureDoneDamage))
 end
 
 -- Projectiles (issue #3795).
@@ -745,7 +815,7 @@ local function shotPlan()
 					say(string.format("stray %s weapon=%s frame=%s at=%.1f,%.1f,%.1f ground=%.1f near=%s", label, info.weaponDefs[shotWeapons[hit.def]], tostring(hit.frame), hit.x, hit.y, hit.z, hit.ground, near))
 				end
 			end
-			say(string.format("watched %s speed=%s direction=%d from=%d to=%d shots_ended=%d impacts=%d unmatched=%d off_mean=%.3f off_worst=%.3f craters=%d raw_damage=%d done_damage=%d feature_damage=%d feature_damage_by_deaths=%d in_air_after=%d", label, tostring(speed), direction, from, to, ended, landed, late, total / math.max(landed - late, 1), worstOff, craters, rawDamage, doneDamage, featureShotDamage, featureOtherDamage, #airborne()))
+			say(string.format("watched %s speed=%s direction=%d from=%d to=%d shots_ended=%d impacts=%d unmatched=%d off_mean=%.3f off_worst=%.3f craters=%d raw_damage=%d done_damage=%d feature_damage=%d feature_hits_by_deaths=%d feature_damage_by_deaths=%d in_air_after=%d", label, tostring(speed), direction, from, to, ended, landed, late, total / math.max(landed - late, 1), worstOff, craters, rawDamage, doneDamage, featureShotDamage, featureOtherDamage, featureDoneDamage, #airborne()))
 			measure("after_" .. label, param("frame"))
 		end)
 	end
@@ -831,8 +901,26 @@ local function matchPlan()
 	local hurt, least = wounded()
 	if hurt then
 		seekTo(hurt)
+		-- The probe reads the unit's health on every frame, between the game's
+		-- gadgets and the player's correction.
+		push("run", function()
+			local lowest, fraction = nil, 2
+			for _, unitID in ipairs(liveUnits()) do
+				local health, maxHealth = Spring.GetUnitHealth(unitID)
+				local _, _, beingBuilt = Spring.GetUnitIsStunned(unitID)
+				if not beingBuilt and health / maxHealth < fraction then
+					lowest, fraction = unitID, health / maxHealth
+				end
+			end
+			if lowest and GG.rewind_health_probe then
+				GG.rewind_health_probe.start(lowest)
+			end
+		end)
 		push("wait", 450)
 		push("run", function()
+			if GG.rewind_health_probe then
+				GG.rewind_health_probe.finish("held_health")
+			end
 			say(string.format("wounded frame=%d least=%.5f", hurt, least))
 			measure("held_wounded", hurt)
 		end)
@@ -960,6 +1048,9 @@ local function plan()
 end
 
 function gadget:GameFrame()
+	if track then
+		lookAtDeathGround()
+	end
 	if not track then
 		track = assert(Track.open(assert(Fetch.fromVFS())))
 		info, features = assert(track:info()), assert(track:features())

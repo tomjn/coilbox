@@ -349,14 +349,42 @@ A game's adapter ([Game adapters](#game-adapters)) is where a game says what to 
 - A unit or a feature that the track does not have is removed on the next frame. That covers the map's own features, a unit the game spawns and a feature a base game gadget creates, as Splinter Faction's `unit_deathContainerSpawn.lua` does where a unit dies.
 - A unit or a feature of the track that something else destroys is made again on the next frame.
 - The engine asks before it leaves a wreck, and is refused, because the track has every wreck of the match.
-- Nothing takes damage: `UnitPreDamaged` gives every hit no damage and no push. Health that changes anyway is set again on the next frame. That includes health that rises with no damage to hear of: the engine heals an idle unit, and a game can have a gadget that does, as Splinter Faction's `unit_auto_health_regeneration.lua` does for its commanders. The units stage asks the engine for each unit's health on every frame, so a wounded unit on a paused frame stays wounded.
+- Nothing takes damage: `UnitPreDamaged` gives every hit no damage and no push. Health that changes anyway is set again on the next frame, and the first time it does the player logs one line saying so. [Nothing heals](#nothing-heals) has the rest: the engine's own healing never gets to heal a unit, and a game's gadget that heals belongs in the game's adapter.
 - A nanoframe nobody is building decays, and the engine kills it when its progress or health reaches zero. A unit under construction has both set on every frame, and held above one step of that decay.
 - A unit with no health left is killed by the next hit, and the track can have a living unit at none. A finished unit keeps one step of health.
-- A unit that dies with its death effect explodes, and that explosion damages features. `UnitPreDamaged` covers units only. A feature it destroys is made again on the next frame (issue #3987).
+- A unit that dies with its death effect explodes, and that explosion reaches the features round it (`CGameHelper::Explosion` to `CFeature::DoDamage` in `rts/Game/GameHelper.cpp` and `rts/Sim/Features/Feature.cpp`). The engine asks `FeaturePreDamaged` first, and the gadget answers no damage and no push, as it does for units (issue #3987). A tree does not fall and a wreck stays. The explosion's effect and sound do not depend on the damage done, so they still show. [Death explosions](#death-explosions) has what else was checked.
 
 A track's team is the same number in the game, because the start script carries the replay's teams. A team the game does not have as a team of its own is Gaia, read from `Spring.GetGaiaTeamID()`.
 
 Not handled: on an engine before `2025.03.9` a finished unit cannot be turned back into a nanoframe, so the stage destroys it and creates it again as one. That path has only run on the stand-in, since no such engine is installed here.
+
+### Nothing heals
+
+The recording owns health, so no unit's health changes in a playback except when the player sets it. Every way the engine or a game can move a unit's health or build progress with nothing simulated, as read in the engine source at commit `212c369b4c`, and what the player does about each:
+
+| What | In the engine | What the player does |
+| --- | --- | --- |
+| `autoHeal` and `idleAutoHeal` | `CUnit::SlowUpdate` (`rts/Sim/Units/Unit.cpp`) adds both to a unit whose health is below its maximum. It runs between `GameFrame` and `GameFramePost`, and the engine tells nobody | Stopped. See below |
+| Repair by a builder | `CUnit::AddBuildPower` refuses when `health >= maxHealth`. A builder looks for something to repair only while it carries out an order (`CBuilderCAI`), and the player gives a unit no order but on and off | Stopped by the same maximum. An idle builder does not repair on its own |
+| A repair pad | No code for one in `rts/Sim`. A game does it in a gadget that sets health | The game's adapter |
+| A nanoframe's decay | `CUnit::SlowUpdate` takes progress and health off a unit under construction that nobody is building, and kills it at none | Set again on every frame, held above one step of decay, as before |
+| Shields recharging | `CPlasmaRepulser::Update` raises shield power, which is not health. Weapons only update when `CUnit::CanUpdateWeapons` is true, and the player switches them off | Nothing needed. The track holds no shield power either |
+| Paralysis wearing off | `paralyzeDamage` falls in `CUnit::SlowUpdate`. Nothing sets it in a playback | Nothing needed |
+| A game's gadget that sets health | Splinter Faction's `unit_auto_health_regeneration.lua` and `unit_area_heal_radius.lua`. Neither raises `UnitDamaged` | Splinter Faction's adapter switches both off. Any other is put right in the frame it acts in and logged once |
+
+The engine has no switch for healing on one unit. The numbers are in the unit definition, which Lua reads and cannot change. `restTime` is not reachable from Lua. A stunned unit does not heal, but `SlowUpdate` returns early for it, so it also stops making resources. A depending game cannot change the definitions either: `CGame::Load` runs the one `gamedata/defs.lua` that the top archive has, a game's own is a single file that the playback game would have to replace, and `VFS.Include` from Lua cannot reach the file that one hides.
+
+So the player takes away what the heal acts on. `SlowUpdate` heals only when `health < maxHealth`, so after it has put a wounded unit's health in place, the player gives the unit a maximum equal to that health (`Spring.SetUnitMaxHealth`). The engine then finds nothing to heal, and nothing to repair. `GameFramePost` is the end of the simulation frame, where the player gives every unit its maximum back and looks at its health once more. Health never moves, so a read at any point of any frame finds the track's value. A unit at full health, and a unit under construction, are left alone. If a held unit's health has changed by then, or a gadget of the game raised health before the player's frame, the player sets it again and logs one line starting `COILBOX_REWIND_PLAYER the health of a unit of the track changed with no damage to hear of`. A game that logs it needs its healing gadget in its adapter.
+
+What a viewer can notice: for the part of a frame between the player's `GameFrame` and `GameFramePost`, a wounded unit reports a maximum equal to its health. A gadget of a higher layer than the player's, which is 0, that reads a unit's health in its `GameFrame`, sees it as whole in that frame. Nothing is drawn in that time. A widget reads between frames, when the maximum is whole again.
+
+### Death explosions
+
+What else a unit's death explosion does, read in `CGameHelper::Explosion`:
+
+- It starts no fire. `CFeature::StartFire` has two callers, a weapon projectile's collision with a feature (`fireStarter`) and a fire projectile (`rts/Sim/Projectiles/FireProjectile.cpp`). A death explosion is neither.
+- It can crater. The ground is deformed when the weapon's `craterMult` is above 0, and no call-in answers that. The death weapons of the match in this folder's runs, `commnuke_up1`, `commnuke_up2` and `smallexplosiongeneric`, have a `craterMult` of 0, and the driver's `death_ground` lines show the ground round all 4 explosions of the whole match run and all 55 of the fight run within 0.019 elmo of the track's. A game whose death weapon does crater would have it cratered at the frame the unit goes, and the terrain stage puts the track's heights on the corners the track changed.
+- A gadget of the game with a higher layer than the player's can overrule the answer, since the handler calls the lowest layer first. In Splinter Faction none did: the driver, which is called first and so sees the engine's own damage, counts the hits it would have done and the damage that was done after all the gadgets.
 
 ## Game adapters
 
@@ -490,8 +518,9 @@ What a whole match did with no adapter, on engine `2026.07.01-102-g6e5c5a0`, and
 | A container was left where a unit died, picked at random, and also where a seek removed a unit | `unit_deathContainerSpawn.lua`. The track has the containers the match left | the gadget is switched off |
 | A menu that gives units and resources to another team | `gui_static_sharemenu.lua` | the widget is switched off, and the menu's Sharing button then does nothing |
 | A strip of buttons for the selection drew under the timeline | `gui_static_selected_units_buttons.lua`, which sits at the bottom centre of the view | the widget is switched off |
-| A wounded unit healed while the time stood still | the engine's idle healing and `unit_auto_health_regeneration.lua` | nothing. The player puts health back, for every game |
-| A feature of the track was destroyed a moment early | the death explosion of a unit that died while the match was watched | nothing yet. The player makes it again on the next frame (issue #3987) |
+| A wounded unit healed while the time stood still | `unit_auto_health_regeneration.lua`, which sets a commander's health once a second. The game turns the engine's own healing off in `alldefs_post.lua` | the gadget is switched off. The player stops the engine's healing for every game ([Nothing heals](#nothing-heals)) |
+| A heal station healed the units round it and drew the heal effect on each | `unit_area_heal_radius.lua` | the gadget is switched off |
+| A feature of the track was destroyed a moment early | the death explosion of a unit that died while the match was watched | nothing needed. The player's `FeaturePreDamaged` gives it no damage ([Death explosions](#death-explosions)) |
 
 With `game_spawn.lua` off, a team would keep the engine's own storage of 1,000,000 and the resource bars would read 0/1000000. The adapter's `started` hook gives each team what that gadget gave it: the `startmetal` and `startenergy` of the team or of the mod options, and 1000 of each when neither says.
 
@@ -692,9 +721,9 @@ luajit lua/rewind-player/tests/timeline_test.lua
 - `fetch_test.lua` reads a string of 38,400,000 bytes and the fixture with every chunk moved past 16,777,216 bytes. It wraps `string.sub` to raise for a position a 32 bit float does not hold.
 - `clock_test.lua` checks the clock and every message.
 - `rotation_test.lua` checks the pitch, yaw and roll against the engine's own matrix arithmetic, in doubles and with every result rounded to a float.
-- `player_test.lua` checks the stages on tracks made from a table (`tests/fake_track.lua`): what is alive at a time, removal before creation, a seek back past a construction, play in both directions, a missing definition, a nil from `Spring.CreateUnit`, terrain forward and back, and that a frame of play allocates nothing.
+- `player_test.lua` checks the stages on tracks made from a table (`tests/fake_track.lua`): what is alive at a time, removal before creation, a seek back past a construction, play in both directions, a missing definition, a nil from `Spring.CreateUnit`, terrain forward and back, that the engine's own healing (`world.heal` in the stand-in, run between a frame and its post frame) leaves a wounded unit's health alone and its maximum is whole again afterwards, that health which moved anyway is put right and logged once, and that a frame of play allocates nothing.
 - `projectiles_test.lua` checks the projectiles stage: what is in the air at a time, stepping forward and backward, that a seek looks at the shots that can be alive and not the window's list, that a shot lands only while it is watched and with no damage, crater or push, a shell that ends in the air, a bolt that stops, a beam fired once, the fire sound and when it is not played, a weapon the game lacks, an engine with no `Spring.SetProjectileTimeToLive`, a shot the engine ended and an id handed out again, a shot alive across two windows, and that 300 frames of play with 40 shots in the air allocate nothing.
-- `gadget_test.lua` loads the two gadgets the way the engine does.
+- `gadget_test.lua` loads the two gadgets the way the engine does. That includes the gadget's answers of no damage for units and for features, and its post frame.
 - `adapter_test.lua` checks how the player reads an adapter, that it never creates a hidden unit or skipped feature and says nothing about either, that each hook is called with the right arguments and a hook that raises is switched off, the log line, and that 60 frames of play with hooks allocate nothing.
 - `engine_test.lua` is made from the engine table ([Engine calls](#engine-calls)). For every call of every row it takes the call out of the stand-in and plays the fixture track, and it checks the table against the source with `tests/scan.lua`. The widget's table is tested the same way in `timeline_test.lua`.
 - `timeline_test.lua` checks the timeline on a stand-in for `Spring` and `gl`: the message for every key, that a key with Ctrl, Alt or Meta is left alone, the frame a drag seeks to at both ends and between, the time and speed shown, that everything drawn is inside views from 640 by 480 to 3840 by 2160, moving the panel, changing a key, marks, and that 300 draws allocate nothing. It also loads the widget file the way a handler does.
@@ -733,11 +762,23 @@ A fourth test, `a_whole_splinter_faction_match_plays_with_its_adapter`, is not p
 
 It was run on a match of 23,091 frames on All That Glitters v2.2.3, with up to 54 units at the frames the driver looked at, recorded from a replay of 24 August 2026. Once on the game the replay was played on, which is the game's repository at that day's commit and declares `$VERSION`, and once on Splinter Faction 0.1.89 standing in for it. Both times:
 
-- With no adapter the four gadgets load, a commander is spawned that the track does not have and a team is asked to be killed.
-- With the adapter none of the four loads, nothing is spawned, no team is asked for, the match is not asked to end, no team is dead and the engine does not hold the match to be over.
+- With no adapter the gadgets the adapter names load, a commander is spawned that the track does not have and a team is asked to be killed.
+- With the adapter none of them loads, nothing is spawned, no team is asked for, the match is not asked to end, no team is dead and the engine does not hold the match to be over.
 - At both ends of play, at the ten seeks, past the death and after the wounded unit was held, the engine has the track's units and features, each unit where and how the track has it.
 - No Lua raised once the match was running, apart from `cus_gl4.lua`, the game's unit shader gadget. It calls `gl.SetUnitBufferUniforms` for every unit created, which a headless engine does not have, so it raised 664 times in a run. In an engine with a window it did not raise once.
 - With the player as it was before this test, the wounded unit, at 8.5% of its health, was 4.3% of its maximum higher after the 450 frames.
+
+Issues #3986 and #3987 added to this test and ran it again on Splinter Faction 0.1.89 standing in for the game, with the two gadgets of the adapter that heal now named in it. A second test gadget, `tests/headless/health_probe.lua`, has layer -50. It reads the held unit's health at the start of every `GameFrame`, which is after Splinter Faction's regeneration gadget (layer -100) and before the player's correction, and at the start of every `GameFramePost`, where the engine's own healing of that frame would show. It also reads the unit's maximum at each `GameFrame`. Over the 450 frames, for the unit at 1309.088 health:
+
+| Player and adapter | Health changed at a `GameFrame` start | Changed at a `GameFramePost` start | Maximum not whole | The player's line |
+| --- | --- | --- | --- | --- |
+| Before, with the adapter as it was | 12 frames, 60 each, by the regeneration gadget | 0 | not read | none, the player put it back silently |
+| Now, no adapter | 11 frames, 60 each, by the regeneration gadget | 0 | 0 | once |
+| Now, with the adapter | 0 | 0 | 0 | none |
+
+Splinter Faction turns the engine's own healing off, so none of those rows has the engine healing a unit. The test `the_engine_does_not_heal_a_wounded_unit` runs the same hold with no adapter on a scratch game on top of Splinter Faction 0.1.89 whose `Gamedata/alldefs_post.lua` is the game's with `autoheal` and `idleautoheal` at 20 (the unit definition then reads 10 for each) and whose two healing gadgets are files that return `false`. With the player as it was, the engine raised the unit's health by 20 on 30 of the 450 frames, seen at both readings, and the player put it back on the next frame. Now the engine raises it on none, the maximum is whole at the start of every frame, and the player logs nothing.
+
+For a unit's death, the driver counts the hits a death's explosion makes on features before any gadget is asked and the damage that is done after all of them. In the whole match, the death at frame 9,514 reached 7 features. Before the gadget answered `FeaturePreDamaged`, all 7 were damaged, and 0 are now. The explosions the driver counts went from 0 to 2 across the death, so the effect still shows. In the fight of the shots test, a death reached 2 features in each pass at 1x, 0.5x and 2x and damaged none, and the line about a destroyed feature was not logged. The mean frame of work was 0.337 ms before and after in the whole match, with the slowest 29 ms before and 27 ms after.
 
 A fifth test, `the_shots_of_a_whole_match_follow_the_track`, wants the same replay and runs the driver's shots plan on it with the shipped adapter (issue #3795). On the match above, whose shots are 195 rockets and 83 laser bolts fired between frames 20,256 and 23,048:
 

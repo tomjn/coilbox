@@ -38,6 +38,14 @@ return {
 		-- unit a seek removes as well, and the track has the containers the
 		-- match left.
 		"unit_deathContainerSpawn.lua",
+		-- The track owns health, and these two raise it. The first sets a
+		-- commander's health once a second after it has gone without damage, the
+		-- second heals the allied units around a heal station and draws the heal
+		-- effect on each. Neither tells anybody, and nothing a viewer reads depends
+		-- on them. The game turns the engine's own healing off in
+		-- alldefs_post.lua, so these are all there is.
+		"unit_auto_health_regeneration.lua",
+		"unit_area_heal_radius.lua",
 	},
 
 	widgets = {
