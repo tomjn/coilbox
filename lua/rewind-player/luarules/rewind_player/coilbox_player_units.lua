@@ -13,6 +13,16 @@
 -- the tables handed to the engine are made once and written to, and the units
 -- are walked with `next`, because synced `pairs` makes a closure for each call.
 --
+-- A seek can need hundreds of units made or removed, and the engine takes the
+-- time it takes for each (issue #3988). The stage does at most `budget` of them
+-- in a frame, creations and removals together, and the rest wait for the next
+-- frames. Removals come first: while any is left, nothing is made. A stage that
+-- has left work says so with `unsettled`, and `worked` is how many it did in
+-- the frame, which the gadget tells its unsynced half, which times the frame and
+-- works out the budget (see coilbox_rewind_player.lua). Every frame works out
+-- what is wanted at `t` from nothing, so a seek that arrives while another
+-- settles needs no special care.
+--
 -- The game's adapter can hide a unit definition, which is then never created,
 -- and can ask to be told when a unit is created and put in place (issue #3799).
 --
@@ -114,6 +124,13 @@ function M.new(context, rotation)
 		-- Units somebody else created since the last frame.
 		strangers = {},
 		strangerCount = 0,
+		-- The most units made or removed in a frame, how many were in this one,
+		-- and whether the frame left some for the next. `removing` is whether a
+		-- removal was left.
+		budget = math.huge,
+		worked = 0,
+		unsettled = false,
+		removing = false,
 		creating = false,
 		destroying = false,
 		lostReported = false,
@@ -123,6 +140,11 @@ function M.new(context, rotation)
 		buildArg = { health = 0, build = 0 },
 		onArg = { 0 },
 	}, Units)
+end
+
+--- Sets the most units made or removed in a frame, which is at least one.
+function Units:setBudget(count)
+	self.budget = math.max(1, count)
 end
 
 function Units:forget(serial, unitID)
@@ -273,6 +295,8 @@ end
 -- stage before anything is created, because after a seek a building may stand
 -- where another stood earlier.
 function Units:remove(t, clock)
+	self.worked = 0
+	self.removing = false
 	local track = self.track
 	local w, why = track:seek(t)
 	if not w then
@@ -292,19 +316,31 @@ function Units:remove(t, clock)
 	-- A unit that dies while somebody watches dies with the game's death effect.
 	local loud = clock:watched()
 	local indexOf = self.indexOf
+	local budget = self.budget
 	for serial, unitID in next, self.unitOf do
 		local i = indexOf[serial]
 		if not i or not w:unitExistsAt(i, t) then
+			if self.worked >= budget then
+				self.removing = true
+				break
+			end
+			self.worked = self.worked + 1
 			self:destroy(serial, unitID, loud)
 		end
 	end
 
 	local strangers = self.strangers
-	for n = self.strangerCount, 1, -1 do
+	local n = self.strangerCount
+	while n > 0 and self.worked < budget do
+		self.worked = self.worked + 1
 		self:evict(strangers[n])
 		strangers[n] = nil
+		n = n - 1
 	end
-	self.strangerCount = 0
+	self.strangerCount = n
+	if n > 0 then
+		self.removing = true
+	end
 end
 
 --- Creates unit `i` of window `w` at the transform already sampled, and gives
@@ -320,6 +356,7 @@ function Units:create(w, i, serial, nanoframe, t)
 	end
 	local team = self.context.teamOf(w.unitTeam[i])
 	local at = self.transform
+	self.worked = self.worked + 1
 	self.creating = true
 	-- The ground is the track's, so the engine is not to flatten it.
 	local unitID = Spring.CreateUnit(id, at[1], at[2], at[3], 0, team, nanoframe, false)
@@ -424,13 +461,16 @@ function Units:applyStatus(w, i, serial, unitID, t)
 	return unitID
 end
 
---- Creates every unit of the track at `t` that is not there, and puts each one
--- where the track has it.
+--- Creates every unit of the track at `t` that is not there, as far as the
+-- budget goes, and puts each one where the track has it. A unit the budget
+-- leaves is made on a later frame, where the track has it then.
 function Units:place(t, clock)
 	local w = self.window
+	self.unsettled = self.removing
 	if not w then
 		return
 	end
+	local budget, defID = self.budget, self.defID
 	local unitOf, failed, held = self.unitOf, self.failed, self.held
 	local transform, status = self.transform, self.status
 	local MoveCtrl, euler = self.MoveCtrl, self.euler
@@ -440,7 +480,11 @@ function Units:place(t, clock)
 		if w:unitExistsAt(i, t) then
 			local serial = serials[i]
 			local unitID = unitOf[serial]
-			if (unitID or not failed[serial]) and w:sampleTransform(i, t, transform) and w:sampleStatus(i, t, status) then
+			if not unitID and not failed[serial] and defID[w.unitDef[i] + 1] and (self.removing or self.worked >= budget) then
+				-- Nothing is made while a removal is left, and a definition the
+				-- game lacks costs nothing, so it is not held back.
+				self.unsettled = true
+			elseif (unitID or not failed[serial]) and w:sampleTransform(i, t, transform) and w:sampleStatus(i, t, status) then
 				local made = not unitID
 				if unitID and held[serial] then
 					self:release(serial, unitID)

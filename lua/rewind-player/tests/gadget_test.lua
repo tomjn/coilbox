@@ -37,7 +37,9 @@ local function synced(file, w, files)
 end
 
 --- The same as the unsynced half. `clock` is a table whose `now` is the time
--- in milliseconds that the timers read.
+-- in milliseconds that the timers read. With `micros` set the engine has
+-- `Spring.GetTimerMicros`, and the timers read microseconds. The messages the
+-- gadget sends are collected in `clock.messages`.
 local function unsynced(file, lines, clock)
 	local env = t.unsyncedEnv()
 	env.gadget = {}
@@ -54,11 +56,24 @@ local function unsynced(file, lines, clock)
 		GetTimer = function()
 			return clock.now
 		end,
-		DiffTimers = function(a, b, milliseconds)
+		DiffTimers = function(a, b, milliseconds, fromMicroseconds)
 			assert(milliseconds == true, "the gadget did not ask for milliseconds")
+			if clock.micros then
+				assert(fromMicroseconds == true, "the gadget read microsecond timers as milliseconds")
+				return (a - b) / 1000
+			end
 			return a - b
 		end,
+		SendLuaRulesMsg = function(text)
+			clock.messages[#clock.messages + 1] = text
+		end,
 	}
+	clock.messages = clock.messages or {}
+	if clock.micros then
+		env.Spring.GetTimerMicros = function()
+			return clock.now * 1000
+		end
+	end
 	local chunk = assert(loadfile(GADGETS .. file))
 	setfenv(chunk, env)
 	local returned = chunk()
@@ -67,6 +82,20 @@ end
 
 local PLAYER = "coilbox_rewind_player.lua"
 local GUARD = "!coilbox_rewind_guard.lua"
+
+--- Runs the gadget's frames from `frame` until the player says the world is
+-- settled, and gives the number of the last. The gadget starts with a budget of
+-- one unit a frame, until its unsynced half has timed some work (issue #3988).
+local function settle(gadget, w, frame)
+	for _ = 1, 50 do
+		gadget:GameFrame(frame)
+		if w.params.coilbox_rewind_settled == 1 then
+			return frame
+		end
+		frame = frame + 1
+	end
+	error("the gadget never settled")
+end
 
 -- The player opens the track and says so.
 
@@ -89,15 +118,22 @@ do
 
 	t.same("nothing is created before the first frame", w.unitCount(), 0)
 	gadget:GameFrame(1)
-	t.same("the first frame makes the track's first frame", w.unitCount(), 3)
-	t.same("with its features", #w.Spring.GetAllFeatures(), 5)
+	t.same("the first frame makes one unit, the budget the gadget starts with", w.unitCount(), 1)
+	t.same("and all of the features", #w.Spring.GetAllFeatures(), 5)
 	t.same("the unsynced half is told when the work starts and ends", w.sent, 2)
 	t.same("by the name it listens for", w.sentName, "coilbox_rewind_work")
+	t.same("with how many units the frame made", w.sentWorked, 1)
 	t.same("the frame is published", w.params.coilbox_rewind_frame, h.firstFrame)
+	t.same("the world is not settled yet", w.params.coilbox_rewind_settled, 0)
+	local frame = settle(gadget, w, 2)
+	t.same("a few frames later it makes the track's first frame", w.unitCount(), 3)
+	t.same("and is settled", w.params.coilbox_rewind_settled, 1)
+	t.same("the last of them made one", w.sentWorked, 1)
 
 	t.same("a message for the player is taken", gadget:RecvLuaMsg("coilbox_rewind:seek 800", 0), true)
 	t.same("a message for something else is not", gadget:RecvLuaMsg("somebody:else", 0), false)
-	gadget:GameFrame(2)
+	t.same("the budget message is the player's", gadget:RecvLuaMsg("coilbox_rewind_budget:50", 0), true)
+	frame = settle(gadget, w, frame + 1)
 	t.same("the seek is where the next frame is", w.params.coilbox_rewind_frame, 800)
 	t.same("with the units of that frame", w.unitCount(), 4)
 
@@ -111,7 +147,7 @@ do
 	t.same("the engine is refused a wreck", gadget:AllowFeatureCreation(1, 0, 0, 0, 0), false)
 
 	w.Spring.CreateUnit("armpw", 0, 0, 0, 0, 0, false, false)
-	gadget:GameFrame(3)
+	gadget:GameFrame(frame + 1)
 	t.same("a unit the base game creates is gone on the next frame", w.unitCount(), 4)
 	w.Spring.KillTeam(1)
 	t.check("a team that dies is logged", w.lines[#w.lines]:find("team 1 died", 1, true) ~= nil, w.lines[#w.lines])
@@ -129,7 +165,7 @@ do
 	w.gadget = gadget
 	gadget:Initialize()
 	t.check("the adapter is named in the log", w.lines[1]:find("COILBOX_REWIND_PLAYER adapter loaded: Test game.", 1, true) == 1, w.lines[1])
-	gadget:GameFrame(1)
+	settle(gadget, w, 1)
 	t.same("a hidden definition is not created", w.unitNamed("armpw"), nil)
 	t.same("the others are", w.unitCount(), 2)
 	t.same("a skipped feature is not created", #w.Spring.GetAllFeatures(), 0)
@@ -145,7 +181,7 @@ do
 		w.lines[1],
 		"COILBOX_REWIND_PLAYER adapter loaded: none. it was not for this game"
 	)
-	gadget:GameFrame(1)
+	settle(gadget, w, 1)
 	t.same("and the match still plays", w.unitCount(), 3)
 end
 
@@ -154,7 +190,7 @@ do
 	local gadget = synced(PLAYER, w, { [TRACK] = bytes, ["coilbox_rewind/adapter.lua"] = "error('broken')" })
 	gadget:Initialize()
 	t.check("an adapter file that raises is logged", w.lines[1]:find("adapter loaded: none. the adapter file raised", 1, true) ~= nil, w.lines[1])
-	gadget:GameFrame(1)
+	settle(gadget, w, 1)
 	t.same("and the match still plays", w.unitCount(), 3)
 end
 
@@ -211,6 +247,56 @@ do
 	t.same("the first slow frame after it is logged", #lines, 2)
 	t.check("with how many there were and the slowest", lines[2]:find("30 slow since the last line, the slowest 80.0 ms", 1, true) ~= nil, lines[2])
 	t.same("a message that is somebody else's is left", gadget:RecvFromSynced("other", 1, 9), false)
+end
+
+-- The unsynced half reads microseconds when the engine has them.
+
+do
+	local lines, clock = {}, { now = 0, micros = true }
+	local gadget = unsynced(PLAYER, lines, clock)
+	gadget:RecvFromSynced("coilbox_rewind_work", 0, 1)
+	clock.now = clock.now + 34.5
+	gadget:RecvFromSynced("coilbox_rewind_work", 1, 1, 0)
+	t.same("a frame is timed in microseconds when the engine can", #lines, 1)
+	t.check("to a fraction of a millisecond", lines[1]:find("took 34.5 ms", 1, true) ~= nil, lines[1])
+end
+
+-- The unsynced half works out how many units a frame may make or remove
+-- (issue #3988). It is sent back as a message to the synced half, which has no
+-- clock. Half a simulation frame is 16.7 ms.
+
+do
+	local lines, clock = {}, { now = 0 }
+	local gadget = unsynced(PLAYER, lines, clock)
+	local frame = 0
+	local function work(milliseconds, worked)
+		frame = frame + 1
+		gadget:RecvFromSynced("coilbox_rewind_work", 0, frame)
+		clock.now = clock.now + milliseconds
+		gadget:RecvFromSynced("coilbox_rewind_work", 1, frame, worked)
+	end
+	local function said()
+		return table.concat(clock.messages, " ")
+	end
+	work(5, 0)
+	t.same("a frame that made and removed nothing says nothing", #clock.messages, 0)
+	work(1, 1)
+	t.same("a unit a millisecond fits 16 in half a frame, but the budget at most doubles from one", said(), "coilbox_rewind_budget:2")
+	work(2, 2)
+	work(4, 4)
+	work(8, 8)
+	t.same("each frame of a seek doubles it", said(), "coilbox_rewind_budget:2 coilbox_rewind_budget:4 coilbox_rewind_budget:8 coilbox_rewind_budget:16")
+	work(16, 16)
+	t.same("a budget that does not change is not sent again", #clock.messages, 4)
+	work(48, 16)
+	t.same("a frame that took 3 ms a unit cuts it to 5", clock.messages[5], "coilbox_rewind_budget:5")
+	t.same("and the slow frame is logged as before", #lines, 1)
+	work(0.5, 5)
+	t.same("a cheap frame of a few units cannot more than double it", clock.messages[6], "coilbox_rewind_budget:10")
+	work(0, 10)
+	t.same("a frame the timer read as no time at all does not divide by nothing", clock.messages[7], "coilbox_rewind_budget:20")
+	work(60, 2)
+	t.same("a budget is never below one", clock.messages[8], "coilbox_rewind_budget:1")
 end
 
 -- The guard.

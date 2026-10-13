@@ -753,9 +753,9 @@ function M.new(options)
 			constructionDecay = options.constructionDecay == true,
 			constructionDecaySpeed = 0.03,
 		},
-		SendToUnsynced = function(name, phase)
+		SendToUnsynced = function(name, phase, _, worked)
 			world.sent = world.sent + 1
-			world.sentName, world.sentPhase = name, phase
+			world.sentName, world.sentPhase, world.sentWorked = name, phase, worked
 		end,
 		next = next,
 	}

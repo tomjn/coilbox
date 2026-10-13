@@ -26,6 +26,13 @@
 -- and not a message, so it costs no frame), and the unsynced half logs a line
 -- when it took longer than one simulation frame lasts.
 --
+-- The same timing sets how much a seek may do in one frame (issue #3988). A
+-- seek can need hundreds of units made or removed, at a cost for each that only
+-- the engine knows. The synced half says how many it made or removed in the
+-- frame, the unsynced half works out how many fit in half a simulation frame
+-- and sends that back as a Lua message, and the player does no more than that
+-- in a frame until it hears another. The player starts at one.
+--
 -- The base game's own gadgets still run, except those the game's adapter
 -- switches off (issue #3799). !coilbox_rewind_guard.lua stops the rest killing a
 -- team or ending the match.
@@ -48,6 +55,14 @@ local PREFIX = "COILBOX_REWIND_PLAYER "
 
 --- What the synced half sends the unsynced one around a frame's work.
 local WORK = "coilbox_rewind_work"
+
+--- What the player does in a frame until the unsynced half has timed some work:
+-- the least that makes progress.
+local FIRST_BUDGET = 1
+
+--- The Lua message that sets the player's budget, which is
+-- `Player.BUDGET` in coilbox_player.lua.
+local BUDGET = "coilbox_rewind_budget:"
 
 if gadgetHandler:IsSyncedCode() then
 	local player
@@ -77,6 +92,7 @@ if gadgetHandler:IsSyncedCode() then
 		local adapter, adapterWhy = Adapter.load(VFS)
 		local made, madeWhy = Player.new(track, {
 			modOptions = Spring.GetModOptions(),
+			budget = FIRST_BUDGET,
 			log = log,
 			adapter = adapter,
 			adapterWhy = adapterWhy,
@@ -110,7 +126,7 @@ if gadgetHandler:IsSyncedCode() then
 		end
 		SendToUnsynced(WORK, 0, frame)
 		player:frame()
-		SendToUnsynced(WORK, 1, frame)
+		SendToUnsynced(WORK, 1, frame, player:worked())
 	end
 
 	function gadget:RecvLuaMsg(message)
@@ -186,23 +202,52 @@ else
 	-- frames, so a run of them does not make itself slower.
 	local QUIET_FRAMES = Game.gameSpeed
 
+	-- Half a frame is what a seek's work aims at. The rest of the frame is the
+	-- engine's own simulation and drawing, and the slow frame line is what says
+	-- whether that left enough.
+	local TARGET = LIMIT / 2
+
+	-- Microseconds where the engine has them, which it does from 2025.01.1. The
+	-- other timer gives whole milliseconds.
+	local micros = Spring.GetTimerMicros ~= nil
+	local clock = Spring.GetTimerMicros or Spring.GetTimer
+
 	local started
 	local lastLine
 	local slow, worst = 0, 0
+	-- How many units a frame may make or remove, as last sent.
+	local budget = FIRST_BUDGET
 
-	function gadget:RecvFromSynced(name, phase, frame)
+	--- A frame made or removed `worked` units in `took` milliseconds. Each took
+	-- that long with the rest of the frame's work counted in, which only makes it
+	-- more, so the budget errs low. It at most doubles in a frame, because a few
+	-- units say little about the next many, and it is never below one.
+	local function retune(took, worked)
+		local each = math.max(took / worked, 0.001)
+		local wanted = math.floor(TARGET / each)
+		local count = math.max(1, math.min(wanted, 2 * math.max(worked, budget)))
+		if count ~= budget then
+			budget = count
+			Spring.SendLuaRulesMsg(BUDGET .. count)
+		end
+	end
+
+	function gadget:RecvFromSynced(name, phase, frame, worked)
 		if name ~= WORK then
 			return false
 		end
 		if phase == 0 then
-			started = Spring.GetTimer()
+			started = clock()
 			return true
 		end
 		if not started then
 			return true
 		end
-		local took = Spring.DiffTimers(Spring.GetTimer(), started, true)
+		local took = Spring.DiffTimers(clock(), started, true, micros)
 		started = nil
+		if worked and worked > 0 then
+			retune(took, worked)
+		end
 		if took <= LIMIT then
 			return true
 		end

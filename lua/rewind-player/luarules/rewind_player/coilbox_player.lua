@@ -54,7 +54,14 @@ M.PARAMS = {
 	firstFrame = "coilbox_rewind_first_frame",
 	lastFrame = "coilbox_rewind_last_frame",
 	framesPerSecond = "coilbox_rewind_frames_per_second",
+	-- 1 when the world is the track at the time shown, 0 from a seek until it is.
+	-- A seek can take several frames (issue #3988).
+	settled = "coilbox_rewind_settled",
 }
+
+--- A Lua message that sets the most units made or removed in a frame, and the
+-- text it starts with. The gadget's unsynced half sends it.
+M.BUDGET = "coilbox_rewind_budget:"
 
 --- The mod options the player reads.
 M.OPTIONS = {
@@ -77,13 +84,15 @@ end
 
 local function publishClock(self)
 	local clock, P = self.clock, M.PARAMS
+	publish(self, P.settled, self:settled() and 1 or 0)
 	publish(self, P.frame, clock.frame)
 	publish(self, P.playing, clock.playing and 1 or 0)
 	publish(self, P.direction, clock.direction)
 	publish(self, P.speed, clock.speed)
 end
 
---- A player of `track`, or nil and the reason. `options.modOptions` is what
+--- A player of `track`, or nil and the reason. `options.budget` is the most
+-- units a frame makes or removes, and without it there is no limit. `options.modOptions` is what
 -- `Spring.GetModOptions` gave and `options.log` takes a line for the engine's
 -- log. `options.adapter` is the game's adapter as coilbox_player_adapter.lua
 -- reads it, or nil for a game with none, and `options.adapterWhy` is the reason
@@ -168,6 +177,9 @@ function M.new(track, options)
 	local terrain = Terrain.new(context, Reader)
 	local featureStage = Features.new(context, Rotation)
 	local units = Units.new(context, Rotation)
+	if options.budget then
+		units:setBudget(options.budget)
+	end
 	local projectiles = Projectiles.new(context, units, Clock)
 
 	local self = setmetatable({
@@ -234,9 +246,29 @@ function Player:framePost()
 	self.units:afterSim()
 end
 
+--- Whether the world is the track at the time shown: no seek is waiting to be
+-- shown and no stage left work for a later frame.
+function Player:settled()
+	return not self.clock.pending and not self.units.unsettled and not self.projectiles.unsettled
+end
+
+--- How many units the last frame made or removed.
+function Player:worked()
+	return self.units.worked
+end
+
 --- A Lua message. True when it was the player's, done or refused, and false
 -- when it was somebody else's.
 function Player:message(text)
+	if text:sub(1, #M.BUDGET) == M.BUDGET then
+		local count = tonumber(text:sub(#M.BUDGET + 1))
+		if count and count >= 1 and count < math.huge and count == math.floor(count) then
+			self.units:setBudget(count)
+		else
+			self.log("the message \"" .. text .. "\" was refused: the budget is a whole number of 1 or more")
+		end
+		return true
+	end
 	local done, why = self.clock:message(text)
 	if done == nil then
 		return false

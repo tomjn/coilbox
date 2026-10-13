@@ -171,6 +171,8 @@ function M.new(context, units, clock)
 		window = nil,
 		from = 1,
 		to = 0,
+		-- Whether the last frame left a shot to make for want of its unit.
+		unsettled = false,
 		-- Simulation frames the engine has run, which is what a time to live
 		-- counts.
 		tick = 0,
@@ -279,9 +281,29 @@ local function owner(self, w, p)
 	return -1
 end
 
+--- Whether shot `p` has to wait for the unit that fired it: the unit is in the
+-- track now and the units stage has not made it yet (issue #3988). A shot made
+-- before its unit would have no owner for good.
+function Projectiles:waits(w, p)
+	local shooter = w.projectileShooter[p]
+	if shooter == 0 then
+		return false
+	end
+	local units = self.units
+	local serial = w.unitSerial[shooter]
+	if units.unitOf[serial] or units.failed[serial] or not w:unitExistsAt(shooter, self.shown) then
+		return false
+	end
+	self.unsettled = true
+	return true
+end
+
 --- Creates a held projectile for shot `p` at a place and a velocity, and gives
--- its id, or nil when the engine gave none.
+-- its id, or nil when the engine gave none or the shot is waiting for its unit.
 function Projectiles:create(w, p, d, serial, x, y, z, vx, vy, vz)
+	if self:waits(w, p) then
+		return nil
+	end
 	local Spring = self.Spring
 	local arg = self.spawnArg
 	local at, speed, target = arg.pos, arg.speed, arg["end"]
@@ -380,6 +402,9 @@ function Projectiles:birth(w, p, t, step, watched)
 		-- Fired once, for the frames the track has it at the speed of play. The
 		-- engine fades it. A beam is as bright at its start as its weapon and
 		-- dimmer along its range (CBeamLaser::FireInternal).
+		if self:waits(w, p) then
+			return
+		end
 		local arg = self.beamArg
 		local at, target = arg.pos, arg["end"]
 		at[1], at[2], at[3] = s[1], s[2], s[3]
@@ -575,6 +600,7 @@ end
 --- Creates every shot of the track at `t` that is not in the air, and puts
 -- each one where the track has it.
 function Projectiles:place(t, clock)
+	self.unsettled = false
 	self:show(t, clock)
 	-- The engine now takes a frame off every time to live.
 	self.tick = self.tick + 1

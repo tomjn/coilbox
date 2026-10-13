@@ -68,6 +68,8 @@ local PATIENCE = 300
 local WHOLE_MATCH = "coilbox_rewind/driver_whole_match.lua"
 -- And one that asks for the plan that looks at a match's shots.
 local SHOTS = "coilbox_rewind/driver_shots.lua"
+-- And one that asks for the plan of seeks across the whole match (issue #3988).
+local SEEKS = "coilbox_rewind/driver_seeks.lua"
 
 local Track = VFS.Include("luarules/rewind_player/coilbox_track.lua")
 local Fetch = VFS.Include("luarules/rewind_player/coilbox_track_fetch.lua")
@@ -940,6 +942,40 @@ local function matchPlan()
 	end)
 end
 
+--- The plan for seeks across a whole match (issue #3988): from the first frame
+-- to its last minutes, back, to the end, back, and again, each waited for until
+-- the player says the world has caught up. Each says how many simulation
+-- frames the world took to settle and what the engine has against the track.
+-- The player's own slow frame lines in the log say whether a frame took too
+-- long, and the work line at the end has the slowest.
+local function seeksPlan()
+	local h = track.header
+	local first, last = h.firstFrame, h.lastFrame
+	local late = math.max(first, last - 10 * h.framesPerSecond)
+	say(string.format("start first=%d last=%d tolerance=%s step=%s rotation_bits=%d", first, last, tostring(h.tolerance), tostring(h.positionStep), h.rotationBits))
+	send("pause")
+	seekTo(first)
+	for n, frame in ipairs({ late, first, last, first, late, last, first, late }) do
+		local sent
+		push("run", function()
+			sent = Spring.GetGameFrame()
+		end)
+		send("seek " .. frame)
+		push("await", frame)
+		push("settled")
+		push("run", function()
+			say(string.format("seek_settle n=%d to=%d frames=%d settled=%s", n, frame, Spring.GetGameFrame() - sent, tostring((param("settled")))))
+		end)
+		push("wait", SETTLE)
+		push("run", function()
+			measure("seeks n=" .. n, frame)
+		end)
+	end
+	push("run", function()
+		SendToUnsynced(REPORT)
+	end)
+end
+
 local function plan()
 	local h = track.header
 	local first, last = h.firstFrame, h.lastFrame
@@ -1056,7 +1092,9 @@ function gadget:GameFrame()
 		info, features = assert(track:info()), assert(track:features())
 		-- The test that wants a whole match played writes this file beside the
 		-- track. Without it the plan is the fixture match's.
-		if VFS.FileExists(SHOTS) then
+		if VFS.FileExists(SEEKS) then
+			seeksPlan()
+		elseif VFS.FileExists(SHOTS) then
 			shotPlan()
 		elseif VFS.FileExists(WHOLE_MATCH) then
 			matchPlan()
@@ -1078,6 +1116,15 @@ function gadget:GameFrame()
 					return
 				end
 				say("lost frame=" .. tostring(item.a) .. " shown=" .. tostring(param("frame")))
+			end
+		elseif item.kind == "settled" then
+			-- A player that publishes no such parameter has nothing to wait for.
+			if param("settled") == 0 then
+				item.waited = item.waited + 1
+				if item.waited < PATIENCE then
+					return
+				end
+				say("lost settle")
 			end
 		elseif item.kind == "each" then
 			-- A function run on each of a number of frames.
