@@ -136,6 +136,9 @@ pub struct AnalysisRequest {
     /// Another installed version of the replay's game to depend on, when the
     /// exact one is not installed. `None` depends on the one the replay names.
     pub game: Option<String>,
+    /// The base game's modinfo short name, when the caller already knows it.
+    /// `None` reads it from the installed game, which is what the app does.
+    pub game_short_name: Option<String>,
     /// Where to make this run's scratch folder. Under the app's cache directory
     /// in the app.
     pub scratch_root: PathBuf,
@@ -364,6 +367,25 @@ fn analyse_with(
         ));
     }
 
+    // The replay's start script names the game and its version and never its
+    // short name, so the engine fills `Game.gameShortName` from the game it
+    // loads. The analysis game takes the base game's, or a gadget that branches
+    // on it plays a different match (issue #3943).
+    let short_name = match &request.game_short_name {
+        Some(name) => name.clone(),
+        None => tauri_plugin_coilbox_unitsync::game_short_name_blocking(
+            &request.engine_dir.to_string_lossy(),
+            &request
+                .data_dirs
+                .iter()
+                .map(|dir| dir.to_string_lossy())
+                .collect::<Vec<_>>()
+                .join(&coilbox_proc::DATADIR_SEP.to_string()),
+            &base_game,
+        )
+        .map_err(|e| format!("could not read the short name of {base_game}: {e}"))?,
+    };
+
     let recording = match &request.record {
         Some(_) => Some(recording_for(&request.replay)?),
         None => None,
@@ -375,7 +397,7 @@ fn analyse_with(
     let demo = scratch.dir.join("replay.sdfz");
     let engine_log = scratch.dir.join("engine.log");
 
-    game::write_game(&data, &base_game, logger, recording.as_ref())?;
+    game::write_game(&data, &base_game, &short_name, logger, recording.as_ref())?;
     super::retarget::write_retargeted(&request.replay, &demo, &game::gametype())?;
 
     // The scratch folder first, so nothing in a content folder can stand in
@@ -588,6 +610,7 @@ mod tests {
                     engine_dir: self.dir.path().join("engine"),
                     data_dirs: vec![self.dir.path().join("content")],
                     game: game.map(str::to_string),
+                    game_short_name: Some("some_game".to_string()),
                     scratch_root: self.scratch_root(),
                     timeout,
                     record: self.record.clone(),
@@ -1015,6 +1038,7 @@ mod tests {
         assert_eq!(run.report.status, AnalysisStatus::Reproduced);
         let modinfo = std::fs::read_to_string(witness.join("modinfo.lua")).unwrap();
         assert!(modinfo.contains("    \"Some Game 1.0\","), "{modinfo}");
+        assert!(modinfo.contains("shortname = \"some_game\","), "{modinfo}");
 
         // The copy the engine played names the analysis game in its header,
         // and still decodes to the match the original recorded.
@@ -1092,6 +1116,7 @@ mod tests {
                 engine_dir: world.dir.path().join("no-engine-here"),
                 data_dirs: Vec::new(),
                 game: None,
+                game_short_name: Some("some_game".to_string()),
                 scratch_root: world.scratch_root(),
                 timeout: LONG,
                 record: None,
@@ -1132,6 +1157,7 @@ mod tests {
                 engine_dir: world.dir.path().join("engine"),
                 data_dirs: Vec::new(),
                 game: None,
+                game_short_name: Some("some_game".to_string()),
                 scratch_root: world.scratch_root(),
                 timeout: LONG,
                 record: None,
@@ -1286,7 +1312,19 @@ end
         let scratch = tempfile::tempdir().unwrap();
         let data = scratch.path().join("data");
         let write_dir = scratch.path().join("write");
-        let game = game::write_game(&data, &base_game, game::LOGGER, None).unwrap();
+        let game = game::write_game(
+            &data,
+            &base_game,
+            &tauri_plugin_coilbox_unitsync::game_short_name_blocking(
+                &engine_dir,
+                &data_dirs,
+                &base_game,
+            )
+            .expect("the base game's short name"),
+            game::LOGGER,
+            None,
+        )
+        .unwrap();
         std::fs::write(
             game.join("luarules/gadgets/coilbox_scratch_match_end.lua"),
             QUIT_GADGET,
@@ -1440,6 +1478,7 @@ end
                     .map(PathBuf::from)
                     .collect(),
                 game: None,
+                game_short_name: None,
                 scratch_root: scratch.path().to_path_buf(),
                 timeout: Duration::from_secs(timeout.parse().expect("seconds")),
                 record: record.clone(),

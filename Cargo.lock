@@ -6373,6 +6373,7 @@ dependencies = [
  "tauri",
  "tauri-plugin",
  "tauri-plugin-coilbox-scenario",
+ "tauri-plugin-coilbox-unitsync",
  "tempfile",
  "zip 8.6.0",
 ]

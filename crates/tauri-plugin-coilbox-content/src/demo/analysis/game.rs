@@ -13,11 +13,13 @@
 //! tests pin the file list to the files written here: two, and two more for a
 //! run that records.
 //!
-//! The game keeps a name, short name and version of its own. It has to have its
-//! own name, because the name is what the rewritten replay points at, and the
-//! short name follows it the way the test mutator's does. A base game whose
-//! gadgets branch on `Game.gameShortName` or `Game.gameName` will see these and
-//! not its own. The divergence check after every run is what catches a game
+//! The game keeps a name and version of its own. It has to have its own name,
+//! because the name is what the rewritten replay points at. Its short name is
+//! the base game's, because the replay's start script does not carry one and
+//! the engine fills `Game.gameShortName` from the game it loads. Under a short
+//! name of its own, a Beyond All Reason replay desyncs (issue #3943). A base
+//! game whose gadgets branch on `Game.gameName` will still see the analysis
+//! game's name. The divergence check after every run is what catches a game
 //! where that changes the match.
 
 use std::path::{Path, PathBuf};
@@ -28,7 +30,6 @@ use tauri_plugin_coilbox_scenario::mutator::write_file;
 pub const FOLDER: &str = "coilbox-replay-analysis.sdd";
 
 const NAME: &str = "Coilbox replay analysis";
-const SHORT_NAME: &str = "coilbox_replay_analysis";
 const VERSION: &str = "1";
 
 /// The logger, compiled in so a run needs nothing on disk but the engine.
@@ -99,8 +100,9 @@ fn lua_string(text: &str) -> String {
 }
 
 /// The analysis game's `modinfo.lua`, depending on `base_game`, which is the
-/// `gametype` the replay was recorded with.
-pub fn modinfo(base_game: &str) -> String {
+/// `gametype` the replay was recorded with, and carrying `short_name`, which is
+/// the base game's own.
+pub fn modinfo(base_game: &str, short_name: &str) -> String {
     let description = format!("The coilbox replay logger on top of {base_game}.");
     [
         "-- The game coilbox replays a match in to record what happened.".to_string(),
@@ -108,7 +110,7 @@ pub fn modinfo(base_game: &str) -> String {
         String::new(),
         "return {".to_string(),
         format!("  name = {},", lua_string(NAME)),
-        format!("  shortname = {},", lua_string(SHORT_NAME)),
+        format!("  shortname = {},", lua_string(short_name)),
         format!("  game = {},", lua_string(NAME)),
         format!("  version = {},", lua_string(VERSION)),
         format!("  description = {},", lua_string(&description)),
@@ -131,11 +133,14 @@ pub fn modinfo(base_game: &str) -> String {
 /// the test that perturbs the simulation on purpose to prove the divergence
 /// check notices.
 ///
+/// `short_name` is the base game's modinfo short name.
+///
 /// `recording` adds the rewind recorder and its request. Without it neither
 /// file is written, so a run that does not record plays the game it always did.
 pub fn write_game(
     data_dir: &Path,
     base_game: &str,
+    short_name: &str,
     logger: &str,
     recording: Option<&Recording>,
 ) -> Result<PathBuf, String> {
@@ -143,7 +148,7 @@ pub fn write_game(
         return Err("the replay names no game to depend on".into());
     }
     let dir = data_dir.join("games").join(FOLDER);
-    write_file(&dir.join("modinfo.lua"), &modinfo(base_game))?;
+    write_file(&dir.join("modinfo.lua"), &modinfo(base_game, short_name))?;
     write_file(&dir.join(LOGGER_PATH), logger)?;
     if let Some(recording) = recording {
         write_file(&dir.join(RECORDER_PATH), RECORDER)?;
@@ -181,7 +186,8 @@ mod tests {
     #[test]
     fn the_game_is_a_modinfo_and_one_gadget_and_nothing_else() {
         let data = tempfile::tempdir().expect("tempdir");
-        let dir = write_game(data.path(), "Some Game 1.0", LOGGER, None).expect("write");
+        let dir =
+            write_game(data.path(), "Some Game 1.0", "some_game", LOGGER, None).expect("write");
 
         assert_eq!(dir, data.path().join("games").join(FOLDER));
         // No units, weapons, features or gamedata: anything of that kind would
@@ -198,8 +204,14 @@ mod tests {
     fn a_recording_adds_the_recorder_and_its_request_and_nothing_else() {
         let data = tempfile::tempdir().expect("tempdir");
         let recording = Recording { last_frame: 23200 };
-        let dir =
-            write_game(data.path(), "Some Game 1.0", LOGGER, Some(&recording)).expect("write");
+        let dir = write_game(
+            data.path(),
+            "Some Game 1.0",
+            "some_game",
+            LOGGER,
+            Some(&recording),
+        )
+        .expect("write");
 
         assert_eq!(
             files(&dir),
@@ -232,7 +244,8 @@ mod tests {
     #[test]
     fn the_gadget_written_is_the_one_in_the_repository() {
         let data = tempfile::tempdir().expect("tempdir");
-        let dir = write_game(data.path(), "Some Game 1.0", LOGGER, None).expect("write");
+        let dir =
+            write_game(data.path(), "Some Game 1.0", "some_game", LOGGER, None).expect("write");
 
         let written = std::fs::read_to_string(dir.join(LOGGER_PATH)).expect("read");
         assert_eq!(written, LOGGER);
@@ -241,7 +254,7 @@ mod tests {
 
     #[test]
     fn the_modinfo_depends_on_the_game_the_replay_was_recorded_on() {
-        let text = modinfo("SplinterFaction $VERSION");
+        let text = modinfo("SplinterFaction $VERSION", "SF");
 
         assert!(text.contains("depend = {\n    \"SplinterFaction $VERSION\",\n  },"));
         assert!(text.contains("modtype = 1,"));
@@ -249,9 +262,21 @@ mod tests {
         assert!(text.contains("version = \"1\","));
     }
 
+    /// A replay's start script carries the game's name and version and not its
+    /// short name, so the engine fills `Game.gameShortName` from the game that
+    /// is loaded. Under a short name of its own, BAR's replay of 82,496 frames
+    /// desyncs (issue #3943).
+    #[test]
+    fn the_modinfo_takes_the_base_games_short_name() {
+        let text = modinfo("Beyond All Reason test-30922-8064a43", "BYAR");
+
+        assert!(text.contains("shortname = \"BYAR\","), "{text}");
+        assert!(!text.contains("coilbox_replay_analysis"), "{text}");
+    }
+
     #[test]
     fn a_game_name_with_a_quote_in_it_cannot_end_the_string() {
-        let text = modinfo("Odd \"Game\" \\ 2");
+        let text = modinfo("Odd \"Game\" \\ 2", "x");
 
         assert!(text.contains("    \"Odd \\\"Game\\\" \\\\ 2\","));
     }
@@ -261,13 +286,13 @@ mod tests {
     #[test]
     fn the_gametype_is_the_name_the_engine_gives_the_archive() {
         assert_eq!(gametype(), "Coilbox replay analysis 1");
-        assert!(modinfo("x").contains(&format!("name = \"{NAME}\"")));
+        assert!(modinfo("x", "x").contains(&format!("name = \"{NAME}\"")));
     }
 
     #[test]
     fn a_replay_that_names_no_game_is_refused() {
         let data = tempfile::tempdir().expect("tempdir");
-        assert!(write_game(data.path(), "  ", LOGGER, None).is_err());
+        assert!(write_game(data.path(), "  ", "x", LOGGER, None).is_err());
     }
 
     /// The folder has to be one no real game could have, held to the same shape

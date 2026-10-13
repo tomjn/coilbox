@@ -110,6 +110,7 @@ impl Engine for HeadlessEngine {
                 engine_dir: job.engine_dir.clone(),
                 data_dirs: job.data_dirs.clone(),
                 game: job.game.clone(),
+                game_short_name: None,
                 scratch_root: self.scratch_root.clone(),
                 timeout: run_timeout(job.match_seconds),
                 record: None,
