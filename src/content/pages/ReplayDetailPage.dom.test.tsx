@@ -186,7 +186,7 @@ describe("ReplayDetailPage", () => {
     expect(screen.queryByText("analysis events section")).toBeNull();
   });
 
-  it("says whether the replay's track is current or out of date (#3786)", () => {
+  it("says whether the replay's track is current or out of date (#3786, #3788)", () => {
     const gameId = "00112233445566778899aabbccddeeff";
     FILE = "a.sdfz";
     INFO = { ...LOADED_INFO, gameId };
@@ -194,12 +194,17 @@ describe("ReplayDetailPage", () => {
 
     seedReplayTracksForTests([{ ...track, state: "current" }]);
     const first = renderAt("a.sdfz");
-    expect(screen.queryByText("Track recorded")).not.toBeNull();
+    expect(screen.queryByText(/^Recorded\. The track takes/)).not.toBeNull();
+    // The list's badge is not repeated on the page.
+    expect(screen.queryByText("Track recorded")).toBeNull();
     first.unmount();
 
     seedReplayTracksForTests([{ ...track, state: "stale" }]);
     renderAt("a.sdfz");
-    expect(screen.queryByText("Track out of date")).not.toBeNull();
-    expect(screen.queryByText("Track recorded")).toBeNull();
+    expect(
+      screen.queryByText(/The recorded track is out of date/),
+    ).not.toBeNull();
+    expect(screen.queryByText("Track out of date")).toBeNull();
+    expect(screen.queryByText(/^Recorded\. The track takes/)).toBeNull();
   });
 });

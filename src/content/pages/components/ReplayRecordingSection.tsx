@@ -87,8 +87,6 @@ export function ReplayRecordingSection({
   const hidden = analysisRunHidden();
   const tracks = useStoredTracks();
   const costs = useRecordingCosts();
-  const usage = useTrackUsage();
-  const { budgetBytes } = useTrackBudget();
   // A remix carries its original's game id and has no track of its own.
   const gameId = info.remixed ? undefined : info.gameId;
   const job = useRecordingJob(hidden ? undefined : gameId);
@@ -136,13 +134,6 @@ export function ReplayRecordingSection({
     info.gameType,
     info.durationSec * FRAMES_PER_SECOND,
   );
-  const effect = budgetEffect({
-    budgetBytes,
-    totalBytes: usage.totalBytes,
-    ownBytes: track?.sizeBytes ?? 0,
-    estimateBytes: estimate?.bytes ?? null,
-  });
-
   async function record() {
     if (!target) return;
     setOpen(false);
@@ -249,52 +240,12 @@ export function ReplayRecordingSection({
                     align="start"
                     className="flex w-80 flex-col gap-3"
                   >
-                    <div className="flex flex-col gap-1.5">
-                      <h3 className="text-sm font-medium">
-                        Record this replay?
-                      </h3>
-                      <p className="text-xs text-muted-foreground">
-                        This runs the game without a window.
-                      </p>
-                      <p className="text-xs">
-                        {`Time: ${estimate ? `about ${roughly(estimate.seconds)}` : "unknown"}`}
-                      </p>
-                      <p className="text-xs">
-                        {`Size: ${estimate ? `about ${formatBytes(estimate.bytes)}` : "unknown"}`}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {estimate
-                          ? `Estimated from ${plural(estimate.runs, "earlier recording", "earlier recordings")} of this game on this computer.`
-                          : "Nothing of this game has been recorded on this computer yet."}
-                      </p>
-                      {effect === "removesOlder" && (
-                        <p className="text-xs text-amber-700 dark:text-amber-400">
-                          {`Older tracks will be removed to stay within the ${formatBytes(budgetBytes)} limit.`}
-                        </p>
-                      )}
-                      {effect === "largerThanBudget" && (
-                        <p className="text-xs text-amber-700 dark:text-amber-400">
-                          {`The track would be larger than the whole ${formatBytes(budgetBytes)} limit. It is kept and every other track is removed.`}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setOpen(false)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => void record()}
-                      >
-                        Record
-                      </Button>
-                    </div>
+                    <Confirmation
+                      estimate={estimate}
+                      ownBytes={track?.sizeBytes ?? 0}
+                      onCancel={() => setOpen(false)}
+                      onRecord={() => void record()}
+                    />
                   </PopoverContent>
                 </Popover>
                 {check !== undefined && blockers.length > 0 && (
@@ -312,6 +263,72 @@ export function ReplayRecordingSection({
         {error && <p className="text-xs text-destructive">{error}</p>}
       </div>
     </section>
+  );
+}
+
+/**
+ * What pressing the button will do and cost, said before it is pressed. Read
+ * only while the popover is open, so the budget is not followed while it is
+ * shut.
+ */
+function Confirmation({
+  estimate,
+  ownBytes,
+  onCancel,
+  onRecord,
+}: {
+  estimate: ReturnType<typeof estimateRecording>;
+  /** What the replay's own track takes now, which recording it replaces. */
+  ownBytes: number;
+  onCancel: () => void;
+  onRecord: () => void;
+}) {
+  const usage = useTrackUsage();
+  const { budgetBytes } = useTrackBudget();
+  const effect = budgetEffect({
+    budgetBytes,
+    totalBytes: usage.totalBytes,
+    ownBytes,
+    estimateBytes: estimate?.bytes ?? null,
+  });
+  return (
+    <>
+      <div className="flex flex-col gap-1.5">
+        <h3 className="text-sm font-medium">Record this replay?</h3>
+        <p className="text-xs text-muted-foreground">
+          This runs the game without a window.
+        </p>
+        <p className="text-xs">
+          {`Time: ${estimate ? `about ${roughly(estimate.seconds)}` : "unknown"}`}
+        </p>
+        <p className="text-xs">
+          {`Size: ${estimate ? `about ${formatBytes(estimate.bytes)}` : "unknown"}`}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {estimate
+            ? `Estimated from ${plural(estimate.runs, "earlier recording", "earlier recordings")} of this game on this computer.`
+            : "Nothing of this game has been recorded on this computer yet."}
+        </p>
+        {effect === "removesOlder" && (
+          <p className="text-xs text-amber-700 dark:text-amber-400">
+            {`Older tracks will be removed to stay within the ${formatBytes(budgetBytes)} limit.`}
+          </p>
+        )}
+        {effect === "largerThanBudget" && (
+          <p className="text-xs text-amber-700 dark:text-amber-400">
+            {`The track would be larger than the whole ${formatBytes(budgetBytes)} limit. It is kept and every other track is removed.`}
+          </p>
+        )}
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button type="button" size="sm" variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="button" size="sm" onClick={onRecord}>
+          Record
+        </Button>
+      </div>
+    </>
   );
 }
 
