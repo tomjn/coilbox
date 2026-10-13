@@ -43,7 +43,9 @@ pub use header::{
     INDEX_ENTRY_SIZE, MAGIC,
 };
 pub use keys::*;
-pub use quant::{Quantiser, ANGLE_UNITS_PER_TURN, FRACTION_FULL, VALUE_LIMIT};
+pub use quant::{
+    quaternion_from_front_up, Quantiser, ANGLE_UNITS_PER_TURN, FRACTION_FULL, VALUE_LIMIT,
+};
 pub use reader::TrackReader;
 pub use terrain::apply_terrain;
 pub use track::Track;
