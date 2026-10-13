@@ -890,6 +890,7 @@ mod tests {
                     "luaui/widgets/gui_static_factionchooser.lua",
                     "luaui/widgets/gui_static_placement.lua",
                     "luaui/widgets/gui_static_sharemenu.lua",
+                    "luaui/widgets/gui_static_selected_units_buttons.lua",
                 ]
             );
             assert!(adapter.units.is_empty() && adapter.features.is_empty());

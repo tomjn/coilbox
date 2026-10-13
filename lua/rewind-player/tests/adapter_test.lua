@@ -127,7 +127,7 @@ do
 	t.same(
 		"and logs what it has",
 		Adapter.describe(adapter),
-		"adapter loaded: Splinter Faction. 4 gadgets and 3 widgets are switched off by the playback game, 0 unit definitions are hidden, 0 feature definitions are skipped, hooks: started"
+		"adapter loaded: Splinter Faction. 4 gadgets and 4 widgets are switched off by the playback game, 0 unit definitions are hidden, 0 feature definitions are skipped, hooks: started"
 	)
 	t.same("it has no hook the player does not call", #adapter.unknownHooks, 0)
 end

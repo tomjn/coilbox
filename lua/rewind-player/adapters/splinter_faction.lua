@@ -4,6 +4,13 @@
 -- something to do that means nothing. Everything that tells a viewer about the
 -- match stays: the resource bars, the tooltip and its unit descriptions, the
 -- minimap, the players list, the menu, health bars and the game's own effects.
+-- The menu keeps its Resign and Sharing buttons, because it is one widget with
+-- Settings and Quit in it. Neither does anything for a spectator.
+--
+-- gui_static_buildordermenu.lua stays too, though it shows a spectator the
+-- build and order buttons of a selected unit. It is what hides the engine's own
+-- command menu, which takes its place when it is gone, and
+-- game_buildHotkeys.lua raises without it.
 --
 -- The file names were read from the archives of 0.1.88 and 0.1.89 and from the
 -- game's repository at the commit of 24 August 2026, which declares no version.
@@ -40,6 +47,9 @@ return {
 		"gui_static_placement.lua",
 		-- Gives units and resources to another team.
 		"gui_static_sharemenu.lua",
+		-- A strip of buttons for the selection at the bottom centre of the view,
+		-- which is where the timeline is, so the two draw over each other.
+		"gui_static_selected_units_buttons.lua",
 	},
 
 	hooks = {
