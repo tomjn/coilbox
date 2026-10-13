@@ -1595,6 +1595,35 @@ end
         game_dir: PathBuf,
         script: PathBuf,
         wait: std::time::Duration,
+        replay: PathBuf,
+        tracks: PathBuf,
+        stand_in: Option<String>,
+    }
+
+    impl Prepared {
+        /// Writes the playback game again, as a launch with `adapters` shipped
+        /// would. The track is not recorded again.
+        fn rewrite(&self, adapters: &[(&str, &str)]) {
+            let datadirs = self
+                .data_dirs
+                .iter()
+                .map(|d| d.to_string_lossy())
+                .collect::<Vec<_>>()
+                .join(&coilbox_proc::DATADIR_SEP.to_string());
+            prepare(
+                &Prepare {
+                    replay: &self.replay,
+                    tracks: &self.tracks,
+                    content_root: &self.content,
+                    game: self.stand_in.as_deref(),
+                    opening: Opening::default(),
+                    script_dir: &self.dir.path().join("play"),
+                    adapters,
+                },
+                |game| installed_game(&self.engine_dir.to_string_lossy(), &datadirs, game),
+            )
+            .expect("the playback is prepared again");
+        }
     }
 
     fn var(name: &str) -> Option<String> {
@@ -1714,6 +1743,9 @@ end
             game_dir,
             script,
             wait,
+            replay,
+            tracks,
+            stand_in,
         })
     }
 
@@ -2083,6 +2115,177 @@ end
             .collect();
         assert!(errors.is_empty(), "{errors:#?}");
         assert_eq!(written, 0, "the playback wrote a replay");
+    }
+
+    /// The adapter the headless run uses, shipped to the launch the way
+    /// coilbox ships its own. It is not part of the game coilbox ships.
+    const HEADLESS_ADAPTER: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../lua/rewind-player/tests/headless/fixture_adapter.lua"
+    ));
+
+    /// The widget that says what was loaded and created.
+    const ADAPTER_PROBE: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../lua/rewind-player/tests/headless/adapter_probe.lua"
+    ));
+
+    /// Launches the prepared playback with the probe in it and gives the
+    /// engine's log, once the probe has reported. `before` runs after the probe
+    /// is written, for a variation on the game.
+    fn probed(prepared: &Prepared, before: &dyn Fn(&Path)) -> String {
+        std::fs::write(
+            prepared
+                .game_dir
+                .join("luaui/widgets/coilbox_rewind_adapter_probe.lua"),
+            ADAPTER_PROBE,
+        )
+        .unwrap();
+        before(&prepared.game_dir);
+        let (timed_out, output, _) = launch(prepared, &|text| text.contains("ADAPTER_PROBE done"));
+        assert!(!timed_out, "the probe never reported. Log:\n{output}");
+        output
+    }
+
+    fn lines_with<'a>(output: &'a str, needles: &[&str]) -> Vec<&'a str> {
+        output
+            .lines()
+            .filter(|l| needles.iter().any(|n| l.contains(n)))
+            .collect()
+    }
+
+    fn count(output: &str, needle: &str) -> usize {
+        output.lines().filter(|l| l.contains(needle)).count()
+    }
+
+    /// A game's adapter against a real engine and a real game (issue #3799).
+    /// The same playback is launched three times on Splinter Faction.
+    ///
+    /// 1. With no adapter shipped. The base game's `game_end.lua` and
+    ///    `game_team_com_ends.lua` load and a team is asked to be killed, which
+    ///    the guard says, and the widget loads, and the unit the adapter will
+    ///    hide is created.
+    /// 2. With the fixture adapter. Neither gadget is loaded and no team is
+    ///    asked to be killed, the widget is not loaded, the hidden unit is not
+    ///    created, and the hooks run.
+    /// 3. With the fixture adapter and the files that stand in for the gadget
+    ///    and the widget emptied, which says what the handlers do with an
+    ///    empty file.
+    ///
+    /// `scripts/rewind-playback-headless.sh` runs this, and it reads the
+    /// variables the tests above do.
+    #[test]
+    #[ignore = "needs an engine, a game, a map and a replay recorded with them"]
+    fn an_adapter_switches_things_off_in_the_engine() {
+        let Some(prepared) = prepared(false) else {
+            return;
+        };
+        let gadgets = ["game_end.lua>", "game_team_com_ends.lua>"];
+        let kill = "the base game asked to kill team";
+
+        // 1. No adapter.
+        prepared.rewrite(&[]);
+        let plain = probed(&prepared, &|_| {});
+        let report = |name: &str, output: &str| {
+            for l in lines_with(
+                output,
+                &[
+                    "ADAPTER_PROBE ",
+                    "ADAPTER_FIXTURE ",
+                    "adapter loaded",
+                    kill,
+                    gadgets[0],
+                    gadgets[1],
+                ],
+            ) {
+                eprintln!("{name}: {l}");
+            }
+        };
+        report("no adapter", &plain);
+        // The engine loads the game twice in a headless run, so a line is there
+        // once for each.
+        assert!(
+            count(&plain, "COILBOX_REWIND_PLAYER adapter loaded: none") >= 1,
+            "{plain}"
+        );
+        for gadget in gadgets {
+            assert!(count(&plain, gadget) >= 1, "{gadget} did not load");
+        }
+        assert_eq!(count(&plain, kill), 1, "the base game never asked");
+        assert!(
+            plain.contains("gui_static_resourcebar.lua=1"),
+            "the widget the adapter names did not load without it"
+        );
+        let units = lines_with(&plain, &["ADAPTER_PROBE units"])[0].to_string();
+        assert!(units.contains("lozscorpion="), "{units}");
+        assert!(units.contains("fedak="), "{units}");
+        assert_eq!(count(&plain, "ADAPTER_FIXTURE"), 0);
+
+        // 2. The fixture adapter.
+        prepared.rewrite(&[("fixture.lua", HEADLESS_ADAPTER)]);
+        let shadows = adapter::Adapter::parse(HEADLESS_ADAPTER).unwrap().shadows();
+        assert_eq!(
+            shadows,
+            [
+                "luarules/gadgets/game_end.lua",
+                "luarules/gadgets/game_team_com_ends.lua",
+                "luaui/widgets/gui_static_resourcebar.lua"
+            ]
+        );
+        let adapted = probed(&prepared, &|_| {});
+        report("adapter", &adapted);
+        assert!(
+            count(
+                &adapted,
+                "COILBOX_REWIND_PLAYER adapter loaded: Headless fixture. 2 gadgets and 1 widgets"
+            ) >= 1,
+            "{adapted}"
+        );
+        for gadget in gadgets {
+            assert_eq!(count(&adapted, gadget), 0, "{gadget} loaded");
+        }
+        assert_eq!(count(&adapted, kill), 0, "the base game still asked");
+        assert!(
+            adapted.contains("gui_static_resourcebar.lua=0"),
+            "the widget loaded"
+        );
+        let units = lines_with(&adapted, &["ADAPTER_PROBE units"])[0].to_string();
+        assert!(!units.contains("lozscorpion"), "{units}");
+        assert!(units.contains("fedak="), "{units}");
+        assert_eq!(count(&adapted, "ADAPTER_FIXTURE unitPlaced first"), 1);
+        let first = lines_with(&adapted, &["ADAPTER_FIXTURE unitPlaced first"])[0].to_string();
+        assert!(!first.contains("def=lozscorpion"), "{first}");
+        assert_eq!(count(&adapted, "ADAPTER_FIXTURE afterFrame first"), 1);
+        for name in ["game_end", "game_team_com_ends", "gui_static_resourcebar"] {
+            let errors: Vec<&str> = lines_with(&adapted, &[name])
+                .into_iter()
+                .filter(|l| l.to_lowercase().contains("error") || l.contains("Failed"))
+                .collect();
+            assert!(errors.is_empty(), "{name}: {errors:#?}");
+        }
+
+        // 3. The same, with empty files in place of `return false`.
+        prepared.rewrite(&[("fixture.lua", HEADLESS_ADAPTER)]);
+        let emptied = probed(&prepared, &|game| {
+            for rel in &shadows {
+                std::fs::write(game.join(rel), "").unwrap();
+            }
+        });
+        report("empty shadows", &emptied);
+        // Why a shadow returns `false` and is not empty. Splinter Faction's
+        // gadget handler takes an empty file as a gadget with nothing in it and
+        // loads it under the file's name, so the log still lists the gadget. Its
+        // widget handler refuses an empty file with an error.
+        for gadget in ["game_end.lua", "game_team_com_ends.lua"] {
+            assert!(
+                emptied.contains(&format!("gadget:  {gadget}")),
+                "an empty {gadget} did not load as an empty gadget"
+            );
+        }
+        assert!(
+            emptied.contains("Failed to load: gui_static_resourcebar.lua  (no GetInfo() call)"),
+            "an empty widget was not an error"
+        );
     }
 
     /// The widget that presses the timeline's keys in the engine. It is
