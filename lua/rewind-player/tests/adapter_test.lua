@@ -37,7 +37,7 @@ do
 	t.same("a problem the coilbox side found is no adapter", adapter, nil)
 	t.same("and is the reason", why, "the file could not be read")
 
-	for key, value in pairs({ gadgets = "game_end.lua", widgets = 4, units = true, features = {} }) do
+	for key, value in pairs({ gadgets = "game_end.lua", widgets = 4, units = true, features = {}, teamParams = "supplyUsed", gameParams = 7 }) do
 		adapter, why = Adapter.normalize({ [key] = value })
 		if key == "features" then
 			t.check("an empty " .. key .. " list is fine", adapter ~= nil, why)
@@ -127,9 +127,15 @@ do
 	t.same(
 		"and logs what it has",
 		Adapter.describe(adapter),
-		"adapter loaded: Splinter Faction. 6 gadgets and 4 widgets are switched off by the playback game, 0 unit definitions are hidden, 0 feature definitions are skipped, hooks: started"
+		"adapter loaded: Splinter Faction. 6 gadgets and 4 widgets are switched off by the playback game, 0 unit definitions are hidden, 0 feature definitions are skipped, hooks: none"
 	)
 	t.same("it has no hook the player does not call", #adapter.unknownHooks, 0)
+	t.same(
+		"it names the game's own numbers on the resource bar, in the game's own spelling",
+		table.concat(adapter.teamParams, ","),
+		"supplyUsed,supplyMax,researchPoints"
+	)
+	t.same("and none of the game's as a whole", #adapter.gameParams, 0)
 end
 
 -- The player with an adapter.
