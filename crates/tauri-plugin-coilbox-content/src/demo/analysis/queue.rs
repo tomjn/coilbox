@@ -1064,6 +1064,10 @@ pub enum CannotAnalyse {
     NoGameOver,
     /// The file does not read as a replay.
     Unreadable,
+    /// It was recorded on the playback game. A replay binds to its game by
+    /// name only, so a replay of the playback has the track of the match it
+    /// showed but nothing of its own to record (issue #3793).
+    PlaybackGame,
 }
 
 impl CannotAnalyse {
@@ -1079,6 +1083,9 @@ impl CannotAnalyse {
                 "this replay never recorded a game over, so there is nothing to check a run of it against"
             }
             CannotAnalyse::Unreadable => "this file does not read as a replay",
+            CannotAnalyse::PlaybackGame => {
+                "this replay was recorded on the playback game, which has no match of its own to record"
+            }
         }
     }
 }
@@ -1092,6 +1099,9 @@ pub fn check_replay(replay: &Path) -> Result<(String, u32), CannotAnalyse> {
     let game = super::super::find_game(&super::super::parse_tdf(&raw.script));
     if super::super::read_remix_marker(&game).remixed {
         return Err(CannotAnalyse::Remix);
+    }
+    if game.get("gametype") == Some(super::super::playback::gametype().as_str()) {
+        return Err(CannotAnalyse::PlaybackGame);
     }
     let game_id = store::valid_game_id(&raw.game_id).map_err(|_| CannotAnalyse::NoGameId)?;
     let finished = super::super::read_trailer(replay)
@@ -1201,7 +1211,7 @@ pub fn headless_engines(paths: Vec<String>) -> Vec<String> {
 /// `headless` answers which of them hold a headless engine. Answers `{ cannot,
 /// gameId, matchSeconds, headless }`. `cannot` is
 /// null for a replay that can be, and otherwise `remix`, `noGameId`,
-/// `noGameOver` or `unreadable`. Whether its engine, game and map are
+/// `noGameOver`, `playbackGame` or `unreadable`. Whether its engine, game and map are
 /// installed is a separate question, which the page already answers.
 #[tauri::command]
 pub(crate) async fn content_analysis_check(
@@ -3341,6 +3351,33 @@ mod tests {
             assert_eq!(spec.name, "match.sdfz");
             assert_eq!(spec.match_seconds, 50);
             assert!(!spec.force);
+        }
+
+        /// A replay binds to its game by name, so one recorded on the playback
+        /// game cannot be told from the playback by anything but that name.
+        #[test]
+        fn a_replay_of_the_playback_game_is_refused_for_recording() {
+            let script = SCRIPT.replace(
+                "Some Game 1.0",
+                &super::super::super::super::playback::gametype(),
+            );
+            let playback = DemoFixture {
+                script: script.clone(),
+                stream: super::super::super::super::retarget::tests::stream_with_game_data(
+                    &script,
+                    &[],
+                ),
+                ..finished()
+            };
+            let (_dir, replay, engine) = world(playback.gzipped());
+
+            assert_eq!(check_replay(&replay), Err(CannotAnalyse::PlaybackGame));
+            let err = job_for(&replay, &engine, Vec::new(), None, false).unwrap_err();
+            assert!(err.contains("recorded on the playback game"), "{err}");
+            assert_eq!(
+                serde_json::to_value(CannotAnalyse::PlaybackGame).unwrap(),
+                "playbackGame"
+            );
         }
 
         #[test]
