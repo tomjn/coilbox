@@ -887,6 +887,8 @@ mod tests {
                     "luarules/gadgets/game_team_com_ends.lua",
                     "luarules/gadgets/game_spawn.lua",
                     "luarules/gadgets/unit_deathContainerSpawn.lua",
+                    "luarules/gadgets/unit_auto_health_regeneration.lua",
+                    "luarules/gadgets/unit_area_heal_radius.lua",
                     "luaui/widgets/gui_static_factionchooser.lua",
                     "luaui/widgets/gui_static_placement.lua",
                     "luaui/widgets/gui_static_sharemenu.lua",
