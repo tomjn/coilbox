@@ -6391,6 +6391,7 @@ dependencies = [
  "sha2 0.11.0",
  "tauri",
  "tauri-plugin",
+ "tauri-plugin-coilbox-play",
  "tauri-plugin-coilbox-scenario",
  "tauri-plugin-coilbox-unitsync",
  "tempfile",

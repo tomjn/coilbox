@@ -26,6 +26,9 @@ coilbox-tdf = { path = "../coilbox-tdf" }
 # The writer the scenario test mutator uses for a generated game, which the
 # replay analysis game is written with too (issue #1183).
 tauri-plugin-coilbox-scenario = { path = "../tauri-plugin-coilbox-scenario" }
+# Launches the playback game through the play plugin's run registry, so a second
+# game cannot start over a running one (issue #3793).
+tauri-plugin-coilbox-play = { path = "../tauri-plugin-coilbox-play" }
 # Reads the short name of the game an analysis depends on (issue #3943).
 tauri-plugin-coilbox-unitsync = { path = "../tauri-plugin-coilbox-unitsync" }
 # Reads a track's header, and says which recorder version is current, for the
