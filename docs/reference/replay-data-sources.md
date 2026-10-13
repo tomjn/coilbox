@@ -251,7 +251,7 @@ On an 1,800 second Metal Factions match of four AIs, 15,883 calls of `UnitDamage
 
 The replay's map draws five layers from these lines: deaths, damage dealt, buildings finished, starting unit deaths and starting unit paths. Only the kinds a layer needs are read, and only when that layer is switched on. The value of living units by kind, under the match chart, is added up from the finished, destroyed and given lines. The gadget samples nothing for it.
 
-A run starts only when you press the button on the replay page, and a distribution can hide the button with `analytics.run`. Runs go through a queue the app owns, so leaving the page changes nothing. A game you start always wins. A running analysis is stopped and put back at the front of the queue.
+A run starts only when you press the button on the replay page, and a distribution can hide the button with `analytics.run`. The same run records the match as a track for rewind, so the engine plays a replay once for both. Runs go through a queue the app owns, so leaving the page changes nothing. A game you start always wins. A running analysis is stopped and put back at the front of the queue.
 
 While a run goes on, the section says how long it has been running. "What the engine is saying" shows the last 40 lines of the engine's output, read again each second while it is open. Every line the engine logs carries its own frame number, so this is where to look when the frame on the page has stopped moving.
 
@@ -278,7 +278,7 @@ A stored analysis is small. Under logger version 4 the 769 second Splinter Facti
 - The engine the replay was recorded on, its game or its map are not installed.
 - The run crashed, ran out of time or was cancelled. That is kept in the queue for the session and not stored.
 - The run finished and did not reproduce the match. Coilbox remembers that, with the figures that disagreed, and stores no events.
-- The analysis is outdated. An earlier coilbox recorded less. The section offers "Analyse again".
+- The analysis is outdated. An earlier coilbox recorded less. The section offers "Analyse and record again".
 
 ### How far to trust it
 

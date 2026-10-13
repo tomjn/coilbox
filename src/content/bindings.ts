@@ -1238,9 +1238,8 @@ export interface ReplayDisagreement {
 }
 
 /**
- * How far a running job has got. `thinning` is only for a job that records:
- * the engine has exited and its dump is being made into a track, which reports
- * no progress.
+ * How far a running job has got. In `thinning` the engine has exited and its
+ * dump is being made into a track, which reports no progress.
  */
 export type ReplayAnalysisPhase =
   | "starting"
@@ -1248,7 +1247,7 @@ export type ReplayAnalysisPhase =
   | "playing"
   | "thinning";
 
-/** The analysis that is running. */
+/** The job that is running. It analyses the match and records it (#3962). */
 export interface ReplayAnalysisRunningJob {
   id: number;
   gameId: string;
@@ -1270,18 +1269,14 @@ export interface ReplayAnalysisRunningJob {
   lastFrame: number;
   /** A cancel has been asked for and the run is on its way out. */
   cancelling: boolean;
-  /** The job also records the match as a track (#3785). */
-  record: boolean;
 }
 
-/** An analysis waiting its turn. */
+/** A job waiting its turn. */
 export interface ReplayAnalysisQueuedJob {
   id: number;
   gameId: string;
   name: string;
   replayPath: string;
-  /** The job also records the match as a track (#3785). */
-  record: boolean;
 }
 
 /**
@@ -1291,32 +1286,23 @@ export interface ReplayAnalysisQueuedJob {
  * - `tookTooLong`: the run reached `limitSeconds` and was killed. Not a
  *   divergence: it never got as far as being compared.
  * - `engineFailed`: the engine stopped before the match ended.
- * - `couldNotRun`: the run could not be started, or its result not stored. For
- *   a recording it is also a recorder that wrote no file.
- * - `diverged`: a recording whose playback did not reproduce the match, so no
- *   track was made. `disagreements` has the figures that differed. The
- *   analysis from the same run is stored as diverged.
+ * - `couldNotRun`: the run could not be started, its result not stored, or its
+ *   recorder wrote no file.
  * - `thinFailed`: the playback was good and its recording could not be made
- *   into a track. Any earlier track is kept.
+ *   into a track. Any earlier track is kept, and so is the analysis.
+ *
+ * A playback that did not reproduce the match is not here: its analysis is
+ * stored as diverged, with the figures that differed.
  */
 export interface ReplayAnalysisFailure {
   gameId: string;
   name: string;
-  reason:
-    | "tookTooLong"
-    | "engineFailed"
-    | "couldNotRun"
-    | "diverged"
-    | "thinFailed";
+  reason: "tookTooLong" | "engineFailed" | "couldNotRun" | "thinFailed";
   /** The detail: an error, or how the engine exited. */
   message: string;
   limitSeconds?: number;
   /** What the engine said: its fatal lines, or its last lines. */
   logExcerpt: string[];
-  /** The job was a recording, so the page words it as one (#3785). */
-  record: boolean;
-  /** The figures a diverged recording's playback got wrong. Empty otherwise. */
-  disagreements: ReplayDisagreement[];
 }
 
 /** The analysis queue, which belongs to the app and outlives any page. */
@@ -1347,9 +1333,9 @@ export interface ReplayAnalysisQueue {
 export const ANALYSIS_QUEUE_EVENT = "coilbox-content://analysis-queue";
 
 /**
- * Ask for a replay to be analysed: played back headless under coilbox's
- * analysis game, with the result stored (#1157). This is the only command that
- * leads to an engine being run for an analysis. Call it through
+ * Ask for a replay to be analysed and recorded as a track, in one headless
+ * playback under coilbox's analysis game (#1157, #3785, #3962). This is the
+ * only command that leads to an engine being run for either. Call it through
  * `src/content/replayAnalysis.ts`, which is where the `analytics.run` profile
  * key is checked, and only because a person pressed the button for that
  * replay.
@@ -1359,7 +1345,13 @@ export const ANALYSIS_QUEUE_EVENT = "coilbox-content://analysis-queue";
  * or those of another installed engine when the replay's own is not installed
  * (#3869). `game` names another installed version of the replay's game to
  * depend on instead of the one it names, and is left out for the recorded one.
- * `force` asks for a run of a match that already has a current analysis.
+ * `force` asks for a run of a match that already has a current analysis and a
+ * current track. A match with only one of the two is run without it.
+ *
+ * - `queued`: a job was added.
+ * - `alreadyQueued`: a job for that match is already queued or running.
+ * - `alreadyDone`: the match has a current analysis and a current track, and
+ *   `force` was not set.
  *
  * It rejects, with the reason, for a replay that cannot be analysed: a remix,
  * one with no recorded game over, or an engine folder with no headless engine.
@@ -1375,40 +1367,10 @@ export const contentAnalysisEnqueue = defineCommand<
     force?: boolean;
   },
   {
-    outcome: "queued" | "alreadyQueued" | "alreadyAnalysed";
+    outcome: "queued" | "alreadyQueued" | "alreadyDone";
     queue: ReplayAnalysisQueue;
   }
 >("coilbox-content", "content_analysis_enqueue");
-
-/**
- * Ask for a replay to be recorded as a track (#3785). The arguments are those
- * of {@link contentAnalysisEnqueue}, and the job joins the same queue: it is
- * cancelled with {@link contentAnalysisCancel}, its state is in the queue, and
- * a run that ends without a track says why in the queue's `failures`. Call it
- * through `requestRecording` in `src/content/replayRecording.ts`, which checks
- * the `analytics.run` profile key, and only because a person pressed the
- * button for that replay.
- *
- * - `queued`: a job of its own was added.
- * - `joined`: the replay was already waiting as an analysis, which is now a
- *   recording too. The engine runs once.
- * - `alreadyQueued`: a job that records, or that analyses a recording that
- *   covers this one, is already queued or running.
- * - `alreadyRecorded`: the match has a current track and `force` was not set.
- */
-export const contentRecordingEnqueue = defineCommand<
-  {
-    replayPath: string;
-    enginePath: string;
-    dataDir: string;
-    game?: string;
-    force?: boolean;
-  },
-  {
-    outcome: "queued" | "joined" | "alreadyQueued" | "alreadyRecorded";
-    queue: ReplayAnalysisQueue;
-  }
->("coilbox-content", "content_recording_enqueue");
 
 /**
  * Whether a replay can be analysed at all, read from the replay itself.

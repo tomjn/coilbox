@@ -14,6 +14,11 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Progress } from "@/components/ui/progress";
 import { formatBytes, formatDuration } from "@/lib/format";
 import {
@@ -23,8 +28,11 @@ import {
   type ReplayAnalysisFailure,
   type ReplayAnalysisRunningJob,
   type StoredReplayAnalysis,
+  type StoredReplayTrack,
 } from "../../bindings";
+import { FRAMES_PER_SECOND } from "../../chatClock";
 import {
+  ANALYSIS_ACTION_ATTRIBUTE,
   ANALYSIS_SECTION_ID,
   analysisBlockers,
   analysisEngineOutput,
@@ -36,7 +44,6 @@ import {
   differenceNote,
   disagreementInWords,
   dismissAnalysisFailure,
-  estimateAnalysisSeconds,
   requestAnalysis,
   useAnalysisQueue,
   useStoredAnalyses,
@@ -50,10 +57,18 @@ import {
   useInstalledEngines,
 } from "../../replayAnalysisOffer";
 import { replayDependencyBlock } from "../../replayEngine";
+import { budgetEffect, estimateRecording } from "../../replayRecordingEstimate";
+import {
+  useRecordingCosts,
+  useStoredTracks,
+  useTrackBudget,
+  useTrackUsage,
+} from "../../replayTracks";
 import { useMetricRegistry } from "../../useMetricRegistry";
 import { SectionHelp } from "./SectionHelp";
 
 type Check = Awaited<ReturnType<typeof contentAnalysisCheck>>;
+type Estimate = ReturnType<typeof estimateRecording>;
 
 /** How many disagreeing figures are listed before the rest go behind a disclosure. */
 const FIGURES_SHOWN = 4;
@@ -81,16 +96,24 @@ export function roughly(seconds: number): string {
 }
 
 /**
- * The replay page's analysis section (#1157, #1158).
+ * The replay page's analysis and recording section (#1157, #1158, #3788,
+ * #3962).
  *
- * Analysing a replay plays the match back in the engine, on this computer, so
- * it never starts by itself: the button here is the only thing in the app that
- * asks for a run, and it says what it will do before it is pressed. Once a run
- * is asked for it belongs to the app's queue, not to this page, so leaving the
- * page changes nothing and coming back shows where it has got to.
+ * One playback of the match in the engine, on this computer, makes the
+ * analysis and the track that rewind plays, so there is one section, one
+ * button and one job for both. It never starts by itself: the button here is
+ * the only thing in the app that asks for a run, and it says what the run will
+ * cost before it starts. Once a run is asked for it belongs to the app's
+ * queue, not to this page, so leaving the page changes nothing and coming back
+ * shows where it has got to.
+ *
+ * A replay can have one of the two and not the other: tracks go when the disk
+ * limit is reached and an analysis can be deleted by itself. The section says
+ * which it has, and the button makes both again.
  *
  * `analytics.run` hides the button and everything that steers a run. An
- * analysis that is already stored is still shown, with no way to make another.
+ * analysis or a track that is already stored is still shown, with no way to
+ * make another.
  *
  * The page works out what is installed and hands it in, so this asks nothing
  * of the content scan itself.
@@ -144,8 +167,12 @@ function AnalysisBody({
   const hidden = analysisRunHidden();
   const queue = useAnalysisQueue();
   const analyses = useStoredAnalyses();
+  const tracks = useStoredTracks();
+  const costs = useRecordingCosts();
   const [check, setCheck] = useState<Check | undefined>(undefined);
   const [pending, setPending] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   /** The engine the person picked, by path. Unset until they pick one. */
   const [picked, setPicked] = useState<string | null>(null);
@@ -169,10 +196,12 @@ function AnalysisBody({
     };
   }, [replayPath, hidden, enginePaths]);
 
-  // A remix carries its original's game id and has no analysis of its own.
+  // A remix carries its original's game id and has no analysis or track of
+  // its own.
   const gameId = info.remixed ? undefined : info.gameId;
   const stored = gameId ? analyses.get(gameId) : undefined;
-  if (hidden && !stored) return null;
+  const track = gameId ? tracks.get(gameId) : undefined;
+  if (hidden && !stored && !track) return null;
 
   // With the run hidden there is nothing here to follow or to steer.
   const jobId = hidden ? undefined : gameId;
@@ -216,6 +245,10 @@ function AnalysisBody({
     cannot: check?.cannot,
     engineVersion: info.engineVersion,
     engineInstalled: target !== null,
+    engineHeadless:
+      target === null || check === undefined
+        ? undefined
+        : check.headless.includes(target.enginePath),
     otherEngines: options.length,
     installedEngines: engines.length,
     missingGame,
@@ -228,18 +261,26 @@ function AnalysisBody({
   const ready = check !== undefined && blockers.length === 0 && run !== null;
   const substitution = check !== undefined && (options.length > 0 || otherGame);
 
-  async function analyse(force: boolean) {
+  async function analyse() {
     if (!run) return;
+    setConfirming(false);
     setPending(true);
     setError(null);
+    setNote(null);
     try {
-      await requestAnalysis({
+      const outcome = await requestAnalysis({
         replayPath,
         enginePath: run.enginePath,
         dataDir: run.dataDir,
         game: otherGame?.name,
-        force,
+        // Whatever is stored, stale or current, is replaced on purpose.
+        force: stored !== undefined || track !== undefined,
       });
+      if (outcome === "alreadyQueued") {
+        setNote("This replay is already in the queue.");
+      } else if (outcome === "alreadyDone") {
+        setNote("This replay is already analysed and recorded.");
+      }
     } catch (e) {
       setError(errMessage(e));
     } finally {
@@ -256,26 +297,27 @@ function AnalysisBody({
     }
   }
 
-  const button = (label: string, force: boolean) => (
-    <Button
-      type="button"
-      variant="outline"
-      className="w-fit gap-1.5"
-      disabled={!ready || pending}
-      onClick={() => analyse(force)}
-    >
-      {pending ? (
-        <Loader2 className="size-4 animate-spin motion-reduce:animate-none" />
-      ) : (
-        <ScanSearch className="size-4" />
-      )}
-      {label}
-    </Button>
+  const estimate = estimateRecording(
+    costs,
+    info.gameType,
+    info.durationSec * FRAMES_PER_SECOND,
   );
+  const analysed = stored?.state === "current";
+  const recorded = track?.state === "current";
+  // What the button is for. A run always makes both, so the words say what is
+  // missing and the confirmation says what the run costs.
+  const label =
+    failure || stored?.state === "diverged"
+      ? "Try again"
+      : analysed && !track
+        ? "Record this replay"
+        : recorded && !stored
+          ? "Analyse this replay"
+          : stored || track
+            ? "Analyse and record again"
+            : "Analyse and record this replay";
 
-  const estimate = estimateAnalysisSeconds(analyses.values(), info.durationSec);
-
-  const offer = (label: string, force: boolean) => (
+  const offer = (
     <>
       {substitution && (
         <Substitution
@@ -287,19 +329,34 @@ function AnalysisBody({
           gameUsed={otherGame ? gameUsed : null}
         />
       )}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        {button(
-          chosen
-            ? `${label.startsWith("Try") ? "Try" : "Analyse"} with ${chosen.label}`
-            : label,
-          force,
-        )}
-        {estimate && (
-          <span className="text-xs text-muted-foreground">
-            About {roughly(estimate.seconds)}
-          </span>
-        )}
-      </div>
+      <Popover open={confirming} onOpenChange={setConfirming}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-fit gap-1.5"
+            disabled={!ready || pending}
+            {...{ [ANALYSIS_ACTION_ATTRIBUTE]: "" }}
+          >
+            {pending ? (
+              <Loader2 className="size-4 animate-spin motion-reduce:animate-none" />
+            ) : (
+              <ScanSearch className="size-4" />
+            )}
+            {chosen
+              ? `${label === "Try again" ? "Try" : "Analyse and record"} with ${chosen.label}`
+              : label}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="flex w-80 flex-col gap-3">
+          <Confirmation
+            estimate={estimate}
+            ownBytes={track?.sizeBytes ?? 0}
+            onCancel={() => setConfirming(false)}
+            onStart={() => void analyse()}
+          />
+        </PopoverContent>
+      </Popover>
       {check !== undefined && blockers.length > 0 && (
         <ul className="flex flex-col gap-1 text-xs text-amber-700 dark:text-amber-400">
           {blockers.map((b) => (
@@ -315,18 +372,15 @@ function AnalysisBody({
     <section
       id={ANALYSIS_SECTION_ID}
       className="flex flex-col gap-2"
-      aria-label="Analysis"
+      aria-label="Analysis and recording"
     >
       <div className="flex items-center gap-1">
-        <h2 className="text-sm font-medium">Analysis</h2>
-        <SectionHelp section="the analysis">
+        <h2 className="text-sm font-medium">Analysis and recording</h2>
+        <SectionHelp section="the analysis and recording">
           <AnalysisHelp
             canRun={!hidden}
             matchSeconds={info.durationSec}
-            estimate={estimateAnalysisSeconds(
-              analyses.values(),
-              info.durationSec,
-            )}
+            estimate={estimate}
             hasEngineOptions={options.length > 0}
             gameUsed={otherGame ? gameUsed : null}
             running={!!running}
@@ -347,7 +401,7 @@ function AnalysisBody({
                 ? "Queued. It starts when the game you are playing ends."
                 : queuedAt === 0
                   ? "Queued. It is next."
-                  : `Queued, with ${plural(queuedAt, "analysis", "analyses")} ahead of it.`}
+                  : `Queued, with ${plural(queuedAt, "replay", "replays")} ahead of it.`}
             </p>
             <Button
               type="button"
@@ -364,6 +418,7 @@ function AnalysisBody({
             {failure && !hidden && (
               <Failed
                 failure={failure}
+                earlierTrack={track !== undefined}
                 onDismiss={() =>
                   act(() => dismissAnalysisFailure(failure.gameId))
                 }
@@ -375,17 +430,13 @@ function AnalysisBody({
                 onDelete={() => act(() => deleteStoredAnalysis(stored.gameId))}
               />
             ) : null}
-            {hidden
-              ? null
-              : stored?.state === "current"
-                ? null
-                : stored?.state === "outdated"
-                  ? offer("Analyse again", true)
-                  : stored?.state === "diverged" || failure
-                    ? offer("Try again", false)
-                    : offer("Analyse this replay", false)}
+            {(track || (stored && stored.state !== "diverged")) && (
+              <TrackLine track={track} />
+            )}
+            {!hidden && !(analysed && recorded) && offer}
           </>
         )}
+        {note && <p className="text-xs text-muted-foreground">{note}</p>}
         {error && <p className="text-xs text-destructive">{error}</p>}
       </div>
     </section>
@@ -393,9 +444,9 @@ function AnalysisBody({
 }
 
 /**
- * Why the analysis behaves as it does, for the section's help entry: what it
- * records, how long it takes, why a different engine often will not match, and
- * what a run and a failed match leave behind.
+ * Why the run behaves as it does, for the section's help entry: what it makes,
+ * how long it takes, why a different engine often will not match, and what a
+ * run and a failed match leave behind.
  */
 function AnalysisHelp({
   canRun,
@@ -408,7 +459,7 @@ function AnalysisHelp({
 }: {
   canRun: boolean;
   matchSeconds: number;
-  estimate: { seconds: number; runs: number } | null;
+  estimate: Estimate;
   hasEngineOptions: boolean;
   gameUsed: string | null;
   running: boolean;
@@ -424,7 +475,8 @@ function AnalysisHelp({
     <>
       <p>
         Analysing plays the match back in the game's engine on this computer, to
-        record where units were made and lost.
+        record where units were made and lost. The same playback records the
+        whole match as a track, which is what the page shows and rewinds.
       </p>
       {canRun && (
         <>
@@ -433,7 +485,7 @@ function AnalysisHelp({
             faster than the match did.
             {estimate && ` Expect about ${roughly(estimate.seconds)}.`}
             {estimate &&
-              ` The estimate goes by the ${plural(estimate.runs, "analysis", "analyses")} this computer has finished.`}{" "}
+              ` The estimate goes by the ${plural(estimate.runs, "run", "runs")} of this game this computer has finished.`}{" "}
             The engine and the game the replay used must be installed. The
             result is kept, so this happens once.
           </p>
@@ -442,7 +494,13 @@ function AnalysisHelp({
             the engine only keeps its playback in step within one version. The
             result is kept only if the playback matches the recorded match
             exactly: who won, how long it lasted and every team's final totals.
-            If it does not, no events are kept and the page says so.
+            If it does not, no events and no track are kept and the page says
+            so.
+          </p>
+          <p>
+            Tracks share a limit on disk space. When a new track takes them past
+            it, tracks that are out of date are removed first and then the ones
+            watched longest ago. Their analyses stay.
           </p>
           {hasEngineOptions && (
             <p>
@@ -551,6 +609,88 @@ function Substitution({
   );
 }
 
+/**
+ * What pressing the button will do and cost, said before the run starts. Read
+ * only while the popover is open, so the limit on disk space is not followed
+ * while it is shut.
+ */
+function Confirmation({
+  estimate,
+  ownBytes,
+  onCancel,
+  onStart,
+}: {
+  estimate: Estimate;
+  /** What the replay's own track takes now, which a new one replaces. */
+  ownBytes: number;
+  onCancel: () => void;
+  onStart: () => void;
+}) {
+  const usage = useTrackUsage();
+  const { budgetBytes } = useTrackBudget();
+  const effect = budgetEffect({
+    budgetBytes,
+    totalBytes: usage.totalBytes,
+    ownBytes,
+    estimateBytes: estimate?.bytes ?? null,
+  });
+  return (
+    <>
+      <div className="flex flex-col gap-1.5">
+        <h3 className="text-sm font-medium">Analyse and record this replay?</h3>
+        <p className="text-xs text-muted-foreground">
+          This runs the game once, without a window.
+        </p>
+        <p className="text-xs">
+          {`Time: ${estimate ? `about ${roughly(estimate.seconds)}` : "unknown"}`}
+        </p>
+        <p className="text-xs">
+          {`Track size: ${estimate ? `about ${formatBytes(estimate.bytes)}` : "unknown"}`}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {estimate
+            ? `Estimated from ${plural(estimate.runs, "earlier run", "earlier runs")} of this game on this computer.`
+            : "Nothing of this game has been run on this computer yet."}
+        </p>
+        {effect === "removesOlder" && (
+          <p className="text-xs text-amber-700 dark:text-amber-400">
+            {`Older tracks will be removed to stay within the ${formatBytes(budgetBytes)} limit.`}
+          </p>
+        )}
+        {effect === "largerThanBudget" && (
+          <p className="text-xs text-amber-700 dark:text-amber-400">
+            {`The track would be larger than the whole ${formatBytes(budgetBytes)} limit. It is kept and every other track is removed.`}
+          </p>
+        )}
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button type="button" size="sm" variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="button" size="sm" onClick={onStart}>
+          Start
+        </Button>
+      </div>
+    </>
+  );
+}
+
+/** Whether the replay has a track for rewind, beside what its analysis says. */
+function TrackLine({ track }: { track: StoredReplayTrack | undefined }) {
+  if (!track) return <p>Not recorded for rewind.</p>;
+  if (track.state === "stale") {
+    return (
+      <p className="text-xs text-amber-700 dark:text-amber-400">
+        The recorded track is out of date and is not played. A new run replaces
+        it.
+      </p>
+    );
+  }
+  return (
+    <p>Recorded for rewind. The track takes {formatBytes(track.sizeBytes)}.</p>
+  );
+}
+
 function Running({
   job,
   onCancel,
@@ -602,9 +742,7 @@ function Running({
           <Loader2 className="size-4 animate-spin motion-reduce:animate-none" />
           {job.phase === "thinning"
             ? "Making the track from the recording."
-            : job.record
-              ? `Recording the match. ${label}.`
-              : `Playing the match back. ${label}.`}
+            : `Playing the match back. ${label}.`}
         </p>
         <Button
           type="button"
@@ -778,16 +916,18 @@ function Disagreements({ stored }: { stored: StoredReplayAnalysis }) {
 const FAILURE_WORDS: Record<ReplayAnalysisFailure["reason"], string> = {
   tookTooLong: "The playback took too long and was stopped.",
   engineFailed: "The engine stopped before the match ended.",
-  couldNotRun: "The analysis could not be run.",
-  diverged: "The recording did not reproduce the match.",
+  couldNotRun: "The analysis and recording could not be run.",
   thinFailed: "The recording could not be made into a track.",
 };
 
 function Failed({
   failure,
+  earlierTrack,
   onDismiss,
 }: {
   failure: ReplayAnalysisFailure;
+  /** The replay has a track from an earlier run, which a failed run leaves. */
+  earlierTrack: boolean;
   onDismiss: () => void;
 }) {
   return (
@@ -798,7 +938,7 @@ function Failed({
           <p className="text-xs text-muted-foreground">
             {failure.reason === "tookTooLong" && failure.limitSeconds
               ? `It was allowed ${roughly(failure.limitSeconds)}, which is the length of the match plus time for the engine to start. Nothing was stored.`
-              : `${failure.message.charAt(0).toUpperCase()}${failure.message.slice(1)}. ${failure.record ? "No track was made." : "Nothing was stored."}`}
+              : `${failure.message.charAt(0).toUpperCase()}${failure.message.slice(1)}. ${earlierTrack ? "The earlier track was kept." : "No track was made."}`}
           </p>
         </div>
         <Button type="button" variant="ghost" size="sm" onClick={onDismiss}>
