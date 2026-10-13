@@ -64,6 +64,8 @@ local PARAM = "coilbox_rewind_"
 local SETTLE = 3
 -- Frames a message is waited for before the step is called lost.
 local PATIENCE = 300
+-- A file in the playback game that asks for the whole match plan.
+local WHOLE_MATCH = "coilbox_rewind/driver_whole_match.lua"
 
 local Track = VFS.Include("luarules/rewind_player/coilbox_track.lua")
 local Fetch = VFS.Include("luarules/rewind_player/coilbox_track_fetch.lua")
@@ -130,6 +132,10 @@ local function measure(label, frame)
 	local live = liveUnits()
 	local taken = {}
 	local wanted, worstPlace, worstTurn, worstHealth, worstBuild, wrongState = 0, 0, 0, 0, 0, 0
+	-- The same two, less what the player is known to add: a unit under
+	-- construction is held one step of the engine's decay above nothing, and the
+	-- engine takes a step off again before this looks.
+	local overHealth, overBuild = 0, 0
 	for i = 1, w.unitCount do
 		local def = UnitDefNames[info.unitDefs[w.unitDef[i] + 1]]
 		if def and w:unitExistsAt(i, frame) then
@@ -159,8 +165,15 @@ local function measure(label, frame)
 				if (status[2] < 1) ~= (beingBuilt == true) then
 					wrongState = wrongState + 1
 				end
-				worstBuild = math.max(worstBuild, math.abs(build - status[2]))
-				worstHealth = math.max(worstHealth, math.abs(health / maxHealth - status[1]))
+				local offBuild, offHealth = math.abs(build - status[2]), math.abs(health / maxHealth - status[1])
+				worstBuild = math.max(worstBuild, offBuild)
+				worstHealth = math.max(worstHealth, offHealth)
+				local slack = 0
+				if status[2] < 1 and Game.constructionDecay then
+					slack = 1 / math.max(0.001, def.buildTime * Game.constructionDecaySpeed) + 1 / 65535
+				end
+				overBuild = math.max(overBuild, offBuild - slack)
+				overHealth = math.max(overHealth, offHealth - slack)
 			else
 				worstPlace = math.huge
 			end
@@ -174,7 +187,7 @@ local function measure(label, frame)
 	end
 	say(
 		string.format(
-			"%s frame=%s shown=%s track_units=%d engine_units=%d track_features=%d engine_features=%d place=%.4f turn=%.5f health=%.5f build=%.5f wrong_build_state=%d",
+			"%s frame=%s shown=%s track_units=%d engine_units=%d track_features=%d engine_features=%d place=%.4f turn=%.5f health=%.5f build=%.5f health_over=%.5f build_over=%.5f wrong_build_state=%d",
 			label,
 			tostring(frame),
 			tostring(param("frame")),
@@ -186,6 +199,8 @@ local function measure(label, frame)
 			worstTurn,
 			worstHealth,
 			worstBuild,
+			overHealth,
+			overBuild,
 			wrongState
 		)
 	)
@@ -235,6 +250,25 @@ local function death()
 			end
 		end
 	end
+end
+
+--- The frame at which a finished unit of the track has the least health, looked
+-- for every 150 frames, and that health as a part of its maximum.
+local function wounded()
+	local h = track.header
+	local at, least = nil, 1
+	for frame = h.firstFrame, h.lastFrame, 150 do
+		local w = assert(track:seek(frame))
+		for i = 1, w.unitCount do
+			if UnitDefNames[info.unitDefs[w.unitDef[i] + 1]] and w:unitExistsAt(i, frame) then
+				w:sampleStatus(i, frame, status)
+				if status[2] >= 1 and status[1] < least then
+					at, least = frame, status[1]
+				end
+			end
+		end
+	end
+	return at, least
 end
 
 --- How many live units of a definition the engine has, and how many of them
@@ -298,14 +332,8 @@ local function longString()
 	say("long_string bytes=" .. blocks * 64 .. " checked=" .. checked .. " wrong=" .. wrong)
 end
 
-local function plan()
-	local h = track.header
-	local first, last = h.firstFrame, h.lastFrame
-	say(string.format("start first=%d last=%d tolerance=%s step=%s rotation_bits=%d", first, last, tostring(h.tolerance), tostring(h.positionStep), h.rotationBits))
-	say(string.format("options frame=%s playing=%s", tostring(param("frame")), tostring(param("playing"))))
-
-	send("pause")
-	-- Ten seeks spread over the match, in an order that goes both ways.
+--- Ten seeks spread over the match, in an order that goes both ways.
+local function tenSeeks(first, last)
 	local order = { 5, 2, 9, 0, 7, 3, 10, 1, 8, 4 }
 	for n, tenth in ipairs(order) do
 		local frame = first + math.floor((last - first) * tenth / 10)
@@ -314,6 +342,111 @@ local function plan()
 			measure("seek n=" .. n, frame)
 		end)
 	end
+end
+
+--- The dead teams, and whether the engine holds the match to be over.
+local function ending()
+	local dead = 0
+	for _, team in ipairs(Spring.GetTeamList()) do
+		local _, _, isDead = Spring.GetTeamInfo(team, false)
+		if isDead then
+			dead = dead + 1
+		end
+	end
+	say("teams dead=" .. dead .. " of=" .. #Spring.GetTeamList() .. " game_over=" .. (Spring.IsGameOver() and 1 or 0))
+end
+
+--- The plan for a whole recorded match (issue #3800): all of it forward, all of
+-- it backward, ten seeks, and a death at the match's own speed, which is where
+-- the base game's own gadgets hear of a unit dying the way they would in a
+-- match. Nothing here knows what the match has in it.
+local function matchPlan()
+	local h = track.header
+	local first, last = h.firstFrame, h.lastFrame
+	-- Simulation frames the whole match takes at the fastest speed, and some
+	-- over for the message to arrive.
+	local whole = math.ceil((last - first) / 32) + PATIENCE
+	say(string.format("start first=%d last=%d tolerance=%s step=%s rotation_bits=%d", first, last, tostring(h.tolerance), tostring(h.positionStep), h.rotationBits))
+
+	send("pause")
+	seekTo(first)
+	send("speed 32")
+	send("play 1")
+	push("await", last, whole)
+	push("wait", SETTLE)
+	push("run", function()
+		measure("played_forward", last)
+		say("play forward_end playing=" .. tostring(param("playing")))
+	end)
+	send("reverse")
+	push("await", first, whole)
+	push("wait", SETTLE)
+	push("run", function()
+		measure("played_backward", first)
+		say("play backward_end playing=" .. tostring(param("playing")) .. " direction=" .. tostring(param("direction")))
+	end)
+	send("pause")
+	send("speed 1")
+	send("direction 1")
+
+	tenSeeks(first, last)
+
+	local died = death()
+	if died then
+		local from = math.max(first, died - 20)
+		seekTo(from)
+		push("run", function()
+			say("explosions before_death=" .. explosions)
+		end)
+		send("play")
+		push("wait", 120)
+		send("pause")
+		push("wait", SETTLE)
+		push("run", function()
+			say("death last_frame=" .. died)
+			say("explosions after_death=" .. explosions)
+			measure("played_past_death", param("frame"))
+		end)
+	else
+		say("death none")
+	end
+
+	-- A wounded unit, held paused for fifteen seconds. The engine heals an idle
+	-- unit and a base game can have a gadget that does, and neither tells
+	-- anybody, so a player that only set health when the track's changed would
+	-- let it climb.
+	local hurt, least = wounded()
+	if hurt then
+		seekTo(hurt)
+		push("wait", 450)
+		push("run", function()
+			say(string.format("wounded frame=%d least=%.5f", hurt, least))
+			measure("held_wounded", hurt)
+		end)
+	else
+		say("wounded none")
+	end
+
+	-- A time before every unit of the match, held long enough for a base game
+	-- to decide a team is beaten.
+	seekTo(first)
+	push("wait", 150)
+	seekTo(last)
+	push("run", function()
+		measure("after_empty", last)
+		ending()
+		SendToUnsynced(REPORT)
+	end)
+end
+
+local function plan()
+	local h = track.header
+	local first, last = h.firstFrame, h.lastFrame
+	say(string.format("start first=%d last=%d tolerance=%s step=%s rotation_bits=%d", first, last, tostring(h.tolerance), tostring(h.positionStep), h.rotationBits))
+	say(string.format("options frame=%s playing=%s", tostring(param("frame")), tostring(param("playing"))))
+
+	send("pause")
+	tenSeeks(first, last)
 
 	local name, born, built = construction()
 	if name then
@@ -404,15 +537,8 @@ local function plan()
 	push("wait", 150)
 	seekTo(last)
 	push("run", function()
-		local dead = 0
-		for _, team in ipairs(Spring.GetTeamList()) do
-			local _, _, isDead = Spring.GetTeamInfo(team, false)
-			if isDead then
-				dead = dead + 1
-			end
-		end
 		measure("after_empty", last)
-		say("teams dead=" .. dead .. " of=" .. #Spring.GetTeamList())
+		ending()
 		longString()
 		-- The unsynced half says how long the player's work took, and that the
 		-- run is over.
@@ -424,7 +550,13 @@ function gadget:GameFrame()
 	if not track then
 		track = assert(Track.open(assert(Fetch.fromVFS())))
 		info, features = assert(track:info()), assert(track:features())
-		plan()
+		-- The test that wants a whole match played writes this file beside the
+		-- track. Without it the plan is the fixture match's.
+		if VFS.FileExists(WHOLE_MATCH) then
+			matchPlan()
+		else
+			plan()
+		end
 		return
 	end
 	while queue[at] do
@@ -436,7 +568,7 @@ function gadget:GameFrame()
 		elseif item.kind == "await" then
 			if param("frame") ~= item.a then
 				item.waited = item.waited + 1
-				if item.waited < PATIENCE then
+				if item.waited < (item.b or PATIENCE) then
 					return
 				end
 				say("lost frame=" .. tostring(item.a) .. " shown=" .. tostring(param("frame")))

@@ -224,7 +224,7 @@ pub fn start_script(replay_script: &str, opening: &Opening) -> Result<String, St
     let ally_teams = numbered(&game, "allyteam");
 
     let mut out = String::from("[game]\n{\n");
-    let top: [(&str, String); 10] = [
+    let top: [(&str, String); 11] = [
         ("ishost", "1".into()),
         ("numplayers", "1".into()),
         ("numusers", "1".into()),
@@ -236,6 +236,11 @@ pub fn start_script(replay_script: &str, opening: &Opening) -> Result<String, St
         // Nobody can choose a start position, so the one the script or the
         // map gives is used.
         ("startpostype", "1".into()),
+        // The engine otherwise counts down for four seconds before the first
+        // frame (`GAME\GameStartDelay` in rts/Game/GameSetup.cpp), during which
+        // the timeline is on screen and takes a seek that the world cannot
+        // show, since the player moves only on frames.
+        ("gamestartdelay", "0".into()),
         ("recorddemo", "0".into()),
         ("gametype", gametype()),
         ("mapname", map.to_string()),
@@ -811,6 +816,19 @@ mod tests {
         let game = parsed(&start_script(REPLAY_SCRIPT, &Opening::default()).unwrap());
 
         assert_eq!(game.get("startpostype"), Some("1"));
+    }
+
+    /// The engine's own countdown before the first frame is switched off,
+    /// whatever the replay's script had.
+    #[test]
+    fn the_match_starts_with_no_countdown() {
+        let game = parsed(&start_script(REPLAY_SCRIPT, &Opening::default()).unwrap());
+        assert_eq!(game.get("gamestartdelay"), Some("0"));
+
+        let slow = REPLAY_SCRIPT.replacen("[game]\n{\n", "[game]\n{\n\tgamestartdelay=9;\n", 1);
+        assert!(slow.contains("gamestartdelay=9"));
+        let game = parsed(&start_script(&slow, &Opening::default()).unwrap());
+        assert_eq!(game.get("gamestartdelay"), Some("0"));
     }
 
     /// The replay's address is not the playback's.
@@ -2292,6 +2310,212 @@ end
             emptied.contains("Failed to load: gui_static_resourcebar.lua  (no GetInfo() call)"),
             "an empty widget was not an error"
         );
+    }
+
+    /// Launches the prepared playback with the driver in it, asked for its
+    /// whole match plan, and gives the engine's log.
+    fn whole_match(prepared: &Prepared) -> String {
+        std::fs::write(
+            prepared
+                .game_dir
+                .join("luarules/gadgets/playback_driver.lua"),
+            DRIVER,
+        )
+        .unwrap();
+        std::fs::write(
+            prepared
+                .game_dir
+                .join("coilbox_rewind/driver_whole_match.lua"),
+            "return true\n",
+        )
+        .unwrap();
+        let (timed_out, output, written) =
+            launch(prepared, &|text| text.contains("REWIND_DRIVER done"));
+        assert!(!timed_out, "the driver never finished. Log:\n{output}");
+        assert_eq!(written, 0, "the playback wrote a replay");
+        output
+    }
+
+    /// The lines of an engine log in which Lua raised once the match was
+    /// running. A line from before the first frame is left out, because a
+    /// headless engine has no graphics and Splinter Faction's shader widgets say
+    /// so as they load. So is `cus_gl4.lua`, the game's unit shader gadget, for
+    /// the same reason: it calls `gl.SetUnitBufferUniforms` for every unit that
+    /// is created, which a headless engine does not have and one with a window
+    /// does.
+    fn lua_errors(output: &str) -> Vec<&str> {
+        output
+            .lines()
+            .filter(|l| !l.contains("[f=-"))
+            .filter(|l| {
+                l.contains("LUA_ERR")
+                    || l.contains("Error in ")
+                    || (l.contains("Error") && l.contains("[string \""))
+            })
+            .filter(|l| !l.contains("cus_gl4.lua"))
+            .collect()
+    }
+
+    /// Splinter Faction's adapter against a real engine and a whole recorded
+    /// match (issue #3800). The replay is recorded into a track, and the
+    /// playback is launched twice with a driver gadget that plays the match
+    /// forward to its end, backward to its start, seeks to ten times, plays
+    /// through a death at the match's own speed, holds a wounded unit for
+    /// fifteen seconds and holds the empty start for five.
+    ///
+    /// 1. With no adapter. The base game does what the adapter is for: its
+    ///    four gadgets load, it creates a commander the track does not have and
+    ///    it asks to kill a team.
+    /// 2. With the adapter coilbox ships. None of the four gadgets loads,
+    ///    nothing is created that the track does not have, no team is asked to
+    ///    be killed and the match is not asked to end, no team is dead and the
+    ///    match is not over, the engine has the track's units and features at
+    ///    both ends of play and at all ten seeks, and no Lua raised.
+    ///
+    /// Give it a replay of a whole Splinter Faction match in
+    /// `COILBOX_ANALYSIS_REPLAY`, with the variables the tests above read. It
+    /// is not part of `scripts/rewind-playback-headless.sh`, whose match is 1,100
+    /// frames of a scripted fixture.
+    #[test]
+    #[ignore = "needs an engine, Splinter Faction, a map and a replay of a whole match on them"]
+    fn a_whole_splinter_faction_match_plays_with_its_adapter() {
+        let Some(prepared) = prepared(false) else {
+            return;
+        };
+        // As the engine's log has them, which is in lower case.
+        let gadgets = [
+            "<game_end.lua>",
+            "<game_team_com_ends.lua>",
+            "<game_spawn.lua>",
+            "<unit_deathcontainerspawn.lua>",
+        ];
+        let kill = "the base game asked to kill team";
+        let over = "the base game asked to end the match";
+        let stranger = "a unit was created that the track does not have";
+        let report = |name: &str, output: &str| {
+            for l in lines_with(
+                output,
+                &["REWIND_DRIVER ", "COILBOX_REWIND_PLAYER", "[Game Spawn]"],
+            ) {
+                eprintln!("{name}: {l}");
+            }
+            eprintln!("{name}: Lua errors: {:#?}", lua_errors(output));
+        };
+
+        // 1. No adapter.
+        prepared.rewrite(&[]);
+        let plain = whole_match(&prepared);
+        report("no adapter", &plain);
+        assert!(
+            count(&plain, "COILBOX_REWIND_PLAYER adapter loaded: none") >= 1,
+            "{plain}"
+        );
+        for gadget in gadgets {
+            assert!(count(&plain, gadget) >= 1, "{gadget} did not load");
+        }
+        assert_eq!(count(&plain, stranger), 1, "the base game spawned nothing");
+        assert_eq!(count(&plain, kill), 1, "the base game never asked");
+
+        // 2. The adapter coilbox ships.
+        prepared.rewrite(REWIND_PLAYER_ADAPTERS);
+        let adapted = whole_match(&prepared);
+        report("adapter", &adapted);
+        assert!(
+            count(
+                &adapted,
+                "COILBOX_REWIND_PLAYER adapter loaded: Splinter Faction. 4 gadgets and 4 widgets"
+            ) >= 1,
+            "{adapted}"
+        );
+        for gadget in gadgets {
+            assert_eq!(count(&adapted, gadget), 0, "{gadget} loaded");
+        }
+        assert_eq!(count(&adapted, stranger), 0, "a unit was still spawned");
+        assert_eq!(count(&adapted, kill), 0, "a team was still asked for");
+        assert_eq!(count(&adapted, over), 0, "the match was asked to end");
+        assert_eq!(count(&adapted, "COILBOX_REWIND_PLAYER team "), 0);
+
+        let driver: Vec<&str> = adapted
+            .lines()
+            .filter_map(|l| l.split_once("REWIND_DRIVER ").map(|(_, rest)| rest))
+            .collect();
+        let line = |start: &str| {
+            *driver
+                .iter()
+                .find(|l| l.starts_with(start))
+                .unwrap_or_else(|| panic!("no driver line starting {start}"))
+        };
+        let start = line("start ");
+        let (first, last) = (number(start, "first"), number(start, "last"));
+        let tolerance = number(start, "tolerance");
+        let rounding = 6f64.sqrt() / (2f64.powf(number(start, "rotation_bits") - 1.0) - 1.0);
+        let fraction = 1.0 / 65535.0;
+        let agrees = |l: &str| {
+            assert_eq!(field(l, "shown"), field(l, "frame"), "{l}");
+            assert_eq!(field(l, "engine_units"), field(l, "track_units"), "{l}");
+            assert_eq!(
+                field(l, "engine_features"),
+                field(l, "track_features"),
+                "{l}"
+            );
+            assert!(number(l, "place") <= tolerance, "{l}");
+            assert!(number(l, "turn") <= rounding, "{l}");
+            assert!(number(l, "health_over") <= fraction, "{l}");
+            assert!(number(l, "build_over") <= fraction, "{l}");
+            assert_eq!(field(l, "wrong_build_state"), "0", "{l}");
+        };
+        assert!(!driver.iter().any(|l| l.starts_with("lost ")), "{driver:?}");
+
+        // Forward to the end and backward to the start, each the whole match.
+        let forward = line("played_forward ");
+        assert_eq!(number(forward, "frame"), last, "{forward}");
+        agrees(forward);
+        assert_eq!(field(line("play forward_end "), "playing"), "0");
+        let backward = line("played_backward ");
+        assert_eq!(number(backward, "frame"), first, "{backward}");
+        agrees(backward);
+        let ended = line("play backward_end ");
+        assert_eq!(field(ended, "playing"), "0", "{ended}");
+        assert_eq!(field(ended, "direction"), "-1", "{ended}");
+
+        // Ten seeks, which have to see a match with something in it.
+        let seeks: Vec<&str> = driver
+            .iter()
+            .copied()
+            .filter(|l| l.starts_with("seek "))
+            .collect();
+        assert_eq!(seeks.len(), 10, "{driver:?}");
+        seeks.iter().for_each(|l| agrees(l));
+        let mut counts: Vec<&str> = seeks.iter().map(|l| field(l, "track_units")).collect();
+        counts.sort_unstable();
+        counts.dedup();
+        assert!(
+            counts.len() >= 3,
+            "the seeks saw only {counts:?} units, so they show little"
+        );
+
+        // A death at the match's own speed, a wounded unit held, and the empty
+        // start held.
+        let past = line("played_past_death ");
+        assert!(
+            number(past, "frame") > number(line("death "), "last_frame"),
+            "{past}"
+        );
+        agrees(past);
+        assert!(
+            number(line("wounded "), "least") < 1.0,
+            "nothing was wounded"
+        );
+        agrees(line("held_wounded "));
+        agrees(line("after_empty "));
+
+        // The game never ended itself.
+        let teams = line("teams ");
+        assert_eq!(field(teams, "dead"), "0", "{teams}");
+        assert_eq!(field(teams, "game_over"), "0", "{teams}");
+
+        let errors = lua_errors(&adapted);
+        assert!(errors.is_empty(), "{errors:#?}");
     }
 
     /// The widget that presses the timeline's keys in the engine. It is
