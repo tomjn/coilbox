@@ -295,8 +295,8 @@ mod tests {
     #[test]
     fn the_default_holds_a_hundred_bar_sized_tracks_and_not_a_hundred_and_one_and_a_half() {
         const BAR_SIZED: u64 = 4_713_582;
-        assert!(DEFAULT_BUDGET_BYTES >= 100 * BAR_SIZED);
-        assert!(DEFAULT_BUDGET_BYTES < 101 * BAR_SIZED);
+        const { assert!(DEFAULT_BUDGET_BYTES >= 100 * BAR_SIZED) };
+        const { assert!(DEFAULT_BUDGET_BYTES < 101 * BAR_SIZED) };
     }
 
     #[test]
