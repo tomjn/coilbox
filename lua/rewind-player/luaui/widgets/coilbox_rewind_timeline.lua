@@ -119,3 +119,11 @@ function widget:MouseRelease()
 		timeline:mouseRelease()
 	end
 end
+
+--- A widget that is switched off in the middle of a drag ends the drag, so
+-- that the player does not wait for the end of one for good.
+function widget:Shutdown()
+	if timeline then
+		timeline:mouseRelease()
+	end
+end

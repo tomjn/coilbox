@@ -688,8 +688,12 @@ function Timeline:mousePress(x, y, button)
 		return true
 	end
 	if overBar(self, x, y) then
+		-- The player is told a drag has begun and when it ends, because a drag
+		-- sends many seeks a second and the player shows no arrival effect for
+		-- them (issue #4009).
 		self.dragging = true
 		self.sought = nil
+		self:send("drag 1")
 		drag(self, x)
 		return true
 	end
@@ -725,6 +729,9 @@ function Timeline:mouseMove(x, y)
 end
 
 function Timeline:mouseRelease()
+	if self.dragging then
+		self:send("drag 0")
+	end
 	self.dragging = false
 	self.moving = false
 end
