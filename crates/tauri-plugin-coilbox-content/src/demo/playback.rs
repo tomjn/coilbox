@@ -1900,6 +1900,14 @@ end
         "/../../lua/rewind-player/tests/headless/playback_driver.lua"
     ));
 
+    /// The gadget that reads a unit's health between the game's gadgets and
+    /// the player's correction (issues #3986 and #3987). It is written into the
+    /// game folder beside the driver and is not part of the game.
+    const HEALTH_PROBE: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../lua/rewind-player/tests/headless/health_probe.lua"
+    ));
+
     /// What the driver said, from the last time it started. Splinter Faction's
     /// Initial Settings widget reloads the engine four seconds after a settings
     /// file it has not seen is first read, which a scratch run's is, and the
@@ -2340,6 +2348,13 @@ end
         )
         .unwrap();
         std::fs::write(
+            prepared
+                .game_dir
+                .join("luarules/gadgets/playback_health_probe.lua"),
+            HEALTH_PROBE,
+        )
+        .unwrap();
+        std::fs::write(
             prepared.game_dir.join("coilbox_rewind").join(plan),
             "return true\n",
         )
@@ -2379,13 +2394,20 @@ end
     /// fifteen seconds and holds the empty start for five.
     ///
     /// 1. With no adapter. The base game does what the adapter is for: its
-    ///    four gadgets load, it creates a commander the track does not have and
-    ///    it asks to kill a team.
-    /// 2. With the adapter coilbox ships. None of the four gadgets loads,
+    ///    six gadgets load, it creates a commander the track does not have and
+    ///    it asks to kill a team. A wounded unit held paused for 450 frames
+    ///    has its health raised by the game's regeneration gadget before the
+    ///    player's frame, and the player puts it right and says so once.
+    /// 2. With the adapter coilbox ships. None of the six gadgets loads,
     ///    nothing is created that the track does not have, no team is asked to
     ///    be killed and the match is not asked to end, no team is dead and the
     ///    match is not over, the engine has the track's units and features at
-    ///    both ends of play and at all ten seeks, and no Lua raised.
+    ///    both ends of play and at all ten seeks, and no Lua raised. The
+    ///    wounded unit has the same health on every one of the 450 frames, read
+    ///    before the player's correction runs, and the player says nothing
+    ///    about health (issue #3986). A unit's death explosion reaches
+    ///    features and hurts none, the death effect still happens, and the
+    ///    player never has to make a feature again (issue #3987).
     ///
     /// Give it a replay of a whole Splinter Faction match in
     /// `COILBOX_ANALYSIS_REPLAY`, with the variables the tests above read. It
@@ -2403,10 +2425,14 @@ end
             "<game_team_com_ends.lua>",
             "<game_spawn.lua>",
             "<unit_deathcontainerspawn.lua>",
+            "<unit_auto_health_regeneration.lua>",
+            "<unit_area_heal_radius.lua>",
         ];
         let kill = "the base game asked to kill team";
         let over = "the base game asked to end the match";
         let stranger = "a unit was created that the track does not have";
+        let moved = "with no damage to hear of";
+        let lost_feature = "the base game destroyed a feature the track has";
         let report = |name: &str, output: &str| {
             for l in lines_with(
                 output,
@@ -2435,6 +2461,30 @@ end
             "the base game spawned nothing"
         );
         assert!(count(&plain, kill) >= 1, "the base game never asked");
+        // Splinter Faction turns the engine's own healing off, so what raised
+        // the unit's health is the game's gadget, before the player's frame.
+        let plain_driver = driver_lines(&plain);
+        let plain_held = *plain_driver
+            .iter()
+            .find(|l| l.starts_with("held_health "))
+            .expect("the wounded unit was watched");
+        assert_eq!(number(plain_held, "post_changes"), 0.0, "{plain_held}");
+        assert!(
+            number(plain_held, "frame_changes") > 0.0,
+            "the regeneration gadget never healed the wounded unit: {plain_held}"
+        );
+        assert_eq!(count(&plain, moved), 1, "{plain_held}");
+        assert_eq!(count(&plain, lost_feature), 0);
+        assert_eq!(
+            field(
+                plain_driver
+                    .iter()
+                    .find(|l| l.starts_with("deaths "))
+                    .unwrap(),
+                "feature_damage_by_deaths"
+            ),
+            "0"
+        );
 
         // 2. The adapter coilbox ships.
         prepared.rewrite(REWIND_PLAYER_ADAPTERS);
@@ -2443,7 +2493,7 @@ end
         assert!(
             count(
                 &adapted,
-                "COILBOX_REWIND_PLAYER adapter loaded: Splinter Faction. 4 gadgets and 4 widgets"
+                "COILBOX_REWIND_PLAYER adapter loaded: Splinter Faction. 6 gadgets and 4 widgets"
             ) >= 1,
             "{adapted}"
         );
@@ -2454,6 +2504,12 @@ end
         assert_eq!(count(&adapted, kill), 0, "a team was still asked for");
         assert_eq!(count(&adapted, over), 0, "the match was asked to end");
         assert_eq!(count(&adapted, "COILBOX_REWIND_PLAYER team "), 0);
+        assert_eq!(
+            count(&adapted, moved),
+            0,
+            "the player had to put health right"
+        );
+        assert_eq!(count(&adapted, lost_feature), 0);
 
         let driver = driver_lines(&adapted);
         let line = |start: &str| {
@@ -2526,12 +2582,81 @@ end
         agrees(line("held_wounded "));
         agrees(line("after_empty "));
 
+        // Health did not move on any of the 450 frames, at the start of the
+        // frame after the game's gadgets and before the player's, nor at the
+        // start of the post frame, and the maximum was whole at every start.
+        let held = line("held_health ");
+        assert_eq!(number(held, "frames"), 450.0, "{held}");
+        assert_eq!(number(held, "frame_changes"), 0.0, "{held}");
+        assert_eq!(number(held, "post_changes"), 0.0, "{held}");
+        assert_eq!(number(held, "maximum_moved"), 0.0, "{held}");
+        assert_eq!(number(held, "start"), number(held, "end"), "{held}");
+
+        // A death's explosion reaches features, hurts none, and still shows.
+        let deaths = line("deaths ");
+        assert!(
+            number(deaths, "feature_hits_by_deaths") > 0.0,
+            "no death reached a feature, so the match shows nothing of it: {deaths}"
+        );
+        assert_eq!(field(deaths, "feature_damage_by_deaths"), "0", "{deaths}");
+        let before = number(line("explosions before_death"), "before_death");
+        let after = number(line("explosions after_death"), "after_death");
+        assert!(after > before, "the unit died with no explosion");
+
         // The game never ended itself.
         let teams = line("teams ");
         assert_eq!(field(teams, "dead"), "0", "{teams}");
         assert_eq!(field(teams, "game_over"), "0", "{teams}");
 
         let errors = lua_errors(&adapted);
+        assert!(errors.is_empty(), "{errors:#?}");
+    }
+
+    /// The engine's own healing against a real engine and a whole recorded
+    /// match (issue #3986). Splinter Faction turns that healing off in its
+    /// definitions, so the game the playback depends on has to be one whose
+    /// units heal and which has no gadget that heals. Name it in
+    /// `COILBOX_PLAYBACK_GAME`. A small game on top of Splinter Faction does:
+    /// its own `Gamedata/alldefs_post.lua` is the game's with `autoheal` and
+    /// `idleautoheal` set above 0, and the two regeneration gadgets are files
+    /// that return `false`.
+    ///
+    /// Launches the playback with no adapter and holds a wounded unit paused
+    /// for 450 frames. The unit's definition heals, and its health is the same
+    /// at the start of every frame, read after the game's gadgets and before
+    /// the player's correction, and at the start of every post frame, where
+    /// the engine's healing of that frame would show. The player has nothing
+    /// to put right and says nothing.
+    #[test]
+    #[ignore = "needs an engine, a game whose units heal, a map and a replay of a whole match on them"]
+    fn the_engine_does_not_heal_a_wounded_unit() {
+        let Some(prepared) = prepared(false) else {
+            return;
+        };
+        prepared.rewrite(&[]);
+        let output = whole_match(&prepared);
+        for l in lines_with(
+            &output,
+            &["REWIND_DRIVER held_health", "COILBOX_REWIND_PLAYER"],
+        ) {
+            eprintln!("{l}");
+        }
+        let driver = driver_lines(&output);
+        let held = *driver
+            .iter()
+            .find(|l| l.starts_with("held_health "))
+            .expect("the wounded unit was watched");
+        assert!(
+            number(held, "auto_heal") > 0.0 || number(held, "idle_auto_heal") > 0.0,
+            "the unit's definition does not heal, so this shows nothing: {held}"
+        );
+        assert_eq!(number(held, "frames"), 450.0, "{held}");
+        assert_eq!(number(held, "frame_changes"), 0.0, "{held}");
+        assert_eq!(number(held, "post_changes"), 0.0, "{held}");
+        assert_eq!(number(held, "maximum_moved"), 0.0, "{held}");
+        assert_eq!(number(held, "start"), number(held, "end"), "{held}");
+        assert_eq!(count(&output, "with no damage to hear of"), 0, "{held}");
+        let errors = lua_errors(&output);
         assert!(errors.is_empty(), "{errors:#?}");
     }
 
@@ -2656,6 +2781,21 @@ end
             assert_eq!(field(harmless(label), "impacts"), "0");
         }
 
+        // A unit that dies in the fight explodes with the game's effect. The
+        // explosion reaches features and hurts none, so none is made again
+        // (issue #3987).
+        for label in ["forward", "half", "double"] {
+            let l = line(&format!("watched {label} "));
+            assert_eq!(field(l, "feature_damage_by_deaths"), "0", "{l}");
+        }
+        assert!(
+            number(line("deaths "), "feature_hits_by_deaths") > 0.0,
+            "no death in the fight reached a feature, so it shows nothing of the rule"
+        );
+        assert_eq!(
+            count(&output, "the base game destroyed a feature the track has"),
+            0
+        );
         assert_eq!(count(&output, "the engine ended a shot"), 0);
         let slow = lines_with(&output, &["slow frame:"]);
         assert!(slow.is_empty(), "{slow:#?}");
