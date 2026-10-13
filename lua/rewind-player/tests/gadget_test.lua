@@ -47,6 +47,9 @@ local function unsynced(file, lines, clock)
 		end,
 	}
 	env.Game = { gameSpeed = 30 }
+	env.VFS.Include = function(path)
+		return t.load(assert(path:match("^luarules/rewind_player/(.+)$"), path), env)
+	end
 	env.Spring = {
 		Echo = function(line)
 			lines[#lines + 1] = line

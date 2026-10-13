@@ -38,6 +38,7 @@ local Features = VFS.Include(MODULES .. "coilbox_player_features.lua")
 local Units = VFS.Include(MODULES .. "coilbox_player_units.lua")
 local Projectiles = VFS.Include(MODULES .. "coilbox_player_projectiles.lua")
 local Adapter = VFS.Include(MODULES .. "coilbox_player_adapter.lua")
+local Engine = VFS.Include(MODULES .. "coilbox_player_engine.lua")
 
 local M = {}
 
@@ -67,6 +68,13 @@ M.OPTIONS = {
 local Player = {}
 Player.__index = Player
 
+--- A stage that does nothing, for one whose engine calls are missing. It takes
+-- the engine's call-ins too, since the player hands them to every stage.
+local OFF = {}
+for _, name in ipairs({ "resync", "remove", "place", "created", "destroyed" }) do
+	OFF[name] = function() end
+end
+
 --- Sets a parameter when its value has changed since it was last set.
 local function publish(self, name, value)
 	if self.published[name] ~= value then
@@ -87,7 +95,9 @@ end
 -- `Spring.GetModOptions` gave and `options.log` takes a line for the engine's
 -- log. `options.adapter` is the game's adapter as coilbox_player_adapter.lua
 -- reads it, or nil for a game with none, and `options.adapterWhy` is the reason
--- when there is none because the game's could not be used.
+-- when there is none because the game's could not be used. `options.engine` is
+-- what coilbox_player_engine.lua's `check` gave for the engine, which says what
+-- is switched off. Without it every feature is on.
 function M.new(track, options)
 	local header = track.header
 	local info, why = track:info()
@@ -150,7 +160,9 @@ function M.new(track, options)
 		end
 	end
 
+	local on = options.engine and options.engine.on or Engine.ALL_ON
 	local context = {
+		on = on,
 		adapter = options.adapter,
 		hooks = hooks,
 		track = track,
@@ -165,10 +177,11 @@ function M.new(track, options)
 		teamOf = teamOf,
 		report = report,
 	}
-	local terrain = Terrain.new(context, Reader)
-	local featureStage = Features.new(context, Rotation)
+	-- A stage whose calls the engine lacks is the one that does nothing.
+	local terrain = on.terrain and Terrain.new(context, Reader) or OFF
+	local featureStage = on.features and Features.new(context, Rotation) or OFF
 	local units = Units.new(context, Rotation)
-	local projectiles = Projectiles.new(context, units, Clock)
+	local projectiles = on.shots and Projectiles.new(context, units, Clock) or OFF
 
 	local self = setmetatable({
 		Spring = Spring,
@@ -190,8 +203,10 @@ function M.new(track, options)
 
 	-- Every ally team sees the whole map, so nothing the track shows is hidden
 	-- from a view that follows one of them.
-	for _, allyTeam in ipairs(Spring.GetAllyTeamList()) do
-		Spring.SetGlobalLos(allyTeam, true)
+	if on.sight then
+		for _, allyTeam in ipairs(Spring.GetAllyTeamList()) do
+			Spring.SetGlobalLos(allyTeam, true)
+		end
 	end
 
 	local P = M.PARAMS
