@@ -8,6 +8,7 @@ import {
   ANALYSIS_ACTION_ATTRIBUTE,
   ANALYSIS_SECTION_ID,
 } from "../../replayAnalysis";
+import type { ReplayWatch } from "../../replayEngine";
 import { createReplayClock, type ReplayClock } from "../../replayMapView/clock";
 import {
   createMapView,
@@ -27,6 +28,7 @@ import type { ReplayTrackError, ReplayTrackHandle } from "../../replayTrack";
 import { useReplayTrack } from "../../replayTrack";
 import { useStoredTracks } from "../../replayTracks";
 import { useReplayTimelineMarks } from "../../useReplayTimelineMarks";
+import { OpenInEngineButton } from "./OpenInEngineButton";
 import { plural } from "./ReplayAnalysisSection";
 import {
   performAction,
@@ -67,6 +69,9 @@ export function ReplayMapViewSection({
   enginePath,
   dataDir,
   replayPath,
+  watch,
+  dependencyBlock,
+  game,
 }: {
   info: DemoInfo;
   /** The replay file, whose chat and leavers are marks on the timeline. */
@@ -74,6 +79,12 @@ export function ReplayMapViewSection({
   /** For the map's picture. Without them the units are on plain ground. */
   enginePath: string | undefined;
   dataDir: string | undefined;
+  /** The page's engine decision, for the button that opens the engine. */
+  watch: ReplayWatch;
+  /** `replayDependencyBlock`: why the replay's game cannot run, or null. */
+  dependencyBlock: string | null;
+  /** Another installed version of the replay's game, when its own is missing. */
+  game?: string;
 }) {
   const tracks = useStoredTracks();
   // A remix carries its original's game id and has no track of its own.
@@ -108,6 +119,9 @@ export function ReplayMapViewSection({
             <RecordedMatch
               info={info}
               replayPath={replayPath}
+              watch={watch}
+              dependencyBlock={dependencyBlock}
+              game={game}
               handle={track.handle}
               mapName={info.mapName}
               minimapUrl={minimap.url}
@@ -257,12 +271,18 @@ const TIME_PARAM = "frame";
 function RecordedMatch({
   info,
   replayPath,
+  watch,
+  dependencyBlock,
+  game,
   handle,
   mapName,
   minimapUrl,
 }: {
   info: DemoInfo;
   replayPath: string;
+  watch: ReplayWatch;
+  dependencyBlock: string | null;
+  game?: string;
   handle: ReplayTrackHandle;
   mapName: string;
   minimapUrl: string | null;
@@ -360,6 +380,16 @@ function RecordedMatch({
             loading={status.kind === "loading"}
             onKeyDown={onKeyDown}
           />
+          <div className="mt-2 flex justify-end">
+            <OpenInEngineButton
+              replayPath={replayPath}
+              engineVersion={info.engineVersion}
+              watch={watch}
+              dependencyBlock={dependencyBlock}
+              game={game}
+              clock={clock}
+            />
+          </div>
         </div>
       )}
       {!minimapUrl && (
