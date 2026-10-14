@@ -21,8 +21,10 @@
 #    switches off two Splinter Faction gadgets and a widget, and with the files
 #    that stand in for them emptied (issue #3799).
 #
-# The match is generated every run, not committed as a replay, because a replay
-# only plays back against the exact game version it was recorded on.
+# The match is not committed as a replay, because a replay only plays back
+# against the exact game version it was recorded on. It is kept in target/
+# instead, under a key made from everything it depends on, so a change to any of
+# those plays it again. Steps 2 onwards run every time.
 #
 # The engine is headless and draws nothing, so this shows what the engine holds
 # and not what a person would see.
@@ -42,6 +44,11 @@
 #   UNITSYNC_WORKER          the unitsync worker. Default
 #                            target/debug/coilbox-unitsync-worker.
 #   COILBOX_PLAYBACK_KEEP    set to keep the scratch folder and its logs.
+#   COILBOX_PLAYBACK_FRESH   set to play the match again and replace the cached
+#                            replay. Otherwise step 1 is skipped when
+#                            target/rewind-playback-match/ holds a replay for
+#                            the same engine, game archive, map archive,
+#                            fixture_match.lua, modinfo.lua and start-script.tdf.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -141,26 +148,47 @@ GAME_NAME="$GAME_NAME" MAP_NAME="$MAP_NAME" TEMPLATE="$RECORDER_HEADLESS/start-s
     out:close()
   '
 
-echo "== playing the fixture match"
+# The replay binds to the game by name, and the match depends on the engine, the
+# two archives and the three fixture files.
+MATCH_KEY="$(
+  { shasum -a 256 "$ENGINE" "$DATA_DIR/games/$GAME_ARCHIVE" "$DATA_DIR/maps/$MAP_ARCHIVE" \
+      "$HEADLESS/fixture_match.lua" "$RECORDER_HEADLESS/modinfo.lua" "$RECORDER_HEADLESS/start-script.tdf" \
+      | cut -d' ' -f1; } | shasum -a 256 | cut -c1-16
+)"
+MATCH_CACHE="$ROOT/target/rewind-playback-match/$MATCH_KEY"
+
 MATCH_LOG="$WORK/match.log"
-if ! engine "$SCRIPT" >"$MATCH_LOG" 2>&1; then
-  echo "  fail the engine exited nonzero, see $MATCH_LOG"
-  exit 1
-fi
-# The fixture gadget says what it did. A run in which the engine started and
-# the gadget did not load has none of these lines.
-for said in 'PLAYBACK_FIXTURE created ' 'PLAYBACK_FIXTURE building ' 'PLAYBACK_FIXTURE wrecks removed ' 'PLAYBACK_FIXTURE done '; do
-  if [ "$(grep -c "$said" "$MATCH_LOG" || true)" != 1 ]; then
-    echo "  fail the fixture match did not say '$said', see $MATCH_LOG"
+if [ -z "${COILBOX_PLAYBACK_FRESH:-}" ] && [ -f "$MATCH_CACHE/fixture.sdfz" ]; then
+  echo "== using the cached fixture match ($MATCH_CACHE)"
+  mkdir -p "$WORK/write/demos"
+  cp "$MATCH_CACHE/fixture.sdfz" "$WORK/write/demos/fixture.sdfz"
+  sed 's/^/  /' "$MATCH_CACHE/said.txt"
+else
+  echo "== playing the fixture match"
+  if ! engine "$SCRIPT" >"$MATCH_LOG" 2>&1; then
+    echo "  fail the engine exited nonzero, see $MATCH_LOG"
     exit 1
   fi
-done
-grep 'PLAYBACK_FIXTURE ' "$MATCH_LOG" | sed 's/^.*PLAYBACK_FIXTURE /  /'
-REPLAY="$(ls "$WORK"/write/demos/*.sdfz 2>/dev/null | sort | tail -n 1 || true)"
-if [ -z "$REPLAY" ]; then
-  echo "  fail the engine recorded no replay, see $MATCH_LOG"
-  exit 1
+  # The fixture gadget says what it did. A run in which the engine started and
+  # the gadget did not load has none of these lines.
+  for said in 'PLAYBACK_FIXTURE created ' 'PLAYBACK_FIXTURE building ' 'PLAYBACK_FIXTURE wrecks removed ' 'PLAYBACK_FIXTURE done '; do
+    if [ "$(grep -c "$said" "$MATCH_LOG" || true)" != 1 ]; then
+      echo "  fail the fixture match did not say '$said', see $MATCH_LOG"
+      exit 1
+    fi
+  done
+  grep 'PLAYBACK_FIXTURE ' "$MATCH_LOG" | sed 's/^.*PLAYBACK_FIXTURE /  /' | tee "$WORK/said.txt"
+  REPLAY="$(ls "$WORK"/write/demos/*.sdfz 2>/dev/null | sort | tail -n 1 || true)"
+  if [ -z "$REPLAY" ]; then
+    echo "  fail the engine recorded no replay, see $MATCH_LOG"
+    exit 1
+  fi
+  rm -rf "$ROOT/target/rewind-playback-match"
+  mkdir -p "$MATCH_CACHE"
+  cp "$REPLAY" "$MATCH_CACHE/fixture.sdfz"
+  cp "$WORK/said.txt" "$MATCH_CACHE/said.txt"
 fi
+REPLAY="$(ls "$WORK"/write/demos/*.sdfz 2>/dev/null | sort | tail -n 1 || true)"
 echo "  replay $(basename "$REPLAY")"
 
 # Unitsync, which the runs below ask for a game's short name, reads the base
