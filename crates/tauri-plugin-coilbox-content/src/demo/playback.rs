@@ -3167,6 +3167,9 @@ end
         "/../../lua/rewind-player/tests/headless/ghosts_probe.lua"
     ));
 
+    /// A ghost: the definition's name, the team, x, z and the facing.
+    type QueuedGhost = (String, u8, f64, f64, u8);
+
     /// What the ghosts should be at `frame`, worked out from the track with the
     /// Rust reader: every queued building of every unit, once for each place,
     /// less those a unit of the same definition stands at within the 8 elmos
@@ -3176,7 +3179,7 @@ end
         reader: &mut coilbox_track::TrackReader<std::io::Cursor<Vec<u8>>>,
         names: &[String],
         frame: u32,
-    ) -> Vec<(String, u8, f64, f64, u8)> {
+    ) -> Vec<QueuedGhost> {
         let q = reader.quantiser().unwrap();
         let state = reader.sample(frame).unwrap();
         let mut seen = std::collections::HashSet::new();
@@ -3233,7 +3236,7 @@ end
         // Every 15th frame, and the frames where what is queued changes with the
         // frame before it, so both sides of a building starting are looked at.
         let mut frames = Vec::new();
-        let mut before: Option<Vec<(String, u8, f64, f64, u8)>> = None;
+        let mut before: Option<Vec<QueuedGhost>> = None;
         for frame in (0..=last).step_by(15) {
             let now = queued_ghosts(&mut reader, &names, frame);
             if before.as_ref() != Some(&now) {
@@ -3301,7 +3304,7 @@ end
             // Each ghost has its footprint filled and outlined too.
             assert_eq!(number(l, "outlines") as usize, wanted.len() * 2, "{l}");
             let list = field(l, "list");
-            let mut drawn: Vec<(String, u8, f64, f64, u8)> = list
+            let mut drawn: Vec<QueuedGhost> = list
                 .split(';')
                 .filter(|s| !s.is_empty())
                 .map(|s| {
