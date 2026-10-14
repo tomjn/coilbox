@@ -341,8 +341,9 @@ else
 	local framed = 0
 	local lastLine
 	local slow, worst = 0, 0
-	-- How many units a frame may make and remove, as last sent.
-	local makeBudget, removeBudget = FIRST_BUDGET, FIRST_BUDGET
+	-- How many units a frame may make and remove, and how many corners of the
+	-- ground it may set for a seek (issue #4025), as last sent.
+	local makeBudget, removeBudget, groundBudget = FIRST_BUDGET, FIRST_BUDGET, FIRST_BUDGET
 
 	--- The budget after a frame in which `count` units took `took` milliseconds,
 	-- for a budget that was `budget`. Each took that long with the rest of the
@@ -363,35 +364,40 @@ else
 		return budget
 	end
 
-	--- A frame made `made` units and removed `removed` in `took` milliseconds.
-	-- Making costs the engine something other than removing, so only a frame that
-	-- did one of them says what that one costs. A frame that did neither ends a
-	-- seek, and the budgets go back to one. What a unit costs moves with how many
-	-- there are, from 0.28 to 0.5 ms to make and from 0.13 to 0.37 ms to remove
-	-- in a headless run of issue #3988 as the count went from none to 400 and
-	-- from 400 to none, so what one seek ended on is not safe for the start of
-	-- the next. Each starts from one and doubles each frame while the cost
-	-- allows.
-	local function retune(took, made, removed)
-		local make, remove = makeBudget, removeBudget
-		if made + removed == 0 then
+	--- A frame made `made` units, removed `removed` and set `ground` corners of a
+	-- seek's ground in `took` milliseconds. Each costs the engine something of
+	-- its own, so only a frame that did one of them says what that one costs. A
+	-- frame that did none ends a seek, and the unit budgets go back to one. What
+	-- a unit costs moves with how many there are, from 0.28 to 0.5 ms to make and
+	-- from 0.13 to 0.37 ms to remove in a headless run of issue #3988 as the count
+	-- went from none to 400 and from 400 to none, so what one seek ended on is not
+	-- safe for the start of the next. Each starts from one and doubles each frame
+	-- while the cost allows. The ground budget is kept from one seek to the next,
+	-- since what a corner costs is the engine's work round it and does not move
+	-- with what else is in the world (lua/rewind-player/README.md has the
+	-- measurements). A frame that took too long still cuts it.
+	local function retune(took, made, removed, ground)
+		local make, remove, earth = makeBudget, removeBudget, groundBudget
+		if made + removed + ground == 0 then
 			make, remove = FIRST_BUDGET, FIRST_BUDGET
-		elseif made > 0 and removed == 0 then
+		elseif ground > 0 and made + removed == 0 then
+			earth = fit(took, ground, groundBudget)
+		elseif made > 0 and removed + ground == 0 then
 			make = fit(took, made, makeBudget)
-		elseif removed > 0 and made == 0 then
+		elseif removed > 0 and made + ground == 0 then
 			remove = fit(took, removed, removeBudget)
 		end
-		if make ~= makeBudget or remove ~= removeBudget then
-			makeBudget, removeBudget = make, remove
-			Spring.SendLuaRulesMsg(BUDGET .. make .. " " .. remove)
+		if make ~= makeBudget or remove ~= removeBudget or earth ~= groundBudget then
+			makeBudget, removeBudget, groundBudget = make, remove, earth
+			Spring.SendLuaRulesMsg(BUDGET .. make .. " " .. remove .. " " .. earth)
 		end
 	end
 
-	function gadget:RecvFromSynced(name, phase, frame, made, removed, team)
+	function gadget:RecvFromSynced(name, phase, frame, made, removed, ground)
 		if name == ARRIVE then
 			-- A unit's id, its place and its team, where the work's arguments are.
 			if arrival then
-				arrival:add(phase, frame, made, removed, team)
+				arrival:add(phase, frame, made, removed, ground)
 			end
 			return true
 		end
@@ -435,7 +441,7 @@ else
 		else
 			framed = took
 			if made and removed and engine.on.budgetMessage then
-				retune(took, made, removed)
+				retune(took, made, removed, ground or 0)
 			end
 		end
 		if took <= LIMIT then
