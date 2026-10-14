@@ -3289,9 +3289,10 @@ end
     ///   pointing the way the track has it going.
     /// - Nothing lands while paused, during a seek, at 4x or backward.
     /// - Backward, the shot is nearer where it was fired on every frame.
-    /// - Forward at 1x and 0.5x every shot that ends lands once. At 2x a shot
-    ///   let go a frame before its last is a frame ahead of a unit it hit, so
-    ///   some miss, and the line says how many.
+    /// - Forward at 1x and 0.5x every shot that ends lands once, but for a
+    ///   flame with no impact, which the line counts apart since a flame can
+    ///   end without landing. At 2x a shot let go a frame before its last is a
+    ///   frame ahead of a unit it hit, so some miss, and the line says how many.
     /// - No shot does damage, to a unit or a feature, by the engine's own sum
     ///   before any gadget is asked. None leaves a crater. After each pass
     ///   every unit has the track's health.
@@ -3399,7 +3400,13 @@ end
         for label in ["forward", "half"] {
             let l = harmless(label);
             assert!(number(l, "shots_ended") > 0.0, "{l}");
-            assert_eq!(field(l, "impacts"), field(l, "shots_ended"), "{l}");
+            // A flame can end with no impact, as it did in the match, and the
+            // track does not say which did (issue #4026).
+            assert_eq!(
+                number(l, "impacts") + number(l, "flames_unlanded"),
+                number(l, "shots_ended"),
+                "{l}"
+            );
             assert_eq!(field(l, "unmatched"), "0", "{l}");
             assert!(number(l, "off_mean") <= tolerance, "{l}");
         }
