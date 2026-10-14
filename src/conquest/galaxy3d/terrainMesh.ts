@@ -18,7 +18,18 @@ import {
   terrainNormalPixels,
   terrainTriangles,
 } from "./terrain";
-import { applyTerrainShader, type TerrainFrame } from "./terrainShader";
+import {
+  bakePass,
+  createTerrainBake,
+  MARGIN_BAKE_SIZE,
+  SHEET_BAKE_SIZE,
+  type TerrainBake,
+} from "./terrainBake";
+import {
+  applyTerrainShader,
+  type TerrainFrame,
+  type TerrainShading,
+} from "./terrainShader";
 
 /**
  * The terrain sheet as a three.js mesh: the map picture laid over a
@@ -148,7 +159,7 @@ function buildMargin(
   surface: TerrainSurface,
   margin: MarginSurface,
   mat: THREE.Material,
-): void {
+): THREE.Mesh {
   const data = marginGeometry(surface, margin);
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.BufferAttribute(data.positions, 3));
@@ -160,6 +171,7 @@ function buildMargin(
   // Decoration: picking goes to the map and what stands on it.
   ring.raycast = () => {};
   scene.add(ring);
+  return ring;
 }
 
 export function isColorPixels(
@@ -172,8 +184,22 @@ export function isColorPixels(
   );
 }
 
+/** The terrain sheet, and the work left before it is drawn at its best. */
+export interface TerrainSheet {
+  mesh: THREE.Mesh;
+  /** The detail's bake, on a generated map with detail on. See terrainBake.ts. */
+  bake: TerrainBake | null;
+  /**
+   * Call with the renderer before each draw. The first call sets the
+   * pictures' filtering from what the GPU offers, and each call draws one
+   * tile of the bake. Answers whether there is more to do, so the caller asks
+   * for another frame.
+   */
+  prepare(renderer: THREE.WebGLRenderer): boolean;
+}
+
 /**
- * Build the terrain sheet into `scene` and return its mesh. The mesh writes
+ * Build the terrain sheet into `scene` and return it. The mesh writes
  * depth, so anything behind a hill is hidden by it, and it stays raycastable
  * so later layers can pick against the ground.
  *
@@ -206,7 +232,7 @@ export function buildTerrainMesh(
   ground?: GroundShading,
   /** The map's own weights, which go with `color` when it is pixels. */
   biomes?: BiomePixels,
-): THREE.Mesh {
+): TerrainSheet {
   const geo = terrainGeometry(surface);
   // Unlit: the shader lights the sheet itself, which leaves the scene's
   // lights to the few lit objects that expect them.
@@ -333,18 +359,74 @@ export function buildTerrainMesh(
       greyBeyond: !apron,
     };
   }
-  applyTerrainShader(
-    mat,
-    {
-      normals,
-      biomes: biomeTextures,
-      detail: detail && isColorPixels(color),
-      frame,
-      ground,
-    },
-    disposables,
-  );
-  if (margin) buildMargin(scene, disposables, surface, margin, mat);
+  const ring = margin
+    ? buildMargin(scene, disposables, surface, margin, mat)
+    : undefined;
+  const shading: TerrainShading = {
+    normals,
+    biomes: biomeTextures,
+    detail: detail && isColorPixels(color),
+    frame,
+    ground,
+  };
+  // Every material that shows the map picture.
+  const pictured: THREE.MeshBasicMaterial[] = [mat];
+  let bake: TerrainBake | null = null;
+  if (shading.detail && biomeTextures && normals) {
+    // The detail is drawn once into a picture for the sheet, and one for the
+    // land past its edge, which also holds the sheet so its mipmaps never
+    // blend in empty texels at the edge.
+    const draw = new THREE.MeshBasicMaterial({
+      side: THREE.DoubleSide,
+      depthTest: false,
+      depthWrite: false,
+      // Keeps the alpha, which carries the glint.
+      blending: THREE.NoBlending,
+    });
+    const rect = { value: new THREE.Vector4() };
+    applyTerrainShader(
+      draw,
+      { ...shading, bake: { kind: "draw", rect } },
+      disposables,
+    );
+    pictured.push(draw);
+    const ready = { value: 0 };
+    const passes = [bakePass([geo], SHEET_BAKE_SIZE)];
+    if (ring) passes.push(bakePass([geo, ring.geometry], MARGIN_BAKE_SIZE));
+    const reads = [mat];
+    if (ring) {
+      const ringMat = new THREE.MeshBasicMaterial();
+      disposables.push(ringMat);
+      ring.material = ringMat;
+      reads.push(ringMat);
+      pictured.push(ringMat);
+    }
+    reads.forEach((m, i) => {
+      applyTerrainShader(
+        m,
+        {
+          ...shading,
+          bake: {
+            kind: "read",
+            look: passes[i].target.texture,
+            rect: passes[i].rect,
+            ready,
+          },
+        },
+        disposables,
+      );
+    });
+    bake = createTerrainBake(draw, rect, passes, ready, [
+      biomeTextures.a,
+      biomeTextures.b,
+    ]);
+    disposables.push(bake);
+  } else {
+    applyTerrainShader(mat, shading, disposables);
+  }
+  // Mipmaps alone blur ground seen at an angle, which is how the camera sees
+  // it. Set from the GPU once the renderer is known, outside performance mode.
+  let anisotropy = 1;
 
   const pixelTexture = (picture: ColorPixels): THREE.Texture => {
     const tex = new THREE.DataTexture(
@@ -362,14 +444,17 @@ export function buildTerrainMesh(
   const applyTexture = (tex: THREE.Texture) => {
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.flipY = false;
+    tex.anisotropy = anisotropy;
     tex.needsUpdate = true;
-    mat.map = tex;
-    mat.color.set(0xffffff);
-    mat.needsUpdate = true;
+    for (const m of pictured) {
+      m.map = tex;
+      m.color.set(0xffffff);
+      m.needsUpdate = true;
+    }
   };
 
   if (typeof color === "string") {
-    mat.color.set(PLACEHOLDER_COLOR);
+    for (const m of pictured) m.color.set(PLACEHOLDER_COLOR);
     let disposed = false;
     let loaded: THREE.Texture | undefined;
     disposables.push({
@@ -421,5 +506,20 @@ export function buildTerrainMesh(
   const mesh = new THREE.Mesh(geo, mat);
   mesh.name = "terrain";
   scene.add(mesh);
-  return mesh;
+  let prepared = false;
+  return {
+    mesh,
+    bake,
+    prepare(renderer) {
+      if (!prepared) {
+        prepared = true;
+        if (detail) {
+          anisotropy = renderer.capabilities.getMaxAnisotropy();
+          // Before its first upload, which is when three.js applies it.
+          if (mat.map) mat.map.anisotropy = anisotropy;
+        }
+      }
+      return bake?.step(renderer) ?? false;
+    },
+  };
 }

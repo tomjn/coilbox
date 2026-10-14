@@ -3,12 +3,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PlanetId } from "../planets";
 import { apronPicture, apronPixels, commonEdgeColor } from "./handmadeEdge";
 import { createTerrainSurface, type HeightGrid } from "./terrain";
+import { BAKE_TILE, MARGIN_BAKE_SIZE, SHEET_BAKE_SIZE } from "./terrainBake";
 import {
   type BiomePixels,
   buildTerrainMesh,
   outerRingColor,
   type TerrainExtension,
 } from "./terrainMesh";
+import { TERRAIN_NOISE } from "./terrainShader";
 
 /** A 64 by 64 picture, green land on the left half and blue sea on the right. */
 function halves(): { data: Uint8ClampedArray; width: number; height: number } {
@@ -82,11 +84,13 @@ describe("the sheet's shader", () => {
       },
     );
     for (const d of disposables) d.dispose();
-    return mesh.material as THREE.MeshBasicMaterial;
+    return mesh.mesh.material as THREE.MeshBasicMaterial;
   };
 
-  it("lights the slopes and adds detail on a generated map", () => {
-    expect(build(halves(), grid).customProgramCacheKey()).toBe("terrain:1:1");
+  it("lights the slopes and reads the baked detail on a generated map", () => {
+    expect(build(halves(), grid).customProgramCacheKey()).toBe(
+      "terrain:1:1:read:glint",
+    );
   });
 
   it("drops the detail when asked, as performance mode does", () => {
@@ -171,7 +175,7 @@ describe("the sheet's biome weights", () => {
   ) => {
     const surface = createTerrainSurface({ width: 64, height: 64 }, 100, grid);
     const disposables: { dispose(): void }[] = [];
-    const mesh = buildTerrainMesh(
+    const sheet = buildTerrainMesh(
       new THREE.Scene(),
       disposables,
       surface,
@@ -184,7 +188,10 @@ describe("the sheet's biome weights", () => {
       biomes,
     );
     for (const d of disposables) d.dispose();
-    return uniformsOf(mesh.material as THREE.Material);
+    // The weights are read by the material that bakes the detail.
+    return uniformsOf(
+      sheet.bake?.material ?? (sheet.mesh.material as THREE.Material),
+    );
   };
 
   it("binds the weights when detail is on and not when it is off", () => {
@@ -297,7 +304,7 @@ describe("the sheet's biome weights", () => {
     );
     vi.unstubAllGlobals();
     expect(
-      uniformsOf(mesh.material as THREE.Material).uTerrainDetail.value,
+      uniformsOf(mesh.mesh.material as THREE.Material).uTerrainDetail.value,
     ).toBe(0);
     // No weights passed to a generated-looking picture either.
     expect(build(undefined).uTerrainDetail.value).toBe(0);
@@ -351,7 +358,7 @@ describe("a generated map with land past its edge", () => {
 
   it("draws the land past the edge as a ring in the sheet's own material", () => {
     expect(ring).toBeInstanceOf(THREE.Mesh);
-    expect(ring.material).toBe(sheet.material);
+    expect(ring.material).toBe(sheet.mesh.material);
   });
 
   it("depth tests the ring like the sheet, since it never lies under it", () => {
@@ -367,7 +374,7 @@ describe("a generated map with land past its edge", () => {
   });
 
   it("moves the sheet's picture coordinates into the middle of the wider picture", () => {
-    const uv = sheet.geometry.getAttribute("uv") as THREE.BufferAttribute;
+    const uv = sheet.mesh.geometry.getAttribute("uv") as THREE.BufferAttribute;
     expect(uv.getX(0)).toBeCloseTo(margin / across);
     expect(uv.getY(0)).toBeCloseTo(margin / across);
     expect(uv.getX(uv.count - 1)).toBeCloseTo((margin + 4) / across);
@@ -379,7 +386,7 @@ describe("a generated map with land past its edge", () => {
       vertexShader: THREE.ShaderLib.basic.vertexShader,
       fragmentShader: THREE.ShaderLib.basic.fragmentShader,
     } as unknown as THREE.WebGLProgramParametersWithUniforms;
-    (sheet.material as THREE.Material).onBeforeCompile(
+    (sheet.mesh.material as THREE.Material).onBeforeCompile(
       shader,
       {} as THREE.WebGLRenderer,
     );
@@ -432,7 +439,7 @@ describe("a map with nothing past its edge", () => {
 
   it("draws a short apron round it in the sheet's own material", () => {
     expect(ring).toBeInstanceOf(THREE.Mesh);
-    expect(ring.material).toBe(sheet.material);
+    expect(ring.material).toBe(sheet.mesh.material);
   });
 
   it("carries a raised edge on with no gap, then eases it down", () => {
@@ -467,7 +474,7 @@ describe("a map with nothing past its edge", () => {
   });
 
   it("puts the sheet's picture in the middle of the widened one", () => {
-    const uv = sheet.geometry.getAttribute("uv") as THREE.BufferAttribute;
+    const uv = sheet.mesh.geometry.getAttribute("uv") as THREE.BufferAttribute;
     const margin = Math.ceil(0.08 * 64);
     const across = 64 + 2 * margin;
     expect(uv.getX(0)).toBeCloseTo(margin / across);
@@ -481,5 +488,188 @@ describe("a map with nothing past its edge", () => {
     const flatRing = plain.getObjectByName("terrain-margin") as THREE.Mesh;
     const p = flatRing.geometry.getAttribute("position");
     for (let i = 0; i < p.count; i++) expect(p.getY(i)).toBe(0);
+  });
+});
+
+describe("the baked ground detail", () => {
+  const across = 8;
+  const weights = (planet: PlanetId, size: number): BiomePixels => ({
+    a: new Uint8Array(size * size * 4).fill(10),
+    b: new Uint8Array(size * size * 4).fill(20),
+    width: size,
+    height: size,
+    planet,
+  });
+  const mapGrid: HeightGrid = {
+    data: new Float32Array(16).fill(0.3),
+    width: 4,
+    height: 4,
+  };
+  const build = (planet: PlanetId = "temperate", detail = true) => {
+    const extension: TerrainExtension = {
+      margin: 2,
+      heights: {
+        data: new Float32Array(across * across).fill(0.3),
+        width: across,
+        height: across,
+      },
+      image: {
+        data: new Uint8ClampedArray(across * across * 4).fill(60),
+        width: across,
+        height: across,
+      },
+      biomes: weights(planet, across),
+    };
+    const scene = new THREE.Scene();
+    const disposables: { dispose(): void }[] = [];
+    const surface = createTerrainSurface(
+      { width: 90, height: 90, heightScale: 30 },
+      90,
+      mapGrid,
+    );
+    const sheet = buildTerrainMesh(
+      scene,
+      disposables,
+      surface,
+      halves(),
+      { current: null },
+      mapGrid,
+      detail,
+      extension,
+      undefined,
+      weights(planet, 64),
+    );
+    const ring = scene.getObjectByName("terrain-margin") as THREE.Mesh;
+    return { sheet, ring, disposables };
+  };
+  /** A material's fragment shader as it compiles, less the noise library. */
+  const fragmentOf = (material: THREE.Material) => {
+    const shader = {
+      uniforms: {},
+      vertexShader: THREE.ShaderLib.basic.vertexShader,
+      fragmentShader: THREE.ShaderLib.basic.fragmentShader,
+    } as unknown as THREE.WebGLProgramParametersWithUniforms;
+    material.onBeforeCompile(shader, {} as THREE.WebGLRenderer);
+    return {
+      code: shader.fragmentShader.replace(TERRAIN_NOISE, ""),
+      uniforms: shader.uniforms as Record<string, { value: unknown }>,
+      vertex: shader.vertexShader,
+    };
+  };
+  const calls = (code: string, fn: string) => code.split(`${fn}(`).length - 1;
+  /** A renderer that records what the bake draws. */
+  const fakeRenderer = (maxTextureSize = 16384) => {
+    const drawn: { target: THREE.WebGLRenderTarget; mipmaps: boolean }[] = [];
+    let current: THREE.WebGLRenderTarget | null = null;
+    const renderer = {
+      capabilities: { maxTextureSize, getMaxAnisotropy: () => 8 },
+      initRenderTarget: vi.fn(),
+      getRenderTarget: () => current,
+      setRenderTarget: (t: THREE.WebGLRenderTarget | null) => {
+        current = t;
+      },
+      render: () => {
+        if (current) {
+          drawn.push({
+            target: current,
+            mipmaps: current.texture.generateMipmaps,
+          });
+        }
+      },
+    };
+    return { renderer: renderer as unknown as THREE.WebGLRenderer, drawn };
+  };
+
+  it("draws the sheet with no ground pattern noise once baked", () => {
+    const { sheet } = build();
+    const { code } = fragmentOf(sheet.mesh.material as THREE.Material);
+    for (const fn of ["tPlates", "tCell", "tSimplex3"]) {
+      expect(calls(code, fn)).toBe(0);
+    }
+    // Only the glint on the sea, which moves with the camera.
+    expect(calls(code, "tField")).toBe(1);
+    expect(code).toContain("texture2D(uBakedLook");
+  });
+
+  it("works out no noise at all on a planet whose sea is not liquid", () => {
+    const { sheet } = build("moon");
+    const { code } = fragmentOf(sheet.mesh.material as THREE.Material);
+    expect(calls(code, "tField")).toBe(0);
+    expect(calls(code, "tSimplex")).toBe(0);
+  });
+
+  it("bakes the detail with the full shader, without roads, haze or glint", () => {
+    const { sheet } = build();
+    const material = sheet.bake?.material as THREE.Material;
+    const { code, vertex } = fragmentOf(material);
+    expect(calls(code, "tPlates")).toBeGreaterThan(0);
+    expect(code).not.toContain("uRoadDistance");
+    expect(code).not.toContain("if (terrainPast > 0.0)");
+    expect(code).toContain("diffuseColor.a = sheen;");
+    expect(vertex).toContain("gl_Position = vec4((uv - uBakeRect.xy)");
+    expect(material.blending).toBe(THREE.NoBlending);
+  });
+
+  it("gives the land past the edge its own picture", () => {
+    const { sheet, ring } = build();
+    expect(ring.material).not.toBe(sheet.mesh.material);
+    const own = fragmentOf(sheet.mesh.material as THREE.Material).uniforms;
+    const past = fragmentOf(ring.material as THREE.Material).uniforms;
+    expect(own.uBakedLook.value).not.toBe(past.uBakedLook.value);
+    expect(own.uBakeReady).toBe(past.uBakeReady);
+    // The weights are left to the bake.
+    expect((own.uBiomeA.value as THREE.DataTexture).image.width).toBe(1);
+  });
+
+  it("draws one tile a frame and makes the mipmaps once per picture", () => {
+    const { sheet } = build();
+    const { renderer, drawn } = fakeRenderer();
+    const ready = fragmentOf(sheet.mesh.material as THREE.Material).uniforms
+      .uBakeReady as { value: number };
+    const tiles =
+      (SHEET_BAKE_SIZE / BAKE_TILE) ** 2 + (MARGIN_BAKE_SIZE / BAKE_TILE) ** 2;
+    let more = 0;
+    while (sheet.prepare(renderer)) {
+      more++;
+      expect(ready.value).toBe(0);
+    }
+    expect(more).toBe(tiles - 1);
+    expect(drawn).toHaveLength(tiles);
+    expect(ready.value).toBe(1);
+    const targets = [...new Set(drawn.map((d) => d.target))];
+    expect(targets.map((t) => t.width)).toEqual([
+      SHEET_BAKE_SIZE,
+      MARGIN_BAKE_SIZE,
+    ]);
+    for (const t of targets) {
+      const mine = drawn.filter((d) => d.target === t);
+      expect(mine.map((d) => d.mipmaps)).toEqual(
+        mine.map((_, i) => i === mine.length - 1),
+      );
+      expect(t.texture.anisotropy).toBe(8);
+    }
+    // Done: later frames draw nothing more.
+    expect(sheet.prepare(renderer)).toBe(false);
+    expect(drawn).toHaveLength(tiles);
+  });
+
+  it("fits the pictures to the largest texture the GPU takes", () => {
+    const { sheet } = build();
+    const { renderer, drawn } = fakeRenderer(2048);
+    while (sheet.prepare(renderer));
+    const widths = [...new Set(drawn.map((d) => d.target.width))];
+    expect(widths).toEqual([2048]);
+  });
+
+  it("sets the picture's anisotropy from the GPU, outside performance mode", () => {
+    const on = build();
+    on.sheet.prepare(fakeRenderer().renderer);
+    const map = (on.sheet.mesh.material as THREE.MeshBasicMaterial).map;
+    expect(map?.anisotropy).toBe(8);
+    const off = build("temperate", false);
+    expect(off.sheet.bake).toBeNull();
+    expect(off.sheet.prepare(fakeRenderer().renderer)).toBe(false);
+    const plain = (off.sheet.mesh.material as THREE.MeshBasicMaterial).map;
+    expect(plain?.anisotropy).toBe(1);
   });
 });
