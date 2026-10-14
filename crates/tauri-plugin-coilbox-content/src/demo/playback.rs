@@ -3287,11 +3287,13 @@ end
     /// - Paused, held and at every seek the engine has as many of the track's
     ///   shots in the air as the track, each where the track has it and
     ///   pointing the way the track has it going.
-    /// - Nothing lands while paused, during a seek, at 4x or backward.
+    /// - Nothing lands where it can be seen while paused, during a seek, at 4x
+    ///   or backward. A burst of a held shot is hidden by the player.
     /// - Backward, the shot is nearer where it was fired on every frame.
-    /// - Forward at 1x and 0.5x every shot that ends lands once. At 2x a shot
-    ///   let go a frame before its last is a frame ahead of a unit it hit, so
-    ///   some miss, and the line says how many.
+    /// - Forward at 1x and 0.5x every shot that ends lands once, but for a
+    ///   flame with no impact, which the line counts apart since a flame can
+    ///   end without landing. At 2x a shot let go a frame before its last is a
+    ///   frame ahead of a unit it hit, so some miss, and the line says how many.
     /// - No shot does damage, to a unit or a feature, by the engine's own sum
     ///   before any gadget is asked. None leaves a crater. After each pass
     ///   every unit has the track's health.
@@ -3300,6 +3302,8 @@ end
     ///
     /// Give it a replay of a whole match with a fight in it in
     /// `COILBOX_ANALYSIS_REPLAY`, with the variables the tests above read.
+    /// `COILBOX_PLAYBACK_SHOTS_SPAN`, two frames with a comma between them,
+    /// keeps the plan to the shots fired and ended between them (issue #4026).
     #[test]
     #[ignore = "needs an engine, Splinter Faction, a map and a replay of a whole match on them"]
     fn the_shots_of_a_whole_match_follow_the_track() {
@@ -3307,7 +3311,20 @@ end
             return;
         };
         prepared.rewrite(REWIND_PLAYER_ADAPTERS);
-        let output = driven(&prepared, "driver_shots.lua");
+        // A match with shots in the air from its first minutes to its last would
+        // play its frames five times over, so a span can be asked for.
+        let asked = match var("COILBOX_PLAYBACK_SHOTS_SPAN") {
+            Some(span) => {
+                let (from, to) = span
+                    .split_once(',')
+                    .expect("COILBOX_PLAYBACK_SHOTS_SPAN is two frames with a comma between");
+                let (from, to): (u32, u32) =
+                    (from.trim().parse().unwrap(), to.trim().parse().unwrap());
+                format!("return {{ from = {from}, to = {to} }}\n")
+            }
+            None => "return true\n".to_string(),
+        };
+        let output = driven_with(&prepared, "driver_shots.lua", &asked);
         for l in lines_with(&output, &["REWIND_DRIVER ", "COILBOX_REWIND_PLAYER"]) {
             eprintln!("{l}");
         }
@@ -3322,7 +3339,7 @@ end
         let (tolerance, step) = (number(start, "tolerance"), number(start, "step"));
         assert!(!driver.iter().any(|l| l.starts_with("lost ")), "{driver:?}");
         assert!(
-            number(line("shots "), "held_kinds") > 0.0,
+            number(line("shots held_kinds"), "held_kinds") > 0.0,
             "the match has no shot of a weapon the game has"
         );
         assert!(
@@ -3384,7 +3401,13 @@ end
         for label in ["forward", "half"] {
             let l = harmless(label);
             assert!(number(l, "shots_ended") > 0.0, "{l}");
-            assert_eq!(field(l, "impacts"), field(l, "shots_ended"), "{l}");
+            // A flame can end with no impact, as it did in the match, and the
+            // track does not say which did (issue #4026).
+            assert_eq!(
+                number(l, "impacts") + number(l, "flames_unlanded"),
+                number(l, "shots_ended"),
+                "{l}"
+            );
             assert_eq!(field(l, "unmatched"), "0", "{l}");
             assert!(number(l, "off_mean") <= tolerance, "{l}");
         }
@@ -3394,8 +3417,10 @@ end
             number(double, "impacts") <= number(double, "shots_ended"),
             "{double}"
         );
+        // A burst the player hid is not shown (issue #4026).
         for label in ["fast", "backward"] {
-            assert_eq!(field(harmless(label), "impacts"), "0");
+            let l = harmless(label);
+            assert_eq!(number(l, "impacts"), number(l, "hidden"), "{l}");
         }
 
         // A unit that dies in the fight explodes with the game's effect. The

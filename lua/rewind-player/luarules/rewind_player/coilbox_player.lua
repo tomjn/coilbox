@@ -71,6 +71,9 @@ M.PARAMS = {
 	-- 1 when the world is the track at the time shown, 0 from a seek until it is.
 	-- A seek can take several frames (issue #3988).
 	settled = "coilbox_rewind_settled",
+	-- How many bursts of shots the player held the engine has had and the player
+	-- hid, since the player was made (issue #4026).
+	hidden = "coilbox_rewind_hidden",
 }
 
 --- The Lua message that sets the most units made in a frame and the most
@@ -126,7 +129,7 @@ end
 --- A stage that does nothing, for one whose engine calls are missing. It takes
 -- the engine's call-ins too, since the player hands them to every stage.
 local OFF = {}
-for _, name in ipairs({ "resync", "remove", "place", "created", "destroyed", "afterSim" }) do
+for _, name in ipairs({ "resync", "remove", "place", "created", "destroyed", "afterSim", "explosion" }) do
 	OFF[name] = function() end
 end
 
@@ -249,6 +252,7 @@ function M.new(track, options)
 		Spring = Spring,
 		Game = Game,
 		CMD = CMD,
+		Script = Script,
 		UnitDefNames = UnitDefNames,
 		FeatureDefNames = FeatureDefNames,
 		WeaponDefNames = WeaponDefNames,
@@ -273,7 +277,7 @@ function M.new(track, options)
 	-- Scripts are told what their units do, and builders' work is published.
 	-- Each of its rows switches off a part of it, so the stage is always made.
 	local animation = Animation.new(context, units, aim ~= OFF and aim or nil, featureStage ~= OFF and featureStage or nil)
-	local projectiles = on.shots and Projectiles.new(context, units, Clock) or OFF
+	local projectiles = on.shots and Projectiles.new(context, units, Clock, terrain) or OFF
 	-- A track from before recorder version 4 has no team's resources in it.
 	local resources = OFF
 	if (header.recorderVersion or 0) >= RESOURCES_SINCE then
@@ -317,6 +321,7 @@ function M.new(track, options)
 		posted = false,
 		misses = 0,
 		installed = false,
+		hiddenBursts = 0,
 	}, Player)
 
 	-- Every ally team sees the whole map, so nothing the track shows is hidden
@@ -331,6 +336,7 @@ function M.new(track, options)
 	publish(self, P.firstFrame, header.firstFrame)
 	publish(self, P.lastFrame, header.lastFrame)
 	publish(self, P.framesPerSecond, header.framesPerSecond)
+	publish(self, P.hidden, 0)
 	publishClock(self)
 	if hooks.started then
 		hooks.started()
@@ -540,6 +546,17 @@ end
 
 function Player:featureDestroyed(featureID)
 	self.features:destroyed(featureID)
+end
+
+--- The engine is about to show a burst. True hides it, for a shot the player
+-- holds, which the match did not land there (issue #4026).
+function Player:explosion(projectileID)
+	if not self.projectiles:explosion(projectileID) then
+		return false
+	end
+	self.hiddenBursts = self.hiddenBursts + 1
+	publish(self, M.PARAMS.hidden, self.hiddenBursts)
+	return true
 end
 
 --- The engine asks before it leaves a wreck. The track already has every wreck

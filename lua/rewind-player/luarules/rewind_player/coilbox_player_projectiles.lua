@@ -78,9 +78,9 @@ local function clear(list)
 	end
 end
 
---- `context` is the player's (see coilbox_player.lua), `units` its units stage
--- and `clock` coilbox_player_clock.lua.
-function M.new(context, units, clock)
+--- `context` is the player's (see coilbox_player.lua), `units` its units stage,
+-- `clock` coilbox_player_clock.lua and `terrain` its terrain stage.
+function M.new(context, units, clock, terrain)
 	local Spring, Game, on = context.Spring, context.Game, context.on
 	local header = context.track.header
 	local names = context.info.weaponDefs
@@ -127,6 +127,17 @@ function M.new(context, units, clock)
 		end
 	end
 
+	-- The engine asks the gadget before it shows a burst of a weapon it watches,
+	-- and shows none when the answer is true (CGameHelper::Explosion). Only a
+	-- shot that is held is in the air for longer than one frame of its own.
+	if on.hiddenBursts then
+		for i = 1, #names do
+			if defID[i] and not beam[i] then
+				context.Script.SetWatchExplosion(defID[i], true)
+			end
+		end
+	end
+
 	-- Every armour type's damage, and what makes a crater and a push. The table
 	-- form of `Spring.SetProjectileDamages` takes string keys only, and reads one
 	-- that is a number as an armour type.
@@ -142,6 +153,7 @@ function M.new(context, units, clock)
 		track = context.track,
 		Spring = Spring,
 		units = units,
+		terrain = terrain,
 		near = clock.NEAR_SPEED,
 		-- Missing before engine 2025.03.9, which coilbox_player_engine.lua checks.
 		-- `release` is the one place it is used.
@@ -165,15 +177,26 @@ function M.new(context, units, clock)
 		-- than that in a frame is standing still.
 		tolerance = header.tolerance,
 		stopped = header.tolerance * header.tolerance,
+		-- The least a shot is held short of where its flight ends. It ended on a
+		-- unit or a feature, each of which is the track's place to within the
+		-- tolerance, as the shot is, so the two can be twice that much closer than
+		-- they were in the match (issue #4026).
+		clear = 2 * header.tolerance,
 		-- The speed a held shot is given, and how far above the ground it is
 		-- kept: the least distance the track tells apart.
 		hold = header.positionStep,
 		lift = header.positionStep,
+		-- How far above the playback's ground a shot can be that was under the
+		-- match's: its place is the track's to within the tolerance, and a height
+		-- of the ground to within half a position step (issue #4026).
+		graze = header.tolerance + header.positionStep / 2,
 		window = nil,
 		from = 1,
 		to = 0,
-		-- Whether the last frame left a shot to make for want of its unit.
+		-- Whether the last frame left a shot to make for want of its unit, or
+		-- because a seek has not finished removing units.
 		unsettled = false,
+		waiting = false,
 		-- Simulation frames the engine has run, which is what a time to live
 		-- counts.
 		tick = 0,
@@ -190,6 +213,9 @@ function M.new(context, units, clock)
 		serialOf = {},
 		-- How fast a bolt last flew, by serial number.
 		flown = {},
+		-- By serial number: the shots made while the unit that fired them was not
+		-- in the world, which have no owner for the engine to skip.
+		ownerless = {},
 		-- Shots the engine has ended or has been handed, which are not made again
 		-- until a jump, a turn or the next window.
 		spent = {},
@@ -210,6 +236,17 @@ function Projectiles:forget(serial, id)
 	self.born[serial] = nil
 	self.stamp[serial] = nil
 	self.flown[serial] = nil
+	self.ownerless[serial] = nil
+end
+
+--- Whether to hide the burst of the engine's projectile `id`. A shot the stage
+-- holds that the engine ends has met something the match's did not, whatever
+-- the speed or the way of play, since the match landed it only on its last
+-- frame, where the stage lets it go. The burst still makes its sound, and the
+-- shot is gone from the air until the next seek, turn or window (issue #4026).
+function Projectiles:explosion(id)
+	local serial = self.serialOf[id]
+	return serial ~= nil and self.state[serial] == HELD
 end
 
 --- Whether the engine's projectile `id` is still the one created for `serial`.
@@ -252,6 +289,18 @@ function Projectiles:remove(t)
 	if w ~= self.window then
 		self.window = w
 		clear(self.spent)
+	end
+
+	-- A seek can leave the engine units the track does not have, which the units
+	-- stage takes away over some frames, and ground the track does not have, which
+	-- the terrain stage moves over some frames. A shot put in the air meanwhile
+	-- could hit either, so there are none until both are done (issue #4026).
+	self.waiting = self.units.seeking or self.terrain.unsettled == true
+	if self.waiting then
+		for serial, id in next, self.idOf do
+			self:delete(serial, id)
+		end
+		return
 	end
 	local tick = self.tick
 
@@ -313,6 +362,7 @@ function Projectiles:create(w, p, d, serial, x, y, z, vx, vy, vz)
 	target[1], target[2], target[3] = x + vx, y + vy, z + vz
 	arg.team = self.context.teamOf(w.projectileTeam[p])
 	arg.owner = owner(self, w, p)
+	local ownerless = arg.owner == -1 and w.projectileShooter[p] > 0
 	local id = Spring.SpawnProjectile(self.defID[d], arg)
 	if not id then
 		self.spent[serial] = true
@@ -329,6 +379,7 @@ function Projectiles:create(w, p, d, serial, x, y, z, vx, vy, vz)
 	Spring.SetProjectileDamages(id, 0, self.noDamage)
 	self.idOf[serial], self.serialOf[id] = id, serial
 	self.state[serial], self.born[serial], self.stamp[serial] = HELD, self.tick, self.tick
+	self.ownerless[serial] = ownerless or nil
 	return id
 end
 
@@ -343,6 +394,17 @@ end
 -- taken away with nothing shown when it hit nothing.
 function Projectiles:release(serial, id, d, x, y, z, vx, vy, vz)
 	local Spring = self.Spring
+	-- The engine takes a projectile under the ground to have hit it, and looks at
+	-- no line for it, so a shot that ended on the ground can be just above the
+	-- playback's ground and fly over. One that close is put a position step under
+	-- it. A unit or a feature in its way is looked for first.
+	local floor = Spring.GetGroundHeight(x, z)
+	if floor < 0 and not self.wet[d] then
+		floor = 0
+	end
+	if y - floor <= self.graze then
+		y = math.min(y, floor - self.lift)
+	end
 	Spring.SetProjectilePosition(id, x, y, z)
 	Spring.SetProjectileVelocity(id, vx, vy, vz)
 	if self.setTimeToLive and self.ends[d] then
@@ -469,6 +531,13 @@ function Projectiles:steer(w, p, d, t, step, watched)
 			self.context.report("shot ended", "the engine ended a shot the player was holding in the air, of weapon " .. self.names[d] .. " at frame " .. t .. ". Such a shot is not made again until the next seek. Later ones are not logged")
 			return
 		end
+		if self.ownerless[serial] and self.units.unitOf[w.unitSerial[w.projectileShooter[p]]] then
+			-- The unit that fired it is in the world now. A shot made before that has
+			-- no owner, so the engine would not skip the unit, and a shot at its first
+			-- frame is in the barrel. It is made again with the unit as its owner.
+			self:delete(serial, id)
+			id = nil
+		end
 	elseif self.spent[serial] then
 		return
 	end
@@ -545,10 +614,14 @@ function Projectiles:steer(w, p, d, t, step, watched)
 
 	-- Held. Where a shot ends it is on what it hit, or about to be, and the
 	-- engine takes a projectile that reaches or is inside something to have hit
-	-- it. So a shot on its last frame is held the track's tolerance short of
-	-- where the track has it, which is how far the playback's units can be from
-	-- the match's. A bolt stops on the frame it hits, on what it hit, so from
-	-- the frame before it stops it is held a frame of its flight short.
+	-- it. So a shot on its last frame is held a frame of its flight short of
+	-- where the track has it, which is where it was on the frame before, when the
+	-- match's engine found nothing in its way. The shot and what it hit are each
+	-- the track's to within its tolerance, so for a shot slower than twice that
+	-- it is held that much short. Watched, it is held there on the frame before
+	-- the one it is let go on too. A bolt stops on the frame it hits, on what it
+	-- hit, so from the frame before it stops it is held a frame of its flight
+	-- short as well.
 	local Spring = self.Spring
 	local last = w.projectileLastFrame[p]
 	local back = 0
@@ -567,8 +640,20 @@ function Projectiles:steer(w, p, d, t, step, watched)
 		if ending then
 			back = flown[serial]
 		end
-	elseif moving and t > last - 1 and w.projectileFlags[p] < 2 then
-		back = self.tolerance
+	elseif moving and w.projectileFlags[p] < 2 and (t > last - 1 or (watched and t + 2 * step > last)) then
+		-- Measured from its last frame, and not from `t`, which is between frames
+		-- at 0.5x and more than a frame before the last at 2x. The engine finds a
+		-- hit on the ground on the line from where a shot was before its last move,
+		-- and no further along it than one frame of flight, so a shot let go from
+		-- anywhere else lands short of the ground or in the air (issue #4026).
+		local a = self.ahead
+		if w:sampleProjectile(p, last, a) then
+			local flight = a[4] * a[4] + a[5] * a[5] + a[6] * a[6]
+			if flight >= self.stopped then
+				local scale = math.max(self.clear, math.sqrt(flight)) / math.sqrt(flight)
+				x, y, z = a[1] - a[4] * scale, a[2] - a[5] * scale, a[3] - a[6] * scale
+			end
+		end
 	end
 	if back > 0 then
 		if moving then
@@ -617,6 +702,10 @@ function Projectiles:show(t, clock)
 		clear(self.spent)
 	end
 	if not w then
+		return
+	end
+	if self.waiting then
+		self.unsettled = true
 		return
 	end
 	-- How far play moved the time forward to reach this frame, or nil for a

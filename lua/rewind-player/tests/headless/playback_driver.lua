@@ -244,6 +244,17 @@ local function param(name)
 	return Spring.GetGameRulesParam(PARAM .. name)
 end
 
+--- The bursts the player hid (issue #4026). The game's handler asks the player
+-- before the driver, and stops at the player's true, so the driver's own count
+-- is of the bursts that were shown.
+local function hiddenImpacts()
+	return param("hidden") or 0
+end
+
+local function shownImpacts()
+	return impactCount
+end
+
 -- Every row of the track's terrain, by corner: `groundRows[z][x]` is a list of
 -- a frame and the height after it, in the order the track has them. It is made
 -- the first time it is asked for. Reading every window's terrain for each
@@ -678,8 +689,9 @@ local function measureShots(label, frame, held, shots)
 	local taken = {}
 	local wanted, raised, worstPlace, worstTurn, worstSpeed = 0, 0, 0, 0, 0
 	-- A shot at the end of its flight is held short of where the track has it:
-	-- by the tolerance on its last frame, and a bolt by a frame of its flight
-	-- from the frame before it stops. `short` is how many were, `place` the
+	-- on its last frame by a frame of its flight, or twice the tolerance when
+	-- that is more, and a bolt by a frame of its flight from the frame before it
+	-- stops. `short` is how many were, `place` the
 	-- furthest any other shot is from the track, and `over` the furthest any
 	-- shot is past what it may be.
 	local short, over = 0, 0
@@ -687,11 +699,34 @@ local function measureShots(label, frame, held, shots)
 	for _, one in ipairs(shots) do
 		bySerial[one.serial] = one
 	end
+	-- The shots held where the track has them choose first, since one held short
+	-- can be where the next shot of a burst is (issue #4026).
+	local found = {}
 	for p = 1, w.projectileCount do
 		local weapon = w.projectileWeapon[p] + 1
 		if w.projectileWeapon[p] ~= 65535 and held[weapon] and w:projectileExistsAt(p, frame) then
 			wanted = wanted + 1
 			w:sampleProjectile(p, frame, shot)
+			local one = bySerial[w.projectileSerial[p]]
+			local slack = 0
+			if one.endFrame and one.endFrame < one.last then
+				if frame > one.endFrame - 1 then
+					slack = math.sqrt(one.evx ^ 2 + one.evy ^ 2 + one.evz ^ 2)
+				end
+			elseif frame > one.last - 1 then
+				-- A frame of its flight, and twice the tolerance for a slower shot.
+				slack = math.max(2 * h.tolerance, math.sqrt(shot[4] ^ 2 + shot[5] ^ 2 + shot[6] ^ 2))
+			end
+			found[#found + 1] = { weapon = weapon, slack = slack, shot[1], shot[2], shot[3], shot[4], shot[5], shot[6] }
+		end
+	end
+	table.sort(found, function(a, b)
+		return (a.slack > 0 and 1 or 0) < (b.slack > 0 and 1 or 0)
+	end)
+	for _, one in ipairs(found) do
+		local weapon, slack = one.weapon, one.slack
+		shot[1], shot[2], shot[3], shot[4], shot[5], shot[6] = one[1], one[2], one[3], one[4], one[5], one[6]
+		do
 			local x, y, z = shot[1], shot[2], shot[3]
 			local floor = math.max(Spring.GetGroundHeight(x, z), 0)
 			if y <= floor then
@@ -711,15 +746,6 @@ local function measureShots(label, frame, held, shots)
 			end
 			if best then
 				taken[best] = true
-				local one = bySerial[w.projectileSerial[p]]
-				local slack = 0
-				if one.endFrame and one.endFrame < one.last then
-					if frame > one.endFrame - 1 then
-						slack = math.sqrt(one.evx ^ 2 + one.evy ^ 2 + one.evz ^ 2)
-					end
-				elseif frame > one.last - 1 then
-					slack = h.tolerance
-				end
 				if slack > 0 then
 					short = short + 1
 				else
@@ -801,7 +827,7 @@ local function shotPlan(asked)
 	push("wait", 150)
 	push("run", function()
 		measureShots("held", busiest, held, shots)
-		say("impacts paused=" .. impactCount)
+		say("impacts paused=" .. shownImpacts() .. " hidden=" .. hiddenImpacts())
 	end)
 
 	-- 2. Twenty seeks to frames with shots in the air, in an order that goes
@@ -820,7 +846,7 @@ local function shotPlan(asked)
 		end)
 	end
 	push("run", function()
-		say("impacts seeks=" .. impactCount)
+		say("impacts seeks=" .. shownImpacts() .. " hidden=" .. hiddenImpacts())
 	end)
 
 	-- 3. Backward, one shot frame by frame: how far it is from where the track
@@ -870,7 +896,7 @@ local function shotPlan(asked)
 	end)
 	send("pause")
 	push("run", function()
-		say(string.format("backward serial=%d weapon=%s frames=%d seen=%d falls=%d rises=%d place=%.4f shown=%s first=%d impacts=%d", longest.serial, info.weaponDefs[longest.weapon], flight, seen, falls, rises, worst, tostring(param("frame")), longest.first, impactCount))
+		say(string.format("backward serial=%d weapon=%s frames=%d seen=%d falls=%d rises=%d place=%.4f shown=%s first=%d impacts=%d", longest.serial, info.weaponDefs[longest.weapon], flight, seen, falls, rises, worst, tostring(param("frame")), longest.first, shownImpacts()))
 	end)
 
 	-- 4. The fight watched forward at the match's own speed, then at 4x, then
@@ -879,10 +905,11 @@ local function shotPlan(asked)
 	local from = math.max(first, fightStart - 5)
 	local to = math.min(last, from + math.ceil((fightEnd + 30 - from) / 4) * 4)
 	local function watch(label, speed, direction)
-		local before
+		local before, hiddenBefore
 		seekTo(direction == 1 and from or to)
 		push("run", function()
 			before = impactCount
+			hiddenBefore = hiddenImpacts()
 			rawDamage, doneDamage = 0, 0
 			featureShotDamage, featureOtherDamage = 0, 0
 		end)
@@ -893,19 +920,28 @@ local function shotPlan(asked)
 		push("wait", 30)
 		push("run", function()
 			-- How far each impact is from the nearest place a shot of that weapon
-			-- stopped moving, along its last frame of flight, and how many left a
-			-- mark on the ground.
+			-- stopped moving, along its flight from a frame before its last place to
+			-- a frame after it, and how many left a mark on the ground. The engine
+			-- finds a unit or a feature along a shot's speed from where it is, and
+			-- the ground between where it was before its last move and where it is
+			-- (CProjectileHandler::CheckGroundCollisions), so a shot that hit the
+			-- ground landed short of its last place (issue #4026).
+			local function off(one, hit)
+				if not one.endFrame or shotWeapons[hit.def] ~= one.weapon or math.abs(hit.frame - one.endFrame) > 3 then
+					return nil
+				end
+				local length = one.evx ^ 2 + one.evy ^ 2 + one.evz ^ 2
+				local along = math.max(-1, math.min(1, ((hit.x - one.ex) * one.evx + (hit.y - one.ey) * one.evy + (hit.z - one.ez) * one.evz) / length))
+				return math.sqrt((hit.x - one.ex - one.evx * along) ^ 2 + (hit.y - one.ey - one.evy * along) ^ 2 + (hit.z - one.ez - one.evz * along) ^ 2)
+			end
 			local worstOff, total, craters, late = 0, 0, 0, 0
 			for n = before + 1, impactCount do
 				local hit = impacts[n]
 				local best = math.huge
 				for _, one in ipairs(shots) do
-					if one.endFrame and shotWeapons[hit.def] == one.weapon and math.abs(hit.frame - one.endFrame) <= 3 then
-						-- The nearest point of the last frame's flight.
-						local length = one.evx ^ 2 + one.evy ^ 2 + one.evz ^ 2
-						local along = math.max(0, math.min(1, ((hit.x - one.ex) * one.evx + (hit.y - one.ey) * one.evy + (hit.z - one.ez) * one.evz) / length))
-						local d = math.sqrt((hit.x - one.ex - one.evx * along) ^ 2 + (hit.y - one.ey - one.evy * along) ^ 2 + (hit.z - one.ez - one.evz * along) ^ 2)
-						best = math.min(best, d)
+					local d = off(one, hit)
+					if d and d < best then
+						best = d
 					end
 				end
 				if best == math.huge then
@@ -924,21 +960,37 @@ local function shotPlan(asked)
 				end
 			end
 			local landed = impactCount - before
+			local hidden = hiddenImpacts() - hiddenBefore
+			-- A flame that reaches the end of its life goes with no impact, and one
+			-- that touches the ground only slides along it (CFlameProjectile), so a
+			-- flame's end in the track can be a landing or not. The ones with no
+			-- impact are counted apart.
+			local unlandedFlames = 0
 			if speed <= 2 and direction == 1 then
-				-- The shots that ended and have no impact of their weapon near their
-				-- end, by weapon, and the first few.
+				-- The shots that ended and have no impact of their own near their end,
+				-- by weapon, and the first few. Each impact is the nearest shot's that
+				-- has none yet, since shots of a burst end on the same frames.
+				local claimed = {}
+				for n = before + 1, impactCount do
+					local hit = impacts[n]
+					local best, bestOne = math.huge, nil
+					for _, one in ipairs(shots) do
+						local d = not claimed[one] and off(one, hit)
+						if d and d < best then
+							best, bestOne = d, one
+						end
+					end
+					if bestOne then
+						claimed[bestOne] = true
+					end
+				end
 				local missed, listed = {}, 0
 				for _, one in ipairs(shots) do
 					if one.endFrame and one.endFrame > from and one.endFrame <= to then
-						local found = false
-						for n = before + 1, impactCount do
-							local hit = impacts[n]
-							if shotWeapons[hit.def] == one.weapon and math.abs(hit.frame - one.endFrame) <= 3 then
-								found = true
-								break
-							end
-						end
-						if not found then
+						local found = claimed[one]
+						if not found and WeaponDefNames[info.weaponDefs[one.weapon]].type == "Flame" then
+							unlandedFlames = unlandedFlames + 1
+						elseif not found then
 							missed[one.weapon] = (missed[one.weapon] or 0) + 1
 							if listed < 6 then
 								listed = listed + 1
@@ -966,7 +1018,7 @@ local function shotPlan(asked)
 					say(string.format("stray %s weapon=%s frame=%s at=%.1f,%.1f,%.1f ground=%.1f near=%s", label, info.weaponDefs[shotWeapons[hit.def]], tostring(hit.frame), hit.x, hit.y, hit.z, hit.ground, near))
 				end
 			end
-			say(string.format("watched %s speed=%s direction=%d from=%d to=%d shots_ended=%d impacts=%d unmatched=%d off_mean=%.3f off_worst=%.3f craters=%d raw_damage=%d done_damage=%d feature_damage=%d feature_hits_by_deaths=%d feature_damage_by_deaths=%d in_air_after=%d", label, tostring(speed), direction, from, to, ended, landed, late, total / math.max(landed - late, 1), worstOff, craters, rawDamage, doneDamage, featureShotDamage, featureOtherDamage, featureDoneDamage, #airborne()))
+			say(string.format("watched %s speed=%s direction=%d from=%d to=%d shots_ended=%d flames_unlanded=%d impacts=%d hidden=%d unmatched=%d off_mean=%.3f off_worst=%.3f craters=%d raw_damage=%d done_damage=%d feature_damage=%d feature_hits_by_deaths=%d feature_damage_by_deaths=%d in_air_after=%d", label, tostring(speed), direction, from, to, ended, unlandedFlames, landed, hidden, late, total / math.max(landed - late, 1), worstOff, craters, rawDamage, doneDamage, featureShotDamage, featureOtherDamage, featureDoneDamage, #airborne()))
 			measure("after_" .. label, param("frame"))
 		end)
 	end
