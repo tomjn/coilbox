@@ -15,8 +15,8 @@
 --
 -- `since` was read from rts/Lua in the engine's source at the tags 105.0,
 -- 105.1.1, 2025.01.6, 2025.04.11 and 2026.07.04: `gl.UnitShape`, `gl.MatrixMode`, `gl.PushMatrix`,
--- `gl.PopMatrix`, `gl.Translate` and `gl.Rotate` in LuaOpenGL.cpp, and
--- `Spring.GetGroundHeight` and `Spring.GetGameRulesParam` in LuaSyncedRead.cpp,
+-- `gl.PopMatrix`, `gl.LoadIdentity`, `gl.Translate` and `gl.Rotate` in LuaOpenGL.cpp, and
+-- `Spring.Pos2BuildPos` and `Spring.GetGameRulesParam` in LuaSyncedRead.cpp,
 -- which LuaUI is given too (LuaUI.cpp adds the synced read entries to `Spring`).
 -- All are at every one of those tags. `gl.UnitShape` has its fifth argument,
 -- which picks translucent drawing, at 105.0. No older engine was read, and none
@@ -64,7 +64,7 @@ M.ROWS = {
 	{
 		id = "ground",
 		feature = "putting a ghost on the ground",
-		calls = { "Spring.GetGroundHeight" },
+		calls = { "Spring.Pos2BuildPos" },
 		how = "presence",
 		used = "coilbox_ghosts.lua, Ghosts:draw",
 		required = true,
@@ -75,7 +75,7 @@ M.ROWS = {
 	{
 		id = "drawing",
 		feature = "drawing a ghost",
-		calls = { "gl.MatrixMode", "gl.PushMatrix", "gl.PopMatrix", "gl.Translate", "gl.Rotate", "gl.UnitShape", "GL.MODELVIEW" },
+		calls = { "gl.MatrixMode", "gl.PushMatrix", "gl.PopMatrix", "gl.LoadIdentity", "gl.Translate", "gl.Rotate", "gl.UnitShape", "GL.MODELVIEW" },
 		how = "presence",
 		used = "coilbox_ghosts.lua, Ghosts:draw",
 		required = true,
