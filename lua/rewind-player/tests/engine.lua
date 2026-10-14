@@ -219,6 +219,11 @@ function M.new(options)
 	world.nativeExcessSharing = true
 	-- How often the calls that set a team's numbers were made.
 	world.resourceSets, world.shareSets, world.resourceFeeds, world.excessAdds, world.teamParamSets = 0, 0, 0, 0, 0
+	-- How often a transfer between teams went through.
+	world.transfers = 0
+	-- What a game's AllowResourceTransfer answers on the engines that ask it (105.0
+	-- to 2025.03.9). Nil asks nobody, as a game with no such gadget.
+	world.allowTransfer = nil
 
 	local function call(name, ...)
 		local gadget = world.gadget
@@ -377,6 +382,27 @@ function M.new(options)
 			world.resourceFeeds = world.resourceFeeds + 1
 			return use(found, math.max(0, amount))
 		end
+	end
+
+	--- LuaSyncedCtrl::ShareTeamResource: moves what a team holds, up to what it
+	-- holds, and adds it to the first team's sent sum and the second's received
+	-- sum. It does not ask whether the teams are allied. Before 2026.07.01 it
+	-- asks the game's AllowResourceTransfer, which may refuse.
+	function Spring.ShareTeamResource(from, to, name, amount)
+		assert(world.teams[from] and world.teams[to], "Incorrect arguments to ShareTeamResource(teamID1, teamID2, type, amount)")
+		local giver, receiver = poolOf(from, name), poolOf(to, name)
+		if not giver then
+			return
+		end
+		amount = math.min(amount, giver.held)
+		if world.allowTransfer and not world.allowTransfer(from, to, name:sub(1, 1), amount) then
+			return
+		end
+		giver.held = giver.held - amount
+		giver.sent = giver.sent + amount
+		receiver.held = receiver.held + amount
+		receiver.received = receiver.received + amount
+		world.transfers = world.transfers + 1
 	end
 
 	--- Registered from 2026.07.01 only. It adds to the excess of the stretch

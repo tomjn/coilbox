@@ -147,6 +147,7 @@ True to the recording:
 - The resource bars. Each team's metal and energy, and how much it can store, are what they were in the match at the moment showing. They stay put while you pause and go back when you seek back. A figure is within half a unit of the match's, or within a thousandth of it for a team that holds thousands.
 - In Splinter Faction, supply used, supply available and research points.
 - In Beyond All Reason, each team's faction and its energy converters' level and use.
+- Resources one team gave another, sent and received, for metal and energy. Like income, they take up to three seconds to settle after a seek. Where a recording's sent and received do not add up to each other, both sides read the smaller total.
 - Income and spending, once the playback has caught up. They take up to three seconds to settle after a seek and can read high for a moment after a team's income rose in the match. The engine has no way to set them directly, so coilbox tops them up to the match's figures and cannot bring them down.
 - The minimap, the tooltip with a unit's description, the players list and the game's own effects and lights.
 
@@ -154,7 +155,6 @@ A track recorded by an earlier version of coilbox has no resources in it. It sho
 
 Not true to the recording:
 
-- Resources one team gave another. A playback shows none sent and none received. This is issue #4011.
 - The totals in the end of game statistics, such as all the metal a team ever made. The engine keeps those itself and nothing can set them.
 - The players in the match show under the names they had, in the players list and over their commanders, but the game treats them as not connected. Splinter Faction marks each with a red "dc". You are listed as a spectator called CoilboxPlayback.
 - In Splinter Faction the clock in the players list starts at nothing each time the playback is opened. In Beyond All Reason the time and the speed under the players list are the game's own in the same way. Its Player View button, which follows a player's camera, is switched off during playback. The game's day and night and its weather follow that clock, so a moment that was dark in the match can be light. The engine's clock only counts up and cannot be set to the moment you seek to. This is issue #4013.

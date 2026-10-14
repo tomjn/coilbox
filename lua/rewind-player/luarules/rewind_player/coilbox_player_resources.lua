@@ -23,8 +23,10 @@
 --   engine reports. So that the playback wastes nothing of its own, a team has
 --   room for the playback's own income for the length of a frame.
 --
---   What a team sent and received is not set. It would take a transfer between
---   two teams for each of them.
+--   What a team sent and received has no call either. The engine adds a
+--   transfer between two teams to the first one's sent sum and the second one's
+--   received sum, so the stage makes the transfers the match made, each from a
+--   team that sent to one that received (issue #4011).
 --
 -- The playback's own share is not known for the 30 frames that are running,
 -- since only the sums of the 30 before can be read. The stage takes those, less
@@ -144,6 +146,7 @@ function M.new(context, reader)
 		sets = on.resources == true,
 		reads = on.resourceRates == true,
 		feeds = on.resources == true and on.resourceRates == true,
+		shares = on.resources == true and on.resourceRates == true and on.resourceShares == true,
 		excess = on.resourceRates == true and on.resourceExcess == true,
 		teamNames = teamNames,
 		teamCodes = teamCodes,
@@ -166,10 +169,10 @@ function M.new(context, reader)
 	-- For each team and each of its two resources, in one list: the tracks of
 	-- its numbers in the window, false for a number the window has no track of,
 	-- then the playback's own sums, and what the stage added to the running ones.
-	for _, name in ipairs({ "held", "storage", "share", "pull", "income", "expense", "wasted" }) do
+	for _, name in ipairs({ "held", "storage", "share", "pull", "income", "expense", "wasted", "sent", "received" }) do
 		self[name] = {}
 	end
-	for _, name in ipairs({ "ownPull", "ownIncome", "ownExpense", "addedPull", "addedIncome", "addedExpense" }) do
+	for _, name in ipairs({ "ownPull", "ownIncome", "ownExpense", "addedPull", "addedIncome", "addedExpense", "ownSent", "ownReceived", "addedSent", "addedReceived", "giving", "taking" }) do
 		local list = {}
 		for s = 1, #teams * 2 do
 			list[s] = 0
@@ -194,6 +197,8 @@ local function index(self, w)
 			self.income[s] = w:valueOf(team, base + CODE.INCOME) or false
 			self.expense[s] = w:valueOf(team, base + CODE.EXPENSE) or false
 			self.wasted[s] = w:valueOf(team, base + CODE.EXCESS) or false
+			self.sent[s] = w:valueOf(team, base + CODE.SENT) or false
+			self.received[s] = w:valueOf(team, base + CODE.RECEIVED) or false
 		end
 		local count = #self.teamCodes
 		for j = 1, count do
@@ -220,12 +225,18 @@ end
 local function settle(self, w, t)
 	local Spring, teams = self.Spring, self.teams
 	local getTeamResources = Spring.GetTeamResources
+	local shares = self.shares
 	for i = 1, #teams do
 		local team = teams[i]
 		for r = 1, 2 do
 			local s = (i - 1) * 2 + r
-			local _, _, pull, income, expense, _, _, _, wasted = getTeamResources(team, NAME[r])
+			local _, _, pull, income, expense, _, sent, received, wasted = getTeamResources(team, NAME[r])
 			if pull then
+				if shares then
+					self.ownSent[s] = max(0, sent - self.addedSent[s])
+					self.ownReceived[s] = max(0, received - self.addedReceived[s])
+					self.addedSent[s], self.addedReceived[s] = 0, 0
+				end
 				self.ownPull[s] = max(0, pull - self.addedPull[s])
 				self.ownIncome[s] = max(0, income - self.addedIncome[s])
 				self.ownExpense[s] = max(0, expense - self.addedExpense[s])
@@ -281,6 +292,81 @@ local function feed(self, w, t)
 				end
 			end
 			self.addedIncome[s], self.addedExpense[s], self.addedPull[s] = income, expense, expense + pull
+		end
+	end
+end
+
+--- Makes the transfers that add what the match sent and received to the
+-- engine's running sums. For each resource the senders give to the receivers,
+-- never to themselves, the largest first. The tracks are thinned one by one, so the two totals may
+-- differ. The smaller total is made whole and the larger is cut in the same
+-- proportion. `apply` puts what every team holds back.
+local function share(self, w, t)
+	local Spring, teams = self.Spring, self.teams
+	local setTeamResource, shareTeamResource = Spring.SetTeamResource, Spring.ShareTeamResource
+	local giving, taking = self.giving, self.taking
+	local count = #teams
+	for r = 1, 2 do
+		local name = NAME[r]
+		local gives, takes = 0, 0
+		for i = 1, count do
+			local s = (i - 1) * 2 + r
+			giving[i] = max(0, value(w, self.sent[s], t) - self.ownSent[s])
+			taking[i] = max(0, value(w, self.received[s], t) - self.ownReceived[s])
+			gives = gives + giving[i]
+			takes = takes + taking[i]
+		end
+		local matched = gives < takes and gives or takes
+		if matched > 0 then
+			local cutGiving, cutTaking = matched / gives, matched / takes
+			for i = 1, count do
+				giving[i] = giving[i] * cutGiving
+				taking[i] = taking[i] * cutTaking
+			end
+			-- The team with the most left to send gives to the one with the most left
+			-- to take, and never to itself. Each step empties one of them, so it ends.
+			while true do
+				local i, most = 0, 0
+				for k = 1, count do
+					if giving[k] > most then
+						i, most = k, giving[k]
+					end
+				end
+				if i == 0 then
+					break
+				end
+				local j, room = 0, 0
+				for k = 1, count do
+					if k ~= i and taking[k] > room then
+						j, room = k, taking[k]
+					end
+				end
+				if j == 0 then
+					-- Only itself is left to give to.
+					giving[i] = 0
+				else
+					local amount = most < room and most or room
+					-- The sender must hold the amount, and storage must hold it.
+					setTeamResource(teams[i], STORAGE_NAME[r], 2 * amount)
+					setTeamResource(teams[i], name, amount)
+					shareTeamResource(teams[i], teams[j], name, amount)
+					if (Spring.GetTeamResources(teams[i], name)) > 0 then
+						-- Before 2026.07.01 the engine asks the game's AllowResourceTransfer,
+						-- which refused.
+						self.context.report(
+							"transfer refused",
+							"the game's AllowResourceTransfer refused a transfer between teams, so what those teams sent and received reads as the playback's own"
+						)
+						giving[i] = 0
+					else
+						giving[i] = giving[i] - amount
+						taking[j] = taking[j] - amount
+						local si, sj = (i - 1) * 2 + r, (j - 1) * 2 + r
+						self.addedSent[si] = self.addedSent[si] + amount
+						self.addedReceived[sj] = self.addedReceived[sj] + amount
+					end
+				end
+			end
 		end
 	end
 end
@@ -367,6 +453,9 @@ function Resources:place(t)
 	if summing then
 		if self.feeds then
 			feed(self, w, t)
+		end
+		if self.shares then
+			share(self, w, t)
 		end
 		self.rolled = true
 	end

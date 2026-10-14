@@ -1923,6 +1923,10 @@ end
             .map(|_| ())
         })
         .expect("a track is stored");
+        if let Some(save) = var("COILBOX_PLAYBACK_SAVE_TRACK") {
+            // The recorded track, to make another from.
+            std::fs::copy(track_store::track_path(&tracks, &game_id).unwrap(), save).unwrap();
+        }
         // What a recording cost, for whoever is measuring a game or a match.
         eprintln!(
             "recorded: engine_seconds={:.1} dump_bytes={} thin_seconds={:.1} track_bytes={}",
@@ -3093,7 +3097,10 @@ end
 
         // 1. A track the player takes as having no resources.
         let inside = prepared.game_dir.join(TRACK_PATH);
-        let mut track = std::fs::read(&inside).unwrap();
+        let mut track = match var("COILBOX_PLAYBACK_TRACK") {
+            Some(own) => std::fs::read(own).unwrap(),
+            None => std::fs::read(&inside).unwrap(),
+        };
         assert_eq!(
             u16::from_le_bytes([track[8], track[9]]),
             coilbox_track_thin::RECORDER_VERSION
@@ -3122,6 +3129,14 @@ end
 
         // 2. The track as it was recorded.
         prepared.rewrite(REWIND_PLAYER_ADAPTERS);
+        if let Some(track) = var("COILBOX_PLAYBACK_TRACK") {
+            // A track to play instead of the recorded one, such as one with
+            // sharing in it that `crates/coilbox-track/tests/crowd.rs` made
+            // (issue #4011).
+            let at = prepared.game_dir.join(TRACK_PATH);
+            std::fs::remove_file(&at).unwrap();
+            std::fs::copy(track, &at).unwrap();
+        }
         let after = driven_with(&prepared, "driver_resources.lua", &plan);
         report("after", &after);
         let driver = driver_lines(&after);
@@ -3146,7 +3161,17 @@ end
             &after,
             "this engine has no Spring.AddTeamResourceExcessStats",
         ) == 0;
+        let sharing = count(&after, "this engine has no Spring.ShareTeamResource") == 0;
         let seen = resources(&driver, "forward");
+        // The match has to have had sharing in it, or the run shows nothing.
+        let shared = seen
+            .iter()
+            .filter(|l| number(l, "track_sent") > 0.0 || number(l, "track_received") > 0.0)
+            .count();
+        eprintln!(
+            "lines with sent or received in the track: {shared} of {}",
+            seen.len()
+        );
         assert_eq!(
             seen.len(),
             own.len(),
@@ -3157,6 +3182,19 @@ end
             assert_eq!(field(l, "frame"), field(was, "frame"));
             assert_eq!(number(l, "held_off"), 0.0, "{l}");
             assert_eq!(field(l, "share"), field(l, "track_share"), "{l}");
+            // What a team sent and received is made with transfers between the
+            // teams (issue #4011), so it is the track's, give or take the cut
+            // that makes the two sides of a stretch equal.
+            if sharing {
+                for key in ["sent", "received"] {
+                    let wanted = number(l, &format!("track_{key}"));
+                    let allowed = coilbox_track::value_allowance(tolerance, fraction, wanted);
+                    assert!(
+                        (number(l, key) - wanted).abs() <= allowed,
+                        "{key} is not the track's: {l}"
+                    );
+                }
+            }
             // The engine's sums only go up, so a number is the track's or the
             // playback's own, whichever is the larger.
             for key in ["income", "expense"] {
