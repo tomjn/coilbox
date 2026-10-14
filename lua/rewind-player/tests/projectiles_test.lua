@@ -43,6 +43,7 @@ local function setup(spec, options)
 	local track = Fake.new(spec)
 	local player = assert(Player.new(track, {
 		modOptions = {},
+		budget = options.budget,
 		log = function(text)
 			world.lines[#world.lines + 1] = text
 		end,
@@ -319,7 +320,7 @@ do
 	seek(world, player, 103)
 	run(world, player, 30)
 	seek(world, player, 110)
-	t.same("on its last frame it is held the track's tolerance short of where it ends", world.projectileNamed("rocket").x, 99.5)
+	t.same("on its last frame it is held a frame of its flight short of where it ends", world.projectileNamed("rocket").x, 90)
 	run(world, player, 30)
 	t.same("held, a rocket whose path ends in a unit does not hit it", #world.explosions, 0)
 	seek(world, player, 109)
@@ -330,6 +331,136 @@ do
 	t.same("watched, it hits on its last frame", #world.explosions, 1)
 	t.same("the unit", (world.explosions[1] or {}).why, "target")
 	t.same("and is gone", world.projectileCount(), 0)
+end
+
+-- The shot's place and the unit's place are each the track's to within its
+-- tolerance, so a unit can stand that much nearer than in the match, and the
+-- shot that much further on (issue #4026). A shot that ended on the unit's
+-- edge is held clear of it for either.
+
+do
+	local world, player = setup({ last = 400, projectiles = { { weapon = ROCKET, first = 100, last = 110, at = flight(100, { 0, 50, 0 }, { 10, 0, 0 }) } } })
+	-- Its edge is 0.8 nearer than the 100 where the shot ends, which the match did
+	-- not have, though the track is within 0.5 of it.
+	world.target = { x = 102.2, y = 50, z = 0, radius = 3 }
+	send(player, "pause")
+	seek(world, player, 110)
+	run(world, player, 30)
+	t.same("a shot that ended on a unit's edge is held clear of it when the unit stands 0.8 nearer", #world.explosions, 0)
+	seek(world, player, 105)
+	send(player, "speed 4")
+	send(player, "play 1")
+	run(world, player, 10)
+	t.same("and so it is at 4x, passing its last frame", #world.explosions, 0)
+	seek(world, player, 110)
+	send(player, "speed 1")
+	send(player, "play -1")
+	run(world, player, 3)
+	t.same("and playing backward onto it", #world.explosions, 0)
+end
+
+-- A shot that came down beside a feature's side ended 0.3 inside its box in
+-- the playback (issue #4026). The track's last place for it is where the
+-- engine looked from when it found its hit, and the frame before that one is
+-- the last place the match's engine found nothing in the way. The shot is held
+-- there, and not a little way back along a path that runs alongside the face.
+
+do
+	-- It falls 19.64 a frame and drifts 2.81 toward a box whose face is at x = 10,
+	-- and on frame 110 it is at x = 9.7, 12.5 up.
+	local fall = { weapon = ROCKET, first = 100, last = 110, at = flight(100, { 37.8, 208.9, 0 }, { -2.81, -19.64, 0 }) }
+	local world, player = setup({ last = 400, projectiles = { fall } })
+	world.target = { x = 0, y = 8, z = 0, half = { 10, 9, 15 } }
+	local x, y = fall.at(110)
+	t.check("the track's last place for it is inside the box", math.abs(x) < 10 and math.abs(y - 8) < 9, x .. " " .. y)
+	t.check("the place before it is clear of the box", math.abs((fall.at(109))) > 10, (fall.at(109)))
+	send(player, "pause")
+	seek(world, player, 110)
+	local one = world.projectileNamed("rocket")
+	t.check("held on its last frame it is clear of the box", math.abs(one.x - world.target.x) > 10 or math.abs(one.y - world.target.y) > 9, one.x .. " " .. one.y)
+	run(world, player, 30)
+	t.same("and nothing lands, held", #world.explosions, 0)
+	send(player, "play -1")
+	run(world, player, 12)
+	t.same("nor playing backward", #world.explosions, 0)
+	seek(world, player, 100)
+	send(player, "speed 4")
+	send(player, "play 1")
+	run(world, player, 6)
+	t.same("nor at 4x", #world.explosions, 0)
+end
+
+-- After a seek the engine can still have units the track does not, for as many
+-- frames as the player's budget takes to remove them, and a shot made in those
+-- frames can hit one (issue #4026). No shot is made until they are gone.
+
+do
+	local units = {}
+	for n = 1, 4 do
+		units[n] = { first = 0, last = 150 }
+	end
+	local rocket = { weapon = ROCKET, first = 100, last = 300, at = flight(100, { 0, 50, 0 }, { 0, 0, 1 }) }
+	local world, player = setup({ last = 400, units = units, projectiles = { rocket } }, { budget = 1 })
+	send(player, "pause")
+	run(world, player, 6)
+	seek(world, player, 120)
+	run(world, player, 6)
+	t.same("with the budget of one, the four units are made and the shot is held", world.unitCount() + world.projectileCount(), 5)
+	seek(world, player, 200)
+	t.same("a seek away from the units removes one of them in the frame it is shown", world.unitCount(), 3)
+	t.same("and the shot of that frame is not made while the engine has the other three", world.projectileCount(), 0)
+	t.same("the player is not settled", player:settled(), false)
+	frame(world, player)
+	frame(world, player)
+	t.same("nor in the next frames", world.projectileCount(), 0)
+	frame(world, player)
+	t.same("the units are gone", world.unitCount(), 0)
+	t.same("and the frame that removed the last one has the shot", world.projectileCount(), 1)
+	t.same("the player is settled", player:settled(), true)
+	t.same("it was made again once", world.spawned, 2)
+
+	-- A shot in the air before the seek goes too, for it is put somewhere else.
+	world, player = setup({ last = 400, units = units, projectiles = { rocket } }, { budget = 1 })
+	send(player, "pause")
+	run(world, player, 6)
+	seek(world, player, 120)
+	run(world, player, 6)
+	seek(world, player, 140)
+	t.same("a seek that does not remove a unit keeps the shot in the air", world.projectileCount(), 1)
+	seek(world, player, 160)
+	t.same("one that removes four with a budget of one takes it away until they are", world.projectileCount(), 0)
+end
+
+-- A shot is made by its owner so that the engine ignores that unit. One whose
+-- unit is not in the world when it is made has none, and has to be made again
+-- when the unit is, or it hits the unit it was fired from when play goes back
+-- to its first frame (issue #4026).
+
+do
+	local rocket = { weapon = ROCKET, first = 100, last = 300, shooter = 1, at = flight(100, { 0, 50, 0 }, { 0, 0, 1 }) }
+	local world, player = setup({ last = 400, units = { { first = 0, last = 150 } }, projectiles = { rocket } })
+	world.target = { x = 0, y = 50, z = 0, radius = 5 }
+	send(player, "pause")
+	seek(world, player, 200)
+	t.same("the unit that fired a shot is gone when a seek makes it", world.unitCount(), 0)
+	local shot = world.projectileNamed("rocket")
+	t.same("so the shot has no owner", shot.owner, -1)
+	seek(world, player, 140)
+	local tank = world.unitNamed("tank")
+	t.check("the unit is back", tank ~= nil)
+	-- The shot starts inside the unit, which is where a gun's muzzle is.
+	world.target.unit = tank.id
+	local again = world.projectileNamed("rocket")
+	t.same("the shot has been made again with the unit as its owner", again.owner, tank.id)
+	t.same("and there is one", world.projectileCount(), 1)
+	t.same("that was made twice", world.spawned, 2)
+	t.same("the engine was told about nothing it no longer has", world.staleCalls, 0)
+	run(world, player, 30)
+	t.same("held, it is made no more times", world.spawned, 2)
+	send(player, "play -1")
+	run(world, player, 45)
+	t.same("played back to its first frame it is the same shot", world.spawned, 2)
+	t.same("and nothing landed on the unit it was fired from", #world.explosions, 0)
 end
 
 -- A laser bolt stops where it hit and fades there for some frames more. It

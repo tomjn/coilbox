@@ -678,8 +678,9 @@ local function measureShots(label, frame, held, shots)
 	local taken = {}
 	local wanted, raised, worstPlace, worstTurn, worstSpeed = 0, 0, 0, 0, 0
 	-- A shot at the end of its flight is held short of where the track has it:
-	-- by the tolerance on its last frame, and a bolt by a frame of its flight
-	-- from the frame before it stops. `short` is how many were, `place` the
+	-- on its last frame by a frame of its flight, or twice the tolerance when
+	-- that is more, and a bolt by a frame of its flight from the frame before it
+	-- stops. `short` is how many were, `place` the
 	-- furthest any other shot is from the track, and `over` the furthest any
 	-- shot is past what it may be.
 	local short, over = 0, 0
@@ -718,7 +719,8 @@ local function measureShots(label, frame, held, shots)
 						slack = math.sqrt(one.evx ^ 2 + one.evy ^ 2 + one.evz ^ 2)
 					end
 				elseif frame > one.last - 1 then
-					slack = h.tolerance
+					-- A frame of its flight, and twice the tolerance for a slower shot.
+					slack = math.max(2 * h.tolerance, math.sqrt(shot[4] ^ 2 + shot[5] ^ 2 + shot[6] ^ 2))
 				end
 				if slack > 0 then
 					short = short + 1

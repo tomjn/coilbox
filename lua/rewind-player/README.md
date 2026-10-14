@@ -588,8 +588,13 @@ A shot the track has in the air at `t` is a projectile under move control. On ev
 Three places are not the track's, each because the engine would otherwise land the shot during a seek or a pause:
 
 - A shot under the ground is held one position step above it, or above the water for a weapon that is not a water weapon.
-- A shot on its last frame is held the track's tolerance (half an elmo) short of where the track has it, along its flight. The playback's units can be that far from the match's.
+- A shot on its last frame is held one frame of its flight short of where the track has it, which is where the track has it on the frame before. The match's engine found nothing in the way there, since it found the hit on the next frame. The shot and what it hit are each the track's to within its tolerance, so the playback's can be closer than the match's by twice that, and a shot slower than twice the tolerance (1 elmo) is held that far short. Held half an elmo short, a shell and a missile of the Beyond All Reason match that came down along the side of a wreck's collision box were still inside the box by 0.3 elmo, and a shot that runs alongside a face gets clear of it only slowly as it goes back along its path, so one frame of flight is the least that does not depend on the angle.
 - A laser bolt stops on the frame it hits and stays there while it fades, which the track has as a velocity of nothing. From the frame before it stops it is held one frame of its flight short of there. A bolt first created in the frames it fades in is pointed by the last frame the track has it moving on.
+
+Two more things keep a held shot from landing, both found in Beyond All Reason's match (issue #4026):
+
+- A shot is made with the unit that fired it as its owner, and the engine skips the owner when it looks for a hit. A shot made while its unit is not in the world has no owner, as when play goes backward from after the unit's death, and at its first frame it is in the barrel, so it hit the unit it was fired from. The stage keeps which shots were made with no owner, and makes one again when its unit is back.
+- After a seek the engine can have units the track does not for the frames the units stage takes to remove them, which its budget spreads over frames. A shot made in those frames can hit one: a shell made at a seek hit an extractor that the track had gone by then. So while the units stage has a seek's removals to do, the stage has no shots, and the player is not settled.
 
 A shot is held at any speed and in either direction, paused included, so it is the same projectile from its first frame to its last.
 

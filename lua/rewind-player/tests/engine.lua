@@ -1289,7 +1289,15 @@ function M.new(options)
 					explode(found, found.x, world.ground(found.x, found.z), found.z, "ground")
 				else
 					local target = world.target
-					if target then
+					-- The engine skips the unit that fired a projectile
+					-- (CProjectileHandler::CheckUnitCollisions).
+					if target and target.half and not (target.unit and found.owner == target.unit) then
+						-- A box with half the sides in `half`: a hit when the projectile is
+						-- inside it, as the engine takes the start of a path inside a volume.
+						if math.abs(found.x - target.x) <= target.half[1] and math.abs(found.y - target.y) <= target.half[2] and math.abs(found.z - target.z) <= target.half[3] then
+							explode(found, found.x, found.y, found.z, "target")
+						end
+					elseif target and not (target.unit and found.owner == target.unit) then
 						-- The nearest the path comes to the target's middle.
 						local dx, dy, dz = target.x - found.x, target.y - found.y, target.z - found.z
 						local along = 0
