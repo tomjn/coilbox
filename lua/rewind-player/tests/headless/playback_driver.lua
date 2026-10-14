@@ -1204,6 +1204,10 @@ end
 local function measureResources(label, frame)
 	local w = assert(track:seek(frame))
 	local CODE = Track.VALUE
+	-- The wind a windmill makes energy from. It comes from the engine's random
+	-- numbers, which are seeded afresh for every launch (issue #4053).
+	local _, _, _, wind = Spring.GetWind()
+	say(string.format("wind %s frame=%d engine_frame=%d strength=%.4f min=%.4f max=%.4f", label, frame, Spring.GetGameFrame(), wind or -1, Game.windMin or -1, Game.windMax or -1))
 	for _, team in ipairs(resourceTeams()) do
 		for r, name in ipairs({ "metal", "energy" }) do
 			local base = (r - 1) * CODE.ENERGY
@@ -1257,6 +1261,17 @@ local function resourcePlan(asked)
 			#info.gameParams
 		)
 	)
+	-- A windmill makes energy from a wind that comes from the engine's random
+	-- numbers, which are seeded afresh for every launch. The playback's own
+	-- energy income, which the two launches of this plan are compared by, then
+	-- differs between them (issue #4053). So both launches hold the wind at the
+	-- middle of the game's range, where it is the same at every frame.
+	local windMin, windMax = Game.windMin or 0, Game.windMax or 0
+	if windMax > windMin then
+		local held = (windMin + windMax) / 2
+		Spring.SetWind(held, held)
+		say(string.format("wind held=%.4f min=%.4f max=%.4f", held, windMin, windMax))
+	end
 	local frames = {}
 	for _, frame in ipairs(type(asked) == "table" and asked or {}) do
 		if frame >= first and frame <= last then

@@ -3071,6 +3071,11 @@ end
     ///    where that is the larger. Every rules parameter the adapter names
     ///    and the match had set is the track's.
     ///
+    /// The playback's own figure is the one the first launch read, so it has
+    /// to be the same in both. A game with windmills makes it from the wind,
+    /// which the engine draws from a seed that is new for every launch, so the
+    /// driver holds the wind at the middle of the game's range (issue #4053).
+    ///
     /// The track is within its header's tolerance of the recording, which
     /// `coilbox-track-thin` checks sample by sample when it writes one.
     #[test]
