@@ -249,7 +249,7 @@ do
 	t.same(
 		"and logs what it has",
 		Adapter.describe(adapter),
-		"adapter loaded: Beyond All Reason. 32 gadgets and 3 widgets are switched off by the playback game, 0 unit definitions are hidden, 0 feature definitions are skipped, hooks: afterFrame, drawQueuedBuilding, queuedBuildingsDrawn, started, unitPlaced"
+		"adapter loaded: Beyond All Reason. 32 gadgets and 4 widgets are switched off by the playback game, 0 unit definitions are hidden, 0 feature definitions are skipped, hooks: afterFrame, drawQueuedBuilding, queuedBuildingsDrawn, started, unitPlaced"
 	)
 	t.same("it has no hook the player does not call", #adapter.unknownHooks, 0)
 	t.same("it names each team's commander and its energy converters", table.concat(adapter.teamParams, ","), "startUnit,mmLevel,mmCapacity,mmUse,mmAvgEffi")
