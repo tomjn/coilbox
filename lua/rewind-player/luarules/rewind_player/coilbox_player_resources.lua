@@ -285,6 +285,35 @@ local function feed(self, w, t)
 	end
 end
 
+--- Sets the rules parameters the adapter names to the track's at `t`. A rules
+-- parameter with no value at `t` had not been set yet, and the game keeps its
+-- own.
+local function setParams(self, w, t)
+	local Spring, teams = self.Spring, self.teams
+	local teamNames = self.teamNames
+	local count = #teamNames
+	if count > 0 then
+		local setTeamRulesParam, teamValue = Spring.SetTeamRulesParam, self.teamValue
+		for i = 1, #teams do
+			for j = 1, count do
+				local v = teamValue[(i - 1) * count + j]
+				local now = v and w:sampleValue(v, t)
+				if now then
+					setTeamRulesParam(teams[i], teamNames[j], now)
+				end
+			end
+		end
+	end
+	local gameNames = self.gameNames
+	for j = 1, #gameNames do
+		local v = self.gameValue[j]
+		local now = v and w:sampleValue(v, t)
+		if now then
+			Spring.SetGameRulesParam(gameNames[j], now)
+		end
+	end
+end
+
 --- Sets what has a call: storage, share level and what a team holds, and the
 -- rules parameters. `summing` is true on a frame the engine sums up on.
 -- `during` is true for the start of a frame on an engine that is known to call
@@ -318,33 +347,26 @@ local function apply(self, w, t, summing, during)
 		end
 	end
 
-	-- A rules parameter with no value at `t` had not been set yet, and the game
-	-- keeps its own.
-	local teamNames = self.teamNames
-	local count = #teamNames
-	if count > 0 then
-		local setTeamRulesParam, teamValue = Spring.SetTeamRulesParam, self.teamValue
-		for i = 1, #teams do
-			for j = 1, count do
-				local v = teamValue[(i - 1) * count + j]
-				local now = v and w:sampleValue(v, t)
-				if now then
-					setTeamRulesParam(teams[i], teamNames[j], now)
-				end
-			end
-		end
-	end
-	local gameNames = self.gameNames
-	for j = 1, #gameNames do
-		local v = self.gameValue[j]
-		local now = v and w:sampleValue(v, t)
-		if now then
-			Spring.SetGameRulesParam(gameNames[j], now)
-		end
-	end
+	setParams(self, w, t)
 end
 
 function Resources:resync() end
+
+--- The rules parameters the adapter names, at `t`, as the player is made and
+-- before the first frame. A game can read one once as it loads: Splinter
+-- Faction's weather widget takes its seed from `weather_seed` in its
+-- Initialize, and its gadget makes one of its own when the engine gives the
+-- playback's game id, unless the parameter is set already (issue #4013).
+-- Gadgets and widgets load before the engine gives the id, so this is in time
+-- for both.
+function Resources:start(t)
+	local w = self.track:seek(t)
+	if not w then
+		return
+	end
+	index(self, w)
+	setParams(self, w, t)
+end
 
 function Resources:remove() end
 

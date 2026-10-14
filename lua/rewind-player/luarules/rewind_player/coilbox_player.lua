@@ -338,6 +338,10 @@ function M.new(track, options)
 	publish(self, P.framesPerSecond, header.framesPerSecond)
 	publish(self, P.hidden, 0)
 	publishClock(self)
+	-- A game can read a rules parameter once as it loads, before the first frame.
+	if resources.start then
+		resources:start(clock.frame)
+	end
 	if hooks.started then
 		hooks.started()
 	end
