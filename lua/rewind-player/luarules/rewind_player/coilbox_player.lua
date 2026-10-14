@@ -163,7 +163,10 @@ end
 -- unit wants an arrival effect (issue #4009), and without it none is asked for.
 -- `options.scriptCallIns` is a table the gadget keeps, by the engine's unit id,
 -- of the call-ins of each Lua unit script (issue #3797), and without it a unit
--- with a Lua script is told nothing.
+-- with a Lua script is told nothing. `options.work` is a function the animation
+-- stage calls with a builder's id, its work's command, target and power, where
+-- the work is, the frame of the track and whether a seek brought it there,
+-- when its work changes (issue #4029), and without it nothing draws the stream.
 function M.new(track, options)
 	local header = track.header
 	local info, why = track:info()
@@ -257,6 +260,7 @@ function M.new(track, options)
 		report = report,
 		arrive = options.arrive,
 		scriptCallIns = options.scriptCallIns,
+		work = options.work,
 	}
 	-- A stage whose calls the engine lacks is the one that does nothing.
 	local terrain = on.terrain and Terrain.new(context) or OFF

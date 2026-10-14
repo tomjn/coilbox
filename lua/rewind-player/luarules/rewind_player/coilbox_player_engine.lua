@@ -31,7 +31,9 @@
 -- `since` was read from the engine's source (rts/Lua, the registration of each
 -- name) at the tags 105.0, 105.1.1, 2025.01.6 and 2026.07.04, and agrees with
 -- the spike on issue #3791, which read ten tags. The camera and drawing calls
--- of the `view` and `arrivalEffect` rows were read at those and at 2025.03.9. A name found at 105.0 is given
+-- of the `view` and `arrivalEffect` rows were read at those and at 2025.03.9,
+-- and those of the `nanoPieces`, `buildStream` and `workerAnswer` rows at all
+-- five. A name found at 105.0 is given
 -- as 105.0. No older engine was read, so the player does not say that one older
 -- lacks it. The rows of the resources stage (issue #3982) were read at 105.0,
 -- 105.1.1, 2025.01.6, 2025.03.9 and 2026.07.04, and the one call that is not at
@@ -197,6 +199,17 @@ M.SYNCED = {
 		required = false,
 		since = "105.0",
 		without = "The unit rules parameters that hold a builder's recorded work are not set",
+		visible = false,
+	},
+	{
+		id = "nanoPieces",
+		feature = "the nano pieces a build stream starts at",
+		calls = { "Spring.SetUnitNanoPieces", "Spring.GetUnitNanoPieces", "Spring.GetUnitScriptPiece" },
+		how = "presence",
+		used = "coilbox_player_animation.lua, nanoPieces",
+		required = false,
+		since = "105.0",
+		without = "A builder whose script does not give its own nano pieces has none, so it shows no build stream, and nor does a game's own build effect that reads them",
 		visible = false,
 	},
 	{
@@ -510,6 +523,49 @@ M.UNSYNCED = {
 		required = false,
 		since = "105.0",
 		without = "A unit that a slow seek makes appears with no effect",
+		visible = false,
+	},
+	{
+		id = "buildStream",
+		feature = "the stream of build particles",
+		-- The drawing calls it shares with the arrival effect are in that row,
+		-- and the stream is off without them too.
+		calls = {
+			"gl.TexCoord",
+			"Spring.GetGameRulesParam",
+			"Spring.GetFrameTimeOffset",
+			"Spring.GetConfigInt",
+			"Spring.IsSphereInView",
+			"Spring.ValidUnitID",
+			"Spring.GetUnitDefID",
+			"Spring.GetUnitTeam",
+			"Spring.GetUnitNanoPieces",
+			"Spring.GetUnitPiecePosDir",
+			"Spring.GetUnitPosition",
+			"Spring.GetFeaturePosition",
+			"Spring.GetFeatureRadius",
+			"Game.maxUnits",
+			"CMD.REPAIR",
+			"CMD.RECLAIM",
+			"CMD.RESURRECT",
+			"CMD.RESTORE",
+		},
+		how = "presence",
+		used = "coilbox_player_stream.lua",
+		required = false,
+		since = "105.0",
+		without = "A builder at work shows no stream of build particles, and a game's own build effect that asks the engine gets nothing",
+		visible = false,
+	},
+	{
+		id = "workerAnswer",
+		feature = "answering a game's build effect from the recording",
+		calls = { "Spring.GetUnitWorkerTask", "Spring.GetUnitCurrentBuildPower" },
+		how = "presence",
+		used = "coilbox_rewind_player.lua, the unsynced half",
+		required = false,
+		since = "2025.01.6",
+		without = "A game's own build effect that asks the engine what a builder is doing gets nothing, since no unit of a playback builds",
 		visible = false,
 	},
 }

@@ -38,7 +38,10 @@
       "legoparts": "legoparts",
       "../catalog.json": "catalog.json",
       "../lua/mission-runtime": "mission-runtime",
-      "../lua/blueprint-widget": "blueprint-widget"
+      "../lua/blueprint-widget": "blueprint-widget",
+      "../lua/GAME-NOTICE.md": "coilbox-licence/NOTICE.md",
+      "../LICENSE": "coilbox-licence/LICENSE-MIT",
+      "../lua/COPYING": "coilbox-licence/COPYING"
     },
     "active": true,
     "fileAssociations": [

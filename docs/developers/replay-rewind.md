@@ -191,7 +191,7 @@ end,
 
 #### Your build effect
 
-No unit builds anything in a playback, so a build effect that asks the engine what a builder is doing (`Spring.GetUnitWorkerTask`, `Spring.GetUnitIsBuilding`, `Spring.GetUnitCurrentBuildPower`) gets nothing, and the engine's own build particles do not show (issue #4029). Your builders' scripts are told `StartBuilding` and `StopBuilding` ([Units with COB scripts](#units-with-cob-scripts)), so an effect your script makes shows. For anything else, the player publishes each builder's recorded work in unit rules parameters, set when it changes. Read them with `Spring.GetUnitRulesParam(unitID, name)` from a widget, a gadget or a hook. A playback is running when `Spring.GetGameRulesParam("coilbox_rewind_first_frame")` is a number.
+No unit builds anything in a playback, so the engine draws no build particles of its own. The player draws a builder's stream as the engine would, with your particle texture, and stops when your game sets `MaxNanoParticles` to 0 to draw its own (issue #4029). A build effect of your own that asks the engine in the unsynced half of a gadget gets the recording's answers from `Spring.GetUnitWorkerTask` and `Spring.GetUnitCurrentBuildPower`, with a power of 0 while paused or played backward. `Spring.GetUnitIsBuilding`, widgets and the synced half get nothing. Your builders' scripts are told `StartBuilding` and `StopBuilding` ([Units with COB scripts](#units-with-cob-scripts)), so an effect your script makes shows. For anything else, the player publishes each builder's recorded work in unit rules parameters, set when it changes. Read them with `Spring.GetUnitRulesParam(unitID, name)` from a widget, a gadget or a hook. A playback is running when `Spring.GetGameRulesParam("coilbox_rewind_first_frame")` is a number.
 
 | Parameter | Value |
 | --- | --- |
@@ -236,7 +236,7 @@ An adapter with a `versions` range is for no game that has no version. A game fo
 
 Keep what tells a viewer about the match. Switch off only what fights the recording, what offers an action that makes no sense in playback, and what covers the timeline.
 
-Keep the resource bars, the tooltip with a unit's description, the minimap, the players list, health bars and build progress. Splinter Faction's adapter keeps all of these, along with the game's own effects, lights and weather.
+Keep the resource bars, the tooltip with a unit's description, the minimap, the players list, health bars and build progress. Splinter Faction's adapter keeps all of these, along with the game's own effects, lights and weather. It switches off the time left over a building under construction, `gui_build_eta.lua`, which works that time out from how fast build progress moves. In a playback build progress moves at the speed of play, backward too, and not at all while paused, so the time would not be the match's. Do the same for any widget of yours that works a rate out from the frames it watches.
 
 Switch off a gadget that fights the recording. These are the kinds Splinter Faction had:
 
@@ -391,4 +391,4 @@ The oldest engine tag read for any call is 105.0. No engine before 2025.03.9 has
 
 The rewind Lua and its adapters are offered under the MIT licence or the GNU General Public License version 2 or any later version, at your choice. Each file names this in its `license` field, and the notice is in `lua/LICENSE.md` in the coilbox repository.
 
-The playback game is written again on every launch and stays on your machine, so it carries no notice. A game you install the mission runtime into gets a `coilbox-licence/` folder with the notice and both licence texts.
+The playback game is written again on every launch and stays on your machine, so it carries no notice. A game you install the mission runtime into gets a `coilbox-licence/` folder with the notice and both licence texts. The installed app carries the same folder beside the Lua it ships.

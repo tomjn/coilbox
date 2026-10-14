@@ -12,6 +12,7 @@
 
 use picoframe_core::CliResult;
 use serde_json::json;
+use std::ffi::OsStr;
 use std::path::{Component, Path, PathBuf};
 use tauri::{AppHandle, Manager, Runtime};
 
@@ -22,6 +23,22 @@ const VENDORED: &str = "luaui";
 /// Where the tree lands under the content root, spelled the way the engine's
 /// own `cont/LuaUI` spells it.
 const DEST: &str = "LuaUI";
+
+/// The folder under `LuaUI/` that holds the licence notice for coilbox's Lua
+/// (issue #4005), named as the folder written into a game by the mission runtime
+/// install. The name carries `coilbox` so it cannot be taken for anything
+/// else's licence. The folder is coilbox's outright: an install rewrites every
+/// file in it and removes any other, and a removal takes it.
+const NOTICE_DIR: &str = "coilbox-licence";
+
+/// What goes in [`NOTICE_DIR`], as the file name and its contents. Embedded from
+/// the files in the repo so the licence texts are copied byte for byte, and a
+/// dev run writes the same bytes as a packaged one.
+const NOTICE_FILES: [(&str, &[u8]); 3] = [
+    ("NOTICE.md", include_bytes!("../../../lua/GAME-NOTICE.md")),
+    ("LICENSE-MIT", include_bytes!("../../../LICENSE")),
+    ("COPYING", include_bytes!("../../../lua/COPYING")),
+];
 
 /// Where the widget can sit inside the resource directory, in the order they
 /// are tried. The same shapes the mission runtime is probed under.
@@ -159,6 +176,12 @@ pub fn status(src: &Path, root: &Path) -> WidgetStatus {
             _ => stale.push(rel.clone()),
         }
     }
+    let notice = resolve_case(&dest, Path::new(NOTICE_DIR));
+    for (name, bytes) in NOTICE_FILES {
+        if std::fs::read(notice.join(name)).ok().as_deref() != Some(bytes) {
+            stale.push(format!("{NOTICE_DIR}/{name}"));
+        }
+    }
     if !installed {
         installed = files_under(&dest).iter().any(|rel| widget_owned(rel));
     }
@@ -200,7 +223,32 @@ pub fn install(src: &Path, root: &Path) -> Result<Vec<String>, String> {
                 .map_err(|e| format!("could not remove {}: {e}", stale.display()))?;
         }
     }
+    install_notice(&dest)?;
     Ok(written)
+}
+
+/// Write the licence notice into `dest` (the `LuaUI/` tree), and drop any file an
+/// older notice left in the folder. Not part of the list [`install`] returns,
+/// which is the widget's files.
+fn install_notice(dest: &Path) -> Result<(), String> {
+    let dir = resolve_case(dest, Path::new(NOTICE_DIR));
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("could not create {}: {e}", dir.display()))?;
+    for (name, bytes) in NOTICE_FILES {
+        let to = dir.join(name);
+        std::fs::write(&to, bytes).map_err(|e| format!("could not write {}: {e}", to.display()))?;
+    }
+    if let Ok(entries) = std::fs::read_dir(&dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let path = entry.path();
+            if path.is_file() && !NOTICE_FILES.iter().any(|(own, _)| OsStr::new(own) == name) {
+                std::fs::remove_file(&path)
+                    .map_err(|e| format!("could not remove {}: {e}", path.display()))?;
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Remove every file the widget owns under `root`, and its own directory once
@@ -216,6 +264,12 @@ pub fn remove(root: &Path) -> Result<Vec<String>, String> {
             removed.push(rel);
         }
     }
+    let notice = resolve_case(&dest, Path::new(NOTICE_DIR));
+    for (name, _) in NOTICE_FILES {
+        let _ = std::fs::remove_file(notice.join(name));
+    }
+    // Only when empty, so anything else in there stays.
+    let _ = std::fs::remove_dir(&notice);
     let own_dir = resolve_case(&dest, Path::new("coilbox_blueprints"));
     if own_dir.is_dir() {
         // Only when empty: remove_dir refuses otherwise, and anything left in
@@ -363,7 +417,8 @@ mod tests {
         let root = tmp("root-status");
         let s = status(&src, &root);
         assert!(!s.installed && !s.current);
-        assert_eq!(s.stale.len(), 3);
+        // The three widget files and the three notice files.
+        assert_eq!(s.stale.len(), 6);
     }
 
     #[test]
@@ -434,6 +489,116 @@ mod tests {
         assert!(install(&empty, &root).is_err());
         let src = source("missing-root");
         assert!(install(&src, &root.join("nope")).is_err());
+    }
+
+    /// The repo file a notice copy is made from, read at test time so the
+    /// comparison is against the file on disk and not against the embedded bytes.
+    fn repo_file(rel: &str) -> Vec<u8> {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join(rel);
+        std::fs::read(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
+    }
+
+    /// The three files an install writes beside the widget, and the repo file
+    /// each is a copy of.
+    const NOTICE_COPIES: [(&str, &str); 3] = [
+        ("LuaUI/coilbox-licence/NOTICE.md", "lua/GAME-NOTICE.md"),
+        ("LuaUI/coilbox-licence/LICENSE-MIT", "LICENSE"),
+        ("LuaUI/coilbox-licence/COPYING", "lua/COPYING"),
+    ];
+
+    fn assert_notice_current(root: &Path) {
+        for (rel, from) in NOTICE_COPIES {
+            assert_eq!(
+                std::fs::read(root.join(rel)).unwrap_or_else(|e| panic!("{rel}: {e}")),
+                repo_file(from),
+                "{rel} is not a copy of {from}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_fresh_install_writes_the_notice_and_both_licence_texts() {
+        let src = source("notice-fresh");
+        let root = tmp("root-notice-fresh");
+        let written = install(&src, &root).unwrap();
+        assert_notice_current(&root);
+        // The notice is not one of the widget's files.
+        assert!(written.iter().all(|f| !f.starts_with("coilbox-licence")));
+    }
+
+    #[test]
+    fn a_reinstall_replaces_a_changed_notice_and_drops_a_stale_file() {
+        let src = source("notice-again");
+        let root = tmp("root-notice-again");
+        install(&src, &root).unwrap();
+        for (rel, _) in NOTICE_COPIES {
+            std::fs::write(root.join(rel), "an older notice").unwrap();
+        }
+        let stale = root.join("LuaUI/coilbox-licence/OLD-NOTICE.md");
+        write(&stale, "from an older coilbox");
+        install(&src, &root).unwrap();
+        assert_notice_current(&root);
+        assert!(!stale.exists());
+    }
+
+    #[test]
+    fn an_install_without_the_notice_is_stale_until_it_is_written() {
+        let src = source("notice-stale");
+        let root = tmp("root-notice-stale");
+        install(&src, &root).unwrap();
+        std::fs::remove_dir_all(root.join("LuaUI/coilbox-licence")).unwrap();
+        let s = status(&src, &root);
+        assert!(s.installed && !s.current);
+        assert!(s.stale.contains(&"coilbox-licence/NOTICE.md".to_string()));
+        install(&src, &root).unwrap();
+        assert!(status(&src, &root).current);
+    }
+
+    #[test]
+    fn the_notice_takes_the_case_the_root_already_has() {
+        let src = source("notice-case");
+        let root = tmp("root-notice-case");
+        write(&root.join("luaui/Widgets/other.lua"), "theirs");
+        install(&src, &root).unwrap();
+        assert!(root.join("luaui/coilbox-licence/NOTICE.md").is_file());
+        assert!(status(&src, &root).current);
+    }
+
+    #[test]
+    fn the_notice_install_leaves_the_players_own_files_and_licences() {
+        let src = source("notice-theirs");
+        let root = tmp("root-notice-theirs");
+        write(&root.join("LuaUI/Widgets/gui_theirs.lua"), "theirs");
+        write(&root.join("LuaUI/LICENSE"), "their licence");
+        write(&root.join("LuaUI/COPYING"), "their GPL");
+        write(&root.join("LICENSE"), "the root's licence");
+        write(&root.join("LuaUI/Config/coilbox_blueprints.json"), "{}");
+        install(&src, &root).unwrap();
+        install(&src, &root).unwrap();
+        for (rel, text) in [
+            ("LuaUI/Widgets/gui_theirs.lua", "theirs"),
+            ("LuaUI/LICENSE", "their licence"),
+            ("LuaUI/COPYING", "their GPL"),
+            ("LICENSE", "the root's licence"),
+            ("LuaUI/Config/coilbox_blueprints.json", "{}"),
+        ] {
+            assert_eq!(std::fs::read_to_string(root.join(rel)).unwrap(), text);
+        }
+    }
+
+    #[test]
+    fn remove_takes_the_notice_with_the_widget_and_nothing_else() {
+        let src = source("notice-remove");
+        let root = tmp("root-notice-remove");
+        write(&root.join("LuaUI/Widgets/gui_theirs.lua"), "theirs");
+        write(&root.join("LuaUI/LICENSE"), "their licence");
+        install(&src, &root).unwrap();
+        remove(&root).unwrap();
+        assert!(!root.join("LuaUI/coilbox-licence").exists());
+        assert!(root.join("LuaUI/Widgets/gui_theirs.lua").is_file());
+        assert!(root.join("LuaUI/LICENSE").is_file());
     }
 
     #[test]

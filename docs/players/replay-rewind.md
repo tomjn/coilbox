@@ -140,7 +140,7 @@ True to the recording:
 
 - Where units, wrecks and features are, which way they face and when they appear or go.
 - Units walk and roll, and a builder turns to what it is building, with its own build glow in Splinter Faction. A unit's own walk plays while you watch, forward or backward, and stops when you pause, so a paused unit stands at ease and not in the middle of a step. At high speed the walk keeps its own pace while the ground goes by faster.
-- Health, health bars, build progress and its time left.
+- Health, health bars and build progress. In Splinter Faction the time left over a building under construction is hidden, because a playback builds at whatever speed and direction you play.
 - Terrain changes. One the engine did not report during the match can show up to 900 frames late.
 - A big jump. When a jump has hundreds of units to remove and make, or a lot of ground to change, the world takes a few frames to catch up, about a second for several hundred units, so it changes over that time and not all at once. The ground changes first, a patch at a time, and the units appear on it after. The units you are looking at appear first, and the rest of the map fills in after them. Each unit that arrives late in view shows a short effect in its team's colour: a column of light, a ring that closes on it and a few dots that fall into it. The effect is the playback's and was not in the match. While you drag the bar's knob no effect is shown, and units that are removed go with nothing shown. The playback spreads the work so that the game does not stutter.
 - Shots in the air. A unit that dies while you play forward at 0.5x, 1x or 2x dies with the game's own death effect, and a shot lands with the game's impact effect. At any other time (after a seek or a step, playing backward, or at 4x and faster) they come and go with nothing shown.
@@ -161,7 +161,7 @@ Not true to the recording:
 - In Splinter Faction, the menu at the top right stays whole. Its Resign button does nothing for a spectator and its Sharing button does nothing in a playback.
 - In Splinter Faction, the build menu and order buttons show for a selected unit. Orders go nowhere. In Beyond All Reason neither shows.
 - In Beyond All Reason, energy income can read higher than the match's, by as much as 17% late in the match it was checked on. Metal and energy held, storage and spending are the match's.
-- The stream of build particles from a builder to what it builds does not show. This is issue #4029.
+- In Beyond All Reason the stream of build particles from a builder to what it builds does not show. This is issue #4042. In Splinter Faction it shows, and stands still while paused.
 - A unit does not recoil or flash when it fires. Its shot still leaves the barrel. This is issue #4030.
 
 ## Current limits
