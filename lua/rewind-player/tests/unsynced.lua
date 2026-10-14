@@ -78,6 +78,33 @@ function M.new(clock)
 		return a - b
 	end
 
+	-- The engine's own speed and pause (Spring.GetGameSpeed in
+	-- rts/Lua/LuaUnsyncedRead.cpp), which `pause` and `setspeed` change. The
+	-- commands sent are collected in `clock.commands`.
+	e.speed = { wanted = 1, paused = false }
+	clock.commands = clock.commands or {}
+
+	function Spring.GetGameSpeed()
+		return e.speed.wanted, e.speed.wanted, e.speed.paused
+	end
+
+	function Spring.SendCommands(command)
+		clock.commands[#clock.commands + 1] = command
+		-- The server answers a command a little later. `clock.held` keeps it
+		-- from taking effect, the way the frames before the answer see it.
+		if clock.held then
+			return
+		end
+		local pause = command:match("^pause (%d)$")
+		if pause then
+			e.speed.paused = pause == "1"
+		end
+		local speed = tonumber(command:match("^setspeed (%S+)$"))
+		if speed then
+			e.speed.wanted = speed
+		end
+	end
+
 	function Spring.SendLuaRulesMsg(text)
 		if text:find("^coilbox_rewind_view:") then
 			clock.views[#clock.views + 1] = text

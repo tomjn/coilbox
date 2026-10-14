@@ -335,6 +335,40 @@ else
 		end
 	end
 
+	-- The engine's own pause and speed (issue #4033). The player's pause is its
+	-- own, and the world only moves on simulation frames, so a paused engine
+	-- would hold a seek too, and a faster one would play faster than the timeline
+	-- says. A game can do either with a key or a chat command, as Beyond All
+	-- Reason's pause key does. So the engine is given back its speed and the ask
+	-- goes to the player as the timeline's own: a pause plays or pauses, and a
+	-- speed up or down is the next speed up or down. The engine stays paused, or
+	-- at its new speed, until the server answers, over several drawn frames, so
+	-- each is handed on once.
+	if engine.on.enginePace then
+		-- Whether a pause has been handed on, and the speed last handed on.
+		local unpausing, handled = false, 1
+		local function tell(command)
+			if engine.on.budgetMessage then
+				Spring.SendLuaRulesMsg("coilbox_rewind:" .. command)
+			end
+		end
+		function gadget:Update()
+			local wanted, _, paused = Spring.GetGameSpeed()
+			if paused and not unpausing then
+				unpausing = true
+				Spring.SendCommands("pause 0")
+				tell("toggle")
+			elseif not paused then
+				unpausing = false
+			end
+			if wanted ~= 1 and wanted ~= handled then
+				Spring.SendCommands("setspeed 1")
+				tell(wanted > handled and "faster" or "slower")
+			end
+			handled = wanted
+		end
+	end
+
 	local started
 	-- How long the work of the frame's GameFrame took, for its GameFramePost to
 	-- add to.

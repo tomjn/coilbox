@@ -409,6 +409,17 @@ M.UNSYNCED = {
 		visible = true,
 	},
 	{
+		id = "enginePace",
+		feature = "keeping the engine's own pause and speed to the timeline",
+		calls = { "Spring.GetGameSpeed", "Spring.SendCommands" },
+		how = "presence",
+		used = "coilbox_rewind_player.lua, gadget:Update",
+		required = false,
+		since = "105.0",
+		without = "A game's pause key or speed command stops or speeds the engine, and with it the playback, without the timeline knowing",
+		visible = false,
+	},
+	{
 		id = "view",
 		feature = "making the units in view first",
 		calls = { "Spring.GetViewGeometry", "Spring.TraceScreenRay", "Spring.GetCameraPosition" },

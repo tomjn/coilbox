@@ -589,4 +589,59 @@ do
 	t.same("the guard's file sorts first", names[1], GUARD)
 end
 
+-- The engine's own pause and speed (issue #4033). A game can pause the engine
+-- or change its speed by a key or a chat command, and the world only moves on
+-- simulation frames. The unsynced half gives the engine back its speed and
+-- hands the ask to the player as the timeline's own.
+
+do
+	local lines, clock = {}, { now = 0 }
+	local gadget, _, e = unsynced(PLAYER, lines, clock)
+	gadget:Update()
+	t.same("an engine running at its speed is left alone", #clock.commands, 0)
+	e.speed.paused = true
+	gadget:Update()
+	t.same("a paused engine is set going again", clock.commands[#clock.commands], "pause 0")
+	t.same("and the player pauses or plays in its place", clock.messages[#clock.messages], "coilbox_rewind:toggle")
+	t.same("so the engine runs", e.speed.paused, false)
+	gadget:Update()
+	t.same("once for each pause", #clock.messages, 1)
+	e.speed.wanted = 2
+	gadget:Update()
+	t.same("a faster engine is put back to its own speed", clock.commands[#clock.commands], "setspeed 1")
+	t.same("and the player plays faster in its place", clock.messages[#clock.messages], "coilbox_rewind:faster")
+	e.speed.wanted = 0.5
+	gadget:Update()
+	t.same("a slower engine is put back too", e.speed.wanted, 1)
+	t.same("and the player plays slower", clock.messages[#clock.messages], "coilbox_rewind:slower")
+	t.same("nothing of it is logged", #lines, 0)
+
+	-- The engine stays paused until the server answers, over several drawn frames.
+	clock.held = true
+	local sent = #clock.messages
+	e.speed.paused = true
+	gadget:Update()
+	gadget:Update()
+	gadget:Update()
+	t.same("a pause the server has not answered yet is handed on once", #clock.messages, sent + 1)
+	clock.held = false
+	e.speed.paused = false
+	gadget:Update()
+	e.speed.paused = true
+	gadget:Update()
+	t.same("and the next pause is handed on again", #clock.messages, sent + 2)
+end
+
+-- Without the calls the engine's pause is left to it.
+
+do
+	local lines, clock = {}, { now = 0, without = { GetGameSpeed = true } }
+	local gadget, _, e = unsynced(PLAYER, lines, clock)
+	e.speed.paused = true
+	if gadget.Update then
+		gadget:Update()
+	end
+	t.same("an engine without Spring.GetGameSpeed is never told to go on", #clock.commands, 0)
+end
+
 t.report()
