@@ -2,9 +2,9 @@
 -- engine tables to the source (issue #3802). Comments and strings are taken
 -- out first, so a name in either is not a use.
 --
--- A name is a use when it is a member of `Spring`, `VFS`, `Game`, `CMD`, `gl` or
--- `GL`, a member of `Spring.MoveCtrl` however it is reached, or the global
--- `SendToUnsynced`. A parameter called `vfs` is `VFS`.
+-- A name is a use when it is a member of `Spring`, `VFS`, `Game`, `CMD`,
+-- `Script`, `gl` or `GL`, a member of `Spring.MoveCtrl` however it is reached,
+-- or the global `SendToUnsynced`. A parameter called `vfs` is `VFS`.
 
 local M = {}
 
@@ -47,7 +47,7 @@ end
 function M.usedBy(path)
 	local code = M.strip(M.sourceOf(path)):gsub("%f[%w_]vfs%.", "VFS.")
 	local found = {}
-	for _, root in ipairs({ "Spring", "VFS", "Game", "CMD", "gl", "GL" }) do
+	for _, root in ipairs({ "Spring", "VFS", "Game", "CMD", "Script", "gl", "GL" }) do
 		for member in code:gmatch("%f[%w_]" .. root .. "%.([%w_]+)") do
 			if not (root == "Spring" and member == "MoveCtrl") then
 				found[root .. "." .. member] = true

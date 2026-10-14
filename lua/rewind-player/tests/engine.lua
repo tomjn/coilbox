@@ -43,6 +43,13 @@
 -- happens after the gadgets' GameFrame and before their GameFramePost, and
 -- `world.step` runs a frame in that order. No call sets income, expense or pull.
 --
+-- Script.UpdateCallIn follows CLuaHandle::UpdateCallIn in rts/Lua/LuaHandle.cpp:
+-- the engine calls a call-in when the handler's global table has a function of
+-- that name at the time of the call, and stops calling it when it has none. A
+-- gadget sees that table as `_G` (a handler's NewGadget). `world.gameFrame` is a
+-- frame for a gadget in a game whose handler does or does not pass GameFramePost
+-- on, on an engine that does or does not have it (issue #4002).
+--
 -- Nothing a gadget calls on every frame allocates here, so a test can count
 -- what the gadget itself allocates.
 
@@ -425,6 +432,37 @@ function M.new(options)
 		if post then
 			post(world.frame)
 		end
+	end
+
+	-- The gadget handler's global table, and the call-ins the engine was told it
+	-- has a function for.
+	world.handlerGlobals = {}
+	world.callIns = {}
+	world.callInUpdates = 0
+	local Script = {}
+
+	function Script.UpdateCallIn(name)
+		world.callInUpdates = world.callInUpdates + 1
+		world.callIns[name] = type(world.handlerGlobals[name]) == "function"
+	end
+
+	--- One frame for `gadget` in a game. `how.engine == false` is an engine that
+	-- makes no GameFramePost call. `how.handler == false` is a gadget handler that
+	-- does not pass the call on, so the gadget only hears it through a global the
+	-- engine was told of.
+	function world.gameFrame(gadget, how)
+		world.step(function(n)
+			gadget:GameFrame(n)
+		end, function(n)
+			if how and how.engine == false then
+				return
+			end
+			if not (how and how.handler == false) then
+				gadget:GameFramePost(n)
+			elseif world.callIns.GameFramePost and world.handlerGlobals.GameFramePost then
+				world.handlerGlobals.GameFramePost(n)
+			end
+		end)
 	end
 
 	--- The engine's own call. The guard gadget replaces it in this table.
@@ -1000,6 +1038,8 @@ function M.new(options)
 		FeatureDefNames = featureDefNames,
 		WeaponDefNames = weaponDefNames,
 		CMD = { ONOFF = 85 },
+		Script = Script,
+		_G = world.handlerGlobals,
 		Game = {
 			gameSpeed = 30,
 			squareSize = SQUARE,

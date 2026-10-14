@@ -142,6 +142,18 @@ M.SYNCED = {
 		visible = false,
 	},
 	{
+		id = "frameEnd",
+		feature = "installing the end of frame call-in",
+		calls = { "Script.UpdateCallIn" },
+		how = "behaviour",
+		where = "coilbox_player.lua, lookBack. Whether gadget:GameFramePost comes is found by whether it came after the frame before. When it did not, the gadget puts a global of that name in the handler's table and tells the engine with Script.UpdateCallIn, and the player gives that one frame. On an engine with no GameFramePost (105.0 and 105.1.1) nothing comes of it, and the units, resources and aim stages each say what they do without the call",
+		used = "coilbox_rewind_player.lua, installFramePost",
+		required = false,
+		since = "105.0",
+		without = "In a game whose gadget handler does not pass GameFramePost on, a wounded unit can heal for a frame, what a team holds reads a frame off and a unit's own script can move an aiming piece after it was posed",
+		visible = false,
+	},
+	{
 		id = "terrain",
 		feature = "ground changes",
 		calls = { "Spring.SetHeightMapFunc", "Spring.SetHeightMap", "Game.squareSize" },
