@@ -268,6 +268,8 @@ These stay in place whatever an adapter says. An adapter makes them unnecessary 
 
 No unit's health changes in a playback except when the player sets it. The player stops the engine's own healing for every game. It does this by giving a wounded unit a maximum equal to its health during the frame, so the engine finds nothing to heal and nothing to repair.
 
+The maximum is given back in the engine's `GameFramePost` call-in, so it is only lowered once that call has been seen to arrive. The player installs the call-in for itself in a game whose gadget handler does not pass it on. On an engine before `105.1.1-2590`, which has no such call-in, no maximum is touched, and health the engine adds in a frame is taken off on the next.
+
 A gadget of your game that sets health is not stopped this way. The player puts the health right in the frame it acts in and logs one line, and you should put the gadget in your adapter. Splinter Faction's two are `unit_auto_health_regeneration.lua` and `unit_area_heal_radius.lua`. A repair pad done in a gadget is the same kind of thing.
 
 A gadget of a higher layer than the player's that reads a unit's health in its `GameFrame` sees a wounded unit as whole in that frame. Nothing is drawn in that time.
@@ -308,9 +310,16 @@ The recording is kept only if the playback matches the recorded match exactly, w
 
 ### Units with COB scripts
 
-Today the player does not pose or animate any unit, whatever its script. That covers walking, building and aiming, and a turret or torso does not turn to face its target after a seek. Issues #3796 and #3797 are about it.
+The player sets every aiming piece to its recorded pose on every frame, so a turret or torso points where it pointed in the match from the first frame after a seek. It does this the same way for a unit with a COB script and one with a Lua script, with `Spring.UnitScript.CallAsUnit` and the `Turn` and `Move` of the Lua unit script interface, and the recorded values are passed as they are for both. There is no COB specific step, and nothing for your game to do. It was run on Splinter Faction's units and on Balanced Annihilation's `armpw`, `armstump` and `armllt`, which have COB scripts, and every posed piece read back as recorded.
 
-A spike on posing, issue #3791, ran the same engine calls on a COB unit and on a Lua unit and found no difference between them for posing a piece. There is no COB specific step to document.
+What to know about your own scripts:
+
+- Your unit's script goes on running. The player sets its poses after the scripts have run in a frame, so the recorded pose is what is drawn, and the pieces the recording does not name are left to your script. Legs, wheels and idle motion are yours.
+- The pieces the recording names are each weapon's muzzle piece and every parent up to the root. A piece that did not move in the match is put at rest.
+- Nothing fires and no weapon aims by itself in a playback, so your script's aim and fire functions are not called.
+- The player still does not play walk or build animations. Issue #3797 is about it.
+
+The player sets poses from the engine's `GameFramePost` call-in. If your gadget handler does not pass that call-in on to gadgets, the player installs it for itself and logs one line saying so. Balanced Annihilation V15.9.8's handler is one that does not, and logs `UpdateCallIn: GameFramePost is not implemented` as its gadgets load, which is harmless. On an engine before `105.1.1-2590`, which has no such call-in, the player sets poses earlier in the frame, and a script that moves an aiming piece on its own can win until the next frame.
 
 A unit's own script still runs when the unit is created. Splinter Faction's commander stages work because of it. A stage is a unit definition of its own, with a script that hides the pieces the stage does not have. A morph destroys one unit and creates another, so the track has two units and the player creates each by its definition.
 

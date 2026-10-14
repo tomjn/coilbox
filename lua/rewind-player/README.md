@@ -1,6 +1,6 @@
 # Rewind player
 
-The rewind player plays a replay track back inside the engine, with time going in either direction. This folder holds the Lua that reads a track (issue #3792) and the gadget that makes the world match it (issue #3794): units, features, terrain and the shots in the air (issue #3795) at any time. It does not yet pose aiming pieces or animate units (issues #3796 and #3797). The control on screen is a widget, the timeline (issue #3798), and a second widget draws the buildings a builder had queued (issue #3804). What a game switches off or hides during playback is its adapter (issue #3799).
+The rewind player plays a replay track back inside the engine, with time going in either direction. This folder holds the Lua that reads a track (issue #3792) and the gadget that makes the world match it (issue #3794): units, features, terrain and the shots in the air (issue #3795) at any time, with every turret and torso pointing where it pointed in the match (issue #3796). It does not yet animate units: walking, building and firing (issue #3797). The control on screen is a widget, the timeline (issue #3798), and a second widget draws the buildings a builder had queued (issue #3804). What a game switches off or hides during playback is its adapter (issue #3799).
 
 A track is the file `crates/coilbox-track` writes, in the format `docs/reference/replay-track-format.md` describes. The format was designed so that the engine's Lua can read the file as it is, so there is no export step and no second copy on disk.
 
@@ -17,7 +17,7 @@ The player holds a time `t`, a frame of the track that can be a fraction. On eve
 | `luarules/rewind_player/coilbox_player.lua` | the player: the clock, the list of stages, the published state |
 | `luarules/rewind_player/coilbox_player_clock.lua` | the time and the messages that change it. It touches nothing in the engine |
 | `luarules/rewind_player/coilbox_player_engine.lua` | the table of engine calls the player needs, and the check of it ([Engine calls](#engine-calls)) |
-| `luarules/rewind_player/coilbox_player_terrain.lua`, `coilbox_player_features.lua`, `coilbox_player_units.lua`, `coilbox_player_projectiles.lua` | the four stages |
+| `luarules/rewind_player/coilbox_player_terrain.lua`, `coilbox_player_features.lua`, `coilbox_player_units.lua`, `coilbox_player_aim.lua`, `coilbox_player_projectiles.lua`, `coilbox_player_resources.lua` | the six stages |
 | `luarules/rewind_player/coilbox_player_rotation.lua` | a track's rotation as the pitch, yaw and roll the engine takes |
 | `luarules/rewind_player/coilbox_player_adapter.lua` | reads the game's adapter, and guards its hooks |
 | `luaui/widgets/coilbox_rewind_timeline.lua` | the timeline widget: the engine's call-ins for drawing, keys and the pointer |
@@ -236,7 +236,16 @@ stage:place(t, clock)   -- create what is missing and put everything in place
 stage:afterSim()        -- optional: the frame is over (GameFramePost)
 ```
 
-The engine does its own work on a frame between a gadget's `GameFrame` and its `GameFramePost`: units heal, and teams make and use resources. A stage that has to put something back after that has `afterSim`, as the units and resources stages do. `Player:framePost` calls it.
+The engine does its own work on a frame between a gadget's `GameFrame` and its `GameFramePost`: units heal, unit scripts turn their pieces, and teams make and use resources. A stage that has to put something back after that has `afterSim`, as the units, aim and resources stages do. `Player:framePost` calls it.
+
+`GameFramePost` does not reach every gadget ([The call at the end of a frame](#the-call-at-the-end-of-a-frame)), so a stage with `afterSim` has to work without it. `context.post.arrives` is true in a frame when the frame before ended with the call. Two more optional functions are for such a stage:
+
+```lua
+stage:afterSimMissed()   -- a frame ended without the call, after frames that
+                         -- ended with it: put back what was held for the frame
+stage:withoutAfterSim()  -- the call does not come: say once what the stage does
+                         -- without it, with context.report
+```
 
 `clock.jumped` says the frame was reached by a seek or a step and not by play, and `clock.direction` and `clock.speed` say how it is playing. `clock:watched()` is true for a frame of play forward at 0.5x, 1x or 2x, which is when a death, an impact and a sound are shown. A stage is made with the context, a table that has the track, its `info` and `features`, the engine's `Spring`, `Game`, `CMD` and definition tables, `teamOf(team)` and `report(key, text)`. Take the engine from the context and not from a global, so that the tests can hand the stage a stand-in.
 
@@ -251,7 +260,7 @@ A stage that can leave work for the next frame sets `stage.unsettled` to true in
 
 The units stage has, by serial number, `unitOf[serial]` for the engine's unit id and `indexOf[serial]` for the unit's place in the current window's lists. `player.units` is the stage. The projectiles stage has `idOf[serial]` for the engine's projectile id of a shot it is holding, and is `player.projectiles`.
 
-Weapons never fire, because the units stage calls `Spring.SetUnitUseWeapons(unitID, false, false)` on every unit it creates. That also stops a weapon aiming. A stage that wants the engine to aim a unit has to give that back.
+Weapons never fire, because the units stage calls `Spring.SetUnitUseWeapons(unitID, false, false)` on every unit it creates. That also stops a weapon aiming, so the engine aims nothing. The aim stage sets the recorded pose of each aiming piece instead ([Aim poses](#aim-poses)), and gives no unit a target.
 
 ### Engine calls
 
@@ -268,6 +277,8 @@ A row names the calls (`calls`), the feature that hangs on them (`feature`), how
 | `track` | `VFS.UnpackU8`, `UnpackU16`, `UnpackS16`, `UnpackU32`, `UnpackS32`, `UnpackF32`, `VFS.ZlibDecompress`, `VFS.LoadFile` | yes | no playback | the engine to use |
 | `world` | `Spring.GetModOptions`, `GetGaiaTeamID`, `GetTeamList`, `GetAllyTeamList`, `SetGameRulesParam` | yes | no playback | the engine to use |
 | `units` | `Spring.CreateUnit`, `DestroyUnit`, `ValidUnitID`, `GetUnitIsDead`, `GetAllUnits`, `GetUnitHealth`, `SetUnitHealth`, `SetUnitMaxHealth`, `Spring.MoveCtrl.Enable`, `SetPosition`, `SetRotation`, `Game.constructionDecay`, `Game.constructionDecaySpeed` | yes | no playback | the engine to use |
+| `aimPoses` (behaviour) | `Spring.UnitScript.CallAsUnit`, `Turn`, `Move`, `Spring.GetUnitScriptNames` | no | units hold the pose their own script gives them | unit aiming |
+| `frameEnd` (behaviour) | `Script.UpdateCallIn` | no | in a game whose gadget handler does not pass `GameFramePost` on, the player cannot install it, and falls back as on an engine without the call | nothing |
 | `terrain` | `Spring.SetHeightMapFunc`, `SetHeightMap`, `Game.squareSize` | no | the terrain stage does nothing | ground changes |
 | `features` | `Spring.CreateFeature`, `DestroyFeature`, `ValidFeatureID`, `GetAllFeatures` | no | the features stage does nothing | wrecks and rocks |
 | `featureTurn` | `Spring.SetFeatureRotation` | no | features are not turned | feature turns |
@@ -303,14 +314,14 @@ Required rows are the ones the units stage cannot work without: it creates, plac
 
 A new stage adds its calls to the table in the commit that adds the stage. For a call the stage uses:
 
-1. Add a row to `M.SYNCED` in `coilbox_player_engine.lua` with every field. A call in the unsynced half of the gadget goes in `M.UNSYNCED`. Name a call by the dotted path from a global the gadget hands over (`Spring`, `VFS`, `Game`, `CMD` and `SendToUnsynced`). A different global needs adding to the roots table the gadget passes to `check` in `gadget:Initialize` as well.
+1. Add a row to `M.SYNCED` in `coilbox_player_engine.lua` with every field. A call in the unsynced half of the gadget goes in `M.UNSYNCED`. Name a call by the dotted path from a global the gadget hands over (`Spring`, `VFS`, `Game`, `CMD`, `Script` and `SendToUnsynced`). A different global needs adding to the roots table the gadget passes to `check` in `gadget:Initialize` as well.
 2. Read `context.on.<id>` in the stage when it is made, and do not call what the row says is off. If the whole stage depends on it, make the stage in `Player.new` only when `on.<id>` is true, as the terrain, features and projectiles stages are. A stage that is off is the table `OFF`, which does nothing.
 3. If the calls exist on every engine but act differently on some, set `how = "behaviour"`, say in `where` how the stage checks, report it with `context.report` when it finds the older behaviour, and add the check to `BEHAVIOUR` in `tests/engine_test.lua`. A behaviour row with no entry there fails the test.
 4. Run `luajit lua/rewind-player/tests/engine_test.lua`. For every call of every row it takes the call out of the engine stand-in, plays the fixture track forward, backward and across seeks, and asserts that nothing raises, the log line and the note are right (or that a required call stops playback), and that the other features still work. To also assert that the feature is off, add an entry to `OBSERVE` in that file, a function that gives a number that is above 0 on a full run and 0 when the feature is off. A call the fixture track cannot show, as with `onOff`, gets a test of its own.
 
 The same test reads the source of every file under `luarules/` and fails for an engine call with no row, and for a row whose call nothing uses.
 
-Calls that are not engine functions come into a row too, when the stage reads them: `Game.squareSize` is a row member as `Spring.SetHeightMap` is. A call-in the engine may not make, such as `GameFramePost` before `105.1.1-2590`, cannot be found by looking at a global. Its row is `how = "behaviour"`, with the calls the stage makes in `calls` and the check, which is whether the call-in has arrived after a few frames, in `where`.
+Calls that are not engine functions come into a row too, when the stage reads them: `Game.squareSize` is a row member as `Spring.SetHeightMap` is. A call-in the engine may not make, such as `GameFramePost` before `105.1.1-2590`, cannot be found by looking at a global. The `frameEnd` row is the one for it: `how = "behaviour"`, the call the gadget installs it with in `calls`, and the check, which is whether the call-in came after the frame before, in `where`. [The call at the end of a frame](#the-call-at-the-end-of-a-frame) has the rest. The `aimPoses` row is a behaviour row for the same reason, since where its poses are set from depends on the call.
 
 `Spring.SetUnitPieceMatrix`, `Spring.SetUnitDirection`, `Spring.SetFeatureDirection` and `Spring.GetFeatureDirection` are on every engine read and changed what they do. The player does not use them, and `M.AVOID` in the table says why. A test fails if the source uses one. A stage that needs one adds a row and checks its behaviour.
 
@@ -335,7 +346,84 @@ Without `SendToUnsynced` the synced half has no timing at all and starts with no
 
 #### What has run
 
-No engine was run for this table. No engine before `2025.03.9` is installed, so every older path is tested on the stand-in in `tests/engine.lua` with a call taken out of it, and none has run in an engine. The stand-in has `world.oldEngine` for the `SetUnitHealth` behaviour, and the tests take `Spring.SetProjectileTimeToLive` out for the rest. That shows the logic, the log lines and the note. It does not show what an old engine does with the calls that are left.
+The `aimPoses` and `frameEnd` rows have run in an engine, `2026.07.01-102-g6e5c5a0`: with the calls there, with `Spring.GetUnitScriptNames` taken out, and with the engine kept from making the call at the end of a frame ([The call at the end of a frame](#the-call-at-the-end-of-a-frame)). Their calls were read at `105.0`, and the spike on issue #3791 read `CallAsUnit`, `Turn` and `Move` at four tags. No engine was run for the other rows. No engine before `2025.03.9` is installed, so every older path is tested on the stand-in in `tests/engine.lua` with a call taken out of it, and none has run in an engine. The stand-in has `world.oldEngine` for the `SetUnitHealth` behaviour, and the tests take `Spring.SetProjectileTimeToLive` out for the rest. That shows the logic, the log lines and the note. It does not show what an old engine does with the calls that are left.
+
+### Aim poses
+
+Nothing fires in a playback, so left alone a turret points wherever the unit's own script left it, which is straight ahead. The track has the pose of every aiming piece, and the aim stage, `coilbox_player_aim.lua`, sets it on the engine's unit on every frame (issue #3796).
+
+![The same moment of a fight with the stage off and on](screenshots/aim-before-after.jpg)
+
+Both halves are frame 22,550 of the whole match of [In a real engine](#in-a-real-engine), paused, three seconds after a seek, from the same place. On the left the stage is switched off and every unit stands as its script made it. On the right the commander's torso and gun arm are turned to the rocket bots to its right, and each bot's launcher is raised and turned to the commander. The light differs because the game's day and night follow the engine's own clock (issue #4013).
+
+#### How a piece is posed
+
+One path poses a piece of a unit with a COB script and of one with a Lua script. The spike on issue #3791 ran it on both. The runs below pose Splinter Faction's units and Balanced Annihilation's `armpw`, `armstump` and `armllt`, which have COB scripts.
+
+```lua
+Spring.UnitScript.CallAsUnit(unitID, function()
+	Spring.UnitScript.Turn(piece, axis, angle)   -- radians, at once
+	Spring.UnitScript.Move(piece, axis, offset)  -- elmos from rest, at once
+end)
+```
+
+- `axis` is 1, 2 or 3. The six values of a pose key are passed as the track has them, for both kinds of unit. `Turn` and `Move` go straight to `CUnitScript::TurnNow` and `MoveNow`, past the sign changes a COB script's own numbers get. There is no difference between COB and Lua units to handle.
+- An angle of the track is in 65,536ths of a turn and is not reduced to one turn. The stage takes the whole turns off before it makes radians of it, since the engine's numbers are 32 bit floats.
+- `piece` is the script's number for the piece, `Spring.GetUnitScriptNames(unitID)[name] + 1`. It is not the model's number from `Spring.GetUnitPieceMap`, which differs on a COB unit.
+- The stage makes one `CallAsUnit` for a unit and poses all its pieces inside it, with a function made once.
+- `Spring.SetUnitPieceMatrix` is not used. It is in the table's avoid list and a test fails if a file uses it.
+
+#### When
+
+The unit's own script goes on running, and would turn an aiming piece back. In a frame the engine runs the gadgets' `GameFrame`, then the unit scripts, then the gadgets' `GameFramePost`. The spike measured it: set from `GameFrame`, a pose held for 4, 4 and 64 of 69 frames on three aiming units, and set from `GameFramePost` for 69 of 69 on each. So the stage poses in `afterSim`, which is `GameFramePost`, on every frame: paused, playing either way, at any speed, and on the first frame a seek is shown. Where that call does not reach the player it poses in `place`, which is `GameFrame`, and logs the line [The call at the end of a frame](#the-call-at-the-end-of-a-frame) has.
+
+After a seek the units stage makes its units over several frames ([A seek over frames](#a-seek-over-frames)). A unit that is not there yet gets no pose. The stage looks up a unit's piece numbers in `place` in the frame the units stage made it, which is timed with the frame's work, and poses it at the end of that same frame.
+
+#### Which pieces
+
+The pieces the track names for the unit's definition (`info.posedPieces`), and no others. Legs, wheels and anything else are the script's.
+
+- The recorder watches each weapon's muzzle piece and every parent up to the root. Where it took a piece on a leg for a muzzle (issue #3941), the leg's chain is among the posed pieces and is posed as it was recorded. `fedstorm` of the match below has `rfoot`, `rleg` and `rthigh` among its 14.
+- A piece that the track names and has no pose track for in a window is at rest for the whole of that window, which the format page says. The stage sets it to no turn and no offset, so a piece the script turned comes back to rest.
+- A piece name the unit's script does not have is logged once for the definition, `the script of <unit> has no piece called <piece>, which the track has poses for, so that piece is left to the unit's own script`, and skipped. The unit's other pieces are still posed.
+- Piece numbers are looked up once for a unit, when it is made, and again for a unit that is destroyed and made again, which is another unit.
+
+A model in a format that gives a piece a rest rotation, which Assimp and glTF models can have, has that rotation in the track's angles, and they are then not what to pass to `Turn` (the format page, pose tracks). The stage does not tell such a model apart. No unit with a posed piece in the matches recorded so far has one.
+
+#### Units with no recorded poses
+
+Issue #3796 asked for a unit with no recorded poses to be aimed by giving it the recorded target, which the spike did with `Spring.SetUnitTarget(unitID, enemyUnitID, false, true)`. The stage does not do that, for two reasons.
+
+There is nothing left for it to aim. The recorder writes a piece's pose whenever its matrix changes, so a unit whose aiming pieces have no pose track did not move them in the match, and rest is where they were. The stage puts them at rest. In the whole match below, 17 units ever have a weapon target and all 17 have pose tracks. A unit of a definition the track names no pieces for is not touched.
+
+And it cannot be done without the unit's weapons running. A unit only aims at its target while its weapons update (`CUnit::CanUpdateWeapons`, which `Spring.SetUnitUseWeapons(unitID, false, false)` makes false). Giving that back runs all of `CWeapon::Update` for every weapon on every frame: it fires when it is aimed and loaded (`UpdateFire`), so every weapon's reload would have to be pushed back on every frame to hold it. It picks targets of its own (`AutoTarget` in `SlowUpdate`). A shield is a weapon too, and its update pushes away the shots the projectiles stage holds. A stockpile builds. Each of those can be fought one by one, and a miss is a projectile the track does not have. The risk buys nothing while the track has the poses.
+
+A track whose recorder wrote no poses at all would be the case for it. Whether one can still be played was not looked into. Coilbox takes a track from before recorder version 4 as stale and records the replay again. Issue #4023 has what aiming by target would take.
+
+#### What it costs
+
+One `CallAsUnit` for a unit, and three turns and three offsets for each posed piece, on every frame. A frame of play allocates nothing, which `tests/aim_test.lua` counts over 300 frames of 20 units.
+
+Timed in a headless engine with the driver's aim plan, 1,474 frames of six seeks with 60 frames paused and 90 played each way after each, with the stage on and with it switched off. A frame's work is the player's `GameFrame` and `GameFramePost` together, in milliseconds, and the end of the frame is `GameFramePost` alone. One run of each, on a machine with a load average of 4 to 6.
+
+| Track | Posed pieces a frame | Mean, off | Mean, on | End of frame mean, off | End of frame mean, on | Slowest frame, off | Slowest frame, on |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| the whole match, seeks into its fight, up to 54 units | 249 to 268 | 0.276 | 0.425 | 0.020 | 0.167 | 10.2 | 10.5 |
+| a crowd of 400 of the match's 13 definitions, 123 of them posed | 773 | 1.098 | 2.006 | 0.008 | 0.899 | 18.2 | 18.8 |
+| a crowd of 400 `fedstorm`, 14 posed pieces each | 5,600 | 1.404 | 6.741 | 0.009 | 5.357 | 85.2 | 91.9 |
+
+So a posed piece costs about a microsecond a frame: 0.89 ms for 773 and 5.35 ms for 5,600. The whole match pays 0.15 ms a frame. A crowd of 400 units with the match's mix of buildings and units pays 0.9 ms, and 400 of the unit with the most posed pieces pay 5.3 ms, a sixth of a simulation frame, on every frame. The slowest frame is a seek in every row and is the same with the stage off.
+
+The crowds are `crates/coilbox-track/tests/crowd.rs` with `COILBOX_CROWD_POSES`, which gives every posed piece a key every 30 frames. The third row's slowest frames, 80 to 87 ms with the stage on or off, are the reader loading a window with 173,600 pose keys in it, on each seek into another window. The whole match has 125,204 pose keys in all of its 26 windows. It is a made-up worst case, and it is what a recorded match with thousands of posed pieces would meet at every window edge (issue #4022).
+
+The slowest end of a frame was 1.0 ms in the first row's run, 14.3 ms in the second's and 9.1 ms in the third's. What the second's one frame of 14.3 ms was, in a run whose mean was 0.9 ms, has not been looked into.
+
+#### What has run
+
+- `tests/aim_test.lua` and `tests/engine_test.lua` on the stand-in, which has unit scripts written from `rts/Sim/Units/Scripts/LuaUnitScript.cpp`.
+- A headless engine, on the whole match and on Balanced Annihilation: [In a real engine](#in-a-real-engine).
+- A window, twice, with the stage off and on, at frames 22,850, 22,550, 21,650 and 22,250 of the whole match, paused, three seconds after each seek. The picture above is from those. A commander still shows the right stage with its pieces posed: the `fedcommander_up2` of the fight shows the same pieces with the stage on as with it off, since a pose turns and moves a piece and does not show or hide one.
+- Not run: play in a window, which the headless run measures and nobody has watched. A unit under construction with poses, a piece the script lacks, and a window with no track for a piece have only run on the stand-in.
 
 ### Projectiles
 
@@ -412,7 +500,9 @@ The unsynced half of the gadget times each frame's work and logs when it took lo
 COILBOX_REWIND_PLAYER slow frame: the work of frame 4521 took 41.0 ms, and a simulation frame lasts 33.3 ms. 3 slow since the last line, the slowest 52.0 ms
 ```
 
-After a line, slow frames are counted and not logged for 30 frames. Synced Lua has no clock, so the synced half calls `SendToUnsynced("coilbox_rewind_work", 0, frame)` before the work and with a 1 after it, and the unsynced half reads `Spring.GetTimerMicros` where the engine has it, which is 2025.01.1 and later, and `Spring.GetTimer` otherwise, which gave whole milliseconds in the runs below. Measured in four runs of the real engine run below, on a track of 5 units and 30 features, 460 frames each: a mean between 0.087 and 0.117 ms, and a slowest frame between 3 and 13 ms, which was the first frame every time.
+A frame's work is what the player does in `GameFrame` and in `GameFramePost` together, since the aim stage poses in the second (issue #3796). A frame that was slow before its end is counted once.
+
+After a line, slow frames are counted and not logged for 30 frames. Synced Lua has no clock, so the synced half calls `SendToUnsynced("coilbox_rewind_work", 0, frame)` before the work and with a 1 after it, and with a 2 and a 3 round the work at the end of the frame, and the unsynced half reads `Spring.GetTimerMicros` where the engine has it, which is 2025.01.1 and later, and `Spring.GetTimer` otherwise, which gave whole milliseconds in the runs below. Measured in four runs of the real engine run below, on a track of 5 units and 30 features, 460 frames each: a mean between 0.087 and 0.117 ms, and a slowest frame between 3 and 13 ms, which was the first frame every time.
 
 A whole match of 23,091 frames with up to 54 units, in the run [In a real engine](#in-a-real-engine) describes, over 2,236 frames of work: a mean of 0.305 ms and a slowest frame of 27 ms without the projectiles stage, and 0.321 ms and 26 ms with it. The slowest is a seek that creates the match's units. The shots plan, 13,929 frames of mostly play through the fight, had a mean of 0.220 ms and a slowest frame of 26 ms. None of those runs logged a slow frame. Two earlier runs of the shots plan logged one each, of 36 ms on a seek and of 59 ms in the middle of play, on a frame where the log shows nothing else happening. The timer reads the wall clock, so another process taking the processor shows up as a slow frame, and whether that is what those two were is not known.
 
@@ -545,7 +635,58 @@ The engine has no switch for healing on one unit. The numbers are in the unit de
 
 So the player takes away what the heal acts on. `SlowUpdate` heals only when `health < maxHealth`, so after it has put a wounded unit's health in place, the player gives the unit a maximum equal to that health (`Spring.SetUnitMaxHealth`). The engine then finds nothing to heal, and nothing to repair. `GameFramePost` is the end of the simulation frame, where the player gives every unit its maximum back and looks at its health once more. Health never moves, so a read at any point of any frame finds the track's value. A unit at full health, and a unit under construction, are left alone. If a held unit's health has changed by then, or a gadget of the game raised health before the player's frame, the player sets it again and logs one line starting `COILBOX_REWIND_PLAYER the health of a unit of the track changed with no damage to hear of`. A game that logs it needs its healing gadget in its adapter.
 
+A lowered maximum is only safe if the engine calls back at the end of the frame, and it does not for every gadget ([The call at the end of a frame](#the-call-at-the-end-of-a-frame)). So a unit is held only in a frame that follows one the call came after (issue #4002):
+
+- In the first frame nothing is held, since nothing has said yet that the call comes. If the engine heals a unit in that frame, the call at its end puts the health back without a line in the log.
+- A frame that ends without the call, after frames that ended with it, has every held unit's maximum given back at the start of the next frame, and nothing is held again until the call has come back.
+- Where the call never comes, no maximum is ever touched. Health the engine adds in a frame is taken off on the next, which is what the player did before issue #3986, and the player logs `GameFramePost does not reach the player, so a wounded unit keeps its maximum health, and health the engine's own healing adds in a frame is taken off again on the next`.
+- A unit that is destroyed and made again is a new unit with its own maximum. Playback that is refused holds nothing, since no player is made. The gadget's `Shutdown` gives back whatever is held if the gadget is removed in the middle of a frame.
+
 What a viewer can notice: for the part of a frame between the player's `GameFrame` and `GameFramePost`, a wounded unit reports a maximum equal to its health. A gadget of a higher layer than the player's, which is 0, that reads a unit's health in its `GameFrame`, sees it as whole in that frame. Nothing is drawn in that time. A widget reads between frames, when the maximum is whole again.
+
+### The call at the end of a frame
+
+Three stages lean on `gadget:GameFramePost`, the engine's call when a simulation frame is over: the units stage gives back a wounded unit's maximum health there, the resources stage puts the teams' numbers back, and the aim stage sets its poses. The call does not reach every gadget (issue #4002).
+
+- The engine may not make it. It is missing at the tags `105.0` and `105.1.1` and present from `105.1.1-2590`, read in `rts/System/Events.def`.
+- The game's gadget handler may not pass it on. Splinter Faction's does. Balanced Annihilation V15.9.8's and Complete Annihilation's do not.
+
+Nothing in a global says which. So the player finds out by behaviour, in `lookBack` in `coilbox_player.lua`: at the start of a frame it knows whether the frame before ended with the call. `context.post.arrives` is that, and a stage reads it on every frame.
+
+1. The first frame knows nothing, and nothing leans on the call in it.
+2. The first frame that follows one with no call asks the gadget to install the call-in. That is frame 2 in a game whose handler does not pass it on.
+3. The install has the frame it was made in to show. If that frame ends with the call, the player logs `the game's gadget handler does not pass GameFramePost on, so the player installed it, and the engine's call now reaches the player`, and everything works as it does in Splinter Faction from frame 3.
+4. If that frame ends without the call too, or nothing could be installed, every stage is told. Each logs one line of what it does without the call, and the player logs `GameFramePost does not reach the player. The player installed the call-in itself and still none came, so this engine does not make the call. Engine 105.1.1-2590 and later do`.
+5. A call that stops coming later is asked for again the same way, at the cost of one frame.
+
+The install is `installFramePost` in the gadget, and is what the spike on issue #3791 ran:
+
+```lua
+local g = gadget
+_G.GameFramePost = function(frame) g:GameFramePost(frame) end
+Script.UpdateCallIn("GameFramePost")
+```
+
+A handler gives a gadget its own global table as `_G`. The engine calls a call-in when that table has a function of its name and it has been told to look, which is all `Script.UpdateCallIn` does (`CLuaHandle::UpdateCallIn` in `rts/Lua/LuaHandle.cpp`). On an engine with no such call-in the name is not in the engine's list and nothing happens, with no error (`CEventHandler::InsertEvent`).
+
+What Balanced Annihilation logs as its gadgets load, `Error: UpdateCallIn: GameFramePost is not implemented`, is the handler's own line and not the engine's. Its `luarules/gadgets.lua` takes the list of call-in names from the engine's `LuaGadgets/callins.lua`, which has `GameFramePost` on this engine. So it keeps a list of the gadgets that have a function of that name, finds the player in it, finds that it has no `gadgetHandler:GameFramePost` of its own to pass the call on with, logs the line, clears the global and tells the engine, which then calls nothing. The handler does not refuse a name. It does the same again for every call-in each time a gadget is added or removed, which clears a global somebody else put there. That is why the player installs after the first frame and not as its file loads, and why it asks again when the call stops. The handler's own `gadgetHandler:UpdateCallIn(name)` for a gadget goes through the same function, so it cannot install the call either.
+
+What each stage does without the call:
+
+| Stage | With the call | Without it |
+| --- | --- | --- |
+| Units | a wounded unit's maximum is its health for the middle of a frame, so the engine heals nothing | no maximum is touched. Health the engine adds in a frame shows until the next frame takes it off |
+| Resources | what a team holds, its storage and its share level are put back before the frame is drawn | what a team holds reads one frame of the playback's own economy off, and its share level reads 1 on a frame the engine sums up on |
+| Aim | a piece has the track's pose when the frame is drawn | the pose is set in `GameFrame`, and a unit's own script can move the piece again before the frame is drawn |
+
+The `frameEnd` row of the engine table is the install's call, `Script.UpdateCallIn`. Without it nothing is installed, and a game whose handler passes the call on works as before.
+
+What ran, on engine `2026.07.01-102-g6e5c5a0`, with the test `aim_poses_follow_the_track_in_the_engine` ([In a real engine](#in-a-real-engine)):
+
+- Balanced Annihilation V15.9.8, whose handler does not pass the call on. The player logged the install line at frame 2, and the call reached it on 2,843 of the run's 2,844 frames, which is every frame but the first. A third of the 60 units were wounded. At the start of each of 2,823 frames looked at, no unit had a maximum other than its definition's, and no finished unit's health was off the track's, including 2,100 frames stood paused, which is past the 1,800 frames (`idletime`) that game's `armpw` stands idle for before the engine heals it.
+- The same with the engine kept from being told of any function called `GameFramePost`, which the test's `nocall` does by wrapping `Script.UpdateCallIn`. That stands in for an engine without the call. The player logged the four lines once, at frame 2, and no call came in 2,844 frames. No unit's maximum was other than its definition's on any frame. In the 2,100 frames stood paused, a unit's health was off the track's 1,374 times at the start of a frame, by up to 0.0083 of its maximum, which is the engine's idle healing of the frame before, and the player took it off in that frame. Of 338,100 pieces looked at in those frames, 21,000 were off the track's pose at the start of the next frame, by up to 0.052 radians, where the unit's own script had moved them after the player's `GameFrame`. With the call there, none was.
+
+No engine without the call is installed, so the second run is as near as this machine gets to one. It shows the fallback's logic in a real engine and not what a 105.0 engine does with the rest of the player.
 
 ### Team resources
 
@@ -577,7 +718,7 @@ Then storage and what is held are set to the track's, as on every frame. All of 
 
 The sums only go up. Where the playback's own economy makes or uses more than the match did, the number reads as the playback's. That happens for a moment after the match's income went up. The engine reports the 30 frames before, so the track's income at frame 10,262 of the Splinter Faction match is 18.4 metal, from before a metal extractor was finished. The extractor stands finished in the playback at that frame, and held there the engine's own income is 28.1.
 
-The same goes for excess, and there the stage can do something. A team that is nearly full wastes what its units make, and the engine counts that as excess, which can be more than the match wasted: 396.7 energy against the track's 174.7 at frame 20,525. So at the start of a frame the stage gives a team room for all the playback makes in 30 frames, on top of the track's storage, and takes it away again in `GameFramePost`. The playback then wastes nothing itself and the excess is the track's. It does this only once the engine has made a `GameFramePost` call, since without one the storage would be drawn with the room in it.
+The same goes for excess, and there the stage can do something. A team that is nearly full wastes what its units make, and the engine counts that as excess, which can be more than the match wasted: 396.7 energy against the track's 174.7 at frame 20,525. So at the start of a frame the stage gives a team room for all the playback makes in 30 frames, on top of the track's storage, and takes it away again in `GameFramePost`. The playback then wastes nothing itself and the excess is the track's. It does this only in a frame that follows one the engine made a `GameFramePost` call after, since without the call the storage would be drawn with the room in it.
 
 Production cannot be switched off at its source. `CUnit::SlowUpdate` adds a unit's `resourceMake`, takes its upkeep and adds what an extractor, a windmill or a tidal generator makes, all from the unit definition, which Lua reads and cannot change. `Spring.SetUnitResourcing` only reaches the amounts a gadget gave a unit itself. A team's income multiplier comes from the start script, and one of 0 would also stop the stage adding what is missing.
 
@@ -587,7 +728,7 @@ What a team sent and received would take a transfer between two teams for each a
 
 The engine's order in a frame is the gadgets' `GameFrame`, its own units, its teams and then the gadgets' `GameFramePost` (`CGame::SimFrame`). The units make and use resources, and the teams sum up and hand excess to allies, after the stage has set everything. So the stage sets storage, share level, what is held and the rules parameters again in `GameFramePost`, and that is what is drawn.
 
-It does not depend on that call-in, which an engine before `105.1.1-2590` does not make (issue #4002). Without it nothing is put back before the frame is drawn, so what a team holds reads one frame of the playback's own economy off, and never more, since the next frame sets it again. The sums are then read at the start of the next frame, which gives the same numbers.
+It does not depend on that call-in, which an engine before `105.1.1-2590` does not make and a game's gadget handler may not pass on ([The call at the end of a frame](#the-call-at-the-end-of-a-frame)). Without it the stage logs `GameFramePost does not reach the player, so what a team holds reads one frame of the playback's own economy off`, with the rest of this paragraph in it. Nothing is put back before the frame is drawn, so what a team holds reads one frame of the playback's own economy off, and never more, since the next frame sets it again. The sums are then read at the start of the next frame, which gives the same numbers.
 
 On a frame the engine sums up on, it also hands what a team holds above its share level to its allies (`CTeam::SlowUpdate`, with the game's `nativeExcessSharing`). The match did that once already. So on those frames the stage sets the share level to 1, where the engine has nothing to hand over, and `GameFramePost` sets it back. Without `GameFramePost` the share level reads 1 until the next frame.
 
@@ -816,7 +957,7 @@ A commander shows the right stage after a seek with nothing done for it. Each st
 
 ![The commander in the playback and in the real replay, at frames 6,927 and 12,000](screenshots/adapter-commander.jpg)
 
-The left column is the playback and the right the real replay, at the same two frames and from the same place. The colours differ because the playback takes each team's from the replay's start script, and the game recolours them for whoever is playing. The pose and the build spray differ because the player does not animate yet (issues #3796 and #3797).
+The left column is the playback and the right the real replay, at the same two frames and from the same place. The colours differ because the playback takes each team's from the replay's start script, and the game recolours them for whoever is playing. The pose and the build spray differ because the picture is from before the aim stage (issue #3796), and the player does not animate yet (issue #3797).
 
 ## Where the reader runs
 
@@ -958,6 +1099,7 @@ luajit lua/rewind-player/tests/fetch_test.lua
 luajit lua/rewind-player/tests/clock_test.lua
 luajit lua/rewind-player/tests/rotation_test.lua
 luajit lua/rewind-player/tests/player_test.lua
+luajit lua/rewind-player/tests/aim_test.lua
 luajit lua/rewind-player/tests/projectiles_test.lua
 luajit lua/rewind-player/tests/resources_test.lua
 luajit lua/rewind-player/tests/settle_test.lua
@@ -976,6 +1118,8 @@ luajit lua/rewind-player/tests/ghosts_test.lua
 - `clock_test.lua` checks the clock and every message.
 - `rotation_test.lua` checks the pitch, yaw and roll against the engine's own matrix arithmetic, in doubles and with every result rounded to a float.
 - `player_test.lua` checks the stages on tracks made from a table (`tests/fake_track.lua`): what is alive at a time, removal before creation, a seek back past a construction, play in both directions, a missing definition, a nil from `Spring.CreateUnit`, terrain forward and back, that the engine's own healing (`world.heal` in the stand-in, run between a frame and its post frame) leaves a wounded unit's health alone and its maximum is whole again afterwards, that health which moved anyway is put right and logged once, and that a frame of play allocates nothing.
+- `player_test.lua` also checks the call at the end of a frame (issue #4002): that nothing is held in the first frame, that with no call no unit starts or ends a frame with a lowered maximum and the line is logged once, that the install is asked for once and a unit is held once it works, that a call which stops is asked for again, and that a gadget removed in the middle of a frame leaves no maximum lowered.
+- `aim_test.lua` checks the aim stage on a stand-in whose unit's own script turns pieces in the middle of every frame: the pose on the first frame after a seek, held for 60 frames paused and while playing each way, a piece the track does not name left to the script, an angle of 141 turns, half speed, a piece the script lacks, a piece with no track in a window, a seek that makes its units over several frames, a unit destroyed between a frame and its post frame, a unit under construction, an engine with no call at the end of a frame, the fixture through the real reader, and that 300 frames of posing 20 units allocate nothing.
 - `projectiles_test.lua` checks the projectiles stage: what is in the air at a time, stepping forward and backward, that a seek looks at the shots that can be alive and not the window's list, that a shot lands only while it is watched and with no damage, crater or push, a shell that ends in the air, a bolt that stops, a beam fired once, the fire sound and when it is not played, a weapon the game lacks, an engine with no `Spring.SetProjectileTimeToLive`, a shot the engine ended and an id handed out again, a shot alive across two windows, and that 300 frames of play with 40 shots in the air allocate nothing.
 - `resources_test.lua` checks the resources stage on a stand-in whose teams follow `rts/Sim/Misc/Team.cpp` and whose frame runs in the engine's order, with the playback's own economy between the gadget's two call-ins: what a team holds, its storage and its share level at a frame, after a seek forward and backward, held for 400 frames and while playing each way, on an engine with and without `GameFramePost`, income, expense and pull after three of the engine's sums, a team with an income multiplier, excess, allied teams and the engine's own sharing, rules parameters with and without an adapter that names them, a track from recorder version 3, the fixture through the real reader, and that 300 frames allocate nothing.
 - `settle_test.lua` checks a seek that needs more units than a frame may make or remove: that it settles over several frames, that removals use their own budget and come first, that a second seek while one settles starts again, that play goes on while it settles and units made late stand where the track has them now, what `coilbox_rewind_settled` says and when, the budget message and the ones it refuses, that a shot waits for its shooter, and that 300 frames of play with a budget allocate nothing.
@@ -988,7 +1132,7 @@ luajit lua/rewind-player/tests/ghosts_test.lua
 
 `tests/support.lua` is the stand-in for the reader. Its `VFS.Unpack*` and `VFS.ZlibDecompress` follow the engine source, round what they return to a 32 bit float, and raise for a position or count a float could not hold. The zlib is the system's, through LuaJIT's FFI. Its synced environment has no `io`, so a reader that reached for it would fail the tests.
 
-`tests/engine.lua` is the stand-in for the player: units, features, projectiles, the heightmap, teams and their resources, and rules parameters, each call written from the engine source it names. `world.step(frame, post)` runs one frame in the engine's order: the gadget's `GameFrame`, the engine's own economy as the test gives it in `world.economy`, the teams' sums on a frame that divides by 30, and the gadget's `GameFramePost`. `world.simulate()` is the engine's own frame for projectiles: it looks for a hit along a projectile's speed and under the ground, whether or not the projectile is under move control, and then counts its time to live down.
+`tests/engine.lua` is the stand-in for the player: units and their script pieces, features, projectiles, the heightmap, teams and their resources, and rules parameters, each call written from the engine source it names. `world.gameFrame(gadget, how)` is a frame for a gadget in a game whose handler does or does not pass `GameFramePost` on, on an engine that does or does not make the call, with the handler's global table and `Script.UpdateCallIn` behind it. `world.step(frame, post)` runs one frame in the engine's order: the gadget's `GameFrame`, the engine's own economy as the test gives it in `world.economy`, the teams' sums on a frame that divides by 30, and the gadget's `GameFramePost`. `world.simulate()` is the engine's own frame for projectiles: it looks for a hit along a projectile's speed and under the ground, whether or not the projectile is under move control, and then counts its time to live down.
 
 The tests cannot show that the player works in the engine. They show the logic, the reading and the addressing.
 
@@ -1063,6 +1207,15 @@ A sixth test, `the_teams_resources_are_the_matchs_in_the_engine`, wants the same
 0 means equal to the track's value as the 32 bit float the engine holds, with what is held cut to the storage. The one line is team 0's energy income at frame 5,131: 75 where the track has 62.5, and the playback's own is 75 with the stage off. After the 600 frames at frame 10,262 team 0's metal income was 28.1 where the track has 18.4, which [Team resources](#team-resources) explains. No team died and no Lua raised. The player's work took a mean of 0.220 ms a frame in that run.
 
 The first run of the plan waited two of the engine's sums after a seek and had 7 lines of 60 that were not the track's. One had an income of 112.5 at frame 6,927 where the track has 100, and was right a sum later, which is why the numbers are said to settle on the third sum. All 7 had more excess than the track, up to 396.7 where it has 174.7, which is why a team is given room for the playback's own income during a frame.
+
+A seventh test, `aim_poses_follow_the_track_in_the_engine`, wants the same replay and runs the driver's aim plan (issues #3796 and #4002). `COILBOX_PLAYBACK_AIM_FRAMES` gives it frames to seek to. At each seek the driver reads every posed piece back out of the engine with `GetPieceRotation` and `GetPieceTranslation`: on the first frame the seek is shown, on each of 60 frames paused, and on each of 90 frames played forward and 90 played backward at 1x. Its gadget runs before the player's, so a look reads what the frame before left when it was over. A piece is wrong when it is further from the track's pose than half a step of what the track stores, which is 0.000048 radians and a 16th of an elmo. On the match above, with seeks to frames 20,400, 21,000, 21,600, 22,200, 22,791 and 23,000 of its fight:
+
+- Of 1,446 looks, with up to 268 posed pieces in one, no piece was wrong, and the furthest any was from the track read as 0.0000000 radians and 0.00000 elmo.
+- On the first frame of the first seek no unit with a posed piece has been made yet, and 22 are still to be made. They are made over the frames after, and every piece of a unit that is there has the track's pose in every look. The later seeks find their units there and have 249 to 268 pieces right on the first frame.
+- No unit's maximum health was other than its definition's at the start of any of those frames, with wounded units in the looks of every seek, and no finished unit's health was off the track's.
+- No Lua raised. With the stage switched off, which `COILBOX_PLAYBACK_AIM=off` does, the same looks find every piece that the track has away from rest wrong, so the looks can tell.
+
+The same test ran on Balanced Annihilation V15.9.8 with `COILBOX_PLAYBACK_GAME`, whose gadget handler does not pass `GameFramePost` on. No Balanced Annihilation match is recorded on this machine, so the track is made up: `crates/coilbox-track/tests/crowd.rs` on the track of the match above, with `COILBOX_CROWD_UNITS=60`, `COILBOX_CROWD_DEFS=armpw,armstump,armllt`, `COILBOX_CROWD_POSES=armpw:torso+ruparm+luparm,armstump:turret+barrel,armllt:turret+sleeve+barrel` and `COILBOX_CROWD_WOUNDED=3`. That is 60 units of those three definitions standing still on All That Glitters, 20 of them at half health, each posed piece swinging a quarter turn to either side with a key every 30 frames. All three have COB scripts. With seeks to frames 12,000, 14,000 and 16,000 and 2,100 frames stood paused at the last: the player installed the call-in at frame 2, all 161 posed pieces were right in every one of 2,823 looks, and [The call at the end of a frame](#the-call-at-the-end-of-a-frame) has what it showed of health.
 
 What it cannot show: anything on screen. A headless engine draws nothing, so how a unit, a death or the changed ground looks cannot be seen in any of the above.
 
