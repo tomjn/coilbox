@@ -55,8 +55,8 @@ local function engine()
 		GetGameRulesParam = function(name)
 			return e.params[name]
 		end,
-		-- Snaps to the build grid and gives the build height. The places in the
-		-- track are snapped already, so the stand-in gives them back as they are.
+		-- The real one snaps the place to the 16 elmo build grid and gives the
+		-- build height. The stand-in leaves the place as it is.
 		Pos2BuildPos = function(def, x, y, z, facing)
 			if e.record then
 				e.asked[#e.asked + 1] = string.format("%d %s %s %s %d", def, x, y, z, facing)

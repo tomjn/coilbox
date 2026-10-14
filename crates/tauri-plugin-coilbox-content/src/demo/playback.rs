@@ -4109,7 +4109,17 @@ end
                 })
                 .collect();
             drawn.sort_by(|a, b| a.partial_cmp(b).unwrap());
-            assert_eq!(drawn, wanted, "{l}");
+            // The widget draws where the engine would build (Spring.Pos2BuildPos),
+            // which snaps the order's place to the 16 elmo build grid, moving it
+            // by up to 8 elmos on each axis (issue #4018).
+            assert_eq!(drawn.len(), wanted.len(), "{l}");
+            for (got, want) in drawn.iter().zip(&wanted) {
+                assert_eq!((&got.0, got.1, got.4), (&want.0, want.1, want.4), "{l}");
+                assert!(
+                    (got.2 - want.2).abs() <= 8.0 && (got.3 - want.3).abs() <= 8.0,
+                    "{l}"
+                );
+            }
             looked += 1;
             with_ghosts += usize::from(!wanted.is_empty());
             ghosts_seen += wanted.len();
