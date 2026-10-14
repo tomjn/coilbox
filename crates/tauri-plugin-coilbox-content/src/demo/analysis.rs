@@ -955,7 +955,7 @@ mod tests {
             "{splinter_faction}"
         );
         assert!(
-            splinter_faction.contains("gameParams = {},"),
+            splinter_faction.contains("gameParams = {\"weather_seed\"},"),
             "{splinter_faction}"
         );
         let beyond_all_reason = request_for("BYAR");
