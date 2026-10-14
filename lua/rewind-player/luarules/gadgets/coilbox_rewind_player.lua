@@ -265,7 +265,7 @@ if gadgetHandler:IsSyncedCode() then
 		if engine.on.workTiming then
 			local made, removed, ground = player:worked()
 			local make, remove, earth = player:budgets()
-			SendToUnsynced(WORK, 1, frame, made, removed, ground, make, remove, earth, player:firstUnits())
+			SendToUnsynced(WORK, 1, frame, made, removed, ground, make, remove, earth, player:firstUnits(), player:started() and 1 or 0)
 		end
 	end
 
@@ -561,10 +561,16 @@ else
 	-- next, since what a corner costs is the engine's work round it and does not
 	-- move with what else is in the world (lua/rewind-player/README.md has the
 	-- measurements).
-	local function retune(frame, took, made, removed, ground, hadMake, hadRemove, hadGround, firsts)
+	local function retune(frame, took, made, removed, ground, hadMake, hadRemove, hadGround, firsts, start)
 		arrived(makes, frame, hadMake)
 		arrived(removes, frame, hadRemove)
 		arrived(grounds, frame, hadGround)
+		-- The first frame of a seek into another window only read the window
+		-- (issue #4037). It does not end a seek and says nothing of what a unit
+		-- or a corner costs.
+		if start == 1 then
+			return
+		end
 		if made + removed + ground == 0 then
 			makes.budget, removes.budget = FIRST_BUDGET, FIRST_BUDGET
 			for _, b in ipairs(budgets) do
@@ -587,7 +593,7 @@ else
 		end
 	end
 
-	function gadget:RecvFromSynced(name, phase, frame, made, removed, ground, hadMake, hadRemove, hadGround, firsts)
+	function gadget:RecvFromSynced(name, phase, frame, made, removed, ground, hadMake, hadRemove, hadGround, firsts, start)
 		if name == LOG then
 			write(phase)
 			return true
@@ -639,7 +645,7 @@ else
 		else
 			framed = took
 			if made and removed and engine.on.budgetMessage then
-				retune(frame, took, made, removed, ground or 0, hadMake, hadRemove, hadGround or 0, firsts or 0)
+				retune(frame, took, made, removed, ground or 0, hadMake, hadRemove, hadGround or 0, firsts or 0, start)
 			end
 		end
 		if took <= LIMIT then

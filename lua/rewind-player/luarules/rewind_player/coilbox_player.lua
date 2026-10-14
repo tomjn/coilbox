@@ -229,8 +229,11 @@ function M.new(track, options)
 	local post = { arrives = false }
 	-- The share of a frame's time a seek's work has used so far. The terrain
 	-- stage sets `ground` and the units stage adds its own to it, so that the
-	-- ground of a seek comes before its units (issue #4025).
-	local share = { ground = 0 }
+	-- ground of a seek comes before its units (issue #4025). `start` is true in
+	-- the first frame of a seek into another window, which the units stage
+	-- spends reading the window, and nothing else of the seek is done in it
+	-- (issue #4037).
+	local share = { ground = 0, start = false }
 	local context = {
 		on = on,
 		post = post,
@@ -394,6 +397,7 @@ function Player:frame()
 	lookBack(self)
 	clock:advance()
 	local t = clock.frame
+	self.context.share.start = false
 	if clock.jumped then
 		for i = 1, #stages do
 			stages[i]:resync(t)
@@ -451,6 +455,12 @@ end
 -- ones (issue #4015).
 function Player:firstUnits()
 	return self.units.firsts
+end
+
+--- Whether the last frame was the start of a seek into another window, which
+-- did nothing but read the window (issue #4037).
+function Player:started()
+	return self.context.share.start
 end
 
 --- A Lua message. True when it was the player's, done or refused, and false
