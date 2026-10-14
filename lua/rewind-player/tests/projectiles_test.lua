@@ -416,6 +416,35 @@ do
 	end
 end
 
+-- A shot that ended on the ground can be above the playback's, since its place
+-- is the track's to within the tolerance and the ground's height to within half
+-- a position step. The engine looks at no line for the ground, so a rocket the
+-- track has 0.3 above it would fly over, as one of the Beyond All Reason match
+-- did (issue #4026).
+
+do
+	local function rocket(height)
+		return { weapon = ROCKET, first = 100, last = 110, shooter = 1, at = flight(100, { 0, height + 2.7, 0 }, { 0, -0.27, -6.3 }) }
+	end
+	local world, player = setup({ last = 400, units = { { first = 0, last = 400 } }, projectiles = { rocket(0.3) } })
+	send(player, "pause")
+	seek(world, player, 105)
+	send(player, "play 1")
+	run(world, player, 10)
+	t.same("a rocket 0.3 above the ground at its end lands", #world.explosions, 1)
+	t.same("on the ground", (world.explosions[1] or {}).why, "ground")
+
+	world, player = setup({ last = 400, units = { { first = 0, last = 400 } }, projectiles = { rocket(2) } })
+	send(player, "pause")
+	seek(world, player, 105)
+	send(player, "play 1")
+	run(world, player, 5)
+	local two = world.projectileNamed("rocket")
+	t.same("one 2 above it is let go where the track has it", two and two.y, 2)
+	run(world, player, 5)
+	t.same("and lands nowhere, there being nothing in its way", #world.explosions, 0)
+end
+
 -- After a seek the engine can still have units the track does not, for as many
 -- frames as the player's budget takes to remove them, and a shot made in those
 -- frames can hit one (issue #4026). No shot is made until they are gone.
@@ -493,7 +522,9 @@ end
 -- lands on the frame it stops, not its last.
 
 do
-	local bolt = { weapon = BOLT, first = 100, last = 112, at = flight(100, { 0, 60, 0 }, { 0, -10, 20 }, 106.5) }
+	-- On the frame before it stops it is 2 above the ground, clear of where a
+	-- shot is taken to have ended on the ground.
+	local bolt = { weapon = BOLT, first = 100, last = 112, at = flight(100, { 0, 62, 0 }, { 0, -10, 20 }, 106.5) }
 	local world, player = setup({ last = 400, projectiles = { bolt } })
 	send(player, "pause")
 	seek(world, player, 98)
@@ -526,7 +557,7 @@ do
 	t.same("a seek into the frames a bolt fades in has it in the air", world.projectileCount(), 1)
 	local one = world.projectileNamed("bolt")
 	t.near("a frame of its flight short of where it stopped, which is on what it hit", one.z, 110, 1e-9)
-	t.near("in height too", one.y, 5, 1e-9)
+	t.near("in height too", one.y, 7, 1e-9)
 	t.check("pointing the way it flew", one.vz > 0 and one.vy < 0 and one.vx == 0, one.vy .. " " .. one.vz)
 	t.same("as long as a bolt that flew at its speed", one.speedf, math.sqrt(500))
 	run(world, player, 30)

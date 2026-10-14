@@ -174,6 +174,10 @@ function M.new(context, units, clock)
 		-- kept: the least distance the track tells apart.
 		hold = header.positionStep,
 		lift = header.positionStep,
+		-- How far above the playback's ground a shot can be that was under the
+		-- match's: its place is the track's to within the tolerance, and a height
+		-- of the ground to within half a position step (issue #4026).
+		graze = header.tolerance + header.positionStep / 2,
 		window = nil,
 		from = 1,
 		to = 0,
@@ -367,6 +371,17 @@ end
 -- taken away with nothing shown when it hit nothing.
 function Projectiles:release(serial, id, d, x, y, z, vx, vy, vz)
 	local Spring = self.Spring
+	-- The engine takes a projectile under the ground to have hit it, and looks at
+	-- no line for it, so a shot that ended on the ground can be just above the
+	-- playback's ground and fly over. One that close is put a position step under
+	-- it. A unit or a feature in its way is looked for first.
+	local floor = Spring.GetGroundHeight(x, z)
+	if floor < 0 and not self.wet[d] then
+		floor = 0
+	end
+	if y - floor <= self.graze then
+		y = math.min(y, floor - self.lift)
+	end
 	Spring.SetProjectilePosition(id, x, y, z)
 	Spring.SetProjectileVelocity(id, vx, vy, vz)
 	if self.setTimeToLive and self.ends[d] then

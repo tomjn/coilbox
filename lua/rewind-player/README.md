@@ -602,6 +602,8 @@ A shot is held at any speed and in either direction, paused included, so it is t
 
 Played forward at 0.5x, 1x or 2x, a shot is let go on the frame its flight ends: its last frame, or for a bolt the last whole frame before it stops. It is put where the track has it on that frame, at the speed the track has. The engine's own look then finds what the match's did and makes the game's impact effect and its sound.
 
+The engine takes a projectile under the ground to have hit it, and looks along no line for that. A shot that ended on the ground is under it on its last frame, but the track has its place to within the tolerance and the ground's height to within half a position step, so it can be just above the playback's ground. A rocket of the Beyond All Reason match was 0.04 under the match's ground and flew over the playback's. So a shot let go within the tolerance and half a position step (0.5625 elmo) above the ground is put a position step under it. The engine looks for a unit or a feature in its way before the ground, so one that hit a unit still does.
+
 No frames of free flight are needed, so none are given. Measured on the whole match below, with 195 rockets and 83 laser bolts: at 1x and at 0.5x all 278 landed, a mean of 0.09 elmo from the last frame of flight the track has for them. At 2x 277 landed. The one that did not was let go on the frame before its last, because play at 2x passed over the last, and the unit it hit was a frame short of where it was hit.
 
 What letting go means depends on the kind and on the engine:
