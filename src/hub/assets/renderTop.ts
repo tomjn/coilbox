@@ -316,6 +316,9 @@ export async function renderUnit(
     canvas: document.createElement("canvas"),
     alpha: true,
     antialias: true,
+    // A one-off render that is disposed when it ends, so the fast GPU is only
+    // woken for as long as the picture takes.
+    powerPreference: "high-performance",
     // Straight alpha out, so the only thing between the framebuffer and the
     // encoder is the multisample resolve, which `unpremultiply` undoes.
     premultipliedAlpha: false,
