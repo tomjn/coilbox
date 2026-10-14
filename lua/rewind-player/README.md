@@ -889,7 +889,7 @@ COILBOX_CROWD_SOURCE=whole-match.cbtrack COILBOX_CROWD_OUT=crowd.cbtrack COILBOX
 COILBOX_PLAYBACK_TRACK=crowd.cbtrack  # then run the test below, with the variables of the whole match tests
 ```
 
-`COILBOX_CROWD_DEFS` is a list of unit definition names with commas between them. The crowd then uses those in place of the match's own, in turn, which makes a crowd for another game than the one the match was played on. The crowd of 400 Balanced Annihilation units in [The arrival effect](#the-arrival-effect) was made with `armcom,armpw,armsolar,armllt,armmex,armlab,armvp,armstump,armflash,armrad,corcom,corak,corllt` and played with `COILBOX_PLAYBACK_GAME` naming Balanced Annihilation V15.9.8. The ignored test below passed on it in a headless engine: 400 units at each stop and no slow frame.
+`COILBOX_CROWD_DEFS` is a list of unit definition names with commas between them. The crowd then uses those in place of the match's own, in turn, which makes a crowd for another game than the one the match was played on. The crowd of 400 Balanced Annihilation units in the arrival effect runs of issue #4009 was made with `armcom,armpw,armsolar,armllt,armmex,armlab,armvp,armstump,armflash,armrad,corcom,corak,corllt` and played with `COILBOX_PLAYBACK_GAME` naming Balanced Annihilation V15.9.8. The ignored test below passed on it in a headless engine: 400 units at each stop and no slow frame.
 
 The ignored test `a_seek_across_a_whole_match_settles_in_frames_that_fit` plays eight seeks across a match with the driver's seeks plan, waits for `coilbox_rewind_settled` after each, and checks that the engine has the track's units and features at each stop and that the log has no slow frame line and no Lua error. It passed on the whole match and on the crowd of 400 in a headless engine. `COILBOX_PLAYBACK_TRACK` names a track to play instead of the one recorded from the replay.
 
@@ -1052,26 +1052,38 @@ In an engine with a window, on the crowd of 400, with the view of 2560 by 1440 p
 
 ### The arrival effect
 
-A unit that a slow seek makes gets a short effect where it appears, so that it arrives and does not pop into place (issue #4009).
+A jump hides the units it makes and removes under an orb of white light (issues #4009 and #4051). The effect is the transporter beam of Stargate: an orb grows over the unit, the unit appears or goes under it, and the orb rises and clears.
 
-![The effect in Splinter Faction, 0.4 seconds into a seek](screenshots/arrival-effect.jpg)
+The three times of the effect, in seconds of the frame timer's clock, whatever rate the game draws at:
 
-![The same effect in Balanced Annihilation V15.9.8, on a crowd of its own units](screenshots/arrival-effect-ba.jpg)
+| From | To | Stage |
+| --- | --- | --- |
+| 0 | 0.08 | the orb appears small at the unit and grows until it covers it. Chosen by eye, from the owner's note that the growing is a small part of the effect |
+| 0.08 | 0.4 | it holds at full size, opaque over the whole unit. The unit is made or removed in this window, never before it |
+| 0.4 | 0.5 | it goes up at least its own size and goes from opaque to clear. The 0.1 seconds are the design of the issue. Most of the rise is in the first half |
 
-Which units get one is the units stage's to say:
+The orb never waits for its unit. If the player is behind, the orb still ends on time and the unit appears after it.
 
-- A unit made in a later frame than the frame that showed the seek, while the seek's units are still arriving. That is what slow means here. A seek that is shown in one frame gets none. With a budget that starts at one, a seek that makes more than one unit takes more than one frame.
-- Only a unit inside the view's four corners. With a view that has no corners, or no view, every unit counts as inside.
-- None while the timeline's knob is being dragged, which the `drag` message says. A drag sends many seeks a second. When the drag ends, the units still to come get one.
-- None for a unit a seek removes, and none in plain play. A unit that play brings in while a seek is still settling does get one.
+Which units get one:
 
-The stage asks with `context.arrive(unitID, x, y, z, team)`. The gadget hands that to its unsynced half with `SendToUnsynced("coilbox_rewind_arrive", ...)`, which is a call and costs no frame, and the unsynced half draws from `gadget:DrawWorld`. `luarules/rewind_player/coilbox_player_arrival.lua` is the effect.
+- A unit inside the view's four corners that a jump makes, and a unit inside them that a jump removes, no more than 256 at once (`Units.MOST_ORBS`, which is `Arrival.MOST`). With a view that has no corners, or no view, every unit counts as inside. A unit outside the view, or past the cap, is made and removed with no orb and no wait.
+- A jump is a seek that is not part of a drag, which covers a click on the bar, every key that steps or seeks, and a play that starts again from the other end. The first frame of a playback is not a jump.
+- None while the timeline's knob is being dragged. When the drag ends, each unit the drag made and left standing in view gets an orb at once, with no wait, since the unit is already there.
+- None in plain play, forward or backward, at any speed. A unit that play brings in while a jump is still settling gets none either.
+
+How it works:
+
+- At the start of a jump, once the window is read, the units stage asks for an orb over each unit in view that it will make or remove, with `context.arrive(serial, definition, x, y, z, true)`. The gadget hands that to its unsynced half with `SendToUnsynced("coilbox_rewind_arrive", ...)`, which costs no frame, and the unsynced half draws from `gadget:DrawWorld`. The orb is found again by the unit's serial in the track.
+- The synced half has no timer, so the unsynced half says when the orbs have grown: `coilbox_rewind_orbs:full`, sent from the first frame's work after 0.08 seconds. Until it arrives the stage makes none of those units and removes none. A removal it holds back holds back every creation, since a removal comes first. Units without an orb are made and removed as before, in the meantime.
+- The unsynced half says once, `coilbox_rewind_orbs:ready`, that it can draw orbs. Without it, or without the calls it needs (the `arrivalEffect` row of the engine tables), no orb is asked for and nothing waits.
+- A jump that arrives while another settles starts again: the stage forgets the old orbs, which finish on their own, and asks for the new jump's.
+- `luarules/rewind_player/coilbox_player_arrival.lua` is the effect.
 
 #### What is drawn
 
-A column of light that fades, a ring on the ground that closes on the unit, and 16 dots in the team's colour that fall into it, over 0.9 seconds of the frame timer's clock. The lengths are in the unit's radius, from `Spring.GetUnitRadius`, so a larger unit has a larger effect, and the colour is the team's, from `Spring.GetTeamColor`. The dots are plain squares with a little difference in shade from one to the next. The lengths and the 0.9 seconds are choices of how it looks, made by looking at it in six runs.
+A camera facing circle, centred on the unit's middle, which is half the unit definition's `height` above its base. Its size is `Arrival.COVER` (2.2) times the larger of the definition's `radius` and half its `height`. The inner `Arrival.CORE` (0.6) of the circle is as opaque as it gets, which is 1.32 times the unit's size, so it covers the unit's height and width. The rest is glow, which falls to nothing at the rim in three bands along a curve, so that no edge shows. These sizes, the start size of 0.15, and the rise of 2.2 times the orb's size, are set by eye and are not measured.
 
-It is drawn with `gl.BeginEnd`, `gl.Vertex` and `gl.Color` as quads, with `gl.Blending`, `gl.DepthTest`, `gl.DepthMask` and `gl.Texture(false)` round them. It has no texture, no shader and nothing from the game, and it never touches how a unit is drawn. An effect is a row in lists made once, and a draw allocates nothing.
+It is drawn with `gl.BeginEnd`, `gl.Vertex` and `gl.Color` as quads, with no texture, no shader and nothing from the game. The blending adds to what is behind it, so a fully opaque core whitens the unit, and the depth test is off so that nothing in front hides the orb. The unit's colour does not enter into it. An orb is a row in lists made once, and a draw allocates nothing.
 
 #### Why the player draws it
 
@@ -1084,7 +1096,7 @@ Drawing from a gadget needs the game's gadget handler to pass `DrawWorld` to the
 
 #### A game's own effect
 
-A game's adapter can show the game's own spawn or warp effect in its `unitPlaced` hook ([Hooks](#hooks)). The hook's fifth argument is whether the player is about to show its effect for the unit, and a hook that gives true has shown its own, so the player shows none. The name below stands for one of the game's own explosion generators.
+A game's adapter can show the game's own spawn or warp effect in its `unitPlaced` hook ([Hooks](#hooks)). The hook's fifth argument is whether the unit has an orb, and a hook that gives true has shown its own, so the player takes the orb away at once. The unit has been made by then, under the orb. The name below stands for one of the game's own explosion generators.
 
 ```lua
 unitPlaced = function(unitID, unitDefID, t, clock, effect)
@@ -1096,56 +1108,20 @@ unitPlaced = function(unitID, unitDefID, t, clock, effect)
 end,
 ```
 
-A hook that gives nothing leaves the player's effect, and so does one that raises. The hook is still called for every unit the player makes, whatever `effect` is.
+A hook that gives nothing leaves the orb, and so does one that raises. The hook is still called for every unit the player makes, whatever `effect` is. When a drag ends, it is called a second time for each unit the drag made and left standing in view, with `effect` true. It is not called for a unit that is removed.
 
-#### What it costs
+#### What it costs and what was measured
 
-- Asking is inside the frame's timed work: one `SendToUnsynced` and, in the unsynced half, `Spring.GetUnitRadius` and `Spring.GetTeamColor`. The budget counts it.
-- Drawing was timed by a scratch gadget that held 16, 64, 256 and 1,024 effects half way through their lives and timed the module's draw, in three runs in a view of 2560 by 1440 pixels, two in Splinter Faction and one in Balanced Annihilation: 13.4 to 16.0 microseconds for each effect in each drawn frame. 64 effects drew in 0.91 to 0.94 ms, 256 in 3.5 to 3.8 ms and 1,024 in 13.8 to 14.9 ms.
-- So there is a cap. No more than 256 effects are alive at once (`Arrival.MOST`), and a unit that arrives past that has none. The cap is a choice of how much of a drawn frame to spend, 3.8 ms at the worst measured. The crowd of 400 had 79 units in view.
-- While a seek of the crowd of 400 settled, the engine drew 9 to 10 frames a second with the effect and 8 to 11 without, in three of the runs below.
+All of this is from one windowed launch of Splinter Faction on the crowd of 400 ([The crowd](#the-crowd)), on 14 October 2026, in a window of 1,280 by 720 points (2560 by 1440 pixels), engine `2026.07.01-102-g6e5c5a0`. The load average before was 4.59 6.32 6.68 and after 12.67 8.90 7.65, with another agent's engine running on the machine. The camera was nearly level, 1.8 degrees below the horizontal, because the run's search for a pitch of 50 degrees failed. That is not the angle a player plays at. A scratch gadget timed each jump from the message that sent it to the player's own settled flag, read the engine once a simulation frame, and wrapped the effect's module.
 
-#### Measured in a window
+- Drawing: 23.4 to 25.2 microseconds for each orb in each drawn frame. 16 orbs drew in 0.40 ms, 64 in 1.58 ms and 256 in 5.99 ms, in 13 draws of each count. The cap of 256 is what that allows a drawn frame, which is 6 ms at the worst measured.
+- Asking: one `SendToUnsynced` for each orb in the frame that shows the jump, over the units in the window once. No slow frame line was logged in the run's `coilbox_rewind.log`.
+- Orbs alive: 256 at the most in each jump in, the cap, with 255 units on screen at the end by a test of the screen. A jump out of 400 units also had 256.
+- How long a jump takes to settle, in, with orbs and then as the drag path, which has none, twice each: orbs 1,026 ms (31 game frames) and 1,157 ms (34), no orbs 1,174 ms (35) and 945 ms (28). Out: orbs 806 ms (24) and 742 ms (22), no orbs 745 ms (22) and 802 ms (24). Two runs of each differ by more than the orbs do, so this run shows no stretch from holding units back and cannot show a small one.
+- How long an orb lived, read as the age when the draw took it out: 0.516, 0.509 and 0.536 seconds for the jumps out and the second jump in, and 0.657 for the first jump in, where the engine drew 8 frames a second. That is the 0.5 seconds plus up to a drawn frame, so the run shows the timer's 0.5 seconds to within the frame time and not exactly.
+- Whether the unit appears under the orb: of the units in view that the two jumps in made, by the orb's phase when the frame that made them was read, 1 appeared while the orb grew, 67 and 86 while it held, 90 and 42 while it rose, and 97 and 126 after it was gone. So 26 and 34 in 100 appeared under a full orb, and 38 and 49 in 100 appeared after it. The budget made the units later than the orb's 0.4 seconds. That is the orb finishing on time with its unit late. Units outside the view appeared with no wait, 84 and 95 while the orbs held. Of the units the jumps out removed, 369 and 354 went while the orbs held, 30 and 46 while they rose and 1 in the first phase.
 
-The engine was `2026.07.01-102-g6e5c5a0` with Splinter Faction, in a window of 1,280 by 720 points, which is 2560 by 1440 pixels, on 14 October 2026. Another agent was building and running engines on the same machine, so the load average is given for each run. The track is the crowd of 400 and the seek is from the first frame to frame 22,791, with the camera over the place most of its units are. The first seek of a run is the first row and later ones follow. A scratch gadget read the player's own measure of each frame's work. "Frames" is the frames that made a unit. "In view by" is when the last unit in view was there, after the seek was sent, and "whole seek" is when the player said it was settled.
-
-| Player | Run, load | Seek | Effect | Frames | Slowest frame | In view by | Whole seek | Slow frames |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| before | 1, 5.6 | first | none | 21 | 28.04 ms | 759 ms | 942 ms | 0 |
-| before | 1, 5.6 | later | none | 16 | 19.67 ms | 567 ms | 605 ms | 0 |
-| before | 1, 5.6 | later | none | 16 | 22.84 ms | 590 ms | 617 ms | 0 |
-| now | 2, 5.2 | first | on | 22 | 39.06 ms | 549 ms | 1,114 ms | 1 |
-| now | 2, 5.2 | later | on | 18 | 23.72 ms | 322 ms | 768 ms | 0 |
-| now | 2, 5.2 | later | on | 17 | 21.20 ms | 324 ms | 779 ms | 0 |
-| now | 2, 5.2 | later | off | 16 | 24.25 ms | 347 ms | 642 ms | 0 |
-| now | 2, 5.2 | later | off | 15 | 21.74 ms | 260 ms | 692 ms | 0 |
-| now | 3, 17.6 | first | on | 19 | 46.13 ms | 433 ms | 963 ms | 2 |
-| now | 3, 17.6 | later | on | 16 | 24.32 ms | 315 ms | 747 ms | 0 |
-| now | 3, 17.6 | later | on | 18 | 23.28 ms | 374 ms | 690 ms | 0 |
-| now | 3, 17.6 | later | off | 16 | 24.02 ms | 331 ms | 625 ms | 0 |
-| now | 3, 17.6 | later | off | 17 | 25.65 ms | 390 ms | 654 ms | 0 |
-| now | 4, 4.4 | first | on | 23 | 21.54 ms | 415 ms | 925 ms | 0 |
-| now | 4, 4.4 | later | on | 17 | 23.40 ms | 373 ms | 814 ms | 0 |
-| now | 4, 4.4 | later | on | 17 | 23.83 ms | 344 ms | 647 ms | 0 |
-| now | 4, 4.4 | later | off | 17 | 22.30 ms | 366 ms | 853 ms | 0 |
-| now | 4, 4.4 | later | off | 16 | 22.25 ms | 300 ms | 734 ms | 0 |
-| now | 6, 3.5 | first | on | 22 | 39.92 ms | 487 ms | 1,028 ms | 3 |
-| now | 6, 3.5 | later | on | 18 | 21.16 ms | 358 ms | 714 ms | 0 |
-| now | 6, 3.5 | later | on | 17 | 20.52 ms | 404 ms | 731 ms | 0 |
-| now | 6, 3.5 | later | off | 16 | 23.94 ms | 377 ms | 715 ms | 0 |
-| now | 6, 3.5 | later | off | 16 | 24.38 ms | 341 ms | 615 ms | 0 |
-
-"Off" is the same seek sent between a `drag 1` and a `drag 0`, which asks for no effect. A first seek with the effect off was not run. Run 5 was Balanced Annihilation.
-
-What the table shows and does not:
-
-- A later seek logged no slow frame in any run, with the effect or without, and its slowest frame is the same before and now.
-- The first seek of a run logged a slow frame in three of the four runs now, of 36.6 to 46.1 ms, and not in the one run before, whose slowest was 28.0 ms. One run before is not enough to say the first seek was safe before.
-- In the two runs that have each frame, the slow frames came late in the seek, after every unit in view had been made. Going by run 4, where the first unit of all 13 definitions was made in the first seven frames, the first units of the definitions were over too. They were frames of 40 and 46 units that took 0.80 to 1.15 ms a unit, where the frames that set the budget had taken 0.36 to 0.41 ms a unit. The sort and the asks for an effect were over by then. It did not show in a headless engine, where three first seeks before and three now had a slowest frame of 18.4 to 21.9 ms. Issue #4015 found why: [The first seek in a window](#the-first-seek-in-a-window).
-- A screenshot was taken part way through 13 more seeks, and one of those logged a slow frame of 33.8 ms.
-- In a headless engine on the same machine the ignored test of the crowd of 400 passed twice and failed twice on one slow frame, of 41.4 and 36.5 ms, with a load average of 4 to 7. That is the test [Where it stops holding](#where-it-stops-holding) says can fail on a busy machine. The scratch gadget's run of seeks, three times with the player of `origin/main` and three times with this one, logged a slow frame in one run of each: 42.3 ms before, and 39.9 and 53.9 ms now in a run with a load average of 12.9.
-
-In Balanced Annihilation, in run 5, the same crowd as its own units logged no slow frame and no Lua error, with a slowest frame of 13.4 ms. The engine drew 4 to 7 frames a second there, and the budget was slow to grow: the first seek took 49 frames, 25 of them at two units a frame, and the later ones 21 to 25 frames. Issue #4016 found why the budget was slow there, and [How many a frame](#how-many-a-frame) has it. Balanced Annihilation's gadget handler logs `UpdateCallIn: GameFramePost is not implemented`, so the player never hears the end of a simulation frame there (issue #4002).
+Screenshots from that run are in `docs/reports/milestone-80-gallery/` from 130, which is gitignored. Two of them, of the effect's module at fixed ages on every unit on screen, show white wedges that are not the orb's circle, and the cause was not looked into.
 
 ### What the base game does
 
