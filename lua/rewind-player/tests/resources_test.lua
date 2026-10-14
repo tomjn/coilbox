@@ -466,6 +466,28 @@ do
 	near("the second's received", read(world, 1, "metal").received, 30)
 end
 
+-- Three teams sending round in a ring, each to the next. Pairing the senders
+-- in order leaves the last team nobody to send to but itself, which the real
+-- engine showed (issue #4011).
+
+do
+	local sent, received = { 20, 25, 30 }, { 30, 20, 25 }
+	local values = {}
+	for team = 0, 2 do
+		values[#values + 1] = { team = team, code = STORAGE, at = 1000 }
+		values[#values + 1] = { team = team, code = SENT, at = sent[team + 1] }
+		values[#values + 1] = { team = team, code = RECEIVED, at = received[team + 1] }
+	end
+	local world, player, run = setup({ values = values })
+	player:message("coilbox_rewind:pause")
+	run(100)
+	for team = 0, 2 do
+		local metal = read(world, team, "metal")
+		near("team " .. team .. " sent in the ring", metal.sent, sent[team + 1])
+		near("and received", metal.received, received[team + 1])
+	end
+end
+
 -- The tracks are thinned one by one, so what was sent may not equal what was
 -- received. The transfers match the smaller side and both sides read that.
 

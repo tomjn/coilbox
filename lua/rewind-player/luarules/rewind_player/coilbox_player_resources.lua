@@ -298,7 +298,7 @@ end
 
 --- Makes the transfers that add what the match sent and received to the
 -- engine's running sums. For each resource the senders give to the receivers,
--- never to themselves. The tracks are thinned one by one, so the two totals may
+-- never to themselves, the largest first. The tracks are thinned one by one, so the two totals may
 -- differ. The smaller total is made whole and the larger is cut in the same
 -- proportion. `apply` puts what every team holds back.
 local function share(self, w, t)
@@ -323,28 +323,47 @@ local function share(self, w, t)
 				giving[i] = giving[i] * cutGiving
 				taking[i] = taking[i] * cutTaking
 			end
-			for i = 1, count do
-				for j = 1, count do
-					local amount = giving[i] < taking[j] and giving[i] or taking[j]
-					if i ~= j and amount > 0 then
-						-- The sender must hold the amount, and storage must hold it.
-						setTeamResource(teams[i], STORAGE_NAME[r], 2 * amount)
-						setTeamResource(teams[i], name, amount)
-						shareTeamResource(teams[i], teams[j], name, amount)
-						if (Spring.GetTeamResources(teams[i], name)) > 0 then
-							-- Before 2026.07.01 the engine asks the game's
-							-- AllowResourceTransfer, which refused.
-							self.context.report(
-								"transfer refused",
-								"the game's AllowResourceTransfer refused a transfer between teams, so what those teams sent and received reads as the playback's own"
-							)
-						else
-							giving[i] = giving[i] - amount
-							taking[j] = taking[j] - amount
-							local si, sj = (i - 1) * 2 + r, (j - 1) * 2 + r
-							self.addedSent[si] = self.addedSent[si] + amount
-							self.addedReceived[sj] = self.addedReceived[sj] + amount
-						end
+			-- The team with the most left to send gives to the one with the most left
+			-- to take, and never to itself. Each step empties one of them, so it ends.
+			while true do
+				local i, most = 0, 0
+				for k = 1, count do
+					if giving[k] > most then
+						i, most = k, giving[k]
+					end
+				end
+				if i == 0 then
+					break
+				end
+				local j, room = 0, 0
+				for k = 1, count do
+					if k ~= i and taking[k] > room then
+						j, room = k, taking[k]
+					end
+				end
+				if j == 0 then
+					-- Only itself is left to give to.
+					giving[i] = 0
+				else
+					local amount = most < room and most or room
+					-- The sender must hold the amount, and storage must hold it.
+					setTeamResource(teams[i], STORAGE_NAME[r], 2 * amount)
+					setTeamResource(teams[i], name, amount)
+					shareTeamResource(teams[i], teams[j], name, amount)
+					if (Spring.GetTeamResources(teams[i], name)) > 0 then
+						-- Before 2026.07.01 the engine asks the game's AllowResourceTransfer,
+						-- which refused.
+						self.context.report(
+							"transfer refused",
+							"the game's AllowResourceTransfer refused a transfer between teams, so what those teams sent and received reads as the playback's own"
+						)
+						giving[i] = 0
+					else
+						giving[i] = giving[i] - amount
+						taking[j] = taking[j] - amount
+						local si, sj = (i - 1) * 2 + r, (j - 1) * 2 + r
+						self.addedSent[si] = self.addedSent[si] + amount
+						self.addedReceived[sj] = self.addedReceived[sj] + amount
 					end
 				end
 			end

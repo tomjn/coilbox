@@ -284,6 +284,9 @@ fn a_crowd_of_real_definitions_is_written() {
             queue: vec![],
         });
     }
+    if std::env::var("COILBOX_CROWD_SHARING").is_ok() {
+        add_sharing(&mut track, h.first_frame, h.last_frame);
+    }
     let bytes = track.to_bytes().unwrap();
     std::fs::write(&out, &bytes).unwrap();
     eprintln!(
@@ -293,4 +296,53 @@ fn a_crowd_of_real_definitions_is_written() {
         places.len(),
         bytes.len()
     );
+}
+
+/// Gives every team of the track storage, what it holds and a share level, and
+/// has the teams send metal and energy round in a ring, each to the next, with
+/// a different amount before and after the middle of the match. What each
+/// team received is what the one before it sent, as in a real match. A real
+/// replay without sharing in it cannot show the sent and received of a team in
+/// an engine (issue #4011), and a team that both sends and receives is the
+/// hard case.
+fn add_sharing(track: &mut Track, first: u32, last: u32) {
+    let teams: Vec<u8> = track.info.teams.iter().map(|t| t.id).collect();
+    assert!(teams.len() >= 2, "sharing needs two teams");
+    let middle = first + (last - first) / 2;
+    let energy = value_code::ENERGY;
+    let mut put = |team: u8, code: u16, early: f32, late: f32| {
+        track.values.retain(|v| !(v.team == team && v.code == code));
+        track.values.push(ValueTrack {
+            team,
+            code,
+            keys: vec![
+                ValueKey::new(first, early),
+                ValueKey::new(middle, early),
+                ValueKey::new(middle + 1, late),
+                ValueKey::new(last, late),
+            ],
+        });
+    };
+    for (n, team) in teams.iter().enumerate() {
+        let b = ((n + teams.len() - 1) % teams.len()) as f32;
+        let n = n as f32;
+        for (base, scale) in [(0, 1.0), (energy, 10.0)] {
+            put(*team, base + value_code::STORAGE, 5000.0, 5000.0);
+            put(*team, base + value_code::HELD, 2000.0, 1500.0);
+            put(*team, base + value_code::SHARE, 0.9, 0.9);
+            put(
+                *team,
+                base + value_code::SENT,
+                scale * (20.0 + 5.0 * n),
+                scale * (8.0 + 2.0 * n),
+            );
+            put(
+                *team,
+                base + value_code::RECEIVED,
+                scale * (20.0 + 5.0 * b),
+                scale * (8.0 + 2.0 * b),
+            );
+        }
+    }
+    eprintln!("sharing: {} teams send round in a ring", teams.len());
 }

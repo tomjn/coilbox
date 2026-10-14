@@ -1266,6 +1266,31 @@ local function resourcePlan(asked)
 	for i = 1, 8 do
 		frames[#frames + 1] = first + math.floor((last - first) * i / 9)
 	end
+	-- The frames where the teams sent the most to each other (issue #4011),
+	-- looked at 90 frames apart, so that a match with sharing in it is looked
+	-- at where the sharing is.
+	local CODE = Track.VALUE
+	local shared, looked = {}, 0
+	for frame = first, last, 90 do
+		local w = track:seek(frame)
+		local total = 0
+		for _, team in ipairs(resourceTeams()) do
+			for _, base in ipairs({ 0, CODE.ENERGY }) do
+				total = total + trackValue(w, team, base + CODE.SENT, frame) + trackValue(w, team, base + CODE.RECEIVED, frame)
+			end
+		end
+		looked = looked + 1
+		if total > 0 then
+			shared[#shared + 1] = { frame = frame, total = total }
+		end
+	end
+	table.sort(shared, function(a, b)
+		return a.total > b.total
+	end)
+	say(string.format("sharing frames=%d of=%d most=%.4f at=%s", #shared, looked, shared[1] and shared[1].total or 0, tostring(shared[1] and shared[1].frame)))
+	for i = 1, math.min(4, #shared) do
+		frames[#frames + 1] = shared[i].frame
+	end
 	table.sort(frames)
 
 	send("pause")
