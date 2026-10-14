@@ -58,6 +58,14 @@ function Window:sampleQueue(i, frame)
 	return self.queueItemFirst[a], self.queueItemCount[a]
 end
 
+--- As the reader's: pose track `track` at `frame`, as the turns about x, y and z
+-- in 65,536ths of a turn and then the offsets in elmos. A pose's `at(frame)`
+-- gives the six.
+function Window:samplePose(track, frame, out)
+	out[1], out[2], out[3], out[4], out[5], out[6] = self.poseSource[track].at(frame)
+	return true
+end
+
 function Window:sampleValue(v, frame)
 	return self.track.values[v].at(frame)
 end
@@ -153,9 +161,14 @@ function Track:loadWindow(k)
 		queueItemX = {},
 		queueItemZ = {},
 		queueItemFacing = {},
+		unitPoseFirst = {},
+		unitPoseCount = {},
+		posePiece = {},
+		poseSource = {},
 	}, Window)
 	local n = 0
 	local keys, items = 0, 0
+	local poses = 0
 	for _, unit in ipairs(self.units) do
 		if unit.first <= finish and unit.last >= start then
 			n = n + 1
@@ -163,6 +176,16 @@ function Track:loadWindow(k)
 			w.unitSerial[n], w.unitDef[n], w.unitTeam[n] = unit.serial, unit.def, unit.team
 			local first, last = math.max(unit.first, start), math.min(unit.last, finish)
 			w.unitFirstFrame[n], w.unitLastFrame[n] = first, last
+			-- The pose tracks of the window. A piece that is at rest for the whole
+			-- of a window has none there, which a pose's own `first` and `last` say.
+			w.unitPoseFirst[n], w.unitPoseCount[n] = poses + 1, 0
+			for _, pose in ipairs(unit.poses) do
+				if (pose.first or first) <= last and (pose.last or last) >= first then
+					poses = poses + 1
+					w.unitPoseCount[n] = w.unitPoseCount[n] + 1
+					w.posePiece[poses], w.poseSource[poses] = pose.piece, pose
+				end
+			end
 			-- The queue keys of the window, as the writer slices them: the key
 			-- held at the unit's first frame in the window and every key after it.
 			-- A unit whose queue is empty throughout has none.
@@ -273,6 +296,10 @@ local function unit(spec, serial)
 		rotation = spec.rotation or { 0, 0, 0, 1 },
 		-- Build queue keys, each `{ frame = n, items = { { def, x, z, facing } } }`.
 		queue = spec.queue or {},
+		-- Pose tracks, each `{ piece = n, at = function(frame) }` with `piece` an
+		-- index from 0 into the posed pieces of the definition, and optionally the
+		-- `first` and `last` frame the piece is away from rest between.
+		poses = spec.poses or {},
 		at = type(place) == "function" and place or function()
 			return place[1], place[2], place[3]
 		end,
@@ -370,6 +397,8 @@ function M.new(spec)
 			unitDefs = spec.unitDefs or {},
 			weaponDefs = spec.weaponDefs or {},
 			featureDefs = spec.featureDefs or {},
+			-- Each `{ unitDef = n, pieces = { names } }`, as the reader gives them.
+			posedPieces = spec.posedPieces or {},
 			teams = teams,
 			teamParams = spec.teamParams or {},
 			gameParams = spec.gameParams or {},
