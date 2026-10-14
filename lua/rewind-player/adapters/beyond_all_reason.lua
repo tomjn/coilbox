@@ -157,6 +157,12 @@ return {
 		-- its pause, next and sliders are the music's and the sound's, not the
 		-- engine's.
 		"camera_player_tv.lua",
+		-- The time left over a building under construction, which works it out from
+		-- how fast build progress moved between the frames it watched. A playback's
+		-- build progress moves at the speed of play, backward too, so the label
+		-- read "Decaying" when a playback ran backward (issue #4048). Build
+		-- progress still shows.
+		"gui_build_eta.lua",
 	},
 
 	-- The numbers the game's panels read that are the game's own and not the
