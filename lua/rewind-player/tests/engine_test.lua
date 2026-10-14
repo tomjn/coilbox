@@ -69,7 +69,8 @@ local HOOK = "return { name = 'Probe', hooks = { started = function() Spring.Ech
 -- `removed` is a call the engine does not have.
 local function scene(removed)
 	local w = Engine.new({
-		unitDefs = { { name = "armcom" }, { name = "armpw" }, { name = "armsolar" } },
+		-- The fixture has poses for three pieces of armpw.
+		unitDefs = { { name = "armcom" }, { name = "armpw", pieces = { "pelvis", "turret", "barrel", "arm" } }, { name = "armsolar" } },
 		featureDefs = { { name = "rock" } },
 		weaponDefs = {
 			{ name = "laser", type = "LaserCannon", fireSound = { { name = "zap", volume = 1 } } },
@@ -155,6 +156,9 @@ local OBSERVE = {
 		return count(w.los, function()
 			return true
 		end)
+	end,
+	aimPoses = function(w)
+		return w.poseSets
 	end,
 	holdFire = function(w)
 		return count(w.units, function(unit)
@@ -682,12 +686,80 @@ BEHAVIOUR.frameEnd = function()
 			count = count + 1
 		end
 	end
-	t.same("each line is logged once in 600 frames", count, 3)
+	t.check("the aim stage says what it does", said(w, MISSING .. ", so aiming pieces are posed from GameFrame") ~= nil)
+	t.same("each of the four lines is logged once in 600 frames", count, 4)
 
 	w, seen = frameEndScene({ handler = false }, "Script.UpdateCallIn")
 	t.same("frameEnd: without Script.UpdateCallIn nothing is installed", w.handlerGlobals.GameFramePost, nil)
 	t.same("no unit's maximum is ever lowered", seen.held + seen.lowered, 0)
 	t.check("and the player says it could not install the call", said(w, "could not install the call-in itself") ~= nil, table.concat(w.lines, " | "))
+end
+
+-- Aim poses (issue #3796). The fixture's one armpw at frame 800 has pose tracks
+-- for three pieces. Its own script turns the turret somewhere else in the
+-- middle of every frame, as an aiming script does. Gives the world, the
+-- turret's turn about y after the gadget's frame on each of 20 frames, and the
+-- same when each frame is over.
+local SCRIPT_AIM = 2.5
+local function aimScene(how, removed)
+	local w, gadget = scene(removed)
+	gadget:Initialize()
+	gadget:RecvLuaMsg("coilbox_rewind_budget:none", 0)
+	gadget:RecvLuaMsg("coilbox_rewind:pause", 0)
+	gadget:RecvLuaMsg("coilbox_rewind:seek 800", 0)
+	local seen = { framed = {}, over = {} }
+	w.economy = function()
+		local unit = w.unitNamed("armpw")
+		seen.framed[#seen.framed + 1] = unit and select(2, w.pieceOf(unit, "turret")) or false
+		if unit then
+			w.scriptTurn(unit, "turret", 0, SCRIPT_AIM, 0)
+		end
+	end
+	for _ = 1, 20 do
+		w.gameFrame(gadget, how)
+		local unit = w.unitNamed("armpw")
+		seen.over[#seen.over + 1] = unit and select(2, w.pieceOf(unit, "turret")) or false
+	end
+	return w, seen
+end
+
+--- How many of `list` from position `from` on are `value`.
+local function countOf(list, from, value)
+	local n = 0
+	for i = from, #list do
+		if list[i] == value then
+			n = n + 1
+		end
+	end
+	return n
+end
+
+BEHAVIOUR.aimPoses = function()
+	local LINE = "GameFramePost does not reach the player, so aiming pieces are posed from GameFrame"
+
+	local w, seen = aimScene(nil)
+	local pose = seen.over[20]
+	t.check("aimPoses: the track's turn is not where the script aims, so the two can be told apart", type(pose) == "number" and pose ~= SCRIPT_AIM and pose ~= 0, pose)
+	t.same("with the call at the end of a frame the pose is the track's when every frame is over", countOf(seen.over, 1, pose), 20)
+	t.same("and the player says nothing about posing", said(w, LINE), nil)
+
+	w, seen = aimScene({ engine = false })
+	t.same("aimPoses: on an engine with no such call the pose is set in the gadget's frame, on every frame", countOf(seen.framed, 1, pose), 20)
+	t.same("the script, which runs after it, has the last word in each", countOf(seen.over, 1, SCRIPT_AIM), 20)
+	local line = said(w, LINE)
+	t.check("and the player says so, with its prefix", line ~= nil and line:sub(1, #PREFIX) == PREFIX, table.concat(w.lines, " | "))
+	local lines = 0
+	for _, text in ipairs(w.lines) do
+		if text:find(LINE, 1, true) then
+			lines = lines + 1
+		end
+	end
+	t.same("once", lines, 1)
+
+	w, seen = aimScene({ handler = false })
+	t.same("aimPoses: in a game whose handler does not pass the call on, the pose holds from the frame the call was installed in", countOf(seen.over, 2, pose), 19)
+	t.same("the first frame, before it, is the script's", seen.over[1], SCRIPT_AIM)
+	t.same("and the player does not say the call is missing", said(w, LINE), nil)
 end
 
 -- A row the fixture track cannot show, because it has no unit that is switched

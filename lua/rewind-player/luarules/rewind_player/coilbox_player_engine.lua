@@ -142,6 +142,18 @@ M.SYNCED = {
 		visible = false,
 	},
 	{
+		id = "aimPoses",
+		feature = "unit aiming",
+		calls = { "Spring.UnitScript.CallAsUnit", "Spring.UnitScript.Turn", "Spring.UnitScript.Move", "Spring.GetUnitScriptNames" },
+		how = "behaviour",
+		where = "coilbox_player_aim.lua. The stage poses from gadget:GameFramePost, and the gadget installs the global when the game's handler does not pass the call-in on (the frameEnd row). On an engine with no GameFramePost (105.0 and 105.1.1) it poses from GameFrame and gives a posed unit no target",
+		used = "coilbox_player_aim.lua",
+		required = false,
+		since = "105.0",
+		without = "Units hold the pose the engine's own script gives them",
+		visible = true,
+	},
+	{
 		id = "frameEnd",
 		feature = "installing the end of frame call-in",
 		calls = { "Script.UpdateCallIn" },

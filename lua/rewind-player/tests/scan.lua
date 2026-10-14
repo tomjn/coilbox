@@ -3,8 +3,9 @@
 -- out first, so a name in either is not a use.
 --
 -- A name is a use when it is a member of `Spring`, `VFS`, `Game`, `CMD`,
--- `Script`, `gl` or `GL`, a member of `Spring.MoveCtrl` however it is reached,
--- or the global `SendToUnsynced`. A parameter called `vfs` is `VFS`.
+-- `Script`, `gl` or `GL`, a member of `Spring.MoveCtrl` or `Spring.UnitScript`
+-- however it is reached, or the global `SendToUnsynced`. A parameter called
+-- `vfs` is `VFS`.
 
 local M = {}
 
@@ -49,13 +50,16 @@ function M.usedBy(path)
 	local found = {}
 	for _, root in ipairs({ "Spring", "VFS", "Game", "CMD", "Script", "gl", "GL" }) do
 		for member in code:gmatch("%f[%w_]" .. root .. "%.([%w_]+)") do
-			if not (root == "Spring" and member == "MoveCtrl") then
+			if not (root == "Spring" and (member == "MoveCtrl" or member == "UnitScript")) then
 				found[root .. "." .. member] = true
 			end
 		end
 	end
 	for member in code:gmatch("%f[%w_]MoveCtrl%.([%w_]+)") do
 		found["Spring.MoveCtrl." .. member] = true
+	end
+	for member in code:gmatch("%f[%w_]UnitScript%.([%w_]+)") do
+		found["Spring.UnitScript." .. member] = true
 	end
 	if code:find("%f[%w_]SendToUnsynced%f[^%w_]") then
 		found.SendToUnsynced = true
