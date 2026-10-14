@@ -314,10 +314,12 @@ function Units:destroyed(unitID)
 end
 
 --- Something damaged a unit in spite of the gadget. Its health is set again on
--- the next frame.
-function Units:damaged(unitID)
+-- the next frame. The engine calls UnitDamaged for a hit that did no damage
+-- too (CUnit::DoDamage), which every shot of the track that lands is, and such
+-- a hit is nothing to put right (issue #4020).
+function Units:damaged(unitID, damage)
 	local serial = self.serialOf[unitID]
-	if serial then
+	if serial and damage ~= 0 then
 		self.health[serial] = nil
 		self.context.report("unit damaged", "a unit of the track was damaged, past the gadget that gives every hit no damage, so another gadget of the game overruled it. The player sets its health again. Later ones are not logged")
 	end

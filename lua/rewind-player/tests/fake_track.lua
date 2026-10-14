@@ -26,6 +26,39 @@ function Window:sampleTransform(i, frame, out)
 	return true
 end
 
+--- As the reader's: the unit's velocity in elmos a frame, which here is how far
+-- its place moves in the frame after `frame`.
+function Window:sampleVelocity(i, frame, out)
+	local unit = self.source[i]
+	local x, y, z = unit.at(frame)
+	local nx, ny, nz = unit.at(frame + 1)
+	out[1], out[2], out[3] = nx - x, ny - y, nz - z
+	return true
+end
+
+--- As the reader's: target track `track` at `frame`, as the kind, the
+-- reference, the build power and a place. A unit's `work(frame)` gives the
+-- kind, the unit it works on as its position in the track's list of units or
+-- the feature as its position in the track's features, the build power from 0
+-- to 255, and a place for terraforming. A unit the window does not have is
+-- reference 0.
+function Window:sampleTarget(track, frame, out)
+	local kind, ref, power, x, y, z = self.targetSource[track].work(frame)
+	kind = kind or 0
+	if kind == 16 or kind == 17 or kind == 20 then
+		local wanted = self.track.units[ref]
+		ref = 0
+		for j = 1, self.unitCount do
+			if self.source[j] == wanted then
+				ref = j
+			end
+		end
+	end
+	out[1], out[2], out[3] = kind, ref or 0, power or 0
+	out[4], out[5], out[6] = x or 0, y or 0, z or 0
+	return true
+end
+
 function Window:sampleStatus(i, frame, out)
 	out[1], out[2], out[3] = self.source[i].status(frame)
 	return true
@@ -165,10 +198,15 @@ function Track:loadWindow(k)
 		unitPoseCount = {},
 		posePiece = {},
 		poseSource = {},
+		unitTargetFirst = {},
+		unitTargetCount = {},
+		targetWeapon = {},
+		targetSource = {},
 	}, Window)
 	local n = 0
 	local keys, items = 0, 0
 	local poses = 0
+	local targets = 0
 	for _, unit in ipairs(self.units) do
 		if unit.first <= finish and unit.last >= start then
 			n = n + 1
@@ -178,6 +216,14 @@ function Track:loadWindow(k)
 			w.unitFirstFrame[n], w.unitLastFrame[n] = first, last
 			-- The pose tracks of the window. A piece that is at rest for the whole
 			-- of a window has none there, which a pose's own `first` and `last` say.
+			-- A builder has one target track for its work, as weapon 0. A unit
+			-- with `workFrom` has none in a window that ends before that frame.
+			w.unitTargetFirst[n], w.unitTargetCount[n] = targets + 1, 0
+			if unit.work and (unit.workFrom or first) <= last and (unit.workUntil or last) >= first then
+				targets = targets + 1
+				w.unitTargetCount[n] = 1
+				w.targetWeapon[targets], w.targetSource[targets] = 0, unit
+			end
 			w.unitPoseFirst[n], w.unitPoseCount[n] = poses + 1, 0
 			for _, pose in ipairs(unit.poses) do
 				if (pose.first or first) <= last and (pose.last or last) >= first then
@@ -300,6 +346,12 @@ local function unit(spec, serial)
 		-- index from 0 into the posed pieces of the definition, and optionally the
 		-- `first` and `last` frame the piece is away from rest between.
 		poses = spec.poses or {},
+		-- A builder's work, `function(frame)` giving the kind, what it works
+		-- on, the build power and a place, with optionally the frames
+		-- `workFrom` and `workUntil` outside which a window has no track for it.
+		work = spec.work,
+		workFrom = spec.workFrom,
+		workUntil = spec.workUntil,
 		at = type(place) == "function" and place or function()
 			return place[1], place[2], place[3]
 		end,

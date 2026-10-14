@@ -3263,6 +3263,11 @@ end
     /// - `COILBOX_PLAYBACK_AIM_REST` is a number of frames to stand paused for
     ///   at the last seek, with a look on each. A game whose units heal only
     ///   after standing idle for a while needs it to show that none does.
+    /// - `COILBOX_PLAYBACK_WALK_PIECES` names the posed pieces that a unit's
+    ///   walk turns, which the player leaves to the unit's own script once it
+    ///   is told its unit moves (issue #3797), and which the looks then leave
+    ///   out ([`walk_pieces`]). The whole match of Splinter Faction needs
+    ///   `fedstorm:rfoot+rleg+rthigh`.
     #[test]
     #[ignore = "needs an engine, a game, a map and a replay of a whole match on them"]
     fn aim_poses_follow_the_track_in_the_engine() {
@@ -3292,9 +3297,10 @@ end
             &prepared,
             "driver_aim.lua",
             &format!(
-                "return {{ frames = {{ {frames} }}, off = {}, nocall = {}, rest = {rest} }}\n",
+                "return {{ frames = {{ {frames} }}, off = {}, nocall = {}, rest = {rest}, walkPieces = {} }}\n",
                 wants("off"),
-                wants("nocall")
+                wants("nocall"),
+                walk_pieces().0
             ),
         );
         for l in lines_with(&output, &["REWIND_DRIVER ", "COILBOX_REWIND_PLAYER"]) {
@@ -3374,6 +3380,200 @@ end
         assert_eq!(installed > 0, wants("installed"), "{driver:?}");
         assert_eq!(count(&output, "GameFramePost does not reach the player"), 0);
         assert_eq!(count(&output, "has no piece called"), 0);
+        assert_walk_pieces(&output, &walk_pieces().1);
+    }
+
+    /// `COILBOX_PLAYBACK_WALK_PIECES` as a Lua table for the driver, by unit
+    /// definition name, and as the line the player logs for each definition.
+    /// It is a definition name, a colon and piece names with `+` between them,
+    /// with commas between definitions, and the pieces in the order the track
+    /// names them.
+    fn walk_pieces() -> (String, Vec<String>) {
+        let given = var("COILBOX_PLAYBACK_WALK_PIECES").unwrap_or_default();
+        let mut table = vec![];
+        let mut lines = vec![];
+        for entry in given.split(',').filter(|e| !e.trim().is_empty()) {
+            let (name, pieces) = entry
+                .trim()
+                .split_once(':')
+                .expect("COILBOX_PLAYBACK_WALK_PIECES is name:piece+piece,name:piece");
+            let pieces: Vec<&str> = pieces.split('+').collect();
+            assert!(
+                std::iter::once(name)
+                    .chain(pieces.iter().copied())
+                    .all(|w| !w.is_empty()
+                        && w.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')),
+                "COILBOX_PLAYBACK_WALK_PIECES has a name that is not a plain word: {entry}"
+            );
+            table.push(format!(
+                "{name} = {{ {} }}",
+                pieces
+                    .iter()
+                    .map(|p| format!("{p} = true"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+            lines.push(format!(
+                "the walk of {name} turns {}, which the track has poses for",
+                pieces.join(", ")
+            ));
+        }
+        (format!("{{ {} }}", table.join(", ")), lines)
+    }
+
+    /// The player said it left a walk's pieces to the script for exactly the
+    /// definitions and pieces named, and for no other.
+    fn assert_walk_pieces(output: &str, wanted: &[String]) {
+        for line in wanted {
+            assert!(count(output, line) >= 1, "the log has no line: {line}");
+        }
+        let mut said: Vec<&str> = lines_with(output, &["the walk of "])
+            .into_iter()
+            .filter_map(|l| l.split_once("the walk of ").map(|(_, rest)| rest))
+            .collect();
+        said.sort_unstable();
+        said.dedup();
+        assert_eq!(said.len(), wanted.len(), "{said:#?}");
+    }
+
+    /// The gadget that hears what unit scripts are told is the driver, which
+    /// has the plan below. This is a stand-in for the animation stage that does
+    /// nothing, for a run that is to show the looks can tell the stage is off.
+    const ANIMATION_OFF: &str = "local function nothing() end\nreturn { PARAMS = {}, new = function() return { resync = nothing, remove = nothing, place = nothing } end }\n";
+
+    /// What unit scripts are told, against a real engine (issue #3797). The
+    /// driver's animation plan seeks to frames where units walk and builders
+    /// work, and looks on every frame of 150 frames played forward, 30 paused,
+    /// 40 forward and then 60 backward with no pause between, 20 at 8x, 10
+    /// back at 1x and 30 across a seek made while playing. Its gadget hears
+    /// every `StartMoving`, `StopMoving`, `StartBuilding` and `StopBuilding`
+    /// that reaches a unit's script, a Lua one through the call-ins the
+    /// game's script framework hands the engine and a COB one through
+    /// `Spring.CallCOBScript`. It works out from the track, with a reader of
+    /// its own, which of them should have come and on which frame. On each
+    /// look it also reads every unit's velocity, every builder's unit rules
+    /// parameters, the angles a builder was given against the engine's own
+    /// vectors, every posed piece, and whether the pieces a unit's script
+    /// moves moved since the look before.
+    ///
+    /// Give it a replay of a whole match in `COILBOX_ANALYSIS_REPLAY`, with
+    /// the variables the tests above read.
+    ///
+    /// - `COILBOX_PLAYBACK_TRACK` names a track to play instead of the one
+    ///   recorded from the replay.
+    /// - `COILBOX_PLAYBACK_ANIMATION_FRAMES` is the frames to seek to, as
+    ///   numbers with commas between them. Without it the driver takes the
+    ///   two with the most units moving and the two with the most builders at
+    ///   work.
+    /// - `COILBOX_PLAYBACK_ANIMATION_LONG` is a number of frames to play
+    ///   forward from the first of them at the end, with a look on each.
+    /// - `COILBOX_PLAYBACK_WALK_PIECES` is as for the aim test above.
+    /// - `COILBOX_PLAYBACK_ANIMATION` says what the run is to show, as words
+    ///   with commas between them. `lua` and `cob` want a call heard by a
+    ///   script of that kind, and `build` a builder at work and the angles of
+    ///   a `StartBuilding` looked at. `off` puts [`ANIMATION_OFF`] in place of
+    ///   the stage and asserts that nothing is told and that no moving unit's
+    ///   own pieces move, which shows that the looks can tell.
+    #[test]
+    #[ignore = "needs an engine, a game, a map and a replay of a whole match on them"]
+    fn units_are_animated_from_the_track_in_the_engine() {
+        let Some(prepared) = prepared(false) else {
+            return;
+        };
+        prepared.rewrite(REWIND_PLAYER_ADAPTERS);
+        if let Some(track) = var("COILBOX_PLAYBACK_TRACK") {
+            // The recorded track is a hard link to the stored one.
+            let at = prepared.game_dir.join("coilbox_rewind/track.cbtrack");
+            std::fs::remove_file(&at).unwrap();
+            std::fs::copy(track, &at).unwrap();
+        }
+        let wanted = var("COILBOX_PLAYBACK_ANIMATION").unwrap_or_default();
+        let wants = |word: &str| wanted.split(',').any(|w| w.trim() == word);
+        if wants("off") {
+            std::fs::write(
+                prepared
+                    .game_dir
+                    .join("luarules/rewind_player/coilbox_player_animation.lua"),
+                ANIMATION_OFF,
+            )
+            .unwrap();
+        }
+        let frames = var("COILBOX_PLAYBACK_ANIMATION_FRAMES").unwrap_or_default();
+        assert!(
+            frames
+                .chars()
+                .all(|c| c.is_ascii_digit() || c == ',' || c == ' '),
+            "COILBOX_PLAYBACK_ANIMATION_FRAMES is numbers with commas between them"
+        );
+        let long: u32 = var("COILBOX_PLAYBACK_ANIMATION_LONG")
+            .map(|v| {
+                v.parse()
+                    .expect("COILBOX_PLAYBACK_ANIMATION_LONG is a number")
+            })
+            .unwrap_or(0);
+        let (walk_table, walk_lines) = walk_pieces();
+        let output = driven_with(
+            &prepared,
+            "driver_animation.lua",
+            &format!(
+                "return {{ frames = {{ {frames} }}, long = {long}, walkPieces = {walk_table} }}\n"
+            ),
+        );
+        let driver = driver_lines(&output);
+        for l in &driver {
+            if l.starts_with("animation") || l.starts_with("start ") || l.starts_with("work ") {
+                eprintln!("{l}");
+            }
+        }
+        for l in lines_with(&output, &["COILBOX_REWIND_PLAYER"]) {
+            eprintln!("{l}");
+        }
+        assert!(!driver.iter().any(|l| l.starts_with("lost ")), "{driver:?}");
+        let errors = lua_errors(&output);
+        assert!(errors.is_empty(), "{errors:#?}");
+        assert_eq!(count(&output, "raised in"), 0, "a unit script raised");
+        let looks: Vec<&&str> = driver
+            .iter()
+            .filter(|l| l.starts_with("animation ") && !l.starts_with("animation note "))
+            .collect();
+        assert!(!looks.is_empty(), "{driver:?}");
+        let total = |key: &str| looks.iter().map(|l| number(l, key)).sum::<f64>();
+        if wants("off") {
+            assert_eq!(total("heard"), 0.0, "{driver:?}");
+            assert_eq!(total("moving_animated"), 0.0, "{driver:?}");
+            assert!(total("moving_looks") > 0.0, "{driver:?}");
+            assert!(total("velocity_bad") > 0.0, "{driver:?}");
+            return;
+        }
+        for l in &looks {
+            for key in [
+                "missing",
+                "extra",
+                "loose_missing",
+                "loose_extra",
+                "args_bad",
+                "unknown",
+                "velocity_bad",
+                "params_bad",
+                "heading_bad",
+                "posed_bad",
+            ] {
+                assert_eq!(number(l, key), 0.0, "{key} in {l}");
+            }
+        }
+        assert!(total("heard") > 0.0, "{driver:?}");
+        assert!(total("moving_animated") > 0.0, "{driver:?}");
+        if wants("lua") {
+            assert!(total("lua") > 0.0, "{driver:?}");
+        }
+        if wants("cob") {
+            assert!(total("cob") > 0.0, "{driver:?}");
+        }
+        if wants("build") {
+            assert!(total("working") > 0.0, "{driver:?}");
+            assert!(total("headings") > 0.0, "{driver:?}");
+        }
+        assert_walk_pieces(&output, &walk_lines);
     }
 
     /// The widget that presses the timeline's keys in the engine. It is

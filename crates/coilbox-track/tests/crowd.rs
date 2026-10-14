@@ -29,6 +29,17 @@
 //! `COILBOX_CROWD_WOUNDED` is a number `n`. Every `n`th unit then has half its
 //! health, where without it every unit is whole (issue #4002).
 //!
+//! `COILBOX_CROWD_WALK` is a distance in elmos. Every unit then walks that far
+//! out from its place, away from the place its ring is round, over 90 frames,
+//! stands for 90, walks back over 90 facing the same way, and stands for 90,
+//! for the whole match (issue #3797). Walking back it moves against the way it
+//! faces, which the engine calls reversing.
+//!
+//! `COILBOX_CROWD_BUILD` is a unit definition name. Every unit of that
+//! definition then builds the unit two after it in the crowd for 120 frames
+//! and does nothing for 120, for the whole match (issue #3797). The two exist
+//! over the same frames, so the one it builds is always there.
+//!
 //! ```sh
 //! COILBOX_CROWD_SOURCE=whole-match.cbtrack COILBOX_CROWD_OUT=crowd.cbtrack \
 //!   COILBOX_CROWD_UNITS=400 \
@@ -150,6 +161,12 @@ fn a_crowd_of_real_definitions_is_written() {
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(0);
+    let walk: f64 = std::env::var("COILBOX_CROWD_WALK")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0.0);
+    let builder = std::env::var("COILBOX_CROWD_BUILD").unwrap_or_default();
+    let builds = |def: u16| !builder.is_empty() && track.info.unit_defs[def as usize] == builder;
     track.features = features;
     for k in 0..h.window_count as usize {
         track.terrain.extend(reader.terrain(k).unwrap());
@@ -174,7 +191,55 @@ fn a_crowd_of_real_definitions_is_written() {
             middle
         };
         let position = at.map(|v| q.position(v).unwrap());
+        // Out along the line from the place to the ring, and back.
+        let away = [
+            at[0] + angle.cos() * walk,
+            at[1],
+            at[2] + angle.sin() * walk,
+        ]
+        .map(|v| q.position(v).unwrap());
+        let mut transform = vec![TransformKey {
+            frame: first,
+            position,
+            rotation,
+        }];
+        if walk > 0.0 {
+            let mut frame = first;
+            while frame + 360 <= h.last_frame {
+                for (after, at) in [(90, away), (180, away), (270, position), (360, position)] {
+                    transform.push(TransformKey {
+                        frame: frame + after,
+                        position: at,
+                        rotation,
+                    });
+                }
+                frame += 360;
+            }
+        }
+        if transform.last().unwrap().frame < h.last_frame {
+            let last = transform.last().unwrap().position;
+            transform.push(TransformKey {
+                frame: h.last_frame,
+                position: last,
+                rotation,
+            });
+        }
         let unit_def = defs[n % defs.len()];
+        let mut targets = vec![];
+        if builds(unit_def) && serial + 2 < count {
+            let keys = (first..h.last_frame)
+                .step_by(120)
+                .enumerate()
+                .map(|(k, frame)| TargetKey {
+                    frame,
+                    kind: if k % 2 == 0 { 16 } else { 0 },
+                    reference: if k % 2 == 0 { serial + 2 } else { 0 },
+                    build_power: if k % 2 == 0 { 255 } else { 0 },
+                    position: [0, 0, 0],
+                })
+                .collect();
+            targets.push(TargetTrack { weapon: 0, keys });
+        }
         // Each piece swings a quarter turn to either side of an angle of the
         // unit's own, over 240 frames, so no two units point the same way.
         let quarter = ANGLE_UNITS_PER_TURN / 4;
@@ -207,25 +272,14 @@ fn a_crowd_of_real_definitions_is_written() {
             team: teams[n % teams.len()],
             first_frame: first,
             last_frame: h.last_frame,
-            transform: vec![
-                TransformKey {
-                    frame: first,
-                    position,
-                    rotation,
-                },
-                TransformKey {
-                    frame: h.last_frame,
-                    position,
-                    rotation,
-                },
-            ],
+            transform,
             status: vec![StatusKey {
                 frame: first,
                 health,
                 build_progress: 65535,
                 flags: 1,
             }],
-            targets: vec![],
+            targets,
             poses,
             queue: vec![],
         });

@@ -756,6 +756,179 @@ BEHAVIOUR.aimPoses = function()
 	t.same("and the player does not say the call is missing", said(w, LINE), nil)
 end
 
+-- Telling a unit's script (issue #3797). A unit with a COB script, one with a
+-- Lua script and one with neither walk from frame 100 to frame 200, and a
+-- builder with a Lua script works on the first of them from frame 120 to frame
+-- 180. The player is made as the gadget makes it, with the wrap of the call a
+-- script framework hands a Lua script's call-ins over with. `removed` is a call
+-- the engine lacks, and `copied` a game whose framework copied the engine's
+-- call before the wrap. Gives the world, or nil and what raised.
+local function scriptScene(removed, copied)
+	local function walk(world, unit)
+		world.animate(unit, "leg", 1)
+	end
+	local function nothing() end
+	local w = Engine.new({
+		unitDefs = {
+			{ name = "cobbot", script = "cob", pieces = { "base", "leg" }, callins = { StartMoving = walk, StopMoving = nothing } },
+			{ name = "luabot", script = "lua", pieces = { "base", "leg" }, callins = { StartMoving = walk, StopMoving = nothing } },
+			{ name = "crate" },
+			{ name = "engineer", script = "lua", isImmobile = true, callins = { StartBuilding = nothing, StopBuilding = nothing } },
+		},
+	})
+	w.frameworkCopied = copied or false
+	local env = Engine.env(t, w)
+	if removed then
+		remove(env, removed)
+	end
+	local engine = Table.check(rootsOf(env), Table.SYNCED)
+	local callIns = {}
+	local create = w.Spring.UnitScript.CreateScript
+	if create then
+		w.Spring.UnitScript.CreateScript = function(unitID, given)
+			callIns[unitID] = given
+			return create(unitID, given)
+		end
+	end
+	local function stroll(def, x)
+		return {
+			first = 0,
+			last = 400,
+			def = def,
+			at = function(frame)
+				return x, 0, 2 * (math.min(math.max(frame, 100), 200) - 100)
+			end,
+			poses = def == 0 and { { piece = 0, at = function()
+				return 4096, 0, 0, 0, 0, 0
+			end } } or nil,
+		}
+	end
+	local Player = t.load("coilbox_player.lua", env)
+	local track = Fake.new({
+		last = 400,
+		unitDefs = { "cobbot", "luabot", "crate", "engineer" },
+		posedPieces = { { unitDef = 0, pieces = { "leg" } } },
+		units = {
+			stroll(0, 0),
+			stroll(1, 50),
+			stroll(2, 100),
+			{
+				first = 0,
+				last = 400,
+				def = 3,
+				at = { 200, 0, 0 },
+				work = function(frame)
+					return frame >= 120 and frame <= 180 and 16 or 0, 1, 255
+				end,
+			},
+		},
+	})
+	local player = assert(Player.new(track, {
+		modOptions = {},
+		engine = engine,
+		scriptCallIns = callIns,
+		log = function(text)
+			w.lines[#w.lines + 1] = text
+		end,
+	}))
+	w.gadget = {
+		UnitCreated = function(_, unitID)
+			player:unitCreated(unitID)
+		end,
+		UnitDestroyed = function(_, unitID)
+			player:unitDestroyed(unitID)
+		end,
+	}
+	local ok, err = pcall(function()
+		player:message("coilbox_rewind:seek 90")
+		for _ = 1, 150 do
+			w.step(function()
+				player:frame()
+			end, function()
+				player:framePost()
+			end)
+		end
+	end)
+	if not ok then
+		return nil, err
+	end
+	return w, engine
+end
+
+--- The names of the script functions a unit of a definition was told, in order.
+local function toldTo(w, def)
+	local names = {}
+	for _, one in ipairs(w.scriptCalls) do
+		if one.def == def then
+			names[#names + 1] = one.name .. " by " .. one.how
+		end
+	end
+	return table.concat(names, ", ")
+end
+
+BEHAVIOUR.unitScripts = function()
+	local w = scriptScene()
+	t.same("unitScripts: a unit with a COB script is told through the COB call", toldTo(w, "cobbot"), "StartMoving by cob, StopMoving by cob")
+	t.same("a unit with a Lua script is told through its own call-ins", toldTo(w, "luabot"), "StartMoving by lua, StopMoving by lua")
+	t.same("a unit with neither is told nothing", toldTo(w, "crate"), "")
+	t.same("a builder with a Lua script is told when it works", toldTo(w, "engineer"), "StartBuilding by lua, StopBuilding by lua")
+	t.same("and no script raised", said(w, "raised in"), nil)
+
+	-- A framework that copied the engine's call before the gadget wrapped it.
+	local err
+	w, err = scriptScene(nil, true)
+	t.check("unitScripts: a Lua script the wrap did not see raises nothing", w ~= nil, err)
+	if w then
+		t.same("its unit is told nothing", toldTo(w, "luabot"), "")
+		t.same("and a COB unit beside it is still told", toldTo(w, "cobbot"), "StartMoving by cob, StopMoving by cob")
+	end
+end
+
+-- The rows of the animation stage, which the fixture cannot show: its units
+-- are under construction at every whole frame, and such a unit is told
+-- nothing. Each call is taken out of the engine in turn and the made-up track
+-- above is played.
+do
+	local full = scriptScene()
+	local function sees(w)
+		local leg = w.unitNamed("cobbot")
+		return {
+			unitScripts = #w.scriptCalls,
+			unitSpeed = w.velocitySets,
+			builderWork = w.unitParamSets,
+			-- The walk's turn of the posed leg is left to the script.
+			walkPieces = said(w, "the walk of cobbot turns leg") and 1 or 0,
+			placed = leg and leg.z or -1,
+		}
+	end
+	local control = sees(full)
+	for _, id in ipairs({ "unitScripts", "unitSpeed", "builderWork", "walkPieces" }) do
+		t.check("the made-up track shows " .. id .. " at work", control[id] > 0, control[id])
+	end
+	-- A walk's pieces can only be asked about when a script is told.
+	local needs = { walkPieces = "unitScripts" }
+	for _, row in ipairs(Table.SYNCED) do
+		if control[row.id] then
+			for _, call in ipairs(row.calls) do
+				local label = "without " .. call
+				local w, engine = scriptScene(call)
+				t.check(label .. " the player raises nothing", w ~= nil, engine)
+				if w then
+					t.same(label .. " the row " .. row.id .. " is off", engine.on[row.id], false)
+					local seen = sees(w)
+					t.same(label .. " " .. row.id .. " does nothing", seen[row.id], 0)
+					for _, other in ipairs({ "unitScripts", "unitSpeed", "builderWork", "walkPieces" }) do
+						if other ~= row.id and needs[other] ~= row.id then
+							t.check(label .. " " .. other .. " still works", seen[other] > 0, other)
+						end
+					end
+					t.same(label .. " the units are still placed", seen.placed, control.placed)
+				end
+			end
+		end
+	end
+end
+
 -- A row the fixture track cannot show, because it has no unit that is switched
 -- on. A switchable unit is on for the whole of a made-up track, and what the
 -- engine did to it is read back.

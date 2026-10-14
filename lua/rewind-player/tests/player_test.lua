@@ -396,10 +396,21 @@ do
 	t.same("health follows the track", radar.health, 50)
 
 	-- Something hurt it. The track owns health.
+	-- A shot of the track that lands hits for no damage, and the engine still
+	-- calls UnitDamaged for it (CUnit::DoDamage does not look at the amount).
+	-- Nothing was damaged, so nothing is said and health is not set again
+	-- (issue #4020).
+	local before = radar.healthSets
+	player:unitDamaged(radar.id, 0)
+	player:frame()
+	t.same("a hit for no damage logs nothing", said(world, "a unit of the track was damaged"), 0)
+	t.same("and health is not set again", radar.healthSets, before)
+
 	radar.health = 10
-	player:unitDamaged(radar.id)
+	player:unitDamaged(radar.id, 40)
 	player:frame()
 	t.same("damage that got through is put right on the next frame", radar.health, 50)
+	t.same("and a hit that did some damage logs the line", said(world, "a unit of the track was damaged"), 1)
 
 	-- Something healed it and nothing said so: the engine heals an idle unit,
 	-- and Splinter Faction's regeneration gadget sets health once a second. The

@@ -658,6 +658,32 @@ function Window:sampleTransform(i, frame, out)
 	return true
 end
 
+--- Unit `i`'s velocity at `frame` in elmos a frame, written to `out` as x, y,
+-- z. A unit's place runs in a straight line between two keys, so this is the
+-- slope of the line the frame is on: from the key at or before the frame to
+-- the next. It is nothing from the unit's last key on and before its first.
+-- False when the unit has no key.
+function Window:sampleVelocity(i, frame, out)
+	local n = self.transformCount[i]
+	if n == 0 then
+		return false
+	end
+	local first = self.transformFirst[i]
+	local times = self.transformTime
+	local a = locate(self, times, first, first + n - 1, self.transformCursor[i], frame)
+	self.transformCursor[i] = a
+	local ta = times[a]
+	if ta > frame or a == first + n - 1 then
+		out[1], out[2], out[3] = 0, 0, 0
+		return true
+	end
+	local b = a + 1
+	local span = times[b] - ta
+	local xs, ys, zs = self.transformX, self.transformY, self.transformZ
+	out[1], out[2], out[3] = (xs[b] - xs[a]) / span, (ys[b] - ys[a]) / span, (zs[b] - zs[a]) / span
+	return true
+end
+
 --- Unit `i`'s health and build progress at `frame` as fractions from 0 to 1,
 -- then its flags (bit 0: switched on), written to `out`. The fractions run in a
 -- straight line between keys and the flags hold until the next.

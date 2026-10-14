@@ -139,6 +139,7 @@ The whole map is visible to everyone. Fog of war is off and you watch as one spe
 True to the recording:
 
 - Where units, wrecks and features are, which way they face and when they appear or go.
+- Units walk and roll, and a builder turns to what it is building, with its own build glow in Splinter Faction. A unit's own walk plays while you watch, forward or backward, and stops when you pause, so a paused unit stands at ease and not in the middle of a step. At high speed the walk keeps its own pace while the ground goes by faster.
 - Health, health bars, build progress and its time left.
 - Terrain changes. One the engine did not report during the match can show up to 900 frames late.
 - A big jump. When a jump has hundreds of units to remove and make, or a lot of ground to change, the world takes a few frames to catch up, about a second for several hundred units, so it changes over that time and not all at once. The ground changes first, a patch at a time, and the units appear on it after. The units you are looking at appear first, and the rest of the map fills in after them. Each unit that arrives late in view shows a short effect in its team's colour: a column of light, a ring that closes on it and a few dots that fall into it. The effect is the playback's and was not in the match. While you drag the bar's knob no effect is shown, and units that are removed go with nothing shown. The playback spreads the work so that the game does not stutter.
@@ -160,14 +161,14 @@ Not true to the recording:
 - In Splinter Faction, the menu at the top right stays whole. Its Resign button does nothing for a spectator and its Sharing button does nothing in a playback.
 - In Splinter Faction, the build menu and order buttons show for a selected unit. Orders go nowhere. In Beyond All Reason neither shows.
 - In Beyond All Reason, energy income can read higher than the match's, by as much as 17% late in the match it was checked on. Metal and energy held, storage and spending are the match's.
+- The stream of build particles from a builder to what it builds does not show. This is issue #4029.
+- A unit does not recoil or flash when it fires. Its shot still leaves the barrel. This is issue #4030.
 
 ## Current limits
 
-- Units do not play walk or build animations. This is issue #3797. Turrets and torsos do point where they pointed in the match, from the first frame after a jump.
 - `[` and `]` do nothing in the engine, as above. This is issue #3978.
 - Splinter Faction and Beyond All Reason are the games with a tailored setup. In another game nothing is switched off or hidden, and the match still plays.
 - Beyond All Reason's setup was checked on a match between two of its own AIs. A match against raptors or scavengers, a territory match and a match on a lava map have not been played back, and the panels that belong to those modes do not show.
-- Builders do not show their build spray. This is issue #3797.
 - Recording needs the replay's engine, game and map installed. Coilbox can offer another installed engine or game version, and keeps the result only when it matches the match exactly.
 
 For how the track is stored, see the [replay track format](../reference/replay-track-format.md). If you make a game, see [Replay rewind for your game](../developers/replay-rewind.md).
