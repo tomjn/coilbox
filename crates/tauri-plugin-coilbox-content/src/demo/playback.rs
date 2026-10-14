@@ -596,28 +596,161 @@ mod tests {
         section.children.iter().map(|(n, _)| n.as_str()).collect()
     }
 
+    /// The replay's `[player0]` is "You", and it leads both teams. A spectator
+    /// with a name of its own is the playback's one connected player, and sits
+    /// after every player the replay had.
     #[test]
-    fn the_script_has_one_spectator_and_no_players_or_ais() {
+    fn every_original_player_is_in_the_script_with_the_replays_name() {
         let game = parsed(&start_script(REPLAY_SCRIPT, &Opening::default()).unwrap());
 
         let players = numbered(&game, "player");
-        assert_eq!(players.len(), 1);
-        assert_eq!(players[0].1.get("spectator"), Some("1"));
-        assert_eq!(players[0].1.get("name"), Some(SPECTATOR));
-        assert_eq!(game.get("myplayername"), Some(SPECTATOR));
-        assert_eq!(game.get("numplayers"), Some("1"));
+        assert_eq!(players.len(), 2);
+        assert_eq!(players[0].0, 0);
+        assert_eq!(players[0].1.get("name"), Some("You"));
+        assert_eq!(players[0].1.get("team"), Some("0"));
+        assert_eq!(players[0].1.get("spectator"), Some("0"));
+        assert_eq!(game.get("numplayers"), Some("2"));
         assert!(numbered(&game, "ai").is_empty());
         assert!(!names(&game).iter().any(|n| n.starts_with("ai")));
     }
 
     #[test]
-    fn every_team_is_led_by_the_spectator_and_has_no_ai() {
+    fn the_spectator_is_the_one_local_player() {
         let game = parsed(&start_script(REPLAY_SCRIPT, &Opening::default()).unwrap());
 
-        for (index, team) in numbered(&game, "team") {
-            assert_eq!(team.get("teamleader"), Some("0"), "team {index}");
+        let players = numbered(&game, "player");
+        let (index, spectator) = players.last().unwrap();
+        assert_eq!(*index, 1);
+        assert_eq!(spectator.get("name"), Some(SPECTATOR));
+        assert_eq!(spectator.get("spectator"), Some("1"));
+        assert_eq!(spectator.get("isfromdemo"), None);
+        assert_eq!(game.get("myplayername"), Some(SPECTATOR));
+        let local: Vec<_> = players
+            .iter()
+            .filter(|(_, p)| p.get("name") == game.get("myplayername"))
+            .collect();
+        assert_eq!(local.len(), 1);
+    }
+
+    /// The engine's start check skips the first `numDemoPlayers` players and
+    /// waits up to 30 seconds for any later one who never connects
+    /// (`CGameServer::CheckForGameStart`). So every absent player is marked as
+    /// from a demo and the one connected player comes last.
+    #[test]
+    fn nothing_makes_the_engine_wait_for_an_absent_player() {
+        let script = REPLAY_SCRIPT.replace(
+            "[player0]\n{\nteam=0;\nspectator=0;\nname=You;\n}\n",
+            "[player0]\n{\nteam=0;\nspectator=0;\nname=You;\n}\n\
+             [player1]\n{\nteam=1;\nspectator=0;\nname=Them;\n}\n\
+             [player2]\n{\nspectator=1;\nname=Watcher;\n}\n",
+        );
+        let game = parsed(&start_script(&script, &Opening::default()).unwrap());
+        let players = numbered(&game, "player");
+
+        let mut seen_connected = false;
+        for (index, player) in &players {
+            let absent = player.get("isfromdemo") == Some("1");
+            assert!(
+                !(absent && seen_connected),
+                "player {index} is absent but follows a player who connects"
+            );
+            seen_connected |= !absent;
+        }
+        let connected = players
+            .iter()
+            .filter(|(_, p)| p.get("isfromdemo").is_none())
+            .count();
+        assert_eq!(connected, 1);
+        assert_eq!(game.get("gamestartdelay"), Some("0"));
+        assert_eq!(game.get("numplayers"), Some("4"));
+    }
+
+    #[test]
+    fn every_teams_leader_is_its_original_player_and_has_no_ai() {
+        let script = REPLAY_SCRIPT
+            .replace(
+                "[player0]\n{\nteam=0;\nspectator=0;\nname=You;\n}\n",
+                "[player0]\n{\nteam=0;\nspectator=0;\nname=You;\n}\n\
+                 [player1]\n{\nteam=1;\nspectator=0;\nname=Them;\n}\n",
+            )
+            .replace(
+                "[team1]\n{\nallyteam=1;\nteamleader=0;",
+                "[team1]\n{\nallyteam=1;\nteamleader=1;",
+            );
+        let game = parsed(&start_script(&script, &Opening::default()).unwrap());
+        let players = numbered(&game, "player");
+        let name_of = |leader: &str| {
+            let leader: i32 = leader.parse().unwrap();
+            players
+                .iter()
+                .find(|(i, _)| *i == leader)
+                .and_then(|(_, p)| p.get("name"))
+                .unwrap()
+        };
+
+        let teams = numbered(&game, "team");
+        assert_eq!(name_of(teams[0].1.get("teamleader").unwrap()), "You");
+        assert_eq!(name_of(teams[1].1.get("teamleader").unwrap()), "Them");
+        for (index, team) in &teams {
             assert_eq!(team.get("luaai"), None, "team {index}");
         }
+    }
+
+    /// A team whose leader is not a player of the replay falls back to the
+    /// spectator, which the engine accepts.
+    #[test]
+    fn a_team_with_no_player_to_lead_it_is_led_by_the_spectator() {
+        let script = REPLAY_SCRIPT.replace("teamleader=0;\nrgbcolor=0.9", "teamleader=7;\nrgbcolor=0.9");
+        let game = parsed(&start_script(&script, &Opening::default()).unwrap());
+
+        let teams = numbered(&game, "team");
+        assert_eq!(teams[0].1.get("teamleader"), Some("1"));
+        assert_eq!(teams[1].1.get("teamleader"), Some("0"));
+
+        let no_players = "[game]\n{\nmapname=M;\ngametype=G 1;\n[team0]\n{\nallyteam=0;\nteamleader=0;\n}\n}\n";
+        let game = parsed(&start_script(no_players, &Opening::default()).unwrap());
+        assert_eq!(numbered(&game, "player").len(), 1);
+        assert_eq!(numbered(&game, "team")[0].1.get("teamleader"), Some("0"));
+        assert_eq!(game.get("numplayers"), Some("1"));
+    }
+
+    /// Whoever watched the match is listed as a spectator, and the replay's
+    /// gaps in player numbers stay.
+    #[test]
+    fn the_replays_own_spectators_are_listed_and_the_numbers_keep_their_gaps() {
+        let script = REPLAY_SCRIPT.replace(
+            "[player0]\n{\nteam=0;\nspectator=0;\nname=You;\n}\n",
+            "[player0]\n{\nteam=0;\nspectator=0;\nname=You;\n}\n\
+             [player4]\n{\nspectator=1;\nname=Onlooker;\npassword=secret;\ncountrycode=gb;\n}\n",
+        );
+        let text = start_script(&script, &Opening::default()).unwrap();
+        let game = parsed(&text);
+
+        let players = numbered(&game, "player");
+        assert_eq!(
+            players.iter().map(|(i, _)| *i).collect::<Vec<_>>(),
+            vec![0, 4, 5]
+        );
+        assert_eq!(players[1].1.get("name"), Some("Onlooker"));
+        assert_eq!(players[1].1.get("spectator"), Some("1"));
+        assert_eq!(players[1].1.get("countrycode"), Some("gb"));
+        assert!(!text.contains("secret"), "{text}");
+    }
+
+    /// The engine refuses two players of one name, so a replay player called
+    /// the spectator's name keeps it and the spectator is renamed.
+    #[test]
+    fn a_replay_player_with_the_spectators_name_keeps_it() {
+        let script = REPLAY_SCRIPT.replace("name=You;", "name=CoilboxPlayback;");
+        let game = parsed(&start_script(&script, &Opening::default()).unwrap());
+
+        let players = numbered(&game, "player");
+        assert_eq!(players[0].1.get("name"), Some(SPECTATOR));
+        assert_eq!(players[0].1.get("isfromdemo"), Some("1"));
+        let spectator = players[1].1.get("name").unwrap();
+        assert_ne!(spectator, SPECTATOR);
+        assert!(!spectator.contains(' '));
+        assert_eq!(game.get("myplayername"), Some(spectator));
     }
 
     #[test]
