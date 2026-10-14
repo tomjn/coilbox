@@ -41,6 +41,11 @@ M.HOOKS = {
 	-- widget reads the adapter file itself, in unsynced Lua, where `gl` is. It is
 	-- here so the player does not take it for a misspelling.
 	drawQueuedBuilding = true,
+	-- (count) for the ghosts widget too, at the end of each of its passes of
+	-- drawing, with how many buildings the pass drew (issue #3801). A game whose
+	-- shape helper keeps a shape until told to drop it uses it to drop the ones
+	-- a pass no longer asked for.
+	queuedBuildingsDrawn = true,
 }
 
 local LISTS = { "gadgets", "widgets", "units", "features", "teamParams", "gameParams" }

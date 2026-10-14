@@ -45,6 +45,12 @@ M.FACING_DEGREES = 90
 -- what a hook is called with.
 M.HOOK = "drawQueuedBuilding"
 
+--- The name of the adapter's hook that is told a pass of drawing is over, with
+-- how many buildings the pass drew. A game whose shape helper keeps a shape
+-- until it is told to drop it, as Beyond All Reason's does, needs to hear of a
+-- pass that drew fewer than the one before, and of one that drew none.
+M.DRAWN_HOOK = "queuedBuildingsDrawn"
+
 --- Elmos in a square of a unit definition's footprint.
 M.SQUARE = 8
 
@@ -112,6 +118,10 @@ function M.new(engine, track)
 	local hook = type(adapter) == "table" and type(adapter.hooks) == "table" and adapter.hooks[M.HOOK]
 	if type(hook) == "function" then
 		self.hook = hook
+	end
+	local drawn = type(adapter) == "table" and type(adapter.hooks) == "table" and adapter.hooks[M.DRAWN_HOOK]
+	if type(drawn) == "function" then
+		self.drawnHook = drawn
 	end
 	return self
 end
@@ -351,14 +361,31 @@ local function footprint(vertex, x, y, z, hx, hz)
 	vertex(x - hx, y, z + hz)
 end
 
---- Draws what `update` made, from `widget:DrawWorld`.
+--- Tells the adapter that a pass drew `count` buildings. A hook that raises is
+-- said once and not called again.
+local function passOver(self, count)
+	local hook = self.drawnHook
+	if not hook then
+		return
+	end
+	local ok, err = pcall(hook, count)
+	if not ok then
+		self.drawnHook = nil
+		self:say("drawn hook", "the adapter's " .. M.DRAWN_HOOK .. " hook raised and is switched off for the rest of the run: " .. tostring(err))
+	end
+end
+
+--- Draws what `update` made, from `widget:DrawWorld`. The adapter is told how
+-- many buildings every pass drew, a pass that drew none included.
 function Ghosts:draw()
 	if not self.enabled then
+		passOver(self, 0)
 		return
 	end
 	self:update()
 	local count = self.count
 	if count == 0 then
+		passOver(self, 0)
 		return
 	end
 	local gl, ground = self.gl, self.Spring.GetGroundHeight
@@ -415,6 +442,13 @@ function Ghosts:draw()
 		end
 		gl.PopMatrix()
 	end
+	passOver(self, count)
+end
+
+--- The widget is going. An adapter that keeps shapes is told a last pass drew
+-- nothing, so that it drops them.
+function Ghosts:close()
+	passOver(self, 0)
 end
 
 --- Switches the ghosts on or off.
