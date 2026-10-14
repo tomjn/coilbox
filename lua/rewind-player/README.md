@@ -138,9 +138,11 @@ A key the timeline takes goes no further. `widget:KeyPress` gives true for it, a
 
 One thing gets in before it. A widget handler that comes from the engine's runs the actions that widgets have registered and a key is bound to, before it asks any widget for the key. If a game binds one of the timeline's keys to such an action, that action runs and the timeline never hears the key. In Splinter Faction 0.1.89 none of the keys is bound that way: they are bound to the engine's own `repair`, `moveleft`, `moveright`, `prevmenu`, `nextmenu`, `increaseviewradius`, `decreaseviewradius` and `buildfacing`, which the timeline does stop. The cure in a game where one is, is to change the key in the list.
 
+Beyond All Reason `test-30922-8064a43` has one such case. Its default keys (`luaui/configs/hotkeys/grid_keys.txt`) bind Minus, Equals and the keypad's Plus to `snd_volume_decrease` and `snd_volume_increase`, which its Volume OSD widget registers and takes, so those keys change the volume and the timeline never hears them. Every other key of the timeline reaches it: the engine's actions bound to them and the game's `gridmenu_cycle_builder`, `gridmenu_key` and `stop` handlers let them through for a spectator. That was measured by handing each key to the game's widget handler with the actions the game binds to it, in a window and in a headless engine. The adapter leaves the volume keys alone, since they tell nobody anything wrong about the match. Issue #4027 is for deciding which should win.
+
 #### What it remembers
 
-The widget handler keeps what `widget:GetConfigData` gives, in the file it keeps every widget's data in. Splinter Faction's and THIS's handlers name that file after the game being played, which is the playback game and not the game it depends on. What is kept is the panel's place, as a share of the view so that it holds in a window of another size, and the keys when they are not the table's.
+The widget handler keeps what `widget:GetConfigData` gives, in the file it keeps every widget's data in. Splinter Faction's and THIS's handlers name that file after the game being played, which is the playback game and not the game it depends on. Beyond All Reason's names it after the game's short name, `LuaUI/Config/BYAR.lua`, and the playback game has the short name of the game it depends on, so the timeline's place and keys are kept beside the player's own Beyond All Reason widget settings. What is kept is the panel's place, as a share of the view so that it holds in a window of another size, and the keys when they are not the table's.
 
 #### Marks
 
@@ -212,7 +214,11 @@ A facing of 0 is south, 1 east, 2 north and 3 west, and the shape is turned 90 d
 
 #### An adapter's own drawing
 
-The adapter's `hooks.drawQueuedBuilding(unitDefID, teamID, x, y, z, facing)` replaces both the shape and the outline. The widget reads `coilbox_rewind/adapter.lua` itself with `VFS.Include`, in its own environment, so a hook that calls `gl` works there. The player reads the same file in synced Lua and knows the name, so it does not take it for a misspelling. A hook that raises is logged once and the engine's drawing takes over. Beyond All Reason's adapter (issue #3801) would call its unit shape helper from this hook, and is not written.
+The adapter's `hooks.drawQueuedBuilding(unitDefID, teamID, x, y, z, facing)` replaces both the shape and the outline. The widget reads `coilbox_rewind/adapter.lua` itself with `VFS.Include`, in its own environment, so a hook that calls `gl` works there. The player reads the same file in synced Lua and knows the name, so it does not take it for a misspelling. A hook that raises is logged once and the engine's drawing takes over.
+
+A second hook, `hooks.queuedBuildingsDrawn(count)`, is called once at the end of every pass of `DrawWorld` with how many buildings the pass drew, after the last `drawQueuedBuilding`. It is called for a pass that drew none, while the ghosts are switched off, and once more with 0 when the widget shuts down. It is for a game whose way of drawing keeps a shape until it is told to drop it. Without it such a hook would never hear that a building had left the queue, and the last ones would stay drawn for good. One that raises is logged once and not called again.
+
+Beyond All Reason's adapter (issue #3801) uses both. Its `drawQueuedBuilding` hands each queued building once to the game's unit shape widget, `WG.DrawUnitShapeGL4`, which is how the game draws a builder's queue itself, and its `queuedBuildingsDrawn` drops the shapes a pass no longer asked for. In a window the buildings drew as the game's own translucent buildings in their team's colour, which is the first ghost shape that has drawn in any game (`milestone-80-gallery/52-...`). Where the game's widget is not running, as in a headless engine, the hook raises and the widget's own outline takes over.
 
 #### The key and what it remembers
 
@@ -818,7 +824,7 @@ An adapter with a `versions` range is for no game that has no version. A game fo
 
 For each name in `gadgets` and `widgets`, coilbox writes a file at that path in the playback game, `luarules/gadgets/<name>` or `luaui/widgets/<name>`. A depending game's file takes precedence over the same path in the game it depends on, and the engine's file names are not case sensitive, so the base game's file is never read. The shadow is a comment and `return false`.
 
-The handlers read for this treat a file that returns `false` as one that asked not to be loaded, and load nothing for it. Those are the engine's own gadget and widget handlers, Splinter Faction's (run in the engine, see [In a real engine](#in-a-real-engine)) and THIS's widget handler. Beyond All Reason's has not been read or run here. An empty file is not the same:
+The handlers read for this treat a file that returns `false` as one that asked not to be loaded, and load nothing for it. Those are the engine's own gadget and widget handlers, Splinter Faction's (run in the engine, see [In a real engine](#in-a-real-engine)), THIS's widget handler and Beyond All Reason's gadget and widget handlers (`luarules/gadgets.lua` and `luaui/barwidgets.lua` of `test-30922-8064a43`, read and run). An empty file is not the same:
 
 - Splinter Faction's gadget handler loads it as a gadget with nothing in it, and the log still lists the gadget.
 - Splinter Faction's widget handler refuses it with `Failed to load: <file>  (no GetInfo() call)`.
@@ -859,10 +865,11 @@ A hook is an optional function in `hooks`. The player calls these and no others,
 | `unitPlaced` | after the player created a unit and put it in place, and again for a unit made again after a seek | the engine's unit id, the unit definition's engine id, the track frame, the clock, and whether the player is about to show its arrival effect for the unit. A hook that gives true has shown the game's own effect, and the player shows none ([A game's own effect](#a-games-own-effect)) |
 | `afterFrame` | at the end of every simulation frame, after every stage | the track frame, the clock |
 | `drawQueuedBuilding` | not the player's. The ghosts widget calls it in `DrawWorld` for each queued building, in its own Lua state ([An adapter's own drawing](#an-adapters-own-drawing)) | the unit definition's engine id, the team, x, y, z, the facing |
+| `queuedBuildingsDrawn` | not the player's. The ghosts widget calls it at the end of every pass of `DrawWorld` and when it shuts down | how many buildings the pass drew |
 
 The clock is the player's, and a hook only reads it. `clock.jumped` says the frame was reached by a seek or a step, `clock.direction` is 1 or -1 and `clock.speed` is how many frames of the track a simulation frame covers.
 
-The player's three hooks run in synced Lua, in the gadget's environment, and a frame of play allocates nothing in the player, so a hook that is called every frame should not either. These are the only hook points. They are the smallest set that issues #3797 (a build spray effect that reads a builder's recorded work), #3800 (a team's storage, which had to be set before any unit was placed until the track held it, issue #3982), #3801 (a warp in effect for a unit that appears) and #3804 (replacing ghost drawing) are known to need, and a hook point is added by the issue that needs one.
+The player's three hooks run in synced Lua, in the gadget's environment, and a frame of play allocates nothing in the player, so a hook that is called every frame should not either. These are the only hook points. They are the smallest set that issues #3797 (a build spray effect that reads a builder's recorded work), #3800 (a team's storage, which had to be set before any unit was placed until the track held it, issue #3982), #3801 (a warp in effect for a unit that appears, and dropping a shape the game's helper keeps) and #3804 (replacing ghost drawing) are known to need, and a hook point is added by the issue that needs one.
 
 ### The log line
 
@@ -956,6 +963,85 @@ A commander shows the right stage after a seek with nothing done for it. Each st
 ![The commander in the playback and in the real replay, at frames 6,927 and 12,000](screenshots/adapter-commander.jpg)
 
 The left column is the playback and the right the real replay, at the same two frames and from the same place. The colours differ because the playback takes each team's from the replay's start script, and the game recolours them for whoever is playing. The pose and the build spray differ because the player does not animate yet (issues #3796 and #3797).
+
+### Beyond All Reason
+
+`adapters/beyond_all_reason.lua` is the adapter for Beyond All Reason (issue #3801). It has no version range: the game has a new version most days and a replay is played on the one it was recorded on, so a range would leave nearly every replay with none. A name a version lacks switches nothing off, since its shadow returns `false` and nothing else. The file names were read from the rapid package of `test-30922-8064a43` (`~/.spring/packages/ded9b29714a05164e4b4523b09809af2.sdp` on the machine that wrote this), which is the version the match below was played on.
+
+The match is the one made for the spike of issue #3778: two of the game's `SimpleAI` against each other on All That Glitters v2.2.3, Armada against Cortex, 82,496 frames, on engine `2026.07.01-102-g6e5c5a0`. It was recorded through coilbox's own analysis run and reproduced. The engine run took 151.6 s and 145.5 s in two recordings, the dump was 664,493,194 and 664,510,536 bytes, the debug build of the tests took 135 s to thin it, and the track is 5,226,071 bytes with the adapter's five team parameters and 5,222,496 without them. At its busiest frame the track has 685 units, and it has 168,736 changes to the ground.
+
+What the match did with no adapter, and what the adapter does about it. The gadget names in the second column come from a scratch gadget that wrapped the engine's calls and read the caller's gadget from its environment:
+
+| What went wrong | Where it came from | With the adapter |
+| --- | --- | --- |
+| A team was asked to be killed before the first frame | `game_end.lua` and `game_team_com_ends.lua` | both switched off |
+| A commander the track does not have was created for each team when the match started, hidden and paralysed, and removed by the player a frame later | `game_initial_spawn.lua` | switched off. Its `startUnit` and `validStartUnits`, which the game's widgets read, are set by the `started` hook, and the track has `startUnit` from its first frame |
+| A gravestone was left where each of those commanders was removed, and would be where any commander a seek removes was | `unit_tombstones.lua` | switched off. The match's own gravestones are features of the track and stand where the match had them |
+| Every building the player made part way through its construction was destroyed on the next frame, so at seeks the engine had 347 of 383, 454 of 492 and 576 of 607 of the track's units, with health off by up to 0.38 of a unit's maximum | `unit_prevent_lab_hax2.lua`, which destroys a unit created unfinished with no builder | switched off |
+| An extractor the track has was destroyed and its team paid for it | `unit_mex_upgrade_reclaimer.lua` | switched off, with the same for geothermal generators |
+| A feature the track has was destroyed where the player made a building | `unit_footprint_clearance.lua`, with an effect and a sound each time | switched off. Features still go when the match's did, with no effect |
+| The commander stood there from the first frame, where the match hid it until frame 90 and showed the game's warp in effect at frame 60 | `game_initial_spawn.lua` was not running it, the player was placing it | the `unitPlaced` and `afterFrame` hooks hide every commander before frame 90, whichever way the time went, and play at 0.5x to 2x that passes frame 60 shows the game's `commander-spawn` effect, its lightning and its sound |
+| With a unit selected, the order menu reached under the timeline and the build menu offered buildings to a spectator | `gui_ordermenu.lua` and `gui_gridmenu.lua` | both switched off. Nothing took their place, unlike Splinter Faction's |
+
+The rest of the adapter's 32 gadgets are switched off for what they do when the match has what they act on, and none was in this match: gadgets that replace a finished unit with two (`unit_attached_con_turret.lua`, `unit_attached_con_turret_mex.lua`), make wildlife or drones (`game_critters.lua`, `unit_carrier_spawner.lua`), act on a shot (`unit_explosion_spawner.lua`, `unit_custom_weapons_cluster.lua`, `unit_custom_weapons_behaviours.lua`, `unit_custom_weapons_overpen.lua`, `unit_lightning_splash_dmg.lua`, the three `unit_juno_*` gadgets), move a commander caught in a blast (`game_preventcombomb.lua`), or create units and features under a mod option (`game_quick_start.lua`, `game_assistdronespawn.lua`, `game_commander_builder.lua`, `game_coop_ii.lua`, `unit_scenario_loadout.lua`, `unit_zombies.lua`, `unit_evolution.lua`, `unit_respawning.lua`, `unit_xmas.lua`, `game_easter_eggs.lua`, `ai_ruins.lua`). Those were read and not seen.
+
+With the adapter, the scratch gadget saw no gadget of the game create, destroy, move or damage anything in the whole match plan or the shots plan. The one call left is `game_team_resources.lua` setting each team's storage as the match loads, which the track's storage replaces.
+
+What the issue expected, against what the game's files and the runs showed:
+
+- Game end, initial spawn and commander death: true, the three gadgets above. Start setup: `game_ffa_start_setup.lua` only shuffles the start boxes of a free for all, and only `game_initial_spawn.lua` reads what it makes, so it is left on.
+- Start commanders hidden until they warp in, with an effect: true, as above. The commander's health bar still shows while it is hidden, from the game's health bar widget.
+- A Legion construction turret on an extractor is two units: true. `legmohocon` is the shape while it is built, and when it is finished `unit_attached_con_turret_mex.lua` destroys it and makes `legmohoconin`, the extractor, and `legmohoconct`, the turret, attached to it. The extractor is made unselectable and stealthy and is drawn, not hidden. The track has all three as units of their own, so the gadget is switched off. The match has no Legion unit, so this was read and not seen.
+- No gravestones where commanders fell: the gadget is off, so the playback adds none. The match's own are in the track and do appear.
+- Build spray: the game draws it in `gfx_nano_particles_gl4.lua`, which asks the engine every frame for a builder's `Spring.GetUnitCurrentBuildPower` and `Spring.GetUnitWorkerTask`. A placed builder is building nothing, so there is no spray, and an adapter cannot answer for the engine. Issue #3797.
+- Queued buildings with the game's shape helper: true, see [An adapter's own drawing](#an-adapters-own-drawing).
+
+Healing: the game has no gadget that heals a unit over time in a match like this one. `pve_areahealers.lua` heals only with raptors or scavengers, `unit_carrier_spawner.lua` heals drones and is switched off, and the game has no repair pad gadget. The engine's own healing is the player's to stop. In the whole match plan the wounded unit's health did not move in 450 frames, and the player's line about health that changed was not logged, with or without the adapter.
+
+Rules parameters. The game's widgets a spectator sees read five team parameters that come from the match: `startUnit`, each team's commander, which the top bar and the players list take a faction from, and `mmLevel`, `mmCapacity`, `mmUse` and `mmAvgEffi`, the energy converters' level, capacity, use and efficiency, which the top bar and the converter panel show. `game_energy_conversion.lua` stays, since it is also what makes a converter convert, and the recording has the last word. `enemyComCount` is recounted from the placed units by `game_com_counter.lua`, so it needs nothing. Game parameters of the raptor, scavenger and territory modes and of lava maps were left out, see below. The real replay was read by a scratch widget at three frames, and the playback by the driver's resources plan. Team 0, Armada:
+
+| At frame | Number | In the match | In the playback |
+| --- | --- | --- | --- |
+| 12,000 | metal held, storage | 304.26, 1250 | 304.26, 1250 |
+| 12,000 | metal income, expense | 7.51, 15.76 | 7.51, 15.76 |
+| 12,000 | energy held, storage | 1588.41, 1603.5 | 1588.41, 1603.5 |
+| 12,000 | energy income, expense | 318.29, 159.94 | 320.14, 159.94 |
+| 40,000 | metal held, storage | 1289.51, 1575 | 1289.51, 1575 |
+| 40,000 | metal income, expense | 14.86, 36.14 | 14.86, 36.14 |
+| 40,000 | energy income, expense | 694.86, 240.03 | 711.80, 240.03 |
+| 70,000 | metal held, storage | 2005.30, 8500 | 2005.30, 8500 |
+| 70,000 | metal income, expense | 123.55, 162.95 | 123.55, 162.95 |
+| 70,000 | energy held, storage | 12683.05, 12740 | 12683.05, 12740 |
+| 70,000 | energy income, expense | 2450.56, 1913.33 | 2667.20, 1913.33 |
+| all three | `startUnit`, `mmLevel` | 52, 0.75 | 52, 0.75 |
+
+Team 1 was the same but for energy income, which read 307.19, 551.45 and 1646.40 where the match had 306.10, 528.32 and 1404.22, and its metal held at frame 40,000, 1949.97 where the match had 1949.77, which is the track's value and inside its tolerance. Pull and excess were within 0.15 of the match's at all three. Energy income reads high because the sums only go up ([Team resources](#team-resources)): the playback's own units make more energy than the match's did. That the cause is the wind, which the playback's engine draws for itself, is a guess that was not measured. The match has no energy converter, so the four converter numbers were 0 in both. The top bar showed the playback's numbers in a window (`milestone-80-gallery/58-...`).
+
+The timeline in Beyond All Reason. The game's widget handler loads it and the ghosts widget out of the playback game, 192 widgets in all in a window. It draws at the bottom centre between the game's unit panel at the bottom left and its players list at the bottom right, and with the order menu switched off nothing else draws there. Its keys are under [Keys](#keys): all but Minus, Equals and the keypad's Plus reach it.
+
+Seeks on this match, from the first frame to frame 82,196 with 674 units and back, timed by a scratch patch round each stage:
+
+| Engine | Seek | Frames to settle | Slowest frame | Of which the terrain stage |
+| --- | --- | --- | --- | --- |
+| headless | seven seeks across the match, either way, the first of them the first of the run | 24 to 26 | 168.2 to 220.2 ms | 165.9 to 217.9 ms |
+| headless | from frame 82,196 to the last, 82,496 | 14 | 13.7 ms | 11.6 ms |
+| window | first, to the end | 30, in 1,003 ms | 240.6 ms | 223.8 ms |
+| window | later, to the end | 24 and 25, in 746 and 780 ms | 208.3 and 212.3 ms | 195.9 and 199.8 ms |
+| window | back to the start, three times | 26 to 27, in 834 to 893 ms | 179.6 to 182.2 ms | 174.4 to 176.6 ms |
+
+Every seek across the match logged a slow frame line, but for those that came within 30 frames of the last line, which the line's quiet spell hides. Without the terrain stage the slowest frame of any seek was 17.2 ms headless, a frame that made 195 units, and 30.7 ms in a window, one that made 90.
+
+Making and removing units is cheap here: 195 creations took 14.8 ms and 256 removals 6.4 ms in a headless frame, and the budget kept every frame of units under a simulation frame. The slow frame of every seek across the match is the terrain stage, which has no budget and moves all 168,736 changes to the ground in the frame the seek is shown in. Issue #4025 is about it. The window was 1,280 by 720 points with a load average of 3.9 to 5, and the game's idle frame limiter was switched off for that run by a scratch file, since nobody moved the mouse.
+
+Shots, on frames 59,400 to 60,900 with the driver's shots plan given that span (the whole match would play 82,496 frames five times over): 29 of 29 shots held where the track has them, paused, for 150 frames, and 19 of 20 seeks had every shot. Played forward, 442 of the 450 shots that ended landed at 1x, 440 at 0.5x and 445 at 2x, a mean of 1.15, 0.89 and 3.17 elmos from the end of their flight. No shot did damage. One landed at 4x and three playing backward, which the shots plan says should not happen. Issue #4026 is about those. The engine also ended a held shot of `corpun_plasma` once while playing backward at 32x.
+
+What has run, on engine `2026.07.01-102-g6e5c5a0` and `test-30922-8064a43`:
+
+- The whole match plan, headless, with no adapter and with the adapter, which is the ignored test `a_whole_beyond_all_reason_match_plays_with_its_adapter`. With the adapter the engine had the track's units and features at both ends of play, at ten seeks, past a death and after the wounded unit was held. No Lua raised after the first frame in either.
+- The seeks plan and the resources plan headless with the adapter, the shots plan headless on the span above, and the real replay headless with a scratch widget reading its numbers.
+- Two launches with a window, one with no adapter and one with it. The pictures are in `docs/reports/milestone-80-gallery/`, numbered from 50. In both, the game's own `gui_flowui.lua` raised from a display list, a line on the console. It is not the playback's, and was not looked into.
+
+Not covered. Raptors, scavengers, territorial domination and lava maps were not played back. Their spawner gadgets only run for a team whose AI is the raptors or the scavengers, and the playback has no AI, so their panels do not load. The territory and lava gadgets do run and work from the playback's own clock. Issue #4028 is about them.
 
 ## Where the reader runs
 
@@ -1123,11 +1209,11 @@ luajit lua/rewind-player/tests/ghosts_test.lua
 - `view_test.lua` checks the order a seek makes its units in: the list's with no view, nearest the camera's place first with one, inside the view's corners before outside, the rest following a camera that moves, the list's again after `coilbox_rewind_view:none`, removals still first, a unit born while a seek settles, the view messages it refuses, and that 300 frames of play with a view allocate nothing.
 - `arrival_test.lua` checks which units the player asks an arrival effect for: each one a slow seek makes after its first frame, none for a seek shown in one frame, a removal or plain play, none during a drag until it ends, none outside the view, and none when the adapter's hook says it showed its own. Then the two unsynced modules on a stand-in (`tests/unsynced.lua`): the view's message, when it is sent again, a corner off the map and one in the sky, and what the effect draws, where, in which colour, for how long, how many at once, the state it leaves and that a draw allocates nothing. It does not show how the effect looks.
 - `gadget_test.lua` loads the two gadgets the way the engine does. That includes the gadget's answers of no damage for units and for features, its post frame, and the unsynced half's working out of the two budgets from the time a frame's work took.
-- `adapter_test.lua` checks how the player reads an adapter, that it never creates a hidden unit or skipped feature and says nothing about either, that each hook is called with the right arguments and a hook that raises is switched off, the log line, and that 60 frames of play with hooks allocate nothing.
+- `adapter_test.lua` checks how the player reads an adapter, that it never creates a hidden unit or skipped feature and says nothing about either, that each hook is called with the right arguments and a hook that raises is switched off, the log line, and that 60 frames of play with hooks allocate nothing. It also runs Beyond All Reason's adapter on a stand-in for the engine and the game: the commanders hidden before they warp in and drawn after, the warp in effect only where play passes its frame, what the `started` hook sets, and the queued buildings handed to the game's shape widget once and dropped when they leave the queue.
 - `engine_test.lua` is made from the engine table ([Engine calls](#engine-calls)). For every call of every row it takes the call out of the stand-in and plays the fixture track, and it checks the table against the source with `tests/scan.lua`. The widget's table is tested the same way in `timeline_test.lua`.
 - `timeline_test.lua` checks the timeline on a stand-in for `Spring` and `gl`: the message for every key, that a key with Ctrl, Alt or Meta is left alone, the frame a drag seeks to at both ends and between, the time and speed shown, that everything drawn is inside views from 640 by 480 to 3840 by 2160, moving the panel, changing a key, marks, and that 300 draws allocate nothing. It also loads the widget file the way a handler does.
 
-- `ghosts_test.lua` checks the ghosts on a track made from a table (`tests/fake_track.lua`, which has queues) against an answer worked out from the table. It plays the whole track forward and backward and seeks to 19 frames across window edges. It checks a building started within and beyond the 8 elmos, two builders with one item, a definition the game lacks, a window that does not read, what is drawn and how (the facing, a floating building, the matrices), the footprint, the switch and the text command, the saved choice, an adapter's hook and one that raises, and that 300 frames allocate nothing. It runs the fixture through the real reader against the Rust reader's queues, loads the widget file, and holds the widget's files and the reader's to its table of engine calls.
+- `ghosts_test.lua` checks the ghosts on a track made from a table (`tests/fake_track.lua`, which has queues) against an answer worked out from the table. It plays the whole track forward and backward and seeks to 19 frames across window edges. It checks a building started within and beyond the 8 elmos, two builders with one item, a definition the game lacks, a window that does not read, what is drawn and how (the facing, a floating building, the matrices), the footprint, the switch and the text command, the saved choice, an adapter's hook and one that raises, the hook that hears a pass is over, and that 300 frames allocate nothing. It runs the fixture through the real reader against the Rust reader's queues, loads the widget file, and holds the widget's files and the reader's to its table of engine calls.
 
 `tests/support.lua` is the stand-in for the reader. Its `VFS.Unpack*` and `VFS.ZlibDecompress` follow the engine source, round what they return to a 32 bit float, and raise for a position or count a float could not hold. The zlib is the system's, through LuaJIT's FFI. Its synced environment has no `io`, so a reader that reached for it would fail the tests.
 

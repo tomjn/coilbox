@@ -122,7 +122,7 @@ Coilbox runs the file in `coilbox-springlua`, the sandboxed Spring Lua evaluator
 
 For each name in `gadgets` and `widgets`, coilbox writes a file at that path in the playback game, `luarules/gadgets/<name>` or `luaui/widgets/<name>`. The engine gives a depending game's file precedence over the same path in the game it depends on, and file names are not case sensitive, so your file is never read. The file is a comment and `return false`.
 
-This relies on your gadget and widget handlers treating a file that returns `false` as one that asked not to be loaded. The engine's own handlers do. So do Splinter Faction's, and the widget handler of THIS. Beyond All Reason's handlers have not been read or run for this. An empty file is not a substitute. Splinter Faction's gadget handler loads an empty file as a gadget with nothing in it and still lists it, and its widget handler refuses it with `Failed to load: <file>  (no GetInfo() call)`.
+This relies on your gadget and widget handlers treating a file that returns `false` as one that asked not to be loaded. The engine's own handlers do. So do Splinter Faction's, and the widget handler of THIS. So do Beyond All Reason's gadget and widget handlers, read and run on its version `test-30922-8064a43`. An empty file is not a substitute. Splinter Faction's gadget handler loads an empty file as a gadget with nothing in it and still lists it, and its widget handler refuses it with `Failed to load: <file>  (no GetInfo() call)`.
 
 Coilbox does not write over one of its own files and refuses an adapter that names one.
 
@@ -159,10 +159,13 @@ A hook is an optional function in `hooks`. The player calls the first three and 
 | `unitPlaced` | After the player created a unit and put it in place, and again for a unit made again after a seek. A seek that needs many units made spreads them over several frames, so this can come some frames after the seek. | The engine's unit id, the unit definition's engine id, the track frame, the clock, and `effect`, which is true when the player is about to show its arrival effect for the unit. Return true to say you showed your own. |
 | `afterFrame` | At the end of every simulation frame, after every stage. | The track frame and the clock. |
 | `drawQueuedBuilding` | Not the player's. The ghosts widget calls it in unsynced Lua, in `DrawWorld`, once for each queued building it would draw, inside a matrix of its own. It replaces the engine's own shape and the footprint outline, so use it to draw the building the way your game does. | The unit definition's engine id, the team, x, the ground height, z and the facing from 0 to 3. A facing of 0 is south, 1 east, 2 north and 3 west. |
+| `queuedBuildingsDrawn` | Not the player's. The ghosts widget calls it once at the end of every pass of `DrawWorld`, after the last `drawQueuedBuilding`, and once more when the widget shuts down. It is called for a pass that drew nothing too, and while the ghosts are switched off. | How many buildings the pass drew. 0 for a pass that drew none and for the call at shutdown. |
 
 The clock is the player's, and a hook only reads it. `clock.jumped` says the frame was reached by a seek or a step. `clock.direction` is 1 or -1. `clock.speed` is how many frames of the track one simulation frame covers.
 
-The first three run in synced Lua, in the gadget's environment. `drawQueuedBuilding` runs in the ghosts widget, which reads the adapter file itself, so `gl` is there and the synced calls are not. A hook of it that raises is logged once and the engine's shape and outline take over. Coilbox does not read it. Write the hook so that the same file still loads in synced Lua, where it is never called.
+The first three run in synced Lua, in the gadget's environment. `drawQueuedBuilding` and `queuedBuildingsDrawn` run in the ghosts widget, which reads the adapter file itself, so `gl` and `WG` are there and the synced calls are not. A `drawQueuedBuilding` that raises is logged once and the engine's shape and outline take over. Coilbox does not read either. Write the hooks so that the same file still loads in synced Lua, where they are never called, and in coilbox's sandbox, which has no engine at all: reach for `Spring`, `UnitDefs`, `Game`, `gl` and `WG` only inside a hook.
+
+`queuedBuildingsDrawn` is for a game whose way of drawing a building keeps the shape until it is told to drop it, as Beyond All Reason's unit shape widget does. Hand a building to it the first time `drawQueuedBuilding` asks for it, note in each pass which ones were asked for, and drop the rest in `queuedBuildingsDrawn`. Beyond All Reason's adapter in `lua/rewind-player/adapters/beyond_all_reason.lua` does this.
 
 A frame of play allocates nothing in the player, so a hook that runs every frame should not allocate either.
 
@@ -194,7 +197,7 @@ Put your adapter at `coilbox_rewind/adapter.lua` in your game's primary archive.
 
 Your own adapter wins. It applies whatever its `shortname` and `versions` say, because it is in the archive of the version being played. If it cannot be used, because it does not run or has a key that is not in the table, the launch carries on with an adapter coilbox ships for your game if one matches, and with none otherwise. The player's log line says why.
 
-Coilbox also ships adapters, in `lua/rewind-player/adapters/` in the coilbox repository. A file there is picked up by the next build, and it matches a game by `shortname` and `versions`. Of those, the first in file name order that matches wins, so give two adapters for one game ranges that do not overlap.
+Coilbox also ships adapters, in `lua/rewind-player/adapters/` in the coilbox repository. It ships two, for Splinter Faction and for Beyond All Reason. A file there is picked up by the next build, and it matches a game by `shortname` and `versions`. Of those, the first in file name order that matches wins, so give two adapters for one game ranges that do not overlap.
 
 Whichever adapter is chosen, the playback game holds it at `coilbox_rewind/adapter.lua`, written on every launch. When no adapter applies, that file returns `false`, so a file at that path in your base game never reaches the player.
 
@@ -228,9 +231,18 @@ Switch off a gadget that fights the recording. These are the kinds Splinter Fact
 - A gadget that creates units or features the track does not have, such as a start of match spawn or a container left where a unit dies.
 - A gadget that changes health, because the recording owns health. See [healing](#healing).
 
+Beyond All Reason had more kinds:
+
+- A gadget that destroys what the player places. Its guard against a lab trick destroys a unit created unfinished with no builder, which is every half built building the player places after a seek. Another clears the features under a new building, and the track's wrecks lie there later in the match.
+- A gadget that acts on a shot. The player creates every shot of the track, so a gadget that splits a shot into bomblets, moves it or creates units where it lands doubles what the track has.
+- A gadget that replaces one unit with two when it is finished. The track has both.
+- A gadget that does something a viewer sees at the start, such as hiding commanders until they warp in. Switch it off and do the part a viewer sees in the adapter's hooks: `unitPlaced` and `afterFrame` can hide a unit and show the game's effect, and `started` can set what the game's widgets read as they load.
+
 Switch off a widget that offers an action that makes no sense in playback. A faction picker, a start position picker and a menu that gives units to another team are of this kind. A spectator can do none of them.
 
-Switch off a widget that covers the timeline. The timeline sits at the bottom centre of the view and a player can drag it. Splinter Faction's strip of buttons for the selection was at the bottom centre too, so the two drew over each other.
+Switch off a widget that covers the timeline. The timeline sits at the bottom centre of the view and a player can drag it. Splinter Faction's strip of buttons for the selection was at the bottom centre too, so the two drew over each other. Beyond All Reason's order menu reaches under the timeline when a unit is selected, and its adapter switches the order menu and the build menu off. Look with a unit selected.
+
+Check your key bindings too. A key your game binds to an action one of its widgets handles is that widget's before the timeline hears it. Beyond All Reason binds Minus and Equals to its volume, so they change the volume there and not the speed. Its adapter leaves them, since the volume keys tell nobody wrong about the match.
 
 Two things stay in Splinter Faction because there is no way to take them out cleanly, and issue #3983 is about it.
 
