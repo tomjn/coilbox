@@ -28,6 +28,19 @@ end
 
 local function nothing() end
 
+--- A Lua script's QueryNanoPiece that gives its two nozzles in turn, counted
+-- from 1 as a Lua script counts its pieces: the model's third and fourth.
+local function nozzles(_, unit)
+	unit.nozzle = unit.nozzle == 3 and 4 or 3
+	return unit.nozzle
+end
+
+--- A COB script's QueryNanoPiece that always gives its arm, counted from 0 as
+-- a COB script counts its pieces: the model's second.
+local function arm()
+	return 1
+end
+
 local LEGS = { "pelvis", "torso", "rleg", "lleg" }
 local UNIT_DEFS = {
 	{ name = "walker", script = "lua", pieces = LEGS, callins = { StartMoving = walk, StopMoving = nothing } },
@@ -36,11 +49,19 @@ local UNIT_DEFS = {
 	{
 		name = "engineer",
 		script = "lua",
+		isBuilder = true,
+		pieces = { "base", "arm", "nozzle1", "nozzle2" },
+		midHeight = 10,
+		callins = { StartMoving = nothing, StopMoving = nothing, StartBuilding = nothing, StopBuilding = nothing, QueryNanoPiece = nozzles },
+	},
+	{
+		name = "cobengineer",
+		script = "cob",
+		isBuilder = true,
 		pieces = { "base", "arm" },
 		midHeight = 10,
-		callins = { StartMoving = nothing, StopMoving = nothing, StartBuilding = nothing, StopBuilding = nothing },
+		callins = { StartBuilding = nothing, StopBuilding = nothing, QueryNanoPiece = arm },
 	},
-	{ name = "cobengineer", script = "cob", pieces = { "base", "arm" }, midHeight = 10, callins = { StartBuilding = nothing, StopBuilding = nothing } },
 	{ name = "plant", script = "cob", isImmobile = true, isFactory = true, buildTime = 500, callins = { StartBuilding = nothing, StopBuilding = nothing } },
 	{ name = "hut", isImmobile = true, buildTime = 500 },
 }
@@ -70,6 +91,7 @@ local function setup(spec, options)
 		engine = options.engine,
 		budget = options.budget,
 		scriptCallIns = callIns,
+		work = options.work,
 		log = function(text)
 			world.lines[#world.lines + 1] = text
 		end,
@@ -118,7 +140,10 @@ end
 local function calls(world, unit)
 	local names = {}
 	for _, one in ipairs(world.callsTo(unit)) do
-		names[#names + 1] = one.name
+		-- Asking for a nano piece is not telling the script anything.
+		if one.name ~= "QueryNanoPiece" then
+			names[#names + 1] = one.name
+		end
 	end
 	return table.concat(names, " ")
 end
@@ -378,7 +403,7 @@ do
 	local hut = world.unitNamed("hut")
 	t.same("a builder is told once when it starts work", calls(world, builder), "StartBuilding")
 	t.same("on the frame the track has it start", player.clock.frame, 50)
-	local start = world.callsTo(builder)[1]
+	local start = world.callsTo(builder, "StartBuilding")[1]
 	t.near("with the heading from its facing to what it builds", start.a, TURN / 4, 1e-9)
 	t.near("and the pitch up to it from its own middle", start.b, TURN / 8, 1e-9)
 	local hutDef = world.globals.UnitDefNames.hut.id
@@ -436,7 +461,7 @@ do
 	player:message("coilbox_rewind:seek 60")
 	run(2)
 	local builder = world.unitNamed("cobengineer")
-	local start = world.callsTo(builder)[1]
+	local start = world.callsTo(builder, "StartBuilding")[1]
 	t.same("a builder with a COB script is told through the COB call", start.how, "cob")
 	t.same("with whole numbers", start.a == math.floor(start.a) and start.b == math.floor(start.b), true)
 	-- A quarter turn and an eighth, cut to a whole number as the engine cuts them.
@@ -453,7 +478,7 @@ do
 	player:message("coilbox_rewind:seek 60")
 	run(2)
 	local plant = world.unitNamed("plant")
-	local start = world.callsTo(plant)[1]
+	local start = world.callsTo(plant, "StartBuilding")[1]
 	t.same("a factory is told it builds", start.name, "StartBuilding")
 	t.same("with no heading", start.a, nil)
 	t.same("and no pitch", start.b, nil)
@@ -551,6 +576,135 @@ do
 	t.same("and has the place the track has for it", builder.params.coilbox_rewind_work_x, 100)
 	run(2)
 	t.same("the frame that makes the target names it", builder.params.coilbox_rewind_work_target, world.unitNamed("hut").id)
+end
+
+-- A builder's nano pieces (issue #4029). The engine fills its list by asking
+-- the script only while a builder really builds, which none does in a
+-- playback, so the stage asks the script the engine's way, once for a unit,
+-- and gives the engine what it found.
+
+do
+	local world, player, run = setup(building(ENGINEER))
+	player:message("coilbox_rewind:seek 40")
+	run(10)
+	local builder = world.unitNamed("engineer")
+	t.same("a builder with no work is not asked for a nano piece", #world.callsTo(builder, "QueryNanoPiece"), 0)
+	t.same("and the engine has none for it", world.Spring.GetUnitNanoPieces(builder.id), nil)
+	run(1)
+	local pieces = world.Spring.GetUnitNanoPieces(builder.id)
+	t.same("once it works the engine has its nano pieces, as the model numbers them from 1", pieces and table.concat(pieces, " "), "3 4")
+	-- Two new pieces, then 31 asks that give none, as NanoPieceCache does.
+	t.same("asked until 31 asks in a row give no new piece", #world.callsTo(builder, "QueryNanoPiece"), 33)
+	t.same("in the frame its work starts", world.callsTo(builder, "QueryNanoPiece")[1].frame, world.callsTo(builder, "StartBuilding")[1].frame)
+	run(150)
+	player:message("coilbox_rewind:seek 80")
+	run(2)
+	t.same("a unit is asked once, whatever its work does after", #world.callsTo(builder, "QueryNanoPiece"), 33)
+	t.same("and the engine was told once", world.nanoSets, 1)
+end
+
+do
+	local world, player, run = setup(building(COBENGINEER))
+	player:message("coilbox_rewind:seek 60")
+	run(2)
+	local builder = world.unitNamed("cobengineer")
+	local pieces = world.Spring.GetUnitNanoPieces(builder.id)
+	t.same("a COB script's piece, counted from 0, is the model's from 1", pieces and table.concat(pieces, " "), "2")
+	t.same("asked once and then 31 times more", #world.callsTo(builder, "QueryNanoPiece"), 32)
+	t.same("through the COB call", world.callsTo(builder, "QueryNanoPiece")[1].how, "cob")
+end
+
+do
+	local world, player, run = setup(building(ENGINEER))
+	player:message("coilbox_rewind:seek 40")
+	run(2)
+	local builder = world.unitNamed("engineer")
+	-- What a game's script does as its unit is created, as Splinter Faction's do.
+	world.Spring.SetUnitNanoPieces(builder.id, { 2 })
+	local sets = world.nanoSets
+	run(20)
+	t.same("a builder whose script gave its own nano pieces is not asked", #world.callsTo(builder, "QueryNanoPiece"), 0)
+	t.same("and keeps them", table.concat(world.Spring.GetUnitNanoPieces(builder.id), " "), "2")
+	t.same("the engine is not told again", world.nanoSets, sets)
+end
+
+do
+	local world, player, run = setup(building(PLANT))
+	player:message("coilbox_rewind:seek 60")
+	local ok, err = pcall(run, 5)
+	t.check("a factory whose script has no QueryNanoPiece raises nothing", ok, err)
+	t.same("and the engine has no nano piece for it", world.Spring.GetUnitNanoPieces(world.unitNamed("plant").id), nil)
+end
+
+do
+	local raising = {}
+	for k, def in ipairs(UNIT_DEFS) do
+		raising[k] = def
+	end
+	raising[ENGINEER + 1] = {
+		name = "engineer",
+		script = "lua",
+		isBuilder = true,
+		pieces = { "base", "arm" },
+		midHeight = 10,
+		callins = {
+			StartBuilding = nothing,
+			StopBuilding = nothing,
+			QueryNanoPiece = function()
+				error("no nozzle")
+			end,
+		},
+	}
+	local world, player, run = setup(building(ENGINEER), { unitDefs = raising })
+	player:message("coilbox_rewind:seek 60")
+	local ok, err = pcall(run, 5)
+	t.check("a script that raises when asked for a nano piece takes nothing down", ok, err)
+	local builder = world.unitNamed("engineer")
+	t.same("it is asked once", #world.callsTo(builder, "QueryNanoPiece"), 1)
+	t.same("and the line says so once", said(world, "raised in QueryNanoPiece"), 1)
+	t.same("its unit is still told it builds", calls(world, builder), "StartBuilding")
+end
+
+-- The work the stage hands on to the unsynced half, which draws the stream of
+-- build particles (issue #4029): a builder's id, the command and target of its
+-- parameters, the build power, where the work is, the frame of the track and
+-- whether a seek brought it there. Handed on when one of the first three
+-- changes, and again after a seek while it works.
+
+do
+	local sent = {}
+	local world, player, run = setup(building(ENGINEER), {
+		work = function(unitID, command, target, power, x, y, z, frame, jumped)
+			sent[#sent + 1] = table.concat({ unitID, command, target, power, x, y, z, frame, jumped }, " ")
+		end,
+	})
+	player:message("coilbox_rewind:seek 40")
+	run(10)
+	t.same("a builder with no work hands nothing on", #sent, 0)
+	run(1)
+	local builder, hut = world.unitNamed("engineer"), world.unitNamed("hut")
+	local hutDef = world.globals.UnitDefNames.hut.id
+	t.same("its work is handed on as it starts", sent[1], string.format("%d %d %d 1 100 110 0 50 0", builder.id, -hutDef, hut.id))
+	run(30)
+	t.same("and not again while it goes on", #sent, 1)
+	run(20)
+	t.same("a change of power is handed on", sent[2], string.format("%d %d %d 0.2 100 110 0 100 0", builder.id, -hutDef, hut.id))
+	run(20)
+	t.same("so is the build becoming a repair", sent[3], string.format("%d 40 %d 0.2 100 110 0 120 0", builder.id, hut.id))
+	player:message("coilbox_rewind:pause")
+	run(20)
+	t.same("pausing hands nothing on", #sent, 3)
+	player:message("coilbox_rewind:play")
+	run(31)
+	t.same("the work stopping is handed on as no command", sent[4], string.format("%d 0 -1 0 100 110 0 151 0", builder.id))
+	player:message("coilbox_rewind:seek 80")
+	run(1)
+	t.same("a seek into the work hands it on, saying it was a seek", sent[5], string.format("%d %d %d 1 100 110 0 80 1", builder.id, -hutDef, hut.id))
+	player:message("coilbox_rewind:seek 90")
+	run(1)
+	t.same("so does a seek inside the same work", sent[6], string.format("%d %d %d 1 100 110 0 90 1", builder.id, -hutDef, hut.id))
+	run(5)
+	t.same("and play after it hands nothing more on", #sent, 6)
 end
 
 -- A piece the track has poses for and a walk also turns. The script turns the
@@ -713,6 +867,13 @@ do
 	player:message("coilbox_rewind:seek 40")
 	run(200)
 	t.same("without the parameter call no parameter is set", world.unitParamSets, 0)
+	t.same("and a builder's script is still told", calls(world, world.unitNamed("engineer")), "StartBuilding StopBuilding")
+
+	world, player, run = setup(spec(), { engine = without("nanoPieces") })
+	player:message("coilbox_rewind:seek 40")
+	run(200)
+	t.same("without the nano piece calls no script is asked for one", #world.callsTo(world.unitNamed("engineer"), "QueryNanoPiece"), 0)
+	t.same("and the engine is told none", world.nanoSets, 0)
 	t.same("and a builder's script is still told", calls(world, world.unitNamed("engineer")), "StartBuilding StopBuilding")
 end
 

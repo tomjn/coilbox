@@ -437,6 +437,7 @@ local function unsyncedScene(removed)
 	}
 	env.Game = { gameSpeed = 30 }
 	env.Spring, env.gl, env.GL = e.Spring, e.gl, e.GL
+	env.CMD, env.UnitDefs, env.Game.maxUnits = e.CMD, e.UnitDefs, e.maxUnits
 	env.io = e.io
 	env.VFS.Include = function(path)
 		local file = assert(path:match("^luarules/rewind_player/(.+)$"), path)
@@ -445,6 +446,16 @@ local function unsyncedScene(removed)
 	if removed then
 		remove(env, removed)
 	end
+	-- A builder at work for the stream: unit 21 with its nano piece 90 elmos
+	-- from the middle of unit 22, at frame 1000 of the track, played forward.
+	e.UnitDefs[1] = { isFactory = false, showNanoSpray = true }
+	e.units[21] = { def = 1, team = 0, x = 0, y = 0, z = 0, pieces = { 1 }, at = { [1] = { 0, 10, 0 } } }
+	e.units[22] = { def = 1, team = 0, x = 90, y = 0, z = 0, mx = 90, my = 10, mz = 0, radius = 20 }
+	e.rules.coilbox_rewind_frame = 1000
+	e.rules.coilbox_rewind_playing = 1
+	e.rules.coilbox_rewind_direction = 1
+	e.rules.coilbox_rewind_speed = 1
+	e.radius[7] = 10
 	local chunk = assert(loadfile(GADGET))
 	setfenv(chunk, env)
 	chunk()
@@ -465,7 +476,7 @@ end
 for _, row in ipairs(Table.UNSYNCED) do
 	for _, call in ipairs(row.calls) do
 		local label = "unsynced, without " .. call
-		local ok, gadget, lines, clock = pcall(unsyncedScene, call)
+		local ok, gadget, lines, clock, e = pcall(unsyncedScene, call)
 		t.check(label .. " the gadget loads", ok, gadget)
 		if ok then
 			-- The view needs a way to send it, and the effect needs a clock.
@@ -482,8 +493,18 @@ for _, row in ipairs(Table.UNSYNCED) do
 			end)
 			t.check(label .. " a frame's work is taken and raises nothing", fine)
 			t.same(label .. " the view is " .. (viewOff and "not sent" or "still sent"), #clock.views, viewOff and 0 or 1)
-			t.same(label .. " the arrival effect is " .. (effectOff and "not drawn" or "still drawn"), type(gadget.DrawWorld), effectOff and "nil" or "function")
+			-- The stream of build particles needs the arrival effect's drawing
+			-- calls and its own, and takes its time from the track.
+			local streamOff = row.id == "buildStream" or row.id == "arrivalEffect"
 			t.same(label .. " a unit that arrives is taken and raises nothing", pcall(gadget.RecvFromSynced, gadget, "coilbox_rewind_arrive", 7, 0, 0, 0, 0), true)
+			t.same(label .. " a builder's work is taken and raises nothing", pcall(gadget.RecvFromSynced, gadget, "coilbox_rewind_build", 21, -1, 22, 1, 0, 0, 0, 1000, 1), true)
+			t.same(label .. " the world is " .. ((effectOff and streamOff) and "not drawn" or "drawn"), type(gadget.DrawWorld), (effectOff and streamOff) and "nil" or "function")
+			if gadget.DrawWorld then
+				e.clear()
+				t.same(label .. " a draw raises nothing", pcall(gadget.DrawWorld, gadget), true)
+				t.same(label .. " the arrival effect is " .. (effectOff and "not drawn" or "still drawn"), e.vertices - e.texCoords > 0, not effectOff)
+				t.same(label .. " the stream is " .. (streamOff and "not drawn" or "still drawn"), e.texCoords > 0, not streamOff)
+			end
 			-- A row that leaves the slow frame line on still logs a slow frame.
 			local more = 0
 			for _, l in ipairs(lines) do
@@ -773,7 +794,20 @@ local function scriptScene(removed, copied)
 			{ name = "cobbot", script = "cob", pieces = { "base", "leg" }, callins = { StartMoving = walk, StopMoving = nothing } },
 			{ name = "luabot", script = "lua", pieces = { "base", "leg" }, callins = { StartMoving = walk, StopMoving = nothing } },
 			{ name = "crate" },
-			{ name = "engineer", script = "lua", isImmobile = true, callins = { StartBuilding = nothing, StopBuilding = nothing } },
+			{
+				name = "engineer",
+				script = "lua",
+				isImmobile = true,
+				isBuilder = true,
+				pieces = { "base", "nozzle" },
+				callins = {
+					StartBuilding = nothing,
+					StopBuilding = nothing,
+					QueryNanoPiece = function()
+						return 2
+					end,
+				},
+			},
 		},
 	})
 	w.frameworkCopied = copied or false
@@ -859,7 +893,8 @@ end
 local function toldTo(w, def)
 	local names = {}
 	for _, one in ipairs(w.scriptCalls) do
-		if one.def == def then
+		-- Asking for a nano piece is not telling the script anything.
+		if one.def == def and one.name ~= "QueryNanoPiece" then
 			names[#names + 1] = one.name .. " by " .. one.how
 		end
 	end
@@ -896,17 +931,19 @@ do
 			unitScripts = #w.scriptCalls,
 			unitSpeed = w.velocitySets,
 			builderWork = w.unitParamSets,
+			nanoPieces = w.nanoSets,
 			-- The walk's turn of the posed leg is left to the script.
 			walkPieces = said(w, "the walk of cobbot turns leg") and 1 or 0,
 			placed = leg and leg.z or -1,
 		}
 	end
 	local control = sees(full)
-	for _, id in ipairs({ "unitScripts", "unitSpeed", "builderWork", "walkPieces" }) do
+	for _, id in ipairs({ "unitScripts", "unitSpeed", "builderWork", "walkPieces", "nanoPieces" }) do
 		t.check("the made-up track shows " .. id .. " at work", control[id] > 0, control[id])
 	end
-	-- A walk's pieces can only be asked about when a script is told.
-	local needs = { walkPieces = "unitScripts" }
+	-- A walk's pieces can only be asked about when a script is told, and a
+	-- builder's nano pieces only asked of a script the stage can call.
+	local needs = { walkPieces = "unitScripts", nanoPieces = "unitScripts" }
 	for _, row in ipairs(Table.SYNCED) do
 		if control[row.id] then
 			for _, call in ipairs(row.calls) do
@@ -917,7 +954,7 @@ do
 					t.same(label .. " the row " .. row.id .. " is off", engine.on[row.id], false)
 					local seen = sees(w)
 					t.same(label .. " " .. row.id .. " does nothing", seen[row.id], 0)
-					for _, other in ipairs({ "unitScripts", "unitSpeed", "builderWork", "walkPieces" }) do
+					for _, other in ipairs({ "unitScripts", "unitSpeed", "builderWork", "walkPieces", "nanoPieces" }) do
 						if other ~= row.id and needs[other] ~= row.id then
 							t.check(label .. " " .. other .. " still works", seen[other] > 0, other)
 						end

@@ -49,6 +49,13 @@
 -- slow seek made appears, when the synced half asks for one (issue #4009,
 -- coilbox_player_arrival.lua).
 --
+-- It draws a builder's stream of build particles too (issue #4029,
+-- coilbox_player_stream.lua). The engine draws its own only while a builder
+-- really builds, and no unit of a playback does. A game whose own build effect
+-- asks the engine what a builder is doing, as Beyond All Reason's does, is
+-- answered from the recording: this half wraps the two calls it asks with in
+-- the table every gadget's unsynced half shares, as its file loads.
+--
 -- A unit's own script is told when its unit moves and when a builder works
 -- (issue #3797, coilbox_player_animation.lua). A Lua script's functions are not
 -- something the engine hands out, so this file wraps the call a game's script
@@ -88,6 +95,12 @@ local BUDGET = "coilbox_rewind_budget:"
 --- What the synced half sends the unsynced one for a unit that wants an
 -- arrival effect: the unit's id, its x, y and z and its team.
 local ARRIVE = "coilbox_rewind_arrive"
+
+--- What the synced half sends the unsynced one when a builder's work changes,
+-- for the stream of build particles (issue #4029): the builder's id, the
+-- command, target and power of its work, where the work is, the frame of the
+-- track and 1 after a seek.
+local BUILD = "coilbox_rewind_build"
 
 --- What the synced half sends the unsynced one for a line of the log, which
 -- the unsynced half writes to the playback's log file (issue #4032,
@@ -218,6 +231,10 @@ if gadgetHandler:IsSyncedCode() then
 			-- is asked for.
 			arrive = engine.on.workTiming and function(unitID, x, y, z, team)
 				SendToUnsynced(ARRIVE, unitID, x, y, z, team)
+			end or nil,
+			-- The unsynced half draws the stream too.
+			work = engine.on.workTiming and function(unitID, command, target, power, x, y, z, frame, jumped)
+				SendToUnsynced(BUILD, unitID, command, target, power, x, y, z, frame, jumped)
 			end or nil,
 			log = log,
 			adapter = adapter,
@@ -352,7 +369,7 @@ if gadgetHandler:IsSyncedCode() then
 else
 	-- What this half needs from the engine, from coilbox_player_engine.lua.
 	local Engine = VFS.Include("luarules/rewind_player/coilbox_player_engine.lua")
-	local engine = Engine.check({ Spring = Spring, Game = Game, gl = gl, GL = GL }, Engine.UNSYNCED)
+	local engine = Engine.check({ Spring = Spring, Game = Game, gl = gl, GL = GL, CMD = CMD }, Engine.UNSYNCED)
 	-- The playback's log file, emptied as this half loads, which is before any
 	-- widget writes to it.
 	local write = VFS.Include("luarules/rewind_player/coilbox_log.lua").new(io, Spring.Echo, true)
@@ -399,10 +416,70 @@ else
 				return Spring.DiffTimers(clock(), epoch, true, micros) / 1000
 			end,
 		})
-		-- Defined only when there is an effect to draw, so that a gadget
-		-- handler does not call it for nothing.
+	end
+
+	-- A builder's stream of build particles, through the game's own particle
+	-- texture, which its gamedata/resources.lua names. A game whose file does
+	-- not run gets the particles with no texture.
+	local stream
+	-- It draws with the arrival effect's calls as well as its own.
+	if engine.on.buildStream and engine.on.arrivalEffect then
+		local Stream = VFS.Include("luarules/rewind_player/coilbox_player_stream.lua")
+		local ok, resources = pcall(VFS.Include, "gamedata/resources.lua")
+		stream = Stream.new({
+			Spring = Spring,
+			gl = gl,
+			GL = GL,
+			UnitDefs = UnitDefs,
+			CMD = CMD,
+			maxUnits = Game.maxUnits,
+			texture = ok and Stream.textureOf(resources) or nil,
+		})
+	end
+
+	-- A game's own build effect asks the engine what a builder is doing and how
+	-- hard, and in a playback the engine would say nothing, since no unit
+	-- builds. Beyond All Reason's asks Spring.GetUnitWorkerTask and
+	-- Spring.GetUnitCurrentBuildPower in the unsynced half of a gadget, and
+	-- copies both as its file loads. Every gadget's unsynced half shares this
+	-- `Spring` (a handler's NewGadget), and the files load in the order of
+	-- their names, so the calls are wrapped here, as this file loads, and a
+	-- builder at work is answered from the recording. The synced half is left
+	-- alone, since a game's synced gadgets act on what they read.
+	if stream and engine.on.workerAnswer then
+		local task, power = Spring.GetUnitWorkerTask, Spring.GetUnitCurrentBuildPower
+		Spring.GetUnitWorkerTask = function(unitID, ...)
+			local command, target = stream:task(unitID)
+			if command then
+				return command, target
+			end
+			return task(unitID, ...)
+		end
+		Spring.GetUnitCurrentBuildPower = function(unitID, ...)
+			local given = stream:power(unitID)
+			if given then
+				return given
+			end
+			return power(unitID, ...)
+		end
+	end
+
+	-- Defined only when there is something to draw, so that a gadget handler
+	-- does not call it for nothing.
+	if arrival or stream then
 		function gadget:DrawWorld()
-			arrival:draw()
+			if arrival then
+				arrival:draw()
+			end
+			if stream then
+				stream:draw()
+			end
+		end
+	end
+
+	if stream then
+		function gadget:UnitDestroyed(unitID)
+			stream:drop(unitID)
 		end
 	end
 
@@ -602,6 +679,13 @@ else
 			-- A unit's id, its place and its team, where the work's arguments are.
 			if arrival then
 				arrival:add(phase, frame, made, removed, ground)
+			end
+			return true
+		end
+		if name == BUILD then
+			-- A builder's work, where the frame's work's arguments are.
+			if stream then
+				stream:work(phase, frame, made, removed, ground, hadMake, hadRemove, hadGround, firsts)
 			end
 			return true
 		end
