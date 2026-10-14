@@ -33,7 +33,10 @@
 -- the spike on issue #3791, which read ten tags. The camera and drawing calls
 -- of the `view` and `arrivalEffect` rows were read at those and at 2025.03.9. A name found at 105.0 is given
 -- as 105.0. No older engine was read, so the player does not say that one older
--- lacks it. None of the older paths has run in an engine: no engine before
+-- lacks it. The rows of the resources stage (issue #3982) were read at 105.0,
+-- 105.1.1, 2025.01.6, 2025.03.9 and 2026.07.04, and the one call that is not at
+-- all five, Spring.AddTeamResourceExcessStats, at every tag of 2025 and 2026:
+-- 2026.07.01 is the first that has it. None of the older paths has run in an engine: no engine before
 -- 2025.03.9 is installed, so they are tested on the stand-in in
 -- tests/engine.lua only.
 --
@@ -260,6 +263,56 @@ M.SYNCED = {
 		since = "105.0",
 		without = "Weapons fire without a sound",
 		visible = false,
+	},
+	{
+		id = "resources",
+		feature = "team resources",
+		calls = { "Spring.SetTeamResource", "Spring.SetTeamShareLevel" },
+		how = "presence",
+		used = "coilbox_player_resources.lua, apply",
+		required = false,
+		since = "105.0",
+		without = "Each team's metal, energy, storage and share level are the playback's own and not the match's",
+		visible = true,
+	},
+	{
+		id = "resourceRates",
+		feature = "team income and expense",
+		calls = {
+			"Spring.GetGameFrame",
+			"Spring.GetTeamResources",
+			"Spring.GetTeamInfo",
+			"Spring.AddTeamResource",
+			"Spring.UseTeamResource",
+		},
+		how = "presence",
+		used = "coilbox_player_resources.lua, feed and settle",
+		required = false,
+		since = "105.0",
+		without = "Each team's income, expense and pull are the playback's own and not the match's",
+		visible = true,
+	},
+	{
+		id = "resourceExcess",
+		feature = "team excess",
+		calls = { "Spring.AddTeamResourceExcessStats" },
+		how = "presence",
+		used = "coilbox_player_resources.lua, settle",
+		required = false,
+		since = "2026.07.01",
+		without = "The resources a team wasted read as the playback's own, which is none",
+		visible = false,
+	},
+	{
+		id = "teamParams",
+		feature = "the game's own team numbers",
+		calls = { "Spring.SetTeamRulesParam" },
+		how = "presence",
+		used = "coilbox_player_resources.lua, apply",
+		required = false,
+		since = "105.0",
+		without = "The team rules parameters a game's adapter names are the playback's own and not the match's",
+		visible = true,
 	},
 	{
 		id = "workTiming",

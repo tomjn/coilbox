@@ -37,6 +37,12 @@
 -- engine moving the projectile itself. `world.simulate` is the engine's own
 -- frame for them, from rts/Sim/Projectiles.
 --
+-- A team's resources follow rts/Sim/Misc/Team.cpp. What a team makes and uses
+-- adds up over 30 frames, and on a frame that divides by 30 the sums become the
+-- numbers Spring.GetTeamResources gives and start again from nothing. That
+-- happens after the gadgets' GameFrame and before their GameFramePost, and
+-- `world.step` runs a frame in that order. No call sets income, expense or pull.
+--
 -- Nothing a gadget calls on every frame allocates here, so a test can count
 -- what the gadget itself allocates.
 
@@ -113,10 +119,51 @@ function M.new(options)
 	local ZERO = { 0, 0, 0 }
 
 	local teamList = options.teams or { { id = 0, allyTeam = 0 }, { id = 1, allyTeam = 1 }, { id = 2, allyTeam = 2 } }
-	for _, team in ipairs(teamList) do
-		world.teams[team.id] = { id = team.id, allyTeam = team.allyTeam, dead = false, limit = team.limit or 1000, count = 0 }
+	-- One resource of a team, as CTeam holds it: what it has, the numbers of the
+	-- stretch of 30 frames that is running, and those of the one before, which
+	-- are the ones Spring.GetTeamResources gives.
+	local function pool(storage, share)
+		return {
+			held = 0,
+			storage = storage,
+			share = share,
+			pull = 0,
+			income = 0,
+			expense = 0,
+			sent = 0,
+			received = 0,
+			delayed = 0,
+			prevPull = 0,
+			prevIncome = 0,
+			prevExpense = 0,
+			prevSent = 0,
+			prevReceived = 0,
+			prevExcess = 0,
+		}
+	end
+	world.teamOrder = {}
+	for i, team in ipairs(teamList) do
+		world.teams[team.id] = {
+			id = team.id,
+			allyTeam = team.allyTeam,
+			dead = false,
+			limit = team.limit or 1000,
+			count = 0,
+			multiplier = team.incomeMultiplier or 1,
+			-- CTeam's constructor: a share level of 0.99 for metal and 0.95 for energy.
+			metal = pool(team.storage or 1000, 0.99),
+			energy = pool(team.storage or 1000, 0.95),
+			params = {},
+		}
+		world.teamOrder[i] = world.teams[team.id]
 		world.gaia = team.id
 	end
+	-- The simulation frame, which a test moves with `world.step`.
+	world.frame = 0
+	-- modInfo.nativeExcessSharing, which is on unless a game switches it off.
+	world.nativeExcessSharing = true
+	-- How often the calls that set a team's numbers were made.
+	world.resourceSets, world.shareSets, world.resourceFeeds, world.excessAdds, world.teamParamSets = 0, 0, 0, 0, 0
 
 	local function call(name, ...)
 		local gadget = world.gadget
@@ -170,7 +217,214 @@ function M.new(options)
 		if not team then
 			return
 		end
-		return teamID, 0, team.dead, false, "", team.allyTeam
+		return teamID, 0, team.dead, false, "", team.allyTeam, team.multiplier
+	end
+
+	-- Team resources, from rts/Sim/Misc/Team.cpp and TeamHandler.cpp.
+
+	function Spring.GetGameFrame()
+		return world.frame
+	end
+
+	--- The pool a resource name means. The calls below read its first letter
+	-- only, as the engine's do.
+	local function poolOf(teamID, name)
+		local team = world.teams[teamID]
+		if not team then
+			return nil
+		end
+		local letter = name:byte(1)
+		if letter == 109 then
+			return team.metal, team
+		elseif letter == 101 then
+			return team.energy, team
+		end
+	end
+
+	--- CTeam::AddMetal. What does not fit in storage waits for the next slow
+	-- update (CTeamHandler::HandleFrameExcess, with no gadget taking the excess).
+	local function add(found, amount)
+		found.held = found.held + amount
+		found.income = found.income + amount
+		if found.held > found.storage then
+			found.delayed = found.delayed + (found.held - found.storage)
+			found.held = found.storage
+		end
+	end
+
+	--- LuaSyncedCtrl::UseTeamResource: the pull counts whether or not the team
+	-- has the amount.
+	local function use(found, amount)
+		found.pull = found.pull + amount
+		if found.held < amount then
+			return false
+		end
+		found.held = found.held - amount
+		found.expense = found.expense + amount
+		return true
+	end
+
+	function Spring.GetTeamResources(teamID, name)
+		local found = poolOf(teamID, name)
+		if not found then
+			return
+		end
+		return found.held, found.storage, found.prevPull, found.prevIncome, found.prevExpense, found.share, found.prevSent, found.prevReceived, found.prevExcess
+	end
+
+	--- LuaSyncedCtrl::SetTeamResource, which takes these eight names and no
+	-- others. What a team holds is cut to its storage, both ways round.
+	function Spring.SetTeamResource(teamID, name, value)
+		local team = world.teams[teamID]
+		if not team then
+			return
+		end
+		world.resourceSets = world.resourceSets + 1
+		value = math.max(0, value)
+		if name == "m" or name == "metal" then
+			team.metal.held = math.min(team.metal.storage, value)
+		elseif name == "e" or name == "energy" then
+			team.energy.held = math.min(team.energy.storage, value)
+		elseif name == "ms" or name == "metalStorage" then
+			team.metal.storage = value
+			team.metal.held = math.min(team.metal.held, value)
+		elseif name == "es" or name == "energyStorage" then
+			team.energy.storage = value
+			team.energy.held = math.min(team.energy.held, value)
+		end
+	end
+
+	function Spring.SetTeamShareLevel(teamID, name, level)
+		local found = poolOf(teamID, name)
+		if found then
+			world.shareSets = world.shareSets + 1
+			found.share = math.max(0, math.min(1, level))
+		end
+	end
+
+	function Spring.AddTeamResource(teamID, name, amount)
+		local found, team = poolOf(teamID, name)
+		if found then
+			world.resourceFeeds = world.resourceFeeds + 1
+			add(found, math.max(0, amount) * team.multiplier)
+		end
+	end
+
+	function Spring.UseTeamResource(teamID, name, amount)
+		assert(type(name) == "string", "the table form of UseTeamResource is not the stand-in's")
+		local found = poolOf(teamID, name)
+		if found then
+			world.resourceFeeds = world.resourceFeeds + 1
+			return use(found, math.max(0, amount))
+		end
+	end
+
+	--- Registered from 2026.07.01 only. It adds to the excess of the stretch
+	-- before, which is the number Spring.GetTeamResources gives.
+	function Spring.AddTeamResourceExcessStats(teamID, name, amount)
+		local found = poolOf(teamID, name)
+		if found then
+			world.excessAdds = world.excessAdds + 1
+			found.prevExcess = found.prevExcess + math.max(0, amount)
+		end
+	end
+
+	function Spring.SetTeamRulesParam(teamID, name, value)
+		local team = world.teams[teamID]
+		if team then
+			world.teamParamSets = world.teamParamSets + 1
+			team.params[name] = value
+		end
+	end
+
+	function Spring.GetTeamRulesParam(teamID, name)
+		local team = world.teams[teamID]
+		return team and team.params[name]
+	end
+
+	--- What the engine's own units and a game's gadgets make and use in the
+	-- middle of a frame: `world.produce(team, "metal", 2)` and `world.consume`.
+	function world.produce(teamID, name, amount)
+		local found, team = poolOf(teamID, name)
+		add(found, amount * team.multiplier)
+	end
+
+	function world.consume(teamID, name, amount)
+		return use(poolOf(teamID, name), amount)
+	end
+
+	--- CTeam::SlowUpdate for one resource of one team.
+	local function slowUpdate(team, key)
+		local found = team[key]
+		-- What the allied teams can take.
+		local room = 0
+		for _, other in ipairs(world.teamOrder) do
+			if other ~= team and other.allyTeam == team.allyTeam and not other.dead then
+				room = room + math.max(0, other[key].storage * 0.99 - other[key].held)
+			end
+		end
+		found.held = found.held + found.delayed
+		found.delayed = 0
+		local excess = math.max(0, found.held - found.storage * found.share)
+		local part = room > 0 and math.min(1, excess / room) or 0
+		if world.nativeExcessSharing then
+			for _, other in ipairs(world.teamOrder) do
+				if other ~= team and other.allyTeam == team.allyTeam and not other.dead then
+					local theirs = other[key]
+					local given = math.max(0, math.min(found.held, (theirs.storage * 0.99 - theirs.held) * part))
+					found.held, theirs.held = found.held - given, theirs.held + given
+					found.sent, theirs.received = found.sent + given, theirs.received + given
+				end
+			end
+		end
+		if found.held > found.storage then
+			found.prevExcess = found.held - found.storage
+			found.held = found.storage
+		else
+			found.prevExcess = 0
+		end
+	end
+
+	--- CTeamHandler::GameFrame, which the engine runs after the gadgets'
+	-- GameFrame and its own units, and before the gadgets' GameFramePost. On a
+	-- frame that divides by 30 every team's running numbers become the ones it
+	-- reports, and then every team has its slow update.
+	function world.teamUpdate()
+		if world.frame % 30 ~= 0 then
+			return
+		end
+		for _, team in ipairs(world.teamOrder) do
+			local found = team.metal
+			for _ = 1, 2 do
+				found.prevPull, found.pull = found.pull, 0
+				found.prevIncome, found.income = found.income, 0
+				found.prevExpense, found.expense = found.expense, 0
+				found.prevSent, found.sent = found.sent, 0
+				found.prevReceived, found.received = found.received, 0
+				found = team.energy
+			end
+		end
+		for _, team in ipairs(world.teamOrder) do
+			slowUpdate(team, "metal")
+			slowUpdate(team, "energy")
+		end
+	end
+
+	--- One simulation frame in the engine's order (CGame::SimFrame): the
+	-- gadgets' GameFrame, the engine's own economy, which a test gives as
+	-- `world.economy`, the teams, and the gadgets' GameFramePost. `frame` and
+	-- `post` are what stands in for the gadget's two call-ins, and an engine
+	-- with no GameFramePost is a step with no `post`.
+	function world.step(frame, post)
+		world.frame = world.frame + 1
+		frame(world.frame)
+		if world.economy then
+			world.economy(world.frame)
+		end
+		world.teamUpdate()
+		if post then
+			post(world.frame)
+		end
 	end
 
 	--- The engine's own call. The guard gadget replaces it in this table.

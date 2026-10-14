@@ -61,6 +61,10 @@ KNOWN_FEATURES=29
 # The fixture ends the match at frame 360, and the recorder's last frame is
 # the one it ended on.
 KNOWN_LAST_FRAME=360
+# The rows the recorder writes for what the teams hold and for the rest of
+# their economy, each written when a number changes (issue #3982).
+KNOWN_TEAM_RESOURCE_ROWS=15
+KNOWN_TEAM_ECONOMY_ROWS=8
 # The samples of the dump that thinning measures against the track.
 KNOWN_SAMPLES_CHECKED=214
 # The frames at which the track is compared with the engine's own report of
@@ -244,6 +248,12 @@ expect "units created" "$(summary 'units created')" "$KNOWN_UNITS"
 expect "units destroyed" "$(summary 'units destroyed')" "$KNOWN_UNITS_DESTROYED"
 expect "features created" "$(summary 'features created')" "$KNOWN_FEATURES"
 expect "last frame" "$(summary 'last frame')" "$KNOWN_LAST_FRAME"
+expect "team resource rows" "$(summary 'team resource rows')" "$KNOWN_TEAM_RESOURCE_ROWS"
+expect "team economy rows" "$(summary 'team economy rows')" "$KNOWN_TEAM_ECONOMY_ROWS"
+# The recorder keeps the rules parameters the request names, and the analysis
+# run takes those from the game's playback adapter. The fixture game has a
+# short name of its own, so no adapter is for it and none is asked for.
+expect "team rules parameters asked for" "$(summary 'team parameters asked for')" ""
 
 echo "== thinning it into a track and reading the track back"
 TRACK="$WORK/fixture.track"

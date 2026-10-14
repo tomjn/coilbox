@@ -1,4 +1,4 @@
-//! The four kinds of curve that are thinned, and how far a recorded sample is
+//! The five kinds of curve that are thinned, and how far a recorded sample is
 //! from each.
 //!
 //! A distance is one number in elmos. Where a sample has a rotation as well
@@ -14,8 +14,8 @@ use crate::error::Result;
 use crate::pose::{self, PieceSample};
 use crate::thin::{Curve, Rules};
 use coilbox_track::{
-    pose_at, projectile_at, status_at, transform_at, PoseKey, ProjectileKey, Quantiser, StatusKey,
-    TransformKey, FRACTION_FULL,
+    pose_at, projectile_at, status_at, transform_at, value_allowance, value_at, value_code,
+    PoseKey, ProjectileKey, Quantiser, StatusKey, TransformKey, ValueKey, FRACTION_FULL,
 };
 
 fn distance(a: [f64; 3], b: [f64; 3]) -> f64 {
@@ -242,6 +242,85 @@ impl ProjectileCurve {
         match projectile_at(keys, q, s.frame) {
             Some((_, v)) => distance(v, s.velocity),
             None => f64::INFINITY,
+        }
+    }
+}
+
+/// One number of a team's or of the game's on one frame.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ValueSample {
+    pub frame: u32,
+    pub value: f32,
+}
+
+/// Whether a number is kept exactly, and not to the resource tolerance.
+///
+/// Storage and the share level change a few times in a match and stand still
+/// in between, so keeping them exactly costs nothing. A share level is also a
+/// fraction from 0 to 1, which a tolerance in metal would flatten. A rules
+/// parameter is a game's own number on a scale this crate does not know.
+pub(crate) fn kept_exactly(code: u16) -> bool {
+    code >= value_code::PARAMETER
+        || matches!(
+            code % value_code::ENERGY,
+            value_code::STORAGE | value_code::SHARE
+        )
+}
+
+pub(crate) struct ValueCurve {
+    /// See [`kept_exactly`].
+    pub exact: bool,
+    /// The track's resource tolerance and fraction, which a number that is
+    /// not exact is thinned to.
+    pub tolerance: f32,
+    pub fraction: f32,
+}
+
+impl ValueCurve {
+    pub fn new(code: u16, rules: &Rules) -> Self {
+        Self {
+            exact: kept_exactly(code),
+            tolerance: rules.value_tolerance,
+            fraction: rules.value_fraction,
+        }
+    }
+}
+
+impl Curve for ValueCurve {
+    type Sample = ValueSample;
+    type Key = ValueKey;
+    const FLAT_BETWEEN_EQUAL_KEYS: bool = true;
+
+    fn frame(s: &ValueSample) -> u32 {
+        s.frame
+    }
+
+    fn key(&self, _: &Quantiser, s: &ValueSample) -> Result<ValueKey> {
+        Ok(ValueKey::new(s.frame, s.value))
+    }
+
+    /// For a number kept exactly, how far the sample is from the track. For
+    /// any other, that distance as a share of what the sample is allowed,
+    /// since a large sample is allowed more than a small one and thinning has
+    /// one limit for a curve.
+    fn error(&self, _: &Quantiser, keys: &[ValueKey], s: &ValueSample) -> f64 {
+        let Some(value) = value_at(keys, s.frame) else {
+            return f64::INFINITY;
+        };
+        let off = (value - s.value as f64).abs();
+        let allowed = value_allowance(self.tolerance, self.fraction, s.value as f64);
+        if self.exact || allowed == 0.0 {
+            off
+        } else {
+            off / allowed
+        }
+    }
+
+    fn tolerance(&self, _: &Rules) -> f64 {
+        if self.exact || (self.tolerance == 0.0 && self.fraction == 0.0) {
+            0.0
+        } else {
+            1.0
         }
     }
 }

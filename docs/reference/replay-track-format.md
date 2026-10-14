@@ -53,7 +53,7 @@ Chunks start on 64 byte blocks so that Lua can address them. A block number belo
 | 16 | `u32` | last frame recorded |
 | 20 | `u32` | window length in frames, 1 to 65,535, so that an offset in a window fits 16 bits |
 | 24 | `u32` | number of windows |
-| 28 | `f32` | tolerance in elmos. No recorded sample is further than this from the track, measured as [the tolerance](#what-the-tolerance-measures) says. The only float in the file |
+| 28 | `f32` | tolerance in elmos. No recorded sample is further than this from the track, measured as [the tolerance](#what-the-tolerance-measures) says |
 | 32 | `u8` | position shift. The position step is 1 elmo divided by 2 to this power |
 | 33 | `u8` | velocity shift. The velocity step is 1 elmo per frame divided by 2 to this power |
 | 34 | `u8` | rotation bits, 8 to 16 |
@@ -66,7 +66,9 @@ Chunks start on 64 byte blocks so that Lua can address them. A block number belo
 | 56 | `u32` | number of projectiles in the match |
 | 60 | `u32` | number of features in the match |
 | 64 | `u8[16]` | the replay's game id, copied from the replay header |
-| 80 | `u8[16]` | reserved, zero |
+| 80 | `f32` | resource tolerance. No recorded [team number](#team-numbers) that is thinned is further than this from the track, unless the resource fraction allows it more. 0 in a track from before recorder version 4 |
+| 84 | `f32` | resource fraction. A recorded team number may be this part of its own size from the track, when that is more than the resource tolerance. 0 in a track from before recorder version 4 |
+| 88 | `u8[8]` | reserved, zero |
 
 A block number times 64 is the chunk's offset in the file. Every `u32` in the header and index is at most 16,777,215.
 
@@ -88,6 +90,7 @@ The recorder version is separate. It changes when the recorder would produce dif
 | --- | --- |
 | 2 | Pose keys are relative to the parent piece (issue #3783) |
 | 3 | The info chunk has a footprint for each unit definition, columns 181 and 182 (issue #3807). The format version is still 1, because a column was added and nothing changed its meaning |
+| 4 | The main chunk has the [team numbers](#team-numbers), columns 104 to 108, the header has their tolerance and fraction in bytes that were reserved, and the info chunk names the rules parameters, columns 183 to 186 (issue #3982). The format version is still 1. Columns and header fields were added, one of them of a new type, and a reader skips a type it does not know. Playback depends on the numbers, so a track without them is stale |
 
 ## Window index
 
@@ -104,13 +107,13 @@ A reader that has the header and the index knows where every window is without t
 
 ## Chunks
 
-A chunk is one zlib stream. Decompressed, it is a list of columns. A column is an array of one integer type.
+A chunk is one zlib stream. Decompressed, it is a list of columns. A column is an array of one type: an integer of one size, or a 32 bit float.
 
 ```
 u32   number of columns
       then for each column, 12 bytes:
 u16     column id
-u16     type: 1 u8, 2 u16, 3 s16, 4 u32, 5 s32
+u16     type: 1 u8, 2 u16, 3 s16, 4 u32, 5 s32, 6 f32
 u32     offset of the column's data from the start of the decompressed chunk
 u32     number of values
       then the data of each column
@@ -132,7 +135,7 @@ In Lua, one column is one call: `VFS.UnpackS16(chunk, offset + 1, count)`.
 
 Columns of the same kind sit together, so position differences are beside position differences. That is what lets zlib compress them. Four ways of storing a value are used.
 
-Plain. The value itself.
+Plain. The value itself. Every `f32` column is plain: the four bytes of the float, little endian, which is what `VFS.UnpackF32` reads. Only the [team numbers](#team-numbers) are floats. They are the engine's own floats and have no step to count in, since a team can hold a fraction of a unit of metal and more than 16,777,215 of it.
 
 Time. A `u16` number of frames since the previous key of the same curve. For a curve's first key in a window it is the number of frames since the window's first frame. Two keys of one curve never share a frame.
 
@@ -189,6 +192,8 @@ One chunk, read once. A list of strings is two columns: the length of each strin
 | 180 | `u32` | two values, the map's size along x and z in elmos |
 | 181 | `u16` | for each unit definition, the size of its footprint across the unit, in elmos |
 | 182 | `u16` | for each unit definition, the size of its footprint along the way the unit faces, in elmos |
+| 183, 184 | strings | names of the team rules parameters the track has, as the game spells them |
+| 185, 186 | strings | names of the game rules parameters the track has |
 
 Every other chunk refers to a definition by its index in these lists, counting from 0. A definition is stored by name because its id changes between builds of a game (issue #1176). A piece is stored by name for the same reason.
 
@@ -394,6 +399,59 @@ p(s) = (2s^3 - 3s^2 + 1) p0 + (s^3 - 2s^2 + s) n v0 + (-2s^3 + 3s^2) p1 + (s^3 -
 
 The velocity is the slope of that curve, divided by `n`.
 
+### Team numbers
+
+What each team holds, the rest of its economy, and the rules parameters a game keeps its own numbers in (issue #3982). Each number of each team is one track: a list of keys, each a frame and a value. Playback sets the engine's own team resources from them, so a resource bar shows the match and not the playback.
+
+| Id | Type | Column |
+| --- | --- | --- |
+| 104 | `u8` | for each track, the team's id, or 255 for a number that is the game's and no team's |
+| 105 | `u16` | for each track, the code of the number |
+| 106 | `u16` | for each track, its number of keys |
+| 107 | `u16` | time |
+| 108 | `f32` | value, plain |
+
+The tracks of a window are in rising order of team and then of code, and a team and code appear once. The keys of all the tracks follow each other in columns 107 and 108, in the order of the tracks.
+
+| Code | Number |
+| --- | --- |
+| 0 | metal the team holds |
+| 1 | metal storage |
+| 2 | metal pull |
+| 3 | metal income |
+| 4 | metal expense |
+| 5 | metal share level, 0 to 1. The engine hands what a team holds above this part of its storage to its allies |
+| 6 | metal sent to other teams |
+| 7 | metal received from other teams |
+| 8 | metal excess, which is what was wasted because storage was full |
+| 16 to 24 | the same nine for energy |
+| 256 and up | a rules parameter: 256 plus its index in the info chunk's names, counting from 0. Column 183 for a team's and column 185 for the game's |
+
+Codes 0 to 8 are in the order `Spring.GetTeamResources` gives its nine numbers. Pull, income, expense, sent, received and excess are the engine's own figures, which are sums over the 30 frames before it last added a team's economy up (`TEAM_SLOWUPDATE_RATE` in `rts/Sim/Misc/GlobalConstants.h`). They are not rates per second.
+
+The recorder reads every team on every frame and writes a number when it changes. A reader holds a number until it changes, so every frame has a sample of every number.
+
+A value at a frame between two keys is on the straight line between them. Before a track's first key in a window its value is that key's, and after its last key that key's, with one exception: a rules parameter has no value before the frame of its first key. That is a parameter the match had not set yet, which is not the same as one set to 0.
+
+A resource with no track in a window is 0 on every frame of it. A team with nothing has no tracks at all. A rules parameter with no track in a window had not been set by the window's last frame.
+
+A parameter that was set before a window has a key on the window's first frame, even where the general rule for a writer would leave that key out. Without it a reader would take the parameter as not set until the window's first key.
+
+How the keys are chosen depends on the number.
+
+- Storage, share level and every rules parameter are kept exactly. The track has the recorded value on every frame. These are numbers that change in steps, and a supply of 12 is not nearly 13.
+- The other numbers are thinned. A recorded sample may be the header's resource tolerance from the track, or the resource fraction of its own size when that is more: `max(tolerance, fraction * |sample|)`. Coilbox writes a tolerance of 0.5 and a fraction of 1/1024. A resource bar draws whole numbers, so half a unit is the least it can show. The fraction is for a late game, where a team holds a hundred thousand and half a unit is far below anything drawn.
+
+A rules parameter is kept only when it is a number. The engine holds a rules parameter as a boolean, a 32 bit float or text (`rts/Lua/LuaRulesParams.h`), and a resource as a 32 bit float, so an `f32` column holds every value exactly as the engine had it.
+
+A reader of a track from before recorder version 4 finds none of these columns, no names in the info chunk, and zero in the header's two fields.
+
+- The Rust reader gives a window with no team numbers and an info with no parameter names. `Header::value_allowance` is then 0 for every sample.
+- The Lua reader gives a window whose `valueCount` is 0, so `Window:valueOf` is nil for every team and code, and `resourceTolerance` and `resourceFraction` of 0.
+- The TypeScript reader in the app does not read the file. It reads windows the Rust side has decoded and sent again with only the columns the map view draws, which have never included these. It reads a track of either age the same.
+
+The player sets no team's resources from a track older than recorder version 4, and says so in the log. Coilbox takes such a track as stale and records the replay again.
+
 ## Terrain chunk
 
 One for each window in which the heightmap changed. It has one row for each height that changed, sorted by frame, then z, then x.
@@ -444,6 +502,7 @@ To give every value at frame `f`:
 4. For each curve, find the keys either side of `f`. Before a curve's first key in the window its value is that key's value. After its last key its value is that key's value.
 5. A feature exists when its first and last frame say so.
 6. For terrain, apply the rows between the frame last shown and `f`.
+7. A team number is its track's value at `f`. A resource with no track in the window is 0. A rules parameter with no track, or with a first key after `f`, is not set.
 
 A reader that holds a whole track as one Lua string can only address the first 16,777,216 bytes of it exactly. Past that it either needs `io`, with `file:seek` to the block and `file:read` of the length, or has to cut the string into pieces short enough to address. The Lua reader in `lua/rewind-player` takes the way bytes are fetched as a function. Its string fetch cuts the string, since the player runs in synced Lua, which has no `io`.
 
@@ -455,6 +514,8 @@ A reader that holds a whole track as one Lua string can only address the first 1
 - A recorded sample that falls on a window's edge is kept as a key. When none falls on an edge, the samples either side of it are kept. Then no window has a value between two samples that was worked out from the curve and rounded a second time, which could put a sample up to one position rounding, 0.108 elmo, further from the track than thinning measured.
 - Of three keys in a row with the same value, the middle one is left out, for every curve that runs in a straight line between keys. A unit that stands still for the whole match has one transform key, and the keys above give it one in each window.
 - A value that does not fit is an error, not a silent wrap. That covers a position, a velocity, an offset, a height and every value a column stores, including a difference from the key before. Nothing is clamped except health and build progress, which go to the range 0 to 65,535 as the status keys say.
+- A team number's track is cut into windows the same way: the keys that fall in the window, and a key worked out from the whole curve at an end no key sits on. A resource track that is 0 for the whole of a window is left out of it. A rules parameter has no key before the frame it was first set on, and has one on the first frame of every window after that.
+- A team number that is not a finite number is an error. So is a rules parameter the info chunk does not name, and two tracks for one team and code.
 - Any zlib level reads the same. Level 9 was 1.6% smaller than level 6 on the larger benchmark.
 
 ## What the tolerance measures
@@ -467,6 +528,7 @@ The header's tolerance is one distance in elmos. How far a recorded sample is fr
 - A projectile. The distance between the recorded position and the cubic's. Velocity has no tolerance. Its worst error is reported, and [Projectile velocity](#projectile-velocity) has what it came to.
 - Health and build progress. These are fractions and not distances, so the header's tolerance does not apply. A sample is within one step of the 65,535 a fraction is stored in.
 - Flags, targets, build queues, teams, and the frames a unit or a projectile exists on have no tolerance. The track has what was recorded or it is wrong.
+- A team number. These are amounts of metal and energy and not distances, so they have the header's resource tolerance and resource fraction and not its tolerance in elmos. A thinned sample is within `max(resource tolerance, resource fraction * |sample|)` of the track. Storage, share level and rules parameters are not thinned, and the track has what was recorded. [Team numbers](#team-numbers) has which is which.
 
 A track that is further from a recorded sample than its tolerance is a failed recording. `coilbox-track-thin` writes no file for one and names the sample.
 
@@ -888,6 +950,46 @@ Weapons after the first cost the BAR track 3,909 bytes of main chunks, which is 
 The file stores each chunk in whole blocks of 64 bytes, so the difference in the size of the file can be up to 63 bytes a window different from the difference in main chunks. The track as it is, 4,713,582 and 289,328 bytes, is the "after".
 
 A unit with one weapon has one target track, and a second weapon that never had a target has none. The tests `a_unit_with_one_weapon_costs_one_target_track_and_a_weapon_without_a_target_none` and `two_weapons_aimed_at_different_targets_each_have_a_target_curve` in `coilbox-track-thin` check both. The second also covers a weapon aimed at a projectile and at a position, which neither benchmark recording has.
+
+## Measured with the team numbers of issue #3982
+
+Both benchmark replays were recorded again on 13 October 2026 with the recorder that reads the teams, and `coilbox-track-thin` made a track from each. The tracks without team numbers are those of the section above. The Splinter Faction recording asked for the three rules parameters its adapter names, `supplyUsed`, `supplyMax` and `researchPoints`. BAR has no adapter, so its recording has none.
+
+| | BAR, 82,496 frames | Splinter Faction, 23,091 frames |
+| --- | --- | --- |
+| Teams, Gaia included | 3 | 3 |
+| Rows in the dump for what a team holds | 162,172 | 16,413 |
+| Rows in the dump for the rest of a team's economy | 5,930 | 176 |
+| Rows in the dump for rules parameters | 0 | 1,567 |
+| The dump | 664,492,186 bytes | 23,503,213 bytes |
+| Samples the thinning read, one for each number on each frame | 4,454,838 | 1,328,322 |
+| Tracks and keys kept | 34 and 178,805 | 36 and 20,407 |
+| Tracks and keys written, over every window | 2,936 and 181,035 | 905 and 21,186 |
+| Team number columns before compression | 1,107,388 bytes | 133,488 bytes |
+| Team number columns compressed on their own | 509,351 bytes | 30,160 bytes |
+| Main chunks compressed, without and with them | 4,470,488 and 5,012,794 bytes | 277,633 and 309,081 bytes |
+| The track without team numbers | 4,713,582 bytes | 289,328 bytes |
+| The track with them | 5,255,917 bytes | 321,116 bytes |
+| What they cost | 542,335 bytes, 11.5% | 31,788 bytes, 11.0% |
+| Furthest thinned sample from the track, and what it was allowed | 0.5 and 0.5 | 1.7438 and 1.7459 |
+
+What a team holds is nearly all of it. In the Splinter Faction track 5,196 of the 21,186 keys are metal held, 10,870 are energy held and 3,211 are the three rules parameters. Storage has 88 keys for each resource, and every other number between 78 and 279.
+
+The tolerance and the fraction were chosen from these runs of the same two dumps.
+
+| Resource tolerance | Resource fraction | BAR track | Splinter Faction track |
+| --- | --- | --- | --- |
+| 0.05 | 0 | 5,448,109 bytes | 324,764 bytes |
+| 0.5 | 0 | 5,380,333 bytes | 322,900 bytes |
+| 0.5 | 1/4096 | 5,358,701 bytes | not measured |
+| 0.5 | 1/1024 | 5,255,917 bytes | 321,116 bytes |
+| 0.5 | 1/256 | 5,031,597 bytes | 314,159 bytes |
+
+A tolerance ten times tighter costs 67,776 bytes more for BAR, 1.3% of the track, so the tolerance buys little, because what a team holds seldom runs in a straight line for long. Half a unit was kept as the least a bar that draws whole numbers can show. The fraction does more for BAR, whose teams hold thousands. 1/1024 was chosen over 1/256, which saves another 224,320 bytes, because a resource bar prints the figure as well as drawing it. At 1/1024 a team that holds 10,000 reads within 9.8 of the recording, and at 1/256 within 39. Neither was looked at on a screen for BAR.
+
+Thinning the BAR dump took 8.57 seconds with the team numbers in it. What it took without them was not measured on the same day.
+
+Not measured: a match with many teams. Both benchmarks have two playing teams and Gaia. The cost is by team, so a 16 team match would cost several times as much for the same length, and what an 8 against 8 costs is not known.
 
 ## Savings considered and rejected
 

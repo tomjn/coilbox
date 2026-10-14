@@ -43,6 +43,11 @@ pub struct Window {
     pub end_frame: u32,
     pub units: Vec<WindowUnit>,
     pub projectiles: Vec<WindowProjectile>,
+    /// The numbers of the teams and of the game that the window holds. A
+    /// resource that is not here is 0 for the whole window, and a rules
+    /// parameter that is not here had not been set by the window's end. None
+    /// in a track written before recorder version 4.
+    pub values: Vec<ValueTrack>,
 }
 
 fn corrupt(reason: impl Into<String>) -> TrackError {
@@ -367,7 +372,32 @@ impl Window {
         c.set_u8(77, item_facing);
 
         self.projectiles_to_chunk(&mut c)?;
+        self.values_to_chunk(&mut c)?;
         Ok(c)
+    }
+
+    fn values_to_chunk(&self, c: &mut Chunk) -> Result<()> {
+        let (mut team, mut code, mut count) = (Vec::new(), Vec::new(), Vec::new());
+        let (mut time, mut value) = (Vec::new(), Vec::new());
+        for v in &self.values {
+            let what = format!("value {} of team {}", v.code, v.team);
+            team.push(v.team);
+            code.push(v.code);
+            count.push(count16(v.keys.len(), &format!("the keys of {what}"))?);
+            push_times(
+                &mut time,
+                v.keys.iter().map(|k| k.frame),
+                self.start_frame,
+                &what,
+            )?;
+            value.extend(v.keys.iter().map(|k| k.bits));
+        }
+        c.set_u8(104, team);
+        c.set_u16(105, code);
+        c.set_u16(106, count);
+        c.set_u16(107, time);
+        c.set_f32_bits(108, value);
+        Ok(())
     }
 
     fn projectiles_to_chunk(&self, c: &mut Chunk) -> Result<()> {
@@ -611,6 +641,7 @@ impl Window {
         decode_poses(c, &mut units, &n_poses, start_frame)?;
         decode_queue(c, &mut units, &n_queue, start_frame)?;
         let projectiles = decode_projectiles(c, start_frame)?;
+        let values = decode_values(c, start_frame)?;
 
         Ok(Window {
             index,
@@ -618,8 +649,41 @@ impl Window {
             end_frame,
             units,
             projectiles,
+            values,
         })
     }
+}
+
+fn decode_values(c: &Chunk, start: u32) -> Result<Vec<ValueTrack>> {
+    let teams = c.u8s(104)?;
+    let n = teams.len();
+    let codes = exactly(c.u16s(105)?, n, 105)?;
+    let counts: Vec<usize> = exactly(c.u16s(106)?, n, 106)?
+        .iter()
+        .map(|n| *n as usize)
+        .collect();
+    let total: usize = counts.iter().sum();
+    let times = exactly(c.u16s(107)?, total, 107)?;
+    let bits = exactly(c.f32_bits(108)?, total, 108)?;
+    let mut out = Vec::with_capacity(n);
+    let mut key = 0;
+    for i in 0..n {
+        let k = counts[i];
+        let what = format!("value {} of team {}", codes[i], teams[i]);
+        let at = frames(&times[key..key + k], start, &what)?;
+        out.push(ValueTrack {
+            team: teams[i],
+            code: codes[i],
+            keys: (0..k)
+                .map(|j| ValueKey {
+                    frame: at[j],
+                    bits: bits[key + j],
+                })
+                .collect(),
+        });
+        key += k;
+    }
+    Ok(out)
 }
 
 fn decode_transform(
@@ -948,12 +1012,25 @@ pub struct ProjectileState {
     pub velocity: [f64; 3],
 }
 
+/// One number of a team's or of the game's at one frame.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ValueState {
+    /// [`NO_TEAM`] for a number that is the game's.
+    pub team: u8,
+    /// See [`value_code`].
+    pub code: u16,
+    pub value: f64,
+}
+
 /// Everything that exists at one frame of one window.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FrameState {
     pub frame: u32,
     pub units: Vec<UnitState>,
     pub projectiles: Vec<ProjectileState>,
+    /// In the window's order. A resource that is not listed is 0, and a rules
+    /// parameter that is not listed has not been set.
+    pub values: Vec<ValueState>,
 }
 
 impl Window {
@@ -1039,10 +1116,25 @@ impl Window {
                 velocity,
             });
         }
+        let values = self
+            .values
+            .iter()
+            // A rules parameter has no value before the frame it was first
+            // set on. A resource is 0 until then, which its first key says.
+            .filter(|v| !v.is_parameter() || v.keys.first().is_some_and(|k| k.frame <= frame))
+            .filter_map(|v| {
+                Some(ValueState {
+                    team: v.team,
+                    code: v.code,
+                    value: curve::value_at(&v.keys, frame)?,
+                })
+            })
+            .collect();
         Ok(FrameState {
             frame,
             units,
             projectiles,
+            values,
         })
     }
 }

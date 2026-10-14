@@ -137,6 +137,10 @@ function M.newEngine(options)
 		fullView = options.fullView ~= false,
 		views = {},
 		nextID = 1,
+		-- team -> { metal = { nine numbers }, energy = { nine numbers },
+		-- params = { name -> value } }. A team with no entry holds nothing.
+		teams = {},
+		gameParams = {},
 	}
 
 	local game = {
@@ -204,6 +208,31 @@ function M.newEngine(options)
 		end,
 		GetAIInfo = function()
 			return 0, "TestAI"
+		end,
+		-- current, storage, pull, income, expense, share, sent, received and
+		-- excess, in the engine's order. Nothing for a team that is not there.
+		GetTeamResources = function(teamID, resource)
+			local known = false
+			for _, id in ipairs(options.teams or { 0, 1, 2 }) do
+				known = known or id == teamID
+			end
+			if not known then
+				return nil
+			end
+			local team = engine.teams[teamID]
+			local values = team and team[resource] or {}
+			local answer = {}
+			for index = 1, 9 do
+				answer[index] = values[index] or 0
+			end
+			return unpack(answer, 1, 9)
+		end,
+		GetTeamRulesParam = function(teamID, name)
+			local team = engine.teams[teamID]
+			return team and team.params and team.params[name]
+		end,
+		GetGameRulesParam = function(name)
+			return engine.gameParams[name]
 		end,
 		GetAllUnits = function()
 			local all = {}

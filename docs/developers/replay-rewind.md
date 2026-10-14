@@ -87,32 +87,17 @@ return {
 		"gui_static_selected_units_buttons.lua",
 	},
 
-	hooks = {
-		-- game_spawn.lua also gave each team its storage at the start of a match,
-		-- the `startmetal` and `startenergy` of the team or of the mod options,
-		-- and 1000 of each when neither says. Without it a team keeps the
-		-- engine's own 1,000,000 and the resource bars read 0/1000000. The
-		-- storage a team's buildings add comes from the units the player places,
-		-- so this has to be in before any of them is.
-		started = function()
-			local options = Spring.GetModOptions()
-			local gaia = Spring.GetGaiaTeamID()
-			for _, team in ipairs(Spring.GetTeamList()) do
-				if team ~= gaia then
-					local keys = select(8, Spring.GetTeamInfo(team)) or {}
-					local metal = tonumber(keys.startmetal or options.startmetal) or 1000
-					local energy = tonumber(keys.startenergy or options.startenergy) or 1000
-					-- As the game does, a 0 leaves the engine's own.
-					if metal ~= 0 then
-						Spring.SetTeamResource(team, "ms", metal)
-					end
-					if energy ~= 0 then
-						Spring.SetTeamResource(team, "es", energy)
-					end
-				end
-			end
-		end,
-	},
+	-- The numbers on the game's resource bar that are the game's own and not the
+	-- engine's (issue #3982). gui_static_resourcebar.lua reads all three as team
+	-- rules parameters. unit_supply_requirement.lua writes the supply a team
+	-- uses and has, and game_researchpoints_ledger.lua its research points. Both
+	-- gadgets stay, since the game's build menu asks them what a team may
+	-- build. In a playback they count the units the player has placed, which is
+	-- not what the match had, so the recording has the last word on every frame.
+	--
+	-- Metal and energy need nothing here. The track has each team's own, storage
+	-- included, and the player sets them whatever the game.
+	teamParams = { "supplyUsed", "supplyMax", "researchPoints" },
 }
 ```
 
@@ -127,9 +112,11 @@ Every key is optional. A key that is not in this table is refused, so a misspell
 | `widgets` | list of file names | Widgets to switch off, as paths inside `luaui/widgets/`. |
 | `units` | list of names | Unit definitions the player never creates. |
 | `features` | list of names | Feature definitions the player never creates. |
+| `teamParams` | list of names | Team rules parameters that are the recording's to set, described under [Your game's own numbers](#your-games-own-numbers). |
+| `gameParams` | list of names | The same for game rules parameters. |
 | `hooks` | table of functions | Three optional functions, described under [Hooks](#hooks). |
 
-Coilbox runs the file in `coilbox-springlua`, the sandboxed Spring Lua evaluator it uses for a game's other config. The file has no `io`, no `os` and no way to read another file, but it can compute its lists in Lua. Coilbox reads everything except `hooks` before the engine starts. The player reads the file again in the engine, for `units`, `features` and `hooks`.
+Coilbox runs the file in `coilbox-springlua`, the sandboxed Spring Lua evaluator it uses for a game's other config. The file has no `io`, no `os` and no way to read another file, but it can compute its lists in Lua. Coilbox reads everything except `hooks` before the engine starts. The player reads the file again in the engine, for `units`, `features`, `teamParams`, `gameParams` and `hooks`.
 
 ### What switching off does
 
@@ -144,6 +131,23 @@ Coilbox does not write over one of its own files and refuses an adapter that nam
 The player never creates a unit of a definition in `units` or a feature of one in `features`. Names are compared without regard to case. The track still holds them, so a seek has no effect on them. A name that is not in the track is harmless, and a name your game does not have gets no log line, since leaving them out is the point.
 
 Use this for a definition the track holds that you do not want to show. It is separate from `gadgets`, which stops the code that creates things. Splinter Faction's adapter hides none.
+
+### Your game's own numbers
+
+Metal and energy are the engine's, and the player makes them the match's for every game with no adapter at all. Each team holds what it held in the match, with the match's storage and share level, at whatever frame is showing. Income, expense and pull follow within three seconds of a seek. The engine has no call that sets them, so the player adds what the match had more than the playback's own units make, and where the playback makes more the number reads high.
+
+Numbers your game keeps for itself are different. Supply, research points, a score or a wave counter live in rules parameters, and the recorder cannot tell which of a game's parameters a viewer reads. So the adapter names them: `teamParams` for the ones set with `Spring.SetTeamRulesParam` and `gameParams` for the ones set with `Spring.SetGameRulesParam`. Spell each name as your gadget does, since rules parameter names are case sensitive.
+
+The two lists are read twice.
+
+1. When a replay is recorded, coilbox passes the names to the recorder, which writes each parameter whenever its value changes. Only a number is recorded. A parameter that holds text or a boolean is left out.
+2. When the recording is played, the player sets each named parameter to the match's value on every frame, and again when the frame is over, which is after your gadgets have run. An engine with no `GameFramePost` call-in has no second moment, and there a gadget of yours that writes the parameter later in the frame wins.
+
+A parameter the match had not set yet at the frame showing is left alone. The player does not change who can read a parameter, so one your gadget made public stays public.
+
+Name a parameter when a gadget that stays loaded would otherwise write the playback's own figure into it. Splinter Faction's supply gadget counts the units in the world, and in a playback those are the units the player has placed. Its adapter names `supplyUsed`, `supplyMax` and `researchPoints`, and keeps both gadgets, because the game's build menu asks them what a team may build.
+
+A recording made before a name was added to the adapter does not have that parameter. The player logs the name and leaves the parameter to your game. Clearing the track and recording the replay again adds it.
 
 ### Hooks
 
@@ -179,7 +183,7 @@ end,
 - A hook that returns true stops the player's effect for that unit. One that returns nothing leaves it, and so does one that raises.
 - The player shows at most 256 of its own effects at once. Your effect has no such cap, and a large seek makes dozens of units a frame, so look at what yours costs.
 
-Splinter Faction's `started` hook is the example. Its `game_spawn.lua` gave each team its storage at the start of a match. With that gadget switched off, a team keeps the engine's own 1,000,000 and the resource bars read 0/1000000. The hook gives each team what the gadget gave it, and it runs before any unit is placed because a team's buildings add storage.
+Splinter Faction's adapter has no hook. It had a `started` hook that gave each team its starting storage, which its switched off `game_spawn.lua` used to do. The track now holds each team's storage and the player sets it on every frame, so the hook went. Reach for a hook when your game needs something set that neither the track nor a rules parameter covers.
 
 ## Where an adapter lives
 
@@ -301,12 +305,15 @@ Recorded:
 - Piece poses. The pieces watched are each weapon's muzzle piece and every parent up to the root.
 - Every feature, and every projectile on every frame.
 - Terrain changes.
+- Team resources, read on every frame. For metal and for energy: what each team holds, its storage, income, expense, pull, share level, what it sent and received, and what it wasted with storage full.
+- The rules parameters your adapter names, whenever one changes. See [Your game's own numbers](#your-games-own-numbers).
 
-Positions in the track are within half an elmo of the sampled ones. That is the track's tolerance.
+Positions in the track are within half an elmo of the sampled ones. That is the track's tolerance. What a team holds is within half a unit of the recorded figure, or within a 1,024th of the figure when that is more. Storage, share level and rules parameters are exact.
 
 Not recorded, or not exact:
 
-- Team resources. The track holds none, so the resource bars show the playback's own economy. That is issue #3982.
+- Rules parameters no adapter names, and any that hold text or a boolean.
+- A team's running totals, such as all the metal it ever produced. The engine keeps those for its end of game statistics and no call sets them.
 - Shield power. The track holds none.
 - Which piece a unit script named as a weapon's muzzle. The engine does not tell Lua. The recorder takes the piece nearest the muzzle's place, and the deeper one in the tree when two sit on the same spot.
 - A script's turn on a model of any type other than `3do` or `s3o`. The engine gives an Assimp or glTF piece a rest rotation that Lua cannot read, so a reader cannot tell a script's turn from the model's own.

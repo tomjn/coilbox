@@ -1,5 +1,6 @@
-//! A chunk is a list of columns, and a column is an array of one integer type.
-//! On disk a chunk is a zlib stream (RFC 1950) of that list.
+//! A chunk is a list of columns, and a column is an array of one type: an
+//! integer of some width, or a 32 bit float. On disk a chunk is a zlib stream
+//! (RFC 1950) of that list.
 
 use crate::error::{Result, TrackError};
 use crate::quant::VALUE_LIMIT;
@@ -9,7 +10,7 @@ use flate2::Compression;
 use std::collections::BTreeMap;
 use std::io::{Read, Write};
 
-/// One array of one integer type.
+/// One array of one type.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Column {
     U8(Vec<u8>),
@@ -17,6 +18,9 @@ pub enum Column {
     S16(Vec<i16>),
     U32(Vec<u32>),
     S32(Vec<i32>),
+    /// 32 bit floats, each held as its bits so that a column compares exactly.
+    /// `f32::from_bits` gives the number.
+    F32(Vec<u32>),
 }
 
 impl Column {
@@ -27,6 +31,7 @@ impl Column {
             Self::S16(_) => 3,
             Self::U32(_) => 4,
             Self::S32(_) => 5,
+            Self::F32(_) => 6,
         }
     }
 
@@ -35,7 +40,7 @@ impl Column {
             Self::U8(v) => v.len(),
             Self::U16(v) => v.len(),
             Self::S16(v) => v.len(),
-            Self::U32(v) => v.len(),
+            Self::U32(v) | Self::F32(v) => v.len(),
             Self::S32(v) => v.len(),
         }
     }
@@ -100,14 +105,18 @@ impl Chunk {
     getter!(s16s, S16, i16);
     getter!(u32s, U32, u32);
     getter!(s32s, S32, i32);
+    getter!(f32_bits, F32, u32);
     setter!(set_u8, U8, u8);
     setter!(set_u16, U16, u16);
     setter!(set_s16, S16, i16);
     setter!(set_u32, U32, u32);
     setter!(set_s32, S32, i32);
+    setter!(set_f32_bits, F32, u32);
 
     /// The chunk as bytes before compression. A column with no values is not
-    /// listed. A value past [`VALUE_LIMIT`] is an error.
+    /// listed. A whole number past [`VALUE_LIMIT`] is an error. A float is
+    /// written as it is, since the engine's Lua reads one as the number it
+    /// already uses.
     pub fn encode(&self) -> Result<Vec<u8>> {
         let listed: Vec<(&u16, &Column)> =
             self.columns.iter().filter(|(_, c)| !c.is_empty()).collect();
@@ -143,6 +152,9 @@ impl Chunk {
                         out.extend_from_slice(&x.to_le_bytes());
                     }
                 }
+                Column::F32(v) => v
+                    .iter()
+                    .for_each(|x| out.extend_from_slice(&x.to_le_bytes())),
             }
             out.resize(start + padded(out.len() - start), 0);
         }
@@ -194,7 +206,7 @@ impl Chunk {
             let size = match ty {
                 1 => 1,
                 2 | 3 => 2,
-                4 | 5 => 4,
+                4..=6 => 4,
                 // A type this version does not know is skipped, as an
                 // unknown id is.
                 _ => continue,
@@ -221,13 +233,19 @@ impl Chunk {
                         .map(|b| i16::from_le_bytes(*b))
                         .collect(),
                 ),
-                4 => Column::U32(
-                    data.as_chunks::<4>()
+                4 | 6 => {
+                    let words = data
+                        .as_chunks::<4>()
                         .0
                         .iter()
                         .map(|b| u32::from_le_bytes(*b))
-                        .collect(),
-                ),
+                        .collect();
+                    if ty == 4 {
+                        Column::U32(words)
+                    } else {
+                        Column::F32(words)
+                    }
+                }
                 _ => Column::S32(
                     data.as_chunks::<4>()
                         .0
@@ -246,7 +264,7 @@ fn width(c: &Column) -> usize {
     match c {
         Column::U8(_) => 1,
         Column::U16(_) | Column::S16(_) => 2,
-        Column::U32(_) | Column::S32(_) => 4,
+        Column::U32(_) | Column::S32(_) | Column::F32(_) => 4,
     }
 }
 

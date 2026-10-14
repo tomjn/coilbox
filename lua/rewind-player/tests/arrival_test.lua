@@ -249,6 +249,10 @@ do
 	t.check("some with an effect", #world.asked > 0, #world.asked)
 	collectgarbage()
 	collectgarbage("stop")
+	-- A full collection gives back part of the Lua stack, and the first frames
+	-- after it take that back, which is the interpreter's and not the player's.
+	player:frame()
+	player:framePost()
 	local before = collectgarbage("count")
 	for _ = 1, 300 do
 		player:frame()

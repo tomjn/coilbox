@@ -12,9 +12,10 @@ use crate::pose::{self, PieceSample};
 use crate::thin::{Rules, Stretch};
 use crate::SampleCounts;
 use coilbox_track::{
-    Keyed, PoseTrack, Projectile, QueueItem, QueueKey, TargetKey, TargetTrack, Unit,
+    Keyed, PoseTrack, Projectile, QueueItem, QueueKey, TargetKey, TargetTrack, Unit, ValueKey,
+    ValueTrack,
 };
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 /// One piece's curve while its unit is alive.
 struct Posing {
@@ -41,10 +42,19 @@ struct Flying {
     stretch: Stretch<ProjectileCurve>,
 }
 
+/// One number of one team while the dump is read.
+struct Valuing {
+    curve: ValueCurve,
+    stretch: Stretch<ValueCurve>,
+    keys: Vec<ValueKey>,
+}
+
 pub(crate) struct Thinner {
     rules: Rules,
     building: HashMap<u32, Building>,
     flying: HashMap<u32, Flying>,
+    /// By team and code, so the track lists them in that order.
+    valuing: BTreeMap<(u8, u16), Valuing>,
     pub units: Vec<Unit>,
     pub projectiles: Vec<Projectile>,
     pub samples: SampleCounts,
@@ -75,6 +85,7 @@ impl Thinner {
             rules,
             building: HashMap::new(),
             flying: HashMap::new(),
+            valuing: BTreeMap::new(),
             units: Vec::new(),
             projectiles: Vec::new(),
             samples: SampleCounts::default(),
@@ -87,12 +98,37 @@ impl Thinner {
             .expect("the interpreter starts a unit before anything else about it")
     }
 
-    /// The units and projectiles in order of serial.
-    pub fn finish(mut self) -> (Vec<Unit>, Vec<Projectile>, SampleCounts) {
+    /// The units and projectiles in order of serial, and the numbers of the
+    /// teams in order of team and code. A resource that was 0 for the whole
+    /// match has no track, since a resource with none is 0.
+    pub fn finish(mut self) -> Result<Thinned> {
         self.units.sort_by_key(|u| u.serial);
         self.projectiles.sort_by_key(|p| p.serial);
-        (self.units, self.projectiles, self.samples)
+        let mut values = Vec::new();
+        for ((team, code), mut v) in self.valuing {
+            v.stretch.finish(&v.curve, &self.rules, &mut v.keys)?;
+            let track = ValueTrack {
+                team,
+                code,
+                keys: v.keys,
+            };
+            if track.is_parameter() || track.keys.iter().any(|k| k.value() != 0.0) {
+                values.push(track);
+            }
+        }
+        Ok(Thinned {
+            units: self.units,
+            projectiles: self.projectiles,
+            values,
+        })
     }
+}
+
+/// What thinning leaves of a dump's curves.
+pub(crate) struct Thinned {
+    pub units: Vec<Unit>,
+    pub projectiles: Vec<Projectile>,
+    pub values: Vec<ValueTrack>,
 }
 
 impl Sink for Thinner {
@@ -352,5 +388,17 @@ impl Sink for Thinner {
         f.projectile.keys.shrink_to_fit();
         self.projectiles.push(f.projectile);
         Ok(())
+    }
+
+    fn value(&mut self, team: u8, code: u16, frame: u32, value: f32) -> Result<()> {
+        self.samples.values += 1;
+        let rules = self.rules;
+        let v = self.valuing.entry((team, code)).or_insert_with(|| Valuing {
+            curve: ValueCurve::new(code, &rules),
+            stretch: Stretch::default(),
+            keys: Vec::new(),
+        });
+        v.stretch
+            .push(&v.curve, &rules, ValueSample { frame, value }, &mut v.keys)
     }
 }

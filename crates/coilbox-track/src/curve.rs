@@ -186,6 +186,18 @@ pub fn projectile_at(
     }
 }
 
+/// A team's or the game's number at a frame, in a straight line between keys.
+pub fn value_at(keys: &[ValueKey], frame: u32) -> Option<f64> {
+    match span(keys, frame) {
+        Span::Empty => None,
+        Span::Hold(k) => Some(k.value() as f64),
+        Span::Between { a, b, s, .. } => {
+            let (a, b) = (a.value() as f64, b.value() as f64);
+            Some(a + (b - a) * s)
+        }
+    }
+}
+
 /// A key worked out from a curve, so the writer can add one where a window
 /// needs it. `at` gives the curve's value at `frame` in the file's own units.
 pub(crate) trait Linear: Keyed + Clone + PartialEq {
@@ -241,6 +253,16 @@ impl Linear for PoseKey {
             angles: a.map(|v| v.round() as i32),
             offsets: [q.position(o[0])?, q.position(o[1])?, q.position(o[2])?],
         })
+    }
+}
+
+impl Linear for ValueKey {
+    fn at(keys: &[Self], _: &Quantiser, frame: u32) -> Result<Self> {
+        if let Span::Hold(_) | Span::Empty = span(keys, frame) {
+            return Ok(held_at(keys, frame));
+        }
+        let value = value_at(keys, frame).expect("not empty");
+        Ok(ValueKey::new(frame, value as f32))
     }
 }
 

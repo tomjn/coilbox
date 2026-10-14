@@ -30,6 +30,11 @@ pub struct Track {
     /// The recorder's rows for the whole match, in any order. The writer
     /// sorts them and applies the three rules for terrain.
     pub terrain: Vec<TerrainRow>,
+    /// The numbers of the teams and of the game over the whole match: what
+    /// each team holds, the rest of its economy, and rules parameters. One
+    /// track for a team and a code. A resource with no track is 0 for the
+    /// whole match.
+    pub values: Vec<ValueTrack>,
 }
 
 impl Track {
@@ -41,6 +46,7 @@ impl Track {
             units: vec![],
             projectiles: vec![],
             terrain: vec![],
+            values: vec![],
         }
     }
 
@@ -130,6 +136,8 @@ impl Track {
             window_length: s.window_length,
             window_count: count,
             tolerance: s.tolerance,
+            value_tolerance: s.value_tolerance,
+            value_fraction: s.value_fraction,
             position_shift: s.position_shift,
             velocity_shift: s.velocity_shift,
             rotation_bits: s.rotation_bits,
@@ -249,6 +257,31 @@ impl Track {
                 return Err(TrackError::invalid(
                     "a feature's first frame is after its last".to_string(),
                 ));
+            }
+        }
+        let mut seen = HashSet::new();
+        for v in &self.values {
+            let what = format!("value {} of team {}", v.code, v.team);
+            if !seen.insert((v.team, v.code)) {
+                return Err(TrackError::invalid(format!("{what} has two tracks")));
+            }
+            rising(&what, &v.keys, s.first_frame, s.last_frame)?;
+            if let Some(k) = v.keys.iter().find(|k| !k.value().is_finite()) {
+                return Err(TrackError::invalid(format!(
+                    "{what} is {} at frame {}, which is not a number a reader can draw",
+                    k.value(),
+                    k.frame
+                )));
+            }
+            let names = if v.team == NO_TEAM {
+                &self.info.game_params
+            } else {
+                &self.info.team_params
+            };
+            if v.is_parameter() && (v.code - value_code::PARAMETER) as usize >= names.len() {
+                return Err(TrackError::invalid(format!(
+                    "{what} is a rules parameter the info does not name"
+                )));
             }
         }
         Ok(())
@@ -372,12 +405,42 @@ impl Track {
                 continues_after: p.last_frame > end,
             });
         }
+        let mut values = Vec::new();
+        for v in &self.values {
+            // A track that starts after the window says nothing about it. A
+            // key added at the window's first frame would give a rules
+            // parameter a value before the game had set it.
+            if v.keys.first().is_none_or(|key| key.frame > end) {
+                continue;
+            }
+            let mut keys = slice_linear(&v.keys, start, end, false, q)?;
+            // A resource with no track is 0 for the whole window.
+            if !v.is_parameter() && keys.iter().all(|key| key.value() == 0.0) {
+                continue;
+            }
+            // A rules parameter has no value before its first key in a window,
+            // so one that was set before the window has a key on the window's
+            // first frame, even where the next key would say the same.
+            if v.is_parameter()
+                && v.keys[0].frame < start
+                && keys.first().is_some_and(|key| key.frame > start)
+            {
+                keys.insert(0, ValueKey::at(&v.keys, q, start)?);
+            }
+            values.push(ValueTrack {
+                team: v.team,
+                code: v.code,
+                keys,
+            });
+        }
+        values.sort_by_key(|v| (v.team, v.code));
         Ok(Window {
             index: k,
             start_frame: start,
             end_frame: end,
             units,
             projectiles,
+            values,
         })
     }
 }

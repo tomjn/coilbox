@@ -68,6 +68,9 @@ local PATIENCE = 300
 local WHOLE_MATCH = "coilbox_rewind/driver_whole_match.lua"
 -- And one that asks for the plan that looks at a match's shots.
 local SHOTS = "coilbox_rewind/driver_shots.lua"
+-- And one that asks for the plan that looks at the teams' resources. It
+-- returns a list of frames to look at, or anything else for none.
+local RESOURCES = "coilbox_rewind/driver_resources.lua"
 -- And one that asks for the plan of seeks across the whole match (issue #3988).
 local SEEKS = "coilbox_rewind/driver_seeks.lua"
 
@@ -947,6 +950,184 @@ local function matchPlan()
 	end)
 end
 
+-- Team resources (issue #3982).
+
+--- A number as the engine holds it, which is in 32 bits.
+local function single(value)
+	return VFS.UnpackF32(VFS.PackF32(value))
+end
+
+local RESOURCE_CODES = { "held", "storage", "pull", "income", "expense", "share", "sent", "received", "excess" }
+
+--- What the driver's own reader has for a number of a team at `frame`. A
+-- resource with no track is 0 and a rules parameter with none is not set.
+local function trackValue(w, team, code, frame)
+	local v = w:valueOf(team, code)
+	if v then
+		return w:sampleValue(v, frame)
+	end
+	if code < Track.VALUE.PARAMETER then
+		return 0
+	end
+end
+
+--- The teams of the track that the engine has.
+local function resourceTeams()
+	local has, teams = {}, {}
+	for _, team in ipairs(Spring.GetTeamList()) do
+		has[team] = true
+	end
+	for _, team in ipairs(info.teams) do
+		if has[team.id] then
+			teams[#teams + 1] = team.id
+		end
+	end
+	return teams
+end
+
+--- How far what the teams hold and can store is from the track at `frame`: the
+-- most over every team, for metal and energy. What a team holds is compared as
+-- the engine holds it, cut to its storage.
+local function heldOff(frame)
+	local w = assert(track:seek(frame))
+	local CODE = Track.VALUE
+	local worst = 0
+	for _, team in ipairs(resourceTeams()) do
+		for r, name in ipairs({ "metal", "energy" }) do
+			local base = (r - 1) * CODE.ENERGY
+			local held, storage = Spring.GetTeamResources(team, name)
+			local wantStorage = single(trackValue(w, team, base + CODE.STORAGE, frame))
+			local wantHeld = math.min(single(trackValue(w, team, base + CODE.HELD, frame)), wantStorage)
+			worst = math.max(worst, math.abs(held - wantHeld), math.abs(storage - wantStorage))
+		end
+	end
+	return worst
+end
+
+--- A line for each resource of each team with the engine's nine numbers and
+-- the track's, and one for each rules parameter the track has.
+local function measureResources(label, frame)
+	local w = assert(track:seek(frame))
+	local CODE = Track.VALUE
+	for _, team in ipairs(resourceTeams()) do
+		for r, name in ipairs({ "metal", "energy" }) do
+			local base = (r - 1) * CODE.ENERGY
+			local engine = { Spring.GetTeamResources(team, name) }
+			-- The engine's order is held, storage, pull, income, expense, share,
+			-- sent, received and excess, which is the order of the track's codes.
+			local parts = {}
+			for i, key in ipairs(RESOURCE_CODES) do
+				parts[#parts + 1] = string.format("%s=%.4f track_%s=%.4f", key, engine[i], key, trackValue(w, team, base + i - 1, frame))
+			end
+			-- How far what the team holds and can store is from the track's, as
+			-- the engine holds a number, with what it holds cut to its storage.
+			local wantStorage = single(trackValue(w, team, base + CODE.STORAGE, frame))
+			local wantHeld = math.min(single(trackValue(w, team, base + CODE.HELD, frame)), wantStorage)
+			local off = math.max(math.abs(engine[1] - wantHeld), math.abs(engine[2] - wantStorage))
+			say(string.format("resources %s frame=%d team=%d resource=%s held_off=%.6f %s", label, frame, team, name, off, table.concat(parts, " ")))
+		end
+		for j, name in ipairs(info.teamParams) do
+			local wanted = trackValue(w, team, CODE.PARAMETER + j - 1, frame)
+			local engine = Spring.GetTeamRulesParam(team, name)
+			-- A parameter the match had not set is the game's to have or not.
+			local off = wanted and (engine and math.abs(engine - single(wanted)) or -1) or 0
+			say(string.format("team_param %s frame=%d team=%d name=%s engine=%s track=%s off=%.6f", label, frame, team, name, tostring(engine), tostring(wanted), off))
+		end
+	end
+	for j, name in ipairs(info.gameParams) do
+		local wanted = trackValue(w, CODE.NO_TEAM, CODE.PARAMETER + j - 1, frame)
+		local engine = Spring.GetGameRulesParam(name)
+		local off = wanted and (engine and math.abs(engine - single(wanted)) or -1) or 0
+		say(string.format("game_param %s frame=%d name=%s engine=%s track=%s off=%.6f", label, frame, name, tostring(engine), tostring(wanted), off))
+	end
+end
+
+--- The plan that looks at the teams' resources: the frames it is asked for and
+-- eight more across the match, each seeked to going forward and then again
+-- going backward, one of them held paused for 600 frames, and 300 frames of
+-- play each way. This gadget runs before the player's on a frame, so what it
+-- reads is what the frame before left, which is what a widget draws.
+local function resourcePlan(asked)
+	local h = track.header
+	local first, last = h.firstFrame, h.lastFrame
+	say(
+		string.format(
+			"start first=%d last=%d recorder=%d resource_tolerance=%s resource_fraction=%s team_params=%d game_params=%d",
+			first,
+			last,
+			h.recorderVersion,
+			tostring(h.resourceTolerance),
+			tostring(h.resourceFraction),
+			#info.teamParams,
+			#info.gameParams
+		)
+	)
+	local frames = {}
+	for _, frame in ipairs(type(asked) == "table" and asked or {}) do
+		if frame >= first and frame <= last then
+			frames[#frames + 1] = frame
+		end
+	end
+	for i = 1, 8 do
+		frames[#frames + 1] = first + math.floor((last - first) * i / 9)
+	end
+	table.sort(frames)
+
+	send("pause")
+	-- Three of the engine's sums after a seek, which is when income, expense and
+	-- pull have had the playback's own taken off: the first sum after a seek
+	-- still has what the units of the frame before it made, and the player
+	-- knows the playback's own from the sum before.
+	local sums = 3 * 30 + SETTLE
+	for _, frame in ipairs(frames) do
+		seekTo(frame)
+		push("wait", sums)
+		push("run", function()
+			measureResources("forward", frame)
+		end)
+	end
+	for i = #frames - 1, 1, -1 do
+		local frame = frames[i]
+		seekTo(frame)
+		push("run", function()
+			say(string.format("seek_back frame=%d held_off=%.6f", frame, heldOff(frame)))
+		end)
+	end
+
+	-- Held paused.
+	local middle = frames[math.ceil(#frames / 2)]
+	seekTo(middle)
+	local worst, looked = 0, 0
+	push("each", 600, function()
+		worst, looked = math.max(worst, heldOff(middle)), looked + 1
+	end)
+	push("run", function()
+		say(string.format("held_resources frame=%d frames=%d held_off=%.6f", middle, looked, worst))
+		measureResources("held", middle)
+	end)
+
+	-- Played at the match's own speed, forward and then backward. The time the
+	-- player shows is the time its numbers are of.
+	for _, way in ipairs({ { "forward", "play 1" }, { "backward", "reverse" } }) do
+		local off, seen, from = 0, 0, nil
+		send(way[2])
+		push("wait", SETTLE)
+		push("each", 300, function()
+			local shown = param("frame")
+			from = from or shown
+			off, seen = math.max(off, heldOff(shown)), seen + 1
+		end)
+		push("run", function()
+			say(string.format("played_resources way=%s from=%s to=%s frames=%d held_off=%.6f", way[1], tostring(from), tostring(param("frame")), seen, off))
+		end)
+	end
+	send("pause")
+	push("run", function()
+		ending()
+		SendToUnsynced(REPORT)
+	end)
+end
+
 --- The plan for seeks across a whole match (issue #3988): from the first frame
 -- to its last minutes, back, to the end, back, and again, each waited for until
 -- the player says the world has caught up. Each says how many simulation
@@ -1098,7 +1279,9 @@ function gadget:GameFrame()
 		info, features = assert(track:info()), assert(track:features())
 		-- The test that wants a whole match played writes this file beside the
 		-- track. Without it the plan is the fixture match's.
-		if VFS.FileExists(SEEKS) then
+		if VFS.FileExists(RESOURCES) then
+			resourcePlan(VFS.Include(RESOURCES))
+		elseif VFS.FileExists(SEEKS) then
 			seeksPlan()
 		elseif VFS.FileExists(SHOTS) then
 			shotPlan()

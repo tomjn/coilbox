@@ -18,7 +18,10 @@ use crate::interpret::{
 use crate::pose::PieceSample;
 use crate::thin::Curve;
 use crate::{KeyCounts, SampleCounts};
-use coilbox_track::{held, Header, PoseKey, Quantiser, QueueItem, TargetKey, TrackReader, Window};
+use coilbox_track::{
+    held, value_at, value_code, Header, PoseKey, Quantiser, QueueItem, TargetKey, TrackReader,
+    Window,
+};
 use std::collections::HashMap;
 use std::io::{Read, Seek};
 
@@ -32,6 +35,8 @@ struct Loaded {
     window: Window,
     units: HashMap<u32, usize>,
     projectiles: HashMap<u32, usize>,
+    /// By team and code.
+    values: HashMap<(u8, u16), usize>,
 }
 
 struct Expected {
@@ -57,6 +62,15 @@ pub struct WorstErrors {
     /// frame. Reported, and not part of [`WorstErrors::elmos`], since the
     /// track's tolerance covers position only.
     pub projectile_velocity: Option<Worst>,
+    /// What a team holds, pulls, makes, spends, sends, receives or wastes, in
+    /// metal or energy: the sample that is furthest from the track as a share
+    /// of what it is allowed, since a large sample is allowed more than a
+    /// small one. Not part of [`WorstErrors::elmos`], since it is not a
+    /// distance.
+    pub value: Option<Worst>,
+    /// What that sample is allowed, from the track's resource tolerance and
+    /// fraction. A track is refused when the sample is further than this.
+    pub value_allowed: f64,
 }
 
 impl WorstErrors {
@@ -156,6 +170,12 @@ impl<R: Read + Seek> Verifier<R> {
             .enumerate()
             .map(|(i, p)| (p.projectile.serial, i))
             .collect();
+        let values = window
+            .values
+            .iter()
+            .enumerate()
+            .map(|(i, v)| ((v.team, v.code), i))
+            .collect();
         if self.loaded.len() == WINDOWS_HELD {
             self.loaded.remove(0);
         }
@@ -164,6 +184,7 @@ impl<R: Read + Seek> Verifier<R> {
             window,
             units,
             projectiles,
+            values,
         });
         Ok(self.loaded.len() - 1)
     }
@@ -564,6 +585,70 @@ impl<R: Read + Seek> Sink for Verifier<R> {
     fn projectile_end(&mut self, serial: u32, last_frame: u32) -> Result<()> {
         self.check_end("projectile", serial, last_frame, false)?;
         self.projectiles.remove(&serial);
+        Ok(())
+    }
+
+    fn value(&mut self, team: u8, code: u16, frame: u32, value: f32) -> Result<()> {
+        self.samples.values += 1;
+        let exact = kept_exactly(code);
+        let parameter = code >= value_code::PARAMETER;
+        let what = || format!("value {code} of team {team}");
+        for k in self.windows_of(frame)? {
+            let at = self.load(k)?;
+            let l = &self.loaded[at];
+            let found = l.values.get(&(team, code)).map(|i| &l.window.values[*i]);
+            let got = match found {
+                // A rules parameter is in a window from the frame it was
+                // first set on, and not before.
+                Some(track)
+                    if !parameter || track.keys.first().is_some_and(|key| key.frame <= frame) =>
+                {
+                    value_at(&track.keys, frame)
+                }
+                Some(_) => None,
+                // A resource with no track in a window is 0 for all of it.
+                None if !parameter => Some(0.0),
+                None => None,
+            };
+            let Some(got) = got else {
+                return Err(mismatch(format!(
+                    "{} is {value} on frame {frame} in the dump, and window {k} does not have it",
+                    what()
+                )));
+            };
+            let error = (got - value as f64).abs();
+            if exact {
+                if error != 0.0 {
+                    return Err(mismatch(format!(
+                        "{} is {value} on frame {frame} in the dump and {got} in window {k}",
+                        what()
+                    )));
+                }
+            } else {
+                let allowed = self.header.value_allowance(value as f64);
+                let share = |error: f64, allowed: f64| {
+                    if allowed > 0.0 {
+                        error / allowed
+                    } else if error == 0.0 {
+                        0.0
+                    } else {
+                        f64::INFINITY
+                    }
+                };
+                let w = &mut self.worst;
+                if w.value
+                    .as_ref()
+                    .is_none_or(|old| share(error, allowed) > share(old.error, w.value_allowed))
+                {
+                    w.value = Some(Worst {
+                        error,
+                        what: what(),
+                        frame,
+                    });
+                    w.value_allowed = allowed;
+                }
+            }
+        }
         Ok(())
     }
 }

@@ -71,6 +71,8 @@ sameAs("the header's fields", {
 	windowLength = header.windowLength,
 	windowCount = header.windowCount,
 	tolerance = header.tolerance,
+	resourceTolerance = header.resourceTolerance,
+	resourceFraction = header.resourceFraction,
 	positionShift = header.positionShift,
 	velocityShift = header.velocityShift,
 	rotationBits = header.rotationBits,
@@ -221,6 +223,28 @@ local function compareFrame(trk, ef)
 	if seen ~= #ef.projectiles then
 		return "frame " .. frame .. " has " .. seen .. " projectiles, Rust has " .. #ef.projectiles
 	end
+	-- The numbers of the teams and of the game: each one Rust gives, and no
+	-- other.
+	for _, ev in ipairs(ef.values) do
+		local team, code, wanted = ev[1], ev[2], ev[3]
+		local v = w:valueOf(team, code)
+		if not v then
+			return "frame " .. frame .. " has no track for value " .. code .. " of team " .. team
+		end
+		local d = difference("frame " .. frame .. " value " .. code .. " of team " .. team, w:sampleValue(v, frame), wanted)
+		if d then
+			return d
+		end
+	end
+	seen = 0
+	for v = 1, w.valueCount do
+		if w:sampleValue(v, frame) ~= nil then
+			seen = seen + 1
+		end
+	end
+	if seen ~= #ef.values then
+		return "frame " .. frame .. " has " .. seen .. " numbers of teams, Rust has " .. #ef.values
+	end
 end
 
 local function pass(name, order)
@@ -266,6 +290,58 @@ do
 		end
 	end
 	t.check("the first window's frames, one window loaded once", problem == nil and checked > 1, problem)
+end
+
+-- The numbers of the teams and of the game (issue #3982).
+
+do
+	local trk = opened()
+	local length = h.windowLength
+	local first = assert(trk:loadWindow(0))
+	-- The fixture's team 0 holds metal (code 0) and energy (16) from the first
+	-- frame, wastes metal (8) from part way through the second window, has one
+	-- rules parameter (256) from the first frame and another (257) from a third
+	-- of the way through the second window. The game's parameter (team 255) is
+	-- first set on the edge of the third window.
+	t.check("a window gives the track of a team's number", first:valueOf(0, 0) ~= nil and first:valueOf(0, 16) ~= nil)
+	t.same("a resource a window has no track for has none", first:valueOf(0, 8), nil)
+	t.same("and neither has a team the track does not have", first:valueOf(7, 0), nil)
+	t.same("a rules parameter that is not set by the end of a window has no track in it", first:valueOf(0, 257), nil)
+	t.same("the team of a track is the file's", first.valueTeam[first:valueOf(0, 16)], 0)
+	t.same("and so is its code", first.valueCode[first:valueOf(0, 16)], 16)
+
+	local second = assert(trk:loadWindow(1))
+	local late = second:valueOf(0, 257)
+	local set = h.firstFrame + length + math.floor(length / 3)
+	t.check("a rules parameter first set in a window has a track in it", late ~= nil)
+	t.same("it has no value on the frame before it was set", second:sampleValue(late, set - 1), nil)
+	t.check("and one on the frame it was set", type(second:sampleValue(late, set)) == "number")
+	local wasted = second:valueOf(0, 8)
+	t.same("a resource is 0 before it is first something, not unset", second:sampleValue(wasted, h.firstFrame + length), 0)
+
+	-- The edge between the second and third windows is in both. The game's
+	-- parameter is first set on it.
+	local edge = h.firstFrame + 2 * length
+	local game = second:valueOf(255, 256)
+	t.check("a parameter first set on a window's last frame is in that window", game ~= nil and second:sampleValue(game, edge) ~= nil)
+	t.same("with no value on the frame before", second:sampleValue(game, edge - 1), nil)
+	local third = assert(trk:loadWindow(2))
+	t.same("and the same value from the window after", third:sampleValue(third:valueOf(255, 256), edge), second:sampleValue(game, edge))
+
+	-- Playing every frame forward and then backward does no search.
+	local searches = third.searches
+	local v = third:valueOf(0, 0)
+	for frame = third.startFrame, third.endFrame do
+		third:sampleValue(v, frame)
+	end
+	for frame = third.endFrame, third.startFrame, -1 do
+		third:sampleValue(v, frame)
+	end
+	t.same("playing a number forward and backward does no search", third.searches, searches)
+	-- A time between two frames is between the two values.
+	local a, b = third:sampleValue(v, third.startFrame + 10), third:sampleValue(v, third.startFrame + 11)
+	local half = third:sampleValue(v, third.startFrame + 10.5)
+	t.check("a time between two frames gives a value between the two", math.abs(half - (a + b) / 2) < 1e-9, half)
 end
 
 -- Which window a frame is in.

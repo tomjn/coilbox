@@ -38,7 +38,16 @@ M.HOOKS = {
 	afterFrame = true,
 }
 
-local LISTS = { "gadgets", "widgets", "units", "features" }
+local LISTS = { "gadgets", "widgets", "units", "features", "teamParams", "gameParams" }
+
+--- A copy of a list of names, which are case sensitive and kept as they are.
+local function copied(list)
+	local copy = {}
+	for i = 1, #(list or {}) do
+		copy[i] = list[i]
+	end
+	return copy
+end
 
 --- The adapter's lists as sets of lowercase names, because the engine's names
 -- for definitions and files are not case sensitive.
@@ -87,6 +96,10 @@ function M.normalize(raw)
 		hiddenUnitCount = raw.units and #raw.units or 0,
 		skippedFeatures = lowerSet(raw.features or {}),
 		skippedFeatureCount = raw.features and #raw.features or 0,
+		-- The rules parameters that are the recording's to set (issue #3982).
+		-- Coilbox reads the same two lists to tell the recorder what to record.
+		teamParams = copied(raw.teamParams),
+		gameParams = copied(raw.gameParams),
 		hooks = {},
 		hookNames = {},
 		unknownHooks = {},

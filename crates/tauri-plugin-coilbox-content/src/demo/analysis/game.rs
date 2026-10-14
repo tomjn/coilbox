@@ -61,18 +61,30 @@ const RECORDER_REQUEST_PATH: &str = "luarules/configs/coilbox_rewind_request.lua
 pub const RECORDING_FILE: &str = "coilbox-rewind.dump";
 
 /// What a run that records tells the recorder.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Recording {
     /// The last frame in the replay's stream. The recorder ends its file
     /// there, because a replay of a match that crashed never reaches game over.
     pub last_frame: i32,
+    /// The team rules parameters to keep, which the game's playback adapter
+    /// names (issue #3982). The recorder keeps a team's resources whatever
+    /// these are.
+    pub team_params: Vec<String>,
+    /// The game rules parameters to keep.
+    pub game_params: Vec<String>,
 }
 
 /// The recorder's request file: a Lua table.
 fn recorder_request(recording: &Recording) -> String {
+    let list = |names: &[String]| {
+        let quoted: Vec<String> = names.iter().map(|name| lua_string(name)).collect();
+        format!("{{{}}}", quoted.join(", "))
+    };
     format!(
-        "-- Asks the coilbox rewind recorder to record this run.\nreturn {{\n  lastFrame = {},\n}}\n",
-        recording.last_frame
+        "-- Asks the coilbox rewind recorder to record this run.\nreturn {{\n  lastFrame = {},\n  teamParams = {},\n  gameParams = {},\n}}\n",
+        recording.last_frame,
+        list(&recording.team_params),
+        list(&recording.game_params),
     )
 }
 
@@ -203,7 +215,10 @@ mod tests {
     #[test]
     fn a_recording_adds_the_recorder_and_its_request_and_nothing_else() {
         let data = tempfile::tempdir().expect("tempdir");
-        let recording = Recording { last_frame: 23200 };
+        let recording = Recording {
+            last_frame: 23200,
+            ..Recording::default()
+        };
         let dir = write_game(
             data.path(),
             "Some Game 1.0",
@@ -227,9 +242,36 @@ mod tests {
         assert!(written.contains("Coilbox rewind recorder"));
         let request = std::fs::read_to_string(dir.join(RECORDER_REQUEST_PATH)).expect("read");
         assert!(
-            request.contains("return {\n  lastFrame = 23200,\n}"),
+            request.contains(
+                "return {\n  lastFrame = 23200,\n  teamParams = {},\n  gameParams = {},\n}"
+            ),
             "{request}"
         );
+    }
+
+    /// The rules parameters a game's adapter names reach the recorder through
+    /// its request, as Lua strings that a name cannot break out of.
+    #[test]
+    fn the_request_names_the_rules_parameters_to_keep() {
+        let request = recorder_request(&Recording {
+            last_frame: 9,
+            team_params: vec!["supplyUsed".into(), "odd \"name\"".into()],
+            game_params: vec!["wave".into()],
+        });
+
+        assert!(
+            request.contains(
+                "  teamParams = {\"supplyUsed\", \"odd \\\"name\\\"\"},\n  gameParams = {\"wave\"},\n"
+            ),
+            "{request}"
+        );
+    }
+
+    /// The recorder reads the request's lists by the names this side writes.
+    #[test]
+    fn the_recorder_reads_the_parameter_lists_this_side_writes() {
+        assert!(RECORDER.contains("request.teamParams"));
+        assert!(RECORDER.contains("request.gameParams"));
     }
 
     /// The recorder reads its request and writes its file by names of its own

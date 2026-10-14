@@ -107,10 +107,15 @@ do
 	w.gadget = gadget
 	t.same("it names itself", gadget:GetInfo().name, "Coilbox rewind player")
 	gadget:Initialize()
-	t.same("it logs the adapter and the track", #w.lines, 2)
+	t.same("it logs the adapter, the rules parameters nobody names and the track", #w.lines, 3)
 	t.same("a game with no adapter file says it loaded none", w.lines[1], "COILBOX_REWIND_PLAYER adapter loaded: none")
+	t.same(
+		"the rules parameters the fixture has are left to a game with no adapter",
+		w.lines[2],
+		"COILBOX_REWIND_PLAYER the track has rules parameters the game's adapter does not name, so they are left to the game: supplyUsed, researchPoints, wave"
+	)
 	local h, info = expected.header, expected.info
-	local line = w.lines[2]
+	local line = w.lines[3]
 	t.check("the line is the player's", line:find("^COILBOX_REWIND_PLAYER ") ~= nil, line)
 	t.check("the line has the frame range", line:find("track frames " .. h.firstFrame .. " to " .. h.lastFrame .. ",", 1, true) ~= nil, line)
 	t.check("the line has the window count", line:find("windows " .. h.windowCount .. ",", 1, true) ~= nil, line)
@@ -489,8 +494,9 @@ do
 	local synced1 = synced(PLAYER, w, { [TRACK] = bytes })
 	w.gadget = synced1
 	synced1:Initialize()
+	local logged = #w.lines
 	t.same("the synced half takes the view", synced1:RecvLuaMsg(clock.views[2], 0), true)
-	t.same("with nothing logged about it", #w.lines, 2)
+	t.same("with nothing logged about it", #w.lines, logged)
 end
 
 do
