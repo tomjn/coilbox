@@ -72,6 +72,14 @@ M.PARAMS = {
 -- and takes the limit off.
 M.BUDGET = "coilbox_rewind_budget:"
 
+--- The Lua message that says where the viewer looks, from the gadget's unsynced
+-- half (issue #4008): the x and z of the place on the ground in the middle of
+-- the view, and after them the x and z of the view's four corners on the
+-- ground, in order round it, when all four are on the ground. For example
+-- `coilbox_rewind_view:4096 2048`. `coilbox_rewind_view:none` says there is no
+-- such place, as when the camera looks at the sky.
+M.VIEW = "coilbox_rewind_view:"
+
 --- The mod options the player reads.
 M.OPTIONS = {
 	-- The frame to open on. The track's first frame without it.
@@ -88,6 +96,22 @@ local function whole(text)
 	local n = tonumber(text)
 	if n and n >= 1 and n < math.huge and n == math.floor(n) then
 		return n
+	end
+end
+
+--- The numbers a view message carries, or nil when it is not two or ten
+-- numbers. `tonumber` reads "nan" and "inf".
+local function viewOf(text)
+	local numbers = {}
+	for word in text:gmatch("%S+") do
+		local n = tonumber(word)
+		if not n or n ~= n or n == math.huge or n == -math.huge then
+			return nil
+		end
+		numbers[#numbers + 1] = n
+	end
+	if #numbers == 2 or #numbers == 10 then
+		return numbers
 	end
 end
 
@@ -123,7 +147,9 @@ end
 -- reads it, or nil for a game with none, and `options.adapterWhy` is the reason
 -- when there is none because the game's could not be used. `options.engine` is
 -- what coilbox_player_engine.lua's `check` gave for the engine, which says what
--- is switched off. Without it every feature is on.
+-- is switched off. Without it every feature is on. `options.arrive` is a function
+-- the units stage calls with a unit's id, its x, y and z and its team when the
+-- unit wants an arrival effect (issue #4009), and without it none is asked for.
 function M.new(track, options)
 	local header = track.header
 	local info, why = track:info()
@@ -202,6 +228,7 @@ function M.new(track, options)
 		WeaponDefNames = WeaponDefNames,
 		teamOf = teamOf,
 		report = report,
+		arrive = options.arrive,
 	}
 	-- A stage whose calls the engine lacks is the one that does nothing.
 	local terrain = on.terrain and Terrain.new(context, Reader) or OFF
@@ -317,6 +344,19 @@ function Player:message(text)
 			self.units:setBudget(make, remove)
 		else
 			self.log("the message \"" .. text .. "\" was refused: the budget is two whole numbers of 1 or more, the most units made and the most removed in a frame")
+		end
+		return true
+	end
+	if text:sub(1, #M.VIEW) == M.VIEW then
+		local rest = text:sub(#M.VIEW + 1)
+		local numbers = rest ~= "none" and viewOf(rest)
+		if rest == "none" then
+			self.units:setView(nil)
+		elseif numbers then
+			local corners = #numbers == 10 and { unpack(numbers, 3, 10) } or nil
+			self.units:setView(numbers[1], numbers[2], corners)
+		else
+			self.log("the message \"" .. text .. "\" was refused: the view is the x and z of the place the camera looks at, and after them the x and z of the view's four corners or nothing")
 		end
 		return true
 	end

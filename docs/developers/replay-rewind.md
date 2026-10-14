@@ -156,7 +156,7 @@ A hook is an optional function in `hooks`. The player calls the first three and 
 | Hook | Called | Arguments |
 | --- | --- | --- |
 | `started` | Once, when the player has opened the track, before the first frame and so before anything of the track is in the world. | None. |
-| `unitPlaced` | After the player created a unit and put it in place, and again for a unit made again after a seek. A seek that needs many units made spreads them over several frames, so this can come some frames after the seek. | The engine's unit id, the unit definition's engine id, the track frame and the clock. |
+| `unitPlaced` | After the player created a unit and put it in place, and again for a unit made again after a seek. A seek that needs many units made spreads them over several frames, so this can come some frames after the seek. | The engine's unit id, the unit definition's engine id, the track frame, the clock, and `effect`, which is true when the player is about to show its arrival effect for the unit. Return true to say you showed your own. |
 | `afterFrame` | At the end of every simulation frame, after every stage. | The track frame and the clock. |
 | `drawQueuedBuilding` | Not the player's. The ghosts widget calls it in unsynced Lua, in `DrawWorld`, once for each queued building it would draw, inside a matrix of its own. It replaces the engine's own shape and the footprint outline, so use it to draw the building the way your game does. | The unit definition's engine id, the team, x, the ground height, z and the facing from 0 to 3. A facing of 0 is south, 1 east, 2 north and 3 west. |
 
@@ -165,6 +165,26 @@ The clock is the player's, and a hook only reads it. `clock.jumped` says the fra
 The first three run in synced Lua, in the gadget's environment. `drawQueuedBuilding` runs in the ghosts widget, which reads the adapter file itself, so `gl` is there and the synced calls are not. A hook of it that raises is logged once and the engine's shape and outline take over. Coilbox does not read it. Write the hook so that the same file still loads in synced Lua, where it is never called.
 
 A frame of play allocates nothing in the player, so a hook that runs every frame should not allocate either.
+
+#### Your own arrival effect
+
+After a seek that takes more than one frame, the player shows a short effect where each unit in view appears: a column of light, a ring and dots in the team's colour. The player draws it itself with plain quads, so it works in your game with no adapter and does not touch how your units are drawn.
+
+To show your game's own spawn or warp effect instead, do it in `unitPlaced` and return true:
+
+```lua
+unitPlaced = function(unitID, unitDefID, t, clock, effect)
+	if effect then
+		local x, y, z = Spring.GetUnitPosition(unitID)
+		Spring.SpawnCEG("name-of-your-effect", x, y, z)
+		return true
+	end
+end,
+```
+
+- `effect` is true only for a unit made in a later frame than the one that showed the seek, inside the view, and not while the timeline's knob is being dragged. Spawn only when it is true. The hook is called for every unit the player makes, and a large seek makes hundreds outside the view.
+- A hook that returns true stops the player's effect for that unit. One that returns nothing leaves it, and so does one that raises.
+- The player shows at most 256 of its own effects at once. Your effect has no such cap, and a large seek makes dozens of units a frame, so look at what yours costs.
 
 Splinter Faction's adapter has no hook. It had a `started` hook that gave each team its starting storage, which its switched off `game_spawn.lua` used to do. The track now holds each team's storage and the player sets it on every frame, so the hook went. Reach for a hook when your game needs something set that neither the track nor a rules parameter covers.
 

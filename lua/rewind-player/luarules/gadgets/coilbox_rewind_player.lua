@@ -34,6 +34,13 @@
 -- no more than that in a frame until it hears another. The player starts at one
 -- of each. The message reaches the synced half about two frames later.
 --
+-- The unsynced half is also the one that can see the camera and draw. It
+-- tells the player where the viewer looks, as another Lua message, so that a
+-- seek makes the units in view first (issue #4008,
+-- coilbox_player_view.lua). And it draws a short effect where a unit that a
+-- slow seek made appears, when the synced half asks for one (issue #4009,
+-- coilbox_player_arrival.lua).
+--
 -- The base game's own gadgets still run, except those the game's adapter
 -- switches off (issue #3799). !coilbox_rewind_guard.lua stops the rest killing a
 -- team or ending the match.
@@ -64,6 +71,10 @@ local FIRST_BUDGET = 1
 --- The Lua message that sets the player's budget, which is
 -- `Player.BUDGET` in coilbox_player.lua.
 local BUDGET = "coilbox_rewind_budget:"
+
+--- What the synced half sends the unsynced one for a unit that wants an
+-- arrival effect: the unit's id, its x, y and z and its team.
+local ARRIVE = "coilbox_rewind_arrive"
 
 if gadgetHandler:IsSyncedCode() then
 	local player
@@ -118,6 +129,11 @@ if gadgetHandler:IsSyncedCode() then
 			-- Without SendToUnsynced nothing times the work, so nothing sets a budget
 			-- and a seek is shown in one frame, as before issue #3988.
 			budget = engine.on.workTiming and FIRST_BUDGET or nil,
+			-- The unsynced half draws the effect, so without SendToUnsynced none
+			-- is asked for.
+			arrive = engine.on.workTiming and function(unitID, x, y, z, team)
+				SendToUnsynced(ARRIVE, unitID, x, y, z, team)
+			end or nil,
 			log = log,
 			adapter = adapter,
 			adapterWhy = adapterWhy,
@@ -225,7 +241,7 @@ if gadgetHandler:IsSyncedCode() then
 else
 	-- What this half needs from the engine, from coilbox_player_engine.lua.
 	local Engine = VFS.Include("luarules/rewind_player/coilbox_player_engine.lua")
-	local engine = Engine.check({ Spring = Spring, Game = Game }, Engine.UNSYNCED)
+	local engine = Engine.check({ Spring = Spring, Game = Game, gl = gl, GL = GL }, Engine.UNSYNCED)
 	for _, line in ipairs(engine.lines) do
 		Spring.Echo(PREFIX .. line)
 	end
@@ -249,6 +265,32 @@ else
 	local clock = micros and Spring.GetTimerMicros or Spring.GetTimer
 	-- Whether the player has been told there is no budget to wait for.
 	local toldNone = false
+
+	-- Where the viewer looks, sent to the player as a message. Without a way to
+	-- send one there is nothing to look for.
+	local view
+	if engine.on.view and engine.on.budgetMessage then
+		view = VFS.Include("luarules/rewind_player/coilbox_player_view.lua").new(Spring)
+	end
+
+	-- The effect where a unit arrives. Its clock is the frame timer's.
+	local arrival
+	if engine.on.arrivalEffect and engine.on.workTimingLine then
+		local epoch = clock()
+		arrival = VFS.Include("luarules/rewind_player/coilbox_player_arrival.lua").new({
+			Spring = Spring,
+			gl = gl,
+			GL = GL,
+			seconds = function()
+				return Spring.DiffTimers(clock(), epoch, true, micros) / 1000
+			end,
+		})
+		-- Defined only when there is an effect to draw, so that a gadget
+		-- handler does not call it for nothing.
+		function gadget:DrawWorld()
+			arrival:draw()
+		end
+	end
 
 	local started
 	local lastLine
@@ -299,9 +341,24 @@ else
 		end
 	end
 
-	function gadget:RecvFromSynced(name, phase, frame, made, removed)
+	function gadget:RecvFromSynced(name, phase, frame, made, removed, team)
+		if name == ARRIVE then
+			-- A unit's id, its place and its team, where the work's arguments are.
+			if arrival then
+				arrival:add(phase, frame, made, removed, team)
+			end
+			return true
+		end
 		if name ~= WORK then
 			return false
+		end
+		-- Before the work is timed, so that looking at the camera is not counted
+		-- as the player's.
+		if phase == 0 and view then
+			local text = view:poll()
+			if text then
+				Spring.SendLuaRulesMsg(text)
+			end
 		end
 		if not engine.on.workTimingLine then
 			-- Nothing here can time a frame, so no budget will come. The player is

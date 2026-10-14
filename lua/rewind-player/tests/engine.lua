@@ -1008,7 +1008,13 @@ function M.new(options)
 			constructionDecay = options.constructionDecay == true,
 			constructionDecaySpeed = 0.03,
 		},
-		SendToUnsynced = function(name, phase, _, made, removed)
+		SendToUnsynced = function(name, phase, a, made, removed, team)
+			if name == "coilbox_rewind_arrive" then
+				-- A unit that wants an arrival effect: its id, where it is, its team.
+				-- It is one of the world's events, as a creation is.
+				world.events[#world.events + 1] = table.concat({ "arrive", phase, a, made, removed, team }, " ")
+				return
+			end
 			world.sent = world.sent + 1
 			world.sentName, world.sentPhase, world.sentMade, world.sentRemoved = name, phase, made, removed
 		end,
