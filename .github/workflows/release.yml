@@ -366,6 +366,12 @@ jobs:
           # the one sidecar that outlives coilbox (win_job.rs), so the installer
           # would have to kill a live relayed battle to move it safely.
           test -d "$STAGING/.coilbox" || { echo "installer did not tuck the sidecars away"; exit 1; }
+          # The Lua licence notice and both licence texts travel beside the Lua
+          # the zip carries (issue #4005).
+          for f in NOTICE.md LICENSE-MIT COPYING; do
+            test -f "$STAGING/.coilbox/resources/coilbox-licence/$f" \
+              || { echo "no $f in the Lua licence folder"; exit 1; }
+          done
           test "$(find "$STAGING" -maxdepth 1 -name '*.exe' ! -name 'coilbox-*.exe' | wc -l)" -eq 1 \
             || { echo "expected exactly one app .exe in $STAGING"; find "$STAGING" -maxdepth 1; exit 1; }
 
