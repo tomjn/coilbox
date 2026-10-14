@@ -3208,6 +3208,153 @@ end
         assert!(errors.is_empty(), "{errors:#?}");
     }
 
+    /// Aim poses against a real engine (issue #3796), and the call at the end
+    /// of a frame that they and a wounded unit's health rest on (issue #4002).
+    /// The driver's aim plan seeks into the match's fights. At each seek it
+    /// reads every posed piece back out of the engine with `GetPieceRotation`
+    /// and `GetPieceTranslation`, on the first frame the seek is shown, on each
+    /// of 60 frames paused, and on each of 90 frames played forward and 90
+    /// played backward. A piece is wrong when it is further from the track's
+    /// pose than half a step of what the track stores. On every one of those
+    /// frames it also counts the units whose maximum health is not their
+    /// definition's, which a unit held to stop it healing would be.
+    ///
+    /// Give it a replay of a whole match in `COILBOX_ANALYSIS_REPLAY`, with
+    /// the variables the tests above read.
+    ///
+    /// - `COILBOX_PLAYBACK_TRACK` names a track to play instead of the one
+    ///   recorded from the replay, as for the test above.
+    /// - `COILBOX_PLAYBACK_AIM_FRAMES` is the frames to seek to, as numbers
+    ///   with commas between them. Without it the driver takes the six frames
+    ///   with the most pieces away from rest.
+    /// - `COILBOX_PLAYBACK_AIM` says what the run is to show, as words with
+    ///   commas between them. `installed` is a game whose gadget handler does
+    ///   not pass `GameFramePost` on, so the player has to say that it
+    ///   installed the call-in. `wounded` wants a wounded unit in the looks.
+    ///   `off` plays with the aim stage switched off and asserts nothing about
+    ///   the poses, which is how the stage's cost is told from the rest.
+    ///   `nocall` stands in for an engine that makes no `GameFramePost` call:
+    ///   the driver keeps the engine from being told of any function of that
+    ///   name. The player then has to say what each stage does without the
+    ///   call, and no unit's maximum may be lowered. Poses and health are
+    ///   printed and not asserted, since without the call a unit's script and
+    ///   the engine's healing have the last word in a frame.
+    /// - `COILBOX_PLAYBACK_AIM_REST` is a number of frames to stand paused for
+    ///   at the last seek, with a look on each. A game whose units heal only
+    ///   after standing idle for a while needs it to show that none does.
+    #[test]
+    #[ignore = "needs an engine, a game, a map and a replay of a whole match on them"]
+    fn aim_poses_follow_the_track_in_the_engine() {
+        let Some(prepared) = prepared(false) else {
+            return;
+        };
+        prepared.rewrite(REWIND_PLAYER_ADAPTERS);
+        if let Some(track) = var("COILBOX_PLAYBACK_TRACK") {
+            // The recorded track is a hard link to the stored one.
+            let at = prepared.game_dir.join("coilbox_rewind/track.cbtrack");
+            std::fs::remove_file(&at).unwrap();
+            std::fs::copy(track, &at).unwrap();
+        }
+        let wanted = var("COILBOX_PLAYBACK_AIM").unwrap_or_default();
+        let wants = |word: &str| wanted.split(',').any(|w| w.trim() == word);
+        let frames = var("COILBOX_PLAYBACK_AIM_FRAMES").unwrap_or_default();
+        assert!(
+            frames
+                .chars()
+                .all(|c| c.is_ascii_digit() || c == ',' || c == ' '),
+            "COILBOX_PLAYBACK_AIM_FRAMES is numbers with commas between them"
+        );
+        let rest: u32 = var("COILBOX_PLAYBACK_AIM_REST")
+            .map(|v| v.parse().expect("COILBOX_PLAYBACK_AIM_REST is a number"))
+            .unwrap_or(0);
+        let output = driven_with(
+            &prepared,
+            "driver_aim.lua",
+            &format!(
+                "return {{ frames = {{ {frames} }}, off = {}, nocall = {}, rest = {rest} }}\n",
+                wants("off"),
+                wants("nocall")
+            ),
+        );
+        for l in lines_with(&output, &["REWIND_DRIVER ", "COILBOX_REWIND_PLAYER"]) {
+            eprintln!("{l}");
+        }
+        let driver = driver_lines(&output);
+        assert!(!driver.iter().any(|l| l.starts_with("lost ")), "{driver:?}");
+        let errors = lua_errors(&output);
+        assert!(errors.is_empty(), "{errors:#?}");
+        let looks: Vec<&&str> = driver.iter().filter(|l| l.starts_with("aim ")).collect();
+        let seeks = looks.iter().filter(|l| l.starts_with("aim first ")).count();
+        assert!(seeks > 0, "{driver:?}");
+        assert_eq!(looks.len(), 4 * seeks + usize::from(rest > 0), "{driver:?}");
+        if wants("nocall") {
+            for l in &looks {
+                assert_eq!(number(l, "lowered_max"), 0.0, "{l}");
+            }
+            for said in [
+                "GameFramePost does not reach the player, so a wounded unit keeps its maximum health",
+                "GameFramePost does not reach the player, so what a team holds",
+                "GameFramePost does not reach the player, so aiming pieces are posed from GameFrame",
+                "The player installed the call-in itself and still none came",
+            ] {
+                assert!(count(&output, said) >= 1, "the log has no line: {said}");
+            }
+            return;
+        }
+        if wants("off") {
+            // Once for each start of the engine, and Splinter Faction's first
+            // run on a settings file restarts it.
+            assert!(
+                count(
+                    &output,
+                    "COILBOX_REWIND_PLAYER this engine has no Spring.GetUnitScriptNames. Switched off: unit aiming"
+                ) >= 1
+            );
+            return;
+        }
+
+        let mut turned = 0.0;
+        let mut wounded = 0.0;
+        for l in &looks {
+            // A unit the seek has yet to make is absent and not wrong. A piece
+            // of a unit that is there has the track's pose.
+            assert_eq!(number(l, "bad"), 0.0, "{l}");
+            assert_eq!(number(l, "lowered_max"), 0.0, "{l}");
+            // No finished unit's health is off the track's when a frame starts,
+            // which is where the engine's own healing of the frame before
+            // would show.
+            assert_eq!(number(l, "health_off"), 0.0, "{l}");
+            turned += number(l, "turned");
+            wounded += number(l, "wounded");
+            if l.starts_with("aim rest ") {
+                assert_eq!(number(l, "looks"), f64::from(rest), "{l}");
+            } else if l.starts_with("aim first ") {
+                assert_eq!(number(l, "looks"), 1.0, "{l}");
+                assert_eq!(field(l, "shown"), field(l, "frame"), "{l}");
+            } else if l.starts_with("aim held ") {
+                assert_eq!(number(l, "looks"), 60.0, "{l}");
+                assert_eq!(field(l, "shown"), field(l, "frame"), "{l}");
+            } else {
+                assert_eq!(number(l, "looks"), 90.0, "{l}");
+                assert!(number(l, "pieces") > 0.0, "{l}");
+            }
+        }
+        assert!(
+            turned > 0.0,
+            "no piece the looks saw was away from rest: {driver:?}"
+        );
+        if wants("wounded") {
+            assert!(wounded > 0.0, "no unit was wounded: {driver:?}");
+        }
+        let installed = count(
+            &output,
+            "does not pass GameFramePost on, so the player installed it",
+        );
+        assert_eq!(installed > 0, wants("installed"), "{driver:?}");
+        assert_eq!(count(&output, "GameFramePost does not reach the player"), 0);
+        assert_eq!(count(&output, "has no piece called"), 0);
+    }
+
     /// The widget that presses the timeline's keys in the engine. It is
     /// written into the game folder for the test below and is not part of the
     /// game.

@@ -161,7 +161,7 @@ Not true to the recording:
 
 ## Current limits
 
-- Units do not play walk, build or aim animations, and turrets and torsos do not turn to face their targets. These are issues #3796 and #3797.
+- Units do not play walk or build animations. This is issue #3797. Turrets and torsos do point where they pointed in the match, from the first frame after a jump.
 - `[` and `]` do nothing in the engine, as above. This is issue #3978.
 - Splinter Faction and Beyond All Reason are the games with a tailored setup. In another game nothing is switched off or hidden, and the match still plays.
 - Beyond All Reason's setup was checked on a match between two of its own AIs. A match against raptors or scavengers, a territory match and a match on a lava map have not been played back, and the panels that belong to those modes do not show.

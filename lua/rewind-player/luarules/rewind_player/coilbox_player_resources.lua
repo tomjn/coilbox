@@ -156,8 +156,9 @@ function M.new(context, reader)
 		-- True from a frame on which the engine sums up until its new numbers
 		-- have been read.
 		rolled = false,
-		-- True once the engine has called back at the end of a frame.
-		posted = false,
+		-- Whether the engine calls back at the end of a frame, which the player
+		-- finds out and keeps in `post.arrives` (issue #4002).
+		post = context.post,
 		gameValue = {},
 		teamValue = {},
 	}, Resources)
@@ -369,14 +370,20 @@ function Resources:place(t)
 		end
 		self.rolled = true
 	end
-	apply(self, w, t, summing, self.posted)
+	apply(self, w, t, summing, self.post.arrives)
+end
+
+--- The player found that no call comes at the end of a frame (issue #4002).
+function Resources:withoutAfterSim()
+	self.context.report(
+		"resources post",
+		"GameFramePost does not reach the player, so what a team holds reads one frame of the playback's own economy off, its share level reads 1 on the frames the engine sums up on, and a team is given no room for the playback's own income, so what it wasted can read higher than the match's"
+	)
 end
 
 --- The end of a simulation frame, after the engine's own economy and after it
 -- has summed up (GameFramePost).
 function Resources:afterSim()
-	-- The engine makes this call, which an old one does not (issue #4002).
-	self.posted = true
 	local w, t = self.window, self.t
 	if not w then
 		return

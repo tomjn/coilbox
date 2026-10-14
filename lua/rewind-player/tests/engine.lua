@@ -43,6 +43,13 @@
 -- happens after the gadgets' GameFrame and before their GameFramePost, and
 -- `world.step` runs a frame in that order. No call sets income, expense or pull.
 --
+-- Script.UpdateCallIn follows CLuaHandle::UpdateCallIn in rts/Lua/LuaHandle.cpp:
+-- the engine calls a call-in when the handler's global table has a function of
+-- that name at the time of the call, and stops calling it when it has none. A
+-- gadget sees that table as `_G` (a handler's NewGadget). `world.gameFrame` is a
+-- frame for a gadget in a game whose handler does or does not pass GameFramePost
+-- on, on an engine that does or does not have it (issue #4002).
+--
 -- Nothing a gadget calls on every frame allocates here, so a test can count
 -- what the gadget itself allocates.
 
@@ -77,7 +84,14 @@ function M.new(options)
 
 	local unitDefs, unitDefNames = {}, {}
 	for id, def in ipairs(options.unitDefs or {}) do
-		local copy = { id = id, name = def.name, health = def.health or 1000, buildTime = def.buildTime or 100, onoffable = def.onoffable or false }
+		local copy = {
+			id = id,
+			name = def.name,
+			health = def.health or 1000,
+			buildTime = def.buildTime or 100,
+			onoffable = def.onoffable or false,
+			pieces = def.pieces or { "base" },
+		}
 		unitDefs[id], unitDefNames[def.name] = copy, copy
 	end
 	local featureDefs, featureDefNames = {}, {}
@@ -427,6 +441,37 @@ function M.new(options)
 		end
 	end
 
+	-- The gadget handler's global table, and the call-ins the engine was told it
+	-- has a function for.
+	world.handlerGlobals = {}
+	world.callIns = {}
+	world.callInUpdates = 0
+	local Script = {}
+
+	function Script.UpdateCallIn(name)
+		world.callInUpdates = world.callInUpdates + 1
+		world.callIns[name] = type(world.handlerGlobals[name]) == "function"
+	end
+
+	--- One frame for `gadget` in a game. `how.engine == false` is an engine that
+	-- makes no GameFramePost call. `how.handler == false` is a gadget handler that
+	-- does not pass the call on, so the gadget only hears it through a global the
+	-- engine was told of.
+	function world.gameFrame(gadget, how)
+		world.step(function(n)
+			gadget:GameFrame(n)
+		end, function(n)
+			if how and how.engine == false then
+				return
+			end
+			if not (how and how.handler == false) then
+				gadget:GameFramePost(n)
+			elseif world.callIns.GameFramePost and world.handlerGlobals.GameFramePost then
+				world.handlerGlobals.GameFramePost(n)
+			end
+		end)
+	end
+
 	--- The engine's own call. The guard gadget replaces it in this table.
 	function Spring.KillTeam(teamID)
 		if world.teams[teamID].dead then
@@ -495,7 +540,14 @@ function M.new(options)
 			active = false,
 			moveCtrl = false,
 			useWeapons = true,
+			-- Each script piece's turn and offset, as its script left them.
+			rot = {},
+			pos = {},
 		}
+		for number = 1, #found.pieces do
+			world.units[id].rot[number] = { 0, 0, 0 }
+			world.units[id].pos[number] = { 0, 0, 0 }
+		end
 		event("create", id)
 		call("UnitCreated", id, found.id, teamID)
 		return id
@@ -624,6 +676,136 @@ function M.new(options)
 		world.orders = world.orders + 1
 		if found and command == 85 and found.def.onoffable then
 			found.active = params[1] == 1
+		end
+	end
+
+	-- Unit scripts, from rts/Sim/Units/Scripts/LuaUnitScript.cpp and
+	-- UnitScript.cpp. A definition's `pieces` are its script's piece names in
+	-- order. Spring.GetUnitScriptNames numbers them from 0 and every call below
+	-- from 1. `world.poseSets` counts the turns and moves that reached a piece.
+
+	world.poseSets = 0
+	world.scriptNameLooks = 0
+	world.scriptErrors = 0
+	local TURN = 2 * math.pi
+	-- The unit a script call acts on (CLuaUnitScript's activeUnit).
+	local active
+
+	function Spring.GetUnitScriptNames(id)
+		local found = unit(id)
+		if not found then
+			return
+		end
+		world.scriptNameLooks = world.scriptNameLooks + 1
+		local names = {}
+		for number, name in ipairs(found.def.pieces) do
+			names[name] = number - 1
+		end
+		return names
+	end
+
+	Spring.UnitScript = {}
+
+	--- CallAsUnit raises for an id the engine has no unit for, and calls `fn`
+	-- with that unit as the one every script call acts on.
+	function Spring.UnitScript.CallAsUnit(id, fn, ...)
+		local found = world.units[id]
+		if not found or found.dead then
+			error("CallAsUnit(): Bad unitID: " .. tostring(id), 2)
+		end
+		assert(type(fn) == "function", "Incorrect arguments to CallAsUnit()")
+		local before = active
+		active = found
+		local ok, a, b, c = pcall(fn, ...)
+		active = before
+		if not ok then
+			error(a, 0)
+		end
+		return a, b, c
+	end
+
+	local function axisOf(axis, caller)
+		if type(axis) ~= "number" or axis < 1 or axis > 3 then
+			error(caller .. "(): Bad axis", 3)
+		end
+		return axis
+	end
+
+	--- Turn and Move with no speed set the piece at once (CUnitScript::TurnNow
+	-- and MoveNow). A piece the script does not have is logged by the engine and
+	-- nothing is raised. An angle is kept between 0 and one turn (ClampRad). The
+	-- player poses at once, so a speed is refused here.
+	function Spring.UnitScript.Turn(piece, axis, angle, speed)
+		if not active then
+			return
+		end
+		axis = axisOf(axis, "Turn")
+		assert(speed == nil or speed == 0, "the player turned a piece at a speed")
+		local rot = active.rot[piece]
+		if not rot then
+			world.scriptErrors = world.scriptErrors + 1
+			return
+		end
+		world.poseSets = world.poseSets + 1
+		rot[axis] = angle % TURN
+	end
+
+	function Spring.UnitScript.Move(piece, axis, distance, speed)
+		if not active then
+			return
+		end
+		axis = axisOf(axis, "Move")
+		assert(speed == nil or speed == 0, "the player moved a piece at a speed")
+		local pos = active.pos[piece]
+		if not pos then
+			world.scriptErrors = world.scriptErrors + 1
+			return
+		end
+		world.poseSets = world.poseSets + 1
+		pos[axis] = distance
+	end
+
+	--- These two raise for a piece the script does not have.
+	function Spring.UnitScript.GetPieceRotation(piece)
+		if not active then
+			return
+		end
+		local rot = active.rot[piece]
+		if not rot then
+			error("GetPieceRotation(): Invalid piecenumber", 2)
+		end
+		return rot[1], rot[2], rot[3]
+	end
+
+	function Spring.UnitScript.GetPieceTranslation(piece)
+		if not active then
+			return
+		end
+		local pos = active.pos[piece]
+		if not pos then
+			error("GetPieceTranslation(): Invalid piecenumber", 2)
+		end
+		return pos[1], pos[2], pos[3]
+	end
+
+	--- A unit's own script moving a piece, which the engine runs between the
+	-- gadgets' GameFrame and their GameFramePost. `piece` is a name.
+	function world.scriptTurn(found, piece, x, y, z)
+		for number, name in ipairs(found.def.pieces) do
+			if name == piece then
+				local rot = found.rot[number]
+				rot[1], rot[2], rot[3] = x % TURN, y % TURN, z % TURN
+			end
+		end
+	end
+
+	--- The rotation and the offset of a unit's piece, by name.
+	function world.pieceOf(found, piece)
+		for number, name in ipairs(found.def.pieces) do
+			if name == piece then
+				local rot, pos = found.rot[number], found.pos[number]
+				return rot[1], rot[2], rot[3], pos[1], pos[2], pos[3]
+			end
 		end
 	end
 
@@ -1000,6 +1182,8 @@ function M.new(options)
 		FeatureDefNames = featureDefNames,
 		WeaponDefNames = weaponDefNames,
 		CMD = { ONOFF = 85 },
+		Script = Script,
+		_G = world.handlerGlobals,
 		Game = {
 			gameSpeed = 30,
 			squareSize = SQUARE,

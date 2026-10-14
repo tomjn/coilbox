@@ -52,7 +52,14 @@ end
 
 --- The engine's globals the synced rows name, as the gadget hands them over.
 local function rootsOf(env)
-	return { Spring = env.Spring, VFS = env.VFS, Game = env.Game, CMD = env.CMD, SendToUnsynced = rawget(env, "SendToUnsynced") }
+	return {
+		Spring = env.Spring,
+		VFS = env.VFS,
+		Game = env.Game,
+		CMD = env.CMD,
+		SendToUnsynced = rawget(env, "SendToUnsynced"),
+		Script = rawget(env, "Script"),
+	}
 end
 
 local HOOK = "return { name = 'Probe', hooks = { started = function() Spring.Echo('hook ran') end }, "
@@ -62,7 +69,8 @@ local HOOK = "return { name = 'Probe', hooks = { started = function() Spring.Ech
 -- `removed` is a call the engine does not have.
 local function scene(removed)
 	local w = Engine.new({
-		unitDefs = { { name = "armcom" }, { name = "armpw" }, { name = "armsolar" } },
+		-- The fixture has poses for three pieces of armpw.
+		unitDefs = { { name = "armcom" }, { name = "armpw", pieces = { "pelvis", "turret", "barrel", "arm" } }, { name = "armsolar" } },
 		featureDefs = { { name = "rock" } },
 		weaponDefs = {
 			{ name = "laser", type = "LaserCannon", fireSound = { { name = "zap", volume = 1 } } },
@@ -148,6 +156,9 @@ local OBSERVE = {
 		return count(w.los, function()
 			return true
 		end)
+	end,
+	aimPoses = function(w)
+		return w.poseSets
 	end,
 	holdFire = function(w)
 		return count(w.units, function(unit)
@@ -564,6 +575,184 @@ BEHAVIOUR.rebuild = function()
 	t.same("rebuild: without the call it asks with, the row is off", engine.on.rebuild, false)
 	local blind = plantScene(true, engine)
 	t.same("rebuild: and an older engine leaves the unit finished", blind.unitNamed("plant").beingBuilt, false)
+end
+
+-- The call at the end of a frame (issue #4002). The fixture is played through
+-- the gadget, in a game whose handler passes GameFramePost on, in one whose
+-- handler does not, and on an engine that has no such call. `removed` is a call
+-- the engine lacks. Gives the world and what was counted: frames in which a
+-- unit's maximum was lowered while the engine healed, units whose maximum was
+-- not whole when a frame was over or when the next began, and the calls that
+-- reached the gadget. The fixture has no finished unit that is wounded, so
+-- that a unit is held once the call is installed is shown in player_test.lua,
+-- on a track made from a table.
+local function frameEndScene(how, removed, frames)
+	local w, gadget = scene(removed)
+	gadget:Initialize()
+	gadget:RecvLuaMsg("coilbox_rewind_budget:none", 0)
+	local seen = { held = 0, lowered = 0, posts = 0 }
+	local function lowered()
+		local n = 0
+		for _, unit in pairs(w.units) do
+			if not unit.dead and unit.maxHealth ~= unit.def.health then
+				n = n + 1
+			end
+		end
+		return n
+	end
+	-- The engine's own work in the middle of a frame.
+	w.economy = function()
+		if lowered() > 0 then
+			seen.held = seen.held + 1
+		end
+		w.heal(30)
+	end
+	local real = gadget.GameFramePost
+	gadget.GameFramePost = function(self, n)
+		seen.posts = seen.posts + 1
+		return real(self, n)
+	end
+	local frame = gadget.GameFrame
+	gadget.GameFrame = function(self, n)
+		seen.lowered = seen.lowered + lowered()
+		return frame(self, n)
+	end
+	for _ = 1, frames or 600 do
+		w.gameFrame(gadget, how)
+		seen.lowered = seen.lowered + lowered()
+	end
+	return w, seen, gadget
+end
+
+BEHAVIOUR.frameEnd = function()
+	local MISSING = "GameFramePost does not reach the player"
+	local INSTALLED = "does not pass GameFramePost on, so the player installed it"
+
+	local w, seen = frameEndScene(nil)
+	t.same("frameEnd: a handler that passes the call on is left alone", w.callInUpdates, 0)
+	t.same("and nothing is put in its global table", w.handlerGlobals.GameFramePost, nil)
+	t.same("the call reaches the gadget on every frame", seen.posts, 600)
+	t.same("and no unit has a lowered maximum when a frame is over or begins", seen.lowered, 0)
+	t.same("the player says nothing about the call", said(w, "GameFramePost"), nil)
+
+	w, seen = frameEndScene({ handler = false })
+	t.same("frameEnd: a handler that does not pass the call on has it installed, once", w.callInUpdates, 1)
+	t.same("as a global of the call-in's name", type(w.handlerGlobals.GameFramePost), "function")
+	t.same("which the engine was told of", w.callIns.GameFramePost, true)
+	t.same("the call then reaches the gadget on every frame but the first", seen.posts, 599)
+	t.same("and no unit has a lowered maximum when a frame is over or begins", seen.lowered, 0)
+	t.check("the player says that it installed the call", said(w, INSTALLED) ~= nil, table.concat(w.lines, " | "))
+	t.same("and not that it is missing", said(w, MISSING), nil)
+
+	-- The handler rebuilds its call-ins, which takes the global away.
+	local gadget
+	w, seen, gadget = frameEndScene({ handler = false }, nil, 50)
+	w.handlerGlobals.GameFramePost = nil
+	w.callIns.GameFramePost = false
+	for _ = 1, 50 do
+		w.gameFrame(gadget, { handler = false })
+		seen.lowered = seen.lowered + (function()
+			local n = 0
+			for _, unit in pairs(w.units) do
+				if not unit.dead and unit.maxHealth ~= unit.def.health then
+					n = n + 1
+				end
+			end
+			return n
+		end)()
+	end
+	t.same("frameEnd: a global the handler took away is installed again", w.callInUpdates, 2)
+	t.same("with one frame lost to finding out", seen.posts, 98)
+	t.same("and no unit left with a lowered maximum", seen.lowered, 0)
+
+	w, seen = frameEndScene({ engine = false })
+	t.same("frameEnd: an engine with no such call has the install tried once", w.callInUpdates, 1)
+	t.same("no call reaches the gadget", seen.posts, 0)
+	t.same("no unit's maximum is ever lowered", seen.held + seen.lowered, 0)
+	local line = said(w, MISSING .. ", so a wounded unit keeps its maximum health")
+	t.check("the units stage says what it does without the call", line ~= nil and line:sub(1, #PREFIX) == PREFIX, table.concat(w.lines, " | "))
+	t.check("the resources stage does too", said(w, MISSING .. ", so what a team holds") ~= nil)
+	t.check("and the player says which engine has the call", said(w, "Engine 105.1.1-2590 and later do") ~= nil)
+	local count = 0
+	for _, text in ipairs(w.lines) do
+		if text:find(MISSING, 1, true) then
+			count = count + 1
+		end
+	end
+	t.check("the aim stage says what it does", said(w, MISSING .. ", so aiming pieces are posed from GameFrame") ~= nil)
+	t.same("each of the four lines is logged once in 600 frames", count, 4)
+
+	w, seen = frameEndScene({ handler = false }, "Script.UpdateCallIn")
+	t.same("frameEnd: without Script.UpdateCallIn nothing is installed", w.handlerGlobals.GameFramePost, nil)
+	t.same("no unit's maximum is ever lowered", seen.held + seen.lowered, 0)
+	t.check("and the player says it could not install the call", said(w, "could not install the call-in itself") ~= nil, table.concat(w.lines, " | "))
+end
+
+-- Aim poses (issue #3796). The fixture's one armpw at frame 800 has pose tracks
+-- for three pieces. Its own script turns the turret somewhere else in the
+-- middle of every frame, as an aiming script does. Gives the world, the
+-- turret's turn about y after the gadget's frame on each of 20 frames, and the
+-- same when each frame is over.
+local SCRIPT_AIM = 2.5
+local function aimScene(how, removed)
+	local w, gadget = scene(removed)
+	gadget:Initialize()
+	gadget:RecvLuaMsg("coilbox_rewind_budget:none", 0)
+	gadget:RecvLuaMsg("coilbox_rewind:pause", 0)
+	gadget:RecvLuaMsg("coilbox_rewind:seek 800", 0)
+	local seen = { framed = {}, over = {} }
+	w.economy = function()
+		local unit = w.unitNamed("armpw")
+		seen.framed[#seen.framed + 1] = unit and select(2, w.pieceOf(unit, "turret")) or false
+		if unit then
+			w.scriptTurn(unit, "turret", 0, SCRIPT_AIM, 0)
+		end
+	end
+	for _ = 1, 20 do
+		w.gameFrame(gadget, how)
+		local unit = w.unitNamed("armpw")
+		seen.over[#seen.over + 1] = unit and select(2, w.pieceOf(unit, "turret")) or false
+	end
+	return w, seen
+end
+
+--- How many of `list` from position `from` on are `value`.
+local function countOf(list, from, value)
+	local n = 0
+	for i = from, #list do
+		if list[i] == value then
+			n = n + 1
+		end
+	end
+	return n
+end
+
+BEHAVIOUR.aimPoses = function()
+	local LINE = "GameFramePost does not reach the player, so aiming pieces are posed from GameFrame"
+
+	local w, seen = aimScene(nil)
+	local pose = seen.over[20]
+	t.check("aimPoses: the track's turn is not where the script aims, so the two can be told apart", type(pose) == "number" and pose ~= SCRIPT_AIM and pose ~= 0, pose)
+	t.same("with the call at the end of a frame the pose is the track's when every frame is over", countOf(seen.over, 1, pose), 20)
+	t.same("and the player says nothing about posing", said(w, LINE), nil)
+
+	w, seen = aimScene({ engine = false })
+	t.same("aimPoses: on an engine with no such call the pose is set in the gadget's frame, on every frame", countOf(seen.framed, 1, pose), 20)
+	t.same("the script, which runs after it, has the last word in each", countOf(seen.over, 1, SCRIPT_AIM), 20)
+	local line = said(w, LINE)
+	t.check("and the player says so, with its prefix", line ~= nil and line:sub(1, #PREFIX) == PREFIX, table.concat(w.lines, " | "))
+	local lines = 0
+	for _, text in ipairs(w.lines) do
+		if text:find(LINE, 1, true) then
+			lines = lines + 1
+		end
+	end
+	t.same("once", lines, 1)
+
+	w, seen = aimScene({ handler = false })
+	t.same("aimPoses: in a game whose handler does not pass the call on, the pose holds from the frame the call was installed in", countOf(seen.over, 2, pose), 19)
+	t.same("the first frame, before it, is the script's", seen.over[1], SCRIPT_AIM)
+	t.same("and the player does not say the call is missing", said(w, LINE), nil)
 end
 
 -- A row the fixture track cannot show, because it has no unit that is switched
