@@ -20,6 +20,8 @@ The player holds a time `t`, a frame of the track that can be a fraction. On eve
 | `luarules/rewind_player/coilbox_player_terrain.lua`, `coilbox_player_features.lua`, `coilbox_player_units.lua`, `coilbox_player_projectiles.lua` | the four stages |
 | `luarules/rewind_player/coilbox_player_rotation.lua` | a track's rotation as the pitch, yaw and roll the engine takes |
 | `luarules/rewind_player/coilbox_player_adapter.lua` | reads the game's adapter, and guards its hooks |
+| `luarules/rewind_player/coilbox_player_view.lua` | works out where the viewer looks, for the unsynced half of the gadget to send ([Which units first](#which-units-first)) |
+| `luarules/rewind_player/coilbox_player_arrival.lua` | draws the effect where a unit arrives, in the unsynced half of the gadget ([The arrival effect](#the-arrival-effect)) |
 | `luaui/widgets/coilbox_rewind_timeline.lua` | the timeline widget: the engine's call-ins for drawing, keys and the pointer |
 | `luaui/rewind_timeline/coilbox_timeline.lua` | the timeline: where everything is, what a key or a press sends, and the drawing. It takes the engine as a table, so the tests run it |
 | `luaui/rewind_timeline/coilbox_timeline_engine.lua` | the widget's own table of engine calls, in the same shape |
@@ -67,6 +69,7 @@ Spring.SendLuaRulesMsg("coilbox_rewind:toggle")
 | `direction` | `1` or `-1` | sets the direction and leaves playing or paused as it was |
 | `speed` | `0.5`, `1`, `2`, `4`, `8`, `16` or `32` | sets the speed |
 | `faster`, `slower` | | the next speed up or down the list, stopping at its ends |
+| `drag` | `1` or `0` | says the timeline's knob is being dragged, or has been let go. It moves nothing. While a drag lasts no arrival effect is shown ([The arrival effect](#the-arrival-effect)) |
 
 Every row of the replay page's key table (`src/content/replayMapView/timelineKeys.ts`) is one message:
 
@@ -81,7 +84,7 @@ Every row of the replay page's key table (`src/content/replayMapView/timelineKey
 | `[`, `]` | `seek` with the mark's frame. The player knows nothing of marks |
 | Minus, Plus | `slower`, `faster` |
 
-The gadget's own unsynced half sends one more, `coilbox_rewind_budget:` and two whole numbers, the most units a frame may make and the most it may remove. It is not for a widget. [How many a frame](#how-many-a-frame) has what sets it.
+The gadget's own unsynced half sends one more, `coilbox_rewind_budget:` and two whole numbers, the most units a frame may make and the most it may remove. It is not for a widget. [How many a frame](#how-many-a-frame) has what sets it. It sends a second of its own, `coilbox_rewind_view:`, which says where the viewer looks. [Which units first](#which-units-first) has that one.
 
 A message that is refused changes nothing and logs one line, `COILBOX_REWIND_PLAYER the message "..." was refused:` and the reason. A speed off the list, a frame that is not a number and a command the player does not know are refused. Playing into either end pauses there.
 
@@ -102,7 +105,7 @@ The start script can carry two, which `Player.OPTIONS` also names. Passing them 
 
 The timeline is a LuaUI widget. It reads the parameters above on every draw and sends the messages above, and keeps nothing about playback itself. It sits at the bottom centre of the view. Dragging the panel by any part that is not a control moves it.
 
-From the left: play the other way, play or pause, slower, the speed, faster, the time and the match's length, and a `?` that opens the key list. The bar above them has a knob that seeks while it is dragged, and a press anywhere on the bar seeks there. The times count from the track's first frame, as the replay page's do.
+From the left: play the other way, play or pause, slower, the speed, faster, the time and the match's length, and a `?` that opens the key list. The bar above them has a knob that seeks while it is dragged, and a press anywhere on the bar seeks there. A press on the bar sends `drag 1` before its first seek, and letting go sends `drag 0`, which is how the player tells the many seeks of a drag from one seek. A widget that is switched off in the middle of a drag sends the `drag 0` too. The times count from the track's first frame, as the replay page's do.
 
 ![The key list over Metal Factions, waiting for a key](screenshots/timeline-keys.jpg)
 
@@ -215,7 +218,7 @@ A row names the calls (`calls`), the feature that hangs on them (`feature`), how
 | `shots` | `Spring.SpawnProjectile`, `SetProjectileMoveControl`, `SetProjectileDamages`, `SetProjectilePosition`, `SetProjectileVelocity`, `GetProjectileTimeToLive`, `GetProjectileDirection`, `DeleteProjectile`, `GetGroundHeight`, `Game.armorTypes` | no | the projectiles stage does nothing | shots |
 | `shotHandover` | `Spring.SetProjectileTimeToLive`, from `2025.03.9` | no | `Projectiles:release` keeps the shot under move control for the engine's one look | nothing |
 | `sound` | `Spring.PlaySoundFile`, `Game.gameSpeed` | no | weapons fire without a sound | nothing |
-| `workTiming` | `SendToUnsynced` | no | the slow frame line is not logged, and a seek is shown in one frame because no budget is worked out | nothing |
+| `workTiming` | `SendToUnsynced` | no | the slow frame line is not logged, a seek is shown in one frame because no budget is worked out, units are made in the order of the track's list and there is no arrival effect | nothing |
 | `adapter` | `VFS.FileExists` | no | no adapter is read | the game adapter |
 
 Every row has `since = "105.0"` except `shotHandover`. That is the oldest tag read, not a claim about an older engine. `105.0`, `105.1.1`, `2025.01.6` and `2026.07.04` were read for this table in `rts/Lua` of `~/dev/RecoilEngine`, and the spike on issue #3791 read ten tags and found `Spring.SetProjectileTimeToLive` registered from `2025.03.9` only. In `2025.01.6` the function's body is in `LuaSyncedCtrl.cpp` and nothing registers it.
@@ -258,11 +261,16 @@ The timeline widget uses `gl`, `GL` and the unsynced `Spring`, which the synced 
 
 A widget cannot set a game rules parameter, so the widget has no note. An engine too old for the player's own calls shows the gadget's note through this widget. An engine too old for the widget's calls shows nothing on screen and has the line in the log.
 
-The unsynced half of the gadget has three rows in `M.UNSYNCED`:
+The unsynced half of the gadget has five rows in `M.UNSYNCED`:
 
 - `workTimingLine` needs `Spring.GetTimer`, `Spring.DiffTimers` and `Game.gameSpeed`. Without one it logs a line, takes no timings and sends the player `coilbox_rewind_budget:none` once, which takes the limit off the units stage, so a seek is shown in one frame as it was before issue #3988.
 - `microTimer` needs `Spring.GetTimerMicros`, from `2025.01.6`. Without it a frame is timed in whole milliseconds with `Spring.GetTimer`, and the budgets are coarser.
 - `budgetMessage` needs `Spring.SendLuaRulesMsg`. Without it no budget can be sent, so the budgets stay at one unit made and one removed in a frame. A seek of many units then takes that many frames to show and shows correctly, and a viewer can notice, so the note names it. The synced half cannot tell, which is why this is not a fall back to no limit.
+
+- `view` needs `Spring.GetViewGeometry`, `Spring.TraceScreenRay` and `Spring.GetCameraPosition`. Without one the camera is not looked at, so the units a seek makes are made in the order of the track's list, and an arrival effect is shown for a unit outside the view too. The view is sent with `Spring.SendLuaRulesMsg`, so it is off without the `budgetMessage` row as well.
+- `arrivalEffect` needs `gl.BeginEnd`, `gl.Vertex`, `gl.Color`, `gl.Blending`, `gl.DepthTest`, `gl.DepthMask`, `gl.Texture`, `GL.QUADS`, `GL.SRC_ALPHA`, `GL.ONE`, `GL.ONE_MINUS_SRC_ALPHA`, `Spring.GetCameraDirection`, `Spring.GetUnitRadius` and `Spring.GetTeamColor`. Without one no effect is drawn and the gadget has no `DrawWorld`. The effect's clock is the frame timer's, so it is off without the `workTimingLine` row as well.
+
+Neither is in the note. A viewer cannot tell that an order or an effect they never saw is missing. All of those calls are registered at `105.0`, `105.1.1`, `2025.01.6`, `2025.03.9` and `2026.07.04`: the `Spring` ones in `rts/Lua/LuaUnsyncedRead.cpp` and `LuaSyncedRead.cpp`, the `gl` ones in `LuaOpenGL.cpp` and the constants in `LuaConstGL.cpp`. The unsynced half of a gadget is given `gl` and `GL` in `rts/Lua/LuaHandleSynced.cpp`. They have run on engine `2026.07.01-102-g6e5c5a0` and on no other.
 
 Without `SendToUnsynced` the synced half has no timing at all and starts with no budget, so a seek is shown in one frame.
 
@@ -377,7 +385,7 @@ The player cannot time itself, because synced Lua has no clock. The synced half 
 
 The message reaches the synced half 2 to 5 frames later in the windowed runs below, and up to 22 frames later in a headless run on a machine doing other work. A budget therefore doubles every few frames, and a seek of 400 units took 17 to 24 frames to settle in the windowed runs, and 38 the first time. No count of units is written in the code. The only numbers are half a frame, one to start from and a doubling.
 
-The player makes its units in the order of the window's list, so which units appear first is not chosen.
+Which units a seek makes first follows the viewer. [Which units first](#which-units-first) has how.
 
 #### Measured
 
@@ -418,6 +426,8 @@ COILBOX_CROWD_SOURCE=whole-match.cbtrack COILBOX_CROWD_OUT=crowd.cbtrack COILBOX
 COILBOX_PLAYBACK_TRACK=crowd.cbtrack  # then run the test below, with the variables of the whole match tests
 ```
 
+`COILBOX_CROWD_DEFS` is a list of unit definition names with commas between them. The crowd then uses those in place of the match's own, in turn, which makes a crowd for another game than the one the match was played on. The crowd of 400 Balanced Annihilation units in [The arrival effect](#the-arrival-effect) was made with `armcom,armpw,armsolar,armllt,armmex,armlab,armvp,armstump,armflash,armrad,corcom,corak,corllt` and played with `COILBOX_PLAYBACK_GAME` naming Balanced Annihilation V15.9.8. The ignored test below passed on it in a headless engine: 400 units at each stop and no slow frame.
+
 The ignored test `a_seek_across_a_whole_match_settles_in_frames_that_fit` plays eight seeks across a match with the driver's seeks plan, waits for `coilbox_rewind_settled` after each, and checks that the engine has the track's units and features at each stop and that the log has no slow frame line and no Lua error. It passed on the whole match and on the crowd of 400 in a headless engine. `COILBOX_PLAYBACK_TRACK` names a track to play instead of the one recorded from the replay.
 
 #### Where it stops holding
@@ -441,6 +451,134 @@ The first unit of a definition costs more than the next ones. In the first windo
 The engine already loads every model while the game loads (`PreloadModels` in `rts/Rendering/WorldDrawer.cpp`, on by default, which calls `SolidObjectDef::PreloadModel` for every unit, feature and weapon definition), so the cost is not the model. What it is was not measured. `Spring.PreloadUnitDefModel(unitDefID)` exists in unsynced Lua (`rts/Lua/LuaUnsyncedCtrl.cpp`, since 2015) and does the same thing for one definition, so it adds nothing unless a player has switched `PreloadModels` off.
 
 The player does not create one unit of every definition while the game loads, which the issue suggested. The extra was 10.3 ms in all for 13 definitions, once. With a budget of one, then two, then four, the first units of a seek are few, and in the crowd all 13 definitions were among the first 15 units, made in frames of one, two, four and eight. A unit made and destroyed at load would also run the base game's gadgets for a unit that is not in the track.
+
+### Which units first
+
+After a seek the units the viewer is looking at are made first (issue #4008).
+
+![A seek 0.35 seconds after it was sent: every unit in view is there, and the minimap shows that nothing outside the view is yet](screenshots/seek-view-first.jpg)
+
+The same seek at the same moment with no view sent and no effect, which is how the player made its units before:
+
+![The same moment in the order of the track's list: three units in view, and the rest scattered over the map](screenshots/seek-list-order.jpg)
+
+- The synced gadget cannot see the camera. Its unsynced half looks at it once a simulation frame, before the frame's work is timed, and sends what it finds as a Lua message, `coilbox_rewind_view:`, the way it sends the budget. `luarules/rewind_player/coilbox_player_view.lua` works it out.
+- The view is the place on the ground in the middle of the screen, then the places on the ground at the screen's four corners, going round, each as an x and a z in whole elmos: `coilbox_rewind_view:4000 3000 3200 3450 4799 3450 4799 2551 3200 2551`. That is five calls of `Spring.TraceScreenRay`. Each is made with `onlyCoords`, so the engine walks the heightmap along the ray and looks at no unit and no feature, and with `ignoreWater`, because the engine takes a ray that ends above the water plane to have missed the ground too (`TraceRay::GuiTraceRay` in `rts/Game/TraceRay.cpp`).
+- A corner whose ray leaves the map is where the ray meets the level of the middle. A corner that looks at the sky is nowhere, and the message is then the middle alone: `coilbox_rewind_view:4000 3000`. A camera whose middle looks at the sky sends `coilbox_rewind_view:none`.
+- A view is sent again when its middle or a corner has moved by more than a sixteenth of the distance from the camera to the middle (`View.SHARE`), or when it gains or loses its corners. The share is a choice and not a measurement. A smaller one follows the camera more closely and makes the player sort more often while a seek settles.
+- The units stage keeps the last view. While a seek's units are arriving it puts the units still to be made in order once: those inside the four corners first, and in each group the nearest the middle first. Two as near are in the order of the window's list. A frame makes the next ones of that order as far as its budget goes. With the middle alone, every unit counts as inside.
+- The order is worked out again when a view arrives while the seek settles, when another seek arrives, when the window changes, and when play has brought in a unit the order does not have. So the units still to come follow a camera that moves.
+- A frame of play never sorts. The stage only sorts between a seek and the frame that makes the seek's last unit.
+- With no view the order is the window's list, as it was before: until the first message arrives, on an engine without the calls, and after `coilbox_rewind_view:none`.
+- The world at the end of a seek is the same, and removals still come before creations.
+
+A refused view logs `COILBOX_REWIND_PLAYER the message "..." was refused:` and leaves the last good one.
+
+What the sort costs was timed in a headless engine on a crowd of 2,000, with a scratch mark either side of it: 3.7 to 4.5 ms for 1,740 to 2,000 units over 14 sorts, and 0.59 to 0.81 ms for 289 to 318 units over 6. That includes sampling where each unit stands. It is inside the frame's timed work, so the budget that is worked out from the frame counts it. A camera that scrolls while a seek settles makes the stage sort once for each sixteenth of the camera's distance it moves. A headless engine has a camera, with a view of 8 by 8 pixels, so the headless runs make their units in view order too.
+
+In an engine with a window, on the crowd of 400, with the view of 2560 by 1440 pixels read from the engine once a simulation frame by a scratch gadget, which takes a unit to be in view when its middle is on the screen:
+
+- Before, 288 to 304 of the 360 to 368 units outside the view were made in an earlier frame than the last unit in view, in three seeks of one run.
+- Now, 0 to 7 of the 320 outside were, in 20 seeks over four runs. Each of those was within 115 pixels of the edge of the view. The four corners are joined by straight lines on the ground, and the edge of a view over hills is not straight, so a unit beside the edge can fall on either side. So the rule that every unit in view exists before any unit outside it holds but for units at the edge.
+- Now, the last of the 79 units in view was there 260 to 549 ms after the seek was sent, and the whole seek took 615 to 1,114 ms. Before, it was 567 to 759 ms of 605 to 942 ms, with 31 to 39 units in view, because the camera had moved in that run.
+
+[Measured in a window](#measured-in-a-window) has the frames.
+
+### The arrival effect
+
+A unit that a slow seek makes gets a short effect where it appears, so that it arrives and does not pop into place (issue #4009).
+
+![The effect in Splinter Faction, 0.4 seconds into a seek](screenshots/arrival-effect.jpg)
+
+![The same effect in Balanced Annihilation V15.9.8, on a crowd of its own units](screenshots/arrival-effect-ba.jpg)
+
+Which units get one is the units stage's to say:
+
+- A unit made in a later frame than the frame that showed the seek, while the seek's units are still arriving. That is what slow means here. A seek that is shown in one frame gets none. With a budget that starts at one, a seek that makes more than one unit takes more than one frame.
+- Only a unit inside the view's four corners. With a view that has no corners, or no view, every unit counts as inside.
+- None while the timeline's knob is being dragged, which the `drag` message says. A drag sends many seeks a second. When the drag ends, the units still to come get one.
+- None for a unit a seek removes, and none in plain play. A unit that play brings in while a seek is still settling does get one.
+
+The stage asks with `context.arrive(unitID, x, y, z, team)`. The gadget hands that to its unsynced half with `SendToUnsynced("coilbox_rewind_arrive", ...)`, which is a call and costs no frame, and the unsynced half draws from `gadget:DrawWorld`. `luarules/rewind_player/coilbox_player_arrival.lua` is the effect.
+
+#### What is drawn
+
+A column of light that fades, a ring on the ground that closes on the unit, and 16 dots in the team's colour that fall into it, over 0.9 seconds of the frame timer's clock. The lengths are in the unit's radius, from `Spring.GetUnitRadius`, so a larger unit has a larger effect, and the colour is the team's, from `Spring.GetTeamColor`. The dots are plain squares with a little difference in shade from one to the next. The lengths and the 0.9 seconds are choices of how it looks, made by looking at it in six runs.
+
+It is drawn with `gl.BeginEnd`, `gl.Vertex` and `gl.Color` as quads, with `gl.Blending`, `gl.DepthTest`, `gl.DepthMask` and `gl.Texture(false)` round them. It has no texture, no shader and nothing from the game, and it never touches how a unit is drawn. An effect is a row in lists made once, and a draw allocates nothing.
+
+#### Why the player draws it
+
+The other way would be a particle effect of the engine's, an explosion generator, which the player could start with `Spring.SpawnCEG`. Read in the engine source at commit `212c369b4c`, it cannot be made to work in every game:
+
+- The engine reads every definition from one file, `gamedata/explosions.lua`, and takes the game's own before the engine's (`CExplosionGeneratorHandler::ParseExplosionTables` in `rts/Sim/Projectiles/ExplosionGenerator.cpp`). The engine's file lists `gamedata/explosions/` and `effects/` in every archive, so a file the playback game added there would be read. A game that ships its own `gamedata/explosions.lua` decides what is read. None of Splinter Faction 0.1.89, Balanced Annihilation V15.9.8, Metal Factions v2.58 and THIS does.
+- A particle needs a texture, and the textures are the game's. The atlas is built from the game's `gamedata/resources.lua` (`CProjectileDrawer::Init` in `rts/Rendering/Env/Particles/ProjectileDrawer.cpp`), and the engine's base content has no projectile bitmap. A particle whose texture the atlas lacks is not drawn (`CSimpleParticleSystem::Draw`). No name is in every game.
+
+Drawing from a gadget needs the game's gadget handler to pass `DrawWorld` to the unsynced half. Splinter Faction and Balanced Annihilation have handlers of their own and both pass it, as the engine's does, which Metal Factions and THIS use. Each lists the call-ins it knows, and a gadget that defines one is called with nothing to register. A game whose handler does not pass `DrawWorld` gets no effect and no error.
+
+#### A game's own effect
+
+A game's adapter can show the game's own spawn or warp effect in its `unitPlaced` hook ([Hooks](#hooks)). The hook's fifth argument is whether the player is about to show its effect for the unit, and a hook that gives true has shown its own, so the player shows none. The name below stands for one of the game's own explosion generators.
+
+```lua
+unitPlaced = function(unitID, unitDefID, t, clock, effect)
+	if effect then
+		local x, y, z = Spring.GetUnitPosition(unitID)
+		Spring.SpawnCEG("mygame_warp_in", x, y, z)
+		return true
+	end
+end,
+```
+
+A hook that gives nothing leaves the player's effect, and so does one that raises. The hook is still called for every unit the player makes, whatever `effect` is.
+
+#### What it costs
+
+- Asking is inside the frame's timed work: one `SendToUnsynced` and, in the unsynced half, `Spring.GetUnitRadius` and `Spring.GetTeamColor`. The budget counts it.
+- Drawing was timed by a scratch gadget that held 16, 64, 256 and 1,024 effects half way through their lives and timed the module's draw, in three runs in a view of 2560 by 1440 pixels, two in Splinter Faction and one in Balanced Annihilation: 13.4 to 16.0 microseconds for each effect in each drawn frame. 64 effects drew in 0.91 to 0.94 ms, 256 in 3.5 to 3.8 ms and 1,024 in 13.8 to 14.9 ms.
+- So there is a cap. No more than 256 effects are alive at once (`Arrival.MOST`), and a unit that arrives past that has none. The cap is a choice of how much of a drawn frame to spend, 3.8 ms at the worst measured. The crowd of 400 had 79 units in view.
+- While a seek of the crowd of 400 settled, the engine drew 9 to 10 frames a second with the effect and 8 to 11 without, in three of the runs below.
+
+#### Measured in a window
+
+The engine was `2026.07.01-102-g6e5c5a0` with Splinter Faction, in a window of 1,280 by 720 points, which is 2560 by 1440 pixels, on 14 October 2026. Another agent was building and running engines on the same machine, so the load average is given for each run. The track is the crowd of 400 and the seek is from the first frame to frame 22,791, with the camera over the place most of its units are. The first seek of a run is the first row and later ones follow. A scratch gadget read the player's own measure of each frame's work. "Frames" is the frames that made a unit. "In view by" is when the last unit in view was there, after the seek was sent, and "whole seek" is when the player said it was settled.
+
+| Player | Run, load | Seek | Effect | Frames | Slowest frame | In view by | Whole seek | Slow frames |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| before | 1, 5.6 | first | none | 21 | 28.04 ms | 759 ms | 942 ms | 0 |
+| before | 1, 5.6 | later | none | 16 | 19.67 ms | 567 ms | 605 ms | 0 |
+| before | 1, 5.6 | later | none | 16 | 22.84 ms | 590 ms | 617 ms | 0 |
+| now | 2, 5.2 | first | on | 22 | 39.06 ms | 549 ms | 1,114 ms | 1 |
+| now | 2, 5.2 | later | on | 18 | 23.72 ms | 322 ms | 768 ms | 0 |
+| now | 2, 5.2 | later | on | 17 | 21.20 ms | 324 ms | 779 ms | 0 |
+| now | 2, 5.2 | later | off | 16 | 24.25 ms | 347 ms | 642 ms | 0 |
+| now | 2, 5.2 | later | off | 15 | 21.74 ms | 260 ms | 692 ms | 0 |
+| now | 3, 17.6 | first | on | 19 | 46.13 ms | 433 ms | 963 ms | 2 |
+| now | 3, 17.6 | later | on | 16 | 24.32 ms | 315 ms | 747 ms | 0 |
+| now | 3, 17.6 | later | on | 18 | 23.28 ms | 374 ms | 690 ms | 0 |
+| now | 3, 17.6 | later | off | 16 | 24.02 ms | 331 ms | 625 ms | 0 |
+| now | 3, 17.6 | later | off | 17 | 25.65 ms | 390 ms | 654 ms | 0 |
+| now | 4, 4.4 | first | on | 23 | 21.54 ms | 415 ms | 925 ms | 0 |
+| now | 4, 4.4 | later | on | 17 | 23.40 ms | 373 ms | 814 ms | 0 |
+| now | 4, 4.4 | later | on | 17 | 23.83 ms | 344 ms | 647 ms | 0 |
+| now | 4, 4.4 | later | off | 17 | 22.30 ms | 366 ms | 853 ms | 0 |
+| now | 4, 4.4 | later | off | 16 | 22.25 ms | 300 ms | 734 ms | 0 |
+| now | 6, 3.5 | first | on | 22 | 39.92 ms | 487 ms | 1,028 ms | 3 |
+| now | 6, 3.5 | later | on | 18 | 21.16 ms | 358 ms | 714 ms | 0 |
+| now | 6, 3.5 | later | on | 17 | 20.52 ms | 404 ms | 731 ms | 0 |
+| now | 6, 3.5 | later | off | 16 | 23.94 ms | 377 ms | 715 ms | 0 |
+| now | 6, 3.5 | later | off | 16 | 24.38 ms | 341 ms | 615 ms | 0 |
+
+"Off" is the same seek sent between a `drag 1` and a `drag 0`, which asks for no effect. A first seek with the effect off was not run. Run 5 was Balanced Annihilation.
+
+What the table shows and does not:
+
+- A later seek logged no slow frame in any run, with the effect or without, and its slowest frame is the same before and now.
+- The first seek of a run logged a slow frame in three of the four runs now, of 36.6 to 46.1 ms, and not in the one run before, whose slowest was 28.0 ms. One run before is not enough to say the first seek was safe before.
+- In the two runs that have each frame, the slow frames came late in the seek, after every unit in view had been made. Going by run 4, where the first unit of all 13 definitions was made in the first seven frames, the first units of the definitions were over too. They were frames of 40 and 46 units that took 0.80 to 1.15 ms a unit, where the frames that set the budget had taken 0.36 to 0.41 ms a unit. The sort and the asks for an effect were over by then. Why the last units of a first seek cost twice the first ones in a window is not known. It did not show in a headless engine, where three first seeks before and three now had a slowest frame of 18.4 to 21.9 ms. Issue #4015 is for it.
+- A screenshot was taken part way through 13 more seeks, and one of those logged a slow frame of 33.8 ms.
+
+In Balanced Annihilation, in run 5, the same crowd as its own units logged no slow frame and no Lua error, with a slowest frame of 13.4 ms. The engine drew 4 to 7 frames a second there, and the budget was slow to grow: the first seek took 49 frames, 25 of them at two units a frame, and the later ones 21 to 25 frames. Why the budget's message took longer to come back there was not looked into, and issue #4016 is for it. Balanced Annihilation's gadget handler logs `UpdateCallIn: GameFramePost is not implemented`, so the player never hears the end of a simulation frame there (issue #4002).
 
 ### What the base game does
 
@@ -577,7 +715,7 @@ A hook is an optional function in `hooks`. The player calls these and no others,
 | Hook | Called | Arguments |
 | --- | --- | --- |
 | `started` | once, when the player has opened the track, before the first frame and so before anything of the track is in the world | none |
-| `unitPlaced` | after the player created a unit and put it in place, and again for a unit made again after a seek | the engine's unit id, the unit definition's engine id, the track frame, the clock |
+| `unitPlaced` | after the player created a unit and put it in place, and again for a unit made again after a seek | the engine's unit id, the unit definition's engine id, the track frame, the clock, and whether the player is about to show its arrival effect for the unit. A hook that gives true has shown the game's own effect, and the player shows none ([A game's own effect](#a-games-own-effect)) |
 | `afterFrame` | at the end of every simulation frame, after every stage | the track frame, the clock |
 
 The clock is the player's, and a hook only reads it. `clock.jumped` says the frame was reached by a seek or a step, `clock.direction` is 1 or -1 and `clock.speed` is how many frames of the track a simulation frame covers.
@@ -811,6 +949,8 @@ luajit lua/rewind-player/tests/rotation_test.lua
 luajit lua/rewind-player/tests/player_test.lua
 luajit lua/rewind-player/tests/projectiles_test.lua
 luajit lua/rewind-player/tests/settle_test.lua
+luajit lua/rewind-player/tests/view_test.lua
+luajit lua/rewind-player/tests/arrival_test.lua
 luajit lua/rewind-player/tests/gadget_test.lua
 luajit lua/rewind-player/tests/adapter_test.lua
 luajit lua/rewind-player/tests/engine_test.lua
@@ -827,6 +967,8 @@ luajit lua/rewind-player/tests/timeline_test.lua
 - `player_test.lua` checks the stages on tracks made from a table (`tests/fake_track.lua`): what is alive at a time, removal before creation, a seek back past a construction, play in both directions, a missing definition, a nil from `Spring.CreateUnit`, terrain forward and back, that the engine's own healing (`world.heal` in the stand-in, run between a frame and its post frame) leaves a wounded unit's health alone and its maximum is whole again afterwards, that health which moved anyway is put right and logged once, and that a frame of play allocates nothing.
 - `projectiles_test.lua` checks the projectiles stage: what is in the air at a time, stepping forward and backward, that a seek looks at the shots that can be alive and not the window's list, that a shot lands only while it is watched and with no damage, crater or push, a shell that ends in the air, a bolt that stops, a beam fired once, the fire sound and when it is not played, a weapon the game lacks, an engine with no `Spring.SetProjectileTimeToLive`, a shot the engine ended and an id handed out again, a shot alive across two windows, and that 300 frames of play with 40 shots in the air allocate nothing.
 - `settle_test.lua` checks a seek that needs more units than a frame may make or remove: that it settles over several frames, that removals use their own budget and come first, that a second seek while one settles starts again, that play goes on while it settles and units made late stand where the track has them now, what `coilbox_rewind_settled` says and when, the budget message and the ones it refuses, that a shot waits for its shooter, and that 300 frames of play with a budget allocate nothing.
+- `view_test.lua` checks the order a seek makes its units in: the list's with no view, nearest the camera's place first with one, inside the view's corners before outside, the rest following a camera that moves, the list's again after `coilbox_rewind_view:none`, removals still first, a unit born while a seek settles, the view messages it refuses, and that 300 frames of play with a view allocate nothing.
+- `arrival_test.lua` checks which units the player asks an arrival effect for: each one a slow seek makes after its first frame, none for a seek shown in one frame, a removal or plain play, none during a drag until it ends, none outside the view, and none when the adapter's hook says it showed its own. Then the two unsynced modules on a stand-in (`tests/unsynced.lua`): the view's message, when it is sent again, a corner off the map and one in the sky, and what the effect draws, where, in which colour, for how long, how many at once, the state it leaves and that a draw allocates nothing. It does not show how the effect looks.
 - `gadget_test.lua` loads the two gadgets the way the engine does. That includes the gadget's answers of no damage for units and for features, its post frame, and the unsynced half's working out of the two budgets from the time a frame's work took.
 - `adapter_test.lua` checks how the player reads an adapter, that it never creates a hidden unit or skipped feature and says nothing about either, that each hook is called with the right arguments and a hook that raises is switched off, the log line, and that 60 frames of play with hooks allocate nothing.
 - `engine_test.lua` is made from the engine table ([Engine calls](#engine-calls)). For every call of every row it takes the call out of the stand-in and plays the fixture track, and it checks the table against the source with `tests/scan.lua`. The widget's table is tested the same way in `timeline_test.lua`.
@@ -914,6 +1056,8 @@ MaxTextureAtlasSizeY = 8192
 Without the first line, the Initial Settings widget reloads the engine four seconds after it loads, which is what every headless run above does, since each has a settings file of its own. The match has no countdown to wait behind, so a driver starts, is cut off at about frame 100 and starts again, and the tests read what it said from its last start.
 
 A scripted screenshot can hang this engine for good. `CBitmap::Save` logs while it holds the bitmap lock, and the info console, updating on the main thread, holds its own lock while it wraps a new line and loads any character its font does not have yet, which takes the bitmap lock. The font has ASCII from the start. Splinter Faction logs an em dash and an arrow in its first frames. Echo both before the first screenshot, wait until the game's start has logged, and keep any line of your own a second away from a screenshot.
+
+The order a seek makes its units in and the arrival effect were looked at on 14 October 2026, in six runs with a window: one of the player as it was, four on Splinter Faction and one on Balanced Annihilation V15.9.8, each with a scratch gadget that pointed the camera, seeked, read the engine once a frame and took the engine's own screenshots part way through a seek. [Which units first](#which-units-first) and [The arrival effect](#the-arrival-effect) have the pictures and the figures. In the first two of those runs the camera moved by itself, because the pointer was at the edge of the window. A run that needs the camera to stay sets `WindowedEdgeMove = 0` in its settings file.
 
 The timeline has been looked at, once, by hand, on 13 October 2026: the same playback game opened in the engine with a window, in Splinter Faction 0.1.89 and in Metal Factions v2.58, with a scratch widget pressing the timeline's keys and taking the engine's own screenshots. The two pictures on this page are from those runs. The marks on the bar were not in them, since nothing writes a marks file yet. To do it again, set `COILBOX_PLAYBACK_KEEP_GAME` to a folder when running the timeline's test, which copies the playback game and its script there, and launch `spring` on the script. A settings file Splinter Faction has not seen makes its Initial Settings widget reload the engine, which took this engine down, so give the run a settings file with `SFInitialSettingsVersion = 1` in it.
 

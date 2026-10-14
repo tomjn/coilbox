@@ -131,7 +131,7 @@ True to the recording:
 - Where units, wrecks and features are, which way they face and when they appear or go.
 - Health, health bars, build progress and its time left.
 - Terrain changes. One the engine did not report during the match can show up to 900 frames late.
-- A big jump. When a jump has hundreds of units to remove and make, the world takes a few frames to catch up, about a second for several hundred, so the units appear over that time and not all at once. The playback does this so that the game does not stutter.
+- A big jump. When a jump has hundreds of units to remove and make, the world takes a few frames to catch up, about a second for several hundred, so the units appear over that time and not all at once. The units you are looking at appear first, and the rest of the map fills in after them. Each unit that arrives late in view shows a short effect in its team's colour: a column of light, a ring that closes on it and a few dots that fall into it. The effect is the playback's and was not in the match. While you drag the bar's knob no effect is shown, and units that are removed go with nothing shown. The playback spreads the work so that the game does not stutter.
 - Shots in the air. A unit that dies while you play forward at 0.5x, 1x or 2x dies with the game's own death effect, and a shot lands with the game's impact effect. At any other time (after a seek or a step, playing backward, or at 4x and faster) they come and go with nothing shown.
 - The resource bars' storage and income, because the same buildings make them.
 - The minimap, the tooltip with a unit's description, the players list and the game's own effects and lights.

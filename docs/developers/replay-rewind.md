@@ -152,12 +152,32 @@ A hook is an optional function in `hooks`. The player calls these three and no o
 | Hook | Called | Arguments |
 | --- | --- | --- |
 | `started` | Once, when the player has opened the track, before the first frame and so before anything of the track is in the world. | None. |
-| `unitPlaced` | After the player created a unit and put it in place, and again for a unit made again after a seek. A seek that needs many units made spreads them over several frames, so this can come some frames after the seek. | The engine's unit id, the unit definition's engine id, the track frame and the clock. |
+| `unitPlaced` | After the player created a unit and put it in place, and again for a unit made again after a seek. A seek that needs many units made spreads them over several frames, so this can come some frames after the seek. | The engine's unit id, the unit definition's engine id, the track frame, the clock, and `effect`, which is true when the player is about to show its arrival effect for the unit. Return true to say you showed your own. |
 | `afterFrame` | At the end of every simulation frame, after every stage. | The track frame and the clock. |
 
 The clock is the player's, and a hook only reads it. `clock.jumped` says the frame was reached by a seek or a step. `clock.direction` is 1 or -1. `clock.speed` is how many frames of the track one simulation frame covers.
 
 A hook runs in synced Lua, in the gadget's environment. A frame of play allocates nothing in the player, so a hook that runs every frame should not allocate either.
+
+#### Your own arrival effect
+
+After a seek that takes more than one frame, the player shows a short effect where each unit in view appears: a column of light, a ring and dots in the team's colour. The player draws it itself with plain quads, so it works in your game with no adapter and does not touch how your units are drawn.
+
+To show your game's own spawn or warp effect instead, do it in `unitPlaced` and return true:
+
+```lua
+unitPlaced = function(unitID, unitDefID, t, clock, effect)
+	if effect then
+		local x, y, z = Spring.GetUnitPosition(unitID)
+		Spring.SpawnCEG("name-of-your-effect", x, y, z)
+		return true
+	end
+end,
+```
+
+- `effect` is true only for a unit made in a later frame than the one that showed the seek, inside the view, and not while the timeline's knob is being dragged. Spawn only when it is true. The hook is called for every unit the player makes, and a large seek makes hundreds outside the view.
+- A hook that returns true stops the player's effect for that unit. One that returns nothing leaves it, and so does one that raises.
+- The player shows at most 256 of its own effects at once. Your effect has no such cap, and a large seek makes dozens of units a frame, so look at what yours costs.
 
 Splinter Faction's `started` hook is the example. Its `game_spawn.lua` gave each team its storage at the start of a match. With that gadget switched off, a team keeps the engine's own 1,000,000 and the resource bars read 0/1000000. The hook gives each team what the gadget gave it, and it runs before any unit is placed because a team's buildings add storage.
 
