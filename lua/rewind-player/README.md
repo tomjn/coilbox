@@ -666,6 +666,7 @@ A seek can need hundreds of units made or removed, and in Splinter Faction the e
 - Play goes on while a seek settles. The clock moves in every frame, and a unit made late is put where the track has it at the time of the frame it is made in.
 - A shot waits for its shooter. A shot made before its unit would have no owner for good, so the projectiles stage leaves a shot whose shooter is in the track and not yet made, and makes it in the frame the shooter is there if it is still in the air.
 - The adapter's `unitPlaced` hook is called when a unit is made, which can be several frames after the seek.
+- A seek into another window reads that window in its first frame, and does nothing else of the seek in it ([The start of a seek](#the-start-of-a-seek)).
 - `coilbox_rewind_settled` is 0 from a seek's message until the world is the track at `coilbox_rewind_frame`, and 0 before the first frame. A test or a widget that waits for a seek waits for the frame and then for this.
 
 #### How many a frame
@@ -832,7 +833,7 @@ Beyond All Reason `test-30922-8064a43` on the match of 674 units, with its idle 
 | w5 | after | 5.1, 7.3 | first | 20 | 6 | 1,012 ms | 25.0 ms | 4 | 0 |
 | w5 | | | later, two | 12, 16 | 2, 2 | 554, 731 ms | 27.8, 41.3 ms | 4, 5 | 0, 1 |
 
-The one slow frame line on Beyond All Reason, 41.2 ms, was the first frame of a later seek, before any unit was made: 28.5 ms of ground and 12.8 ms of the units stage's start of a seek, which no budget covers. The old rule would have sent that frame the same ground budget. Issue #4037 is for it.
+The one slow frame line on Beyond All Reason, 41.2 ms, was the first frame of a later seek, before any unit was made: 28.5 ms of ground and 12.8 ms of the units stage's start of a seek, which no budget covers. The old rule would have sent that frame the same ground budget. Issue #4037 gave that start a frame of its own ([The start of a seek](#the-start-of-a-seek)).
 
 Headless after the change, on the same three tracks and two later seeks each: Splinter Faction 16, 15 and 15 frames with a slowest of 18.7 to 19.5 ms, Balanced Annihilation 7 frames each with a slowest of 17.4 to 17.9 ms, and Beyond All Reason 9, 7 and 7 frames and 2 ground frames each, with a slowest of 25.8 to 28.1 ms, which was each seek's first frame. Every budget arrived on the next frame. None logged a slow frame line.
 
@@ -841,6 +842,45 @@ What this shows and does not:
 - The first seek now settles in about as many frames as later ones: 17 against 14 and 15 on Splinter Faction, 8 against 11 and 12 on Balanced Annihilation, and in 1,012 ms against 554 and 731 on Beyond All Reason. Balanced Annihilation's first seek went from 49 frames to 8.
 - No first seek logged a slow frame line, in four launches with the change and one before it. The first seek's slowest frames were 25.0 to 30.8 ms, under a simulation frame and well over the half the budget aims at. One launch of a kind is a small sample, and the issue's own runs before the change had none in one launch of four.
 - The rows after the change are three versions of the rule, as the work went, and only w5 and w6 are the rule as it is. The limit on how far a rise is taken only changes a budget early in a seek, where a rise has been read over few units.
+
+Issue #4015 asked for five first seeks in a window on the crowd of 400 with no slow frame line. With the rule above and the start of a seek of issue #4037, five launches on 14 October 2026, each one first seek and one later seek, on the same engine, game and window, with the machine's load average read before and after each:
+
+| Launch | Load | First seek, frames | Slowest frame | Longest wait for a budget | Whole seek | Later seek, frames | Slowest frame | Slow frame lines |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| f1 | 5.1, 5.4 | 15 | 26.4 ms | 10 | 774 ms | 15 | 20.4 ms | 0 |
+| f2 | 5.4, 5.7 | 15 | 24.7 ms | 7 | 814 ms | 15 | 21.7 ms | 0 |
+| f3 | 5.7, 5.6 | 17 | 26.9 ms | 11 | 899 ms | 14 | 23.4 ms | 0 |
+| f4 | 5.6, 6.1 | 16 | 24.9 ms | 8 | 922 ms | 13 | 24.0 ms | 0 |
+| f5 | 5.9, 6.3 | 19 | 25.8 ms | 11 | 1,079 ms | 15 | 21.1 ms | 0 |
+
+No line in any of the five, and the first seek's slowest frame was 24.7 to 26.9 ms. The first seeks made their units in 15 to 19 frames, against 17 in w6, before the start of a seek had a frame of its own.
+
+#### The start of a seek
+
+Issue #4037. A seek into another window starts with work no budget covers. Timed part by part with a scratch probe on the Beyond All Reason match headless, the first frame of a seek to frame 82,196 spent:
+
+| Part | Time |
+| --- | --- |
+| reading the window, `track:seek` in the units stage | 8.5 to 9.4 ms |
+| the view's sort of the units to come | 1.3 to 1.5 ms |
+| the terrain stage marking the tiles to set | 0.45 to 0.53 ms |
+| the stages' `resync` and the window's index | 0.1 to 0.3 ms |
+
+The ground then took its whole budget on top, which was learned from frames that only set ground, so the frame came to 26.8 to 28.4 ms headless and 41.3 ms once in a window. A seek back to the first frame reads a small window, 0.6 ms.
+
+The window cannot be read in parts, and the synced half has no clock to count it against the ground's share. So the units stage reads the window in `resync`, before any stage moves anything, and a frame that read another window does nothing else of the seek: no ground is set, and no unit is made or removed. The ground and the units start on the next frame with their budgets. The synced half says so with each frame, and the unsynced half neither judges a budget by that frame nor takes it for the end of a seek. A seek inside the window already read, the playback's first frame, which reads the first window with a budget of one unit, and a seek with no budget start at once as before. It costs a seek into another window one frame.
+
+In a window, on 14 October 2026, the Beyond All Reason match, one launch before and one after:
+
+| Run | Player | Load | Seek | First frame | Frames after it, slowest | Frames | Ground frames | Whole seek | Slowest frame | Slow frame lines |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| w5 | before | 5.1, 7.3 | first | 20.0 ms | | 20 | 6 | 1,012 ms | 25.0 ms | 0 |
+| w5 | before | | later, two | 27.8, 41.3 ms | | 12, 16 | 2, 2 | 554, 731 ms | 27.8, 41.3 ms | 0, 1 |
+| w7 | after | 6.0, 6.4 | first | 16.3 ms | 10.2 ms of ground | 18 | 8 | 1,173 ms | 30.6 ms | 0 |
+| w7 | after | | back, two | 10.3, 6.8 ms | 16.7, 15.1 ms of ground | 12, 10 | 2, 2 | 618, 438 ms | 24.6, 18.6 ms | 0 |
+| w7 | after | | later, two | 14.1, 15.2 ms | 18.5, 18.5 ms of ground | 13, 14 | 2, 2 | 680, 687 ms | 22.7, 20.3 ms | 0 |
+
+The first seek's slowest frame, 30.6 ms, made 61 units, after the start and the ground. Headless, on a machine with a load average of 7 to 12, the start frames took 11.5 to 22.8 ms. That run logged two slow frames of the seeks' own budgets, 289 removals in 103.4 ms where the next frame did 289 in 10.8 ms, and 39.6 ms of ground, which is the machine.
 
 ### Which units first
 
@@ -1614,7 +1654,7 @@ luajit lua/rewind-player/tests/ghosts_test.lua
 - `animation_test.lua` checks the animation stage on a stand-in whose units have COB and Lua scripts: a unit that starts and stops is told once each, with its velocity and its place left alone, a unit with no script, pause, play backward and turning play round, seeks, a unit made again, 8x and half speed, a unit under construction, a builder's start and stop with its angles for a Lua and a COB script, a factory, every kind of work and its parameters, a factory that goes straight on to the next unit, a window with no track for the work, a target a seek has yet to make, the pieces a walk turns and the aim stage leaves to the script, a script that raises, a framework the wrap does not see, each row switched off, the fixture through the real reader, and that 300 frames of 20 walking units and 5 builders at work allocate nothing.
 - `projectiles_test.lua` checks the projectiles stage: what is in the air at a time, stepping forward and backward, that a seek looks at the shots that can be alive and not the window's list, that a shot lands only while it is watched and with no damage, crater or push, a shell that ends in the air, a bolt that stops, a beam fired once, the fire sound and when it is not played, a weapon the game lacks, an engine with no `Spring.SetProjectileTimeToLive`, a shot the engine ended and an id handed out again, a shot alive across two windows, and that 300 frames of play with 40 shots in the air allocate nothing.
 - `resources_test.lua` checks the resources stage on a stand-in whose teams follow `rts/Sim/Misc/Team.cpp` and whose frame runs in the engine's order, with the playback's own economy between the gadget's two call-ins: what a team holds, its storage and its share level at a frame, after a seek forward and backward, held for 400 frames and while playing each way, on an engine with and without `GameFramePost`, income, expense and pull after three of the engine's sums, a team with an income multiplier, excess, allied teams and the engine's own sharing, rules parameters with and without an adapter that names them, a track from recorder version 3, the fixture through the real reader, and that 300 frames allocate nothing.
-- `settle_test.lua` checks a seek that needs more units than a frame may make or remove: that it settles over several frames, that removals use their own budget and come first, that a second seek while one settles starts again, that play goes on while it settles and units made late stand where the track has them now, what `coilbox_rewind_settled` says and when, how many of a frame's units were the first of their definition in the run, the budget message and the ones it refuses, that a shot waits for its shooter, and that 300 frames of play with a budget allocate nothing.
+- `settle_test.lua` checks a seek that needs more units than a frame may make or remove: that it settles over several frames, that removals use their own budget and come first, that a second seek while one settles starts again, that play goes on while it settles and units made late stand where the track has them now, what `coilbox_rewind_settled` says and when, how many of a frame's units were the first of their definition in the run, the budget message and the ones it refuses, that the first frame of a seek into another window makes and removes nothing (issue #4037), that a shot waits for its shooter, and that 300 frames of play with a budget allocate nothing.
 - `terrain_test.lua` checks the ground of a seek (issue #4025) on tracks with craters across a map of 256 by 256 corners and a block of rows on the last frame: that a seek with a small ground budget takes several frames and no frame does more than its budget and one tile, that no call reaches past a tile and the corner beside it, that no call that moved a corner leaves the engine a rectangle of no area, that the ground is the track's after seeks both ways and after a seek that arrives while another settles, that a corner before its first change has the map's own height, that no unit is made while the ground still moves and the player is not settled until it stops, that a unit stands at the track's height before and after the ground under it arrives, that play at 1x forward and backward moves a crater on its frame while a seek's ground is still being set, the third number of the budget message, and that 300 frames of play through craters allocate nothing.
 - `view_test.lua` checks the order a seek makes its units in: the list's with no view, nearest the camera's place first with one, inside the view's corners before outside, the rest following a camera that moves, the list's again after `coilbox_rewind_view:none`, removals still first, a unit born while a seek settles, the view messages it refuses, and that 300 frames of play with a view allocate nothing.
 - `arrival_test.lua` checks which units the player asks an arrival effect for: each one a slow seek makes after its first frame, none for a seek shown in one frame, a removal or plain play, none during a drag until it ends, none outside the view, and none when the adapter's hook says it showed its own. Then the two unsynced modules on a stand-in (`tests/unsynced.lua`): the view's message, when it is sent again, a corner off the map and one in the sky, and what the effect draws, where, in which colour, for how long, how many at once, the state it leaves and that a draw allocates nothing. It does not show how the effect looks.
