@@ -475,6 +475,9 @@ do
 	e.gl.Blending, e.gl.DepthTest, e.gl.DepthMask, e.gl.Texture, e.gl.Color = nothing, nothing, nothing, nothing, nothing
 	collectgarbage()
 	collectgarbage("stop")
+	-- A full collection gives back part of the Lua stack, and the first draws
+	-- after it take that back, which is the interpreter's and not the effect's.
+	draws()
 	local before = collectgarbage("count")
 	draws()
 	local grew = collectgarbage("count") - before
