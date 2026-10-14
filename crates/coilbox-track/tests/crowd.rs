@@ -12,6 +12,23 @@
 //! start to the end creates all of them, the first time of each definition
 //! included, and a seek back removes all of them.
 //!
+//! `COILBOX_CROWD_DEFS` is a list of unit definition names, with commas between
+//! them, to give the definitions the crowd uses instead of the match's own, in
+//! turn. That makes a crowd for another game than the one the match was played
+//! on, whose units the match's names do not exist in (issue #4009).
+//!
+//! `COILBOX_CROWD_POSES` gives the crowd aim poses, which it has none of
+//! without it (issue #3796). `track` poses the pieces the source track names
+//! for each definition. Anything else is a list for another game, of a
+//! definition name, a colon and its piece names with `+` between them, with
+//! commas between the definitions: `armpw:torso,armstump:turret+sleeve`. Every
+//! posed piece of every unit turns about its y axis, a quarter turn to either
+//! side of where it started, with a key every 30 frames, so a frame between two
+//! keys is a blend of them as it is in a recorded match.
+//!
+//! `COILBOX_CROWD_WOUNDED` is a number `n`. Every `n`th unit then has half its
+//! health, where without it every unit is whole (issue #4002).
+//!
 //! ```sh
 //! COILBOX_CROWD_SOURCE=whole-match.cbtrack COILBOX_CROWD_OUT=crowd.cbtrack \
 //!   COILBOX_CROWD_UNITS=400 \
@@ -88,6 +105,51 @@ fn a_crowd_of_real_definitions_is_written() {
     });
     track.info = info;
     track.info.writer = "coilbox-track tests crowd".into();
+    if let Ok(names) = std::env::var("COILBOX_CROWD_DEFS") {
+        let names: Vec<&str> = names.split(',').filter(|n| !n.is_empty()).collect();
+        assert!(!names.is_empty(), "COILBOX_CROWD_DEFS names no definition");
+        for (n, def) in defs.iter().enumerate() {
+            track.info.unit_defs[*def as usize] = names[n % names.len()].to_string();
+        }
+    }
+    // How many posed pieces each definition of the crowd has.
+    let posed = std::env::var("COILBOX_CROWD_POSES").unwrap_or_default();
+    if posed.is_empty() {
+        track.info.posed_pieces.clear();
+    } else if posed != "track" {
+        track.info.posed_pieces.clear();
+        for entry in posed.split(',').filter(|e| !e.is_empty()) {
+            let (name, pieces) = entry
+                .split_once(':')
+                .expect("COILBOX_CROWD_POSES is name:piece+piece,name:piece");
+            // `COILBOX_CROWD_DEFS` can give several definitions one name.
+            let named: Vec<usize> = (0..track.info.unit_defs.len())
+                .filter(|d| track.info.unit_defs[*d] == name)
+                .collect();
+            assert!(
+                !named.is_empty(),
+                "the crowd has no definition called {name}"
+            );
+            for unit_def in named {
+                track.info.posed_pieces.push(PosedPieces {
+                    unit_def: unit_def as u16,
+                    pieces: pieces.split('+').map(str::to_string).collect(),
+                });
+            }
+        }
+    }
+    let pieces_of = |def: u16| {
+        track
+            .info
+            .posed_pieces
+            .iter()
+            .find(|p| p.unit_def == def)
+            .map_or(0, |p| p.pieces.len())
+    };
+    let wounded: u32 = std::env::var("COILBOX_CROWD_WOUNDED")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
     track.features = features;
     for k in 0..h.window_count as usize {
         track.terrain.extend(reader.terrain(k).unwrap());
@@ -112,10 +174,36 @@ fn a_crowd_of_real_definitions_is_written() {
             middle
         };
         let position = at.map(|v| q.position(v).unwrap());
+        let unit_def = defs[n % defs.len()];
+        // Each piece swings a quarter turn to either side of an angle of the
+        // unit's own, over 240 frames, so no two units point the same way.
+        let quarter = ANGLE_UNITS_PER_TURN / 4;
+        let poses = (0..pieces_of(unit_def))
+            .map(|piece| PoseTrack {
+                piece: piece as u16,
+                keys: (first..=h.last_frame)
+                    .step_by(30)
+                    .map(|frame| {
+                        let step = ((frame - first) / 30 + serial + piece as u32) % 8;
+                        let swing = [0, 1, 2, 1, 0, -1, -2, -1][step as usize] * quarter / 2;
+                        PoseKey {
+                            frame,
+                            angles: [0, (serial as i32 * 4099) % ANGLE_UNITS_PER_TURN + swing, 0],
+                            offsets: [0, 0, 0],
+                        }
+                    })
+                    .collect(),
+            })
+            .collect();
+        let health = if wounded > 0 && serial % wounded == 0 {
+            32768
+        } else {
+            65535
+        };
         track.units.push(Unit {
             engine_id: serial as u16 + 1,
             serial,
-            unit_def: defs[n % defs.len()],
+            unit_def,
             team: teams[n % teams.len()],
             first_frame: first,
             last_frame: h.last_frame,
@@ -133,12 +221,12 @@ fn a_crowd_of_real_definitions_is_written() {
             ],
             status: vec![StatusKey {
                 frame: first,
-                health: 65535,
+                health,
                 build_progress: 65535,
                 flags: 1,
             }],
             targets: vec![],
-            poses: vec![],
+            poses,
             queue: vec![],
         });
     }
