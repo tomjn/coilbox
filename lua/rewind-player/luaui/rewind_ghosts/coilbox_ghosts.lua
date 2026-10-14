@@ -87,7 +87,6 @@ function M.new(engine, track)
 		xs = {},
 		zs = {},
 		facings = {},
-		floats = {},
 		reds = {},
 		greens = {},
 		blues = {},
@@ -142,14 +141,12 @@ end
 function Ghosts:lookUp(engine, track)
 	local names = track:info().unitDefs
 	self.defOf = {}
-	self.floatOf = {}
 	self.halfX, self.halfZ = {}, {}
 	for i = 1, #names do
 		local found = engine.UnitDefNames[names[i]]
 		if found then
 			self.defOf[i - 1] = found.id
 			local def = engine.UnitDefs[found.id]
-			self.floatOf[i - 1] = def ~= nil and def.floatOnWater == true
 			-- The footprint, in squares of 8 elmos (xsize is twice footprintX).
 			self.halfX[i - 1] = (def and def.xsize or 4) * M.SQUARE / 2
 			self.halfZ[i - 1] = (def and def.zsize or 4) * M.SQUARE / 2
@@ -253,7 +250,7 @@ end
 --- Makes the lists of what to draw at `frame` from the queues just read.
 local function rebuild(self, frame)
 	local w = self.window
-	local defs, teams, xs, zs, facings, floats = self.defs, self.teams, self.xs, self.zs, self.facings, self.floats
+	local defs, teams, xs, zs, facings = self.defs, self.teams, self.xs, self.zs, self.facings
 	self.stamp = self.stamp + 1
 	local stamp, stampOf = self.stamp, self.stampOf
 	local count = 0
@@ -273,7 +270,7 @@ local function rebuild(self, frame)
 						defs[count], teams[count] = def, team
 						xs[count], zs[count] = w.queueItemX[j], w.queueItemZ[j]
 						local facing = w.queueItemFacing[j]
-						facings[count], floats[count] = facing, self.floatOf[trackDef]
+						facings[count] = facing
 						-- A building turned a quarter has its sides the other way round.
 						local hx, hz = self.halfX[trackDef], self.halfZ[trackDef]
 						if facing % 2 == 1 then
@@ -391,8 +388,8 @@ function Ghosts:draw()
 		passOver(self, 0)
 		return
 	end
-	local gl, ground = self.gl, self.Spring.GetGroundHeight
-	local defs, teams, xs, zs, facings, floats = self.defs, self.teams, self.xs, self.zs, self.facings, self.floats
+	local gl, buildPos = self.gl, self.Spring.Pos2BuildPos
+	local defs, teams, xs, zs, facings = self.defs, self.teams, self.xs, self.zs, self.facings
 	-- UnitShape wants the model view matrix, and a widget's world drawing is not
 	-- always left on it.
 	gl.MatrixMode(self.GL.MODELVIEW)
@@ -401,11 +398,7 @@ function Ghosts:draw()
 		gl.Blending(true)
 		gl.LineWidth(M.LINE_WIDTH)
 		for k = 1, count do
-			local x, z = xs[k], zs[k]
-			local y = ground(x, z)
-			if floats[k] and y < 0 then
-				y = 0
-			end
+			local x, y, z = buildPos(defs[k], xs[k], 0, zs[k], facings[k])
 			local r, g, b = self.reds[k], self.greens[k], self.blues[k]
 			gl.Color(r, g, b, M.FILL_ALPHA)
 			gl.BeginEnd(GL.TRIANGLE_FAN, footprint, gl.Vertex, x, y + lift, z, self.hx[k], self.hz[k])
@@ -416,12 +409,9 @@ function Ghosts:draw()
 		gl.Color(1, 1, 1, 1)
 	end
 	for k = 1, count do
-		local x, z = xs[k], zs[k]
-		local y = ground(x, z)
-		-- A floating building rides on the water and does not sink below it.
-		if floats[k] and y < 0 then
-			y = 0
-		end
+		-- Where the engine would build it: levelled ground, or on the water for one
+		-- that floats (CGameHelper::GetBuildHeight).
+		local x, y, z = buildPos(defs[k], xs[k], 0, zs[k], facings[k])
 		gl.PushMatrix()
 		local drawn = false
 		if self.hook then
@@ -434,14 +424,16 @@ function Ghosts:draw()
 			end
 		end
 		if not drawn then
+			-- Without its raw state UnitShape puts the camera's view on the
+			-- projection and draws with the model view Lua left
+			-- (CModelDrawerHelper::PushTransform and DIDResetPrevModelView), so that
+			-- has to be the building's place alone, as the engine's own
+			-- DrawBuildIcons makes it. Left as the camera's view, the view is
+			-- applied twice and the shape lands off the screen (issue #4018).
+			gl.LoadIdentity()
 			gl.Translate(x, y, z)
 			gl.Rotate(facings[k] * M.FACING_DEGREES, 0, 1, 0)
-			-- Without its raw state UnitShape pops the matrix and pushes a copy of
-			-- the one below (CModelDrawerHelper::DIDResetPrevModelView), which
-			-- drops the transform above. A push of its own keeps it.
-			gl.PushMatrix()
 			gl.UnitShape(defs[k], teams[k], false, false, false)
-			gl.PopMatrix()
 		end
 		gl.PopMatrix()
 	end
