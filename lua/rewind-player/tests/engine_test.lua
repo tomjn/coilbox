@@ -180,6 +180,9 @@ local OBSERVE = {
 	resourceRates = function(w)
 		return w.resourceFeeds
 	end,
+	resourceShares = function(w)
+		return w.transfers
+	end,
 	resourceExcess = function(w)
 		return w.excessAdds
 	end,
@@ -204,10 +207,26 @@ local NEEDS = {
 	-- Adding to a team's income takes its storage out of the way first, and the
 	-- excess is read with the call that reads the income.
 	resourceRates = "resources",
+	-- A transfer needs the sender to hold the amount first, and the sums read back.
+	resourceShares = { "resources", "resourceRates" },
 	resourceExcess = "resourceRates",
 	-- The adapter names the rules parameters.
 	teamParams = "adapter",
 }
+
+--- Whether feature `id` works only while feature `other` does.
+local function needs(id, other)
+	local need = NEEDS[id]
+	if type(need) == "table" then
+		for _, name in ipairs(need) do
+			if name == other then
+				return true
+			end
+		end
+		return false
+	end
+	return need == other
+end
 
 --- A line the gadget logged that starts with `start`, after its prefix.
 local function logged(w, start)
@@ -360,7 +379,7 @@ for _, row in ipairs(Table.SYNCED) do
 				t.same(label .. " " .. row.id .. " does nothing", observe(w), 0)
 			end
 			for id, observeOther in pairs(OBSERVE) do
-				if id ~= row.id and NEEDS[id] ~= row.id then
+				if id ~= row.id and not needs(id, row.id) then
 					t.check(label .. " " .. id .. " still works", observeOther(w) > 0, id)
 				end
 			end

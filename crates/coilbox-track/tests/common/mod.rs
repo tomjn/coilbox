@@ -452,5 +452,38 @@ pub fn random_track(seed: u64, windows: u32, window_length: u32, units: usize) -
             .collect(),
         });
     }
+    // Team 0 sends metal to a second team from part way through the second
+    // window, and the second team receives it. Nothing here draws from the
+    // generator, so everything above is what the same seed made before.
+    track.info.teams.push(Team {
+        id: 1,
+        ally_team: 0,
+        flags: 0,
+        colour: [0, 0, 255],
+        side: "arm".into(),
+        leader: "Friend".into(),
+    });
+    for (team, code, after) in [
+        (0, value_code::SENT, 18.5),
+        (1, value_code::RECEIVED, 18.5),
+        (1, value_code::STORAGE, 1000.0),
+    ] {
+        let from = (second_window + 50).min(last);
+        let keys: Vec<ValueKey> = [(first, 0.0), (from, after)]
+            .into_iter()
+            .filter(|(frame, _)| *frame <= last)
+            .map(|(frame, value)| {
+                ValueKey::new(
+                    frame,
+                    if code == value_code::STORAGE {
+                        after
+                    } else {
+                        value
+                    },
+                )
+            })
+            .collect();
+        track.values.push(ValueTrack { team, code, keys });
+    }
     track
 }

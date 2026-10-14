@@ -397,6 +397,17 @@ M.SYNCED = {
 		visible = true,
 	},
 	{
+		id = "resourceShares",
+		feature = "team sent and received",
+		calls = { "Spring.ShareTeamResource" },
+		how = "presence",
+		used = "coilbox_player_resources.lua, share",
+		required = false,
+		since = "105.0",
+		without = "What each team sent to other teams and received from them read as the playback's own, which is none",
+		visible = true,
+	},
+	{
 		id = "resourceExcess",
 		feature = "team excess",
 		calls = { "Spring.AddTeamResourceExcessStats" },
