@@ -187,8 +187,12 @@ function M.new(track, options)
 	end
 
 	local on = options.engine and options.engine.on or Engine.ALL_ON
+	-- Whether the engine tells the player when a frame is over. `arrives` is
+	-- true in a frame when the frame before ended with that call.
+	local post = { arrives = false }
 	local context = {
 		on = on,
+		post = post,
 		adapter = options.adapter,
 		hooks = hooks,
 		track = track,
@@ -241,6 +245,15 @@ function M.new(track, options)
 		stages = { terrain, featureStage, units, projectiles, resources },
 		afterFrame = hooks.afterFrame,
 		published = {},
+		post = post,
+		installFramePost = options.installFramePost,
+		-- Whether a frame has run, whether the call came after the last one, how
+		-- many frames in a row ended without it, and whether the install was
+		-- asked for since it last came.
+		framed = false,
+		posted = false,
+		misses = 0,
+		installed = false,
 	}, Player)
 
 	-- Every ally team sees the whole map, so nothing the track shows is hidden
@@ -262,10 +275,67 @@ function M.new(track, options)
 	return self
 end
 
+--- Tells every stage that has `name` to run it.
+local function each(stages, name)
+	for i = 1, #stages do
+		local stage = stages[i]
+		if stage[name] then
+			stage[name](stage)
+		end
+	end
+end
+
+--- Finds out whether the frame before this one ended with the engine's call
+-- (GameFramePost), which is the only way to know that it comes (issue #4002).
+-- An engine before 105.1.1-2590 does not make the call, and a game's gadget
+-- handler may not pass it on.
+--
+-- The first frame that follows one with no call asks the gadget to install the
+-- call-in, and the install has the one frame it needs to show. When that frame
+-- ends without the call too, or nothing could be installed, the stages are
+-- told, and each says what it does without it. A call that stops coming later,
+-- which a handler that rebuilds its call-ins can cause, is asked for again the
+-- same way.
+local function lookBack(self)
+	local post = self.post
+	if self.posted then
+		self.posted = false
+		if self.installed and self.misses > 0 then
+			self.report("post installed", "the game's gadget handler does not pass GameFramePost on, so the player installed it, and the engine's call now reaches the player")
+		end
+		post.arrives = true
+		self.misses = 0
+		self.installed = false
+		return
+	end
+	if not self.framed then
+		self.framed = true
+		return
+	end
+	if post.arrives then
+		post.arrives = false
+		each(self.stages, "afterSimMissed")
+	end
+	self.misses = self.misses + 1
+	if self.misses == 1 and self.installFramePost and self.installFramePost() then
+		self.installed = true
+		return
+	end
+	if self.misses == 1 or (self.misses == 2 and self.installed) then
+		each(self.stages, "withoutAfterSim")
+		if self.installed then
+			self.report("post missing", "GameFramePost does not reach the player. The player installed the call-in itself and still none came, so this engine does not make the call. Engine 105.1.1-2590 and later do")
+		else
+			self.report("post missing", "GameFramePost does not reach the player, and the player could not install the call-in itself")
+		end
+	end
+end
+
 --- One simulation frame: move the clock, then make the world the track at the
 -- time it shows.
 function Player:frame()
 	local clock, stages = self.clock, self.stages
+	lookBack(self)
 	clock:advance()
 	local t = clock.frame
 	if clock.jumped then
@@ -288,8 +358,15 @@ end
 --- The end of a simulation frame, after the engine has done its own work on
 -- the units (GameFramePost).
 function Player:framePost()
+	self.posted = true
 	self.units:afterSim()
 	self.resources:afterSim()
+end
+
+--- The gadget is going away. Nothing the player holds for the length of a
+-- frame is left behind.
+function Player:shutdown()
+	each(self.stages, "afterSimMissed")
 end
 
 --- Whether the world is the track at the time shown: no seek is waiting to be

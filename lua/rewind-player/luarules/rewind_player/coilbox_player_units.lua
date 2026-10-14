@@ -41,6 +41,13 @@
 -- repair stops on the same test (CUnit::AddBuildPower). `Units:afterSim` gives
 -- the maximum back, so nothing else sees it, and checks health once more.
 --
+-- That rests on the engine calling back at the end of the frame, which an
+-- engine before 105.1.1-2590 does not do and a game's gadget handler may not
+-- pass on (issue #4002). The player finds out by whether the call came after
+-- the frame before, and a unit is only held in a frame that follows one it came
+-- after. Without the call no maximum is touched, and health the engine added is
+-- taken off on the next frame, as it was before issue #3986.
+--
 -- Three things the engine or the base game does to a unit are undone here and
 -- not prevented, because nothing can prevent them:
 --
@@ -119,6 +126,10 @@ function M.new(context, rotation)
 		held = {},
 		fullHealth = {},
 		holdAt = {},
+		-- Whether any unit is held in this frame, and whether the engine calls
+		-- back at the end of a frame, which the player finds out (issue #4002).
+		holding = false,
+		post = context.post,
 		on = {},
 		nanoframe = {},
 		-- Serial numbers that could not be created, so they are not tried on every
@@ -227,10 +238,12 @@ function Units:damaged(unitID)
 end
 
 --- Makes the maximum of a wounded unit its health, so that the engine's own
--- healing in the rest of the frame has nothing to heal.
+-- healing in the rest of the frame has nothing to heal. Only in a frame that
+-- follows one the engine called back at the end of: with no such call nothing
+-- would give the maximum back (issue #4002).
 function Units:hold(serial, unitID)
 	local health = self.health[serial]
-	if not health or health >= 1 then
+	if not health or health >= 1 or not self.post.arrives then
 		return
 	end
 	local Spring = self.Spring
@@ -241,6 +254,7 @@ function Units:hold(serial, unitID)
 	self.fullHealth[serial] = max
 	self.holdAt[serial] = now
 	self.held[serial] = true
+	self.holding = true
 	Spring.SetUnitMaxHealth(unitID, now)
 end
 
@@ -253,8 +267,27 @@ end
 --- The end of a simulation frame, after the engine has healed what it could.
 -- Every held unit has its maximum back and the health it was held at. Anything
 -- that moved it in the meantime is put right.
+--
+-- In a frame that held nothing because the call was not yet known to come,
+-- which the first frame is, the engine may have healed a wounded unit. Its
+-- health is put back here without a word.
 function Units:afterSim()
 	local Spring, held, holdAt = self.Spring, self.held, self.holdAt
+	if not self.post.arrives then
+		local health, maxHealth, nanoframe = self.health, self.maxHealth, self.nanoframe
+		for serial, unitID in next, self.unitOf do
+			local wanted = health[serial]
+			if wanted and wanted < 1 and not nanoframe[serial] and not held[serial] and Spring.GetUnitHealth(unitID) ~= wanted * maxHealth[serial] then
+				local arg = self.healthArg
+				arg.health = wanted * maxHealth[serial]
+				Spring.SetUnitHealth(unitID, arg)
+			end
+		end
+	end
+	if not self.holding then
+		return
+	end
+	self.holding = false
 	for serial, unitID in next, self.unitOf do
 		if held[serial] then
 			self:release(serial, unitID)
@@ -267,6 +300,30 @@ function Units:afterSim()
 			end
 		end
 	end
+end
+
+--- A frame ended and the engine did not call back, after frames in which it
+-- did. Every unit that was held for that frame has its maximum back, so none is
+-- left lowered. `Player:shutdown` uses it too.
+function Units:afterSimMissed()
+	if not self.holding then
+		return
+	end
+	self.holding = false
+	local held = self.held
+	for serial, unitID in next, self.unitOf do
+		if held[serial] then
+			self:release(serial, unitID)
+		end
+	end
+end
+
+--- The player found that no call comes at the end of a frame.
+function Units:withoutAfterSim()
+	self.context.report(
+		"health post",
+		"GameFramePost does not reach the player, so a wounded unit keeps its maximum health, and health the engine's own healing adds in a frame is taken off again on the next"
+	)
 end
 
 --- After a jump: what the engine has is checked against what the stage thinks
@@ -462,7 +519,9 @@ function Units:applyStatus(w, i, serial, unitID, t)
 		-- The second test is for health that moved with no damage to hear of: a
 		-- base game gadget can set health, and while the track's value stands
 		-- still, as it does when paused, nothing else would put it back.
-		if self.health[serial] == health then
+		-- Without the call at the end of a frame the engine's own healing is what
+		-- moved it, which `Units:withoutAfterSim` has said.
+		if self.health[serial] == health and self.post.arrives then
 			self.context.report("health moved", HEALTH_MOVED)
 		end
 		local arg = self.healthArg

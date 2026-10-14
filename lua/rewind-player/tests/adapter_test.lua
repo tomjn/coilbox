@@ -198,9 +198,15 @@ local function setup(raw)
 	return world, player
 end
 
+--- One frame of an engine that calls back when the frame is over.
+local function step(player)
+	player.frame(player)
+	player:framePost()
+end
+
 local function seek(player, frame)
 	player:message("coilbox_rewind:seek " .. frame)
-	player:frame()
+	step(player)
 end
 
 local function said(world, needle)
@@ -282,7 +288,7 @@ do
 	t.same("started is called when the player is made, before any frame", started, 1)
 	t.same("when nothing of the track is in the world yet", world.unitCount(), 0)
 	player:message("coilbox_rewind:pause")
-	player:frame()
+	step(player)
 	t.same("a frame does not call it again", started, 1)
 	t.same("a unit made on the first frame is announced, one for each", #placed, 2)
 	t.same("with its engine id", placed[1].unitID, world.unitNamed("tank").id)
@@ -291,7 +297,7 @@ do
 	t.same("every frame ends in afterFrame", #after, 1)
 	t.same("with the frame", after[1].frame, 0)
 
-	player:frame()
+	step(player)
 	t.same("a frame that creates nothing announces nothing", #placed, 2)
 	t.same("and still calls afterFrame", #after, 2)
 
@@ -314,9 +320,9 @@ do
 		},
 	})
 	player:message("coilbox_rewind:pause")
-	player:frame()
-	player:frame()
-	player:frame()
+	step(player)
+	step(player)
+	step(player)
 	t.same("a hook that raises is called once", calls, 1)
 	t.same("and the player goes on", world.unitCount(), 2)
 	t.same("it is reported once", said(world, "afterFrame hook raised"), 1)
@@ -340,12 +346,12 @@ do
 	})
 	player:message("coilbox_rewind:seek 10")
 	player:message("coilbox_rewind:play")
-	player:frame()
+	step(player)
 	collectgarbage()
 	collectgarbage("stop")
 	local before = collectgarbage("count")
 	for _ = 1, 60 do
-		player:frame()
+		step(player)
 	end
 	local after = collectgarbage("count")
 	collectgarbage("restart")
