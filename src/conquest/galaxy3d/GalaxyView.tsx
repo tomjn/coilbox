@@ -46,7 +46,7 @@ import {
   VIEW_FOV_DEGREES,
 } from "./terrain";
 import { type TerrainPixels, useTerrainHeights } from "./terrainLoad";
-import { buildTerrainMesh } from "./terrainMesh";
+import { buildTerrainMesh, type TerrainSheet } from "./terrainMesh";
 import { paintsTowns } from "./townGate";
 import { buildTownLayer, type TownLayer, townsOnRoads } from "./townLayer";
 import type { Town } from "./towns";
@@ -615,6 +615,8 @@ export function GalaxyView({
 
     // Roads painted into a terrain map's ground. See groundLayer.ts.
     let ground: GroundLayer | undefined;
+    // The ground itself, whose detail is baked over the first frames.
+    let terrainSheet: TerrainSheet | undefined;
     // A town at every location. See townLayer.ts.
     let towns: TownLayer | undefined;
     // Where each sea crossing runs. Its tracks to the shore are painted with
@@ -661,7 +663,7 @@ export function GalaxyView({
           !terrainColor,
         );
       }
-      buildTerrainMesh(
+      terrainSheet = buildTerrainMesh(
         scene,
         disposables,
         surface,
@@ -1064,6 +1066,8 @@ export function GalaxyView({
         cities.fitToCamera(distance);
         endMarkers?.fitToCamera(distance);
       }
+      // One tile of the ground's bake a frame, until it is done.
+      if (terrainSheet?.prepare(renderer)) requestRender();
       renderer.render(scene, camera);
       declutter?.();
       labelRenderer.render(scene, camera);

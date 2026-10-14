@@ -2,7 +2,8 @@
 /**
  * A land map with placed models opens once (issue #3996). The models' sources
  * arrive after the scene is built, and they are added to it instead of the
- * terrain being built again.
+ * terrain being built again. Its ground detail is baked over the first frames
+ * (issue #3992).
  */
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -167,5 +168,35 @@ describe("GalaxyView with placed models", () => {
     expect(h.rendererOptions[0]).toMatchObject({
       powerPreference: "high-performance",
     });
+  });
+});
+
+describe("GalaxyView baking the ground", () => {
+  it("prepares the ground before each draw and asks for frames until it is done", () => {
+    const prepare = vi.fn();
+    prepare.mockReturnValueOnce(true).mockReturnValueOnce(true);
+    prepare.mockReturnValue(false);
+    h.terrainBuilds.mockReturnValue({ prepare });
+    const queued: (() => void)[] = [];
+    vi.stubGlobal("requestAnimationFrame", (cb: () => void) => {
+      queued.push(cb);
+      return queued.length;
+    });
+    render(
+      <GalaxyView
+        galaxy={{ ...galaxy, models: undefined }}
+        playerFactionId="a"
+        owners={{}}
+        terrainPixels={terrainPixels}
+        display={{ reduceMotion: true, effects: false }}
+      />,
+    );
+    // Each frame drawn runs whatever the last one asked for.
+    for (let i = 0; i < 10 && queued.length > 0; i++) queued.shift()?.();
+    expect(queued).toHaveLength(0);
+    expect(prepare).toHaveBeenCalledTimes(3);
+    const renderer = prepare.mock.calls[0][0];
+    expect(renderer.render).toBeTypeOf("function");
+    expect(h.terrainBuilds).toHaveBeenCalledTimes(1);
   });
 });
