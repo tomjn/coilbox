@@ -261,7 +261,9 @@ if gadgetHandler:IsSyncedCode() then
 		end
 		player:frame()
 		if engine.on.workTiming then
-			SendToUnsynced(WORK, 1, frame, player:worked())
+			local made, removed, ground = player:worked()
+			local make, remove, earth = player:budgets()
+			SendToUnsynced(WORK, 1, frame, made, removed, ground, make, remove, earth, player:firstUnits())
 		end
 	end
 
@@ -442,59 +444,136 @@ else
 	local framed = 0
 	local lastLine
 	local slow, worst = 0, 0
-	-- How many units a frame may make and remove, and how many corners of the
-	-- ground it may set for a seek (issue #4025), as last sent.
-	local makeBudget, removeBudget, groundBudget = FIRST_BUDGET, FIRST_BUDGET, FIRST_BUDGET
 
-	--- The budget after a frame in which `count` units took `took` milliseconds,
-	-- for a budget that was `budget`. Each took that long with the rest of the
-	-- frame's work counted in, which only makes it more, so what fits in `TARGET`
-	-- errs low. A frame that used the whole budget sets it to what fits, at least
-	-- one and at most twice what the frame did. The cost of a few units says
-	-- little about the next many. A frame that used less of the budget leaves it
-	-- alone unless it took longer than `TARGET`, and then cuts it. The last frame
-	-- of a seek has few units and a rest of the frame that is dear beside them,
-	-- and says little.
-	local function fit(took, count, budget)
-		local wanted = math.floor(TARGET / math.max(took / count, 0.001))
-		if count >= budget then
-			return math.max(1, math.min(wanted, 2 * count))
-		elseif took > TARGET then
-			return math.max(1, math.min(wanted, budget))
+	-- The least a frame can have taken when the timer read `took`. A timer of
+	-- whole milliseconds reads less than one as none.
+	local TICK = micros and 0.001 or 1
+
+	--- One of the three budgets of a seek: units made, units removed and corners
+	-- of the ground set in a frame (issue #4025). `budget` is what it should be
+	-- and `sent` what was last sent, after frame `sentAt`. `waiting` is whether
+	-- the synced half has yet to work to it, and `delay` how many frames the last
+	-- one took to arrive. `done` is how many the seek has done. The rest are the
+	-- sums for a straight line through what one cost against `done`, over the
+	-- `frames` of the seek that used their whole budget, each weighted by how
+	-- many it did.
+	local function newBudget()
+		return { budget = FIRST_BUDGET, sent = FIRST_BUDGET, sentAt = 0, waiting = false, delay = 1, done = 0, frames = 0, sw = 0, sx = 0, sy = 0, sxx = 0, sxy = 0 }
+	end
+
+	--- How much more each one costs than the one before, from the line through
+	-- the seek's frames so far, and never less than nothing. A frame of a few is
+	-- dear beside a frame of many for the rest of its work, and weighs little.
+	local function riseOf(b)
+		local d = b.sw * b.sxx - b.sx * b.sx
+		if b.frames < 2 or d <= 0 then
+			return 0
 		end
-		return budget
+		return math.max(0, (b.sw * b.sxy - b.sx * b.sy) / d)
+	end
+	local makes, removes, grounds = newBudget(), newBudget(), newBudget()
+	local budgets = { makes, removes, grounds }
+
+	--- The most that fit in `TARGET` when the first costs `per` more than `rise`
+	-- times `ahead`, and each after it `rise` more again. Each is taken to cost
+	-- what the last of them does, so it errs low.
+	local function fits(per, rise, ahead)
+		local first = per + rise * ahead
+		if rise <= 0 then
+			return math.max(1, math.floor(TARGET / first))
+		end
+		return math.max(1, math.floor((math.sqrt(first * first + 4 * rise * TARGET) - first) / (2 * rise)))
+	end
+
+	--- A frame did `count` of a budget's work in `took` milliseconds, working to
+	-- a budget of `had`. Each took that long with the rest of the frame's work
+	-- counted in, which only makes it more, so what fits errs low.
+	--
+	-- A frame that used its whole budget sets it to what fits, however many more
+	-- that is (issue #4016). A message reaches the synced half some frames after
+	-- it is sent, so a budget that could only double would take as many trips as
+	-- doublings. What a unit costs grows as a seek fills the world, because a
+	-- game's own gadgets do more for each unit created when there are more
+	-- (issue #4015). So the rise in cost over the seek so far is taken to go on,
+	-- through the units made at the old budget while the new one is on its way,
+	-- as many frames as the last one took to arrive, and through the new budget's
+	-- own. `firsts` of the frame's units were the first of their definition in
+	-- the run, which cost more once and say nothing of a rise, so such a frame is
+	-- left out of it.
+	--
+	-- A frame that used less of its budget, which the last frame of a seek does,
+	-- leaves it alone unless it took longer than `TARGET`, and then cuts it.
+	local function judge(b, frame, took, count, had, firsts)
+		local per = (took + TICK) / count
+		b.done = b.done + count
+		local full = count >= had
+		if not full and took <= TARGET then
+			return
+		end
+		if full and firsts == 0 then
+			local x = b.done
+			b.frames = b.frames + 1
+			b.sw, b.sx, b.sy = b.sw + count, b.sx + count * x, b.sy + count * per
+			b.sxx, b.sxy = b.sxx + count * x * x, b.sxy + count * x * per
+		end
+		local rise = full and riseOf(b) or 0
+		local delay = b.delay
+		if b.waiting then
+			delay = math.max(delay, frame - b.sentAt)
+		end
+		local wanted = fits(per, rise, delay * had)
+		if not full then
+			wanted = math.min(wanted, had)
+		end
+		b.budget = wanted
+	end
+
+	--- Whether the budget the synced half worked to is the last one sent, and how
+	-- many frames that took.
+	local function arrived(b, frame, had)
+		if b.waiting and had == b.sent then
+			b.waiting = false
+			b.delay = math.max(1, frame - b.sentAt)
+		end
 	end
 
 	--- A frame made `made` units, removed `removed` and set `ground` corners of a
-	-- seek's ground in `took` milliseconds. Each costs the engine something of
-	-- its own, so only a frame that did one of them says what that one costs. A
-	-- frame that did none ends a seek, and the unit budgets go back to one. What
-	-- a unit costs moves with how many there are, from 0.28 to 0.5 ms to make and
-	-- from 0.13 to 0.37 ms to remove in a headless run of issue #3988 as the count
-	-- went from none to 400 and from 400 to none, so what one seek ended on is not
-	-- safe for the start of the next. Each starts from one and doubles each frame
-	-- while the cost allows. The ground budget is kept from one seek to the next,
-	-- since what a corner costs is the engine's work round it and does not move
-	-- with what else is in the world (lua/rewind-player/README.md has the
-	-- measurements). A frame that took too long still cuts it.
-	local function retune(took, made, removed, ground)
-		local make, remove, earth = makeBudget, removeBudget, groundBudget
+	-- seek's ground in `took` milliseconds, working to the budgets `hadMake`,
+	-- `hadRemove` and `hadGround`. Each costs the engine something of its own, so
+	-- only a frame that did one of them says what that one costs. A frame that
+	-- did none ends a seek, and the unit budgets go back to one. What a unit
+	-- costs moves with how many there are, so what one seek ended on is not safe
+	-- for the start of the next. The ground budget is kept from one seek to the
+	-- next, since what a corner costs is the engine's work round it and does not
+	-- move with what else is in the world (lua/rewind-player/README.md has the
+	-- measurements).
+	local function retune(frame, took, made, removed, ground, hadMake, hadRemove, hadGround, firsts)
+		arrived(makes, frame, hadMake)
+		arrived(removes, frame, hadRemove)
+		arrived(grounds, frame, hadGround)
 		if made + removed + ground == 0 then
-			make, remove = FIRST_BUDGET, FIRST_BUDGET
+			makes.budget, removes.budget = FIRST_BUDGET, FIRST_BUDGET
+			for _, b in ipairs(budgets) do
+				b.done, b.frames, b.sw, b.sx, b.sy, b.sxx, b.sxy = 0, 0, 0, 0, 0, 0, 0
+			end
 		elseif ground > 0 and made + removed == 0 then
-			earth = fit(took, ground, groundBudget)
+			judge(grounds, frame, took, ground, hadGround, 0)
 		elseif made > 0 and removed + ground == 0 then
-			make = fit(took, made, makeBudget)
+			judge(makes, frame, took, made, hadMake, firsts)
 		elseif removed > 0 and made + ground == 0 then
-			remove = fit(took, removed, removeBudget)
+			judge(removes, frame, took, removed, hadRemove, 0)
 		end
-		if make ~= makeBudget or remove ~= removeBudget or earth ~= groundBudget then
-			makeBudget, removeBudget, groundBudget = make, remove, earth
-			Spring.SendLuaRulesMsg(BUDGET .. make .. " " .. remove .. " " .. earth)
+		if makes.budget ~= makes.sent or removes.budget ~= removes.sent or grounds.budget ~= grounds.sent then
+			for _, b in ipairs(budgets) do
+				if b.budget ~= b.sent then
+					b.sent, b.sentAt, b.waiting = b.budget, frame, true
+				end
+			end
+			Spring.SendLuaRulesMsg(BUDGET .. makes.budget .. " " .. removes.budget .. " " .. grounds.budget)
 		end
 	end
 
-	function gadget:RecvFromSynced(name, phase, frame, made, removed, ground)
+	function gadget:RecvFromSynced(name, phase, frame, made, removed, ground, hadMake, hadRemove, hadGround, firsts)
 		if name == LOG then
 			write(phase)
 			return true
@@ -546,7 +625,7 @@ else
 		else
 			framed = took
 			if made and removed and engine.on.budgetMessage then
-				retune(took, made, removed, ground or 0)
+				retune(frame, took, made, removed, ground or 0, hadMake, hadRemove, hadGround or 0, firsts or 0)
 			end
 		end
 		if took <= LIMIT then
