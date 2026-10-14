@@ -9,11 +9,12 @@
 //!
 //! Unlike the analysis game, this one is launched in a window for a person, from
 //! a start script of its own and not from the replay. Nobody plays in it. The
-//! script has one spectator and no players or AIs, and every team's
-//! `teamleader` is that spectator, which the engine accepts and which lets a
-//! gadget create units on any team (the findings in issue #3791). Team and ally
-//! team numbers are the replay's own, so a team in the track is the same number
-//! in the game. Nothing here names or counts the Gaia team: the engine adds it
+//! script has the replay's players, who never connect (issue #4012), and one
+//! spectator who does, and no AIs. Each team's `teamleader` is its player of
+//! the replay, so a name tag and the players list read the names the match had.
+//! A gadget can still create units on any team (the findings in issue #3791).
+//! Team and ally team numbers are the replay's own, so a team in the track is
+//! the same number in the game. Nothing here names or counts the Gaia team: the engine adds it
 //! and the Lua side reads it from the engine.
 //!
 //! `recorddemo=0` keeps the engine from writing a replay of the playback, which
@@ -57,7 +58,8 @@ const VERSION: &str = "1";
 /// string, and a test holds the two together.
 pub const TRACK_PATH: &str = "coilbox_rewind/track.cbtrack";
 
-/// The one spectator's name, and the name the script gives as the local player.
+/// The one connected spectator's name, and the name the script gives as the
+/// local player.
 /// It has no space, because the engine's client replaces one with an underscore
 /// when it connects, and the connection then matches no player in the script.
 const SPECTATOR: &str = "CoilboxPlayback";
@@ -199,14 +201,32 @@ fn is_rebuilt(name: &str) -> bool {
         .any(|prefix| index_suffix(name, prefix).is_some())
 }
 
+/// The spectator's name: [`SPECTATOR`], or that with underscores added when a
+/// player of the replay has it, since the engine refuses two of one name.
+fn spectator_name(players: &[(i32, &Section)]) -> String {
+    let mut name = SPECTATOR.to_string();
+    while players.iter().any(|(_, p)| p.get("name") == Some(&name)) {
+        name.push('_');
+    }
+    name
+}
+
 /// The start script that launches the playback game, made from the start script
 /// of the replay.
 ///
 /// What it takes from the replay: the map, the teams and ally teams with every
-/// key they have, and the mod options, map options and any other section that
-/// is not a player or an AI. What it drops: the players, the AIs and each
-/// team's `luaai`, because nobody plays and no team is controlled. Every team's
-/// `teamleader` becomes the one spectator.
+/// key they have, the players with every key but the password, and the mod
+/// options, map options and any other section that is not a player or an AI.
+/// What it drops: the AIs and each team's `luaai`, because nobody plays and no
+/// team is controlled.
+///
+/// Every player of the replay is in the script as `isfromdemo=1`, with its own
+/// number, name and team, and never connects. That is what a name tag and the
+/// players list show, and what a team's leader is. The engine's start check
+/// (`CGameServer::CheckForGameStart`) skips the first `numDemoPlayers` players
+/// and otherwise waits up to 30 seconds for a player who has not connected, so
+/// the one spectator who does connect is numbered after all of them. A team
+/// whose `teamleader` is no player of the replay is led by that spectator.
 ///
 /// `opening` adds the player's two mod options. The replay's own values for
 /// those keys are dropped whether or not `opening` sets them, since they are
@@ -223,10 +243,22 @@ pub fn start_script(replay_script: &str, opening: &Opening) -> Result<String, St
     }
     let ally_teams = numbered(&game, "allyteam");
 
+    // The replay's people, as players who are not there. They keep their
+    // numbers, and the one spectator who is there takes the next number, so it
+    // follows every one of them.
+    let absent: Vec<(i32, &Section)> = numbered(&game, "player")
+        .into_iter()
+        .filter(|(_, player)| player.get("name").is_some_and(|name| !name.is_empty()))
+        .collect();
+    let spectator = numbered(&game, "player")
+        .last()
+        .map_or(0, |(index, _)| index + 1);
+    let spectator_name = spectator_name(&absent);
+
     let mut out = String::from("[game]\n{\n");
     let top: [(&str, String); 11] = [
         ("ishost", "1".into()),
-        ("numplayers", "1".into()),
+        ("numplayers", (absent.len() + 1).to_string()),
         ("numusers", "1".into()),
         ("numteams", declared(&game, "numteams", &teams).to_string()),
         (
@@ -244,21 +276,35 @@ pub fn start_script(replay_script: &str, opening: &Opening) -> Result<String, St
         ("recorddemo", "0".into()),
         ("gametype", gametype()),
         ("mapname", map.to_string()),
-        ("myplayername", SPECTATOR.into()),
+        ("myplayername", spectator_name.clone()),
     ];
     for (key, value) in top {
         out.push_str(&format!("\t{key}={value};\n"));
     }
+    for (index, player) in &absent {
+        write_section(
+            &mut out,
+            &format!("player{index}"),
+            player,
+            &["password", "isfromdemo"],
+            &[("isfromdemo", "1")],
+        );
+    }
     out.push_str(&format!(
-        "\t[player0]\n\t{{\n\t\tname={SPECTATOR};\n\t\tspectator=1;\n\t}}\n"
+        "\t[player{spectator}]\n\t{{\n\t\tname={spectator_name};\n\t\tspectator=1;\n\t}}\n"
     ));
     for (index, team) in &teams {
+        let leader = team
+            .get("teamleader")
+            .and_then(|leader| leader.parse::<i32>().ok())
+            .filter(|leader| absent.iter().any(|(index, _)| index == leader))
+            .unwrap_or(spectator);
         write_section(
             &mut out,
             &format!("team{index}"),
             team,
             &["teamleader", "luaai"],
-            &[("teamleader", "0")],
+            &[("teamleader", &leader.to_string())],
         );
     }
     for (index, ally_team) in &ally_teams {
@@ -700,14 +746,16 @@ mod tests {
     /// spectator, which the engine accepts.
     #[test]
     fn a_team_with_no_player_to_lead_it_is_led_by_the_spectator() {
-        let script = REPLAY_SCRIPT.replace("teamleader=0;\nrgbcolor=0.9", "teamleader=7;\nrgbcolor=0.9");
+        let script =
+            REPLAY_SCRIPT.replace("teamleader=0;\nrgbcolor=0.9", "teamleader=7;\nrgbcolor=0.9");
         let game = parsed(&start_script(&script, &Opening::default()).unwrap());
 
         let teams = numbered(&game, "team");
         assert_eq!(teams[0].1.get("teamleader"), Some("1"));
         assert_eq!(teams[1].1.get("teamleader"), Some("0"));
 
-        let no_players = "[game]\n{\nmapname=M;\ngametype=G 1;\n[team0]\n{\nallyteam=0;\nteamleader=0;\n}\n}\n";
+        let no_players =
+            "[game]\n{\nmapname=M;\ngametype=G 1;\n[team0]\n{\nallyteam=0;\nteamleader=0;\n}\n}\n";
         let game = parsed(&start_script(no_players, &Opening::default()).unwrap());
         assert_eq!(numbered(&game, "player").len(), 1);
         assert_eq!(numbered(&game, "team")[0].1.get("teamleader"), Some("0"));
@@ -1723,13 +1771,28 @@ if gadgetHandler:IsSyncedCode() then
 		end
 		local players, spectators = 0, 0
 		for _, player in ipairs(Spring.GetPlayerList()) do
-			local _, _, spectator = Spring.GetPlayerInfo(player, false)
+			local name, active, spectator, team = Spring.GetPlayerInfo(player, false)
+				Spring.Echo(string.format("PROBE player %d name %s active %s spectator %s team %d", player, name, tostring(active), tostring(spectator), team))
 			players = players + 1
 			if spectator then
 				spectators = spectators + 1
 			end
 		end
 		Spring.Echo("PROBE players " .. players .. " spectators " .. spectators)
+			-- The name the engine gives each team's leader, which is what a name
+			-- tag and the players list read.
+			for _, team in ipairs(Spring.GetTeamList()) do
+				local _, leader = Spring.GetTeamInfo(team, false)
+				local name = leader and leader >= 0 and Spring.GetPlayerInfo(leader, false) or "none"
+				Spring.Echo(string.format("PROBE leader team %d player %d name %s", team, leader or -1, name))
+			end
+		end
+		local reported = false
+		function gadget:GameFrame(frame)
+			if not reported then
+				reported = true
+				Spring.Echo("PROBE first frame " .. frame)
+			end
 	end
 else
 	-- Team colours are only readable from the unsynced half.
@@ -2014,7 +2077,7 @@ end
         std::fs::write(prepared.game_dir.join("luarules/gadgets/probe.lua"), PROBE).unwrap();
 
         let (timed_out, output, written) = launch(&prepared, &|text| {
-            text.contains("PROBE players") && text.contains("COILBOX_REWIND_PLAYER")
+            text.contains("PROBE first frame") && text.contains("COILBOX_REWIND_PLAYER")
         });
         let lines: Vec<&str> = output
             .lines()
@@ -2027,7 +2090,75 @@ end
         );
 
         assert!(!timed_out, "the log never showed the lines. Log:\n{output}");
-        assert!(output.contains("PROBE players 1 spectators 1"), "{output}");
+        // Every player of the replay is there under the name it had, and every
+        // team's leader is the replay's own, as the game's interface reads them
+        // (issue #4012).
+        let replay_script = read_header_and_script(&prepared.replay).unwrap().script;
+        let replay = find_game(&parse_tdf(&replay_script));
+        let replay_players = numbered(&replay, "player");
+        let spectators = replay_players
+            .iter()
+            .filter(|(_, p)| p.get("spectator") == Some("1"))
+            .count();
+        assert!(
+            output.contains(&format!(
+                "PROBE players {} spectators {}",
+                replay_players.len() + 1,
+                spectators + 1
+            )),
+            "{output}"
+        );
+        for (_, player) in &replay_players {
+            let name = player.get("name").unwrap();
+            assert!(
+                output.contains(&format!("name {name} active false")),
+                "{name} is not an absent player: {output}"
+            );
+        }
+        // The one spectator who connects is there too. It is not yet active
+        // when the game loads, since the engine marks a player active when its
+        // name arrives over the connection.
+        assert!(
+            output.contains(&format!("name {SPECTATOR} active false spectator true")),
+            "{output}"
+        );
+        for (team, section) in numbered(&replay, "team") {
+            let leader: i32 = section.get("teamleader").unwrap().parse().unwrap();
+            let name = replay_players
+                .iter()
+                .find(|(i, _)| *i == leader)
+                .and_then(|(_, p)| p.get("name"))
+                .unwrap();
+            assert!(
+                lines
+                    .iter()
+                    .any(|l| l.contains(&format!("PROBE leader team {team} player"))
+                        && l.ends_with(&format!(" name {name}"))),
+                "team {team} is not led by {name}: {output}"
+            );
+        }
+        // The first simulation frame arrived, and sooner than the 30 seconds
+        // after which the engine's start check gives up on a player who has not
+        // connected (`CGameServer::CheckForGameStart`), so nobody was waited
+        // for. The log's `[t=hh:mm:ss.uuuuuu]` counts from the engine's start.
+        let first = lines
+            .iter()
+            .find(|l| l.contains("PROBE first frame"))
+            .unwrap_or_else(|| panic!("no first frame: {output}"));
+        let clock = first
+            .strip_prefix("[t=")
+            .and_then(|rest| rest.split(']').next())
+            .unwrap_or_else(|| panic!("no time in {first}"));
+        let seconds: f64 = clock
+            .split(':')
+            .try_fold(0.0, |total, part| {
+                Some(total * 60.0 + part.parse::<f64>().ok()?)
+            })
+            .unwrap_or_else(|| panic!("no time in {first}"));
+        assert!(
+            seconds < 30.0,
+            "the first frame came at {seconds} s: {output}"
+        );
         // The track reached the game, through the reader.
         assert!(
             lines
