@@ -164,6 +164,11 @@ function M.new(context, rotation)
 		removeBudget = math.huge,
 		made = 0,
 		removed = 0,
+		-- How many of the units made in the frame were the first of their
+		-- definition in the run, and the definitions made so far. The first unit
+		-- of a definition costs the engine and the game more (issue #4015).
+		firsts = 0,
+		madeDef = {},
 		unsettled = false,
 		removing = false,
 		-- Whether a seek's removals are still being done, which go quietly in
@@ -456,7 +461,7 @@ end
 -- stage before anything is created, because after a seek a building may stand
 -- where another stood earlier.
 function Units:remove(t, clock)
-	self.made, self.removed = 0, 0
+	self.made, self.removed, self.firsts = 0, 0, 0
 	self.removing = false
 	local track = self.track
 	local w, why = track:seek(t)
@@ -537,6 +542,10 @@ function Units:create(w, i, serial, nanoframe, t)
 				.. ". The team is dead or at its unit limit. Its units are tried again after the next seek"
 		)
 		return nil
+	end
+	if not self.madeDef[id] then
+		self.madeDef[id] = true
+		self.firsts = self.firsts + 1
 	end
 	self.MoveCtrl.Enable(unitID)
 	-- Weapons never fire. This also stops them aiming, which issue #3796 sets

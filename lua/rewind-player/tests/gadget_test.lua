@@ -135,6 +135,8 @@ do
 	t.same("by the name it listens for", w.sentName, "coilbox_rewind_work")
 	t.same("with how many units the frame made", w.sentMade, 1)
 	t.same("and removed", w.sentRemoved, 0)
+	t.same("and the budgets the frame worked to, which a message changes some frames after it is sent (issue #4016)", table.concat(w.sentBudgets or {}, " "), "1 1 1")
+	t.same("and how many of its units were the first of their definition (issue #4015)", w.sentFirsts, 1)
 	t.same("the frame is published", w.params.coilbox_rewind_frame, h.firstFrame)
 	t.same("the world is not settled yet", w.params.coilbox_rewind_settled, 0)
 	local frame = settle(gadget, w, 2)
@@ -146,6 +148,7 @@ do
 	t.same("a message for something else is not", gadget:RecvLuaMsg("somebody:else", 0), false)
 	t.same("the budget message is the player's", gadget:RecvLuaMsg("coilbox_rewind_budget:50 50 100000", 0), true)
 	frame = settle(gadget, w, frame + 1)
+	t.same("a frame after the message works to its budgets", table.concat(w.sentBudgets or {}, " "), "50 50 100000")
 	t.same("the seek is where the next frame is", w.params.coilbox_rewind_frame, 800)
 	t.same("with the units of that frame", w.unitCount(), 4)
 
@@ -348,60 +351,67 @@ end
 
 -- The unsynced half works out how many units a frame may make and how many it
 -- may remove (issue #3988). It is sent back as a message to the synced half,
--- which has no clock. Half a simulation frame is 16.7 ms.
+-- which has no clock. Half a simulation frame is 16.7 ms. A message reaches the
+-- synced half some frames after it is sent, so the synced half says with each
+-- frame the budgets that frame worked to (issue #4016).
 
-do
-	local lines, clock = {}, { now = 0 }
-	local gadget = unsynced(PLAYER, lines, clock)
+--- A stand-in for the synced half's frames. `work(ms, made, removed, ground,
+-- late, firsts)` is a frame that took `ms`, of whose units `firsts` were the
+-- first of their definition in the run. The budgets it worked to are the last
+-- ones sent, as if each message arrived before the next frame, unless it is
+-- `late`.
+local function budgetFrames(gadget, clock)
 	local frame = 0
-	local function work(milliseconds, made, removed, ground)
+	local had = { 1, 1, 1 }
+	local function work(milliseconds, made, removed, ground, late, firsts)
 		frame = frame + 1
+		local last = clock.messages[#clock.messages]
+		if last and not late then
+			local a, b, c = last:match("^coilbox_rewind_budget:(%d+) (%d+) (%d+)$")
+			had = { tonumber(a), tonumber(b), tonumber(c) }
+		end
 		gadget:RecvFromSynced("coilbox_rewind_work", 0, frame)
 		clock.now = clock.now + milliseconds
-		gadget:RecvFromSynced("coilbox_rewind_work", 1, frame, made, removed or 0, ground or 0)
-	end
-	local function said()
-		return table.concat(clock.messages, " | ")
+		gadget:RecvFromSynced("coilbox_rewind_work", 1, frame, made, removed or 0, ground or 0, had[1], had[2], had[3], firsts or 0)
 	end
 	local function last()
 		return clock.messages[#clock.messages]
 	end
+	return work, last
+end
+
+do
+	local lines, clock = {}, { now = 0, micros = true }
+	local gadget = unsynced(PLAYER, lines, clock)
+	local work, last = budgetFrames(gadget, clock)
 	work(5, 0)
 	t.same("a frame that made and removed nothing says nothing", #clock.messages, 0)
 	work(1, 1)
-	t.same("a unit a millisecond fits 16 in half a frame, but the budget at most doubles from one", last(), "coilbox_rewind_budget:2 1 1")
-	work(2, 2)
-	work(4, 4)
-	work(8, 8)
-	t.same("each frame of a seek doubles it", said(), "coilbox_rewind_budget:2 1 1 | coilbox_rewind_budget:4 1 1 | coilbox_rewind_budget:8 1 1 | coilbox_rewind_budget:16 1 1")
-	work(16, 16)
-	t.same("a budget that does not change is not sent again", #clock.messages, 4)
-	work(48, 16)
-	t.same("a frame that took 3 ms a unit cuts it to 5", last(), "coilbox_rewind_budget:5 1 1")
-	t.same("and the slow frame is logged as before", #lines, 1)
-	work(0.5, 5)
-	t.same("a cheap frame of a few units cannot more than double it", last(), "coilbox_rewind_budget:10 1 1")
-	work(0, 10)
-	t.same("a frame the timer read as no time at all does not divide by nothing", last(), "coilbox_rewind_budget:20 1 1")
-	work(60, 2)
-	t.same("a budget is never below one", last(), "coilbox_rewind_budget:1 1 1")
-	work(8, 40)
-	t.same("a budget is never more than twice what the last frame made", last(), "coilbox_rewind_budget:80 1 1")
-	local sent = #clock.messages
+	t.same("a unit a millisecond fits 16 in half a frame, and the budget goes straight there however few the frame made (issue #4016)", last(), "coilbox_rewind_budget:16 1 1")
+	work(8, 16)
+	t.same("16 units in 8 ms fit 33", last(), "coilbox_rewind_budget:33 1 1")
+	work(16.5, 33)
+	t.same("a budget that does not change is not sent again", #clock.messages, 2)
 	work(0.3, 3)
-	t.same("the few cheap units that end a seek leave it", #clock.messages, sent)
+	t.same("the few cheap units that end a seek leave it", #clock.messages, 2)
 	work(3, 3)
-	t.same("so do a few dear ones that still fit in half a frame", #clock.messages, sent)
+	t.same("so do a few dear ones that still fit in half a frame", #clock.messages, 2)
 	work(20, 3)
 	t.same("a few that took longer than half a frame cut it, even when they did not use it all", last(), "coilbox_rewind_budget:2 1 1")
+	work(0.4, 2)
+	t.same("a cheap frame can more than double it (issue #4016)", last(), "coilbox_rewind_budget:83 1 1")
+	t.same("a frame that fits in a simulation frame is not logged", #lines, 0)
+	work(60, 2)
+	t.same("a budget is never below one", last(), "coilbox_rewind_budget:1 1 1")
+	t.same("and the slow frame is logged as before", #lines, 1)
 
 	work(2, 0, 4)
-	t.same("a frame of removals sets the removal budget and leaves the other", last(), "coilbox_rewind_budget:2 8 1")
-	sent = #clock.messages
+	t.same("a frame of removals sets the removal budget and leaves the other", last(), "coilbox_rewind_budget:1 33 1")
+	local sent = #clock.messages
 	work(5, 5, 5)
 	t.same("a frame that did both says what neither costs, so changes neither", #clock.messages, sent)
-	work(0.4, 0, 8)
-	t.same("a removal budget moves on removals alone", last(), "coilbox_rewind_budget:2 16 1")
+	work(6.6, 0, 33)
+	t.same("a removal budget moves on removals alone", last(), "coilbox_rewind_budget:1 83 1")
 	work(1, 0, 0)
 	t.same("a frame with nothing to do sends both back to one, since what a unit costs moves with how many there are", last(), "coilbox_rewind_budget:1 1 1")
 	sent = #clock.messages
@@ -410,17 +420,109 @@ do
 
 	-- The ground of a seek has a budget of its own, in corners (issue #4025).
 	work(2, 0, 0, 100)
-	t.same("a frame of ground sets the ground budget, at most twice what it did", last(), "coilbox_rewind_budget:1 1 200")
-	work(4, 0, 0, 200)
-	t.same("and doubles while the cost allows", last(), "coilbox_rewind_budget:1 1 400")
+	t.same("a frame of ground sets the ground budget to what fits, with a microsecond of the timer's in it", last(), "coilbox_rewind_budget:1 1 832")
 	sent = #clock.messages
 	work(1, 0, 0, 0)
 	t.same("a frame with nothing to do keeps the ground budget, since a corner costs the same whatever else is in the world", #clock.messages, sent)
-	work(30, 0, 0, 400)
-	t.same("a frame of ground that took longer than half a frame cuts it", last(), "coilbox_rewind_budget:1 1 222")
+	work(30, 0, 0, 832)
+	t.same("a frame of ground that took longer than half a frame cuts it", last(), "coilbox_rewind_budget:1 1 462")
 	sent = #clock.messages
 	work(5, 2, 0, 100)
 	t.same("a frame that made units and set ground says what neither costs", #clock.messages, sent)
+end
+
+-- A budget is judged by the budget the frame worked to, and not the one last
+-- sent, which may not have arrived (issue #4016).
+
+do
+	local lines, clock = {}, { now = 0, micros = true }
+	local gadget = unsynced(PLAYER, lines, clock)
+	local work, last = budgetFrames(gadget, clock)
+	work(0.499, 1, 0, 0, false, 1)
+	t.same("33 are on their way", last(), "coilbox_rewind_budget:33 1 1")
+	work(0.999, 1, 0, 0, true)
+	t.same("a frame that made the whole of the one unit it had counts though 33 are on their way, and at 1 ms a unit 16 fit", last(), "coilbox_rewind_budget:16 1 1")
+end
+
+-- What a unit costs grows as a seek fills the world, because a game's own
+-- gadgets do more for each unit created when there are more (issue #4015). A
+-- budget is in force for the frames its message takes to arrive, so the rise is
+-- taken to go on through them. Each frame here costs 0.5 ms a unit and 0.002 ms
+-- more for each unit the seek has made, with the microsecond the timer adds.
+
+do
+	local lines, clock = {}, { now = 0, micros = true }
+	local gadget = unsynced(PLAYER, lines, clock)
+	local work, last = budgetFrames(gadget, clock)
+	work(0.501, 1)
+	t.same("a unit at 0.502 ms fits 33", last(), "coilbox_rewind_budget:33 1 1")
+	work(18.743, 33)
+	t.same(
+		"0.066 ms a unit more after 33 more is taken to come again, but no further than the 33 units it was read over, so 26 fit where 29 would at the cost of this frame",
+		last(),
+		"coilbox_rewind_budget:26 1 1"
+	)
+	work(16.119, 26)
+	t.same(
+		"read over 59 units it is taken through the 26 made before the budget arrives and through the budget's own, so 23 fit",
+		last(),
+		"coilbox_rewind_budget:23 1 1"
+	)
+	work(19.317, 23, 0, 0, false, 1)
+	t.same(
+		"a frame that made the first unit of a definition, 4 ms dearer, is left out of the rise, since that cost is the first time and not a trend",
+		last(),
+		"coilbox_rewind_budget:18 1 1"
+	)
+end
+
+-- A seek starts at one unit a frame, and the timer's noise on one unit is not a
+-- rise to take a hundred units further, which the first windowed run of Balanced
+-- Annihilation did.
+
+do
+	local lines, clock = {}, { now = 0, micros = true }
+	local gadget = unsynced(PLAYER, lines, clock)
+	local work, last = budgetFrames(gadget, clock)
+	work(0.339, 1)
+	t.same("a unit in 0.34 ms fits 49", last(), "coilbox_rewind_budget:49 1 1")
+	work(0.399, 1, 0, 0, true)
+	t.same("0.06 ms more on the next unit is taken no further than one unit, so 36 fit and not 13", last(), "coilbox_rewind_budget:36 1 1")
+end
+
+-- How many frames the last budget took to arrive is how many frames are taken
+-- to pass before the next one does.
+
+do
+	local lines, clock = {}, { now = 0, micros = true }
+	local gadget = unsynced(PLAYER, lines, clock)
+	local work, last = budgetFrames(gadget, clock)
+	-- The first units of three definitions, which say nothing of a rise.
+	work(0.499, 1, 0, 0, false, 1)
+	work(0.499, 1, 0, 0, true, 1)
+	work(0.499, 1, 0, 0, true, 1)
+	t.same("33 are sent and three frames go by before they arrive", last(), "coilbox_rewind_budget:33 1 1")
+	work(16.499, 33)
+	t.same("a frame that keeps the cost keeps the budget", #clock.messages, 1)
+	-- 0.001 ms a unit more for each unit made, while the budgets sent wait.
+	work(17.588, 33)
+	work(18.677, 33, 0, 0, true)
+	work(19.766, 33, 0, 0, true)
+	t.same(
+		"three frames of 33 are taken to come before the next budget arrives, as the last one took, and over 99 units of a rising cost 23 fit where one frame would leave room for 25",
+		last(),
+		"coilbox_rewind_budget:23 1 1"
+	)
+end
+
+-- A timer that reads whole milliseconds reads less than a millisecond as none.
+
+do
+	local lines, clock = {}, { now = 0 }
+	local gadget = unsynced(PLAYER, lines, clock)
+	local work, last = budgetFrames(gadget, clock)
+	work(0, 10)
+	t.same("a frame the timer read as no time took up to a millisecond, which its 10 units share", last(), "coilbox_rewind_budget:166 1 1")
 end
 
 -- When a budget cannot be worked out (issue #3988): what the engine lacks, and

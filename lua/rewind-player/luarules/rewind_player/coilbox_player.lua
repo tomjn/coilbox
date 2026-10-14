@@ -438,6 +438,21 @@ function Player:worked()
 	return self.units.made, self.units.removed, self.terrain.done or 0
 end
 
+--- The budgets the last frame worked to: the most units it could make and
+-- remove, and the most corners of the ground it could set. A budget message
+-- reaches the synced half some frames after it is sent, so the unsynced half
+-- is told which one a frame had (issue #4016).
+function Player:budgets()
+	return self.units.makeBudget, self.units.removeBudget, self.terrain.budget or 0
+end
+
+--- How many of the units the last frame made were the first of their
+-- definition in the run, which cost the engine and the game more than the next
+-- ones (issue #4015).
+function Player:firstUnits()
+	return self.units.firsts
+end
+
 --- A Lua message. True when it was the player's, done or refused, and false
 -- when it was somebody else's.
 function Player:message(text)
