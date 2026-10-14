@@ -17,6 +17,20 @@
 --
 -- Change this in the coilbox repository under lua/rewind-player/.
 
+--- What it is, for whoever reads the file. A handler never asks, since the file
+-- returns false before the handler looks for it.
+function widget:GetInfo()
+	return {
+		name = "Coilbox rewind match time",
+		desc = "Tells the widgets a game's adapter names the time of the match being played back.",
+		author = "coilbox",
+		date = "2026",
+		license = "MIT or GNU GPL, v2 or later",
+		layer = 0,
+		enabled = true,
+	}
+end
+
 local PREFIX = "COILBOX_REWIND_MATCH_TIME "
 local ADAPTER_PATH = "coilbox_rewind/adapter.lua"
 local OWN_NAME = "!coilbox_rewind_match_time.lua"

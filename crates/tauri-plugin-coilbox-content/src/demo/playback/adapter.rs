@@ -284,7 +284,11 @@ impl Adapter {
         names("features", &raw.features.0)?;
         params("teamParams", &raw.team_params.0)?;
         params("gameParams", &raw.game_params.0)?;
-        files("matchTimeWidgets", "luaui/widgets/", &raw.match_time_widgets.0)?;
+        files(
+            "matchTimeWidgets",
+            "luaui/widgets/",
+            &raw.match_time_widgets.0,
+        )?;
         let versions = raw.versions.unwrap_or_default();
         let (min, max) = (bound("min", &versions.min)?, bound("max", &versions.max)?);
         if let (Some(min), Some(max)) = (&min, &max) {
@@ -566,7 +570,13 @@ mod tests {
 
     #[test]
     fn a_widget_that_reads_the_matchs_time_is_a_lua_file_inside_the_folder() {
-        for bad in ["../x.lua", "x.txt", "", "a\\b.lua", "coilbox_rewind_timeline.lua"] {
+        for bad in [
+            "../x.lua",
+            "x.txt",
+            "",
+            "a\\b.lua",
+            "coilbox_rewind_timeline.lua",
+        ] {
             let source = format!("return {{ matchTimeWidgets = {{ {bad:?} }} }}");
             let err = Adapter::parse(&source).unwrap_err();
             assert!(err.contains("matchTimeWidgets"), "{bad}: {err}");
