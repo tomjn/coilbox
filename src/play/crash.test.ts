@@ -129,12 +129,6 @@ describe("classifyLine", () => {
 });
 
 describe("buildCrashReport", () => {
-  const lines = [
-    "[t=00:00:03.307308] Warning: [GR::ProbeImmediateModeBatching] batches render wrongly",
-    '[t=00:00:22.144642][f=-000001] Error: [SetConfigString] key "UsePBO" is deprecated',
-    "[t=00:00:24.185623][f=-000001] LuaRules loaded",
-  ];
-
   const report = () =>
     buildCrashReport({
       outcome: { exitCode: null, signal: 11 },
@@ -142,7 +136,6 @@ describe("buildCrashReport", () => {
       game: "Beyond All Reason test-1234",
       map: "Comet Catcher Remake",
       logPath: "/Users/tomjn/.config/spring/infolog.txt",
-      lines,
     });
 
   it("leads with how the engine died", () => {
@@ -159,33 +152,17 @@ describe("buildCrashReport", () => {
     expect(r).toContain("Comet Catcher Remake");
   });
 
-  it("pulls the error lines out ahead of the tail", () => {
+  it("carries no lines from the log, which would pass for the whole file", () => {
     const r = report();
-    expect(r).toContain("Error lines (1):");
-    expect(r.indexOf("Error lines (1):")).toBeLessThan(
-      r.indexOf("Last 3 lines:"),
-    );
-  });
-
-  it("caps the tail it carries", () => {
-    const many = Array.from({ length: 200 }, (_, i) => `line ${i}`);
-    const r = buildCrashReport({
-      outcome: { exitCode: 1, signal: null },
-      runKind: "replay",
-      lines: many,
-    });
-    expect(r).toContain("Last 60 lines:");
-    expect(r).toContain("line 199");
-    expect(r).not.toContain("line 139\n");
+    expect(r).not.toContain("Error lines");
+    expect(r).not.toContain("Last ");
   });
 
   it("says so when no log was found", () => {
     const r = buildCrashReport({
       outcome: { exitCode: 1, signal: null },
       runKind: "skirmish",
-      lines: [],
     });
     expect(r).toContain("Log: none found");
-    expect(r).not.toContain("Last");
   });
 });

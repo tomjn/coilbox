@@ -97,7 +97,9 @@ export function classifyLine(line: string): LineKind {
   return "normal";
 }
 
-/** What a crash report says, beyond the log itself. */
+/** What a crash report says. It carries no lines from the log: a few lines of
+ * `infolog.txt` pasted as the log hide the start of the file, which is where the
+ * engine records the system, the GPU and what it loaded (issue #4064). */
 export interface CrashReport {
   outcome: LaunchOutcome;
   /** What was being run: "skirmish", "replay" and so on. */
@@ -107,22 +109,13 @@ export interface CrashReport {
   engine?: string;
   /** The replay or savegame being played back, when that is what died. */
   file?: string;
-  /** Absolute path of the log the lines came from, when one was found. */
+  /** Absolute path of the log, when one was found. */
   logPath?: string;
-  lines: string[];
 }
 
-/** How many trailing lines a report carries. Enough for a stack trace, which is
- * the thing somebody is being asked to paste. */
-const REPORT_TAIL = 60;
-
 /**
- * A plain-text crash report to paste into Discord or a bug report.
- *
- * It leads with the error lines, because they are what somebody reading it
- * needs, and follows with the tail for context. It is not trimmed to Discord's
- * 2000 character limit: a stack trace does not fit in one, and quietly cutting
- * the trace would defeat the point of sending it.
+ * A plain-text note about a crash to paste into Discord or a bug report. It
+ * names the log file so the reader can attach the whole of it.
  */
 export function buildCrashReport(r: CrashReport): string {
   const out: string[] = [
@@ -136,15 +129,5 @@ export function buildCrashReport(r: CrashReport): string {
   if (r.file) out.push(`File: ${r.file}`);
   if (r.engine) out.push(`Engine: ${r.engine}`);
   out.push(`Log: ${r.logPath ?? "none found"}`);
-
-  const errors = r.lines.filter((l) => classifyLine(l) === "error");
-  if (errors.length > 0) {
-    out.push("", `Error lines (${errors.length}):`, ...errors);
-  }
-
-  if (r.lines.length > 0) {
-    const tail = r.lines.slice(-REPORT_TAIL);
-    out.push("", `Last ${tail.length} lines:`, ...tail);
-  }
   return out.join("\n");
 }
