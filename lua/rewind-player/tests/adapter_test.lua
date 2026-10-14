@@ -144,7 +144,7 @@ do
 		table.concat(adapter.teamParams, ","),
 		"supplyUsed,supplyMax,researchPoints"
 	)
-	t.same("and none of the game's as a whole", #adapter.gameParams, 0)
+	t.same("and the seed of the game's weather as a game parameter (issue #4013)", table.concat(adapter.gameParams, ","), "weather_seed")
 end
 
 -- Beyond All Reason's adapter (issue #3801), whose hooks do work of their own.

@@ -150,6 +150,8 @@ True to the recording:
 - Resources one team gave another, sent and received, for metal and energy. Like income, they take up to three seconds to settle after a seek. Where a recording's sent and received do not add up to each other, both sides read the smaller total.
 - Income and spending, once the playback has caught up. They take up to three seconds to settle after a seek and can read high for a moment after a team's income rose in the match. The engine has no way to set them directly, so coilbox tops them up to the match's figures and cannot bring them down.
 - The minimap, the tooltip with a unit's description, the players list and the game's own effects and lights.
+- The clock. In Splinter Faction the clock in the players list reads the time of the match at the moment showing, stands still while paused and counts down when you play backward. In Beyond All Reason the time under the players list does the same, and the speed beside it is the speed you are playing at.
+- In Splinter Faction, day and night, rain and fog are as they were in the match at the moment showing, so a moment that was dark in the match is dark in the playback. The red tint the game gives a battle that has gone on a long time does not show, since nothing is damaged in a playback.
 
 A track recorded by an earlier version of coilbox has no resources in it. It shows as "Track out of date" and has to be recorded again.
 
@@ -157,7 +159,7 @@ Not true to the recording:
 
 - The totals in the end of game statistics, such as all the metal a team ever made. The engine keeps those itself and nothing can set them.
 - The players in the match show under the names they had, in the players list and over their commanders, but the game treats them as not connected. Splinter Faction marks each with a red "dc". You are listed as a spectator called CoilboxPlayback.
-- In Splinter Faction the clock in the players list starts at nothing each time the playback is opened. In Beyond All Reason the time and the speed under the players list are the game's own in the same way. Its Player View button, which follows a player's camera, is switched off during playback. The game's day and night and its weather follow that clock, so a moment that was dark in the match can be light. The engine's clock only counts up and cannot be set to the moment you seek to. This is issue #4013.
+- In Beyond All Reason the Player View button, which follows a player's camera, is switched off during playback.
 - In Splinter Faction, the menu at the top right stays whole. Its Resign button does nothing for a spectator and its Sharing button does nothing in a playback.
 - In Splinter Faction, the build menu and order buttons show for a selected unit. Orders go nowhere. In Beyond All Reason neither shows.
 - In Beyond All Reason, energy income can read higher than the match's, by as much as 17% late in the match it was checked on. Metal and energy held, storage and spending are the match's.

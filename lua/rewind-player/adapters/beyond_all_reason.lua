@@ -152,8 +152,8 @@ return {
 		-- player's camera (issue #4033). A playback has no players, only its one
 		-- spectator. The line under the players list with the time, the speed and
 		-- the frame rate stays: it offers nothing to press, and it hides the
-		-- engine's own clock, which shows at the top right without it. Its time
-		-- and speed are the engine's (issue #4013). The music player stays too:
+		-- engine's own clock, which shows at the top right without it. It is told
+		-- the match's time, below. The music player stays too:
 		-- its pause, next and sliders are the music's and the sound's, not the
 		-- engine's.
 		"camera_player_tv.lua",
@@ -177,6 +177,14 @@ return {
 	-- Metal and energy need nothing here. The track has each team's own, storage
 	-- included, and the player sets them whatever the game.
 	teamParams = { "startUnit", "mmLevel", "mmCapacity", "mmUse", "mmAvgEffi" },
+
+	-- Widgets that are told the match's time when they ask the engine for the
+	-- game's frame (issue #4013). The line under the players list prints it as
+	-- the time of the match, and works its speed out from how fast it moves, so
+	-- the speed it shows is the playback's. Every other widget keeps the
+	-- engine's count, which only goes up, since a playback's time jumps and runs
+	-- backward.
+	matchTimeWidgets = { "gui_advplayerslist_gameinfo.lua" },
 
 	hooks = {
 		-- What game_initial_spawn set before the match that the game's widgets

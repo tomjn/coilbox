@@ -30,6 +30,8 @@ The player holds a time `t`, a frame of the track that can be a fraction. On eve
 | `luaui/widgets/coilbox_rewind_ghosts.lua` | the ghosts widget: the call-ins, and finding the track and the adapter |
 | `luaui/rewind_ghosts/coilbox_ghosts.lua` | the ghosts: which buildings are queued at a time, and the drawing. It takes the engine as a table, so the tests run it |
 | `luaui/rewind_ghosts/coilbox_ghosts_engine.lua` | the ghosts widget's own table of engine calls |
+| `luaui/widgets/!coilbox_rewind_match_time.lua` | gives the widgets an adapter names the match's time, as its file runs, and is no widget ([The match's time](#the-matchs-time)) |
+| `luaui/rewind_match_time/coilbox_match_time.lua`, `coilbox_match_time_engine.lua` | the wrap of the engine's frame calls, and its table of engine calls |
 
 It runs in synced Lua, because creating a unit is synced. It moves only on simulation frames, and a paused engine runs none. So the player's own pause is what holds `t`, and the engine has to be left running for a seek to show. A game can still pause the engine or change its speed, with a key or a chat command, and the gadget hands that to the player ([The engine's own pause and speed](#the-engines-own-pause-and-speed)).
 
@@ -52,6 +54,38 @@ The ignored Rust tests read the file with the engine's log, so they find the lin
 A game can pause the engine or change its speed: Beyond All Reason binds its pause key to the engine's `pause` and `Alt` with `=` or `-` to its own speed actions, and the chat commands `/pause` and `/setspeed` work in every game. The playback's one spectator is the local host, which the server lets do both (`NETMSG_PAUSE` and `NETMSG_USER_SPEED` in `rts/Net/GameServer.cpp`). A paused engine holds a seek too, and a faster one plays faster than the timeline says.
 
 So the gadget's unsynced half reads `Spring.GetGameSpeed` in `gadget:Update`, which runs on every drawn frame and while the engine is paused (issue #4033). A paused engine is sent `pause 0` and the player is sent `toggle`, so the pause the viewer asked for is the player's own. An engine at another speed is sent `setspeed 1` and the player `faster` or `slower`. The engine stays paused, or at its new speed, until the server answers, over several drawn frames, so each is handed on once. Without `Spring.GetGameSpeed` or `Spring.SendCommands` the engine is left alone, which the `enginePace` row says.
+
+### The match's time
+
+The engine counts its frames from when the playback was opened, and no Lua call sets that count. A widget that prints the time, or works something out from it, shows the playback's time and not the match's (issue #4013). In Splinter Faction that was the clock in the players list and the game's day, night, rain and fog.
+
+An adapter names such widgets in `matchTimeWidgets` ([Game adapters](#game-adapters)). When one of them asks `Spring.GetGameFrame` or `Spring.GetGameSeconds`, it is answered with the whole frame of `coilbox_rewind_frame`, so after a seek to minute 10 the players list reads 10:00, paused it stands still and played backward it counts down. Every other widget, and every gadget, is answered with the engine's count.
+
+Only named widgets are told, and not every widget. Splinter Faction has 53 widgets that read the frame and Beyond All Reason `test-30922-8064a43` has 294, read in their files. Many use it as a clock that only goes up: a light keeps the frame it was made on and fades by the frames since, a cooldown ends at a frame, a health bar shader is handed the frame. Several mix it with the frame the engine hands `widget:GameFrame`. A playback's time jumps and runs backward, and a frame that went back would leave those stuck or wrong, which no real replay ever does to them.
+
+How it works, read in the engine and the handlers of Splinter Faction (`cont/LuaUI/widgets.lua` of the engine, through its `widgets_custom.lua`) and Beyond All Reason (`luaui/barwidgets.lua`):
+
+- Every widget's table is made from the handler's `System` table, so `Spring` is one table that all widgets share. A widget keeps a call in a local as its own file runs, so the wrap has to be in place before a named widget's file runs.
+- The handler runs every widget file before it starts any widget, in the order `VFS.DirList` gives, which is sorted by path (`CFileHandler::DirList` in `rts/System/FileSystem/FileHandler.cpp`). `!coilbox_rewind_match_time.lua` comes before any name that starts with a letter, a digit or an underscore. It wraps the two calls as it runs, and then returns `false`, which the handlers take as a file that asked not to be loaded. It is no widget, so it has nothing to switch off and no call-in to run. A named widget whose name comes before it is logged as keeping the engine's count.
+- A call is told the match's frame when its caller's environment is a named widget's. A widget's functions run in its own table, and the handler gives that table a `whInfo` with the file it was loaded from. The caller is found with `getfenv(3)` inside `pcall`, which allocates nothing. A widget asking as its own file runs has no `whInfo` yet, and a call made as a tail call (`return Spring.GetGameFrame()`) leaves no frame to find the widget by. Both are told the engine's count. Neither of Splinter Faction's named widgets does either.
+- The frame is the second number too: the engine gives the frame as what is left of a day of frames and the days, and so does the wrap. A frame that is a fraction, at 0.5x, is the whole frame it is in.
+
+The file logs one line, `COILBOX_REWIND_MATCH_TIME the match's time is given to: ...`, and nothing when the adapter names no widget. Its table of engine calls has two rows, both required: `matchTime` (`Spring.GetGameFrame`, `GetGameSeconds`, `GetGameRulesParam`, `Game.gameSpeed`) and `adapter` (`VFS.FileExists`, `VFS.ZIP`). Without one nothing is wrapped and the line says which call is missing. All were read at `105.0`, `105.1.1`, `2025.01.6`, `2025.04.11` and `2026.07.04`.
+
+Splinter Faction's weather also needs its seed. `weather_seed.lua` makes it from the engine's id for the match, as the game rules parameter `weather_seed`, unless it is set already, and the weather widget reads it once. The engine hands a gadget the id after every gadget and widget has loaded (`NETMSG_GAMEID` in `CGame::ClientReadNet`), and a playback's id is its own. So the adapter names `weather_seed` in `gameParams`, the recorder keeps it, and the player sets the parameters an adapter names as it is made, before the first frame ([Rules parameters](#rules-parameters)). The playback's seed is then the match's, and the game's gadget makes none.
+
+What has run, on engine `2026.07.01-102-g6e5c5a0` and the Splinter Faction commit the whole match was played on, on 14 October 2026:
+
+- Headless, a probe user widget found the players list's and the weather widget's own kept call through their upvalues and called it from inside each widget. In the playback both were the wrap, and paused after seeks to frames 12,000, 14,000 and 21,000 the players list's answered 12000, 14000 and 21000, with the engine's own count at 58, 105 and 154. The seed was 2895200, the real replay's, and the playback logged no `[Weather Seed] published`. The weather widget's night was 0.99815, 0.80634 and 0.10570 at the three frames, and in the real replay 0.99815, 0.80634 and 0.10570. Rain was 0 in both at all three, which is the match's.
+- In a window, the playback and the real replay paused at frames 12,000, 14,000 and 21,000, from the same camera. The players list read 6:40, 7:46 and 11:40 in both, and the light of the ground and the fog were the same: night at 12,000 and day at 21,000. The pictures are in `docs/reports/milestone-80-gallery/` from 120, which is gitignored.
+- In a window, Beyond All Reason `test-30922-8064a43`'s playback paused at frame 12,000 read `6:40` and `x0.00` on the line under its players list, which is the match's time and the playback's speed.
+- Headless, `scripts/rewind-playback-headless.sh`, `a_whole_splinter_faction_match_plays_with_its_adapter` and `a_whole_beyond_all_reason_match_plays_with_its_adapter` passed with the change.
+
+![The playback on the left and the real replay on the right, paused at frame 12,000 above and 21,000 below, from the same camera](screenshots/match-time.jpg)
+
+The players list is at the bottom right of each, and reads 6:40 above and 11:40 below in both. The playback's timeline reads the same.
+
+The war tint of the weather widget is the one part that is not the match's. It comes from damage the widget saw, which in a match is each player's own and in a playback is none, since nothing is damaged.
 
 ### Published state
 
@@ -417,7 +451,7 @@ Nothing fires in a playback, so left alone a turret points wherever the unit's o
 
 ![The same moment of a fight with the stage off and on](screenshots/aim-before-after.jpg)
 
-Both halves are frame 22,550 of the whole match of [In a real engine](#in-a-real-engine), paused, three seconds after a seek, from the same place. On the left the stage is switched off and every unit stands as its script made it. On the right the commander's torso and gun arm are turned to the rocket bots to its right, and each bot's launcher is raised and turned to the commander. The light differs because the game's day and night follow the engine's own clock (issue #4013).
+Both halves are frame 22,550 of the whole match of [In a real engine](#in-a-real-engine), paused, three seconds after a seek, from the same place. On the left the stage is switched off and every unit stands as its script made it. On the right the commander's torso and gun arm are turned to the rocket bots to its right, and each bot's launcher is raised and turned to the commander. The light differs because the game's day and night followed the engine's own clock when these were taken, before issue #4013 ([The match's time](#the-matchs-time)).
 
 #### How a piece is posed
 
@@ -1285,6 +1319,7 @@ return {
 
 	teamParams = { "supplyUsed", "supplyMax" },
 	gameParams = { "wave" },
+	matchTimeWidgets = { "gui_static_playerslist.lua" },
 
 	hooks = {
 		started = function() end,
@@ -1307,6 +1342,7 @@ Every key is optional except `shortname` in an adapter that coilbox ships. A key
 | `features` | list of names | feature definitions the player never creates |
 | `teamParams` | list of names | team rules parameters that are the recording's to set, see [Rules parameters](#rules-parameters) |
 | `gameParams` | list of names | the same for game rules parameters |
+| `matchTimeWidgets` | list of file names | widgets told the match's time when they ask the engine for the game's frame or seconds, as paths inside `luaui/widgets/`. See [The match's time](#the-matchs-time) |
 | `hooks` | table of functions | see [Hooks](#hooks) |
 
 The file is run by `coilbox-springlua`, the sandboxed Spring Lua evaluator that reads a game's other config, so the lists can be worked out in Lua. It has no `io`, no `os` and no way to read another file. Coilbox reads everything but `hooks` from it before the engine starts, and the player reads the same file again in the engine, for `units`, `features`, `teamParams`, `gameParams` and `hooks`.
@@ -1373,7 +1409,7 @@ COILBOX_REWIND_PLAYER the game's adapter names rules parameters the track was re
 
 Coilbox does not take a track as stale when an adapter gains a name. The track has to be cleared and the replay recorded again.
 
-A parameter is set on every frame and again in `GameFramePost`, so a gadget of the game that writes the same parameter during the frame is written over before anything is drawn. A parameter with no value at the time showing had not been set yet in the match, and the player leaves it as the game has it. `Spring.SetTeamRulesParam` is called with no access argument, which keeps whatever access the game gave the parameter, and gives a parameter the game never made the engine's default of private. A spectator with the full view reads those too.
+A parameter is set once as the player is made, before the first frame, at the time it opens on, because a game can read one once as it loads ([The match's time](#the-matchs-time)). It is set again on every frame and in `GameFramePost`, so a gadget of the game that writes the same parameter during the frame is written over before anything is drawn. A parameter with no value at the time showing had not been set yet in the match, and the player leaves it as the game has it. `Spring.SetTeamRulesParam` is called with no access argument, which keeps whatever access the game gave the parameter, and gives a parameter the game never made the engine's default of private. A spectator with the full view reads those too.
 
 ### Hooks
 
@@ -1464,7 +1500,7 @@ The real replay showed a metal expense of 7.0 at frame 6,927 and the track has 6
 
 The left column is the playback with the track marked as one that has no resources and the adapter as it was, which is the playback before the stage. The right is the same launch with the track as recorded. Both are the engine's own screenshots of a window, cut down to the bars, taken paused seven seconds after the seek.
 
-Two things on screen are still the playback's and not the match's. The clock in the players list is the engine's, which starts at nothing whenever the playback is opened. And the game's day and night and its weather follow that clock, so a moment that was dark in the match can be light in the playback (issue #4013). Neither can be set from the gadget, since no Lua call sets the engine's frame number.
+The clock in the players list and the game's day, night, rain and fog follow the engine's count of frames, which starts at nothing whenever the playback is opened. The adapter names both widgets in `matchTimeWidgets` and the seed of the weather, `weather_seed`, in `gameParams`, so the clock reads the match's time at the frame showing and the sky is the match's (issue #4013, [The match's time](#the-matchs-time)).
 
 A player's name comes from the start script and no Lua call sets it, so it is the script that carries the match's names (issue #4012). The script lists every player of the replay under the name and number it had, and each team's leader is its player of the replay. [Player names](#player-names) has what the engine does with a player who never connects, and what each game shows.
 
@@ -1585,7 +1621,7 @@ In the whole match plan the engine ended a held shot of `corpun_plasma` at 32x f
 Issue #4033 took the panel at the bottom right for the game's replay controls. They are three widgets, read in `test-30922-8064a43` and seen in a window:
 
 - The pause, next, note and speaker buttons and the two sliders are the music player, `gui_advplayerslist_music_new.lua`. Its pause pauses the music (`Spring.PauseSoundStream`) and its sliders set the music's and the sound's volume. It stays, since it fights nothing.
-- The line with the time, `x1.00`, the frame rate and the clock is `gui_advplayerslist_gameinfo.lua`. It offers nothing to press, so it stays. Its time and speed are the engine's, which the playback cannot set (issue #4013). It also hides the engine's own clock, with the engine's `clock 0` command as it starts: switched off in a window run, the engine's clock showed at the top right instead.
+- The line with the time, `x1.00`, the frame rate and the clock is `gui_advplayerslist_gameinfo.lua`. It offers nothing to press, so it stays. The adapter names it in `matchTimeWidgets`, so its time is the match's and its speed, which it works out from how fast the frame moves, is the playback's (issue #4013). It also hides the engine's own clock, with the engine's `clock 0` command as it starts: switched off in a window run, the engine's clock showed at the top right instead.
 - The Player View button is `camera_player_tv.lua`, switched off as above.
 - `gui_replaybuttons.lua`, the game's real replay buttons, only starts in a replay (`Spring.IsReplay()`), and a playback is not one.
 
@@ -1775,6 +1811,7 @@ luajit lua/rewind-player/tests/adapter_test.lua
 luajit lua/rewind-player/tests/engine_test.lua
 luajit lua/rewind-player/tests/timeline_test.lua
 luajit lua/rewind-player/tests/ghosts_test.lua
+luajit lua/rewind-player/tests/match_time_test.lua
 ```
 
 - `reader_test.lua` reads the fixture and compares every sampled value with what the Rust reader gives. It also checks a unit's velocity against how far its place moves in a frame. It plays forward, backward and in a fixed shuffle, and checks the errors and the three ways of fetching.
@@ -1789,7 +1826,7 @@ luajit lua/rewind-player/tests/ghosts_test.lua
 - `aim_test.lua` checks the aim stage on a stand-in whose unit's own script turns pieces in the middle of every frame: the pose on the first frame after a seek, held for 60 frames paused and while playing each way, a piece the track does not name left to the script, an angle of 141 turns, half speed, a piece the script lacks, a piece with no track in a window, a seek that makes its units over several frames, a unit destroyed between a frame and its post frame, a unit under construction, an engine with no call at the end of a frame, the fixture through the real reader, and that 300 frames of posing 20 units allocate nothing.
 - `animation_test.lua` checks the animation stage on a stand-in whose units have COB and Lua scripts: a unit that starts and stops is told once each, with its velocity and its place left alone, a unit with no script, pause, play backward and turning play round, seeks, a unit made again, 8x and half speed, a unit under construction, a builder's start and stop with its angles for a Lua and a COB script, a factory, every kind of work and its parameters, a factory that goes straight on to the next unit, a builder's nano pieces asked of its script once and given to the engine, the work handed on to the stream and when, a window with no track for the work, a target a seek has yet to make, the pieces a walk turns and the aim stage leaves to the script, a script that raises, a framework the wrap does not see, each row switched off, the fixture through the real reader, and that 300 frames of 20 walking units and 5 builders at work allocate nothing.
 - `projectiles_test.lua` checks the projectiles stage: what is in the air at a time, stepping forward and backward, that a seek looks at the shots that can be alive and not the window's list, that a shot lands only while it is watched and with no damage, crater or push, a shell that ends in the air, a bolt that stops, a beam fired once, the fire sound and when it is not played, a weapon the game lacks, an engine with no `Spring.SetProjectileTimeToLive`, a shot the engine ended and an id handed out again, a shot alive across two windows, and that 300 frames of play with 40 shots in the air allocate nothing.
-- `resources_test.lua` checks the resources stage on a stand-in whose teams follow `rts/Sim/Misc/Team.cpp` and whose frame runs in the engine's order, with the playback's own economy between the gadget's two call-ins: what a team holds, its storage and its share level at a frame, after a seek forward and backward, held for 400 frames and while playing each way, on an engine with and without `GameFramePost`, income, expense and pull after three of the engine's sums, a team with an income multiplier, excess, allied teams and the engine's own sharing, rules parameters with and without an adapter that names them, a track from recorder version 3, the fixture through the real reader, and that 300 frames allocate nothing.
+- `resources_test.lua` checks the resources stage on a stand-in whose teams follow `rts/Sim/Misc/Team.cpp` and whose frame runs in the engine's order, with the playback's own economy between the gadget's two call-ins: what a team holds, its storage and its share level at a frame, after a seek forward and backward, held for 400 frames and while playing each way, on an engine with and without `GameFramePost`, income, expense and pull after three of the engine's sums, a team with an income multiplier, excess, allied teams and the engine's own sharing, rules parameters with and without an adapter that names them and set before the first frame, a track from recorder version 3, the fixture through the real reader, and that 300 frames allocate nothing.
 - `settle_test.lua` checks a seek that needs more units than a frame may make or remove: that it settles over several frames, that removals use their own budget and come first, that a second seek while one settles starts again, that play goes on while it settles and units made late stand where the track has them now, what `coilbox_rewind_settled` says and when, how many of a frame's units were the first of their definition in the run, the budget message and the ones it refuses, that the first frame of a seek into another window makes and removes nothing (issue #4037), that a shot waits for its shooter, and that 300 frames of play with a budget allocate nothing.
 - `terrain_test.lua` checks the ground of a seek (issue #4025) on tracks with craters across a map of 256 by 256 corners and a block of rows on the last frame: that a seek with a small ground budget takes several frames and no frame does more than its budget and one tile, that no call reaches past a tile and the corner beside it, that no call that moved a corner leaves the engine a rectangle of no area, that the ground is the track's after seeks both ways and after a seek that arrives while another settles, that a corner before its first change has the map's own height, that no unit is made while the ground still moves and the player is not settled until it stops, that a unit stands at the track's height before and after the ground under it arrives, that play at 1x forward and backward moves a crater on its frame while a seek's ground is still being set, the third number of the budget message, and that 300 frames of play through craters allocate nothing.
 - `view_test.lua` checks the order a seek makes its units in: the list's with no view, nearest the camera's place first with one, inside the view's corners before outside, the rest following a camera that moves, the list's again after `coilbox_rewind_view:none`, removals still first, a unit born while a seek settles, the view messages it refuses, and that 300 frames of play with a view allocate nothing.
@@ -1801,6 +1838,8 @@ luajit lua/rewind-player/tests/ghosts_test.lua
 - `timeline_test.lua` checks the timeline on a stand-in for `Spring` and `gl`: the message for every key, that a key with Ctrl, Alt or Meta is left alone, the frame a drag seeks to at both ends and between, the time and speed shown, that everything drawn is inside views from 640 by 480 to 3840 by 2160, moving the panel, changing a key, marks, and that 300 draws allocate nothing. It also loads the widget file the way a handler does.
 
 - `ghosts_test.lua` checks the ghosts on a track made from a table (`tests/fake_track.lua`, which has queues) against an answer worked out from the table. It plays the whole track forward and backward and seeks to 19 frames across window edges. It checks a building started within and beyond the 8 elmos, two builders with one item, a definition the game lacks, a window that does not read, what is drawn and how (the facing, the engine's build height asked with the definition and the facing, the identity loaded before the move), the footprint, the switch and the text command, the saved choice, an adapter's hook and one that raises, the hook that hears a pass is over, and that 300 frames allocate nothing. It runs the fixture through the real reader against the Rust reader's queues, loads the widget file, and holds the widget's files and the reader's to its table of engine calls.
+
+- `match_time_test.lua` checks the match's time on a stand-in for `Spring`: a named widget is told the match's frame and seconds and another widget the engine's, before the player has a time, at a fraction, after a seek backward and past a day, names in any case and in a folder, a widget asking as its file runs, a call made as a tail call, an adapter that names none, and that 600 asks allocate nothing. It runs the file the way a handler does, with an adapter, without one, one that raises and one that names a widget whose file comes first, checks that the file's name comes before the widgets Splinter Faction's adapter names, and holds the file to its table of engine calls.
 
 `tests/support.lua` is the stand-in for the reader. Its `VFS.Unpack*` and `VFS.ZlibDecompress` follow the engine source, round what they return to a 32 bit float, and raise for a position or count a float could not hold. The zlib is the system's, through LuaJIT's FFI. Its synced environment has no `io`, so a reader that reached for it would fail the tests.
 

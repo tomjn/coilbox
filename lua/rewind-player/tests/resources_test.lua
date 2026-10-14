@@ -34,7 +34,7 @@ local function setup(spec, options)
 	spec.last = spec.last or 3000
 	local track = spec.header and spec or Fake.new(spec)
 	local player = assert(Player.new(track, {
-		modOptions = {},
+		modOptions = options.modOptions or {},
 		engine = options.engine,
 		adapter = options.adapter and assert(Adapter.normalize(options.adapter)),
 		log = function(text)
@@ -597,6 +597,39 @@ do
 	t.same("and a seek backward the earlier one", Spring.GetTeamRulesParam(0, "researchPoints"), 620)
 	run(50)
 	t.same("nothing more is said", said(world, "secret") + said(world, "supplyMax"), 2)
+end
+
+-- A game reads some rules parameters once, as it loads, before the first frame.
+-- Splinter Faction's weather widget takes its seed that way (issue #4013), so
+-- the parameters the adapter names are the track's as soon as the player is
+-- made, at the time it opens on.
+
+do
+	local spec = rising()
+	spec.teamParams = { "supplyUsed" }
+	spec.gameParams = { "weather_seed" }
+	spec.values[#spec.values + 1] = { team = 0, code = PARAMETER, at = function(frame)
+		return math.floor(frame / 100)
+	end }
+	spec.values[#spec.values + 1] = { team = NO_TEAM, code = PARAMETER, at = 9876543 }
+	local world = setup(spec, {
+		adapter = { name = "Test game", teamParams = { "supplyUsed" }, gameParams = { "weather_seed" } },
+	})
+	t.same("a game rules parameter the adapter names is the track's before the first frame", world.Spring.GetGameRulesParam("weather_seed"), 9876543)
+	t.same("and a team rules parameter", world.Spring.GetTeamRulesParam(0, "supplyUsed"), 0)
+end
+
+do
+	local spec = rising()
+	spec.gameParams = { "wave" }
+	spec.values[#spec.values + 1] = { team = NO_TEAM, code = PARAMETER, at = function(frame)
+		return math.floor(frame / 100)
+	end }
+	local world = setup(spec, {
+		adapter = { name = "Test game", gameParams = { "wave" } },
+		modOptions = { coilbox_rewind_start_frame = "1234" },
+	})
+	t.same("a player that opens at a frame sets the value at that frame", world.Spring.GetGameRulesParam("wave"), 12)
 end
 
 -- A track with rules parameters and a game with no adapter.

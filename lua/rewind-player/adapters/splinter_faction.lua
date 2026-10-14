@@ -77,4 +77,18 @@ return {
 	-- Metal and energy need nothing here. The track has each team's own, storage
 	-- included, and the player sets them whatever the game.
 	teamParams = { "supplyUsed", "supplyMax", "researchPoints" },
+
+	-- The seed of the game's day, night, rain and fog (issue #4013).
+	-- weather_seed.lua makes it from the engine's id for the match, which a
+	-- playback does not have, unless the parameter is set already. The player
+	-- sets it as it is made, before the gadget asks and before the weather widget
+	-- reads it once as it loads.
+	gameParams = { "weather_seed" },
+
+	-- Widgets that are told the match's time when they ask the engine for the
+	-- game's frame (issue #4013). The players list prints it as the time of the
+	-- match, and the weather widget works the sun, the rain and the fog out from
+	-- it and the seed. Every other widget keeps the engine's count, which only
+	-- goes up, since a playback's time jumps and runs backward.
+	matchTimeWidgets = { "gui_static_playerslist.lua", "gfx_timecyclesweathereffects_weather.lua" },
 }

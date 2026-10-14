@@ -123,6 +123,9 @@ pub struct Adapter {
     pub team_params: Vec<String>,
     /// Game rules parameters the recorder keeps and the player sets back.
     pub game_params: Vec<String>,
+    /// Widget files, relative to `luaui/widgets/`, that are told the match's
+    /// time when they ask the engine for the game's frame or seconds.
+    pub match_time_widgets: Vec<String>,
 }
 
 /// The keys of an adapter. `hooks` is the player's and is dropped before this
@@ -141,6 +144,8 @@ struct Raw {
     team_params: List,
     #[serde(rename = "gameParams")]
     game_params: List,
+    #[serde(rename = "matchTimeWidgets")]
+    match_time_widgets: List,
 }
 
 #[derive(Deserialize, Default)]
@@ -223,7 +228,7 @@ fn files(kind: &str, folder: &str, list: &[String]) -> Result<(), String> {
         }
         if is_player_file(&format!("{folder}{name}")) {
             return Err(format!(
-                "{name:?} in {kind} is one of coilbox's own files, and switching it off would stop the playback"
+                "{name:?} in {kind} is one of coilbox's own files, which an adapter cannot name"
             ));
         }
     }
@@ -279,6 +284,11 @@ impl Adapter {
         names("features", &raw.features.0)?;
         params("teamParams", &raw.team_params.0)?;
         params("gameParams", &raw.game_params.0)?;
+        files(
+            "matchTimeWidgets",
+            "luaui/widgets/",
+            &raw.match_time_widgets.0,
+        )?;
         let versions = raw.versions.unwrap_or_default();
         let (min, max) = (bound("min", &versions.min)?, bound("max", &versions.max)?);
         if let (Some(min), Some(max)) = (&min, &max) {
@@ -301,6 +311,7 @@ impl Adapter {
             features: raw.features.0,
             team_params: raw.team_params.0,
             game_params: raw.game_params.0,
+            match_time_widgets: raw.match_time_widgets.0,
         })
     }
 
@@ -538,6 +549,39 @@ mod tests {
         }
         // The same name for a team and for the game is two parameters.
         assert!(Adapter::parse("return { teamParams = { 'a' }, gameParams = { 'a' } }").is_ok());
+    }
+
+    /// Widgets that read the time and are told the match's (issue #4013).
+    #[test]
+    fn an_adapter_names_the_widgets_that_read_the_matchs_time() {
+        let adapter = Adapter::parse(
+            "return { matchTimeWidgets = { 'gui_static_playerslist.lua', 'sub/clock.lua' } }",
+        )
+        .unwrap();
+
+        assert_eq!(
+            adapter.match_time_widgets,
+            ["gui_static_playerslist.lua", "sub/clock.lua"]
+        );
+        assert!(Adapter::parse(FULL).unwrap().match_time_widgets.is_empty());
+        // Nothing is switched off for it.
+        assert!(adapter.shadows().is_empty());
+    }
+
+    #[test]
+    fn a_widget_that_reads_the_matchs_time_is_a_lua_file_inside_the_folder() {
+        for bad in [
+            "../x.lua",
+            "x.txt",
+            "",
+            "a\\b.lua",
+            "coilbox_rewind_timeline.lua",
+        ] {
+            let source = format!("return {{ matchTimeWidgets = {{ {bad:?} }} }}");
+            let err = Adapter::parse(&source).unwrap_err();
+            assert!(err.contains("matchTimeWidgets"), "{bad}: {err}");
+        }
+        assert!(Adapter::parse("return { matchTimeWidgets = 'x.lua' }").is_err());
     }
 
     #[test]
@@ -963,7 +1007,18 @@ mod tests {
                 adapter.team_params,
                 ["supplyUsed", "supplyMax", "researchPoints"]
             );
-            assert!(adapter.game_params.is_empty());
+            // The seed of the game's day, night and weather, which its gadget
+            // makes from the engine's id for the match (issue #4013).
+            assert_eq!(adapter.game_params, ["weather_seed"]);
+            // The players list prints the match's time, and the weather widget
+            // works its sky out from it (issue #4013).
+            assert_eq!(
+                adapter.match_time_widgets,
+                [
+                    "gui_static_playerslist.lua",
+                    "gfx_timecyclesweathereffects_weather.lua"
+                ]
+            );
         }
         for other in ["MF", "BA"] {
             assert_eq!(choose(Ok(None), shipped, other, Some("1")), Chosen::none());
@@ -1038,6 +1093,12 @@ mod tests {
                 ["startUnit", "mmLevel", "mmCapacity", "mmUse", "mmAvgEffi"]
             );
             assert!(adapter.game_params.is_empty());
+            // The line under the players list prints the match's time and the
+            // speed it moves at (issue #4013).
+            assert_eq!(
+                adapter.match_time_widgets,
+                ["gui_advplayerslist_gameinfo.lua"]
+            );
         }
         // The original project still uses the short name BAR.
         for other in ["BAR", "BA", "SF"] {

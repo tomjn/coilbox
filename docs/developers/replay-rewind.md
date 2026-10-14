@@ -114,6 +114,7 @@ Every key is optional. A key that is not in this table is refused, so a misspell
 | `features` | list of names | Feature definitions the player never creates. |
 | `teamParams` | list of names | Team rules parameters that are the recording's to set, described under [Your game's own numbers](#your-games-own-numbers). |
 | `gameParams` | list of names | The same for game rules parameters. |
+| `matchTimeWidgets` | list of file names | Widgets told the match's time when they ask the engine for the game's frame or seconds, as paths inside `luaui/widgets/`, described under [The match's time](#the-matchs-time). |
 | `hooks` | table of functions | Three optional functions, described under [Hooks](#hooks). |
 
 Coilbox runs the file in `coilbox-springlua`, the sandboxed Spring Lua evaluator it uses for a game's other config. The file has no `io`, no `os` and no way to read another file, but it can compute its lists in Lua. Coilbox reads everything except `hooks` before the engine starts. The player reads the file again in the engine, for `units`, `features`, `teamParams`, `gameParams` and `hooks`.
@@ -141,7 +142,7 @@ Numbers your game keeps for itself are different. Supply, research points, a sco
 The two lists are read twice.
 
 1. When a replay is recorded, coilbox passes the names to the recorder, which writes each parameter whenever its value changes. Only a number is recorded. A parameter that holds text or a boolean is left out.
-2. When the recording is played, the player sets each named parameter to the match's value on every frame, and again when the frame is over, which is after your gadgets have run. An engine with no `GameFramePost` call-in has no second moment, and there a gadget of yours that writes the parameter later in the frame wins.
+2. When the recording is played, the player sets each named parameter to the match's value once as it starts, before the first frame and before your widgets load, and then on every frame, and again when the frame is over, which is after your gadgets have run. An engine with no `GameFramePost` call-in has no second moment, and there a gadget of yours that writes the parameter later in the frame wins.
 
 A parameter the match had not set yet at the frame showing is left alone. The player does not change who can read a parameter, so one your gadget made public stays public.
 
@@ -233,6 +234,16 @@ A version is the numbers it starts with. Coilbox skips whatever comes before the
 | `$VERSION`, `KRE $VERSION`, nothing | no version |
 
 An adapter with a `versions` range is for no game that has no version. A game folder under development declares `$VERSION`, so only an adapter without `versions`, or the game's own, applies to it. `min` and `max` are read the same way, and one with no number in it is refused. `max = "0.1"` means up to 0.1.0, so write `max = "0.1.99"` for every 0.1 release.
+
+## The match's time
+
+The engine counts its frames from when the playback was opened, and nothing can set that count. So `Spring.GetGameFrame` and `Spring.GetGameSeconds` give the playback's time, not the match's, and a seek to minute 10 can read as 0:30. A widget that prints the time, or works something out from it, such as a day and night cycle, then shows the wrong thing.
+
+Name such widgets in `matchTimeWidgets`. When a named widget asks either call, it is told the time of the match at the moment showing: it jumps with a seek, stands still while paused and goes back when the viewer plays backward. Splinter Faction's adapter names its players list and its weather widget, and Beyond All Reason's names the line under its players list.
+
+Every other widget, and every gadget, keeps the engine's count, which only goes up. Name only a widget that is fine with a time that jumps and runs backward. One that keeps a frame and waits for a later one, for a fade, a cooldown or a cache, would stop or misbehave when the time goes back. A widget that asks as a tail call, `return Spring.GetGameFrame()`, gets the engine's count, so keep the answer in a local first.
+
+If the widget also needs a number your game makes once per match, such as Splinter Faction's weather seed, name it in `gameParams` as well. The player sets those before your widgets load, so a widget that reads one as it starts gets the match's.
 
 ## What to switch off
 
