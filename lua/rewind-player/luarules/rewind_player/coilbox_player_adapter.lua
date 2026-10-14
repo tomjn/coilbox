@@ -48,7 +48,7 @@ M.HOOKS = {
 	queuedBuildingsDrawn = true,
 }
 
-local LISTS = { "gadgets", "widgets", "units", "features", "teamParams", "gameParams" }
+local LISTS = { "gadgets", "widgets", "units", "features", "teamParams", "gameParams", "matchTimeWidgets" }
 
 --- A copy of a list of names, which are case sensitive and kept as they are.
 local function copied(list)
