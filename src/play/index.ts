@@ -84,12 +84,13 @@ const playPlugin: FramePlugin = {
   ],
   // Declared into Engine Settings, which the content plugin owns, because that
   // is where somebody goes looking for what the engine did. The code stays here
-  // because the crash drawer it shares a viewer with is a play concern.
+  // because it finds the log the way the crash drawer does.
   settings: [
     {
       id: "engine-log",
       title: "Engine log",
-      description: "What the engine last wrote down, and where it wrote it.",
+      description:
+        "Where the engine last wrote its log, and the system it ran on.",
       parent: "engine-settings",
       order: 70,
       icon: FileText,
