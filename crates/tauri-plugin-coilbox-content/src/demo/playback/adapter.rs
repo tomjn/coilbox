@@ -1025,7 +1025,6 @@ mod tests {
                     "luarules/gadgets/ai_ruins.lua",
                     "luaui/widgets/gui_gridmenu.lua",
                     "luaui/widgets/gui_ordermenu.lua",
-                    "luaui/widgets/gui_advplayerslist_gameinfo.lua",
                     "luaui/widgets/camera_player_tv.lua",
                 ]
             );
