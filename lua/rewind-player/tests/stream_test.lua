@@ -378,6 +378,12 @@ do
 	draws()
 	collectgarbage()
 	collectgarbage("stop")
+	-- A full collection gives back part of the Lua stack, and the draws after it
+	-- take that back, which is the interpreter's and not the stream's. LuaJIT
+	-- 2.1.0-beta3 on x64 took 1.2 kB more in the first measured batch after one
+	-- batch of this, which is less than one table and does not grow with the
+	-- draws, so it takes two.
+	draws()
 	draws()
 	local before = collectgarbage("count")
 	draws()
