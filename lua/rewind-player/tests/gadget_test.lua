@@ -280,6 +280,30 @@ do
 	t.same("a message that is somebody else's is left", gadget:RecvFromSynced("other", 1, 9), false)
 end
 
+-- The work at the end of a frame, which the aim stage poses in (issue #3796),
+-- is the same frame's work.
+
+do
+	local lines, clock = {}, { now = 0 }
+	local gadget = unsynced(PLAYER, lines, clock)
+	local function part(phase, frame, milliseconds)
+		gadget:RecvFromSynced("coilbox_rewind_work", phase, frame)
+		clock.now = clock.now + milliseconds
+		gadget:RecvFromSynced("coilbox_rewind_work", phase + 1, frame, 0, 0)
+	end
+	part(0, 1, 20)
+	part(2, 1, 10)
+	t.same("a frame and its post frame that fit in a frame together are not logged", #lines, 0)
+	part(0, 2, 20)
+	part(2, 2, 20)
+	t.same("a frame and its post frame that do not are", #lines, 1)
+	t.check("with the two added up", lines[1]:find("the work of frame 2 took 40.0 ms", 1, true) ~= nil, lines[1])
+	part(0, 40, 50)
+	part(2, 40, 5)
+	t.same("a frame that was slow before its end is logged", #lines, 2)
+	t.check("and counted once", lines[2]:find("1 slow since the last line", 1, true) ~= nil, lines[2])
+end
+
 -- The unsynced half reads microseconds when the engine has them.
 
 do

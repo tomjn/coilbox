@@ -29,7 +29,8 @@
 -- A frame's work is timed. Synced Lua has no clock, so the synced half tells
 -- the unsynced half when the work starts and ends (`SendToUnsynced` is a call
 -- and not a message, so it costs no frame), and the unsynced half logs a line
--- when it took longer than one simulation frame lasts.
+-- when it took longer than one simulation frame lasts. A frame's work is what
+-- the player does in `GameFrame` and in `GameFramePost` together.
 --
 -- The same timing sets how much a seek may do in one frame (issue #3988). A
 -- seek can need hundreds of units made or removed, at a cost for each that only
@@ -201,9 +202,18 @@ if gadgetHandler:IsSyncedCode() then
 		end
 	end
 
-	function gadget:GameFramePost()
-		if player then
-			player:framePost()
+	-- The work at the end of a frame is timed as well, with phases 2 and 3, and
+	-- the unsynced half adds it to the frame's.
+	function gadget:GameFramePost(frame)
+		if not player then
+			return
+		end
+		if engine.on.workTiming then
+			SendToUnsynced(WORK, 2, frame)
+		end
+		player:framePost()
+		if engine.on.workTiming then
+			SendToUnsynced(WORK, 3, frame)
 		end
 	end
 
@@ -284,6 +294,9 @@ else
 	local toldNone = false
 
 	local started
+	-- How long the work of the frame's GameFrame took, for its GameFramePost to
+	-- add to.
+	local framed = 0
 	local lastLine
 	local slow, worst = 0, 0
 	-- How many units a frame may make and remove, as last sent.
@@ -345,7 +358,7 @@ else
 			end
 			return true
 		end
-		if phase == 0 then
+		if phase == 0 or phase == 2 then
 			started = clock()
 			return true
 		end
@@ -354,8 +367,19 @@ else
 		end
 		local took = Spring.DiffTimers(clock(), started, true, micros)
 		started = nil
-		if made and removed and engine.on.budgetMessage then
-			retune(took, made, removed)
+		if phase == 3 then
+			-- The end of the frame, which the aim stage poses in. It is the same
+			-- frame's work, so the two are judged together, and a frame that was
+			-- slow before its end has been counted already.
+			if framed > LIMIT then
+				return true
+			end
+			took = framed + took
+		else
+			framed = took
+			if made and removed and engine.on.budgetMessage then
+				retune(took, made, removed)
+			end
 		end
 		if took <= LIMIT then
 			return true
