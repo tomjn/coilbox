@@ -1472,7 +1472,28 @@ The ignored test `a_seek_across_a_whole_match_settles_in_frames_that_fit` passed
 
 Making and removing units is cheap here: 195 creations took 14.8 ms and 256 removals 6.4 ms in a headless frame, and the budget kept every frame of units under a simulation frame.
 
-Shots, on frames 59,400 to 60,900 with the driver's shots plan given that span (the whole match would play 82,496 frames five times over): 29 of 29 shots held where the track has them, paused, for 150 frames, and 19 of 20 seeks had every shot. Played forward, 442 of the 450 shots that ended landed at 1x, 440 at 0.5x and 445 at 2x, a mean of 1.15, 0.89 and 3.17 elmos from the end of their flight. No shot did damage. One landed at 4x and three playing backward, which the shots plan says should not happen. Issue #4026 is about those. The engine also ended a held shot of `corpun_plasma` once while playing backward at 32x.
+Shots, on frames 59,400 to 60,900 with the driver's shots plan given that span (the whole match would play 82,496 frames five times over). 450 shots end in it. Shots that landed where they could be seen, before and after issue #4026:
+
+| Pass | Before | After | Hidden after |
+| --- | --- | --- | --- |
+| forward 1x | 442 | 443, a mean of 0.002 elmo from their flight's end | 0 |
+| forward 0.5x | 440 | 441, a mean of 0.002 | 0 |
+| forward 2x | 446 | 445, a mean of 0.002 | 1 |
+| forward 4x | 1 | 0 | 0 |
+| backward 1x | 4 | 0 | 0 |
+| paused | 0 | 0 | 0 |
+| 20 seeks | 1 | 0 | 1 |
+
+Before is the work at the start of the issue and after is the work at its end, each one run of the test. Of the shots that did not land forward:
+
+- Flames: 5 at 1x, 7 at 0.5x and 4 at 2x with no impact of their own. Two of them were checked in the recording and did not land in the match (see [What is not there](#what-is-not-there)). The others were not checked.
+- A rocket of `armmh_armmh_weapon` hit an open `cormaw` in the match and flies over the closed one in playback (issue #4040).
+- A rocket of `corstorm_cor_bot_rocket` (serial 8799), which is in the air when the span starts, lands at no speed. It was not looked into.
+- At 2x, a rocket of `corstorm_cor_bot_rocket` (serial 8920) that earlier runs showed the engine ending inside a dying unit (issue #4041). The one hidden burst at 2x is most likely it, though the driver does not say which shot a hidden burst was. And a rocket of `armjanus_janus_rocket` that was not looked into.
+
+At seek 14 the engine ends one held shot of `armstump_arm_lightcannon`. Its burst is hidden, and the shot is missing from the air until the next seek, so the test still fails there. Waiting for the units and the ground of the seek did not stop it, and why it is ended was not found. The test also fails on the Beyond All Reason span for reasons that are not about shots that land: the terrain stage moves the ground during a pass (`craters`), shots are in the air when the span ends (`in_air_after`), slow frames were logged, and a starburst rocket played backward gets further from its launcher on 13 frames because it climbs, turns and comes down, which the track has too.
+
+In the whole match plan the engine ended a held shot of `corpun_plasma` at 32x forward and backward, on a wreck the match had moved (issue #4044). The burst is now hidden.
 
 Issue #4033 took the panel at the bottom right for the game's replay controls. They are three widgets, read in `test-30922-8064a43` and seen in a window:
 
@@ -1749,7 +1770,7 @@ A fifth test, `the_shots_of_a_whole_match_follow_the_track`, wants the same repl
 - Paused on frame 22,819, the frame with the most in the air, the engine has the track's 7 shots, and still has them after 150 frames. At 20 seeks to frames with shots in the air it has as many as the track each time. Every shot is where the track has it, to four decimal places of an elmo, or held short as [Held](#held) says, and points the way the track has it going.
 - Nothing lands while paused or during the seeks.
 - Played backward from the frame it landed on, a rocket is nearer where it was fired on each of 58 frames in a row.
-- Played forward through the fight, all 278 shots land at 1x and at 0.5x, a mean of 0.09 elmo from the last frame of flight the track has for them, and 277 at 2x. At 4x and played backward none lands.
+- Played forward through the fight, all 278 shots land at 1x and at 0.5x, a mean of 0.09 elmo from the last frame of flight the track has for them, and 277 at 2x. At 4x and played backward none lands. Run again on 14 October 2026 for issue #4026, measured from a frame before the end to a frame after it, the mean was 0.077 elmo at each speed, the counts were the same and no burst was hidden.
 - No shot did damage to a unit or a feature, by the engine's own sum before any gadget was asked, and none left a crater. After each pass every unit has the track's health.
 - The engine ended no shot the player was holding, no slow frame was logged, no team died and no Lua raised.
 
