@@ -224,15 +224,26 @@ An item is not drawn while a unit of its definition stands within 8 elmos of it 
 
 #### The drawing
 
-For each ghost the widget outlines the footprint on the ground in the team's colour, lightened, with a pale fill, and asks the engine for the building's own shape with `gl.UnitShape(unitDefID, teamID, false, false, false)`. That is translucent in the engine's own state, with the alpha from the player's `UnitTransparency` setting (0.3 by default). The widget pushes a matrix for the call, because without its raw state `UnitShape` pops the top matrix and pushes a copy of the one below it (`CModelDrawerHelper::DIDResetPrevModelView`).
+For each ghost the widget outlines the footprint on the ground in the team's colour, lightened, with a pale fill, and asks the engine for the building's own shape with `gl.UnitShape(unitDefID, teamID, false, false, false)`. That is translucent in the engine's own state, with the alpha from the player's `UnitTransparency` setting (0.3 by default).
 
-The shape did not draw. In the engine run in a window (`2026.07.01-102-g6e5c5a0`, Splinter Faction 0.1.89), the call reached the engine with the right arguments and no shape appeared, with or without the extra matrix and with the matrix mode set. The raw form draws flat white silhouettes. The outline did draw, at the right places, and is what a viewer sees. Issue #4018 is the shape.
+![Queued buildings in Splinter Faction: a fission plant and an air plant as translucent shapes in the team's red, beside a factory being built](screenshots/ghost-shapes.jpg)
 
-A footprint is the definition's `xsize` and `zsize` squares of 8 elmos, turned by the facing. The height is `Spring.GetGroundHeight`, or 0 for a building that floats over water, as the engine's `GetBuildHeight` has it. The widget does not take the slope into account, and a building the engine would level is put at the height of its middle.
+Before the call the widget loads the identity into the model view and then turns and moves it to the building, as the engine's own `CUnitDrawerGLSL::DrawBuildIcons` does for a building being placed. Without its raw state `UnitShape` puts the camera's view on the projection matrix and loads the identity into the model view (`CModelDrawerHelper::PushTransform`), then pops that and pushes a copy of the matrix Lua left (`DIDResetPrevModelView`), as its comment says: "assumes the Lua transform includes a LoadIdentity!". In a widget's `DrawWorld` the model view holds the camera's view, so a shape drawn without the identity went through the view twice and landed off the screen. That is why nothing drew in the first windowed runs (issue #4018), and why the raw form, which leaves the matrices alone, drew in the right place.
 
-The outline's width, its lightening and the fill's opacity are design choices, made after the first look at the outline found it too dark to read. The repository's version of them was not looked at on screen, because the four windowed launches were spent before the change. It ran in the headless engine, where nothing is drawn.
+A footprint is the definition's `xsize` and `zsize` squares of 8 elmos, turned by the facing. The height is the engine's own, `Spring.Pos2BuildPos(unitDefID, x, 0, z, facing)`, which is `CGameHelper::GetBuildHeight`: the levelled ground of a building that levels it, the ground of one that does not, and the water for one that floats. A building the engine would level is put at that height, and on a slope part of its outline is under the ground.
 
-A facing of 0 is south, 1 east, 2 north and 3 west, and the shape is turned 90 degrees for each (`gl.Rotate(facing * 90, 0, 1, 0)`). That was not checked against a real unit, since the shape never appeared.
+The outline's width, its lightening and the fill's opacity are design choices, made after the first look at the outline found it too dark to read.
+
+A facing of 0 is south, 1 east, 2 north and 3 west, and the shape is turned 90 degrees for each (`gl.Rotate(facing * 90, 0, 1, 0)`), as `DrawBuildIcons` turns it.
+
+In a window on Splinter Faction 0.1.89 and engine `2026.07.01-102-g6e5c5a0`, the whole match paused at frames 4,695, 5,460 and 7,905, each queued building drew as its shape in the team's colour over its outline. Two were checked against the building that later stood there:
+
+| Queued | Facing | Ghost's height | Built unit's height | Built unit's facing |
+| --- | --- | --- | --- | --- |
+| `fissionpowerplant` at 728, 8104, frame 5,460 | 2 | 172.15 | 172.13 at frame 6,300 | 2 |
+| `fedmetalextractor_up1` at 992, 9248, frame 7,905 | 0 | 167.87 | 167.75 at frame 9,000, standing at 1000, 9256 | 0 |
+
+The ground at those two places was 172.16 and 168.03. The pictures are in `docs/reports/milestone-80-gallery/` from 110, which is gitignored.
 
 #### An adapter's own drawing
 
@@ -248,13 +259,14 @@ The key is in the timeline's key list, `G` by default. The timeline switches the
 
 #### Engine calls
 
-The widget has a table of its own, `coilbox_ghosts_engine.lua`, in the same shape. Its rows are `track` (the reader's calls), `player`, `ground` and `drawing`, which are required, and `outline` and `adapter`, which are optional. Every call in it is registered at the tags 105.0, 105.1.1, 2025.01.6, 2025.04.11 and 2026.07.04, read for this table, and `gl.UnitShape` has its fifth argument, the one that picks translucent drawing, at 105.0. The test reads the widget's files and the reader's, and fails for a call with no row.
+The widget has a table of its own, `coilbox_ghosts_engine.lua`, in the same shape. Its rows are `track` (the reader's calls), `player`, `ground` and `drawing`, which are required, and `outline` and `adapter`, which are optional. Every call in it is registered at the tags 105.0, 105.1.1, 2025.01.6, 2025.04.11 and 2026.07.04, read for this table, and `gl.UnitShape` has its fifth argument, the one that picks translucent drawing, at 105.0. `gl.LoadIdentity` and `Spring.Pos2BuildPos` were read at those five tags and at `6e5c5a0`. The test reads the widget's files and the reader's, and fails for a call with no row.
 
 #### What has run
 
 - The headless engine with Splinter Faction's own widget handler and the whole match. The handler loads the widget and the widget finds the track. At 130 visits to frames chosen from the track, forward and then backward, the widget would draw what the Rust reader's queues give less what is built, 260 ghosts in all with the right shape, team, place and turn. The timeline's key switched them off and on. The test is `the_ghosts_follow_the_track_in_the_engine`. Its probe, `tests/headless/ghosts_probe.lua`, puts counting calls where the widget's drawing calls are for the length of one draw.
-- A window, four launches. The outline was at the right places from frame 4695 to 7905. The shape did not appear.
-- Only on the stand-in: a floating building, the footprint of a building turned a quarter, a hook that raises, and an engine without any one call.
+- A window, four launches for issue #3804. The outline was at the right places from frame 4695 to 7905. The shape did not appear.
+- A window, two launches for issue #4018, the first of which pointed the camera nowhere useful. With the identity loaded the shapes drew, as [The drawing](#the-drawing) says. A headless run of the same scratch widget read the heights in its table.
+- Only on the stand-in: a building the engine puts under water, the footprint of a building turned a quarter, a hook that raises, and an engine without any one call. No queued building of the match is on water, so a floating one has not been seen.
 
 ### Adding a stage
 
@@ -1748,7 +1760,7 @@ luajit lua/rewind-player/tests/ghosts_test.lua
 - `engine_test.lua` is made from the engine table ([Engine calls](#engine-calls)). For every call of every row it takes the call out of the stand-in and plays the fixture track, and it checks the table against the source with `tests/scan.lua`. The widget's table is tested the same way in `timeline_test.lua`.
 - `timeline_test.lua` checks the timeline on a stand-in for `Spring` and `gl`: the message for every key, that a key with Ctrl, Alt or Meta is left alone, the frame a drag seeks to at both ends and between, the time and speed shown, that everything drawn is inside views from 640 by 480 to 3840 by 2160, moving the panel, changing a key, marks, and that 300 draws allocate nothing. It also loads the widget file the way a handler does.
 
-- `ghosts_test.lua` checks the ghosts on a track made from a table (`tests/fake_track.lua`, which has queues) against an answer worked out from the table. It plays the whole track forward and backward and seeks to 19 frames across window edges. It checks a building started within and beyond the 8 elmos, two builders with one item, a definition the game lacks, a window that does not read, what is drawn and how (the facing, a floating building, the matrices), the footprint, the switch and the text command, the saved choice, an adapter's hook and one that raises, the hook that hears a pass is over, and that 300 frames allocate nothing. It runs the fixture through the real reader against the Rust reader's queues, loads the widget file, and holds the widget's files and the reader's to its table of engine calls.
+- `ghosts_test.lua` checks the ghosts on a track made from a table (`tests/fake_track.lua`, which has queues) against an answer worked out from the table. It plays the whole track forward and backward and seeks to 19 frames across window edges. It checks a building started within and beyond the 8 elmos, two builders with one item, a definition the game lacks, a window that does not read, what is drawn and how (the facing, the engine's build height asked with the definition and the facing, the identity loaded before the move), the footprint, the switch and the text command, the saved choice, an adapter's hook and one that raises, the hook that hears a pass is over, and that 300 frames allocate nothing. It runs the fixture through the real reader against the Rust reader's queues, loads the widget file, and holds the widget's files and the reader's to its table of engine calls.
 
 `tests/support.lua` is the stand-in for the reader. Its `VFS.Unpack*` and `VFS.ZlibDecompress` follow the engine source, round what they return to a 32 bit float, and raise for a position or count a float could not hold. The zlib is the system's, through LuaJIT's FFI. Its synced environment has no `io`, so a reader that reached for it would fail the tests.
 

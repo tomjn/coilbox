@@ -112,11 +112,11 @@ If the engine is too old for part of the player, a small panel above the timelin
 
 ## Queued buildings
 
-A builder's queue of buildings shows as an outline of each building's footprint on the ground, in the builder's team colour, with a pale fill. It follows the time, so it is right after a seek and when you play backward. A building that has been started, or finished, stands where its outline was and is not outlined again.
+A builder's queue of buildings shows as each building, translucent, in the builder's team colour, where it would stand and facing the way it would face. An outline of its footprint with a pale fill is on the ground under it. It follows the time, so it is right after a seek and when you play backward. A building that has been started, or finished, stands where its ghost was and is not drawn again.
 
-Press G to hide the outlines or show them again. The timeline's key list has the key, so you can change it there. The choice is kept for next time. Typing `/rewindghosts` in the engine's console does the same, and `/rewindghosts on` or `/rewindghosts off` sets it.
+Press G to hide the ghosts or show them again. The timeline's key list has the key, so you can change it there. The choice is kept for next time. Typing `/rewindghosts` in the engine's console does the same, and `/rewindghosts on` or `/rewindghosts off` sets it.
 
-In the one engine this was looked at, the engine's own call for a translucent building shape drew nothing from a widget, so the outline is all you see. The shape is still asked for, and issue #4018 is about getting it to show. Where a game has its own way to draw a building ghost, its adapter can use that instead. Beyond All Reason does: there each queued building is the game's own translucent building in its team's colour, as the game draws a builder's queue.
+Where a game has its own way to draw a building ghost, its adapter can use that instead. Beyond All Reason does: there each queued building is the game's own translucent building in its team's colour, as the game draws a builder's queue, with no outline.
 
 ## Disk space
 
