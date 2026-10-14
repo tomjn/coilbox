@@ -71,6 +71,12 @@ do
 	t.same("the hooks it has are listed in order", table.concat(adapter.hookNames, ","), "afterFrame,unitPlaced")
 	t.same("a hook the player does not call is listed apart", table.concat(adapter.unknownHooks, ","), "frame,onTuesday")
 	t.same("an adapter with no name is unnamed", Adapter.normalize({}).name, "unnamed")
+
+	-- The ghosts widget's hook (issue #3804) is in the adapter's format, and the
+	-- player never calls it, so it is not a misspelling.
+	adapter = Adapter.normalize({ hooks = { drawQueuedBuilding = hook } })
+	t.same("the ghosts widget's drawing hook is a hook of the format", table.concat(adapter.hookNames, ","), "drawQueuedBuilding")
+	t.same("and not one the player does not know", #adapter.unknownHooks, 0)
 end
 
 -- Reading it from the game.

@@ -33,6 +33,11 @@ M.HOOKS = {
 	unitPlaced = true,
 	-- (t, clock) after every stage has put the world in place on a frame.
 	afterFrame = true,
+	-- (unitDefID, teamID, x, y, z, facing) for the ghosts widget, not the player
+	-- (issue #3804). It draws one queued building in the game's own way. The
+	-- widget reads the adapter file itself, in unsynced Lua, where `gl` is. It is
+	-- here so the player does not take it for a misspelling.
+	drawQueuedBuilding = true,
 }
 
 local LISTS = { "gadgets", "widgets", "units", "features", "teamParams", "gameParams" }
