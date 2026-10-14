@@ -458,18 +458,36 @@ do
 	t.same("a unit at 0.502 ms fits 33", last(), "coilbox_rewind_budget:33 1 1")
 	work(18.743, 33)
 	t.same(
-		"0.066 ms a unit more after 33 more is taken to go on, through the 33 made before the budget arrives and through its own, so 24 fit where 29 would at the cost of this frame",
+		"0.066 ms a unit more after 33 more is taken to come again, but no further than the 33 units it was read over, so 26 fit where 29 would at the cost of this frame",
 		last(),
-		"coilbox_rewind_budget:24 1 1"
+		"coilbox_rewind_budget:26 1 1"
 	)
-	work(14.783, 24)
-	t.same("the rise is read from every frame of the seek that used its budget", last(), "coilbox_rewind_budget:23 1 1")
-	work(19.225, 23, 0, 0, false, 1)
+	work(16.119, 26)
+	t.same(
+		"read over 59 units it is taken through the 26 made before the budget arrives and through the budget's own, so 23 fit",
+		last(),
+		"coilbox_rewind_budget:23 1 1"
+	)
+	work(19.317, 23, 0, 0, false, 1)
 	t.same(
 		"a frame that made the first unit of a definition, 4 ms dearer, is left out of the rise, since that cost is the first time and not a trend",
 		last(),
 		"coilbox_rewind_budget:18 1 1"
 	)
+end
+
+-- A seek starts at one unit a frame, and the timer's noise on one unit is not a
+-- rise to take a hundred units further, which the first windowed run of Balanced
+-- Annihilation did.
+
+do
+	local lines, clock = {}, { now = 0, micros = true }
+	local gadget = unsynced(PLAYER, lines, clock)
+	local work, last = budgetFrames(gadget, clock)
+	work(0.339, 1)
+	t.same("a unit in 0.34 ms fits 49", last(), "coilbox_rewind_budget:49 1 1")
+	work(0.399, 1, 0, 0, true)
+	t.same("0.06 ms more on the next unit is taken no further than one unit, so 36 fit and not 13", last(), "coilbox_rewind_budget:36 1 1")
 end
 
 -- How many frames the last budget took to arrive is how many frames are taken
@@ -486,11 +504,14 @@ do
 	t.same("33 are sent and three frames go by before they arrive", last(), "coilbox_rewind_budget:33 1 1")
 	work(16.499, 33)
 	t.same("a frame that keeps the cost keeps the budget", #clock.messages, 1)
-	work(18.677, 33)
+	-- 0.001 ms a unit more for each unit made, while the budgets sent wait.
+	work(17.588, 33)
+	work(18.677, 33, 0, 0, true)
+	work(19.766, 33, 0, 0, true)
 	t.same(
-		"0.066 ms a unit more after 33 more, with three frames of 33 taken to come before the next budget arrives, leaves room for 20 where one frame would leave 24",
+		"three frames of 33 are taken to come before the next budget arrives, as the last one took, and over 99 units of a rising cost 23 fit where one frame would leave room for 25",
 		last(),
-		"coilbox_rewind_budget:20 1 1"
+		"coilbox_rewind_budget:23 1 1"
 	)
 end
 

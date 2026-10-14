@@ -456,9 +456,9 @@ else
 	-- one took to arrive. `done` is how many the seek has done. The rest are the
 	-- sums for a straight line through what one cost against `done`, over the
 	-- `frames` of the seek that used their whole budget, each weighted by how
-	-- many it did.
+	-- many it did, the first of them at `from` and the last at `to`.
 	local function newBudget()
-		return { budget = FIRST_BUDGET, sent = FIRST_BUDGET, sentAt = 0, waiting = false, delay = 1, done = 0, frames = 0, sw = 0, sx = 0, sy = 0, sxx = 0, sxy = 0 }
+		return { budget = FIRST_BUDGET, sent = FIRST_BUDGET, sentAt = 0, waiting = false, delay = 1, done = 0, frames = 0, from = 0, to = 0, sw = 0, sx = 0, sy = 0, sxx = 0, sxy = 0 }
 	end
 
 	--- How much more each one costs than the one before, from the line through
@@ -476,13 +476,21 @@ else
 
 	--- The most that fit in `TARGET` when the first costs `per` more than `rise`
 	-- times `ahead`, and each after it `rise` more again. Each is taken to cost
-	-- what the last of them does, so it errs low.
-	local function fits(per, rise, ahead)
-		local first = per + rise * ahead
-		if rise <= 0 then
-			return math.max(1, math.floor(TARGET / first))
+	-- what the last of them does, so it errs low. A rise read over `span` is
+	-- taken no further than that, so the dearest is `per` and `rise` times
+	-- `span`.
+	local function fits(per, rise, ahead, span)
+		local b = TARGET / (per + rise * math.min(ahead, span))
+		if rise > 0 and ahead < span then
+			local first = per + rise * ahead
+			local quadratic = (math.sqrt(first * first + 4 * rise * TARGET) - first) / (2 * rise)
+			if ahead + quadratic <= span then
+				b = quadratic
+			else
+				b = TARGET / (per + rise * span)
+			end
 		end
-		return math.max(1, math.floor((math.sqrt(first * first + 4 * rise * TARGET) - first) / (2 * rise)))
+		return math.max(1, math.floor(b))
 	end
 
 	--- A frame did `count` of a budget's work in `took` milliseconds, working to
@@ -497,9 +505,10 @@ else
 	-- (issue #4015). So the rise in cost over the seek so far is taken to go on,
 	-- through the units made at the old budget while the new one is on its way,
 	-- as many frames as the last one took to arrive, and through the new budget's
-	-- own. `firsts` of the frame's units were the first of their definition in
-	-- the run, which cost more once and say nothing of a rise, so such a frame is
-	-- left out of it.
+	-- own, but no further than the units it was read over, since the timer's
+	-- noise on a frame of one unit is not a trend. `firsts` of the frame's units
+	-- were the first of their definition in the run, which cost more once and say
+	-- nothing of a rise, so such a frame is left out of it.
 	--
 	-- A frame that used less of its budget, which the last frame of a seek does,
 	-- leaves it alone unless it took longer than `TARGET`, and then cuts it.
@@ -512,7 +521,10 @@ else
 		end
 		if full and firsts == 0 then
 			local x = b.done
-			b.frames = b.frames + 1
+			if b.frames == 0 then
+				b.from = x
+			end
+			b.frames, b.to = b.frames + 1, x
 			b.sw, b.sx, b.sy = b.sw + count, b.sx + count * x, b.sy + count * per
 			b.sxx, b.sxy = b.sxx + count * x * x, b.sxy + count * x * per
 		end
@@ -521,7 +533,7 @@ else
 		if b.waiting then
 			delay = math.max(delay, frame - b.sentAt)
 		end
-		local wanted = fits(per, rise, delay * had)
+		local wanted = fits(per, rise, delay * had, b.to - b.from)
 		if not full then
 			wanted = math.min(wanted, had)
 		end
