@@ -186,6 +186,19 @@ end,
 - A hook that returns true stops the player's effect for that unit. One that returns nothing leaves it, and so does one that raises.
 - The player shows at most 256 of its own effects at once. Your effect has no such cap, and a large seek makes dozens of units a frame, so look at what yours costs.
 
+#### Your build effect
+
+No unit builds anything in a playback, so a build effect that asks the engine what a builder is doing (`Spring.GetUnitWorkerTask`, `Spring.GetUnitIsBuilding`, `Spring.GetUnitCurrentBuildPower`) gets nothing, and the engine's own build particles do not show (issue #4029). Your builders' scripts are told `StartBuilding` and `StopBuilding` ([Units with COB scripts](#units-with-cob-scripts)), so an effect your script makes shows. For anything else, the player publishes each builder's recorded work in unit rules parameters, set when it changes. Read them with `Spring.GetUnitRulesParam(unitID, name)` from a widget, a gadget or a hook. A playback is running when `Spring.GetGameRulesParam("coilbox_rewind_first_frame")` is a number.
+
+| Parameter | Value |
+| --- | --- |
+| `coilbox_rewind_work_command` | what `Spring.GetUnitWorkerTask` gives first in a match: minus the unit definition's id while building it, `CMD.REPAIR` once it is finished, `CMD.RECLAIM`, `CMD.RESURRECT`, `CMD.CAPTURE`, `CMD.RESTORE`, and 0 for no work |
+| `coilbox_rewind_work_target` | what it gives second: the unit id, or the feature id plus `Game.maxUnits`, and -1 for none |
+| `coilbox_rewind_work_power` | the build power in use, from 0 to 1 |
+| `coilbox_rewind_work_x`, `coilbox_rewind_work_y`, `coilbox_rewind_work_z` | where the work is, when the command or the target last changed |
+
+The work follows the recording and not the clock, so a builder keeps its work while the playback is paused or played backward. No hook is needed for it.
+
 Splinter Faction's adapter has no hook. It had a `started` hook that gave each team its starting storage, which its switched off `game_spawn.lua` used to do. The track now holds each team's storage and the player sets it on every frame, so the hook went. Reach for a hook when your game needs something set that neither the track nor a rules parameter covers.
 
 ## Where an adapter lives
@@ -336,8 +349,19 @@ What to know about your own scripts:
 
 - Your unit's script goes on running. The player sets its poses after the scripts have run in a frame, so the recorded pose is what is drawn, and the pieces the recording does not name are left to your script. Legs, wheels and idle motion are yours.
 - The pieces the recording names are each weapon's muzzle piece and every parent up to the root. A piece that did not move in the match is put at rest.
-- Nothing fires and no weapon aims by itself in a playback, so your script's aim and fire functions are not called.
-- The player still does not play walk or build animations. Issue #3797 is about it.
+- Nothing fires and no weapon aims by itself in a playback, so your script's aim and fire functions are not called (issue #4030).
+
+Your script is told what the engine would tell it in a match, from the recording: `StartMoving` and `StopMoving` as a unit starts and stops moving, and `StartBuilding` and `StopBuilding` as a builder starts and stops work, with the heading and pitch to the work as the engine gives them. A COB script is told through `Spring.CallCOBScript` and a Lua script through the call-ins your script framework handed the engine with `Spring.UnitScript.CreateScript`. Nothing is asked of your game, and `Spring.UnitScript.GetScriptEnv` is not used.
+
+- Paused, a moving unit is told it stopped, since time stands still. Your walk goes back to rest the way your script stops it.
+- Played backward, a unit moves against the way it faces, so `StartMoving` gets 1, as for a unit that reverses in a match. A script with no animation for reversing plays its walk.
+- At any speed a script is told the same. A unit's velocity is the speed it is shown moving at, so a script that reads `GET CURRENT_SPEED` or `Spring.GetUnitVelocity` to pace its steps keeps up with the ground.
+- A builder's work follows the recording at any speed and paused, so it goes on facing its work.
+- A script whose `StartMoving` starts turning a piece the recording has poses for gets that turn: the player leaves it to the script from then on, for every unit of the definition, and logs `the walk of <unit> turns <pieces>, which the track has poses for`.
+- A script that raises is logged once and that function of that unit is not called again.
+- A script framework that copies `Spring.UnitScript.CreateScript` into a local in a gadget file that sorts before `coilbox_rewind_player.lua` hides its scripts from the player, and those units are told nothing. The engine's own framework, which Splinter Faction uses, looks the call up each time.
+
+It was run headless on the whole Splinter Faction match, whose units have Lua scripts and whose land factory has a COB one, and on a crowd of Balanced Annihilation V15.9.8's `armcom`, `armpw`, `armstump` and `armflash`, which have COB scripts. Every call came on the frame the recording has it, and no script raised.
 
 The player sets poses from the engine's `GameFramePost` call-in. If your gadget handler does not pass that call-in on to gadgets, the player installs it for itself and logs one line saying so. Balanced Annihilation V15.9.8's handler is one that does not, and logs `UpdateCallIn: GameFramePost is not implemented` as its gadgets load, which is harmless. On an engine before `105.1.1-2590`, which has no such call-in, the player sets poses earlier in the frame, and a script that moves an aiming piece on its own can win until the next frame.
 
