@@ -497,6 +497,14 @@ function M.new(options)
 	world.callInUpdates = 0
 	local Script = {}
 
+	-- The weapons whose bursts the gadget is asked about (Script.SetWatchExplosion,
+	-- and CLuaHandle::Explosion in rts/Lua/LuaHandle.cpp).
+	world.watchedExplosions = {}
+
+	function Script.SetWatchExplosion(weaponDefID, watch)
+		world.watchedExplosions[weaponDefID] = watch == true or nil
+	end
+
 	function Script.UpdateCallIn(name)
 		world.callInUpdates = world.callInUpdates + 1
 		world.callIns[name] = type(world.handlerGlobals[name]) == "function"
@@ -1308,8 +1316,15 @@ function M.new(options)
 		return true
 	end
 
-	--- An explosion at a place, as CWeaponProjectile::Explode makes one.
+	--- An explosion at a place, as CWeaponProjectile::Explode makes one. For a
+	-- watched weapon the gadget's Explosion is asked first, and true hides the
+	-- burst's effect (CGameHelper::Explosion). `hidden` is that answer.
 	local function explode(found, x, y, z, why)
+		local hidden = false
+		local gadget = world.gadget
+		if world.watchedExplosions[found.def.id] and gadget and gadget.Explosion then
+			hidden = gadget:Explosion(found.def.id, x, y, z, found.owner, found.id) == true
+		end
 		local n = #world.explosions + 1
 		local worst = 0
 		for armor = 0, world.armorTypes - 1 do
@@ -1322,6 +1337,7 @@ function M.new(options)
 			y = y,
 			z = z,
 			why = why,
+			hidden = hidden,
 			damage = worst,
 			crater = found.damages.craterMult > 0,
 			impulse = found.damages.impulseFactor ~= 0 or found.damages.impulseBoost ~= 0,
@@ -1344,11 +1360,35 @@ function M.new(options)
 			local kind = found.def.type
 			local hitscan = kind == "BeamLaser" or kind == "LightningCannon"
 			if not hitscan and not found.hit then
-				if found.y < world.ground(found.x, found.z) then
-					explode(found, found.x, world.ground(found.x, found.z), found.z, "ground")
+				local floor = world.ground(found.x, found.z)
+				if found.y < floor then
+					-- CProjectileHandler::CheckGroundCollisions: on the line from where
+					-- it was before its last move, and no further along it than its
+					-- speed. The ground is taken as flat at the height under it.
+					local pre = found.pre or found
+					local speed = math.sqrt(found.vx ^ 2 + found.vy ^ 2 + found.vz ^ 2)
+					local x, z = found.x, found.z
+					if speed > 0 then
+						local along = 0
+						if pre.y > floor then
+							local length = math.sqrt((found.x - pre.x) ^ 2 + (found.y - pre.y) ^ 2 + (found.z - pre.z) ^ 2)
+							along = math.min((pre.y - floor) / (pre.y - found.y) * length, speed)
+						end
+						x, z = pre.x + found.vx * along / speed, pre.z + found.vz * along / speed
+						floor = pre.y + found.vy * along / speed
+					end
+					explode(found, x, floor, z, "ground")
 				else
 					local target = world.target
-					if target then
+					-- The engine skips the unit that fired a projectile
+					-- (CProjectileHandler::CheckUnitCollisions).
+					if target and target.half and not (target.unit and found.owner == target.unit) then
+						-- A box with half the sides in `half`: a hit when the projectile is
+						-- inside it, as the engine takes the start of a path inside a volume.
+						if math.abs(found.x - target.x) <= target.half[1] and math.abs(found.y - target.y) <= target.half[2] and math.abs(found.z - target.z) <= target.half[3] then
+							explode(found, found.x, found.y, found.z, "target")
+						end
+					elseif target and not (target.unit and found.owner == target.unit) then
 						-- The nearest the path comes to the target's middle.
 						local dx, dy, dz = target.x - found.x, target.y - found.y, target.z - found.z
 						local along = 0
@@ -1366,6 +1406,9 @@ function M.new(options)
 			found = world.projectiles[id]
 			-- A piece of debris has no time to live, and a test puts one in by hand.
 			if found and found.ttl then
+				-- CProjectile::PreUpdate keeps the place before the move.
+				found.pre = found.pre or {}
+				found.pre.x, found.pre.y, found.pre.z = found.x, found.y, found.z
 				if not found.moveCtrl and not hitscan then
 					found.x, found.y, found.z = found.x + found.vx, found.y + found.vy, found.z + found.vz
 				end

@@ -67,6 +67,7 @@ Game rules parameters, which any widget reads with `Spring.GetGameRulesParam(nam
 | `coilbox_rewind_last_frame` | the track's last frame |
 | `coilbox_rewind_frames_per_second` | simulation frames in a second of the match, 30 |
 | `coilbox_rewind_settled` | 1 when the world is the track at `coilbox_rewind_frame`, 0 from a seek until it is. See [A seek over frames](#a-seek-over-frames) |
+| `coilbox_rewind_hidden` | how many bursts of held shots the player has hidden since it started. See [Hidden bursts](#hidden-bursts) |
 
 A parameter is set when the player is made, before the first frame, and again whenever its value changes. A message changes them as it arrives, so a widget sees a seek's frame before the world has moved to it. The world moves on the next simulation frame, and for a seek that needs a lot made or removed, on several. `coilbox_rewind_settled` is 0 from the seek's message until the last of them.
 
@@ -337,6 +338,7 @@ A row names the calls (`calls`), the feature that hangs on them (`feature`), how
 | `rebuild` (behaviour) | `Spring.GetUnitIsStunned` | no | a building seeked back to its construction can show as finished | construction after a seek |
 | `shots` | `Spring.SpawnProjectile`, `SetProjectileMoveControl`, `SetProjectileDamages`, `SetProjectilePosition`, `SetProjectileVelocity`, `GetProjectileTimeToLive`, `GetProjectileDirection`, `DeleteProjectile`, `GetGroundHeight`, `Game.armorTypes` | no | the projectiles stage does nothing | shots |
 | `shotHandover` | `Spring.SetProjectileTimeToLive`, from `2025.03.9` | no | `Projectiles:release` keeps the shot under move control for the engine's one look | nothing |
+| `hiddenBursts` | `Script.SetWatchExplosion` | no | a held shot the engine ends shows its burst | hiding the burst of a shot the engine ends while it is held |
 | `sound` | `Spring.PlaySoundFile`, `Game.gameSpeed` | no | weapons fire without a sound | nothing |
 | `resources` | `Spring.SetTeamResource`, `SetTeamShareLevel` | no | what each team holds, its storage and its share level are the playback's own | team resources |
 | `resourceRates` | `Spring.GetGameFrame`, `GetTeamResources`, `GetTeamInfo`, `AddTeamResource`, `UseTeamResource` | no | each team's income, expense and pull are the playback's own | team income and expense |
@@ -696,14 +698,21 @@ A shot the track has in the air at `t` is a projectile under move control. On ev
 Three places are not the track's, each because the engine would otherwise land the shot during a seek or a pause:
 
 - A shot under the ground is held one position step above it, or above the water for a weapon that is not a water weapon.
-- A shot on its last frame is held the track's tolerance (half an elmo) short of where the track has it, along its flight. The playback's units can be that far from the match's.
+- A shot on its last frame is held one frame of its flight short of where the track has it on that frame, which is where the track has it on the frame before. The match's engine found nothing in the way there, since it found the hit on the next frame. Played forward and watched, it is held there on the frame before the one it is let go on too, which at 0.5x is half a frame before its last and at 2x up to two frames before. The engine puts a hit on the ground on the line from where a projectile was before its last move, and no further along it than one frame of its flight, so a shell let go from anywhere else bursts in the air. In the Beyond All Reason match one burst 59.9 elmos from where its flight ended at 2x, and 30.7 at 0.5x when it was held from half a frame before its last (issue #4026). The shot and what it hit are each the track's to within its tolerance, so the playback's can be closer than the match's by twice that, and a shot slower than twice the tolerance (1 elmo) is held that far short. Held half an elmo short, a shell and a missile of the Beyond All Reason match that came down along the side of a wreck's collision box were still inside the box by 0.3 elmo, and a shot that runs alongside a face gets clear of it only slowly as it goes back along its path, so one frame of flight is the least that does not depend on the angle.
 - A laser bolt stops on the frame it hits and stays there while it fades, which the track has as a velocity of nothing. From the frame before it stops it is held one frame of its flight short of there. A bolt first created in the frames it fades in is pointed by the last frame the track has it moving on.
+
+Two more things keep a held shot from landing, both found in Beyond All Reason's match (issue #4026):
+
+- A shot is made with the unit that fired it as its owner, and the engine skips the owner when it looks for a hit. A shot made while its unit is not in the world has no owner, as when play goes backward from after the unit's death, and at its first frame it is in the barrel, so it hit the unit it was fired from. The stage keeps which shots were made with no owner, and makes one again when its unit is back.
+- After a seek the engine can have units the track does not for the frames the units stage takes to remove them, which its budget spreads over frames. A shot made in those frames can hit one: a shell made at a seek hit an extractor that the track had gone by then. The terrain stage moves a seek's ground over frames as well, and a shot held above the ground of one frame can be under the ground the next moves. So while the units stage has a seek's removals to do, or the terrain stage has ground to move, the stage has no shots, and the player is not settled.
 
 A shot is held at any speed and in either direction, paused included, so it is the same projectile from its first frame to its last.
 
 #### Let go
 
 Played forward at 0.5x, 1x or 2x, a shot is let go on the frame its flight ends: its last frame, or for a bolt the last whole frame before it stops. It is put where the track has it on that frame, at the speed the track has. The engine's own look then finds what the match's did and makes the game's impact effect and its sound.
+
+The engine takes a projectile under the ground to have hit it, and looks along no line for that. A shot that ended on the ground is under it on its last frame, but the track has its place to within the tolerance and the ground's height to within half a position step, so it can be just above the playback's ground. A rocket of the Beyond All Reason match was 0.04 under the match's ground and flew over the playback's. So a shot let go within the tolerance and half a position step (0.5625 elmo) above the ground is put a position step under it. The engine looks for a unit or a feature in its way before the ground, so one that hit a unit still does.
 
 No frames of free flight are needed, so none are given. Measured on the whole match below, with 195 rockets and 83 laser bolts: at 1x and at 0.5x all 278 landed, a mean of 0.09 elmo from the last frame of flight the track has for them. At 2x 277 landed. The one that did not was let go on the frame before its last, because play at 2x passed over the last, and the unit it hit was a frame short of where it was hit.
 
@@ -716,6 +725,20 @@ What letting go means depends on the kind and on the engine:
 | Any kind on an engine before `2025.03.9`, which has no `Spring.SetProjectileTimeToLive` | As the row above. `Projectiles:release` is the one place the call is used |
 
 Only a rocket and a laser bolt have been let go in a real engine. The other kinds are read from the engine source and run on the stand-in.
+
+#### Hidden bursts
+
+Whatever keeps a held shot clear of what it would hit, the playback's world is the match's only to within the track's precision, and a game has wrecks, collision volumes and units in states the track does not hold. So the player hides the burst of any shot it holds that the engine ends. The match landed a shot only on its last frame, where the stage lets it go, so a held shot's burst is never one the match had, at any speed, in either direction, paused or after a seek.
+
+The stage asks to hear of the bursts of every weapon it holds shots of, with `Script.SetWatchExplosion`. The engine then calls the gadget's `Explosion` before it shows a burst, and draws none of the burst's effect when the answer is true (`CGameHelper::Explosion` in `rts/Game/GameHelper.cpp`, `CLuaHandle::Explosion` in `rts/Lua/LuaHandle.cpp`). The answer is true for a projectile the stage holds and false for one it let go. The count is published as `coilbox_rewind_hidden`.
+
+What a hidden burst still does, read in the same function:
+
+- Its weapon's hit sound plays. The engine plays it whatever the answer.
+- A widget that answers `ShockFront` hears of it, which is how a game shakes the view.
+- The game's own gadgets that the game's handler asks before the player hear of it. The engine stops asking once a synced gadget answers true, so the unsynced handlers and widgets that come after do not.
+- It reaches the units and features round it for no damage, as a shot let go does (see [No damage](#no-damage)). It leaves no scar on the ground, since the engine draws none for less than 5 damage.
+- The shot is gone from the air until the next seek, turn or window, as for any shot the engine ends.
 
 #### Fired once
 
@@ -743,8 +766,12 @@ Nobody has heard it. The headless engine has no sound and the runs with a window
 #### What is not there
 
 - A weapon the game does not have, or one of a kind that makes no projectile, is logged once by name and its shots are left out.
-- The engine can still end a held shot, when the playback's world is not the match's. The stage notices, because a projectile it holds has a time to live nothing else has, logs the first, and does not make the shot again until a seek, a turn or the next window. The engine tells Lua of a projectile's death only for weapons a gadget has asked to watch, a list the base game's gadgets change, so the stage asks and does not listen. In the whole match below the engine ended none.
+- The engine can still end a held shot, when the playback's world is not the match's. The stage notices, because a projectile it holds has a time to live nothing else has, logs the first, hides its burst (see [Hidden bursts](#hidden-bursts)) and does not make the shot again until a seek, a turn or the next window. The engine tells Lua of a projectile's death only for weapons a gadget has asked to watch, a list the base game's gadgets change, so the stage asks and does not listen. In the whole match below the engine ended none.
 - A shot the engine has been handed, or has ended, is not in the air for the rest of its frames. Pause while a bolt fades and it finishes fading.
+- A flame lands only if it hits a unit or a feature. One that reaches the end of its life goes with no impact, and one that touches the ground slides along it (`CFlameProjectile`). The track cannot tell those ends from a hit, so the driver counts the flames with no impact apart. Two flames of `cormaw_dmaw` in the Beyond All Reason match ended with no impact in the playback, and a probe gadget in the recording showed they did not land in the match either: no unit or feature was damaged by them, and none was within 80 elmos of their end.
+- A unit's state that changes its collision volume is not in the track. Beyond All Reason's `cormaw` turret was open in the match and is closed in playback, so a rocket that hit it flies over (issue #4040).
+- A unit that dies with its death effect stays in the world, and can be hit, while its death script runs, for the same number of engine frames at any speed. At 2x that is twice as long in the match's frames, and a rocket made beside a dying unit in the Beyond All Reason match was ended inside it. Its burst is hidden, and it is missing from the air and does not land where it did (issue #4041).
+- The track has one place for a feature. A wreck of the Beyond All Reason match had moved 15.9 elmos from where it was made, and at 32x a shell held where the wreck was made was ended by it, which now shows no burst (issue #4044).
 
 ### The slow frame line
 
@@ -1554,7 +1581,28 @@ The ignored test `a_seek_across_a_whole_match_settles_in_frames_that_fit` passed
 
 Making and removing units is cheap here: 195 creations took 14.8 ms and 256 removals 6.4 ms in a headless frame, and the budget kept every frame of units under a simulation frame.
 
-Shots, on frames 59,400 to 60,900 with the driver's shots plan given that span (the whole match would play 82,496 frames five times over): 29 of 29 shots held where the track has them, paused, for 150 frames, and 19 of 20 seeks had every shot. Played forward, 442 of the 450 shots that ended landed at 1x, 440 at 0.5x and 445 at 2x, a mean of 1.15, 0.89 and 3.17 elmos from the end of their flight. No shot did damage. One landed at 4x and three playing backward, which the shots plan says should not happen. Issue #4026 is about those. The engine also ended a held shot of `corpun_plasma` once while playing backward at 32x.
+Shots, on frames 59,400 to 60,900 with the driver's shots plan given that span (the whole match would play 82,496 frames five times over). 450 shots end in it. Shots that landed where they could be seen, before and after issue #4026:
+
+| Pass | Before | After | Hidden after |
+| --- | --- | --- | --- |
+| forward 1x | 442 | 443, a mean of 0.002 elmo from their flight's end | 0 |
+| forward 0.5x | 440 | 441, a mean of 0.002 | 0 |
+| forward 2x | 446 | 445, a mean of 0.002 | 1 |
+| forward 4x | 1 | 0 | 0 |
+| backward 1x | 4 | 0 | 0 |
+| paused | 0 | 0 | 0 |
+| 20 seeks | 1 | 0 | 1 |
+
+Before is the work at the start of the issue and after is the work at its end, each one run of the test. Of the shots that did not land forward:
+
+- Flames: 5 at 1x, 7 at 0.5x and 4 at 2x with no impact of their own. Two of them were checked in the recording and did not land in the match (see [What is not there](#what-is-not-there)). The others were not checked.
+- A rocket of `armmh_armmh_weapon` hit an open `cormaw` in the match and flies over the closed one in playback (issue #4040).
+- A rocket of `corstorm_cor_bot_rocket` (serial 8799), which is in the air when the span starts, lands at no speed. It was not looked into.
+- At 2x, a rocket of `corstorm_cor_bot_rocket` (serial 8920) that earlier runs showed the engine ending inside a dying unit (issue #4041). The one hidden burst at 2x is most likely it, though the driver does not say which shot a hidden burst was. And a rocket of `armjanus_janus_rocket` that was not looked into.
+
+At seek 14 the engine ends one held shot of `armstump_arm_lightcannon`. Its burst is hidden, and the shot is missing from the air until the next seek, so the test still fails there. Waiting for the units and the ground of the seek did not stop it, and why it is ended was not found. The test also fails on the Beyond All Reason span for reasons that are not about shots that land: the terrain stage moves the ground during a pass (`craters`), shots are in the air when the span ends (`in_air_after`), slow frames were logged, and a starburst rocket played backward gets further from its launcher on 13 frames because it climbs, turns and comes down, which the track has too.
+
+In the whole match plan the engine ended a held shot of `corpun_plasma` at 32x forward and backward, on a wreck the match had moved (issue #4044). The burst is now hidden.
 
 Issue #4033 took the panel at the bottom right for the game's replay controls. They are three widgets, read in `test-30922-8064a43` and seen in a window:
 
@@ -1828,12 +1876,12 @@ Splinter Faction turns the engine's own healing off, so none of those rows has t
 
 For a unit's death, the driver counts the hits a death's explosion makes on features before any gadget is asked and the damage that is done after all of them. In the whole match, the death at frame 9,514 reached 7 features. Before the gadget answered `FeaturePreDamaged`, all 7 were damaged, and 0 are now. The explosions the driver counts went from 0 to 2 across the death, so the effect still shows. In the fight of the shots test, a death reached 2 features in each pass at 1x, 0.5x and 2x and damaged none, and the line about a destroyed feature was not logged. The mean frame of work was 0.337 ms before and after in the whole match, with the slowest 29 ms before and 27 ms after.
 
-A fifth test, `the_shots_of_a_whole_match_follow_the_track`, wants the same replay and runs the driver's shots plan on it with the shipped adapter (issue #3795). On the match above, whose shots are 195 rockets and 83 laser bolts fired between frames 20,256 and 23,048:
+A fifth test, `the_shots_of_a_whole_match_follow_the_track`, wants the same replay and runs the driver's shots plan on it with the shipped adapter (issue #3795). `COILBOX_PLAYBACK_SHOTS_SPAN` keeps the plan to the shots fired and ended between two frames, given as two numbers with a comma between them, such as `59400,60900`, for a match whose shots run from its first minutes to its last. The driver measures an impact against the shot's flight from one frame before its last place to one frame after it, since the engine finds a unit or a feature along a shot's speed and the ground between where it was before its last move and where it is. Each impact counts for one shot, the nearest. On the match above, whose shots are 195 rockets and 83 laser bolts fired between frames 20,256 and 23,048:
 
 - Paused on frame 22,819, the frame with the most in the air, the engine has the track's 7 shots, and still has them after 150 frames. At 20 seeks to frames with shots in the air it has as many as the track each time. Every shot is where the track has it, to four decimal places of an elmo, or held short as [Held](#held) says, and points the way the track has it going.
 - Nothing lands while paused or during the seeks.
 - Played backward from the frame it landed on, a rocket is nearer where it was fired on each of 58 frames in a row.
-- Played forward through the fight, all 278 shots land at 1x and at 0.5x, a mean of 0.09 elmo from the last frame of flight the track has for them, and 277 at 2x. At 4x and played backward none lands.
+- Played forward through the fight, all 278 shots land at 1x and at 0.5x, a mean of 0.09 elmo from the last frame of flight the track has for them, and 277 at 2x. At 4x and played backward none lands. Run again on 14 October 2026 for issue #4026, measured from a frame before the end to a frame after it, the mean was 0.077 elmo at each speed, the counts were the same and no burst was hidden.
 - No shot did damage to a unit or a feature, by the engine's own sum before any gadget was asked, and none left a crater. After each pass every unit has the track's health.
 - The engine ended no shot the player was holding, no slow frame was logged, no team died and no Lua raised.
 
