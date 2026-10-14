@@ -38,6 +38,26 @@ function Window:valueOf(team, code)
 	return self.track.valueIndex[team * 65536 + code]
 end
 
+--- As the reader's: the first item and the number of items of unit `i`'s queue
+-- at `frame`, held from one key to the next, with the items in `queueItemDef`,
+-- `queueItemX`, `queueItemZ` and `queueItemFacing`. Counts how often it is
+-- asked, in `track.queueLooks`.
+function Window:sampleQueue(i, frame)
+	self.track.queueLooks = self.track.queueLooks + 1
+	local n = self.unitQueueCount[i]
+	if n == 0 then
+		return 1, 0
+	end
+	local first = self.unitQueueFirst[i]
+	local a = first
+	for key = first, first + n - 1 do
+		if self.queueTime[key] <= frame then
+			a = key
+		end
+	end
+	return self.queueItemFirst[a], self.queueItemCount[a]
+end
+
 function Window:sampleValue(v, frame)
 	return self.track.values[v].at(frame)
 end
@@ -124,14 +144,57 @@ function Track:loadWindow(k)
 		unitTeam = {},
 		unitFirstFrame = {},
 		unitLastFrame = {},
+		unitQueueFirst = {},
+		unitQueueCount = {},
+		queueTime = {},
+		queueItemFirst = {},
+		queueItemCount = {},
+		queueItemDef = {},
+		queueItemX = {},
+		queueItemZ = {},
+		queueItemFacing = {},
 	}, Window)
 	local n = 0
+	local keys, items = 0, 0
 	for _, unit in ipairs(self.units) do
 		if unit.first <= finish and unit.last >= start then
 			n = n + 1
 			w.source[n] = unit
 			w.unitSerial[n], w.unitDef[n], w.unitTeam[n] = unit.serial, unit.def, unit.team
-			w.unitFirstFrame[n], w.unitLastFrame[n] = math.max(unit.first, start), math.min(unit.last, finish)
+			local first, last = math.max(unit.first, start), math.min(unit.last, finish)
+			w.unitFirstFrame[n], w.unitLastFrame[n] = first, last
+			-- The queue keys of the window, as the writer slices them: the key
+			-- held at the unit's first frame in the window and every key after it.
+			-- A unit whose queue is empty throughout has none.
+			local held, kept, any = nil, {}, false
+			for _, key in ipairs(unit.queue) do
+				if key.frame <= first then
+					held = key
+				elseif key.frame <= last then
+					kept[#kept + 1] = key
+				end
+			end
+			if held or #kept > 0 then
+				table.insert(kept, 1, { frame = first, items = held and held.items or {} })
+			end
+			for _, key in ipairs(kept) do
+				if #key.items > 0 then
+					any = true
+				end
+			end
+			w.unitQueueFirst[n], w.unitQueueCount[n] = keys + 1, any and #kept or 0
+			if any then
+				for _, key in ipairs(kept) do
+					keys = keys + 1
+					w.queueTime[keys] = key.frame
+					w.queueItemFirst[keys], w.queueItemCount[keys] = items + 1, #key.items
+					for _, item in ipairs(key.items) do
+						items = items + 1
+						w.queueItemDef[items], w.queueItemX[items] = item.def, item.x
+						w.queueItemZ[items], w.queueItemFacing[items] = item.z, item.facing or 0
+					end
+				end
+			end
 		end
 	end
 	w.unitCount = n
@@ -208,6 +271,8 @@ local function unit(spec, serial)
 		first = spec.first,
 		last = spec.last,
 		rotation = spec.rotation or { 0, 0, 0, 1 },
+		-- Build queue keys, each `{ frame = n, items = { { def, x, z, facing } } }`.
+		queue = spec.queue or {},
 		at = type(place) == "function" and place or function()
 			return place[1], place[2], place[3]
 		end,
@@ -313,6 +378,8 @@ function M.new(spec)
 		projectiles = projectiles,
 		-- How often a window was asked whether a projectile exists or where it is.
 		projectileLooks = 0,
+		-- How often a window was asked for a build queue.
+		queueLooks = 0,
 		featureList = features,
 		terrainRows = spec.terrain or {},
 		broken = spec.broken or {},

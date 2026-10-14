@@ -108,6 +108,14 @@ The game's own keys can still win. If your game binds one of these keys to an ac
 
 If the engine is too old for part of the player, a small panel above the timeline says what is switched off, for example "Switched off on this engine: ground changes". If it is too old to play the match at all, the panel says which engine you need and nothing plays. If you have switched off the engine's LuaUI, there is no timeline, and the match still plays.
 
+## Queued buildings
+
+A builder's queue of buildings shows as an outline of each building's footprint on the ground, in the builder's team colour, with a pale fill. It follows the time, so it is right after a seek and when you play backward. A building that has been started, or finished, stands where its outline was and is not outlined again.
+
+Press G to hide the outlines or show them again. The timeline's key list has the key, so you can change it there. The choice is kept for next time. Typing `/rewindghosts` in the engine's console does the same, and `/rewindghosts on` or `/rewindghosts off` sets it.
+
+In the one engine this was looked at, the engine's own call for a translucent building shape drew nothing from a widget, so the outline is all you see. The shape is still asked for, and issue #4018 is about getting it to show. Where a game has its own way to draw a building ghost, its adapter can use that instead.
+
 ## Disk space
 
 A track takes disk space. The measured tracks are 5,255,917 bytes for the 45.83 minute Beyond All Reason match above and 321,116 bytes for the 12.83 minute Splinter Faction one. About a tenth of each is the teams' resources. The Beyond All Reason match was between two AIs. A match with more units will be larger, and coilbox has not measured one between people.
@@ -152,7 +160,6 @@ Not true to the recording:
 ## Current limits
 
 - Units do not play walk, build or aim animations, and turrets and torsos do not turn to face their targets. These are issues #3796 and #3797.
-- Builders do not show the buildings they had queued. This is issue #3804.
 - `[` and `]` do nothing in the engine, as above. This is issue #3978.
 - Splinter Faction is the only game with a tailored setup. In another game nothing is switched off or hidden, and the match still plays. Beyond All Reason has none yet (issue #3801), so anything its interface does at the start of a match can show up in a playback.
 - Recording needs the replay's engine, game and map installed. Coilbox can offer another installed engine or game version, and keeps the result only when it matches the match exactly.

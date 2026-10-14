@@ -77,6 +77,9 @@ M.ACTIONS = {
 	{ id = "markForward", does = "Go to the next mark", keys = { { key = "]" } } },
 	{ id = "slower", does = "Slower", keys = { { key = "-" } } },
 	{ id = "faster", does = "Faster", keys = { { key = "=" }, { key = "+" } } },
+	-- Not the replay page's. It switches the ghosts of queued buildings, which
+	-- are another widget's (issue #3804), through the switch that widget offers.
+	{ id = "ghosts", does = "Show queued buildings", keys = { { key = "g" } } },
 }
 
 local ACTION = {}
@@ -242,6 +245,8 @@ function M.new(engine)
 		Spring = engine.Spring,
 		gl = engine.gl,
 		GL = engine.GL,
+		-- The widgets' shared table, where the ghosts widget offers its switch.
+		WG = engine.WG,
 		-- Whether the player is there, as of the last read.
 		present = false,
 		keys = defaultKeys(),
@@ -553,6 +558,16 @@ local function perform(self, id, isRepeat)
 		self:send(string.format("seek %d", self.first))
 	elseif id == "finish" then
 		self:send(string.format("seek %d", self.last))
+	elseif id == "ghosts" then
+		-- With no ghosts widget the key is the game's. A held key is taken and
+		-- does not switch again.
+		local ghosts = self.WG and self.WG.coilboxRewindGhosts
+		if not ghosts then
+			return false
+		end
+		if not isRepeat then
+			ghosts.toggle()
+		end
 	else
 		if self.groupCount == 0 then
 			return false

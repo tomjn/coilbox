@@ -1,6 +1,6 @@
 # Rewind player
 
-The rewind player plays a replay track back inside the engine, with time going in either direction. This folder holds the Lua that reads a track (issue #3792) and the gadget that makes the world match it (issue #3794): units, features, terrain and the shots in the air (issue #3795) at any time. It does not yet pose aiming pieces or animate units (issues #3796 and #3797). The control on screen is a widget, the timeline (issue #3798). What a game switches off or hides during playback is its adapter (issue #3799).
+The rewind player plays a replay track back inside the engine, with time going in either direction. This folder holds the Lua that reads a track (issue #3792) and the gadget that makes the world match it (issue #3794): units, features, terrain and the shots in the air (issue #3795) at any time. It does not yet pose aiming pieces or animate units (issues #3796 and #3797). The control on screen is a widget, the timeline (issue #3798), and a second widget draws the buildings a builder had queued (issue #3804). What a game switches off or hides during playback is its adapter (issue #3799).
 
 A track is the file `crates/coilbox-track` writes, in the format `docs/reference/replay-track-format.md` describes. The format was designed so that the engine's Lua can read the file as it is, so there is no export step and no second copy on disk.
 
@@ -23,6 +23,9 @@ The player holds a time `t`, a frame of the track that can be a fraction. On eve
 | `luaui/widgets/coilbox_rewind_timeline.lua` | the timeline widget: the engine's call-ins for drawing, keys and the pointer |
 | `luaui/rewind_timeline/coilbox_timeline.lua` | the timeline: where everything is, what a key or a press sends, and the drawing. It takes the engine as a table, so the tests run it |
 | `luaui/rewind_timeline/coilbox_timeline_engine.lua` | the widget's own table of engine calls, in the same shape |
+| `luaui/widgets/coilbox_rewind_ghosts.lua` | the ghosts widget: the call-ins, and finding the track and the adapter |
+| `luaui/rewind_ghosts/coilbox_ghosts.lua` | the ghosts: which buildings are queued at a time, and the drawing. It takes the engine as a table, so the tests run it |
+| `luaui/rewind_ghosts/coilbox_ghosts_engine.lua` | the ghosts widget's own table of engine calls |
 
 It runs in synced Lua, because creating a unit is synced. It moves only on simulation frames, and a paused engine runs none. So the player's own pause is what holds `t`, and the engine has to be left running for a seek to show.
 
@@ -121,6 +124,7 @@ The keys are the replay page's (`src/content/replayMapView/timelineKeys.ts`). `M
 | `[`, `]` | Go to the previous or the next mark |
 | Minus | Slower |
 | Equals or Plus | Faster |
+| G | Show or hide the queued building ghosts. Not on the replay page, and left to the game when the ghosts widget is not there |
 
 - A key held with Ctrl, Alt or Meta is never taken.
 - A held key repeats a step and a change of speed. It does not repeat play, pause or reverse.
@@ -164,6 +168,62 @@ It draws with `gl.Color`, `gl.Rect`, `gl.BeginEnd`, `gl.Vertex` and `gl.Text`, m
 Sizes are in pixels of a view 1,080 high and follow the view's height, down to three quarters of that size and no smaller. A draw allocates nothing.
 
 The look follows Slate, the interface in `luaui/slate` of [xta-springrts](https://github.com/Recoil-Game-Archive/xta-springrts/tree/master/luaui/slate): a dark translucent panel, a thin light border, rounded corners and buttons that are a faint wash of white. Its colours and proportions were followed and none of its code, its font or its images was taken. Slate blurs the world behind a panel with a shader. The timeline has no shader, so its panel is more opaque than Slate's, 0.82 against 0.6.
+
+### Queued building ghosts
+
+A builder's queue of buildings is in the track (`sampleQueue` in the reader, whose values are checked against the Rust reader's), and the world has nothing that shows one. The ghosts widget draws each queued building at its place and facing, in its team's colour. It is a widget in the playback game like the timeline, so any game's widget handler loads it and nothing is asked of the game.
+
+#### How it gets the queues
+
+The widget reads the track itself, with the player's reader. The engine allows it. `VFS.LoadFile` and `VFS.Include` in unsynced Lua take any path of the game (`LuaVFS::GetModes` only forbids the `VFS.RAW` and `VFS.MENU` modes in synced Lua, and looks at no path), so a widget can include `luarules/rewind_player/coilbox_track.lua` and read `coilbox_rewind/track.cbtrack`. The timeline keeps its own table of engine calls because each widget checks the calls it uses, and not because a widget cannot reach the gadget's files. The time is the player's `coilbox_rewind_frame`.
+
+The other way is for the gadget to send the queues. A queue is variable length data, so that is a message for each change, from the synced half to the unsynced half and on to the widget through `Script.LuaUI`. It was not chosen.
+
+- The synced half would sample every builder on every frame, which the widget does for itself at no cost to the simulation.
+- A widget that is loaded late or reloaded would need a message of its own to catch up.
+- It changes the gadget, which issues #4008 and #4009 were changing at the same time.
+
+The cost of reading it itself is a second copy of the track in the widget's Lua state, and a window read in the widget when the time crosses into one, as the player reads one in its own. The whole match's track is 321,116 bytes, which is small. A track of tens of megabytes would be held twice, and nothing has measured the widget on one.
+
+#### What a frame costs
+
+For each builder, whether it exists and which key of its queue it is on. Nothing is made unless one of those changed or a unit that is a queued building began or ended. A draw allocates nothing, which `tests/ghosts_test.lua` counts over 300 frames of play with changes in them, 300 draws of an unchanged queue, and backward play and seeks inside a window. Reading a window allocates, as it does in the player.
+
+#### A started building
+
+The recorder writes a builder's queue as the build commands it holds. The engine leaves a build command at the front of the queue while the building is made, and takes it off some frames after the building is finished. In the whole match the first extractor is in the queue from frame 504 and is a unit in the track from that same frame. The queue loses it on frame 888 and the unit was finished by frame 873. So a queued item is not a building that has not been started, and drawing every item would draw a ghost over the real building.
+
+An item is not drawn while a unit of its definition stands within 8 elmos of it on each axis. That is half a square of the 16 elmo grid the engine snaps a building to (`CGameHelper::Pos2BuildPos`). The match's first extractor was queued at 480,8128 and stands at 488,8136. A building that is destroyed while it is still queued is a ghost again. Where each unit stands is read once for each window, and the frames each one begins and ends on are kept in order, so a frame only has to ask whether it has crossed one.
+
+#### The drawing
+
+For each ghost the widget outlines the footprint on the ground in the team's colour, lightened, with a pale fill, and asks the engine for the building's own shape with `gl.UnitShape(unitDefID, teamID, false, false, false)`. That is translucent in the engine's own state, with the alpha from the player's `UnitTransparency` setting (0.3 by default). The widget pushes a matrix for the call, because without its raw state `UnitShape` pops the top matrix and pushes a copy of the one below it (`CModelDrawerHelper::DIDResetPrevModelView`).
+
+The shape did not draw. In the engine run in a window (`2026.07.01-102-g6e5c5a0`, Splinter Faction 0.1.89), the call reached the engine with the right arguments and no shape appeared, with or without the extra matrix and with the matrix mode set. The raw form draws flat white silhouettes. The outline did draw, at the right places, and is what a viewer sees. Issue #4018 is the shape.
+
+A footprint is the definition's `xsize` and `zsize` squares of 8 elmos, turned by the facing. The height is `Spring.GetGroundHeight`, or 0 for a building that floats over water, as the engine's `GetBuildHeight` has it. The widget does not take the slope into account, and a building the engine would level is put at the height of its middle.
+
+The outline's width, its lightening and the fill's opacity are design choices, made after the first look at the outline found it too dark to read. The repository's version of them was not looked at on screen, because the four windowed launches were spent before the change. It ran in the headless engine, where nothing is drawn.
+
+A facing of 0 is south, 1 east, 2 north and 3 west, and the shape is turned 90 degrees for each (`gl.Rotate(facing * 90, 0, 1, 0)`). That was not checked against a real unit, since the shape never appeared.
+
+#### An adapter's own drawing
+
+The adapter's `hooks.drawQueuedBuilding(unitDefID, teamID, x, y, z, facing)` replaces both the shape and the outline. The widget reads `coilbox_rewind/adapter.lua` itself with `VFS.Include`, in its own environment, so a hook that calls `gl` works there. The player reads the same file in synced Lua and knows the name, so it does not take it for a misspelling. A hook that raises is logged once and the engine's drawing takes over. Beyond All Reason's adapter (issue #3801) would call its unit shape helper from this hook, and is not written.
+
+#### The key and what it remembers
+
+The key is in the timeline's key list, `G` by default. The timeline switches the ghosts through `WG.coilboxRewindGhosts.toggle()`, which the ghosts widget offers, and leaves the key to the game when the ghosts widget is not there. The timeline keeps the key with the others, a key held with Ctrl, Alt or Meta is left alone, and a held key does not switch again. `/rewindghosts`, `/rewindghosts on` and `/rewindghosts off` do it from the console. The widget keeps whether the ghosts are on with `widget:GetConfigData`.
+
+#### Engine calls
+
+The widget has a table of its own, `coilbox_ghosts_engine.lua`, in the same shape. Its rows are `track` (the reader's calls), `player`, `ground` and `drawing`, which are required, and `outline` and `adapter`, which are optional. Every call in it is registered at the tags 105.0, 105.1.1, 2025.01.6, 2025.04.11 and 2026.07.04, read for this table, and `gl.UnitShape` has its fifth argument, the one that picks translucent drawing, at 105.0. The test reads the widget's files and the reader's, and fails for a call with no row.
+
+#### What has run
+
+- The headless engine with Splinter Faction's own widget handler and the whole match. The handler loads the widget and the widget finds the track. At 130 visits to frames chosen from the track, forward and then backward, the widget would draw what the Rust reader's queues give less what is built, 260 ghosts in all with the right shape, team, place and turn. The timeline's key switched them off and on. The test is `the_ghosts_follow_the_track_in_the_engine`. Its probe, `tests/headless/ghosts_probe.lua`, puts counting calls where the widget's drawing calls are for the length of one draw.
+- A window, four launches. The outline was at the right places from frame 4695 to 7905. The shape did not appear.
+- Only on the stand-in: a floating building, the footprint of a building turned a quarter, a hook that raises, and an engine without any one call.
 
 ### Adding a stage
 
@@ -258,7 +318,7 @@ Rows for the guard gadget's `Spring.KillTeam` and `Spring.GameOver` are not need
 
 #### The widget
 
-The timeline widget uses `gl`, `GL` and the unsynced `Spring`, which the synced gadget cannot look at. It has a second, small table of its own in `luaui/rewind_timeline/coilbox_timeline_engine.lua`, with rows in the same shape and a `check` copied from the gadget's, since a widget cannot reach a file under `luarules/`. The widget checks it in `widget:Initialize`:
+The timeline widget uses `gl`, `GL` and the unsynced `Spring`, which the synced gadget cannot look at. It has a second, small table of its own in `luaui/rewind_timeline/coilbox_timeline_engine.lua`, with rows in the same shape and a `check` copied from the gadget's, so that each widget checks the calls it uses and the gadget's table stays the gadget's. (A widget can reach a file under `luarules/`, as [Queued building ghosts](#queued-building-ghosts) shows.) The widget checks it in `widget:Initialize`:
 
 - `drawing`, `player` and `keys` are required. A widget missing one logs `COILBOX_REWIND_TIMELINE cannot start: this engine has no gl.Rect. It is needed for drawing the timeline. Engine 105.0 and later have it` and does not start. The player goes on playing.
 - `marks` is optional. Without `VFS.FileExists` or `VFS.ZIP` the timeline starts with no marks and logs a line.
@@ -659,10 +719,11 @@ A hook is an optional function in `hooks`. The player calls these and no others,
 | `started` | once, when the player has opened the track, before the first frame and so before anything of the track is in the world | none |
 | `unitPlaced` | after the player created a unit and put it in place, and again for a unit made again after a seek | the engine's unit id, the unit definition's engine id, the track frame, the clock |
 | `afterFrame` | at the end of every simulation frame, after every stage | the track frame, the clock |
+| `drawQueuedBuilding` | not the player's. The ghosts widget calls it in `DrawWorld` for each queued building, in its own Lua state ([An adapter's own drawing](#an-adapters-own-drawing)) | the unit definition's engine id, the team, x, y, z, the facing |
 
 The clock is the player's, and a hook only reads it. `clock.jumped` says the frame was reached by a seek or a step, `clock.direction` is 1 or -1 and `clock.speed` is how many frames of the track a simulation frame covers.
 
-A hook runs in synced Lua, in the gadget's environment, and a frame of play allocates nothing in the player, so a hook that is called every frame should not either. These are the only hook points. They are the smallest set that issues #3797 (a build spray effect that reads a builder's recorded work), #3800 (a team's storage, which had to be set before any unit was placed until the track held it, issue #3982), #3801 (a warp in effect for a unit that appears) and #3804 (replacing ghost drawing) are known to need, and a hook point is added by the issue that needs one.
+The player's three hooks run in synced Lua, in the gadget's environment, and a frame of play allocates nothing in the player, so a hook that is called every frame should not either. These are the only hook points. They are the smallest set that issues #3797 (a build spray effect that reads a builder's recorded work), #3800 (a team's storage, which had to be set before any unit was placed until the track held it, issue #3982), #3801 (a warp in effect for a unit that appears) and #3804 (replacing ghost drawing) are known to need, and a hook point is added by the issue that needs one.
 
 ### The log line
 
@@ -904,6 +965,7 @@ luajit lua/rewind-player/tests/gadget_test.lua
 luajit lua/rewind-player/tests/adapter_test.lua
 luajit lua/rewind-player/tests/engine_test.lua
 luajit lua/rewind-player/tests/timeline_test.lua
+luajit lua/rewind-player/tests/ghosts_test.lua
 ```
 
 - `reader_test.lua` reads the fixture and compares every sampled value with what the Rust reader gives. It plays forward, backward and in a fixed shuffle, and checks the errors and the three ways of fetching.
@@ -921,6 +983,8 @@ luajit lua/rewind-player/tests/timeline_test.lua
 - `adapter_test.lua` checks how the player reads an adapter, that it never creates a hidden unit or skipped feature and says nothing about either, that each hook is called with the right arguments and a hook that raises is switched off, the log line, and that 60 frames of play with hooks allocate nothing.
 - `engine_test.lua` is made from the engine table ([Engine calls](#engine-calls)). For every call of every row it takes the call out of the stand-in and plays the fixture track, and it checks the table against the source with `tests/scan.lua`. The widget's table is tested the same way in `timeline_test.lua`.
 - `timeline_test.lua` checks the timeline on a stand-in for `Spring` and `gl`: the message for every key, that a key with Ctrl, Alt or Meta is left alone, the frame a drag seeks to at both ends and between, the time and speed shown, that everything drawn is inside views from 640 by 480 to 3840 by 2160, moving the panel, changing a key, marks, and that 300 draws allocate nothing. It also loads the widget file the way a handler does.
+
+- `ghosts_test.lua` checks the ghosts on a track made from a table (`tests/fake_track.lua`, which has queues) against an answer worked out from the table. It plays the whole track forward and backward and seeks to 19 frames across window edges. It checks a building started within and beyond the 8 elmos, two builders with one item, a definition the game lacks, a window that does not read, what is drawn and how (the facing, a floating building, the matrices), the footprint, the switch and the text command, the saved choice, an adapter's hook and one that raises, and that 300 frames allocate nothing. It runs the fixture through the real reader against the Rust reader's queues, loads the widget file, and holds the widget's files and the reader's to its table of engine calls.
 
 `tests/support.lua` is the stand-in for the reader. Its `VFS.Unpack*` and `VFS.ZlibDecompress` follow the engine source, round what they return to a 32 bit float, and raise for a position or count a float could not hold. The zlib is the system's, through LuaJIT's FFI. Its synced environment has no `io`, so a reader that reached for it would fail the tests.
 

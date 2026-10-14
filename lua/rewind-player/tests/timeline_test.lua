@@ -19,7 +19,7 @@ local WIDGET = t.root() .. "/luaui/widgets/coilbox_rewind_timeline.lua"
 -- cont/LuaUI/Headers/keysym.h.lua in RecoilEngine. A printable key's code is
 -- its character's.
 local CODES = { space = 32, left = 276, right = 275, home = 278, ["end"] = 279, escape = 27, shift = 304 }
-for _, char in ipairs({ "r", "p", "a", ",", ".", "[", "]", "-", "=", "+" }) do
+for _, char in ipairs({ "r", "p", "a", "g", ",", ".", "[", "]", "-", "=", "+" }) do
 	CODES[char] = char:byte()
 end
 local NAMES = {}
@@ -217,6 +217,52 @@ do
 	t.same("and neither toggles again", #e.sent, 0)
 	t.same("a repeat of Right is taken", tl:keyPress(CODES.right, NONE, true), true)
 	t.same("and steps again", e.sent[1], "coilbox_rewind:step 30")
+end
+
+-- The key that switches the queued building ghosts (issue #3804). The ghosts
+-- are another widget's, which offers its switch in WG. The timeline sends the
+-- player nothing for it.
+
+do
+	local e = engine(params())
+	local switched = 0
+	local WG = {}
+	local function made()
+		local tl = Timeline.new({ Spring = e.Spring, gl = e.gl, GL = e.GL, VFS = e.VFS, WG = WG })
+		tl:resize(1920, 1080)
+		tl:read()
+		return tl
+	end
+	local tl = made()
+	t.same("with no ghosts widget G is left to the game", tl:keyPress(CODES.g, NONE, false), false)
+	WG.coilboxRewindGhosts = {
+		toggle = function()
+			switched = switched + 1
+			return true
+		end,
+	}
+	t.same("with one G is taken", tl:keyPress(CODES.g, NONE, false), true)
+	t.same("and switches the ghosts", switched, 1)
+	t.same("a held G is taken", tl:keyPress(CODES.g, NONE, true), true)
+	t.same("and does not switch them again", switched, 1)
+	t.same("G with Ctrl is left alone", tl:keyPress(CODES.g, { alt = false, ctrl = true, meta = false, shift = false }, false), false)
+	t.same("the player is sent nothing", #e.sent, 0)
+	t.same("a timeline given no WG leaves G alone", Timeline.new({ Spring = e.Spring, gl = e.gl, GL = e.GL }):keyPress(CODES.g, NONE, false), false)
+
+	tl:draw()
+	click(tl, tl.rects.help)
+	e.clear()
+	tl:draw()
+	t.check("the key list says what G does", e.texts["Show queued buildings"])
+	t.check("and the key", e.texts["G"])
+	e.clear()
+	click(tl, tl.rects["row:ghosts"])
+	t.same("a click on its row waits for a key", tl.listening, "ghosts")
+	tl:keyPress(CODES.a, NONE, false)
+	t.same("the next key is the new one", tl:keyPress(CODES.a, NONE, false), true)
+	t.same("and it switches the ghosts", switched, 2)
+	t.same("G no longer does", tl:keyPress(CODES.g, NONE, false), false)
+	t.check("the new key is saved with the others", tl:config().keys.ghosts[1].key == "a")
 end
 
 -- A game with no player has no timeline.
@@ -604,6 +650,7 @@ do
 	local e = engine(params())
 	local env = t.unsyncedEnv()
 	env.widget = {}
+	env.WG = {}
 	env.Spring = e.Spring
 	env.Spring.GetViewGeometry = function()
 		return 1920, 1080
@@ -679,8 +726,10 @@ do
 	-- Every engine name the widget uses has a row, and every row is used.
 	local allowed = Scan.setOf(Scan.callsOf(Table.ROWS), Table.ASSUMED)
 	local used = {}
-	local files = Scan.filesUnder(t.root() .. "/luaui")
-	t.check("the scan found the widget's files", #files >= 2, #files)
+	-- The timeline's files only: the ghosts widget has a table of its own.
+	local files = Scan.filesUnder(t.root() .. "/luaui/rewind_timeline")
+	files[#files + 1] = WIDGET
+	t.check("the scan found the widget's files", #files >= 3, #files)
 	for _, path in ipairs(files) do
 		for name in pairs(Scan.usedBy(path)) do
 			used[name] = true
@@ -713,6 +762,7 @@ do
 		local lines = {}
 		local env = t.unsyncedEnv()
 		env.widget = {}
+		env.WG = {}
 		env.Spring = e.Spring
 		env.Spring.GetViewGeometry = function()
 			return 1920, 1080

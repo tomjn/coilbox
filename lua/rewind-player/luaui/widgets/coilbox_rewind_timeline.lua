@@ -56,7 +56,7 @@ function widget:Initialize()
 		Spring.Echo("COILBOX_REWIND_TIMELINE failed: " .. tostring(Timeline))
 		return
 	end
-	local made = Timeline.new({ Spring = Spring, gl = gl, GL = GL, VFS = engine.on.marks and VFS or nil })
+	local made = Timeline.new({ Spring = Spring, gl = gl, GL = GL, WG = WG, VFS = engine.on.marks and VFS or nil })
 	made:setConfig(saved)
 	made:resize(Spring.GetViewGeometry())
 	timeline = made

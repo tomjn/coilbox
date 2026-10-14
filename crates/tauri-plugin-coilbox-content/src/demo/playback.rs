@@ -3158,4 +3158,207 @@ end
             .collect();
         assert!(errors.is_empty(), "{errors:#?}");
     }
+
+    /// The widget that says what the ghosts widget would draw at chosen frames.
+    /// It is written into the game folder for the test below and is not part of
+    /// the game.
+    const GHOSTS_PROBE: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../lua/rewind-player/tests/headless/ghosts_probe.lua"
+    ));
+
+    /// A ghost: the definition's name, the team, x, z and the facing.
+    type QueuedGhost = (String, u8, f64, f64, u8);
+
+    /// What the ghosts should be at `frame`, worked out from the track with the
+    /// Rust reader: every queued building of every unit, once for each place,
+    /// less those a unit of the same definition stands at within the 8 elmos
+    /// the build grid moves a building by. One string for each, as the probe
+    /// writes them but for the height and the turn, and sorted.
+    fn queued_ghosts(
+        reader: &mut coilbox_track::TrackReader<std::io::Cursor<Vec<u8>>>,
+        names: &[String],
+        frame: u32,
+    ) -> Vec<QueuedGhost> {
+        let q = reader.quantiser().unwrap();
+        let state = reader.sample(frame).unwrap();
+        let mut seen = std::collections::HashSet::new();
+        let mut ghosts = Vec::new();
+        for unit in &state.units {
+            for item in &unit.queue {
+                let (x, z) = (q.position_value(item.x), q.position_value(item.z));
+                if !seen.insert((item.unit_def, item.x, item.z)) {
+                    continue;
+                }
+                let built = state.units.iter().any(|other| {
+                    other.unit_def == item.unit_def
+                        && (other.position[0] - x).abs() <= 8.0
+                        && (other.position[2] - z).abs() <= 8.0
+                });
+                if !built {
+                    ghosts.push((
+                        names[item.unit_def as usize].clone(),
+                        unit.team,
+                        x,
+                        z,
+                        item.facing,
+                    ));
+                }
+            }
+        }
+        ghosts.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        ghosts
+    }
+
+    /// The ghosts widget against a real engine and a real game's widget
+    /// handler (issue #3804). The handler has to load the widget out of the
+    /// playback game and turn it on with nothing asked of the game. At frames
+    /// chosen from the track, which has its build orders in it, what the widget
+    /// would draw has to be what the Rust reader says the builders had queued
+    /// less what is already built: the shape, the team, the place and the turn.
+    ///
+    /// Give it a replay of a whole Splinter Faction match in
+    /// `COILBOX_ANALYSIS_REPLAY`, with the variables the tests above read. The
+    /// engine is headless, so nothing is drawn, and the widget's five drawing
+    /// calls are replaced by counting ones for the one call that asks for the
+    /// draw.
+    #[test]
+    #[ignore = "needs an engine, Splinter Faction, a map and a replay of a whole match on them"]
+    fn the_ghosts_follow_the_track_in_the_engine() {
+        let Some(prepared) = prepared(false) else {
+            return;
+        };
+        let bytes = std::fs::read(prepared.game_dir.join("coilbox_rewind/track.cbtrack")).unwrap();
+        let mut reader = coilbox_track::TrackReader::open(std::io::Cursor::new(bytes)).unwrap();
+        let names = reader.info().unwrap().unit_defs;
+        let last = reader.header().last_frame;
+
+        // Every 15th frame, and the frames where what is queued changes with the
+        // frame before it, so both sides of a building starting are looked at.
+        let mut frames = Vec::new();
+        let mut before: Option<Vec<QueuedGhost>> = None;
+        for frame in (0..=last).step_by(15) {
+            let now = queued_ghosts(&mut reader, &names, frame);
+            if before.as_ref() != Some(&now) {
+                if frame >= 15 && before.is_some() {
+                    frames.push(frame - 15);
+                }
+                frames.push(frame);
+            }
+            before = Some(now);
+        }
+        frames.dedup();
+        // The frame with the most ghosts is where the key is pressed.
+        let toggle_frame = frames
+            .iter()
+            .copied()
+            .max_by_key(|f| queued_ghosts(&mut reader, &names, *f).len())
+            .expect("the track has frames");
+        let toggled = queued_ghosts(&mut reader, &names, toggle_frame).len();
+        assert!(toggled > 0, "the track has no queued building to look at");
+        // Forward and then backward, so a change is met in both directions.
+        let mut order = frames.clone();
+        order.extend(frames.iter().rev());
+        let list = format!(
+            "{{ {} }}",
+            order
+                .iter()
+                .map(u32::to_string)
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        std::fs::write(
+            prepared
+                .game_dir
+                .join("luaui/widgets/coilbox_rewind_ghosts_probe.lua"),
+            GHOSTS_PROBE
+                .replace("@FRAMES@", &list)
+                .replace("@TOGGLE_FRAME@", &toggle_frame.to_string()),
+        )
+        .unwrap();
+
+        let (timed_out, output, _) = launch(&prepared, &|text| text.contains("GHOSTS_PROBE done"));
+        let probe: Vec<&str> = output
+            .lines()
+            .filter_map(|l| l.split_once("GHOSTS_PROBE ").map(|(_, rest)| rest))
+            .collect();
+        for l in &probe {
+            eprintln!("ghosts {l}");
+        }
+        assert!(!timed_out, "the probe never finished. Log:\n{output}");
+        let loaded = probe
+            .iter()
+            .find(|l| l.starts_with("loaded="))
+            .expect("the probe said whether the widget was loaded");
+        assert_eq!(field(loaded, "loaded"), "1", "{loaded}");
+
+        let mut looked = 0;
+        let mut with_ghosts = 0;
+        let mut ghosts_seen = 0;
+        for l in probe.iter().filter(|l| l.starts_with("frame=")) {
+            let frame = number(l, "frame") as u32;
+            assert_eq!(field(l, "arrived"), "1", "{l}");
+            assert_eq!(field(l, "ok"), "1", "{l}");
+            let wanted = queued_ghosts(&mut reader, &names, frame);
+            assert_eq!(number(l, "ghosts") as usize, wanted.len(), "{l}");
+            // Each ghost has its footprint filled and outlined too.
+            assert_eq!(number(l, "outlines") as usize, wanted.len() * 2, "{l}");
+            let list = field(l, "list");
+            let mut drawn: Vec<QueuedGhost> = list
+                .split(';')
+                .filter(|s| !s.is_empty())
+                .map(|s| {
+                    let parts: Vec<&str> = s.split(':').collect();
+                    // The shape, drawn in the engine's translucent state.
+                    assert_eq!(parts[6], "falsefalsefalse", "{l}");
+                    (
+                        parts[0].to_string(),
+                        parts[1].parse().unwrap(),
+                        parts[2].parse().unwrap(),
+                        parts[4].parse().unwrap(),
+                        (parts[5].parse::<u32>().unwrap() / 90) as u8,
+                    )
+                })
+                .collect();
+            drawn.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            assert_eq!(drawn, wanted, "{l}");
+            looked += 1;
+            with_ghosts += usize::from(!wanted.is_empty());
+            ghosts_seen += wanted.len();
+        }
+        eprintln!(
+            "ghosts frames_looked_at={looked} with_ghosts={with_ghosts} ghosts_checked={ghosts_seen}"
+        );
+        assert_eq!(looked, order.len());
+        assert!(with_ghosts > 0);
+
+        // The timeline's key switches them off and on, through the widgets' own
+        // shared table.
+        let at_toggle = probe
+            .iter()
+            .find(|l| l.starts_with("toggle_frame="))
+            .expect("the probe went to the frame for the key");
+        assert_eq!(number(at_toggle, "ghosts") as usize, toggled, "{at_toggle}");
+        let key = probe
+            .iter()
+            .find(|l| l.starts_with("toggle "))
+            .expect("the probe pressed the key");
+        assert_eq!(field(key, "taken"), "1", "{key}");
+        assert_eq!(number(key, "ghosts_off"), 0.0, "{key}");
+        assert_eq!(field(key, "show_off"), "false", "{key}");
+        assert_eq!(field(key, "taken_again"), "1", "{key}");
+        assert_eq!(number(key, "ghosts_on") as usize, toggled, "{key}");
+
+        let still = probe
+            .iter()
+            .find(|l| l.starts_with("still_loaded="))
+            .expect("the probe ended");
+        assert_eq!(field(still, "still_loaded"), "1", "{still}");
+        let errors: Vec<&str> = output
+            .lines()
+            .filter(|l| l.to_lowercase().contains("error"))
+            .filter(|l| l.contains("COILBOX_REWIND") || l.contains("Coilbox rewind"))
+            .collect();
+        assert!(errors.is_empty(), "{errors:#?}");
+    }
 }

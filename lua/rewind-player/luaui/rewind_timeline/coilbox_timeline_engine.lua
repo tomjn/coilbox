@@ -4,7 +4,8 @@
 -- and read the same way, and the rows are in the same shape (see that file for
 -- the fields). It is a second table because the synced gadget cannot check
 -- these: `gl`, `GL` and the unsynced `Spring` are the widget's own, and the
--- widget cannot reach a luarules file to share the code. So the small `check`
+-- gadget's table is for the synced half, and each widget checks its own calls.
+-- So the small `check`
 -- here is a copy of the gadget's, with the note left out. A widget cannot set a
 -- game rules parameter, so a widget that cannot start says so in the log only.
 --
