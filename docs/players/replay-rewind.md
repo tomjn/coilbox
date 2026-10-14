@@ -156,7 +156,7 @@ Not true to the recording:
 
 - Resources one team gave another. A playback shows none sent and none received. This is issue #4011.
 - The totals in the end of game statistics, such as all the metal a team ever made. The engine keeps those itself and nothing can set them.
-- A commander's name tag reads CoilboxPlayback, because one spectator leads every team. The match had the player's name. This is issue #4012.
+- The players in the match show under the names they had, in the players list and over their commanders, but the game treats them as not connected. Splinter Faction marks each with a red "dc". You are listed as a spectator called CoilboxPlayback.
 - In Splinter Faction the clock in the players list starts at nothing each time the playback is opened. In Beyond All Reason the time and the speed under the players list are the game's own in the same way. Its Player View button, which follows a player's camera, is switched off during playback. The game's day and night and its weather follow that clock, so a moment that was dark in the match can be light. The engine's clock only counts up and cannot be set to the moment you seek to. This is issue #4013.
 - In Splinter Faction, the menu at the top right stays whole. Its Resign button does nothing for a spectator and its Sharing button does nothing in a playback.
 - In Splinter Faction, the build menu and order buttons show for a selected unit. Orders go nowhere. In Beyond All Reason neither shows.

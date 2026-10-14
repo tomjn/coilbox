@@ -1242,7 +1242,9 @@ The real replay showed a metal expense of 7.0 at frame 6,927 and the track has 6
 
 The left column is the playback with the track marked as one that has no resources and the adapter as it was, which is the playback before the stage. The right is the same launch with the track as recorded. Both are the engine's own screenshots of a window, cut down to the bars, taken paused seven seconds after the seek.
 
-Three things on screen are still the playback's and not the match's. A commander's name tag reads `CoilboxPlayback`, the one spectator who leads every team, where the match had the player's name (issue #4012). The clock in the players list is the engine's, which starts at nothing whenever the playback is opened. And the game's day and night and its weather follow that clock, so a moment that was dark in the match can be light in the playback (issue #4013). None of the three can be set from the gadget: a player's name comes from the start script, and no Lua call sets the engine's frame number.
+Two things on screen are still the playback's and not the match's. The clock in the players list is the engine's, which starts at nothing whenever the playback is opened. And the game's day and night and its weather follow that clock, so a moment that was dark in the match can be light in the playback (issue #4013). Neither can be set from the gadget, since no Lua call sets the engine's frame number.
+
+A player's name comes from the start script and no Lua call sets it, so it is the script that carries the match's names (issue #4012). The script lists every player of the replay under the name and number it had, and each team's leader is its player of the replay. [Player names](#player-names) has what the engine does with a player who never connects, and what each game shows.
 
 The game's gadgets hear of the player's shots as they would of a match's. In the whole match, whose two weapons are a rocket (`fedstorm_rocket`, a `MissileLauncher`) and a laser bolt (`fedcommander_up2_particlebeamcannon_up2`, a `LaserCannon`), none raised and none changed what the track has:
 
@@ -1390,11 +1392,33 @@ Coilbox writes a game called `coilbox-replay-playback.sdd` under the content roo
 
 The list of files is made by `crates/tauri-plugin-coilbox-content/build.rs` when coilbox is built, so a gadget added under `luarules/gadgets/` or a widget under `luaui/widgets/` ships with no change to the Rust. A file with another extension, and `tests/`, stay out. A new file is picked up by the next build.
 
-The start script has one spectator, no players or AIs, and every team's `teamleader` is that spectator. Team and ally team numbers are the replay's own. Mod options and map options are the replay's. The script sets `recorddemo=0`, and `gamestartdelay=0`, which takes away the engine's four second countdown before the first frame. The timeline is on screen during a countdown and takes a seek, and the world cannot show it, since the player moves only on frames. The engine adds the Gaia team, so read its number from the engine and do not assume it.
+The start script has the replay's players, none of whom connects, one spectator who does, and no AIs. Each team's `teamleader` is its player of the replay, see [Player names](#player-names). Team and ally team numbers are the replay's own. Mod options and map options are the replay's. The script sets `recorddemo=0`, and `gamestartdelay=0`, which takes away the engine's four second countdown before the first frame. The timeline is on screen during a countdown and takes a seek, and the world cannot show it, since the player moves only on frames. The engine adds the Gaia team, so read its number from the engine and do not assume it.
 
 The base game's own gadgets run, except those the game's adapter switches off. A game with no adapter that creates starting units or ends the match when a team has no units will try to during playback. [What the base game does](#what-the-base-game-does) has what the player does about it.
 
 `contentReplayPlaybackLaunch` in `src/content/bindings.ts` writes the game and script and launches the engine.
+
+### Player names
+
+Every player of the replay is in the start script with its own number, name, team and the other keys it had, except its password, and `isfromdemo=1`. The one spectator who connects, `CoilboxPlayback`, is numbered after all of them, and is renamed with underscores added if a player of the replay already has that name. A team's `teamleader` is its player's number from the replay, and the spectator's where the replay's leader is no player. The names are read from the replay's own start script, which coilbox already reads for the teams. The track's leader names (columns 178 and 179 of the format page) come from `Spring.GetPlayerInfo` in the recording run, which reads the same script, and name only each team's leader.
+
+A player in the script who never connects makes the engine wait. `CGameServer::CheckForGameStart` in `rts/Net/GameServer.cpp` does not start until every player after the first `numDemoPlayers` has connected, and gives up on one only 30 seconds after the server started. A player marked `isfromdemo=1` counts towards `numDemoPlayers` and is skipped, and `CGameServer::Update` does not time it out either. The first `numDemoPlayers` places in the list are the ones skipped, which is why the connected spectator comes last. `gamestartdelay=0` and `startpostype=1` are as before.
+
+Measured on 14 October 2026 in a headless engine on the Splinter Faction replay, the same playback with the `isfromdemo` lines taken out of the script and with them in:
+
+| Script | First simulation frame |
+|---|---|
+| `isfromdemo=1` removed from the player | 33.5 s after the engine started |
+| as written | 10.3 s after the engine started |
+
+What the engine then reports, from a gadget in the game: `Spring.GetPlayerInfo` gives the replay's name, `active` false and the replay's `spectator` and team. The connected spectator is reported `active` false too while the game loads, since a player is marked active when its name arrives over the connection. `Spring.GetTeamInfo` gives the replay's leader and a team that is not dead. A team whose leader never connected is not treated as dead by the engine. `CPlayerHandler::NumActivePlayersInTeam` counts only active players, and its only callers are the sharing and AI control commands. The playback still guards against a game that kills a team with no units, see [What the base game does](#what-the-base-game-does).
+
+What each game shows, in a window:
+
+- Splinter Faction 0.1.89. A commander's name tag reads the player's name, and the players list has the name with a red `dc` beside it, and the playback's spectator under Spectators. The `dc` is the game's mark for a player who is not connected.
+- Beyond All Reason `test-30922-8064a43`. The players list has the name, and the spectator is counted under Spectators. No `dc` or other mark was seen. The replay used has one human, a spectator named `bench`, who leads both teams, so no commander name tag is of a player on a team.
+
+The ignored tests `a_real_replay_is_played_back_in_the_engine`, and the whole match tests for Splinter Faction and Beyond All Reason, pass with this script. The first checks every player's name and every team's leader against the replay and that the first frame came before 30 seconds. The replay of Splinter Faction is the one in `COILBOX_ANALYSIS_REPLAY` for the other tests of the whole match, which needs the game's dev folder at the commit it was recorded on, exported with `git archive` to a scratch folder under `games/`. The Beyond All Reason replay needs the game's rapid packages in `COILBOX_ANALYSIS_DATA_DIRS`.
 
 ## Fetching bytes
 
