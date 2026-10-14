@@ -21,10 +21,16 @@
 -- simulation frame, so `GameFramePost` gives the player the end of it, where it
 -- gives back what it held. coilbox_player_units.lua has how.
 --
+-- `GameFramePost` does not reach every gadget (issue #4002). An engine before
+-- 105.1.1-2590 does not make the call, and a game's gadget handler may not
+-- pass it on. The player finds out by whether the call came, and this file
+-- installs the call-in when it did not. coilbox_player.lua has the rest.
+--
 -- A frame's work is timed. Synced Lua has no clock, so the synced half tells
 -- the unsynced half when the work starts and ends (`SendToUnsynced` is a call
 -- and not a message, so it costs no frame), and the unsynced half logs a line
--- when it took longer than one simulation frame lasts.
+-- when it took longer than one simulation frame lasts. A frame's work is what
+-- the player does in `GameFrame` and in `GameFramePost` together.
 --
 -- The same timing sets how much a seek may do in one frame (issue #3988). A
 -- seek can need hundreds of units made or removed, at a cost for each that only
@@ -85,11 +91,32 @@ if gadgetHandler:IsSyncedCode() then
 		Spring.Echo(PREFIX .. text)
 	end
 
+	--- Makes the engine's call at the end of a frame reach this gadget in a game
+	-- whose gadget handler does not pass it on (issue #4002). A handler hands a
+	-- gadget its own global table as `_G`, and the engine calls a call-in when
+	-- that table has a function of its name and it has been told to look
+	-- (CLuaHandle::UpdateCallIn). True when it did both. The player asks for this
+	-- after a frame that ended without the call, and finds out by the next frame
+	-- whether it helped. A handler that rebuilds its call-ins takes the global
+	-- away again, and the player then asks again.
+	local function installFramePost()
+		local globals = _G
+		if type(globals) ~= "table" then
+			return false
+		end
+		local g = gadget
+		globals.GameFramePost = function(frame)
+			g:GameFramePost(frame)
+		end
+		Script.UpdateCallIn("GameFramePost")
+		return true
+	end
+
 	function gadget:Initialize()
 		-- What the engine has comes first: the modules below take calls from it as
 		-- they load, and a missing one would stop them with an error.
 		local Engine = VFS.Include("luarules/rewind_player/coilbox_player_engine.lua")
-		engine = Engine.check({ Spring = Spring, VFS = VFS, Game = Game, CMD = CMD, SendToUnsynced = SendToUnsynced }, Engine.SYNCED)
+		engine = Engine.check({ Spring = Spring, VFS = VFS, Game = Game, CMD = CMD, SendToUnsynced = SendToUnsynced, Script = Script }, Engine.SYNCED)
 		for _, line in ipairs(engine.lines) do
 			log(line)
 		end
@@ -129,6 +156,7 @@ if gadgetHandler:IsSyncedCode() then
 			-- Without SendToUnsynced nothing times the work, so nothing sets a budget
 			-- and a seek is shown in one frame, as before issue #3988.
 			budget = engine.on.workTiming and FIRST_BUDGET or nil,
+			installFramePost = engine.on.frameEnd and installFramePost or nil,
 			-- The unsynced half draws the effect, so without SendToUnsynced none
 			-- is asked for.
 			arrive = engine.on.workTiming and function(unitID, x, y, z, team)
@@ -190,9 +218,24 @@ if gadgetHandler:IsSyncedCode() then
 		end
 	end
 
-	function gadget:GameFramePost()
+	-- The work at the end of a frame is timed as well, with phases 2 and 3, and
+	-- the unsynced half adds it to the frame's.
+	function gadget:GameFramePost(frame)
+		if not player then
+			return
+		end
+		if engine.on.workTiming then
+			SendToUnsynced(WORK, 2, frame)
+		end
+		player:framePost()
+		if engine.on.workTiming then
+			SendToUnsynced(WORK, 3, frame)
+		end
+	end
+
+	function gadget:Shutdown()
 		if player then
-			player:framePost()
+			player:shutdown()
 		end
 	end
 
@@ -293,6 +336,9 @@ else
 	end
 
 	local started
+	-- How long the work of the frame's GameFrame took, for its GameFramePost to
+	-- add to.
+	local framed = 0
 	local lastLine
 	local slow, worst = 0, 0
 	-- How many units a frame may make and remove, as last sent.
@@ -369,7 +415,7 @@ else
 			end
 			return true
 		end
-		if phase == 0 then
+		if phase == 0 or phase == 2 then
 			started = clock()
 			return true
 		end
@@ -378,8 +424,19 @@ else
 		end
 		local took = Spring.DiffTimers(clock(), started, true, micros)
 		started = nil
-		if made and removed and engine.on.budgetMessage then
-			retune(took, made, removed)
+		if phase == 3 then
+			-- The end of the frame, which the aim stage poses in. It is the same
+			-- frame's work, so the two are judged together, and a frame that was
+			-- slow before its end has been counted already.
+			if framed > LIMIT then
+				return true
+			end
+			took = framed + took
+		else
+			framed = took
+			if made and removed and engine.on.budgetMessage then
+				retune(took, made, removed)
+			end
 		end
 		if took <= LIMIT then
 			return true

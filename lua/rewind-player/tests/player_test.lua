@@ -42,6 +42,7 @@ local function setup(spec, options)
 	local track = spec.header and spec or Fake.new(spec)
 	local player = assert(Player.new(track, {
 		modOptions = options.modOptions or {},
+		installFramePost = options.installFramePost,
 		log = function(text)
 			world.lines[#world.lines + 1] = text
 		end,
@@ -450,6 +451,17 @@ do
 	local radar, tank, plant = world.unitNamed("radar"), world.unitNamed("tank"), world.unitNamed("plant")
 	t.same("a wounded unit has the track's health", radar.health, 50)
 
+	-- The first frame: nothing has said yet that the engine tells the player when
+	-- a frame is over, so the maximum is left alone (issue #4002).
+	t.same("before the player knows a post frame call comes, the maximum is whole", radar.maxHealth, 200)
+	world.heal(30)
+	t.same("so the engine heals in the first frame", radar.health, 80)
+	player:framePost()
+	t.same("and the post frame call takes it off again", radar.health, 50)
+	t.same("without a word, since nothing of the game did it", said(world, "with no damage to hear of"), 0)
+	t.same("the maximum was never touched", radar.maxHealthSets, nil)
+
+	player:frame()
 	world.heal(30)
 	t.same("the engine's healing in the rest of the frame changes nothing", radar.health, 50)
 	t.same("because until the frame is over the unit's maximum is its health", radar.maxHealth, 50)
@@ -467,15 +479,20 @@ do
 	t.same("a unit at full health keeps its maximum all the time", tank.maxHealthSets, nil)
 	t.same("a unit under construction does too, since the engine does not heal it", plant.maxHealthSets, nil)
 
-	-- A frame with no post frame before it, which the engine does not do, still
-	-- gives the unit its maximum back before the next frame sets health.
+	-- A frame whose post frame call never comes, which is a gadget handler that
+	-- stopped passing it on. The maximum is back at the start of the next frame,
+	-- and no unit is held again until the call has come back.
 	player:frame()
-	t.same("a unit still held at the end of a frame is held in the next", radar.maxHealth, 50)
+	t.same("a unit is held in a frame that follows a post frame call", radar.maxHealth, 50)
 	player:message("coilbox_rewind:seek 10")
 	player:frame()
-	t.same("and nothing in the way of the player's own health", radar.health, 50)
+	t.same("a unit whose post frame call never came has its maximum back on the next frame", radar.maxHealth, 200)
+	t.same("and the track's health", radar.health, 50)
 	player:framePost()
-	t.same("with its maximum back after", radar.maxHealth, 200)
+	t.same("with its maximum whole after", radar.maxHealth, 200)
+	player:frame()
+	t.same("and is held again once the call has come back", radar.maxHealth, 50)
+	player:framePost()
 
 	-- Holding a unit and giving it back allocates nothing.
 	player:message("coilbox_rewind:play")
@@ -483,6 +500,11 @@ do
 	player:framePost()
 	collectgarbage()
 	collectgarbage("stop")
+	-- A full collection gives back part of the Lua stack, and the first frames
+	-- after it take that back, which is the interpreter's and not the player's.
+	player:frame()
+	world.heal(30)
+	player:framePost()
 	local before = collectgarbage("count")
 	for _ = 1, 200 do
 		player:frame()
@@ -493,6 +515,120 @@ do
 	collectgarbage("restart")
 	t.same("200 frames of holding a wounded unit allocate nothing", after - before, 0)
 	t.same("and it kept the track's health", radar.health, 50)
+end
+
+-- The post frame call never arrives (issue #4002): an engine before
+-- 105.1.1-2590, or a game whose gadget handler does not pass it on and where
+-- the player could not install it. No unit's maximum is ever lowered, the
+-- engine's healing is taken off on the next frame, and the player says so once.
+
+local function wounded()
+	return {
+		last = 300,
+		unitDefs = NAMES,
+		units = { {
+			first = 0,
+			last = 300,
+			def = 2,
+			status = function()
+				return 0.25, 1, 1
+			end,
+		} },
+	}
+end
+
+do
+	local world, player = setup(wounded())
+	player:message("coilbox_rewind:pause")
+	local lowered, radar = 0, nil
+	for _ = 1, 60 do
+		player:frame()
+		radar = world.unitNamed("radar")
+		if radar.maxHealth ~= 200 then
+			lowered = lowered + 1
+		end
+		world.heal(30)
+		if radar.maxHealth ~= 200 then
+			lowered = lowered + 1
+		end
+	end
+	t.same("with no post frame call no unit starts or ends a frame with a lowered maximum", lowered, 0)
+	t.same("its maximum is never set at all", radar.maxHealthSets, nil)
+	t.same("the engine's healing of a frame shows until the next", radar.health, 80)
+	player:frame()
+	t.same("which puts the health back", radar.health, 50)
+	t.same("the player says once that the call does not reach it", said(world, "GameFramePost does not reach the player, so a wounded unit keeps its maximum health"), 1)
+	t.same("and does not blame a gadget of the game", said(world, "with no damage to hear of"), 0)
+	t.same("the resources stage says what it does without the call, once", said(world, "GameFramePost does not reach the player, so what a team holds"), 1)
+end
+
+-- The gadget can install the call when the game's handler does not pass it on.
+-- The player asks once, a frame after it saw none, and gives it one frame.
+
+do
+	local asked = 0
+	local world, player = setup(wounded(), {
+		installFramePost = function()
+			asked = asked + 1
+			return true
+		end,
+	})
+	player:message("coilbox_rewind:pause")
+	player:frame()
+	local radar = world.unitNamed("radar")
+	t.same("the first frame asks for nothing, since no frame has ended yet", asked, 0)
+	player:frame()
+	t.same("the second frame, with no post frame call before it, asks for the install", asked, 1)
+	t.same("and lowers nothing while it waits", radar.maxHealth, 200)
+	player:framePost()
+	for _ = 1, 20 do
+		player:frame()
+		world.heal(30)
+		player:framePost()
+	end
+	t.same("an install that works is asked for once", asked, 1)
+	t.same("and the unit is held from then on", radar.health, 50)
+	t.same("with its maximum whole when a frame is over", radar.maxHealth, 200)
+	t.same("the player says that it installed the call", said(world, "does not pass GameFramePost on, so the player installed it"), 1)
+	t.same("and not that it is missing", said(world, "GameFramePost does not reach the player"), 0)
+
+	-- The handler takes the global away again, as one does when a gadget is
+	-- removed. The player asks again.
+	player:frame()
+	player:frame()
+	t.same("a call that stops coming is asked for again", asked, 2)
+	t.same("with the maximum whole in the meantime", radar.maxHealth, 200)
+	player:framePost()
+	player:frame()
+	t.same("and held again once it is back", radar.maxHealth, 50)
+	player:framePost()
+
+	-- The gadget is removed in the middle of a frame.
+	player:frame()
+	t.same("a unit is held in the frame the gadget goes in", radar.maxHealth, 50)
+	player:shutdown()
+	t.same("and has its maximum back when the gadget shuts down", radar.maxHealth, 200)
+end
+
+do
+	-- An install that changes nothing: the engine has no such call.
+	local asked = 0
+	local world, player = setup(wounded(), {
+		installFramePost = function()
+			asked = asked + 1
+			return true
+		end,
+	})
+	player:message("coilbox_rewind:pause")
+	for _ = 1, 30 do
+		player:frame()
+		world.heal(30)
+	end
+	local radar = world.unitNamed("radar")
+	t.same("an install that brings no call is tried once and not again", asked, 1)
+	t.same("the maximum is never set", radar.maxHealthSets, nil)
+	t.same("the missing call is said once", said(world, "GameFramePost does not reach the player, so a wounded unit keeps its maximum health"), 1)
+	t.same("with the install that was tried", said(world, "The player installed the call-in itself and still none came"), 1)
 end
 
 -- A game's gadget that heals before the player's frame, and anything else that

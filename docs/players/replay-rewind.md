@@ -159,7 +159,7 @@ Not true to the recording:
 
 ## Current limits
 
-- Units do not play walk, build or aim animations, and turrets and torsos do not turn to face their targets. These are issues #3796 and #3797.
+- Units do not play walk or build animations. This is issue #3797. Turrets and torsos do point where they pointed in the match, from the first frame after a jump.
 - `[` and `]` do nothing in the engine, as above. This is issue #3978.
 - Splinter Faction is the only game with a tailored setup. In another game nothing is switched off or hidden, and the match still plays. Beyond All Reason has none yet (issue #3801), so anything its interface does at the start of a match can show up in a playback.
 - Recording needs the replay's engine, game and map installed. Coilbox can offer another installed engine or game version, and keeps the result only when it matches the match exactly.
