@@ -28,7 +28,8 @@
 -- under move control (ParseScriptMoveType).
 --
 -- Spring.SetHeightMap raises outside Spring.SetHeightMapFunc, and takes x and z
--- in elmos, which it divides by 8 and cuts to a whole number.
+-- in elmos, which it divides by 8 and cuts to a whole number. Its fourth
+-- argument scales the change, so 0 touches a corner and leaves its height.
 --
 -- Spring.SpawnProjectile gives nothing for a weapon definition the engine does
 -- not have and raises when its second argument is not a table. The calls that
@@ -1139,20 +1140,57 @@ function M.new(options)
 
 	-- The heightmap.
 
+	-- The rectangle of corners the calls inside one SetHeightMapFunc touched,
+	-- which is what the engine works out again afterwards (CBasicMapDamage::
+	-- RecalcArea in rts/Map/BasicMapDamage.cpp). It skips a rectangle of no
+	-- area, so corners set along one line are never worked out again.
+	-- `world.heightMapRects` has one `{ x1, x2, z1, z2, changed }` for each call
+	-- that touched a corner, `changed` being how many corners it moved, while
+	-- `world.recordRects` is true. Recording allocates, so it is off for a test
+	-- that counts allocations.
+	world.heightMapRects = {}
+	local rect
+
 	function Spring.SetHeightMapFunc(fn, ...)
 		assert(not world.inHeightMap, "SetHeightMapFunc() recursion is not permitted")
 		world.heightMapCalls = (world.heightMapCalls or 0) + 1
 		world.inHeightMap = true
+		rect = nil
 		fn(...)
 		world.inHeightMap = false
+		if rect and world.recordRects then
+			world.heightMapRects[#world.heightMapRects + 1] = rect
+		end
 	end
 
-	function Spring.SetHeightMap(x, z, height)
+	--- `terraform` scales the change, as the engine's fourth argument does: the
+	-- corner moves that share of the way to `height`.
+	function Spring.SetHeightMap(x, z, height, terraform)
 		if not world.inHeightMap then
 			error("SetHeightMap() can only be called in SetHeightMapFunc()", 2)
 		end
 		local cx, cz = math.floor(x / SQUARE), math.floor(z / SQUARE)
-		world.heights[cz * 65536 + cx] = height
+		local key = cz * 65536 + cx
+		local old = world.heights[key]
+		if terraform then
+			if old then
+				height = old + (height - old) * terraform
+			else
+				height = nil
+			end
+		end
+		world.heights[key] = height
+		if not world.recordRects then
+			return
+		end
+		if not rect then
+			rect = { cx, cx, cz, cz, 0 }
+		end
+		rect[1], rect[2] = math.min(rect[1], cx), math.max(rect[2], cx)
+		rect[3], rect[4] = math.min(rect[3], cz), math.max(rect[4], cz)
+		if height ~= old then
+			rect[5] = rect[5] + 1
+		end
 	end
 
 	--- The height the test last saw set at a corner, or nil.

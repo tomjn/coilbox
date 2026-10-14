@@ -845,7 +845,7 @@ do
 	player:message("coilbox_rewind:pause")
 	player:frame()
 	t.same("the rows on the first frame are applied on the first frame", world.height(3, 4), 12)
-	t.same("a corner whose change is later is untouched", world.height(5, 5), nil)
+	t.same("a corner whose change is later keeps the map's own height", world.height(5, 5), 30)
 	seek(player, 49)
 	t.same("nothing changes before a row's frame", world.height(3, 4), 12)
 	seek(player, 50)
