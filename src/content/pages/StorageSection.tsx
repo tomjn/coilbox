@@ -372,7 +372,7 @@ function RootStorageCard({
                 {state.overview.engines.map((engine) => (
                   <li
                     key={engine.path}
-                    className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-border/50 p-3"
+                    className="relative flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-border/50 p-3"
                   >
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="font-medium">{engine.version}</span>
