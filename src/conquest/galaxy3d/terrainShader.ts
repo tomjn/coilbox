@@ -55,7 +55,31 @@ export interface TerrainShading {
   frame?: TerrainFrame;
   /** Roads painted into the ground. See `groundShader.ts`. */
   ground?: GroundShading;
+  /**
+   * The detail drawn once into a picture and read from it (`terrainBake.ts`).
+   * Left out, the detail is worked out for every pixel of every frame.
+   */
+  bake?: TerrainBakeShading;
 }
+
+/**
+ * `draw`: the material that draws the detail into the picture, with no
+ * roads, haze or glint. `rect` is the part of the map picture's coordinates
+ * the picture covers, as x, y, width and height, and the bake moves it from
+ * one picture to the next.
+ *
+ * `read`: the material the sheet is drawn with, which reads the picture.
+ * Until `ready` is 1 it draws the map picture lit by its relief, as
+ * performance mode does.
+ */
+export type TerrainBakeShading =
+  | { kind: "draw"; rect: { value: THREE.Vector4 } }
+  | {
+      kind: "read";
+      look: THREE.Texture;
+      rect: THREE.Vector4;
+      ready: { value: number };
+    };
 
 /** The sheet's place in world units, and the haze past it. */
 export interface TerrainFrame {
@@ -368,6 +392,8 @@ const SEA_PATTERN: Partial<Record<SeaLook, number>> = {
 const FRAGMENT_BODY = /* glsl */ `
 // How far past the map's edge this pixel lies, in sheets. 0 on the map.
 float terrainPast = 0.0;
+// How much of the sun's glint on water this pixel shows, for the bake.
+float sheen = 0.0;
 if (uTerrainHaze > 0.0) {
   vec2 past = max(abs(vTerrainPos.xz) - uTerrainFrame.xy, 0.0) / uTerrainFrame.zw;
   terrainPast = length(past);
@@ -387,9 +413,26 @@ if (terrainPast >= uTerrainHaze && uTerrainHaze > 0.0) {
   vec3 glow = vec3(0.0);
   float unlit = 0.0;
 
+  SURFACE_HERE
+
+  // Roads (groundShader.ts), when the sheet has them.
+  GROUND_BODY_HERE
+
+  float facing = max(dot(n, uTerrainSun), 0.0);
+  float shade = uTerrainAmbient + (1.0 - uTerrainAmbient) * (facing / uTerrainSun.y);
+  vec3 lit = albedo * mix(shade, 1.0, unlit) + spec + glow;
+  GROUND_LIT_HERE
+  HAZE_HERE
+  diffuseColor.rgb = lit;
+}
+BAKE_ALPHA_HERE
+`;
+
+/** Procedural detail by biome. Drawn once into the baked picture. */
+const DETAIL = /* glsl */ `
   if (uTerrainDetail > 0.5) {
     vec2 p = vTerrainPos.xz;
-    float footprint = max(length(dFdx(p)), length(dFdy(p))) + 1e-5;
+    float footprint = (max(length(dFdx(p)), length(dFdy(p))) + 1e-5) * FOOTPRINT_SCALE;
     // The generator's weights for this pixel, eight slots in two samples.
     vec4 wa = texture2D(uBiomeA, vTerrainUv);
     vec4 wb = texture2D(uBiomeB, vTerrainUv);
@@ -811,15 +854,12 @@ if (terrainPast >= uTerrainHaze && uTerrainHaze > 0.0) {
 
     vec3 h = normalize(view + uTerrainSun);
     spec += pow(max(dot(n, h), 0.0), 40.0) * 0.08 * liquid * (1.0 - foam);
+    sheen = liquid * (1.0 - foam);
   }
+`;
 
-  // Roads (groundShader.ts), when the sheet has them.
-  GROUND_BODY_HERE
-
-  float facing = max(dot(n, uTerrainSun), 0.0);
-  float shade = uTerrainAmbient + (1.0 - uTerrainAmbient) * (facing / uTerrainSun.y);
-  vec3 lit = albedo * mix(shade, 1.0, unlit) + spec + glow;
-  GROUND_LIT_HERE
+/** The land past the map's edge, greyed and hazed, on the lit colour. */
+const HAZE = /* glsl */ `
   if (terrainPast > 0.0) {
     // Past the edge the land turns a little greyer and darker, so the map
     // reads as the map, then everything hazes into the background until it
@@ -833,8 +873,60 @@ if (terrainPast >= uTerrainHaze && uTerrainHaze > 0.0) {
     lit *= 1.0 - 0.12 * beyond * landHere;
     lit = mix(lit, uTerrainFar, smoothstep(0.0, uTerrainHaze, terrainPast));
   }
-  diffuseColor.rgb = lit;
-}
+`;
+
+/**
+ * In place of {@link DETAIL}, once the detail is baked: its lit colour read
+ * back from the picture. Dividing by the light from the relief alone gives a
+ * colour that the lighting below turns back into exactly the baked one, and
+ * that a road can still paint over and light.
+ */
+const BAKED = /* glsl */ `
+  if (uBakeReady > 0.5) {
+    vec4 baked = texture2D(uBakedLook, (vTerrainUv - uBakeRect.xy) / uBakeRect.zw);
+    float facing0 = max(dot(n, uTerrainSun), 0.0);
+    albedo = baked.rgb / (uTerrainAmbient + (1.0 - uTerrainAmbient) * (facing0 / uTerrainSun.y));
+    GLINT_HERE
+  }
+`;
+
+/**
+ * The sun's glint on a liquid sea, which moves with the camera and so cannot
+ * be baked. Its ripples are the bake's. Run only where the bake says there is
+ * open water.
+ */
+const GLINT = /* glsl */ `
+    vec2 sp = vTerrainPos.xz;
+    float sFoot = max(length(dFdx(sp)), length(dFdy(sp))) + 1e-5;
+    if (baked.a > 0.004) {
+      vec3 wave = tField(sp + 11.0, 0.6, 3, sFoot);
+      vec3 nw = normalize(n + vec3(-wave.y, 0.0, -wave.z) * 0.03);
+      vec3 sh = normalize(normalize(cameraPosition - vTerrainPos) + uTerrainSun);
+      spec += pow(max(dot(nw, sh), 0.0), 40.0) * 0.08 * baked.a;
+    }
+`;
+
+/**
+ * The bake draws each pattern as though a texel were half its size. Patterns
+ * fade out at a few pixels across so they never shimmer as the camera moves,
+ * and a picture never shimmers. At a whole texel the cracks in cracked ground
+ * were gone at the closest zoom on a screen at twice the pixels. At half they
+ * show, a little softer.
+ */
+const BAKE_FOOTPRINT_SCALE = "0.5";
+
+const BAKE_HEAD = /* glsl */ `
+uniform vec4 uBakeRect;
+uniform sampler2D uBakedLook;
+uniform float uBakeReady;
+`;
+
+/**
+ * For the bake: put each vertex where its picture coordinate falls in the
+ * baked picture, so the sheet is drawn flat into it from above.
+ */
+const BAKE_VERTEX = /* glsl */ `
+gl_Position = vec4((uv - uBakeRect.xy) / uBakeRect.zw * 2.0 - 1.0, 0.0, 1.0);
 `;
 
 /** Seas that ripple, foam and glint. The rest are drawn as the picture has them. */
@@ -861,6 +953,11 @@ export function applyTerrainShader(
   const detail =
     shading.detail && shading.biomes !== null && shading.normals !== null;
   const planet = shading.biomes ? planetOf(shading.biomes.planet) : null;
+  const bake = detail ? shading.bake : undefined;
+  // Only the material that draws the detail reads the weights.
+  const weighs = detail && bake?.kind !== "read";
+  const glint =
+    bake?.kind === "read" && (!planet || LIQUID_SEAS.includes(planet.sea.look));
   const colour = (rgb: [number, number, number]) =>
     new THREE.Color().setRGB(
       rgb[0] / 255,
@@ -876,10 +973,10 @@ export function applyTerrainShader(
     shader.uniforms.uTerrainDetail = { value: detail ? 1 : 0 };
     // Weights are bound only when the detail will read them.
     shader.uniforms.uBiomeA = {
-      value: detail && shading.biomes ? shading.biomes.a : placeholder,
+      value: weighs && shading.biomes ? shading.biomes.a : placeholder,
     };
     shader.uniforms.uBiomeB = {
-      value: detail && shading.biomes ? shading.biomes.b : placeholder,
+      value: weighs && shading.biomes ? shading.biomes.b : placeholder,
     };
     shader.uniforms.uBiomePattern = {
       value: Array.from({ length: BIOME_SLOTS }, (_, k) =>
@@ -931,20 +1028,37 @@ export function applyTerrainShader(
     if (shading.ground) {
       Object.assign(shader.uniforms, groundUniforms(shading.ground));
     }
-    shader.vertexShader = `${VERTEX_HEAD}${shader.vertexShader.replace(
+    if (bake?.kind === "draw") {
+      shader.uniforms.uBakeRect = bake.rect;
+    } else if (bake?.kind === "read") {
+      shader.uniforms.uBakeRect = { value: bake.rect };
+      shader.uniforms.uBakedLook = { value: bake.look };
+      shader.uniforms.uBakeReady = bake.ready;
+    }
+    const bakeHead = bake ? BAKE_HEAD : "";
+    shader.vertexShader = `${VERTEX_HEAD}${bakeHead}${shader.vertexShader.replace(
       "#include <project_vertex>",
-      `#include <project_vertex>\n${VERTEX_BODY}`,
+      `#include <project_vertex>\n${VERTEX_BODY}${bake?.kind === "draw" ? BAKE_VERTEX : ""}`,
     )}`;
-    const body = FRAGMENT_BODY.replace(
-      "GROUND_BODY_HERE",
-      shading.ground ? GROUND_BODY : "",
-    ).replace("GROUND_LIT_HERE", shading.ground ? GROUND_LIT : "");
-    shader.fragmentShader = `${FRAGMENT_HEAD.replace("TERRAIN_NOISE_HERE", TERRAIN_NOISE)}${shading.ground ? GROUND_HEAD : ""}${shader.fragmentShader.replace(
+    // The picture holds the lit colour, with no roads, haze or glint, and
+    // how much glint each pixel shows in its alpha.
+    const drawing = bake?.kind === "draw";
+    const surface =
+      bake?.kind === "read"
+        ? BAKED.replace("GLINT_HERE", glint ? GLINT : "")
+        : `${DETAIL.replace("FOOTPRINT_SCALE", drawing ? BAKE_FOOTPRINT_SCALE : "1.0")}${drawing ? "spec = 0.0;" : ""}`;
+    const ground = shading.ground && !drawing ? shading.ground : undefined;
+    const body = FRAGMENT_BODY.replace("SURFACE_HERE", surface)
+      .replace("GROUND_BODY_HERE", ground ? GROUND_BODY : "")
+      .replace("GROUND_LIT_HERE", ground ? GROUND_LIT : "")
+      .replace("HAZE_HERE", drawing ? "" : HAZE)
+      .replace("BAKE_ALPHA_HERE", drawing ? "diffuseColor.a = sheen;" : "");
+    shader.fragmentShader = `${FRAGMENT_HEAD.replace("TERRAIN_NOISE_HERE", TERRAIN_NOISE)}${bakeHead}${ground ? GROUND_HEAD : ""}${shader.fragmentShader.replace(
       "#include <color_fragment>",
       `#include <color_fragment>\n${body}`,
     )}`;
   };
   // One program for every terrain with the same switches.
   material.customProgramCacheKey = () =>
-    `terrain:${shading.normals ? 1 : 0}:${detail ? 1 : 0}${shading.ground ? ":ground" : ""}`;
+    `terrain:${shading.normals ? 1 : 0}:${detail ? 1 : 0}${shading.ground && bake?.kind !== "draw" ? ":ground" : ""}${bake ? `:${bake.kind}` : ""}${glint ? ":glint" : ""}`;
 }
