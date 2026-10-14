@@ -25,8 +25,9 @@
 ; a broken sidecar. On update the old `.coilbox` copies are cleared first so the
 ; freshly-extracted ones move in cleanly.
 ;
-; The read-only data resources (the branding catalog seed, the mission runtime and
-; the lego parts pack) go one level further down, into `.coilbox\resources`. That
+; The read-only data resources (the branding catalog seed, the mission runtime, the
+; blueprint widget, the Lua licence notice and the lego parts pack) go one level
+; further down, into `.coilbox\resources`. That
 ; folder belongs to the installer, so tucking them away cannot collide with the
 ; paths a distribution fills in itself — `.coilbox\legoparts` is the documented
 ; place to drop a replacement parts pack, and an update must not delete it.
@@ -57,6 +58,10 @@
 
   RMDir /r "$INSTDIR\.coilbox\resources\blueprint-widget"
   Rename "$INSTDIR\blueprint-widget" "$INSTDIR\.coilbox\resources\blueprint-widget"
+
+  ; The licence notice and texts for the Lua above travel beside it.
+  RMDir /r "$INSTDIR\.coilbox\resources\coilbox-licence"
+  Rename "$INSTDIR\coilbox-licence" "$INSTDIR\.coilbox\resources\coilbox-licence"
 
   ; Layouts earlier versions left in the install root. `_up_` is what the bundler
   ; used to make of a `../` resource path, and `branding` held the catalog before
