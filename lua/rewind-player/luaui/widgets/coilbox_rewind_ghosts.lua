@@ -18,7 +18,8 @@
 -- A game's adapter can draw the ghosts in the game's own way, with a hook called
 -- `drawQueuedBuilding` (lua/rewind-player/README.md, "Hooks"). The adapter file
 -- is read here as well as by the player, and runs in this widget's environment,
--- where `gl` is.
+-- where `gl` is. A second hook, `queuedBuildingsDrawn`, is told when a pass of
+-- drawing is over, for a game whose helper keeps a shape until it is dropped.
 --
 -- A game's own widget handler loads this, as it loads the timeline: it lists
 -- luaui/widgets/ out of the game and turns on a widget it has not seen before
@@ -136,6 +137,9 @@ end
 function widget:Shutdown()
 	if WG.coilboxRewindGhosts then
 		WG.coilboxRewindGhosts = nil
+	end
+	if ghosts then
+		ghosts:close()
 	end
 	ghosts = nil
 end
