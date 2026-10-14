@@ -19,7 +19,7 @@ local Engine = dofile(here .. "/engine.lua")
 local Fake = dofile(here .. "/fake_track.lua")
 
 -- The codes of a team's numbers, as the format page has them.
-local HELD, STORAGE, PULL, INCOME, EXPENSE, SHARE, EXCESS = 0, 1, 2, 3, 4, 5, 8
+local HELD, STORAGE, PULL, INCOME, EXPENSE, SHARE, SENT, RECEIVED, EXCESS = 0, 1, 2, 3, 4, 5, 6, 7, 8
 local ENERGY, PARAMETER, NO_TEAM = 16, 256, 255
 
 --- A world, a player of `spec` in it, and the two functions that stand in for
@@ -375,6 +375,179 @@ do
 	near("nothing was sent on the playback's own account", giver.sent, 0)
 	near("and nothing received", taker.received, 0)
 	near("the share level reads as the track's", giver.share, 0.5)
+end
+
+-- What a team sent and received. No call sets either. The engine adds a
+-- transfer between two teams to the first's sent sum and the second's received
+-- sum, so the player makes the transfers the match made (issue #4011).
+
+local function sharing()
+	return {
+		values = {
+			{ team = 0, code = STORAGE, at = 1000 },
+			{ team = 0, code = HELD, at = 400 },
+			{ team = 0, code = SENT, at = function(frame)
+				return frame < 1000 and 40 or 0
+			end },
+			{ team = 0, code = SHARE, at = 0.99 },
+			{ team = 1, code = STORAGE, at = 1000 },
+			{ team = 1, code = HELD, at = 300 },
+			{ team = 1, code = RECEIVED, at = function(frame)
+				return frame < 1000 and 40 or 0
+			end },
+			{ team = 1, code = SENT, at = function(frame)
+				return frame < 1000 and 0 or 10
+			end },
+			{ team = 0, code = RECEIVED, at = function(frame)
+				return frame < 1000 and 0 or 10
+			end },
+			{ team = 1, code = ENERGY + STORAGE, at = 800 },
+			{ team = 1, code = ENERGY + SENT, at = 25.5 },
+			{ team = 2, code = ENERGY + STORAGE, at = 800 },
+			{ team = 2, code = ENERGY + RECEIVED, at = 25.5 },
+		},
+	}
+end
+
+do
+	local world, player, run = setup(sharing())
+	player:message("coilbox_rewind:pause")
+	player:message("coilbox_rewind:seek 100")
+	run(90)
+	local zero, one, two = read(world, 0, "metal"), read(world, 1, "metal"), read(world, 2, "energy")
+	near("a team's metal sent is the track's", zero.sent, 40)
+	near("and what the other team received", one.received, 40)
+	near("energy sent", read(world, 1, "energy").sent, 25.5)
+	near("and received", two.received, 25.5)
+	near("a team that sent nothing has sent nothing", one.sent, 0)
+	t.same("what a team holds is still the track's", zero.held, 400)
+	t.same("for the one that received", one.held, 300)
+	t.same("and its storage", zero.storage, 1000)
+	near("the share level was not moved", zero.share, 0.99)
+	near("income is untouched", zero.income, 0)
+
+	player:message("coilbox_rewind:seek 2000")
+	run(90)
+	near("after a seek the later frame's sent", read(world, 1, "metal").sent, 10)
+	near("and received", read(world, 0, "metal").received, 10)
+	near("and the sent of the first frame is gone", read(world, 1, "energy").sent, 25.5)
+	player:message("coilbox_rewind:seek 100")
+	run(90)
+	near("after a seek back the earlier sent", read(world, 0, "metal").sent, 40)
+
+	collectgarbage()
+	collectgarbage("stop")
+	local before = collectgarbage("count")
+	run(300)
+	local after = collectgarbage("count")
+	collectgarbage("restart")
+	t.same("300 frames of sharing allocate nothing", after - before, 0)
+end
+
+-- A team that sent and received at once is paired with the others and never
+-- with itself.
+
+do
+	local world, player, run = setup({
+		values = {
+			{ team = 0, code = STORAGE, at = 1000 },
+			{ team = 0, code = SENT, at = 30 },
+			{ team = 0, code = RECEIVED, at = 20 },
+			{ team = 1, code = STORAGE, at = 1000 },
+			{ team = 1, code = SENT, at = 20 },
+			{ team = 1, code = RECEIVED, at = 30 },
+		},
+	})
+	player:message("coilbox_rewind:pause")
+	run(100)
+	near("two teams that gave each other metal: the first's sent", read(world, 0, "metal").sent, 30)
+	near("the first's received", read(world, 0, "metal").received, 20)
+	near("the second's sent", read(world, 1, "metal").sent, 20)
+	near("the second's received", read(world, 1, "metal").received, 30)
+end
+
+-- Three teams sending round in a ring, each to the next. Pairing the senders
+-- in order leaves the last team nobody to send to but itself, which the real
+-- engine showed (issue #4011).
+
+do
+	local sent, received = { 20, 25, 30 }, { 30, 20, 25 }
+	local values = {}
+	for team = 0, 2 do
+		values[#values + 1] = { team = team, code = STORAGE, at = 1000 }
+		values[#values + 1] = { team = team, code = SENT, at = sent[team + 1] }
+		values[#values + 1] = { team = team, code = RECEIVED, at = received[team + 1] }
+	end
+	local world, player, run = setup({ values = values })
+	player:message("coilbox_rewind:pause")
+	run(100)
+	for team = 0, 2 do
+		local metal = read(world, team, "metal")
+		near("team " .. team .. " sent in the ring", metal.sent, sent[team + 1])
+		near("and received", metal.received, received[team + 1])
+	end
+end
+
+-- The tracks are thinned one by one, so what was sent may not equal what was
+-- received. The transfers match the smaller side and both sides read that.
+
+do
+	local world, player, run = setup({
+		values = {
+			{ team = 0, code = STORAGE, at = 1000 },
+			{ team = 0, code = SENT, at = 60 },
+			{ team = 1, code = STORAGE, at = 1000 },
+			{ team = 1, code = SENT, at = 40 },
+			{ team = 2, code = STORAGE, at = 1000 },
+			{ team = 2, code = RECEIVED, at = 99.5 },
+		},
+	})
+	player:message("coilbox_rewind:pause")
+	run(100)
+	local a, b, c = read(world, 0, "metal"), read(world, 1, "metal"), read(world, 2, "metal")
+	near("received is the smaller side's whole", c.received, 99.5)
+	near("the larger side is cut in the same proportion, first team", a.sent, 60 * 0.995)
+	near("and the second", b.sent, 40 * 0.995)
+end
+
+-- The playback's own transfers are taken off, so the sums are the track's.
+
+do
+	local world, player, run = setup(sharing())
+	world.economy = function(frame)
+		if frame % 30 == 7 then
+			world.Spring.ShareTeamResource(0, 1, "metal", 10)
+		end
+	end
+	world.teams[0].metal.held = 500
+	player:message("coilbox_rewind:pause")
+	player:message("coilbox_rewind:seek 100")
+	run(130)
+	near("a transfer the playback made itself is not added to the match's", read(world, 0, "metal").sent, 40)
+	near("for the receiver", read(world, 1, "metal").received, 40)
+end
+
+-- An engine from before 2026.07.01 asks the game's AllowResourceTransfer, which
+-- may refuse. The player says so and does not go on trying to count it.
+
+do
+	local world, player, run = setup(sharing())
+	world.allowTransfer = function()
+		return false
+	end
+	player:message("coilbox_rewind:pause")
+	run(100)
+	near("a refused transfer is not counted", read(world, 0, "metal").sent, 0)
+	t.same("the log says why, once", said(world, "AllowResourceTransfer"), 1)
+end
+
+-- A track with no sent or received sets no transfer, and an engine without
+-- the call is not asked for one.
+
+do
+	local world, _, run = setup(economy())
+	run(100)
+	t.same("a track with nothing sent makes no transfer", world.transfers, 0)
 end
 
 -- Rules parameters a game's adapter names.
