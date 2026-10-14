@@ -113,8 +113,12 @@ local function wrongCorners(world, rows, frame)
 	return wrong, first
 end
 
-local function setup(spec, budget)
+--- `before` is called with the world before the player is made.
+local function setup(spec, budget, before)
 	local world = Engine.new({ unitDefs = UNIT_DEFS, featureDefs = { { name = "rock" } } })
+	if before then
+		before(world)
+	end
 	local env = Engine.env(t, world)
 	local Player = t.load("coilbox_player.lua", env)
 	spec.unitDefs = { "tank" }
@@ -196,6 +200,37 @@ do
 		local wrongAt, firstAt = wrongCorners(world, ROWS, frame)
 		t.check("after a seek to " .. frame .. " the ground is the track's", wrongAt == 0, firstAt)
 	end
+end
+
+-- A corner before its first change has the map's own height, which the engine
+-- knows exactly and the track holds only in position steps.
+
+do
+	-- The track's height before a corner's first row, here 100 and a little,
+	-- is the map's own rounded to a step.
+	local world, player = setup({}, 1, function(w)
+		function w.origin(x, z)
+			return 100 + (x + z) % 7 + 0.03
+		end
+	end)
+	player:message("coilbox_rewind:pause")
+	player:frame()
+	player:message("coilbox_rewind_budget:1000 1000 100000")
+	seek(player, LAST)
+	settle(world, player)
+	seek(player, 0)
+	settle(world, player)
+	local cx, cz
+	for _, row in ipairs(ROWS) do
+		if row[1] > 0 then
+			cx, cz = row[2], row[3]
+			break
+		end
+	end
+	t.same("back before a corner's first change it has the map's own height", world.height(cx, cz), 100 + (cx + cz) % 7 + 0.03)
+	seek(player, LAST)
+	settle(world, player)
+	t.same("and after it the track's", world.height(cx, cz), trackHeight(ROWS, cx, cz, LAST))
 end
 
 -- With no budget the ground of a seek is all moved in the frame it is shown.

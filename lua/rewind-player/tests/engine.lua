@@ -131,6 +131,12 @@ function M.new(options)
 	function world.ground()
 		return 0
 	end
+	--- The map's own height at a corner, before anything changed it, in corners.
+	-- A test replaces it. The engine always gives a number, and this gives nil
+	-- so that a test that does not care sees the track's own heights.
+	function world.origin()
+		return nil
+	end
 	local ZERO = { 0, 0, 0 }
 
 	local teamList = options.teams or { { id = 0, allyTeam = 0 }, { id = 1, allyTeam = 1 }, { id = 2, allyTeam = 2 } }
@@ -1016,6 +1022,10 @@ function M.new(options)
 
 	function Spring.GetGroundHeight(x, z)
 		return world.ground(x, z)
+	end
+
+	function Spring.GetGroundOrigHeight(x, z)
+		return world.origin(math.floor(x / SQUARE), math.floor(z / SQUARE))
 	end
 
 	function Spring.PlaySoundFile(name, volume, x, y, z, channel)

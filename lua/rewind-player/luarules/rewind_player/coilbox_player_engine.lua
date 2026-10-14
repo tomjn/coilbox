@@ -178,6 +178,17 @@ M.SYNCED = {
 		visible = true,
 	},
 	{
+		id = "terrainOrigin",
+		feature = "the map's own ground",
+		calls = { "Spring.GetGroundOrigHeight" },
+		how = "presence",
+		used = "coilbox_player_terrain.lua",
+		required = false,
+		since = "105.0",
+		without = "A corner before its first change takes the track's height for it, which is in position steps and can be up to half a step from the map's own",
+		visible = false,
+	},
+	{
 		id = "features",
 		feature = "wrecks and rocks",
 		calls = { "Spring.CreateFeature", "Spring.DestroyFeature", "Spring.ValidFeatureID", "Spring.GetAllFeatures" },

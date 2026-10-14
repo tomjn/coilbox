@@ -79,6 +79,8 @@ function M.new(context)
 	local square = context.Game.squareSize
 	local tile = M.TILE
 	local rowFrame, rowX, rowZ, rowBefore, rowAfter, n = readAll(context, track)
+	-- The map's own height, which the track holds only in position steps.
+	local origin = context.on.terrainOrigin and Spring.GetGroundOrigHeight
 
 	-- Number the corners and the tiles in the order they first change. Corners
 	-- are looked up by z and then x, since a key of the two together would not
@@ -102,8 +104,8 @@ function M.new(context)
 			column[x] = c
 			cornerX[c], cornerZ[c] = x, z
 			-- A corner's height before its first row is the map's own (the format
-			-- page's rule 3).
-			cornerOwn[c] = rowBefore[i]
+			-- page's rule 3). The engine has it exactly, and the track to a step.
+			cornerOwn[c] = origin and origin(x * square, z * square) or rowBefore[i]
 			cornerRows[c] = 0
 			local tx, tz = floor(x / tile), floor(z / tile)
 			local tileColumn = tileAt[tz]
