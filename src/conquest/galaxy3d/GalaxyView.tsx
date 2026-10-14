@@ -902,6 +902,9 @@ export function GalaxyView({
     renderer = new THREE.WebGLRenderer({
       antialias: !performanceMode,
       alpha: true,
+      // Ask for the fast GPU on a machine with two. The map redraws every
+      // frame while it is panned, so it is the view that needs it most.
+      powerPreference: "high-performance",
     });
     renderer.setClearColor(0x000000, 0); // page background shows through
     container.appendChild(renderer.domElement);

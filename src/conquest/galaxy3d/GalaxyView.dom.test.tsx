@@ -13,11 +13,15 @@ import type { PlacedModelSources } from "./placedModelLoaders";
 const h = vi.hoisted(() => ({
   terrainBuilds: vi.fn(),
   gameRead: vi.fn(),
+  rendererOptions: [] as unknown[],
 }));
 
 vi.mock("three", async (orig) => {
   const actual = await orig<typeof import("three")>();
   class FakeRenderer {
+    constructor(options: unknown) {
+      h.rendererOptions.push(options);
+    }
     domElement = document.createElement("canvas");
     setClearColor() {}
     setPixelRatio() {}
@@ -63,6 +67,7 @@ class FakeResizeObserver {
 beforeEach(() => {
   h.terrainBuilds.mockReset();
   h.gameRead.mockReset();
+  h.rendererOptions.length = 0;
   vi.stubGlobal("ResizeObserver", FakeResizeObserver);
   window.matchMedia = (() => ({ matches: true })) as never;
   // Each frame the view asks for is dropped, so no draw runs.
@@ -146,6 +151,23 @@ describe("GalaxyView with placed models", () => {
     });
     expect(h.terrainBuilds).toHaveBeenCalledTimes(1);
     expect(h.gameRead).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks for the high performance GPU", () => {
+    render(
+      <GalaxyView
+        galaxy={galaxy}
+        playerFactionId="a"
+        owners={{}}
+        terrainPixels={terrainPixels}
+        modelSources={{ pending: true }}
+        display={{ reduceMotion: true, effects: false }}
+      />,
+    );
+    expect(h.rendererOptions).toHaveLength(1);
+    expect(h.rendererOptions[0]).toMatchObject({
+      powerPreference: "high-performance",
+    });
   });
 });
 
