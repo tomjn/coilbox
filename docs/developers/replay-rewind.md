@@ -391,4 +391,4 @@ The oldest engine tag read for any call is 105.0. No engine before 2025.03.9 has
 
 The rewind Lua and its adapters are offered under the MIT licence or the GNU General Public License version 2 or any later version, at your choice. Each file names this in its `license` field, and the notice is in `lua/LICENSE.md` in the coilbox repository.
 
-The playback game is written again on every launch and stays on your machine, so it carries no notice. A game you install the mission runtime into gets a `coilbox-licence/` folder with the notice and both licence texts.
+The playback game is written again on every launch and stays on your machine, so it carries no notice. A game you install the mission runtime into gets a `coilbox-licence/` folder with the notice and both licence texts. The installed app carries the same folder beside the Lua it ships.
