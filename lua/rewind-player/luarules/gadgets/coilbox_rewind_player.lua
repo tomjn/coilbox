@@ -38,7 +38,9 @@
 -- removed in the frame, the unsynced half works out how many of each fit in half
 -- a simulation frame and sends that back as a Lua message, and the player does
 -- no more than that in a frame until it hears another. The player starts at one
--- of each. The message reaches the synced half about two frames later.
+-- of each. The message reaches the synced half from one frame later in a
+-- headless engine to more than ten in a window, so the synced half says with
+-- each frame which budget it worked to (issues #4015 and #4016).
 --
 -- The unsynced half is also the one that can see the camera and draw. It
 -- tells the player where the viewer looks, as another Lua message, so that a
