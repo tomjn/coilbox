@@ -154,6 +154,23 @@ do
 	t.same("the gadget takes the end of a simulation frame", pcall(gadget.GameFramePost, gadget, 1), true)
 	t.same("the engine is refused a wreck", gadget:AllowFeatureCreation(1, 0, 0, 0, 0), false)
 
+	-- The engine calls UnitDamaged with the unit, its definition, its team and
+	-- the damage done, for a hit that did none too (issue #4020).
+	local hit = w.Spring.GetAllUnits()[1]
+	local function damagedLines()
+		local n = 0
+		for _, line in ipairs(w.lines) do
+			if line:find("a unit of the track was damaged", 1, true) then
+				n = n + 1
+			end
+		end
+		return n
+	end
+	gadget:UnitDamaged(hit, 1, 0, 0, 0)
+	t.same("a shot that lands for no damage is not logged as damage", damagedLines(), 0)
+	gadget:UnitDamaged(hit, 1, 0, 25, 0)
+	t.same("a hit that did some damage is", damagedLines(), 1)
+
 	w.Spring.CreateUnit("armpw", 0, 0, 0, 0, 0, false, false)
 	gadget:GameFrame(frame + 1)
 	t.same("a unit the base game creates is gone on the next frame", w.unitCount(), 4)

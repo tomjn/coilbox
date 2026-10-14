@@ -471,8 +471,8 @@ function Player:unitDestroyed(unitID)
 	self.units:destroyed(unitID)
 end
 
-function Player:unitDamaged(unitID)
-	self.units:damaged(unitID)
+function Player:unitDamaged(unitID, damage)
+	self.units:damaged(unitID, damage)
 end
 
 function Player:featureCreated(featureID)

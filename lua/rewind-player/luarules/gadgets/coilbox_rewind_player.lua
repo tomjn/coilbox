@@ -239,9 +239,9 @@ if gadgetHandler:IsSyncedCode() then
 		end
 	end
 
-	function gadget:UnitDamaged(unitID)
+	function gadget:UnitDamaged(unitID, _, _, damage)
 		if player then
-			player:unitDamaged(unitID)
+			player:unitDamaged(unitID, damage)
 		end
 	end
 
