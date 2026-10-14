@@ -653,6 +653,20 @@ do
 	end
 end
 
+-- The orb does not reach below the ground the unit stands on, for a camera
+-- that looks along the ground.
+
+do
+	local e = Unsynced.new()
+	e.camera.direction = { 1, 0, 0 }
+	local arrival, at = effects(e)
+	unit(e, 7, 20, 0, 100, 0, 2)
+	arrival:add(7, 0, 100, 0, 1)
+	look(e, arrival, at, Arrival.GROW)
+	t.check("the lowest of it is no lower than the unit's base", e.box.y1 >= 100 - 1e-6, e.box.y1)
+	t.check("and it is still as tall as the unit is wide", e.box.y2 - e.box.y1 >= 2 * 20, e.box.y2 - e.box.y1)
+end
+
 -- A unit the engine cannot size, or place, has no effect.
 
 do

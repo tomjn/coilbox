@@ -47,8 +47,8 @@ M.MOST = 256
 -- `COVER` is wide enough that the opaque part, which is `CORE` of the orb, is as
 -- wide as the unit.
 M.START = 0.15
-M.COVER = 1.5
-M.CORE = 0.7
+M.COVER = 1.25
+M.CORE = 0.85
 -- How far the orb rises, in its own radius. Two is its own size.
 M.RISE = 2.4
 -- Where the glow's bands end, in the orb's radius, and how opaque it is at the
@@ -76,7 +76,7 @@ Arrival.__index = Arrival
 local function orbs(self, now, rx, rz, ux, uy, uz, dx, dy, dz)
 	local gl = self.gl
 	local Color, Vertex = gl.Color, gl.Vertex
-	local xs, ys, zs, radii, born = self.x, self.y, self.z, self.radius, self.born
+	local xs, ys, zs, radii, born, bases = self.x, self.y, self.z, self.radius, self.born, self.base
 	local grow, fade, start, cover, rise = M.GROW, M.FADE, M.START, M.COVER, M.RISE
 	for i = 1, self.count do
 		local seconds = now - born[i]
@@ -92,11 +92,17 @@ local function orbs(self, now, rx, rz, ux, uy, uz, dx, dy, dz)
 			size = radius * cover
 			alpha, lift = 1 - gone, gone * rise * size
 		end
-		-- Nearer the camera than the unit by its radius, so that the depth test
-		-- does not hide the orb behind the unit it covers.
-		local cx = xs[i] - dx * radius
-		local cy = ys[i] + lift - dy * radius
-		local cz = zs[i] - dz * radius
+		-- Nearer the camera than the unit by the orb's full radius, so that the
+		-- depth test hides the orb neither behind the unit it covers nor in the
+		-- ground below it.
+		local near = radius * cover
+		local cx = xs[i] - dx * near
+		-- And no lower than its own radius above the unit's base, so that the
+		-- ground does not cut the bottom off the orb.
+		local base = bases[i] + size
+		local middle = ys[i]
+		local cy = (middle > base and middle or base) + lift - dy * near
+		local cz = zs[i] - dz * near
 		local rightX, rightZ = rx * size, rz * size
 		local upX, upY, upZ = ux * size, uy * size, uz * size
 		for band = 1, BANDS do
@@ -130,6 +136,7 @@ function M.new(engine)
 		z = {},
 		radius = {},
 		born = {},
+		base = {},
 	}, Arrival)
 end
 
@@ -153,6 +160,7 @@ function Arrival:add(unitID, x, y, z)
 	self.count = i
 	self.x[i], self.y[i] = x, y + (middleY - baseY)
 	self.z[i], self.radius[i] = z, radius
+	self.base[i] = y
 	self.born[i] = self.seconds()
 end
 
@@ -160,7 +168,7 @@ end
 local function drop(self, i)
 	local n = self.count
 	self.x[i], self.y[i], self.z[i], self.radius[i] = self.x[n], self.y[n], self.z[n], self.radius[n]
-	self.born[i] = self.born[n]
+	self.born[i], self.base[i] = self.born[n], self.base[n]
 	self.count = n - 1
 end
 
