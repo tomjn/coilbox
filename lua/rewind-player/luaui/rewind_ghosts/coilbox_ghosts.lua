@@ -74,6 +74,9 @@ function M.new(engine, track)
 	local self = setmetatable({
 		Spring = engine.Spring,
 		gl = engine.gl,
+		-- Where a line goes: the playback's log file from the widget (issue
+		-- #4032), and the engine's log without one.
+		log = engine.log or engine.Spring.Echo,
 		track = track,
 		enabled = true,
 		said = {},
@@ -129,7 +132,7 @@ end
 function Ghosts:say(key, text)
 	if not self.said[key] then
 		self.said[key] = true
-		self.Spring.Echo(M.PREFIX .. text)
+		self.log(M.PREFIX .. text)
 	end
 end
 

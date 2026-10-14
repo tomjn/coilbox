@@ -1990,6 +1990,17 @@ end
         String::from_utf8_lossy(&std::fs::read(log).unwrap_or_default()).into_owned()
     }
 
+    /// The engine's log followed by the playback's own log file, which the
+    /// player, the timeline and the ghosts widget write their lines to so that
+    /// none reaches the console (issue #4032). It is in the engine's write
+    /// folder, beside `infolog.txt`.
+    fn read_logs(log: &Path, write_dir: &Path) -> String {
+        let mut text = read_log(log);
+        text.push('\n');
+        text.push_str(&read_log(&write_dir.join("coilbox_rewind.log")));
+        text
+    }
+
     /// A copy of a folder and everything in it.
     fn copy_folder(from: &Path, to: &Path) {
         std::fs::create_dir_all(to).unwrap();
@@ -2026,7 +2037,7 @@ end
                 log: &log,
                 timeout: prepared.wait,
                 on_poll: &|| {
-                    if done(&read_log(&log)) {
+                    if done(&read_logs(&log, &write_dir)) {
                         control.cancel();
                     }
                 },
@@ -2034,10 +2045,10 @@ end
             &control,
         )
         .expect("the engine launches");
-        let output = read_log(&log);
+        let output = read_logs(&log, &write_dir);
         // For a person to read afterwards, since the folder is removed.
         if let Some(keep) = var("COILBOX_PLAYBACK_LOG") {
-            let _ = std::fs::copy(&log, keep);
+            let _ = std::fs::write(keep, &output);
         }
         // The game and its script, for a person to open in an engine with a
         // window, which is the only way to see anything the playback draws.
@@ -3003,7 +3014,7 @@ end
         assert!(
             count(
                 &adapted,
-                "COILBOX_REWIND_PLAYER adapter loaded: Beyond All Reason. 32 gadgets and 2 widgets"
+                "COILBOX_REWIND_PLAYER adapter loaded: Beyond All Reason. 32 gadgets and 3 widgets"
             ) >= 1,
             "{adapted}"
         );
@@ -3450,6 +3461,16 @@ end
             .filter(|l| l.starts_with("seek_settle "))
             .collect();
         let stops: Vec<&&str> = driver.iter().filter(|l| l.starts_with("seeks ")).collect();
+        let grounds: Vec<&&str> = driver
+            .iter()
+            .filter(|l| l.starts_with("seek_ground "))
+            .collect();
+        assert_eq!(grounds.len(), 8, "{driver:?}");
+        // Every corner the track changes is at the track's height after each
+        // seek, read back out of the engine (issue #4025).
+        for l in &grounds {
+            assert_eq!(field(l, "wrong"), "0", "{l}");
+        }
         assert_eq!(settles.len(), 8, "{driver:?}");
         assert_eq!(stops.len(), 8, "{driver:?}");
         for l in &settles {

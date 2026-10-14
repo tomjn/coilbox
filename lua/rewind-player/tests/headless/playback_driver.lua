@@ -291,6 +291,29 @@ local function trackGround(corner, frame)
 	return height
 end
 
+--- How many corners the track changes are not at the track's height at
+-- `frame` in the engine, and the furthest any is (issue #4025).
+local function groundAgainstTrack(frame)
+	if not groundRows then
+		indexGround()
+	end
+	local size = Game.squareSize
+	local corners, wrong, worst = 0, 0, 0
+	local corner = { x = 0, z = 0 }
+	for z, row in pairs(groundRows) do
+		for x in pairs(row) do
+			corner.x, corner.z = x, z
+			corners = corners + 1
+			local off = math.abs(Spring.GetGroundHeight(x * size, z * size) - trackGround(corner, frame))
+			if off > 0.001 then
+				wrong = wrong + 1
+			end
+			worst = math.max(worst, off)
+		end
+	end
+	return corners, wrong, worst
+end
+
 --- Says, for each explosion since the last call, how far the ground round it is
 -- from the track's.
 local function lookAtDeathGround()
@@ -1275,6 +1298,8 @@ local function seeksPlan()
 		push("wait", SETTLE)
 		push("run", function()
 			measure("seeks n=" .. n, frame)
+			local corners, wrong, worst = groundAgainstTrack(frame)
+			say(string.format("seek_ground n=%d frame=%d corners=%d wrong=%d worst=%.4f", n, frame, corners, wrong, worst))
 		end)
 	end
 	push("run", function()

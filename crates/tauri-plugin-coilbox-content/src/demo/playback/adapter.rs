@@ -1025,6 +1025,7 @@ mod tests {
                     "luarules/gadgets/ai_ruins.lua",
                     "luaui/widgets/gui_gridmenu.lua",
                     "luaui/widgets/gui_ordermenu.lua",
+                    "luaui/widgets/camera_player_tv.lua",
                 ]
             );
             assert!(adapter.units.is_empty() && adapter.features.is_empty());

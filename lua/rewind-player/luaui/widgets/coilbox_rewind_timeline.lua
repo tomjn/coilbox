@@ -32,28 +32,40 @@ function widget:GetInfo()
 end
 
 local timeline
+--- Where the widget's lines go: the playback's own log file, and not the
+-- engine's log, which the console shows (issue #4032,
+-- luarules/rewind_player/coilbox_log.lua). Without the module, the engine's log.
+local function logWriter()
+	local ok, Log = pcall(VFS.Include, "luarules/rewind_player/coilbox_log.lua", nil, VFS.ZIP)
+	if ok and type(Log) == "table" then
+		return (Log.new(io, Spring.Echo))
+	end
+	return Spring.Echo
+end
+
 -- What the widget handler kept from last time, which it hands over before
 -- Initialize.
 local saved
 
 function widget:Initialize()
+	local say = logWriter()
 	-- What the engine has comes first. A widget that lacks a call it cannot do
 	-- without does not start, and says which.
 	local found, Engine = pcall(VFS.Include, "luaui/rewind_timeline/coilbox_timeline_engine.lua", nil, VFS.ZIP)
 	if not found then
-		Spring.Echo("COILBOX_REWIND_TIMELINE failed: " .. tostring(Engine))
+		say("COILBOX_REWIND_TIMELINE failed: " .. tostring(Engine))
 		return
 	end
 	local engine = Engine.check({ Spring = Spring, gl = gl, GL = GL, VFS = VFS })
 	for _, line in ipairs(engine.lines) do
-		Spring.Echo(line)
+		say(line)
 	end
 	if engine.refused then
 		return
 	end
 	local ok, Timeline = pcall(VFS.Include, "luaui/rewind_timeline/coilbox_timeline.lua", nil, VFS.ZIP)
 	if not ok then
-		Spring.Echo("COILBOX_REWIND_TIMELINE failed: " .. tostring(Timeline))
+		say("COILBOX_REWIND_TIMELINE failed: " .. tostring(Timeline))
 		return
 	end
 	local made = Timeline.new({ Spring = Spring, gl = gl, GL = GL, WG = WG, VFS = engine.on.marks and VFS or nil })

@@ -148,6 +148,15 @@ return {
 		-- timeline.
 		"gui_gridmenu.lua",
 		"gui_ordermenu.lua",
+		-- The Player View button above the players list, which follows a
+		-- player's camera (issue #4033). A playback has no players, only its one
+		-- spectator. The line under the players list with the time, the speed and
+		-- the frame rate stays: it offers nothing to press, and it hides the
+		-- engine's own clock, which shows at the top right without it. Its time
+		-- and speed are the engine's (issue #4013). The music player stays too:
+		-- its pause, next and sliders are the music's and the sound's, not the
+		-- engine's.
+		"camera_player_tv.lua",
 	},
 
 	-- The numbers the game's panels read that are the game's own and not the

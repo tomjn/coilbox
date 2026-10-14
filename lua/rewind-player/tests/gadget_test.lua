@@ -70,6 +70,7 @@ local function unsynced(file, lines, clock)
 	local e = Unsynced.new(clock)
 	e.lines = lines
 	env.Spring, env.gl, env.GL = e.Spring, e.gl, e.GL
+	env.io = e.io
 	local chunk = assert(loadfile(GADGETS .. file))
 	setfenv(chunk, env)
 	local returned = chunk()
@@ -107,6 +108,10 @@ do
 	w.gadget = gadget
 	t.same("it names itself", gadget:GetInfo().name, "Coilbox rewind player")
 	gadget:Initialize()
+	t.same("nothing is logged before the first frame, since the unsynced half that writes the log file is not there yet", #w.lines, 0)
+
+	t.same("nothing is created before the first frame", w.unitCount(), 0)
+	gadget:GameFrame(1)
 	t.same("it logs the adapter, the rules parameters nobody names and the track", #w.lines, 3)
 	t.same("a game with no adapter file says it loaded none", w.lines[1], "COILBOX_REWIND_PLAYER adapter loaded: none")
 	t.same(
@@ -123,11 +128,10 @@ do
 	t.check("the line has the team count", line:find("teams " .. #info.teams .. ",", 1, true) ~= nil, line)
 	t.check("the line names the map", line:find("map " .. info.map, 1, true) ~= nil, line)
 
-	t.same("nothing is created before the first frame", w.unitCount(), 0)
-	gadget:GameFrame(1)
+	t.same("none of it goes to the engine's log, which the console shows", w.echoed, 0)
 	t.same("the first frame makes one unit, the budget the gadget starts with", w.unitCount(), 1)
 	t.same("and all of the features", #w.Spring.GetAllFeatures(), 5)
-	t.same("the unsynced half is told when the work starts and ends", w.sent, 2)
+	t.same("the unsynced half is told when the work starts and ends, apart from the lines it writes", w.sent, 2)
 	t.same("by the name it listens for", w.sentName, "coilbox_rewind_work")
 	t.same("with how many units the frame made", w.sentMade, 1)
 	t.same("and removed", w.sentRemoved, 0)
@@ -140,7 +144,7 @@ do
 
 	t.same("a message for the player is taken", gadget:RecvLuaMsg("coilbox_rewind:seek 800", 0), true)
 	t.same("a message for something else is not", gadget:RecvLuaMsg("somebody:else", 0), false)
-	t.same("the budget message is the player's", gadget:RecvLuaMsg("coilbox_rewind_budget:50 50", 0), true)
+	t.same("the budget message is the player's", gadget:RecvLuaMsg("coilbox_rewind_budget:50 50 100000", 0), true)
 	frame = settle(gadget, w, frame + 1)
 	t.same("the seek is where the next frame is", w.params.coilbox_rewind_frame, 800)
 	t.same("with the units of that frame", w.unitCount(), 4)
@@ -214,8 +218,8 @@ do
 	})
 	w.gadget = gadget
 	gadget:Initialize()
-	t.check("the adapter is named in the log", w.lines[1]:find("COILBOX_REWIND_PLAYER adapter loaded: Test game.", 1, true) == 1, w.lines[1])
 	settle(gadget, w, 1)
+	t.check("the adapter is named in the log", w.lines[1]:find("COILBOX_REWIND_PLAYER adapter loaded: Test game.", 1, true) == 1, w.lines[1])
 	t.same("a hidden definition is not created", w.unitNamed("armpw"), nil)
 	t.same("the others are", w.unitCount(), 2)
 	t.same("a skipped feature is not created", #w.Spring.GetAllFeatures(), 0)
@@ -226,12 +230,12 @@ do
 	local w = world()
 	local gadget = synced(PLAYER, w, { [TRACK] = bytes, ["coilbox_rewind/adapter.lua"] = "return { problem = 'it was not for this game' }" })
 	gadget:Initialize()
+	settle(gadget, w, 1)
 	t.same(
 		"an adapter coilbox could not use is logged with its reason",
 		w.lines[1],
 		"COILBOX_REWIND_PLAYER adapter loaded: none. it was not for this game"
 	)
-	settle(gadget, w, 1)
 	t.same("and the match still plays", w.unitCount(), 3)
 end
 
@@ -239,8 +243,8 @@ do
 	local w = world()
 	local gadget = synced(PLAYER, w, { [TRACK] = bytes, ["coilbox_rewind/adapter.lua"] = "error('broken')" })
 	gadget:Initialize()
-	t.check("an adapter file that raises is logged", w.lines[1]:find("adapter loaded: none. the adapter file raised", 1, true) ~= nil, w.lines[1])
 	settle(gadget, w, 1)
+	t.check("an adapter file that raises is logged", w.lines[1]:find("adapter loaded: none. the adapter file raised", 1, true) ~= nil, w.lines[1])
 	t.same("and the match still plays", w.unitCount(), 3)
 end
 
@@ -250,9 +254,15 @@ do
 	local w = world()
 	local gadget = synced(PLAYER, w, {})
 	gadget:Initialize()
+	gadget:GameFrame(1)
 	t.same("a game with no track logs one line", #w.lines, 1)
 	t.check("the line says what is missing", w.lines[1]:find("failed: the game holds no file at coilbox_rewind/track.cbtrack", 1, true) ~= nil, w.lines[1])
-	gadget:GameFrame(1)
+	t.same("not on the engine's log", w.echoed, 0)
+	t.check(
+		"and the timeline's note tells a viewer that playback did not start",
+		tostring(w.params.coilbox_rewind_note):find("^Playback did not start: ") ~= nil,
+		tostring(w.params.coilbox_rewind_note)
+	)
 	t.same("and the gadget then does nothing on a frame", w.sent, 0)
 	t.same("leaves damage alone", gadget:UnitPreDamaged(100, 1, 0, 500), nil)
 	t.same("and a feature's too", gadget:FeaturePreDamaged(1, 0, -1, 80), nil)
@@ -265,6 +275,7 @@ do
 	local w = world()
 	local gadget = synced(PLAYER, w, { [TRACK] = "not a track" })
 	gadget:Initialize()
+	gadget:GameFrame(1)
 	t.same("a file that is not a track logs one line", #w.lines, 1)
 	t.check("the line is a failure", w.lines[1]:find("COILBOX_REWIND_PLAYER failed: ", 1, true) == 1, w.lines[1])
 end
@@ -343,11 +354,11 @@ do
 	local lines, clock = {}, { now = 0 }
 	local gadget = unsynced(PLAYER, lines, clock)
 	local frame = 0
-	local function work(milliseconds, made, removed)
+	local function work(milliseconds, made, removed, ground)
 		frame = frame + 1
 		gadget:RecvFromSynced("coilbox_rewind_work", 0, frame)
 		clock.now = clock.now + milliseconds
-		gadget:RecvFromSynced("coilbox_rewind_work", 1, frame, made, removed or 0)
+		gadget:RecvFromSynced("coilbox_rewind_work", 1, frame, made, removed or 0, ground or 0)
 	end
 	local function said()
 		return table.concat(clock.messages, " | ")
@@ -358,44 +369,58 @@ do
 	work(5, 0)
 	t.same("a frame that made and removed nothing says nothing", #clock.messages, 0)
 	work(1, 1)
-	t.same("a unit a millisecond fits 16 in half a frame, but the budget at most doubles from one", last(), "coilbox_rewind_budget:2 1")
+	t.same("a unit a millisecond fits 16 in half a frame, but the budget at most doubles from one", last(), "coilbox_rewind_budget:2 1 1")
 	work(2, 2)
 	work(4, 4)
 	work(8, 8)
-	t.same("each frame of a seek doubles it", said(), "coilbox_rewind_budget:2 1 | coilbox_rewind_budget:4 1 | coilbox_rewind_budget:8 1 | coilbox_rewind_budget:16 1")
+	t.same("each frame of a seek doubles it", said(), "coilbox_rewind_budget:2 1 1 | coilbox_rewind_budget:4 1 1 | coilbox_rewind_budget:8 1 1 | coilbox_rewind_budget:16 1 1")
 	work(16, 16)
 	t.same("a budget that does not change is not sent again", #clock.messages, 4)
 	work(48, 16)
-	t.same("a frame that took 3 ms a unit cuts it to 5", last(), "coilbox_rewind_budget:5 1")
+	t.same("a frame that took 3 ms a unit cuts it to 5", last(), "coilbox_rewind_budget:5 1 1")
 	t.same("and the slow frame is logged as before", #lines, 1)
 	work(0.5, 5)
-	t.same("a cheap frame of a few units cannot more than double it", last(), "coilbox_rewind_budget:10 1")
+	t.same("a cheap frame of a few units cannot more than double it", last(), "coilbox_rewind_budget:10 1 1")
 	work(0, 10)
-	t.same("a frame the timer read as no time at all does not divide by nothing", last(), "coilbox_rewind_budget:20 1")
+	t.same("a frame the timer read as no time at all does not divide by nothing", last(), "coilbox_rewind_budget:20 1 1")
 	work(60, 2)
-	t.same("a budget is never below one", last(), "coilbox_rewind_budget:1 1")
+	t.same("a budget is never below one", last(), "coilbox_rewind_budget:1 1 1")
 	work(8, 40)
-	t.same("a budget is never more than twice what the last frame made", last(), "coilbox_rewind_budget:80 1")
+	t.same("a budget is never more than twice what the last frame made", last(), "coilbox_rewind_budget:80 1 1")
 	local sent = #clock.messages
 	work(0.3, 3)
 	t.same("the few cheap units that end a seek leave it", #clock.messages, sent)
 	work(3, 3)
 	t.same("so do a few dear ones that still fit in half a frame", #clock.messages, sent)
 	work(20, 3)
-	t.same("a few that took longer than half a frame cut it, even when they did not use it all", last(), "coilbox_rewind_budget:2 1")
+	t.same("a few that took longer than half a frame cut it, even when they did not use it all", last(), "coilbox_rewind_budget:2 1 1")
 
 	work(2, 0, 4)
-	t.same("a frame of removals sets the removal budget and leaves the other", last(), "coilbox_rewind_budget:2 8")
+	t.same("a frame of removals sets the removal budget and leaves the other", last(), "coilbox_rewind_budget:2 8 1")
 	sent = #clock.messages
 	work(5, 5, 5)
 	t.same("a frame that did both says what neither costs, so changes neither", #clock.messages, sent)
 	work(0.4, 0, 8)
-	t.same("a removal budget moves on removals alone", last(), "coilbox_rewind_budget:2 16")
+	t.same("a removal budget moves on removals alone", last(), "coilbox_rewind_budget:2 16 1")
 	work(1, 0, 0)
-	t.same("a frame with nothing to do sends both back to one, since what a unit costs moves with how many there are", last(), "coilbox_rewind_budget:1 1")
+	t.same("a frame with nothing to do sends both back to one, since what a unit costs moves with how many there are", last(), "coilbox_rewind_budget:1 1 1")
 	sent = #clock.messages
 	work(1, 0, 0)
 	t.same("and says so once", #clock.messages, sent)
+
+	-- The ground of a seek has a budget of its own, in corners (issue #4025).
+	work(2, 0, 0, 100)
+	t.same("a frame of ground sets the ground budget, at most twice what it did", last(), "coilbox_rewind_budget:1 1 200")
+	work(4, 0, 0, 200)
+	t.same("and doubles while the cost allows", last(), "coilbox_rewind_budget:1 1 400")
+	sent = #clock.messages
+	work(1, 0, 0, 0)
+	t.same("a frame with nothing to do keeps the ground budget, since a corner costs the same whatever else is in the world", #clock.messages, sent)
+	work(30, 0, 0, 400)
+	t.same("a frame of ground that took longer than half a frame cuts it", last(), "coilbox_rewind_budget:1 1 222")
+	sent = #clock.messages
+	work(5, 2, 0, 100)
+	t.same("a frame that made units and set ground says what neither costs", #clock.messages, sent)
 end
 
 -- When a budget cannot be worked out (issue #3988): what the engine lacks, and
@@ -609,12 +634,113 @@ do
 	t.same("the unsynced half does not load the guard", unsyncedReturn, false)
 end
 
+-- With the player there, the guard's lines go to the playback's log file with
+-- the player's (issue #4032).
+
+do
+	local w = world()
+	local player = synced(PLAYER, w, { [TRACK] = bytes })
+	synced(GUARD, w)
+	player:Initialize()
+	local Spring = w.Spring
+	Spring.KillTeam(1)
+	player:GameFrame(1)
+	local found = 0
+	for _, line in ipairs(w.lines) do
+		if line:find("kill team 1", 1, true) then
+			found = found + 1
+		end
+	end
+	t.same("the guard's line is in the log", found, 1)
+	t.same("and not on the engine's log", w.echoed, 0)
+end
+
 -- The guard's file name sorts before any gadget a game names with letters,
 -- digits or an underscore, which is the order gadget files load in.
 do
 	local names = { "game_end.lua", "0_first.lua", "_first.lua", "API_first.lua", "a.lua", GUARD }
 	table.sort(names)
 	t.same("the guard's file sorts first", names[1], GUARD)
+end
+
+-- The lines go to the playback's own log file and not the engine's log, which
+-- the console shows (issue #4032).
+
+do
+	local lines, clock = {}, { now = 0 }
+	local gadget, _, e = unsynced(PLAYER, lines, clock)
+	t.same("the unsynced half empties the file as it loads and then appends to it", table.concat(e.files, " | "), "coilbox_rewind.log w | coilbox_rewind.log a")
+	t.same("a line from the synced half is the unsynced half's", gadget:RecvFromSynced("coilbox_rewind_log", "COILBOX_REWIND_PLAYER a line"), true)
+	t.same("and is written to the file", lines[#lines], "COILBOX_REWIND_PLAYER a line")
+	local echoed = e.echoed
+	gadget:RecvFromSynced("coilbox_rewind_work", 0, 1)
+	clock.now = clock.now + 40
+	gadget:RecvFromSynced("coilbox_rewind_work", 1, 1, 0, 0, 0)
+	t.check("the slow frame line is written there too", lines[#lines]:find("slow frame", 1, true) ~= nil, lines[#lines])
+	t.same("and nothing went to the engine's log", e.echoed, echoed)
+end
+
+do
+	local lines, clock = {}, { now = 0, noFile = true }
+	local gadget, _, e = unsynced(PLAYER, lines, clock)
+	local echoed = e.echoed
+	gadget:RecvFromSynced("coilbox_rewind_log", "COILBOX_REWIND_PLAYER a line")
+	t.same("a file that cannot be opened leaves the lines on the engine's log", e.echoed, echoed + 1)
+end
+
+-- The engine's own pause and speed (issue #4033). A game can pause the engine
+-- or change its speed by a key or a chat command, and the world only moves on
+-- simulation frames. The unsynced half gives the engine back its speed and
+-- hands the ask to the player as the timeline's own.
+
+do
+	local lines, clock = {}, { now = 0 }
+	local gadget, _, e = unsynced(PLAYER, lines, clock)
+	gadget:Update()
+	t.same("an engine running at its speed is left alone", #clock.commands, 0)
+	e.speed.paused = true
+	gadget:Update()
+	t.same("a paused engine is set going again", clock.commands[#clock.commands], "pause 0")
+	t.same("and the player pauses or plays in its place", clock.messages[#clock.messages], "coilbox_rewind:toggle")
+	t.same("so the engine runs", e.speed.paused, false)
+	gadget:Update()
+	t.same("once for each pause", #clock.messages, 1)
+	e.speed.wanted = 2
+	gadget:Update()
+	t.same("a faster engine is put back to its own speed", clock.commands[#clock.commands], "setspeed 1")
+	t.same("and the player plays faster in its place", clock.messages[#clock.messages], "coilbox_rewind:faster")
+	e.speed.wanted = 0.5
+	gadget:Update()
+	t.same("a slower engine is put back too", e.speed.wanted, 1)
+	t.same("and the player plays slower", clock.messages[#clock.messages], "coilbox_rewind:slower")
+	t.same("nothing of it is logged", #lines, 0)
+
+	-- The engine stays paused until the server answers, over several drawn frames.
+	clock.held = true
+	local sent = #clock.messages
+	e.speed.paused = true
+	gadget:Update()
+	gadget:Update()
+	gadget:Update()
+	t.same("a pause the server has not answered yet is handed on once", #clock.messages, sent + 1)
+	clock.held = false
+	e.speed.paused = false
+	gadget:Update()
+	e.speed.paused = true
+	gadget:Update()
+	t.same("and the next pause is handed on again", #clock.messages, sent + 2)
+end
+
+-- Without the calls the engine's pause is left to it.
+
+do
+	local lines, clock = {}, { now = 0, without = { GetGameSpeed = true } }
+	local gadget, _, e = unsynced(PLAYER, lines, clock)
+	e.speed.paused = true
+	if gadget.Update then
+		gadget:Update()
+	end
+	t.same("an engine without Spring.GetGameSpeed is never told to go on", #clock.commands, 0)
 end
 
 t.report()

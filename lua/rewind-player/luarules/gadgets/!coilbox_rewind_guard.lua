@@ -41,16 +41,27 @@ local PREFIX = "COILBOX_REWIND_PLAYER "
 
 local saidKill, saidOver = false, false
 
+--- A line for the log. The player gadget writes it to the playback's own log
+-- file with its own lines (issue #4032), and a game without the player gadget
+-- has it on the engine's log.
+local function say(text)
+	if GG and GG.coilboxRewindLog then
+		GG.coilboxRewindLog(text)
+	else
+		Spring.Echo(PREFIX .. text)
+	end
+end
+
 Spring.KillTeam = function(teamID)
 	if not saidKill then
 		saidKill = true
-		Spring.Echo(PREFIX .. "the base game asked to kill team " .. tostring(teamID) .. ", and was not let. Later asks are not logged")
+		say("the base game asked to kill team " .. tostring(teamID) .. ", and was not let. Later asks are not logged")
 	end
 end
 
 Spring.GameOver = function()
 	if not saidOver then
 		saidOver = true
-		Spring.Echo(PREFIX .. "the base game asked to end the match, and was not let. Later asks are not logged")
+		say("the base game asked to end the match, and was not let. Later asks are not logged")
 	end
 end

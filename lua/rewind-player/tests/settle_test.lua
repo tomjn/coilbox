@@ -249,7 +249,7 @@ do
 	seek(player, 50)
 	player:frame()
 	t.same("a frame makes as many as the make budget", world.unitCount(), 4)
-	t.same("and says so", table.concat({ player:worked() }, " "), "4 0")
+	t.same("and says so", table.concat({ player:worked() }, " "), "4 0 0")
 	player:frame()
 	t.same("then the rest", world.unitCount(), 6)
 	seek(player, 200)
@@ -264,7 +264,7 @@ do
 
 	seek(player, 50)
 	player:frame()
-	t.same("a frame that uses its whole removal budget makes nothing", table.concat({ player:worked() }, " "), "0 2")
+	t.same("a frame that uses its whole removal budget makes nothing", table.concat({ player:worked() }, " "), "0 2 0")
 end
 
 -- The count arrives as a message.
@@ -280,7 +280,7 @@ do
 	player:frame()
 	t.same("a new count applies to the next frame", world.unitCount(), 6)
 	local before = #world.lines
-	for _, bad in ipairs({ "x 4", "0 4", "4 -3", "1.5 4", "", "4", "nan 4", "4 inf", "4 4 4" }) do
+	for _, bad in ipairs({ "x 4", "0 4", "4 -3", "1.5 4", "", "4", "nan 4", "4 inf", "4 4 4 4" }) do
 		t.same("the message with \"" .. bad .. "\" is the player's", player:message("coilbox_rewind_budget:" .. bad), true)
 	end
 	t.same("each is refused and logged", #world.lines - before, 9)

@@ -106,6 +106,8 @@ To change a key, press `?` to open the key list, click the action's row and pres
 
 The game's own keys can still win. If your game binds one of these keys to an action that its interface scripts handle, that action runs first and the timeline never hears the key. Change the key in the list to get round it. In Beyond All Reason, Minus, Equals and the keypad's Plus are the game's volume keys, so they change the volume and not the speed. Use the timeline's buttons, or give Slower and Faster other keys.
 
+The game's own pause and speed work on the timeline. Pausing the game, with its pause key or a chat command, plays or pauses the timeline instead, and speeding the game up or slowing it down moves the timeline to its next speed up or down. The game itself keeps running at its own speed, because the playback only moves while it runs.
+
 If the engine is too old for part of the player, a small panel above the timeline says what is switched off, for example "Switched off on this engine: ground changes". If it is too old to play the match at all, the panel says which engine you need and nothing plays. If you have switched off the engine's LuaUI, there is no timeline, and the match still plays.
 
 ## Queued buildings
@@ -140,7 +142,7 @@ True to the recording:
 - Units walk and roll, and a builder turns to what it is building, with its own build glow in Splinter Faction. A unit's own walk plays while you watch, forward or backward, and stops when you pause, so a paused unit stands at ease and not in the middle of a step. At high speed the walk keeps its own pace while the ground goes by faster.
 - Health, health bars, build progress and its time left.
 - Terrain changes. One the engine did not report during the match can show up to 900 frames late.
-- A big jump. When a jump has hundreds of units to remove and make, the world takes a few frames to catch up, about a second for several hundred, so the units appear over that time and not all at once. The units you are looking at appear first, and the rest of the map fills in after them. Each unit that arrives late in view shows a short effect in its team's colour: a column of light, a ring that closes on it and a few dots that fall into it. The effect is the playback's and was not in the match. While you drag the bar's knob no effect is shown, and units that are removed go with nothing shown. The playback spreads the work so that the game does not stutter.
+- A big jump. When a jump has hundreds of units to remove and make, or a lot of ground to change, the world takes a few frames to catch up, about a second for several hundred units, so it changes over that time and not all at once. The ground changes first, a patch at a time, and the units appear on it after. The units you are looking at appear first, and the rest of the map fills in after them. Each unit that arrives late in view shows a short effect in its team's colour: a column of light, a ring that closes on it and a few dots that fall into it. The effect is the playback's and was not in the match. While you drag the bar's knob no effect is shown, and units that are removed go with nothing shown. The playback spreads the work so that the game does not stutter.
 - Shots in the air. A unit that dies while you play forward at 0.5x, 1x or 2x dies with the game's own death effect, and a shot lands with the game's impact effect. At any other time (after a seek or a step, playing backward, or at 4x and faster) they come and go with nothing shown.
 - The resource bars. Each team's metal and energy, and how much it can store, are what they were in the match at the moment showing. They stay put while you pause and go back when you seek back. A figure is within half a unit of the match's, or within a thousandth of it for a team that holds thousands.
 - In Splinter Faction, supply used, supply available and research points.
@@ -155,7 +157,7 @@ Not true to the recording:
 - Resources one team gave another. A playback shows none sent and none received. This is issue #4011.
 - The totals in the end of game statistics, such as all the metal a team ever made. The engine keeps those itself and nothing can set them.
 - The players in the match show under the names they had, in the players list and over their commanders, but the game treats them as not connected. Splinter Faction marks each with a red "dc". You are listed as a spectator called CoilboxPlayback.
-- The clock in the players list starts at nothing each time the playback is opened. The game's day and night and its weather follow that clock, so a moment that was dark in the match can be light. The engine's clock only counts up and cannot be set to the moment you seek to. This is issue #4013.
+- In Splinter Faction the clock in the players list starts at nothing each time the playback is opened. In Beyond All Reason the time and the speed under the players list are the game's own in the same way. Its Player View button, which follows a player's camera, is switched off during playback. The game's day and night and its weather follow that clock, so a moment that was dark in the match can be light. The engine's clock only counts up and cannot be set to the moment you seek to. This is issue #4013.
 - In Splinter Faction, the menu at the top right stays whole. Its Resign button does nothing for a spectator and its Sharing button does nothing in a playback.
 - In Splinter Faction, the build menu and order buttons show for a selected unit. Orders go nowhere. In Beyond All Reason neither shows.
 - In Beyond All Reason, energy income can read higher than the match's, by as much as 17% late in the match it was checked on. Metal and energy held, storage and spending are the match's.
@@ -167,7 +169,6 @@ Not true to the recording:
 - `[` and `]` do nothing in the engine, as above. This is issue #3978.
 - Splinter Faction and Beyond All Reason are the games with a tailored setup. In another game nothing is switched off or hidden, and the match still plays.
 - Beyond All Reason's setup was checked on a match between two of its own AIs. A match against raptors or scavengers, a territory match and a match on a lava map have not been played back, and the panels that belong to those modes do not show.
-- A jump across a long Beyond All Reason match stops the picture for 166 to 241 ms in the runs measured, while the ground is set back to how it was. Issue #4025 is about it.
 - Recording needs the replay's engine, game and map installed. Coilbox can offer another installed engine or game version, and keeps the result only when it matches the match exactly.
 
 For how the track is stored, see the [replay track format](../reference/replay-track-format.md). If you make a game, see [Replay rewind for your game](../developers/replay-rewind.md).

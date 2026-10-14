@@ -28,7 +28,8 @@
 -- under move control (ParseScriptMoveType).
 --
 -- Spring.SetHeightMap raises outside Spring.SetHeightMapFunc, and takes x and z
--- in elmos, which it divides by 8 and cuts to a whole number.
+-- in elmos, which it divides by 8 and cuts to a whole number. Its fourth
+-- argument scales the change, so 0 touches a corner and leaves its height.
 --
 -- Spring.SpawnProjectile gives nothing for a weapon definition the engine does
 -- not have and raises when its second argument is not a table. The calls that
@@ -163,6 +164,12 @@ function M.new(options)
 	function world.ground()
 		return 0
 	end
+	--- The map's own height at a corner, before anything changed it, in corners.
+	-- A test replaces it. The engine always gives a number, and this gives nil
+	-- so that a test that does not care sees the track's own heights.
+	function world.origin()
+		return nil
+	end
 	local ZERO = { 0, 0, 0 }
 
 	local teamList = options.teams or { { id = 0, allyTeam = 0 }, { id = 1, allyTeam = 1 }, { id = 2, allyTeam = 2 } }
@@ -226,7 +233,12 @@ function M.new(options)
 
 	local Spring = {}
 
+	-- `world.lines` has the lines logged either way: on the engine's log, which
+	-- the console shows, and in the playback's log file, which the unsynced half
+	-- writes what the synced half sends it to. `world.echoed` counts the first.
+	world.echoed = 0
 	function Spring.Echo(line)
+		world.echoed = world.echoed + 1
 		world.lines[#world.lines + 1] = tostring(line)
 	end
 
@@ -1226,6 +1238,10 @@ function M.new(options)
 		return world.ground(x, z)
 	end
 
+	function Spring.GetGroundOrigHeight(x, z)
+		return world.origin(math.floor(x / SQUARE), math.floor(z / SQUARE))
+	end
+
 	function Spring.PlaySoundFile(name, volume, x, y, z, channel)
 		local n = world.soundCount + 1
 		world.soundCount = n
@@ -1348,20 +1364,57 @@ function M.new(options)
 
 	-- The heightmap.
 
+	-- The rectangle of corners the calls inside one SetHeightMapFunc touched,
+	-- which is what the engine works out again afterwards (CBasicMapDamage::
+	-- RecalcArea in rts/Map/BasicMapDamage.cpp). It skips a rectangle of no
+	-- area, so corners set along one line are never worked out again.
+	-- `world.heightMapRects` has one `{ x1, x2, z1, z2, changed }` for each call
+	-- that touched a corner, `changed` being how many corners it moved, while
+	-- `world.recordRects` is true. Recording allocates, so it is off for a test
+	-- that counts allocations.
+	world.heightMapRects = {}
+	local rect
+
 	function Spring.SetHeightMapFunc(fn, ...)
 		assert(not world.inHeightMap, "SetHeightMapFunc() recursion is not permitted")
 		world.heightMapCalls = (world.heightMapCalls or 0) + 1
 		world.inHeightMap = true
+		rect = nil
 		fn(...)
 		world.inHeightMap = false
+		if rect and world.recordRects then
+			world.heightMapRects[#world.heightMapRects + 1] = rect
+		end
 	end
 
-	function Spring.SetHeightMap(x, z, height)
+	--- `terraform` scales the change, as the engine's fourth argument does: the
+	-- corner moves that share of the way to `height`.
+	function Spring.SetHeightMap(x, z, height, terraform)
 		if not world.inHeightMap then
 			error("SetHeightMap() can only be called in SetHeightMapFunc()", 2)
 		end
 		local cx, cz = math.floor(x / SQUARE), math.floor(z / SQUARE)
-		world.heights[cz * 65536 + cx] = height
+		local key = cz * 65536 + cx
+		local old = world.heights[key]
+		if terraform then
+			if old then
+				height = old + (height - old) * terraform
+			else
+				height = nil
+			end
+		end
+		world.heights[key] = height
+		if not world.recordRects then
+			return
+		end
+		if not rect then
+			rect = { cx, cx, cz, cz, 0 }
+		end
+		rect[1], rect[2] = math.min(rect[1], cx), math.max(rect[2], cx)
+		rect[3], rect[4] = math.min(rect[3], cz), math.max(rect[4], cz)
+		if height ~= old then
+			rect[5] = rect[5] + 1
+		end
 	end
 
 	--- The height the test last saw set at a corner, or nil.
@@ -1402,7 +1455,14 @@ function M.new(options)
 			constructionDecay = options.constructionDecay == true,
 			constructionDecaySpeed = 0.03,
 		},
+		-- What every synced gadget shares.
+		GG = {},
 		SendToUnsynced = function(name, phase, a, made, removed, team)
+			if name == "coilbox_rewind_log" then
+				-- A line for the playback's log file, which the unsynced half writes.
+				world.lines[#world.lines + 1] = phase
+				return
+			end
 			if name == "coilbox_rewind_arrive" then
 				-- A unit that wants an arrival effect: its id, where it is, its team.
 				-- It is one of the world's events, as a creation is.

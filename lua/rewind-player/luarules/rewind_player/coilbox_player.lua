@@ -227,9 +227,14 @@ function M.new(track, options)
 	-- Whether the engine tells the player when a frame is over. `arrives` is
 	-- true in a frame when the frame before ended with that call.
 	local post = { arrives = false }
+	-- The share of a frame's time a seek's work has used so far. The terrain
+	-- stage sets `ground` and the units stage adds its own to it, so that the
+	-- ground of a seek comes before its units (issue #4025).
+	local share = { ground = 0 }
 	local context = {
 		on = on,
 		post = post,
+		share = share,
 		adapter = options.adapter,
 		hooks = hooks,
 		track = track,
@@ -247,11 +252,14 @@ function M.new(track, options)
 		scriptCallIns = options.scriptCallIns,
 	}
 	-- A stage whose calls the engine lacks is the one that does nothing.
-	local terrain = on.terrain and Terrain.new(context, Reader) or OFF
+	local terrain = on.terrain and Terrain.new(context) or OFF
 	local featureStage = on.features and Features.new(context, Rotation) or OFF
 	local units = Units.new(context, Rotation)
 	if options.budget then
 		units:setBudget(options.budget)
+		if terrain.setBudget then
+			terrain:setBudget(options.budget)
+		end
 	end
 	-- Aiming pieces are posed on the units the stage before it made.
 	local aim = on.aimPoses and Aim.new(context, units) or OFF
@@ -421,12 +429,13 @@ end
 --- Whether the world is the track at the time shown: no seek is waiting to be
 -- shown and no stage left work for a later frame.
 function Player:settled()
-	return not self.clock.pending and not self.units.unsettled and not self.projectiles.unsettled
+	return not self.clock.pending and not self.terrain.unsettled and not self.units.unsettled and not self.projectiles.unsettled
 end
 
---- How many units the last frame made, and how many it removed.
+--- How many units the last frame made, how many it removed, and how many
+-- corners of the ground it set for a seek.
 function Player:worked()
-	return self.units.made, self.units.removed
+	return self.units.made, self.units.removed, self.terrain.done or 0
 end
 
 --- A Lua message. True when it was the player's, done or refused, and false
@@ -435,14 +444,25 @@ function Player:message(text)
 	if text:sub(1, #M.BUDGET) == M.BUDGET then
 		if text == M.BUDGET .. "none" then
 			self.units:setBudget(math.huge)
+			if self.terrain.setBudget then
+				self.terrain:setBudget(math.huge)
+			end
 			return true
 		end
-		local make, remove = text:match("^(%S+) (%S+)$", #M.BUDGET + 1)
+		local rest = text:sub(#M.BUDGET + 1)
+		local make, remove, ground = rest:match("^(%S+) (%S+)$")
+		if not make then
+			make, remove, ground = rest:match("^(%S+) (%S+) (%S+)$")
+			ground = whole(ground) or false
+		end
 		make, remove = whole(make), whole(remove)
-		if make and remove then
+		if make and remove and ground ~= false then
 			self.units:setBudget(make, remove)
+			if ground and self.terrain.setBudget then
+				self.terrain:setBudget(ground)
+			end
 		else
-			self.log("the message \"" .. text .. "\" was refused: the budget is two whole numbers of 1 or more, the most units made and the most removed in a frame")
+			self.log("the message \"" .. text .. "\" was refused: the budget is two or three whole numbers of 1 or more, the most units made and the most removed in a frame, and the most corners of the ground set in a frame")
 		end
 		return true
 	end

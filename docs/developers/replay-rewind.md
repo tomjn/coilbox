@@ -265,7 +265,7 @@ Two things stay in Splinter Faction because there is no way to take them out cle
 ## Finding what to switch off
 
 1. Play a recorded match with no adapter. Open the replay with "Watch with rewind" in coilbox, with no adapter of your own in the archive.
-2. Open the engine's `infolog.txt` and read the lines that start `COILBOX_REWIND_PLAYER`. Each says something the base game did that the track does not have. [The log](#the-log) lists them.
+2. Open `coilbox_rewind.log`, in the engine's write folder beside `infolog.txt`, and read the lines that start `COILBOX_REWIND_PLAYER`. Each says something the base game did that the track does not have. [The log](#the-log) lists them.
 3. Find the gadgets the engine loaded, in lines that read `Loaded SYNCED gadget:  <name>  <file>.lua`. Read the ones that end a game, spawn units or kill teams.
 4. Look at the screen. Note any widget that offers something a spectator cannot do, and any that draws at the bottom centre.
 5. Put the file names in `gadgets` and `widgets`, and the definitions in `units` and `features`.
@@ -276,6 +276,8 @@ A gadget that an adapter switches off is not in the engine's `Loaded SYNCED gadg
 If you add an adapter to coilbox's own set instead, the steps and the tests that check a shipped adapter are in [`lua/rewind-player/README.md`](https://github.com/tomjn/coilbox/blob/main/lua/rewind-player/README.md), under "Writing one for a game".
 
 ### The log
+
+The player, the timeline and the queued building ghosts write their lines to `coilbox_rewind.log` in the engine's write folder, beside `infolog.txt`. The file is emptied each time a playback starts. The lines are not in `infolog.txt` and not in the game's console, because a viewer would read them as errors, and the engine sends every line of its own log to the console too.
 
 The player logs which adapter it has, once, when it starts.
 
@@ -289,14 +291,14 @@ The first line is an example of an adapter that switches off 2 gadgets and 1 wid
 
 Other lines you may see.
 
-- `COILBOX_REWIND_PLAYER failed:` means there is no track or a bad one, and nothing plays.
+- `COILBOX_REWIND_PLAYER failed:` means there is no track or a bad one, and nothing plays. The timeline shows the reason too, since a viewer sees nothing of the log.
 - `COILBOX_REWIND_PLAYER this engine has no Spring.SetHeightMapFunc. Switched off: ground changes. ...` names a call the engine lacks and the one feature it switches off. The rest plays. A line that starts `COILBOX_REWIND_PLAYER cannot play:` means a call that cannot be done without, and nothing plays.
 - `COILBOX_REWIND_PLAYER the message "..." was refused:` and a reason is a message to the player it did not accept.
 - `COILBOX_REWIND_PLAYER the health of a unit of the track changed with no damage to hear of` means a gadget of your game raised a unit's health. Put that gadget in your adapter.
 - `COILBOX_REWIND_PLAYER slow frame:` means a frame's work took longer than a simulation frame lasts.
 - The player logs once by name a weapon your game does not have and a unit or feature definition it cannot find, and leaves them out.
 - Creating a unit for a dead team, or for one at its unit limit, gives nothing and no error. The player logs it once for each team and tries the unit again after the next seek.
-- The guard that stops the base game killing a team or ending the match logs the first ask of each, and a team that dies anyway.
+- The guard that stops the base game killing a team or ending the match logs the first ask of each, and a team that dies anyway. Without the player in the game, the guard's lines go to `infolog.txt`.
 
 ## What the player does without an adapter
 

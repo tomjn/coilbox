@@ -87,13 +87,34 @@ local BUDGET = "coilbox_rewind_budget:"
 -- arrival effect: the unit's id, its x, y and z and its team.
 local ARRIVE = "coilbox_rewind_arrive"
 
+--- What the synced half sends the unsynced one for a line of the log, which
+-- the unsynced half writes to the playback's log file (issue #4032,
+-- coilbox_log.lua). The lines are for whoever works on the player, and a viewer
+-- would read them as errors, so none goes to the engine's log, which the
+-- console shows.
+local LOG = "coilbox_rewind_log"
+
 if gadgetHandler:IsSyncedCode() then
 	local player
 	-- What the engine has, from coilbox_player_engine.lua.
 	local engine
 
+	-- The unsynced half loads after every synced gadget has, so a line sent
+	-- before the first frame would reach nobody. Those lines wait for it.
+	local waiting = {}
 	local function log(text)
-		Spring.Echo(PREFIX .. text)
+		local line = PREFIX .. text
+		if type(SendToUnsynced) ~= "function" then
+			Spring.Echo(line)
+		elseif waiting then
+			waiting[#waiting + 1] = line
+		else
+			SendToUnsynced(LOG, line)
+		end
+	end
+	-- The guard gadget's lines come this way too.
+	if GG then
+		GG.coilboxRewindLog = log
 	end
 
 	-- The call-ins of each Lua unit script, by unit id. A game's script
@@ -158,14 +179,22 @@ if gadgetHandler:IsSyncedCode() then
 		local Player = VFS.Include("luarules/rewind_player/coilbox_player.lua")
 		local Adapter = VFS.Include("luarules/rewind_player/coilbox_player_adapter.lua")
 
+		-- Playback that does not start says why on the timeline too, since a
+		-- viewer sees nothing of the log.
+		local function failed(why)
+			log("failed: " .. tostring(why))
+			if not engine.note and Spring.SetGameRulesParam then
+				Spring.SetGameRulesParam(Engine.NOTE_PARAM, "Playback did not start: " .. tostring(why))
+			end
+		end
 		local fetch, why = Fetch.fromVFS()
 		if not fetch then
-			log("failed: " .. tostring(why))
+			failed(why)
 			return
 		end
 		local track, openWhy = Track.open(fetch)
 		if not track then
-			log("failed: " .. tostring(openWhy))
+			failed(openWhy)
 			return
 		end
 		-- The game's adapter, which coilbox wrote into the playback game. Its
@@ -194,7 +223,7 @@ if gadgetHandler:IsSyncedCode() then
 			scriptCallIns = scriptCallIns,
 		})
 		if not made then
-			log("failed: " .. tostring(madeWhy))
+			failed(madeWhy)
 			return
 		end
 		player = made
@@ -217,6 +246,13 @@ if gadgetHandler:IsSyncedCode() then
 	end
 
 	function gadget:GameFrame(frame)
+		if waiting then
+			local lines = waiting
+			waiting = nil
+			for i = 1, #lines do
+				SendToUnsynced(LOG, lines[i])
+			end
+		end
 		if not player then
 			return
 		end
@@ -313,8 +349,11 @@ else
 	-- What this half needs from the engine, from coilbox_player_engine.lua.
 	local Engine = VFS.Include("luarules/rewind_player/coilbox_player_engine.lua")
 	local engine = Engine.check({ Spring = Spring, Game = Game, gl = gl, GL = GL }, Engine.UNSYNCED)
+	-- The playback's log file, emptied as this half loads, which is before any
+	-- widget writes to it.
+	local write = VFS.Include("luarules/rewind_player/coilbox_log.lua").new(io, Spring.Echo, true)
 	for _, line in ipairs(engine.lines) do
-		Spring.Echo(PREFIX .. line)
+		write(PREFIX .. line)
 	end
 
 	-- How long one simulation frame lasts, in milliseconds. Work that takes
@@ -363,14 +402,49 @@ else
 		end
 	end
 
+	-- The engine's own pause and speed (issue #4033). The player's pause is its
+	-- own, and the world only moves on simulation frames, so a paused engine
+	-- would hold a seek too, and a faster one would play faster than the timeline
+	-- says. A game can do either with a key or a chat command, as Beyond All
+	-- Reason's pause key does. So the engine is given back its speed and the ask
+	-- goes to the player as the timeline's own: a pause plays or pauses, and a
+	-- speed up or down is the next speed up or down. The engine stays paused, or
+	-- at its new speed, until the server answers, over several drawn frames, so
+	-- each is handed on once.
+	if engine.on.enginePace then
+		-- Whether a pause has been handed on, and the speed last handed on.
+		local unpausing, handled = false, 1
+		local function tell(command)
+			if engine.on.budgetMessage then
+				Spring.SendLuaRulesMsg("coilbox_rewind:" .. command)
+			end
+		end
+		function gadget:Update()
+			local wanted, _, paused = Spring.GetGameSpeed()
+			if paused and not unpausing then
+				unpausing = true
+				Spring.SendCommands("pause 0")
+				tell("toggle")
+			elseif not paused then
+				unpausing = false
+			end
+			if wanted ~= 1 and wanted ~= handled then
+				Spring.SendCommands("setspeed 1")
+				tell(wanted > handled and "faster" or "slower")
+			end
+			handled = wanted
+		end
+	end
+
 	local started
 	-- How long the work of the frame's GameFrame took, for its GameFramePost to
 	-- add to.
 	local framed = 0
 	local lastLine
 	local slow, worst = 0, 0
-	-- How many units a frame may make and remove, as last sent.
-	local makeBudget, removeBudget = FIRST_BUDGET, FIRST_BUDGET
+	-- How many units a frame may make and remove, and how many corners of the
+	-- ground it may set for a seek (issue #4025), as last sent.
+	local makeBudget, removeBudget, groundBudget = FIRST_BUDGET, FIRST_BUDGET, FIRST_BUDGET
 
 	--- The budget after a frame in which `count` units took `took` milliseconds,
 	-- for a budget that was `budget`. Each took that long with the rest of the
@@ -391,35 +465,44 @@ else
 		return budget
 	end
 
-	--- A frame made `made` units and removed `removed` in `took` milliseconds.
-	-- Making costs the engine something other than removing, so only a frame that
-	-- did one of them says what that one costs. A frame that did neither ends a
-	-- seek, and the budgets go back to one. What a unit costs moves with how many
-	-- there are, from 0.28 to 0.5 ms to make and from 0.13 to 0.37 ms to remove
-	-- in a headless run of issue #3988 as the count went from none to 400 and
-	-- from 400 to none, so what one seek ended on is not safe for the start of
-	-- the next. Each starts from one and doubles each frame while the cost
-	-- allows.
-	local function retune(took, made, removed)
-		local make, remove = makeBudget, removeBudget
-		if made + removed == 0 then
+	--- A frame made `made` units, removed `removed` and set `ground` corners of a
+	-- seek's ground in `took` milliseconds. Each costs the engine something of
+	-- its own, so only a frame that did one of them says what that one costs. A
+	-- frame that did none ends a seek, and the unit budgets go back to one. What
+	-- a unit costs moves with how many there are, from 0.28 to 0.5 ms to make and
+	-- from 0.13 to 0.37 ms to remove in a headless run of issue #3988 as the count
+	-- went from none to 400 and from 400 to none, so what one seek ended on is not
+	-- safe for the start of the next. Each starts from one and doubles each frame
+	-- while the cost allows. The ground budget is kept from one seek to the next,
+	-- since what a corner costs is the engine's work round it and does not move
+	-- with what else is in the world (lua/rewind-player/README.md has the
+	-- measurements). A frame that took too long still cuts it.
+	local function retune(took, made, removed, ground)
+		local make, remove, earth = makeBudget, removeBudget, groundBudget
+		if made + removed + ground == 0 then
 			make, remove = FIRST_BUDGET, FIRST_BUDGET
-		elseif made > 0 and removed == 0 then
+		elseif ground > 0 and made + removed == 0 then
+			earth = fit(took, ground, groundBudget)
+		elseif made > 0 and removed + ground == 0 then
 			make = fit(took, made, makeBudget)
-		elseif removed > 0 and made == 0 then
+		elseif removed > 0 and made + ground == 0 then
 			remove = fit(took, removed, removeBudget)
 		end
-		if make ~= makeBudget or remove ~= removeBudget then
-			makeBudget, removeBudget = make, remove
-			Spring.SendLuaRulesMsg(BUDGET .. make .. " " .. remove)
+		if make ~= makeBudget or remove ~= removeBudget or earth ~= groundBudget then
+			makeBudget, removeBudget, groundBudget = make, remove, earth
+			Spring.SendLuaRulesMsg(BUDGET .. make .. " " .. remove .. " " .. earth)
 		end
 	end
 
-	function gadget:RecvFromSynced(name, phase, frame, made, removed, team)
+	function gadget:RecvFromSynced(name, phase, frame, made, removed, ground)
+		if name == LOG then
+			write(phase)
+			return true
+		end
 		if name == ARRIVE then
 			-- A unit's id, its place and its team, where the work's arguments are.
 			if arrival then
-				arrival:add(phase, frame, made, removed, team)
+				arrival:add(phase, frame, made, removed, ground)
 			end
 			return true
 		end
@@ -463,7 +546,7 @@ else
 		else
 			framed = took
 			if made and removed and engine.on.budgetMessage then
-				retune(took, made, removed)
+				retune(took, made, removed, ground or 0)
 			end
 		end
 		if took <= LIMIT then
@@ -474,7 +557,7 @@ else
 			worst = took
 		end
 		if not lastLine or frame - lastLine >= QUIET_FRAMES then
-			Spring.Echo(
+			write(
 				string.format(
 					"%sslow frame: the work of frame %d took %.1f ms, and a simulation frame lasts %.1f ms. %d slow since the last line, the slowest %.1f ms",
 					PREFIX,

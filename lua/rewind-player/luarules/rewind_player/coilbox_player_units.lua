@@ -122,6 +122,8 @@ function M.new(context, rotation)
 		Spring = Spring,
 		MoveCtrl = Spring.MoveCtrl,
 		euler = rotation.euler,
+		-- The share of the frame a seek's ground used (coilbox_player_terrain.lua).
+		share = context.share or { ground = 0 },
 		names = names,
 		defID = defID,
 		floor = floor,
@@ -477,10 +479,12 @@ function Units:remove(t, clock)
 	local loud = clock:watched() and not self.seeking
 	local indexOf = self.indexOf
 	local budget = self.removeBudget
+	-- What the ground of a seek used of the frame comes off the share first.
+	local ground = self.share.ground
 	for serial, unitID in next, self.unitOf do
 		local i = indexOf[serial]
 		if not i or not w:unitExistsAt(i, t) then
-			if self.removed >= budget then
+			if ground + self.removed / budget >= 1 then
 				self.removing = true
 				break
 			end
@@ -491,7 +495,7 @@ function Units:remove(t, clock)
 
 	local strangers = self.strangers
 	local n = self.strangerCount
-	while n > 0 and self.removed < budget do
+	while n > 0 and ground + self.removed / budget < 1 do
 		self.removed = self.removed + 1
 		self:evict(strangers[n])
 		strangers[n] = nil
@@ -721,6 +725,7 @@ function Units:place(t, clock)
 	end
 	local makeBudget, removeBudget, defID = self.makeBudget, self.removeBudget, self.defID
 	local unitOf, failed = self.unitOf, self.failed
+	local ground = self.share.ground
 	local serials = w.unitSerial
 	-- While a seek's units arrive and the viewer's place is known, a unit to be
 	-- made waits for the walk in the view's order below.
@@ -730,7 +735,7 @@ function Units:place(t, clock)
 		if w:unitExistsAt(i, t) then
 			local serial = serials[i]
 			local unitID = unitOf[serial]
-			if not unitID and not failed[serial] and defID[w.unitDef[i] + 1] and (sorted or self.removing or self.removed / removeBudget + self.made / makeBudget >= 1) then
+			if not unitID and not failed[serial] and defID[w.unitDef[i] + 1] and (sorted or self.removing or ground + self.removed / removeBudget + self.made / makeBudget >= 1) then
 				-- Nothing is made while a removal is left, and what the frame has
 				-- removed uses up its share of the time. A definition the game lacks
 				-- costs nothing, so it is not held back.
@@ -747,7 +752,7 @@ function Units:place(t, clock)
 		end
 		local order = self.order
 		for k = 1, self.orderCount do
-			if self.removed / removeBudget + self.made / makeBudget >= 1 then
+			if ground + self.removed / removeBudget + self.made / makeBudget >= 1 then
 				break
 			end
 			local i = order[k]
@@ -759,7 +764,7 @@ function Units:place(t, clock)
 		end
 		-- A unit that play brought in since the order was worked out is not in
 		-- it, so the order is worked out again for the next frame.
-		if waiting > 0 and self.removed / removeBudget + self.made / makeBudget < 1 then
+		if waiting > 0 and ground + self.removed / removeBudget + self.made / makeBudget < 1 then
 			self.orderStale = true
 		end
 		self.unsettled = waiting > 0

@@ -61,9 +61,32 @@ function M.new(clock)
 
 	local Spring = {}
 
+	-- `e.echoed` counts the lines on the engine's log, which the console shows.
+	e.echoed = 0
 	function Spring.Echo(line)
+		e.echoed = e.echoed + 1
 		e.lines[#e.lines + 1] = line
 	end
+
+	-- `io` for the playback's log file. What is written to it goes into
+	-- `e.lines` with the engine's log, and `e.files` has each file opened with
+	-- its mode. `clock.noFile` is a file that cannot be opened.
+	e.files = {}
+	e.io = {
+		open = function(path, mode)
+			if clock.noFile then
+				return nil, "denied"
+			end
+			e.files[#e.files + 1] = path .. " " .. mode
+			return {
+				write = function(_, line)
+					e.lines[#e.lines + 1] = line
+				end,
+				flush = function() end,
+				close = function() end,
+			}
+		end,
+	}
 
 	function Spring.GetTimer()
 		return clock.now
@@ -76,6 +99,33 @@ function M.new(clock)
 			return (a - b) / 1000
 		end
 		return a - b
+	end
+
+	-- The engine's own speed and pause (Spring.GetGameSpeed in
+	-- rts/Lua/LuaUnsyncedRead.cpp), which `pause` and `setspeed` change. The
+	-- commands sent are collected in `clock.commands`.
+	e.speed = { wanted = 1, paused = false }
+	clock.commands = clock.commands or {}
+
+	function Spring.GetGameSpeed()
+		return e.speed.wanted, e.speed.wanted, e.speed.paused
+	end
+
+	function Spring.SendCommands(command)
+		clock.commands[#clock.commands + 1] = command
+		-- The server answers a command a little later. `clock.held` keeps it
+		-- from taking effect, the way the frames before the answer see it.
+		if clock.held then
+			return
+		end
+		local pause = command:match("^pause (%d)$")
+		if pause then
+			e.speed.paused = pause == "1"
+		end
+		local speed = tonumber(command:match("^setspeed (%S+)$"))
+		if speed then
+			e.speed.wanted = speed
+		end
 	end
 
 	function Spring.SendLuaRulesMsg(text)
