@@ -78,9 +78,9 @@ local function clear(list)
 	end
 end
 
---- `context` is the player's (see coilbox_player.lua), `units` its units stage
--- and `clock` coilbox_player_clock.lua.
-function M.new(context, units, clock)
+--- `context` is the player's (see coilbox_player.lua), `units` its units stage,
+-- `clock` coilbox_player_clock.lua and `terrain` its terrain stage.
+function M.new(context, units, clock, terrain)
 	local Spring, Game, on = context.Spring, context.Game, context.on
 	local header = context.track.header
 	local names = context.info.weaponDefs
@@ -142,6 +142,7 @@ function M.new(context, units, clock)
 		track = context.track,
 		Spring = Spring,
 		units = units,
+		terrain = terrain,
 		near = clock.NEAR_SPEED,
 		-- Missing before engine 2025.03.9, which coilbox_player_engine.lua checks.
 		-- `release` is the one place it is used.
@@ -270,9 +271,10 @@ function Projectiles:remove(t)
 	end
 
 	-- A seek can leave the engine units the track does not have, which the units
-	-- stage takes away over some frames. A shot put in the air meanwhile could hit
-	-- one, so there are none until they are gone (issue #4026).
-	self.waiting = self.units.seeking
+	-- stage takes away over some frames, and ground the track does not have, which
+	-- the terrain stage moves over some frames. A shot put in the air meanwhile
+	-- could hit either, so there are none until both are done (issue #4026).
+	self.waiting = self.units.seeking or self.terrain.unsettled == true
 	if self.waiting then
 		for serial, id in next, self.idOf do
 			self:delete(serial, id)

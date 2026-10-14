@@ -486,6 +486,30 @@ do
 	t.same("one that removes four with a budget of one takes it away until they are", world.projectileCount(), 0)
 end
 
+-- The ground of a seek is moved over frames too, and a shot held above the
+-- ground of the frame before can be under the ground the next frame moves
+-- (issue #4026). No shot is made until the ground is the track's.
+
+do
+	local rows = {}
+	for n = 1, 4 do
+		rows[n] = { 150, n * 100, n * 100, 0, 20 }
+	end
+	local rocket = { weapon = ROCKET, first = 100, last = 300, at = flight(100, { 0, 50, 0 }, { 0, 0, 1 }) }
+	local world, player = setup({ last = 400, terrain = rows, projectiles = { rocket } }, { budget = 1 })
+	send(player, "pause")
+	run(world, player, 6)
+	seek(world, player, 120)
+	run(world, player, 6)
+	t.same("before the ground changes the shot is held", world.projectileCount(), 1)
+	seek(world, player, 200)
+	t.same("a seek whose ground takes frames has no shot in the frame it is shown", world.projectileCount(), 0)
+	t.same("and the player is not settled", player:settled(), false)
+	run(world, player, 10)
+	t.same("the shot is made once the ground is the track's", world.projectileCount(), 1)
+	t.same("and the player is settled", player:settled(), true)
+end
+
 -- A shot is made by its owner so that the engine ignores that unit. One whose
 -- unit is not in the world when it is made has none, and has to be made again
 -- when the unit is, or it hits the unit it was fired from when play goes back

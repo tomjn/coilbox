@@ -269,7 +269,7 @@ function M.new(track, options)
 	-- Scripts are told what their units do, and builders' work is published.
 	-- Each of its rows switches off a part of it, so the stage is always made.
 	local animation = Animation.new(context, units, aim ~= OFF and aim or nil, featureStage ~= OFF and featureStage or nil)
-	local projectiles = on.shots and Projectiles.new(context, units, Clock) or OFF
+	local projectiles = on.shots and Projectiles.new(context, units, Clock, terrain) or OFF
 	-- A track from before recorder version 4 has no team's resources in it.
 	local resources = OFF
 	if (header.recorderVersion or 0) >= RESOURCES_SINCE then

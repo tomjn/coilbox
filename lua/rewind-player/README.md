@@ -594,7 +594,7 @@ Three places are not the track's, each because the engine would otherwise land t
 Two more things keep a held shot from landing, both found in Beyond All Reason's match (issue #4026):
 
 - A shot is made with the unit that fired it as its owner, and the engine skips the owner when it looks for a hit. A shot made while its unit is not in the world has no owner, as when play goes backward from after the unit's death, and at its first frame it is in the barrel, so it hit the unit it was fired from. The stage keeps which shots were made with no owner, and makes one again when its unit is back.
-- After a seek the engine can have units the track does not for the frames the units stage takes to remove them, which its budget spreads over frames. A shot made in those frames can hit one: a shell made at a seek hit an extractor that the track had gone by then. So while the units stage has a seek's removals to do, the stage has no shots, and the player is not settled.
+- After a seek the engine can have units the track does not for the frames the units stage takes to remove them, which its budget spreads over frames. A shot made in those frames can hit one: a shell made at a seek hit an extractor that the track had gone by then. The terrain stage moves a seek's ground over frames as well, and a shot held above the ground of one frame can be under the ground the next moves. So while the units stage has a seek's removals to do, or the terrain stage has ground to move, the stage has no shots, and the player is not settled.
 
 A shot is held at any speed and in either direction, paused included, so it is the same projectile from its first frame to its last.
 
