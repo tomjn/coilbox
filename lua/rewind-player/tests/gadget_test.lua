@@ -178,6 +178,31 @@ do
 	t.check("a team that dies is logged", w.lines[#w.lines]:find("team 1 died", 1, true) ~= nil, w.lines[#w.lines])
 end
 
+-- The gadget wraps the call a game's script framework hands a Lua unit
+-- script's call-ins to the engine with, as its file loads (issue #3797). The
+-- engine still gets them, and a unit that goes is forgotten.
+
+do
+	local w = Engine.new({
+		unitDefs = { { name = "armcom", script = "lua", callins = { StartMoving = function() end } }, { name = "armpw" }, { name = "armsolar" } },
+		featureDefs = { { name = "rock" } },
+	})
+	local engines = w.Spring.UnitScript.CreateScript
+	local gadget = synced(PLAYER, w, { [TRACK] = bytes })
+	w.gadget = gadget
+	t.check("the call is wrapped as the file loads", w.Spring.UnitScript.CreateScript ~= engines)
+	local unitID = w.Spring.CreateUnit("armcom", 0, 0, 0, 0, 0, false, false)
+	t.same("the engine still gets a Lua script's call-ins through the wrap", type(w.units[unitID].luaScript.StartMoving), "function")
+	gadget:Initialize()
+	t.same("a unit that is destroyed raises nothing", pcall(w.Spring.DestroyUnit, unitID, false, true), true)
+
+	-- An engine with no such call has no Lua unit scripts, and the gadget loads.
+	local bare = world()
+	bare.Spring.UnitScript.CreateScript = nil
+	local ok, why = pcall(synced, PLAYER, bare, { [TRACK] = bytes })
+	t.check("without the call the gadget's file still loads", ok, why)
+end
+
 -- The player reads the adapter the playback game holds (issue #3799).
 
 do
