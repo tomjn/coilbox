@@ -958,6 +958,13 @@ mod tests {
             splinter_faction.contains("gameParams = {},"),
             "{splinter_faction}"
         );
+        let beyond_all_reason = request_for("BYAR");
+        assert!(
+            beyond_all_reason.contains(
+                "teamParams = {\"startUnit\", \"mmLevel\", \"mmCapacity\", \"mmUse\", \"mmAvgEffi\"},"
+            ),
+            "{beyond_all_reason}"
+        );
         let other = request_for("some_game");
         assert!(other.contains("teamParams = {},"), "{other}");
     }

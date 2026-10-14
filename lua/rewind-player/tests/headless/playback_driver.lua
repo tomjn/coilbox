@@ -100,6 +100,10 @@ local PARAM = "coilbox_rewind_"
 local SETTLE = 3
 -- Frames a message is waited for before the step is called lost.
 local PATIENCE = 300
+-- The distance said for a unit or a shot of the track that the engine does not
+-- have. It is a number and not an infinity, because the string.format of the
+-- engine's Lua raises for one, which left a run with no report at all.
+local MISSING = 1e9
 -- A file in the playback game that asks for the whole match plan.
 local WHOLE_MATCH = "coilbox_rewind/driver_whole_match.lua"
 -- And one that asks for the plan that looks at a match's shots.
@@ -233,16 +237,47 @@ local function param(name)
 	return Spring.GetGameRulesParam(PARAM .. name)
 end
 
---- The height the track has a corner of the ground at `frame`: the last row
--- that touches it, or the map's own.
-local function trackGround(corner, frame, x, z)
-	local size = Game.squareSize
-	local height = Spring.GetGroundOrigHeight(corner.x * size, corner.z * size)
-	for k = 0, track:windowOf(frame) do
+-- Every row of the track's terrain, by corner: `groundRows[z][x]` is a list of
+-- a frame and the height after it, in the order the track has them. It is made
+-- the first time it is asked for. Reading every window's terrain for each
+-- corner looked at was 1.5 GB of synced Lua in a few frames on a Beyond All
+-- Reason match, whose track has 168,000 rows, and the engine stopped.
+local groundRows
+
+local function indexGround()
+	groundRows = {}
+	for k = 0, track.header.windowCount - 1 do
 		local rows = assert(track:terrain(k))
 		for i = 1, rows.count do
-			if rows.frame[i] <= frame and rows.x[i] == corner.x and rows.z[i] == corner.z then
-				height = rows.after[i]
+			local row = groundRows[rows.z[i]]
+			if not row then
+				row = {}
+				groundRows[rows.z[i]] = row
+			end
+			local list = row[rows.x[i]]
+			if not list then
+				list = {}
+				row[rows.x[i]] = list
+			end
+			list[#list + 1] = rows.frame[i]
+			list[#list + 1] = rows.after[i]
+		end
+	end
+end
+
+--- The height the track has a corner of the ground at `frame`: the last row
+-- that touches it, or the map's own.
+local function trackGround(corner, frame)
+	if not groundRows then
+		indexGround()
+	end
+	local size = Game.squareSize
+	local height = Spring.GetGroundOrigHeight(corner.x * size, corner.z * size)
+	local list = groundRows[corner.z] and groundRows[corner.z][corner.x]
+	if list then
+		for i = 1, #list, 2 do
+			if list[i] <= frame then
+				height = list[i + 1]
 			end
 		end
 	end
@@ -272,7 +307,7 @@ local function lookAtDeathGround()
 				if math.abs(actual - Spring.GetGroundOrigHeight(corner.x * size, corner.z * size)) > 0.001 then
 					changed = changed + 1
 				end
-				worst = math.max(worst, math.abs(actual - trackGround(corner, frame, corner.x, corner.z)))
+				worst = math.max(worst, math.abs(actual - trackGround(corner, frame)))
 			end
 		end
 		say(string.format("death_ground weapon=%s frame=%s crater_mult=%s crater_aoe=%.1f damage_aoe=%.1f looked=%d changed_from_map=%d off_worst=%.3f", def.name, tostring(frame), tostring(def.damages and def.damages.craterMult), def.craterAreaOfEffect or 0, def.damageAreaOfEffect or 0, looked, changed, worst))
@@ -355,7 +390,7 @@ local function measure(label, frame)
 				overBuild = math.max(overBuild, offBuild - slack)
 				overHealth = math.max(overHealth, offHealth - slack)
 			else
-				worstPlace = math.huge
+				worstPlace = MISSING
 			end
 		end
 	end
@@ -367,7 +402,7 @@ local function measure(label, frame)
 	end
 	say(
 		string.format(
-			"%s frame=%s shown=%s track_units=%d engine_units=%d track_features=%d engine_features=%d place=%.4f turn=%.5f health=%.5f build=%.5f health_over=%.5f build_over=%.5f wrong_build_state=%d",
+			"%s frame=%s shown=%s track_units=%d engine_units=%d track_features=%d engine_features=%d place=%.4f turn=%.5f health=%.5f build=%.5f health_over=%.8f build_over=%.8f wrong_build_state=%d",
 			label,
 			tostring(frame),
 			tostring(param("frame")),
@@ -669,7 +704,7 @@ local function measureShots(label, frame, held, shots)
 					worstTurn = math.max(worstTurn, 1 - (vx * shot[4] + vy * shot[5] + vz * shot[6]) / (speed * recorded))
 				end
 			else
-				worstPlace = math.huge
+				worstPlace = MISSING
 			end
 		end
 	end
@@ -680,23 +715,40 @@ end
 -- during a fight and at seeks, a shot followed backward frame by frame, the
 -- fight watched forward at the match's own speed, then at 4x and backward, and
 -- a seek across the whole match and back.
-local function shotPlan()
+--
+-- `asked` is what the file that asks for the plan returns. A table with `from`
+-- and `to` keeps the plan to the shots that are fired and end between those two
+-- frames. A Beyond All Reason match has shots in the air from its first minutes
+-- to its last, and the plan plays the frames its shots span five times over.
+local function shotPlan(asked)
 	local h = track.header
 	local first, last = h.firstFrame, h.lastFrame
 	say(string.format("start first=%d last=%d tolerance=%s step=%s rotation_bits=%d", first, last, tostring(h.tolerance), tostring(h.positionStep), h.rotationBits))
 	local held = weapons()
 	local shots = allShots(held)
-	say("shots held_kinds=" .. #shots)
-	if #shots == 0 then
+	-- The shots whose frames the plan plays. Every shot of the track is still
+	-- measured against, since a frame in the span has shots from outside it.
+	local span = shots
+	if type(asked) == "table" and asked.from and asked.to then
+		span = {}
+		for _, one in ipairs(shots) do
+			if one.first >= asked.from and one.last <= asked.to then
+				span[#span + 1] = one
+			end
+		end
+		say(string.format("shots between from=%d to=%d kept=%d of=%d", asked.from, asked.to, #span, #shots))
+	end
+	say("shots held_kinds=" .. #span)
+	if #span == 0 then
 		SendToUnsynced(REPORT)
 		return
 	end
 
 	-- The frame with the most in the air, and the frames the fight spans.
 	local perFrame, busiest, most = {}, nil, 0
-	local fightStart, fightEnd = shots[1].first, shots[1].last
-	local longest = shots[1]
-	for _, one in ipairs(shots) do
+	local fightStart, fightEnd = span[1].first, span[1].last
+	local longest = span[1]
+	for _, one in ipairs(span) do
 		for frame = one.first, one.last do
 			perFrame[frame] = (perFrame[frame] or 0) + 1
 			if perFrame[frame] > most then
@@ -1609,7 +1661,7 @@ function gadget:GameFrame()
 		elseif VFS.FileExists(SEEKS) then
 			seeksPlan()
 		elseif VFS.FileExists(SHOTS) then
-			shotPlan()
+			shotPlan(VFS.Include(SHOTS))
 		elseif VFS.FileExists(WHOLE_MATCH) then
 			matchPlan()
 		else

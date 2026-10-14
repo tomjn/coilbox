@@ -560,8 +560,66 @@ do
 	end
 	t.same("and one line to say so", said, 1)
 
+	-- The hook that hears a pass is over. A helper that keeps a shape until it is
+	-- told to drop it, as Beyond All Reason's does, needs to hear of every pass,
+	-- the ones that draw nothing too.
+	local d = engine()
+	local passes, asked = {}, 0
+	local keeper = ghosts(d, nil, {
+		adapter = {
+			hooks = {
+				drawQueuedBuilding = function()
+					asked = asked + 1
+				end,
+				queuedBuildingsDrawn = function(count)
+					passes[#passes + 1] = asked .. ":" .. count
+				end,
+			},
+		},
+	})
+	at(d, keeper, 300)
+	keeper:draw()
+	t.same("the adapter is told a pass is over after its last building, with how many it drew", table.concat(passes, " "), "1:1")
+	at(d, keeper, 0)
+	keeper:draw()
+	t.same("and of a pass that drew none", table.concat(passes, " "), "1:1 1:0")
+	at(d, keeper, 300)
+	keeper:setEnabled(false)
+	keeper:draw()
+	t.same("and of a pass with the ghosts switched off", table.concat(passes, " "), "1:1 1:0 1:0")
+	keeper:setEnabled(true)
+	keeper:draw()
+	keeper:close()
+	t.same("and once more when the widget goes", table.concat(passes, " "), "1:1 1:0 1:0 2:1 2:0")
+
+	local r = engine()
+	local raised = 0
+	local wrong = ghosts(r, nil, {
+		adapter = {
+			hooks = {
+				queuedBuildingsDrawn = function()
+					raised = raised + 1
+					error("nothing to drop")
+				end,
+			},
+		},
+	})
+	at(r, wrong, 300)
+	wrong:draw()
+	wrong:draw()
+	t.same("an end of pass hook that raises is called once", raised, 1)
+	t.same("and the engine's shape goes on being drawn", r.shapes, 2)
+	local told = 0
+	for _, line in ipairs(r.lines) do
+		if line:find("queuedBuildingsDrawn hook raised", 1, true) then
+			told = told + 1
+		end
+	end
+	t.same("with one line to say so", told, 1)
+
 	local plain = ghosts(engine(), nil, { adapter = { hooks = { afterFrame = hook } } })
 	t.same("an adapter with other hooks leaves the drawing alone", plain.hook, nil)
+	t.same("and is told of no pass", plain.drawnHook, nil)
 	local none = ghosts(engine(), nil, { adapter = false })
 	t.same("no adapter is no hook", none.hook, nil)
 end

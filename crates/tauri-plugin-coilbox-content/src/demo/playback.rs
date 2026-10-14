@@ -1712,6 +1712,8 @@ end
         )
         .expect("the recording run");
         assert_eq!(run.report.status, AnalysisStatus::Reproduced);
+        let dump_bytes = std::fs::metadata(&dump).map(|m| m.len()).unwrap_or(0);
+        let thinning = std::time::Instant::now();
         track_store::store(&tracks, &game_id, |track| {
             thin_dump_cancellable(
                 &dump,
@@ -1725,6 +1727,18 @@ end
             .map(|_| ())
         })
         .expect("a track is stored");
+        // What a recording cost, for whoever is measuring a game or a match.
+        eprintln!(
+            "recorded: engine_seconds={:.1} dump_bytes={} thin_seconds={:.1} track_bytes={}",
+            run.report.exit.wall_seconds,
+            dump_bytes,
+            thinning.elapsed().as_secs_f64(),
+            track_store::track_path(&tracks, &game_id)
+                .ok()
+                .and_then(|path| std::fs::metadata(path).ok())
+                .map(|m| m.len())
+                .unwrap_or(0),
+        );
 
         // 2. Write the playback game and its start script.
         let content = dir.path().join("content");
@@ -2391,6 +2405,112 @@ end
             .collect()
     }
 
+    /// What a whole match played with a game's adapter has to show, whatever the
+    /// game: the driver's lines of `adapted`, the log of a launch with the
+    /// adapter. The engine has the track's units and features at both ends of
+    /// play, at all ten seeks, past a death and after a wounded unit was held,
+    /// the wounded unit's health never moved, no team is dead, the match is not
+    /// over and no Lua raised.
+    fn a_whole_match_agrees_with_its_track(adapted: &str) {
+        let driver = driver_lines(adapted);
+        let line = |start: &str| {
+            *driver
+                .iter()
+                .find(|l| l.starts_with(start))
+                .unwrap_or_else(|| panic!("no driver line starting {start}"))
+        };
+        let start = line("start ");
+        let (first, last) = (number(start, "first"), number(start, "last"));
+        let tolerance = number(start, "tolerance");
+        let rounding = 6f64.sqrt() / (2f64.powf(number(start, "rotation_bits") - 1.0) - 1.0);
+        // One step of health, which the player keeps a living unit above none
+        // by, and half the last digit the driver prints it to.
+        let fraction = 1.0 / 65535.0 + 0.5e-8;
+        let agrees = |l: &str| {
+            assert_eq!(field(l, "shown"), field(l, "frame"), "{l}");
+            assert_eq!(field(l, "engine_units"), field(l, "track_units"), "{l}");
+            assert_eq!(
+                field(l, "engine_features"),
+                field(l, "track_features"),
+                "{l}"
+            );
+            assert!(number(l, "place") <= tolerance, "{l}");
+            assert!(number(l, "turn") <= rounding, "{l}");
+            assert!(number(l, "health_over") <= fraction, "{l}");
+            assert!(number(l, "build_over") <= fraction, "{l}");
+            assert_eq!(field(l, "wrong_build_state"), "0", "{l}");
+        };
+        assert!(!driver.iter().any(|l| l.starts_with("lost ")), "{driver:?}");
+
+        // Forward to the end and backward to the start, each the whole match.
+        let forward = line("played_forward ");
+        assert_eq!(number(forward, "frame"), last, "{forward}");
+        agrees(forward);
+        assert_eq!(field(line("play forward_end "), "playing"), "0");
+        let backward = line("played_backward ");
+        assert_eq!(number(backward, "frame"), first, "{backward}");
+        agrees(backward);
+        let ended = line("play backward_end ");
+        assert_eq!(field(ended, "playing"), "0", "{ended}");
+        assert_eq!(field(ended, "direction"), "-1", "{ended}");
+
+        // Ten seeks, which have to see a match with something in it.
+        let seeks: Vec<&str> = driver
+            .iter()
+            .copied()
+            .filter(|l| l.starts_with("seek "))
+            .collect();
+        assert_eq!(seeks.len(), 10, "{driver:?}");
+        seeks.iter().for_each(|l| agrees(l));
+        let mut counts: Vec<&str> = seeks.iter().map(|l| field(l, "track_units")).collect();
+        counts.sort_unstable();
+        counts.dedup();
+        assert!(
+            counts.len() >= 3,
+            "the seeks saw only {counts:?} units, so they show little"
+        );
+
+        // A death at the match's own speed, a wounded unit held, and the empty
+        // start held.
+        let past = line("played_past_death ");
+        assert!(
+            number(past, "frame") > number(line("death "), "last_frame"),
+            "{past}"
+        );
+        agrees(past);
+        assert!(
+            number(line("wounded "), "least") < 1.0,
+            "nothing was wounded"
+        );
+        agrees(line("held_wounded "));
+        agrees(line("after_empty "));
+
+        // Health did not move on any of the 450 frames, at the start of the
+        // frame after the game's gadgets and before the player's, nor at the
+        // start of the post frame, and the maximum was whole at every start.
+        let held = line("held_health ");
+        assert_eq!(number(held, "frames"), 450.0, "{held}");
+        assert_eq!(number(held, "frame_changes"), 0.0, "{held}");
+        assert_eq!(number(held, "post_changes"), 0.0, "{held}");
+        assert_eq!(number(held, "maximum_moved"), 0.0, "{held}");
+        assert_eq!(number(held, "start"), number(held, "end"), "{held}");
+
+        // A death's explosion hurts no feature, and still shows.
+        let deaths = line("deaths ");
+        assert_eq!(field(deaths, "feature_damage_by_deaths"), "0", "{deaths}");
+        let before = number(line("explosions before_death"), "before_death");
+        let after = number(line("explosions after_death"), "after_death");
+        assert!(after > before, "the unit died with no explosion");
+
+        // The game never ended itself.
+        let teams = line("teams ");
+        assert_eq!(field(teams, "dead"), "0", "{teams}");
+        assert_eq!(field(teams, "game_over"), "0", "{teams}");
+
+        let errors = lua_errors(adapted);
+        assert!(errors.is_empty(), "{errors:#?}");
+    }
+
     /// Splinter Faction's adapter against a real engine and a whole recorded
     /// match (issue #3800). The replay is recorded into a track, and the
     /// playback is launched twice with a driver gadget that plays the match
@@ -2516,105 +2636,141 @@ end
         );
         assert_eq!(count(&adapted, lost_feature), 0);
 
+        a_whole_match_agrees_with_its_track(&adapted);
+
+        // A death's explosion reaches features in this match.
         let driver = driver_lines(&adapted);
-        let line = |start: &str| {
-            *driver
-                .iter()
-                .find(|l| l.starts_with(start))
-                .unwrap_or_else(|| panic!("no driver line starting {start}"))
-        };
-        let start = line("start ");
-        let (first, last) = (number(start, "first"), number(start, "last"));
-        let tolerance = number(start, "tolerance");
-        let rounding = 6f64.sqrt() / (2f64.powf(number(start, "rotation_bits") - 1.0) - 1.0);
-        let fraction = 1.0 / 65535.0;
-        let agrees = |l: &str| {
-            assert_eq!(field(l, "shown"), field(l, "frame"), "{l}");
-            assert_eq!(field(l, "engine_units"), field(l, "track_units"), "{l}");
-            assert_eq!(
-                field(l, "engine_features"),
-                field(l, "track_features"),
-                "{l}"
-            );
-            assert!(number(l, "place") <= tolerance, "{l}");
-            assert!(number(l, "turn") <= rounding, "{l}");
-            assert!(number(l, "health_over") <= fraction, "{l}");
-            assert!(number(l, "build_over") <= fraction, "{l}");
-            assert_eq!(field(l, "wrong_build_state"), "0", "{l}");
-        };
-        assert!(!driver.iter().any(|l| l.starts_with("lost ")), "{driver:?}");
-
-        // Forward to the end and backward to the start, each the whole match.
-        let forward = line("played_forward ");
-        assert_eq!(number(forward, "frame"), last, "{forward}");
-        agrees(forward);
-        assert_eq!(field(line("play forward_end "), "playing"), "0");
-        let backward = line("played_backward ");
-        assert_eq!(number(backward, "frame"), first, "{backward}");
-        agrees(backward);
-        let ended = line("play backward_end ");
-        assert_eq!(field(ended, "playing"), "0", "{ended}");
-        assert_eq!(field(ended, "direction"), "-1", "{ended}");
-
-        // Ten seeks, which have to see a match with something in it.
-        let seeks: Vec<&str> = driver
+        let deaths = *driver
             .iter()
-            .copied()
-            .filter(|l| l.starts_with("seek "))
-            .collect();
-        assert_eq!(seeks.len(), 10, "{driver:?}");
-        seeks.iter().for_each(|l| agrees(l));
-        let mut counts: Vec<&str> = seeks.iter().map(|l| field(l, "track_units")).collect();
-        counts.sort_unstable();
-        counts.dedup();
-        assert!(
-            counts.len() >= 3,
-            "the seeks saw only {counts:?} units, so they show little"
-        );
-
-        // A death at the match's own speed, a wounded unit held, and the empty
-        // start held.
-        let past = line("played_past_death ");
-        assert!(
-            number(past, "frame") > number(line("death "), "last_frame"),
-            "{past}"
-        );
-        agrees(past);
-        assert!(
-            number(line("wounded "), "least") < 1.0,
-            "nothing was wounded"
-        );
-        agrees(line("held_wounded "));
-        agrees(line("after_empty "));
-
-        // Health did not move on any of the 450 frames, at the start of the
-        // frame after the game's gadgets and before the player's, nor at the
-        // start of the post frame, and the maximum was whole at every start.
-        let held = line("held_health ");
-        assert_eq!(number(held, "frames"), 450.0, "{held}");
-        assert_eq!(number(held, "frame_changes"), 0.0, "{held}");
-        assert_eq!(number(held, "post_changes"), 0.0, "{held}");
-        assert_eq!(number(held, "maximum_moved"), 0.0, "{held}");
-        assert_eq!(number(held, "start"), number(held, "end"), "{held}");
-
-        // A death's explosion reaches features, hurts none, and still shows.
-        let deaths = line("deaths ");
+            .find(|l| l.starts_with("deaths "))
+            .expect("the deaths were counted");
         assert!(
             number(deaths, "feature_hits_by_deaths") > 0.0,
             "no death reached a feature, so the match shows nothing of it: {deaths}"
         );
-        assert_eq!(field(deaths, "feature_damage_by_deaths"), "0", "{deaths}");
-        let before = number(line("explosions before_death"), "before_death");
-        let after = number(line("explosions after_death"), "after_death");
-        assert!(after > before, "the unit died with no explosion");
+    }
 
-        // The game never ended itself.
-        let teams = line("teams ");
-        assert_eq!(field(teams, "dead"), "0", "{teams}");
-        assert_eq!(field(teams, "game_over"), "0", "{teams}");
+    /// Beyond All Reason's adapter against a real engine and a whole recorded
+    /// match (issue #3801). The replay is recorded into a track, and the
+    /// playback is launched twice with the driver's whole match plan, as for
+    /// Splinter Faction above.
+    ///
+    /// 1. With no adapter. The gadgets the adapter is for load, the game
+    ///    creates commanders the track does not have, asks to kill a team and
+    ///    destroys the buildings the player places part way through their
+    ///    construction, so the engine does not have the track's units.
+    /// 2. With the adapter coilbox ships. None of those gadgets loads, nothing
+    ///    is created or destroyed that the track does not say, no team is
+    ///    asked to be killed and the match is not asked to end, and everything
+    ///    [`a_whole_match_agrees_with_its_track`] asks holds.
+    ///
+    /// A frame that takes longer than a simulation frame is not looked for. A
+    /// seek across a match whose ground changed 168,736 times moves the ground
+    /// in one frame, which took 166 to 218 ms in the runs of the issue.
+    ///
+    /// Give it a replay of a whole Beyond All Reason match in
+    /// `COILBOX_ANALYSIS_REPLAY`, with the variables the tests above read and
+    /// the game's rapid packages in `COILBOX_ANALYSIS_DATA_DIRS`.
+    #[test]
+    #[ignore = "needs an engine, Beyond All Reason, a map and a replay of a whole match on them"]
+    fn a_whole_beyond_all_reason_match_plays_with_its_adapter() {
+        let Some(prepared) = prepared(false) else {
+            return;
+        };
+        // As the game's gadget handler logs them. These run in every match. The
+        // adapter names more, which run under a mod option or for a unit this
+        // match may not have.
+        let gadgets = [
+            "<game_end.lua>",
+            "<game_team_com_ends.lua>",
+            "<game_initial_spawn.lua>",
+            "<unit_tombstones.lua>",
+            "<unit_prevent_lab_hax2.lua>",
+            "<unit_mex_upgrade_reclaimer.lua>",
+            "<unit_footprint_clearance.lua>",
+        ];
+        let kill = "the base game asked to kill team";
+        let over = "the base game asked to end the match";
+        let stranger = "a unit was created that the track does not have";
+        let lost_unit = "the base game destroyed a unit the track has alive";
+        let lost_feature = "the base game destroyed a feature the track has";
+        let moved = "with no damage to hear of";
+        let report = |name: &str, output: &str| {
+            for l in lines_with(output, &["REWIND_DRIVER ", "COILBOX_REWIND_PLAYER"]) {
+                if !l.contains("death_ground") {
+                    eprintln!("{name}: {l}");
+                }
+            }
+            eprintln!("{name}: Lua errors: {:#?}", lua_errors(output));
+        };
 
-        let errors = lua_errors(&adapted);
-        assert!(errors.is_empty(), "{errors:#?}");
+        // 1. No adapter.
+        prepared.rewrite(&[]);
+        let plain = whole_match(&prepared);
+        report("no adapter", &plain);
+        assert!(
+            count(&plain, "COILBOX_REWIND_PLAYER adapter loaded: none") >= 1,
+            "{plain}"
+        );
+        for gadget in gadgets {
+            assert!(count(&plain, gadget) >= 1, "{gadget} did not load");
+        }
+        assert!(
+            count(&plain, stranger) >= 1,
+            "the base game spawned nothing"
+        );
+        assert!(count(&plain, kill) >= 1, "the base game never asked");
+        assert!(
+            count(&plain, lost_unit) >= 1,
+            "the base game destroyed no unit of the track"
+        );
+        // A building the game destroyed is missing wherever the driver looked.
+        let short = driver_lines(&plain)
+            .iter()
+            .filter(|l| l.starts_with("seek "))
+            .filter(|l| field(l, "engine_units") != field(l, "track_units"))
+            .count();
+        assert!(short >= 1, "every seek had the track's units");
+
+        // 2. The adapter coilbox ships.
+        prepared.rewrite(REWIND_PLAYER_ADAPTERS);
+        let adapted = whole_match(&prepared);
+        report("adapter", &adapted);
+        assert!(
+            count(
+                &adapted,
+                "COILBOX_REWIND_PLAYER adapter loaded: Beyond All Reason. 32 gadgets and 2 widgets"
+            ) >= 1,
+            "{adapted}"
+        );
+        for gadget in gadgets {
+            assert_eq!(count(&adapted, gadget), 0, "{gadget} loaded");
+        }
+        assert_eq!(count(&adapted, stranger), 0, "a unit was still spawned");
+        assert_eq!(count(&adapted, kill), 0, "a team was still asked for");
+        assert_eq!(count(&adapted, over), 0, "the match was asked to end");
+        assert_eq!(count(&adapted, "COILBOX_REWIND_PLAYER team "), 0);
+        assert_eq!(count(&adapted, lost_unit), 0, "a unit was still destroyed");
+        assert_eq!(count(&adapted, lost_feature), 0);
+        assert_eq!(
+            count(&adapted, moved),
+            0,
+            "the player had to put health right"
+        );
+        // No hook of the adapter that the player calls raised, and the track
+        // has what the adapter names.
+        assert_eq!(
+            count(&adapted, "COILBOX_REWIND_PLAYER the adapter's"),
+            0,
+            "{adapted}"
+        );
+        assert_eq!(
+            count(&adapted, "the track was recorded without"),
+            0,
+            "the recording did not ask for the adapter's rules parameters"
+        );
+
+        a_whole_match_agrees_with_its_track(&adapted);
     }
 
     /// Team resources against a real engine and a recorded match (issue

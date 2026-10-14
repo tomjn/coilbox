@@ -104,7 +104,7 @@ The keys are the same as in the table above, with these differences.
 
 To change a key, press `?` to open the key list, click the action's row and press the key you want. Escape leaves the key as it was. A key that another action had moves to the action you chose, and the other action loses it. "Reset keys" puts the table back. The timeline remembers its place and any keys you changed.
 
-The game's own keys can still win. If your game binds one of these keys to an action that its interface scripts handle, that action runs first and the timeline never hears the key. Change the key in the list to get round it.
+The game's own keys can still win. If your game binds one of these keys to an action that its interface scripts handle, that action runs first and the timeline never hears the key. Change the key in the list to get round it. In Beyond All Reason, Minus, Equals and the keypad's Plus are the game's volume keys, so they change the volume and not the speed. Use the timeline's buttons, or give Slower and Faster other keys.
 
 If the engine is too old for part of the player, a small panel above the timeline says what is switched off, for example "Switched off on this engine: ground changes". If it is too old to play the match at all, the panel says which engine you need and nothing plays. If you have switched off the engine's LuaUI, there is no timeline, and the match still plays.
 
@@ -114,7 +114,7 @@ A builder's queue of buildings shows as an outline of each building's footprint 
 
 Press G to hide the outlines or show them again. The timeline's key list has the key, so you can change it there. The choice is kept for next time. Typing `/rewindghosts` in the engine's console does the same, and `/rewindghosts on` or `/rewindghosts off` sets it.
 
-In the one engine this was looked at, the engine's own call for a translucent building shape drew nothing from a widget, so the outline is all you see. The shape is still asked for, and issue #4018 is about getting it to show. Where a game has its own way to draw a building ghost, its adapter can use that instead.
+In the one engine this was looked at, the engine's own call for a translucent building shape drew nothing from a widget, so the outline is all you see. The shape is still asked for, and issue #4018 is about getting it to show. Where a game has its own way to draw a building ghost, its adapter can use that instead. Beyond All Reason does: there each queued building is the game's own translucent building in its team's colour, as the game draws a builder's queue.
 
 ## Disk space
 
@@ -130,7 +130,7 @@ To clear them, press "Clear all tracks" and confirm. The replays stay and can be
 
 ## What is true to the recording
 
-Playback is a second run of the engine on the recorded positions. It does not simulate the match again, so some of what the game's interface shows is the recording's and some is the playback's own. This part is about Splinter Faction 0.1.89, the game coilbox has a tailored setup for.
+Playback is a second run of the engine on the recorded positions. It does not simulate the match again, so some of what the game's interface shows is the recording's and some is the playback's own. This part is about the two games coilbox has a tailored setup for, Splinter Faction 0.1.89 and Beyond All Reason.
 
 The whole map is visible to everyone. Fog of war is off and you watch as one spectator who leads every team. You cannot give orders, and nothing takes damage.
 
@@ -142,7 +142,8 @@ True to the recording:
 - A big jump. When a jump has hundreds of units to remove and make, the world takes a few frames to catch up, about a second for several hundred, so the units appear over that time and not all at once. The units you are looking at appear first, and the rest of the map fills in after them. Each unit that arrives late in view shows a short effect in its team's colour: a column of light, a ring that closes on it and a few dots that fall into it. The effect is the playback's and was not in the match. While you drag the bar's knob no effect is shown, and units that are removed go with nothing shown. The playback spreads the work so that the game does not stutter.
 - Shots in the air. A unit that dies while you play forward at 0.5x, 1x or 2x dies with the game's own death effect, and a shot lands with the game's impact effect. At any other time (after a seek or a step, playing backward, or at 4x and faster) they come and go with nothing shown.
 - The resource bars. Each team's metal and energy, and how much it can store, are what they were in the match at the moment showing. They stay put while you pause and go back when you seek back. A figure is within half a unit of the match's, or within a thousandth of it for a team that holds thousands.
-- Supply used, supply available and research points.
+- In Splinter Faction, supply used, supply available and research points.
+- In Beyond All Reason, each team's faction and its energy converters' level and use.
 - Income and spending, once the playback has caught up. They take up to three seconds to settle after a seek and can read high for a moment after a team's income rose in the match. The engine has no way to set them directly, so coilbox tops them up to the match's figures and cannot bring them down.
 - The minimap, the tooltip with a unit's description, the players list and the game's own effects and lights.
 
@@ -154,14 +155,18 @@ Not true to the recording:
 - The totals in the end of game statistics, such as all the metal a team ever made. The engine keeps those itself and nothing can set them.
 - A commander's name tag reads CoilboxPlayback, because one spectator leads every team. The match had the player's name. This is issue #4012.
 - The clock in the players list starts at nothing each time the playback is opened. The game's day and night and its weather follow that clock, so a moment that was dark in the match can be light. The engine's clock only counts up and cannot be set to the moment you seek to. This is issue #4013.
-- The menu at the top right stays whole. Its Resign button does nothing for a spectator and its Sharing button does nothing in a playback.
-- The build menu and order buttons show for a selected unit. Orders go nowhere.
+- In Splinter Faction, the menu at the top right stays whole. Its Resign button does nothing for a spectator and its Sharing button does nothing in a playback.
+- In Splinter Faction, the build menu and order buttons show for a selected unit. Orders go nowhere. In Beyond All Reason neither shows.
+- In Beyond All Reason, energy income can read higher than the match's, by as much as 17% late in the match it was checked on. Metal and energy held, storage and spending are the match's.
 
 ## Current limits
 
 - Units do not play walk or build animations. This is issue #3797. Turrets and torsos do point where they pointed in the match, from the first frame after a jump.
 - `[` and `]` do nothing in the engine, as above. This is issue #3978.
-- Splinter Faction is the only game with a tailored setup. In another game nothing is switched off or hidden, and the match still plays. Beyond All Reason has none yet (issue #3801), so anything its interface does at the start of a match can show up in a playback.
+- Splinter Faction and Beyond All Reason are the games with a tailored setup. In another game nothing is switched off or hidden, and the match still plays.
+- Beyond All Reason's setup was checked on a match between two of its own AIs. A match against raptors or scavengers, a territory match and a match on a lava map have not been played back, and the panels that belong to those modes do not show.
+- A jump across a long Beyond All Reason match stops the picture for 166 to 241 ms in the runs measured, while the ground is set back to how it was. Issue #4025 is about it.
+- Builders do not show their build spray. This is issue #3797.
 - Recording needs the replay's engine, game and map installed. Coilbox can offer another installed engine or game version, and keeps the result only when it matches the match exactly.
 
 For how the track is stored, see the [replay track format](../reference/replay-track-format.md). If you make a game, see [Replay rewind for your game](../developers/replay-rewind.md).
