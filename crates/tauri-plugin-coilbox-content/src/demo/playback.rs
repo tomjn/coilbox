@@ -2739,7 +2739,7 @@ end
         assert!(
             count(
                 &adapted,
-                "COILBOX_REWIND_PLAYER adapter loaded: Beyond All Reason. 32 gadgets and 2 widgets"
+                "COILBOX_REWIND_PLAYER adapter loaded: Beyond All Reason. 32 gadgets and 4 widgets"
             ) >= 1,
             "{adapted}"
         );

@@ -148,6 +148,17 @@ return {
 		-- timeline.
 		"gui_gridmenu.lua",
 		"gui_ordermenu.lua",
+		-- The line under the players list with the time, the speed and the
+		-- frame rate (issue #4033). The time is the engine's clock, which starts
+		-- at nothing whenever the playback is opened, and the speed is the
+		-- engine's, which reads 1 whatever the timeline plays at. The timeline
+		-- shows the match's time and speed.
+		"gui_advplayerslist_gameinfo.lua",
+		-- The Player View button above the players list, which follows a
+		-- player's camera. A playback has no players, only its one spectator.
+		-- The music player under the players list stays: its pause, next and
+		-- sliders are the music's and the sound's, not the engine's.
+		"camera_player_tv.lua",
 	},
 
 	-- The numbers the game's panels read that are the game's own and not the
