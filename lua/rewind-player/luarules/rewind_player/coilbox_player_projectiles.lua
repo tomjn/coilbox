@@ -580,7 +580,8 @@ function Projectiles:steer(w, p, d, t, step, watched)
 	-- where the track has it, which is where it was on the frame before, when the
 	-- match's engine found nothing in its way. The shot and what it hit are each
 	-- the track's to within its tolerance, so for a shot slower than twice that
-	-- it is held that much short. A bolt stops on the frame it hits, on what it
+	-- it is held that much short. Watched, it is held there on the frame before
+	-- the one it is let go on too. A bolt stops on the frame it hits, on what it
 	-- hit, so from the frame before it stops it is held a frame of its flight
 	-- short as well.
 	local Spring = self.Spring
@@ -601,8 +602,20 @@ function Projectiles:steer(w, p, d, t, step, watched)
 		if ending then
 			back = flown[serial]
 		end
-	elseif moving and t > last - 1 and w.projectileFlags[p] < 2 then
-		back = math.max(self.clear, math.sqrt(speed))
+	elseif moving and w.projectileFlags[p] < 2 and (t > last - 1 or (watched and t + 2 * step > last)) then
+		-- Measured from its last frame, and not from `t`, which is between frames
+		-- at 0.5x and more than a frame before the last at 2x. The engine finds a
+		-- hit on the ground on the line from where a shot was before its last move,
+		-- and no further along it than one frame of flight, so a shot let go from
+		-- anywhere else lands short of the ground or in the air (issue #4026).
+		local a = self.ahead
+		if w:sampleProjectile(p, last, a) then
+			local flight = a[4] * a[4] + a[5] * a[5] + a[6] * a[6]
+			if flight >= self.stopped then
+				local scale = math.max(self.clear, math.sqrt(flight)) / math.sqrt(flight)
+				x, y, z = a[1] - a[4] * scale, a[2] - a[5] * scale, a[3] - a[6] * scale
+			end
+		end
 	end
 	if back > 0 then
 		if moving then

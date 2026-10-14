@@ -390,6 +390,32 @@ do
 	t.same("nor at 4x", #world.explosions, 0)
 end
 
+-- The engine puts a hit on the ground on the line from where a shot was before
+-- its last move, no further along it than a frame of its flight. A shell that
+-- ended under the ground lands where the track's line crosses the ground only
+-- if it was a frame short of its last place before it was let go, which at
+-- 0.5x and 2x is not where the track has it at the time shown (issue #4026).
+
+do
+	-- 8 above the ground on frame 110 and 2 under it on 111, its last, so the
+	-- line crosses the ground at 0.8 of a frame, at x = 43.2.
+	local one = { weapon = SHELL, first = 100, last = 111, shooter = 1, at = flight(100, { 0, 108, 0 }, { 4, -10, 0 }) }
+	for _, case in ipairs({ { 1, 105 }, { 0.5, 105 }, { 2, 104 }, { 2, 105 } }) do
+		local speed, from = case[1], case[2]
+		local world, player = setup({ last = 400, units = { { first = 0, last = 400 } }, projectiles = { one } })
+		send(player, "pause")
+		seek(world, player, from)
+		send(player, "speed " .. speed)
+		send(player, "play 1")
+		run(world, player, 30)
+		local hit = world.explosions[1] or {}
+		t.same(string.format("at %sx from frame %d a shell under the ground at its end lands once", speed, from), #world.explosions, 1)
+		t.same("on the ground", hit.why, "ground")
+		t.near("at the ground's height", hit.y, 0, 1e-9)
+		t.near("where the track's line crosses it", hit.x, 43.2, 1e-9)
+	end
+end
+
 -- After a seek the engine can still have units the track does not, for as many
 -- frames as the player's budget takes to remove them, and a shot made in those
 -- frames can hit one (issue #4026). No shot is made until they are gone.

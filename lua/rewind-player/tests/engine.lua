@@ -1285,8 +1285,24 @@ function M.new(options)
 			local kind = found.def.type
 			local hitscan = kind == "BeamLaser" or kind == "LightningCannon"
 			if not hitscan and not found.hit then
-				if found.y < world.ground(found.x, found.z) then
-					explode(found, found.x, world.ground(found.x, found.z), found.z, "ground")
+				local floor = world.ground(found.x, found.z)
+				if found.y < floor then
+					-- CProjectileHandler::CheckGroundCollisions: on the line from where
+					-- it was before its last move, and no further along it than its
+					-- speed. The ground is taken as flat at the height under it.
+					local pre = found.pre or found
+					local speed = math.sqrt(found.vx ^ 2 + found.vy ^ 2 + found.vz ^ 2)
+					local x, z = found.x, found.z
+					if speed > 0 then
+						local along = 0
+						if pre.y > floor then
+							local length = math.sqrt((found.x - pre.x) ^ 2 + (found.y - pre.y) ^ 2 + (found.z - pre.z) ^ 2)
+							along = math.min((pre.y - floor) / (pre.y - found.y) * length, speed)
+						end
+						x, z = pre.x + found.vx * along / speed, pre.z + found.vz * along / speed
+						floor = pre.y + found.vy * along / speed
+					end
+					explode(found, x, floor, z, "ground")
 				else
 					local target = world.target
 					-- The engine skips the unit that fired a projectile
@@ -1315,6 +1331,9 @@ function M.new(options)
 			found = world.projectiles[id]
 			-- A piece of debris has no time to live, and a test puts one in by hand.
 			if found and found.ttl then
+				-- CProjectile::PreUpdate keeps the place before the move.
+				found.pre = found.pre or {}
+				found.pre.x, found.pre.y, found.pre.z = found.x, found.y, found.z
 				if not found.moveCtrl and not hitscan then
 					found.x, found.y, found.z = found.x + found.vx, found.y + found.vy, found.z + found.vz
 				end
