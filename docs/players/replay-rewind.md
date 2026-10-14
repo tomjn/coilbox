@@ -161,7 +161,7 @@ Not true to the recording:
 - In Splinter Faction, the menu at the top right stays whole. Its Resign button does nothing for a spectator and its Sharing button does nothing in a playback.
 - In Splinter Faction, the build menu and order buttons show for a selected unit. Orders go nowhere. In Beyond All Reason neither shows.
 - In Beyond All Reason, energy income can read higher than the match's, by as much as 17% late in the match it was checked on. Metal and energy held, storage and spending are the match's.
-- The stream of build particles from a builder to what it builds does not show. This is issue #4029.
+- In Beyond All Reason the stream of build particles from a builder to what it builds does not show. This is issue #4042. In Splinter Faction it shows, and stands still while paused.
 - A unit does not recoil or flash when it fires. Its shot still leaves the barrel. This is issue #4030.
 
 ## Current limits

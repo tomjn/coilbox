@@ -1,6 +1,6 @@
 # Rewind player
 
-The rewind player plays a replay track back inside the engine, with time going in either direction. This folder holds the Lua that reads a track (issue #3792) and the gadget that makes the world match it (issue #3794): units, features, terrain and the shots in the air (issue #3795) at any time, with every turret and torso pointing where it pointed in the match (issue #3796). Each unit's own script is told when its unit moves and when a builder works, so units walk and builders turn to their work (issue #3797). A unit's fire animation does not play (issue #4030). The control on screen is a widget, the timeline (issue #3798), and a second widget draws the buildings a builder had queued (issue #3804). What a game switches off or hides during playback is its adapter (issue #3799).
+The rewind player plays a replay track back inside the engine, with time going in either direction. This folder holds the Lua that reads a track (issue #3792) and the gadget that makes the world match it (issue #3794): units, features, terrain and the shots in the air (issue #3795) at any time, with every turret and torso pointing where it pointed in the match (issue #3796). Each unit's own script is told when its unit moves and when a builder works, so units walk and builders turn to their work (issue #3797), and a builder at work shows its stream of build particles (issue #4029). A unit's fire animation does not play (issue #4030). The control on screen is a widget, the timeline (issue #3798), and a second widget draws the buildings a builder had queued (issue #3804). What a game switches off or hides during playback is its adapter (issue #3799).
 
 A track is the file `crates/coilbox-track` writes, in the format `docs/reference/replay-track-format.md` describes. The format was designed so that the engine's Lua can read the file as it is, so there is no export step and no second copy on disk.
 
@@ -23,6 +23,7 @@ The player holds a time `t`, a frame of the track that can be a fraction. On eve
 | `luarules/rewind_player/coilbox_log.lua` | the playback's own log file, which every line of the player, the timeline and the ghosts goes to ([The log file](#the-log-file)) |
 | `luarules/rewind_player/coilbox_player_view.lua` | works out where the viewer looks, for the unsynced half of the gadget to send ([Which units first](#which-units-first)) |
 | `luarules/rewind_player/coilbox_player_arrival.lua` | draws the effect where a unit arrives, in the unsynced half of the gadget ([The arrival effect](#the-arrival-effect)) |
+| `luarules/rewind_player/coilbox_player_stream.lua` | draws a builder's stream of build particles, in the unsynced half of the gadget ([Build particles](#build-particles)) |
 | `luaui/widgets/coilbox_rewind_timeline.lua` | the timeline widget: the engine's call-ins for drawing, keys and the pointer |
 | `luaui/rewind_timeline/coilbox_timeline.lua` | the timeline: where everything is, what a key or a press sends, and the drawing. It takes the engine as a table, so the tests run it |
 | `luaui/rewind_timeline/coilbox_timeline_engine.lua` | the widget's own table of engine calls, in the same shape |
@@ -312,6 +313,7 @@ A row names the calls (`calls`), the feature that hangs on them (`feature`), how
 | `unitSpeed` | `Spring.MoveCtrl.SetExtrapolate`, `Spring.MoveCtrl.SetVelocity` | no | a unit's speed reads as nothing | nothing |
 | `walkPieces` | `Spring.UnitScript.IsInTurn`, `IsInMove` | no | a posed piece a walk turns follows the track, out of step with the rest of the walk | nothing |
 | `builderWork` | `Spring.SetUnitRulesParam`, `CMD.REPAIR`, `RECLAIM`, `RESURRECT`, `CAPTURE`, `RESTORE`, `Game.maxUnits` | no | the unit rules parameters of a builder's work are not set | nothing |
+| `nanoPieces` | `Spring.SetUnitNanoPieces`, `GetUnitNanoPieces`, `GetUnitScriptPiece` | no | a builder whose script gives no nano pieces of its own has none, so it shows no build stream | nothing |
 | `frameEnd` (behaviour) | `Script.UpdateCallIn` | no | in a game whose gadget handler does not pass `GameFramePost` on, the player cannot install it, and falls back as on an engine without the call | nothing |
 | `terrain` | `Spring.SetHeightMapFunc`, `SetHeightMap`, `Game.squareSize` | no | the terrain stage does nothing | ground changes |
 | `terrainOrigin` | `Spring.GetGroundOrigHeight` | no | a corner before its first change takes the track's height for it, which is in position steps and can be half a step from the map's own | nothing |
@@ -371,7 +373,7 @@ The timeline widget uses `gl`, `GL` and the unsynced `Spring`, which the synced 
 
 A widget cannot set a game rules parameter, so the widget has no note. An engine too old for the player's own calls shows the gadget's note through this widget. An engine too old for the widget's calls shows nothing on screen and has the line in the log.
 
-The unsynced half of the gadget has six rows in `M.UNSYNCED`:
+The unsynced half of the gadget has eight rows in `M.UNSYNCED`:
 
 - `workTimingLine` needs `Spring.GetTimer`, `Spring.DiffTimers` and `Game.gameSpeed`. Without one it logs a line, takes no timings and sends the player `coilbox_rewind_budget:none` once, which takes the limit off the units stage, so a seek is shown in one frame as it was before issue #3988.
 - `microTimer` needs `Spring.GetTimerMicros`, from `2025.01.6`. Without it a frame is timed in whole milliseconds with `Spring.GetTimer`, and the budgets are coarser.
@@ -381,7 +383,10 @@ The unsynced half of the gadget has six rows in `M.UNSYNCED`:
 - `view` needs `Spring.GetViewGeometry`, `Spring.TraceScreenRay` and `Spring.GetCameraPosition`. Without one the camera is not looked at, so the units a seek makes are made in the order of the track's list, and an arrival effect is shown for a unit outside the view too. The view is sent with `Spring.SendLuaRulesMsg`, so it is off without the `budgetMessage` row as well.
 - `arrivalEffect` needs `gl.BeginEnd`, `gl.Vertex`, `gl.Color`, `gl.Blending`, `gl.DepthTest`, `gl.DepthMask`, `gl.Texture`, `GL.QUADS`, `GL.SRC_ALPHA`, `GL.ONE`, `GL.ONE_MINUS_SRC_ALPHA`, `Spring.GetCameraDirection`, `Spring.GetUnitRadius` and `Spring.GetTeamColor`. Without one no effect is drawn and the gadget has no `DrawWorld`. The effect's clock is the frame timer's, so it is off without the `workTimingLine` row as well.
 
-Neither is in the note. A viewer cannot tell that an order or an effect they never saw is missing. All of those calls are registered at `105.0`, `105.1.1`, `2025.01.6`, `2025.03.9` and `2026.07.04`: the `Spring` ones in `rts/Lua/LuaUnsyncedRead.cpp` and `LuaSyncedRead.cpp`, the `gl` ones in `LuaOpenGL.cpp` and the constants in `LuaConstGL.cpp`. The unsynced half of a gadget is given `gl` and `GL` in `rts/Lua/LuaHandleSynced.cpp`. They have run on engine `2026.07.01-102-g6e5c5a0` and on no other.
+- `buildStream` needs `gl.TexCoord`, `Spring.GetGameRulesParam`, `GetFrameTimeOffset`, `GetConfigInt`, `IsSphereInView`, `ValidUnitID`, `GetUnitDefID`, `GetUnitTeam`, `GetUnitNanoPieces`, `GetUnitPiecePosDir`, `GetUnitPosition`, `GetFeaturePosition`, `GetFeatureRadius`, `Game.maxUnits` and four `CMD` constants, and the `arrivalEffect` row's drawing calls as well. Without one no build stream is drawn and the next row is off too ([Build particles](#build-particles)).
+- `workerAnswer` needs `Spring.GetUnitWorkerTask` and `Spring.GetUnitCurrentBuildPower`, from `2025.01.6`. Without them nothing is wrapped, and a game's own build effect that asks the engine gets nothing.
+
+None is in the note. A viewer cannot tell that an order or an effect they never saw is missing. All of those calls are registered at `105.0`, `105.1.1`, `2025.01.6`, `2025.03.9` and `2026.07.04`: the `Spring` ones in `rts/Lua/LuaUnsyncedRead.cpp` and `LuaSyncedRead.cpp`, the `gl` ones in `LuaOpenGL.cpp` and the constants in `LuaConstGL.cpp`. The unsynced half of a gadget is given `gl` and `GL` in `rts/Lua/LuaHandleSynced.cpp`. They have run on engine `2026.07.01-102-g6e5c5a0` and on no other.
 
 Without `SendToUnsynced` the synced half has no timing at all and starts with no budget, so a seek is shown in one frame.
 
@@ -533,7 +538,84 @@ A builder's recorded work is published in unit rules parameters for a game's own
 
 A parameter is set when it changes. A unit that never works in the track has none of them. A game's build effect that asks the engine (`Spring.GetUnitWorkerTask`, `Spring.GetUnitIsBuilding`, `Spring.GetUnitCurrentBuildPower`) gets nothing in a playback, since no unit builds, and reads these instead. The parameters are set in synced Lua, so a widget and the unsynced half of a gadget read them with `Spring.GetUnitRulesParam`.
 
-The engine's own build particles are not shown. Only `CBuilder::Update` and `CFactory::Update` make them, while a unit really builds, and no Lua call makes one (`CreateNanoParticle` in `rts/Sim/Units/UnitTypes`). Splinter Faction uses those particles. Its builders' scripts also emit a glow at their nano points every 425 ms from `StartBuilding` to `StopBuilding`, which does show. Issue #4029 is for the particles.
+The stage also hands each change of a builder's work to the unsynced half of the gadget, which draws the builder's stream of build particles ([Build particles](#build-particles)).
+
+#### Build particles
+
+A builder at work shows its stream of build particles, from its nano pieces to its work, as the engine draws it in a match (issue #4029). The player draws it, in the unsynced half of the gadget (`coilbox_player_stream.lua`), because the engine's own stream cannot be shown without the builder really building.
+
+![A paused frame after a seek in Splinter Faction: the engineer above the air plant streams to the geothermal plant on the right](screenshots/build-stream-paused.jpg)
+
+##### Why the engine's own stream is not used
+
+The owner's rule for playback is that the engine's own state is the recording's, so that each game's own effects work with nothing special. For the stream that would mean giving a builder a real order on its recorded work, with its build speed set to nothing. Read in the engine at `6e5c5a0`, that cannot show a stream without changing the world:
+
+- `CBuilder::UpdateBuild` makes a particle only when the build speed is above nothing and `CUnit::AddBuildPower` gives true, and `AddBuildPower` gives true for a build only after it has used the team's resources, asked the game's gadgets with `AllowUnitBuildStep` and moved health and build progress on, finishing the unit when progress reaches 1. A repair is the same, and gives false for a unit at full health, which every wounded unit is for the middle of a frame ([Nothing heals](#nothing-heals)).
+- A reclaim at no speed passes `-0.0`, which `AddBuildPower` takes as a build or a repair. At real speed it turns a finished unit back into a nanoframe and kills it at none.
+- A factory builds only a unit its own queue made it create (`CFactory::StartBuild`), and no call hands it one that exists.
+- `Spring.GetUnitCurrentBuildPower` is the share of the last 15 frames on which the builder made a particle (`NanoPieceCache`), so a game's effect that reads it needs particles made too.
+
+A headless run on the Splinter Faction match, paused at frame 9,570, gave a `fedengineer_up1` `CMD.REPAIR` on the geothermal plant the track has it building, a nanoframe at 0.996 build progress, and read the engine before the player's end of the frame:
+
+| Build speed | Worker task | Build power | Build progress each frame | Health each frame | Team metal each frame | Builder moved |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0, every kind, for 60 frames | the build, `-77` and the nanoframe | 0.000 | +0 | +0 | +0 | 0 elmos |
+| 8, its own, for 60 frames | the same | 1/15 more each frame, to 1.000 | +0.000631 | +2.05 | -0.41 | 0 elmos |
+
+The order was taken under move control and the builder stood where the track has it, but at no speed nothing is drawn, and at real speed the world moves each frame and the nanoframe would have finished in 7 frames. A factory at work in the track gave no task and no power. A resurrect, a capture and a terraform would make particles at no speed, read in the source and not run, which leaves a build, the commonest work, without one.
+
+##### What is drawn
+
+The engine's own particle (`AddNanoParticle` in `rts/Sim/Projectiles/ProjectileHandler.cpp` and `NanoProjectile.cpp`):
+
+- It starts at one of the builder's nano pieces, picked at random, where `Spring.GetUnitPiecePosDir` has it. A builder the engine has no nano piece for makes none, as in the engine.
+- A builder's goes along the line to the middle of its work, spread by a random vector in the unit ball times the target's radius over the distance, at 3 elmos a frame, and lives `int(distance / 3)` frames. The radius is half the target's for a build or a repair and 0.7 of it for a reclaim, a resurrect and a capture. A reclaim's starts at the work and comes back, and so does half of a resurrect's. A terraform's goes to the recorded place with no spread, since the track has no radius for it.
+- A factory's goes about 1 elmo a frame with a spread of 0.15 and lives `int(distance)` frames.
+- A frame makes one when a random number falls under the recorded build power, which is the share of frames the engine made one on.
+- It is a square 6 elmos across facing the camera, through the game's particle texture: its `gfxtexture` from `gamedata/resources.lua`, or `circularthingy`. The colour is the team's at an alpha of 20 in 255, or the definition's `nanoColor` at 20 in 256 with the `TeamNanoSpray` setting off. It is blended one and one less the alpha, with no depth written.
+- `MaxNanoParticles` caps it, and at 0 nothing is drawn. The engine makes a particle with a chance of one less the share of 95% of that already alive. The stream keeps each with the share the engine settles at, `L / (c + L)` with `L` 95% of the setting and `c` the particles the drawn frame before would have had, which does not flicker, and never draws more than `L`.
+
+Splinter Faction's `circularthingy` is a lit square with a shadow, with no alpha, so its stream is small blue squares in the team's colour that dim the ground under them a little, as the engine draws its own.
+
+Not the engine's: the engine turns each particle as it flies, which a round texture hides and Splinter Faction's square does not, the engine starts a particle at the piece's raw place, and a particle here follows its builder and its target when they move.
+
+##### Paused, backward and seeks
+
+A particle's place is worked out on every drawn frame from the time of the track: which frames since the work began made one, and how far each has gone since. So the stream needs nothing kept from frame to frame.
+
+| Play | The stream |
+| --- | --- |
+| Forward, any speed | Flows as in the match. At 4x it flows four times as fast, as the engine's does in a replay at that speed. Between simulation frames a particle is drawn where the time between has it |
+| Paused | Stands still, every particle where it was, as a paused match shows them |
+| Backward | Each particle goes back the way it came and into the piece it left |
+| A seek, or a builder a seek makes in a later frame | The whole stream is there at once |
+| Work that starts while playing forward | One particle a frame from its first frame |
+| Work that stops | No more are made, and those in the air fly on until they have lived their frames |
+
+Played backward into a span of work from its end, the whole stream shows, and it shows whole until the play passes the work's first frame, since the player only learns where the work began when it gets there. That is up to a particle's life too many particles near the start of the work.
+
+##### A game's own build effect
+
+A game that draws its own stream sets `MaxNanoParticles` to 0, as Beyond All Reason does, and the player then draws none. Its own effect asks the engine what a builder is doing, which in a playback is nothing. So the gadget's unsynced half wraps `Spring.GetUnitWorkerTask` and `Spring.GetUnitCurrentBuildPower` in the `Spring` every gadget's unsynced half shares, as its file loads, before a game's gadget that copies them into a local loads. A builder at work is answered with its recorded command and target, and with its recorded power while playing forward and 0 paused and backward, so that a game's stream, which flows on the engine's own clock, stands still with the time. Any other unit gets the engine's answer. The synced half is left alone, since a game's synced gadgets act on what they read.
+
+In Beyond All Reason the wrap reaches the game's gadget, `gfx_nano_particles_gl4.lua`: in a window its `Update` and `DrawWorld` hold the wrapped functions, and headless six builders at work were each answered with their recorded work and a power of 1, and had nano pieces. The game's stream still did not show in two windowed launches. Issue #4042 is for finding out why.
+
+An adapter can draw its own stream from the unit rules parameters of [Builders' work](#builders-work) instead.
+
+##### Nano pieces
+
+The engine keeps a builder's nano pieces and fills that list by asking the script with `QueryNanoPiece` each time it makes a particle, so in a playback it has none. A script can give its own with `Spring.SetUnitNanoPieces`, as Splinter Faction's do as their units are created. For one that has not, the animation stage asks the script the engine's way the first time a unit works, until 30 asks in a row give no new piece (`MAX_QUERYNANOPIECE_CALLS`), turns each script piece into the model's with `Spring.GetUnitScriptPiece`, and gives the engine the list. A game's own effect that reads `Spring.GetUnitNanoPieces` gets them too. A script that raises is logged once and the engine keeps what it gave before.
+
+##### What it costs
+
+Nothing in a frame of the player's work: the stage hands a change of a builder's work on with one `SendToUnsynced`, and asks a script for nano pieces once for a unit. The drawing is in `DrawWorld`, timed by a scratch gadget round the player's whole `DrawWorld`, which draws the arrival effect too, over three windowed launches on Splinter Faction from the game's start to the end of the run: a mean of 0.087 ms and a slowest of 1.41 ms over 1,917 draws, 0.189 and 1.30 ms over 1,852, and 0.246 and 4.45 ms over 733, the last with a load average of 22 after the launch. A draw allocates nothing, which `tests/stream_test.lua` counts over 300 draws of twenty streams. Headless, the module drew 25 to 61 particles for 3 or 4 builders at work in the match.
+
+##### What has run
+
+- `tests/stream_test.lua` on a stand-in for `Spring` and `gl`, `tests/animation_test.lua` for the nano pieces and the work handed on, and `tests/gadget_test.lua` and `tests/engine_test.lua` for the wrap and the rows.
+- Headless, engine `2026.07.01-102-g6e5c5a0`: the run of a real order above, the module drawing the Splinter Faction match through a stand-in `gl`, and the wrapped calls in Beyond All Reason.
+- Five windowed launches on 14 October 2026, three on Splinter Faction and two on Beyond All Reason, with a scratch widget seeking, pointing the camera at a builder at work and taking the engine's own screenshots. Splinter Faction's streams showed paused after a seek, playing, at the air plant and backward, and switching `MaxNanoParticles` to 0 took them away. Beyond All Reason's own did not show (issue #4042). The pictures are in `docs/reports/milestone-80-gallery/` from 100, which is gitignored.
+- Not looked at in an engine: a reclaim, a resurrect, a capture and a terraform, and any engine older than `2026.07.01-102-g6e5c5a0`. Those have only run on the stand-in.
 
 #### A walk's pieces and the aim stage
 
@@ -1373,7 +1455,7 @@ A commander shows the right stage after a seek with nothing done for it. Each st
 
 ![The commander in the playback and in the real replay, at frames 6,927 and 12,000](screenshots/adapter-commander.jpg)
 
-The left column is the playback and the right the real replay, at the same two frames and from the same place. The colours differ because the playback takes each team's from the replay's start script, and the game recolours them for whoever is playing. The pose and the build spray differ because the picture is from before the aim stage (issue #3796) and the animation stage (issue #3797). The engine's own build particles still do not show in a playback (issue #4029).
+The left column is the playback and the right the real replay, at the same two frames and from the same place. The colours differ because the playback takes each team's from the replay's start script, and the game recolours them for whoever is playing. The pose and the build spray differ because the picture is from before the aim stage (issue #3796), the animation stage (issue #3797) and the build stream (issue #4029, [Build particles](#build-particles)).
 
 ### Beyond All Reason
 
@@ -1405,7 +1487,7 @@ What the issue expected, against what the game's files and the runs showed:
 - Start commanders hidden until they warp in, with an effect: true, as above. The commander's health bar still shows while it is hidden, from the game's health bar widget.
 - A Legion construction turret on an extractor is two units: true. `legmohocon` is the shape while it is built, and when it is finished `unit_attached_con_turret_mex.lua` destroys it and makes `legmohoconin`, the extractor, and `legmohoconct`, the turret, attached to it. The extractor is made unselectable and stealthy and is drawn, not hidden. The track has all three as units of their own, so the gadget is switched off. The match has no Legion unit, so this was read and not seen.
 - No gravestones where commanders fell: the gadget is off, so the playback adds none. The match's own are in the track and do appear.
-- Build spray: the game draws it in `gfx_nano_particles_gl4.lua`, which asks the engine every frame for a builder's `Spring.GetUnitCurrentBuildPower` and `Spring.GetUnitWorkerTask`. A placed builder is building nothing, so there is no spray, and an adapter cannot answer for the engine. Issue #3797.
+- Build spray: the game draws it in `gfx_nano_particles_gl4.lua`, which asks the engine every frame for a builder's `Spring.GetUnitCurrentBuildPower` and `Spring.GetUnitWorkerTask`. The player answers both from the recording ([A game's own build effect](#a-games-own-build-effect)), and the game's gadget holds the answers, but its stream still did not show in a window. Issue #4042.
 - Queued buildings with the game's shape helper: true, see [An adapter's own drawing](#an-adapters-own-drawing).
 
 Healing: the game has no gadget that heals a unit over time in a match like this one. `pve_areahealers.lua` heals only with raptors or scavengers, `unit_carrier_spawner.lua` heals drones and is switched off, and the game has no repair pad gadget. The engine's own healing is the player's to stop. In the whole match plan the wounded unit's health did not move in 450 frames, and the player's line about health that changed was not logged, with or without the adapter.
@@ -1635,6 +1717,7 @@ luajit lua/rewind-player/tests/settle_test.lua
 luajit lua/rewind-player/tests/terrain_test.lua
 luajit lua/rewind-player/tests/view_test.lua
 luajit lua/rewind-player/tests/arrival_test.lua
+luajit lua/rewind-player/tests/stream_test.lua
 luajit lua/rewind-player/tests/gadget_test.lua
 luajit lua/rewind-player/tests/adapter_test.lua
 luajit lua/rewind-player/tests/engine_test.lua
@@ -1652,13 +1735,14 @@ luajit lua/rewind-player/tests/ghosts_test.lua
 - `player_test.lua` checks the stages on tracks made from a table (`tests/fake_track.lua`): what is alive at a time, removal before creation, a seek back past a construction, play in both directions, a missing definition, a nil from `Spring.CreateUnit`, terrain forward and back, that the engine's own healing (`world.heal` in the stand-in, run between a frame and its post frame) leaves a wounded unit's health alone and its maximum is whole again afterwards, that health which moved anyway is put right and logged once, and that a frame of play allocates nothing.
 - `player_test.lua` also checks the call at the end of a frame (issue #4002): that nothing is held in the first frame, that with no call no unit starts or ends a frame with a lowered maximum and the line is logged once, that the install is asked for once and a unit is held once it works, that a call which stops is asked for again, and that a gadget removed in the middle of a frame leaves no maximum lowered.
 - `aim_test.lua` checks the aim stage on a stand-in whose unit's own script turns pieces in the middle of every frame: the pose on the first frame after a seek, held for 60 frames paused and while playing each way, a piece the track does not name left to the script, an angle of 141 turns, half speed, a piece the script lacks, a piece with no track in a window, a seek that makes its units over several frames, a unit destroyed between a frame and its post frame, a unit under construction, an engine with no call at the end of a frame, the fixture through the real reader, and that 300 frames of posing 20 units allocate nothing.
-- `animation_test.lua` checks the animation stage on a stand-in whose units have COB and Lua scripts: a unit that starts and stops is told once each, with its velocity and its place left alone, a unit with no script, pause, play backward and turning play round, seeks, a unit made again, 8x and half speed, a unit under construction, a builder's start and stop with its angles for a Lua and a COB script, a factory, every kind of work and its parameters, a factory that goes straight on to the next unit, a window with no track for the work, a target a seek has yet to make, the pieces a walk turns and the aim stage leaves to the script, a script that raises, a framework the wrap does not see, each row switched off, the fixture through the real reader, and that 300 frames of 20 walking units and 5 builders at work allocate nothing.
+- `animation_test.lua` checks the animation stage on a stand-in whose units have COB and Lua scripts: a unit that starts and stops is told once each, with its velocity and its place left alone, a unit with no script, pause, play backward and turning play round, seeks, a unit made again, 8x and half speed, a unit under construction, a builder's start and stop with its angles for a Lua and a COB script, a factory, every kind of work and its parameters, a factory that goes straight on to the next unit, a builder's nano pieces asked of its script once and given to the engine, the work handed on to the stream and when, a window with no track for the work, a target a seek has yet to make, the pieces a walk turns and the aim stage leaves to the script, a script that raises, a framework the wrap does not see, each row switched off, the fixture through the real reader, and that 300 frames of 20 walking units and 5 builders at work allocate nothing.
 - `projectiles_test.lua` checks the projectiles stage: what is in the air at a time, stepping forward and backward, that a seek looks at the shots that can be alive and not the window's list, that a shot lands only while it is watched and with no damage, crater or push, a shell that ends in the air, a bolt that stops, a beam fired once, the fire sound and when it is not played, a weapon the game lacks, an engine with no `Spring.SetProjectileTimeToLive`, a shot the engine ended and an id handed out again, a shot alive across two windows, and that 300 frames of play with 40 shots in the air allocate nothing.
 - `resources_test.lua` checks the resources stage on a stand-in whose teams follow `rts/Sim/Misc/Team.cpp` and whose frame runs in the engine's order, with the playback's own economy between the gadget's two call-ins: what a team holds, its storage and its share level at a frame, after a seek forward and backward, held for 400 frames and while playing each way, on an engine with and without `GameFramePost`, income, expense and pull after three of the engine's sums, a team with an income multiplier, excess, allied teams and the engine's own sharing, rules parameters with and without an adapter that names them, a track from recorder version 3, the fixture through the real reader, and that 300 frames allocate nothing.
 - `settle_test.lua` checks a seek that needs more units than a frame may make or remove: that it settles over several frames, that removals use their own budget and come first, that a second seek while one settles starts again, that play goes on while it settles and units made late stand where the track has them now, what `coilbox_rewind_settled` says and when, how many of a frame's units were the first of their definition in the run, the budget message and the ones it refuses, that the first frame of a seek into another window makes and removes nothing (issue #4037), that a shot waits for its shooter, and that 300 frames of play with a budget allocate nothing.
 - `terrain_test.lua` checks the ground of a seek (issue #4025) on tracks with craters across a map of 256 by 256 corners and a block of rows on the last frame: that a seek with a small ground budget takes several frames and no frame does more than its budget and one tile, that no call reaches past a tile and the corner beside it, that no call that moved a corner leaves the engine a rectangle of no area, that the ground is the track's after seeks both ways and after a seek that arrives while another settles, that a corner before its first change has the map's own height, that no unit is made while the ground still moves and the player is not settled until it stops, that a unit stands at the track's height before and after the ground under it arrives, that play at 1x forward and backward moves a crater on its frame while a seek's ground is still being set, the third number of the budget message, and that 300 frames of play through craters allocate nothing.
 - `view_test.lua` checks the order a seek makes its units in: the list's with no view, nearest the camera's place first with one, inside the view's corners before outside, the rest following a camera that moves, the list's again after `coilbox_rewind_view:none`, removals still first, a unit born while a seek settles, the view messages it refuses, and that 300 frames of play with a view allocate nothing.
 - `arrival_test.lua` checks which units the player asks an arrival effect for: each one a slow seek makes after its first frame, none for a seek shown in one frame, a removal or plain play, none during a drag until it ends, none outside the view, and none when the adapter's hook says it showed its own. Then the two unsynced modules on a stand-in (`tests/unsynced.lua`): the view's message, when it is sent again, a corner off the map and one in the sky, and what the effect draws, where, in which colour, for how long, how many at once, the state it leaves and that a draw allocates nothing. It does not show how the effect looks.
+- `stream_test.lua` checks the stream of build particles on a stand-in (`tests/unsynced.lua`): every particle on the line from the nano piece to the work and within its spread, how many a builder and a factory have, the engine's colour, alpha, blending and texture, `MaxNanoParticles`, `TeamNanoSpray` and `showNanoSpray`, a builder with no nano piece, paused, backward, work that starts, stops and is seeked into, a reclaim, a resurrect on a feature, a target the playback does not have yet, half power, the answers to the two wrapped calls, which texture a game's `resources.lua` gives, and that 300 draws of twenty streams allocate nothing. It does not show how the stream looks.
 - `gadget_test.lua` loads the two gadgets the way the engine does. That includes the gadget's answers of no damage for units and for features, its post frame, the unsynced half's working out of the three budgets from the time a frame's work took (growth to what fits in one message, a frame judged by the budget it had and not the last one sent, a rise in cost read over the seek and taken through as many frames as the last budget took to arrive and no further than it was read over, and a frame with a first unit of a definition left out of the rise), the lines going to the log file and not the engine's log, from the synced half, the unsynced half and the guard, and the engine's own pause and speed handed to the player once each.
 - `adapter_test.lua` checks how the player reads an adapter, that it never creates a hidden unit or skipped feature and says nothing about either, that each hook is called with the right arguments and a hook that raises is switched off, the log line, and that 60 frames of play with hooks allocate nothing. It also runs Beyond All Reason's adapter on a stand-in for the engine and the game: the commanders hidden before they warp in and drawn after, the warp in effect only where play passes its frame, what the `started` hook sets, and the queued buildings handed to the game's shape widget once and dropped when they leave the queue.
 - `engine_test.lua` is made from the engine table ([Engine calls](#engine-calls)). For every call of every row it takes the call out of the stand-in and plays the fixture track, and it checks the table against the source with `tests/scan.lua`. The widget's table is tested the same way in `timeline_test.lua`.
