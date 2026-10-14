@@ -421,7 +421,15 @@ end
 
 --- After a jump: what the engine has is checked against what the stage thinks
 -- it has, and what could not be created is tried again.
-function Units:resync()
+--
+-- A jump into another window reads that window here, before any stage moves
+-- anything. Reading one took 8.5 to 9.4 ms of a frame on a Beyond All Reason
+-- match, which no budget covers, so that frame is the start's alone: the ground
+-- is set and units are made and removed from the next frame on (issue #4037).
+-- With no budget a seek is shown in one frame, and the start has no frame of its
+-- own. Nor does the playback's first frame, which reads the first window with a
+-- budget of one unit.
+function Units:resync(t)
 	self.seeking = true
 	self.arriving = true
 	self.late = false
@@ -439,6 +447,12 @@ function Units:resync()
 	local all = Spring.GetAllUnits()
 	for i = 1, #all do
 		self:evict(all[i])
+	end
+	if self.makeBudget < math.huge and self.window then
+		local w = self.track:seek(t)
+		if w and w ~= self.window then
+			self.share.start = true
+		end
 	end
 end
 
@@ -484,8 +498,9 @@ function Units:remove(t, clock)
 	local loud = clock:watched() and not self.seeking
 	local indexOf = self.indexOf
 	local budget = self.removeBudget
-	-- What the ground of a seek used of the frame comes off the share first.
-	local ground = self.share.ground
+	-- What the ground of a seek used of the frame comes off the share first, and
+	-- the start of a seek uses all of it.
+	local ground = self.share.start and 1 or self.share.ground
 	for serial, unitID in next, self.unitOf do
 		local i = indexOf[serial]
 		if not i or not w:unitExistsAt(i, t) then
@@ -734,7 +749,7 @@ function Units:place(t, clock)
 	end
 	local makeBudget, removeBudget, defID = self.makeBudget, self.removeBudget, self.defID
 	local unitOf, failed = self.unitOf, self.failed
-	local ground = self.share.ground
+	local ground = self.share.start and 1 or self.share.ground
 	local serials = w.unitSerial
 	-- While a seek's units arrive and the viewer's place is known, a unit to be
 	-- made waits for the walk in the view's order below.

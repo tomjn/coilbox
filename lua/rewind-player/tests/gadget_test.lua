@@ -137,6 +137,7 @@ do
 	t.same("and removed", w.sentRemoved, 0)
 	t.same("and the budgets the frame worked to, which a message changes some frames after it is sent (issue #4016)", table.concat(w.sentBudgets or {}, " "), "1 1 1")
 	t.same("and how many of its units were the first of their definition (issue #4015)", w.sentFirsts, 1)
+	t.same("and whether the frame was only the start of a seek (issue #4037)", w.sentStarted, 0)
 	t.same("the frame is published", w.params.coilbox_rewind_frame, h.firstFrame)
 	t.same("the world is not settled yet", w.params.coilbox_rewind_settled, 0)
 	local frame = settle(gadget, w, 2)
@@ -149,7 +150,11 @@ do
 	t.same("the budget message is the player's", gadget:RecvLuaMsg("coilbox_rewind_budget:50 50 100000", 0), true)
 	frame = settle(gadget, w, frame + 1)
 	t.same("a frame after the message works to its budgets", table.concat(w.sentBudgets or {}, " "), "50 50 100000")
-	t.same("the seek is where the next frame is", w.params.coilbox_rewind_frame, 800)
+	t.same(
+		"the seek is where the next frame is, and play has gone one frame on by the time it settles, since a seek into another window gives its first frame to reading the window (issue #4037)",
+		w.params.coilbox_rewind_frame,
+		801
+	)
 	t.same("with the units of that frame", w.unitCount(), 4)
 
 	local damage, impulse = gadget:UnitPreDamaged(100, 1, 0, 500)
@@ -356,14 +361,15 @@ end
 -- frame the budgets that frame worked to (issue #4016).
 
 --- A stand-in for the synced half's frames. `work(ms, made, removed, ground,
--- late, firsts)` is a frame that took `ms`, of whose units `firsts` were the
--- first of their definition in the run. The budgets it worked to are the last
+-- late, firsts, started)` is a frame that took `ms`, of whose units `firsts`
+-- were the first of their definition in the run. `started` is 1 for the first
+-- frame of a seek into another window. The budgets it worked to are the last
 -- ones sent, as if each message arrived before the next frame, unless it is
 -- `late`.
 local function budgetFrames(gadget, clock)
 	local frame = 0
 	local had = { 1, 1, 1 }
-	local function work(milliseconds, made, removed, ground, late, firsts)
+	local function work(milliseconds, made, removed, ground, late, firsts, started)
 		frame = frame + 1
 		local last = clock.messages[#clock.messages]
 		if last and not late then
@@ -372,7 +378,7 @@ local function budgetFrames(gadget, clock)
 		end
 		gadget:RecvFromSynced("coilbox_rewind_work", 0, frame)
 		clock.now = clock.now + milliseconds
-		gadget:RecvFromSynced("coilbox_rewind_work", 1, frame, made, removed or 0, ground or 0, had[1], had[2], had[3], firsts or 0)
+		gadget:RecvFromSynced("coilbox_rewind_work", 1, frame, made, removed or 0, ground or 0, had[1], had[2], had[3], firsts or 0, started or 0)
 	end
 	local function last()
 		return clock.messages[#clock.messages]
@@ -513,6 +519,23 @@ do
 		last(),
 		"coilbox_rewind_budget:23 1 1"
 	)
+end
+
+-- The first frame of a seek into another window reads the window and does
+-- nothing else (issue #4037). It is not a frame with nothing to do, which ends a
+-- seek, and its time says nothing of what a unit or a corner costs.
+
+do
+	local lines, clock = {}, { now = 0, micros = true }
+	local gadget = unsynced(PLAYER, lines, clock)
+	local work, last = budgetFrames(gadget, clock)
+	work(1, 1)
+	work(8, 16)
+	t.same("a seek's budget", last(), "coilbox_rewind_budget:33 1 1")
+	work(10, 0, 0, 0, false, 0, 1)
+	t.same("the start of another seek changes no budget", #clock.messages, 2)
+	work(16.5, 33)
+	t.same("and the frames after it go on as before", #clock.messages, 2)
 end
 
 -- A timer that reads whole milliseconds reads less than a millisecond as none.

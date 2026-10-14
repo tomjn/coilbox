@@ -107,6 +107,42 @@ do
 	t.same("every unit has been made once", world.nextUnit - 100, 10)
 end
 
+-- A seek into another window reads that window, which no budget covers, and
+-- on a Beyond All Reason match took 8.5 to 9.4 ms of the seek's first frame
+-- (issue #4037). So that frame makes and removes nothing, and the next one
+-- starts on the budget. A seek inside the window already read starts at once.
+
+do
+	local units = append(row(10, 100, 400), row(6, 180, 400))
+	local world, player = setup({ last = 600, windowLength = 100, units = units }, 3)
+	player:message("coilbox_rewind:pause")
+	player:frame()
+	seek(player, 150)
+	local counts, starts, flags = {}, {}, {}
+	for n = 1, 5 do
+		player:frame()
+		counts[n], starts[n], flags[n] = world.unitCount(), tostring(player:started()), world.params[SETTLED]
+	end
+	t.same("the first frame of a seek into another window makes nothing", table.concat(counts, " "), "0 3 6 9 10")
+	t.same("and says it was the start", table.concat(starts, " "), "true false false false false")
+	t.same("and is not settled", table.concat(flags, " "), "0 0 0 0 1")
+	seek(player, 190)
+	counts = {}
+	for n = 1, 3 do
+		player:frame()
+		counts[n] = world.unitCount()
+	end
+	t.same("a seek inside the window already read starts on its first frame", table.concat(counts, " "), "13 16 16")
+	t.same("and is no start", tostring(player:started()), "false")
+	seek(player, 0)
+	counts = {}
+	for n = 1, 7 do
+		player:frame()
+		counts[n] = world.unitCount()
+	end
+	t.same("removals wait for the start as well", table.concat(counts, " "), "16 13 10 7 4 1 0")
+end
+
 -- A budget of nothing means no limit, and the least a frame may do is one.
 
 do

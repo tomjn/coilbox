@@ -320,8 +320,11 @@ function Terrain:remove(t, clock)
 	end
 	self.urgentCount = 0
 
+	-- The first frame of a seek into another window is the units stage's start
+	-- (issue #4037), so the ground waits for the next.
+	local start = self.share.start
 	local budget, ring, marked, queued = self.budget, self.ring, self.marked, self.queued
-	while self.ringCount > 0 and self.done < budget do
+	while not start and self.ringCount > 0 and self.done < budget do
 		local first = self.ringFirst
 		local k = ring[first]
 		self.ringFirst = first % self.tiles + 1
@@ -342,7 +345,7 @@ function Terrain:remove(t, clock)
 		end
 	end
 	self.unsettled = left
-	self.share.ground = self.done / budget
+	self.share.ground = start and 1 or self.done / budget
 end
 
 function Terrain:place() end

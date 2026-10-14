@@ -1474,9 +1474,10 @@ function M.new(options)
 			-- The end of a frame's work also says the budgets the frame worked to,
 			-- and how many of its units were the first of their definition.
 			if phase == 1 then
-				local make, remove, earth, firsts = ...
+				local make, remove, earth, firsts, started = ...
 				world.sentBudgets = { make, remove, earth }
 				world.sentFirsts = firsts
+				world.sentStarted = started
 			end
 		end,
 		next = next,

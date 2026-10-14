@@ -202,6 +202,35 @@ do
 	end
 end
 
+-- The first frame of a seek into another window is the units stage's, which
+-- reads the window, so it sets no ground (issue #4037). With no budget, as when
+-- nothing times a frame, the seek is shown in one frame as before.
+
+do
+	local world, player = setup({}, 1)
+	player:message("coilbox_rewind:pause")
+	player:frame()
+	player:message("coilbox_rewind_budget:1000 1000 30")
+	seek(player, LAST)
+	player:frame()
+	local _, _, first = player:worked()
+	t.same("the first frame of a seek into another window sets no ground", first, 0)
+	t.same("and says it was the start", player:started(), true)
+	t.same("and is not settled", world.params[SETTLED], 0)
+	player:frame()
+	local _, _, second = player:worked()
+	t.check("the next frame sets ground", second > 0, second)
+	t.same("and is no start", player:started(), false)
+
+	local world2, player2 = setup({})
+	player2:message("coilbox_rewind:pause")
+	player2:frame()
+	seek(player2, LAST)
+	player2:frame()
+	t.same("with no budget the start is no frame of its own", player2:started(), false)
+	t.same("and the seek is shown in one frame", world2.params[SETTLED], 1)
+end
+
 -- A corner before its first change has the map's own height, which the engine
 -- knows exactly and the track holds only in position steps.
 
