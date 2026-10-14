@@ -70,6 +70,7 @@ local function unsynced(file, lines, clock)
 	local e = Unsynced.new(clock)
 	e.lines = lines
 	env.Spring, env.gl, env.GL = e.Spring, e.gl, e.GL
+	env.CMD, env.UnitDefs, env.Game.maxUnits = e.CMD, e.UnitDefs, e.maxUnits
 	env.io = e.io
 	local chunk = assert(loadfile(GADGETS .. file))
 	setfenv(chunk, env)
@@ -728,7 +729,11 @@ do
 	local blind, _, e2 = unsynced(PLAYER, lines2, clock2)
 	e2.radius[104] = 25
 	t.same("without a timer an arrival is still taken", blind:RecvFromSynced("coilbox_rewind_arrive", 104, 500, 10, 700, 1), true)
-	t.same("and there is no world draw", blind.DrawWorld, nil)
+	-- The world is still drawn, for the stream of build particles, which
+	-- takes its time from the track and needs no timer.
+	e2.clear()
+	blind:DrawWorld()
+	t.same("and no effect is drawn for it", e2.vertices, 0)
 end
 
 -- The guard.
@@ -866,6 +871,52 @@ do
 		gadget:Update()
 	end
 	t.same("an engine without Spring.GetGameSpeed is never told to go on", #clock.commands, 0)
+end
+
+-- A game's own build effect asks the engine what a builder is doing (issue
+-- #4029). The unsynced half wraps the two calls in the `Spring` every
+-- unsynced gadget shares, as its file loads, and answers a builder at work
+-- from the work the synced half hands on.
+
+do
+	local lines, clock = {}, { now = 0 }
+	local e0 = Unsynced.new(clock)
+	local task, power = e0.Spring.GetUnitWorkerTask, e0.Spring.GetUnitCurrentBuildPower
+	local gadget, _, e = unsynced(PLAYER, lines, clock)
+	local Spring = e.Spring
+	e.UnitDefs[1] = { isFactory = false, showNanoSpray = true }
+	e.units[21] = { def = 1, team = 0, x = 0, y = 0, z = 0, pieces = { 1 }, at = { [1] = { 0, 10, 0 } } }
+	e.units[22] = { def = 1, team = 0, x = 90, y = 0, z = 0, radius = 20 }
+	e.rules.coilbox_rewind_playing = 1
+	e.rules.coilbox_rewind_direction = 1
+	t.check("the worker task call is wrapped as the file loads", Spring.GetUnitWorkerTask ~= task)
+	t.check("and the build power call", Spring.GetUnitCurrentBuildPower ~= power)
+	local asked = e.workerAsks
+	t.same("a unit not at work gets the engine's answer", Spring.GetUnitWorkerTask(21), nil)
+	t.same("which was asked", e.workerAsks, asked + 1)
+	t.same("and its build power", Spring.GetUnitCurrentBuildPower(21), 0)
+	gadget:RecvFromSynced("coilbox_rewind_build", 21, -5, 22, 0.6, 90, 0, 0, 1000, 1)
+	asked = e.workerAsks
+	local command, target = Spring.GetUnitWorkerTask(21)
+	t.same("a builder at work is answered with its recorded command", command, -5)
+	t.same("and target", target, 22)
+	t.same("and power, playing forward", Spring.GetUnitCurrentBuildPower(21), 0.6)
+	t.same("without asking the engine", e.workerAsks, asked)
+	e.rules.coilbox_rewind_playing = 0
+	t.same("paused its power is 0, so a game's stream stands still", Spring.GetUnitCurrentBuildPower(21), 0)
+	gadget:UnitDestroyed(21)
+	t.same("a builder the engine removed is the engine's again", Spring.GetUnitWorkerTask(21), nil)
+end
+
+do
+	-- An engine before 2025.01.6 has no Spring.GetUnitWorkerTask, and nothing
+	-- is wrapped.
+	local lines, clock = {}, { now = 0, without = { GetUnitWorkerTask = true } }
+	local ok, gadget, _, e = pcall(unsynced, PLAYER, lines, clock)
+	t.check("without the worker task call the unsynced half loads", ok, gadget)
+	if ok then
+		t.same("and does not make one", e.Spring.GetUnitWorkerTask, nil)
+	end
 end
 
 t.report()

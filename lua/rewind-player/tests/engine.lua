@@ -116,6 +116,7 @@ function M.new(options)
 			script = def.script,
 			callins = def.callins or {},
 			isFactory = def.isFactory or false,
+			isBuilder = def.isBuilder or false,
 			isImmobile = def.isImmobile or false,
 			-- How far above its place the middle of the unit is.
 			midHeight = def.midHeight or 0,
@@ -936,8 +937,66 @@ function M.new(options)
 			name = found.def.cobNames[func + 1]
 			assert(name, "[CallCOBScript] bad function id")
 		end
-		told(found, name, "cob", a, b)
+		-- A function hands back what it put in its first argument, which is what
+		-- the engine gives after the code when one value is asked for.
+		local given = told(found, name, "cob", a, b)
+		if returned >= 1 and count >= 1 then
+			if given == nil then
+				given = a
+			end
+			return 0, given
+		end
 		return 0
+	end
+
+	-- A builder's nano pieces (NanoPieceCache in rts/Sim/Misc, read and set in
+	-- rts/Lua/LuaSyncedRead.cpp and LuaSyncedCtrl.cpp). Only a builder or a
+	-- factory has them. Spring.SetUnitNanoPieces takes the model's piece numbers,
+	-- counted from 1, and raises for a piece the model does not have.
+	-- Spring.GetUnitNanoPieces gives a new list, and nothing while there are
+	-- none. `world.nanoSets` counts the sets.
+	world.nanoSets = 0
+	function Spring.SetUnitNanoPieces(id, pieces)
+		local found = unit(id)
+		if not found or not (found.def.isBuilder or found.def.isFactory) then
+			return
+		end
+		assert(type(pieces) == "table", "[SetUnitNanoPieces] a table of pieces")
+		world.nanoSets = world.nanoSets + 1
+		local list = {}
+		for _, piece in ipairs(pieces) do
+			if piece < 1 or piece > #found.def.pieces then
+				error("[SetUnitNanoPieces] incorrect model-piece number " .. (piece - 1), 2)
+			end
+			list[#list + 1] = piece
+		end
+		found.nanoPieces = list
+	end
+
+	function Spring.GetUnitNanoPieces(id)
+		local found = unit(id)
+		if not found or not found.nanoPieces or #found.nanoPieces == 0 then
+			return
+		end
+		local list = {}
+		for k, piece in ipairs(found.nanoPieces) do
+			list[k] = piece
+		end
+		return list
+	end
+
+	--- The model's piece of a script's piece, counted from 1, as
+	-- LuaSyncedRead::GetUnitScriptPiece gives it. A script here numbers its
+	-- pieces as the model does, from 0.
+	function Spring.GetUnitScriptPiece(id, scriptPiece)
+		local found = unit(id)
+		if not found or type(scriptPiece) ~= "number" then
+			return
+		end
+		if scriptPiece < 0 or scriptPiece >= #found.def.pieces then
+			return
+		end
+		return scriptPiece + 1
 	end
 
 	--- The engine's own call, which keeps the functions of the table it is given.

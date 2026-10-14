@@ -62,6 +62,15 @@
 -- for a game's own build effect to read. The command and the target are what
 -- Spring.GetUnitWorkerTask answers in a match.
 --
+-- The engine draws a builder's stream of build particles only while the
+-- builder really builds (issue #4029), so the unsynced half of the gadget
+-- draws it, and this stage hands it each change of a builder's work
+-- (`context.work`). The stream starts at the builder's nano pieces, which the
+-- engine keeps and fills by asking the script only while a builder really
+-- builds. So the first time a unit works, the stage asks its script the
+-- engine's way and gives the engine what it found, unless the script gave its
+-- own, as Splinter Faction's do.
+--
 -- The aim stage sets the pieces the track has poses for at the end of every
 -- frame, and a walk can turn one of those too: the track of the match this was
 -- written on has the right leg of one unit, because the recorder took a piece
@@ -106,6 +115,11 @@ local MOVING = 0.01 * 0.01
 --- A half turn in what a COB script takes for an angle (RAD2TAANG).
 local COB_HALF_TURN = 32768
 
+--- How many asks in a row the engine lets give no new nano piece before it
+-- stops asking a builder's script (MAX_QUERYNANOPIECE_CALLS in
+-- rts/Sim/Misc/NanoPieceCache.h).
+local QUIET_ASKS = 30
+
 --- The kinds of work a track has (the format page, target tracks).
 local BUILD, RECLAIM_UNIT, RECLAIM_FEATURE, RESURRECT, CAPTURE, TERRAFORM = 16, 17, 18, 19, 20, 129
 
@@ -146,6 +160,11 @@ function M.new(context, units, aim, features)
 		setVelocity = on.unitSpeed and Spring.MoveCtrl.SetVelocity or nil,
 		setExtrapolate = on.unitSpeed and Spring.MoveCtrl.SetExtrapolate or nil,
 		setParam = on.builderWork and Spring.SetUnitRulesParam or nil,
+		-- Hands a change of a builder's work to the stream, or nil.
+		signal = context.work,
+		setNano = scripts and on.nanoPieces and Spring.SetUnitNanoPieces or nil,
+		getNano = scripts and on.nanoPieces and Spring.GetUnitNanoPieces or nil,
+		scriptPiece = scripts and on.nanoPieces and Spring.GetUnitScriptPiece or nil,
 		probing = on.walkPieces and aim ~= nil and aim.free ~= nil,
 		maxUnits = context.Game.maxUnits,
 		-- The engine's commands for the kinds of work.
@@ -162,6 +181,11 @@ function M.new(context, units, aim, features)
 		stopMoving = {},
 		startBuilding = {},
 		stopBuilding = {},
+		queryNano = {},
+		-- The unit whose nano pieces have been seen to, by serial number, and the
+		-- list the asks fill, made once.
+		nanoFor = {},
+		nanoFound = {},
 		-- What the script was last told: 0 for stopped, 1 for moving and 2 for
 		-- reversing.
 		told = {},
@@ -291,14 +315,76 @@ local function learn(self, serial, unitID)
 		self.stopMoving[serial] = lua.StopMoving or false
 		self.startBuilding[serial] = lua.StartBuilding or false
 		self.stopBuilding[serial] = lua.StopBuilding or false
+		self.queryNano[serial] = lua.QueryNanoPiece or false
 	elseif cob and self.callCOBScript then
 		self.startMoving[serial] = cob(unitID, "StartMoving") or false
 		self.stopMoving[serial] = cob(unitID, "StopMoving") or false
 		self.startBuilding[serial] = cob(unitID, "StartBuilding") or false
 		self.stopBuilding[serial] = cob(unitID, "StopBuilding") or false
+		self.queryNano[serial] = cob(unitID, "QueryNanoPiece") or false
 	else
 		self.startMoving[serial], self.stopMoving[serial] = false, false
 		self.startBuilding[serial], self.stopBuilding[serial] = false, false
+		self.queryNano[serial] = false
+	end
+end
+
+--- Gives the engine a builder's nano pieces, once for a unit. The engine asks
+-- the script for one each time it makes a particle, until QUIET_ASKS asks in a
+-- row have given none it had (NanoPieceCache::GetNanoPiece), and here those
+-- asks are made at once. A script's piece is turned into the model's, which is
+-- what the engine keeps. A script that gave its own is left alone.
+local function nanoPieces(self, unitID, serial, def)
+	if self.nanoFor[serial] == unitID then
+		return
+	end
+	self.nanoFor[serial] = unitID
+	local query = self.queryNano[serial]
+	if not query or not self.setNano or self.getNano(unitID) then
+		return
+	end
+	local found, count, quiet = self.nanoFound, 0, 0
+	while quiet <= QUIET_ASKS do
+		local ok, piece, given
+		if type(query) == "number" then
+			-- The script puts its piece, counted from 0, in its one argument.
+			ok, piece, given = pcall(self.callCOBScript, unitID, query, 1, -1)
+			piece = given
+		else
+			-- A Lua script gives its piece counted from 1
+			-- (CLuaUnitScript::RunQueryCallIn).
+			ok, piece = pcall(self.callAsUnit, unitID, query)
+			piece = type(piece) == "number" and piece - 1 or nil
+		end
+		if not ok then
+			local unitName = self.names[def]
+			self.context.report(
+				"script " .. unitName .. " QueryNanoPiece",
+				"the script of " .. unitName .. " raised in QueryNanoPiece, so the engine has the nano pieces it gave before that: " .. tostring(piece) .. ". Later ones are not logged"
+			)
+			break
+		end
+		local model = type(piece) == "number" and self.scriptPiece(unitID, piece) or nil
+		local new = model ~= nil
+		for k = 1, count do
+			if found[k] == model then
+				new = false
+				break
+			end
+		end
+		if new then
+			count = count + 1
+			found[count] = model
+			quiet = 0
+		else
+			quiet = quiet + 1
+		end
+	end
+	for k = #found, count + 1, -1 do
+		found[k] = nil
+	end
+	if count > 0 then
+		self.setNano(unitID, found)
 	end
 end
 
@@ -434,7 +520,12 @@ end
 -- is where the work is.
 local function labour(self, w, i, t, serial, unitID, def, kind, on, command, target, power, again)
 	local set, P = self.setParam, M.PARAMS
-	local changed = command ~= self.command[serial] or target ~= self.target[serial]
+	local had = self.command[serial]
+	local changed = command ~= had or target ~= self.target[serial]
+	local powered = power ~= self.power[serial]
+	if kind ~= 0 and self.setNano then
+		nanoPieces(self, unitID, serial, def)
+	end
 	if changed then
 		self.command[serial], self.target[serial] = command, target
 		if set then
@@ -448,11 +539,20 @@ local function labour(self, w, i, t, serial, unitID, def, kind, on, command, tar
 			end
 		end
 	end
-	if power ~= self.power[serial] then
+	if powered then
 		self.power[serial] = power
 		if set then
 			set(unitID, P.power, power)
 		end
+	end
+	-- A builder first seen with no work has nothing to stop. One first seen at
+	-- work was made there, by a seek that makes its units over several frames
+	-- or by play, and its work did not start now, so it is handed on as after a
+	-- seek.
+	local signal = self.signal
+	if signal and (changed or powered or (again and kind ~= 0)) and (command ~= 0 or (had ~= nil and had ~= 0)) then
+		local place = self.site
+		signal(unitID, command, target, power, place[1], place[2], place[3], t, (again or had == nil) and 1 or 0)
 	end
 	if kind ~= self.jobKind[serial] or on ~= self.jobOn[serial] or (again and kind ~= 0) then
 		self.jobKind[serial], self.jobOn[serial] = kind, on

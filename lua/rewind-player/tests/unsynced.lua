@@ -48,6 +48,7 @@ function M.new(clock)
 		e.coloured = 0
 		e.state = {}
 		e.begins = 0
+		e.texCoords = 0
 	end
 	e.clear()
 
@@ -181,6 +182,114 @@ function M.new(clock)
 		end
 	end
 
+	-- What the stream of build particles reads (issue #4029). `e.units` has a
+	-- unit by id: `def`, `team`, its place `x, y, z`, its middle `mx, my, mz`,
+	-- `radius`, `pieces` (the engine's nano pieces, model numbers from 1) and
+	-- `at`, a piece's place by its number. `e.features` has a feature by id with
+	-- its middle and radius. `e.rules` holds the game rules parameters,
+	-- `e.config` the settings, `e.offset` the time since the last simulation
+	-- frame in frames, and `e.inView` whether a sphere is in view.
+	e.units, e.features, e.rules, e.config = {}, {}, {}, {}
+	-- The engine's CMD and UnitDefs as far as the stream reads them, and its
+	-- unit id limit (Game.maxUnits).
+	e.CMD = { REPAIR = 40, RECLAIM = 90, RESURRECT = 125, CAPTURE = 130, RESTORE = 110 }
+	e.UnitDefs = {}
+	e.maxUnits = 32000
+	e.offset, e.inView = 0, true
+	function Spring.GetGameRulesParam(name)
+		return e.rules[name]
+	end
+	function Spring.GetFrameTimeOffset()
+		return e.offset
+	end
+	--- The engine gives the default for a setting nobody set.
+	function Spring.GetConfigInt(name, default)
+		local value = e.config[name]
+		if value == nil then
+			return default
+		end
+		return value
+	end
+	function Spring.ValidUnitID(id)
+		return e.units[id] ~= nil
+	end
+	function Spring.GetUnitDefID(id)
+		local u = e.units[id]
+		return u and u.def
+	end
+	function Spring.GetUnitTeam(id)
+		local u = e.units[id]
+		return u and u.team
+	end
+	--- A new list, and nothing while there are none (LuaSyncedRead::GetUnitNanoPieces).
+	function Spring.GetUnitNanoPieces(id)
+		local u = e.units[id]
+		if not u or not u.pieces or #u.pieces == 0 then
+			return
+		end
+		local list = {}
+		for k, piece in ipairs(u.pieces) do
+			list[k] = piece
+		end
+		return list
+	end
+	--- A piece's place and the way it points, in the world.
+	function Spring.GetUnitPiecePosDir(id, piece)
+		local u = e.units[id]
+		local at = u and u.at and u.at[piece]
+		if not at then
+			return
+		end
+		return at[1], at[2], at[3], 0, 0, 1
+	end
+	function Spring.GetUnitPosition(id, middle)
+		local u = e.units[id]
+		if not u then
+			return
+		end
+		if middle then
+			return u.x, u.y, u.z, u.mx or u.x, u.my or u.y, u.mz or u.z
+		end
+		return u.x, u.y, u.z
+	end
+	function Spring.GetFeaturePosition(id, middle)
+		local f = e.features[id]
+		if not f then
+			return
+		end
+		if middle then
+			return f.x, f.y, f.z, f.x, f.y, f.z
+		end
+		return f.x, f.y, f.z
+	end
+	function Spring.GetFeatureRadius(id)
+		local f = e.features[id]
+		return f and f.radius
+	end
+	function Spring.IsSphereInView()
+		return e.inView
+	end
+	-- The engine's own answers about a builder's work, which nobody gives in a
+	-- playback: nothing for every unit.
+	e.workerAsks = 0
+	function Spring.GetUnitWorkerTask()
+		e.workerAsks = e.workerAsks + 1
+	end
+	function Spring.GetUnitCurrentBuildPower(id)
+		e.workerAsks = e.workerAsks + 1
+		if e.units[id] then
+			return 0
+		end
+	end
+	local radiusOf = Spring.GetUnitRadius
+	function Spring.GetUnitRadius(id)
+		local u = e.units[id]
+		if u and u.radius then
+			return u.radius
+		end
+		return radiusOf(id)
+	end
+
 	for name in pairs(clock.without or {}) do
 		Spring[name] = nil
 	end
@@ -204,14 +313,30 @@ function M.new(clock)
 	gl.Blending = state("Blending")
 	gl.DepthTest = state("DepthTest")
 	gl.DepthMask = state("DepthMask")
-	gl.Texture = state("Texture")
+	-- A texture that the engine finds gives true. `e.noTexture` is a path it
+	-- does not find.
+	local recordTexture = state("Texture")
+	function gl.Texture(which)
+		recordTexture(which)
+		return which ~= e.noTexture
+	end
 	local inside = false
 	local r, g, b = 1, 1, 1
+	-- The texture coordinates given since the last clear.
+	e.texCoords = 0
+	function gl.TexCoord(s, u)
+		assert(inside, "a texture coordinate outside gl.BeginEnd is not drawn")
+		assert(s >= 0 and s <= 1 and u >= 0 and u <= 1, "a texture coordinate outside the texture")
+		e.texCoords = e.texCoords + 1
+	end
 	function gl.Color(red, green, blue, alpha)
 		assert(type(red) == "number" and type(green) == "number" and type(blue) == "number" and type(alpha) == "number", "a colour is four numbers")
 		assert(alpha >= 0 and alpha <= 1, "an alpha of " .. tostring(alpha))
 		r, g, b = red, green, blue
 		e.lastColour = alpha
+		if inside then
+			e.drawnAlpha = alpha
+		end
 		if not inside then
 			e.state[#e.state + 1] = "Color " .. red .. " " .. green .. " " .. blue .. " " .. alpha
 		end
