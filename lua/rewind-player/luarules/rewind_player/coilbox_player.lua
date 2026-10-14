@@ -91,6 +91,14 @@ M.BUDGET = "coilbox_rewind_budget:"
 -- such place, as when the camera looks at the sky.
 M.VIEW = "coilbox_rewind_view:"
 
+--- What the unsynced half says when the orbs a jump asked for are full grown
+-- (issue #4051).
+M.ORBS_FULL = "coilbox_rewind_orbs:full"
+
+--- What it says once, when it can draw the orbs and say they are full, which
+-- the synced half cannot know. Without it no orb is asked for.
+M.ORBS_READY = "coilbox_rewind_orbs:ready"
+
 --- The mod options the player reads.
 M.OPTIONS = {
 	-- The frame to open on. The track's first frame without it.
@@ -159,8 +167,10 @@ end
 -- when there is none because the game's could not be used. `options.engine` is
 -- what coilbox_player_engine.lua's `check` gave for the engine, which says what
 -- is switched off. Without it every feature is on. `options.arrive` is a function
--- the units stage calls with a unit's id, its x, y and z and its team when the
--- unit wants an arrival effect (issue #4009), and without it none is asked for.
+-- the units stage calls with a unit's serial, its definition's engine id, its
+-- x, y and z and whether units are held for it, when a unit is to arrive or
+-- leave under an orb (issues #4009 and #4051), and without it none is asked
+-- for. `options.cancel` takes an orb away by its serial.
 -- `options.scriptCallIns` is a table the gadget keeps, by the engine's unit id,
 -- of the call-ins of each Lua unit script (issue #3797), and without it a unit
 -- with a Lua script is told nothing. `options.work` is a function the animation
@@ -259,6 +269,7 @@ function M.new(track, options)
 		teamOf = teamOf,
 		report = report,
 		arrive = options.arrive,
+		cancel = options.cancel,
 		scriptCallIns = options.scriptCallIns,
 		work = options.work,
 	}
@@ -499,6 +510,14 @@ function Player:message(text)
 		else
 			self.log("the message \"" .. text .. "\" was refused: the budget is two or three whole numbers of 1 or more, the most units made and the most removed in a frame, and the most corners of the ground set in a frame")
 		end
+		return true
+	end
+	if text == M.ORBS_READY then
+		self.units:orbsReady()
+		return true
+	end
+	if text == M.ORBS_FULL then
+		self.units:orbsFull()
 		return true
 	end
 	if text:sub(1, #M.VIEW) == M.VIEW then

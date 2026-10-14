@@ -642,12 +642,21 @@ do
 	settle(gadget, w, 2)
 	t.same("nor do the frames that settle it", #arrived(w), 0)
 	gadget:RecvLuaMsg("coilbox_rewind:seek 800", 0)
+	gadget:GameFrame(3)
+	t.same("a jump asks for no orb until the unsynced half says it can draw them", #arrived(w), 0)
 	settle(gadget, w, 3)
+	gadget:RecvLuaMsg("coilbox_rewind_orbs:ready", 0)
+	local standing = w.unitCount()
+	gadget:RecvLuaMsg("coilbox_rewind:seek 0", 0)
+	gadget:GameFrame(4)
 	local asked = arrived(w)
-	t.check("a jump asks for the units it makes", #asked > 0, #asked)
-	local id, x, y, z, team = asked[1]:match("^arrive (%S+) (%S+) (%S+) (%S+) (%S+)$")
-	local unit = w.units[tonumber(id)]
-	t.check("each with its id, a place and its team", unit ~= nil and tonumber(x) and tonumber(y) and tonumber(z) and tonumber(team) == unit.team, asked[1])
+	t.check("a jump asks for an orb for each unit it removes", #asked > 0, #asked)
+	t.same("and removes none while they grow", w.unitCount(), standing)
+	t.same("the unsynced half's word that they are full is the player's", gadget:RecvLuaMsg("coilbox_rewind_orbs:full", 0), true)
+	settle(gadget, w, 5)
+	t.same("and then the units are made", w.unitCount() > 0, true)
+	local id, def, x, y, z, held = asked[1]:match("^arrive (%S+) (%S+) (%S+) (%S+) (%S+) (%S+)$")
+	t.check("each with its serial, its definition, a place and that units wait for it", tonumber(id) and tonumber(def) and tonumber(x) and tonumber(y) and tonumber(z) and held == "true", asked[1])
 	t.same("and they do not count as timing a frame", w.sentName, "coilbox_rewind_work")
 end
 
@@ -667,17 +676,33 @@ end
 do
 	local lines, clock = {}, { now = 0 }
 	local gadget, _, e = unsynced(PLAYER, lines, clock)
-	e.units[104] = { x = 500, y = 10, z = 700, mx = 500, my = 22, mz = 700, radius = 25, team = 1 }
+	e.UnitDefs[3] = { radius = 25, height = 40 }
 	t.same("the unsynced half has a world draw", type(gadget.DrawWorld), "function")
 	gadget:DrawWorld()
 	t.same("which draws nothing while no unit arrives", e.vertices, 0)
-	t.same("the unsynced half takes an arrival", gadget:RecvFromSynced("coilbox_rewind_arrive", 104, 500, 10, 700, 1), true)
+	t.same("it says once that it can draw orbs, on the first frame's work", #clock.orbs, 0)
+	gadget:RecvFromSynced("coilbox_rewind_work", 0, 1)
+	gadget:RecvFromSynced("coilbox_rewind_work", 0, 2)
+	t.same("and says it once", table.concat(clock.orbs, " "), "coilbox_rewind_orbs:ready")
+	t.same("the unsynced half takes an arrival", gadget:RecvFromSynced("coilbox_rewind_arrive", 104, 3, 500, 10, 700, true), true)
+	clock.now = clock.now + 10
+	gadget:RecvFromSynced("coilbox_rewind_work", 0, 3)
+	t.same("it says nothing of the orbs before they are full", #clock.orbs, 1)
 	clock.now = clock.now + 100
 	gadget:DrawWorld()
 	t.check("and draws its effect", e.vertices > 0, e.vertices)
 	t.check("round the unit", e.box.x1 < 500 and e.box.x2 > 500 and e.box.z1 < 700 and e.box.z2 > 700)
 	local sum = e.colourSum
 	t.check("in white", sum[1] == sum[2] and sum[2] == sum[3], table.concat(sum, " "))
+	gadget:RecvFromSynced("coilbox_rewind_work", 0, 4)
+	t.same("once they are full it says so, once", table.concat(clock.orbs, " "), "coilbox_rewind_orbs:ready coilbox_rewind_orbs:full")
+	gadget:RecvFromSynced("coilbox_rewind_work", 0, 5)
+	t.same("only once", #clock.orbs, 2)
+	t.same("the unsynced half takes an orb away", gadget:RecvFromSynced("coilbox_rewind_cancel", 104), true)
+	e.clear()
+	gadget:DrawWorld()
+	t.same("which is not drawn after", e.vertices, 0)
+	gadget:RecvFromSynced("coilbox_rewind_arrive", 105, 3, 500, 10, 700, false)
 	e.clear()
 	clock.now = clock.now + 5000
 	gadget:DrawWorld()

@@ -467,14 +467,13 @@ local function unsyncedScene(removed)
 	end
 	-- A builder at work for the stream: unit 21 with its nano piece 90 elmos
 	-- from the middle of unit 22, at frame 1000 of the track, played forward.
-	e.UnitDefs[1] = { isFactory = false, showNanoSpray = true }
+	e.UnitDefs[1] = { isFactory = false, showNanoSpray = true, radius = 10, height = 12 }
 	e.units[21] = { def = 1, team = 0, x = 0, y = 0, z = 0, pieces = { 1 }, at = { [1] = { 0, 10, 0 } } }
 	e.units[22] = { def = 1, team = 0, x = 90, y = 0, z = 0, mx = 90, my = 10, mz = 0, radius = 20 }
 	e.rules.coilbox_rewind_frame = 1000
 	e.rules.coilbox_rewind_playing = 1
 	e.rules.coilbox_rewind_direction = 1
 	e.rules.coilbox_rewind_speed = 1
-	e.units[7] = { def = 1, team = 0, x = 0, y = 0, z = 0, mx = 0, my = 5, mz = 0, radius = 10 }
 	local chunk = assert(loadfile(GADGET))
 	setfenv(chunk, env)
 	chunk()
@@ -515,7 +514,7 @@ for _, row in ipairs(Table.UNSYNCED) do
 			-- The stream of build particles needs the arrival effect's drawing
 			-- calls and its own, and takes its time from the track.
 			local streamOff = row.id == "buildStream" or row.id == "arrivalEffect"
-			t.same(label .. " a unit that arrives is taken and raises nothing", pcall(gadget.RecvFromSynced, gadget, "coilbox_rewind_arrive", 7, 0, 0, 0, 0), true)
+			t.same(label .. " a unit that arrives is taken and raises nothing", pcall(gadget.RecvFromSynced, gadget, "coilbox_rewind_arrive", 7, 1, 0, 0, 0, true), true)
 			t.same(label .. " a builder's work is taken and raises nothing", pcall(gadget.RecvFromSynced, gadget, "coilbox_rewind_build", 21, -1, 22, 1, 0, 0, 0, 1000, 1), true)
 			t.same(label .. " the world is " .. ((effectOff and streamOff) and "not drawn" or "drawn"), type(gadget.DrawWorld), (effectOff and streamOff) and "nil" or "function")
 			if gadget.DrawWorld then

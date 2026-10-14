@@ -1592,9 +1592,14 @@ function M.new(options)
 				return
 			end
 			if name == "coilbox_rewind_arrive" then
-				-- A unit that wants an arrival effect: its id, where it is, its team.
-				-- It is one of the world's events, as a creation is.
-				world.events[#world.events + 1] = table.concat({ "arrive", phase, a, made, removed, team }, " ")
+				-- A unit that gets an orb: its serial, its definition, where it is and
+				-- whether units wait for it. It is one of the world's events, as a
+				-- creation is.
+				world.events[#world.events + 1] = table.concat({ "arrive", phase, a, made, removed, team, tostring((...)) }, " ")
+				return
+			end
+			if name == "coilbox_rewind_cancel" then
+				world.events[#world.events + 1] = "cancel " .. tostring(phase)
 				return
 			end
 			world.sent = world.sent + 1

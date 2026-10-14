@@ -45,9 +45,9 @@
 -- The unsynced half is also the one that can see the camera and draw. It
 -- tells the player where the viewer looks, as another Lua message, so that a
 -- seek makes the units in view first (issue #4008,
--- coilbox_player_view.lua). And it draws a short effect where a unit that a
--- slow seek made appears, when the synced half asks for one (issue #4009,
--- coilbox_player_arrival.lua).
+-- coilbox_player_view.lua). And it draws an orb over each unit that a jump
+-- makes or removes in view, when the synced half asks for one (issues #4009
+-- and #4051, coilbox_player_arrival.lua).
 --
 -- It draws a builder's stream of build particles too (issue #4029,
 -- coilbox_player_stream.lua). The engine draws its own only while a builder
@@ -93,8 +93,14 @@ local FIRST_BUDGET = 1
 local BUDGET = "coilbox_rewind_budget:"
 
 --- What the synced half sends the unsynced one for a unit that wants an
--- arrival effect: the unit's id, its x, y and z and its team.
+-- orb: the unit's serial in the track, its definition's engine id, its x, y and
+-- z and whether units are held for the orb. `CANCEL` takes an orb away by
+-- serial (issue #4051). `ORBS_FULL` is what the unsynced half says to the
+-- player when the orbs it was told of have grown.
+local ORBS_FULL = "coilbox_rewind_orbs:full"
+local ORBS_READY = "coilbox_rewind_orbs:ready"
 local ARRIVE = "coilbox_rewind_arrive"
+local CANCEL = "coilbox_rewind_cancel"
 
 --- What the synced half sends the unsynced one when a builder's work changes,
 -- for the stream of build particles (issue #4029): the builder's id, the
@@ -229,8 +235,11 @@ if gadgetHandler:IsSyncedCode() then
 			installFramePost = engine.on.frameEnd and installFramePost or nil,
 			-- The unsynced half draws the effect, so without SendToUnsynced none
 			-- is asked for.
-			arrive = engine.on.workTiming and function(unitID, x, y, z, team)
-				SendToUnsynced(ARRIVE, unitID, x, y, z, team)
+			arrive = engine.on.workTiming and function(serial, defID, x, y, z, gated)
+				SendToUnsynced(ARRIVE, serial, defID, x, y, z, gated)
+			end or nil,
+			cancel = engine.on.workTiming and function(serial)
+				SendToUnsynced(CANCEL, serial)
 			end or nil,
 			-- The unsynced half draws the stream too.
 			work = engine.on.workTiming and function(unitID, command, target, power, x, y, z, frame, jumped)
@@ -402,6 +411,7 @@ else
 	local clock = micros and Spring.GetTimerMicros or Spring.GetTimer
 	-- Whether the player has been told there is no budget to wait for.
 	local toldNone = false
+	local toldOrbs = false
 
 	-- Where the viewer looks, sent to the player as a message. Without a way to
 	-- send one there is nothing to look for.
@@ -418,6 +428,7 @@ else
 			Spring = Spring,
 			gl = gl,
 			GL = GL,
+			UnitDefs = UnitDefs,
 			seconds = function()
 				return Spring.DiffTimers(clock(), epoch, true, micros) / 1000
 			end,
@@ -682,9 +693,16 @@ else
 			return true
 		end
 		if name == ARRIVE then
-			-- A unit's id, its place and its team, where the work's arguments are.
+			-- A unit's serial, its definition, its place and whether units are held
+			-- for the orb, where the work's arguments are.
 			if arrival then
-				arrival:add(phase, frame, made, removed, ground)
+				arrival:add(phase, frame, made, removed, ground, hadMake)
+			end
+			return true
+		end
+		if name == CANCEL then
+			if arrival then
+				arrival:cancel(phase)
 			end
 			return true
 		end
@@ -704,6 +722,17 @@ else
 			local text = view:poll()
 			if text then
 				Spring.SendLuaRulesMsg(text)
+			end
+		end
+		-- The synced half asks for no orb until it is told this half can draw
+		-- them and say when they are full.
+		if phase == 0 and arrival and engine.on.budgetMessage then
+			if not toldOrbs then
+				toldOrbs = true
+				Spring.SendLuaRulesMsg(ORBS_READY)
+			end
+			if arrival:poll() then
+				Spring.SendLuaRulesMsg(ORBS_FULL)
 			end
 		end
 		if not engine.on.workTimingLine then

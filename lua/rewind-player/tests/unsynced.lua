@@ -31,6 +31,7 @@ function M.new(clock)
 	clock = clock or { now = 0 }
 	clock.messages = clock.messages or {}
 	clock.views = clock.views or {}
+	clock.orbs = clock.orbs or {}
 	local e = {
 		clock = clock,
 		lines = {},
@@ -136,6 +137,8 @@ function M.new(clock)
 	function Spring.SendLuaRulesMsg(text)
 		if text:find("^coilbox_rewind_view:") then
 			clock.views[#clock.views + 1] = text
+		elseif text:find("^coilbox_rewind_orbs:") then
+			clock.orbs[#clock.orbs + 1] = text
 		else
 			clock.messages[#clock.messages + 1] = text
 		end

@@ -35,15 +35,22 @@
 -- the window changes, and never in a frame of play. With no view the order is
 -- the window's list.
 --
--- A unit that a jump makes gets a short effect where it appears (issues #4009
--- and #4051). The stage only says which: a unit made while a jump's units are
--- still arriving, in the frame that showed the jump or a later one, inside the
--- view's corners. It asks with `context.arrive`, and the gadget's unsynced half
--- draws. A jump is a seek that is not part of a drag, and the start of the
--- playback is not one. While the timeline's knob is being dragged no unit asks.
--- When the drag ends, the units it made and left standing in view ask, and so
--- do the ones the last of its seeks still has to make. A removal and a unit that
--- plain play brings in ask for none, at any speed in either direction.
+-- A jump's units arrive and leave under an orb of light (issues #4009 and
+-- #4051, coilbox_player_arrival.lua). At the start of a jump, once the window
+-- is read, the stage asks for an orb over each unit in view that the jump will
+-- make and each that it will remove, no more than `M.MOST_ORBS` of them, with
+-- `context.arrive(serial, definition, x, y, z, true)`. The gadget's unsynced
+-- half draws them and tells the player when they are full grown
+-- (`Units:orbsFull`). Until then the stage makes none of those units and
+-- removes none, and any removal it holds back holds back every creation, since
+-- a removal comes first. Units outside the view are made and removed with no
+-- orb and no wait. The orb does not wait for a unit, so a unit the budget makes
+-- late appears after the orb is gone.
+--
+-- A jump is a seek that is not part of a drag, and the start of the playback is
+-- not one. While the timeline's knob is being dragged no unit gets an orb. When
+-- the drag ends, the units it made and left standing in view get one at once,
+-- with no wait. Plain play, at any speed in either direction, gets none.
 --
 -- The game's adapter can hide a unit definition, which is then never created,
 -- and can ask to be told when a unit is created and put in place (issue #3799).
@@ -82,6 +89,10 @@
 --   unit the base game creates is removed on the next frame.
 
 local M = {}
+
+--- The most units an orb is held for at once, which is the most orbs the
+-- effect's module draws (coilbox_player_arrival.lua).
+M.MOST_ORBS = 256
 
 local Units = {}
 Units.__index = Units
@@ -183,14 +194,24 @@ function M.new(context, rotation)
 		-- Whether a jump has not been looked at yet by `place`, which decides
 		-- whether its units want an effect.
 		fresh = false,
-		-- Whether the units of the jump that is arriving want an effect. The
-		-- playback's first frame is not a jump the viewer made, and a drag's seeks
-		-- are not jumps until it ends.
+		-- Whether the jump that is arriving gets orbs. The playback's first frame
+		-- is not a jump the viewer made, and a drag's seeks are not jumps until it
+		-- ends.
 		beam = false,
+		-- The serials of the units an orb is held for, how many, and whether the
+		-- orbs are still growing, so that none of them is made or removed yet.
+		orbs = {},
+		orbCount = 0,
+		growing = false,
+		-- Whether the unsynced half has said it can draw the orbs and say when they
+		-- are full. Until then none is asked for.
+		orbsOn = false,
+		-- The engine's id of the definition of each unit made, by serial.
+		defOf = {},
 		-- Whether any frame has been shown, so that the first is known.
 		shown = false,
-		-- The units a drag made, by serial, with their team and their definition's
-		-- engine id. They are the ones that want an effect when the drag ends.
+		-- The units a drag made, by serial, with their definition's engine id.
+		-- They are the ones that get an orb when the drag ends.
 		dragMade = {},
 		dragDef = {},
 		-- Where the viewer looks: the camera's place on the ground, and the
@@ -282,6 +303,7 @@ function Units:forget(serial, unitID)
 	self.holdAt[serial] = nil
 	self.on[serial] = nil
 	self.nanoframe[serial] = nil
+	self.defOf[serial] = nil
 end
 
 --- Destroys a unit of the track. `loud` is with the game's death effect, and
@@ -447,6 +469,13 @@ function Units:resync(t)
 	self.arriving = true
 	self.fresh = true
 	self.orderStale = true
+	-- The orbs of an earlier jump finish on their own. This jump's are asked for
+	-- once the window is read.
+	for serial in next, self.orbs do
+		self.orbs[serial] = nil
+	end
+	self.orbCount = 0
+	self.growing = false
 	local Spring = self.Spring
 	local failed = self.failed
 	for serial in next, failed do
@@ -484,6 +513,61 @@ local function index(self, w)
 	self.orderStale = true
 end
 
+--- Asks for an orb over each unit in view that the jump to `t` removes and each
+-- that it makes, as far as the most at once. Those units are held until
+-- `orbsFull`.
+function Units:startOrbs(w, t)
+	local arrive = self.context.arrive
+	if not arrive or not self.orbsOn then
+		return
+	end
+	local Spring, orbs, unitOf, failed = self.Spring, self.orbs, self.unitOf, self.failed
+	local indexOf, at = self.indexOf, self.transform
+	local most = M.MOST_ORBS
+	local n = 0
+	for serial, unitID in next, unitOf do
+		if n >= most then
+			break
+		end
+		local i = indexOf[serial]
+		if not i or not w:unitExistsAt(i, t) then
+			local x, y, z = Spring.GetUnitPosition(unitID)
+			local def = self.defOf[serial]
+			if x and def and self:inView(x, z) then
+				n = n + 1
+				orbs[serial] = true
+				arrive(serial, def, x, y, z, true)
+			end
+		end
+	end
+	local serials, defID = w.unitSerial, self.defID
+	for i = 1, w.unitCount do
+		if n >= most then
+			break
+		end
+		local serial = serials[i]
+		local def = defID[w.unitDef[i] + 1]
+		if def and not unitOf[serial] and not failed[serial] and w:unitExistsAt(i, t) and w:sampleTransform(i, t, at) and self:inView(at[1], at[3]) then
+			n = n + 1
+			orbs[serial] = true
+			arrive(serial, def, at[1], at[2], at[3], true)
+		end
+	end
+	self.orbCount = n
+	self.growing = n > 0
+end
+
+--- The orbs have grown full, so the units held for them can be made and
+-- removed.
+function Units:orbsFull()
+	self.growing = false
+end
+
+--- The unsynced half can draw orbs and say when they are full.
+function Units:orbsReady()
+	self.orbsOn = true
+end
+
 --- Takes away every unit that is not in the track at `t`. This runs for every
 -- stage before anything is created, because after a seek a building may stand
 -- where another stood earlier.
@@ -506,6 +590,22 @@ function Units:remove(t, clock)
 		index(self, w)
 	end
 
+	-- A jump that has just been shown asks for its orbs, before anything is
+	-- made or removed.
+	if self.fresh then
+		self.fresh = false
+		self.beam = self.shown and not clock.dragging
+		if not clock.dragging then
+			for serial in next, self.dragMade do
+				self.dragMade[serial] = nil
+				self.dragDef[serial] = nil
+			end
+		end
+		if self.beam then
+			self:startOrbs(w, t)
+		end
+	end
+
 	-- A unit that dies while somebody watches dies with the game's death effect.
 	-- One a seek removes does not, in the frames after the seek's too.
 	local loud = clock:watched() and not self.seeking
@@ -517,12 +617,21 @@ function Units:remove(t, clock)
 	for serial, unitID in next, self.unitOf do
 		local i = indexOf[serial]
 		if not i or not w:unitExistsAt(i, t) then
-			if ground + self.removed / budget >= 1 then
+			if self.growing and self.orbs[serial] then
+				-- Its orb is not full yet. It is a removal left, so nothing is made.
 				self.removing = true
-				break
+			else
+				if ground + self.removed / budget >= 1 then
+					self.removing = true
+					break
+				end
+				self.removed = self.removed + 1
+				self:destroy(serial, unitID, loud)
+				if self.orbs[serial] then
+					self.orbs[serial] = nil
+					self.orbCount = self.orbCount - 1
+				end
 			end
-			self.removed = self.removed + 1
-			self:destroy(serial, unitID, loud)
 		end
 	end
 
@@ -584,6 +693,7 @@ function Units:create(w, i, serial, nanoframe, t)
 	local _, maxHealth = Spring.GetUnitHealth(unitID)
 	self.unitOf[serial] = unitID
 	self.serialOf[unitID] = serial
+	self.defOf[serial] = id
 	self.maxHealth[serial] = maxHealth
 	self.nanoframe[serial] = nanoframe
 	return unitID
@@ -701,16 +811,20 @@ function Units:put(w, i, serial, unitID, t, clock)
 		self.MoveCtrl.SetRotation(unitID, self.euler(transform[4], transform[5], transform[6], transform[7]))
 		if made then
 			local context = self.context
-			local placed, arrive = context.hooks.unitPlaced, context.arrive
-			local team = context.teamOf(w.unitTeam[i])
-			local effect = self.beam and arrive ~= nil and self:inView(transform[1], transform[3])
+			local placed = context.hooks.unitPlaced
+			local orb = self.orbs[serial]
 			local defID = self.defID[w.unitDef[i] + 1]
-			local handled = placed and placed(unitID, defID, t, clock, effect)
-			if effect and not handled then
-				arrive(unitID, transform[1], transform[2], transform[3], team)
+			local handled = placed and placed(unitID, defID, t, clock, orb ~= nil)
+			if orb then
+				self.orbs[serial] = nil
+				self.orbCount = self.orbCount - 1
+				-- The game shows its own effect, so the orb goes.
+				if handled and context.cancel then
+					context.cancel(serial)
+				end
 			end
 			if clock.dragging then
-				self.dragMade[serial] = team
+				self.dragMade[serial] = true
 				self.dragDef[serial] = defID
 			end
 		end
@@ -761,16 +875,6 @@ end
 -- budget goes, and puts each one where the track has it. A unit the budget
 -- leaves is made on a later frame, where the track has it then.
 function Units:place(t, clock)
-	if self.fresh then
-		self.fresh = false
-		self.beam = self.shown and not clock.dragging
-		if not clock.dragging then
-			for serial in next, self.dragMade do
-				self.dragMade[serial] = nil
-				self.dragDef[serial] = nil
-			end
-		end
-	end
 	self.shown = true
 	if clock.dragEnded then
 		self:dragEnd(t, clock)
@@ -792,7 +896,7 @@ function Units:place(t, clock)
 		if w:unitExistsAt(i, t) then
 			local serial = serials[i]
 			local unitID = unitOf[serial]
-			if not unitID and not failed[serial] and defID[w.unitDef[i] + 1] and (sorted or self.removing or ground + self.removed / removeBudget + self.made / makeBudget >= 1) then
+			if not unitID and not failed[serial] and defID[w.unitDef[i] + 1] and (sorted or self.removing or (self.growing and self.orbs[serial]) or ground + self.removed / removeBudget + self.made / makeBudget >= 1) then
 				-- Nothing is made while a removal is left, and what the frame has
 				-- removed uses up its share of the time. A definition the game lacks
 				-- costs nothing, so it is not held back.
@@ -814,7 +918,7 @@ function Units:place(t, clock)
 			end
 			local i = order[k]
 			local serial = serials[i]
-			if not unitOf[serial] and not failed[serial] and w:unitExistsAt(i, t) then
+			if not unitOf[serial] and not failed[serial] and w:unitExistsAt(i, t) and not (self.growing and self.orbs[serial]) then
 				self:put(w, i, serial, nil, t, clock)
 				waiting = waiting - 1
 			end
@@ -829,29 +933,36 @@ function Units:place(t, clock)
 	if not self.unsettled then
 		self.arriving = false
 		self.beam = false
+		-- A unit that could not be made has no orb to wait for.
+		for serial in next, self.orbs do
+			self.orbs[serial] = nil
+		end
+		self.orbCount = 0
+		self.growing = false
 	end
 end
 
 --- The timeline's knob was let go. The units its seeks made and left standing
--- in view get the effect now, with the game's own if the hook shows one. The
--- ones the last seek still has to make get it as they are made.
+-- in view get an orb now, with the game's own effect if the hook shows one. No
+-- unit waits for it.
 function Units:dragEnd(t, clock)
 	clock.dragEnded = false
-	self.beam = self.arriving
 	local Spring, context = self.Spring, self.context
 	local arrive, placed = context.arrive, context.hooks.unitPlaced
 	local unitOf = self.unitOf
-	for serial, team in next, self.dragMade do
+	local left = M.MOST_ORBS
+	for serial in next, self.dragMade do
 		self.dragMade[serial] = nil
 		local defID = self.dragDef[serial]
 		self.dragDef[serial] = nil
 		local unitID = unitOf[serial]
-		if unitID and arrive ~= nil then
+		if unitID and arrive ~= nil and left > 0 then
 			local x, y, z = Spring.GetUnitPosition(unitID)
 			if x and self:inView(x, z) then
+				left = left - 1
 				local handled = placed and placed(unitID, defID, t, clock, true)
 				if not handled then
-					arrive(unitID, x, y, z, team)
+					arrive(serial, defID, x, y, z, false)
 				end
 			end
 		end

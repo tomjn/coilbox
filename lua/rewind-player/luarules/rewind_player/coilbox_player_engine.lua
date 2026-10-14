@@ -526,8 +526,6 @@ M.UNSYNCED = {
 			"GL.ONE",
 			"GL.ONE_MINUS_SRC_ALPHA",
 			"Spring.GetCameraDirection",
-			"Spring.GetUnitRadius",
-			"Spring.GetUnitPosition",
 		},
 		how = "presence",
 		used = "coilbox_player_arrival.lua",
@@ -539,9 +537,8 @@ M.UNSYNCED = {
 	{
 		id = "buildStream",
 		feature = "the stream of build particles",
-		-- The drawing calls it shares with the arrival effect, and
-		-- Spring.GetUnitPosition, are in that row, and the stream is off without
-		-- them too.
+		-- The drawing calls it shares with the arrival effect are in that row,
+		-- and the stream is off without them too.
 		calls = {
 			"gl.TexCoord",
 			"Spring.GetGameRulesParam",
@@ -553,6 +550,8 @@ M.UNSYNCED = {
 			"Spring.GetUnitTeam",
 			"Spring.GetUnitNanoPieces",
 			"Spring.GetUnitPiecePosDir",
+			"Spring.GetUnitPosition",
+			"Spring.GetUnitRadius",
 			"Spring.GetTeamColor",
 			"Spring.GetFeaturePosition",
 			"Spring.GetFeatureRadius",
