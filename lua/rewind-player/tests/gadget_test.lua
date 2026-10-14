@@ -70,6 +70,7 @@ local function unsynced(file, lines, clock)
 	local e = Unsynced.new(clock)
 	e.lines = lines
 	env.Spring, env.gl, env.GL = e.Spring, e.gl, e.GL
+	env.io = e.io
 	local chunk = assert(loadfile(GADGETS .. file))
 	setfenv(chunk, env)
 	local returned = chunk()
@@ -107,6 +108,10 @@ do
 	w.gadget = gadget
 	t.same("it names itself", gadget:GetInfo().name, "Coilbox rewind player")
 	gadget:Initialize()
+	t.same("nothing is logged before the first frame, since the unsynced half that writes the log file is not there yet", #w.lines, 0)
+
+	t.same("nothing is created before the first frame", w.unitCount(), 0)
+	gadget:GameFrame(1)
 	t.same("it logs the adapter, the rules parameters nobody names and the track", #w.lines, 3)
 	t.same("a game with no adapter file says it loaded none", w.lines[1], "COILBOX_REWIND_PLAYER adapter loaded: none")
 	t.same(
@@ -123,11 +128,10 @@ do
 	t.check("the line has the team count", line:find("teams " .. #info.teams .. ",", 1, true) ~= nil, line)
 	t.check("the line names the map", line:find("map " .. info.map, 1, true) ~= nil, line)
 
-	t.same("nothing is created before the first frame", w.unitCount(), 0)
-	gadget:GameFrame(1)
+	t.same("none of it goes to the engine's log, which the console shows", w.echoed, 0)
 	t.same("the first frame makes one unit, the budget the gadget starts with", w.unitCount(), 1)
 	t.same("and all of the features", #w.Spring.GetAllFeatures(), 5)
-	t.same("the unsynced half is told when the work starts and ends", w.sent, 2)
+	t.same("the unsynced half is told when the work starts and ends, apart from the lines it writes", w.sent, 2)
 	t.same("by the name it listens for", w.sentName, "coilbox_rewind_work")
 	t.same("with how many units the frame made", w.sentMade, 1)
 	t.same("and removed", w.sentRemoved, 0)
@@ -172,8 +176,8 @@ do
 	})
 	w.gadget = gadget
 	gadget:Initialize()
-	t.check("the adapter is named in the log", w.lines[1]:find("COILBOX_REWIND_PLAYER adapter loaded: Test game.", 1, true) == 1, w.lines[1])
 	settle(gadget, w, 1)
+	t.check("the adapter is named in the log", w.lines[1]:find("COILBOX_REWIND_PLAYER adapter loaded: Test game.", 1, true) == 1, w.lines[1])
 	t.same("a hidden definition is not created", w.unitNamed("armpw"), nil)
 	t.same("the others are", w.unitCount(), 2)
 	t.same("a skipped feature is not created", #w.Spring.GetAllFeatures(), 0)
@@ -184,12 +188,12 @@ do
 	local w = world()
 	local gadget = synced(PLAYER, w, { [TRACK] = bytes, ["coilbox_rewind/adapter.lua"] = "return { problem = 'it was not for this game' }" })
 	gadget:Initialize()
+	settle(gadget, w, 1)
 	t.same(
 		"an adapter coilbox could not use is logged with its reason",
 		w.lines[1],
 		"COILBOX_REWIND_PLAYER adapter loaded: none. it was not for this game"
 	)
-	settle(gadget, w, 1)
 	t.same("and the match still plays", w.unitCount(), 3)
 end
 
@@ -197,8 +201,8 @@ do
 	local w = world()
 	local gadget = synced(PLAYER, w, { [TRACK] = bytes, ["coilbox_rewind/adapter.lua"] = "error('broken')" })
 	gadget:Initialize()
-	t.check("an adapter file that raises is logged", w.lines[1]:find("adapter loaded: none. the adapter file raised", 1, true) ~= nil, w.lines[1])
 	settle(gadget, w, 1)
+	t.check("an adapter file that raises is logged", w.lines[1]:find("adapter loaded: none. the adapter file raised", 1, true) ~= nil, w.lines[1])
 	t.same("and the match still plays", w.unitCount(), 3)
 end
 
@@ -208,9 +212,15 @@ do
 	local w = world()
 	local gadget = synced(PLAYER, w, {})
 	gadget:Initialize()
+	gadget:GameFrame(1)
 	t.same("a game with no track logs one line", #w.lines, 1)
 	t.check("the line says what is missing", w.lines[1]:find("failed: the game holds no file at coilbox_rewind/track.cbtrack", 1, true) ~= nil, w.lines[1])
-	gadget:GameFrame(1)
+	t.same("not on the engine's log", w.echoed, 0)
+	t.check(
+		"and the timeline's note tells a viewer that playback did not start",
+		tostring(w.params.coilbox_rewind_note):find("^Playback did not start: ") ~= nil,
+		tostring(w.params.coilbox_rewind_note)
+	)
 	t.same("and the gadget then does nothing on a frame", w.sent, 0)
 	t.same("leaves damage alone", gadget:UnitPreDamaged(100, 1, 0, 500), nil)
 	t.same("and a feature's too", gadget:FeaturePreDamaged(1, 0, -1, 80), nil)
@@ -223,6 +233,7 @@ do
 	local w = world()
 	local gadget = synced(PLAYER, w, { [TRACK] = "not a track" })
 	gadget:Initialize()
+	gadget:GameFrame(1)
 	t.same("a file that is not a track logs one line", #w.lines, 1)
 	t.check("the line is a failure", w.lines[1]:find("COILBOX_REWIND_PLAYER failed: ", 1, true) == 1, w.lines[1])
 end
@@ -581,12 +592,58 @@ do
 	t.same("the unsynced half does not load the guard", unsyncedReturn, false)
 end
 
+-- With the player there, the guard's lines go to the playback's log file with
+-- the player's (issue #4032).
+
+do
+	local w = world()
+	local player = synced(PLAYER, w, { [TRACK] = bytes })
+	synced(GUARD, w)
+	player:Initialize()
+	local Spring = w.Spring
+	Spring.KillTeam(1)
+	player:GameFrame(1)
+	local found = 0
+	for _, line in ipairs(w.lines) do
+		if line:find("kill team 1", 1, true) then
+			found = found + 1
+		end
+	end
+	t.same("the guard's line is in the log", found, 1)
+	t.same("and not on the engine's log", w.echoed, 0)
+end
+
 -- The guard's file name sorts before any gadget a game names with letters,
 -- digits or an underscore, which is the order gadget files load in.
 do
 	local names = { "game_end.lua", "0_first.lua", "_first.lua", "API_first.lua", "a.lua", GUARD }
 	table.sort(names)
 	t.same("the guard's file sorts first", names[1], GUARD)
+end
+
+-- The lines go to the playback's own log file and not the engine's log, which
+-- the console shows (issue #4032).
+
+do
+	local lines, clock = {}, { now = 0 }
+	local gadget, _, e = unsynced(PLAYER, lines, clock)
+	t.same("the unsynced half empties the file as it loads and then appends to it", table.concat(e.files, " | "), "coilbox_rewind.log w | coilbox_rewind.log a")
+	t.same("a line from the synced half is the unsynced half's", gadget:RecvFromSynced("coilbox_rewind_log", "COILBOX_REWIND_PLAYER a line"), true)
+	t.same("and is written to the file", lines[#lines], "COILBOX_REWIND_PLAYER a line")
+	local echoed = e.echoed
+	gadget:RecvFromSynced("coilbox_rewind_work", 0, 1)
+	clock.now = clock.now + 40
+	gadget:RecvFromSynced("coilbox_rewind_work", 1, 1, 0, 0, 0)
+	t.check("the slow frame line is written there too", lines[#lines]:find("slow frame", 1, true) ~= nil, lines[#lines])
+	t.same("and nothing went to the engine's log", e.echoed, echoed)
+end
+
+do
+	local lines, clock = {}, { now = 0, noFile = true }
+	local gadget, _, e = unsynced(PLAYER, lines, clock)
+	local echoed = e.echoed
+	gadget:RecvFromSynced("coilbox_rewind_log", "COILBOX_REWIND_PLAYER a line")
+	t.same("a file that cannot be opened leaves the lines on the engine's log", e.echoed, echoed + 1)
 end
 
 -- The engine's own pause and speed (issue #4033). A game can pause the engine

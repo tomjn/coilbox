@@ -200,7 +200,12 @@ function M.new(options)
 
 	local Spring = {}
 
+	-- `world.lines` has the lines logged either way: on the engine's log, which
+	-- the console shows, and in the playback's log file, which the unsynced half
+	-- writes what the synced half sends it to. `world.echoed` counts the first.
+	world.echoed = 0
 	function Spring.Echo(line)
+		world.echoed = world.echoed + 1
 		world.lines[#world.lines + 1] = tostring(line)
 	end
 
@@ -1240,7 +1245,14 @@ function M.new(options)
 			constructionDecay = options.constructionDecay == true,
 			constructionDecaySpeed = 0.03,
 		},
+		-- What every synced gadget shares.
+		GG = {},
 		SendToUnsynced = function(name, phase, a, made, removed, team)
+			if name == "coilbox_rewind_log" then
+				-- A line for the playback's log file, which the unsynced half writes.
+				world.lines[#world.lines + 1] = phase
+				return
+			end
 			if name == "coilbox_rewind_arrive" then
 				-- A unit that wants an arrival effect: its id, where it is, its team.
 				-- It is one of the world's events, as a creation is.

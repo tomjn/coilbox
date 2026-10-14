@@ -681,9 +681,25 @@ do
 	env.Spring.GetViewGeometry = function()
 		return 1920, 1080
 	end
+	-- The playback's log file, which takes the widget's lines (issue #4032),
+	-- and the engine's log, which the console shows.
+	local opened, echoed = {}, 0
 	env.Spring.Echo = function(line)
+		echoed = echoed + 1
 		e.line = line
 	end
+	env.io = {
+		open = function(path, mode)
+			opened[#opened + 1] = path .. " " .. mode
+			return {
+				write = function(_, line)
+					e.line = line
+				end,
+				flush = function() end,
+				close = function() end,
+			}
+		end,
+	}
 	env.gl, env.GL = e.gl, e.GL
 	env.VFS = {
 		ZIP = "z",
@@ -809,9 +825,23 @@ do
 		env.Spring.GetViewGeometry = function()
 			return 1920, 1080
 		end
+		local opened = {}
 		env.Spring.Echo = function(line)
 			lines[#lines + 1] = line
+			lines.echoed = (lines.echoed or 0) + 1
 		end
+		env.io = {
+			open = function(path, mode)
+				opened[#opened + 1] = path .. " " .. mode
+				return {
+					write = function(_, line)
+						lines[#lines + 1] = line
+					end,
+					flush = function() end,
+					close = function() end,
+				}
+			end,
+		}
 		env.gl, env.GL = e.gl, e.GL
 		env.VFS = {
 			ZIP = "z",
@@ -862,6 +892,7 @@ do
 			t.check(label .. " raises nothing", ok, err)
 			local line = lines[1]
 			t.same(label .. " logs one line", #lines, 1)
+			t.same(label .. " in the playback's log file and not on the engine's log", lines.echoed, nil)
 			t.check(label .. " starting with the widget's prefix", line ~= nil and line:sub(1, #PREFIX) == PREFIX, line)
 			t.check(label .. " naming the call", line ~= nil and line:find("this engine has no " .. call, 1, true) ~= nil, line)
 			t.check(label .. " and the engine that has it", line ~= nil and line:find("Engine " .. row.since .. " and later have it", 1, true) ~= nil, line)

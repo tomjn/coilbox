@@ -437,6 +437,7 @@ local function unsyncedScene(removed)
 	}
 	env.Game = { gameSpeed = 30 }
 	env.Spring, env.gl, env.GL = e.Spring, e.gl, e.GL
+	env.io = e.io
 	env.VFS.Include = function(path)
 		local file = assert(path:match("^luarules/rewind_player/(.+)$"), path)
 		return t.load(file, env)

@@ -61,6 +61,19 @@ local function definitionsByName()
 	return names
 end
 
+--- Where the widget's lines go: the playback's own log file, and not the
+-- engine's log, which the console shows (issue #4032,
+-- luarules/rewind_player/coilbox_log.lua). Without the module, the engine's log.
+local function logWriter()
+	local ok, Log = pcall(VFS.Include, "luarules/rewind_player/coilbox_log.lua", nil, VFS.ZIP)
+	if ok and type(Log) == "table" then
+		return (Log.new(io, Spring.Echo))
+	end
+	return Spring.Echo
+end
+
+local say = Spring.Echo
+
 --- The adapter the playback game holds, or nil. Include runs the file in the
 -- environment of the function that calls it, which is wanted: its hooks then see
 -- the widget's `gl`.
@@ -72,23 +85,24 @@ local function readAdapter(engine)
 		return VFS.Include(ADAPTER_PATH, nil, VFS.ZIP)
 	end)
 	if not ok then
-		Spring.Echo(PREFIX .. "the game's adapter could not be read, so the engine's own shape is used: " .. tostring(adapter))
+		say(PREFIX .. "the game's adapter could not be read, so the engine's own shape is used: " .. tostring(adapter))
 		return nil
 	end
 	return adapter
 end
 
 function widget:Initialize()
+	say = logWriter()
 	-- What the engine has comes first. A widget that lacks a call it cannot do
 	-- without does not start, and says which.
 	local found, Engine = pcall(VFS.Include, "luaui/rewind_ghosts/coilbox_ghosts_engine.lua", nil, VFS.ZIP)
 	if not found then
-		Spring.Echo(PREFIX .. "failed: " .. tostring(Engine))
+		say(PREFIX .. "failed: " .. tostring(Engine))
 		return
 	end
 	local engine = Engine.check({ Spring = Spring, gl = gl, GL = GL, VFS = VFS })
 	for _, line in ipairs(engine.lines) do
-		Spring.Echo(line)
+		say(line)
 	end
 	if engine.refused then
 		return
@@ -97,7 +111,7 @@ function widget:Initialize()
 	local readers, Track = pcall(VFS.Include, "luarules/rewind_player/coilbox_track.lua", nil, VFS.ZIP)
 	local fetchers, Fetch = pcall(VFS.Include, "luarules/rewind_player/coilbox_track_fetch.lua", nil, VFS.ZIP)
 	if not (loaded and readers and fetchers) then
-		Spring.Echo(PREFIX .. "failed: " .. tostring(not loaded and Ghosts or not readers and Track or Fetch))
+		say(PREFIX .. "failed: " .. tostring(not loaded and Ghosts or not readers and Track or Fetch))
 		return
 	end
 
@@ -108,7 +122,7 @@ function widget:Initialize()
 		track, why = Track.open(fetch)
 	end
 	if not track then
-		Spring.Echo(PREFIX .. "no queued building will be drawn: " .. tostring(why))
+		say(PREFIX .. "no queued building will be drawn: " .. tostring(why))
 		return
 	end
 
@@ -120,6 +134,7 @@ function widget:Initialize()
 		UnitDefs = UnitDefs,
 		UnitDefNames = definitionsByName(),
 		adapter = readAdapter(engine),
+		log = say,
 	}, track)
 	made:setConfig(saved)
 	ghosts = made

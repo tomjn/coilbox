@@ -61,9 +61,32 @@ function M.new(clock)
 
 	local Spring = {}
 
+	-- `e.echoed` counts the lines on the engine's log, which the console shows.
+	e.echoed = 0
 	function Spring.Echo(line)
+		e.echoed = e.echoed + 1
 		e.lines[#e.lines + 1] = line
 	end
+
+	-- `io` for the playback's log file. What is written to it goes into
+	-- `e.lines` with the engine's log, and `e.files` has each file opened with
+	-- its mode. `clock.noFile` is a file that cannot be opened.
+	e.files = {}
+	e.io = {
+		open = function(path, mode)
+			if clock.noFile then
+				return nil, "denied"
+			end
+			e.files[#e.files + 1] = path .. " " .. mode
+			return {
+				write = function(_, line)
+					e.lines[#e.lines + 1] = line
+				end,
+				flush = function() end,
+				close = function() end,
+			}
+		end,
+	}
 
 	function Spring.GetTimer()
 		return clock.now

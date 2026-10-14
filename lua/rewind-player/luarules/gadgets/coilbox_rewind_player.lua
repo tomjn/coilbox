@@ -82,13 +82,34 @@ local BUDGET = "coilbox_rewind_budget:"
 -- arrival effect: the unit's id, its x, y and z and its team.
 local ARRIVE = "coilbox_rewind_arrive"
 
+--- What the synced half sends the unsynced one for a line of the log, which
+-- the unsynced half writes to the playback's log file (issue #4032,
+-- coilbox_log.lua). The lines are for whoever works on the player, and a viewer
+-- would read them as errors, so none goes to the engine's log, which the
+-- console shows.
+local LOG = "coilbox_rewind_log"
+
 if gadgetHandler:IsSyncedCode() then
 	local player
 	-- What the engine has, from coilbox_player_engine.lua.
 	local engine
 
+	-- The unsynced half loads after every synced gadget has, so a line sent
+	-- before the first frame would reach nobody. Those lines wait for it.
+	local waiting = {}
 	local function log(text)
-		Spring.Echo(PREFIX .. text)
+		local line = PREFIX .. text
+		if type(SendToUnsynced) ~= "function" then
+			Spring.Echo(line)
+		elseif waiting then
+			waiting[#waiting + 1] = line
+		else
+			SendToUnsynced(LOG, line)
+		end
+	end
+	-- The guard gadget's lines come this way too.
+	if GG then
+		GG.coilboxRewindLog = log
 	end
 
 	--- Makes the engine's call at the end of a frame reach this gadget in a game
@@ -132,14 +153,22 @@ if gadgetHandler:IsSyncedCode() then
 		local Player = VFS.Include("luarules/rewind_player/coilbox_player.lua")
 		local Adapter = VFS.Include("luarules/rewind_player/coilbox_player_adapter.lua")
 
+		-- Playback that does not start says why on the timeline too, since a
+		-- viewer sees nothing of the log.
+		local function failed(why)
+			log("failed: " .. tostring(why))
+			if not engine.note and Spring.SetGameRulesParam then
+				Spring.SetGameRulesParam(Engine.NOTE_PARAM, "Playback did not start: " .. tostring(why))
+			end
+		end
 		local fetch, why = Fetch.fromVFS()
 		if not fetch then
-			log("failed: " .. tostring(why))
+			failed(why)
 			return
 		end
 		local track, openWhy = Track.open(fetch)
 		if not track then
-			log("failed: " .. tostring(openWhy))
+			failed(openWhy)
 			return
 		end
 		-- The game's adapter, which coilbox wrote into the playback game. Its
@@ -167,7 +196,7 @@ if gadgetHandler:IsSyncedCode() then
 			adapterWhy = adapterWhy,
 		})
 		if not made then
-			log("failed: " .. tostring(madeWhy))
+			failed(madeWhy)
 			return
 		end
 		player = made
@@ -190,6 +219,13 @@ if gadgetHandler:IsSyncedCode() then
 	end
 
 	function gadget:GameFrame(frame)
+		if waiting then
+			local lines = waiting
+			waiting = nil
+			for i = 1, #lines do
+				SendToUnsynced(LOG, lines[i])
+			end
+		end
 		if not player then
 			return
 		end
@@ -285,8 +321,11 @@ else
 	-- What this half needs from the engine, from coilbox_player_engine.lua.
 	local Engine = VFS.Include("luarules/rewind_player/coilbox_player_engine.lua")
 	local engine = Engine.check({ Spring = Spring, Game = Game, gl = gl, GL = GL }, Engine.UNSYNCED)
+	-- The playback's log file, emptied as this half loads, which is before any
+	-- widget writes to it.
+	local write = VFS.Include("luarules/rewind_player/coilbox_log.lua").new(io, Spring.Echo, true)
 	for _, line in ipairs(engine.lines) do
-		Spring.Echo(PREFIX .. line)
+		write(PREFIX .. line)
 	end
 
 	-- How long one simulation frame lasts, in milliseconds. Work that takes
@@ -428,6 +467,10 @@ else
 	end
 
 	function gadget:RecvFromSynced(name, phase, frame, made, removed, ground)
+		if name == LOG then
+			write(phase)
+			return true
+		end
 		if name == ARRIVE then
 			-- A unit's id, its place and its team, where the work's arguments are.
 			if arrival then
@@ -486,7 +529,7 @@ else
 			worst = took
 		end
 		if not lastLine or frame - lastLine >= QUIET_FRAMES then
-			Spring.Echo(
+			write(
 				string.format(
 					"%sslow frame: the work of frame %d took %.1f ms, and a simulation frame lasts %.1f ms. %d slow since the last line, the slowest %.1f ms",
 					PREFIX,

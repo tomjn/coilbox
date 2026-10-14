@@ -754,6 +754,22 @@ local function widgetScene(options)
 	env.widget = {}
 	env.WG = {}
 	env.Spring = e.Spring
+	-- The playback's log file, which takes the widget's lines (issue #4032).
+	local opened = {}
+	e.opened = opened
+	env.io = {
+		open = function(path, mode)
+			opened[#opened + 1] = path .. " " .. mode
+			return {
+				write = function(_, line)
+					e.lines[#e.lines + 1] = line
+					e.filed = (e.filed or 0) + 1
+				end,
+				flush = function() end,
+				close = function() end,
+			}
+		end,
+	}
 	env.gl, env.GL = e.gl, e.GL
 	env.UnitDefs = e.UnitDefs
 	-- A handler whose LuaUI does not set the table has no such global, and a
@@ -829,6 +845,8 @@ do
 	widget:SetConfigData({ show = false })
 	widget:Initialize()
 	t.same("it starts, and says only that the game lacks a definition the track names", #e.lines, 1)
+	t.same("in the playback's log file, which it appends to", e.filed, 1)
+	t.same("opened once", table.concat(e.opened, " | "), "coilbox_rewind.log a")
 	e.params.coilbox_rewind_frame = 300
 	widget:DrawWorld()
 	t.same("what it was told to remember before it started is kept", e.shapes, 0)
@@ -852,6 +870,7 @@ do
 	widget:Initialize()
 	widget:DrawWorld()
 	t.check("a game with no track logs a line and draws nothing", #e.lines == 1 and e.lines[1]:find("the game has no track", 1, true) and e.shapes == 0, e.lines[1])
+	t.same("in the playback's log file", e.filed, 1)
 end
 
 do
