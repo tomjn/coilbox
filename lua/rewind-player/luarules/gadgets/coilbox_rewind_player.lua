@@ -47,6 +47,11 @@
 -- slow seek made appears, when the synced half asks for one (issue #4009,
 -- coilbox_player_arrival.lua).
 --
+-- A unit's own script is told when its unit moves and when a builder works
+-- (issue #3797, coilbox_player_animation.lua). A Lua script's functions are not
+-- something the engine hands out, so this file wraps the call a game's script
+-- framework gives them to the engine with, as it loads, and keeps them.
+--
 -- The base game's own gadgets still run, except those the game's adapter
 -- switches off (issue #3799). !coilbox_rewind_guard.lua stops the rest killing a
 -- team or ending the match.
@@ -89,6 +94,27 @@ if gadgetHandler:IsSyncedCode() then
 
 	local function log(text)
 		Spring.Echo(PREFIX .. text)
+	end
+
+	-- The call-ins of each Lua unit script, by unit id. A game's script
+	-- framework hands them to the engine with Spring.UnitScript.CreateScript
+	-- when a unit is created, and the engine keeps them where Lua cannot reach.
+	-- The engine's own framework looks the call up in the table every gadget
+	-- shares each time it uses it
+	-- (cont/base/springcontent/LuaGadgets/Gadgets/unit_script.lua), so a wrap
+	-- put there as this file loads sees every script. A framework that copied
+	-- the call into a local in a file that loads before this one is not seen,
+	-- and its units are told nothing.
+	local scriptCallIns = {}
+	do
+		local UnitScript = Spring.UnitScript
+		local create = UnitScript and UnitScript.CreateScript
+		if create then
+			UnitScript.CreateScript = function(unitID, callIns, ...)
+				scriptCallIns[unitID] = callIns
+				return create(unitID, callIns, ...)
+			end
+		end
 	end
 
 	--- Makes the engine's call at the end of a frame reach this gadget in a game
@@ -165,6 +191,7 @@ if gadgetHandler:IsSyncedCode() then
 			log = log,
 			adapter = adapter,
 			adapterWhy = adapterWhy,
+			scriptCallIns = scriptCallIns,
 		})
 		if not made then
 			log("failed: " .. tostring(madeWhy))
@@ -239,9 +266,9 @@ if gadgetHandler:IsSyncedCode() then
 		end
 	end
 
-	function gadget:UnitDamaged(unitID)
+	function gadget:UnitDamaged(unitID, _, _, damage)
 		if player then
-			player:unitDamaged(unitID)
+			player:unitDamaged(unitID, damage)
 		end
 	end
 
@@ -252,6 +279,7 @@ if gadgetHandler:IsSyncedCode() then
 	end
 
 	function gadget:UnitDestroyed(unitID)
+		scriptCallIns[unitID] = nil
 		if player then
 			player:unitDestroyed(unitID)
 		end

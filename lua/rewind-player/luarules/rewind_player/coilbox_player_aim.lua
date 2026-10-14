@@ -38,6 +38,11 @@
 --
 -- A unit is never given a target to aim itself at. See "Units with no recorded
 -- poses" in lua/rewind-player/README.md for why.
+--
+-- A unit's walk can turn a piece the track has poses for (issue #3797). The
+-- animation stage finds those turns and moves when a unit of a definition is
+-- first told that it moves, and writes them into `free`. This stage leaves
+-- them to the unit's own script, and sets the rest of the piece's pose.
 
 local M = {}
 
@@ -79,6 +84,12 @@ function M.new(context, units)
 		pose = { 0, 0, 0, 0, 0, 0 },
 		-- Which of a unit's posed pieces had a track, while it is being posed.
 		seen = {},
+		-- By a definition's place in the track's list and then by posed piece:
+		-- six flags, true for a turn about x, y or z and a move along x, y or z
+		-- that is the script's. The animation stage fills it in.
+		free = {},
+		-- The flags of the unit that `poseUnit` is to pose, or nil for none.
+		frees = nil,
 		-- What `poseUnit` is to pose: the unit's piece numbers and its pose tracks.
 		numbers = nil,
 		first = 0,
@@ -89,19 +100,32 @@ function M.new(context, units)
 	local pose, seen = self.pose, self.seen
 	--- Poses every piece of one unit. It runs inside `CallAsUnit`, as that unit.
 	self.poseUnit = function()
-		local w, t, numbers = self.window, self.t, self.numbers
+		local w, t, numbers, frees = self.window, self.t, self.numbers, self.frees
 		local posePiece = w.posePiece
 		for track = self.first, self.first + self.count - 1 do
 			local k = posePiece[track] + 1
 			local piece = numbers[k]
 			if piece and w:samplePose(track, t, pose) then
 				seen[k] = true
-				turn(piece, 1, (pose[1] % STEPS) * RADIANS)
-				turn(piece, 2, (pose[2] % STEPS) * RADIANS)
-				turn(piece, 3, (pose[3] % STEPS) * RADIANS)
-				move(piece, 1, pose[4])
-				move(piece, 2, pose[5])
-				move(piece, 3, pose[6])
+				local free = frees and frees[k]
+				if free then
+					-- Part of this piece's pose is the walk's.
+					for axis = 1, 3 do
+						if not free[axis] then
+							turn(piece, axis, (pose[axis] % STEPS) * RADIANS)
+						end
+						if not free[axis + 3] then
+							move(piece, axis, pose[axis + 3])
+						end
+					end
+				else
+					turn(piece, 1, (pose[1] % STEPS) * RADIANS)
+					turn(piece, 2, (pose[2] % STEPS) * RADIANS)
+					turn(piece, 3, (pose[3] % STEPS) * RADIANS)
+					move(piece, 1, pose[4])
+					move(piece, 2, pose[5])
+					move(piece, 3, pose[6])
+				end
 			end
 		end
 		-- A piece with no track in this window is at rest.
@@ -110,7 +134,17 @@ function M.new(context, units)
 				seen[k] = false
 			else
 				local piece = numbers[k]
-				if piece then
+				local free = frees and frees[k]
+				if piece and free then
+					for axis = 1, 3 do
+						if not free[axis] then
+							turn(piece, axis, 0)
+						end
+						if not free[axis + 3] then
+							move(piece, axis, 0)
+						end
+					end
+				elseif piece then
 					turn(piece, 1, 0)
 					turn(piece, 2, 0)
 					turn(piece, 3, 0)
@@ -162,11 +196,12 @@ local function poseAll(self)
 	end
 	local unitOf, indexOf, known = units.unitOf, units.indexOf, self.unitID
 	local callAsUnit, poseUnit, t = self.callAsUnit, self.poseUnit, self.t
-	local firsts, counts = w.unitPoseFirst, w.unitPoseCount
+	local firsts, counts, defs, free = w.unitPoseFirst, w.unitPoseCount, w.unitDef, self.free
 	for serial, numbers in next, self.pieces do
 		local unitID, i = unitOf[serial], indexOf[serial]
 		if unitID and i and unitID == known[serial] and w:unitExistsAt(i, t) then
 			self.numbers, self.first, self.count = numbers, firsts[i], counts[i]
+			self.frees = free[defs[i] + 1]
 			callAsUnit(unitID, poseUnit)
 		end
 	end

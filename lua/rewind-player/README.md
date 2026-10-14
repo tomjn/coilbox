@@ -1,6 +1,6 @@
 # Rewind player
 
-The rewind player plays a replay track back inside the engine, with time going in either direction. This folder holds the Lua that reads a track (issue #3792) and the gadget that makes the world match it (issue #3794): units, features, terrain and the shots in the air (issue #3795) at any time, with every turret and torso pointing where it pointed in the match (issue #3796). It does not yet animate units: walking, building and firing (issue #3797). The control on screen is a widget, the timeline (issue #3798), and a second widget draws the buildings a builder had queued (issue #3804). What a game switches off or hides during playback is its adapter (issue #3799).
+The rewind player plays a replay track back inside the engine, with time going in either direction. This folder holds the Lua that reads a track (issue #3792) and the gadget that makes the world match it (issue #3794): units, features, terrain and the shots in the air (issue #3795) at any time, with every turret and torso pointing where it pointed in the match (issue #3796). Each unit's own script is told when its unit moves and when a builder works, so units walk and builders turn to their work (issue #3797). A unit's fire animation does not play (issue #4030). The control on screen is a widget, the timeline (issue #3798), and a second widget draws the buildings a builder had queued (issue #3804). What a game switches off or hides during playback is its adapter (issue #3799).
 
 A track is the file `crates/coilbox-track` writes, in the format `docs/reference/replay-track-format.md` describes. The format was designed so that the engine's Lua can read the file as it is, so there is no export step and no second copy on disk.
 
@@ -17,7 +17,7 @@ The player holds a time `t`, a frame of the track that can be a fraction. On eve
 | `luarules/rewind_player/coilbox_player.lua` | the player: the clock, the list of stages, the published state |
 | `luarules/rewind_player/coilbox_player_clock.lua` | the time and the messages that change it. It touches nothing in the engine |
 | `luarules/rewind_player/coilbox_player_engine.lua` | the table of engine calls the player needs, and the check of it ([Engine calls](#engine-calls)) |
-| `luarules/rewind_player/coilbox_player_terrain.lua`, `coilbox_player_features.lua`, `coilbox_player_units.lua`, `coilbox_player_aim.lua`, `coilbox_player_projectiles.lua`, `coilbox_player_resources.lua` | the six stages |
+| `luarules/rewind_player/coilbox_player_terrain.lua`, `coilbox_player_features.lua`, `coilbox_player_units.lua`, `coilbox_player_aim.lua`, `coilbox_player_animation.lua`, `coilbox_player_projectiles.lua`, `coilbox_player_resources.lua` | the seven stages |
 | `luarules/rewind_player/coilbox_player_rotation.lua` | a track's rotation as the pitch, yaw and roll the engine takes |
 | `luarules/rewind_player/coilbox_player_adapter.lua` | reads the game's adapter, and guards its hooks |
 | `luarules/rewind_player/coilbox_player_view.lua` | works out where the viewer looks, for the unsynced half of the gadget to send ([Which units first](#which-units-first)) |
@@ -287,6 +287,10 @@ A row names the calls (`calls`), the feature that hangs on them (`feature`), how
 | `world` | `Spring.GetModOptions`, `GetGaiaTeamID`, `GetTeamList`, `GetAllyTeamList`, `SetGameRulesParam` | yes | no playback | the engine to use |
 | `units` | `Spring.CreateUnit`, `DestroyUnit`, `ValidUnitID`, `GetUnitIsDead`, `GetAllUnits`, `GetUnitHealth`, `SetUnitHealth`, `SetUnitMaxHealth`, `Spring.MoveCtrl.Enable`, `SetPosition`, `SetRotation`, `Game.constructionDecay`, `Game.constructionDecaySpeed` | yes | no playback | the engine to use |
 | `aimPoses` (behaviour) | `Spring.UnitScript.CallAsUnit`, `Turn`, `Move`, `Spring.GetUnitScriptNames` | no | units hold the pose their own script gives them | unit aiming |
+| `unitScripts` (behaviour) | `Spring.UnitScript.CreateScript`, `Spring.CallCOBScript`, `Spring.GetCOBScriptID`, `Spring.GetUnitPosition` | no | units slide with their legs and wheels still, and a builder's script is not told that it builds | walking and building animation |
+| `unitSpeed` | `Spring.MoveCtrl.SetExtrapolate`, `Spring.MoveCtrl.SetVelocity` | no | a unit's speed reads as nothing | nothing |
+| `walkPieces` | `Spring.UnitScript.IsInTurn`, `IsInMove` | no | a posed piece a walk turns follows the track, out of step with the rest of the walk | nothing |
+| `builderWork` | `Spring.SetUnitRulesParam`, `CMD.REPAIR`, `RECLAIM`, `RESURRECT`, `CAPTURE`, `RESTORE`, `Game.maxUnits` | no | the unit rules parameters of a builder's work are not set | nothing |
 | `frameEnd` (behaviour) | `Script.UpdateCallIn` | no | in a game whose gadget handler does not pass `GameFramePost` on, the player cannot install it, and falls back as on an engine without the call | nothing |
 | `terrain` | `Spring.SetHeightMapFunc`, `SetHeightMap`, `Game.squareSize` | no | the terrain stage does nothing | ground changes |
 | `features` | `Spring.CreateFeature`, `DestroyFeature`, `ValidFeatureID`, `GetAllFeatures` | no | the features stage does nothing | wrecks and rocks |
@@ -360,6 +364,8 @@ Without `SendToUnsynced` the synced half has no timing at all and starts with no
 
 #### What has run
 
+The four rows of the animation stage were read at `105.0`, `105.1.1`, `2025.01.6`, `2025.03.9` and `2026.07.04`, in `rts/Lua/LuaSyncedCtrl.cpp`, `LuaSyncedMoveCtrl.cpp`, `LuaSyncedRead.cpp` and `rts/Sim/Units/Scripts/LuaUnitScript.cpp`, and every call is registered at all five. `unitScripts` is a behaviour row: which way a unit's script is run is found for each unit, as [Unit animation](#unit-animation) says. The fixture track cannot show the four, because its units are under construction at every whole frame, so `tests/engine_test.lua` plays a made-up track for them with each call taken out in turn. They have run with every call there in an engine, `2026.07.01-102-g6e5c5a0`, and with none taken out.
+
 The `aimPoses` and `frameEnd` rows have run in an engine, `2026.07.01-102-g6e5c5a0`: with the calls there, with `Spring.GetUnitScriptNames` taken out, and with the engine kept from making the call at the end of a frame ([The call at the end of a frame](#the-call-at-the-end-of-a-frame)). Their calls were read at `105.0`, and the spike on issue #3791 read `CallAsUnit`, `Turn` and `Move` at four tags. No engine was run for the other rows. No engine before `2025.03.9` is installed, so every older path is tested on the stand-in in `tests/engine.lua` with a call taken out of it, and none has run in an engine. The stand-in has `world.oldEngine` for the `SetUnitHealth` behaviour, and the tests take `Spring.SetProjectileTimeToLive` out for the rest. That shows the logic, the log lines and the note. It does not show what an old engine does with the calls that are left.
 
 ### Aim poses
@@ -397,7 +403,7 @@ After a seek the units stage makes its units over several frames ([A seek over f
 
 The pieces the track names for the unit's definition (`info.posedPieces`), and no others. Legs, wheels and anything else are the script's.
 
-- The recorder watches each weapon's muzzle piece and every parent up to the root. Where it took a piece on a leg for a muzzle (issue #3941), the leg's chain is among the posed pieces and is posed as it was recorded. `fedstorm` of the match below has `rfoot`, `rleg` and `rthigh` among its 14.
+- The recorder watches each weapon's muzzle piece and every parent up to the root. Where it took a piece on a leg for a muzzle (issue #3941), the leg's chain is among the posed pieces and is posed as it was recorded. `fedstorm` of the match below has `rfoot`, `rleg` and `rthigh` among its 14. The turns its walk makes of those are left to its script once a unit of it has walked ([A walk's pieces and the aim stage](#a-walks-pieces-and-the-aim-stage)).
 - A piece that the track names and has no pose track for in a window is at rest for the whole of that window, which the format page says. The stage sets it to no turn and no offset, so a piece the script turned comes back to rest.
 - A piece name the unit's script does not have is logged once for the definition, `the script of <unit> has no piece called <piece>, which the track has poses for, so that piece is left to the unit's own script`, and skipped. The unit's other pieces are still posed.
 - Piece numbers are looked up once for a unit, when it is made, and again for a unit that is destroyed and made again, which is another unit.
@@ -438,6 +444,109 @@ The slowest end of a frame was 1.0 ms in the first row's run, 14.3 ms in the sec
 - A headless engine, on the whole match and on Balanced Annihilation: [In a real engine](#in-a-real-engine).
 - A window, twice, with the stage off and on, at frames 22,850, 22,550, 21,650 and 22,250 of the whole match, paused, three seconds after each seek. The picture above is from those. A commander still shows the right stage with its pieces posed: the `fedcommander_up2` of the fight shows the same pieces with the stage on as with it off, since a pose turns and moves a piece and does not show or hide one.
 - Not run: play in a window, which the headless run measures and nobody has watched. A unit under construction with poses, a piece the script lacks, and a window with no track for a piece have only run on the stand-in.
+
+### Unit animation
+
+A unit of a playback is held under move control and put where the track has it, so its own script does not know that it moves, and the engine tells it nothing. A unit's own ground move type calls the script's `StartMoving` when its speed rises past 0.01 elmo a frame and `StopMoving` when it falls below (`CGroundMoveType::UpdateOwnerSpeed`), and a builder calls `StartBuilding` and `StopBuilding` as it starts and stops work (`CBuilder::ScriptStartBuilding` and `CBuilder::StopBuild`). The move type of a unit under move control calls no script function (`CScriptMoveType`, read in `rts/Sim/MoveTypes/ScriptMoveType.cpp` at `105.0` and `2026.07.04`), and no unit of a playback builds anything. So a unit slid with its legs still, and a builder did not turn to its work. The animation stage, `coilbox_player_animation.lua`, tells each script what the engine would have told it, from the track (issue #3797).
+
+#### What a script is told
+
+| Call | When | Arguments |
+| --- | --- | --- |
+| `StartMoving` | the track has the unit moving and play is going, either way | 1 when the unit moves against the way it faces, which is what the engine means by reversing, and 0 otherwise |
+| `StopMoving` | the track has it stand still, or play pauses | none |
+| `StartBuilding` | a builder starts work, works on something else, or is shown after a seek | the heading from the unit's front to the work and the pitch up to it from the unit's middle, worked out as `CBuilder::ScriptStartBuilding` does: radians for a Lua script, 65,536ths of a turn cut to a whole number for a COB one. A factory gets no arguments, as `CFactory` gives none |
+| `StopBuilding` | the builder has no work | none |
+
+- A unit moves when its velocity in the track is above 0.01 elmo a frame, the engine's own line.
+- A script is told on a change and never on every frame. It is told in `GameFrame`, before the engine runs the unit scripts of that frame.
+- A unit under construction is told nothing.
+- A unit's place runs in a straight line between two keys (the format page, transform keys), so its velocity is the slope of that line, which the reader gives with `window:sampleVelocity`. A unit's keys hold no velocity of their own.
+
+#### Lua and COB scripts
+
+Nothing is asked of the game.
+
+- A Lua unit script exists because the game's script framework handed its call-ins to the engine with `Spring.UnitScript.CreateScript` when the unit was created. The engine keeps them where Lua cannot reach. The gadget wraps that call in the table every gadget shares as its file loads, and keeps each unit's table. A call-in is then run with `Spring.UnitScript.CallAsUnit`, which is how the engine runs one. The engine's own framework (`cont/base/springcontent/LuaGadgets/Gadgets/unit_script.lua`, which Splinter Faction includes) looks the call up each time it creates a script, so the wrap sees every script. A framework that copied the call into a local in a file that loads before the player's is not seen, and its units are told nothing.
+- Any other unit is asked for the number of each function with `Spring.GetCOBScriptID`, which gives nothing for a unit with no COB script and for a function the script lacks. A function it has is run with `Spring.CallCOBScript`, which raises for a unit with no COB script.
+- `Spring.UnitScript.GetScriptEnv`, which the spike on issue #3791 used, comes from the game's framework and not from the engine. It is not used.
+- A script that raises is logged once for the definition, `the script of <unit> raised in StartMoving, so that function of that unit is not run again`, and that function of that unit is not run again.
+
+#### Velocity
+
+A unit has the velocity it is shown moving at: the track's times the direction and the speed of play, and nothing while paused, with `Spring.MoveCtrl.SetVelocity`. It is set when it changes, so a unit walking a straight line between two keys costs one call. The engine moves a unit under move control by its velocity on every frame unless it is told not to (`CScriptMoveType::Update`), and the track owns a unit's place, so each unit is told not to once, with `Spring.MoveCtrl.SetExtrapolate(unitID, false)`. The headless runs below read every unit's place back as the track's with velocities set.
+
+What reads the velocity, in `rts` at `2026.07.04`:
+
+- A COB script's `GET CURRENT_SPEED` (`CUnitScript::GetUnitVal`) and anything that asks `Spring.GetUnitVelocity`, such as a Lua script that scales its walk by its speed.
+- What a script emits with `EmitSfx`, which starts with the unit's speed, a sound's place and speed, and the ripples a unit makes in water drawn as `DynWater`.
+
+What it does not touch:
+
+- Where a unit is drawn between two frames. At `2026.07.04` that is a blend of its place on the frame before and now (`CWorldObject::GetDrawPos`). At `105.0` to `2026.07.01` the field's comment says `pos + speed * timeOffset`, and the stage gives the speed the unit is shown moving at, so either way the unit is drawn on its path.
+- Track marks on the ground. The engine adds one when a unit's place changes (`UnitMoved` from `GeneralMoveSystem`), which it did before this stage too.
+- A ground unit's dust and wake. Those are made by the ground move type, which does not run under move control.
+
+#### Paused, backward, seeks and speed
+
+| Play | What a script gets |
+| --- | --- |
+| Paused | The time stands still, so a moving unit is told it stopped and has no velocity. A script cannot be held in the middle of a step, so its legs go back to rest the way the script stops them. |
+| Backward | A unit moves against the way it faces, so it is told it moves and that it reverses. A script cannot be run backward. One that has an animation for reversing plays that, and one that has none plays its walk while the unit goes backward. Turning play round while a unit moves tells it again. |
+| A seek | Nothing by itself. What a unit is told follows from where the track has it after, so a unit that walks on both sides of a seek is not told again. A builder at work is told `StartBuilding` again, since the seek may have turned it. |
+| 0.5x to 32x | The same calls. The script's animation runs at the engine's pace, and the velocity says how fast the ground goes by, so a script that times its steps by its speed keeps up. Splinter Faction's walk takes its pace from the definition's top speed and does not keep up at 8x. |
+| A builder | Its work follows the track and not the clock: paused and backward it is what the track has at the time shown. A paused builder goes on facing its work. |
+
+#### Builders' work
+
+A builder's recorded work is published in unit rules parameters for a game's own build effect to read, with `Spring.SetUnitRulesParam` and no access argument. The names are `Animation.PARAMS` in `coilbox_player_animation.lua`.
+
+| Parameter | Value |
+| --- | --- |
+| `coilbox_rewind_work_command` | what `Spring.GetUnitWorkerTask` gives first in a match: minus the unit definition's id while building it, `CMD.REPAIR` once it is finished, `CMD.RECLAIM`, `CMD.RESURRECT`, `CMD.CAPTURE`, `CMD.RESTORE` for terraforming, and 0 for no work |
+| `coilbox_rewind_work_target` | what it gives second: the playback's unit id, or the playback's feature id plus `Game.maxUnits`. -1 for none, and while the playback does not have it, as during a seek that has yet to make it |
+| `coilbox_rewind_work_power` | the build power in use, from 0 to 1, in fifteenths as the recorder reads it |
+| `coilbox_rewind_work_x`, `_y`, `_z` | where the work is, in elmos, when the command or the target last changed. Use the target's own place for one that moves |
+
+A parameter is set when it changes. A unit that never works in the track has none of them. A game's build effect that asks the engine (`Spring.GetUnitWorkerTask`, `Spring.GetUnitIsBuilding`, `Spring.GetUnitCurrentBuildPower`) gets nothing in a playback, since no unit builds, and reads these instead. The parameters are set in synced Lua, so a widget and the unsynced half of a gadget read them with `Spring.GetUnitRulesParam`.
+
+The engine's own build particles are not shown. Only `CBuilder::Update` and `CFactory::Update` make them, while a unit really builds, and no Lua call makes one (`CreateNanoParticle` in `rts/Sim/Units/UnitTypes`). Splinter Faction uses those particles. Its builders' scripts also emit a glow at their nano points every 425 ms from `StartBuilding` to `StopBuilding`, which does show. Issue #4029 is for the particles.
+
+#### A walk's pieces and the aim stage
+
+The aim stage sets every piece the track has poses for at the end of every frame ([Aim poses](#aim-poses)), and a walk can turn one of those. `fedstorm` of the match below has its right leg among its posed pieces (issue #3941), and its walk turns both legs. Left to the aim stage, the right leg followed the recording and the left followed the script, out of step whenever the walk had not started on the frame the match's did, which is after every seek into a walk, and always while paused or played backward.
+
+So the first time a unit of a definition is told that it moves, the stage asks which turns and moves of the posed pieces the script started in answer, with `Spring.UnitScript.IsInTurn` and `IsInMove` before and after the call. Those are the walk's, and the aim stage leaves them to the script from then on, for every unit of the definition. The rest of each piece's pose is the track's. The player logs it once for the definition:
+
+```
+COILBOX_REWIND_PLAYER the walk of fedstorm turns rfoot, rleg, rthigh, which the track has poses for, so those turns are left to the unit's own script and the rest of each piece's pose is the track's
+```
+
+- Only what the script starts as it is told is taken. Splinter Faction's walk turns its feet, legs and thighs at once and its pelvis a step later, so the pelvis, the root of the turret, stays the track's. A turn that was already running, such as a turret coming back after work, is not taken.
+- A unit of the definition that has not walked yet in the run has its leg posed. One that stands after a walk has its leg where its script put it.
+- A script whose walk turns an aiming piece as it starts would lose that piece's aim on that axis. None in the two games run here does: Balanced Annihilation's `armpw` logged no such line.
+
+#### What it costs
+
+For each unit that can move, one velocity sample and a comparison on every frame. For each builder that has work in the window, one sample of its work and of what it works on. A script is called only on a change, and the call costs whatever the script does: a Lua walk starts a thread, which allocates. A frame of play allocates nothing in the stage, which `tests/animation_test.lua` counts over 300 frames of 20 walking units and 5 builders at work.
+
+Timed in a headless engine with the stage on and with a stage that does nothing in its place, one run of each, on a machine with a load average of 3 to 6. A frame's work is the player's `GameFrame` and `GameFramePost` together, in milliseconds, as in [Aim poses](#aim-poses). The first three rows are the driver's aim plan of 1,474 to 1,488 frames, and the last its animation plan of 2,332 frames, which starts and stops every unit many times.
+
+| Track and plan | Mean, off | Mean, on | End of frame mean, off | End of frame mean, on | Slowest frame, off | Slowest frame, on |
+| --- | --- | --- | --- | --- | --- | --- |
+| the whole match, aim plan | 0.466 | 0.510 | 0.182 | 0.195 | 10.9 | 10.3 |
+| a crowd of 400 of the match's 13 definitions that walk 60 elmos out and back, aim plan | 2.110 | 2.314 | 0.894 | 0.908 | 22.9 | 23.5 |
+| the same crowd standing still, aim plan | 1.959 | 2.262 | 0.861 | 0.952 | 20.8 | 22.4 |
+| the whole match, animation plan | 0.349 | 0.502 | 0.138 | 0.180 | 10.1 | 12.8 |
+
+So the stage costs 0.04 to 0.3 ms a frame in these runs. The standing crowd paid more than the walking one, which the stage's work does not explain, since a unit that stands costs the same sample as one that walks, and one run of each cannot say how much of it is the machine. No run logged a slow frame. The crowds are `crates/coilbox-track/tests/crowd.rs` with `COILBOX_CROWD_POSES=track`, and the walking one with `COILBOX_CROWD_WALK=60`.
+
+#### What has run
+
+- `tests/animation_test.lua` and `tests/engine_test.lua` on the stand-in, whose units have COB and Lua scripts written from `rts/Lua/LuaSyncedCtrl.cpp` and `rts/Sim/Units/Scripts/LuaUnitScript.cpp`.
+- A headless engine, `2026.07.01-102-g6e5c5a0`, on the whole match and on a Balanced Annihilation crowd of COB units: [In a real engine](#in-a-real-engine). Every call came on the frame the track has it, and none came that it does not.
+- A window, four times on the whole match at frames 9,570 to 9,742, with the stage on, twice with it off, and with a walk's pieces not left to the script, and once on the Balanced Annihilation crowd. With the stage on, six `fedstorm` walk with their legs in stride, played forward and backward, and stand with their legs at rest when paused. With it off they slide with their legs still. Two `fedengineer_up1` and the air factory beside them show Splinter Faction's green build glow at their nano points, which they do not with the stage off. Balanced Annihilation's `armpw` walks. The headless runs, and not the pictures, show that a builder's heading is the engine's own. The Balanced Annihilation pictures missed the commander at work, since the camera was pointed wrong.
+- Not run: an engine older than `2026.07.01-102-g6e5c5a0`, a script that raises, a game whose framework copies `Spring.UnitScript.CreateScript` early, terraforming, reclaiming and resurrecting. Those have only run on the stand-in.
 
 ### Projectiles
 
@@ -1010,7 +1119,7 @@ A hook is an optional function in `hooks`. The player calls these and no others,
 
 The clock is the player's, and a hook only reads it. `clock.jumped` says the frame was reached by a seek or a step, `clock.direction` is 1 or -1 and `clock.speed` is how many frames of the track a simulation frame covers.
 
-The player's three hooks run in synced Lua, in the gadget's environment, and a frame of play allocates nothing in the player, so a hook that is called every frame should not either. These are the only hook points. They are the smallest set that issues #3797 (a build spray effect that reads a builder's recorded work), #3800 (a team's storage, which had to be set before any unit was placed until the track held it, issue #3982), #3801 (a warp in effect for a unit that appears, and dropping a shape the game's helper keeps) and #3804 (replacing ghost drawing) are known to need, and a hook point is added by the issue that needs one.
+The player's three hooks run in synced Lua, in the gadget's environment, and a frame of play allocates nothing in the player, so a hook that is called every frame should not either. These are the only hook points. They are the smallest set that issues #3797 (a build spray effect that reads a builder's recorded work, which is in unit rules parameters, [Builders' work](#builders-work)), #3800 (a team's storage, which had to be set before any unit was placed until the track held it, issue #3982), #3801 (a warp in effect for a unit that appears, and dropping a shape the game's helper keeps) and #3804 (replacing ghost drawing) are known to need, and a hook point is added by the issue that needs one.
 
 ### The log line
 
@@ -1103,7 +1212,7 @@ A commander shows the right stage after a seek with nothing done for it. Each st
 
 ![The commander in the playback and in the real replay, at frames 6,927 and 12,000](screenshots/adapter-commander.jpg)
 
-The left column is the playback and the right the real replay, at the same two frames and from the same place. The colours differ because the playback takes each team's from the replay's start script, and the game recolours them for whoever is playing. The pose and the build spray differ because the picture is from before the aim stage (issue #3796), and the player does not animate yet (issue #3797).
+The left column is the playback and the right the real replay, at the same two frames and from the same place. The colours differ because the playback takes each team's from the replay's start script, and the game recolours them for whoever is playing. The pose and the build spray differ because the picture is from before the aim stage (issue #3796) and the animation stage (issue #3797). The engine's own build particles still do not show in a playback (issue #4029).
 
 ### Beyond All Reason
 
@@ -1325,6 +1434,7 @@ luajit lua/rewind-player/tests/clock_test.lua
 luajit lua/rewind-player/tests/rotation_test.lua
 luajit lua/rewind-player/tests/player_test.lua
 luajit lua/rewind-player/tests/aim_test.lua
+luajit lua/rewind-player/tests/animation_test.lua
 luajit lua/rewind-player/tests/projectiles_test.lua
 luajit lua/rewind-player/tests/resources_test.lua
 luajit lua/rewind-player/tests/settle_test.lua
@@ -1337,7 +1447,7 @@ luajit lua/rewind-player/tests/timeline_test.lua
 luajit lua/rewind-player/tests/ghosts_test.lua
 ```
 
-- `reader_test.lua` reads the fixture and compares every sampled value with what the Rust reader gives. It plays forward, backward and in a fixed shuffle, and checks the errors and the three ways of fetching.
+- `reader_test.lua` reads the fixture and compares every sampled value with what the Rust reader gives. It also checks a unit's velocity against how far its place moves in a frame. It plays forward, backward and in a fixed shuffle, and checks the errors and the three ways of fetching.
 - `format_page_test.lua` builds the format page's worked example by hand and reads it. It checks the reader against the page and not against the Rust crate.
 - `playback_test.lua` checks that sampling allocates nothing, that forward play does no search, and that a minute of play (1,800 frames over several windows) does not grow memory.
 - `stub_test.lua` checks the engine stand-in against `rts/Lua/LuaVFS.cpp`.
@@ -1347,6 +1457,7 @@ luajit lua/rewind-player/tests/ghosts_test.lua
 - `player_test.lua` checks the stages on tracks made from a table (`tests/fake_track.lua`): what is alive at a time, removal before creation, a seek back past a construction, play in both directions, a missing definition, a nil from `Spring.CreateUnit`, terrain forward and back, that the engine's own healing (`world.heal` in the stand-in, run between a frame and its post frame) leaves a wounded unit's health alone and its maximum is whole again afterwards, that health which moved anyway is put right and logged once, and that a frame of play allocates nothing.
 - `player_test.lua` also checks the call at the end of a frame (issue #4002): that nothing is held in the first frame, that with no call no unit starts or ends a frame with a lowered maximum and the line is logged once, that the install is asked for once and a unit is held once it works, that a call which stops is asked for again, and that a gadget removed in the middle of a frame leaves no maximum lowered.
 - `aim_test.lua` checks the aim stage on a stand-in whose unit's own script turns pieces in the middle of every frame: the pose on the first frame after a seek, held for 60 frames paused and while playing each way, a piece the track does not name left to the script, an angle of 141 turns, half speed, a piece the script lacks, a piece with no track in a window, a seek that makes its units over several frames, a unit destroyed between a frame and its post frame, a unit under construction, an engine with no call at the end of a frame, the fixture through the real reader, and that 300 frames of posing 20 units allocate nothing.
+- `animation_test.lua` checks the animation stage on a stand-in whose units have COB and Lua scripts: a unit that starts and stops is told once each, with its velocity and its place left alone, a unit with no script, pause, play backward and turning play round, seeks, a unit made again, 8x and half speed, a unit under construction, a builder's start and stop with its angles for a Lua and a COB script, a factory, every kind of work and its parameters, a factory that goes straight on to the next unit, a window with no track for the work, a target a seek has yet to make, the pieces a walk turns and the aim stage leaves to the script, a script that raises, a framework the wrap does not see, each row switched off, the fixture through the real reader, and that 300 frames of 20 walking units and 5 builders at work allocate nothing.
 - `projectiles_test.lua` checks the projectiles stage: what is in the air at a time, stepping forward and backward, that a seek looks at the shots that can be alive and not the window's list, that a shot lands only while it is watched and with no damage, crater or push, a shell that ends in the air, a bolt that stops, a beam fired once, the fire sound and when it is not played, a weapon the game lacks, an engine with no `Spring.SetProjectileTimeToLive`, a shot the engine ended and an id handed out again, a shot alive across two windows, and that 300 frames of play with 40 shots in the air allocate nothing.
 - `resources_test.lua` checks the resources stage on a stand-in whose teams follow `rts/Sim/Misc/Team.cpp` and whose frame runs in the engine's order, with the playback's own economy between the gadget's two call-ins: what a team holds, its storage and its share level at a frame, after a seek forward and backward, held for 400 frames and while playing each way, on an engine with and without `GameFramePost`, income, expense and pull after three of the engine's sums, a team with an income multiplier, excess, allied teams and the engine's own sharing, rules parameters with and without an adapter that names them, a track from recorder version 3, the fixture through the real reader, and that 300 frames allocate nothing.
 - `settle_test.lua` checks a seek that needs more units than a frame may make or remove: that it settles over several frames, that removals use their own budget and come first, that a second seek while one settles starts again, that play goes on while it settles and units made late stand where the track has them now, what `coilbox_rewind_settled` says and when, the budget message and the ones it refuses, that a shot waits for its shooter, and that 300 frames of play with a budget allocate nothing.
@@ -1445,6 +1556,12 @@ A seventh test, `aim_poses_follow_the_track_in_the_engine`, wants the same repla
 - No Lua raised. With the stage switched off, which `COILBOX_PLAYBACK_AIM=off` does, the same looks find every piece that the track has away from rest wrong, so the looks can tell.
 
 The same test ran on Balanced Annihilation V15.9.8 with `COILBOX_PLAYBACK_GAME`, whose gadget handler does not pass `GameFramePost` on. No Balanced Annihilation match is recorded on this machine, so the track is made up: `crates/coilbox-track/tests/crowd.rs` on the track of the match above, with `COILBOX_CROWD_UNITS=60`, `COILBOX_CROWD_DEFS=armpw,armstump,armllt`, `COILBOX_CROWD_POSES=armpw:torso+ruparm+luparm,armstump:turret+barrel,armllt:turret+sleeve+barrel` and `COILBOX_CROWD_WOUNDED=3`. That is 60 units of those three definitions standing still on All That Glitters, 20 of them at half health, each posed piece swinging a quarter turn to either side with a key every 30 frames. All three have COB scripts. With seeks to frames 12,000, 14,000 and 16,000 and 2,100 frames stood paused at the last: the player installed the call-in at frame 2, all 161 posed pieces were right in every one of 2,823 looks, and [The call at the end of a frame](#the-call-at-the-end-of-a-frame) has what it showed of health.
+
+An eighth test, `units_are_animated_from_the_track_in_the_engine`, wants the same replay and runs the driver's animation plan (issue #3797). It seeks to the two frames with the most units moving and the two with the most builders at work, and looks on every frame of 150 frames played forward, 30 paused, 40 forward and then 60 backward with no pause between, 20 at 8x, 10 at 1x and 30 across a seek made while playing. The driver's gadget hears every `StartMoving`, `StopMoving`, `StartBuilding` and `StopBuilding` that reaches a unit's script: it wraps `Spring.UnitScript.CreateScript` after the player's own wrap and `Spring.CallCOBScript` before the player takes it. With a reader of its own it works out which calls should have come and on which frame. It also reads every unit's velocity, every builder's unit rules parameters, the angles a `StartBuilding` was given against the engine's own vectors of the unit (`Spring.GetUnitVectors`), every posed piece, and whether a unit's own pieces moved since the look before. `COILBOX_PLAYBACK_ANIMATION=off` puts a stage that does nothing in place of the animation stage, and `COILBOX_PLAYBACK_WALK_PIECES` names the posed pieces a walk turns, as for the aim test, which needs `fedstorm:rfoot+rleg+rthigh` on the whole match now.
+
+- On the whole match, with 900 more frames played forward from 9,570: every look had the calls the track gives and no other: 381 calls, 365 of them to Lua scripts and 16 to the COB script of the land factory `f1landfac`. Only 3 were a `StartBuilding` with angles, and those were the engine's to 0.000000 radians. No velocity was off the track's, no builder's parameters were, and every posed piece other than the three of `fedstorm` had the track's pose. The player logged `the walk of fedstorm turns rfoot, rleg, rthigh`. `fedstorm`, `fedcommander_up2` and `fedengineer_up1` moved pieces of their own in every one of the 19,518 looks they moved in. `airscout` moved none in 5,518, since its `StartMoving` only sets a value.
+- With the stage off, the same looks heard nothing, and no moving unit moved a piece of its own, so the looks can tell.
+- On Balanced Annihilation V15.9.8, with a crowd of 60 of `armcom`, `armpw`, `armstump` and `armflash` that walk out and back and with each `armcom` building another unit for 120 frames in every 240: every look had the calls the track gives and no other, 1,120 calls to COB scripts, and the angles of the 122 `StartBuilding` the looks checked were within 0.000095 radians of the engine's, which is less than one step of what a COB script takes. `armcom` and `armpw` moved pieces of their own in 20,358 of the 20,736 looks they moved in, and the two vehicles, whose scripts turn no piece as they start, in none of 18,144. No `the walk of` line was logged. No script raised in either game.
 
 What it cannot show: anything on screen. A headless engine draws nothing, so how a unit, a death or the changed ground looks cannot be seen in any of the above.
 

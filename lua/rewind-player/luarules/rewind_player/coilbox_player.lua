@@ -18,8 +18,7 @@
 -- `clock` is coilbox_player_clock.lua's: `clock.jumped` says the frame was
 -- reached by a seek or a step and not by play, and `clock.direction` and
 -- `clock.speed` say how it is playing, and `clock:watched()` whether it is
--- forward at near the match's own speed. Animation (issue #3797) is a stage to
--- add to the list in `M.new`. A stage can also have `stage:afterSim()`, which
+-- forward at near the match's own speed. A stage can also have `stage:afterSim()`, which
 -- runs when the frame is over (GameFramePost). That call does not reach every
 -- gadget (issue #4002), so `context.post.arrives` says whether the frame before
 -- ended with it, and a stage that leans on it can have two more:
@@ -45,6 +44,7 @@ local Terrain = VFS.Include(MODULES .. "coilbox_player_terrain.lua")
 local Features = VFS.Include(MODULES .. "coilbox_player_features.lua")
 local Units = VFS.Include(MODULES .. "coilbox_player_units.lua")
 local Aim = VFS.Include(MODULES .. "coilbox_player_aim.lua")
+local Animation = VFS.Include(MODULES .. "coilbox_player_animation.lua")
 local Projectiles = VFS.Include(MODULES .. "coilbox_player_projectiles.lua")
 local Resources = VFS.Include(MODULES .. "coilbox_player_resources.lua")
 local Adapter = VFS.Include(MODULES .. "coilbox_player_adapter.lua")
@@ -158,6 +158,9 @@ end
 -- is switched off. Without it every feature is on. `options.arrive` is a function
 -- the units stage calls with a unit's id, its x, y and z and its team when the
 -- unit wants an arrival effect (issue #4009), and without it none is asked for.
+-- `options.scriptCallIns` is a table the gadget keeps, by the engine's unit id,
+-- of the call-ins of each Lua unit script (issue #3797), and without it a unit
+-- with a Lua script is told nothing.
 function M.new(track, options)
 	local header = track.header
 	local info, why = track:info()
@@ -241,6 +244,7 @@ function M.new(track, options)
 		teamOf = teamOf,
 		report = report,
 		arrive = options.arrive,
+		scriptCallIns = options.scriptCallIns,
 	}
 	-- A stage whose calls the engine lacks is the one that does nothing.
 	local terrain = on.terrain and Terrain.new(context, Reader) or OFF
@@ -251,6 +255,9 @@ function M.new(track, options)
 	end
 	-- Aiming pieces are posed on the units the stage before it made.
 	local aim = on.aimPoses and Aim.new(context, units) or OFF
+	-- Scripts are told what their units do, and builders' work is published.
+	-- Each of its rows switches off a part of it, so the stage is always made.
+	local animation = Animation.new(context, units, aim ~= OFF and aim or nil, featureStage ~= OFF and featureStage or nil)
 	local projectiles = on.shots and Projectiles.new(context, units, Clock) or OFF
 	-- A track from before recorder version 4 has no team's resources in it.
 	local resources = OFF
@@ -275,12 +282,15 @@ function M.new(track, options)
 		features = featureStage,
 		units = units,
 		aim = aim,
+		animation = animation,
 		projectiles = projectiles,
 		resources = resources,
 		-- In the order they run. Terrain moves the ground before anything is put
 		-- on it, and a shot's owner is a unit. Resources come last, after every
 		-- unit the game's own gadgets count has been made or taken away.
-		stages = { terrain, featureStage, units, aim, projectiles, resources },
+		-- Animation comes after aim, which has looked up the pieces of the units
+		-- made in the frame.
+		stages = { terrain, featureStage, units, aim, animation, projectiles, resources },
 		afterFrame = hooks.afterFrame,
 		published = {},
 		post = post,
@@ -471,8 +481,8 @@ function Player:unitDestroyed(unitID)
 	self.units:destroyed(unitID)
 end
 
-function Player:unitDamaged(unitID)
-	self.units:damaged(unitID)
+function Player:unitDamaged(unitID, damage)
+	self.units:damaged(unitID, damage)
 end
 
 function Player:featureCreated(featureID)

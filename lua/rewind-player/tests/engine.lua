@@ -50,6 +50,27 @@
 -- frame for a gadget in a game whose handler does or does not pass GameFramePost
 -- on, on an engine that does or does not have it (issue #4002).
 --
+-- A unit's script (issue #3797) follows rts/Sim/Units/Scripts and
+-- rts/Lua/LuaSyncedCtrl.cpp. A definition's `script` is "cob", "lua" or nothing,
+-- and its `callins` are what the script does when one of its functions is run,
+-- each given the world, the unit and the arguments. Spring.GetCOBScriptID gives
+-- the number of a function of a unit with a COB script, and nothing for a
+-- function it lacks and for a unit with any other script. Spring.CallCOBScript
+-- raises for a unit that has no COB script and takes whole numbers only. A Lua
+-- script is the game's own doing: its script framework runs when a unit is
+-- created and hands the call-ins to the engine with
+-- Spring.UnitScript.CreateScript, which it looks up in the table every gadget
+-- shares at that moment (cont/base/springcontent/LuaGadgets/Gadgets/unit_script.lua).
+-- `world.frameworkCopied` is a framework that copied the call into a local as
+-- its file loaded. The engine itself never tells the script of a unit under
+-- move control that it moves (CScriptMoveType calls no script function).
+--
+-- Spring.MoveCtrl.SetVelocity sets the velocity the engine moves a unit by on
+-- every frame while it extrapolates, which it does until
+-- Spring.MoveCtrl.SetExtrapolate says otherwise (CScriptMoveType::Update).
+-- `world.moveUnits` is that update, and `world.step` runs it between the
+-- gadget's two call-ins.
+--
 -- Nothing a gadget calls on every frame allocates here, so a test can count
 -- what the gadget itself allocates.
 
@@ -91,7 +112,19 @@ function M.new(options)
 			buildTime = def.buildTime or 100,
 			onoffable = def.onoffable or false,
 			pieces = def.pieces or { "base" },
+			script = def.script,
+			callins = def.callins or {},
+			isFactory = def.isFactory or false,
+			isImmobile = def.isImmobile or false,
+			-- How far above its place the middle of the unit is.
+			midHeight = def.midHeight or 0,
 		}
+		-- The numbers of a COB script's functions, in the order of their names.
+		copy.cobNames = {}
+		for name in pairs(copy.callins) do
+			copy.cobNames[#copy.cobNames + 1] = name
+		end
+		table.sort(copy.cobNames)
 		unitDefs[id], unitDefNames[def.name] = copy, copy
 	end
 	local featureDefs, featureDefNames = {}, {}
@@ -425,13 +458,16 @@ function M.new(options)
 	end
 
 	--- One simulation frame in the engine's order (CGame::SimFrame): the
-	-- gadgets' GameFrame, the engine's own economy, which a test gives as
+	-- gadgets' GameFrame, the engine's own move of each unit under move control
+	-- (`world.moveUnits`), the engine's own economy, which a test gives as
 	-- `world.economy`, the teams, and the gadgets' GameFramePost. `frame` and
 	-- `post` are what stands in for the gadget's two call-ins, and an engine
 	-- with no GameFramePost is a step with no `post`.
 	function world.step(frame, post)
 		world.frame = world.frame + 1
 		frame(world.frame)
+		-- The engine's own update of the units comes after the gadgets' GameFrame.
+		world.moveUnits()
 		if world.economy then
 			world.economy(world.frame)
 		end
@@ -543,6 +579,13 @@ function M.new(options)
 			-- Each script piece's turn and offset, as its script left them.
 			rot = {},
 			pos = {},
+			-- The turns and moves its script has running, by piece and axis.
+			anim = {},
+			vx = 0,
+			vy = 0,
+			vz = 0,
+			extrapolate = true,
+			params = {},
 		}
 		for number = 1, #found.pieces do
 			world.units[id].rot[number] = { 0, 0, 0 }
@@ -550,6 +593,7 @@ function M.new(options)
 		end
 		event("create", id)
 		call("UnitCreated", id, found.id, teamID)
+		world.framework(world.units[id])
 		return id
 	end
 
@@ -809,7 +853,172 @@ function M.new(options)
 		end
 	end
 
+	-- A unit's script being told something (issue #3797).
+
+	world.scriptCalls = {}
+	world.unitParamSets = 0
+	world.velocitySets = 0
+	world.frameworkCopied = false
+
+	--- A script function of a unit ran: which, with what, and on which frame.
+	local function told(found, name, how, a, b)
+		world.scriptCalls[#world.scriptCalls + 1] = { unit = found.id, def = found.def.name, name = name, how = how, a = a, b = b, frame = world.frame }
+		local does = found.def.callins[name]
+		if does then
+			return does(world, found, a, b)
+		end
+	end
+
+	--- The script calls a test asks about: of a unit, by name.
+	function world.callsTo(found, name)
+		local list = {}
+		for _, one in ipairs(world.scriptCalls) do
+			if one.unit == found.id and (not name or one.name == name) then
+				list[#list + 1] = one
+			end
+		end
+		return list
+	end
+
+	--- A unit's script starts a turn or a move of a piece at a speed, which runs
+	-- until the piece is there (CUnitScript::AddAnim). `kind` is "turn" or "move".
+	function world.animate(found, piece, axis, kind)
+		for number, name in ipairs(found.def.pieces) do
+			if name == piece then
+				found.anim[(kind or "turn") .. " " .. number .. " " .. axis] = true
+			end
+		end
+	end
+
+	function Spring.GetCOBScriptID(id, name)
+		assert(type(id) == "number" and type(name) == "string", "[GetCOBScriptID] incorrect arguments")
+		local found = unit(id)
+		if not found or found.def.script ~= "cob" then
+			return
+		end
+		for number, known in ipairs(found.def.cobNames) do
+			if known == name then
+				return number - 1
+			end
+		end
+	end
+
+	function Spring.CallCOBScript(id, func, returned, ...)
+		local count = select("#", ...)
+		assert(type(id) == "number", "[CallCOBScript] unitID not a number")
+		assert(type(returned) == "number", "[CallCOBScript] retval-count not a number")
+		local found = unit(id)
+		if not found then
+			return
+		end
+		if found.def.script ~= "cob" then
+			error("[CallCOBScript] unit is not running a COB script", 2)
+		end
+		local a, b = ...
+		for n = 1, count do
+			local value = select(n, ...)
+			assert(type(value) == "number" and value == math.floor(value), "a COB script was given something that is not a whole number")
+		end
+		local name = func
+		if type(func) == "number" then
+			name = found.def.cobNames[func + 1]
+			assert(name, "[CallCOBScript] bad function id")
+		end
+		told(found, name, "cob", a, b)
+		return 0
+	end
+
+	--- The engine's own call, which keeps the functions of the table it is given.
+	local function createScript(id, callins)
+		local found = unit(id)
+		if not found then
+			error("CreateScript(): Bad unitID: " .. tostring(id), 2)
+		end
+		found.luaScript = {}
+		for name, fn in pairs(callins) do
+			found.luaScript[name] = fn
+		end
+	end
+	Spring.UnitScript.CreateScript = createScript
+
+	--- The game's script framework, for a unit that has just been created.
+	function world.framework(found)
+		if found.def.script ~= "lua" then
+			return
+		end
+		local callins = {}
+		for name in pairs(found.def.callins) do
+			callins[name] = function(a, b)
+				return told(found, name, "lua", a, b)
+			end
+		end
+		local create = world.frameworkCopied and createScript or Spring.UnitScript.CreateScript
+		if create then
+			create(found.id, callins)
+		end
+	end
+
+	function Spring.UnitScript.IsInTurn(piece, axis)
+		if not active then
+			return
+		end
+		return active.anim["turn " .. piece .. " " .. axisOf(axis, "IsInTurn")] == true
+	end
+
+	function Spring.UnitScript.IsInMove(piece, axis)
+		if not active then
+			return
+		end
+		return active.anim["move " .. piece .. " " .. axisOf(axis, "IsInMove")] == true
+	end
+
+	--- A unit's place and, when asked, its middle (LuaSyncedRead::GetUnitPosition).
+	function Spring.GetUnitPosition(id, middle)
+		local found = unit(id)
+		if not found then
+			return
+		end
+		if middle then
+			return found.x, found.y, found.z, found.x, found.y + found.def.midHeight, found.z
+		end
+		return found.x, found.y, found.z
+	end
+
+	function Spring.SetUnitRulesParam(id, name, value)
+		local found = unit(id)
+		if found then
+			world.unitParamSets = world.unitParamSets + 1
+			found.params[name] = value
+		end
+	end
+
 	Spring.MoveCtrl = {}
+
+	function Spring.MoveCtrl.SetExtrapolate(id, extrapolate)
+		local found = unit(id)
+		if found and found.moveCtrl then
+			assert(type(extrapolate) == "boolean", "SetExtrapolate takes a boolean")
+			found.extrapolate = extrapolate
+		end
+	end
+
+	function Spring.MoveCtrl.SetVelocity(id, x, y, z)
+		local found = unit(id)
+		if found and found.moveCtrl then
+			world.velocitySets = world.velocitySets + 1
+			found.vx, found.vy, found.vz = x, y, z
+		end
+	end
+
+	--- CScriptMoveType::Update for every unit: one that extrapolates is moved by
+	-- its velocity.
+	function world.moveUnits()
+		for _, found in next, world.units do
+			if not found.dead and found.moveCtrl and found.extrapolate then
+				found.x, found.y, found.z = found.x + found.vx, found.y + found.vy, found.z + found.vz
+			end
+		end
+	end
 
 	function Spring.MoveCtrl.Enable(id)
 		local found = unit(id)
@@ -1181,12 +1390,13 @@ function M.new(options)
 		UnitDefs = unitDefs,
 		FeatureDefNames = featureDefNames,
 		WeaponDefNames = weaponDefNames,
-		CMD = { ONOFF = 85 },
+		CMD = { ONOFF = 85, REPAIR = 40, RECLAIM = 90, RESTORE = 110, RESURRECT = 125, CAPTURE = 130 },
 		Script = Script,
 		_G = world.handlerGlobals,
 		Game = {
 			gameSpeed = 30,
 			squareSize = SQUARE,
+			maxUnits = 32000,
 			-- Names and numbers both ways, numbered from 0 (LuaConstGame.cpp).
 			armorTypes = { [0] = "default", [1] = "tanks", [2] = "ships", default = 0, tanks = 1, ships = 2 },
 			constructionDecay = options.constructionDecay == true,

@@ -119,10 +119,17 @@ local SEEKS = "coilbox_rewind/driver_seeks.lua"
 -- stage switched off, which is how its cost is told from the rest.
 local AIM = "coilbox_rewind/driver_aim.lua"
 
+-- And one that asks for the plan that looks at what unit scripts are told
+-- (issue #3797). It returns a table: `frames` to seek to, `long`, a number of
+-- frames to play forward from the first of them, and `walkPieces`, by unit
+-- definition name, the posed pieces a walk turns, which are the script's.
+local ANIMATION = "coilbox_rewind/driver_animation.lua"
+
 local Track = VFS.Include("luarules/rewind_player/coilbox_track.lua")
 local Fetch = VFS.Include("luarules/rewind_player/coilbox_track_fetch.lua")
 
 local aimAsked = VFS.FileExists(AIM) and VFS.Include(AIM) or nil
+local animationAsked = VFS.FileExists(ANIMATION) and VFS.Include(ANIMATION) or nil
 -- The driver keeps the call for itself, and takes it out of the table every
 -- gadget shares before the player's gadget looks at what the engine has. The
 -- player then finds the aim stage's row off, as on an engine without the call.
@@ -1300,8 +1307,10 @@ end
 -- not the track's, the worst turn and offset from it, `absent` units that the
 -- engine does not have yet, `missing` pieces a script lacks, and of all the
 -- engine's units, `wounded` ones and ones whose maximum health is not their
--- definition's (issue #4002).
-local function aimLook(sum)
+-- definition's (issue #4002). `skip` is, by unit definition name, the posed
+-- pieces that a walk turns, which the aim stage leaves to the unit's own
+-- script (issue #3797) and this does not look at.
+local function aimLook(sum, skip)
 	local frame = param("frame")
 	local w = assert(track:seek(frame))
 	local moveLimit = track.header.positionStep / 2
@@ -1354,9 +1363,12 @@ local function aimLook(sum)
 				for poseTrack = w.unitPoseFirst[i], w.unitPoseFirst[i] + w.unitPoseCount[i] - 1 do
 					trackOf[w.posePiece[poseTrack] + 1] = poseTrack
 				end
+				local walks = skip and skip[def.name]
 				for k, name in ipairs(names) do
 					local number = script[name]
-					if not number then
+					if walks and walks[name] then
+						sum.walked = (sum.walked or 0) + 1
+					elseif not number then
 						sum.missing = sum.missing + 1
 					else
 						pose[1], pose[2], pose[3], pose[4], pose[5], pose[6] = 0, 0, 0, 0, 0, 0
@@ -1484,6 +1496,7 @@ local function aimPlan(asked)
 	if not frames or #frames == 0 then
 		frames = aimFrames()
 	end
+	local walkPieces = type(asked) == "table" and asked.walkPieces or nil
 	say(string.format("start first=%d last=%d seeks=%d posed_defs=%d", h.firstFrame, h.lastFrame, #frames, #info.posedPieces))
 	send("pause")
 	seekTo(h.firstFrame)
@@ -1495,12 +1508,12 @@ local function aimPlan(asked)
 		push("wait", 1)
 		push("run", function()
 			local sum = aimSum()
-			aimLook(sum)
+			aimLook(sum, walkPieces)
 			aimSay("first n=" .. n .. " frame=" .. frame .. " settled=" .. tostring(param("settled")), sum)
 		end)
 		local held = aimSum()
 		push("each", 60, function()
-			aimLook(held)
+			aimLook(held, walkPieces)
 		end)
 		push("run", function()
 			aimSay("held n=" .. n .. " frame=" .. frame, held)
@@ -1509,7 +1522,7 @@ local function aimPlan(asked)
 			local sum = aimSum()
 			send(way[2])
 			push("each", 90, function()
-				aimLook(sum)
+				aimLook(sum, walkPieces)
 			end)
 			push("run", function()
 				aimSay(way[1] .. " n=" .. n .. " frame=" .. frame, sum)
@@ -1526,12 +1539,668 @@ local function aimPlan(asked)
 		seekTo(frame)
 		local sum = aimSum()
 		push("each", rest, function()
-			aimLook(sum)
+			aimLook(sum, walkPieces)
 		end)
 		push("run", function()
 			aimSay("rest frame=" .. frame, sum)
 		end)
 	end
+	push("run", function()
+		SendToUnsynced(REPORT)
+	end)
+end
+
+-- Unit scripts (issue #3797).
+
+-- What the player told a unit's script, heard at the two calls it tells one
+-- through: `unit`, `name`, `how` ("lua" or "cob") and the two arguments.
+local heard, heardCount, heardRead = {}, 0, 0
+local WATCHED = { "StartMoving", "StopMoving", "StartBuilding", "StopBuilding" }
+
+-- The functions each unit's Lua script has, of those four, by unit id.
+local luaHas = {}
+
+local function hear(unitID, name, how, a, b)
+	heardCount = heardCount + 1
+	heard[heardCount] = { unit = unitID, name = name, how = how, a = a, b = b }
+end
+
+if animationAsked then
+	-- This file loads after the player's, so the call it finds is the player's
+	-- wrap. The functions put in the table here are the ones the player keeps
+	-- and the engine is given, so a count here is a count of the script's own
+	-- function being run, whoever ran it.
+	local create = Spring.UnitScript.CreateScript
+	Spring.UnitScript.CreateScript = function(unitID, callIns, ...)
+		luaHas[unitID] = {}
+		for _, name in ipairs(WATCHED) do
+			local fn = callIns[name]
+			if fn then
+				luaHas[unitID][name] = true
+				callIns[name] = function(...)
+					local a, b = ...
+					hear(unitID, name, "lua", a, b)
+					return fn(...)
+				end
+			end
+		end
+		return create(unitID, callIns, ...)
+	end
+	-- A COB function is run through this call, by number.
+	local call = Spring.CallCOBScript
+	local numbers = {}
+	Spring.CallCOBScript = function(unitID, func, ...)
+		local name = func
+		if type(func) == "number" then
+			local defID = Spring.GetUnitDefID(unitID)
+			local known = numbers[defID]
+			if not known then
+				known = {}
+				for _, watched in ipairs(WATCHED) do
+					local number = Spring.GetCOBScriptID(unitID, watched)
+					if number then
+						known[number] = watched
+					end
+				end
+				numbers[defID] = known
+			end
+			name = known[func] or ("function " .. func)
+		end
+		local _, a, b = ...
+		hear(unitID, name, "cob", a, b)
+		return call(unitID, func, ...)
+	end
+end
+
+-- What the driver takes each unit's script to have been told last, by the
+-- track's serial number: 0 for standing, 1 for moving and 2 for reversing, and
+-- its work as a text.
+local toldMoving, toldJob = {}, {}
+-- Whether the next look is the first after a seek made while paused, which
+-- told every builder at work that it works.
+local afterPausedSeek = false
+-- The frame a seek made while playing goes to, from the look that sees its
+-- message arrive until the look that sees the world there.
+local seekingTo = nil
+-- The engine's unit a serial number was last seen as, and back.
+local seenAs, serialOfUnit = {}, {}
+-- The pieces of a unit that the track has no poses for, as script numbers, and
+-- what they added up to at the last look.
+local freePieces, pieceSum = {}, {}
+local lastShown, lastRate = nil, 0
+local other = { 0, 0, 0, 0, 0, 0, 0 }
+local target = { 0, 0, 0, 0, 0, 0 }
+local velocity = { 0, 0, 0 }
+local RATES = { [0] = true, [0.5] = true, [1] = true, [2] = true, [4] = true, [8] = true, [16] = true, [32] = true }
+
+local function animationSum()
+	return {
+		looks = 0,
+		units = 0,
+		absent = 0,
+		movingLooks = 0,
+		movingAnimated = 0,
+		standingLooks = 0,
+		standingAnimated = 0,
+		movingMost = 0,
+		expected = 0,
+		heard = 0,
+		missing = 0,
+		extra = 0,
+		want = {},
+		got = {},
+		argsBad = 0,
+		velocityBad = 0,
+		worstVelocity = 0,
+		fastest = 0,
+		builders = 0,
+		working = 0,
+		paramsBad = 0,
+		headings = 0,
+		headingBad = 0,
+		worstHeading = 0,
+		lua = 0,
+		cob = 0,
+		unknown = 0,
+		notes = {},
+		byDef = {},
+	}
+end
+
+local function note(sum, text)
+	if #sum.notes < 6 then
+		sum.notes[#sum.notes + 1] = text
+	end
+end
+
+--- The sum of every turn and offset of a unit's pieces that the track has no
+-- poses for, which only the unit's own script moves.
+local function ownPieces(unitID, def)
+	local pieces = freePieces[unitID]
+	if not pieces then
+		pieces = {}
+		local posed = {}
+		for _, name in ipairs(posedNames[def] or {}) do
+			posed[name] = true
+		end
+		for name, number in pairs(getUnitScriptNames(unitID) or {}) do
+			if not posed[name] then
+				pieces[#pieces + 1] = number + 1
+			end
+		end
+		table.sort(pieces)
+		freePieces[unitID] = pieces
+	end
+	local UnitScript = Spring.UnitScript
+	local sum = 0
+	for _, piece in ipairs(pieces) do
+		local rx, ry, rz = UnitScript.CallAsUnit(unitID, UnitScript.GetPieceRotation, piece)
+		local px, py, pz = UnitScript.CallAsUnit(unitID, UnitScript.GetPieceTranslation, piece)
+		sum = sum + rx + 2 * ry + 3 * rz + 5 * px + 7 * py + 11 * pz
+	end
+	return sum
+end
+
+--- Whether a unit's script has a function, which is when the engine would
+-- call it.
+local function scriptHas(unitID, name)
+	if luaHas[unitID] then
+		return luaHas[unitID][name] == true
+	end
+	return Spring.GetCOBScriptID(unitID, name) ~= nil
+end
+
+--- A wrapped angle's distance from another.
+local function angleOff(a, b)
+	local d = math.abs(a - b) % TURN
+	return math.min(d, TURN - d)
+end
+
+--- Looks at every unit the track has at the time the player last showed, and
+-- at what its script was told since the last look. Adds to `sum`:
+--
+-- - `expected` script calls, worked out from the track by this file's own
+--   reader, `heard` calls the scripts got, and `missing` and `extra`, the
+--   expected ones not heard in this look and the heard ones not expected.
+--   `want` and `got` count them by unit and name over the whole of `sum`.
+-- - `velocityBad` units whose velocity is not the track's times the rate of
+--   play, read with Spring.GetUnitVelocity.
+-- - `movingAnimated` of `movingLooks`, the units the track has moving whose
+--   own pieces moved since the last look, and the same for standing ones.
+-- - `paramsBad` builders whose unit rules parameters are not the track's work.
+-- - `headingBad` of `headings` calls of StartBuilding whose angles are not the
+--   engine's own, from the unit's vectors and middle as the engine has them.
+--
+-- A message changes the frame the player publishes as it arrives, and the
+-- world shows it a frame later. So in the look that sees a seek's message
+-- arrive, the world is still where play had taken it, and that is the time
+-- looked at. The look after sees the world at the seek's frame, which is the
+-- frame the player tells every builder at work that it works, since a seek
+-- may have turned it. Gives true for the first of those two looks.
+local function animationLook(sum)
+	local frame = param("frame")
+	local rate = lastShown and frame - lastShown or 0
+	local arriving = not RATES[math.abs(rate)]
+	local shown = false
+	if arriving then
+		-- The world is one frame of play on from the last look.
+		seekingTo = frame
+		rate = lastRate
+		frame = lastShown + lastRate
+	elseif seekingTo then
+		shown = seekingTo == frame
+		seekingTo = nil
+		if shown then
+			rate = lastRate
+		end
+	end
+	local w = assert(track:seek(frame))
+	local flipped = rate ~= 0 and lastRate ~= 0 and (rate > 0) ~= (lastRate > 0)
+	lastShown = arriving and seekingTo or frame
+	if rate ~= 0 then
+		lastRate = rate
+	end
+	local again = shown or afterPausedSeek
+	local quiet = afterPausedSeek
+	afterPausedSeek = false
+	sum.looks = sum.looks + 1
+	sum.fastest = math.max(sum.fastest, math.abs(rate))
+
+	local byPlace = {}
+	for _, unitID in ipairs(liveUnits()) do
+		local x, y, z = Spring.GetUnitPosition(unitID)
+		byPlace[string.format("%d %.3f %.3f %.3f", Spring.GetUnitDefID(unitID), x, y, z)] = unitID
+	end
+	local unitAt = {}
+	for i = 1, w.unitCount do
+		local def = UnitDefNames[info.unitDefs[w.unitDef[i] + 1]]
+		if def and w:unitExistsAt(i, frame) then
+			w:sampleTransform(i, frame, transform)
+			local unitID = byPlace[string.format("%d %.3f %.3f %.3f", def.id, transform[1], transform[2], transform[3])]
+			unitAt[i] = unitID
+			if unitID then
+				local serial = w.unitSerial[i]
+				if seenAs[serial] ~= unitID then
+					-- Another unit than the one last seen, which has been told nothing.
+					seenAs[serial] = unitID
+					toldMoving[serial], toldJob[serial] = 0, nil
+					pieceSum[unitID] = nil
+				end
+				serialOfUnit[unitID] = serial
+			else
+				sum.absent = sum.absent + 1
+			end
+		end
+	end
+
+	-- What the scripts should have been told, from the track.
+	local want = {}
+	local function expect(serial, name, unitID)
+		if not scriptHas(unitID, name) then
+			return
+		end
+		sum.expected = sum.expected + 1
+		local key = serial .. " " .. name
+		want[key] = (want[key] or 0) + 1
+		sum.want[key] = (sum.want[key] or 0) + 1
+	end
+	local movingNow = 0
+	local startArg, headingOf = {}, {}
+	for i = 1, w.unitCount do
+		local unitID = unitAt[i]
+		if unitID then
+			local serial = w.unitSerial[i]
+			local def = UnitDefNames[info.unitDefs[w.unitDef[i] + 1]]
+			sum.units = sum.units + 1
+			w:sampleStatus(i, frame, status)
+			local finished = status[2] >= 1
+			-- The reader's own slope. A difference of two places sampled a part of
+			-- a frame apart would be off by more than the engine's numbers hold: a
+			-- 32 bit float has steps of a thousandth of an elmo at 8,192 elmos.
+			w:sampleTransform(i, frame, transform)
+			w:sampleVelocity(i, frame, velocity)
+			local vx, vy, vz = velocity[1], velocity[2], velocity[3]
+			local moves = false
+			if rate == 0 or not finished then
+				vx, vy, vz = 0, 0, 0
+			else
+				moves = vx * vx + vy * vy + vz * vz > 0.0001
+				vx, vy, vz = vx * rate, vy * rate, vz * rate
+			end
+			if not def.isImmobile then
+				do
+					local ex, ey, ez = Spring.GetUnitVelocity(unitID)
+					local off = math.max(math.abs(ex - vx), math.abs(ey - vy), math.abs(ez - vz))
+					sum.worstVelocity = math.max(sum.worstVelocity, off)
+					if off > 0.0001 then
+						sum.velocityBad = sum.velocityBad + 1
+						note(sum, string.format("velocity %s at %s: engine %.3f %.3f %.3f track %.3f %.3f %.3f", def.name, tostring(frame), ex, ey, ez, vx, vy, vz))
+					end
+				end
+				local was = toldMoving[serial] or 0
+				if moves then
+					movingNow = movingNow + 1
+					-- A unit that moves against its facing reverses. A script is told
+					-- again when play turns round and that changes.
+					local fx, _, fz = directions(transform[4], transform[5], transform[6], transform[7])
+					local state = (vx * fx + vz * fz < 0) and 2 or 1
+					if was == 0 or (flipped and state ~= was) then
+						expect(serial, "StartMoving", unitID)
+						startArg[serial] = state - 1
+						toldMoving[serial] = state
+					end
+				elseif was ~= 0 then
+					expect(serial, "StopMoving", unitID)
+					toldMoving[serial] = 0
+				end
+				-- Whether the unit's own script moved a piece since the last look.
+				local now = ownPieces(unitID, w.unitDef[i] + 1)
+				local animated = pieceSum[unitID] ~= nil and pieceSum[unitID] ~= now
+				pieceSum[unitID] = now
+				if moves then
+					sum.movingLooks = sum.movingLooks + 1
+					sum.movingAnimated = sum.movingAnimated + (animated and 1 or 0)
+					local byDef = sum.byDef[def.name] or { 0, 0 }
+					sum.byDef[def.name] = byDef
+					byDef[1], byDef[2] = byDef[1] + (animated and 1 or 0), byDef[2] + 1
+				else
+					sum.standingLooks = sum.standingLooks + 1
+					sum.standingAnimated = sum.standingAnimated + (animated and 1 or 0)
+				end
+			end
+
+			-- A builder's work.
+			local job, command, wantedTarget, power = nil, 0, -1, 0
+			local builder = false
+			for targetTrack = w.unitTargetFirst[i], w.unitTargetFirst[i] + w.unitTargetCount[i] - 1 do
+				if w.targetWeapon[targetTrack] == 0 then
+					builder = true
+					if finished and w:sampleTarget(targetTrack, frame, target) then
+						local kind, ref = target[1], target[2]
+						if (kind == 16 or kind == 17 or kind == 20) and ref >= 1 and w:unitExistsAt(ref, frame) then
+							job = kind .. " unit " .. w.unitSerial[ref]
+							wantedTarget = unitAt[ref] or -1
+							w:sampleTransform(ref, frame, other)
+							headingOf[serial] = { other[1], other[2], other[3] }
+							if kind == 17 then
+								command = CMD.RECLAIM
+							elseif kind == 20 then
+								command = CMD.CAPTURE
+							else
+								w:sampleStatus(ref, frame, status)
+								local targetDef = UnitDefNames[info.unitDefs[w.unitDef[ref] + 1]]
+								command = (status[2] < 1 and targetDef) and -targetDef.id or CMD.REPAIR
+							end
+						elseif (kind == 18 or kind == 19) and features[ref] then
+							job = kind .. " feature " .. ref
+							wantedTarget = nil
+							command = kind == 19 and CMD.RESURRECT or CMD.RECLAIM
+							headingOf[serial] = features[ref].position
+						elseif kind == 129 then
+							job = "129"
+							command = CMD.RESTORE
+							headingOf[serial] = { target[4], target[5], target[6] }
+						end
+						if job then
+							power = target[3] / 255
+						end
+					end
+				end
+			end
+			if builder then
+				sum.builders = sum.builders + 1
+				if job then
+					sum.working = sum.working + 1
+				end
+				local gotCommand = Spring.GetUnitRulesParam(unitID, "coilbox_rewind_work_command")
+				local gotTarget = Spring.GetUnitRulesParam(unitID, "coilbox_rewind_work_target")
+				local gotPower = Spring.GetUnitRulesParam(unitID, "coilbox_rewind_work_power")
+				if (gotCommand or 0) ~= command or (wantedTarget and (gotTarget or -1) ~= wantedTarget) or math.abs((gotPower or 0) - power) > 0.000001 then
+					sum.paramsBad = sum.paramsBad + 1
+					note(sum, string.format("params %s at %s: engine %s %s %s track %s %s %s", def.name, tostring(frame), tostring(gotCommand), tostring(gotTarget), tostring(gotPower), tostring(command), tostring(wantedTarget), tostring(power)))
+				end
+			end
+			if quiet then
+				-- Told on the way here, before the counting began.
+			elseif job ~= toldJob[serial] or (again and job) then
+				if job then
+					expect(serial, "StartBuilding", unitID)
+				elseif toldJob[serial] then
+					expect(serial, "StopBuilding", unitID)
+				end
+			end
+			toldJob[serial] = job
+		end
+	end
+	sum.movingMost = math.max(sum.movingMost, movingNow)
+
+	-- What they were told.
+	for k = heardRead + 1, heardCount do
+		local one = heard[k]
+		heard[k] = nil
+		sum.heard = sum.heard + 1
+		sum[one.how] = sum[one.how] + 1
+		local serial = serialOfUnit[one.unit]
+		if not serial then
+			sum.unknown = sum.unknown + 1
+			note(sum, "a unit the track does not have was told " .. one.name)
+		else
+			local key = serial .. " " .. one.name
+			sum.got[key] = (sum.got[key] or 0) + 1
+			if want[key] and want[key] > 0 then
+				want[key] = want[key] - 1
+			else
+				sum.extra = sum.extra + 1
+				note(sum, "extra " .. one.name .. " at " .. tostring(frame) .. " for " .. UnitDefs[Spring.GetUnitDefID(one.unit)].name)
+			end
+			if one.name == "StartMoving" and startArg[serial] and one.a ~= startArg[serial] then
+				sum.argsBad = sum.argsBad + 1
+				note(sum, "StartMoving was given " .. tostring(one.a) .. " and the track has " .. startArg[serial])
+			end
+			local place = headingOf[serial]
+			local unitDef = UnitDefs[Spring.GetUnitDefID(one.unit)]
+			if one.name == "StartBuilding" and place and not unitDef.isFactory then
+				-- The engine's own angles (CBuilder::ScriptStartBuilding), from the
+				-- unit as the engine has it.
+				local _, _, _, mx, my, mz = Spring.GetUnitPosition(one.unit, true)
+				local front, up = Spring.GetUnitVectors(one.unit)
+				local dx, dy, dz = place[1] - mx, place[2] - my, place[3] - mz
+				local length = math.sqrt(dx * dx + dy * dy + dz * dz)
+				if length > 0 and one.a and one.b then
+					dx, dy, dz = dx / length, dy / length, dz / length
+					local heading = math.atan2(dx, dz) - math.atan2(front[1], front[3])
+					local pitch = math.asin(math.max(-1, math.min(1, dx * up[1] + dy * up[2] + dz * up[3])))
+					local a, b = one.a, one.b
+					local limit = 0.001
+					if one.how == "cob" then
+						a, b = a * math.pi / 32768, b * math.pi / 32768
+						limit = 0.001 + math.pi / 32768
+					end
+					local off = math.max(angleOff(a, heading), angleOff(b, pitch))
+					sum.headings = sum.headings + 1
+					sum.worstHeading = math.max(sum.worstHeading, off)
+					if off > limit then
+						sum.headingBad = sum.headingBad + 1
+						note(sum, string.format("StartBuilding of %s was given %.4f %.4f and the engine's vectors give %.4f %.4f", unitDef.name, a, b, heading, pitch))
+					end
+				end
+			elseif one.name == "StartBuilding" and unitDef.isFactory and (one.a ~= nil or one.b ~= nil) then
+				sum.argsBad = sum.argsBad + 1
+				note(sum, "a factory's StartBuilding was given an argument")
+			end
+		end
+	end
+	heardRead = heardCount
+	for key, left in pairs(want) do
+		if left > 0 then
+			sum.missing = sum.missing + left
+			local serial = tonumber(key:match("^(%d+)"))
+			local unitID = seenAs[serial]
+			local name = unitID and Spring.GetUnitDefID(unitID) and UnitDefs[Spring.GetUnitDefID(unitID)].name or "?"
+			note(sum, "missing " .. key .. " of " .. name .. " at " .. tostring(frame))
+		end
+	end
+	return arriving
+end
+
+local function animationSay(label, sum, aim)
+	-- Over the whole of the looks, whatever look each call fell in.
+	local looseMissing, looseExtra = 0, 0
+	for key, n in pairs(sum.want) do
+		looseMissing = looseMissing + math.max(0, n - (sum.got[key] or 0))
+	end
+	for key, n in pairs(sum.got) do
+		looseExtra = looseExtra + math.max(0, n - (sum.want[key] or 0))
+	end
+	say(
+		string.format(
+			"animation %s shown=%s looks=%d units=%d absent=%d moving_most=%d moving_looks=%d moving_animated=%d standing_looks=%d standing_animated=%d expected=%d heard=%d missing=%d extra=%d loose_missing=%d loose_extra=%d args_bad=%d lua=%d cob=%d unknown=%d fastest=%s velocity_bad=%d worst_velocity=%.6f builders=%d working=%d params_bad=%d headings=%d heading_bad=%d worst_heading=%.6f posed=%d posed_bad=%d posed_walk=%d",
+			label,
+			tostring(param("frame")),
+			sum.looks,
+			sum.units,
+			sum.absent,
+			sum.movingMost,
+			sum.movingLooks,
+			sum.movingAnimated,
+			sum.standingLooks,
+			sum.standingAnimated,
+			sum.expected,
+			sum.heard,
+			sum.missing,
+			sum.extra,
+			looseMissing,
+			looseExtra,
+			sum.argsBad,
+			sum.lua,
+			sum.cob,
+			sum.unknown,
+			tostring(sum.fastest),
+			sum.velocityBad,
+			sum.worstVelocity,
+			sum.builders,
+			sum.working,
+			sum.paramsBad,
+			sum.headings,
+			sum.headingBad,
+			sum.worstHeading,
+			aim.pieces,
+			aim.bad,
+			aim.walked or 0
+		)
+	)
+	local byDef = {}
+	for name, counts in pairs(sum.byDef) do
+		byDef[#byDef + 1] = name .. ":" .. counts[1] .. "/" .. counts[2]
+	end
+	table.sort(byDef)
+	if #byDef > 0 then
+		say("animation note " .. label .. ": moving looks animated by definition " .. table.concat(byDef, " "))
+	end
+	for _, text in ipairs(sum.notes) do
+		say("animation note " .. label .. ": " .. text)
+	end
+end
+
+--- The frames to seek to when the test names none: among every 30th frame of
+-- the track, the two with the most units moving and the two with the most
+-- builders at work, no two of them within 600 frames, each with 400 frames of
+-- the track after it.
+local function animationFrames()
+	local h = track.header
+	local scored = {}
+	for frame = h.firstFrame, h.lastFrame - 400, 30 do
+		local w = assert(track:seek(frame))
+		local moving, working = 0, 0
+		for i = 1, w.unitCount do
+			if w:unitExistsAt(i, frame) then
+				w:sampleStatus(i, frame, status)
+				if status[2] >= 1 then
+					w:sampleTransform(i, frame, transform)
+					w:sampleTransform(i, frame + 0.25, other)
+					if (other[1] - transform[1]) ^ 2 + (other[3] - transform[3]) ^ 2 > 0.0001 / 16 then
+						moving = moving + 1
+					end
+					for targetTrack = w.unitTargetFirst[i], w.unitTargetFirst[i] + w.unitTargetCount[i] - 1 do
+						if w.targetWeapon[targetTrack] == 0 and w:sampleTarget(targetTrack, frame, target) and target[1] ~= 0 then
+							working = working + 1
+						end
+					end
+				end
+			end
+		end
+		scored[#scored + 1] = { frame = frame, moving = moving, working = working }
+	end
+	local frames = {}
+	for _, by in ipairs({ "moving", "working" }) do
+		table.sort(scored, function(a, b)
+			if a[by] ~= b[by] then
+				return a[by] > b[by]
+			end
+			return a.frame < b.frame
+		end)
+		local taken = 0
+		for _, item in ipairs(scored) do
+			local clear = item[by] > 0
+			for _, frame in ipairs(frames) do
+				if math.abs(frame - item.frame) < 600 then
+					clear = false
+				end
+			end
+			if clear and taken < 2 then
+				taken = taken + 1
+				frames[#frames + 1] = item.frame
+			end
+		end
+	end
+	table.sort(frames)
+	return frames
+end
+
+--- The plan for unit scripts. At each frame asked for it seeks there paused,
+-- which leaves every script told that its unit stands, and then looks on every
+-- frame of: 150 frames played forward, 30 paused, 40 forward and 60 backward
+-- with no pause between, 20 frames at 8x, and 30 frames across a seek made
+-- while playing. `asked.frames` are the frames, and `asked.long` a number of
+-- frames to play forward from the first of them with a look on each.
+local function animationPlan(asked)
+	local h = track.header
+	posedNames = {}
+	for _, posed in ipairs(info.posedPieces) do
+		posedNames[posed.unitDef + 1] = posed.pieces
+	end
+	local frames = type(asked) == "table" and asked.frames or nil
+	if not frames or #frames == 0 then
+		frames = animationFrames()
+	end
+	say(string.format("start first=%d last=%d seeks=%d frames=%s", h.firstFrame, h.lastFrame, #frames, table.concat(frames, ",")))
+	send("pause")
+	seekTo(h.firstFrame)
+	local walkPieces = type(asked) == "table" and asked.walkPieces or nil
+	--- `count` frames with a look on each. The posed pieces are looked at too,
+	-- as the aim plan looks at them, but for the frame a seek's message has
+	-- arrived in and the world has yet to show.
+	local function looked(label, count)
+		local sum, aim = animationSum(), aimSum()
+		push("each", count, function()
+			if not animationLook(sum) then
+				aimLook(aim, walkPieces)
+			end
+		end)
+		push("run", function()
+			animationSay(label, sum, aim)
+		end)
+	end
+	for n, frame in ipairs(frames) do
+		local at = " n=" .. n .. " frame=" .. frame
+		send("pause")
+		send("speed 1")
+		seekTo(frame)
+		push("run", function()
+			-- Whatever was told on the way here is not what is being counted.
+			heardRead = heardCount
+			lastShown, lastRate, seekingTo = param("frame"), 0, nil
+			afterPausedSeek = true
+			for serial in pairs(toldMoving) do
+				toldMoving[serial] = 0
+			end
+		end)
+		looked("still" .. at, 5)
+		send("play 1")
+		looked("forward" .. at, 150)
+		send("pause")
+		looked("paused" .. at, 30)
+		send("play 1")
+		looked("again" .. at, 40)
+		send("reverse")
+		looked("backward" .. at, 60)
+		send("play 1")
+		send("speed 8")
+		looked("fast" .. at, 20)
+		send("speed 1")
+		looked("slowed" .. at, 10)
+		send("seek " .. (frame + 45))
+		looked("seek" .. at, 30)
+	end
+	local long = type(asked) == "table" and tonumber(asked.long) or 0
+	if long > 0 and #frames > 0 then
+		send("pause")
+		send("speed 1")
+		seekTo(frames[1])
+		push("run", function()
+			heardRead = heardCount
+			lastShown, lastRate, seekingTo = param("frame"), 0, nil
+			afterPausedSeek = true
+			for serial in pairs(toldMoving) do
+				toldMoving[serial] = 0
+			end
+		end)
+		looked("still long frame=" .. frames[1], 2)
+		send("play 1")
+		looked("long frame=" .. frames[1], long)
+	end
+	send("pause")
+	push("wait", SETTLE)
 	push("run", function()
 		SendToUnsynced(REPORT)
 	end)
@@ -1654,7 +2323,9 @@ function gadget:GameFrame()
 		info, features = assert(track:info()), assert(track:features())
 		-- The test that wants a whole match played writes this file beside the
 		-- track. Without it the plan is the fixture match's.
-		if aimAsked then
+		if animationAsked then
+			animationPlan(animationAsked)
+		elseif aimAsked then
 			aimPlan(aimAsked)
 		elseif VFS.FileExists(RESOURCES) then
 			resourcePlan(VFS.Include(RESOURCES))

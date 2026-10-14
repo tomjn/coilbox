@@ -460,6 +460,48 @@ end
 
 -- Errors. A bad part is an error for that part, and the rest still reads.
 
+-- A unit's velocity (issue #3797) is the slope of the line its place is on. A
+-- key is on a whole frame, so a quarter and three quarters of the way through
+-- a frame are on one line, and the place moves between them by half the
+-- velocity. At a unit's last key it is nothing.
+
+do
+	local trk = opened()
+	local p0, p1, v = {}, {}, {}
+	local looked, worst, moving, lastOnes, lastStill = 0, 0, 0, 0, 0
+	for k = 0, trk.header.windowCount - 1 do
+		local w = assert(trk:loadWindow(k))
+		for i = 1, w.unitCount do
+			for frame = w.unitFirstFrame[i], w.unitLastFrame[i] - 1, 7 do
+				w:sampleTransform(i, frame + 0.25, p0)
+				w:sampleTransform(i, frame + 0.75, p1)
+				local ok = w:sampleVelocity(i, frame + 0.25, v)
+				looked = looked + (ok and 1 or 0)
+				for axis = 1, 3 do
+					worst = math.max(worst, math.abs((p1[axis] - p0[axis]) / 0.5 - v[axis]))
+				end
+				if v[1] ~= 0 or v[2] ~= 0 or v[3] ~= 0 then
+					moving = moving + 1
+				end
+			end
+			-- The last key of a unit that has more than one.
+			if w.transformCount[i] > 1 then
+				local last = w.transformTime[w.transformFirst[i] + w.transformCount[i] - 1]
+				w:sampleVelocity(i, last, v)
+				lastOnes = lastOnes + 1
+				if v[1] == 0 and v[2] == 0 and v[3] == 0 then
+					lastStill = lastStill + 1
+				end
+			end
+		end
+	end
+	t.check("velocities were sampled", looked > 100, looked)
+	t.check("a unit's velocity is how far its place moves in a frame", worst < 1e-6, worst)
+	t.check("and the fixture's units do move", moving > 100, moving)
+	t.check("the fixture has units with more than one key", lastOnes > 0, lastOnes)
+	t.same("a unit has no velocity at its last key", lastStill, lastOnes)
+end
+
 local function corrupted(data, from, to, replacement)
 	return data:sub(1, from - 1) .. replacement .. data:sub(to + 1)
 end
