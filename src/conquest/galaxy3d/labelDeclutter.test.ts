@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { declutterLabels, LABEL_GAP_PX, type LabelBox } from "./labelDeclutter";
+import {
+  declutterLabels,
+  LABEL_GAP_PX,
+  type LabelBox,
+  type LabelElement,
+  type LabelInput,
+  placeLabels,
+  sameNumbers,
+} from "./labelDeclutter";
 
 const box = (over: Partial<LabelBox> = {}): LabelBox => ({
   left: 0,
@@ -101,5 +109,161 @@ describe("declutterLabels", () => {
 
   it("answers an empty list with an empty list", () => {
     expect(declutterLabels([])).toEqual([]);
+  });
+});
+
+describe("sameNumbers", () => {
+  it("is true only for equal numbers in the same order", () => {
+    expect(sameNumbers([1, 2, 3], new Float32Array([1, 2, 3]))).toBe(true);
+    expect(sameNumbers([1, 2, 3], [1, 2, 4])).toBe(false);
+    expect(sameNumbers([1, 2], [1, 2, 3])).toBe(false);
+    expect(sameNumbers(undefined, [1])).toBe(false);
+  });
+});
+
+/** An element that logs each size read and style write, in order. */
+function fakeLabel(log: string[], name: string, width = 40, height = 10) {
+  const style = { _v: "", _m: "" } as {
+    _v: string;
+    _m: string;
+    visibility: string;
+    marginTop: string;
+  };
+  Object.defineProperty(style, "visibility", {
+    get: () => style._v,
+    set: (v: string) => {
+      log.push(`write ${name}`);
+      style._v = v;
+    },
+  });
+  Object.defineProperty(style, "marginTop", {
+    get: () => style._m,
+    set: (v: string) => {
+      log.push(`write ${name}`);
+      style._m = v;
+    },
+  });
+  return {
+    style,
+    get offsetWidth() {
+      log.push(`read ${name}`);
+      return width;
+    },
+    get offsetHeight() {
+      return height;
+    },
+  } as LabelElement;
+}
+
+const input = (
+  el: LabelElement,
+  ndc: { x: number; y: number } | null,
+  extra: Partial<LabelInput> = {},
+): LabelInput => ({
+  el,
+  ndc,
+  center: { x: 0.5, y: 0.5 },
+  rank: 1,
+  pinned: false,
+  ...extra,
+});
+
+describe("placeLabels", () => {
+  it("hides lower ranked names that overlap a pinned one", () => {
+    const log: string[] = [];
+    const capital = fakeLabel(log, "capital");
+    const town = fakeLabel(log, "town");
+    const mine = fakeLabel(log, "mine");
+    const far = fakeLabel(log, "far");
+    placeLabels(
+      [
+        input(capital, { x: 0, y: 0 }, { rank: 2 }),
+        input(town, { x: 0, y: 0 }),
+        input(mine, { x: 0, y: 0 }, { pinned: true }),
+        input(far, { x: 0.9, y: 0.9 }),
+      ],
+      800,
+      600,
+      new Map(),
+      true,
+    );
+    expect(mine.style.visibility).toBe("");
+    expect(mine.style.marginTop).toBe("");
+    expect(capital.style.visibility).toBe("hidden");
+    expect(town.style.visibility).toBe("hidden");
+    expect(far.style.visibility).toBe("");
+  });
+
+  it("moves a pinned name clear of another pinned name", () => {
+    const log: string[] = [];
+    const a = fakeLabel(log, "a");
+    const b = fakeLabel(log, "b");
+    placeLabels(
+      [
+        input(a, { x: 0, y: 0 }, { pinned: true }),
+        input(b, { x: 0, y: 0 }, { pinned: true }),
+      ],
+      800,
+      600,
+      new Map(),
+      true,
+    );
+    expect(a.style.marginTop).toBe("");
+    expect(b.style.visibility).toBe("");
+    expect(b.style.marginTop).toBe(`${10 + LABEL_GAP_PX}px`);
+  });
+
+  it("brings back a name that stops colliding or leaves the view", () => {
+    const log: string[] = [];
+    const a = fakeLabel(log, "a");
+    const b = fakeLabel(log, "b");
+    const sizes = new Map();
+    const first = input(a, { x: 0, y: 0 }, { rank: 2 });
+    placeLabels([first, input(b, { x: 0, y: 0 })], 800, 600, sizes, true);
+    expect(b.style.visibility).toBe("hidden");
+    placeLabels([first, input(b, { x: 0.8, y: 0 })], 800, 600, sizes, false);
+    expect(b.style.visibility).toBe("");
+    placeLabels([first, input(b, { x: 0, y: 0 })], 800, 600, sizes, false);
+    expect(b.style.visibility).toBe("hidden");
+    placeLabels([first, input(b, null)], 800, 600, sizes, false);
+    expect(b.style.visibility).toBe("");
+  });
+
+  it("makes no size read after a style write within one pass", () => {
+    const log: string[] = [];
+    const labels = ["a", "b", "c", "d"].map((n) => fakeLabel(log, n));
+    placeLabels(
+      labels.map((el, i) => input(el, { x: 0.01 * i, y: 0 })),
+      800,
+      600,
+      new Map(),
+      true,
+    );
+    const reads = log.filter((l) => l.startsWith("read"));
+    expect(reads).toHaveLength(4);
+    const firstWrite = log.findIndex((l) => l.startsWith("write"));
+    expect(firstWrite).toBeGreaterThan(log.lastIndexOf("read d"));
+  });
+
+  it("keeps sizes between passes and reads them again only on request", () => {
+    const log: string[] = [];
+    const el = fakeLabel(log, "a");
+    const sizes = new Map();
+    const labels = [input(el, { x: 0, y: 0 })];
+    placeLabels(labels, 800, 600, sizes, true);
+    placeLabels(labels, 800, 600, sizes, false);
+    expect(log.filter((l) => l === "read a")).toHaveLength(1);
+    placeLabels(labels, 800, 600, sizes, true);
+    expect(log.filter((l) => l === "read a")).toHaveLength(2);
+  });
+
+  it("reads a zero size again, since the page has not shown that label yet", () => {
+    const log: string[] = [];
+    const el = fakeLabel(log, "a", 0, 0);
+    const sizes = new Map();
+    const labels = [input(el, { x: 0, y: 0 })];
+    placeLabels(labels, 800, 600, sizes, true);
+    placeLabels(labels, 800, 600, sizes, false);
+    expect(log.filter((l) => l === "read a")).toHaveLength(2);
   });
 });

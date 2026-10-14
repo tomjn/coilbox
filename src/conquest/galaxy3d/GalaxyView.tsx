@@ -17,7 +17,13 @@ import { buildEndMarkerLayer } from "./endMarkerLayer";
 import { createFocus } from "./focus";
 import { createFrameScheduler, needsAnotherFrame } from "./frameDemand";
 import { buildGroundLayer, type GroundLayer } from "./groundLayer";
-import { declutterLabels, type LabelBox } from "./labelDeclutter";
+import {
+  type LabelElement,
+  type LabelInput,
+  type LabelSize,
+  placeLabels,
+  sameNumbers,
+} from "./labelDeclutter";
 import { hashString } from "./layout";
 import { createOwners } from "./owners";
 import { pickLocation } from "./picking";
@@ -1186,47 +1192,54 @@ export function GalaxyView({
     // or the labels changed, not on every frame that draws.
     if (surface && labelObjects.length > 0) {
       const projected = new THREE.Vector3();
-      let placedFor = "";
+      const inputs: LabelInput[] = labelObjects.map((label) => ({
+        el: label.element as HTMLElement,
+        ndc: null,
+        center: label.center,
+        rank: 1,
+        pinned: false,
+      }));
+      // What the last pass ran for. The matrices are copied, since the camera
+      // rewrites its own in place.
+      const placedView = new Float32Array(16);
+      const placedProjection = new Float32Array(16);
+      let placedSize = "";
+      let placedEpoch = -1;
+      const keptSizes = new Map<LabelElement, LabelSize>();
       declutter = () => {
         const w = container.clientWidth || 1;
         const h = container.clientHeight || 1;
-        const key = `${w}x${h}|${labelEpoch}|${camera.matrixWorldInverse.elements.join()}|${camera.projectionMatrix.elements.join()}`;
-        if (key === placedFor) return;
-        placedFor = key;
+        const size = `${w}x${h}`;
+        if (
+          size === placedSize &&
+          labelEpoch === placedEpoch &&
+          sameNumbers(camera.matrixWorldInverse.elements, placedView) &&
+          sameNumbers(camera.projectionMatrix.elements, placedProjection)
+        ) {
+          return;
+        }
+        placedSize = size;
+        // A name's size changes with its text or style, not with the camera.
+        const remeasure = labelEpoch !== placedEpoch;
+        placedEpoch = labelEpoch;
+        placedView.set(camera.matrixWorldInverse.elements);
+        placedProjection.set(camera.projectionMatrix.elements);
         const selectedIndex = selection.getIndex();
-        const entries: { label: CSS2DObject; box: LabelBox }[] = [];
         labelObjects.forEach((label, i) => {
-          const el = label.element as HTMLElement;
-          // Reset first, so a name that stops colliding comes back.
-          el.style.visibility = "";
-          el.style.marginTop = "";
+          const input = inputs[i];
+          input.ndc = null;
           if (!label.visible) return;
           projected.copy(label.position).project(camera);
           if (projected.z < -1 || projected.z > 1) return;
-          const width = el.offsetWidth;
-          const height = el.offsetHeight;
           const node = galaxy.nodes[i];
-          entries.push({
-            label,
-            box: {
-              left: (projected.x * 0.5 + 0.5) * w - width * label.center.x,
-              top: (-projected.y * 0.5 + 0.5) * h - height * label.center.y,
-              width,
-              height,
-              rank: node.kind === "capital" ? 2 : 1,
-              pinned:
-                i === hovered ||
-                i === selectedIndex ||
-                (ownersRef.current[node.id] ?? node.owner) === playerFactionId,
-            },
-          });
+          input.rank = node.kind === "capital" ? 2 : 1;
+          input.pinned =
+            i === hovered ||
+            i === selectedIndex ||
+            (ownersRef.current[node.id] ?? node.owner) === playerFactionId;
+          input.ndc = { x: projected.x, y: projected.y };
         });
-        const placed = declutterLabels(entries.map((e) => e.box));
-        placed.forEach((p, k) => {
-          const el = entries[k].label.element as HTMLElement;
-          if (p.hidden) el.style.visibility = "hidden";
-          else if (p.dy !== 0) el.style.marginTop = `${p.dy}px`;
-        });
+        placeLabels(inputs, w, h, keptSizes, remeasure);
       };
     }
     let downAt: [number, number] | null = null;

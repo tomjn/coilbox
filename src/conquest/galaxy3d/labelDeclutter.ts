@@ -97,3 +97,97 @@ export function declutterLabels(
   }
   return out;
 }
+
+/** True when two matrices hold the same numbers. Compared in place, because
+ *  joining 32 numbers into a string on every frame drawn is wasted work. */
+export function sameNumbers(
+  a: ArrayLike<number> | undefined,
+  b: ArrayLike<number> | undefined,
+): boolean {
+  if (!a || !b || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+/** The part of a label's element the pass touches. */
+export interface LabelElement {
+  style: { visibility: string; marginTop: string };
+  readonly offsetWidth: number;
+  readonly offsetHeight: number;
+}
+
+/** One label as the pass sees it. */
+export interface LabelInput {
+  el: LabelElement;
+  /** Where the anchor sits in normalised device coordinates, or null when the
+   *  name is hidden or outside the view and takes no part. */
+  ndc: { x: number; y: number } | null;
+  /** The label's anchor within its own box: 0.5, 0.5 is the middle. */
+  center: { x: number; y: number };
+  rank: number;
+  pinned: boolean;
+}
+
+/** A label's size in pixels. It does not depend on the camera. */
+export interface LabelSize {
+  width: number;
+  height: number;
+}
+
+/**
+ * Place every name for one camera.
+ *
+ * Reads first, writes second. The sizes are read from the page only for a
+ * label with no size kept yet, or all of them when `remeasure` is set, and
+ * every style write waits until the last read is done. Mixing the two makes the
+ * webview lay the page out again once per label.
+ *
+ * `sizes` is the caller's store of kept sizes. A zero size is never kept,
+ * since a label the page has not shown yet reports none.
+ */
+export function placeLabels(
+  inputs: readonly LabelInput[],
+  viewWidth: number,
+  viewHeight: number,
+  sizes: Map<LabelElement, LabelSize>,
+  remeasure: boolean,
+): void {
+  const entries: { el: LabelElement; box: LabelBox }[] = [];
+  for (const input of inputs) {
+    if (!input.ndc) continue;
+    let size = remeasure ? undefined : sizes.get(input.el);
+    if (!size) {
+      size = { width: input.el.offsetWidth, height: input.el.offsetHeight };
+      if (size.width > 0 && size.height > 0) sizes.set(input.el, size);
+      else sizes.delete(input.el);
+    }
+    entries.push({
+      el: input.el,
+      box: {
+        left:
+          (input.ndc.x * 0.5 + 0.5) * viewWidth - size.width * input.center.x,
+        top:
+          (-input.ndc.y * 0.5 + 0.5) * viewHeight -
+          size.height * input.center.y,
+        width: size.width,
+        height: size.height,
+        rank: input.rank,
+        pinned: input.pinned,
+      },
+    });
+  }
+  const placed = declutterLabels(entries.map((e) => e.box));
+
+  // Writes. A name that took no part in the pass comes back to its own place.
+  const result = new Map<LabelElement, LabelPlacement>();
+  for (let k = 0; k < placed.length; k++) {
+    result.set(entries[k].el, placed[k]);
+  }
+  for (const { el } of inputs) {
+    const p = result.get(el);
+    const visibility = p?.hidden ? "hidden" : "";
+    const marginTop = p && !p.hidden && p.dy !== 0 ? `${p.dy}px` : "";
+    if (el.style.visibility !== visibility) el.style.visibility = visibility;
+    if (el.style.marginTop !== marginTop) el.style.marginTop = marginTop;
+  }
+}
