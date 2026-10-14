@@ -334,6 +334,17 @@ M.SYNCED = {
 		visible = false,
 	},
 	{
+		id = "hiddenBursts",
+		feature = "hiding the burst of a shot the engine ends while it is held",
+		calls = { "Script.SetWatchExplosion" },
+		how = "presence",
+		used = "coilbox_player_projectiles.lua, Projectiles.new and Projectiles:explosion",
+		required = false,
+		since = "105.0",
+		without = "A shot the engine ends while the player holds it, where the match had nothing in its way, bursts with the game's impact effect at a time and place the match had none",
+		visible = true,
+	},
+	{
 		id = "sound",
 		feature = "fire sounds",
 		calls = { "Spring.PlaySoundFile", "Game.gameSpeed" },

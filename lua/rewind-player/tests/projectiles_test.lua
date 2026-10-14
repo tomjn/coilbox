@@ -55,6 +55,9 @@ local function setup(spec, options)
 		UnitDestroyed = function(_, unitID)
 			player:unitDestroyed(unitID)
 		end,
+		Explosion = function(_, _, _, _, _, _, projectileID)
+			return player:explosion(projectileID)
+		end,
 	}
 	return world, player, track
 end
@@ -443,6 +446,55 @@ do
 	t.same("one 2 above it is let go where the track has it", two and two.y, 2)
 	run(world, player, 5)
 	t.same("and lands nowhere, there being nothing in its way", #world.explosions, 0)
+end
+
+-- Whatever the playback's world has in a held shot's way that the match's did
+-- not, the engine bursts the shot. The player hides that burst, and shows a
+-- shot it lets go on its last frame (issue #4026).
+
+do
+	-- In the air from frame 100 to 200, and on frame 110 in a target the match
+	-- did not have there.
+	local rocket = { weapon = ROCKET, first = 100, last = 200, shooter = 1, at = flight(100, { 0, 50, 0 }, { 0, 0, 1 }) }
+	local function world110()
+		local world, player = setup({ last = 400, units = { { first = 0, last = 400 } }, projectiles = { rocket } })
+		world.target = { x = 0, y = 50, z = 10, radius = 3 }
+		send(player, "pause")
+		return world, player
+	end
+	local function shown(world)
+		local n = 0
+		for _, one in ipairs(world.explosions) do
+			n = n + (one.hidden and 0 or 1)
+		end
+		return n
+	end
+
+	local world, player = world110()
+	seek(world, player, 110)
+	run(world, player, 5)
+	t.same("paused, a held shot in something the match did not have bursts", #world.explosions, 1)
+	t.same("and the burst is hidden", shown(world), 0)
+	t.same("which the player counts", world.params.coilbox_rewind_hidden, 1)
+
+	for _, case in ipairs({ { "at 4x", 104, "speed 4", "play 1" }, { "backward", 120, "speed 1", "play -1" }, { "watched at 1x", 104, "speed 1", "play 1" } }) do
+		world, player = world110()
+		seek(world, player, case[2])
+		send(player, case[3])
+		send(player, case[4])
+		run(world, player, 12)
+		t.same(case[1] .. " the shot bursts as it passes", #world.explosions, 1)
+		t.same("and the burst is hidden", shown(world), 0)
+	end
+
+	world, player = setup({ last = 400, units = { { first = 0, last = 400 } }, projectiles = { shell() } })
+	send(player, "pause")
+	seek(world, player, 105)
+	send(player, "play 1")
+	run(world, player, 10)
+	t.same("a shell let go on its last frame lands", #world.explosions, 1)
+	t.same("and its burst is shown", shown(world), 1)
+	t.same("and none was counted hidden", world.params.coilbox_rewind_hidden, 0)
 end
 
 -- After a seek the engine can still have units the track does not, for as many

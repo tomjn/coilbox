@@ -66,6 +66,7 @@ Game rules parameters, which any widget reads with `Spring.GetGameRulesParam(nam
 | `coilbox_rewind_last_frame` | the track's last frame |
 | `coilbox_rewind_frames_per_second` | simulation frames in a second of the match, 30 |
 | `coilbox_rewind_settled` | 1 when the world is the track at `coilbox_rewind_frame`, 0 from a seek until it is. See [A seek over frames](#a-seek-over-frames) |
+| `coilbox_rewind_hidden` | how many bursts of held shots the player has hidden since it started. See [Hidden bursts](#hidden-bursts) |
 
 A parameter is set when the player is made, before the first frame, and again whenever its value changes. A message changes them as it arrives, so a widget sees a seek's frame before the world has moved to it. The world moves on the next simulation frame, and for a seek that needs a lot made or removed, on several. `coilbox_rewind_settled` is 0 from the seek's message until the last of them.
 
@@ -323,6 +324,7 @@ A row names the calls (`calls`), the feature that hangs on them (`feature`), how
 | `rebuild` (behaviour) | `Spring.GetUnitIsStunned` | no | a building seeked back to its construction can show as finished | construction after a seek |
 | `shots` | `Spring.SpawnProjectile`, `SetProjectileMoveControl`, `SetProjectileDamages`, `SetProjectilePosition`, `SetProjectileVelocity`, `GetProjectileTimeToLive`, `GetProjectileDirection`, `DeleteProjectile`, `GetGroundHeight`, `Game.armorTypes` | no | the projectiles stage does nothing | shots |
 | `shotHandover` | `Spring.SetProjectileTimeToLive`, from `2025.03.9` | no | `Projectiles:release` keeps the shot under move control for the engine's one look | nothing |
+| `hiddenBursts` | `Script.SetWatchExplosion` | no | a held shot the engine ends shows its burst | hiding the burst of a shot the engine ends while it is held |
 | `sound` | `Spring.PlaySoundFile`, `Game.gameSpeed` | no | weapons fire without a sound | nothing |
 | `resources` | `Spring.SetTeamResource`, `SetTeamShareLevel` | no | what each team holds, its storage and its share level are the playback's own | team resources |
 | `resourceRates` | `Spring.GetGameFrame`, `GetTeamResources`, `GetTeamInfo`, `AddTeamResource`, `UseTeamResource` | no | each team's income, expense and pull are the playback's own | team income and expense |
@@ -616,6 +618,20 @@ What letting go means depends on the kind and on the engine:
 
 Only a rocket and a laser bolt have been let go in a real engine. The other kinds are read from the engine source and run on the stand-in.
 
+#### Hidden bursts
+
+Whatever keeps a held shot clear of what it would hit, the playback's world is the match's only to within the track's precision, and a game has wrecks, collision volumes and units in states the track does not hold. So the player hides the burst of any shot it holds that the engine ends. The match landed a shot only on its last frame, where the stage lets it go, so a held shot's burst is never one the match had, at any speed, in either direction, paused or after a seek.
+
+The stage asks to hear of the bursts of every weapon it holds shots of, with `Script.SetWatchExplosion`. The engine then calls the gadget's `Explosion` before it shows a burst, and draws none of the burst's effect when the answer is true (`CGameHelper::Explosion` in `rts/Game/GameHelper.cpp`, `CLuaHandle::Explosion` in `rts/Lua/LuaHandle.cpp`). The answer is true for a projectile the stage holds and false for one it let go. The count is published as `coilbox_rewind_hidden`.
+
+What a hidden burst still does, read in the same function:
+
+- Its weapon's hit sound plays. The engine plays it whatever the answer.
+- A widget that answers `ShockFront` hears of it, which is how a game shakes the view.
+- The game's own gadgets that the game's handler asks before the player hear of it. The engine stops asking once a synced gadget answers true, so the unsynced handlers and widgets that come after do not.
+- It reaches the units and features round it for no damage, as a shot let go does (see [No damage](#no-damage)). It leaves no scar on the ground, since the engine draws none for less than 5 damage.
+- The shot is gone from the air until the next seek, turn or window, as for any shot the engine ends.
+
 #### Fired once
 
 A beam cannot be steered, so it is fired once as play passes its first frame going forward, from where the track has it to where its velocity says it ends, for the frames the track has it divided by the speed of play. The engine fades it. At 4x and over only the beams born on the last frame of each step are fired, which is as many a frame as the match had. A seek and play backward fire none, so a beam is not among what is in the air when paused. The whole match below has no beam, so this has only run on the stand-in.
@@ -642,8 +658,12 @@ Nobody has heard it. The headless engine has no sound and the runs with a window
 #### What is not there
 
 - A weapon the game does not have, or one of a kind that makes no projectile, is logged once by name and its shots are left out.
-- The engine can still end a held shot, when the playback's world is not the match's. The stage notices, because a projectile it holds has a time to live nothing else has, logs the first, and does not make the shot again until a seek, a turn or the next window. The engine tells Lua of a projectile's death only for weapons a gadget has asked to watch, a list the base game's gadgets change, so the stage asks and does not listen. In the whole match below the engine ended none.
+- The engine can still end a held shot, when the playback's world is not the match's. The stage notices, because a projectile it holds has a time to live nothing else has, logs the first, hides its burst (see [Hidden bursts](#hidden-bursts)) and does not make the shot again until a seek, a turn or the next window. The engine tells Lua of a projectile's death only for weapons a gadget has asked to watch, a list the base game's gadgets change, so the stage asks and does not listen. In the whole match below the engine ended none.
 - A shot the engine has been handed, or has ended, is not in the air for the rest of its frames. Pause while a bolt fades and it finishes fading.
+- A flame lands only if it hits a unit or a feature. One that reaches the end of its life goes with no impact, and one that touches the ground slides along it (`CFlameProjectile`). The track cannot tell those ends from a hit, so the driver counts the flames with no impact apart. Two flames of `cormaw_dmaw` in the Beyond All Reason match ended with no impact in the playback, and a probe gadget in the recording showed they did not land in the match either: no unit or feature was damaged by them, and none was within 80 elmos of their end.
+- A unit's state that changes its collision volume is not in the track. Beyond All Reason's `cormaw` turret was open in the match and is closed in playback, so a rocket that hit it flies over (issue #4040).
+- A unit that dies with its death effect stays in the world, and can be hit, while its death script runs, for the same number of engine frames at any speed. At 2x that is twice as long in the match's frames, and a rocket made beside a dying unit in the Beyond All Reason match was ended inside it. Its burst is hidden, and it is missing from the air and does not land where it did (issue #4041).
+- The track has one place for a feature. A wreck of the Beyond All Reason match had moved 15.9 elmos from where it was made, and at 32x a shell held where the wreck was made was ended by it, which now shows no burst (issue #4044).
 
 ### The slow frame line
 

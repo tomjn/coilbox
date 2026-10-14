@@ -496,6 +496,14 @@ function M.new(options)
 	world.callInUpdates = 0
 	local Script = {}
 
+	-- The weapons whose bursts the gadget is asked about (Script.SetWatchExplosion,
+	-- and CLuaHandle::Explosion in rts/Lua/LuaHandle.cpp).
+	world.watchedExplosions = {}
+
+	function Script.SetWatchExplosion(weaponDefID, watch)
+		world.watchedExplosions[weaponDefID] = watch == true or nil
+	end
+
 	function Script.UpdateCallIn(name)
 		world.callInUpdates = world.callInUpdates + 1
 		world.callIns[name] = type(world.handlerGlobals[name]) == "function"
@@ -1249,8 +1257,15 @@ function M.new(options)
 		return true
 	end
 
-	--- An explosion at a place, as CWeaponProjectile::Explode makes one.
+	--- An explosion at a place, as CWeaponProjectile::Explode makes one. For a
+	-- watched weapon the gadget's Explosion is asked first, and true hides the
+	-- burst's effect (CGameHelper::Explosion). `hidden` is that answer.
 	local function explode(found, x, y, z, why)
+		local hidden = false
+		local gadget = world.gadget
+		if world.watchedExplosions[found.def.id] and gadget and gadget.Explosion then
+			hidden = gadget:Explosion(found.def.id, x, y, z, found.owner, found.id) == true
+		end
 		local n = #world.explosions + 1
 		local worst = 0
 		for armor = 0, world.armorTypes - 1 do
@@ -1263,6 +1278,7 @@ function M.new(options)
 			y = y,
 			z = z,
 			why = why,
+			hidden = hidden,
 			damage = worst,
 			crater = found.damages.craterMult > 0,
 			impulse = found.damages.impulseFactor ~= 0 or found.damages.impulseBoost ~= 0,

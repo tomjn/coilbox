@@ -244,6 +244,17 @@ local function param(name)
 	return Spring.GetGameRulesParam(PARAM .. name)
 end
 
+--- The bursts the player hid (issue #4026). The game's handler asks the player
+-- before the driver, and stops at the player's true, so the driver's own count
+-- is of the bursts that were shown.
+local function hiddenImpacts()
+	return param("hidden") or 0
+end
+
+local function shownImpacts()
+	return impactCount
+end
+
 -- Every row of the track's terrain, by corner: `groundRows[z][x]` is a list of
 -- a frame and the height after it, in the order the track has them. It is made
 -- the first time it is asked for. Reading every window's terrain for each
@@ -816,7 +827,7 @@ local function shotPlan(asked)
 	push("wait", 150)
 	push("run", function()
 		measureShots("held", busiest, held, shots)
-		say("impacts paused=" .. impactCount)
+		say("impacts paused=" .. shownImpacts() .. " hidden=" .. hiddenImpacts())
 	end)
 
 	-- 2. Twenty seeks to frames with shots in the air, in an order that goes
@@ -835,7 +846,7 @@ local function shotPlan(asked)
 		end)
 	end
 	push("run", function()
-		say("impacts seeks=" .. impactCount)
+		say("impacts seeks=" .. shownImpacts() .. " hidden=" .. hiddenImpacts())
 	end)
 
 	-- 3. Backward, one shot frame by frame: how far it is from where the track
@@ -885,7 +896,7 @@ local function shotPlan(asked)
 	end)
 	send("pause")
 	push("run", function()
-		say(string.format("backward serial=%d weapon=%s frames=%d seen=%d falls=%d rises=%d place=%.4f shown=%s first=%d impacts=%d", longest.serial, info.weaponDefs[longest.weapon], flight, seen, falls, rises, worst, tostring(param("frame")), longest.first, impactCount))
+		say(string.format("backward serial=%d weapon=%s frames=%d seen=%d falls=%d rises=%d place=%.4f shown=%s first=%d impacts=%d", longest.serial, info.weaponDefs[longest.weapon], flight, seen, falls, rises, worst, tostring(param("frame")), longest.first, shownImpacts()))
 	end)
 
 	-- 4. The fight watched forward at the match's own speed, then at 4x, then
@@ -894,10 +905,11 @@ local function shotPlan(asked)
 	local from = math.max(first, fightStart - 5)
 	local to = math.min(last, from + math.ceil((fightEnd + 30 - from) / 4) * 4)
 	local function watch(label, speed, direction)
-		local before
+		local before, hiddenBefore
 		seekTo(direction == 1 and from or to)
 		push("run", function()
 			before = impactCount
+			hiddenBefore = hiddenImpacts()
 			rawDamage, doneDamage = 0, 0
 			featureShotDamage, featureOtherDamage = 0, 0
 		end)
@@ -948,6 +960,7 @@ local function shotPlan(asked)
 				end
 			end
 			local landed = impactCount - before
+			local hidden = hiddenImpacts() - hiddenBefore
 			-- A flame that reaches the end of its life goes with no impact, and one
 			-- that touches the ground only slides along it (CFlameProjectile), so a
 			-- flame's end in the track can be a landing or not. The ones with no
@@ -1005,7 +1018,7 @@ local function shotPlan(asked)
 					say(string.format("stray %s weapon=%s frame=%s at=%.1f,%.1f,%.1f ground=%.1f near=%s", label, info.weaponDefs[shotWeapons[hit.def]], tostring(hit.frame), hit.x, hit.y, hit.z, hit.ground, near))
 				end
 			end
-			say(string.format("watched %s speed=%s direction=%d from=%d to=%d shots_ended=%d flames_unlanded=%d impacts=%d unmatched=%d off_mean=%.3f off_worst=%.3f craters=%d raw_damage=%d done_damage=%d feature_damage=%d feature_hits_by_deaths=%d feature_damage_by_deaths=%d in_air_after=%d", label, tostring(speed), direction, from, to, ended, unlandedFlames, landed, late, total / math.max(landed - late, 1), worstOff, craters, rawDamage, doneDamage, featureShotDamage, featureOtherDamage, featureDoneDamage, #airborne()))
+			say(string.format("watched %s speed=%s direction=%d from=%d to=%d shots_ended=%d flames_unlanded=%d impacts=%d hidden=%d unmatched=%d off_mean=%.3f off_worst=%.3f craters=%d raw_damage=%d done_damage=%d feature_damage=%d feature_hits_by_deaths=%d feature_damage_by_deaths=%d in_air_after=%d", label, tostring(speed), direction, from, to, ended, unlandedFlames, landed, hidden, late, total / math.max(landed - late, 1), worstOff, craters, rawDamage, doneDamage, featureShotDamage, featureOtherDamage, featureDoneDamage, #airborne()))
 			measure("after_" .. label, param("frame"))
 		end)
 	end

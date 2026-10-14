@@ -285,6 +285,12 @@ if gadgetHandler:IsSyncedCode() then
 		end
 	end
 
+	-- True hides a burst of a shot the player holds (issue #4026). The engine
+	-- asks only for the weapons the projectiles stage watches.
+	function gadget:Explosion(_, _, _, _, _, projectileID)
+		return player ~= nil and player:explosion(projectileID)
+	end
+
 	-- The work at the end of a frame is timed as well, with phases 2 and 3, and
 	-- the unsynced half adds it to the frame's.
 	function gadget:GameFramePost(frame)

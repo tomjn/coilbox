@@ -3287,7 +3287,8 @@ end
     /// - Paused, held and at every seek the engine has as many of the track's
     ///   shots in the air as the track, each where the track has it and
     ///   pointing the way the track has it going.
-    /// - Nothing lands while paused, during a seek, at 4x or backward.
+    /// - Nothing lands where it can be seen while paused, during a seek, at 4x
+    ///   or backward. A burst of a held shot is hidden by the player.
     /// - Backward, the shot is nearer where it was fired on every frame.
     /// - Forward at 1x and 0.5x every shot that ends lands once, but for a
     ///   flame with no impact, which the line counts apart since a flame can
@@ -3416,8 +3417,10 @@ end
             number(double, "impacts") <= number(double, "shots_ended"),
             "{double}"
         );
+        // A burst the player hid is not shown (issue #4026).
         for label in ["fast", "backward"] {
-            assert_eq!(field(harmless(label), "impacts"), "0");
+            let l = harmless(label);
+            assert_eq!(number(l, "impacts"), number(l, "hidden"), "{l}");
         }
 
         // A unit that dies in the fight explodes with the game's effect. The

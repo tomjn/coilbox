@@ -127,6 +127,17 @@ function M.new(context, units, clock, terrain)
 		end
 	end
 
+	-- The engine asks the gadget before it shows a burst of a weapon it watches,
+	-- and shows none when the answer is true (CGameHelper::Explosion). Only a
+	-- shot that is held is in the air for longer than one frame of its own.
+	if on.hiddenBursts then
+		for i = 1, #names do
+			if defID[i] and not beam[i] then
+				context.Script.SetWatchExplosion(defID[i], true)
+			end
+		end
+	end
+
 	-- Every armour type's damage, and what makes a crater and a push. The table
 	-- form of `Spring.SetProjectileDamages` takes string keys only, and reads one
 	-- that is a number as an armour type.
@@ -226,6 +237,16 @@ function Projectiles:forget(serial, id)
 	self.stamp[serial] = nil
 	self.flown[serial] = nil
 	self.ownerless[serial] = nil
+end
+
+--- Whether to hide the burst of the engine's projectile `id`. A shot the stage
+-- holds that the engine ends has met something the match's did not, whatever
+-- the speed or the way of play, since the match landed it only on its last
+-- frame, where the stage lets it go. The burst still makes its sound, and the
+-- shot is gone from the air until the next seek, turn or window (issue #4026).
+function Projectiles:explosion(id)
+	local serial = self.serialOf[id]
+	return serial ~= nil and self.state[serial] == HELD
 end
 
 --- Whether the engine's projectile `id` is still the one created for `serial`.
