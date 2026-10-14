@@ -638,10 +638,13 @@ do
 	w.gadget = gadget
 	gadget:Initialize()
 	gadget:GameFrame(1)
-	t.same("the frame that shows a seek asks for no effect", #arrived(w), 0)
+	t.same("the first frame of a playback asks for no effect", #arrived(w), 0)
 	settle(gadget, w, 2)
+	t.same("nor do the frames that settle it", #arrived(w), 0)
+	gadget:RecvLuaMsg("coilbox_rewind:seek 800", 0)
+	settle(gadget, w, 3)
 	local asked = arrived(w)
-	t.same("the two units made in the frames after it are asked for", #asked, 2)
+	t.check("a jump asks for the units it makes", #asked > 0, #asked)
 	local id, x, y, z, team = asked[1]:match("^arrive (%S+) (%S+) (%S+) (%S+) (%S+)$")
 	local unit = w.units[tonumber(id)]
 	t.check("each with its id, a place and its team", unit ~= nil and tonumber(x) and tonumber(y) and tonumber(z) and tonumber(team) == unit.team, asked[1])
@@ -664,8 +667,7 @@ end
 do
 	local lines, clock = {}, { now = 0 }
 	local gadget, _, e = unsynced(PLAYER, lines, clock)
-	e.radius[104] = 25
-	e.colours[1] = { 0, 1, 0 }
+	e.units[104] = { x = 500, y = 10, z = 700, mx = 500, my = 22, mz = 700, radius = 25, team = 1 }
 	t.same("the unsynced half has a world draw", type(gadget.DrawWorld), "function")
 	gadget:DrawWorld()
 	t.same("which draws nothing while no unit arrives", e.vertices, 0)
@@ -675,7 +677,7 @@ do
 	t.check("and draws its effect", e.vertices > 0, e.vertices)
 	t.check("round the unit", e.box.x1 < 500 and e.box.x2 > 500 and e.box.z1 < 700 and e.box.z2 > 700)
 	local sum = e.colourSum
-	t.check("in the team's colour", sum[2] > sum[1] and sum[2] > sum[3], table.concat(sum, " "))
+	t.check("in white", sum[1] == sum[2] and sum[2] == sum[3], table.concat(sum, " "))
 	e.clear()
 	clock.now = clock.now + 5000
 	gadget:DrawWorld()
@@ -727,7 +729,7 @@ do
 	-- With no timer the effect has no clock.
 	local lines2, clock2 = {}, { now = 0, without = { GetTimer = true } }
 	local blind, _, e2 = unsynced(PLAYER, lines2, clock2)
-	e2.radius[104] = 25
+	e2.units[104] = { x = 500, y = 10, z = 700, mx = 500, my = 22, mz = 700, radius = 25, team = 1 }
 	t.same("without a timer an arrival is still taken", blind:RecvFromSynced("coilbox_rewind_arrive", 104, 500, 10, 700, 1), true)
 	-- The world is still drawn, for the stream of build particles, which
 	-- takes its time from the track and needs no timer.

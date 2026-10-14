@@ -1,17 +1,24 @@
--- Coilbox rewind player: the effect where a unit arrives (issue #4009).
+-- Coilbox rewind player: the effect where a unit arrives (issues #4009 and
+-- #4051).
 --
--- A seek in a large match takes many frames to show, and each unit would pop
--- into place. The player asks for an effect for each unit a slow seek makes in
--- view, and the unsynced half of the gadget draws it here: a column of light
--- that fades, a ring on the ground that closes on the unit, and dots in the
--- team's colour that fall into it. It is drawn beside the unit and never
--- touches how the unit itself is drawn, which a game does in its own way.
+-- A jump to another time makes the units of that time, and each would pop into
+-- place. The player asks for an effect for each unit a jump makes in view, and
+-- the unsynced half of the gadget draws it here as the transporter beam of
+-- Stargate: a small white orb appears at the unit, grows over 0.25 seconds
+-- until it covers the unit, then goes up fast over 0.1 seconds and turns from
+-- opaque to clear, travelling at least its own size in that time. The unit
+-- stands under it all along. The two times are the design (issue #4051) and the
+-- rest of the shape is a choice of how it looks. It is drawn beside the unit
+-- and never touches how the unit itself is drawn, which a game does in its own
+-- way.
 --
 -- It is drawn with gl.BeginEnd, gl.Vertex and gl.Color, with no texture, no
--- shader and nothing from the game, so it is the same in every game. All of
--- those are in the engine at 105.0 and at 2026.07.04. A game's adapter can
--- show the game's own effect instead (the `unitPlaced` hook), and the player
--- then asks for none.
+-- shader and nothing from the game, so it is the same in every game. The orb is
+-- a disc that faces the camera, as rings of quads whose colour runs from opaque
+-- at the middle to clear at the edge, which is the glow. All of those calls are
+-- in the engine at 105.0 and at 2026.07.04. A game's adapter can show the
+-- game's own effect instead (the `unitPlaced` hook), and the player then asks
+-- for none.
 --
 -- An effect is a row in lists made once, and a draw allocates nothing. No more
 -- than `M.MOST` are alive at once, and a unit that arrives past that has none.
@@ -21,146 +28,89 @@
 
 local M = {}
 
---- How long an effect lasts, in seconds. A choice, not a measurement: long
--- enough to be seen and short next to the seconds a large seek takes.
-M.LIFE = 0.9
+--- How long the orb grows, and how long it takes to rise and clear, in
+-- seconds. The design of issue #4051.
+M.GROW = 0.25
+M.FADE = 0.1
 
---- The most effects alive at once. A draw of 256 took 3.6 ms in an engine with
--- a window, which is what this allows a drawn frame at the worst.
--- lua/rewind-player/README.md has the figures.
+--- How long an effect lasts, in seconds.
+M.LIFE = M.GROW + M.FADE
+
+--- The most effects alive at once. The cost of a draw is in
+-- lua/rewind-player/README.md, which is what this allows a drawn frame at the
+-- worst.
 M.MOST = 256
 
---- How far from the unit an effect reaches, in the unit's radius.
-M.REACH = 2.5
-
---- The widest the ring's line is, in elmos, which is its width round a unit
--- of no size at all. A test adds it to the reach.
-M.LINE = 2
-
--- The shape, in the unit's radius. All of these are choices of how it looks.
-local BEAM_HEIGHT = 2.4
-local BEAM_WIDTH = 0.3
-local RING_FROM, RING_TO = 1.3, 0.85
--- The ring's line and half the side of a dot, in elmos: a part that every unit
--- has and a part that grows with the unit, so that a small unit's can still be
--- seen and a large one's are not slabs.
-local RING_BAND = 0.06
-local RING_LIFT = 0.1
-local DOT_FROM = 1.25
-local DOT_HEIGHT = 1.4
-local DOT_SIZE, DOT_GROWS = 1.5, 0.02
-
--- The ring is SEGMENTS quads, and DOTS dots fall in.
-local SEGMENTS = 24
-local DOTS = 16
+-- The shape. All of these are set by eye, none is measured or designed.
+--
+-- The orb's size, in the unit's radius: where it starts and where it ends.
+-- `COVER` is wide enough that the opaque part, which is `CORE` of the orb, is as
+-- wide as the unit.
+M.START = 0.15
+M.COVER = 1.5
+M.CORE = 0.7
+-- How far the orb rises, in its own radius. Two is its own size.
+M.RISE = 2.4
+-- Where the glow's bands end, in the orb's radius, and how opaque it is at the
+-- inner and outer edge of each. The middle band bends the fall off.
+local EDGES = { 0, M.CORE, 0.86, 1 }
+local ALPHAS = { 1, 1, 0.5, 0 }
+local BANDS = 3
+-- The disc is this many quads round.
+local SEGMENTS = 20
 
 local cos, sin, sqrt, pi = math.cos, math.sin, math.sqrt, math.pi
 
-local RING_COS, RING_SIN = {}, {}
+local DISC_COS, DISC_SIN = {}, {}
 for k = 0, SEGMENTS do
-	RING_COS[k] = cos(k / SEGMENTS * 2 * pi)
-	RING_SIN[k] = sin(k / SEGMENTS * 2 * pi)
-end
-
--- Where each dot starts round the unit, how high, how far out and how bright,
--- spread by the golden angle so that no two fall together.
-local DOT_COS, DOT_SIN, DOT_HIGH, DOT_OUT, DOT_SHADE = {}, {}, {}, {}, {}
-for k = 1, DOTS do
-	local angle = k * 2.399963
-	DOT_COS[k], DOT_SIN[k] = cos(angle), sin(angle)
-	DOT_HIGH[k] = (k * 0.618034) % 1
-	DOT_OUT[k] = 0.35 + 0.65 * ((k * 0.381966) % 1)
-	DOT_SHADE[k] = 0.8 + 0.35 * ((k * 0.754877) % 1)
+	DISC_COS[k] = cos(k / SEGMENTS * 2 * pi)
+	DISC_SIN[k] = sin(k / SEGMENTS * 2 * pi)
 end
 
 local Arrival = {}
 Arrival.__index = Arrival
 
---- The light of every effect: the column and the ring. Called inside
--- gl.BeginEnd for quads, with the camera's right as `rx, rz`.
-local function glow(self, now, rx, rz)
+--- The orbs of every effect, called inside gl.BeginEnd for quads. The camera's
+-- right is `rx, rz` (level with the ground), its up is `ux, uy, uz` and the way
+-- it looks is `dx, dy, dz`.
+local function orbs(self, now, rx, rz, ux, uy, uz, dx, dy, dz)
 	local gl = self.gl
 	local Color, Vertex = gl.Color, gl.Vertex
 	local xs, ys, zs, radii, born = self.x, self.y, self.z, self.radius, self.born
-	local reds, greens, blues = self.red, self.green, self.blue
+	local grow, fade, start, cover, rise = M.GROW, M.FADE, M.START, M.COVER, M.RISE
 	for i = 1, self.count do
-		local p = (now - born[i]) / M.LIFE
-		local x, y, z, radius = xs[i], ys[i], zs[i], radii[i]
-		-- Lightened, so that a dark team colour still shows.
-		local r, g, b = 0.5 + 0.5 * reds[i], 0.5 + 0.5 * greens[i], 0.5 + 0.5 * blues[i]
-
-		-- The column: widest and brightest as the unit appears, clear at its top
-		-- and at both sides, so that it has no edge.
-		local fade = (1 - p) * (1 - p)
-		local half = radius * BEAM_WIDTH * (0.3 + 0.7 * (1 - p))
-		local top = y + radius * BEAM_HEIGHT
-		local core = 0.9 * fade
-		Color(r, g, b, 0)
-		Vertex(x - rx * half, y, z - rz * half)
-		Color(1, 1, 1, core)
-		Vertex(x, y, z)
-		Color(r, g, b, 0)
-		Vertex(x, top, z)
-		Vertex(x - rx * half, top, z - rz * half)
-		Color(1, 1, 1, core)
-		Vertex(x, y, z)
-		Color(r, g, b, 0)
-		Vertex(x + rx * half, y, z + rz * half)
-		Vertex(x + rx * half, top, z + rz * half)
-		Vertex(x, top, z)
-
-		-- The ring: it closes on the unit, quickly at first, and is clear at
-		-- its outer edge.
-		local closed = 1 - (1 - p) * (1 - p)
-		local inner = radius * (RING_FROM + (RING_TO - RING_FROM) * closed)
-		local outer = inner + M.LINE + radius * RING_BAND
-		local alpha = 0.9 * (1 - p) * (p < 0.15 and p / 0.15 or 1)
-		local ground = y + radius * RING_LIFT
-		for k = 0, SEGMENTS - 1 do
-			local c1, s1, c2, s2 = RING_COS[k], RING_SIN[k], RING_COS[k + 1], RING_SIN[k + 1]
-			Color(r, g, b, alpha)
-			Vertex(x + c1 * inner, ground, z + s1 * inner)
-			Vertex(x + c2 * inner, ground, z + s2 * inner)
-			Color(r, g, b, 0)
-			Vertex(x + c2 * outer, ground, z + s2 * outer)
-			Vertex(x + c1 * outer, ground, z + s1 * outer)
+		local seconds = now - born[i]
+		local radius = radii[i]
+		local size, alpha, lift
+		if seconds < grow then
+			-- Quick at first, slowing as it reaches the unit's size.
+			local left = 1 - seconds / grow
+			size = radius * (start + (cover - start) * (1 - left * left))
+			alpha, lift = 1, 0
+		else
+			local gone = (seconds - grow) / fade
+			size = radius * cover
+			alpha, lift = 1 - gone, gone * rise * size
 		end
-	end
-end
-
---- The dots of every effect, which fall into the unit. Each is a square that
--- faces the camera, whose right is `rx, rz` and whose up is `ux, uy, uz`.
-local function dots(self, now, rx, rz, ux, uy, uz)
-	local gl = self.gl
-	local Color, Vertex = gl.Color, gl.Vertex
-	local xs, ys, zs, radii, born = self.x, self.y, self.z, self.radius, self.born
-	local reds, greens, blues = self.red, self.green, self.blue
-	local turnCos, turnSin = self.turnCos, self.turnSin
-	for i = 1, self.count do
-		local p = (now - born[i]) / M.LIFE
-		local x, y, z, radius = xs[i], ys[i], zs[i], radii[i]
-		local r, g, b = reds[i], greens[i], blues[i]
-		local tc, ts = turnCos[i], turnSin[i]
-		local left = 1 - p
-		local out = radius * DOT_FROM * left * sqrt(left)
-		local size = (DOT_SIZE + radius * DOT_GROWS) * (0.5 + 0.5 * left)
-		local alpha = p < 0.7 and 1 or (1 - p) / 0.3
-		local sx, sz, tx, ty, tz = rx * size, rz * size, ux * size, uy * size, uz * size
-		for k = 1, DOTS do
-			-- Each effect is turned by its own angle, so two side by side differ.
-			local c = DOT_COS[k] * tc - DOT_SIN[k] * ts
-			local s = DOT_SIN[k] * tc + DOT_COS[k] * ts
-			local reach = out * DOT_OUT[k] + radius * 0.15
-			local dx = x + c * reach
-			local dy = y + radius * (0.3 + DOT_HEIGHT * DOT_HIGH[k] * left)
-			local dz = z + s * reach
-			local shade = DOT_SHADE[k]
-			local red, green, blue = r * shade, g * shade, b * shade
-			Color(red < 1 and red or 1, green < 1 and green or 1, blue < 1 and blue or 1, alpha)
-			Vertex(dx - sx - tx, dy - ty, dz - sz - tz)
-			Vertex(dx + sx - tx, dy - ty, dz + sz - tz)
-			Vertex(dx + sx + tx, dy + ty, dz + sz + tz)
-			Vertex(dx - sx + tx, dy + ty, dz - sz + tz)
+		-- Nearer the camera than the unit by its radius, so that the depth test
+		-- does not hide the orb behind the unit it covers.
+		local cx = xs[i] - dx * radius
+		local cy = ys[i] + lift - dy * radius
+		local cz = zs[i] - dz * radius
+		local rightX, rightZ = rx * size, rz * size
+		local upX, upY, upZ = ux * size, uy * size, uz * size
+		for band = 1, BANDS do
+			local inner, outer = EDGES[band], EDGES[band + 1]
+			local a0, a1 = ALPHAS[band] * alpha, ALPHAS[band + 1] * alpha
+			for k = 0, SEGMENTS - 1 do
+				local c1, s1, c2, s2 = DISC_COS[k], DISC_SIN[k], DISC_COS[k + 1], DISC_SIN[k + 1]
+				Color(1, 1, 1, a0)
+				Vertex(cx + (rightX * c1 + upX * s1) * inner, cy + upY * s1 * inner, cz + (rightZ * c1 + upZ * s1) * inner)
+				Vertex(cx + (rightX * c2 + upX * s2) * inner, cy + upY * s2 * inner, cz + (rightZ * c2 + upZ * s2) * inner)
+				Color(1, 1, 1, a1)
+				Vertex(cx + (rightX * c2 + upX * s2) * outer, cy + upY * s2 * outer, cz + (rightZ * c2 + upZ * s2) * outer)
+				Vertex(cx + (rightX * c1 + upX * s1) * outer, cy + upY * s1 * outer, cz + (rightZ * c1 + upZ * s1) * outer)
+			end
 		end
 	end
 end
@@ -179,18 +129,14 @@ function M.new(engine)
 		y = {},
 		z = {},
 		radius = {},
-		red = {},
-		green = {},
-		blue = {},
 		born = {},
-		turnCos = {},
-		turnSin = {},
 	}, Arrival)
 end
 
 --- A unit arrived at `x, y, z`. Past the most at once it gets no effect, and
--- neither does a unit the engine cannot give the size of.
-function Arrival:add(unitID, x, y, z, team)
+-- neither does a unit the engine cannot give the size or the middle of. The
+-- orb is round the unit's middle, which is `lift` above its base.
+function Arrival:add(unitID, x, y, z)
 	local i = self.count + 1
 	if i > M.MOST then
 		return
@@ -200,24 +146,21 @@ function Arrival:add(unitID, x, y, z, team)
 	if not radius then
 		return
 	end
-	local r, g, b = Spring.GetTeamColor(team)
-	if not r then
-		r, g, b = 0.8, 0.9, 1
+	local _, baseY, _, _, middleY = Spring.GetUnitPosition(unitID, true)
+	if not middleY then
+		return
 	end
 	self.count = i
-	self.x[i], self.y[i], self.z[i], self.radius[i] = x, y, z, radius
-	self.red[i], self.green[i], self.blue[i] = r, g, b
+	self.x[i], self.y[i] = x, y + (middleY - baseY)
+	self.z[i], self.radius[i] = z, radius
 	self.born[i] = self.seconds()
-	self.turnCos[i], self.turnSin[i] = cos(unitID), sin(unitID)
 end
 
 --- Takes effect `i` out by putting the last in its place.
 local function drop(self, i)
 	local n = self.count
 	self.x[i], self.y[i], self.z[i], self.radius[i] = self.x[n], self.y[n], self.z[n], self.radius[n]
-	self.red[i], self.green[i], self.blue[i] = self.red[n], self.green[n], self.blue[n]
 	self.born[i] = self.born[n]
-	self.turnCos[i], self.turnSin[i] = self.turnCos[n], self.turnSin[n]
 	self.count = n - 1
 end
 
@@ -257,11 +200,9 @@ function Arrival:draw()
 	gl.Texture(false)
 	gl.DepthTest(true)
 	gl.DepthMask(false)
-	-- Light adds to what is behind it. The dots cover it.
-	gl.Blending(GL.SRC_ALPHA, GL.ONE)
-	gl.BeginEnd(GL.QUADS, glow, self, now, rx, rz)
+	-- The orb covers what is behind it where it is opaque.
 	gl.Blending(GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA)
-	gl.BeginEnd(GL.QUADS, dots, self, now, rx, rz, ux, uy, uz)
+	gl.BeginEnd(GL.QUADS, orbs, self, now, rx, rz, ux, uy, uz, dx, dy, dz)
 	gl.DepthMask(true)
 	gl.Color(1, 1, 1, 1)
 end

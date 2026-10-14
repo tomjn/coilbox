@@ -51,6 +51,8 @@ function M.new(first, last)
 		-- Whether the timeline's knob is being dragged, which sends many seeks a
 		-- second (issue #4009).
 		dragging = false,
+		-- Whether a drag has ended that the units stage has not yet looked at.
+		dragEnded = false,
 	}, Clock)
 end
 
@@ -196,10 +198,14 @@ function COMMANDS.direction(clock, argument)
 end
 
 --- The timeline says its knob is being dragged, or has been let go. It moves
--- nothing. The units stage shows no arrival effect while it lasts.
+-- nothing. The units stage shows no arrival effect while it lasts, and shows
+-- one for what the drag made when it ends.
 function COMMANDS.drag(clock, argument)
 	if argument ~= "1" and argument ~= "0" then
 		return false, "drag is 1 or 0, and got \"" .. argument .. "\""
+	end
+	if clock.dragging and argument == "0" then
+		clock.dragEnded = true
 	end
 	clock.dragging = argument == "1"
 	return true

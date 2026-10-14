@@ -527,20 +527,21 @@ M.UNSYNCED = {
 			"GL.ONE_MINUS_SRC_ALPHA",
 			"Spring.GetCameraDirection",
 			"Spring.GetUnitRadius",
-			"Spring.GetTeamColor",
+			"Spring.GetUnitPosition",
 		},
 		how = "presence",
 		used = "coilbox_player_arrival.lua",
 		required = false,
 		since = "105.0",
-		without = "A unit that a slow seek makes appears with no effect",
+		without = "A unit that a jump makes appears with no effect",
 		visible = false,
 	},
 	{
 		id = "buildStream",
 		feature = "the stream of build particles",
-		-- The drawing calls it shares with the arrival effect are in that row,
-		-- and the stream is off without them too.
+		-- The drawing calls it shares with the arrival effect, and
+		-- Spring.GetUnitPosition, are in that row, and the stream is off without
+		-- them too.
 		calls = {
 			"gl.TexCoord",
 			"Spring.GetGameRulesParam",
@@ -552,7 +553,7 @@ M.UNSYNCED = {
 			"Spring.GetUnitTeam",
 			"Spring.GetUnitNanoPieces",
 			"Spring.GetUnitPiecePosDir",
-			"Spring.GetUnitPosition",
+			"Spring.GetTeamColor",
 			"Spring.GetFeaturePosition",
 			"Spring.GetFeatureRadius",
 			"Game.maxUnits",

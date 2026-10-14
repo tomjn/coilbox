@@ -35,12 +35,15 @@
 -- the window changes, and never in a frame of play. With no view the order is
 -- the window's list.
 --
--- A unit that a slow seek makes gets a short effect where it appears (issue
--- #4009). The stage only says which: a unit made in a later frame than the one
--- that showed the seek, while the seek's units are still arriving, inside the
--- view's corners, and not while the timeline's knob is being dragged. It asks
--- with `context.arrive`, and the gadget's unsynced half draws. A seek that is
--- shown in one frame, a removal and a unit that play brings in ask for none.
+-- A unit that a jump makes gets a short effect where it appears (issues #4009
+-- and #4051). The stage only says which: a unit made while a jump's units are
+-- still arriving, in the frame that showed the jump or a later one, inside the
+-- view's corners. It asks with `context.arrive`, and the gadget's unsynced half
+-- draws. A jump is a seek that is not part of a drag, and the start of the
+-- playback is not one. While the timeline's knob is being dragged no unit asks.
+-- When the drag ends, the units it made and left standing in view ask, and so
+-- do the ones the last of its seeks still has to make. A removal and a unit that
+-- plain play brings in ask for none, at any speed in either direction.
 --
 -- The game's adapter can hide a unit definition, which is then never created,
 -- and can ask to be told when a unit is created and put in place (issue #3799).
@@ -177,9 +180,19 @@ function M.new(context, rotation)
 		-- Whether a seek's units are still being made. It is what the view's
 		-- order is for, so that a frame of play never sorts.
 		arriving = false,
-		-- Whether the frame that showed the last seek is over. A unit made after
-		-- it, while the seek's units arrive, is one a viewer saw arrive late.
-		late = false,
+		-- Whether a jump has not been looked at yet by `place`, which decides
+		-- whether its units want an effect.
+		fresh = false,
+		-- Whether the units of the jump that is arriving want an effect. The
+		-- playback's first frame is not a jump the viewer made, and a drag's seeks
+		-- are not jumps until it ends.
+		beam = false,
+		-- Whether any frame has been shown, so that the first is known.
+		shown = false,
+		-- The units a drag made, by serial, with their team and their definition's
+		-- engine id. They are the ones that want an effect when the drag ends.
+		dragMade = {},
+		dragDef = {},
 		-- Where the viewer looks: the camera's place on the ground, and the
 		-- corners of the view on the ground, which `cornered` says are there.
 		-- `viewed` is whether any of it is.
@@ -432,7 +445,7 @@ end
 function Units:resync(t)
 	self.seeking = true
 	self.arriving = true
-	self.late = false
+	self.fresh = true
 	self.orderStale = true
 	local Spring = self.Spring
 	local failed = self.failed
@@ -689,10 +702,16 @@ function Units:put(w, i, serial, unitID, t, clock)
 		if made then
 			local context = self.context
 			local placed, arrive = context.hooks.unitPlaced, context.arrive
-			local effect = self.late and self.arriving and not clock.dragging and arrive ~= nil and self:inView(transform[1], transform[3])
-			local handled = placed and placed(unitID, self.defID[w.unitDef[i] + 1], t, clock, effect)
+			local team = context.teamOf(w.unitTeam[i])
+			local effect = self.beam and arrive ~= nil and self:inView(transform[1], transform[3])
+			local defID = self.defID[w.unitDef[i] + 1]
+			local handled = placed and placed(unitID, defID, t, clock, effect)
 			if effect and not handled then
-				arrive(unitID, transform[1], transform[2], transform[3], context.teamOf(w.unitTeam[i]))
+				arrive(unitID, transform[1], transform[2], transform[3], team)
+			end
+			if clock.dragging then
+				self.dragMade[serial] = team
+				self.dragDef[serial] = defID
 			end
 		end
 	end
@@ -742,6 +761,20 @@ end
 -- budget goes, and puts each one where the track has it. A unit the budget
 -- leaves is made on a later frame, where the track has it then.
 function Units:place(t, clock)
+	if self.fresh then
+		self.fresh = false
+		self.beam = self.shown and not clock.dragging
+		if not clock.dragging then
+			for serial in next, self.dragMade do
+				self.dragMade[serial] = nil
+				self.dragDef[serial] = nil
+			end
+		end
+	end
+	self.shown = true
+	if clock.dragEnded then
+		self:dragEnd(t, clock)
+	end
 	local w = self.window
 	self.unsettled = self.removing
 	if not w then
@@ -795,8 +828,34 @@ function Units:place(t, clock)
 	end
 	if not self.unsettled then
 		self.arriving = false
+		self.beam = false
 	end
-	self.late = true
+end
+
+--- The timeline's knob was let go. The units its seeks made and left standing
+-- in view get the effect now, with the game's own if the hook shows one. The
+-- ones the last seek still has to make get it as they are made.
+function Units:dragEnd(t, clock)
+	clock.dragEnded = false
+	self.beam = self.arriving
+	local Spring, context = self.Spring, self.context
+	local arrive, placed = context.arrive, context.hooks.unitPlaced
+	local unitOf = self.unitOf
+	for serial, team in next, self.dragMade do
+		self.dragMade[serial] = nil
+		local defID = self.dragDef[serial]
+		self.dragDef[serial] = nil
+		local unitID = unitOf[serial]
+		if unitID and arrive ~= nil then
+			local x, y, z = Spring.GetUnitPosition(unitID)
+			if x and self:inView(x, z) then
+				local handled = placed and placed(unitID, defID, t, clock, true)
+				if not handled then
+					arrive(unitID, x, y, z, team)
+				end
+			end
+		end
+	end
 end
 
 return M

@@ -474,7 +474,7 @@ local function unsyncedScene(removed)
 	e.rules.coilbox_rewind_playing = 1
 	e.rules.coilbox_rewind_direction = 1
 	e.rules.coilbox_rewind_speed = 1
-	e.radius[7] = 10
+	e.units[7] = { def = 1, team = 0, x = 0, y = 0, z = 0, mx = 0, my = 5, mz = 0, radius = 10 }
 	local chunk = assert(loadfile(GADGET))
 	setfenv(chunk, env)
 	chunk()

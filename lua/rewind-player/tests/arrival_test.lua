@@ -1,6 +1,6 @@
--- A unit that appears while a slow seek settles gets a short effect (issue
--- #4009). The units stage says which units want one, the gadget hands that to
--- its unsynced half, and the unsynced half draws it.
+-- A unit that a jump makes beams in as an orb (issues #4009 and #4051). The
+-- units stage says which units want one, the gadget hands that to its unsynced
+-- half, and the unsynced half draws it.
 --
 -- The first part checks which units the player asks an effect for. The second
 -- checks the unsynced modules on a stand-in for `Spring` and `gl`: how the view
@@ -77,8 +77,17 @@ local function asked(world)
 	return table.concat(world.asked, " ")
 end
 
--- A slow seek asks for an effect for each unit it makes after the frame that
--- showed it.
+local function sorted(world)
+	local copy = {}
+	for i, x in ipairs(world.asked) do
+		copy[i] = x
+	end
+	table.sort(copy)
+	return table.concat(copy, " ")
+end
+
+-- A jump asks for an effect for each unit it makes, in the frame that shows it
+-- and in the ones after.
 
 do
 	local world, player = setup({ last = 600, units = row(8, 100, 400, 1) }, 3)
@@ -86,11 +95,11 @@ do
 	player:frame()
 	seek(player, 150)
 	player:frame()
-	t.same("the frame that shows a seek asks for no effect, since a seek that fits in it is not slow", asked(world), "")
+	t.same("the frame that shows a jump asks for the units it makes", asked(world), "100 200 300")
 	player:frame()
-	t.same("the next frame asks for one for each unit it makes", asked(world), "400 500 600")
+	t.same("the next frame asks for the ones it makes", asked(world), "100 200 300 400 500 600")
 	player:frame()
-	t.same("and so does the one after", asked(world), "400 500 600 700 800")
+	t.same("and so does the one after", asked(world), "100 200 300 400 500 600 700 800")
 	t.same("settled", world.params[SETTLED], 1)
 	local id
 	for unitID, unit in pairs(world.units) do
@@ -98,12 +107,12 @@ do
 			id = unitID
 		end
 	end
-	t.same("an ask has the unit, where it is and its team", world.askedWith[1], id .. " 400 5 7 1")
+	t.same("an ask has the unit, where it is and its team", world.askedWith[4], id .. " 400 5 7 1")
 	frames(player, 3)
-	t.same("a settled world asks for nothing more", #world.asked, 5)
+	t.same("a settled world asks for nothing more", #world.asked, 8)
 end
 
--- A seek that is shown in one frame asks for none.
+-- A jump that is shown in one frame asks for them too, however fast it is.
 
 do
 	local world, player = setup({ last = 600, units = row(8, 100, 400) })
@@ -112,7 +121,52 @@ do
 	seek(player, 150)
 	frames(player, 3)
 	t.same("every unit is made", world.unitCount(), 8)
-	t.same("a seek that settles in the frame that shows it asks for no effect", asked(world), "")
+	t.same("a jump that settles in the frame that shows it asks for every unit", sorted(world), "100 200 300 400 500 600 700 800")
+	local before = #world.asked
+	seek(player, 160)
+	frames(player, 3)
+	t.same("a jump that makes none asks for none", #world.asked, before)
+	seek(player, 450)
+	frames(player, 3)
+	seek(player, 150)
+	frames(player, 3)
+	t.same("and a jump back that makes them again asks again", #world.asked - before, 8)
+end
+
+-- The first frame of a playback is not a jump the viewer made.
+
+do
+	local world, player = setup({ last = 600, units = row(5, 0, 400) }, 2)
+	frames(player, 6)
+	t.same("every unit is made", world.unitCount(), 5)
+	t.same("the units the playback starts with get no effect", asked(world), "")
+end
+
+-- Jump keys and a wrap from the end are jumps.
+
+do
+	local world, player = setup({ last = 600, units = row(4, 100, 400) })
+	player:message("coilbox_rewind:pause")
+	player:frame()
+	player:message("coilbox_rewind:step 200")
+	frames(player, 2)
+	t.same("a step is a jump", asked(world), "100 200 300 400")
+	world.asked = {}
+	player:message("coilbox_rewind:seek 600")
+	frames(player, 2)
+	t.same("a jump to a time with none removes them and asks for none", asked(world), "")
+end
+
+do
+	local world, player = setup({ last = 600, units = row(4, 0, 100) })
+	player:message("coilbox_rewind:pause")
+	player:frame()
+	seek(player, 600)
+	frames(player, 2)
+	t.same("no unit stands at the end", world.unitCount(), 0)
+	player:message("coilbox_rewind:play")
+	frames(player, 3)
+	t.same("a play from the end starts again from the first frame, which is a jump", sorted(world), "100 200 300 400")
 end
 
 -- Units removed by a seek get none, and neither does plain play.
@@ -139,7 +193,42 @@ do
 	t.same("with no effect", asked(world), "")
 end
 
--- Dragging the timeline's knob asks for none until the drag ends.
+-- Play in either direction at any speed asks for none.
+
+do
+	for _, speed in ipairs({ 0.5, 1, 2, 4, 8, 16, 32 }) do
+		for _, way in ipairs({ 1, -1 }) do
+			-- Units come and go along the track, so that play both makes and removes,
+			-- from either end.
+			local units = {}
+			for i = 1, 30 do
+				units[i] = { first = i * 10, last = i * 10 + 40, at = { i * 100, 0, 0 } }
+				units[30 + i] = { first = 300, last = 520 + i * 2, at = { 3000 + i * 100, 0, 0 } }
+			end
+			local placed = 0
+			local world, player = setup({ last = 600, units = units }, 3, {
+				unitPlaced = function()
+					placed = placed + 1
+				end,
+			})
+			player:message("coilbox_rewind:pause")
+			player:frame()
+			seek(player, way == 1 and 0 or 600)
+			frames(player, 4)
+			world.asked = {}
+			placed = 0
+			player:message("coilbox_rewind:direction " .. way)
+			player:message("coilbox_rewind:speed " .. speed)
+			player:message("coilbox_rewind:play")
+			frames(player, 60)
+			t.check("play at " .. speed .. "x " .. (way == 1 and "forward" or "backward") .. " made units", placed > 0, placed)
+			t.same("and asked for no effect", asked(world), "")
+		end
+	end
+end
+
+-- Dragging the timeline's knob asks for none until the drag ends, and then for
+-- the units the drag made.
 
 do
 	local world, player = setup({ last = 600, units = row(12, 100, 400) }, 2)
@@ -153,13 +242,82 @@ do
 	t.same("units are made during a drag", world.unitCount(), 8)
 	t.same("and none is asked an effect for", asked(world), "")
 	player:message("coilbox_rewind:drag 0")
-	frames(player, 2)
-	t.same("the units still to come when the drag ends are", asked(world), "900 1000 1100 1200")
+	frames(player, 3)
+	t.same("when the drag ends the units it made and the ones still to come are", sorted(world), "100 200 300 400 500 600 700 800 900 1000 1100 1200")
 	t.same("settled", world.params[SETTLED], 1)
+	local count = #world.asked
+	frames(player, 3)
+	t.same("and once each", #world.asked, count)
 
 	local before = #world.lines
 	t.same("a drag that is neither 1 nor 0 is the player's", player:message("coilbox_rewind:drag 2"), true)
 	t.same("and is refused and logged", #world.lines - before, 1)
+end
+
+-- A drag that ends where the units it made are gone asks for none of them, and
+-- a drag that makes none asks for none.
+
+do
+	local world, player = setup({ last = 600, units = row(6, 100, 300) }, 6)
+	player:message("coilbox_rewind:pause")
+	player:frame()
+	player:message("coilbox_rewind:drag 1")
+	seek(player, 150)
+	frames(player, 2)
+	seek(player, 500)
+	frames(player, 2)
+	t.same("the units a drag made were removed by its next seek", world.unitCount(), 0)
+	player:message("coilbox_rewind:drag 0")
+	frames(player, 2)
+	t.same("so that its end asks for none", asked(world), "")
+	player:message("coilbox_rewind:drag 1")
+	player:message("coilbox_rewind:drag 0")
+	frames(player, 2)
+	t.same("and a drag that made nothing asks for nothing", asked(world), "")
+end
+
+-- A jump after a drag is a jump again, and a drag that never ends is cleared by
+-- the next one that does not drag.
+
+do
+	local world, player = setup({ last = 600, units = row(4, 100, 300) }, 6)
+	player:message("coilbox_rewind:pause")
+	player:frame()
+	player:message("coilbox_rewind:drag 1")
+	seek(player, 150)
+	frames(player, 2)
+	player:message("coilbox_rewind:drag 0")
+	frames(player, 2)
+	t.same("a drag's end asks for its units", sorted(world), "100 200 300 400")
+	world.asked = {}
+	seek(player, 500)
+	frames(player, 2)
+	seek(player, 150)
+	frames(player, 2)
+	t.same("a click after it asks for them again", sorted(world), "100 200 300 400")
+end
+
+-- An adapter that shows its own effect is asked again for a unit a drag made,
+-- when the drag ends.
+
+do
+	local calls = {}
+	local world, player = setup({ last = 600, units = row(4, 100, 400) }, 6, {
+		unitPlaced = function(_, _, _, _, effect)
+			calls[#calls + 1] = tostring(effect)
+			return effect
+		end,
+	})
+	player:message("coilbox_rewind:pause")
+	player:frame()
+	player:message("coilbox_rewind:drag 1")
+	seek(player, 150)
+	frames(player, 2)
+	t.same("during the drag the hook is told the player shows none", table.concat(calls, " "), "false false false false")
+	player:message("coilbox_rewind:drag 0")
+	frames(player, 2)
+	t.same("when it ends the hook is told again, with the effect", table.concat(calls, " "), "false false false false true true true true")
+	t.same("and the player shows none for the units it handled", asked(world), "")
 end
 
 -- A unit outside the view needs no effect.
@@ -173,7 +331,7 @@ do
 	seek(player, 150)
 	frames(player, 4)
 	t.same("every unit is made", world.unitCount(), 8)
-	t.same("the units in view made after the first frame are asked for, and the ones outside are not", asked(world), "100 400")
+	t.same("the units in view are asked for, and the ones outside are not", sorted(world), "100 200 300 400")
 end
 
 -- An adapter that shows its own effect stops the player's.
@@ -191,8 +349,8 @@ do
 	player:frame()
 	seek(player, 150)
 	frames(player, 3)
-	t.same("the hook is told for each unit whether the player would show an effect", table.concat(calls, " "), "false false true true true true")
-	t.same("and the player shows none for a unit the hook said it handled", asked(world), "300 500")
+	t.same("the hook is told for each unit whether the player would show an effect", table.concat(calls, " "), "true true true true true true")
+	t.same("and the player shows none for a unit the hook said it handled", asked(world), "100 300 500")
 end
 
 do
@@ -203,7 +361,7 @@ do
 	player:frame()
 	seek(player, 150)
 	frames(player, 3)
-	t.same("a hook that gives nothing back leaves the player's effect", asked(world), "300 400 500 600")
+	t.same("a hook that gives nothing back leaves the player's effect", asked(world), "100 200 300 400 500 600")
 end
 
 do
@@ -218,7 +376,7 @@ do
 	player:frame()
 	seek(player, 150)
 	frames(player, 3)
-	t.same("a hook that raises leaves the player's effect too", asked(world), "300 400 500 600")
+	t.same("a hook that raises leaves the player's effect too", asked(world), "100 200 300 400 500 600")
 end
 
 -- A player that is given nowhere to ask makes its units all the same.
@@ -240,10 +398,12 @@ do
 	t.same("and makes every unit", world.unitCount(), 6)
 end
 
--- A slow seek with effects allocates nothing more in a frame of play.
+-- A jump with effects allocates nothing more in a frame of play.
 
 do
 	local world, player = setup({ last = 3000, windowLength = 3000, units = row(40, 0, 3000) }, 7)
+	frames(player, 1)
+	seek(player, 1500)
 	frames(player, 8)
 	t.same("the forty are made", world.unitCount(), 40)
 	t.check("some with an effect", #world.asked > 0, #world.asked)
@@ -366,71 +526,154 @@ local function effects(e)
 	end
 end
 
+--- A unit of the stand-in: its base at `x, y, z`, its middle `lift` above it.
+local function unit(e, id, radius, x, y, z, lift)
+	e.units[id] = { x = x, y = y, z = z, mx = x, my = y + lift, mz = z, radius = radius, team = 0 }
+end
+
+--- The middle of what the last draw put on the screen, which is the middle of
+-- the orb.
+local function middle(e)
+	local sum = e.placeSum
+	return sum[1] / e.vertices, sum[2] / e.vertices, sum[3] / e.vertices
+end
+
+--- Draws the effect of `arrival` at `seconds` and says what it drew.
+local function look(e, arrival, at, seconds)
+	e.clear()
+	at(seconds)
+	arrival:draw()
+end
+
 do
 	local e = Unsynced.new()
 	local arrival, at = effects(e)
-	e.radius[7] = 20
-	e.colours[1] = { 1, 0, 0 }
+	unit(e, 7, 20, 1000, 50, 2000, 12)
 
 	arrival:draw()
 	t.same("with no unit arriving a draw does nothing", #e.state + e.vertices, 0)
 
 	arrival:add(7, 1000, 50, 2000, 1)
 	t.same("a unit that arrives has an effect", arrival.count, 1)
-	at(Arrival.LIFE / 2)
-	arrival:draw()
-	t.check("half way through its life it is drawn", e.vertices > 0, e.vertices)
-	local box = e.box
-	local reach = 20 * Arrival.REACH + Arrival.LINE
-	t.check(
-		"round the unit, no farther out than the module says an effect reaches",
-		box.x1 >= 1000 - reach and box.x2 <= 1000 + reach and box.z1 >= 2000 - reach and box.z2 <= 2000 + reach and box.y1 >= 50 - reach and box.y2 <= 50 + reach,
-		table.concat({ box.x1, box.x2, box.y1, box.y2, box.z1, box.z2 }, " ")
-	)
-	t.check("and not all at one point", box.x2 - box.x1 > 20 and box.y2 - box.y1 > 20)
-	local sum = e.colourSum
-	t.check("mostly in the team's colour", sum[1] > sum[2] and sum[1] > sum[3], table.concat(sum, " "))
-	t.same("with no texture bound, and the depth test on and nothing written to depth", table.concat(e.state, ", ", 1, 3), "Texture false, DepthTest true, DepthMask false")
-	t.same("it leaves the engine's blending as it found it", e.state[#e.state - 2], "Blending " .. e.GL.SRC_ALPHA .. " " .. e.GL.ONE_MINUS_SRC_ALPHA)
-	t.same("and the depth written again", e.state[#e.state - 1], "DepthMask true")
-	t.same("and the colour white", e.state[#e.state], "Color 1 1 1 1")
-	local wide = box.x2 - box.x1
+	t.same("the design's three stages are 0.25 seconds of growing and 0.1 of rising", Arrival.GROW .. " " .. Arrival.FADE, "0.25 0.1")
+	t.same("so that the effect lasts 0.35 seconds", Arrival.LIFE, 0.35)
 
-	-- A unit twice the size has an effect twice the size.
-	local e2 = Unsynced.new()
-	local arrival2, at2 = effects(e2)
-	e2.radius[7] = 40
-	e2.colours[1] = { 1, 0, 0 }
-	arrival2:add(7, 1000, 50, 2000, 1)
-	at2(Arrival.LIFE / 2)
-	arrival2:draw()
-	t.near("a unit twice the size has an effect twice as wide, but for the ring's own line", e2.box.x2 - e2.box.x1 - 2 * Arrival.LINE, (wide - 2 * Arrival.LINE) * 2, 1e-6)
+	-- Stage one: a small orb at the unit that grows until it covers it. With the
+	-- camera straight down the orb is a flat disc, and its width is its box.
+	look(e, arrival, at, 0)
+	local small = e.box.x2 - e.box.x1
+	t.check("at the start the orb is small, smaller than the unit", small > 0 and small < 2 * 20, small)
+	t.same("and fully opaque at its middle", e.maxAlpha, 1)
+	look(e, arrival, at, Arrival.GROW / 2)
+	local half = e.box.x2 - e.box.x1
+	t.check("half way through growing it is larger", half > small, half .. " " .. small)
+	look(e, arrival, at, Arrival.GROW)
+	local grown = e.box.x2 - e.box.x1
+	t.check("when grown it is larger again", grown > half, grown .. " " .. half)
+	t.check("and wider than the unit's width, so that it covers the unit", grown >= 2 * 20, grown)
+	t.same("still fully opaque", e.maxAlpha, 1)
+	local x, y, z = middle(e)
+	t.near("it is over the unit in x", x, 1000, 1e-6)
+	t.near("and in z", z, 2000, 1e-6)
+	t.check("in front of the unit as the camera sees it, which is above it for a camera looking down", y > 50 + 12, y)
+	t.check("with the part that is opaque as wide as the unit", Arrival.CORE * Arrival.COVER >= 1, Arrival.CORE * Arrival.COVER)
 
-	e.clear()
-	at(Arrival.LIFE + 0.01)
-	arrival:draw()
-	t.same("after its life it is gone", arrival.count, 0)
-	t.same("and nothing is drawn for it", e.vertices, 0)
+	-- Stage two: it goes up fast and becomes clear, over 0.1 seconds.
+	local start = y
+	look(e, arrival, at, Arrival.GROW + Arrival.FADE / 2)
+	local _, mid = middle(e)
+	local midAlpha = e.maxAlpha
+	t.check("half way through the rise it has gone up", mid > start, mid .. " " .. start)
+	t.check("and is half clear", midAlpha > 0.4 and midAlpha < 0.6, midAlpha)
+	look(e, arrival, at, Arrival.LIFE - 0.001)
+	local _, top = middle(e)
+	local size = e.box.x2 - e.box.x1
+	t.check("it travelled at least its own size in the 0.1 seconds", top - start >= size, top - start .. " against " .. size)
+	t.check("and is nearly clear at the end", e.maxAlpha < 0.05, e.maxAlpha)
+	t.check("it keeps its size while it rises", math.abs(size - grown) < 1e-6, size .. " " .. grown)
+
+	look(e, arrival, at, Arrival.LIFE + 0.001)
+	t.same("after 0.35 seconds it is gone", arrival.count, 0)
+	t.same("and nothing is drawn", e.vertices, 0)
 end
+
+-- The state the draw sets, and leaves as it found it.
 
 do
 	local e = Unsynced.new()
 	local arrival, at = effects(e)
-	e.colours[0] = { 0, 0, 1 }
+	unit(e, 7, 20, 1000, 50, 2000, 12)
+	arrival:add(7, 1000, 50, 2000, 1)
+	look(e, arrival, at, 0.1)
+	local state = table.concat(e.state, ", ")
+	t.same("no texture, the depth test on and nothing written to depth", table.concat(e.state, ", ", 1, 3), "Texture false, DepthTest true, DepthMask false")
+	t.check("blended over what is there, so that it hides the unit", state:find("Blending " .. e.GL.SRC_ALPHA .. " " .. e.GL.ONE_MINUS_SRC_ALPHA, 1, true) ~= nil, state)
+	t.same("the depth written again", e.state[#e.state - 1], "DepthMask true")
+	t.same("and the colour white", e.state[#e.state], "Color 1 1 1 1")
+	local sum = e.colourSum
+	t.check("the orb is white", sum[1] == sum[2] and sum[2] == sum[3] and sum[1] > 0, table.concat(sum, " "))
+end
+
+-- A unit twice the size has an orb twice the size, and a small and a large unit
+-- are both covered.
+
+do
+	local widths = {}
+	for _, radius in ipairs({ 8, 16, 32, 64 }) do
+		local e = Unsynced.new()
+		local arrival, at = effects(e)
+		unit(e, 7, radius, 0, 0, 0, radius)
+		arrival:add(7, 0, 0, 0, 1)
+		look(e, arrival, at, Arrival.GROW)
+		widths[#widths + 1] = e.box.x2 - e.box.x1
+		t.check("a unit of radius " .. radius .. " is covered", widths[#widths] >= 2 * radius, widths[#widths])
+	end
+	t.near("a unit twice the size has an orb twice the size", widths[2], widths[1] * 2, 1e-6)
+	t.near("and again", widths[4], widths[3] * 2, 1e-6)
+end
+
+-- The orb is nearer the camera than the unit, whichever way the camera looks,
+-- so that the depth test does not hide it behind the unit it covers.
+
+do
+	for _, direction in ipairs({ { 0, -1, 0 }, { 1, 0, 0 }, { 0.6, -0.5, 0.62 }, { 0, -0.7, 0.7 } }) do
+		local e = Unsynced.new()
+		e.camera.direction = direction
+		local len = math.sqrt(direction[1] ^ 2 + direction[2] ^ 2 + direction[3] ^ 2)
+		local arrival, at = effects(e)
+		unit(e, 7, 20, 0, 0, 0, 12)
+		arrival:add(7, 0, 0, 0, 1)
+		look(e, arrival, at, 0.1)
+		local x, y, z = middle(e)
+		-- How far along the camera's direction the orb's middle is, against the
+		-- unit's middle.
+		local along = ((x - 0) * direction[1] + (y - 12) * direction[2] + z * direction[3]) / len
+		t.check("a camera looking along " .. table.concat(direction, ",") .. " draws", e.vertices > 0)
+		t.check("with the orb on the camera's side of the unit", along < 0, along)
+	end
+end
+
+-- A unit the engine cannot size, or place, has no effect.
+
+do
+	local e = Unsynced.new()
+	local arrival, at = effects(e)
 	arrival:add(9, 0, 0, 0, 0)
-	t.same("a unit the engine cannot size has no effect", arrival.count, 0)
+	t.same("a unit the engine cannot size or place has no effect", arrival.count, 0)
 	e.radius[9] = 10
+	arrival:add(9, 0, 0, 0, 0)
+	t.same("nor one it can size and not place", arrival.count, 0)
+	unit(e, 9, 10, 0, 0, 0, 5)
 	arrival:add(9, 0, 0, 0, 5)
-	t.same("a unit of a team with no colour has one", arrival.count, 1)
+	t.same("a unit of a team with no colour has one, since the orb is white", arrival.count, 1)
 	local ok, err = pcall(function()
-		at(0.1)
-		arrival:draw()
+		look(e, arrival, at, 0.1)
 	end)
 	t.check("and is drawn", ok and e.vertices > 0, err)
 
 	-- No more than the most at once: the ones that arrive past it have none.
 	for id = 100, 100 + Arrival.MOST + 20 do
-		e.radius[id] = 10
+		unit(e, id, 10, id, 0, 0, 5)
 		arrival:add(id, id, 0, 0, 0)
 	end
 	t.same("there are never more than the most at once", arrival.count, Arrival.MOST)
@@ -444,11 +687,11 @@ end
 -- A camera looking straight down, or along the ground, draws finite quads.
 
 do
-	for _, direction in ipairs({ { 0, -1, 0 }, { 1, 0, 0 }, { 0.6, -0.5, 0.62 } }) do
+	for _, direction in ipairs({ { 0, -1, 0 }, { 1, 0, 0 }, { 0, 1, 0 }, { 0.6, -0.5, 0.62 } }) do
 		local e = Unsynced.new()
 		e.camera.direction = direction
 		local arrival, at = effects(e)
-		e.radius[7] = 20
+		unit(e, 7, 20, 0, 0, 0, 12)
 		arrival:add(7, 0, 0, 0, 0)
 		at(0.2)
 		local ok, err = pcall(arrival.draw, arrival)
@@ -462,7 +705,7 @@ do
 	local e = Unsynced.new()
 	local arrival, at = effects(e)
 	for id = 1, 20 do
-		e.radius[id] = 10 + id
+		unit(e, id, 10 + id, id * 50, 0, 0, 5)
 		arrival:add(id, id * 50, 0, 0, 0)
 	end
 	local function draws()

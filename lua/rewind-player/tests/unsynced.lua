@@ -45,6 +45,10 @@ function M.new(clock)
 		e.vertices = 0
 		e.box = { x1 = math.huge, y1 = math.huge, z1 = math.huge, x2 = -math.huge, y2 = -math.huge, z2 = -math.huge }
 		e.colourSum = { 0, 0, 0 }
+		-- The sum of the vertices' places, for the middle of what was drawn, and
+		-- the greatest alpha any vertex had.
+		e.placeSum = { 0, 0, 0 }
+		e.maxAlpha = 0
 		e.coloured = 0
 		e.state = {}
 		e.begins = 0
@@ -336,6 +340,9 @@ function M.new(clock)
 		e.lastColour = alpha
 		if inside then
 			e.drawnAlpha = alpha
+			if alpha > e.maxAlpha then
+				e.maxAlpha = alpha
+			end
 		end
 		if not inside then
 			e.state[#e.state + 1] = "Color " .. red .. " " .. green .. " " .. blue .. " " .. alpha
@@ -349,6 +356,8 @@ function M.new(clock)
 		box.y1, box.y2 = math.min(box.y1, y), math.max(box.y2, y)
 		box.z1, box.z2 = math.min(box.z1, z), math.max(box.z2, z)
 		e.vertices = e.vertices + 1
+		local places = e.placeSum
+		places[1], places[2], places[3] = places[1] + x, places[2] + y, places[3] + z
 		local sum = e.colourSum
 		sum[1], sum[2], sum[3] = sum[1] + r, sum[2] + g, sum[3] + b
 		e.coloured = e.coloured + 1
