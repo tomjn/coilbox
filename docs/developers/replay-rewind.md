@@ -266,7 +266,7 @@ Switch off a widget that offers an action that makes no sense in playback. A fac
 
 Switch off a widget that covers the timeline. The timeline sits at the bottom centre of the view and a player can drag it. Splinter Faction's strip of buttons for the selection was at the bottom centre too, so the two drew over each other. Beyond All Reason's order menu reaches under the timeline when a unit is selected, and its adapter switches the order menu and the build menu off. Look with a unit selected.
 
-Check your key bindings too. A key your game binds to an action one of its widgets handles is that widget's before the timeline hears it. Beyond All Reason binds Minus and Equals to its volume, so they change the volume there and not the speed. Its adapter leaves them, since the volume keys tell nobody wrong about the match.
+Check your key bindings too. A key your game binds to an action one of its widgets handles is that widget's before the timeline hears it. Beyond All Reason binds Minus, Equals and the keypad's Plus to its volume, so they would change the volume there and not the speed. Its adapter switches off the Volume OSD widget, which handles those actions, so the timeline gets the keys.
 
 Two things stay in Splinter Faction because there is no way to take them out cleanly, and issue #3983 is about it.
 

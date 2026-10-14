@@ -3018,7 +3018,7 @@ end
         assert!(
             count(
                 &adapted,
-                "COILBOX_REWIND_PLAYER adapter loaded: Beyond All Reason. 32 gadgets and 4 widgets"
+                "COILBOX_REWIND_PLAYER adapter loaded: Beyond All Reason. 32 gadgets and 5 widgets"
             ) >= 1,
             "{adapted}"
         );
@@ -4013,6 +4013,113 @@ end
             .filter(|l| l.contains("coilbox_") || l.contains("Coilbox rewind"))
             .collect();
         assert!(errors.is_empty(), "{errors:#?}");
+    }
+
+    /// The widget that hands the timeline's speed keys to the game's widget
+    /// handler. It is written into the game folder for the test below and is not
+    /// part of the game.
+    const VOLUME_KEYS_PROBE: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../lua/rewind-player/tests/headless/volume_keys_probe.lua"
+    ));
+
+    /// Minus, Equals and Plus against Beyond All Reason's own widget handler,
+    /// with the actions the game binds to them (issue #4027). Give it a replay
+    /// of a match on Beyond All Reason in `COILBOX_ANALYSIS_REPLAY`, with the
+    /// variables the tests above read.
+    ///
+    /// The playback is launched twice. The first has the adapter without the
+    /// Volume OSD in its list, which is how the keys were before, and the keys
+    /// change the game's volume. The second has the adapter coilbox ships, and
+    /// the keys change the timeline's speed.
+    #[test]
+    #[ignore = "needs an engine, Beyond All Reason, a map and a replay on them"]
+    fn beyond_all_reasons_speed_keys_reach_the_timeline() {
+        let Some(prepared) = prepared(false) else {
+            return;
+        };
+        let (_, shipped) = REWIND_PLAYER_ADAPTERS
+            .iter()
+            .find(|(name, _)| name.contains("beyond_all_reason"))
+            .expect("the Beyond All Reason adapter is shipped");
+        let widget_line = "\t\t\"snd_volume_osd.lua\",\n";
+        assert!(
+            shipped.contains(widget_line),
+            "the adapter does not name the Volume OSD"
+        );
+        let before_source = shipped.replace(widget_line, "");
+        let before_adapters: Vec<(&str, &str)> = REWIND_PLAYER_ADAPTERS
+            .iter()
+            .map(|(name, source)| {
+                if name.contains("beyond_all_reason") {
+                    (*name, before_source.as_str())
+                } else {
+                    (*name, *source)
+                }
+            })
+            .collect();
+
+        let run = |adapters: &[(&str, &str)]| {
+            prepared.rewrite(adapters);
+            std::fs::write(
+                prepared
+                    .game_dir
+                    .join("luaui/widgets/coilbox_volume_keys_probe.lua"),
+                VOLUME_KEYS_PROBE,
+            )
+            .unwrap();
+            let (timed_out, output, _) =
+                launch(&prepared, &|text| text.contains("VOLUME_PROBE done"));
+            assert!(!timed_out, "the probe never finished. Log:\n{output}");
+            let probe: Vec<String> = output
+                .lines()
+                .filter_map(|l| {
+                    l.split_once("VOLUME_PROBE ")
+                        .map(|(_, rest)| rest.to_string())
+                })
+                .collect();
+            probe
+        };
+        let line = |probe: &[String], start: &str| {
+            probe
+                .iter()
+                .find(|l| l.starts_with(start))
+                .unwrap_or_else(|| panic!("no probe line starting {start} in {probe:#?}"))
+                .clone()
+        };
+
+        let before = run(&before_adapters);
+        for l in &before {
+            eprintln!("before {l}");
+        }
+        let start = line(&before, "start ");
+        assert_eq!(field(&start, "timeline"), "1", "{start}");
+        assert_eq!(field(&start, "volume_osd"), "1", "{start}");
+        // The game's action took the key, the volume moved and the speed did
+        // not.
+        for key in ["minus", "equals", "plus"] {
+            let l = line(&before, &format!("{key} "));
+            assert_eq!(field(&l, "taken"), "1", "{l}");
+            assert_eq!(field(&l, "speed"), field(&l, "speed_before"), "{l}");
+        }
+        assert_ne!(
+            field(&line(&before, "minus "), "volume"),
+            field(&start, "volume")
+        );
+
+        let after = run(REWIND_PLAYER_ADAPTERS);
+        for l in &after {
+            eprintln!("after {l}");
+        }
+        let start = line(&after, "start ");
+        assert_eq!(field(&start, "timeline"), "1", "{start}");
+        assert_eq!(field(&start, "volume_osd"), "0", "{start}");
+        for (key, speed) in [("minus", 0.5), ("equals", 1.0), ("plus", 2.0)] {
+            let l = line(&after, &format!("{key} "));
+            assert_eq!(field(&l, "taken"), "1", "{l}");
+            assert_eq!(number(&l, "speed"), speed, "{l}");
+            assert_eq!(field(&l, "volume"), field(&start, "volume"), "{l}");
+        }
     }
 
     /// The widget that says what the ghosts widget would draw at chosen frames.

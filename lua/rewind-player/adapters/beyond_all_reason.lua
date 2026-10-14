@@ -163,6 +163,12 @@ return {
 		-- read "Decaying" when a playback ran backward (issue #4048). Build
 		-- progress still shows.
 		"gui_build_eta.lua",
+		-- The Volume OSD, which registers snd_volume_decrease and
+		-- snd_volume_increase. The game binds Minus, Equals and the keypad's Plus to
+		-- them, and a widget action runs before any widget is asked for the key, so
+		-- the timeline never heard them (issue #4027). A viewer who reads the
+		-- timeline's key list expects those keys to change the speed.
+		"snd_volume_osd.lua",
 	},
 
 	-- The numbers the game's panels read that are the game's own and not the

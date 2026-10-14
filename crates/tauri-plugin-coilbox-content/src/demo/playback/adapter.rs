@@ -1083,6 +1083,7 @@ mod tests {
                     "luaui/widgets/gui_ordermenu.lua",
                     "luaui/widgets/camera_player_tv.lua",
                     "luaui/widgets/gui_build_eta.lua",
+                    "luaui/widgets/snd_volume_osd.lua",
                 ]
             );
             assert!(adapter.units.is_empty() && adapter.features.is_empty());
