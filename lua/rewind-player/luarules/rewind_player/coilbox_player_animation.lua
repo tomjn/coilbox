@@ -545,11 +545,14 @@ local function labour(self, w, i, t, serial, unitID, def, kind, on, command, tar
 			set(unitID, P.power, power)
 		end
 	end
-	-- A builder first seen with no work has nothing to stop.
+	-- A builder first seen with no work has nothing to stop. One first seen at
+	-- work was made there, by a seek that makes its units over several frames
+	-- or by play, and its work did not start now, so it is handed on as after a
+	-- seek.
 	local signal = self.signal
 	if signal and (changed or powered or (again and kind ~= 0)) and (command ~= 0 or (had ~= nil and had ~= 0)) then
 		local place = self.site
-		signal(unitID, command, target, power, place[1], place[2], place[3], t, again and 1 or 0)
+		signal(unitID, command, target, power, place[1], place[2], place[3], t, (again or had == nil) and 1 or 0)
 	end
 	if kind ~= self.jobKind[serial] or on ~= self.jobOn[serial] or (again and kind ~= 0) then
 		self.jobKind[serial], self.jobOn[serial] = kind, on

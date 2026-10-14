@@ -707,6 +707,36 @@ do
 	t.same("and play after it hands nothing more on", #sent, 6)
 end
 
+-- A seek makes its units over several frames, so a builder can be made a frame
+-- or more after the seek, already at work. Its work did not start then, so it
+-- is handed on as after a seek, and the stream is whole at once.
+
+do
+	local sent = {}
+	-- A crate and the hut come first in the track's list, so with a budget of
+	-- one unit a frame the builder is made two frames after the seek.
+	local spec = building(ENGINEER)
+	local builder, hut = spec.units[1], spec.units[2]
+	builder.work = function(frame)
+		if frame >= 50 and frame <= 150 then
+			return 16, 2, 255
+		end
+		return 0, 0, 0
+	end
+	spec.units = { { first = 0, last = 600, def = CRATE, at = { 300, 0, 300 } }, hut, builder }
+	local world, player, run = setup(spec, {
+		budget = 1,
+		work = function(unitID, command, target, power, x, y, z, frame, jumped)
+			sent[#sent + 1] = { frame = frame, jumped = jumped, command = command }
+		end,
+	})
+	player:message("coilbox_rewind:pause")
+	player:message("coilbox_rewind:seek 80")
+	run(3)
+	t.check("the builder's work was handed on", #sent >= 1, #sent)
+	t.same("as after a seek, though the seek was shown in an earlier frame", sent[1] and sent[1].jumped, 1)
+end
+
 -- A piece the track has poses for and a walk also turns. The script turns the
 -- right leg about x the moment it is told its unit moves, so that turn is the
 -- walk's, and the aim stage leaves it to the script from then on, for every
