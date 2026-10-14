@@ -151,17 +151,20 @@ A recording made before a name was added to the adapter does not have that param
 
 ### Hooks
 
-A hook is an optional function in `hooks`. The player calls these three and no others. It logs a name in `hooks` that is not one of them, or is not a function, since it is most likely a misspelling. A hook that raises is logged once and not called again, and the player carries on.
+A hook is an optional function in `hooks`. The player calls the first three and no others. It logs a name in `hooks` that is not one of them, or is not a function, since it is most likely a misspelling. A hook that raises is logged once and not called again, and the player carries on.
 
 | Hook | Called | Arguments |
 | --- | --- | --- |
 | `started` | Once, when the player has opened the track, before the first frame and so before anything of the track is in the world. | None. |
 | `unitPlaced` | After the player created a unit and put it in place, and again for a unit made again after a seek. A seek that needs many units made spreads them over several frames, so this can come some frames after the seek. | The engine's unit id, the unit definition's engine id, the track frame and the clock. |
 | `afterFrame` | At the end of every simulation frame, after every stage. | The track frame and the clock. |
+| `drawQueuedBuilding` | Not the player's. The ghosts widget calls it in unsynced Lua, in `DrawWorld`, once for each queued building it would draw, inside a matrix of its own. It replaces the engine's own shape and the footprint outline, so use it to draw the building the way your game does. | The unit definition's engine id, the team, x, the ground height, z and the facing from 0 to 3. A facing of 0 is south, 1 east, 2 north and 3 west. |
 
 The clock is the player's, and a hook only reads it. `clock.jumped` says the frame was reached by a seek or a step. `clock.direction` is 1 or -1. `clock.speed` is how many frames of the track one simulation frame covers.
 
-A hook runs in synced Lua, in the gadget's environment. A frame of play allocates nothing in the player, so a hook that runs every frame should not allocate either.
+The first three run in synced Lua, in the gadget's environment. `drawQueuedBuilding` runs in the ghosts widget, which reads the adapter file itself, so `gl` is there and the synced calls are not. A hook of it that raises is logged once and the engine's shape and outline take over. Coilbox does not read it. Write the hook so that the same file still loads in synced Lua, where it is never called.
+
+A frame of play allocates nothing in the player, so a hook that runs every frame should not allocate either.
 
 Splinter Faction's adapter has no hook. It had a `started` hook that gave each team its starting storage, which its switched off `game_spawn.lua` used to do. The track now holds each team's storage and the player sets it on every frame, so the hook went. Reach for a hook when your game needs something set that neither the track nor a rules parameter covers.
 
