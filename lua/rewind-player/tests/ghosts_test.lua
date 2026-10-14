@@ -42,9 +42,12 @@ end
 --- The slice of the engine the ghosts use. `e.shapes` counts what was drawn and
 -- `e.calls` is what the draw did in order, when `e.record` is set.
 local function engine()
-	local e = { params = {}, lines = {}, calls = {}, shapes = 0, pushes = 0 }
+	local e = { params = {}, lines = {}, calls = {}, shapes = 0, pushes = 0, asked = {} }
 	local names, defs = gameDefs()
 	e.UnitDefNames, e.UnitDefs = names, defs
+	-- The height the engine would build at. The real one levels the ground under
+	-- a building and floats one that floats (CGameHelper::GetBuildHeight), which
+	-- is the engine's to work out and not the widget's.
 	function e.height(x, z)
 		return 100 + x / 100 - z / 1000
 	end
@@ -52,8 +55,13 @@ local function engine()
 		GetGameRulesParam = function(name)
 			return e.params[name]
 		end,
-		GetGroundHeight = function(x, z)
-			return e.height(x, z)
+		-- The real one snaps the place to the 16 elmo build grid and gives the
+		-- build height. The stand-in leaves the place as it is.
+		Pos2BuildPos = function(def, x, y, z, facing)
+			if e.record then
+				e.asked[#e.asked + 1] = string.format("%d %s %s %s %d", def, x, y, z, facing)
+			end
+			return x, e.height(x, z), z
 		end,
 		Echo = function(line)
 			e.lines[#e.lines + 1] = line
@@ -114,6 +122,9 @@ local function engine()
 		PopMatrix = function()
 			e.pushes = e.pushes - 1
 			note("pop")
+		end,
+		LoadIdentity = function()
+			note("identity")
 		end,
 		Translate = function(x, y, z)
 			if e.record then
@@ -368,21 +379,27 @@ do
 	g:draw()
 	local x, z = 600, 700
 	local y = e.height(x, z)
+	-- The engine's translucent shape takes the camera's view onto the projection
+	-- and puts the model view back as Lua left it (CModelDrawerHelper::PushTransform
+	-- and DIDResetPrevModelView), so the model view has to be the building's place
+	-- alone, as the engine's own DrawBuildIcons makes it. Left as the camera's
+	-- view, the shape is drawn through the view twice and lands off the screen
+	-- (issue #4018).
 	t.same(
-		"a ghost is the engine's own shape of the definition, in its team's colour, translucent, at the ground",
+		"a ghost is the engine's own shape of the definition, in its team's colour, translucent, at the engine's build height",
 		table.concat(e.calls, "|"),
 		table.concat({
 			"matrixmode 5888",
 			"push",
+			"identity",
 			"translate " .. x .. " " .. y .. " " .. z,
 			"rotate 180 0 1 0",
-			"push",
 			"shape 12 1 false false false",
-			"pop",
 			"pop",
 		}, "|")
 	)
 	t.same("every matrix it pushed it popped", e.pushes, 0)
+	t.same("the height is asked of the engine for the definition, the place and the facing", table.concat(e.asked, "|"), "12 600 0 700 2")
 
 	for facing, degrees in pairs({ [0] = 0, [1] = 90, [2] = 180, [3] = 270 }) do
 		local f = engine()
@@ -392,29 +409,19 @@ do
 		local h = ghosts(f, one)
 		at(f, h, 10)
 		h:draw()
-		t.same("facing " .. facing .. " turns the shape " .. degrees .. " degrees", f.calls[4], "rotate " .. degrees .. " 0 1 0")
+		t.same("facing " .. facing .. " turns the shape " .. degrees .. " degrees", f.calls[5], "rotate " .. degrees .. " 0 1 0")
 	end
 
+	-- Whether a building floats, and how deep one sits, is the engine's to say.
 	local sea = engine()
-	sea.UnitDefs[GAME_DEFS.armsolar].floatOnWater = true
 	sea.height = function()
 		return -40
 	end
 	sea.record = true
-	local floater = ghosts(sea)
-	at(sea, floater, 300)
-	floater:draw()
-	t.same("a floating building sits on the water and not under it", sea.calls[3], "translate 600 0 700")
-
-	local deep = engine()
-	deep.height = function()
-		return -40
-	end
-	deep.record = true
-	local sunk = ghosts(deep)
-	at(deep, sunk, 300)
+	local sunk = ghosts(sea)
+	at(sea, sunk, 300)
 	sunk:draw()
-	t.same("one that does not float is on the sea bed", deep.calls[3], "translate 600 -40 700")
+	t.same("a building is where the engine would build it, under water too", sea.calls[4], "translate 600 -40 700")
 end
 
 -- The footprint outline on the ground, in the team's colour.
@@ -540,7 +547,7 @@ do
 	g:draw()
 	t.same("the adapter's hook gets the definition, the team, the place and the facing", seen, string.format("12 1 600 %s 700 2", e.height(600, 700)))
 	t.same("and the engine's shape is not drawn", e.shapes, 0)
-	t.same("with a matrix of its own to leave as it found it", table.concat(e.calls, "|"), "matrixmode 5888|push|pop")
+	t.same("with a matrix of its own to leave as it found it, still the camera's", table.concat(e.calls, "|"), "matrixmode 5888|push|pop")
 
 	local f = engine()
 	local bad = function()
