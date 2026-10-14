@@ -171,7 +171,7 @@ A frame of play allocates nothing in the player, so a hook that runs every frame
 
 #### Your own arrival effect
 
-After a seek that takes more than one frame, the player shows a short effect where each unit in view appears: a column of light, a ring and dots in the team's colour. The player draws it itself with plain quads, so it works in your game with no adapter and does not touch how your units are drawn.
+After a jump, the player shows an orb of white light over each unit in view that the jump makes or removes. The orb grows, holds while the player makes or removes the unit under it, and then rises and clears, in half a second in all. The player draws it itself with plain quads, so it works in your game with no adapter and does not touch how your units are drawn.
 
 To show your game's own spawn or warp effect instead, do it in `unitPlaced` and return true:
 
@@ -185,9 +185,11 @@ unitPlaced = function(unitID, unitDefID, t, clock, effect)
 end,
 ```
 
-- `effect` is true only for a unit made in a later frame than the one that showed the seek, inside the view, and not while the timeline's knob is being dragged. Spawn only when it is true. The hook is called for every unit the player makes, and a large seek makes hundreds outside the view.
-- A hook that returns true stops the player's effect for that unit. One that returns nothing leaves it, and so does one that raises.
-- The player shows at most 256 of its own effects at once. Your effect has no such cap, and a large seek makes dozens of units a frame, so look at what yours costs.
+- `effect` is true for a unit that has an orb: one made after a jump, inside the view, once the orb has grown, and not while the timeline's knob is being dragged. The hook is called after the unit is made, which is under the orb. Spawn only when `effect` is true. The hook is called for every unit the player makes, and a large jump makes hundreds outside the view.
+- A hook that returns true takes the player's orb away at once. One that returns nothing leaves it, and so does one that raises.
+- When a drag ends, the units the drag made and left standing in view get an orb, and the hook is called a second time for each, with `effect` true. A hook that does something every time it is called, other than showing the effect, should check `effect` first.
+- The orb is for units the jump makes and units it removes. The hook is only called for units made.
+- The player shows at most 256 orbs at once. Your effect has no such cap, and a large jump makes dozens of units a frame, so look at what yours costs.
 
 #### Your build effect
 
