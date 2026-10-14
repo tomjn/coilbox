@@ -964,8 +964,86 @@ mod tests {
             );
             assert!(adapter.game_params.is_empty());
         }
-        for other in ["BYAR", "MF", "BA"] {
+        for other in ["MF", "BA"] {
             assert_eq!(choose(Ok(None), shipped, other, Some("1")), Chosen::none());
+        }
+    }
+
+    /// Beyond All Reason's adapter is chosen for every version of the game and
+    /// for no other. It has no range of versions, because the game has a new
+    /// one most days and a replay is played on the one it was recorded on. What
+    /// it switches off is spelled out here, so that a change to the list is a
+    /// change somebody meant (issue #3801).
+    #[test]
+    fn beyond_all_reasons_adapter_is_for_every_version_of_it_and_no_other_game() {
+        let shipped = super::super::REWIND_PLAYER_ADAPTERS;
+
+        for (short_name, version) in [
+            ("BYAR", Some("test-30922-8064a43")),
+            ("BYAR", Some("test-1-0000000")),
+            ("byar", Some("$VERSION")),
+            ("BYAR", None),
+        ] {
+            let chosen = choose(Ok(None), shipped, short_name, version);
+            assert_eq!(chosen.source, Source::App, "{version:?}");
+            let adapter = chosen.adapter.unwrap();
+            assert_eq!(adapter.name.as_deref(), Some("Beyond All Reason"));
+            assert_eq!(
+                adapter.shadows(),
+                [
+                    "luarules/gadgets/game_end.lua",
+                    "luarules/gadgets/game_team_com_ends.lua",
+                    "luarules/gadgets/game_initial_spawn.lua",
+                    "luarules/gadgets/unit_tombstones.lua",
+                    "luarules/gadgets/unit_prevent_lab_hax2.lua",
+                    "luarules/gadgets/unit_mex_upgrade_reclaimer.lua",
+                    "luarules/gadgets/unit_geo_upgrade_reclaimer.lua",
+                    "luarules/gadgets/unit_footprint_clearance.lua",
+                    "luarules/gadgets/unit_attached_con_turret.lua",
+                    "luarules/gadgets/unit_attached_con_turret_mex.lua",
+                    "luarules/gadgets/game_critters.lua",
+                    "luarules/gadgets/unit_carrier_spawner.lua",
+                    "luarules/gadgets/unit_explosion_spawner.lua",
+                    "luarules/gadgets/unit_custom_weapons_cluster.lua",
+                    "luarules/gadgets/unit_custom_weapons_behaviours.lua",
+                    "luarules/gadgets/unit_custom_weapons_overpen.lua",
+                    "luarules/gadgets/unit_lightning_splash_dmg.lua",
+                    "luarules/gadgets/unit_juno_damage.lua",
+                    "luarules/gadgets/unit_juno_damage_mini.lua",
+                    "luarules/gadgets/unit_juno_rework_damage.lua",
+                    "luarules/gadgets/game_preventcombomb.lua",
+                    "luarules/gadgets/game_quick_start.lua",
+                    "luarules/gadgets/game_assistdronespawn.lua",
+                    "luarules/gadgets/game_commander_builder.lua",
+                    "luarules/gadgets/game_coop_ii.lua",
+                    "luarules/gadgets/unit_scenario_loadout.lua",
+                    "luarules/gadgets/unit_zombies.lua",
+                    "luarules/gadgets/unit_evolution.lua",
+                    "luarules/gadgets/unit_respawning.lua",
+                    "luarules/gadgets/unit_xmas.lua",
+                    "luarules/gadgets/game_easter_eggs.lua",
+                    "luarules/gadgets/ai_ruins.lua",
+                    "luaui/widgets/gui_gridmenu.lua",
+                    "luaui/widgets/gui_ordermenu.lua",
+                ]
+            );
+            assert!(adapter.units.is_empty() && adapter.features.is_empty());
+            // What the game's panels read that is the game's own: each team's
+            // commander and its energy converters (issue #3982).
+            assert_eq!(
+                adapter.team_params,
+                ["startUnit", "mmLevel", "mmCapacity", "mmUse", "mmAvgEffi"]
+            );
+            assert!(adapter.game_params.is_empty());
+        }
+        // The original project still uses the short name BAR.
+        for other in ["BAR", "BA", "SF"] {
+            let chosen = choose(Ok(None), shipped, other, Some("1"));
+            assert_ne!(
+                chosen.adapter.and_then(|a| a.name).as_deref(),
+                Some("Beyond All Reason"),
+                "{other}"
+            );
         }
     }
 
