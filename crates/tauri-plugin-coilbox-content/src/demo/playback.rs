@@ -3300,6 +3300,8 @@ end
     ///
     /// Give it a replay of a whole match with a fight in it in
     /// `COILBOX_ANALYSIS_REPLAY`, with the variables the tests above read.
+    /// `COILBOX_PLAYBACK_SHOTS_SPAN`, two frames with a comma between them,
+    /// keeps the plan to the shots fired and ended between them (issue #4026).
     #[test]
     #[ignore = "needs an engine, Splinter Faction, a map and a replay of a whole match on them"]
     fn the_shots_of_a_whole_match_follow_the_track() {
@@ -3307,7 +3309,20 @@ end
             return;
         };
         prepared.rewrite(REWIND_PLAYER_ADAPTERS);
-        let output = driven(&prepared, "driver_shots.lua");
+        // A match with shots in the air from its first minutes to its last would
+        // play its frames five times over, so a span can be asked for.
+        let asked = match var("COILBOX_PLAYBACK_SHOTS_SPAN") {
+            Some(span) => {
+                let (from, to) = span
+                    .split_once(',')
+                    .expect("COILBOX_PLAYBACK_SHOTS_SPAN is two frames with a comma between");
+                let (from, to): (u32, u32) =
+                    (from.trim().parse().unwrap(), to.trim().parse().unwrap());
+                format!("return {{ from = {from}, to = {to} }}\n")
+            }
+            None => "return true\n".to_string(),
+        };
+        let output = driven_with(&prepared, "driver_shots.lua", &asked);
         for l in lines_with(&output, &["REWIND_DRIVER ", "COILBOX_REWIND_PLAYER"]) {
             eprintln!("{l}");
         }
@@ -3322,7 +3337,7 @@ end
         let (tolerance, step) = (number(start, "tolerance"), number(start, "step"));
         assert!(!driver.iter().any(|l| l.starts_with("lost ")), "{driver:?}");
         assert!(
-            number(line("shots "), "held_kinds") > 0.0,
+            number(line("shots held_kinds"), "held_kinds") > 0.0,
             "the match has no shot of a weapon the game has"
         );
         assert!(
