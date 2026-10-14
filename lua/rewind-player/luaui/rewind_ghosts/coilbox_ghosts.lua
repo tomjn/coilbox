@@ -45,6 +45,12 @@ M.FACING_DEGREES = 90
 -- what a hook is called with.
 M.HOOK = "drawQueuedBuilding"
 
+--- Elmos in a square of a unit definition's footprint.
+M.SQUARE = 8
+
+--- How far above the ground the footprint's outline is drawn, in elmos.
+M.OUTLINE_LIFT = 2
+
 local Ghosts = {}
 Ghosts.__index = Ghosts
 
@@ -65,6 +71,14 @@ function M.new(engine, track)
 		zs = {},
 		facings = {},
 		floats = {},
+		reds = {},
+		greens = {},
+		blues = {},
+		hx = {},
+		hz = {},
+		GL = engine.GL,
+		-- Whether the footprint is outlined on the ground, in the team's colour.
+		outline = engine.outline == true,
 		-- The window the lists below are for.
 		window = nil,
 		builders = {},
@@ -108,12 +122,16 @@ function Ghosts:lookUp(engine, track)
 	local names = track:info().unitDefs
 	self.defOf = {}
 	self.floatOf = {}
+	self.halfX, self.halfZ = {}, {}
 	for i = 1, #names do
 		local found = engine.UnitDefNames[names[i]]
 		if found then
 			self.defOf[i - 1] = found.id
 			local def = engine.UnitDefs[found.id]
 			self.floatOf[i - 1] = def ~= nil and def.floatOnWater == true
+			-- The footprint, in squares of 8 elmos (xsize is twice footprintX).
+			self.halfX[i - 1] = (def and def.xsize or 4) * M.SQUARE / 2
+			self.halfZ[i - 1] = (def and def.zsize or 4) * M.SQUARE / 2
 		else
 			self.defOf[i - 1] = false
 			self.missing = (self.missing or 0) + 1
@@ -233,7 +251,17 @@ local function rebuild(self, frame)
 						count = count + 1
 						defs[count], teams[count] = def, team
 						xs[count], zs[count] = w.queueItemX[j], w.queueItemZ[j]
-						facings[count], floats[count] = w.queueItemFacing[j], self.floatOf[trackDef]
+						local facing = w.queueItemFacing[j]
+						facings[count], floats[count] = facing, self.floatOf[trackDef]
+						-- A building turned a quarter has its sides the other way round.
+						local hx, hz = self.halfX[trackDef], self.halfZ[trackDef]
+						if facing % 2 == 1 then
+							hx, hz = hz, hx
+						end
+						self.hx[count], self.hz[count] = hx, hz
+						if self.outline then
+							self.reds[count], self.greens[count], self.blues[count] = self.Spring.GetTeamColor(team)
+						end
 					end
 				end
 			end
@@ -302,6 +330,15 @@ function Ghosts:update()
 	end
 end
 
+--- The corners of a footprint `hx` and `hz` either side of `x, z`, for
+-- `gl.BeginEnd`. A function made once, so that a draw makes nothing.
+local function footprint(vertex, x, y, z, hx, hz)
+	vertex(x - hx, y, z - hz)
+	vertex(x + hx, y, z - hz)
+	vertex(x + hx, y, z + hz)
+	vertex(x - hx, y, z + hz)
+end
+
 --- Draws what `update` made, from `widget:DrawWorld`.
 function Ghosts:draw()
 	if not self.enabled then
@@ -314,6 +351,22 @@ function Ghosts:draw()
 	end
 	local gl, ground = self.gl, self.Spring.GetGroundHeight
 	local defs, teams, xs, zs, facings, floats = self.defs, self.teams, self.xs, self.zs, self.facings, self.floats
+	-- UnitShape wants the model view matrix, and a widget's world drawing is not
+	-- always left on it.
+	gl.MatrixMode(self.GL.MODELVIEW)
+	if self.outline and not self.hook then
+		local lift = M.OUTLINE_LIFT
+		for k = 1, count do
+			local x, z = xs[k], zs[k]
+			local y = ground(x, z)
+			if floats[k] and y < 0 then
+				y = 0
+			end
+			gl.Color(self.reds[k], self.greens[k], self.blues[k], 1)
+			gl.BeginEnd(self.GL.LINE_LOOP, footprint, gl.Vertex, x, y + lift, z, self.hx[k], self.hz[k])
+		end
+		gl.Color(1, 1, 1, 1)
+	end
 	for k = 1, count do
 		local x, z = xs[k], zs[k]
 		local y = ground(x, z)
@@ -335,7 +388,12 @@ function Ghosts:draw()
 		if not drawn then
 			gl.Translate(x, y, z)
 			gl.Rotate(facings[k] * M.FACING_DEGREES, 0, 1, 0)
+			-- Without its raw state UnitShape pops the matrix and pushes a copy of
+			-- the one below (CModelDrawerHelper::DIDResetPrevModelView), which
+			-- drops the transform above. A push of its own keeps it.
+			gl.PushMatrix()
 			gl.UnitShape(defs[k], teams[k], false, false, false)
+			gl.PopMatrix()
 		end
 		gl.PopMatrix()
 	end

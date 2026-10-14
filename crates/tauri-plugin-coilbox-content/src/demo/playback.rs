@@ -3298,6 +3298,8 @@ end
             assert_eq!(field(l, "ok"), "1", "{l}");
             let wanted = queued_ghosts(&mut reader, &names, frame);
             assert_eq!(number(l, "ghosts") as usize, wanted.len(), "{l}");
+            // Each ghost has its footprint outlined too.
+            assert_eq!(number(l, "outlines") as usize, wanted.len(), "{l}");
             let list = field(l, "list");
             let mut drawn: Vec<(String, u8, f64, f64, u8)> = list
                 .split(';')

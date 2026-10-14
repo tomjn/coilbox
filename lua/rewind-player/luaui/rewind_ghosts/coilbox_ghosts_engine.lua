@@ -14,7 +14,7 @@
 -- starts without that one feature.
 --
 -- `since` was read from rts/Lua in the engine's source at the tags 105.0,
--- 105.1.1, 2025.01.6, 2025.04.11 and 2026.07.04: `gl.UnitShape`, `gl.PushMatrix`,
+-- 105.1.1, 2025.01.6, 2025.04.11 and 2026.07.04: `gl.UnitShape`, `gl.MatrixMode`, `gl.PushMatrix`,
 -- `gl.PopMatrix`, `gl.Translate` and `gl.Rotate` in LuaOpenGL.cpp, and
 -- `Spring.GetGroundHeight` and `Spring.GetGameRulesParam` in LuaSyncedRead.cpp,
 -- which LuaUI is given too (LuaUI.cpp adds the synced read entries to `Spring`).
@@ -75,12 +75,23 @@ M.ROWS = {
 	{
 		id = "drawing",
 		feature = "drawing a ghost",
-		calls = { "gl.PushMatrix", "gl.PopMatrix", "gl.Translate", "gl.Rotate", "gl.UnitShape" },
+		calls = { "gl.MatrixMode", "gl.PushMatrix", "gl.PopMatrix", "gl.Translate", "gl.Rotate", "gl.UnitShape", "GL.MODELVIEW" },
 		how = "presence",
 		used = "coilbox_ghosts.lua, Ghosts:draw",
 		required = true,
 		since = "105.0",
 		without = "No queued building is drawn",
+		visible = false,
+	},
+	{
+		id = "outline",
+		feature = "the footprint outline",
+		calls = { "gl.Color", "gl.BeginEnd", "gl.Vertex", "GL.LINE_LOOP", "Spring.GetTeamColor" },
+		how = "presence",
+		used = "coilbox_ghosts.lua, Ghosts:draw",
+		required = false,
+		since = "105.0",
+		without = "A ghost has no outline on the ground",
 		visible = false,
 	},
 	{
@@ -108,7 +119,7 @@ local function lookup(roots, name)
 	return value
 end
 
---- Checks the rows against the engine. `roots` holds `Spring`, `gl` and `VFS`.
+--- Checks the rows against the engine. `roots` holds `Spring`, `gl`, `GL` and `VFS`.
 -- Gives `on`, by row id, `lines` to log, each starting with the widget's prefix,
 -- and `refused`, true when a required row has a call missing.
 function M.check(roots)

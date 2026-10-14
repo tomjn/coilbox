@@ -58,13 +58,45 @@ local function engine()
 		Echo = function(line)
 			e.lines[#e.lines + 1] = line
 		end,
+		-- Team 1 is red and the rest are blue.
+		GetTeamColor = function(team)
+			if team == 1 then
+				return 1, 0, 0, 1
+			end
+			return 0, 0, 1, 1
+		end,
 	}
+	e.GL = { MODELVIEW = 5888, LINE_LOOP = 2 }
 	local function note(...)
 		if e.record then
 			e.calls[#e.calls + 1] = table.concat({ ... }, " ")
 		end
 	end
 	e.gl = {
+		MatrixMode = function(mode)
+			if e.record then
+				note("matrixmode", mode)
+			end
+		end,
+		Color = function(r, g, b, a)
+			if e.record then
+				note("color", r, g, b, a)
+			end
+		end,
+		Vertex = function(x, y, z)
+			if e.record then
+				note("vertex", x, y, z)
+			end
+		end,
+		BeginEnd = function(mode, emit, ...)
+			if e.record then
+				note("begin", mode)
+			end
+			emit(...)
+			if e.record then
+				note("end")
+			end
+		end,
 		PushMatrix = function()
 			e.pushes = e.pushes + 1
 			note("push")
@@ -199,7 +231,7 @@ end
 --- Ghosts over a fresh track, at `frame`.
 local function ghosts(e, source, extra)
 	local track = FakeTrack.new(source or spec())
-	local engineTable = { Spring = e.Spring, gl = e.gl, UnitDefNames = e.UnitDefNames, UnitDefs = e.UnitDefs }
+	local engineTable = { Spring = e.Spring, gl = e.gl, GL = e.GL, UnitDefNames = e.UnitDefNames, UnitDefs = e.UnitDefs }
 	for key, value in pairs(extra or {}) do
 		engineTable[key] = value
 	end
@@ -330,10 +362,13 @@ do
 		"a ghost is the engine's own shape of the definition, in its team's colour, translucent, at the ground",
 		table.concat(e.calls, "|"),
 		table.concat({
+			"matrixmode 5888",
 			"push",
 			"translate " .. x .. " " .. y .. " " .. z,
 			"rotate 180 0 1 0",
+			"push",
 			"shape 12 1 false false false",
+			"pop",
 			"pop",
 		}, "|")
 	)
@@ -347,7 +382,7 @@ do
 		local h = ghosts(f, one)
 		at(f, h, 10)
 		h:draw()
-		t.same("facing " .. facing .. " turns the shape " .. degrees .. " degrees", f.calls[3], "rotate " .. degrees .. " 0 1 0")
+		t.same("facing " .. facing .. " turns the shape " .. degrees .. " degrees", f.calls[4], "rotate " .. degrees .. " 0 1 0")
 	end
 
 	local sea = engine()
@@ -359,7 +394,7 @@ do
 	local floater = ghosts(sea)
 	at(sea, floater, 300)
 	floater:draw()
-	t.same("a floating building sits on the water and not under it", sea.calls[2], "translate 600 0 700")
+	t.same("a floating building sits on the water and not under it", sea.calls[3], "translate 600 0 700")
 
 	local deep = engine()
 	deep.height = function()
@@ -369,7 +404,57 @@ do
 	local sunk = ghosts(deep)
 	at(deep, sunk, 300)
 	sunk:draw()
-	t.same("one that does not float is on the sea bed", deep.calls[2], "translate 600 -40 700")
+	t.same("one that does not float is on the sea bed", deep.calls[3], "translate 600 -40 700")
+end
+
+-- The footprint outline on the ground, in the team's colour.
+
+do
+	local e = engine()
+	e.record = true
+	local g = ghosts(e, nil, { outline = true })
+	at(e, g, 300)
+	g:draw()
+	local y = e.height(600, 700) + 2
+	local calls = table.concat(e.calls, "|")
+	local outline = table.concat({
+		"matrixmode 5888",
+		"color 1 0 0 1",
+		"begin 2",
+		"vertex 584 " .. y .. " 684",
+		"vertex 616 " .. y .. " 684",
+		"vertex 616 " .. y .. " 716",
+		"vertex 584 " .. y .. " 716",
+		"end",
+		"color 1 1 1 1",
+	}, "|")
+	t.check("a ghost's footprint is outlined on the ground in its team's colour, before the shape", calls:sub(1, #outline) == outline, calls)
+	t.same("and the shape follows", e.shapes, 1)
+
+	local f = engine()
+	f.UnitDefs[GAME_DEFS.armsolar].xsize, f.UnitDefs[GAME_DEFS.armsolar].zsize = 6, 2
+	f.record = true
+	local one = spec()
+	one.units[1].queue = { { frame = 0, items = { { def = SOLAR, x = 100, z = 200, facing = 1 } } } }
+	local h = ghosts(f, one, { outline = true })
+	at(f, h, 10)
+	h:draw()
+	local box = table.concat(f.calls, "|")
+	t.check("the sides of a building turned a quarter are the other way round", box:find("vertex 92 ", 1, true) and box:find(" 224|", 1, true), box)
+
+	local plain = engine()
+	plain.record = true
+	local p = ghosts(plain)
+	at(plain, p, 300)
+	p:draw()
+	t.check("without the outline's calls there is none", not table.concat(plain.calls, "|"):find("begin", 1, true))
+
+	local hooked = engine()
+	hooked.record = true
+	local k = ghosts(hooked, nil, { outline = true, adapter = { hooks = { drawQueuedBuilding = function() end } } })
+	at(hooked, k, 300)
+	k:draw()
+	t.check("an adapter that draws is not outlined over", not table.concat(hooked.calls, "|"):find("begin", 1, true))
 end
 
 -- The switch.
@@ -428,7 +513,7 @@ do
 	g:draw()
 	t.same("the adapter's hook gets the definition, the team, the place and the facing", seen, string.format("12 1 600 %s 700 2", e.height(600, 700)))
 	t.same("and the engine's shape is not drawn", e.shapes, 0)
-	t.same("with a matrix of its own to leave as it found it", table.concat(e.calls, "|"), "push|pop")
+	t.same("with a matrix of its own to leave as it found it", table.concat(e.calls, "|"), "matrixmode 5888|push|pop")
 
 	local f = engine()
 	local bad = function()
@@ -584,7 +669,7 @@ local function widgetScene(options)
 	env.widget = {}
 	env.WG = {}
 	env.Spring = e.Spring
-	env.gl = e.gl
+	env.gl, env.GL = e.gl, e.GL
 	env.UnitDefs = e.UnitDefs
 	-- A handler whose LuaUI does not set the table has no such global, and a
 	-- widget asks for it as for any global that may not be there.

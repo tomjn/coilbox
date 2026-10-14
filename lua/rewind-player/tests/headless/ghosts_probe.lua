@@ -12,7 +12,7 @@
 -- player, seeks, waits for the player to publish that frame, and calls the
 -- widget's DrawWorld the way the handler would. A headless engine does not draw,
 -- and the engine's own drawing calls refuse to run outside a draw, so the probe
--- puts counting versions of the five the widget uses in their place for the
+-- puts counting versions of the eight the widget uses in their place for the
 -- length of that one call. What it records is what the widget asked the engine
 -- to draw: which shape, in which team's colour, at which place and turn.
 --
@@ -54,13 +54,25 @@ local function drawn(widget_)
 	local list = {}
 	local current = {}
 	local real = {}
-	for _, name in ipairs({ "PushMatrix", "PopMatrix", "Translate", "Rotate", "UnitShape" }) do
+	for _, name in ipairs({ "MatrixMode", "Color", "BeginEnd", "PushMatrix", "PopMatrix", "Translate", "Rotate", "UnitShape" }) do
 		real[name] = gl[name]
 	end
-	gl.PushMatrix = function()
-		current = { x = 0, y = 0, z = 0, turn = 0 }
+	local depth = 0
+	local outlines = 0
+	gl.MatrixMode = function() end
+	gl.Color = function() end
+	gl.BeginEnd = function()
+		outlines = outlines + 1
 	end
-	gl.PopMatrix = function() end
+	gl.PushMatrix = function()
+		depth = depth + 1
+		if depth == 1 then
+			current = { x = 0, y = 0, z = 0, turn = 0 }
+		end
+	end
+	gl.PopMatrix = function()
+		depth = depth - 1
+	end
 	gl.Translate = function(x, y, z)
 		current.x, current.y, current.z = x, y, z
 	end
@@ -86,7 +98,7 @@ local function drawn(widget_)
 	for name, fn in pairs(real) do
 		gl[name] = fn
 	end
-	return list, ok, err
+	return list, ok, err, outlines
 end
 
 local at = 0
@@ -136,15 +148,16 @@ function widget:Update()
 	end
 	if param("frame") == want and param("playing") == 0 or frame > deadline then
 		local w = ghosts()
-		local list, ok, err = drawn(w)
+		local list, ok, err, outlines = drawn(w)
 		table.sort(list)
 		say(
 			string.format(
-				"%s=%d arrived=%d ghosts=%d ok=%d list=%s%s",
+				"%s=%d arrived=%d ghosts=%d outlines=%d ok=%d list=%s%s",
 				FRAMES[at] and "frame" or "toggle_frame",
 				want,
 				param("frame") == want and 1 or 0,
 				#list,
+				outlines,
 				ok and 1 or 0,
 				table.concat(list, ";"),
 				ok and "" or (" error=" .. tostring(err))

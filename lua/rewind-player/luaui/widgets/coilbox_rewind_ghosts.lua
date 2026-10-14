@@ -85,7 +85,7 @@ function widget:Initialize()
 		Spring.Echo(PREFIX .. "failed: " .. tostring(Engine))
 		return
 	end
-	local engine = Engine.check({ Spring = Spring, gl = gl, VFS = VFS })
+	local engine = Engine.check({ Spring = Spring, gl = gl, GL = GL, VFS = VFS })
 	for _, line in ipairs(engine.lines) do
 		Spring.Echo(line)
 	end
@@ -114,6 +114,8 @@ function widget:Initialize()
 	local made = Ghosts.new({
 		Spring = Spring,
 		gl = gl,
+		GL = GL,
+		outline = engine.on.outline,
 		UnitDefs = UnitDefs,
 		UnitDefNames = definitionsByName(),
 		adapter = readAdapter(engine),
