@@ -636,6 +636,9 @@ do
 	run(world, player, 2)
 	collectgarbage()
 	collectgarbage("stop")
+	-- A full collection gives back part of the Lua stack, and the first frames
+	-- after it take that back, which is the interpreter's and not the player's.
+	run(world, player, 2)
 	local before = collectgarbage("count")
 	run(world, player, 300)
 	local after = collectgarbage("count")
@@ -647,6 +650,7 @@ do
 	run(world, player, 2)
 	collectgarbage()
 	collectgarbage("stop")
+	run(world, player, 2)
 	before = collectgarbage("count")
 	run(world, player, 250)
 	after = collectgarbage("count")
@@ -657,6 +661,7 @@ do
 	run(world, player, 2)
 	collectgarbage()
 	collectgarbage("stop")
+	run(world, player, 2)
 	before = collectgarbage("count")
 	run(world, player, 100)
 	after = collectgarbage("count")

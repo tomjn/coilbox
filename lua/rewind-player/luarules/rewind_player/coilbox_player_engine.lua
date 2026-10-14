@@ -30,7 +30,8 @@
 --
 -- `since` was read from the engine's source (rts/Lua, the registration of each
 -- name) at the tags 105.0, 105.1.1, 2025.01.6 and 2026.07.04, and agrees with
--- the spike on issue #3791, which read ten tags. A name found at 105.0 is given
+-- the spike on issue #3791, which read ten tags. The camera and drawing calls
+-- of the `view` and `arrivalEffect` rows were read at those and at 2025.03.9. A name found at 105.0 is given
 -- as 105.0. No older engine was read, so the player does not say that one older
 -- lacks it. The rows of the resources stage (issue #3982) were read at 105.0,
 -- 105.1.1, 2025.01.6, 2025.03.9 and 2026.07.04, and the one call that is not at
@@ -342,10 +343,10 @@ M.SYNCED = {
 		feature = "timing a frame's work",
 		calls = { "SendToUnsynced" },
 		how = "presence",
-		used = "coilbox_rewind_player.lua, gadget:GameFrame",
+		used = "coilbox_rewind_player.lua, gadget:GameFrame and the arrive function of gadget:Initialize",
 		required = false,
 		since = "105.0",
-		without = "The slow frame line is not logged",
+		without = "The slow frame line is not logged, a seek is shown in one frame, units are made in the order of the track's list and no arrival effect is shown",
 		visible = false,
 	},
 	{
@@ -371,7 +372,7 @@ M.UNSYNCED = {
 		used = "coilbox_rewind_player.lua, gadget:RecvFromSynced",
 		required = false,
 		since = "105.0",
-		without = "The slow frame line is not logged and a seek is not spread over frames, so a seek of many units is shown in one frame",
+		without = "The slow frame line is not logged and a seek is not spread over frames, so a seek of many units is shown in one frame and there is no arrival effect, which has no clock",
 		visible = false,
 	},
 	{
@@ -393,8 +394,45 @@ M.UNSYNCED = {
 		used = "coilbox_rewind_player.lua, retune",
 		required = false,
 		since = "105.0",
-		without = "The budget cannot be sent, so it stays at one unit made and one removed in a frame, and a seek of many units takes that many frames to show",
+		without = "The budget cannot be sent, so it stays at one unit made and one removed in a frame, and a seek of many units takes that many frames to show. The view cannot be sent either, so units are made in the order of the track's list",
 		visible = true,
+	},
+	{
+		id = "view",
+		feature = "making the units in view first",
+		calls = { "Spring.GetViewGeometry", "Spring.TraceScreenRay", "Spring.GetCameraPosition" },
+		how = "presence",
+		used = "coilbox_player_view.lua, View:poll",
+		required = false,
+		since = "105.0",
+		without = "The units a seek makes are made in the order of the track's list, and an arrival effect is shown for a unit outside the view too",
+		visible = false,
+	},
+	{
+		id = "arrivalEffect",
+		feature = "the arrival effect",
+		calls = {
+			"gl.BeginEnd",
+			"gl.Vertex",
+			"gl.Color",
+			"gl.Blending",
+			"gl.DepthTest",
+			"gl.DepthMask",
+			"gl.Texture",
+			"GL.QUADS",
+			"GL.SRC_ALPHA",
+			"GL.ONE",
+			"GL.ONE_MINUS_SRC_ALPHA",
+			"Spring.GetCameraDirection",
+			"Spring.GetUnitRadius",
+			"Spring.GetTeamColor",
+		},
+		how = "presence",
+		used = "coilbox_player_arrival.lua",
+		required = false,
+		since = "105.0",
+		without = "A unit that a slow seek makes appears with no effect",
+		visible = false,
 	},
 }
 

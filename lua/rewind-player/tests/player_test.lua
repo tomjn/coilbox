@@ -500,6 +500,11 @@ do
 	player:framePost()
 	collectgarbage()
 	collectgarbage("stop")
+	-- A full collection gives back part of the Lua stack, and the first frames
+	-- after it take that back, which is the interpreter's and not the player's.
+	player:frame()
+	world.heal(30)
+	player:framePost()
 	local before = collectgarbage("count")
 	for _ = 1, 200 do
 		player:frame()

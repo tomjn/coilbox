@@ -287,6 +287,7 @@ do
 	local bar = tl.rects.bar
 	local y = (bar.y1 + bar.y2) / 2
 	t.same("a press on the bar is taken", tl:mousePress(bar.x1, y, 1), true)
+	t.same("the player is told a drag has begun before the first seek of it (issue #4009)", e.sent[#e.sent - 1], "coilbox_rewind:drag 1")
 	t.same("the left end is the first frame", e.sent[#e.sent], "coilbox_rewind:seek 600")
 	tl:mouseMove(bar.x2, y)
 	t.same("the right end is the last frame", e.sent[#e.sent], "coilbox_rewind:seek 3600")
@@ -302,9 +303,34 @@ do
 	tl:mouseMove(bar.x2 + 600, y)
 	t.same("a move that lands on the same frame sends nothing", #e.sent, before)
 	tl:mouseRelease(bar.x2, y, 1)
+	t.same("letting go tells the player the drag has ended", e.sent[#e.sent], "coilbox_rewind:drag 0")
+	t.same("and that is all it sends", #e.sent, before + 1)
+	before = #e.sent
 	tl:mouseMove(bar.x1, y)
 	t.same("a move after the release seeks nothing", #e.sent, before)
 	t.same("a right click on the bar does not seek", tl:mousePress(bar.x1, y, 3) and #e.sent, before)
+	tl:mouseRelease(bar.x1, y, 3)
+	t.same("and a release with no drag says nothing of one", #e.sent, before)
+
+	local drags = 0
+	for _, text in ipairs(e.sent) do
+		if text == "coilbox_rewind:drag 1" then
+			drags = drags + 1
+		end
+	end
+	t.same("a drag begins once, however far the knob goes", drags, 1)
+end
+
+-- Moving the panel is not a drag of the knob.
+
+do
+	local e = engine(params())
+	local tl = timeline(e)
+	local panel = tl.rects.panel
+	tl:mousePress(panel.x1 + 2, panel.y1 + 2, 1)
+	tl:mouseMove(panel.x1 + 40, panel.y1 + 40)
+	tl:mouseRelease(panel.x1 + 40, panel.y1 + 40, 1)
+	t.same("moving the panel sends the player nothing", #e.sent, 0)
 end
 
 -- The knob is where the frame is.
@@ -697,6 +723,22 @@ do
 	t.check("its place is handed back to be saved", type(saved.x) == "number" and type(saved.y) == "number")
 	widget:ViewResize()
 	t.same("a resize that names no size asks the engine", widget:IsAbove(5, 5), false)
+
+	-- From the top of the panel down, the first press that begins a drag is on
+	-- the bar.
+	local began = false
+	for y = 1080, 1, -1 do
+		local n = #e.sent
+		widget:MousePress(960, y, 1)
+		if e.sent[n + 1] == "coilbox_rewind:drag 1" then
+			began = true
+			break
+		end
+		widget:MouseRelease(960, y, 1)
+	end
+	t.same("a press on the bar begins a drag", began, true)
+	widget:Shutdown()
+	t.same("a widget switched off in the middle of a drag ends it", e.sent[#e.sent], "coilbox_rewind:drag 0")
 end
 
 -- What the widget needs from the engine (issue #3802). The table is the

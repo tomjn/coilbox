@@ -402,9 +402,12 @@ do
 	local world, player, run = setup({ last = 3000, windowLength = 3000, units = list })
 	run(3)
 	t.same("twenty units are posed", world.unitCount(), 20)
-	local before = world.poseSets
 	collectgarbage()
 	collectgarbage("stop")
+	-- A full collection gives back part of the Lua stack, and the first frames
+	-- after it take that back, which is the interpreter's and not the player's.
+	run(1)
+	local before = world.poseSets
 	local memory = collectgarbage("count")
 	run(300)
 	local after = collectgarbage("count")

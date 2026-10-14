@@ -48,6 +48,9 @@ function M.new(first, last)
 		jumped = true,
 		-- A jump that no `advance` has shown yet.
 		pending = true,
+		-- Whether the timeline's knob is being dragged, which sends many seeks a
+		-- second (issue #4009).
+		dragging = false,
 	}, Clock)
 end
 
@@ -189,6 +192,16 @@ function COMMANDS.direction(clock, argument)
 		return false, "direction is 1 or -1, and got \"" .. argument .. "\""
 	end
 	clock.direction = way
+	return true
+end
+
+--- The timeline says its knob is being dragged, or has been let go. It moves
+-- nothing. The units stage shows no arrival effect while it lasts.
+function COMMANDS.drag(clock, argument)
+	if argument ~= "1" and argument ~= "0" then
+		return false, "drag is 1 or 0, and got \"" .. argument .. "\""
+	end
+	clock.dragging = argument == "1"
 	return true
 end
 
