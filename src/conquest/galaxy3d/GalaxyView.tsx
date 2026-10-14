@@ -222,8 +222,8 @@ interface GalaxyViewProps {
   terrainPixels?: TerrainPixels;
   /**
    * Where `galaxy.models` are read from: the installed game and the map's
-   * folder. A model whose source is absent is reported as missing. Keep it
-   * stable between renders, because a new object rebuilds the scene.
+   * folder. A model whose source is absent is reported as missing. A new
+   * object swaps the models only: the scene is not rebuilt.
    */
   modelSources?: PlacedModelSources;
   display?: Partial<GalaxyDisplay>;
@@ -493,6 +493,12 @@ export function GalaxyView({
   const applySelectionRef = useRef<(() => void) | null>(null);
   const applyVisibilityRef = useRef<(() => void) | null>(null);
   const applyFocusRef = useRef<(() => void) | null>(null);
+  // The scenery's sources arrive after the scene is built, so they reach the
+  // live scene through these instead of rebuilding it.
+  const modelSourcesRef = useRef(modelSources);
+  const attachModelsRef = useRef<
+    ((sources: PlacedModelSources | undefined) => void) | null
+  >(null);
   const renderRef = useRef<(() => void) | null>(null);
   // The warp-in plays on a fresh mount but not when only the previewed faction
   // changes. Comparing against the previous faction is robust to StrictMode's
@@ -506,6 +512,7 @@ export function GalaxyView({
   } | null>(null);
 
   onSelectRef.current = onSelect;
+  modelSourcesRef.current = modelSources;
 
   const reduceMotion =
     display?.reduceMotion ??
@@ -578,8 +585,33 @@ export function GalaxyView({
 
     /* ------------------------- decorative backdrop ------------------------- */
 
-    // Set where the scenery is built, for the markers that stand in for it.
+    // The scenery. It is added to the scene that is already built when its
+    // sources arrive, so a late source never rebuilds the terrain.
     let placedModels: PlacedModelsLayer | undefined;
+    let placedDisposables: { dispose(): void }[] = [];
+    disposables.push({
+      dispose: () => {
+        for (const d of placedDisposables) d.dispose();
+      },
+    });
+    // What the markers that stand in for the scenery wait on: it settles when
+    // the models do, whenever their sources arrive.
+    let settlePlaced: (() => void) | undefined;
+    const placedForMarkers:
+      | Pick<PlacedModelsLayer, "failed" | "settled">
+      | undefined = galaxy.models?.length
+      ? {
+          get failed() {
+            return placedModels?.failed ?? [];
+          },
+          settled: new Promise<void>((resolve) => {
+            settlePlaced = resolve;
+          }),
+        }
+      : undefined;
+    const unattached = Symbol("unattached");
+    let attachedSources: PlacedModelSources | undefined | typeof unattached =
+      unattached;
 
     // Roads painted into a terrain map's ground. See groundLayer.ts.
     let ground: GroundLayer | undefined;
@@ -642,16 +674,28 @@ export function GalaxyView({
         terrainBiomes,
       );
       // Scenery. It loads in the background and never holds the map up.
-      if (galaxy.models?.length && !modelSources?.pending) {
-        placedModels = buildPlacedModels(
+      const models = galaxy.models;
+      const attachModels = (sources: PlacedModelSources | undefined) => {
+        if (!models?.length || sources?.pending) return;
+        if (sources === attachedSources) return;
+        attachedSources = sources;
+        for (const d of placedDisposables) d.dispose();
+        placedDisposables = [];
+        const layer = buildPlacedModels(
           scene,
-          disposables,
-          surface,
-          galaxy.models,
-          placedModelLoaders(modelSources),
+          placedDisposables,
+          terrain,
+          models,
+          placedModelLoaders(sources),
           renderRef,
         );
-      }
+        placedModels = layer;
+        void layer.settled.then(() => {
+          if (layer === placedModels) settlePlaced?.();
+        });
+      };
+      attachModelsRef.current = attachModels;
+      attachModels(modelSourcesRef.current);
     } else {
       buildBackdrop(
         scene,
@@ -813,7 +857,7 @@ export function GalaxyView({
             surface,
             identities,
             ownerColor,
-            placedModels,
+            placedForMarkers,
             renderRef,
           )
         : undefined;
@@ -1575,6 +1619,7 @@ export function GalaxyView({
       applyVisibilityRef.current = null;
       applyFocusRef.current = null;
       applyBurstRef.current = null;
+      attachModelsRef.current = null;
     };
   }, [
     galaxy,
@@ -1593,8 +1638,12 @@ export function GalaxyView({
     terrainColor,
     terrainExtension,
     terrainBiomes,
-    modelSources,
   ]);
+
+  // Models added to the scene that is already built.
+  useEffect(() => {
+    attachModelsRef.current?.(modelSources);
+  }, [modelSources]);
 
   // Prop changes mutate the live scene and ask for a frame. Fog changes touch both lanes (via owners.ts's
   // apply) and the per-node styling.
