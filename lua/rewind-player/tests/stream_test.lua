@@ -365,8 +365,11 @@ do
 	local gl = e.gl
 	gl.Blending, gl.DepthTest, gl.DepthMask, gl.Texture, gl.Color, gl.TexCoord = nothing, nothing, nothing, nothing, nothing, nothing
 	gl.Vertex = nothing
-	gl.BeginEnd = function(_, fn, ...)
-		fn(...)
+	-- With fixed arguments: a stub that passes `...` on allocates a frame's
+	-- worth under LuaJIT 2.1.0-beta3 on x64, which CI runs. The engine's own
+	-- gl.BeginEnd is C.
+	gl.BeginEnd = function(_, fn, a, b, c, d, f, g, h, i, j, k, l)
+		fn(a, b, c, d, f, g, h, i, j, k, l)
 	end
 	local function draws()
 		for n = 1, 300 do
@@ -379,11 +382,7 @@ do
 	collectgarbage()
 	collectgarbage("stop")
 	-- A full collection gives back part of the Lua stack, and the draws after it
-	-- take that back, which is the interpreter's and not the stream's. LuaJIT
-	-- 2.1.0-beta3 on x64 took 1.2 kB more in the first measured batch after one
-	-- batch of this, which is less than one table and does not grow with the
-	-- draws, so it takes two.
-	draws()
+	-- take that back, which is the interpreter's and not the stream's.
 	draws()
 	local before = collectgarbage("count")
 	draws()
