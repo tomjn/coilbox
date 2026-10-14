@@ -29,6 +29,23 @@ local WORK = "coilbox_rewind_work"
 if not gadgetHandler:IsSyncedCode() then
 	local started
 	local frames, total, worst, worstFrame = 0, 0, 0, -1
+	-- The work of the frame that is running: the player's frame (phases 0 and
+	-- 1) and its post frame (phases 2 and 3), which are one frame's work. The
+	-- post frame alone is summed too, since the aim stage does its work there.
+	local current, currentFrame = 0, -1
+	local postFrames, postTotal, postWorst = 0, 0, 0
+	local micros = Spring.GetTimerMicros ~= nil
+	local clock = micros and Spring.GetTimerMicros or Spring.GetTimer
+
+	local function close()
+		if currentFrame >= 0 then
+			frames, total = frames + 1, total + current
+			if current > worst then
+				worst, worstFrame = current, currentFrame
+			end
+		end
+		current, currentFrame = 0, -1
+	end
 
 	function gadget:RecvFromSynced(name, a, b)
 		if name == SEND then
@@ -36,19 +53,38 @@ if not gadgetHandler:IsSyncedCode() then
 			return true
 		elseif name == WORK then
 			if a == 0 then
-				started = Spring.GetTimer()
+				close()
+				currentFrame = b
+				started = clock()
+			elseif a == 2 then
+				started = clock()
 			elseif started then
-				local took = Spring.DiffTimers(Spring.GetTimer(), started, true)
+				local took = Spring.DiffTimers(clock(), started, true, micros)
 				started = nil
-				frames, total = frames + 1, total + took
-				if took > worst then
-					worst, worstFrame = took, b
+				current = current + took
+				if a == 3 then
+					postFrames, postTotal = postFrames + 1, postTotal + took
+					if took > postWorst then
+						postWorst = took
+					end
 				end
 			end
 			-- The player's own half has to hear it too.
 			return false
 		elseif name == REPORT then
-			Spring.Echo(string.format("REWIND_DRIVER work frames=%d mean_ms=%.3f worst_ms=%.3f worst_frame=%d", frames, total / math.max(frames, 1), worst, worstFrame))
+			close()
+			Spring.Echo(
+				string.format(
+					"REWIND_DRIVER work frames=%d mean_ms=%.3f worst_ms=%.3f worst_frame=%d post_frames=%d post_mean_ms=%.3f post_worst_ms=%.3f",
+					frames,
+					total / math.max(frames, 1),
+					worst,
+					worstFrame,
+					postFrames,
+					postTotal / math.max(postFrames, 1),
+					postWorst
+				)
+			)
 			Spring.Echo("REWIND_DRIVER done")
 			return true
 		end
@@ -74,8 +110,33 @@ local RESOURCES = "coilbox_rewind/driver_resources.lua"
 -- And one that asks for the plan of seeks across the whole match (issue #3988).
 local SEEKS = "coilbox_rewind/driver_seeks.lua"
 
+-- And one that asks for the plan that looks at aim poses (issue #3796). It
+-- returns a table: `frames` to seek to, and `off = true` to play with the aim
+-- stage switched off, which is how its cost is told from the rest.
+local AIM = "coilbox_rewind/driver_aim.lua"
+
 local Track = VFS.Include("luarules/rewind_player/coilbox_track.lua")
 local Fetch = VFS.Include("luarules/rewind_player/coilbox_track_fetch.lua")
+
+local aimAsked = VFS.FileExists(AIM) and VFS.Include(AIM) or nil
+-- The driver keeps the call for itself, and takes it out of the table every
+-- gadget shares before the player's gadget looks at what the engine has. The
+-- player then finds the aim stage's row off, as on an engine without the call.
+local getUnitScriptNames = Spring.GetUnitScriptNames
+if type(aimAsked) == "table" and aimAsked.off then
+	Spring.GetUnitScriptNames = nil
+end
+-- `nocall = true` stands in for an engine that makes no GameFramePost call
+-- (issue #4002): nothing can tell the engine that a handler or a gadget has a
+-- function of that name, so the engine never calls one.
+if type(aimAsked) == "table" and aimAsked.nocall then
+	local update = Script.UpdateCallIn
+	Script.UpdateCallIn = function(name)
+		if name ~= "GameFramePost" then
+			return update(name)
+		end
+	end
+end
 
 local track, info, features
 local queue, at = {}, 1
@@ -1162,6 +1223,268 @@ local function seeksPlan()
 	end)
 end
 
+-- Aim poses (issue #3796).
+
+-- The posed piece names of a unit definition, by its place in the track's list.
+local posedNames
+-- The script's piece numbers of an engine unit, by name, read once for a unit.
+local scriptNames = {}
+local pose = { 0, 0, 0, 0, 0, 0 }
+local TURN = 2 * math.pi
+-- Half a step of what the track stores: an angle in 65,536ths of a turn, and
+-- an offset in position steps. A piece further from the track than this was
+-- not set to the track's value.
+local TURN_LIMIT = math.pi / 65536
+
+--- How far two angles are apart, taking a whole turn for none.
+local function apart(a, b)
+	local d = math.abs(a - b) % TURN
+	return math.min(d, TURN - d)
+end
+
+--- Looks at every posed piece of every unit the track has at the time the
+-- player last showed, and adds to `sum` what it finds: `pieces` looked at,
+-- `turned` of them that the track has away from rest, `bad` of them that are
+-- not the track's, the worst turn and offset from it, `absent` units that the
+-- engine does not have yet, `missing` pieces a script lacks, and of all the
+-- engine's units, `wounded` ones and ones whose maximum health is not their
+-- definition's (issue #4002).
+local function aimLook(sum)
+	local frame = param("frame")
+	local w = assert(track:seek(frame))
+	local moveLimit = track.header.positionStep / 2
+	local UnitScript = Spring.UnitScript
+	local byPlace = {}
+	for _, unitID in ipairs(liveUnits()) do
+		local x, y, z = Spring.GetUnitPosition(unitID)
+		byPlace[string.format("%d %.3f %.3f %.3f", Spring.GetUnitDefID(unitID), x, y, z)] = unitID
+		local health, maxHealth = Spring.GetUnitHealth(unitID)
+		if health < maxHealth then
+			sum.wounded = sum.wounded + 1
+		end
+		if maxHealth ~= UnitDefs[Spring.GetUnitDefID(unitID)].health then
+			sum.lowered = sum.lowered + 1
+		end
+	end
+	sum.looks = sum.looks + 1
+	for i = 1, w.unitCount do
+		local names = posedNames[w.unitDef[i] + 1]
+		local def = UnitDefNames[info.unitDefs[w.unitDef[i] + 1]]
+		local unitID
+		if def and w:unitExistsAt(i, frame) then
+			w:sampleTransform(i, frame, transform)
+			unitID = byPlace[string.format("%d %.3f %.3f %.3f", def.id, transform[1], transform[2], transform[3])]
+			if unitID then
+				-- A finished unit's health against the track's, as the frame before
+				-- left it. The player keeps a unit one step of health above none.
+				w:sampleStatus(i, frame, status)
+				if status[2] >= 1 then
+					local health, maxHealth = Spring.GetUnitHealth(unitID)
+					local off = math.abs(health / maxHealth - math.max(status[1], 1 / 65535))
+					if off > 1 / 65535 then
+						sum.healthOff = sum.healthOff + 1
+					end
+					sum.worstHealth = math.max(sum.worstHealth, off)
+				end
+			end
+		end
+		if names and def and w:unitExistsAt(i, frame) then
+			if not unitID then
+				sum.absent = sum.absent + 1
+			else
+				local script = scriptNames[unitID]
+				if not script then
+					script = getUnitScriptNames(unitID)
+					scriptNames[unitID] = script
+				end
+				-- The pose track of each posed piece, or none for one at rest.
+				local trackOf = {}
+				for poseTrack = w.unitPoseFirst[i], w.unitPoseFirst[i] + w.unitPoseCount[i] - 1 do
+					trackOf[w.posePiece[poseTrack] + 1] = poseTrack
+				end
+				for k, name in ipairs(names) do
+					local number = script[name]
+					if not number then
+						sum.missing = sum.missing + 1
+					else
+						pose[1], pose[2], pose[3], pose[4], pose[5], pose[6] = 0, 0, 0, 0, 0, 0
+						if trackOf[k] then
+							w:samplePose(trackOf[k], frame, pose)
+						end
+						local rx, ry, rz = UnitScript.CallAsUnit(unitID, UnitScript.GetPieceRotation, number + 1)
+						local px, py, pz = UnitScript.CallAsUnit(unitID, UnitScript.GetPieceTranslation, number + 1)
+						local turn = math.max(
+							apart(rx, (pose[1] % 65536) * TURN / 65536),
+							apart(ry, (pose[2] % 65536) * TURN / 65536),
+							apart(rz, (pose[3] % 65536) * TURN / 65536)
+						)
+						local move = math.max(math.abs(px - pose[4]), math.abs(py - pose[5]), math.abs(pz - pose[6]))
+						sum.pieces = sum.pieces + 1
+						if pose[1] % 65536 ~= 0 or pose[2] % 65536 ~= 0 or pose[3] % 65536 ~= 0 or pose[4] ~= 0 or pose[5] ~= 0 or pose[6] ~= 0 then
+							sum.turned = sum.turned + 1
+						end
+						if turn > TURN_LIMIT or move > moveLimit then
+							sum.bad = sum.bad + 1
+						end
+						sum.worstTurn, sum.worstMove = math.max(sum.worstTurn, turn), math.max(sum.worstMove, move)
+					end
+				end
+			end
+		end
+	end
+end
+
+local function aimSum()
+	return {
+		looks = 0,
+		pieces = 0,
+		turned = 0,
+		bad = 0,
+		absent = 0,
+		missing = 0,
+		wounded = 0,
+		lowered = 0,
+		healthOff = 0,
+		worstTurn = 0,
+		worstMove = 0,
+		worstHealth = 0,
+	}
+end
+
+local function aimSay(label, sum)
+	say(
+		string.format(
+			"aim %s shown=%s looks=%d pieces=%d turned=%d bad=%d worst_turn=%.7f worst_move=%.5f absent=%d missing=%d wounded=%d lowered_max=%d health_off=%d worst_health=%.6f",
+			label,
+			tostring(param("frame")),
+			sum.looks,
+			sum.pieces,
+			sum.turned,
+			sum.bad,
+			sum.worstTurn,
+			sum.worstMove,
+			sum.absent,
+			sum.missing,
+			sum.wounded,
+			sum.lowered,
+			sum.healthOff,
+			sum.worstHealth
+		)
+	)
+end
+
+--- The frames to seek to when the test names none: the six frames with the
+-- most pieces away from rest, among every 30th frame of the track, no two of
+-- them within 150 frames.
+local function aimFrames()
+	local h = track.header
+	local scored = {}
+	for frame = h.firstFrame, h.lastFrame - 100, 30 do
+		local w = assert(track:seek(frame))
+		local n = 0
+		for i = 1, w.unitCount do
+			if w:unitExistsAt(i, frame) then
+				for poseTrack = w.unitPoseFirst[i], w.unitPoseFirst[i] + w.unitPoseCount[i] - 1 do
+					w:samplePose(poseTrack, frame, pose)
+					if pose[1] % 65536 ~= 0 or pose[2] % 65536 ~= 0 or pose[3] % 65536 ~= 0 then
+						n = n + 1
+					end
+				end
+			end
+		end
+		scored[#scored + 1] = { frame = frame, n = n }
+	end
+	table.sort(scored, function(a, b)
+		if a.n ~= b.n then
+			return a.n > b.n
+		end
+		return a.frame < b.frame
+	end)
+	local frames = {}
+	for _, item in ipairs(scored) do
+		local clear = true
+		for _, taken in ipairs(frames) do
+			if math.abs(taken - item.frame) < 150 then
+				clear = false
+			end
+		end
+		if clear and item.n > 0 and #frames < 6 then
+			frames[#frames + 1] = item.frame
+		end
+	end
+	table.sort(frames)
+	return frames
+end
+
+--- The plan for aim poses: seeks into the match's fights, and at each a look on
+-- the first frame the seek is shown, on each of 60 frames paused, and on each of
+-- 90 frames played forward and 90 played backward at the match's own speed. The
+-- driver's frame runs before the player's, so a look reads what the frame
+-- before left when it was over, at the time that frame showed. `asked.frames`
+-- are the frames to seek to.
+local function aimPlan(asked)
+	local h = track.header
+	posedNames = {}
+	for _, posed in ipairs(info.posedPieces) do
+		posedNames[posed.unitDef + 1] = posed.pieces
+	end
+	local frames = type(asked) == "table" and asked.frames or nil
+	if not frames or #frames == 0 then
+		frames = aimFrames()
+	end
+	say(string.format("start first=%d last=%d seeks=%d posed_defs=%d", h.firstFrame, h.lastFrame, #frames, #info.posedPieces))
+	send("pause")
+	seekTo(h.firstFrame)
+	for n, frame in ipairs(frames) do
+		send("seek " .. frame)
+		push("await", frame)
+		-- The message changes the published frame as it arrives. The frame that
+		-- shows it is the next one.
+		push("wait", 1)
+		push("run", function()
+			local sum = aimSum()
+			aimLook(sum)
+			aimSay("first n=" .. n .. " frame=" .. frame .. " settled=" .. tostring(param("settled")), sum)
+		end)
+		local held = aimSum()
+		push("each", 60, function()
+			aimLook(held)
+		end)
+		push("run", function()
+			aimSay("held n=" .. n .. " frame=" .. frame, held)
+		end)
+		for _, way in ipairs({ { "forward", "play 1" }, { "backward", "play -1" } }) do
+			local sum = aimSum()
+			send(way[2])
+			push("each", 90, function()
+				aimLook(sum)
+			end)
+			push("run", function()
+				aimSay(way[1] .. " n=" .. n .. " frame=" .. frame, sum)
+			end)
+		end
+		send("pause")
+		push("wait", SETTLE)
+	end
+	-- A long rest, paused, for a game whose units heal only after they have
+	-- stood idle for a while.
+	local rest = type(asked) == "table" and tonumber(asked.rest) or 0
+	if rest > 0 and #frames > 0 then
+		local frame = frames[#frames]
+		seekTo(frame)
+		local sum = aimSum()
+		push("each", rest, function()
+			aimLook(sum)
+		end)
+		push("run", function()
+			aimSay("rest frame=" .. frame, sum)
+		end)
+	end
+	push("run", function()
+		SendToUnsynced(REPORT)
+	end)
+end
+
 local function plan()
 	local h = track.header
 	local first, last = h.firstFrame, h.lastFrame
@@ -1279,7 +1602,9 @@ function gadget:GameFrame()
 		info, features = assert(track:info()), assert(track:features())
 		-- The test that wants a whole match played writes this file beside the
 		-- track. Without it the plan is the fixture match's.
-		if VFS.FileExists(RESOURCES) then
+		if aimAsked then
+			aimPlan(aimAsked)
+		elseif VFS.FileExists(RESOURCES) then
 			resourcePlan(VFS.Include(RESOURCES))
 		elseif VFS.FileExists(SEEKS) then
 			seeksPlan()
