@@ -3186,6 +3186,16 @@ end
             .filter(|l| l.starts_with("seek_settle "))
             .collect();
         let stops: Vec<&&str> = driver.iter().filter(|l| l.starts_with("seeks ")).collect();
+        let grounds: Vec<&&str> = driver
+            .iter()
+            .filter(|l| l.starts_with("seek_ground "))
+            .collect();
+        assert_eq!(grounds.len(), 8, "{driver:?}");
+        // Every corner the track changes is at the track's height after each
+        // seek, read back out of the engine (issue #4025).
+        for l in &grounds {
+            assert_eq!(field(l, "wrong"), "0", "{l}");
+        }
         assert_eq!(settles.len(), 8, "{driver:?}");
         assert_eq!(stops.len(), 8, "{driver:?}");
         for l in &settles {
