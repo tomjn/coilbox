@@ -237,3 +237,18 @@ export const playInfolog = defineCommand<
   { dataDir: string; maxLines: number },
   { log: InfologTail }
 >("coilbox-play", "play_infolog");
+
+/** The machine coilbox runs on, as far as the OS will say. */
+export interface SystemInfo {
+  /** `macos`, `windows` or `linux`. */
+  os: string;
+  osVersion: string | null;
+  /** `aarch64`, `x86_64` and so on. */
+  arch: string;
+}
+
+/** The operating system, its version and the CPU architecture. */
+export const playSystemInfo = defineCommand<Record<string, never>, SystemInfo>(
+  "coilbox-play",
+  "play_system_info",
+);

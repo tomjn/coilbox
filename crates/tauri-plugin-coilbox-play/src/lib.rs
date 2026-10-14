@@ -11,6 +11,7 @@ mod focus;
 mod infolog;
 mod launch;
 pub mod script;
+mod sysinfo;
 
 use launch::build_engine_args;
 use picoframe_core::CliResult;
@@ -493,6 +494,13 @@ async fn play_infolog<R: Runtime>(
     }
 }
 
+/// `play_system_info` — the operating system, its version and the CPU
+/// architecture, for the engine log page to show next to the log's path.
+#[tauri::command]
+async fn play_system_info() -> CliResult {
+    CliResult::ok(json!(sysinfo::read()))
+}
+
 /// Build the plugin. Registered as `"coilbox-play"` (crate name minus the
 /// `tauri-plugin-` prefix); the frontend invokes `plugin:coilbox-play|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -511,7 +519,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             play_launch_save,
             play_cancel,
             play_focus,
-            play_infolog
+            play_infolog,
+            play_system_info
         ])
         .build()
 }

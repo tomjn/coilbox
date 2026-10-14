@@ -13,4 +13,5 @@ permissions = [
   "allow-play-cancel",
   "allow-play-focus",
   "allow-play-infolog",
+  "allow-play-system-info",
 ]

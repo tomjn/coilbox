@@ -12,8 +12,10 @@ import { InfologView } from "./InfologView";
  *
  * A crash used to be silent: the window closed, the badge cleared, and nothing
  * said the engine had gone. This says what happened, shows the end of the log
- * with the engine's own error lines picked out, and puts a report on the
- * clipboard for pasting into Discord or a bug report.
+ * with the engine's own error lines picked out, and puts a note on the
+ * clipboard for pasting into Discord or a bug report. The note names the log
+ * file and carries none of its lines: part of a log passes for the whole of it
+ * (issue #4064).
  *
  * A right-hand sheet like `DebriefDrawer`, per the repo's preference for drawers
  * over modal dialogs.
@@ -41,7 +43,6 @@ export function CrashDrawer({
       engine,
       file,
       logPath: log?.path,
-      lines: log?.lines ?? [],
     });
     navigator.clipboard
       .writeText(text)
@@ -122,7 +123,7 @@ export function CrashDrawer({
             <div className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
               <Button onClick={copyReport} className="gap-1.5">
                 <ClipboardCopy className="size-4" />
-                {copied ? "Copied" : "Copy report"}
+                {copied ? "Copied" : "Copy details"}
               </Button>
               {log ? (
                 <Button

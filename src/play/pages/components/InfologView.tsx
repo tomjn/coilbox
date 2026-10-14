@@ -13,8 +13,8 @@ const TONE = {
 
 /**
  * The engine log's tail, with the engine's own error and warning lines picked
- * out. Shared by the crash drawer and the Engine log settings page, which want
- * the same thing for different reasons.
+ * out, for the crash drawer to explain what happened. Nothing that shows it may
+ * copy it: the tail passes for the whole file (issue #4064).
  *
  * Rendered as one span per line inside a `<pre>` rather than as a block of text,
  * because each line needs its own colour, and left selectable because a log is
