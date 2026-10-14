@@ -1083,7 +1083,12 @@ mod tests {
                 ["startUnit", "mmLevel", "mmCapacity", "mmUse", "mmAvgEffi"]
             );
             assert!(adapter.game_params.is_empty());
-            assert!(adapter.match_time_widgets.is_empty());
+            // The line under the players list prints the match's time and the
+            // speed it moves at (issue #4013).
+            assert_eq!(
+                adapter.match_time_widgets,
+                ["gui_advplayerslist_gameinfo.lua"]
+            );
         }
         // The original project still uses the short name BAR.
         for other in ["BAR", "BA", "SF"] {
