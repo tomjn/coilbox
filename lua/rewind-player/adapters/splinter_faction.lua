@@ -58,6 +58,12 @@ return {
 		-- A strip of buttons for the selection at the bottom centre of the view,
 		-- which is where the timeline is, so the two draw over each other.
 		"gui_static_selected_units_buttons.lua",
+		-- Writes the time left over a unit under construction, worked out from
+		-- how fast its build progress moved between the frames it watched. A
+		-- playback simulates nothing: its build progress moves as the track
+		-- has it, at the speed of play and backward too, and stands still while
+		-- paused, so the time is not the match's, and paused it reads ???.
+		"gui_build_eta.lua",
 	},
 
 	-- The numbers on the game's resource bar that are the game's own and not the

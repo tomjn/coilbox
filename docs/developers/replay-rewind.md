@@ -236,7 +236,7 @@ An adapter with a `versions` range is for no game that has no version. A game fo
 
 Keep what tells a viewer about the match. Switch off only what fights the recording, what offers an action that makes no sense in playback, and what covers the timeline.
 
-Keep the resource bars, the tooltip with a unit's description, the minimap, the players list, health bars and build progress. Splinter Faction's adapter keeps all of these, along with the game's own effects, lights and weather.
+Keep the resource bars, the tooltip with a unit's description, the minimap, the players list, health bars and build progress. Splinter Faction's adapter keeps all of these, along with the game's own effects, lights and weather. It switches off the time left over a building under construction, `gui_build_eta.lua`, which works that time out from how fast build progress moves. In a playback build progress moves at the speed of play, backward too, and not at all while paused, so the time would not be the match's. Do the same for any widget of yours that works a rate out from the frames it watches.
 
 Switch off a gadget that fights the recording. These are the kinds Splinter Faction had:
 
