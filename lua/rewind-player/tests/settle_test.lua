@@ -124,6 +124,37 @@ do
 	t.same("a budget below one still makes one unit, so that a seek settles", world2.unitCount(), 1)
 end
 
+-- The first unit of each definition in the run costs the engine and the game
+-- more than the next ones, so the units stage says how many a frame made, for
+-- the unsynced half to leave out of the trend in what a unit costs (issue
+-- #4015).
+
+do
+	local units = append(row(3, 100, 400, 0), row(3, 100, 400, 1))
+	local world, player = setup({ last = 600, units = units }, 2)
+	player:message("coilbox_rewind:pause")
+	seek(player, 150)
+	local firsts = {}
+	for n = 1, 4 do
+		player:frame()
+		firsts[n] = player:firstUnits()
+	end
+	t.same("a frame says how many of its units were the first of their definition", table.concat(firsts, " "), "1 1 0 0")
+	seek(player, 0)
+	for _ = 1, 3 do
+		player:frame()
+	end
+	t.same("the seek back removed them", world.unitCount(), 0)
+	seek(player, 150)
+	firsts = {}
+	for n = 1, 4 do
+		player:frame()
+		firsts[n] = player:firstUnits()
+	end
+	t.same("and a later seek makes none, since the first of a definition is the first in the run", table.concat(firsts, " "), "0 0 0 0")
+	t.same("though it made them all again", world.unitCount(), 6)
+end
+
 -- What a frame does first is remove, and removals are the budget's too.
 
 do

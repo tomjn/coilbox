@@ -1457,7 +1457,7 @@ function M.new(options)
 		},
 		-- What every synced gadget shares.
 		GG = {},
-		SendToUnsynced = function(name, phase, a, made, removed, team)
+		SendToUnsynced = function(name, phase, a, made, removed, team, ...)
 			if name == "coilbox_rewind_log" then
 				-- A line for the playback's log file, which the unsynced half writes.
 				world.lines[#world.lines + 1] = phase
@@ -1471,6 +1471,13 @@ function M.new(options)
 			end
 			world.sent = world.sent + 1
 			world.sentName, world.sentPhase, world.sentMade, world.sentRemoved = name, phase, made, removed
+			-- The end of a frame's work also says the budgets the frame worked to,
+			-- and how many of its units were the first of their definition.
+			if phase == 1 then
+				local make, remove, earth, firsts = ...
+				world.sentBudgets = { make, remove, earth }
+				world.sentFirsts = firsts
+			end
 		end,
 		next = next,
 	}
