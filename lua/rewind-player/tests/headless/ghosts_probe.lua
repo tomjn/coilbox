@@ -12,7 +12,7 @@
 -- player, seeks, waits for the player to publish that frame, and calls the
 -- widget's DrawWorld the way the handler would. A headless engine does not draw,
 -- and the engine's own drawing calls refuse to run outside a draw, so the probe
--- puts counting versions of the eight the widget uses in their place for the
+-- puts counting versions of the ten the widget uses in their place for the
 -- length of that one call. What it records is what the widget asked the engine
 -- to draw: which shape, in which team's colour, at which place and turn.
 --
@@ -54,13 +54,15 @@ local function drawn(widget_)
 	local list = {}
 	local current = {}
 	local real = {}
-	for _, name in ipairs({ "MatrixMode", "Color", "BeginEnd", "PushMatrix", "PopMatrix", "Translate", "Rotate", "UnitShape" }) do
+	for _, name in ipairs({ "MatrixMode", "Color", "LineWidth", "Blending", "BeginEnd", "PushMatrix", "PopMatrix", "Translate", "Rotate", "UnitShape" }) do
 		real[name] = gl[name]
 	end
 	local depth = 0
 	local outlines = 0
 	gl.MatrixMode = function() end
 	gl.Color = function() end
+	gl.LineWidth = function() end
+	gl.Blending = function() end
 	gl.BeginEnd = function()
 		outlines = outlines + 1
 	end

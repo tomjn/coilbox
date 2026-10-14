@@ -86,7 +86,7 @@ M.ROWS = {
 	{
 		id = "outline",
 		feature = "the footprint outline",
-		calls = { "gl.Color", "gl.BeginEnd", "gl.Vertex", "GL.LINE_LOOP", "Spring.GetTeamColor" },
+		calls = { "gl.Color", "gl.BeginEnd", "gl.Vertex", "gl.LineWidth", "gl.Blending", "GL.LINE_LOOP", "GL.TRIANGLE_FAN", "Spring.GetTeamColor" },
 		how = "presence",
 		used = "coilbox_ghosts.lua, Ghosts:draw",
 		required = false,

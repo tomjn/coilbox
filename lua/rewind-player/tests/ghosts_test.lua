@@ -66,7 +66,7 @@ local function engine()
 			return 0, 0, 1, 1
 		end,
 	}
-	e.GL = { MODELVIEW = 5888, LINE_LOOP = 2 }
+	e.GL = { MODELVIEW = 5888, LINE_LOOP = 2, TRIANGLE_FAN = 6 }
 	local function note(...)
 		if e.record then
 			e.calls[#e.calls + 1] = table.concat({ ... }, " ")
@@ -76,6 +76,16 @@ local function engine()
 		MatrixMode = function(mode)
 			if e.record then
 				note("matrixmode", mode)
+			end
+		end,
+		LineWidth = function(width)
+			if e.record then
+				note("linewidth", width)
+			end
+		end,
+		Blending = function(on)
+			if e.record then
+				note("blending", tostring(on))
 			end
 		end,
 		Color = function(r, g, b, a)
@@ -417,18 +427,35 @@ do
 	g:draw()
 	local y = e.height(600, 700) + 2
 	local calls = table.concat(e.calls, "|")
-	local outline = table.concat({
-		"matrixmode 5888",
-		"color 1 0 0 1",
-		"begin 2",
+	-- Team 1 is red, a line a share of the way to white.
+	local corners = {
 		"vertex 584 " .. y .. " 684",
 		"vertex 616 " .. y .. " 684",
 		"vertex 616 " .. y .. " 716",
 		"vertex 584 " .. y .. " 716",
+	}
+	local outline = table.concat({
+		"matrixmode 5888",
+		"blending true",
+		"linewidth 2",
+		"color 1 0.4 0.4 0.25",
+		"begin 6",
+		corners[1],
+		corners[2],
+		corners[3],
+		corners[4],
 		"end",
+		"color 1 0.4 0.4 1",
+		"begin 2",
+		corners[1],
+		corners[2],
+		corners[3],
+		corners[4],
+		"end",
+		"linewidth 1",
 		"color 1 1 1 1",
 	}, "|")
-	t.check("a ghost's footprint is outlined on the ground in its team's colour, before the shape", calls:sub(1, #outline) == outline, calls)
+	t.check("a ghost's footprint is filled and outlined on the ground in its team's colour, before the shape", calls:sub(1, #outline) == outline, calls)
 	t.same("and the shape follows", e.shapes, 1)
 
 	local f = engine()

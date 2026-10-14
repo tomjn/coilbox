@@ -48,8 +48,16 @@ M.HOOK = "drawQueuedBuilding"
 --- Elmos in a square of a unit definition's footprint.
 M.SQUARE = 8
 
---- How far above the ground the footprint's outline is drawn, in elmos.
+--- How far above the ground the footprint is drawn, in elmos.
 M.OUTLINE_LIFT = 2
+
+--- The footprint's look: the width of its line in pixels, how much of the way
+-- from the team's colour to white the line is, and the fill's opacity. A dark
+-- team colour in a thin line was hard to see on the ground in the engine run
+-- (issue #3804). They are design choices and not measurements.
+M.LINE_WIDTH = 2
+M.LIGHTEN = 0.4
+M.FILL_ALPHA = 0.25
 
 local Ghosts = {}
 Ghosts.__index = Ghosts
@@ -260,7 +268,11 @@ local function rebuild(self, frame)
 						end
 						self.hx[count], self.hz[count] = hx, hz
 						if self.outline then
-							self.reds[count], self.greens[count], self.blues[count] = self.Spring.GetTeamColor(team)
+							local r, g, b = self.Spring.GetTeamColor(team)
+							local lighten = M.LIGHTEN
+							self.reds[count] = r + (1 - r) * lighten
+							self.greens[count] = g + (1 - g) * lighten
+							self.blues[count] = b + (1 - b) * lighten
 						end
 					end
 				end
@@ -355,16 +367,22 @@ function Ghosts:draw()
 	-- always left on it.
 	gl.MatrixMode(self.GL.MODELVIEW)
 	if self.outline and not self.hook then
-		local lift = M.OUTLINE_LIFT
+		local lift, GL = M.OUTLINE_LIFT, self.GL
+		gl.Blending(true)
+		gl.LineWidth(M.LINE_WIDTH)
 		for k = 1, count do
 			local x, z = xs[k], zs[k]
 			local y = ground(x, z)
 			if floats[k] and y < 0 then
 				y = 0
 			end
-			gl.Color(self.reds[k], self.greens[k], self.blues[k], 1)
-			gl.BeginEnd(self.GL.LINE_LOOP, footprint, gl.Vertex, x, y + lift, z, self.hx[k], self.hz[k])
+			local r, g, b = self.reds[k], self.greens[k], self.blues[k]
+			gl.Color(r, g, b, M.FILL_ALPHA)
+			gl.BeginEnd(GL.TRIANGLE_FAN, footprint, gl.Vertex, x, y + lift, z, self.hx[k], self.hz[k])
+			gl.Color(r, g, b, 1)
+			gl.BeginEnd(GL.LINE_LOOP, footprint, gl.Vertex, x, y + lift, z, self.hx[k], self.hz[k])
 		end
+		gl.LineWidth(1)
 		gl.Color(1, 1, 1, 1)
 	end
 	for k = 1, count do
