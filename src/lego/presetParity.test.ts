@@ -6,6 +6,7 @@ import {
   type AnimPreset,
   BUILD_PREVIEW_AIM,
   BUILD_PREVIEW_LEG,
+  cycleSteps,
   PRESETS,
   RECOIL_PREVIEW_PAUSE,
   type TrackDelta,
@@ -149,12 +150,13 @@ interface Plan {
 const FIRST_LAP =
   "The first lap starts from rest rather than from the cycle's first pose, so it is not compared. Every lap after it is.";
 
-/** The poses `cycleThread` samples, as preset times. */
-function cycleKnots(period: number): number[] {
-  return [0, 1, 2, 3, 4].map((step) => (step / 4) * period);
-}
-
-function cyclePlan(callin: string, frame: number, period: number): Plan {
+function cyclePlan(
+  preset: AnimPreset,
+  params: Record<string, number>,
+  callin: string,
+  frame: number,
+): Plan {
+  const period = Math.max(param(preset, params, "period"), 0.05);
   const lap = Math.round(period * FPS);
   const frames = Math.min(frame + 2 * lap + 1, MAX_FRAMES);
   return {
@@ -168,7 +170,8 @@ function cyclePlan(callin: string, frame: number, period: number): Plan {
         from: frame + lap,
         to: frames - 1,
         t0: lap / FPS,
-        knots: cycleKnots(period),
+        // The poses `cycleThread` samples, as preset times.
+        knots: cycleSteps(preset, params, period).map((frame) => frame / FPS),
         period,
       },
     ],
@@ -326,20 +329,19 @@ function wheelsPlan(): Plan {
 }
 
 function plan(preset: AnimPreset, params: Record<string, number>): Plan {
-  const period = param(preset, params, "period");
   switch (preset.id) {
     case "walk.biped":
     case "walk.quad":
-      return cyclePlan("StartMoving", CALLIN, period);
+      return cyclePlan(preset, params, "StartMoving", CALLIN);
     case "buildarm":
-      return cyclePlan("StartBuilding", CALLIN, period);
+      return cyclePlan(preset, params, "StartBuilding", CALLIN);
     case "open.close":
-      return cyclePlan("Activate", CALLIN, period);
+      return cyclePlan(preset, params, "Activate", CALLIN);
     // Hovering starts on Create, which every run fires on its first frame.
     case "hover.bob":
-      return cyclePlan("Create", 0, period);
+      return cyclePlan(preset, params, "Create", 0);
     case "idle.sway":
-      return cyclePlan("StopMoving", CALLIN, period);
+      return cyclePlan(preset, params, "StopMoving", CALLIN);
     case "turret.track":
     case "aim.track":
       return aimPlan(preset, params);
