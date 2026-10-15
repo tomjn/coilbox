@@ -669,12 +669,12 @@ export const BUILDARM: AnimPreset = {
  * one that only showed the hold would look like nothing. Each leg is a swing
  * followed by a hold, and the two legs aim opposite ways.
  */
-const BUILD_PREVIEW_LEG = 3;
+export const BUILD_PREVIEW_LEG = 3;
 /** The most of a leg the swing may take, so there is always a hold to see. */
 const BUILD_PREVIEW_SWING = 2 / 3;
 
 /** Where the preview aims on each leg, in degrees of heading and pitch. */
-const BUILD_PREVIEW_AIM: [number, number][] = [
+export const BUILD_PREVIEW_AIM: [number, number][] = [
   [40, -12],
   [-35, 8],
 ];
@@ -1121,7 +1121,7 @@ export const AIM_TRACK: AnimPreset = {
  * whenever the weapon does and nothing else. It only exists so a preview at
  * rest keeps demonstrating the motion instead of firing once and going still.
  */
-const RECOIL_PREVIEW_PAUSE = 0.6;
+export const RECOIL_PREVIEW_PAUSE = 0.6;
 
 export const RECOIL: AnimPreset = {
   id: "recoil",
