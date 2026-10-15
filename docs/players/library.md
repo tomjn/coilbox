@@ -169,4 +169,4 @@ If the last scan was saved but the new one has not finished, the page shows the 
 
 If no engine is installed, the page says so and links to Content folders and Engines.
 
-To get more, use Downloads > Maps and Downloads > Games in the sidebar. With no maps or games at all, the Maps and Games pages can suggest some to download.
+To get more, use Downloads > Maps and Downloads > Games in the sidebar. With no maps or games at all, the Maps and Games pages can suggest some to download. See [Get games, maps and engines](downloads.md).

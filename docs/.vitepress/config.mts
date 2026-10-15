@@ -130,7 +130,13 @@ export default defineConfig({
         },
         {
           text: "Set up",
-          items: [{ text: "Portable mode", link: "/players/portable-mode" }],
+          items: [
+            {
+              text: "Get games, maps and engines",
+              link: "/players/downloads",
+            },
+            { text: "Portable mode", link: "/players/portable-mode" },
+          ],
         },
         {
           text: "Share",
