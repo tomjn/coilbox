@@ -26,13 +26,11 @@ These act on one channel only. ChanServ carries them out and answers in a direct
 
 - Make operator gives the player operator rights in this channel. Only the channel's founder or a server moderator can do this. ChanServ refuses an operator who tries.
 - Remove operator takes those rights away. It shows instead of Make operator when the player is already an operator. Nobody can remove the founder.
-- Mute stops the player talking in this channel for the time you set. Type a Duration and a Reason, then select Confirm.
+- Mute stops the player talking in this channel for the time you set. Type a Duration and a Reason, then select Confirm. Confirm stays greyed out until you type a reason.
 - Unmute lets a muted player talk again.
 - Kick from channel removes the player from this channel straight away. They can join again.
-- Ban from channel removes the player and stops them joining again for the time you set. It also bans the address they last connected from. Type a Duration and a Reason, then select Confirm.
+- Ban from channel removes the player and stops them joining again for the time you set. It also bans the address they last connected from. Type a Duration and a Reason, then select Confirm. Confirm stays greyed out until you type a reason.
 - Unban from channel lifts a channel ban.
-
-Always give a reason for a mute or a ban. The form marks Reason as optional, but ChanServ refuses a mute or a ban without one.
 
 ChanServ will not mute, kick or ban another operator. Remove their operator rights first.
 

@@ -184,15 +184,15 @@ export function MemberActionsMenu({
     if (!form) return;
     const d = duration.trim() || FORM_META[form].defaultDuration;
     const r = reason.trim();
-    // uberserver's BAN has no default reason and refuses the command
-    // without one, so the form must not send it empty.
-    if (form === "modBan" && !r) return;
+    // uberserver's BAN and ChanServ's mute and ban have no default reason and
+    // refuse the command without one, so the form must not send it empty.
+    if (form !== "modKick" && !r) return;
     if (form === "chanMute") run(mod.chanServMute(channel, nick, d, r));
     else if (form === "chanBan") run(mod.chanServBan(channel, nick, d, r));
     else if (form === "modKick") run(mod.modKick(nick, r));
     else if (form === "modBan") run(mod.modBan(nick, d, r));
   };
-  const reasonMissing = form === "modBan" && reason.trim() === "";
+  const reasonMissing = form !== "modKick" && reason.trim() === "";
 
   return (
     <Popover
@@ -265,8 +265,7 @@ export function MemberActionsMenu({
               )
             )}
             <span className="flex flex-col gap-1 px-1 text-xs text-muted-foreground">
-              Reason{" "}
-              {form === "modKick" || form === "modBan" ? "" : "(optional)"}
+              Reason
               <Input
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
