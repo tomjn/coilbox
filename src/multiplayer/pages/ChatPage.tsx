@@ -160,6 +160,9 @@ function ChatPage() {
   // run moderator verbs and ChanServ channel-ops anywhere). For a plain user, the
   // channel-op controls appear only when we're that channel's founder/operator,
   // learned from ChanServ `:info` (auto-queried on open below).
+  // The access bit does not tell `mod` from `admin`, and this menu does not
+  // read `ConnectionState.adminLevel`, so admin-only verbs such as `BROADCAST`
+  // and `SETACCESS` are left to the Server admin page.
   const iAmServerMod = !!(me && state?.users[me]?.status.access);
   const activeChannel =
     desc?.kind === "channel" ? state?.channels[desc.name] : undefined;
