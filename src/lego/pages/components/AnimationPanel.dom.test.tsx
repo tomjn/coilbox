@@ -208,10 +208,10 @@ describe("a unit whose game compiled its animation", () => {
 });
 
 describe("a unit on the presets", () => {
-  it("offers them, and runs no script at all", () => {
+  it("offers them, and runs no script until played", () => {
     show(project());
 
-    expect(screen.queryByText(/What happens to the unit/)).toBeNull();
+    expect(screen.getByText("Idle sway")).toBeTruthy();
     expect(runCob).not.toHaveBeenCalled();
     expect(runLua).not.toHaveBeenCalled();
   });
@@ -251,6 +251,43 @@ describe("a unit on the presets, once played", () => {
     expect(unitScript(value)).not.toBe("");
     expect(runCob).not.toHaveBeenCalled();
     await waitFor(() => expect(onScriptTimeline).toHaveBeenCalled());
+  });
+
+  it("offers the scenario picker beside the presets", () => {
+    show(withPreset());
+
+    expect(screen.getByText(/What happens to the unit/)).toBeTruthy();
+    expect(
+      screen.getByRole("combobox", { name: "What happens to the unit" }),
+    ).toBeTruthy();
+    expect(screen.getByText("Idle sway")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Script/ })).toBeTruthy();
+  });
+
+  it("does not offer to edit a script it has not been given", () => {
+    show(withPreset());
+
+    expect(screen.queryByRole("button", { name: /Edit/ })).toBeNull();
+  });
+
+  it("has nothing to play until a preset is applied", () => {
+    show(project());
+
+    const play = screen.getByRole("button", { name: /Play/ });
+    expect((play as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("scrubs the run it gets back", async () => {
+    runLua.mockResolvedValue(
+      timeline({ frames: [[0], [0], [0]] as ScriptTimeline["frames"] }),
+    );
+    show(withPreset());
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+
+    expect(
+      await screen.findByLabelText("Scrub the script preview"),
+    ).toBeTruthy();
+    expect(screen.getByTitle("Step forward one frame")).toBeTruthy();
   });
 
   it("says so when the generated script stops", async () => {
