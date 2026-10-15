@@ -218,6 +218,15 @@ export default defineConfig({
             },
           ],
         },
+        {
+          text: "Tools",
+          items: [
+            {
+              text: "Browse archives and run Lua",
+              link: "/developers/archives",
+            },
+          ],
+        },
       ],
       "/staff/": [
         {
