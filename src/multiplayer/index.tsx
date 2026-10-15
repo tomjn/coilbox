@@ -4,6 +4,7 @@ import {
   BarChart3,
   Crosshair,
   Gamepad2,
+  History,
   LogIn,
   MessagesSquare,
   ShieldCheck,
@@ -21,6 +22,7 @@ import LobbyStatusButton from "./LobbyStatusButton";
 import { BattleNavBadge, ChatNavBadge } from "./nav/navBadges";
 import {
   useBattleRoomLabel,
+  useMpChatLogsVisible,
   useMpDisconnected,
   useMpInBattle,
   useMpMatchmaking,
@@ -127,6 +129,17 @@ const multiplayerPlugin: FramePlugin = {
           useLabel: useBattleRoomLabel,
           // Unread battle chat + a status dot when the game is running (#273).
           badge: () => <BattleNavBadge />,
+        },
+        {
+          id: "multiplayer.chatlogs",
+          label: "Chat logs",
+          to: "/chatlogs",
+          end: true,
+          order: 5,
+          icon: History,
+          // Saved chat is read from disk, so this needs no connection. It shows
+          // once connected or when there is a saved log to read (issue #4082).
+          useVisible: useMpChatLogsVisible,
         },
         {
           id: "multiplayer.admin",

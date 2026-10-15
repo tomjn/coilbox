@@ -188,7 +188,7 @@ To manage the list, open Settings > Multiplayer > Ignored users. If you are on m
 
 ## Read old chat
 
-Coilbox saves your direct messages and channel chat on this computer. To read them, select Chat logs at the bottom of the Chat page.
+Coilbox saves your direct messages and channel chat on this computer. To read them, select Chat logs in the Multiplayer menu. You do not need to be logged in. You can also select Chat logs at the bottom of the Chat page.
 
 Pick a conversation on the left to read it. Type in Search this log to find a word or a player.
 
