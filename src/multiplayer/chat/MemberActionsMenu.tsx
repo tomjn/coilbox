@@ -50,8 +50,10 @@ interface MemberActionsMenuProps {
   targetIsOp: boolean;
   send: (line: string) => void;
   /** Open the Server admin page's player lookup section for `nick`
-   * (issue #2777). Only offered alongside the other moderator actions. */
-  onLookUp: () => void;
+   * (issue #2777). Only offered alongside the other moderator actions, and
+   * only when handed in: the Server admin page opens on uberserver only
+   * (issue #4106). */
+  onLookUp?: () => void;
   /** The private note about `nick` ("" for none) and how to save it. A saved
    * note marks the trigger, so it can be noticed without opening the menu. */
   note?: {
@@ -173,7 +175,7 @@ export function MemberActionsMenu({
   };
   const lookUp = () => {
     close();
-    onLookUp();
+    onLookUp?.();
   };
   const openForm = (kind: FormKind) => {
     setDuration(FORM_META[kind].defaultDuration);
@@ -390,11 +392,13 @@ export function MemberActionsMenu({
                 <p className="px-2 pb-0.5 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Moderator
                 </p>
-                <MenuItem
-                  icon={<Search className="size-4" />}
-                  label="Look up in Server admin"
-                  onClick={lookUp}
-                />
+                {onLookUp && (
+                  <MenuItem
+                    icon={<Search className="size-4" />}
+                    label="Look up in Server admin"
+                    onClick={lookUp}
+                  />
+                )}
                 <MenuItem
                   icon={<Network className="size-4" />}
                   label="Get IP"

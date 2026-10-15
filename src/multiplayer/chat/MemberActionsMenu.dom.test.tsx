@@ -121,6 +121,30 @@ it("does not offer the Server admin look-up to a channel op who is not a server 
   ).toBeNull();
 });
 
+it("hides the Server admin look-up when no look-up is handed in, and keeps the other moderator actions", () => {
+  render(
+    <MemberActionsMenu
+      nick="bob"
+      channel="lobby"
+      channelOps={false}
+      serverMod={true}
+      targetIsOp={false}
+      send={send}
+    />,
+  );
+  expect(
+    screen.queryByRole("button", { name: "Look up in Server admin" }),
+  ).toBeNull();
+  for (const name of [
+    "Get IP",
+    "Get user ID",
+    "Kick from server…",
+    "Ban from server…",
+  ]) {
+    expect(screen.getByRole("button", { name })).toBeTruthy();
+  }
+});
+
 function openChannelForm(item: "Mute…" | "Ban from channel…") {
   render(
     <MemberActionsMenu

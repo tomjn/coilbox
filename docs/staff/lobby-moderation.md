@@ -44,7 +44,7 @@ ChanServ will not mute, kick or ban another operator. Remove their operator righ
 
 These act on the player's whole account, across the server.
 
-- Look up in Server admin opens the Server admin page at the player's details, with their name filled in. See [Server admin](server-admin.md#the-tools) for what it shows.
+- Look up in Server admin opens the Server admin page at the player's details, with their name filled in. See [Server admin](server-admin.md#the-tools) for what it shows. It only shows on uberserver servers, because the Server admin page only opens there.
 - Get IP asks the server for the address the player is connected from, or last connected from.
 - Get user ID asks the server for the player's hardware and system IDs. Use them to spot one person on two accounts.
 - Kick from server disconnects the player, and takes them out of any battle they are in. They see your reason in a message box and can log in again. Type a Reason, then select Confirm.
