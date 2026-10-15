@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 
 /**
- * The frame rate label (issue #4071) counts display frames in which a view
- * drew, not render calls, and leaves the host as it found it.
+ * The frame rate label (issue #4071) is the rate a view draws at while it is
+ * drawing, counts a frame once however many render calls it holds, and leaves
+ * the host as it found it.
  *
  * Animation frames are driven by hand so each test says exactly how many
  * frames passed and how long they took.
@@ -67,12 +68,33 @@ describe("showFrameRates", () => {
     view.stop();
   });
 
-  it("reads 0fps for a view that did not draw", () => {
+  it("reads the display rate for a view that drew a few frames on time", () => {
+    const view = fakeView();
+    const hide = showFrameRates();
+    frame(0);
+    // A 50Hz display for one second, with a draw in 8 of its 50 frames.
+    for (let i = 0; i < 50; i++) {
+      if (i % 7 === 0) view.info.render.frame++;
+      frame(20);
+    }
+    expect(label(view.host)).toBe("50fps");
+    hide();
+    view.stop();
+  });
+
+  it("shows nothing until the view draws, then keeps its last reading", () => {
     const view = fakeView();
     const hide = showFrameRates();
     frame(0);
     for (let i = 0; i < 10; i++) frame(100);
-    expect(label(view.host)).toBe("0fps");
+    expect(view.host.childElementCount).toBe(0);
+    for (let i = 0; i < 10; i++) {
+      view.info.render.frame++;
+      frame(100);
+    }
+    expect(label(view.host)).toBe("10fps");
+    for (let i = 0; i < 10; i++) frame(100);
+    expect(label(view.host)).toBe("10fps");
     hide();
     view.stop();
   });
@@ -83,6 +105,7 @@ describe("showFrameRates", () => {
     const view = fakeView();
     const hide = showFrameRates();
     frame(0);
+    view.info.render.frame++;
     frame(1000);
     expect(view.host.style.position).toBe("relative");
     expect(view.host.childElementCount).toBe(1);
@@ -96,6 +119,7 @@ describe("showFrameRates", () => {
     const view = fakeView();
     const hide = showFrameRates();
     frame(0);
+    view.info.render.frame++;
     frame(1000);
     view.stop();
     frame(16);
