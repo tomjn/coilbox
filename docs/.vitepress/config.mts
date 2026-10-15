@@ -104,6 +104,7 @@ export default defineConfig({
           text: "Play",
           items: [
             { text: "Singleplayer battles", link: "/players/singleplayer" },
+            { text: "Multiplayer battles", link: "/players/multiplayer" },
             { text: "Battle presets", link: "/players/presets" },
             { text: "Galactic conquest", link: "/players/conquest" },
             { text: "Warpath", link: "/players/warpath" },
