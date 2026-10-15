@@ -36,6 +36,7 @@ import {
 } from "../bindings";
 import { useMapconvConfig } from "../config";
 import { useCompileDraft } from "../drafts";
+import { mapNameFromDir } from "../mapName";
 import { useMapProjects } from "../projects";
 import AdvancedOptions, {
   type AdvancedCompileOpts,
@@ -336,9 +337,8 @@ export default function CompilePage() {
     const dir = st?.recompileDir;
     if (!dir) return;
     const sep = dir.includes("\\") ? "\\" : "/";
-    const i = Math.max(dir.lastIndexOf("/"), dir.lastIndexOf("\\"));
     setOutDir(dir);
-    setOutSuffix((i >= 0 ? dir.slice(i + 1) : dir).replace(/-decompiled$/, ""));
+    setOutSuffix(mapNameFromDir(dir));
     void pickTexture(`${dir}${sep}texture.png`);
     // run once on mount for the incoming navigation state
     // eslint-disable-next-line react-hooks/exhaustive-deps
