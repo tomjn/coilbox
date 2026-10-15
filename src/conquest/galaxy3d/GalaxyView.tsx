@@ -5,6 +5,7 @@ import {
   CSS2DObject,
   CSS2DRenderer,
 } from "three/addons/renderers/CSS2DRenderer.js";
+import { registerCanvas3D } from "../../lib/renderStats";
 import { drawingPixelRatio } from "../../lib/uiZoom";
 import type { GalaxyDoc, Incursion, NodeStar } from "../model";
 import { planetOf } from "../planets";
@@ -1642,8 +1643,16 @@ export function GalaxyView({
     observer = new ResizeObserver(resize);
     observer.observe(container);
     resize();
+    // The map makes its own renderer rather than going through useCanvas3D,
+    // so it joins the list of 3D views here.
+    const unregisterStats = registerCanvas3D({
+      renderer,
+      render,
+      host: container,
+    });
 
     return () => {
+      unregisterStats();
       frames.cancel();
       displayClock.cancel();
       // Remember the final pose so a faction-switch rebuild can ease from here.

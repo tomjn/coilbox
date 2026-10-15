@@ -105,7 +105,7 @@ export function useCanvas3D(
 
     // Every 3D view passes through here, so this is the one place that can say
     // what any of them cost to draw (issue #2292).
-    const unregisterStats = registerCanvas3D({ renderer, render });
+    const unregisterStats = registerCanvas3D({ renderer, render, host });
 
     const observer = new ResizeObserver(resize);
     observer.observe(host);

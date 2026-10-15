@@ -13,6 +13,7 @@ export type ReduceMotionSetting = "system" | "on" | "off";
 const REDUCE_MOTION_KEY = "display.reduceMotion";
 const EFFECTS_KEY = "display.effects";
 const PERFORMANCE_KEY = "display.performanceMode";
+const FRAME_RATE_KEY = "display.showFrameRate";
 
 /** `[value, setValue]` for the reduce-motion tri-state toggle. */
 export function useReduceMotionSetting() {
@@ -27,6 +28,11 @@ export function useEffectsSetting() {
 /** `[enabled, setEnabled]` for performance mode (lower res, fewer particles). */
 export function usePerformanceModeSetting() {
   return useSetting<boolean>(PERFORMANCE_KEY, false);
+}
+
+/** `[enabled, setEnabled]` for the frame rate label on 3D views. */
+export function useShowFrameRateSetting() {
+  return useSetting<boolean>(FRAME_RATE_KEY, false);
 }
 
 /** Live `prefers-reduced-motion` media query as React state. */
