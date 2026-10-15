@@ -1199,12 +1199,15 @@ Controls the app-frame chrome — the sidebar mode, the breadcrumb, the top-bar 
 Overrides the [branding catalog](branding-catalog.md#ai-rankings)'s per-game AI block: which AIs are hardest, which is standard, which must never play, which are mini-games, and which garrison a neutral conquest world.
 
 ```json
-"ai": {
-  "ranking": ["BARb", "CircuitAI", "AAI", "SimpleAI"],
-  "standard": "AAI",
-  "never": ["Sandbox", "NullAI"],
-  "minigame": ["ChickensAI", "ScavengersAI"],
-  "neutral": ["ChickensAI"]
+{
+  "version": 1,
+  "ai": {
+    "ranking": ["BARb", "CircuitAI", "AAI", "SimpleAI"],
+    "standard": "AAI",
+    "never": ["Sandbox", "NullAI"],
+    "minigame": ["ChickensAI", "ScavengersAI"],
+    "neutral": ["ChickensAI"]
+  }
 }
 ```
 
