@@ -37,4 +37,8 @@ Most of the tools here are hidden until you turn on Advanced mode in Settings > 
 
 - [Replay rewind for your game](replay-rewind.md). Write an adapter that switches off what fights a recording, bundle it in your archive, and read what the player logs.
 
+## Tools
+
+- [Browse archives and run Lua](archives.md). Look inside any game or map archive, save a file out of it, and run Lua with the archive loaded.
+
 The [reference](../reference/index.md) section has the route list a profile points at and the file formats these tools read and write.
