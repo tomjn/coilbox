@@ -106,6 +106,10 @@ export default defineConfig({
             { text: "Singleplayer battles", link: "/players/singleplayer" },
             { text: "Sign in and chat", link: "/players/lobby-and-chat" },
             { text: "Multiplayer battles", link: "/players/multiplayer" },
+            {
+              text: "Campaigns and scenarios",
+              link: "/players/campaigns-and-scenarios",
+            },
             { text: "Battle presets", link: "/players/presets" },
             { text: "Galactic conquest", link: "/players/conquest" },
             { text: "Warpath", link: "/players/warpath" },
