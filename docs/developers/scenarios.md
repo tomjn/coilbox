@@ -2,7 +2,7 @@
 
 A **scenario** is authored content the engine plays: where the units start, what the zones are, what happens when the player reaches one, what they are being asked to do, and who says what along the way. Coilbox's campaigns stop at the engine boundary, so a campaign mission on its own is a skirmish setup with a briefing over it. A scenario is the other half, and it runs inside the game.
 
-The **Scenario Builder** is an advanced-mode tool: turn on Advanced mode in Settings > General and it appears in the sidebar in its own group, with **Builder** inside it. A scenario you can play also shows up under Play > **Scenarios**.
+The **Scenario Builder** is an advanced-mode tool: turn on Advanced mode in Settings > General and it appears in the sidebar as Campaign Builder > **Scenarios**. A scenario you can play also shows up under Play > **Scenarios**.
 
 Two things to know before you spend an evening on this:
 
@@ -35,7 +35,7 @@ The question a packaged `.sd7` or `.sdz` is asked is whether the mission is alre
 
 ## Author a scenario
 
-Go to **Scenario Builder > Builder** and press **New scenario**. Give it a name and, if you like, a description.
+Go to **Campaign Builder > Scenarios** and press **New scenario**. Give it a name and, if you like, a description.
 
 ### Set the game and map
 
@@ -396,7 +396,7 @@ If the two ever do disagree, because the archive was built by hand or the docume
 
 **Silence the Jericho** is the first mission authored end to end in the Scenario Builder, and you can download it as an export: [silence-the-jericho.json](/scenarios/silence-the-jericho.json).
 
-Importing it takes nothing but coilbox. Open **Play > Scenarios**, press **Import**, then **Import from file…** and pick it. With Advanced mode on you can do the same from **Scenario Builder > Builder** and get a scenario you can read and edit like any other.
+Importing it takes nothing but coilbox. Open **Play > Scenarios**, press **Import**, then **Import from file…** and pick it. With Advanced mode on you can do the same from **Campaign Builder > Scenarios** and get a scenario you can read and edit like any other.
 
 Playing it needs the game it was written for. That machine also needs, in this order:
 
