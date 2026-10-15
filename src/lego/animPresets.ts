@@ -900,6 +900,25 @@ export const BUILD_AIM: AnimPreset = {
   },
 };
 
+/**
+ * The widest a factory's doors open, in degrees.
+ *
+ * Short of half a turn, because `Turn` takes the shortest way round
+ * (`CUnitScript::TurnToward`), and from shut half a turn is as short backwards
+ * as forwards. At 180 the engine swung the doors open the wrong way. 170 is
+ * where the Doors preset's own slider stops.
+ */
+const FACTORY_MAX_OPEN = 170;
+
+/** The opening a factory preset asks for, held under `FACTORY_MAX_OPEN` so a
+ *  project saved while the slider went to 180 opens the right way too. */
+function factoryOpening(
+  preset: AnimPreset,
+  params: Record<string, number>,
+): number {
+  return Math.min(value(preset, params, "open"), FACTORY_MAX_OPEN);
+}
+
 export const BUILD_FACTORY: AnimPreset = {
   id: "build.factory",
   label: "Factory build cycle",
@@ -913,7 +932,7 @@ export const BUILD_FACTORY: AnimPreset = {
       label: "Opening",
       unit: "deg",
       min: 10,
-      max: 180,
+      max: FACTORY_MAX_OPEN,
       step: 5,
       fallback: 100,
     },
@@ -944,12 +963,12 @@ export const BUILD_FACTORY: AnimPreset = {
     const towards = building
       ? Math.min(1, phase / openTime)
       : Math.max(0, reached - phase / openTime);
-    return { rotation: [0, deg(value(this, params, "open")) * towards, 0] };
+    return { rotation: [0, deg(factoryOpening(this, params)) * towards, 0] };
   },
   emit(ctx) {
     const doors = ctx.pieces("door");
     if (doors.length === 0) return null;
-    const open = value(this, ctx.params, "open");
+    const open = factoryOpening(this, ctx.params);
     const speed = lua(
       deg(open) / Math.max(value(this, ctx.params, "openTime"), 0.05),
     );
