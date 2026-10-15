@@ -1,0 +1,186 @@
+# Base blueprints
+
+A blueprint is a layout of buildings that you draw once and put down wherever you like, such as an opening, a wall or a corner of factories. It has no map and no team. Each blueprint belongs to one game, because it names that game's buildings. Inside a match, the coilbox widget lists your blueprints and gives the orders to your builders.
+
+Open your blueprints from Library > Blueprints in the sidebar.
+
+## The Blueprints page
+
+The page is called Base blueprints. Each blueprint shows a small drawing of its layout, its name, how many buildings it has and the game it is for.
+
+- A blueprint that says build order is built in a set order. See [Set a build order](#set-a-build-order).
+- The line with an icon says where the blueprint came from, for example From a shared code, From the hub or Saved in game.
+- "That game is not installed here" means you do not have the blueprint's game. You can still keep and share it.
+- Select a blueprint to open its page.
+- The menu at the top right of each blueprint has Rename and Duplicate.
+
+When your blueprints are for more than one game, a list above them picks one game or Every game.
+
+The buttons at the top of the page are:
+
+- Open a pack, which reads a file holding many blueprints. See [Open a pack](#open-a-pack).
+- Save a pack, which writes some of your blueprints into one file. See [Save a pack](#save-a-pack).
+- Widget, which installs the widget that lets you use blueprints in a game. See [Install the widget](#install-the-widget).
+- Import, which reads a blueprint someone shared. See [Import a blueprint](#import-a-blueprint).
+- New blueprint, which starts an empty one.
+
+## Make a blueprint
+
+1. Select New blueprint.
+2. Type a name. If you leave it empty, the blueprint is called Untitled blueprint.
+3. Pick the game whose buildings you want to use.
+4. Select Make it.
+
+The new blueprint's page opens, ready for buildings. You can also save a base you built during a match. See [Save a base from a game](#save-a-base-from-a-game).
+
+## A blueprint's page
+
+The name, the game and the number of buildings are at the top. Blueprints at the top left goes back to the list.
+
+Under them is a flat build grid with the buildings drawn on it. There is no map, because a blueprint is not tied to one. Drag or middle drag to pan, right drag to turn the view and scroll to zoom.
+
+Every change saves itself a moment after you make it. There is no save button.
+
+### Add, move and remove buildings
+
+1. Select Pick a unit and choose a building.
+2. Click the grid to put one down. Keep clicking to put down more.
+3. Press Escape to stop placing.
+
+Drag a building to move it. Select a building to show two buttons beside it. Turn gives it a quarter turn, and Delete removes it. Click bare ground to deselect. Undo and Redo are at the top right of the grid.
+
+The button with the blueprint's name opens a box where you can rename it.
+
+### Set a build order
+
+At first the buildings are in the order you clicked them. To say what gets built first:
+
+1. Select Build order.
+2. Turn on Build these in this order.
+3. Use the arrows beside each building to build it sooner or later.
+
+Watch it go up plays the layout being built one building at a time. Copy as a build order copies the list.
+
+### Try it on a map
+
+Select Try it on a map, then Choose a map. The blueprint is drawn on the real ground, so you can see which buildings the terrain would refuse. Nothing you do here changes the blueprint. Done with the map puts the view away.
+
+### The other buttons
+
+- Convert swaps the buildings for another side's, in a game with more than one side. Pick the side in Say this blueprint in, check the suggested swaps, then select the Convert button at the bottom.
+- Duplicate makes a copy and opens it, so you can change the copy.
+- Share gives you a code, a link and a file to send. See [Share a blueprint](#share-a-blueprint).
+- Delete removes the blueprint after you confirm.
+
+## Use a blueprint in a game
+
+A widget runs inside the game and lists your blueprints there. You install it once.
+
+### Install the widget
+
+1. On the Blueprints page, select Widget.
+2. Select Install widget.
+
+The panel says where the widget goes and whether it is up to date. When coilbox has a newer widget, the button says Update widget. Remove widget takes it out again.
+
+The widget panel opens by itself the first time you start a match. If it never appears, press F11 in the game and check that Coilbox blueprints is turned on.
+
+### Place a blueprint
+
+1. Start a match in the blueprint's game.
+2. Open the panel. Select the Blueprints tab on the right edge of the screen, or type /coilbox_blueprints in the game's chat.
+3. Select one or more builders.
+4. Select a blueprint in the list. Its buildings follow the cursor. Squares the ground will not take are marked red.
+5. Press [ or ] to turn it.
+6. Left click to place it.
+
+Each builder you selected is ordered to build the buildings it can. Right click or Escape puts the blueprint away without placing it. Hold Shift when you click to add the orders after what the builders are already doing, and to keep the blueprint on the cursor for another copy.
+
+The panel only lists blueprints for the game you are playing. It has three tabs:
+
+- Now shows blueprints your selected builders can build all of.
+- Partly shows blueprints they can build some of.
+- All shows every blueprint for this game.
+
+Under each name is where it came from, how many buildings it has and any buildings this game does not have.
+
+If your builders cannot build every building, the panel says how many are left to build. Select other builders, then select Place to build the rest, or Dismiss to drop them.
+
+Some games use [ and ] for their own keys, so those keys may not reach the widget. Bind keys to coilbox_blueprints_rotate_left and coilbox_blueprints_rotate_right instead.
+
+### Save a base from a game
+
+1. Select the buildings you want to keep.
+2. Select Save selection at the bottom of the panel.
+
+The blueprint is named after the map, for example "Base on Comet Catcher Redux 1". It shows up on the Blueprints page the next time you open it with no game running. It is marked Saved in game.
+
+### Which games it works with
+
+The widget loads in games that load widgets from your content folder. It has been checked with Splinter Faction and Metal Factions. It has not been checked with Beyond All Reason.
+
+Beyond All Reason has its own blueprint tool. The widget reads that tool's blueprints, and lists them marked BAR. To use your coilbox blueprints with the Beyond All Reason tool, write them into its file. See [Save a pack](#save-a-pack).
+
+## Import a blueprint
+
+1. Select Import on the Blueprints page.
+2. Paste a blueprint code into the box and select Read it, or select Read a file… to open a blueprint file.
+3. Check what coilbox says about it. It tells you which game the blueprint is for and whether your copy of that game has its buildings.
+4. Select Add to my library. If the game does not match, the button says Keep it anyway.
+
+If every building in it belongs to one side and the game has other sides, coilbox offers Keep it as that side or Take it as another side before you add it.
+
+A coilbox link to a blueprint opens the same box with the code already in it, after you confirm.
+
+### From the hub
+
+1. Select Coilbox hub in the sidebar.
+2. Select Base blueprints to show only blueprints.
+3. Open one and select Import.
+
+Coilbox opens the Blueprints page with the blueprint read in. Select Add to my library. The blueprint's page then has a See it on the hub link.
+
+You can also browse the hub website at [coilbox-hub.vercel.app](https://coilbox-hub.vercel.app).
+
+### Open a pack
+
+A pack is one file holding many blueprints, such as Beyond All Reason's own blueprints file or a file somebody posted.
+
+1. Select Open a pack.
+2. Select Open a file… and choose the file.
+3. Under Read them against, pick the game the blueprints were drawn in.
+4. Tick the blueprints you want. A button such as Tick the 12 that fit ticks every one your game can place.
+5. Select Add to my library.
+
+Coilbox never changes the file you opened.
+
+## Share a blueprint
+
+Select Share on a blueprint's page.
+
+- Copy code copies a code. Anyone who pastes it into Import gets the blueprint.
+- Copy link copies a coilbox link that opens the blueprint in coilbox. A very large blueprint is too long for a link, so this button does not appear.
+- Export as file saves the blueprint as a file.
+
+### Publish to the hub
+
+The bottom of the Share drawer is about the Coilbox hub. If you are not signed in, select Sign in with Discord, or select Copy code & open hub to finish on the hub website.
+
+Once you are signed in:
+
+1. Type a title. A description and tags are optional.
+2. Select Publish.
+
+Anyone browsing the hub can then find and import it. Copy link and View on the hub then point at its page on the hub.
+
+## Save a pack
+
+Save a pack writes some of your blueprints into one file, for a game's own blueprint tool or for somebody else.
+
+1. Select Save a pack on the Blueprints page.
+2. Tick the blueprints you want. Tick every one ticks them all.
+3. Choose where they go.
+
+A button such as Write 3 blueprints into a game's file puts them into the game's own blueprints file, which Beyond All Reason's blueprint tool reads. Coilbox opens the file where your engine keeps it, and copies the file before it changes it. A blueprint with the same name as one already in the file replaces it. Close the game first, because this button is turned off while a game is running.
+
+Save them as a file to share writes a new file you can post. Others open it with Open a pack.

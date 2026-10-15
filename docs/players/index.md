@@ -18,6 +18,7 @@ Guides for people who play games through coilbox. To install it, see [Install](.
 ## Library
 
 - [Maps, games and units](library.md). Look through the maps and games you have installed, see how a map is played, read and compare a game's units, and find a game or map that is not listed.
+- [Base blueprints](blueprints.md). Draw a layout of buildings, place it in a match with the in-game widget, save a base you built, and share blueprints on the hub.
 
 ## Set up
 
