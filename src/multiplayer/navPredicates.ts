@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react";
 import { isProfileHidden } from "../profile/hidden";
 import { useInBattleKey } from "./battle/useBattleRoomKey";
+import { mpChatLogs } from "./bindings";
 import { liveTachyonKeys } from "./protocol";
 import { serverAdminKeys } from "./serverAdmin";
 import { useConnection, useMultiplayer, useProtocolServers } from "./store";
@@ -10,6 +12,38 @@ import { useConnection, useMultiplayer, useProtocolServers } from "./store";
  */
 export function useMpRevealed(): boolean {
   return useMultiplayer().revealed;
+}
+
+/** Whether any saved chat log exists, read once per session. */
+let savedLogsLookup: Promise<boolean> | null = null;
+
+function hasSavedChatLogs(): Promise<boolean> {
+  savedLogsLookup ??= mpChatLogs({})
+    .then((r) => r.accounts.some((a) => a.threads.length > 0))
+    .catch(() => false);
+  return savedLogsLookup;
+}
+
+/**
+ * Nav predicate for the Chat logs item (issue #4082): true once the user has
+ * connected this session, as for Chat, or when saved chat exists on disk. The
+ * disk is read once and the answer kept, so the sidebar does not call the
+ * backend on every render. A connection reveals the item anyway, so a log
+ * written later in the session never needs a second read.
+ */
+export function useMpChatLogsVisible(): boolean {
+  const revealed = useMpRevealed();
+  const [saved, setSaved] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    void hasSavedChatLogs().then((has) => {
+      if (!cancelled) setSaved(has);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return revealed || saved;
 }
 
 /**
