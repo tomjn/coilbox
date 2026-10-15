@@ -151,6 +151,13 @@ it("puts presence first, then the name, then rank and flag (issue #3695)", () =>
   expect(screen.getByText("In battle").className).toContain("sr-only");
 });
 
+it("has a close button in the header when it can be closed", () => {
+  const onClose = vi.fn();
+  render(<MemberList members={[user("alice")]} onClose={onClose} />);
+  fireEvent.click(screen.getByRole("button", { name: "Close members" }));
+  expect(onClose).toHaveBeenCalledTimes(1);
+});
+
 it("marks you, a friend and a party member in words as well as colour", () => {
   const marks = { me: "you", pal: "friend", mate: "party" } as const;
   render(

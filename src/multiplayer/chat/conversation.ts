@@ -69,7 +69,13 @@ export function backfilledCounts(state: LobbyState): Record<string, number> {
   return out;
 }
 
-/** Resolve members of a conversation from the snapshot (empty for DMs). */
+/** Names compared the way a reader would sort them, ignoring case. */
+const byName = new Intl.Collator(undefined, { sensitivity: "base" });
+
+/**
+ * Resolve members of a conversation from the snapshot (empty for DMs), sorted
+ * by name. Players in a game go to the bottom, since they are not reading.
+ */
 export function conversationMembers(
   state: LobbyState,
   d: ConversationDescriptor,
@@ -81,7 +87,12 @@ export function conversationMembers(
   if (!ch) return [];
   return ch.users
     .map((u) => state.users[u])
-    .filter((u): u is User => Boolean(u));
+    .filter((u): u is User => Boolean(u))
+    .sort(
+      (a, b) =>
+        Number(a.status.ingame) - Number(b.status.ingame) ||
+        byName.compare(a.name, b.name),
+    );
 }
 
 /** Messages of a conversation from the snapshot. Battle chat lives in the

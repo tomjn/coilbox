@@ -187,3 +187,28 @@ describe("battleLive", () => {
     expect(battleLive(stateWith({}))).toBe(false);
   });
 });
+
+describe("unreadNews and people coming and going", () => {
+  const line = (from: string, kind: ChatMsg["kind"]): ChatMsg => ({
+    channel: "main",
+    from,
+    text: "",
+    kind,
+    at: 1,
+    id: null,
+  });
+
+  it("does not count somebody else joining or leaving", () => {
+    const msgs = [line("bob", "join"), line("bob", "leave")];
+    expect(unreadNews(msgs, 0, "me")).toBe(0);
+  });
+
+  it("still counts what was said between them", () => {
+    const msgs = [
+      line("bob", "join"),
+      line("bob", "said"),
+      line("bob", "leave"),
+    ];
+    expect(unreadNews(msgs, 0, "me")).toBe(1);
+  });
+});

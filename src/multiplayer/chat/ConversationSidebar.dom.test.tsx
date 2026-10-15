@@ -144,6 +144,19 @@ describe("ConversationSidebar: grouped by connection", () => {
     expect(screen.getAllByText("Channels").length).toBe(2);
   });
 
+  it("rules off each server from the one above it, and not the first", () => {
+    wire.connections = {
+      [KEY_A]: connectionFor(KEY_A),
+      [KEY_B]: connectionFor(KEY_B),
+    };
+    renderSidebar();
+
+    const first = screen.getByText("AF on bar.example:8200");
+    const second = screen.getByText("Zeta on techa.example:8200");
+    expect(first.className).not.toContain("border-t");
+    expect(second.className).toContain("border-t");
+  });
+
   it("skips a connection that has dropped, not just one that never opened", () => {
     wire.connections = {
       [KEY_A]: connectionFor(KEY_A, true),
@@ -153,6 +166,19 @@ describe("ConversationSidebar: grouped by connection", () => {
 
     expect(screen.queryByText(/on techa.example/)).toBeNull();
     expect(screen.getAllByText("Channels").length).toBe(1);
+  });
+});
+
+describe("ConversationSidebar: a friend's row", () => {
+  it("has the member menu, and offers no friend request to a friend", () => {
+    wire.favourites = { [KEY_A]: ["bob"] };
+    wire.connections = { [KEY_A]: connectionFor(KEY_A) };
+    renderSidebar();
+
+    expect(
+      screen.getByRole("button", { name: "Actions for bob" }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /friend request/ })).toBeNull();
   });
 });
 

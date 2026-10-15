@@ -268,3 +268,28 @@ describe("ConnectionState.adminLevel", () => {
     expect(connections.a.adminLevel).toBe("mod");
   });
 });
+
+describe("a connect that fails before it opens", () => {
+  const failed = (all: Record<string, ConnectionState>, reason: string) =>
+    connectionsReducer(all, {
+      type: "mirror",
+      serverKey: "a",
+      action: { type: "connectFailed", reason },
+    });
+
+  it("leaves its reason on the entry, where no event would have", () => {
+    const next = failed({ a: dropped("a") }, "connection timed out");
+    expect(next.a.mirror.error).toBe("connection timed out");
+  });
+
+  it("keeps a refused login's own reason", () => {
+    const refused = dropped("a");
+    const all = {
+      a: {
+        ...refused,
+        mirror: { ...refused.mirror, loginError: "bad password" },
+      },
+    };
+    expect(failed(all, "connection closed").a.mirror.error).toBeNull();
+  });
+});

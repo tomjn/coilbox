@@ -5,18 +5,12 @@ import {
   CheckCircle2,
   Crown,
   Eye,
-  MoreVertical,
   UserX,
   XCircle,
 } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import type { ReactNode } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Badge } from "@/components/ui/badge";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -26,6 +20,11 @@ import {
 } from "@/components/ui/select";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import {
+  MenuItem,
+  MemberActionsMenu as PlayerMenu,
+} from "../chat/MemberActionsMenu";
+import type { PlayerActions } from "../chat/usePlayerActions";
 import { NameMarkIcon } from "../NameMarkIcon";
 import { NoteButton } from "../NoteButton";
 import { NAME_MARK_CLASS, type NameMark } from "../nameMark";
@@ -75,7 +74,8 @@ function ReadyIcon({ row }: { row: Row }) {
  * for OTHER members so the host can force their team/ally/colour (inline), and
  * spectate or kick them from a trailing `⋮` menu (there's no force-faction
  * command, so side stays read-only for others). Bots we own get `control` too, for
- * removal only. Every remaining row is read-only.
+ * removal only. Every remaining row is read-only, though another
+ * human's still has the menu for the entries in `personal`.
  *
  * `showActions` reserves the trailing actions column so every row lines up even
  * when a particular row has no menu (our own row, or a battle we neither host nor
@@ -86,6 +86,7 @@ export function MemberRow({
   editable,
   aiInvalid,
   control,
+  personal,
   sharedWith,
   striped,
   showActions,
@@ -113,6 +114,9 @@ export function MemberRow({
    * inline so an invalid config from a cross-game/version preset reads as such. */
   aiInvalid?: boolean;
   control?: MemberControls | null;
+  /** The follow, friend and ignore entries of this row's menu. Humans only,
+   * and never on our own row. */
+  personal?: PlayerActions | null;
   /** The earlier row leading this row's team, when the team is shared. The row
    * then shows a branch glyph and Co-player badge instead of colour/side/ally —
    * display-only; the member's own wire state is untouched and the team picker
@@ -447,7 +451,11 @@ export function MemberRow({
 
       {showActions && (
         <TableCell className="px-2 py-2 text-right">
-          <MemberActionsMenu row={row} control={control ?? null} />
+          <MemberActionsMenu
+            row={row}
+            control={control ?? null}
+            personal={personal}
+          />
         </TableCell>
       )}
     </TableRow>
@@ -455,98 +463,86 @@ export function MemberRow({
 }
 
 /**
- * The trailing "⋮" action menu (force spectate, appoint/stand down boss,
- * kick/remove). Shared between a full player row and the compact spectator
- * list (#3194) — a spectator can still be kicked or, if a bot, removed, and a
- * human spectator can still be made boss.
+ * The trailing "⋮" menu. A human other than ourselves gets the personal
+ * entries every player list offers (follow, friend, ignore), handed in as
+ * `personal`. Under those sit the entries `control` allows: force spectate,
+ * appoint/stand down boss, kick/remove. Shared between a full player row and
+ * the compact spectator list (#3194), where a spectator can still be kicked
+ * or, if a bot, removed, and a human spectator can still be made boss.
  */
 export function MemberActionsMenu({
   row,
   control,
+  personal,
 }: {
   row: Row;
   control: MemberControls | null;
+  personal?: PlayerActions | null;
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  if (!control) return null;
+  if (!control && !personal) return null;
   const canSpectate =
-    row.kind === "human" && !row.spectator && !!control.onForceSpectator;
+    row.kind === "human" && !row.spectator && !!control?.onForceSpectator;
   return (
-    <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          aria-label={`Actions for ${row.name}`}
-          className="inline-flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
-        >
-          <MoreVertical className="size-4" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-44 p-1">
-        {canSpectate && (
-          <button
-            type="button"
-            onClick={() => {
-              setMenuOpen(false);
-              control.onForceSpectator?.();
-            }}
-            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
-          >
-            <Eye className="size-4" />
-            Force spectate
-          </button>
-        )}
-        {control.onRing && (
-          <button
-            type="button"
-            onClick={() => {
-              setMenuOpen(false);
-              control.onRing?.();
-            }}
-            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
-          >
-            <BellRing className="size-4" />
-            Ring
-          </button>
-        )}
-        {control.onAppointBoss && (
-          <button
-            type="button"
-            onClick={() => {
-              setMenuOpen(false);
-              control.onAppointBoss?.();
-            }}
-            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
-          >
-            <Crown className="size-4" />
-            Make boss
-          </button>
-        )}
-        {control.onUnboss && (
-          <button
-            type="button"
-            onClick={() => {
-              setMenuOpen(false);
-              control.onUnboss?.();
-            }}
-            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
-          >
-            <Crown className="size-4" />
-            Stand boss down
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => {
-            setMenuOpen(false);
-            control.onKick();
-          }}
-          className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10"
-        >
-          <UserX className="size-4" />
-          {row.kind === "bot" ? "Remove" : "Kick"}
-        </button>
-      </PopoverContent>
-    </Popover>
+    <PlayerMenu
+      nick={row.name}
+      {...personal}
+      extra={
+        control
+          ? (close) => (
+              <>
+                {canSpectate && (
+                  <MenuItem
+                    icon={<Eye className="size-4" />}
+                    label="Force spectate"
+                    onClick={() => {
+                      close();
+                      control.onForceSpectator?.();
+                    }}
+                  />
+                )}
+                {control.onRing && (
+                  <MenuItem
+                    icon={<BellRing className="size-4" />}
+                    label="Ring"
+                    onClick={() => {
+                      close();
+                      control.onRing?.();
+                    }}
+                  />
+                )}
+                {control.onAppointBoss && (
+                  <MenuItem
+                    icon={<Crown className="size-4" />}
+                    label="Make boss"
+                    onClick={() => {
+                      close();
+                      control.onAppointBoss?.();
+                    }}
+                  />
+                )}
+                {control.onUnboss && (
+                  <MenuItem
+                    icon={<Crown className="size-4" />}
+                    label="Stand boss down"
+                    onClick={() => {
+                      close();
+                      control.onUnboss?.();
+                    }}
+                  />
+                )}
+                <MenuItem
+                  icon={<UserX className="size-4" />}
+                  label={row.kind === "bot" ? "Remove" : "Kick"}
+                  onClick={() => {
+                    close();
+                    control.onKick();
+                  }}
+                  destructive
+                />
+              </>
+            )
+          : undefined
+      }
+    />
   );
 }

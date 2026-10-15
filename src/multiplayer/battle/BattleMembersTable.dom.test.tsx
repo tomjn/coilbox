@@ -24,6 +24,12 @@ vi.mock("../store", () => ({
   useConnection: () => null,
 }));
 
+// The row menu reads the friend and ignore lists, which live in settings.
+vi.mock("@picoframe/frame", async () => ({
+  ...(await vi.importActual<Record<string, unknown>>("@picoframe/frame")),
+  useSetting: (_key: string, initial: unknown) => [initial, () => {}],
+}));
+
 // The real Radix popover only draws its content once open, which needs
 // positioning APIs happy-dom does not implement. Always-open stand-in,
 // matching StaffSection.dom.test.tsx.
@@ -72,6 +78,9 @@ const noopHostControls = {
 function renderTable(
   rows: Row[],
   overrides?: {
+    selfHost?: boolean;
+    canKick?: boolean;
+    canBoss?: boolean;
     noteFor?: (row: Row) => string;
     onSetNote?: (row: Row, text: string) => void;
     statsSummaryFor?: (row: Row) => string | null;
@@ -221,6 +230,33 @@ describe("spectators in a compact list (#3194)", () => {
     expect(
       screen.getByRole("button", { name: "Add note for Carol" }),
     ).toBeTruthy();
+  });
+});
+
+describe("the row menu for somebody who is not the host", () => {
+  const notHost = { selfHost: false, canKick: false, canBoss: false };
+
+  it("offers the personal entries on another player's row, with no host ones", () => {
+    renderTable(
+      [row({ name: "me", self: true }), row({ name: "alice" })],
+      notHost,
+    );
+    expect(
+      screen.getByRole("button", { name: "Actions for alice" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Ignore" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Kick" })).toBeNull();
+  });
+
+  it("offers no menu on our own row or on a bot that is not ours", () => {
+    renderTable(
+      [
+        row({ name: "me", self: true }),
+        row({ name: "Bot1", kind: "bot", owner: "alice" }),
+      ],
+      notHost,
+    );
+    expect(screen.queryByRole("button", { name: /^Actions for/ })).toBeNull();
   });
 });
 
