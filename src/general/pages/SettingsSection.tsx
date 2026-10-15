@@ -9,6 +9,7 @@ import {
   useEffectsSetting,
   usePerformanceModeSetting,
   useReduceMotionSetting,
+  useShowFrameRateSetting,
 } from "../display";
 import { isFullscreenLocked, useFullscreenSetting } from "../fullscreen";
 import { hasProfileSplash, useSplashSetting } from "../splash";
@@ -29,6 +30,7 @@ export default function GeneralSettings() {
   const [effects, setEffects] = useEffectsSetting();
   const [performance, setPerformance] = usePerformanceModeSetting();
   const [zoom, setZoom] = useUiZoomSetting();
+  const [showFrameRate, setShowFrameRate] = useShowFrameRateSetting();
   // A kiosk-locked build forces fullscreen and hides the toggle entirely.
   const fullscreenLocked = isFullscreenLocked();
   // The splash toggle only makes sense when the profile actually ships one.
@@ -127,6 +129,24 @@ export default function GeneralSettings() {
             </span>
           </Label>
         )}
+        <Label
+          htmlFor="show-frame-rate"
+          className="flex cursor-pointer items-start gap-3 font-normal"
+        >
+          <Switch
+            id="show-frame-rate"
+            checked={showFrameRate}
+            onCheckedChange={(v) => setShowFrameRate(v === true)}
+            className="mt-0.5"
+          />
+          <span className="space-y-1">
+            <span className="block text-sm font-medium">Show frame rate</span>
+            <span className="block text-xs text-muted-foreground">
+              Shows how many frames a second each 3D view draws, in its bottom
+              right corner.
+            </span>
+          </span>
+        </Label>
       </section>
 
       <section className="space-y-3">
