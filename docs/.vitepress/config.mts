@@ -122,6 +122,10 @@ export default defineConfig({
           ],
         },
         {
+          text: "Library",
+          items: [{ text: "Maps, games and units", link: "/players/library" }],
+        },
+        {
           text: "Set up",
           items: [{ text: "Portable mode", link: "/players/portable-mode" }],
         },
