@@ -352,6 +352,25 @@ Narrows game lists to a single game. When set, the multiplayer **Battles** list,
 
 Provide either or both; an entry matches if the regex matches or any name matches.
 
+### `factionLogos` (object)
+
+Sets the emblem shown for each faction, by side name. Coilbox shows these wherever a player picks or sees a faction: skirmish setup, battle rooms, a game's page, Conquest, Warpath and scenario setup.
+
+```json
+{
+  "version": 1,
+  "factionLogos": {
+    "arm": "factions/arm.png",
+    "core": "factions/core.png"
+  }
+}
+```
+
+- The key is the side name as the game names it. Case does not matter, so `arm` and `Arm` are the same side.
+- The value is a path relative to the `.coilbox/` folder, or an inline `data:` or `https:` URL. These are the same rules as [`splash.image`](#splash-object).
+
+An emblem set here always wins. Coilbox otherwise takes a faction's emblem from the game archive's side pictures or the branding catalog, and this field overrides both. A side you do not list keeps the emblem it would have had.
+
 ### `welcome` (object)
 
 Replaces the default home launcher with a branded landing page. Declarative HTML + CSS only (no JavaScript).
@@ -863,6 +882,31 @@ Shows a brand splash over the whole window at startup: a centered image that fad
 
 Honours `prefers-reduced-motion` (skips the fades). If the image can't be loaded the splash is silently skipped — it never blocks startup.
 
+### `sound` (object)
+
+Ships your own background music. Coilbox plays it while the player is in Coilbox, and pauses it while a game is running or the window is out of focus.
+
+```json
+{
+  "version": 1,
+  "sound": {
+    "tracks": ["sounds/theme.ogg", "sounds/menu.ogg"],
+    "enabled": true,
+    "volume": 40,
+    "shuffle": true
+  }
+}
+```
+
+| Field     | Type     | Meaning                                                                 |
+| --------- | -------- | ----------------------------------------------------------------------- |
+| `tracks`  | string[] | Paths relative to the `.coilbox/` folder. Without any, the rest of `sound` does nothing. |
+| `enabled` | boolean  | Start playing on launch. Default `false`, so music waits for the player to turn it on. |
+| `volume`  | number   | Starting music volume, `0` to `100`. Default `50`.                      |
+| `shuffle` | boolean  | Play the tracks in a random order rather than as listed. Default `false`. |
+
+With tracks set, Settings > Sound offers "Bundled" as the music source and picks it by default. `enabled` and `volume` are starting values. The player can change the source, the volume or turn music off there, and their choice wins on every launch after.
+
 ### `background` (string)
 
 A solid CSS colour painted behind everything from the first frame until the app has rendered. A dark distribution otherwise briefly flashes the default white page while it loads; setting this paints your colour instead. It's also the splash's default backdrop, so one colour covers the boot screen and the splash seamlessly.
@@ -942,6 +986,16 @@ Points the Coilbox hub at a server you run yourself, instead of the built-in `ht
 ```
 
 A player can still override this with a setting of their own. This only changes the default they start from.
+
+### `hubAssetsUrl` (string)
+
+Points Coilbox at your own copy of the hub's pictures, instead of the built-in `https://tomjn.github.io/coilbox-assets/`. Set it with [`hubUrl`](#huburl-string) when you run your own hub, or your hub's items are drawn with pictures from the public one.
+
+```json
+{ "version": 1, "hubUrl": "https://hub.example.com", "hubAssetsUrl": "https://assets.example.com/" }
+```
+
+A trailing slash is optional. An empty string counts as not set. There is no player setting for this one.
 
 ### `hubImportCounts` (boolean)
 
@@ -1031,9 +1085,57 @@ Keeps maps out of warpath and galactic conquest, the two modes that pick maps on
 
 An excluded map stays visible in Content and stays playable in skirmish and multiplayer. A player can opt further maps out themselves on the map detail page, but cannot re-enable one your profile or the catalog excluded. Same shape as the branding catalog's `excludedMaps`, documented in [Branding catalog](branding-catalog.md#excluding-maps-from-warpath-and-conquest).
 
+### `fullscreen` (boolean)
+
+Opens Coilbox fullscreen until the player chooses otherwise. Off by default.
+
+```json
+{ "version": 1, "fullscreen": true }
+```
+
+This sets the starting state and nothing more. The player can still leave fullscreen with F11, the top-bar button or the Fullscreen switch in Settings > General. Coilbox remembers that choice, and it wins over this field on every launch after.
+
+To force fullscreen instead, use [`fullscreenLocked`](#fullscreenlocked-boolean).
+
+### `fullscreenLocked` (boolean)
+
+Forces Coilbox fullscreen on every launch and removes the ways to turn it off. Off by default. Use it for a kiosk build, such as a game on a show floor.
+
+```json
+{ "version": 1, "fullscreenLocked": true, "quit": true }
+```
+
+While it is `true`:
+
+- the window opens fullscreen, whatever [`fullscreen`](#fullscreen-boolean) says
+- the top-bar fullscreen button is gone
+- F11 does nothing
+- the Fullscreen switch in Settings > General is gone
+
+The player's own fullscreen choice is ignored but not erased. Take the field out and their choice comes back on the next launch.
+
+Coilbox sets fullscreen when it starts and does not watch the window after that. If the operating system takes the window out of fullscreen, Coilbox does not put it back until the next launch.
+
+It differs from the other two fullscreen settings:
+
+- `fullscreen` sets the starting state, and the player can change it.
+- [`layout.fullscreenButton`](#layout-object) set to `false` hides the button and turns off F11, but does not force fullscreen. The Settings switch stays.
+
+The lock does not hide the [`quit`](#quit-boolean) button. Set `quit` to `true` alongside it, so a player has a way out of a window that fills the screen.
+
+### `advanced` (boolean)
+
+Starts Coilbox with Advanced mode on, which shows the developer and modding tools in the sidebar: uberstress, mapconv, animation and the archive explorer. Off by default.
+
+```json
+{ "version": 1, "advanced": true }
+```
+
+This sets the starting state, like [`fullscreen`](#fullscreen-boolean). The player can turn Advanced mode off in Settings > General, and their choice wins on every launch after.
+
 ### `quit` (boolean)
 
-Adds a **Quit** button to the bottom of the sidebar that closes Coilbox. Off by default. It's an escape hatch for fullscreen or kiosk (`fullscreenLocked`) builds, where a player may otherwise have no obvious way out — so unlike the fullscreen toggle, this button is **not** removed by the kiosk lock.
+Adds a **Quit** button to the bottom of the sidebar that closes Coilbox. Off by default. It's an escape hatch for fullscreen or kiosk ([`fullscreenLocked`](#fullscreenlocked-boolean)) builds, where a player may otherwise have no obvious way out — so unlike the fullscreen toggle, this button is **not** removed by the kiosk lock.
 
 ```json
 { "version": 1, "fullscreen": true, "quit": true }
@@ -1070,7 +1172,7 @@ Controls the app-frame chrome — the sidebar mode, the breadcrumb, the top-bar 
 | `sidebarCollapsed` | boolean | **Seed** the sidebar to start collapsed. The user can still expand it, and their choice persists. Only meaningful when `popover` is off. |
 | `hideBreadcrumb`   | boolean | Hide the breadcrumb region in the top bar entirely.                     |
 | `historyButtons`   | boolean | Force the top-bar back/forward buttons on (`true`) or off (`false`).    |
-| `fullscreenButton` | boolean | `false` hides the top-bar fullscreen button and makes F11 inert (does **not** force fullscreen — that's `fullscreenLocked`). Default `true`. |
+| `fullscreenButton` | boolean | `false` hides the top-bar fullscreen button and makes F11 inert. It does not force fullscreen, which is what [`fullscreenLocked`](#fullscreenlocked-boolean) does. Default `true`. |
 | `menu`             | object  | Branding for the popover menu button (see below).                       |
 | `left` / `center` / `right` | object | A logo/text in the corresponding top-bar slot (see below).     |
 
