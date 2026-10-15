@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
 import {
-  act,
   cleanup,
   fireEvent,
   render,
   screen,
+  waitFor,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -57,13 +57,11 @@ describe("SectionHelp", () => {
     trigger().focus();
     fireEvent.click(trigger());
     const dialog = screen.getByRole("dialog");
-    await act(async () => {
-      fireEvent.keyDown(dialog, { key: "Escape" });
-      // Radix hands focus back on the next tick.
-      await new Promise((r) => setTimeout(r, 10));
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    await waitFor(() => {
+      expect(screen.queryByText("A long explanation.")).toBeNull();
+      expect(document.activeElement).toBe(trigger());
     });
-    expect(screen.queryByText("A long explanation.")).toBeNull();
-    expect(document.activeElement).toBe(trigger());
   });
 
   it("puts the source line first and the docs link last", () => {
