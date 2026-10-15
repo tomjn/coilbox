@@ -110,6 +110,7 @@ export default defineConfig({
               text: "Campaigns and scenarios",
               link: "/players/campaigns-and-scenarios",
             },
+            { text: "Replays", link: "/players/replays" },
             { text: "Battle presets", link: "/players/presets" },
             { text: "Galactic conquest", link: "/players/conquest" },
             { text: "Warpath", link: "/players/warpath" },
