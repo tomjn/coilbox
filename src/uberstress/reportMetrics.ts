@@ -11,9 +11,13 @@ export interface ReportSummary {
   durationSec: number;
 }
 
-/** A counter key counts as an error when it mentions error/timeout/fail. */
+/**
+ * A counter key counts as an error when it mentions error, timeout, kick or
+ * fail. The History badge sums the same set in Rust (`is_error_counter` in
+ * `report.rs`). Both are tested against `error-counters.json`.
+ */
 export function isErrorCounter(key: string): boolean {
-  return /(error|timeout|fail)/i.test(key);
+  return /(error|timeout|kick|fail)/i.test(key);
 }
 
 /** Derive headline figures shown in the summary band. */

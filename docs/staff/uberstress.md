@@ -143,7 +143,7 @@ The row at the top sums up the run:
 
 - Requests is the number of commands that got an answer.
 - Throughput is the number of answers per second.
-- Errors is the number of failed connections, logins, timeouts and other failures.
+- Errors is the number of failed connections, logins, timeouts, kicks and other failures. The run's entry in the History list shows the same number.
 - Success is the share of attempts that worked.
 - Elapsed is how long the run took.
 
