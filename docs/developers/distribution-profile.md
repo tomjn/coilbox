@@ -352,6 +352,25 @@ Narrows game lists to a single game. When set, the multiplayer **Battles** list,
 
 Provide either or both; an entry matches if the regex matches or any name matches.
 
+### `factionLogos` (object)
+
+Sets the emblem shown for each faction, by side name. Coilbox shows these wherever a player picks or sees a faction: skirmish setup, battle rooms, a game's page, Conquest, Warpath and scenario setup.
+
+```json
+{
+  "version": 1,
+  "factionLogos": {
+    "arm": "factions/arm.png",
+    "core": "factions/core.png"
+  }
+}
+```
+
+- The key is the side name as the game names it. Case does not matter, so `arm` and `Arm` are the same side.
+- The value is a path relative to the `.coilbox/` folder, or an inline `data:` or `https:` URL. These are the same rules as [`splash.image`](#splash-object).
+
+An emblem set here always wins. Coilbox otherwise takes a faction's emblem from the game archive's side pictures or the branding catalog, and this field overrides both. A side you do not list keeps the emblem it would have had.
+
 ### `welcome` (object)
 
 Replaces the default home launcher with a branded landing page. Declarative HTML + CSS only (no JavaScript).
@@ -863,6 +882,31 @@ Shows a brand splash over the whole window at startup: a centered image that fad
 
 Honours `prefers-reduced-motion` (skips the fades). If the image can't be loaded the splash is silently skipped — it never blocks startup.
 
+### `sound` (object)
+
+Ships your own background music. Coilbox plays it while the player is in Coilbox, and pauses it while a game is running or the window is out of focus.
+
+```json
+{
+  "version": 1,
+  "sound": {
+    "tracks": ["sounds/theme.ogg", "sounds/menu.ogg"],
+    "enabled": true,
+    "volume": 40,
+    "shuffle": true
+  }
+}
+```
+
+| Field     | Type     | Meaning                                                                 |
+| --------- | -------- | ----------------------------------------------------------------------- |
+| `tracks`  | string[] | Paths relative to the `.coilbox/` folder. Without any, the rest of `sound` does nothing. |
+| `enabled` | boolean  | Start playing on launch. Default `false`, so music waits for the player to turn it on. |
+| `volume`  | number   | Starting music volume, `0` to `100`. Default `50`.                      |
+| `shuffle` | boolean  | Play the tracks in a random order rather than as listed. Default `false`. |
+
+With tracks set, Settings > Sound offers "Bundled" as the music source and picks it by default. `enabled` and `volume` are starting values. The player can change the source, the volume or turn music off there, and their choice wins on every launch after.
+
 ### `background` (string)
 
 A solid CSS colour painted behind everything from the first frame until the app has rendered. A dark distribution otherwise briefly flashes the default white page while it loads; setting this paints your colour instead. It's also the splash's default backdrop, so one colour covers the boot screen and the splash seamlessly.
@@ -942,6 +986,16 @@ Points the Coilbox hub at a server you run yourself, instead of the built-in `ht
 ```
 
 A player can still override this with a setting of their own. This only changes the default they start from.
+
+### `hubAssetsUrl` (string)
+
+Points Coilbox at your own copy of the hub's pictures, instead of the built-in `https://tomjn.github.io/coilbox-assets/`. Set it with [`hubUrl`](#huburl-string) when you run your own hub, or your hub's items are drawn with pictures from the public one.
+
+```json
+{ "version": 1, "hubUrl": "https://hub.example.com", "hubAssetsUrl": "https://assets.example.com/" }
+```
+
+A trailing slash is optional. An empty string counts as not set. There is no player setting for this one.
 
 ### `hubImportCounts` (boolean)
 
