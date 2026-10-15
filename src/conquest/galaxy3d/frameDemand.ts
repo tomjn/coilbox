@@ -22,7 +22,7 @@ export interface FrameActivity {
   focusEase: boolean;
   /** The heading easing back to north after a rotate. */
   headingEase: boolean;
-  /** The orbit controls moved the camera this frame, so damping may still. */
+  /** The orbit controls moved the camera this frame. */
   cameraMoved: boolean;
   /** A win burst is playing. */
   burst: boolean;

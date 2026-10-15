@@ -14,7 +14,6 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 import { useCanvas3D } from "@/lib/useCanvas3D";
-import { useReduceMotion } from "../../../general/display";
 import type { UnitModelResult } from "../../bindings";
 import { buildModel, missingTextures } from "../../unitModel";
 
@@ -90,7 +89,6 @@ export function ModelViewport({
   className?: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const reduceMotion = useReduceMotion();
 
   useCanvas3D(
     containerRef,
@@ -134,7 +132,6 @@ export function ModelViewport({
 
       const controls = new OrbitControls(camera, renderer.domElement);
       controls.target.copy(centre);
-      controls.enableDamping = !reduceMotion;
       controls.enablePan = false;
       controls.minDistance = radius * 0.4;
       controls.maxDistance = radius * 8;
@@ -172,18 +169,6 @@ export function ModelViewport({
         passive: true,
       });
 
-      // Damping needs a frame loop to settle. Without it the view still moves,
-      // it just stops the moment the pointer does.
-      let frame = 0;
-      if (!reduceMotion) {
-        const tick = () => {
-          controls.update();
-          render();
-          frame = requestAnimationFrame(tick);
-        };
-        frame = requestAnimationFrame(tick);
-      }
-
       return {
         render,
         resize: (width, height) => {
@@ -191,7 +176,6 @@ export function ModelViewport({
           camera.updateProjectionMatrix();
         },
         dispose: () => {
-          cancelAnimationFrame(frame);
           host.removeEventListener("wheel", onWheel, { capture: true });
           controls.removeEventListener("change", render);
           controls.dispose();
@@ -199,7 +183,7 @@ export function ModelViewport({
         },
       };
     },
-    [model, reduceMotion],
+    [model],
   );
 
   return <div ref={containerRef} className={className} />;

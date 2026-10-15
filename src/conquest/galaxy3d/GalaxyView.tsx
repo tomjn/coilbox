@@ -991,7 +991,6 @@ export function GalaxyView({
       Object.assign(controls, terrainCameraLimits(surface, VIEW_FOV_DEGREES));
     }
     controls.zoomToCursor = true;
-    controls.enableDamping = !reduceMotion;
 
     // Spin snap-back: while the pointer is down the user may rotate freely;
     // on release the azimuth eases back to the default heading (instantly
@@ -1425,7 +1424,7 @@ export function GalaxyView({
     /* ---------------------------- animation loop --------------------------- */
 
     // Only when motion is allowed: the intro warp, twinkle time, binary
-    // orbits, ring pulses and control damping. A frame keeps the next one
+    // orbits and ring pulses. A frame keeps the next one
     // coming while any of them runs, see frameDemand.ts. A Galaxy or Theatre
     // map always has something moving. Under reduce-motion the scene draws
     // on demand and stays perfectly still.

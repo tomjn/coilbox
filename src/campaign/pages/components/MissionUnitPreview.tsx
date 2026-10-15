@@ -134,7 +134,6 @@ function UnitSpinner({
 
       const controls = new OrbitControls(camera, renderer.domElement);
       controls.target.copy(centre);
-      controls.enableDamping = !reduceMotion;
       controls.enableZoom = false;
       controls.enablePan = false;
       // A backdrop takes no pointer input, but `update()` still advances the
@@ -156,10 +155,9 @@ function UnitSpinner({
       const render = () => renderer.render(scene, camera);
       controls.addEventListener("change", render);
 
-      // Both the spin and the damping that settles a drag need a frame loop.
-      // Without one the view still moves, it just stops when the pointer does.
+      // The spin needs a frame loop. A drag draws from the "change" event.
       let frame = 0;
-      if (!reduceMotion) {
+      if (wantSpin) {
         const tick = () => {
           controls.update();
           render();

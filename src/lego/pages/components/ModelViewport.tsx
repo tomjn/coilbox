@@ -831,7 +831,6 @@ export function ModelViewport({
       camera.position.set(...HOME_CAMERA);
 
       const controls = new OrbitControls(camera, renderer.domElement);
-      controls.enableDamping = !reduceMotion;
       controls.maxPolarAngle = Math.PI * 0.495;
       controls.minDistance = 1;
       controls.maxDistance = MIN_MAX_DISTANCE;
