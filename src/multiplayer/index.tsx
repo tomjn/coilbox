@@ -4,6 +4,7 @@ import {
   BarChart3,
   Crosshair,
   Gamepad2,
+  History,
   LogIn,
   MessagesSquare,
   ShieldCheck,
@@ -127,6 +128,17 @@ const multiplayerPlugin: FramePlugin = {
           useLabel: useBattleRoomLabel,
           // Unread battle chat + a status dot when the game is running (#273).
           badge: () => <BattleNavBadge />,
+        },
+        {
+          id: "multiplayer.chatlogs",
+          label: "Chat logs",
+          to: "/chatlogs",
+          end: true,
+          order: 5,
+          icon: History,
+          // Saved chat is read from disk, so this needs no connection and is
+          // not gated on having logged in (issue #4082).
+          useVisible: () => true,
         },
         {
           id: "multiplayer.admin",
