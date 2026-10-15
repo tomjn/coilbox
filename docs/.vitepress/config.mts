@@ -140,7 +140,10 @@ export default defineConfig({
         },
         {
           text: "Share",
-          items: [{ text: "Community hub", link: HUB_URL }],
+          items: [
+            { text: "The Coilbox hub", link: "/players/hub" },
+            { text: "Community hub", link: HUB_URL },
+          ],
         },
       ],
       "/developers/": [
