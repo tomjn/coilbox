@@ -97,15 +97,23 @@ impl ReportSummary {
     }
 }
 
-/// Sum of counters that signal failure: any key containing "error", "timeout",
-/// or "kick" (e.g. dial_error, login_error, timeout, flood_kick).
+/// True when a counter name signals a failed attempt: it contains "error",
+/// "timeout", "kick" or "fail", case-insensitively (e.g. dial_error,
+/// login_error, timeout, flood_kick). `isErrorCounter` in
+/// `src/uberstress/reportMetrics.ts` must give the same answer. Both are tested
+/// against `error-counters.json`.
+pub fn is_error_counter(key: &str) -> bool {
+    let k = key.to_lowercase();
+    ["error", "timeout", "kick", "fail"]
+        .iter()
+        .any(|w| k.contains(w))
+}
+
+/// Sum of the counters that `is_error_counter` accepts.
 pub fn error_count(counters: &BTreeMap<String, i64>) -> i64 {
     counters
         .iter()
-        .filter(|(k, _)| {
-            let k = k.to_lowercase();
-            k.contains("error") || k.contains("timeout") || k.contains("kick")
-        })
+        .filter(|(k, _)| is_error_counter(k))
         .map(|(_, v)| *v)
         .sum()
 }
@@ -189,6 +197,33 @@ mod tests {
         assert_eq!(s.login_p99_ms, Some(36.0));
         assert_eq!(s.ping_p99_ms, Some(5.87));
         assert_eq!(s.error_count, 3); // dial_error(2) + timeout(1)
+    }
+
+    #[test]
+    fn error_counter_names_match_the_shared_list() {
+        let list: serde_json::Value =
+            serde_json::from_str(include_str!("../error-counters.json")).unwrap();
+        for name in list["errors"].as_array().unwrap() {
+            let name = name.as_str().unwrap();
+            assert!(is_error_counter(name), "{name} should be an error counter");
+        }
+        for name in list["notErrors"].as_array().unwrap() {
+            let name = name.as_str().unwrap();
+            assert!(
+                !is_error_counter(name),
+                "{name} should not be an error counter"
+            );
+        }
+    }
+
+    #[test]
+    fn kick_and_fail_counters_are_errors() {
+        let counters = BTreeMap::from([
+            ("login_ok".to_string(), 30),
+            ("flood_kick".to_string(), 4),
+            ("login_fail".to_string(), 2),
+        ]);
+        assert_eq!(error_count(&counters), 6);
     }
 
     #[test]
