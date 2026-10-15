@@ -15,44 +15,32 @@ Coilbox is in portable mode **if, and only if, there is a folder named `.coilbox
     profile.json     <- this file is what enables portable mode
 ```
 
-> **Why a `profile.json`, not just the folder?** On Windows the installer now tucks Coilbox's own sidecar binaries into `.coilbox` to keep the install folder tidy, so a bare `.coilbox` folder exists for *ordinary* installs too. The `profile.json` is the specific marker that says "this is a portable/distribution package". If you only want portability (no branding), an empty `{}` in `profile.json` is enough — see [distribution-profile.md](../developers/distribution-profile.md).
+> Why a `profile.json` and not just the folder? The Windows installer puts some of coilbox's own files in a `.coilbox` folder, so an ordinary install can have one too. The `profile.json` file is what marks a copy of coilbox as portable. An empty `{}` is enough.
 
 On **macOS** the `.coilbox` folder sits **beside `Coilbox.app`**, not inside it. (Coilbox looks up from the executable buried in `Coilbox.app/Contents/MacOS/` and anchors on the folder the `.app` lives in.)
-
-In **development** (`bun tauri dev`) the binary runs from `target/debug/`, so the folder is `target/debug/.coilbox/`.
 
 > The leading dot matters: the folder must be exactly `.coilbox`. On Windows, Explorer will let you create it if you type `.coilbox` with the trailing dot as well (`.coilbox.`) and it'll drop the trailing one; or create it from a terminal with `mkdir .coilbox`.
 
 ## What is in the `.coilbox` folder
 
-Once portable mode is on, Coilbox writes **its own** data and caches inside `.coilbox`, and you place any distribution files (profile, campaigns, media) directly in there too:
+Once portable mode is on, coilbox keeps its own settings and caches in the `.coilbox` folder:
 
 ```
 .coilbox/
-  profile.json       # you add this — REQUIRED to enable portable mode ({} is fine)
-  data/              # created by Coilbox: its settings, state, downloads
-  cache/             # created by Coilbox: thumbnails, unitsync caches, etc.
-  campaigns/         # you add these (optional) — bundled campaigns
-    my-campaign.json
-  scenarios/         # you add these (optional) — bundled scenarios
-    my-mission.json
-  content/           # you add this (optional): a bundled engine, game and maps, read only
-  images/            # you add these (optional) — media referenced by profile/campaigns
-  briefings/
-  fonts/
-  # On Windows the installer also places Coilbox's sidecar binaries
-  # (coilbox-unitsync-worker.exe, uberstress.exe, prdownloader/, mapconv/) here,
-  # and its own read-only data (the branding catalog, mission runtime and lego
-  # parts pack) in resources/. Both are the installer's — leave them alone, and
-  # note that resources/ is wiped and rewritten on every update.
+  profile.json       you add this, and {} is enough
+  data/              coilbox creates this for its settings and state
+  cache/             coilbox creates this for thumbnails and unitsync caches
 ```
 
-- **`data/` and `cache/`** are Coilbox's business. It creates and manages them on first run. You never edit them by hand. Deleting `cache/` is always safe (it's rebuilt); deleting `data/` resets Coilbox's settings for that package.
-- **Everything else** in `.coilbox/` is content *you* put there: `profile.json`, `campaigns/`, `scenarios/`, and any media (`images/`, `briefings/`, `fonts/`, or whatever folder names you reference). These are read-only from Coilbox's point of view.
+A copy of coilbox packaged with a game may hold more in here, such as bundled campaigns or the game itself. Leave those files where they are.
 
-**Important distinction:** this covers Coilbox's *own* files. It does **not** automatically include the game itself — the engine, the `.sdz`/`.sd7` game archive, and maps. Those are **content**, and where they live is a separate choice. A portable coilbox reads them from the app folder and from any folder you add, as the next section describes.
+On Windows, a copy you installed with the installer also keeps its helper programs and a `resources` folder in here. They belong to the installer, and an update replaces them.
 
-> **Put the game *beside* `.coilbox/`, not inside it.** `.coilbox/` is Coilbox's private data/config folder. Your engine, game archive and maps go at the **top level of the app folder** (the folder holding the binary and `.coilbox/`), in the standard Spring subfolders — `games/`, `maps/`, `engine/` — **not** inside `.coilbox/`. The app folder itself is the content root: it looks like an ordinary `~/.spring`-style data directory that happens to also contain `coilbox` and `.coilbox/`. Nesting the game under `.coilbox/` mixes your read-only content in with Coilbox's managed `data/`/`cache/`, won't be picked up as a content root, and could be lost if Coilbox's data is reset. The one exception is `.coilbox/content/`, a read-only bundle that coilbox searches after the app folder. See [Bundle the engine, the game and maps](../developers/distributing.md#bundle-the-engine-the-game-and-maps).
+- Deleting `cache/` is always safe. Coilbox rebuilds it.
+- Deleting `data/` resets coilbox's settings for this copy.
+- Do not edit either folder by hand.
+
+Your games, maps and engine are not in this folder. Coilbox finds them in the app folder and in any folder you add, as the next section describes.
 
 ## Which games and maps a portable Coilbox sees
 
@@ -79,5 +67,5 @@ Sharing a content folder is read-mostly and safe, but note the two tools are ind
 ## Check portable mode is on
 
 - **Settings > Distribution profile** tells you whether a profile is loaded and where from. (If you added `profile.json` but it says "No distribution profile loaded", the `.coilbox` folder or the file name/location is wrong.)
-- **Settings > Content Folders** shows a **Portable** badge next to any root stored as a relative path — confirmation your bundled content will travel.
-- The simplest end-to-end test: **move the whole folder somewhere else and relaunch.** If your settings, profile and bundled content are all still there, the package is genuinely portable.
+- Settings > Content Folders shows a Portable badge next to a folder stored relative to the app folder. That folder moves with coilbox.
+- To test it from end to end, move the whole folder somewhere else and relaunch. Your settings, profile and games should all still be there.
