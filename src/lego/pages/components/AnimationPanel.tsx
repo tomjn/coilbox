@@ -8,10 +8,14 @@
  * A unit that has taken its script over is past all of this. The presets are
  * gone for it, so playback runs the script itself: pick what happens to the
  * unit, and the viewport plays what the script does about it.
+ *
+ * A unit on the presets gets the same player above its preset list, running
+ * the script the presets generate.
  */
 
 import { Button, Input } from "@picoframe/frame";
 import {
+  ChevronRight,
   FileCode,
   Pause,
   Play,
@@ -20,6 +24,11 @@ import {
   StepForward,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -639,524 +648,540 @@ export function AnimationPanel({
     );
   }
 
-  if (playsOwnScript) {
+  {
     const scenario = scenarioById(scenarioId);
     const stopped = timeline?.error ?? null;
 
-    return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+    const header = (
+      <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+        <Button
+          size="sm"
+          variant={playing && !scriptPaused ? "default" : "outline"}
+          disabled={
+            reduceMotion ||
+            running ||
+            (isCallMode && !callFunction) ||
+            (!playsOwnScript && applied.length === 0)
+          }
+          onClick={() =>
+            playing
+              ? onScriptPausedChange(!scriptPaused)
+              : isCallMode
+                ? fireCall(callFunction, callArgsText)
+                : void start(scenarioId)
+          }
+        >
+          {playing && !scriptPaused ? <Pause size={14} /> : <Play size={14} />}
+          {!playing
+            ? running
+              ? "Running"
+              : "Play"
+            : scriptPaused
+              ? "Resume"
+              : "Pause"}
+        </Button>
+        {playing ? (
           <Button
             size="sm"
-            variant={playing && !scriptPaused ? "default" : "outline"}
-            disabled={reduceMotion || running || (isCallMode && !callFunction)}
-            onClick={() =>
-              playing
-                ? onScriptPausedChange(!scriptPaused)
-                : isCallMode
-                  ? fireCall(callFunction, callArgsText)
-                  : void start(scenarioId)
-            }
+            variant="ghost"
+            onClick={stop}
+            title="Stop and return to the built pose"
           >
-            {playing && !scriptPaused ? (
-              <Pause size={14} />
-            ) : (
-              <Play size={14} />
-            )}
-            {!playing
-              ? running
-                ? "Running"
-                : "Play"
-              : scriptPaused
-                ? "Resume"
-                : "Pause"}
+            <Square size={14} />
           </Button>
-          {playing ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={stop}
-              title="Stop and return to the built pose"
-            >
-              <Square size={14} />
-            </Button>
-          ) : null}
-          <span className="text-xs text-muted-foreground">
-            {reduceMotion
-              ? "Playback is off while your system asks for reduced motion."
+        ) : null}
+        <span className="text-xs text-muted-foreground">
+          {reduceMotion
+            ? "Playback is off while your system asks for reduced motion."
+            : !playsOwnScript && applied.length === 0
+              ? "Apply one below."
               : `${PREVIEW_SECONDS} seconds, looped`}
-          </span>
-          {owned ? (
-            <Button size="sm" className="ml-auto" onClick={onShowScript}>
-              <FileCode size={14} /> Edit
-            </Button>
-          ) : null}
+        </span>
+        {owned ? (
+          <Button size="sm" className="ml-auto" onClick={onShowScript}>
+            <FileCode size={14} /> Edit
+          </Button>
+        ) : null}
+        {/* Labelled rather than an icon on its own. This is the only way to
+              read the generated script, and as a bare glyph in the corner it
+              was missed by people who went looking for exactly that. */}
+        {playsOwnScript ? null : (
+          <Button
+            size="sm"
+            variant="outline"
+            className="ml-auto"
+            onClick={onShowScript}
+            title="The animation script these presets generate"
+          >
+            <FileCode size={14} /> Script
+          </Button>
+        )}
+      </div>
+    );
+
+    const scrubber = playable(timeline) ? (
+      <div className="flex flex-col gap-1 border-b border-border px-3 py-2">
+        <div className="flex items-start gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={scriptFrame <= 0}
+            onClick={() => step(-1)}
+            title="Step back one frame"
+          >
+            <StepBack size={14} />
+          </Button>
+          <div className="flex flex-1 flex-col gap-1">
+            <Slider
+              min={0}
+              max={Math.max((timeline?.frames.length ?? 1) - 1, 0)}
+              step={1}
+              value={[scriptFrame]}
+              onValueChange={([next]) => {
+                onScriptPausedChange(true);
+                onScriptFrameChange(next);
+              }}
+              aria-label="Scrub the script preview"
+              // Match the h-8 step buttons so the row can go items-start:
+              // with marks underneath, the column is taller than the
+              // buttons, and items-center would otherwise centre the
+              // buttons 14px below the thumb.
+              className="h-8"
+            />
+            {timeline?.events.some(isMarked) ? (
+              <ScrubberMarks
+                events={timeline.events}
+                frameCount={timeline.frames.length}
+                onSeek={(frame) => {
+                  onScriptPausedChange(true);
+                  onScriptFrameChange(frame);
+                }}
+              />
+            ) : null}
+          </div>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={scriptFrame >= (timeline?.frames.length ?? 1) - 1}
+            onClick={() => step(1)}
+            title="Step forward one frame"
+          >
+            <StepForward size={14} />
+          </Button>
+        </div>
+        <span className="text-right text-xs tabular-nums text-muted-foreground">
+          {scriptFrame + 1}/{timeline?.frames.length}
+        </span>
+      </div>
+    ) : null;
+
+    const problems = (
+      <>
+        {failure ? (
+          <p className="text-xs text-destructive">
+            The script could not be run: {failure}
+          </p>
+        ) : null}
+
+        {stopped ? (
+          <div className="flex flex-col gap-1 rounded-md border border-destructive/50 px-2 py-2">
+            <span className="text-xs font-medium text-destructive">
+              The script stopped
+            </span>
+            <p className="text-xs text-destructive">{stopped}</p>
+            <p className="text-xs text-muted-foreground">
+              {timeline && timeline.frames.length > 0
+                ? `Playing the ${(timeline.frames.length / timeline.fps).toFixed(1)} seconds it managed first.`
+                : "It got no further than that, so there is nothing to play."}
+            </p>
+          </div>
+        ) : null}
+      </>
+    );
+
+    const body = (
+      <>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium">What happens to the unit</span>
+          <Select
+            value={scenarioId}
+            onValueChange={(next) => {
+              setScenarioId(next);
+              if (next === CALL_FUNCTION) {
+                // A function to call has to come from somewhere, and the
+                // idle scenario is the cheapest run that learns it.
+                if (!timeline || timeline.functions.length === 0) {
+                  void runEvents(scenarioById("idle")?.events ?? [], values);
+                }
+                return;
+              }
+              if (playing || timeline) void start(next);
+            }}
+          >
+            <SelectTrigger
+              size="sm"
+              className="w-full"
+              aria-label="What happens to the unit"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SCENARIOS.map((option) => (
+                <SelectItem key={option.id} value={option.id}>
+                  {option.label}
+                </SelectItem>
+              ))}
+              <SelectItem value={CALL_FUNCTION}>Call a function</SelectItem>
+            </SelectContent>
+          </Select>
+          {isCallMode ? (
+            <>
+              <Select
+                value={callFunction}
+                onValueChange={(name) => {
+                  setCallFunction(name);
+                  fireCall(name, callArgsText);
+                }}
+              >
+                <SelectTrigger
+                  size="sm"
+                  className="w-full"
+                  aria-label="Function to call"
+                >
+                  <SelectValue placeholder="Choose a function" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(timeline?.functions ?? []).map((name) => (
+                    <SelectItem key={name} value={name}>
+                      {name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                value={callArgsText}
+                aria-label="Arguments"
+                placeholder="0.8, 0.15"
+                onChange={(e) => onArgsTextChange(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Numbers, comma separated. Call-ins that aim take radians, as the
+                engine hands them.
+              </p>
+              {callArgsError ? (
+                <p className="text-xs text-destructive">{callArgsError}</p>
+              ) : null}
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              {scenario?.description}
+            </p>
+          )}
         </div>
 
-        {playable(timeline) ? (
-          <div className="flex flex-col gap-1 border-b border-border px-3 py-2">
-            <div className="flex items-start gap-2">
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={scriptFrame <= 0}
-                onClick={() => step(-1)}
-                title="Step back one frame"
-              >
-                <StepBack size={14} />
-              </Button>
-              <div className="flex flex-1 flex-col gap-1">
-                <Slider
-                  min={0}
-                  max={Math.max((timeline?.frames.length ?? 1) - 1, 0)}
-                  step={1}
-                  value={[scriptFrame]}
-                  onValueChange={([next]) => {
-                    onScriptPausedChange(true);
-                    onScriptFrameChange(next);
-                  }}
-                  aria-label="Scrub the script preview"
-                  // Match the h-8 step buttons so the row can go items-start:
-                  // with marks underneath, the column is taller than the
-                  // buttons, and items-center would otherwise centre the
-                  // buttons 14px below the thumb.
-                  className="h-8"
-                />
-                {timeline?.events.some(isMarked) ? (
-                  <ScrubberMarks
-                    events={timeline.events}
-                    frameCount={timeline.frames.length}
-                    onSeek={(frame) => {
-                      onScriptPausedChange(true);
-                      onScriptFrameChange(frame);
-                    }}
-                  />
-                ) : null}
-              </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={scriptFrame >= (timeline?.frames.length ?? 1) - 1}
-                onClick={() => step(1)}
-                title="Step forward one frame"
-              >
-                <StepForward size={14} />
-              </Button>
-            </div>
-            <span className="text-right text-xs tabular-nums text-muted-foreground">
-              {scriptFrame + 1}/{timeline?.frames.length}
-            </span>
+        {timeline && timeline.asked.length > 0 ? (
+          <div className="flex flex-col gap-2">
+            <span className="text-xs font-medium">Unit values</span>
+            <p className="text-xs text-muted-foreground">
+              What the script reads about its unit. Change one and the preview
+              runs again with it.
+            </p>
+            {timeline.asked.map((asked) => {
+              const control = controlFor(asked.id, asked.name);
+              const changed = values[asked.id] !== undefined;
+              const raw = values[asked.id] ?? asked.default ?? 0;
+              return (
+                <div key={asked.id} className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span>{control.label}</span>
+                    <div className="flex items-center gap-2">
+                      {control.kind === "slider" ? (
+                        <span className="text-muted-foreground">
+                          {control.toDisplay(raw)}
+                          {control.suffix}
+                        </span>
+                      ) : null}
+                      {changed ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-5 px-1.5 text-xs"
+                          onClick={() => changeValue(asked.id, undefined)}
+                        >
+                          Reset
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                  {control.kind === "switch" ? (
+                    <Switch
+                      checked={raw !== 0}
+                      onCheckedChange={(on) =>
+                        changeValue(asked.id, on ? 1 : 0)
+                      }
+                      aria-label={control.label}
+                    />
+                  ) : null}
+                  {control.kind === "slider" ? (
+                    <Slider
+                      min={control.min}
+                      max={control.max}
+                      step={control.step}
+                      value={[control.toDisplay(raw)]}
+                      onValueChange={([next]) =>
+                        changeValue(asked.id, control.toRaw(next))
+                      }
+                      aria-label={control.label}
+                    />
+                  ) : null}
+                  {control.kind === "select" ? (
+                    <Select
+                      value={String(raw)}
+                      onValueChange={(next) =>
+                        changeValue(asked.id, Number(next))
+                      }
+                    >
+                      <SelectTrigger
+                        size="sm"
+                        className="w-full"
+                        aria-label={control.label}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {control.options.map((option) => (
+                          <SelectItem
+                            key={option.value}
+                            value={String(option.value)}
+                          >
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : null}
+                  {control.kind === "number" ? (
+                    <Input
+                      type="number"
+                      value={raw}
+                      aria-label={control.label}
+                      onChange={(e) => {
+                        const next = Number(e.target.value);
+                        if (!Number.isNaN(next)) changeValue(asked.id, next);
+                      }}
+                    />
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
         ) : null}
 
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-3">
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium">
-              What happens to the unit
-            </span>
-            <Select
-              value={scenarioId}
-              onValueChange={(next) => {
-                setScenarioId(next);
-                if (next === CALL_FUNCTION) {
-                  // A function to call has to come from somewhere, and the
-                  // idle scenario is the cheapest run that learns it.
-                  if (!timeline || timeline.functions.length === 0) {
-                    void runEvents(scenarioById("idle")?.events ?? [], values);
-                  }
-                  return;
-                }
-                if (playing || timeline) void start(next);
-              }}
-            >
-              <SelectTrigger
-                size="sm"
-                className="w-full"
-                aria-label="What happens to the unit"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {SCENARIOS.map((option) => (
-                  <SelectItem key={option.id} value={option.id}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-                <SelectItem value={CALL_FUNCTION}>Call a function</SelectItem>
-              </SelectContent>
-            </Select>
-            {isCallMode ? (
-              <>
-                <Select
-                  value={callFunction}
-                  onValueChange={(name) => {
-                    setCallFunction(name);
-                    fireCall(name, callArgsText);
-                  }}
-                >
-                  <SelectTrigger
-                    size="sm"
-                    className="w-full"
-                    aria-label="Function to call"
-                  >
-                    <SelectValue placeholder="Choose a function" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(timeline?.functions ?? []).map((name) => (
-                      <SelectItem key={name} value={name}>
-                        {name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  value={callArgsText}
-                  aria-label="Arguments"
-                  placeholder="0.8, 0.15"
-                  onChange={(e) => onArgsTextChange(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Numbers, comma separated. Call-ins that aim take radians, as
-                  the engine hands them.
-                </p>
-                {callArgsError ? (
-                  <p className="text-xs text-destructive">{callArgsError}</p>
-                ) : null}
-              </>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                {scenario?.description}
-              </p>
-            )}
+        {playsOwnScript ? problems : null}
+
+        {timeline?.warnings.map((warning) => (
+          <p key={warning} className="text-xs text-muted-foreground">
+            {warning}
+          </p>
+        ))}
+
+        {standInNotes.map((note) => (
+          <p key={note} className="text-xs text-muted-foreground">
+            {note}
+          </p>
+        ))}
+
+        {effectsNote &&
+        timeline?.events.some(
+          (event) =>
+            event.kind === "flare" ||
+            event.kind === "shot" ||
+            event.kind === "sfx",
+        ) ? (
+          <p className="text-xs text-muted-foreground">{effectsNote}</p>
+        ) : null}
+
+        {compiled ? (
+          <p className="text-xs text-muted-foreground">
+            This unit's game animates it with{" "}
+            <code className="break-all">{compiled.member}</code>, which is
+            compiled rather than Lua. Coilbox runs it, so what you see is what
+            the game plays. It cannot be edited here and an export does not
+            write it.
+          </p>
+        ) : playsOwnScript ? (
+          <p className="text-xs text-muted-foreground">
+            The presets wrote this unit's script once and are done with it. This
+            plays the script itself, so what you see is what the file says.
+          </p>
+        ) : null}
+      </>
+    );
+
+    if (playsOwnScript) {
+      return (
+        <div className="flex min-h-0 flex-1 flex-col">
+          {header}
+          {scrubber}
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-3">
+            {body}
           </div>
+        </div>
+      );
+    }
 
-          {timeline && timeline.asked.length > 0 ? (
-            <div className="flex flex-col gap-2">
-              <span className="text-xs font-medium">Unit values</span>
-              <p className="text-xs text-muted-foreground">
-                What the script reads about its unit. Change one and the preview
-                runs again with it.
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        {header}
+        {scrubber}
+
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <Collapsible defaultOpen className="border-b border-border/60">
+            <CollapsibleTrigger className="group flex w-full items-center gap-1 px-3 py-2 text-left text-sm font-medium">
+              <ChevronRight
+                size={14}
+                className="transition-transform group-data-[state=open]:rotate-90"
+              />
+              Preview
+            </CollapsibleTrigger>
+            <CollapsibleContent className="flex flex-col gap-3 px-3 pb-3">
+              {body}
+            </CollapsibleContent>
+          </Collapsible>
+          {failure || timeline?.error ? (
+            <div className="flex flex-col gap-3 border-b border-border/60 px-3 py-2">
+              {problems}
+            </div>
+          ) : null}
+          {/* Above the presets, because it is what makes them mean anything: a
+            unit with a build arm and no builder keys animates a job it can
+            never be given. Only for a unit that has one, since the roles are
+            what say this unit builds. */}
+          {isBuilder(project) ? (
+            <div className="border-b border-border/60 px-3 py-2">
+              <p className="text-sm font-medium">What it builds with</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                This unit has a build arm, so its definition is written as a
+                builder. All three go together: the engine reads a builder with
+                no work rate as not a builder at all.
               </p>
-              {timeline.asked.map((asked) => {
-                const control = controlFor(asked.id, asked.name);
-                const changed = values[asked.id] !== undefined;
-                const raw = values[asked.id] ?? asked.default ?? 0;
-                return (
-                  <div key={asked.id} className="flex flex-col gap-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span>{control.label}</span>
-                      <div className="flex items-center gap-2">
-                        {control.kind === "slider" ? (
-                          <span className="text-muted-foreground">
-                            {control.toDisplay(raw)}
-                            {control.suffix}
-                          </span>
-                        ) : null}
-                        {changed ? (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-5 px-1.5 text-xs"
-                            onClick={() => changeValue(asked.id, undefined)}
-                          >
-                            Reset
-                          </Button>
-                        ) : null}
-                      </div>
-                    </div>
-                    {control.kind === "switch" ? (
-                      <Switch
-                        checked={raw !== 0}
-                        onCheckedChange={(on) =>
-                          changeValue(asked.id, on ? 1 : 0)
-                        }
-                        aria-label={control.label}
-                      />
-                    ) : null}
-                    {control.kind === "slider" ? (
-                      <Slider
-                        min={control.min}
-                        max={control.max}
-                        step={control.step}
-                        value={[control.toDisplay(raw)]}
-                        onValueChange={([next]) =>
-                          changeValue(asked.id, control.toRaw(next))
-                        }
-                        aria-label={control.label}
-                      />
-                    ) : null}
-                    {control.kind === "select" ? (
-                      <Select
-                        value={String(raw)}
-                        onValueChange={(next) =>
-                          changeValue(asked.id, Number(next))
-                        }
-                      >
-                        <SelectTrigger
-                          size="sm"
-                          className="w-full"
-                          aria-label={control.label}
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {control.options.map((option) => (
-                            <SelectItem
-                              key={option.value}
-                              value={String(option.value)}
-                            >
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : null}
-                    {control.kind === "number" ? (
-                      <Input
-                        type="number"
-                        value={raw}
-                        aria-label={control.label}
-                        onChange={(e) => {
-                          const next = Number(e.target.value);
-                          if (!Number.isNaN(next)) changeValue(asked.id, next);
-                        }}
-                      />
-                    ) : null}
+
+              {BUILDER_FIELDS.map((field) => (
+                <div key={field.id} className="mt-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span>{field.label}</span>
+                    <span className="text-muted-foreground">
+                      {project.builder?.[field.id] ?? DEFAULT_BUILDER[field.id]}
+                      {field.suffix}
+                    </span>
                   </div>
-                );
-              })}
+                  <Slider
+                    className="mt-1"
+                    min={field.min}
+                    max={field.max}
+                    step={field.step}
+                    value={[
+                      project.builder?.[field.id] ?? DEFAULT_BUILDER[field.id],
+                    ]}
+                    onValueChange={([next]) =>
+                      onBuilderChange({ ...project.builder, [field.id]: next })
+                    }
+                    aria-label={field.label}
+                  />
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {field.note}
+                  </p>
+                </div>
+              ))}
+
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <Label htmlFor="builder-assist" className="text-xs font-medium">
+                  Can help another unit's build
+                </Label>
+                <Switch
+                  id="builder-assist"
+                  checked={
+                    project.builder?.canAssist ?? DEFAULT_BUILDER.canAssist
+                  }
+                  onCheckedChange={(on) =>
+                    onBuilderChange({ ...project.builder, canAssist: on })
+                  }
+                />
+              </div>
             </div>
           ) : null}
 
-          {failure ? (
-            <p className="text-xs text-destructive">
-              The script could not be run: {failure}
+          {PRESETS.map((preset) => {
+            const entry = applied.find((a) => a.presetId === preset.id);
+            const missing = unmetRequirements(preset, counts);
+
+            return (
+              <div
+                key={preset.id}
+                className="border-b border-border/60 px-3 py-2"
+              >
+                <div className="flex items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">{preset.label}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {preset.description}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={entry ? "outline" : "default"}
+                    disabled={!entry && missing.length > 0}
+                    onClick={() =>
+                      entry ? remove(preset.id) : apply(preset.id)
+                    }
+                  >
+                    {entry ? "Remove" : "Apply"}
+                  </Button>
+                </div>
+
+                {!entry && missing.length > 0 ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Needs a piece set as{" "}
+                    {missing.map((role) => roleLabel(role)).join(", ")}.
+                  </p>
+                ) : null}
+
+                {entry
+                  ? preset.params.map((param) => (
+                      <div key={param.id} className="mt-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span>{param.label}</span>
+                          <span className="text-muted-foreground">
+                            {entry.params[param.id] ?? param.fallback}
+                            {PARAM_SUFFIX[param.unit]}
+                          </span>
+                        </div>
+                        <Slider
+                          className="mt-1"
+                          min={param.min}
+                          max={param.max}
+                          step={param.step}
+                          value={[entry.params[param.id] ?? param.fallback]}
+                          onValueChange={([next]) =>
+                            setParam(preset.id, param.id, next)
+                          }
+                          aria-label={`${preset.label}: ${param.label}`}
+                        />
+                      </div>
+                    ))
+                  : null}
+              </div>
+            );
+          })}
+
+          {applied.some((entry) => !presetById(entry.presetId)) ? (
+            <p className="px-3 py-2 text-xs text-muted-foreground">
+              This unit also has an animation this build does not know. It is
+              left alone rather than dropped.
             </p>
           ) : null}
-
-          {stopped ? (
-            <div className="flex flex-col gap-1 rounded-md border border-destructive/50 px-2 py-2">
-              <span className="text-xs font-medium text-destructive">
-                The script stopped
-              </span>
-              <p className="text-xs text-destructive">{stopped}</p>
-              <p className="text-xs text-muted-foreground">
-                {timeline && timeline.frames.length > 0
-                  ? `Playing the ${(timeline.frames.length / timeline.fps).toFixed(1)} seconds it managed first.`
-                  : "It got no further than that, so there is nothing to play."}
-              </p>
-            </div>
-          ) : null}
-
-          {timeline?.warnings.map((warning) => (
-            <p key={warning} className="text-xs text-muted-foreground">
-              {warning}
-            </p>
-          ))}
-
-          {standInNotes.map((note) => (
-            <p key={note} className="text-xs text-muted-foreground">
-              {note}
-            </p>
-          ))}
-
-          {effectsNote &&
-          timeline?.events.some(
-            (event) =>
-              event.kind === "flare" ||
-              event.kind === "shot" ||
-              event.kind === "sfx",
-          ) ? (
-            <p className="text-xs text-muted-foreground">{effectsNote}</p>
-          ) : null}
-
-          {compiled ? (
-            <p className="text-xs text-muted-foreground">
-              This unit's game animates it with{" "}
-              <code className="break-all">{compiled.member}</code>, which is
-              compiled rather than Lua. Coilbox runs it, so what you see is what
-              the game plays. It cannot be edited here and an export does not
-              write it.
-            </p>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              The presets wrote this unit's script once and are done with it.
-              This plays the script itself, so what you see is what the file
-              says.
-            </p>
-          )}
         </div>
       </div>
     );
   }
-
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center gap-2 border-b border-border px-3 py-2">
-        <Button
-          size="sm"
-          variant={playing ? "default" : "outline"}
-          onClick={() => (playing ? stop() : void start(scenarioId))}
-          disabled={applied.length === 0 || reduceMotion || running}
-        >
-          {playing ? <Pause size={14} /> : <Play size={14} />}
-          {playing ? "Stop" : running ? "Running" : "Play"}
-        </Button>
-        <span className="text-xs text-muted-foreground">
-          {reduceMotion
-            ? "Playback is off while your system asks for reduced motion."
-            : applied.length === 0
-              ? "Apply one below."
-              : `${applied.length} applied`}
-        </span>
-        {/* Labelled rather than an icon on its own. This is the only way to
-            read the generated script, and as a bare glyph in the corner it was
-            missed by people who went looking for exactly that. */}
-        <Button
-          size="sm"
-          variant="outline"
-          className="ml-auto"
-          onClick={onShowScript}
-          title="The animation script these presets generate"
-        >
-          <FileCode size={14} /> Script
-        </Button>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {failure || timeline?.error ? (
-          <p className="border-b border-border/60 px-3 py-2 text-xs text-destructive">
-            {failure
-              ? `The script could not be run: ${failure}`
-              : `The script stopped: ${timeline?.error}`}
-          </p>
-        ) : null}
-        {/* Above the presets, because it is what makes them mean anything: a
-            unit with a build arm and no builder keys animates a job it can
-            never be given. Only for a unit that has one, since the roles are
-            what say this unit builds. */}
-        {isBuilder(project) ? (
-          <div className="border-b border-border/60 px-3 py-2">
-            <p className="text-sm font-medium">What it builds with</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              This unit has a build arm, so its definition is written as a
-              builder. All three go together: the engine reads a builder with no
-              work rate as not a builder at all.
-            </p>
-
-            {BUILDER_FIELDS.map((field) => (
-              <div key={field.id} className="mt-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span>{field.label}</span>
-                  <span className="text-muted-foreground">
-                    {project.builder?.[field.id] ?? DEFAULT_BUILDER[field.id]}
-                    {field.suffix}
-                  </span>
-                </div>
-                <Slider
-                  className="mt-1"
-                  min={field.min}
-                  max={field.max}
-                  step={field.step}
-                  value={[
-                    project.builder?.[field.id] ?? DEFAULT_BUILDER[field.id],
-                  ]}
-                  onValueChange={([next]) =>
-                    onBuilderChange({ ...project.builder, [field.id]: next })
-                  }
-                  aria-label={field.label}
-                />
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {field.note}
-                </p>
-              </div>
-            ))}
-
-            <div className="mt-3 flex items-center justify-between gap-3">
-              <Label htmlFor="builder-assist" className="text-xs font-medium">
-                Can help another unit's build
-              </Label>
-              <Switch
-                id="builder-assist"
-                checked={
-                  project.builder?.canAssist ?? DEFAULT_BUILDER.canAssist
-                }
-                onCheckedChange={(on) =>
-                  onBuilderChange({ ...project.builder, canAssist: on })
-                }
-              />
-            </div>
-          </div>
-        ) : null}
-
-        {PRESETS.map((preset) => {
-          const entry = applied.find((a) => a.presetId === preset.id);
-          const missing = unmetRequirements(preset, counts);
-
-          return (
-            <div
-              key={preset.id}
-              className="border-b border-border/60 px-3 py-2"
-            >
-              <div className="flex items-start gap-2">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">{preset.label}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {preset.description}
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  variant={entry ? "outline" : "default"}
-                  disabled={!entry && missing.length > 0}
-                  onClick={() => (entry ? remove(preset.id) : apply(preset.id))}
-                >
-                  {entry ? "Remove" : "Apply"}
-                </Button>
-              </div>
-
-              {!entry && missing.length > 0 ? (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Needs a piece set as{" "}
-                  {missing.map((role) => roleLabel(role)).join(", ")}.
-                </p>
-              ) : null}
-
-              {entry
-                ? preset.params.map((param) => (
-                    <div key={param.id} className="mt-2">
-                      <div className="flex items-center justify-between text-xs">
-                        <span>{param.label}</span>
-                        <span className="text-muted-foreground">
-                          {entry.params[param.id] ?? param.fallback}
-                          {PARAM_SUFFIX[param.unit]}
-                        </span>
-                      </div>
-                      <Slider
-                        className="mt-1"
-                        min={param.min}
-                        max={param.max}
-                        step={param.step}
-                        value={[entry.params[param.id] ?? param.fallback]}
-                        onValueChange={([next]) =>
-                          setParam(preset.id, param.id, next)
-                        }
-                        aria-label={`${preset.label}: ${param.label}`}
-                      />
-                    </div>
-                  ))
-                : null}
-            </div>
-          );
-        })}
-
-        {applied.some((entry) => !presetById(entry.presetId)) ? (
-          <p className="px-3 py-2 text-xs text-muted-foreground">
-            This unit also has an animation this build does not know. It is left
-            alone rather than dropped.
-          </p>
-        ) : null}
-      </div>
-    </div>
-  );
 }
