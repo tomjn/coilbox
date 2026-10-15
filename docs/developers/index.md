@@ -23,6 +23,10 @@ Most of the tools here are hidden until you turn on Advanced mode in Settings > 
 - [Set up conquest for your game](conquest-for-your-game.md). Supply system names, factions and AI rankings, or bundle a galaxy.
 - [Hand-made maps](hand-made-maps.md). Paint provinces in an image editor, describe them in `map.json`, and ship the map for Conquest and Warpath.
 
+## Maps
+
+- [Compile and decompile maps](mapping-tools.md). Build a map for the engine from your images with Mapping Tools, take an existing map apart, and check it in a 3D preview.
+
 ## Units
 
 - [Unit builder](lego-builder.md). Assemble a unit from textured parts, animate it from a preset and write it into a game.
