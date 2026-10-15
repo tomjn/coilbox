@@ -32,12 +32,17 @@ export interface FrameActivity {
   combatFlashes: boolean;
   /** Effects are on. The selection pulse and the flashes only run with them. */
   effects: boolean;
+  /**
+   * The frame was drawn below full resolution, so one more is drawn sharp
+   * once the camera stops (issue #3994).
+   */
+  reducedResolution: boolean;
 }
 
 /** Whether the frame just drawn has to be followed by another. */
 export function needsAnotherFrame(a: FrameActivity): boolean {
   if (a.alwaysMoving || a.intro || a.focusEase || a.headingEase) return true;
-  if (a.cameraMoved || a.burst) return true;
+  if (a.cameraMoved || a.burst || a.reducedResolution) return true;
   return a.effects && (a.selectionPulse || a.combatFlashes);
 }
 
@@ -52,19 +57,33 @@ export interface FrameScheduler {
  * Run `frame` once per animation frame while it is asked for. `frame` draws
  * and answers whether it needs the next frame too. A request made while a
  * frame runs, such as the orbit controls' change event, also gets the next.
+ *
+ * `frame` is told how long it waited in milliseconds: from the start of the
+ * frame before it when it was asked for during that one, otherwise from the
+ * request. `idle` runs after a frame that leaves nothing asked for.
  */
 export function createFrameScheduler(
-  frame: () => boolean,
+  frame: (waited: number) => boolean,
   schedule: (callback: () => void) => number = requestAnimationFrame,
   unschedule: (handle: number) => void = cancelAnimationFrame,
+  now: () => number = () => performance.now(),
+  idle?: () => void,
 ): FrameScheduler {
   let pending: number | undefined;
+  let due = 0;
+  let runningSince: number | undefined;
   const request = () => {
-    if (pending === undefined) pending = schedule(run);
+    if (pending !== undefined) return;
+    due = runningSince ?? now();
+    pending = schedule(run);
   };
   const run = () => {
+    const start = now();
     pending = undefined;
-    if (frame()) request();
+    runningSince = start;
+    if (frame(start - due)) request();
+    runningSince = undefined;
+    if (pending === undefined) idle?.();
   };
   return {
     request,

@@ -24,7 +24,13 @@ vi.mock("three", async (orig) => {
     }
     domElement = document.createElement("canvas");
     setClearColor() {}
-    setPixelRatio() {}
+    pixelRatio = 1;
+    getPixelRatio() {
+      return this.pixelRatio;
+    }
+    setPixelRatio(ratio: number) {
+      this.pixelRatio = ratio;
+    }
     setSize() {}
     render() {}
     dispose() {}

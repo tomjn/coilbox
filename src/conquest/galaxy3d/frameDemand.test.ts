@@ -15,6 +15,7 @@ const still: FrameActivity = {
   selectionPulse: false,
   combatFlashes: false,
   effects: true,
+  reducedResolution: false,
 };
 
 describe("needsAnotherFrame", () => {
@@ -31,6 +32,7 @@ describe("needsAnotherFrame", () => {
     "burst",
     "selectionPulse",
     "combatFlashes",
+    "reducedResolution",
   ] as const)("keeps drawing while %s", (key) => {
     expect(needsAnotherFrame({ ...still, [key]: true })).toBe(true);
   });
@@ -43,6 +45,7 @@ describe("needsAnotherFrame", () => {
 
   it("keeps the camera, bursts and Galaxy maps moving with effects off", () => {
     const off = { ...still, effects: false };
+    expect(needsAnotherFrame({ ...off, reducedResolution: true })).toBe(true);
     expect(needsAnotherFrame({ ...off, cameraMoved: true })).toBe(true);
     expect(needsAnotherFrame({ ...off, burst: true })).toBe(true);
     expect(needsAnotherFrame({ ...off, alwaysMoving: true })).toBe(true);
@@ -144,6 +147,76 @@ describe("createFrameScheduler", () => {
     frames.tick();
     frames.tick();
     expect(drawn).toBe(2);
+  });
+
+  it("tells a frame how long it waited", () => {
+    const frames = fakeFrames();
+    let time = 0;
+    const waits: number[] = [];
+    let left = 3;
+    const s = createFrameScheduler(
+      (waited) => {
+        waits.push(waited);
+        return --left > 0;
+      },
+      frames.schedule,
+      frames.unschedule,
+      () => time,
+    );
+    // Asked for between frames: from the request.
+    time = 10;
+    s.request();
+    time = 16;
+    frames.tick();
+    // Asked for by the frame before: from that frame's start.
+    time = 50;
+    frames.tick();
+    time = 66;
+    frames.tick();
+    expect(waits).toEqual([6, 34, 16]);
+  });
+
+  it("times a request made during a frame from that frame's start", () => {
+    const frames = fakeFrames();
+    let time = 0;
+    const waits: number[] = [];
+    const s = createFrameScheduler(
+      (waited) => {
+        waits.push(waited);
+        time += 5;
+        if (waits.length === 1) s.request();
+        return false;
+      },
+      frames.schedule,
+      frames.unschedule,
+      () => time,
+    );
+    s.request();
+    time = 16;
+    frames.tick();
+    time = 40;
+    frames.tick();
+    expect(waits).toEqual([16, 24]);
+  });
+
+  it("goes idle after a frame that leaves nothing asked for", () => {
+    const frames = fakeFrames();
+    let idle = 0;
+    let left = 2;
+    const s = createFrameScheduler(
+      () => --left > 0,
+      frames.schedule,
+      frames.unschedule,
+      () => 0,
+      () => idle++,
+    );
+    s.request();
+    frames.tick();
+    expect(idle).toBe(0);
+    frames.tick();
+    expect(idle).toBe(1);
+    frames.tick();
+    expect(idle).toBe(1);
   });
 
   it("drops a pending frame on cancel and can start again", () => {

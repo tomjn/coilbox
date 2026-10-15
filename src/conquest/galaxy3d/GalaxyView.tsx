@@ -8,6 +8,10 @@ import {
 import { drawingPixelRatio } from "../../lib/uiZoom";
 import type { GalaxyDoc, Incursion, NodeStar } from "../model";
 import { planetOf } from "../planets";
+import {
+  createAdaptiveResolution,
+  createDisplayClock,
+} from "./adaptiveResolution";
 import { buildBackdrop } from "./backdrop";
 import { bodyLabel, type VoidBody } from "./bodies";
 import { buildCityLayer } from "./cityLayer";
@@ -1059,6 +1063,8 @@ export function GalaxyView({
     // placement reruns for those as well as for a moved camera.
     let labelEpoch = 0;
 
+    // Until the last tile of the ground's bake is drawn.
+    let baking = !!terrainSheet?.bake;
     const render = () => {
       if (!renderer || !labelRenderer) return;
       if (cities && controls) {
@@ -1068,9 +1074,35 @@ export function GalaxyView({
       }
       // One tile of the ground's bake a frame, until it is done.
       if (terrainSheet?.prepare(renderer)) requestRender();
+      else baking = false;
       renderer.render(scene, camera);
       declutter?.();
       labelRenderer.render(scene, camera);
+    };
+    // Fewer pixels while the camera moves and the frames run long, and all of
+    // them again once it stops (issue #3994). See adaptiveResolution.ts.
+    const fullPixelRatio = () => drawingPixelRatio(performanceMode ? 1 : 2);
+    const resolution = createAdaptiveResolution();
+    const displayClock = createDisplayClock();
+    const lastCameraPosition = camera.position.clone();
+    const lastCameraQuaternion = camera.quaternion.clone();
+    const adaptResolution = (waited: number) => {
+      if (!renderer) return;
+      const moving =
+        !camera.position.equals(lastCameraPosition) ||
+        !camera.quaternion.equals(lastCameraQuaternion);
+      lastCameraPosition.copy(camera.position);
+      lastCameraQuaternion.copy(camera.quaternion);
+      const ratio = resolution.frame(
+        {
+          waited,
+          moving,
+          baking,
+          displayInterval: displayClock.interval(),
+        },
+        fullPixelRatio(),
+      );
+      if (renderer.getPixelRatio() !== ratio) renderer.setPixelRatio(ratio);
     };
     // Draw on demand, at most once a frame (issue #3653). Anything that
     // changes the picture asks for a frame, and a frame asks for the next one
@@ -1078,13 +1110,24 @@ export function GalaxyView({
     // pointer handler and again from the loop's update, and each is one more
     // request for the same frame. The animation loop below replaces
     // `drawFrame` when motion is allowed. Under reduce-motion a frame only
-    // draws.
-    let drawFrame = (): boolean => {
+    // draws, and asks for one more after drawing below full resolution.
+    let drawFrame = (waited: number): boolean => {
+      adaptResolution(waited);
       render();
-      return false;
+      return resolution.reduced();
     };
-    const frames = createFrameScheduler(() => drawFrame());
-    const requestRender = frames.request;
+    // The display's interval is measured whenever the map comes to rest.
+    const frames = createFrameScheduler(
+      (waited) => drawFrame(waited),
+      requestAnimationFrame,
+      cancelAnimationFrame,
+      () => performance.now(),
+      displayClock.measure,
+    );
+    const requestRender = () => {
+      displayClock.cancel();
+      frames.request();
+    };
     renderRef.current = requestRender;
     controls.addEventListener("change", () => {
       clampTarget();
@@ -1386,7 +1429,7 @@ export function GalaxyView({
     // map always has something moving. Under reduce-motion the scene draws
     // on demand and stays perfectly still.
     if (!reduceMotion) {
-      drawFrame = (): boolean => {
+      drawFrame = (waited: number): boolean => {
         // The clock the eases started on, not the frame's own timestamp,
         // which can sit a little before a start taken in the same frame.
         const now = performance.now();
@@ -1561,6 +1604,7 @@ export function GalaxyView({
           easeHeading();
           cameraMoved = controls?.update() ?? false;
         }
+        adaptResolution(waited);
         render();
         const selectedIdx = selection.getIndex();
         return needsAnotherFrame({
@@ -1574,6 +1618,7 @@ export function GalaxyView({
           selectionPulse: selectedIdx >= 0 && !!ownerRings[selectedIdx],
           combatFlashes: visibility.isFlashing(),
           effects,
+          reducedResolution: resolution.reduced(),
         });
       };
       requestRender();
@@ -1586,7 +1631,8 @@ export function GalaxyView({
       // Every resize, not once at build: UI zoom moves the pixel ratio and the
       // container's CSS size together, so the observer that reports the size
       // change is also when the ratio needs re-reading (see `lib/uiZoom`).
-      renderer.setPixelRatio(drawingPixelRatio(performanceMode ? 1 : 2));
+      resolution.reset();
+      renderer.setPixelRatio(fullPixelRatio());
       renderer.setSize(w, h, false);
       labelRenderer.setSize(w, h);
       camera.aspect = w / h;
@@ -1599,6 +1645,7 @@ export function GalaxyView({
 
     return () => {
       frames.cancel();
+      displayClock.cancel();
       // Remember the final pose so a faction-switch rebuild can ease from here.
       camPoseRef.current = {
         pos: camera.position.clone(),
