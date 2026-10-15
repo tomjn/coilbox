@@ -11,7 +11,7 @@ Open the Battles page from Multiplayer > Battles in the sidebar.
 
 ## Log in to a server
 
-Server battles only appear once you are logged in. Until then, the Battles page says "Not connected to a server". Select Log in to choose a server and sign in.
+Server battles only appear once you are logged in. Until then, the Battles page says "Not connected to a server". Select Log in to choose a server and sign in. To create an account or add a server, see [Sign in and chat](lobby-and-chat.md).
 
 You can still host and join direct rooms without logging in. See [Host a direct room](#host-a-direct-room).
 
