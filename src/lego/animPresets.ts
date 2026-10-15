@@ -770,8 +770,6 @@ export const BUILDARM: AnimPreset = {
  * followed by a hold, and the two legs aim opposite ways.
  */
 export const BUILD_PREVIEW_LEG = 3;
-/** The most of a leg the swing may take, so there is always a hold to see. */
-const BUILD_PREVIEW_SWING = 2 / 3;
 
 /** Where the preview aims on each leg, in degrees of heading and pitch. */
 export const BUILD_PREVIEW_AIM: [number, number][] = [
@@ -780,24 +778,19 @@ export const BUILD_PREVIEW_AIM: [number, number][] = [
 ];
 
 /**
- * Eased 0 to 1 over the swing, then held at 1, given a position within one leg.
+ * How far through its swing a piece is, 0 to 1, given a position within one
+ * leg.
  *
- * How long the swing takes is the angle divided by the speed, which is what
- * `Turn` does in a game, so the sliders change the preview and not only the
- * exported script. Capped at part of a leg, because a preview whose swing fills
- * the whole leg never shows the hold, and a hold is most of what a builder does.
- *
- * Cosine rather than linear, because a piece starts and stops against the rest
- * of the model, and a linear ramp in a six second loop reads as a machine part
- * sliding rather than an arm swinging.
+ * At one speed from start to finish, the angle divided by the speed, because
+ * that is what `Turn` does in a game. The sliders change the preview and not
+ * only the exported script, and a slow arm that would still be swinging when
+ * the leg ends is still swinging in the preview too. This used to ease in and
+ * out along a cosine and to cap the swing at two seconds, and neither has a
+ * counterpart in the engine.
  */
 function buildSwing(phase: number, angle: number, speed: number): number {
-  const swing = Math.min(
-    BUILD_PREVIEW_LEG * BUILD_PREVIEW_SWING,
-    Math.abs(angle) / Math.max(speed, 1),
-  );
-  if (phase >= swing) return 1;
-  return (1 - Math.cos((phase / swing) * Math.PI)) * 0.5;
+  if (angle === 0) return 1;
+  return Math.min(1, (phase * Math.max(speed, 1)) / Math.abs(angle));
 }
 
 export const BUILD_AIM: AnimPreset = {
@@ -942,14 +935,16 @@ export const BUILD_FACTORY: AnimPreset = {
     const at = t - Math.floor(t / cycle) * cycle;
     const building = at < BUILD_PREVIEW_LEG;
     const phase = at - (building ? 0 : BUILD_PREVIEW_LEG);
-    const open = value(this, params, "open");
     // The doors travel their whole opening in the time the slider asks for,
     // whichever way they are going, so the preview matches the emitted speed.
-    const speed = open / Math.max(value(this, params, "openTime"), 0.05);
+    // Doors slower than a leg are still opening when the build stops, and
+    // `StopBuilding` shuts them from there, so the gap does too.
+    const openTime = Math.max(value(this, params, "openTime"), 0.05);
+    const reached = Math.min(1, BUILD_PREVIEW_LEG / openTime);
     const towards = building
-      ? buildSwing(phase, open, speed)
-      : 1 - buildSwing(phase, open, speed);
-    return { rotation: [0, deg(open) * towards, 0] };
+      ? Math.min(1, phase / openTime)
+      : Math.max(0, reached - phase / openTime);
+    return { rotation: [0, deg(value(this, params, "open")) * towards, 0] };
   },
   emit(ctx) {
     const doors = ctx.pieces("door");
