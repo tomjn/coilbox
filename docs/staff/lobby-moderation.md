@@ -1,75 +1,91 @@
 # Lobby moderation
 
-Coilbox exposes ChanServ channel-operator actions and server-moderator actions directly from the chat UI, gated so the controls only appear to users who actually hold the privilege. This is the coilbox side of issue #203; the wire commands target an uberserver/TASServer-style lobby (the reference is `~/dev/uberserver`).
+This page is for channel operators and server moderators. It covers the moderation controls on coilbox's Chat page. For the Chat page itself, the member list and the menu on each member's row, see [Sign in and chat](../players/lobby-and-chat.md#chat).
 
-## Where the controls appear
+You find the controls in two places:
 
-- **Per-member `⋮` menu** in a channel's member panel (open the members panel from the chat header). One menu per other member, with the actions the current user is allowed to run.
-- **Channel topic control** (pencil icon) in the channel header, for channel operators.
+- The menu at the end of a member's row, in a channel's member list. Select Toggle members at the top of the channel to show the list.
+- Set channel topic, the pencil button at the top of the channel, beside Toggle members.
 
-Nothing is shown on your own row, in DMs, or in battle-room chat.
+The commands are those of uberserver lobby servers. Other servers may refuse some of them.
 
-## Who sees what
+## Who sees the controls
 
-Two independent privilege sources decide which sections render:
+Everybody gets Add private note and Ignore in a member's menu. The moderation actions sit under those, in two groups.
 
-- **Server moderator** — the account's `access` status bit (uberserver `mod`/ `admin`). A server moderator sees both the moderator actions and the ChanServ channel actions in every channel.
-- **Channel operator** — the channel's registered founder or an operator. This is learned by querying ChanServ `:info <channel>` automatically when a channel is opened; the reply is parsed into the channel's `founder`/`operators` (and the reply itself is suppressed from chat, so there's no visible noise). A founder/ operator who is not a server moderator sees only the ChanServ channel actions.
+- Channel. You see these in a channel where you are the founder or an operator. A server moderator sees them in every channel.
+- Moderator. Only a server moderator sees these.
 
-If you are neither, no menu or topic control renders for that channel.
+Coilbox asks ChanServ who runs a channel when you open it, so the Channel group can take a moment to appear.
 
-> Note: the `access` status bit alone does not distinguish `mod` from `admin`.
-> Since issue #2776, the Server admin page (`src/multiplayer/pages/ServerAdminPage.tsx`)
-> learns the level separately: once a connection's `access` bit is set,
-> `ConnectionSession` asks `GETUSERINFO <own username>` and reads the level off
-> the `access=` line the answer carries, keeping it as `ConnectionState.adminLevel`
-> per connection. This chat member menu still does not read that level, so a
-> strictly admin-only verb (e.g. `BROADCAST`, `SETACCESS`) still is not
-> surfaced here. It's offered instead on the [Server admin](server-admin.md) page,
-> under its Announcements and Staff tools.
+The controls never show on your own row, in direct messages or in battle chat. If you hold neither role, you see no moderation actions and no Set channel topic.
 
-## Actions and the commands they send
+## Channel actions
 
-Every action is sent as a raw wire line via `mp_send` (which, unlike `mp_say_private`, records nothing locally — so your commands don't clutter the ChanServ DM; ChanServ's replies still arrive as feedback).
+These act on one channel only. ChanServ carries them out and answers in a direct message from ChanServ, listed under Direct messages.
 
-ChanServ channel actions (private message to `ChanServ`, colon-prefixed, channel as the first argument):
+- Make operator gives the player operator rights in this channel. Only the channel's founder or a server moderator can do this. ChanServ refuses an operator who tries.
+- Remove operator takes those rights away. It shows instead of Make operator when the player is already an operator. Nobody can remove the founder.
+- Mute stops the player talking in this channel for the time you set. Type a Duration and a Reason, then select Confirm.
+- Unmute lets a muted player talk again.
+- Kick from channel removes the player from this channel straight away. They can join again.
+- Ban from channel removes the player and stops them joining again for the time you set. It also bans the address they last connected from. Type a Duration and a Reason, then select Confirm.
+- Unban from channel lifts a channel ban.
 
-| Action | Wire |
+Always give a reason for a mute or a ban. The form marks Reason as optional, but ChanServ refuses a mute or a ban without one.
+
+ChanServ will not mute, kick or ban another operator. Remove their operator rights first.
+
+### Set the topic
+
+1. Select Set channel topic, the pencil at the top of the channel.
+2. Change the text under Channel topic. It starts with the current topic.
+3. Select Set topic.
+
+## Moderator actions
+
+These act on the player's whole account, across the server.
+
+- Look up in Server admin opens the Server admin page at the player's details, with their name filled in. See [Server admin](server-admin.md#the-tools) for what it shows.
+- Get IP asks the server for the address the player is connected from, or last connected from.
+- Get user ID asks the server for the player's hardware and system IDs. Use them to spot one person on two accounts.
+- Kick from server disconnects the player, and takes them out of any battle they are in. They see your reason in a message box and can log in again. Type a Reason, then select Confirm.
+- Ban from server stops the player logging in for the number of days you set. It also bans their last address and their email, and disconnects them if they are online. Other moderators see the ban announced. Type the Days and a Reason, then select Confirm. Confirm stays greyed out until you type a reason.
+
+The server's answer to Get IP, Get user ID and the kick and ban actions shows as a notice titled Server message.
+
+The menu has no way to lift a server ban. Use Bans on the [Server admin](server-admin.md#the-tools) page.
+
+## How long a mute or ban lasts
+
+A channel mute and a channel ban take a length of time:
+
+- `10m` is 10 minutes.
+- `2h` is 2 hours.
+- `3d` is 3 days.
+- `1w` is 1 week.
+- A number on its own, such as `30`, is that many minutes.
+- `0` means it never ends.
+
+A mute starts at `10m` and a channel ban at `1d` unless you change it.
+
+A server ban takes a number of days, not a length of time. Type `7` for a week, or `0.5` for 12 hours. Do not add a letter. The server refuses `7d`. The Days field starts at `1`.
+
+## The commands behind each action
+
+If you also moderate by typing commands, these are the lines coilbox sends. `chan` is the channel name without the `#`, and `name` is the player.
+
+| Action | Command |
 | --- | --- |
-| Make / remove operator | `SAYPRIVATE ChanServ :op <chan> <nick>` / `:deop …` |
-| Kick from channel | `SAYPRIVATE ChanServ :kick <chan> <nick>` |
-| Mute / unmute | `:mute <chan> <nick> <duration> <reason>` / `:unmute …` |
-| Ban / unban | `:ban <chan> <nick> <duration> <reason>` / `:unban …` |
-| Set topic | `:topic <chan> <text>` |
-| (background) learn ops | `:info <chan>` |
-
-Server-moderator actions (first-class protocol verbs, gated by server access):
-
-| Action | Wire |
-| --- | --- |
-| Look up in Server admin | opens `/admin?server=<key>&player=<nick>` |
-| Get IP | `GETIP <nick>` |
-| Get user ID | `GETUSERID <nick>` |
-| Kick from server | `KICK <nick> <reason>` |
-| Ban from server | `BAN <nick> <duration> <reason>` |
-
-"Look up in Server admin" (issue #2777) is the odd one out here: rather than
-sending a wire line through `send`, it calls the menu's `onLookUp` prop, which
-`ChatPage` wires to `navigate`. It opens the Server admin page's player
-lookup section (`src/multiplayer/admin/PlayerLookupSection.tsx`) with the
-member's name filled in, where their `GETUSERINFO` fields, IP and hardware
-IDs show as labelled rows instead of raw server text, and `GETIP` and
-`GETUSERID`'s answers (still toasts from this menu) are folded into that
-same `GETUSERINFO` reply.
-
-ChanServ's `<duration>` (mute/ban above) uses spans like `10m`, `2h`, `3d`.
-`BAN`'s `<duration>` is different: a plain number of days, decimals allowed
-(e.g. `0.5`). uberserver runs `float(duration)` on it and rejects a span. `BAN`
-also has no default reason, so the client must not send it empty.
-
-## Implementation notes
-
-- The `:info` reply is parsed in the protocol crate (`crates/coilbox-lobby-protocol/src/reduce.rs`, `parse_chanserv_info`) and folds into `ChannelState.founder`/`operators`. The reference server's operator-list formatting is buggy for multiple operators (it can emit `[bob] carol]`); the parser is robust to both that and the clean form.
-- Command builders and the `canChannelModerate` gate live in `src/multiplayer/moderation.ts` (pure, unit-tested). The UI is `src/multiplayer/chat/MemberActionsMenu.tsx` and `ChannelTopicMenu.tsx`, wired in `src/multiplayer/pages/ChatPage.tsx`.
-- No new Tauri commands or ACL entries: outgoing actions reuse the existing `mp_send`, and the new channel state rides the standard snapshot refresh.
-- The Server admin page's own tools (issue #2772 onward) are a separate system: they send moderator/admin commands through `useAdminRequest`/`sendAdminCommand` (`src/multiplayer/admin/adminRequest.ts`) rather than `mp_send`, so their replies are parsed (`AdminReply`) instead of arriving as chat toasts. `KICK`'s reply added its own `AdminShape::Kick` in `crates/coilbox-lobby-protocol/src/admin_reply.rs` for issue #2777.
+| Make operator | `SAYPRIVATE ChanServ :op chan name` |
+| Remove operator | `SAYPRIVATE ChanServ :deop chan name` |
+| Mute | `SAYPRIVATE ChanServ :mute chan name 10m reason` |
+| Unmute | `SAYPRIVATE ChanServ :unmute chan name` |
+| Kick from channel | `SAYPRIVATE ChanServ :kick chan name` |
+| Ban from channel | `SAYPRIVATE ChanServ :ban chan name 1d reason` |
+| Unban from channel | `SAYPRIVATE ChanServ :unban chan name` |
+| Set topic | `SAYPRIVATE ChanServ :topic chan text` |
+| Get IP | `GETIP name` |
+| Get user ID | `GETUSERID name` |
+| Kick from server | `KICK name reason` |
+| Ban from server | `BAN name 1 reason` |
