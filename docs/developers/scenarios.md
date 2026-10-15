@@ -417,9 +417,9 @@ What the reader asks is whether **the player's ally team is in the winning list*
 
 - A `victory` naming a participant the human is not playing records a **defeat** for the player. A `victory` naming a different participant on the human's own ally team still reads as a victory, because the test is the ally team rather than the participant.
 - `defeat` declares every other ally team the winner, Gaia aside, which is what a losing player's replay has to say.
-- **A mission the player quits out of is recorded as a defeat**, and so is a mission the runtime ended with nobody winning. The two are indistinguishable in the replay: [issue #875](https://github.com/tomjn/coilbox/issues/875).
+- A mission the player quits before it ends asks the player for the result. The replay has no game over, so it names no winner, and coilbox shows the "How did it go?" prompt. A mission the runtime ended with nobody winning still records a game over, so it reads as a defeat for the player.
 
-The manual **Victory** / **Defeat** prompt appears when the replay cannot answer at all: no new replay was found, the decode failed, or the engine's `demotool` is missing. It does not appear when the replay answered wrongly.
+The manual **Victory** / **Defeat** prompt appears when the replay cannot answer at all: no new replay was found, the decode failed, the engine's `demotool` is missing, or the replay has no game over because the player quit. It does not appear when the replay answered wrongly.
 
 ## What a scenario cannot do yet
 
