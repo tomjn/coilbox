@@ -10,9 +10,10 @@ import {
   Rocket,
   Swords,
   Tag,
+  User,
   X,
 } from "lucide-react";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
 import { ContinueBadge } from "@/components/ContinueBadge";
 import { OptionSelect } from "@/components/OptionSelect";
@@ -25,7 +26,11 @@ import {
 } from "@/components/ui/tooltip";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { mostRecentOpen } from "@/lib/recency";
+import { isProfileHidden } from "../../profile/hidden";
+import type { StatRecord } from "../bindings";
 import {
+  useContentState,
+  useReplayStats,
   useReplays,
   useScanTargetSelection,
   useUnitsyncThumbnails,
@@ -36,21 +41,35 @@ import {
   type ReplayOrigin,
   replayOrigin,
 } from "../replayFilterVisibility";
-import { useReplayUserState } from "../replayUserState";
+import {
+  columnMetrics,
+  compareFigures,
+  figureBasis,
+  formatFigure,
+  isOverMinimum,
+  libraryMetrics,
+  MIN_LENGTH_OPTIONS,
+  matchFigure,
+  metricSortValue,
+  parseMetricSort,
+} from "../replayMatchFigures";
+import { findSet, resolveSet, useReplaySets } from "../replaySets";
+import { refightFilenames, useReplayUserState } from "../replayUserState";
+import { useMetricRegistry } from "../useMetricRegistry";
+import { pickPrimaryPlayer } from "../usePrimaryPlayer";
 import { useReplaysRoot } from "../useReplaysRoot";
 import { BrowserToolbar } from "./components/BrowserToolbar";
+import { ClearUnfinishedButton } from "./components/ClearUnfinishedButton";
 import { FilterBar } from "./components/FilterBar";
 import { GatherReplaysButton } from "./components/GatherReplaysButton";
 import { MapThumb } from "./components/MapThumb";
+import { ReplaySetPicker } from "./components/ReplaySetPicker";
+import { ReplaySetsManager } from "./components/ReplaySetsManager";
+import { ReplayTrackBadge } from "./components/ReplayTrackBadge";
 import { EmptyState, ErrorBanner, SkeletonList } from "./components/states";
 
-type SortKey =
-  | "date-desc"
-  | "date-asc"
-  | "name-asc"
-  | "name-desc"
-  | "size-desc"
-  | "size-asc";
+/** A fixed sort from the list below, or a `metric:<key>:<direction>` value. */
+type SortKey = string;
 
 const SORT_OPTIONS = [
   { value: "date-desc", label: "Newest" },
@@ -59,7 +78,12 @@ const SORT_OPTIONS = [
   { value: "name-desc", label: "Name Z–A" },
   { value: "size-desc", label: "Largest" },
   { value: "size-asc", label: "Smallest" },
+  { value: "duration-desc", label: "Longest" },
+  { value: "duration-asc", label: "Shortest" },
 ];
+
+/** `Damage dealt` becomes `damage dealt`, to follow "Most" or "Least". */
+const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 
 /** The origin filter's value, including the "no filter" choice. Radix's
  * `Select.Item` rejects an empty-string value, so "no filter" needs its own
@@ -188,7 +212,114 @@ export default function ReplaysPage() {
     "content.replayFilters.origin",
     "all",
   );
+  const [minLength, setMinLength] = useSetting(
+    "content.replayFilters.minLength",
+    "0",
+  );
+  // The id of the set the list is narrowed to, "" for none.
+  const [setFilterId, setSetFilterId] = useSetting(
+    "content.replayFilters.set",
+    "",
+  );
+  // Whether the figures and metric sorts are for the primary player's own army
+  // rather than the whole match.
+  const [mineOnly, setMineOnly] = useSetting(
+    "content.replayFilters.mine",
+    false,
+  );
+  const [statsPlayer] = useSetting("content.statsPlayer", "");
+
+  // What happened in the match comes from the stats store, joined to a row by
+  // file. A distribution that hides match statistics gets none of it, and the
+  // empty root list stops the ingest pass and watcher as well.
+  const statsHidden = isProfileHidden("analytics.matchStats");
+  const { state: contentState } = useContentState();
+  const statRoots = useMemo(
+    () => (statsHidden ? [] : (contentState?.roots ?? []).map((r) => r.path)),
+    [statsHidden, contentState],
+  );
+  const { records: statRecords } = useReplayStats(
+    statRoots,
+    selected?.enginePath,
+  );
+  const registry = useMetricRegistry(!statsHidden);
+  const metrics = useMemo(() => libraryMetrics(registry), [registry]);
   const userState = useReplayUserState();
+  // Who "mine" means, decided as the dossier decides it. The list ingests, so
+  // it reads the records it already holds. Empty until they arrive.
+  const primary = useMemo(
+    () =>
+      pickPrimaryPlayer(
+        statRecords,
+        refightFilenames(userState.state),
+        statsPlayer,
+      ),
+    [statRecords, userState.state, statsPlayer],
+  );
+  const mineBasis = metrics.length > 0 && primary !== "";
+  // The player the figures are for, or undefined for the whole match. A saved
+  // "mine" with nobody to be mine for shows the whole match.
+  const basisPlayer = mineOnly && mineBasis ? primary : undefined;
+  const statsByPath = useMemo(() => {
+    const byPath = new Map<string, StatRecord>();
+    const byName = new Map<string, StatRecord>();
+    for (const rec of statRecords) {
+      byPath.set(rec.path, rec);
+      byName.set(rec.filename, rec);
+    }
+    return (r: { path: string; filename: string }) =>
+      byPath.get(r.path) ?? byName.get(r.filename);
+  }, [statRecords]);
+
+  const sortOptions = useMemo(
+    () => [
+      ...SORT_OPTIONS,
+      ...metrics.flatMap((m) => [
+        {
+          value: metricSortValue(m.key, "desc"),
+          label: `Most ${lowerFirst(m.label)}`,
+        },
+        {
+          value: metricSortValue(m.key, "asc"),
+          label: `Least ${lowerFirst(m.label)}`,
+        },
+      ]),
+    ],
+    [metrics],
+  );
+  // A saved sort the page cannot offer now (statistics hidden, or the registry
+  // has not arrived) falls back to newest rather than showing a blank select.
+  const effectiveSort = sortOptions.some((o) => o.value === sort)
+    ? sort
+    : "date-desc";
+  const metricSort = parseMetricSort(effectiveSort);
+  const sortMetric = metricSort
+    ? metrics.find((m) => m.key === metricSort.key)
+    : undefined;
+  const shownMetrics = useMemo(
+    () => columnMetrics(registry, sortMetric?.key),
+    [registry, sortMetric],
+  );
+
+  const replaySets = useReplaySets();
+  // A saved pick whose set was since deleted shows everything.
+  const activeSet = findSet(replaySets.sets, setFilterId);
+  // The game id comes from the stat record, so it is absent while statistics
+  // are hidden or the replay is not ingested yet. The filename still matches.
+  const gameIdOf = useCallback(
+    (r: { path: string; filename: string }) => statsByPath(r)?.gameId,
+    [statsByPath],
+  );
+  const resolveForList = (set: Parameters<typeof resolveSet>[0]) =>
+    resolveSet(set, replays, gameIdOf);
+  const activeResolved = useMemo(
+    () => (activeSet ? resolveSet(activeSet, replays, gameIdOf) : null),
+    [activeSet, replays, gameIdOf],
+  );
+  const inActiveSet = useMemo(
+    () => new Set(activeResolved?.present.map((r) => r.path)),
+    [activeResolved],
+  );
   const tagOptions = useMemo(
     () => [
       { value: "", label: "All tags" },
@@ -228,7 +359,9 @@ export default function ReplaysPage() {
       if (watchedOnly && !us.watched) return false;
       if (remixedOnly && !r.remixed) return false;
       if (!showShort && isShortReplay(r.durationSec)) return false;
+      if (!isOverMinimum(r.durationSec, Number(minLength))) return false;
       if (tagFilter && !(us.tags ?? []).includes(tagFilter)) return false;
+      if (activeSet && !inActiveSet.has(r.path)) return false;
       if (originFilter !== "all" && replayOrigin(us) !== originFilter)
         return false;
       return true;
@@ -240,15 +373,32 @@ export default function ReplaysPage() {
     watchedOnly,
     remixedOnly,
     showShort,
+    minLength,
     tagFilter,
     originFilter,
     userState,
+    activeSet,
+    inActiveSet,
   ]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
     arr.sort((a, b) => {
-      switch (sort) {
+      if (sortMetric && metricSort) {
+        return compareFigures(
+          matchFigure(statsByPath(a), sortMetric, basisPlayer),
+          matchFigure(statsByPath(b), sortMetric, basisPlayer),
+          metricSort.dir,
+        );
+      }
+      switch (effectiveSort) {
+        case "duration-desc":
+        case "duration-asc":
+          return compareFigures(
+            a.durationSec,
+            b.durationSec,
+            effectiveSort === "duration-asc" ? "asc" : "desc",
+          );
         case "date-asc":
           return dateOf(a) - dateOf(b);
         case "name-asc":
@@ -264,7 +414,14 @@ export default function ReplaysPage() {
       }
     });
     return arr;
-  }, [filtered, sort]);
+  }, [
+    filtered,
+    effectiveSort,
+    sortMetric,
+    metricSort,
+    statsByPath,
+    basisPlayer,
+  ]);
 
   // Busy only while actually loading or before the first load completes for the
   // selected target — NOT when a load finished and simply found no replays (that
@@ -281,8 +438,8 @@ export default function ReplaysPage() {
           </p>
         </header>
 
-        <div className="flex items-center gap-2">
-          <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="min-w-0 flex-auto">
             <BrowserToolbar
               targets={targets}
               selectedKey={selectedKey}
@@ -295,6 +452,17 @@ export default function ReplaysPage() {
               old engine in Finder loses those games. This puts them all in one
               place first (issue #971). */}
           <GatherReplaysButton rootPath={replaysRoot} onGathered={refresh} />
+          <ClearUnfinishedButton replays={replays} onCleared={refresh} />
+          <ReplaySetsManager
+            api={replaySets}
+            resolve={resolveForList}
+            shown={sorted.map((r) => ({
+              filename: r.filename,
+              gameId: gameIdOf(r),
+            }))}
+            activeId={activeSet?.id ?? ""}
+            onFilter={setSetFilterId}
+          />
         </div>
 
         {!busy && replays.length > 0 && (
@@ -303,9 +471,10 @@ export default function ReplaysPage() {
             onSearch={setFilter}
             searchPlaceholder="Filter replays…"
             searchLabel="Filter replays"
-            sort={sort}
-            onSort={(v) => setSort(v as SortKey)}
-            sortOptions={SORT_OPTIONS}
+            sort={effectiveSort}
+            onSort={setSort}
+            sortOptions={sortOptions}
+            sortClassName="w-48"
             total={replays.length}
             shown={sorted.length}
             noun="replays"
@@ -320,6 +489,18 @@ export default function ReplaysPage() {
                     title="Clear the map filter"
                   >
                     Map: {mapFilter} <X className="size-3.5" />
+                  </Button>
+                )}
+                {mineBasis && (
+                  <Button
+                    variant={mineOnly ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setMineOnly(!mineOnly)}
+                    aria-pressed={mineOnly}
+                    className="gap-1.5"
+                    title={`Show and sort the figures for ${primary} alone instead of the whole match`}
+                  >
+                    <User className="size-4" /> My figures
                   </Button>
                 )}
                 {filterVisibility.watched && (
@@ -356,6 +537,21 @@ export default function ReplaysPage() {
                     <Clock className="size-4" /> Short replays
                   </Button>
                 )}
+                {activeSet && activeResolved && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setSetFilterId("")}
+                    className="gap-1.5"
+                    title="Show every replay again"
+                  >
+                    Set: {activeSet.name}
+                    {activeResolved.missing.length > 0
+                      ? ` (${activeResolved.missing.length} not in library)`
+                      : ""}
+                    <X className="size-3.5" />
+                  </Button>
+                )}
                 {tagOptions.length > 1 && (
                   <div className="flex items-center gap-1.5 text-muted-foreground">
                     <Tag className="size-4" />
@@ -368,6 +564,13 @@ export default function ReplaysPage() {
                     />
                   </div>
                 )}
+                <OptionSelect
+                  value={minLength}
+                  onValueChange={setMinLength}
+                  options={MIN_LENGTH_OPTIONS}
+                  size="sm"
+                  className="w-44"
+                />
                 <OptionSelect
                   value={originFilter}
                   onValueChange={(v) => setOriginFilter(v as OriginFilterValue)}
@@ -391,7 +594,9 @@ export default function ReplaysPage() {
             label={
               mapFilter
                 ? `No replays on “${mapFilter}”.`
-                : `No replays match “${filter.trim()}”.`
+                : activeSet && !filter.trim()
+                  ? `No replays in “${activeSet.name}” match the filters.`
+                  : `No replays match “${filter.trim()}”.`
             }
           />
         ) : (
@@ -408,6 +613,7 @@ export default function ReplaysPage() {
               ].filter(Boolean);
               const us = userState.get(r.filename);
               const hasSkill = r.skillAvg != null;
+              const stat = statsByPath(r);
               return (
                 <li
                   key={r.path}
@@ -445,7 +651,29 @@ export default function ReplaysPage() {
                             <Code2 className="size-2.5" /> Remix
                           </Badge>
                         )}
+                        {r.unfinished && (
+                          <Badge
+                            variant="ghost"
+                            className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400"
+                            title="The file is empty. The game that was recording it did not finish, or is still running."
+                          >
+                            Recording did not finish
+                          </Badge>
+                        )}
+                        {r.staleRemix && (
+                          <Badge
+                            variant="ghost"
+                            className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400"
+                            title="An older coilbox made this remix. It plays on the game it was recorded with. Open it to remake it from the original."
+                          >
+                            Plays original game
+                          </Badge>
+                        )}
                         <OriginBadge origin={replayOrigin(us)} />
+                        <ReplayTrackBadge
+                          gameId={r.gameId}
+                          remixed={r.remixed}
+                        />
                         {r.filename === resumeFilename && (
                           <ContinueBadge label="Unwatched" />
                         )}
@@ -475,6 +703,32 @@ export default function ReplaysPage() {
                   {/* Skill columns + watched toggle live outside the Link so they
                     stay their own controls. */}
                   <div className="flex shrink-0 items-center gap-3 border-l border-border/40 px-3">
+                    {shownMetrics.map((m) => {
+                      const sorted = m.key === sortMetric?.key;
+                      return (
+                        <Tooltip key={m.key}>
+                          <TooltipTrigger asChild>
+                            {/* Below the large breakpoint only the sorted figure
+                              stays, so a narrow window keeps the one it sorts by. */}
+                            <div
+                              className={`${sorted ? "" : "hidden lg:block"} text-right text-xs text-muted-foreground`}
+                            >
+                              <div className="text-[10px] uppercase tracking-wide">
+                                {m.label}
+                              </div>
+                              <div className="font-mono text-sm text-foreground">
+                                {formatFigure(
+                                  matchFigure(stat, m, basisPlayer),
+                                )}
+                              </div>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {m.label}, {figureBasis(m, basisPlayer)}
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    })}
                     {hasSkill && (
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -496,6 +750,11 @@ export default function ReplaysPage() {
                         </TooltipContent>
                       </Tooltip>
                     )}
+                    <ReplaySetPicker
+                      api={replaySets}
+                      label=""
+                      member={{ filename: r.filename, gameId: gameIdOf(r) }}
+                    />
                     <Button
                       variant="ghost"
                       size="icon"

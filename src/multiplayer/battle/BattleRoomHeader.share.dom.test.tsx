@@ -53,6 +53,7 @@ const status: DirectRoomStatus = {
 function header(over: {
   selfHost: boolean;
   sharedRoom: DirectRoomStatus | null;
+  connectionLabel?: string | null;
 }) {
   return (
     <BattleRoomHeader
@@ -77,6 +78,7 @@ function header(over: {
       serverKey={null}
       directRoom={over.sharedRoom !== null}
       sharedRoom={over.sharedRoom}
+      connectionLabel={over.connectionLabel}
     />
   );
 }
@@ -104,6 +106,29 @@ describe("the battle room header", () => {
     render(header({ selfHost: false, sharedRoom: null }));
 
     expect(screen.queryByRole("button", { name: /^Share/ })).toBeNull();
+  });
+
+  it("names the account and server above the battle's name when it is given one", () => {
+    render(
+      header({
+        selfHost: false,
+        sharedRoom: null,
+        connectionLabel: "alice on Recoil Official",
+      }),
+    );
+
+    const label = screen.getByText("alice on Recoil Official");
+    const title = screen.getByRole("heading", { level: 1 });
+    expect(title.textContent).toBe("alice's room");
+    expect(
+      label.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("draws no line above the battle's name without one", () => {
+    render(header({ selfHost: false, sharedRoom: null }));
+
+    expect(screen.queryByText(/ on /)).toBeNull();
   });
 
   // The band is not in the header, and nothing renders it any more.

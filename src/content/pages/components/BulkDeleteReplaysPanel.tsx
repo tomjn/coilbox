@@ -18,11 +18,12 @@ import { formatBytes } from "@/lib/format";
 import { notify } from "@/notify/notify";
 import {
   contentDeleteReplays,
-  contentListReplays,
   type ReplayDeleteSummary,
   type ReplayFile,
 } from "../../bindings";
 import { SHORT_REPLAY_SECONDS } from "../../replayFilterVisibility";
+import { loadReplays } from "../../replayList";
+import { refreshStoredTracks } from "../../replayTracks";
 import { useReplayUserState } from "../../replayUserState";
 import {
   hasCleanupFilter,
@@ -75,9 +76,9 @@ export function BulkDeleteReplaysPanel({
     let live = true;
     setReplays(null);
     setError(null);
-    contentListReplays({ root: rootPath })
+    loadReplays(rootPath)
       .then((r) => {
-        if (live) setReplays(r.replays);
+        if (live) setReplays(r);
       })
       .catch((e) => {
         if (live) setError(msg(e));
@@ -134,9 +135,9 @@ export function BulkDeleteReplaysPanel({
           level: "warning",
         });
       }
+      if (summary.tracks > 0) void refreshStoredTracks();
       setConfirming(false);
-      const { replays } = await contentListReplays({ root: rootPath });
-      setReplays(replays);
+      setReplays(await loadReplays(rootPath, true));
       onDeleted();
     } catch (e) {
       setError(msg(e));
@@ -235,6 +236,24 @@ export function BulkDeleteReplaysPanel({
                     {formatBytes(preview.bytes) ?? "0 B"} is freed. The files go
                     from disk and coilbox cannot bring them back.
                   </p>
+                  {preview.analyses > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {preview.analyses === 1
+                        ? "1 of them has a stored analysis"
+                        : `${preview.analyses} of them have a stored analysis`}
+                      , which is deleted too and frees another{" "}
+                      {formatBytes(preview.analysisBytes) ?? "0 B"}.
+                    </p>
+                  )}
+                  {preview.tracks > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {preview.tracks === 1
+                        ? "1 of them has a recorded track"
+                        : `${preview.tracks} of them have a recorded track`}
+                      , which is deleted too and frees another{" "}
+                      {formatBytes(preview.trackBytes) ?? "0 B"}.
+                    </p>
+                  )}
                   {preview.skipped.length > 0 && (
                     <p className="text-xs text-muted-foreground">
                       {preview.skipped.length} cannot be deleted and will be

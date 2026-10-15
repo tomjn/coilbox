@@ -157,3 +157,32 @@ it("has a close button in the header when it can be closed", () => {
   fireEvent.click(screen.getByRole("button", { name: "Close members" }));
   expect(onClose).toHaveBeenCalledTimes(1);
 });
+
+it("marks you, a friend and a party member in words as well as colour", () => {
+  const marks = { me: "you", pal: "friend", mate: "party" } as const;
+  render(
+    <MemberList
+      members={[user("me"), user("pal"), user("mate"), user("stranger")]}
+      markFor={(name) => marks[name as keyof typeof marks] ?? null}
+    />,
+  );
+  const row = (name: string) => {
+    const li = screen.getByText(name).closest("li");
+    if (!li) throw new Error(`no row for ${name}`);
+    return li;
+  };
+
+  expect(row("me").querySelector('[aria-label="You"]')).toBeTruthy();
+  expect(row("pal").querySelector('[aria-label="Friend"]')).toBeTruthy();
+  expect(
+    row("mate").querySelector('[aria-label="In your party"]'),
+  ).toBeTruthy();
+  // A stranger gets no glyph and keeps the ordinary text colour.
+  expect(
+    row("stranger").querySelector(
+      '[aria-label="You"], [aria-label="Friend"], [aria-label="In your party"]',
+    ),
+  ).toBeNull();
+  expect(screen.getByText("stranger").className).toBe("truncate");
+  expect(screen.getByText("pal").className).toContain("dark:text-");
+});

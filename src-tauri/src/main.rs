@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod asset_protocol;
+mod open_file;
 mod portable_update;
 mod settings;
 mod win_job;
@@ -147,6 +148,17 @@ fn main() {
     // because the process that did the copy may still be running out of it.
     portable_update::clear_staging();
 
+    // Dev builds only: when this process started, for timing a launch against
+    // the lines the plugins and the webview record later (issue #3713).
+    #[cfg(debug_assertions)]
+    eprintln!(
+        "[launch] process_start t={}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0)
+    );
+
     #[cfg(target_os = "linux")]
     pin_gio_modules_to_bundle();
     #[cfg(target_os = "linux")]
@@ -168,17 +180,23 @@ fn main() {
     // against the configured `coilbox` scheme and emits the same
     // `deep-link://new-url` event the frontend's `onOpenUrl` listener already
     // handles for macOS warm starts (see `DeepLinkHandler`, issue #388). The
-    // callback below only covers the no-URL case: raise the existing window, the
-    // ordinary single-instance behaviour. The plugin's docs require registering
-    // it before any other plugin, and macOS already gets warm-start links from
-    // the OS, so it is compiled out there to avoid double-handling.
+    // callback below raises the existing window, the ordinary single-instance
+    // behaviour, and passes on a `.sdz` or `.sd7` the second launch was given,
+    // which is what opening one from the file manager does (see `open_file`).
+    // The plugin's docs require registering it before any other plugin, and
+    // macOS already gets warm-start links and files from the OS, so it is
+    // compiled out there to avoid double-handling.
     #[cfg(not(target_os = "macos"))]
     {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            use tauri::Manager;
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
+            use tauri::{Emitter, Manager};
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
                 let _ = window.set_focus();
+            }
+            let archives = open_file::archives_in(&argv, std::path::Path::new(&cwd));
+            if !archives.is_empty() {
+                let _ = app.emit(open_file::EVENT, archives);
             }
         }));
     }
@@ -263,6 +281,7 @@ fn main() {
     builder
         .invoke_handler(tauri::generate_handler![
             prepare_for_update,
+            open_file::launch_archives,
             portable_update::portable_update_supported,
             portable_update::portable_update_stage,
             portable_update::portable_update_finish,

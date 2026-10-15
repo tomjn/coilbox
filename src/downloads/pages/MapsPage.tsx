@@ -5,6 +5,7 @@ import {
   Download,
   Loader2,
   Map as MapIcon,
+  RefreshCw,
   Search,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -13,19 +14,12 @@ import { OptionSelect } from "@/components/OptionSelect";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import { formatBytes } from "@/lib/format";
+import { installedContent } from "../../content/installedContent";
 import { useImportParam } from "../../deeplink/useImportParam";
 import { nextDrawerKey } from "../../general/drawerKey";
 import { useRecordHubImport } from "../../hub/imports";
 import { presetRoute } from "../../play/presets";
-import {
-  dlEvolutionRtsMaps,
-  dlGithubReleaseArchives,
-  dlHakoraMaps,
-  dlInstalledContent,
-  dlSpringfilesList,
-  type ReleaseArchive,
-  type SpringFile,
-} from "../bindings";
+import type { ReleaseArchive, SpringFile } from "../bindings";
 import { useContentRootPaths, useWriteRoot } from "../config";
 import {
   type EnqueueInput,
@@ -33,6 +27,15 @@ import {
   useDownloadComplete,
   useDownloadQueue,
 } from "../DownloadQueueProvider";
+import { loadGithubReleases } from "../githubReleases";
+import {
+  heldEvolutionRtsMaps,
+  heldHakoraMaps,
+  heldSpringfilesList,
+  loadEvolutionRtsMaps,
+  loadHakoraMaps,
+  loadSpringfilesList,
+} from "../mirrorIndex";
 import { parseApacheSize } from "../queueLanes";
 import { CachedThumb } from "./components/CachedThumb";
 import { MapPacksBanner } from "./components/MapPacksBanner";
@@ -122,7 +125,7 @@ function springSubtitle(f: SpringFile): string {
 }
 
 export default function MapsPage() {
-  const { path: writePath, loading: writeRootLoading } = useWriteRoot();
+  const { path: writePath, loading: writeRootLoading } = useWriteRoot("maps");
   // Only once the read has landed and said there is none. Before that `writePath`
   // is undefined whatever the user has configured (issue #1104).
   const noWriteRoot = !writeRootLoading && !writePath;
@@ -179,13 +182,24 @@ export default function MapsPage() {
     if (importCode) void openPackImport(importCode);
   }, [importCode]);
 
-  const load = useCallback(async (src: Source) => {
-    setLoading(true);
+  const load = useCallback(async (src: Source, refresh = false) => {
     setError(null);
-    setItems(null);
+    // A list the mirror index already holds is drawn at once with no loading
+    // state. Anything else clears the list and waits.
+    const wait = async <T,>(
+      heldList: T | undefined,
+      read: () => Promise<T>,
+    ): Promise<T> => {
+      if (heldList && !refresh) return heldList;
+      setLoading(true);
+      setItems(null);
+      return read();
+    };
     try {
       if (src === "hakora") {
-        const { maps } = await dlHakoraMaps(undefined);
+        const { maps } = await wait(heldHakoraMaps(), () =>
+          loadHakoraMaps(refresh),
+        );
         setItems(
           maps.map((m) => ({
             springName: m.filename, // no springname on the mirror; filename is unique
@@ -197,7 +211,9 @@ export default function MapsPage() {
           })),
         );
       } else if (src === "evolutionrts") {
-        const { maps } = await dlEvolutionRtsMaps(undefined);
+        const { maps } = await wait(heldEvolutionRtsMaps(), () =>
+          loadEvolutionRtsMaps(refresh),
+        );
         setItems(
           maps.map((m) => ({
             springName: m.filename, // no springname on the mirror; filename is unique
@@ -209,9 +225,9 @@ export default function MapsPage() {
           })),
         );
       } else if (src in MAP_REPOS) {
-        const { archives } = await dlGithubReleaseArchives({
-          repo: MAP_REPOS[src],
-        });
+        setLoading(true);
+        setItems(null);
+        const archives = await loadGithubReleases(MAP_REPOS[src], refresh);
         setItems(
           archives.map((a) => ({
             springName: a.filename, // no springname; filename is unique
@@ -223,7 +239,9 @@ export default function MapsPage() {
           })),
         );
       } else {
-        const { results } = await dlSpringfilesList({ category: "map" });
+        const { results } = await wait(heldSpringfilesList("map"), () =>
+          loadSpringfilesList("map", refresh),
+        );
         setItems(
           results.map((f) => ({
             springName: f.springname,
@@ -258,7 +276,7 @@ export default function MapsPage() {
       return;
     }
     try {
-      const { maps } = await dlInstalledContent({ paths: rootPaths });
+      const { maps } = await installedContent({ paths: rootPaths });
       setInstalled(new Set(maps));
     } catch {
       setInstalled(new Set());
@@ -401,6 +419,19 @@ export default function MapsPage() {
             className="w-36"
             options={SORT_OPTIONS}
           />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => load(source, true)}
+            disabled={loading}
+          >
+            {loading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <RefreshCw className="size-4" />
+            )}
+            Refresh
+          </Button>
           <label
             htmlFor="maps-hide-installed"
             className="flex items-center gap-2 text-sm text-muted-foreground"
@@ -429,9 +460,9 @@ export default function MapsPage() {
             No download folder set — pick one in{" "}
             <Link
               className="underline underline-offset-4"
-              to="/settings/downloads"
+              to="/settings/content-folders"
             >
-              Downloads settings
+              Content folders settings
             </Link>{" "}
             so maps land where the engine can find them.
           </p>

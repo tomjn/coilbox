@@ -7,7 +7,8 @@
  * reads the level off the `access=` line the answer carries.
  *
  * Drives the real provider, the same way `connectionState.dom.test.tsx` does.
- * The mock setup is copied from there, with `mpAdminCommand` added.
+ * The shared mock pieces are in `lobbyStoreMocks.testhelper.ts`, with
+ * `mpAdminCommand` added here.
  */
 
 import { act, cleanup, render } from "@testing-library/react";
@@ -18,10 +19,6 @@ import {
 } from "../lib/storedSetting";
 import type { LobbyServer } from "../lobby-servers/config";
 import type { AdminOutcome, LobbyEvent, LobbyState } from "./bindings";
-
-interface FakeChannel {
-  onmessage?: (ev: LobbyEvent) => void;
-}
 
 const wire = vi.hoisted(() => ({
   channels: new Map<string, FakeChannel>(),
@@ -39,11 +36,9 @@ const adminOutcomes = vi.hoisted(
   () => new Map<string, AdminOutcome | (() => Promise<AdminOutcome>)>(),
 );
 
-vi.mock("@tauri-apps/api/core", () => ({
-  Channel: class {
-    onmessage?: (ev: LobbyEvent) => void;
-  },
-}));
+vi.mock("@tauri-apps/api/core", async () =>
+  (await import("./lobbyStoreMocks.testhelper")).tauriCoreStub(),
+);
 
 vi.mock("@picoframe/frame", async () => {
   const react = await import("react");
@@ -100,13 +95,12 @@ function stateWithAccess(username: string, access = true): LobbyState {
  * before connecting. */
 let snapshotFor: Record<string, LobbyState> = {};
 
-vi.mock("./bindings", () => ({
+vi.mock("./bindings", async () => ({
+  ...(await import("./lobbyStoreMocks.testhelper")).inertBindings(),
   mpConnect: async (args: { serverKey: string; onEvent: FakeChannel }) => {
     wire.channels.set(args.serverKey, args.onEvent);
     return { connected: true };
   },
-  mpConnectTachyon: async () => ({ connected: true }),
-  mpConnectZerok: async () => ({ connected: true }),
   mpSnapshot: async ({ serverKey }: { serverKey: string }) => ({
     state: snapshotFor[serverKey],
   }),
@@ -114,22 +108,8 @@ vi.mock("./bindings", () => ({
     wire.closed.push(serverKey);
     return { disconnected: true };
   },
-  mpWaitUntilReady: async () => ({ ready: true }),
   mpActiveKeys: async () => ({ keys: [] as string[] }),
   mpReattach: async () => ({ reattached: true }),
-  mpCancelConnect: async () => ({ cancelled: true }),
-  mpConfirmAgreement: async () => ({}),
-  mpFriendList: async () => ({}),
-  mpFriendRequestList: async () => ({}),
-  mpIgnore: async () => ({}),
-  mpIgnoreList: async () => ({}),
-  mpJoinBattle: async () => ({}),
-  mpJoinChannel: async () => ({}),
-  mpRegister: async () => ({}),
-  mpRegisterZerok: async () => ({}),
-  mpSetStatus: async () => ({}),
-  mpTachyonSignedIn: async () => ({ signedIn: true }),
-  mpTachyonSignIn: async () => ({}),
   mpAdminCommand: async (args: {
     serverKey: string;
     command: string;
@@ -145,10 +125,11 @@ vi.mock("./bindings", () => ({
   },
 }));
 
-vi.mock("../lobby-servers/bindings", () => ({
-  lsGetCredential: async () => ({ secret: "hunter2" }),
-}));
+vi.mock("../lobby-servers/bindings", async () =>
+  (await import("./lobbyStoreMocks.testhelper")).lobbyServerBindings(),
+);
 
+import type { FakeChannel } from "./lobbyStoreMocks.testhelper";
 import { MultiplayerProvider, useConnection, useMultiplayer } from "./store";
 
 const LOBBY: LobbyServer = {

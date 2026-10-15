@@ -1,35 +1,50 @@
 import { Button } from "@picoframe/frame";
-import { ClipboardCopy, ExternalLink, RefreshCw } from "lucide-react";
+import { getVersion } from "@tauri-apps/api/app";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import {
+  ClipboardCopy,
+  ExternalLink,
+  FolderSearch,
+  RefreshCw,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { contentOpenPath } from "@/content/bindings";
-import { type InfologTail, playInfolog } from "@/play/bindings";
+import {
+  type InfologTail,
+  playInfolog,
+  playSystemInfo,
+  type SystemInfo,
+} from "@/play/bindings";
 import { usePreferredTarget } from "@/play/config";
-import { InfologView } from "./components/InfologView";
-
-/** How many lines to read. Enough to cover a whole session's loading plus
- * whatever went wrong at the end of it. */
-const TAIL_LINES = 500;
 
 /** A log's timestamp, in the reader's own locale. */
 function when(ms: number): string {
   return new Date(ms).toLocaleString();
 }
 
+/** "macos 14.5 (aarch64)", or without the version when the OS would not say. */
+function describeSystem(s: SystemInfo): string {
+  return `${[s.os, s.osVersion].filter(Boolean).join(" ")} (${s.arch})`;
+}
+
 /**
- * The engine's last log, on demand (issue #379).
+ * Where the engine's last log is, and what a helper asks for alongside it
+ * (issues #379 and #4064).
  *
- * The crash drawer covers "it just died". This covers "it worked yesterday":
- * the log outlives the session, so it is still here the next morning, and
- * nothing has to have crashed for somebody to want to read it.
+ * The page shows none of the log. Any slice of it reads as the whole file, and
+ * the start, where the engine records its version, the system and the GPU, is
+ * the part a slice leaves out. It points at the real file instead, so a player
+ * can attach all of it.
  *
- * It shows the same log the crash drawer would, found the same way. The engine
- * writes it to its own write dir rather than to the content root, so this is
- * also the quickest way to find out where that is.
+ * The engine writes the log to its own write dir rather than to the content
+ * root, so this is also the quickest way to find out where that is.
  */
 export default function EngineLogSection() {
   const { target } = usePreferredTarget();
   const dataDir = target?.dataDir;
   const [log, setLog] = useState<InfologTail | null>(null);
+  const [system, setSystem] = useState<SystemInfo | null>(null);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -39,7 +54,8 @@ export default function EngineLogSection() {
     setLoading(true);
     setCopied(false);
     try {
-      const { log } = await playInfolog({ dataDir, maxLines: TAIL_LINES });
+      // No lines: only the path and the time are wanted.
+      const { log } = await playInfolog({ dataDir, maxLines: 0 });
       setLog(log);
       setError(null);
     } catch (e) {
@@ -54,6 +70,15 @@ export default function EngineLogSection() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    playSystemInfo({})
+      .then(setSystem)
+      .catch(() => {});
+    getVersion()
+      .then(setAppVersion)
+      .catch(() => {});
+  }, []);
+
   if (!target) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -61,6 +86,22 @@ export default function EngineLogSection() {
       </p>
     );
   }
+
+  const rows: [string, string][] = [];
+  if (system) rows.push(["System", describeSystem(system)]);
+  if (appVersion) rows.push(["Coilbox", appVersion]);
+  rows.push(["Engine", target.engineVersion]);
+
+  const copySystemInfo = () => {
+    const text = [
+      ...rows.map(([k, v]) => `${k}: ${v}`),
+      `Log: ${log?.path ?? "none found"}`,
+    ].join("\n");
+    navigator.clipboard
+      .writeText(text)
+      .then(() => setCopied(true))
+      .catch(() => {});
+  };
 
   return (
     <div className="space-y-4">
@@ -79,40 +120,51 @@ export default function EngineLogSection() {
               variant="outline"
               className="gap-1.5"
               onClick={() => {
-                navigator.clipboard
-                  .writeText(log.lines.join("\n"))
-                  .then(() => setCopied(true))
-                  .catch(() => {});
+                void contentOpenPath({ path: log.path }).catch(() => {});
               }}
             >
-              <ClipboardCopy className="size-4" />
-              {copied ? "Copied" : "Copy the log"}
+              <ExternalLink className="size-4" /> Open the log file
             </Button>
             <Button
               variant="outline"
               className="gap-1.5"
               onClick={() => {
-                void contentOpenPath({ path: log.path }).catch(() => {});
+                void revealItemInDir(log.path).catch(() => {});
               }}
             >
-              <ExternalLink className="size-4" /> Open the log file
+              <FolderSearch className="size-4" /> Show in folder
             </Button>
           </>
         ) : null}
       </div>
 
       {log ? (
-        <>
-          <p className="break-all text-xs text-muted-foreground">
-            <code>{log.path}</code>, written {when(log.modifiedMs)}
-          </p>
-          <InfologView log={log} className="max-h-[60vh]" />
-        </>
+        <p className="break-all text-sm">
+          <code>{log.path}</code>
+          <span className="block text-xs text-muted-foreground">
+            Written {when(log.modifiedMs)}
+          </span>
+        </p>
       ) : (
         <p className="text-sm text-muted-foreground">
-          {error ?? "Reading the engine log."}
+          {error ?? "Looking for the engine log."}
         </p>
       )}
+
+      <div className="space-y-2">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+          {rows.map(([k, v]) => (
+            <div key={k} className="contents">
+              <dt className="text-muted-foreground">{k}</dt>
+              <dd className="break-all">{v}</dd>
+            </div>
+          ))}
+        </dl>
+        <Button variant="outline" className="gap-1.5" onClick={copySystemInfo}>
+          <ClipboardCopy className="size-4" />
+          {copied ? "Copied" : "Copy system info"}
+        </Button>
+      </div>
     </div>
   );
 }

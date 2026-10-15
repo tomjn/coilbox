@@ -1,0 +1,11 @@
+{
+  "errors": [
+    "dial_error",
+    "login_error",
+    "timeout",
+    "flood_kick",
+    "login_fail",
+    "DIAL_ERROR"
+  ],
+  "notErrors": ["login_ok", "seed_ok", "tcp_ok", "login_retry", "join_ok"]
+}

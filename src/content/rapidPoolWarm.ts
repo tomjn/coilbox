@@ -4,11 +4,8 @@
  * into the OS page cache; safe to fire-and-forget.
  */
 
-import {
-  type ContentState,
-  contentStateLoad,
-  contentWarmRapidPool,
-} from "./bindings";
+import { type ContentState, contentWarmRapidPool } from "./bindings";
+import { loadContentState } from "./contentState";
 
 /**
  * Warm every valid root's rapid pool. Pass the current state to avoid a reload,
@@ -16,7 +13,7 @@ import {
  * valid roots.
  */
 export async function warmAllRoots(state?: ContentState): Promise<void> {
-  const s = state ?? (await contentStateLoad(undefined)).state;
+  const s = state ?? (await loadContentState());
   const roots = s.roots.filter((r) => r.valid).map((r) => r.path);
   if (roots.length === 0) return;
   await contentWarmRapidPool({ roots });

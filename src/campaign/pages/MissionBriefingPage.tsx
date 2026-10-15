@@ -11,7 +11,7 @@ import {
 import type { CSSProperties } from "react";
 import { Link, useParams } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { invalidateMapPreview, invalidateScans } from "../../content/config";
+import { invalidateMapPreview } from "../../content/config";
 import { ReplayHistoryList } from "../../content/pages/components/ReplayHistoryList";
 import {
   DependencyBlocked,
@@ -397,8 +397,8 @@ function MissionRequiredGate({
       await run.refreshTarget();
       return;
     }
-    // Drop the stale scan + map-preview caches so the rescan sees the new content.
-    invalidateScans();
+    // The queue forgot the scans when the download finished. The map preview
+    // is this page's to drop.
     if (need.kind === "map" && target?.enginePath && target?.dataDir)
       invalidateMapPreview(target.enginePath, target.dataDir, need.name);
     await run.recheck();

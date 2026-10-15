@@ -78,6 +78,7 @@ function ReplayPickerForm({
     sides,
     options,
     optionsLoading,
+    mapOptions,
     ais,
     scanLoading,
   } = useRefightSetup(info);
@@ -110,7 +111,14 @@ function ReplayPickerForm({
   }));
 
   const draft: SkirmishDraft | null = info
-    ? demoInfoToSkirmishDraft({ info, ais, sides, options, ai: chosenAi() })
+    ? demoInfoToSkirmishDraft({
+        info,
+        ais,
+        sides,
+        options,
+        mapOptions,
+        ai: chosenAi(),
+      })
     : null;
   // The preset stores only what the match changed, so it waits for the game's
   // option list as well as for the replay and the content scan (#1838).

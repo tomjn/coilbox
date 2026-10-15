@@ -7,6 +7,8 @@ import {
   useRef,
   useState,
 } from "react";
+import { contentReplayPlaybackLaunch } from "@/content/bindings";
+import { refreshContentState } from "@/content/contentState";
 import { setMusicSuspended } from "@/sound/music";
 import { playEvent } from "@/sound/play";
 import {
@@ -80,6 +82,18 @@ interface ReplayOpts {
   dataDir: string;
 }
 
+interface PlaybackOpts {
+  replayPath: string;
+  executable: string;
+  dataDir: string;
+  /** Another installed version of the replay's game, when its own is missing. */
+  game?: string;
+  /** The frame to open on. Whole, and held inside the track by the player. */
+  startFrame?: number;
+  /** Open on the player's own pause. */
+  paused?: boolean;
+}
+
 interface SaveOpts {
   savePath: string;
   executable: string;
@@ -107,6 +121,11 @@ interface PlayContextValue {
   ) => Promise<LaunchOutcome>;
   /** Launch a replay; resolves when the engine exits. */
   launchReplay: (opts: ReplayOpts) => Promise<LaunchOutcome>;
+  /**
+   * Play a replay's recorded track back in the engine (#3793), from a frame if
+   * asked; resolves when the engine exits.
+   */
+  launchReplayPlayback: (opts: PlaybackOpts) => Promise<LaunchOutcome>;
   /** Resume a savegame; resolves when the engine exits. */
   launchSave: (opts: SaveOpts) => Promise<LaunchOutcome>;
   /** Bring the running game's window to the foreground (best-effort). */
@@ -126,6 +145,19 @@ export function usePlay(): PlayContextValue {
   const ctx = useContext(PlayContext);
   if (!ctx) throw new Error("usePlay must be used within PlayProvider");
   return ctx;
+}
+
+/** Refresh the content state from disk and refuse an engine it no longer lists. */
+async function assertEngineInstalled(executable?: string): Promise<void> {
+  // A read that fails says nothing about the engine, so the launch goes ahead.
+  const state = await refreshContentState().catch(() => null);
+  if (!state || !executable) return;
+  const listed = state.roots.some((r) =>
+    r.engines.some((e) => e.executable === executable),
+  );
+  if (!listed) {
+    throw new Error(`The engine at ${executable} is no longer installed.`);
+  }
 }
 
 export function PlayProvider({ children }: { children: ReactNode }) {
@@ -177,6 +209,14 @@ export function PlayProvider({ children }: { children: ReactNode }) {
     ) => {
       if (runningRef.current) throw new Error("a game is already running");
       runningRef.current = true;
+      // The engine folder can be deleted while coilbox runs. Check the disk now
+      // rather than start a process that cannot exist.
+      try {
+        await assertEngineInstalled(ctx.engine);
+      } catch (e) {
+        runningRef.current = false;
+        throw e;
+      }
       const runId = crypto.randomUUID();
       activeRunIdRef.current = runId;
       const onEvent = new Channel<LaunchEvent>();
@@ -267,6 +307,22 @@ export function PlayProvider({ children }: { children: ReactNode }) {
     [start],
   );
 
+  const launchReplayPlayback = useCallback(
+    (opts: PlaybackOpts) =>
+      start(
+        "replay",
+        {
+          dataDir: opts.dataDir,
+          engine: opts.executable,
+          game: opts.game,
+          file: opts.replayPath,
+        },
+        (runId, onEvent) =>
+          contentReplayPlaybackLaunch({ ...opts, runId, onEvent }),
+      ),
+    [start],
+  );
+
   const launchSave = useCallback(
     (opts: SaveOpts) =>
       start(
@@ -306,6 +362,7 @@ export function PlayProvider({ children }: { children: ReactNode }) {
         relayed: activeRunId !== null && activeRunId === relayedRunId,
         launch,
         launchReplay,
+        launchReplayPlayback,
         launchSave,
         focusGame,
         cancel,

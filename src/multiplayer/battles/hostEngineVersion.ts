@@ -1,4 +1,5 @@
 import { contentVerifyEngine } from "../../content/bindings";
+import { refreshContentState } from "../../content/contentState";
 import type { PlayTarget } from "../../play/config";
 
 /**
@@ -20,6 +21,7 @@ export async function hostEngineVersion(
   try {
     const { engine } = await contentVerifyEngine({ path: target.executable });
     reported = engine.syncVersion;
+    refreshContentState().catch(() => {});
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     throw new Error(`Could not read the engine's version: ${reason}`);

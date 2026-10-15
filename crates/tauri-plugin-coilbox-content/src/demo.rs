@@ -17,8 +17,11 @@
 //! this decoder refuses (a future engine version, say), [`demo_info`] shells
 //! out to `demotool --teamstats` for the winner alone, if the tool happens to
 //! ship beside the engine.
+//!
+//! The demo stream itself, which is what each player did, is walked by
+//! [`stream`].
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -26,13 +29,31 @@ use std::time::{Duration, Instant, UNIX_EPOCH};
 
 use flate2::read::GzDecoder;
 use picoframe_core::CliResult;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
+use tauri::{AppHandle, Runtime};
 
 use crate::metrics::{self, TeamTotals};
 use crate::model::{
-    AiInfo, AllyTeamInfo, ChatLine, DemoChat, DemoInfo, DemoTrailer, PlayerInfo, PlayerStats,
-    ReplayFile, StartBox, TeamStatSample, TeamStatSeries,
+    AiInfo, AllyTeamInfo, ChatLine, DemoChat, DemoInfo, DemoStream, DemoTrailer, PlayerInfo,
+    PlayerStats, ReplayFile, StartBox, StreamEvent, StreamEventKind, TeamAction, TeamStatSample,
+    TeamStatSeries, TimelineEvent, TimelineEventKind,
 };
+
+pub(crate) mod analysis;
+mod build_orders;
+pub(crate) mod def_sets;
+pub mod map_grids;
+pub(crate) mod match_setup;
+mod orders;
+pub(crate) mod playback;
+pub mod recording_costs;
+pub(crate) mod retarget;
+pub(crate) mod stream;
+pub mod track_budget;
+pub mod track_store;
+pub mod track_view;
+pub mod unit_orders;
 
 /// Folders under a write dir that hold client demos. The engine writes to
 /// `demos/` (`DemoRecorder.cpp`), and some lobbies/users use `replays/`.
@@ -81,46 +102,167 @@ const PLAYER_STAT_ELEM_SIZE: usize = 20;
 
 // ---- listing ---------------------------------------------------------------
 
-/// List a root's replays (cheap fs metadata only, demotool is never run here so
-/// the list stays fast), newest first.
-pub fn list_replays(root: &Path) -> Vec<ReplayFile> {
-    let mut out: Vec<ReplayFile> = demo_file_entries(root)
-        .into_iter()
-        .map(|e| {
-            // Cheap native decode (header + start-script only, no demotool) so the
-            // list can show map/players/duration. Best-effort, ignored on failure.
-            let summary = decode_native(&e.path).ok();
-            let (skill_min, skill_avg, skill_max) = summary
-                .as_ref()
-                .map(|i| skill_stats(&i.players))
-                .unwrap_or((None, None, None));
-            ReplayFile {
-                filename: e.filename,
-                path: e.path.to_string_lossy().into_owned(),
-                size_bytes: e.size_bytes,
-                modified_ms: e.modified_ms,
-                map_name: summary
-                    .as_ref()
-                    .map(|i| i.map_name.clone())
-                    .filter(|s| !s.is_empty()),
-                game_type: summary
-                    .as_ref()
-                    .map(|i| i.game_type.clone())
-                    .filter(|s| !s.is_empty()),
-                duration_sec: summary.as_ref().map(|i| i.duration_sec),
-                player_count: summary.as_ref().map(|i| {
-                    (i.players.iter().filter(|p| !p.spectator).count() + i.ais.len()) as u32
-                }),
-                start_time_ms: summary.as_ref().map(|i| i.start_time_ms),
-                skill_min,
-                skill_avg,
-                skill_max,
-                remixed: summary.as_ref().map(|i| i.remixed).unwrap_or(false),
+/// List a root's replays with nothing kept between calls, newest first. Every
+/// file is decoded. The command uses [`list_replays_stored`] instead.
+#[cfg(test)]
+fn list_replays(root: &Path) -> Vec<ReplayFile> {
+    list_replays_stored(root, None).0
+}
+
+/// Bumped when [`ReplaySummary`] changes shape. A store written under another
+/// version is read as empty and rebuilt.
+const SUMMARY_STORE_VERSION: u32 = 3;
+
+/// What the list shows for one replay, from the cheap native decode (header and
+/// start-script, no demotool, no winner).
+#[derive(Serialize, Deserialize, Clone)]
+struct ReplaySummary {
+    map_name: Option<String>,
+    game_type: Option<String>,
+    duration_sec: Option<u32>,
+    player_count: Option<u32>,
+    start_time_ms: Option<u64>,
+    skill_min: Option<f32>,
+    skill_avg: Option<f32>,
+    skill_max: Option<f32>,
+    remixed: bool,
+    stale_remix: bool,
+    game_id: Option<String>,
+}
+
+/// One replay file's stored summary and the signature it was decoded under. A
+/// file that would not decode keeps `summary: None`, so it is not opened again
+/// until it changes.
+#[derive(Serialize, Deserialize)]
+struct StoredSummary {
+    size_bytes: u64,
+    modified_ms: u64,
+    summary: Option<ReplaySummary>,
+}
+
+/// The stored summaries for one replay root, keyed by the file's full path so
+/// two folders holding the same file name do not collide.
+#[derive(Serialize, Deserialize)]
+struct SummaryStore {
+    version: u32,
+    entries: HashMap<String, StoredSummary>,
+}
+
+impl Default for SummaryStore {
+    fn default() -> Self {
+        Self {
+            version: SUMMARY_STORE_VERSION,
+            entries: HashMap::new(),
+        }
+    }
+}
+
+/// Read a store. A missing, unreadable, corrupt or other-version file is an
+/// empty store, which the next listing rebuilds.
+fn load_summaries(path: &Path) -> SummaryStore {
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|s| serde_json::from_str::<SummaryStore>(&s).ok())
+        .filter(|s| s.version == SUMMARY_STORE_VERSION)
+        .unwrap_or_default()
+}
+
+fn summarise(info: &DemoInfo) -> ReplaySummary {
+    let (skill_min, skill_avg, skill_max) = skill_stats(&info.players);
+    ReplaySummary {
+        map_name: Some(info.map_name.clone()).filter(|s| !s.is_empty()),
+        game_type: Some(info.game_type.clone()).filter(|s| !s.is_empty()),
+        duration_sec: Some(info.duration_sec),
+        player_count: Some(
+            (info.players.iter().filter(|p| !p.spectator).count() + info.ais.len()) as u32,
+        ),
+        start_time_ms: Some(info.start_time_ms),
+        skill_min,
+        skill_avg,
+        skill_max,
+        remixed: info.remixed,
+        stale_remix: info.stale_remix,
+        game_id: info
+            .game_id
+            .as_deref()
+            .filter(|_| !info.remixed)
+            .and_then(|id| analysis::store::valid_game_id(id).ok()),
+    }
+}
+
+/// List a root's replays (cheap fs metadata plus the cheap native decode, demotool
+/// is never run here), newest first, and how many files were decoded.
+///
+/// With a `store_path` the decoded summaries are kept there. A file whose size and
+/// modified time match its stored entry reuses it, so only new or changed files
+/// are decoded. Entries for files that are gone are dropped. The store is written
+/// only when it changed, and failing to write it is not an error.
+pub fn list_replays_stored(root: &Path, store_path: Option<&Path>) -> (Vec<ReplayFile>, usize) {
+    let mut store = store_path.map(load_summaries).unwrap_or_default();
+    let mut decoded = 0;
+    let mut changed = false;
+    let mut live: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut out: Vec<ReplayFile> = Vec::new();
+    for e in demo_file_entries(root) {
+        let key = e.path.to_string_lossy().into_owned();
+        let fresh = store
+            .entries
+            .get(&key)
+            .is_some_and(|s| s.size_bytes == e.size_bytes && s.modified_ms == e.modified_ms);
+        if !fresh {
+            let summary = decode_native(&e.path).ok().map(|i| summarise(&i));
+            decoded += 1;
+            changed = true;
+            store.entries.insert(
+                key.clone(),
+                StoredSummary {
+                    size_bytes: e.size_bytes,
+                    modified_ms: e.modified_ms,
+                    summary,
+                },
+            );
+        }
+        let summary = store.entries[&key].summary.clone();
+        live.insert(key.clone());
+        out.push(replay_file(e, summary));
+    }
+    let held = store.entries.len();
+    store.entries.retain(|k, _| live.contains(k));
+    changed |= store.entries.len() != held;
+    if changed {
+        if let Some(path) = store_path {
+            if let Some(parent) = path.parent() {
+                let _ = std::fs::create_dir_all(parent);
             }
-        })
-        .collect();
+            if let Ok(json) = serde_json::to_string(&store) {
+                let _ = coilbox_gamebackup::write_atomic(path, json.as_bytes());
+            }
+        }
+    }
     out.sort_by_key(|r| std::cmp::Reverse(r.modified_ms));
-    out
+    (out, decoded)
+}
+
+fn replay_file(e: DemoFileEntry, summary: Option<ReplaySummary>) -> ReplayFile {
+    let s = summary.as_ref();
+    ReplayFile {
+        filename: e.filename,
+        path: e.path.to_string_lossy().into_owned(),
+        size_bytes: e.size_bytes,
+        modified_ms: e.modified_ms,
+        map_name: s.and_then(|s| s.map_name.clone()),
+        game_type: s.and_then(|s| s.game_type.clone()),
+        duration_sec: s.and_then(|s| s.duration_sec),
+        player_count: s.and_then(|s| s.player_count),
+        start_time_ms: s.and_then(|s| s.start_time_ms),
+        skill_min: s.and_then(|s| s.skill_min),
+        skill_avg: s.and_then(|s| s.skill_avg),
+        skill_max: s.and_then(|s| s.skill_max),
+        remixed: s.is_some_and(|s| s.remixed),
+        stale_remix: s.is_some_and(|s| s.stale_remix),
+        unfinished: e.size_bytes == 0,
+        game_id: s.and_then(|s| s.game_id.clone()),
+    }
 }
 
 /// A demo file's identity from cheap fs metadata only (no header/script decode) —
@@ -217,6 +359,14 @@ pub struct DeleteSummary {
     pub bytes: u64,
     /// One sentence per path left alone, saying why.
     pub skipped: Vec<String>,
+    /// How many of the deleted replays had a stored analysis, which goes with
+    /// them, and what those files free. Not counted in `deleted` or `bytes`.
+    pub analyses: u64,
+    pub analysis_bytes: u64,
+    /// The same for recorded tracks (issue #3786): how many of the deleted
+    /// replays had a stored track, and what those files free.
+    pub tracks: u64,
+    pub track_bytes: u64,
 }
 
 /// Delete a batch of replays, returning how many went and what they freed.
@@ -227,11 +377,40 @@ pub struct DeleteSummary {
 ///
 /// `apply` false sizes the batch without deleting, so the caller can show what
 /// would go before it goes.
-pub fn delete_replays(paths: &[PathBuf], apply: bool) -> DeleteSummary {
+///
+/// `analyses` is the folder stored analyses are kept in. A replay's analysis
+/// is found by the game id in its header.
+///
+/// `tracks` is the folder recorded tracks are kept in, and a track goes by the
+/// same rule as an analysis: it is found by the game id in the header and goes
+/// only when no replay of that match is left, so the preview and the real run
+/// count the same.
+///
+/// `library` is every replay in the library as its canonical path and game id
+/// (see [`library_game_ids`]). An analysis goes only when no replay in it with
+/// that game id is left once the batch is gone, so deleting one of two copies
+/// of a match keeps the analysis the other still uses. A remix has no analysis
+/// of its own and does not keep its original's, since the page shows none for
+/// it. The dry run and the real run answer from the same rule, so the counts
+/// match.
+pub fn delete_replays(
+    paths: &[PathBuf],
+    apply: bool,
+    analyses: Option<&Path>,
+    tracks: Option<&Path>,
+    library: &[(PathBuf, String)],
+) -> DeleteSummary {
     let mut out = DeleteSummary {
         applied: apply,
         ..Default::default()
     };
+    // The matches whose analysis may go, with its size, and the files that went
+    // or would go.
+    let mut candidates: std::collections::BTreeMap<String, u64> = Default::default();
+    let mut track_candidates: std::collections::BTreeMap<String, u64> = Default::default();
+    let mut gone: std::collections::HashSet<PathBuf> = Default::default();
+    // Every match a deleted replay belonged to, whether or not it was analysed.
+    let mut matches: std::collections::BTreeSet<String> = Default::default();
     for path in paths {
         let name = path
             .file_name()
@@ -245,6 +424,11 @@ pub fn delete_replays(paths: &[PathBuf], apply: bool) -> DeleteSummary {
             out.skipped.push(format!("{name}: not found"));
             continue;
         };
+        // Read before the replay goes, because the key is inside it.
+        let analysis = analyses.and_then(|dir| analysis::store::stored_for_replay(dir, path));
+        let key = analyses.and_then(|_| analysis::store::replay_key(path).ok());
+        let track = tracks.and_then(|dir| track_store::stored_for_replay(dir, path));
+        let canonical = std::fs::canonicalize(path).unwrap_or_else(|_| path.clone());
         if apply {
             if let Err(e) = std::fs::remove_file(path) {
                 out.skipped.push(format!("{name}: {e}"));
@@ -253,6 +437,175 @@ pub fn delete_replays(paths: &[PathBuf], apply: bool) -> DeleteSummary {
         }
         out.deleted += 1;
         out.bytes += md.len();
+        gone.insert(canonical);
+        if let Some((game_id, size)) = analysis {
+            candidates.insert(game_id, size);
+        }
+        if let Some((game_id, size)) = track {
+            track_candidates.insert(game_id, size);
+        }
+        matches.extend(key);
+    }
+    if let Some(dir) = tracks {
+        for (game_id, size) in track_candidates {
+            if library
+                .iter()
+                .any(|(path, id)| *id == game_id && !gone.contains(path))
+            {
+                continue;
+            }
+            if apply {
+                match track_store::remove(dir, &game_id) {
+                    Ok(true) => {}
+                    Ok(false) => continue,
+                    Err(e) => {
+                        out.skipped.push(format!("track {game_id}: {e}"));
+                        continue;
+                    }
+                }
+            }
+            out.tracks += 1;
+            out.track_bytes += size;
+        }
+    }
+    let Some(dir) = analyses else {
+        return out;
+    };
+    // The unit definitions recorded for a match go by the same rule as its
+    // analysis: when no replay of that match is left. A list no replay links to
+    // any more goes with the last link. Nothing is counted for them, because a
+    // list is small and may be shared with replays that stay.
+    if apply {
+        let orphaned: Vec<String> = matches
+            .into_iter()
+            .filter(|game_id| {
+                !library
+                    .iter()
+                    .any(|(path, id)| id == game_id && !gone.contains(path))
+            })
+            .collect();
+        if let Err(e) = def_sets::unlink(&def_sets::dir_beside(dir), &orphaned) {
+            out.skipped.push(format!("unit definitions: {e}"));
+        }
+    }
+    for (game_id, size) in candidates {
+        if library
+            .iter()
+            .any(|(path, id)| *id == game_id && !gone.contains(path))
+        {
+            continue;
+        }
+        if apply {
+            match analysis::store::delete(dir, &game_id) {
+                Ok(true) => {}
+                Ok(false) => continue,
+                Err(e) => {
+                    out.skipped.push(format!("analysis {game_id}: {e}"));
+                    continue;
+                }
+            }
+        }
+        out.analyses += 1;
+        out.analysis_bytes += size;
+    }
+    out
+}
+
+/// The content folders the app has published.
+fn library_roots() -> Vec<PathBuf> {
+    coilbox_proc::content_roots()
+        .into_iter()
+        .map(PathBuf::from)
+        .collect()
+}
+
+/// Whether `path` is a replay inside one of the folders the Replays list reads
+/// under `roots`: each root's own `demos` and `replays`, and the same folders in
+/// each engine installed under it (see [`demo_search_dirs`]). Compared by real
+/// path, so a `..` or a link cannot step outside them.
+pub fn is_listed_replay(path: &Path, roots: &[PathBuf]) -> bool {
+    if !is_replay_path(path) {
+        return false;
+    }
+    let Some(parent) = path.parent().and_then(|p| std::fs::canonicalize(p).ok()) else {
+        return false;
+    };
+    roots
+        .iter()
+        .flat_map(|root| demo_search_dirs(root))
+        .flat_map(|base| DEMO_DIRS.iter().map(move |dir| base.join(dir)))
+        .filter_map(|dir| std::fs::canonicalize(dir).ok())
+        .any(|dir| dir == parent)
+}
+
+/// [`delete_replays`] for what a person asked to delete from the app.
+///
+/// A path outside the folders the list reads is refused, so these commands
+/// cannot be pointed at a replay somewhere else on disk. With `only_unfinished`
+/// a file that is no longer empty is left alone, so a recording that finished
+/// between the preview and the delete is not lost.
+///
+/// An empty file is refused while `game_running`, because the engine writes
+/// nothing until its game ends and a running game's file looks exactly like
+/// one left by a crash. A game started outside coilbox cannot be seen from
+/// here, which is why the page warns about it.
+#[allow(clippy::too_many_arguments)]
+pub fn delete_listed_replays(
+    paths: &[PathBuf],
+    apply: bool,
+    analyses: Option<&Path>,
+    tracks: Option<&Path>,
+    library: &[(PathBuf, String)],
+    roots: &[PathBuf],
+    only_unfinished: bool,
+    game_running: bool,
+) -> DeleteSummary {
+    let mut refused = Vec::new();
+    let mut allowed = Vec::new();
+    for path in paths {
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| path.to_string_lossy().into_owned());
+        if is_replay_path(path) && !is_listed_replay(path, roots) {
+            refused.push(format!("{name}: not in a folder the Replays list reads"));
+            continue;
+        }
+        let len = std::fs::metadata(path).map(|m| m.len()).ok();
+        if only_unfinished && len.is_some_and(|len| len > 0) {
+            refused.push(format!(
+                "{name}: no longer empty, so the recording finished"
+            ));
+            continue;
+        }
+        if game_running && len == Some(0) {
+            refused.push(format!(
+                "{name}: a game is running, and this empty file may be its recording"
+            ));
+            continue;
+        }
+        allowed.push(path.clone());
+    }
+    let mut out = delete_replays(&allowed, apply, analyses, tracks, library);
+    out.skipped.extend(refused);
+    out
+}
+
+/// Every replay in the library, from the content folders the app has
+/// published, as its canonical path and game id. Replays without a usable id,
+/// and remixes, are left out. The listing reuses each folder's stored
+/// summaries, so only new or changed files are decoded.
+fn library_game_ids<R: Runtime>(app: &AppHandle<R>) -> Vec<(PathBuf, String)> {
+    let mut out = Vec::new();
+    for root in coilbox_proc::content_roots() {
+        let root = PathBuf::from(root);
+        let store = summary_store_path(app, &root);
+        for replay in list_replays_stored(&root, store.as_deref()).0 {
+            if let Some(id) = replay.game_id {
+                let path = PathBuf::from(&replay.path);
+                out.push((std::fs::canonicalize(&path).unwrap_or(path), id));
+            }
+        }
     }
     out
 }
@@ -397,8 +750,11 @@ fn demo_files_in(base: &Path) -> Vec<DemoFileEntry> {
 /// as a fallback for a trailer the decoder refuses. `engine_dir` is only where
 /// that fallback looks, so `None` (no engine installed) still answers with the
 /// header and script and leaves a winner the trailer cannot give unknown.
+///
+/// This is the detail path, so it also reads where each team started from the
+/// start of the demo stream. The list and the stats ingest do not.
 pub fn demo_info(engine_dir: Option<&Path>, demo: &Path) -> Result<DemoInfo, String> {
-    Ok(decode(engine_dir, demo)?.0)
+    Ok(decode(engine_dir, demo, true)?.0)
 }
 
 /// Decode one replay for the stats store: the same info as [`demo_info`], plus
@@ -413,12 +769,13 @@ pub fn demo_info_for_stats(
     engine_dir: &Path,
     demo: &Path,
 ) -> Result<(DemoInfo, Option<Vec<TeamTotals>>), String> {
-    decode(Some(engine_dir), demo)
+    decode(Some(engine_dir), demo, false)
 }
 
 fn decode(
     engine_dir: Option<&Path>,
     demo: &Path,
+    with_start_positions: bool,
 ) -> Result<(DemoInfo, Option<Vec<TeamTotals>>), String> {
     let raw = read_header_and_script(demo)?;
     let game = find_game(&parse_tdf(&raw.script));
@@ -446,7 +803,20 @@ fn decode(
         .filter(|t| t.players.is_some())
         .map(metrics::match_totals);
     let player_stats = trailer.and_then(|t| t.players);
-    Ok((build_demo_info(raw, &game, winners, player_stats), totals))
+    let mut info = build_demo_info(raw, &game, winners, player_stats);
+    info.stale_remix = is_stale_remix(demo, &info);
+    if with_start_positions {
+        // A stream this decoder cannot read costs the positions and nothing
+        // else, the way a refused trailer costs the statistics.
+        let teams: HashSet<i32> = game
+            .children
+            .iter()
+            .filter_map(|(name, _)| index_suffix(name, "team"))
+            .collect();
+        info.start_positions =
+            stream::read_start_positions(demo, |t| teams.contains(&t)).unwrap_or_default();
+    }
+    Ok((info, totals))
 }
 
 /// Native-only decode (header + start-script, no demotool/winner) used for the
@@ -454,7 +824,18 @@ fn decode(
 fn decode_native(demo: &Path) -> Result<DemoInfo, String> {
     let raw = read_header_and_script(demo)?;
     let game = find_game(&parse_tdf(&raw.script));
-    Ok(build_demo_info(raw, &game, None, None))
+    let mut info = build_demo_info(raw, &game, None, None);
+    info.stale_remix = is_stale_remix(demo, &info);
+    Ok(info)
+}
+
+/// A remix whose first packet names another game than its header. The engine
+/// plays such a file on the packet's game. Only a remix is looked at, so an
+/// ordinary replay costs nothing extra.
+fn is_stale_remix(demo: &Path, info: &DemoInfo) -> bool {
+    info.remixed
+        && retarget::packet_game_of(demo)
+            .is_some_and(|packet| !packet.trim().eq_ignore_ascii_case(info.game_type.trim()))
 }
 
 struct RawDemo {
@@ -463,6 +844,8 @@ struct RawDemo {
     unix_time: u64,
     game_time: u32,
     wallclock: u32,
+    /// The header's team statistics period in seconds, 0 when it names none.
+    team_stat_period_sec: u32,
     /// Whether the recorded game reached a game over.
     ///
     /// The engine writes the player and team statistics chunks, and the header
@@ -501,6 +884,7 @@ fn read_header_and_script(demo: &Path) -> Result<RawDemo, String> {
         unix_time: u64_at(&buf, OFF_UNIX_TIME)?,
         game_time: i32_at(&buf, OFF_GAME_TIME)?.max(0) as u32,
         wallclock: i32_at(&buf, OFF_WALLCLOCK)?.max(0) as u32,
+        team_stat_period_sec: i32_at(&buf, OFF_TEAM_STAT_PERIOD).unwrap_or(0).max(0) as u32,
         game_over: i32_at(&buf, OFF_NUM_TEAMS)? > 0,
         script: String::from_utf8_lossy(&buf[header_size..need]).into_owned(),
     })
@@ -908,11 +1292,11 @@ fn read_team_stat_sample(raw: &[u8]) -> TeamStatSample {
 /// `new_gametype` (and, when given, the header engine `versionString` becomes
 /// `new_engine_version`), returning the path of the new file.
 ///
-/// The engine binds a replay to a game purely by the `gametype` name string (no
-/// archive checksum lives in the header — the game is resolved by name at
-/// playback), so swapping that string redirects the replay onto whatever local
-/// archive carries the new name. The demo stream is copied verbatim; only the
-/// `scriptSize` header field (and optionally `versionString`) changes.
+/// The engine binds a replay to a game by the `gametype` name string, which it
+/// reads from the first packet of the demo stream and not from the header. So
+/// both are rewritten (see [`retarget`]), and the header's `scriptSize` and
+/// `demoStreamSize` move with them. Every later packet and the trailer are
+/// copied as they are. Optionally the header `versionString` changes too.
 ///
 /// **The source is never modified or overwritten.** The destination is derived
 /// here — callers cannot supply it — is guaranteed to be a different, not-yet-
@@ -954,20 +1338,13 @@ pub fn rewrite_demo(
         .and_then(|n| n.to_str())
         .unwrap_or("")
         .to_string();
-    let swapped = replace_gametype(&script, new_gametype)?;
-    let new_script = inject_remix_marker(&swapped, &source_gametype, &origin).into_bytes();
 
-    // Rebuild: header | new script | demo stream (unchanged tail).
-    let mut out = Vec::with_capacity(header_size + new_script.len() + (bytes.len() - script_end));
-    out.extend_from_slice(&bytes[..header_size]);
-    out.extend_from_slice(&new_script);
-    out.extend_from_slice(&bytes[script_end..]);
-
-    // Only scriptSize changes; every other header field is a size/count that the
-    // shifted tail preserves.
-    let new_size =
-        i32::try_from(new_script.len()).map_err(|_| "rewritten start-script too large")?;
-    put_i32_at(&mut out, OFF_SCRIPT_SIZE, new_size);
+    // Both places a replay names its game are rewritten, because the engine loads
+    // the game from the first packet of the stream and not from the header
+    // (issue #3861). The packet's script gets the new gametype and no marker.
+    let mut out = retarget::retarget_with(&bytes, new_gametype, |swapped| {
+        Ok(inject_remix_marker(&swapped, &source_gametype, &origin))
+    })?;
     if let Some(ver) = new_engine_version {
         put_cstr_at(&mut out, OFF_VERSION_STRING, 256, ver);
     }
@@ -1404,6 +1781,7 @@ fn build_demo_info(
             .ok()
             .and_then(|n| player_stats.as_ref()?.get(n).copied());
         players.push(PlayerInfo {
+            player: id,
             name: p.get("name").unwrap_or("").to_string(),
             team,
             ally_team,
@@ -1412,6 +1790,10 @@ fn build_demo_info(
             spectator,
             won,
             skill: p.get("skill").map(str::to_string),
+            skill_uncertainty: p
+                .get("skilluncertainty")
+                .and_then(|v| v.trim().parse::<f64>().ok())
+                .filter(|v| v.is_finite()),
             country_code: p.get("countrycode").map(str::to_string),
             stats,
             apm: stats.and_then(|s| apm(s.num_commands, raw.game_time)),
@@ -1465,6 +1847,10 @@ fn build_demo_info(
         .child("modoptions")
         .map(|s| s.keys.clone())
         .unwrap_or_default();
+    let map_options = game
+        .child("mapoptions")
+        .map(|s| s.keys.clone())
+        .unwrap_or_default();
 
     DemoInfo {
         engine_version: raw.engine_version,
@@ -1482,9 +1868,13 @@ fn build_demo_info(
         players,
         ais,
         remixed: marker.remixed,
+        stale_remix: false,
         source_gametype: marker.source,
         origin_filename: marker.origin,
         mod_options,
+        map_options,
+        match_setup: match_setup::match_setup(game),
+        start_positions: Vec::new(),
     }
 }
 
@@ -1571,17 +1961,162 @@ fn skill_stats(players: &[PlayerInfo]) -> (Option<f32>, Option<f32>, Option<f32>
     (Some(min), Some(avg), Some(max))
 }
 
-/// Extract a demo's chat log: run `demotool --dump` and parse its `CHAT`/`SYSTEMMSG`
-/// lines, resolving player numbers to names via the start-script.
-pub fn demo_chat(engine_dir: &Path, demo: &Path) -> Result<DemoChat, String> {
+/// Extract a demo's chat log from the native stream walk. It needs no engine
+/// folder. Player numbers resolve to names through the start script first, then
+/// through the name packets in the stream.
+pub fn demo_chat(demo: &Path) -> Result<DemoChat, String> {
     let raw = read_header_and_script(demo)?;
     let game = find_game(&parse_tdf(&raw.script));
-    let names = player_names(&game);
-    let bin = resolve_demotool(engine_dir).ok_or("demotool not found in engine folder")?;
-    let out = run_demotool(&bin, demo, "--dump", DEMOTOOL_TIMEOUT)?;
-    Ok(DemoChat {
-        messages: parse_chat(&out, &names),
-    })
+    let stream = stream::read_stream(demo)?;
+    Ok(chat_from_stream(
+        &stream,
+        player_names(&game),
+        player_seats(&game),
+    ))
+}
+
+/// The chat and system lines of a walked stream, and the typed events that
+/// belong on a timeline, with every other event dropped. A match is tens of
+/// thousands of events and only these are wanted.
+///
+/// A late joiner's name applies from the frame they joined. A player number can
+/// be reused, so the map is changed as the walk goes and a line or an event
+/// takes the name its player held when it happened. `seats` is the engine team
+/// each playing player controls, which names who lost an army when a team died.
+fn chat_from_stream(
+    stream: &DemoStream,
+    mut names: HashMap<u32, String>,
+    mut seats: HashMap<u32, u8>,
+) -> DemoChat {
+    for e in &stream.events {
+        if let StreamEventKind::PlayerName { player, name } = &e.kind {
+            names
+                .entry(u32::from(*player))
+                .or_insert_with(|| name.clone());
+        }
+    }
+    let mut messages = Vec::new();
+    let mut events = Vec::new();
+    let mut dead_teams = Vec::new();
+    for e in &stream.events {
+        let (player, dest, text, system) = match &e.kind {
+            StreamEventKind::NewPlayer {
+                player,
+                spectator,
+                team,
+                name,
+            } => {
+                names.insert(u32::from(*player), name.clone());
+                if *spectator {
+                    seats.remove(&u32::from(*player));
+                } else {
+                    seats.insert(u32::from(*player), *team);
+                }
+                events.push(timeline_event(
+                    e,
+                    *player,
+                    &names,
+                    TimelineEventKind::Joined {
+                        spectator: *spectator,
+                        team: *team,
+                    },
+                ));
+                continue;
+            }
+            StreamEventKind::Pause { player, paused } => {
+                events.push(timeline_event(
+                    e,
+                    *player,
+                    &names,
+                    TimelineEventKind::Paused { paused: *paused },
+                ));
+                continue;
+            }
+            StreamEventKind::PlayerLeft { player, reason } => {
+                events.push(timeline_event(
+                    e,
+                    *player,
+                    &names,
+                    TimelineEventKind::PlayerLeft { reason: *reason },
+                ));
+                continue;
+            }
+            StreamEventKind::Team { player, action } => {
+                let kind = match *action {
+                    TeamAction::Resign => TimelineEventKind::Resigned,
+                    // Every player reports a death, so one report per team.
+                    TeamAction::TeamDied { team } => {
+                        if dead_teams.contains(&team) {
+                            continue;
+                        }
+                        dead_teams.push(team);
+                        let mut owners: Vec<u32> = seats
+                            .iter()
+                            .filter(|(_, t)| **t == team)
+                            .map(|(p, _)| *p)
+                            .collect();
+                        owners.sort_unstable();
+                        TimelineEventKind::TeamDied {
+                            team,
+                            players: owners
+                                .iter()
+                                .filter_map(|p| names.get(p).cloned())
+                                .collect(),
+                        }
+                    }
+                    TeamAction::GiveAway { to_team, from_team } => {
+                        TimelineEventKind::GiveAway { to_team, from_team }
+                    }
+                    TeamAction::Other {
+                        action,
+                        param1,
+                        param2,
+                    } => TimelineEventKind::Other {
+                        action,
+                        param1,
+                        param2,
+                    },
+                    // How a match starts, not something that happened in it.
+                    TeamAction::JoinTeam { .. } => continue,
+                };
+                events.push(timeline_event(e, *player, &names, kind));
+                continue;
+            }
+            StreamEventKind::Chat { from, dest, text } => (*from, Some(*dest), text, false),
+            StreamEventKind::SystemMessage { player, text } => (*player, None, text, true),
+            _ => continue,
+        };
+        messages.push(ChatLine {
+            frame: e.frame,
+            time: e.time,
+            player,
+            player_name: names.get(&u32::from(player)).cloned(),
+            dest,
+            text: text.clone(),
+            system,
+        });
+    }
+    DemoChat {
+        messages,
+        incomplete: stream.stopped.is_some(),
+        events,
+    }
+}
+
+/// One timeline event, named from the map as it stands at this point of the walk.
+fn timeline_event(
+    e: &StreamEvent,
+    player: u8,
+    names: &HashMap<u32, String>,
+    kind: TimelineEventKind,
+) -> TimelineEvent {
+    TimelineEvent {
+        frame: e.frame,
+        time: e.time,
+        player,
+        player_name: names.get(&u32::from(player)).cloned(),
+        kind,
+    }
 }
 
 /// Map player number -> name from the start-script's `[playerN]` sections.
@@ -1600,31 +2135,25 @@ fn player_names(game: &Section) -> HashMap<u32, String> {
     out
 }
 
-/// Parse demotool `--dump` output for chat + system lines. Each is one line:
-/// `CHAT: Player: N Msg: <text>` / `SYSTEMMSG: Player: N Msg: <text>`.
-fn parse_chat(out: &str, names: &HashMap<u32, String>) -> Vec<ChatLine> {
-    let mut msgs = Vec::new();
-    for line in out.lines() {
-        let (system, rest) = if let Some(r) = line.strip_prefix("CHAT: Player: ") {
-            (false, r)
-        } else if let Some(r) = line.strip_prefix("SYSTEMMSG: Player: ") {
-            (true, r)
-        } else {
+/// Map player number -> the engine team they control, from the start-script's
+/// `[playerN]` sections. Spectators control none.
+fn player_seats(game: &Section) -> HashMap<u32, u8> {
+    let mut out = HashMap::new();
+    for (name, sec) in &game.children {
+        let Some(num) = name
+            .strip_prefix("player")
+            .and_then(|n| n.parse::<u32>().ok())
+        else {
             continue;
         };
-        let Some((num_str, text)) = rest.split_once(" Msg: ") else {
+        if sec.get("spectator") == Some("1") {
             continue;
-        };
-        let player = num_str.trim().parse::<u32>().ok();
-        let player_name = player.and_then(|n| names.get(&n).cloned());
-        msgs.push(ChatLine {
-            player,
-            player_name,
-            text: text.to_string(),
-            system,
-        });
+        }
+        if let Some(team) = sec.get("team").and_then(|t| t.parse::<u8>().ok()) {
+            out.insert(num, team);
+        }
     }
-    msgs
+    out
 }
 
 /// Run `demotool --teamstats <demo>` and parse its trailing `Winning Allyteams:`
@@ -1703,12 +2232,24 @@ fn parse_winners(out: &str) -> Option<Vec<u32>> {
 /// `<root>/replays`, and in the same folders of every engine installed under the
 /// root (fast fs metadata, no decoding). `root` is a `ContentRoot.path`.
 #[tauri::command]
-pub(crate) async fn content_list_replays(root: String) -> CliResult {
+pub(crate) async fn content_list_replays<R: Runtime>(app: AppHandle<R>, root: String) -> CliResult {
     let p = PathBuf::from(&root);
-    match tauri::async_runtime::spawn_blocking(move || list_replays(&p)).await {
+    let store = summary_store_path(&app, &p);
+    match tauri::async_runtime::spawn_blocking(move || list_replays_stored(&p, store.as_deref()).0)
+        .await
+    {
         Ok(replays) => CliResult::ok(json!({ "replays": replays })),
         Err(e) => CliResult::err(format!("list replays task failed: {e}")),
     }
+}
+
+/// Where a root's replay summaries are kept: one file per root under the app
+/// cache dir. `None` when the cache dir cannot be resolved, and every listing
+/// then decodes every file.
+fn summary_store_path<R: Runtime>(app: &AppHandle<R>, root: &Path) -> Option<PathBuf> {
+    let dir = coilbox_portable::cache_dir(app).ok()?;
+    let id = crate::hash_id(&[&root.to_string_lossy()]);
+    Some(dir.join("replay-summaries").join(format!("{id}.json")))
 }
 
 /// `content_demo_info`, decode one replay: native header + start-script (map,
@@ -1747,18 +2288,120 @@ pub(crate) async fn content_replay_trailer(replay_path: String) -> CliResult {
     }
 }
 
-/// `content_demo_chat`, extract a replay's chat log (its `NETMSG_CHAT`/`SYSTEMMSG`
-/// lines) by running `demotool --dump`. `enginePath` holds `demotool`, `replayPath`
-/// is an absolute demo path. Read on demand (it walks the whole demo stream), not
-/// during listing.
+/// `content_demo_chat`, extract a replay's chat log (its `NETMSG_CHAT` and
+/// `NETMSG_SYSTEMMSG` lines) from the native stream walk. No engine folder is
+/// needed. Each line carries its frame, so the page can show match time.
+/// `replayPath` is an absolute demo path. Read on demand (it walks the whole
+/// demo stream), not during listing.
 #[tauri::command]
-pub(crate) async fn content_demo_chat(engine_path: String, replay_path: String) -> CliResult {
-    let engine = PathBuf::from(&engine_path);
+pub(crate) async fn content_demo_chat(replay_path: String) -> CliResult {
     let demo_path = PathBuf::from(&replay_path);
-    match tauri::async_runtime::spawn_blocking(move || demo_chat(&engine, &demo_path)).await {
+    match tauri::async_runtime::spawn_blocking(move || demo_chat(&demo_path)).await {
         Ok(Ok(chat)) => CliResult::ok(json!(chat)),
         Ok(Err(e)) => CliResult::err(e),
         Err(e) => CliResult::err(format!("demo chat task failed: {e}")),
+    }
+}
+
+/// `content_demo_build_orders`, every order to build something in a replay
+/// (#1145), with the unit definition ids as the engine recorded them. Turning an
+/// id into a unit is the caller's job, through unitsync and the game the replay
+/// names. `replayPath` is an absolute demo path. Read on demand (it walks the
+/// whole demo stream), not during listing.
+#[tauri::command]
+pub(crate) async fn content_demo_build_orders(replay_path: String) -> CliResult {
+    let demo_path = PathBuf::from(&replay_path);
+    match tauri::async_runtime::spawn_blocking(move || build_orders::demo_build_orders(&demo_path))
+        .await
+    {
+        Ok(Ok(orders)) => CliResult::ok(json!(orders)),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("demo build orders task failed: {e}")),
+    }
+}
+
+/// `content_demo_order_points`, every order in a replay that points at a place
+/// on the map, packed into parallel columns (#1152). See [`DemoOrderPoints`]
+/// for the layout, and `orders.rs` for which commands have a position. `replayPath`
+/// is an absolute demo path. Read on demand (it walks the whole demo stream),
+/// not during listing.
+#[tauri::command]
+pub(crate) async fn content_demo_order_points(replay_path: String) -> CliResult {
+    let demo_path = PathBuf::from(&replay_path);
+    match tauri::async_runtime::spawn_blocking(move || orders::demo_order_points(&demo_path)).await
+    {
+        Ok(Ok(points)) => CliResult::ok(json!(points)),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("demo order points task failed: {e}")),
+    }
+}
+
+/// `content_replay_map_grids`, each replay in `paths` reduced to counts on its
+/// map's grid, for a picture of many replays of one map (#1161). `worldWidth`
+/// and `worldHeight` are the map's size in elmos, which a replay does not hold.
+/// See [`map_grids`] for the layers and for the kept files.
+///
+/// A path must be a replay in a folder the Replays list reads, as the delete
+/// commands require, and one that is not is answered in `failed` beside any
+/// that would not read. Replays are reduced one at a time. A caller that wants
+/// to show progress asks for one path a call.
+#[tauri::command]
+pub(crate) async fn content_replay_map_grids<R: Runtime>(
+    app: AppHandle<R>,
+    paths: Vec<String>,
+    world_width: u32,
+    world_height: u32,
+) -> CliResult {
+    let Some(grid) = map_grids::Grid::for_world(world_width, world_height) else {
+        return CliResult::err("the map has no size".to_string());
+    };
+    let cache = coilbox_portable::cache_dir(&app)
+        .ok()
+        .map(|dir| dir.join(map_grids::CACHE_DIR));
+    let analyses = analysis::store::app_store_dir(&app).ok();
+    match tauri::async_runtime::spawn_blocking(move || {
+        let roots = library_roots();
+        if let Some(cache) = &cache {
+            sweep_map_grids_once(cache, &roots);
+        }
+        let paths: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
+        map_grids::listed_replay_grids(&paths, &grid, cache.as_deref(), analyses.as_deref(), &roots)
+    })
+    .await
+    {
+        Ok((replays, failed)) => {
+            CliResult::ok(json!({ "grid": grid, "replays": replays, "failed": failed }))
+        }
+        Err(e) => CliResult::err(format!("replay map grids task failed: {e}")),
+    }
+}
+
+/// Drop the kept grids of replays that have left the library, once for each
+/// run of the app. It needs a listing of every replay folder, which is too
+/// much to do on every call and enough to do once.
+fn sweep_map_grids_once(cache: &Path, roots: &[PathBuf]) {
+    static SWEPT: std::sync::Once = std::sync::Once::new();
+    SWEPT.call_once(|| {
+        let live = roots
+            .iter()
+            .flat_map(|root| demo_file_entries(root))
+            .map(|entry| entry.path);
+        map_grids::sweep(cache, live);
+    });
+}
+
+/// `content_demo_command_rates`, how many orders each team gave in each period
+/// of a replay, by who sent them (#1149). The period is the replay's own team
+/// statistics period. `replayPath` is an absolute demo path. Read on demand (it
+/// walks the whole demo stream), not during listing.
+#[tauri::command]
+pub(crate) async fn content_demo_command_rates(replay_path: String) -> CliResult {
+    let demo_path = PathBuf::from(&replay_path);
+    match tauri::async_runtime::spawn_blocking(move || orders::demo_command_rates(&demo_path)).await
+    {
+        Ok(Ok(rates)) => CliResult::ok(json!(rates)),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("demo command rates task failed: {e}")),
     }
 }
 
@@ -1788,27 +2431,81 @@ pub(crate) async fn content_rewrite_demo(
 
 /// `content_delete_replay`, delete one replay file. `path` must be a `.sdfz`/`.sdf`
 /// path from `content_list_replays` (guarded against deleting anything else).
+/// The replay's stored analysis and track go with it, and `analysisDeleted` and
+/// `trackDeleted` say whether there was one.
 #[tauri::command]
-pub(crate) async fn content_delete_replay(path: String) -> CliResult {
+pub(crate) async fn content_delete_replay<R: Runtime>(
+    app: AppHandle<R>,
+    path: String,
+    only_unfinished: Option<bool>,
+) -> CliResult {
     let p = PathBuf::from(&path);
     if !is_replay_path(&p) {
         return CliResult::err("not a replay file".to_string());
     }
-    match std::fs::remove_file(&p) {
-        Ok(()) => CliResult::ok(json!({ "ok": true })),
-        Err(e) => CliResult::err(format!("delete failed: {e}")),
+    let analyses = analysis::store::app_store_dir(&app).ok();
+    let tracks = track_store::app_store_dir(&app).ok();
+    let library = match tauri::async_runtime::spawn_blocking({
+        let app = app.clone();
+        move || library_game_ids(&app)
+    })
+    .await
+    {
+        Ok(library) => library,
+        Err(e) => return CliResult::err(format!("delete replay task failed: {e}")),
+    };
+    let summary = delete_listed_replays(
+        &[p],
+        true,
+        analyses.as_deref(),
+        tracks.as_deref(),
+        &library,
+        &library_roots(),
+        only_unfinished.unwrap_or(false),
+        coilbox_proc::game_running(),
+    );
+    if summary.deleted == 0 {
+        let reason = summary.skipped.first().cloned().unwrap_or_default();
+        return CliResult::err(format!("delete failed: {reason}"));
     }
+    CliResult::ok(json!({
+        "ok": true,
+        "analysisDeleted": summary.analyses > 0,
+        "trackDeleted": summary.tracks > 0,
+    }))
 }
 
 /// `content_delete_replays`: delete a batch of replays, for the storage screen's
 /// bulk cleanup (issue #386). Each path is guarded the same way
 /// `content_delete_replay` guards its one, and a path that fails is skipped with a
 /// reason rather than aborting the batch. `apply=false` sizes the batch without
-/// deleting. See [`delete_replays`].
+/// deleting. The summary counts the stored analyses and tracks that go with the replays.
+/// See [`delete_replays`].
 #[tauri::command]
-pub(crate) async fn content_delete_replays(paths: Vec<String>, apply: bool) -> CliResult {
+pub(crate) async fn content_delete_replays<R: Runtime>(
+    app: AppHandle<R>,
+    paths: Vec<String>,
+    apply: bool,
+    only_unfinished: Option<bool>,
+) -> CliResult {
     let paths: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
-    match tauri::async_runtime::spawn_blocking(move || delete_replays(&paths, apply)).await {
+    let analyses = analysis::store::app_store_dir(&app).ok();
+    let tracks = track_store::app_store_dir(&app).ok();
+    match tauri::async_runtime::spawn_blocking(move || {
+        let library = library_game_ids(&app);
+        delete_listed_replays(
+            &paths,
+            apply,
+            analyses.as_deref(),
+            tracks.as_deref(),
+            &library,
+            &library_roots(),
+            only_unfinished.unwrap_or(false),
+            coilbox_proc::game_running(),
+        )
+    })
+    .await
+    {
         Ok(summary) => CliResult::ok(json!({ "summary": summary })),
         Err(e) => CliResult::err(format!("delete replays task failed: {e}")),
     }
@@ -1886,32 +2583,34 @@ mod tests {
     /// The default is the smallest valid v5 file: a header, a start script, and
     /// an empty trailer, which is what the engine leaves behind when a recording
     /// is aborted. Every other case sets one field and changes nothing else.
-    struct DemoFixture {
-        version: i32,
+    pub(super) struct DemoFixture {
+        pub(super) version: i32,
         /// Also where the start script begins, so a header that grew moves every
         /// offset behind it.
-        header_size: usize,
-        engine_version: String,
-        script: String,
+        pub(super) header_size: usize,
+        pub(super) engine_version: String,
+        pub(super) script: String,
         /// Stands in for the recorded packet stream, which nothing here decodes.
-        stream: Vec<u8>,
+        pub(super) stream: Vec<u8>,
         /// One ally-team id per byte.
-        winning_ally_teams: Vec<u8>,
+        pub(super) winning_ally_teams: Vec<u8>,
         /// Per player, the five `i32` in their true on-disk order: `numCommands`,
         /// `unitCommands`, `mousePixels`, `mouseClicks`, `keyPresses`.
         /// `PlayerStatistics` derives from `TeamControllerStatistics`, so the base
         /// members come first and this is not the order the header file declares.
-        player_stats: Vec<[i32; 5]>,
-        player_stat_elem_size: usize,
+        pub(super) player_stats: Vec<[i32; 5]>,
+        pub(super) player_stat_elem_size: usize,
         /// Per team, its samples in recording order.
-        team_samples: Vec<Vec<TeamStatSample>>,
-        team_stat_elem_size: usize,
-        team_stat_period: i32,
-        game_time: i32,
-        wallclock: i32,
+        pub(super) team_samples: Vec<Vec<TeamStatSample>>,
+        pub(super) team_stat_elem_size: usize,
+        pub(super) team_stat_period: i32,
+        pub(super) game_time: i32,
+        pub(super) wallclock: i32,
+        /// The 16 bytes of the header's game id.
+        pub(super) game_id: [u8; 16],
         /// Bytes chopped off the end once everything is written, for a file that
         /// stops before the trailer the header promised.
-        truncate_by: usize,
+        pub(super) truncate_by: usize,
     }
 
     impl Default for DemoFixture {
@@ -1930,6 +2629,7 @@ mod tests {
                 team_stat_period: 15,
                 game_time: 2356,
                 wallclock: 2531,
+                game_id: std::array::from_fn(|k| 0xA0 + k as u8),
                 truncate_by: 0,
             }
         }
@@ -1941,16 +2641,14 @@ mod tests {
     const SAMPLE_PADDING: u8 = 0xEE;
 
     impl DemoFixture {
-        fn bytes(&self) -> Vec<u8> {
+        pub(super) fn bytes(&self) -> Vec<u8> {
             let mut h = vec![0u8; self.header_size];
             h[..MAGIC.len()].copy_from_slice(MAGIC);
             put_i32(&mut h, 16, self.version);
             put_i32(&mut h, OFF_HEADER_SIZE, self.header_size as i32);
             let ver = self.engine_version.as_bytes();
             h[OFF_VERSION_STRING..OFF_VERSION_STRING + ver.len()].copy_from_slice(ver);
-            for (k, b) in (0..16).zip(0xA0u8..) {
-                h[OFF_GAME_ID + k] = b;
-            }
+            h[OFF_GAME_ID..OFF_GAME_ID + 16].copy_from_slice(&self.game_id);
             put_u64(&mut h, OFF_UNIX_TIME, 1_777_320_845);
             put_i32(&mut h, OFF_SCRIPT_SIZE, self.script.len() as i32);
             put_i32(&mut h, OFF_DEMO_STREAM_SIZE, self.stream.len() as i32);
@@ -2059,7 +2757,7 @@ mod tests {
             b
         }
 
-        fn gzipped(&self) -> Vec<u8> {
+        pub(super) fn gzipped(&self) -> Vec<u8> {
             let mut enc = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
             enc.write_all(&self.bytes()).unwrap();
             enc.finish().unwrap()
@@ -2072,6 +2770,7 @@ mod tests {
     fn build_demo(script: &str, gzip: bool) -> Vec<u8> {
         let f = DemoFixture {
             script: script.into(),
+            stream: retarget::tests::stream_with_game_data(script, &[]),
             team_samples: vec![Vec::new(), Vec::new()],
             ..Default::default()
         };
@@ -2204,6 +2903,43 @@ mod tests {
         assert_eq!(second.version, None);
         assert_eq!(second.advantage, None);
         assert_eq!(second.income_multiplier, Some(1.5));
+    }
+
+    /// The shape a SPADS-hosted recording uses: `skill` in brackets and
+    /// `skilluncertainty` as a bare number, one key each per seat.
+    const SKILL_SCRIPT: &str = "[game]\n{\n\
+        mapname=Comet Catcher;\n\
+        gametype=BAR;\n\
+        [team0]\n{\nallyteam=0;\n}\n\
+        [team1]\n{\nallyteam=1;\n}\n\
+        [team2]\n{\nallyteam=1;\n}\n\
+        [player0]\n{\nteam=0;\nname=Rated;\nskill=[25.06];\nskilluncertainty=2.65;\n}\n\
+        [player1]\n{\nteam=1;\nname=Unrated;\n}\n\
+        [player2]\n{\nteam=2;\nname=Garbled;\nskill=[20];\nskilluncertainty=lots;\n}\n\
+        [player3]\n{\nteam=2;\nname=Empty;\nskill=[20];\nskilluncertainty=;\n}\n\
+        [allyteam0]\n{\nnumallies=0;\n}\n\
+        [allyteam1]\n{\nnumallies=0;\n}\n}\n";
+
+    #[test]
+    fn skill_uncertainty_is_read_when_present_and_absent_when_not() {
+        let info = ai_info("skill-unc.sdfz", SKILL_SCRIPT, None);
+        let by = |n: &str| info.players.iter().find(|p| p.name == n).unwrap();
+        assert_eq!(by("Rated").skill.as_deref(), Some("[25.06]"));
+        assert_eq!(by("Rated").skill_uncertainty, Some(2.65));
+        assert_eq!(by("Unrated").skill_uncertainty, None);
+    }
+
+    /// A value that is not a number is no uncertainty, and does not take the
+    /// rating or the roster down with it.
+    #[test]
+    fn a_malformed_skill_uncertainty_is_absent() {
+        let info = ai_info("skill-unc-bad.sdfz", SKILL_SCRIPT, None);
+        for name in ["Garbled", "Empty"] {
+            let p = info.players.iter().find(|p| p.name == name).unwrap();
+            assert_eq!(p.skill_uncertainty, None, "{name}");
+            assert_eq!(p.skill.as_deref(), Some("[20]"), "{name}");
+        }
+        assert_eq!(info.players.len(), 4);
     }
 
     /// A bot's win is its ally team's win, exactly as a player's is.
@@ -2849,6 +3585,429 @@ mod tests {
         assert!(err.contains("teamStatSize"), "got: {err}");
     }
 
+    // ---- the demo stream, inside a whole file --------------------------------
+
+    use super::stream::fixture::Packets;
+    use crate::model::{ChatDest, LeaveReason, StreamEventKind, TeamAction, PREGAME_FRAME};
+
+    /// A finished 1v1 with a demo stream in it: a start position, two frames,
+    /// and a line of chat.
+    fn fixture_with_stream(stream: Vec<u8>) -> DemoFixture {
+        DemoFixture {
+            stream,
+            winning_ally_teams: vec![1],
+            player_stats: vec![[163, 163, 416_476, 493, 277], [194, 230, 227_928, 364, 462]],
+            team_samples: vec![series(3), series(3)],
+            ..Default::default()
+        }
+    }
+
+    fn short_match() -> Packets {
+        Packets::default()
+            .start_pos(0, 0, 1, [724.0, 0.0, 800.0])
+            .keyframe(0)
+            .newframes(1)
+            .chat(1, 254, "gg")
+    }
+
+    /// The stream sits between the start script and the trailer, and the
+    /// header's sizes are the only thing that says where. A walk that started
+    /// a byte off would read the script's tail as a packet header.
+    #[test]
+    fn the_stream_is_found_between_the_script_and_the_trailer() {
+        let bytes = fixture_with_stream(short_match().bytes()).bytes();
+        let s = stream::decode_stream(&bytes).unwrap();
+
+        assert_eq!(s.stopped, None);
+        assert_eq!(s.undecoded, 0);
+        assert_eq!(s.packets, 4);
+        assert_eq!(s.last_frame, 1);
+        assert_eq!(s.events.len(), 2);
+        assert_eq!(s.events[0].frame, PREGAME_FRAME);
+        assert_eq!(
+            s.events[1].kind,
+            StreamEventKind::Chat {
+                from: 1,
+                dest: ChatDest::Everyone,
+                text: "gg".into()
+            }
+        );
+        assert_eq!(s.events[1].frame, 1);
+    }
+
+    #[test]
+    fn a_gzipped_replay_walks_its_stream() {
+        let p = write_tmp(
+            "stream_gz.sdfz",
+            &fixture_with_stream(short_match().bytes()).gzipped(),
+        );
+        let s = stream::read_stream(&p).unwrap();
+        assert_eq!(s.events.len(), 2);
+        assert_eq!(s.last_frame, 1);
+    }
+
+    /// The two robustness points in issue #1144. A stream whose framing breaks
+    /// stops the walk and is not an error, and the trailer behind it decodes
+    /// exactly as it would have, because it is found from the header and not
+    /// from where the walk stopped.
+    #[test]
+    fn a_broken_stream_stops_the_walk_and_leaves_the_trailer_readable() {
+        let mut stream = short_match().bytes();
+        let break_at = stream.len();
+        // A chunk header claiming far more than the file holds, then junk.
+        stream.extend_from_slice(&9.0f32.to_le_bytes());
+        stream.extend_from_slice(&0x7FFF_FFFFu32.to_le_bytes());
+        stream.extend_from_slice(&[0xAB; 40]);
+        let f = fixture_with_stream(stream);
+        let bytes = f.bytes();
+
+        let s = stream::decode_stream(&bytes).unwrap();
+        assert_eq!(s.events.len(), 2);
+        assert_eq!(s.stopped.expect("should have stopped").offset, break_at);
+
+        let t = decode_trailer(&bytes).unwrap();
+        assert_eq!(t.winning_ally_teams, vec![1]);
+        assert_eq!(t.teams[1].samples[2], sample(2));
+        assert_eq!(t.players.unwrap()[1].num_commands, 194);
+    }
+
+    /// A recording cut off part way through its stream still gives up the
+    /// packets that made it to disk, and says it stopped.
+    #[test]
+    fn a_file_that_ends_inside_its_stream_keeps_the_packets_it_has() {
+        let stream = short_match().bytes();
+        let stream_len = stream.len();
+        let mut f = fixture_with_stream(stream);
+        let trailer_len = f.bytes().len() - (f.header_size + f.script.len() + stream_len);
+        // Drop the whole trailer and the last 3 bytes of the chat packet.
+        f.truncate_by = trailer_len + 3;
+
+        let s = stream::decode_stream(&f.bytes()).unwrap();
+        assert_eq!(s.events.len(), 1, "the start position, not the chat");
+        assert_eq!(s.last_frame, 1);
+        assert!(s.stopped.is_some());
+
+        // Cut exactly at a packet boundary, the walk itself sees nothing
+        // wrong, so the missing bytes have to be reported from the header.
+        // The chat packet is an 8 byte chunk header and a 7 byte payload.
+        let chat_packet = 8 + 7;
+        f.truncate_by = trailer_len + chat_packet;
+        let s = stream::decode_stream(&f.bytes()).unwrap();
+        let stop = s.stopped.expect("should have stopped");
+        assert_eq!(stop.offset, stream_len - chat_packet);
+        assert!(stop.reason.contains("15 bytes before"), "{}", stop.reason);
+    }
+
+    #[test]
+    fn a_replay_with_no_stream_walks_to_nothing() {
+        let s = stream::decode_stream(&fixture_with_stream(Vec::new()).bytes()).unwrap();
+        assert_eq!(s.events, vec![]);
+        assert_eq!(s.last_frame, PREGAME_FRAME);
+        assert_eq!(s.stopped, None);
+    }
+
+    /// The stream refuses the same two header fields the trailer does. A
+    /// different version or header size moves where the stream starts.
+    #[test]
+    fn a_stream_behind_an_unknown_header_is_refused() {
+        let f = DemoFixture {
+            version: 6,
+            ..fixture_with_stream(short_match().bytes())
+        };
+        let err = stream::decode_stream(&f.bytes()).unwrap_err();
+        assert!(err.contains("version is 6, not 5"), "got: {err}");
+
+        let f = DemoFixture {
+            header_size: 360,
+            ..fixture_with_stream(short_match().bytes())
+        };
+        let err = stream::decode_stream(&f.bytes()).unwrap_err();
+        assert!(err.contains("headerSize is 360, not 352"), "got: {err}");
+
+        let err = stream::decode_stream(b"not a demo").unwrap_err();
+        assert!(err.contains("bad magic"), "got: {err}");
+    }
+
+    /// Prints every team's sequence of start positions in each real replay next
+    /// to what `demo_info` reduces it to (#1146). Ignored by default.
+    ///
+    ///   COILBOX_REAL_DEMO_DIR=~/.spring/demos \
+    ///   cargo test -p tauri-plugin-coilbox-content real_demo_start_positions -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn real_demo_start_positions() {
+        let dir = std::env::var("COILBOX_REAL_DEMO_DIR").expect("set COILBOX_REAL_DEMO_DIR");
+        for e in std::fs::read_dir(&dir).unwrap().flatten() {
+            let path = e.path();
+            if !is_replay_path(&path) || e.metadata().unwrap().len() == 0 {
+                continue;
+            }
+            let info = demo_info(None, &path).unwrap();
+            let s = stream::read_stream(&path).unwrap();
+            eprintln!(
+                "{} startPosType={:?} ais={} reduced={}",
+                path.file_name().unwrap().to_string_lossy(),
+                info.start_pos_type,
+                info.ais.len(),
+                info.start_positions.len()
+            );
+            let mut seq: std::collections::BTreeMap<u8, Vec<String>> = Default::default();
+            for ev in &s.events {
+                if let StreamEventKind::StartPos {
+                    player,
+                    team,
+                    ready,
+                    x,
+                    y,
+                    z,
+                } = ev.kind
+                {
+                    seq.entry(team).or_default().push(format!(
+                        "f{} p{player} r{ready} ({x:.0},{y:.0},{z:.0})",
+                        ev.frame
+                    ));
+                }
+            }
+            for (team, msgs) in &seq {
+                let kept = info
+                    .start_positions
+                    .iter()
+                    .find(|p| p.team == i32::from(*team));
+                eprintln!("  team {team}: {} -> {kept:?}", msgs.join(" | "));
+            }
+        }
+    }
+
+    /// Times `demo_info` on the largest replay in a directory, for the cost of
+    /// the detail path (#1146). Ignored by default, it needs replays on disk.
+    ///
+    ///   COILBOX_REAL_DEMO_DIR=~/.spring/demos \
+    ///   cargo test --release -p tauri-plugin-coilbox-content real_demo_info_timing -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn real_demo_info_timing() {
+        let dir = std::env::var("COILBOX_REAL_DEMO_DIR").expect("set COILBOX_REAL_DEMO_DIR");
+        let biggest = std::fs::read_dir(&dir)
+            .unwrap()
+            .flatten()
+            .filter(|e| is_replay_path(&e.path()))
+            .max_by_key(|e| e.metadata().unwrap().len())
+            .expect("no replays");
+        let path = biggest.path();
+        let mut times = Vec::new();
+        for _ in 0..7 {
+            let t = std::time::Instant::now();
+            let info = demo_info(None, &path).unwrap();
+            times.push(t.elapsed());
+            std::hint::black_box(&info);
+        }
+        times.sort();
+        eprintln!(
+            "demo_info on {} bytes: min {:?} median {:?} max {:?}",
+            biggest.metadata().unwrap().len(),
+            times[0],
+            times[times.len() / 2],
+            times[times.len() - 1]
+        );
+    }
+
+    /// End-to-end over real replays, for the check a synthetic stream cannot
+    /// make: that the layouts agree with packets the engine wrote. Ignored by
+    /// default, it needs replays on disk.
+    ///
+    ///   COILBOX_REAL_DEMO_DIR=~/.spring/demos \
+    ///   cargo test -p tauri-plugin-coilbox-content real_demo_streams -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn real_demo_streams() {
+        let dir = std::env::var("COILBOX_REAL_DEMO_DIR").expect("set COILBOX_REAL_DEMO_DIR");
+        let mut seen = 0;
+        for e in std::fs::read_dir(&dir).unwrap().flatten() {
+            let path = e.path();
+            // A zero length file is a recording in progress, not a replay yet.
+            if !is_replay_path(&path) || e.metadata().unwrap().len() == 0 {
+                continue;
+            }
+            seen += 1;
+            let s = stream::read_stream(&path).unwrap_or_else(|err| {
+                panic!("{}: {err}", path.display());
+            });
+            let mut counts: std::collections::BTreeMap<&str, usize> = Default::default();
+            for e in &s.events {
+                *counts
+                    .entry(match e.kind {
+                        StreamEventKind::PlayerName { .. } => "playerName",
+                        StreamEventKind::Chat { .. } => "chat",
+                        StreamEventKind::SystemMessage { .. } => "systemMessage",
+                        StreamEventKind::Command { .. } => "command",
+                        StreamEventKind::Select { .. } => "select",
+                        StreamEventKind::GameOver { .. } => "gameOver",
+                        StreamEventKind::StartPos { .. } => "startPos",
+                        StreamEventKind::Pause { .. } => "pause",
+                        StreamEventKind::PlayerLeft { .. } => "playerLeft",
+                        StreamEventKind::Team { .. } => "team",
+                        StreamEventKind::NewPlayer { .. } => "newPlayer",
+                    })
+                    .or_default() += 1;
+            }
+            eprintln!(
+                "{}: packets={} lastFrame={} undecoded={} stopped={:?} {counts:?}",
+                path.file_name().unwrap().to_string_lossy(),
+                s.packets,
+                s.last_frame,
+                s.undecoded,
+                s.stopped,
+            );
+            // A few of the timeline events, by number only, leaving out the join
+            // messages every replay opens with. A late joiner's
+            // name is checked for presence and never printed.
+            for e in s
+                .events
+                .iter()
+                .filter(|e| {
+                    matches!(
+                        e.kind,
+                        StreamEventKind::Pause { .. }
+                            | StreamEventKind::PlayerLeft { .. }
+                            | StreamEventKind::Team { .. }
+                            | StreamEventKind::NewPlayer { .. }
+                    )
+                })
+                .filter(|e| {
+                    !matches!(
+                        e.kind,
+                        StreamEventKind::Team {
+                            action: TeamAction::JoinTeam { .. },
+                            ..
+                        }
+                    )
+                })
+                .take(20)
+            {
+                match &e.kind {
+                    StreamEventKind::NewPlayer {
+                        player,
+                        spectator,
+                        team,
+                        name,
+                    } => eprintln!(
+                        "  frame {} newPlayer player={player} spectator={spectator} team={team} nameLen={}",
+                        e.frame,
+                        name.len()
+                    ),
+                    kind => eprintln!("  frame {} {kind:?}", e.frame),
+                }
+            }
+            // Every chat line from a late joiner carries a name.
+            let joined: Vec<u8> = s
+                .events
+                .iter()
+                .filter_map(|e| match e.kind {
+                    StreamEventKind::NewPlayer { player, .. } => Some(player),
+                    _ => None,
+                })
+                .collect();
+            if !joined.is_empty() {
+                let chat = chat_from_stream(&s, HashMap::new(), HashMap::new());
+                let from_joiners: Vec<_> = chat
+                    .messages
+                    .iter()
+                    .filter(|m| joined.contains(&m.player))
+                    .collect();
+                eprintln!(
+                    "  late joiners {joined:?}: {} chat lines from them, {} without a name",
+                    from_joiners.len(),
+                    from_joiners
+                        .iter()
+                        .filter(|m| m.player_name.is_none())
+                        .count()
+                );
+            }
+            // Every packet of a kind the walk reads fits the layout it reads
+            // it with, and the framing holds to the last byte.
+            assert_eq!(s.undecoded, 0, "{}", path.display());
+            assert_eq!(s.stopped, None, "{}", path.display());
+            // The stream's own clock reaches the header's match length, which
+            // is in whole seconds at 30 frames each. It can run past it: a
+            // client writes that field when the game ends (`CGame::GameEnd`)
+            // and keeps recording until the player leaves, which on the 2313
+            // second All That Glitters replay is 14 seconds later.
+            let info = decode_native(&path).unwrap();
+            let secs = s.last_frame / 30;
+            assert!(
+                secs >= info.duration_sec as i32,
+                "{}: stream ends at {secs}s, header says {}s",
+                path.display(),
+                info.duration_sec
+            );
+        }
+        assert!(seen > 0, "no replays in {dir}");
+    }
+
+    /// What `demo_chat` hands the timeline for each real replay, by player
+    /// number and never by name. Ignored by default, it needs replays on disk.
+    ///
+    ///   COILBOX_REAL_DEMO_DIR=~/.spring/demos \
+    ///   cargo test -p tauri-plugin-coilbox-content real_demo_timeline_events -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn real_demo_timeline_events() {
+        let dir = std::env::var("COILBOX_REAL_DEMO_DIR").expect("set COILBOX_REAL_DEMO_DIR");
+        for e in std::fs::read_dir(&dir).unwrap().flatten() {
+            let path = e.path();
+            if !is_replay_path(&path) || e.metadata().unwrap().len() == 0 {
+                continue;
+            }
+            let chat = demo_chat(&path).unwrap();
+            if chat.events.is_empty() {
+                continue;
+            }
+            eprintln!(
+                "{}: {} chat lines, {} events, incomplete={}",
+                path.file_name().unwrap().to_string_lossy(),
+                chat.messages.len(),
+                chat.events.len(),
+                chat.incomplete
+            );
+            // The join messages left out, and when they arrive.
+            let joins: Vec<i32> = stream::read_stream(&path)
+                .unwrap()
+                .events
+                .iter()
+                .filter(|e| {
+                    matches!(
+                        e.kind,
+                        StreamEventKind::Team {
+                            action: TeamAction::JoinTeam { .. },
+                            ..
+                        }
+                    )
+                })
+                .map(|e| e.frame)
+                .collect();
+            eprintln!(
+                "  {} JoinTeam left out, frames {:?} to {:?}",
+                joins.len(),
+                joins.iter().min(),
+                joins.iter().max()
+            );
+            for ev in &chat.events {
+                // A team's controllers are names, so they print as a count.
+                let mut kind = serde_json::to_value(&ev.kind).unwrap();
+                if let Some(p) = kind.get_mut("players") {
+                    *p = serde_json::json!(p.as_array().map_or(0, Vec::len));
+                }
+                eprintln!(
+                    "  frame {} ({}s) player={} named={} {kind}",
+                    ev.frame,
+                    ev.frame / 30,
+                    ev.player,
+                    ev.player_name.is_some(),
+                );
+            }
+        }
+    }
+
     /// End-to-end over the real replays in `~/.spring/demos`, which is the check a
     /// synthetic fixture cannot make: that the fixtures agree with a file the
     /// engine wrote. Ignored by default, it needs replays on disk.
@@ -2969,6 +4128,107 @@ mod tests {
         assert!(list.iter().any(|r| r.filename == "b.sdf"));
     }
 
+    /// A root with two real replays and a store path beside it.
+    fn stored_fixture(name: &str) -> (PathBuf, PathBuf) {
+        let root = std::env::temp_dir().join(name);
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("demos")).unwrap();
+        let demo = build_demo(SCRIPT, true);
+        std::fs::write(root.join("demos").join("a.sdfz"), &demo).unwrap();
+        std::fs::write(root.join("demos").join("b.sdfz"), &demo).unwrap();
+        let store = root.join("cache").join("summaries.json");
+        (root, store)
+    }
+
+    #[test]
+    fn a_second_listing_of_an_unchanged_folder_decodes_nothing() {
+        let (root, store) = stored_fixture("coilbox_summary_second_test");
+        let (first, decoded) = list_replays_stored(&root, Some(&store));
+        assert_eq!(decoded, 2);
+        let (second, decoded) = list_replays_stored(&root, Some(&store));
+        assert_eq!(decoded, 0);
+        assert_eq!(second.len(), 2);
+        assert_eq!(second[0].map_name, first[0].map_name);
+        assert_eq!(
+            second[0].map_name.as_deref(),
+            Some("Valles Marineris 2.6.1")
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_new_file_is_the_only_one_decoded() {
+        let (root, store) = stored_fixture("coilbox_summary_new_test");
+        list_replays_stored(&root, Some(&store));
+        std::fs::write(root.join("demos").join("c.sdfz"), build_demo(SCRIPT, true)).unwrap();
+        let (list, decoded) = list_replays_stored(&root, Some(&store));
+        assert_eq!(decoded, 1);
+        assert_eq!(list.len(), 3);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_changed_size_or_modified_time_decodes_that_file_again() {
+        let (root, store) = stored_fixture("coilbox_summary_changed_test");
+        list_replays_stored(&root, Some(&store));
+        let a = root.join("demos").join("a.sdfz");
+        let mut bytes = build_demo(SCRIPT, true);
+        bytes.push(0);
+        std::fs::write(&a, bytes).unwrap();
+        assert_eq!(list_replays_stored(&root, Some(&store)).1, 1);
+
+        let b = std::fs::File::options()
+            .write(true)
+            .open(root.join("demos").join("b.sdfz"))
+            .unwrap();
+        b.set_modified(std::time::SystemTime::now() + Duration::from_secs(60))
+            .unwrap();
+        assert_eq!(list_replays_stored(&root, Some(&store)).1, 1);
+        assert_eq!(list_replays_stored(&root, Some(&store)).1, 0);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_removed_file_is_dropped_from_the_store() {
+        let (root, store) = stored_fixture("coilbox_summary_removed_test");
+        list_replays_stored(&root, Some(&store));
+        std::fs::remove_file(root.join("demos").join("a.sdfz")).unwrap();
+        let (list, decoded) = list_replays_stored(&root, Some(&store));
+        assert_eq!((list.len(), decoded), (1, 0));
+        let kept = load_summaries(&store);
+        assert_eq!(kept.entries.len(), 1);
+        assert!(kept.entries.keys().all(|k| k.ends_with("b.sdfz")));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_corrupt_or_old_store_is_rebuilt() {
+        let (root, store) = stored_fixture("coilbox_summary_corrupt_test");
+        std::fs::create_dir_all(store.parent().unwrap()).unwrap();
+        std::fs::write(&store, b"not json").unwrap();
+        let (list, decoded) = list_replays_stored(&root, Some(&store));
+        assert_eq!((list.len(), decoded), (2, 2));
+        assert_eq!(list_replays_stored(&root, Some(&store)).1, 0);
+
+        std::fs::write(&store, br#"{"version":0,"entries":{}}"#).unwrap();
+        assert_eq!(list_replays_stored(&root, Some(&store)).1, 2);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn the_same_file_name_in_two_folders_is_stored_twice() {
+        let (root, store) = stored_fixture("coilbox_summary_collide_test");
+        std::fs::create_dir_all(root.join("replays")).unwrap();
+        std::fs::write(
+            root.join("replays").join("a.sdfz"),
+            build_demo(SCRIPT, true),
+        )
+        .unwrap();
+        assert_eq!(list_replays_stored(&root, Some(&store)).1, 3);
+        assert_eq!(list_replays_stored(&root, Some(&store)).1, 0);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// The engine writes `demos/` relative to its write dir, and a Recoil release
     /// extracted into `engine/<version>/` is Portable Mode, so that is its own
     /// folder. Measured on a real headless match run out of a staged
@@ -3060,7 +4320,7 @@ mod tests {
         std::fs::write(&a, b"1234").unwrap();
         std::fs::write(&b, b"123").unwrap();
 
-        let summary = delete_replays(&[a.clone(), b.clone()], false);
+        let summary = delete_replays(&[a.clone(), b.clone()], false, None, None, &[]);
         assert!(!summary.applied);
         assert_eq!(summary.deleted, 2);
         assert_eq!(summary.bytes, 7);
@@ -3079,7 +4339,13 @@ mod tests {
         std::fs::write(&replay, b"12345").unwrap();
         std::fs::write(&other, b"config").unwrap();
 
-        let summary = delete_replays(&[replay.clone(), other.clone(), dir.join("gone.sdf")], true);
+        let summary = delete_replays(
+            &[replay.clone(), other.clone(), dir.join("gone.sdf")],
+            true,
+            None,
+            None,
+            &[],
+        );
         assert!(summary.applied);
         assert_eq!(summary.deleted, 1);
         assert_eq!(summary.bytes, 5);
@@ -3089,6 +4355,147 @@ mod tests {
         assert!(!replay.exists());
         assert!(other.is_file(), "a non-replay must survive");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A root with an empty replay in its own `demos`, one in an installed
+    /// engine's `demos` (the owner's two September files), and a real replay.
+    fn unfinished_fixture() -> (tempfile::TempDir, PathBuf, [PathBuf; 3]) {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("root");
+        let engine = root.join("engine").join("macos_arm64").join("2.0");
+        std::fs::create_dir_all(root.join("demos")).unwrap();
+        std::fs::create_dir_all(engine.join("demos")).unwrap();
+        std::fs::write(engine.join("spring-headless"), b"x").unwrap();
+        let shared = root.join("demos").join("shared.sdfz");
+        let inside = engine.join("demos").join("engine.sdfz");
+        let real = root.join("demos").join("real.sdfz");
+        std::fs::write(&shared, b"").unwrap();
+        std::fs::write(&inside, b"").unwrap();
+        std::fs::write(&real, build_demo(SCRIPT, true)).unwrap();
+        (tmp, root, [shared, inside, real])
+    }
+
+    #[test]
+    fn an_empty_replay_is_listed_as_unfinished_wherever_it_is_found() {
+        let (_tmp, root, _) = unfinished_fixture();
+        let list = list_replays(&root);
+        let flags: HashMap<&str, bool> = list
+            .iter()
+            .map(|r| (r.filename.as_str(), r.unfinished))
+            .collect();
+        assert_eq!(flags.len(), 3);
+        assert!(flags["shared.sdfz"]);
+        assert!(flags["engine.sdfz"]);
+        assert!(!flags["real.sdfz"]);
+    }
+
+    #[test]
+    fn an_empty_replay_nothing_is_writing_is_deleted_from_either_folder() {
+        let (_tmp, root, [shared, inside, real]) = unfinished_fixture();
+        let roots = [root];
+
+        let dry = delete_listed_replays(
+            &[shared.clone(), inside.clone()],
+            false,
+            None,
+            None,
+            &[],
+            &roots,
+            true,
+            false,
+        );
+        assert_eq!(dry.deleted, 2);
+        assert!(shared.is_file() && inside.is_file());
+
+        let done = delete_listed_replays(
+            &[shared.clone(), inside.clone()],
+            true,
+            None,
+            None,
+            &[],
+            &roots,
+            true,
+            false,
+        );
+        assert_eq!(
+            (done.deleted, done.bytes, done.skipped.len()),
+            (dry.deleted, dry.bytes, 0)
+        );
+        assert!(!shared.exists() && !inside.exists());
+        assert!(real.is_file());
+    }
+
+    /// The engine writes nothing until its game ends, so a running game's file is
+    /// indistinguishable from a dead one.
+    #[test]
+    fn an_empty_replay_is_left_alone_while_a_game_is_running() {
+        let (_tmp, root, [shared, inside, real]) = unfinished_fixture();
+
+        let out = delete_listed_replays(
+            &[shared.clone(), inside.clone()],
+            true,
+            None,
+            None,
+            &[],
+            &[root],
+            true,
+            true,
+        );
+        assert_eq!(out.deleted, 0);
+        assert_eq!(out.skipped.len(), 2);
+        assert!(out.skipped[0].contains("a game is running"));
+        assert!(shared.is_file() && inside.is_file() && real.is_file());
+    }
+
+    /// A recording that finished between the preview and the delete is a real
+    /// replay now.
+    #[test]
+    fn a_replay_that_finished_since_the_preview_is_not_taken_as_unfinished() {
+        let (_tmp, root, [_, _, real]) = unfinished_fixture();
+
+        let out = delete_listed_replays(
+            std::slice::from_ref(&real),
+            true,
+            None,
+            None,
+            &[],
+            &[root],
+            true,
+            false,
+        );
+        assert_eq!(out.deleted, 0);
+        assert!(out.skipped[0].contains("no longer empty"));
+        assert!(real.is_file());
+    }
+
+    #[test]
+    fn a_replay_outside_the_listed_folders_is_refused() {
+        let (tmp, root, _) = unfinished_fixture();
+        let elsewhere = tmp.path().join("elsewhere");
+        std::fs::create_dir_all(&elsewhere).unwrap();
+        let stray = elsewhere.join("stray.sdfz");
+        std::fs::write(&stray, b"").unwrap();
+        // A spelling that reaches the same stray file through a listed folder.
+        let sneaky = root
+            .join("demos")
+            .join("..")
+            .join("..")
+            .join("elsewhere")
+            .join("stray.sdfz");
+
+        let out = delete_listed_replays(
+            &[stray.clone(), sneaky],
+            true,
+            None,
+            None,
+            &[],
+            &[root],
+            false,
+            false,
+        );
+        assert_eq!(out.deleted, 0);
+        assert_eq!(out.skipped.len(), 2);
+        assert!(stray.is_file());
     }
 
     /// A root with two engines that both recorded, plus one replay of the root's
@@ -3386,6 +4793,78 @@ mod tests {
         );
     }
 
+    /// The detail path carries where each team started (#1146). A team in the
+    /// stream that the script does not declare is dropped, and the stats
+    /// ingest's decode leaves the field empty because it never walks the stream.
+    #[test]
+    fn demo_info_carries_where_each_team_started() {
+        let stream = Packets::default()
+            .start_pos(0, 0, 0, [10.0, 0.0, 20.0])
+            .start_pos(0, 0, 1, [724.0, 3.0, 800.0])
+            .start_pos(255, 1, 1, [4000.0, 0.0, 5000.0])
+            .start_pos(255, 9, 1, [1.0, 1.0, 1.0])
+            .keyframe(0)
+            .start_pos(0, 0, 0, [7.0, 7.0, 7.0])
+            .bytes();
+        let demo = write_tmp(
+            "start-positions.sdfz",
+            &fixture_with_stream(stream).gzipped(),
+        );
+        let info = demo_info(None, &demo).unwrap();
+        let got: Vec<_> = info
+            .start_positions
+            .iter()
+            .map(|p| (p.team, p.x, p.y, p.z))
+            .collect();
+        assert_eq!(got, vec![(0, 724.0, 3.0, 800.0), (1, 4000.0, 0.0, 5000.0)]);
+
+        let json = serde_json::to_value(&info).unwrap();
+        assert_eq!(json["startPositions"][0]["team"], 0);
+        assert_eq!(json["startPositions"][1]["z"], 5000.0);
+
+        let (stats, _) = demo_info_for_stats(Path::new("/no/such/engine"), &demo).unwrap();
+        assert!(stats.start_positions.is_empty());
+        assert!(decode_native(&demo).unwrap().start_positions.is_empty());
+    }
+
+    /// The read stops early, so a pregame longer than the first read has to be
+    /// read on, in a plain file and a gzipped one.
+    #[test]
+    fn a_pregame_longer_than_the_first_read_is_read_to_its_end() {
+        let mut p = Packets::default();
+        for i in 0..30_000 {
+            p = p.start_pos(0, 0, 0, [i as f32, 0.0, 1.0]);
+        }
+        let stream = p.start_pos(0, 0, 1, [123.0, 4.0, 5.0]).keyframe(0).bytes();
+        assert!(stream.len() > 2 * 256 * 1024);
+        for (name, bytes) in [
+            (
+                "long-pregame.sdf",
+                fixture_with_stream(stream.clone()).bytes(),
+            ),
+            ("long-pregame.sdfz", fixture_with_stream(stream).gzipped()),
+        ] {
+            let demo = write_tmp(name, &bytes);
+            let info = demo_info(None, &demo).unwrap();
+            assert_eq!(info.start_positions.len(), 1, "{name}");
+            assert_eq!(info.start_positions[0].x, 123.0, "{name}");
+        }
+    }
+
+    /// A recording with no stream, and one in a layout the walk refuses, still
+    /// decode, with no positions and no key in the JSON.
+    #[test]
+    fn demo_info_without_a_readable_stream_has_no_start_positions() {
+        let demo = write_tmp("no-stream.sdfz", &fixture_with_stream(Vec::new()).gzipped());
+        let info = demo_info(None, &demo).unwrap();
+        assert!(info.start_positions.is_empty());
+        assert!(serde_json::to_value(&info)
+            .unwrap()
+            .get("startPositions")
+            .is_none());
+        assert_eq!(info.map_name, "Valles Marineris 2.6.1");
+    }
+
     /// With no engine, a refused trailer has no `demotool` to fall back to, so
     /// the winner is unknown while the header and script still read.
     #[test]
@@ -3552,6 +5031,7 @@ mod tests {
                 unix_time: 0,
                 game_time: 0,
                 wallclock: 0,
+                team_stat_period_sec: 0,
                 game_over: true,
                 script: SCRIPT.to_string(),
             },
@@ -3576,6 +5056,7 @@ mod tests {
                 unix_time: 0,
                 game_time: 0,
                 wallclock: 0,
+                team_stat_period_sec: 0,
                 game_over: true,
                 script: SCRIPT.to_string(),
             },
@@ -3592,6 +5073,37 @@ mod tests {
             Some("")
         );
         assert_eq!(info.mod_options.len(), 2);
+        assert!(info.map_options.is_empty());
+    }
+
+    #[test]
+    fn build_demo_info_reads_mapoptions() {
+        let script = "[game]\n{\nmapname=BlockFort v1;\n\
+            [modoptions]\n{\nzombies=disabled;\n}\n\
+            [mapoptions]\n{\nfog=1;\nextractorradius=150;\n}\n}\n";
+        let game = find_game(&parse_tdf(script));
+        let info = build_demo_info(
+            RawDemo {
+                engine_version: String::new(),
+                game_id: String::new(),
+                unix_time: 0,
+                game_time: 0,
+                wallclock: 0,
+                team_stat_period_sec: 0,
+                game_over: true,
+                script: script.to_string(),
+            },
+            &game,
+            None,
+            None,
+        );
+        assert_eq!(
+            info.map_options.get("extractorradius").map(String::as_str),
+            Some("150")
+        );
+        assert_eq!(info.map_options.get("fog").map(String::as_str), Some("1"));
+        assert_eq!(info.map_options.len(), 2);
+        assert_eq!(info.mod_options.len(), 1);
     }
 
     #[test]
@@ -3611,13 +5123,16 @@ mod tests {
 
     #[test]
     fn rewrite_redirects_gametype_and_never_touches_source() {
-        // header + script + a fake demo-stream tail we expect to survive verbatim.
-        let mut demo = build_demo(SCRIPT, false);
+        // A fake later packet we expect to survive verbatim.
         let tail: &[u8] = b"\x00\x01\x02DEMO-STREAM-TAIL\xff\xfe";
-        demo.extend_from_slice(tail);
-        // Everything past the start script is copied byte for byte: this
-        // fixture's empty team-statistics counts, then the tail.
-        let verbatim = demo[352 + SCRIPT.len()..].to_vec();
+        let demo = DemoFixture {
+            script: SCRIPT.into(),
+            stream: retarget::tests::stream_with_game_data(SCRIPT, tail),
+            winning_ally_teams: vec![1],
+            team_samples: vec![Vec::new(), Vec::new()],
+            ..Default::default()
+        }
+        .bytes();
         let src = write_tmp("jb_src.sdf", &demo);
         let before = std::fs::read(&src).unwrap();
 
@@ -3647,7 +5162,20 @@ mod tests {
         assert!(script.contains("source=Beyond All Reason test-30018;"));
         assert!(script.contains("origin=jb_src.sdf;"));
         assert!(script.contains("mapname=Valles Marineris 2.6.1")); // map untouched
-        assert_eq!(&out[hs + ss..], &verbatim[..]); // stream tail byte-identical
+
+        // The packet the engine loads the game from names the new game too, and
+        // carries no marker (issue #3861).
+        assert_eq!(
+            retarget::packet_game_of(&dst).as_deref(),
+            Some("Beyond All Reason LOCAL-GIT")
+        );
+        // Every later packet and the trailer are copied as they are.
+        assert_eq!(&out[out.len() - 2..], &before[before.len() - 2..]);
+        assert!(out.windows(tail.len()).any(|w| w == tail));
+        assert_eq!(
+            decode_trailer(&out).unwrap(),
+            decode_trailer(&before).unwrap()
+        );
 
         // Re-reading detects the remix, its source gametype, and its origin file.
         let game = find_game(&parse_tdf(script));
@@ -3706,22 +5234,476 @@ mod tests {
         let _ = std::fs::remove_file(&dst);
     }
 
+    /// The trailer is found from `demoStreamSize`, so a remix that wrote a packet
+    /// of another length and left the size alone would decode other bytes.
     #[test]
-    fn parse_chat_reads_chat_and_system_lines() {
-        let mut names = HashMap::new();
-        names.insert(0u32, "Alice".to_string());
-        let out = "HEADER\n\
-            CHAT: Player: 0 Msg: gg wp\n\
-            SYSTEMMSG: Player: 1 Msg: Bob paused\n\
-            KEYFRAME: 1\n\
-            CHAT: Player: 9 Msg: unknown speaker\n";
-        let msgs = parse_chat(out, &names);
-        assert_eq!(msgs.len(), 3);
-        assert_eq!(msgs[0].player, Some(0));
-        assert_eq!(msgs[0].player_name.as_deref(), Some("Alice"));
-        assert_eq!(msgs[0].text, "gg wp");
-        assert!(!msgs[0].system);
-        assert!(msgs[1].system);
-        assert_eq!(msgs[2].player_name, None);
+    fn a_remix_keeps_its_stream_size_and_trailer_right_whatever_the_new_name_length() {
+        let f = DemoFixture {
+            script: SCRIPT.into(),
+            stream: retarget::tests::stream_with_game_data(SCRIPT, b"later packets"),
+            winning_ally_teams: vec![1],
+            team_samples: vec![Vec::new(), Vec::new()],
+            ..Default::default()
+        };
+        let original = f.bytes();
+        let src = write_tmp("remix_sizes.sdf", &original);
+
+        for name in [
+            "G",
+            "A game with a very much longer name than the first 99.9",
+        ] {
+            let dst = rewrite_demo(&src, name, None).unwrap();
+            let out = std::fs::read(&dst).unwrap();
+            let header = i32_at(&out, OFF_HEADER_SIZE).unwrap() as usize;
+            let script = i32_at(&out, OFF_SCRIPT_SIZE).unwrap() as usize;
+            let stream = i32_at(&out, OFF_DEMO_STREAM_SIZE).unwrap() as usize;
+            let trailer_at = header + script + stream;
+            assert_eq!(
+                &out[trailer_at..trailer_at + 1],
+                &[1],
+                "the winner is where the header says the trailer starts"
+            );
+            assert_eq!(
+                decode_trailer(&out).unwrap(),
+                decode_trailer(&original).unwrap()
+            );
+            let _ = std::fs::remove_file(&dst);
+        }
+    }
+
+    /// A remix made before issue #3861 has the original game in its first
+    /// packet. The engine plays it on that game, so the list says so.
+    #[test]
+    fn a_remix_whose_packet_names_another_game_than_its_header_is_flagged() {
+        let header_script = inject_remix_marker(
+            &replace_gametype(SCRIPT, "Balanced Annihilation V15.9.8").unwrap(),
+            "Beyond All Reason test-30018",
+            "orig.sdfz",
+        );
+        let old = DemoFixture {
+            script: header_script,
+            stream: retarget::tests::stream_with_game_data(SCRIPT, &[]),
+            team_samples: vec![Vec::new(), Vec::new()],
+            ..Default::default()
+        };
+        let path = write_tmp("old_remix.sdf", &old.bytes());
+        let info = decode_native(&path).unwrap();
+        assert!(info.remixed);
+        assert!(info.stale_remix);
+        assert_eq!(info.game_type, "Balanced Annihilation V15.9.8");
+        assert_eq!(
+            info.source_gametype.as_deref(),
+            Some("Beyond All Reason test-30018")
+        );
+    }
+
+    #[test]
+    fn a_remix_made_now_and_an_ordinary_replay_are_not_flagged() {
+        let src = write_tmp("fresh_remix_src.sdf", &build_demo(SCRIPT, false));
+        let dst = rewrite_demo(&src, "Some Game 1.0", None).unwrap();
+        let info = decode_native(&dst).unwrap();
+        assert!(info.remixed);
+        assert!(!info.stale_remix);
+        assert!(!decode_native(&src).unwrap().stale_remix);
+        let _ = std::fs::remove_file(&dst);
+    }
+
+    /// A remix has to name the game the engine will load, or it is no remix.
+    #[test]
+    fn a_replay_with_no_game_data_packet_cannot_be_remixed() {
+        let f = DemoFixture {
+            script: SCRIPT.into(),
+            team_samples: vec![Vec::new(), Vec::new()],
+            ..Default::default()
+        };
+        let src = write_tmp("no_packet.sdf", &f.bytes());
+        assert!(rewrite_demo(&src, "Some Game 1.0", None).is_err());
+    }
+
+    /// Remixes an older coilbox made, read and never written. Set
+    /// `COILBOX_OLD_REMIXES` to their paths, separated the way `PATH` is.
+    #[test]
+    #[ignore = "needs remixes made before issue #3861"]
+    fn a_remix_an_older_coilbox_made_is_flagged() {
+        let Some(paths) = std::env::var_os("COILBOX_OLD_REMIXES") else {
+            eprintln!("did nothing: set COILBOX_OLD_REMIXES to run it");
+            return;
+        };
+        for path in std::env::split_paths(&paths) {
+            let info = decode_native(&path).unwrap();
+            eprintln!(
+                "{}: header {:?}, packet {:?}, stale {}",
+                path.display(),
+                info.game_type,
+                retarget::packet_game_of(&path),
+                info.stale_remix
+            );
+            assert!(info.remixed && info.stale_remix, "{}", path.display());
+        }
+    }
+
+    /// A real engine loading a real remix, to see which game it says it loaded.
+    ///
+    /// Reads what to run from the environment and does nothing without it:
+    ///
+    /// - `COILBOX_REMIX_REPLAY`: a replay.
+    /// - `COILBOX_REMIX_GAMETYPE`: the name of an installed game to remix it to.
+    /// - `COILBOX_REMIX_ENGINE_DIR`: a copy of an engine folder in scratch.
+    /// - `COILBOX_REMIX_DATA_DIRS`: scratch data folders holding that game and
+    ///   the replay's map, separated the way `SPRING_DATADIR` is.
+    /// - `COILBOX_REMIX_TIMEOUT_SECS`: how long the engine may run.
+    ///
+    /// The replay is copied into a temporary folder and the remix written
+    /// beside the copy. The engine gets a write folder and a `--config` file
+    /// in that folder too, so nothing of the player's is read or written.
+    #[test]
+    #[ignore = "needs an engine copy, two installed games, a map and a replay"]
+    fn a_real_engine_plays_a_remix_on_the_game_it_was_remixed_to() {
+        let var = |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
+        let (Some(replay), Some(gametype), Some(engine_dir), Some(data_dirs), Some(timeout)) = (
+            var("COILBOX_REMIX_REPLAY"),
+            var("COILBOX_REMIX_GAMETYPE"),
+            var("COILBOX_REMIX_ENGINE_DIR"),
+            var("COILBOX_REMIX_DATA_DIRS"),
+            var("COILBOX_REMIX_TIMEOUT_SECS"),
+        ) else {
+            eprintln!(
+                "did nothing: set COILBOX_REMIX_REPLAY, COILBOX_REMIX_GAMETYPE, \
+                 COILBOX_REMIX_ENGINE_DIR, COILBOX_REMIX_DATA_DIRS and \
+                 COILBOX_REMIX_TIMEOUT_SECS to run it"
+            );
+            return;
+        };
+        let scratch = tempfile::tempdir().unwrap();
+        let copy = scratch.path().join("replay.sdfz");
+        std::fs::copy(&replay, &copy).unwrap();
+        let remix = rewrite_demo(&copy, &gametype, None).unwrap();
+        let engine_dir = PathBuf::from(engine_dir);
+        let data_dirs: Vec<PathBuf> = data_dirs
+            .split(coilbox_proc::DATADIR_SEP)
+            .map(PathBuf::from)
+            .collect();
+        let log = scratch.path().join("engine.log");
+
+        analysis::launch::run_headless(
+            &analysis::launch::Launch {
+                engine: &analysis::launch::headless_binary(&engine_dir),
+                demo: &remix,
+                write_dir: &scratch.path().join("write"),
+                config: &scratch.path().join("engine.cfg"),
+                pid_file: &scratch.path().join(analysis::launch::PID_FILE),
+                data_dirs: &data_dirs,
+                log: &log,
+                timeout: Duration::from_secs(timeout.parse().expect("seconds")),
+                on_poll: &|| {},
+            },
+            &analysis::launch::RunControl::default(),
+        )
+        .expect("the run");
+
+        let output = std::fs::read_to_string(&log).unwrap_or_default();
+        let line = output
+            .lines()
+            .find(|l| l.contains("using game"))
+            .unwrap_or_else(|| panic!("the engine never named a game:\n{output}"));
+        eprintln!("{line}");
+        assert!(
+            line.contains(&format!("using game \"{gametype}\"")),
+            "{line}"
+        );
+    }
+
+    // ---- the chat log, from the stream walk ------------------------------------
+
+    fn chat_of(name: &str, f: DemoFixture) -> DemoChat {
+        demo_chat(&write_tmp(name, &f.bytes())).unwrap()
+    }
+
+    #[test]
+    fn chat_has_a_frame_a_name_and_a_destination() {
+        let c = chat_of(
+            "chat_normal.sdf",
+            fixture_with_stream(short_match().bytes()),
+        );
+        assert!(!c.incomplete);
+        assert_eq!(c.messages.len(), 1);
+        let m = &c.messages[0];
+        assert_eq!(m.frame, 1);
+        assert_eq!(m.player, 1);
+        assert_eq!(m.player_name.as_deref(), Some("Bob"));
+        assert_eq!(m.dest, Some(ChatDest::Everyone));
+        assert_eq!(m.text, "gg");
+        assert!(!m.system);
+    }
+
+    #[test]
+    fn a_whisper_keeps_its_recipient() {
+        let s = Packets::default()
+            .keyframe(0)
+            .chat(0, 1, "psst")
+            .chat(0, 252, "allies")
+            .chat(2, 253, "specs");
+        let c = chat_of("chat_whisper.sdf", fixture_with_stream(s.bytes()));
+        let dests: Vec<_> = c.messages.iter().map(|m| m.dest).collect();
+        assert_eq!(
+            dests,
+            [
+                Some(ChatDest::Player { player: 1 }),
+                Some(ChatDest::Allies),
+                Some(ChatDest::Spectators)
+            ]
+        );
+    }
+
+    #[test]
+    fn a_system_message_has_no_destination() {
+        let s = Packets::default()
+            .keyframe(0)
+            .newframes(2)
+            .system_message(255, "Bob paused");
+        let c = chat_of("chat_system.sdf", fixture_with_stream(s.bytes()));
+        assert_eq!(c.messages.len(), 1);
+        let m = &c.messages[0];
+        assert!(m.system);
+        assert_eq!(m.dest, None);
+        assert_eq!(m.player, 255);
+        assert_eq!(m.player_name, None);
+        assert_eq!(m.frame, 2);
+    }
+
+    #[test]
+    fn pregame_lines_keep_the_pregame_frame_and_their_order() {
+        let s = Packets::default()
+            .chat(0, 254, "first")
+            .chat(1, 254, "second")
+            .keyframe(0)
+            .chat(0, 254, "in game");
+        let c = chat_of("chat_pregame.sdf", fixture_with_stream(s.bytes()));
+        let frames: Vec<_> = c.messages.iter().map(|m| m.frame).collect();
+        assert_eq!(frames, [PREGAME_FRAME, PREGAME_FRAME, 0]);
+        assert!(c.messages[0].time < c.messages[1].time);
+        assert_eq!(c.messages[0].text, "first");
+    }
+
+    #[test]
+    fn a_stream_that_stopped_early_keeps_its_chat_and_says_so() {
+        let mut bytes = Packets::default()
+            .keyframe(0)
+            .chat(0, 254, "before the break")
+            .bytes();
+        // Three bytes where a packet header should be.
+        bytes.extend_from_slice(&[1, 2, 3]);
+        let c = chat_of("chat_stopped.sdf", fixture_with_stream(bytes));
+        assert!(c.incomplete);
+        assert_eq!(c.messages.len(), 1);
+        assert_eq!(c.messages[0].text, "before the break");
+    }
+
+    #[test]
+    fn a_replay_with_no_chat_gives_an_empty_complete_log() {
+        let s = Packets::default().keyframe(0).newframes(3);
+        let c = chat_of("chat_none.sdf", fixture_with_stream(s.bytes()));
+        assert!(c.messages.is_empty());
+        assert!(!c.incomplete);
+    }
+
+    #[test]
+    fn a_sender_the_script_lacks_is_named_by_the_stream_or_left_unnamed() {
+        let s = Packets::default()
+            .player_name(7, "Latecomer")
+            .keyframe(0)
+            .chat(7, 254, "hi")
+            .chat(9, 254, "who am I");
+        let c = chat_of("chat_names.sdf", fixture_with_stream(s.bytes()));
+        assert_eq!(c.messages[0].player_name.as_deref(), Some("Latecomer"));
+        assert_eq!(c.messages[1].player_name, None);
+        assert_eq!(c.messages[1].player, 9);
+    }
+
+    /// A number reused by a later joiner. The same seat holds one name before
+    /// the join and another after, so a map built up front would give every
+    /// line the last name.
+    #[test]
+    fn a_late_joiner_is_named_from_the_frame_they_joined() {
+        let s = Packets::default()
+            .keyframe(0)
+            .chat(9, 254, "before anyone joined")
+            .new_player(9, 1, 0, "First")
+            .chat(9, 254, "first speaks")
+            .new_player(9, 1, 0, "Second")
+            .chat(9, 254, "second speaks");
+        let c = chat_of("chat_reused.sdf", fixture_with_stream(s.bytes()));
+        let names: Vec<_> = c
+            .messages
+            .iter()
+            .map(|m| m.player_name.as_deref())
+            .collect();
+        assert_eq!(names, [None, Some("First"), Some("Second")]);
+    }
+
+    // ---- timeline events, from the same walk -----------------------------------
+
+    #[test]
+    fn a_resignation_a_departure_and_a_pause_become_named_events() {
+        let s = Packets::default()
+            .player_name(3, "Carol")
+            .keyframe(0)
+            .newframes(2)
+            .team(3, 2, 0, 0)
+            .pause(3, 1)
+            .pause(3, 0)
+            .player_left(3, 0);
+        let c = chat_of("tl_basic.sdf", fixture_with_stream(s.bytes()));
+        let got: Vec<_> = c
+            .events
+            .iter()
+            .map(|e| (e.frame, e.player, e.player_name.as_deref(), e.kind.clone()))
+            .collect();
+        assert_eq!(
+            got,
+            [
+                (2, 3, Some("Carol"), TimelineEventKind::Resigned),
+                (
+                    2,
+                    3,
+                    Some("Carol"),
+                    TimelineEventKind::Paused { paused: true }
+                ),
+                (
+                    2,
+                    3,
+                    Some("Carol"),
+                    TimelineEventKind::Paused { paused: false }
+                ),
+                (
+                    2,
+                    3,
+                    Some("Carol"),
+                    TimelineEventKind::PlayerLeft {
+                        reason: LeaveReason::LostConnection
+                    }
+                ),
+            ]
+        );
+        assert!(c.messages.is_empty(), "events are not chat lines");
+    }
+
+    #[test]
+    fn join_team_is_left_out_and_an_unknown_action_is_kept_as_other() {
+        let s = Packets::default()
+            .keyframe(0)
+            .team(1, 3, 2, 0)
+            .team(1, 9, 5, 6)
+            .player_left(1, 7);
+        let c = chat_of("tl_other.sdf", fixture_with_stream(s.bytes()));
+        let kinds: Vec<_> = c.events.iter().map(|e| e.kind.clone()).collect();
+        assert_eq!(
+            kinds,
+            [
+                TimelineEventKind::Other {
+                    action: 9,
+                    param1: 5,
+                    param2: 6
+                },
+                TimelineEventKind::PlayerLeft {
+                    reason: LeaveReason::Other { code: 7 }
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn a_team_death_reported_by_every_player_is_one_event_naming_who_lost_it() {
+        let s = Packets::default()
+            .new_player(8, 0, 2, "Dee")
+            .new_player(9, 0, 2, "Eve")
+            .new_player(10, 1, 2, "Watcher")
+            .keyframe(0)
+            .team(0, 4, 2, 0)
+            .team(1, 4, 2, 0)
+            .team(1, 4, 3, 0);
+        let c = chat_of("tl_died.sdf", fixture_with_stream(s.bytes()));
+        let got: Vec<_> = c
+            .events
+            .iter()
+            .filter(|e| !matches!(e.kind, TimelineEventKind::Joined { .. }))
+            .map(|e| (e.player, e.kind.clone()))
+            .collect();
+        assert_eq!(
+            got,
+            [
+                (
+                    0,
+                    TimelineEventKind::TeamDied {
+                        team: 2,
+                        players: vec!["Dee".into(), "Eve".into()]
+                    }
+                ),
+                (
+                    1,
+                    TimelineEventKind::TeamDied {
+                        team: 3,
+                        players: vec![]
+                    }
+                ),
+            ]
+        );
+    }
+
+    /// The name on an event is the one its player held when it happened.
+    #[test]
+    fn a_late_joiner_is_an_event_and_names_what_follows() {
+        let s = Packets::default()
+            .keyframe(0)
+            .team(9, 2, 0, 0)
+            .new_player(9, 0, 1, "First")
+            .team(9, 2, 0, 0);
+        let c = chat_of("tl_joined.sdf", fixture_with_stream(s.bytes()));
+        let got: Vec<_> = c
+            .events
+            .iter()
+            .map(|e| (e.player_name.as_deref(), e.kind.clone()))
+            .collect();
+        assert_eq!(
+            got,
+            [
+                (None, TimelineEventKind::Resigned),
+                (
+                    Some("First"),
+                    TimelineEventKind::Joined {
+                        spectator: false,
+                        team: 1
+                    }
+                ),
+                (Some("First"), TimelineEventKind::Resigned),
+            ]
+        );
+    }
+
+    #[test]
+    fn events_serialise_with_a_type_and_the_reason_as_a_kind() {
+        let s = Packets::default()
+            .keyframe(0)
+            .player_left(1, 2)
+            .team(1, 2, 0, 0);
+        let c = chat_of("tl_json.sdf", fixture_with_stream(s.bytes()));
+        let js = serde_json::to_value(&c).unwrap();
+        assert_eq!(js["events"][0]["type"], "playerLeft");
+        assert_eq!(js["events"][0]["reason"]["kind"], "kicked");
+        assert_eq!(js["events"][1]["type"], "resigned");
+        assert_eq!(js["messages"], serde_json::json!([]));
+    }
+
+    /// `demo_chat` takes a replay path and nothing else, so it cannot look for
+    /// `demotool`. The only inputs are the file's own bytes.
+    #[test]
+    fn chat_reads_with_no_engine_folder() {
+        let p = write_tmp(
+            "chat_no_engine.sdfz",
+            &fixture_with_stream(short_match().bytes()).gzipped(),
+        );
+        let c = demo_chat(&p).unwrap();
+        assert_eq!(c.messages.len(), 1);
+        assert_eq!(c.messages[0].text, "gg");
     }
 }

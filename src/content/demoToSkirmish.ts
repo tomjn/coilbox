@@ -46,11 +46,15 @@ export function demoInfoToSkirmishDraft(opts: {
    * caller cannot quietly go back to storing the whole block. An empty list
    * means "not known yet" and keeps everything. */
   options: ConfigOption[];
+  /** The map's declared options, doing for `[mapoptions]` what `options` does
+   * for the game's. Required for the same reason, and an empty list keeps
+   * everything here too, which is still an exact refight. */
+  mapOptions: ConfigOption[];
   /** AI reference to fill every converted player slot. Falls back to a
    * sensible default (skips do-nothing test bots) when omitted or unresolved. */
   ai?: Participant["ai"];
 }): SkirmishDraft | null {
-  const { info, ais, sides, options, ai } = opts;
+  const { info, ais, sides, options, mapOptions, ai } = opts;
   const fallback = standardAi(ais);
   const chosenAi: Participant["ai"] | undefined =
     ai ??
@@ -119,12 +123,17 @@ export function demoInfoToSkirmishDraft(opts: {
     });
   }
 
+  const mapOptionValues = sparseOptions(mapOptions, info.mapOptions);
+
   return {
     participants: [you, ...opponents],
     gameName: info.gameType,
     mapName: info.mapName,
     startPosType: info.startPosType ?? 0,
     modOptionValues: sparseOptions(options, info.modOptions),
+    // Left off when the match set no map option, as `battleToSkirmishDraft`
+    // leaves it off, so a draft from a map with no options is unchanged.
+    ...(Object.keys(mapOptionValues).length > 0 ? { mapOptionValues } : {}),
   };
 }
 

@@ -13,11 +13,13 @@ import {
 import { useMemo } from "react";
 import { Link, useParams } from "react-router";
 import { Badge } from "@/components/ui/badge";
+import { isProfileHidden } from "../../profile/hidden";
 import {
   useContentState,
   useReplayStats,
   useScanTargetSelection,
 } from "../config";
+import { libraryMetrics } from "../replayMatchFigures";
 import { refightFilenames, useReplayUserState } from "../replayUserState";
 import {
   allPlayers,
@@ -27,6 +29,9 @@ import {
   relationTo,
   replaysFor,
 } from "../stats";
+import { useMetricRegistry, useRatioRegistry } from "../useMetricRegistry";
+import { PlayerMatchFigures } from "./components/PlayerMatchFigures";
+import { PlayerUnitUsage } from "./components/PlayerUnitUsage";
 import { StatCard, TallyRow } from "./components/StatWidgets";
 import { EmptyState, ErrorBanner, SkeletonList } from "./components/states";
 
@@ -93,6 +98,12 @@ export default function PlayerDossierPage() {
     () => refightFilenames(replayUserState),
     [replayUserState],
   );
+
+  // A distribution that hides match statistics gets none of the figures.
+  const statsHidden = isProfileHidden("analytics.matchStats");
+  const registry = useMetricRegistry(!statsHidden);
+  const ratios = useRatioRegistry(!statsHidden);
+  const metrics = useMemo(() => libraryMetrics(registry), [registry]);
 
   const players = useMemo(
     () => allPlayers(records, refights),
@@ -225,6 +236,15 @@ export default function PlayerDossierPage() {
                   />
                 </div>
               )}
+              {relation.gamesAgainst > 0 && (
+                <Link
+                  to={`/stats/${encodeURIComponent(playerName)}/matchup?me=${encodeURIComponent(me)}`}
+                  className="mt-3 inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline"
+                >
+                  <Swords className="size-3.5" /> See the matchup by map,
+                  faction and game length
+                </Link>
+              )}
               {relation.commonMaps.length > 0 && (
                 <div className="mt-3">
                   <h3 className="mb-1 flex items-center gap-2 text-xs font-medium text-muted-foreground">
@@ -244,6 +264,24 @@ export default function PlayerDossierPage() {
                 </div>
               )}
             </section>
+          )}
+
+          {!statsHidden && (
+            <PlayerMatchFigures
+              records={records}
+              playerName={playerName}
+              refightFilenames={refights}
+              metrics={metrics}
+              ratios={ratios}
+            />
+          )}
+
+          {!statsHidden && (
+            <PlayerUnitUsage
+              records={records}
+              playerName={playerName}
+              refightFilenames={refights}
+            />
           )}
 
           <div className="grid gap-4 sm:grid-cols-2">

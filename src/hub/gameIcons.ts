@@ -63,6 +63,21 @@ export function matchHubGame(
   return games.find((g) => resolver.byShortname(g.shortname).key === key);
 }
 
+/**
+ * The name to give `GameIcon` for a game known only by its hub shortname.
+ * {@link matchHubGame} finds the hub's entry from the shortname either way. An
+ * installed game is named by its title all the same, because the art behind the
+ * hub's logo (the branding catalog and the game's own loading screen) is looked
+ * up by name, and a shortname read as a name is not an installed game.
+ */
+export function hubGameIconName(
+  shortname: string,
+  installed: readonly GameItem[] | null,
+): string {
+  const id = createGameResolver(installed).byShortname(shortname);
+  return id.installed ? id.title : shortname;
+}
+
 /** What each hub's list read came to this session, keyed by hub address. */
 const requests = new Map<string, Promise<HubGame[]>>();
 /** The same answers once they have landed, so a page that opens later reads
@@ -74,18 +89,32 @@ const answers = new Map<string, HubGame[]>();
  * caller. A failure is remembered as an empty list for the rest of the session,
  * so a hub that is down is asked once rather than on every page that opens.
  * Never rejects, and says nothing about a failure: the pages that use this have
- * a picture to show without it.
+ * a picture to show without it. The launch-time read passes `rememberFailure`
+ * false, so a failure it meets, such as no network, is dropped and the first
+ * page that needs the list asks again.
  */
-export function loadHubGames(hubUrl: string): Promise<HubGame[]> {
+export function loadHubGames(
+  hubUrl: string,
+  rememberFailure = true,
+): Promise<HubGame[]> {
   let request = requests.get(hubUrl);
   if (!request) {
-    request = fetchHubGames(hubUrl)
-      .then((result) => (result.ok ? result.value : []))
-      .catch(() => [])
+    const started: Promise<HubGame[]> = fetchHubGames(hubUrl)
+      .then((result) => (result.ok ? result.value : null))
+      .catch(() => null)
       .then((games) => {
-        answers.set(hubUrl, games);
-        return games;
+        if (games) {
+          answers.set(hubUrl, games);
+          return games;
+        }
+        if (rememberFailure) {
+          answers.set(hubUrl, []);
+        } else if (requests.get(hubUrl) === started) {
+          requests.delete(hubUrl);
+        }
+        return [];
       });
+    request = started;
     requests.set(hubUrl, request);
   }
   return request;

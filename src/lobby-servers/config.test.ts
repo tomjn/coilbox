@@ -396,6 +396,79 @@ describe("autoConnectTargets", () => {
     const targets = autoConnectTargets(true, lastLogin, [a, b], servers);
     expect(targets.map((t) => t.account.id)).toEqual(["a1", "a2"]);
   });
+
+  it("connects a ticked login with auto-connect off and nothing open at quit", () => {
+    const ticked = { ...account, connectOnStartup: true, openAtQuit: false };
+    const targets = autoConnectTargets(false, null, [ticked], servers);
+    expect(targets.map((t) => t.account.id)).toEqual(["acc-1"]);
+  });
+
+  it("leaves an unticked login alone when auto-connect is off", () => {
+    const ticked = { ...account, id: "a1", connectOnStartup: true };
+    const other: LobbyAccount = {
+      id: "a2",
+      serverId: "techa",
+      username: "second",
+      openAtQuit: true,
+    };
+    const targets = autoConnectTargets(
+      false,
+      lastLogin,
+      [ticked, other],
+      servers,
+    );
+    expect(targets.map((t) => t.account.id)).toEqual(["a1"]);
+  });
+
+  it("connects one of two ticked logins on the same host", () => {
+    const a = { ...account, id: "a1", connectOnStartup: true, lastUsedAt: 1 };
+    const b = {
+      ...account,
+      id: "a2",
+      username: "second",
+      connectOnStartup: true,
+      lastUsedAt: 2,
+    };
+    const targets = autoConnectTargets(false, null, [a, b], servers);
+    expect(targets.map((t) => t.account.id)).toEqual(["a2"]);
+  });
+
+  it("never connects a ticked login on a server the profile disallows", () => {
+    const ticked = { ...account, connectOnStartup: true };
+    const narrowed = buildCatalog([], { presets: ["techa"] });
+    expect(autoConnectTargets(true, lastLogin, [ticked], narrowed)).toEqual([]);
+  });
+
+  it("adds the logins open at quit to the ticked ones when auto-connect is on", () => {
+    const ticked = { ...account, id: "a1", connectOnStartup: true };
+    const open: LobbyAccount = {
+      id: "a2",
+      serverId: "techa",
+      username: "second",
+      openAtQuit: true,
+    };
+    const targets = autoConnectTargets(true, null, [open, ticked], servers);
+    expect(targets.map((t) => t.account.id)).toEqual(["a1", "a2"]);
+  });
+
+  it("connects a login that is both ticked and open at quit once", () => {
+    const both = { ...account, connectOnStartup: true, openAtQuit: true };
+    const targets = autoConnectTargets(true, lastLogin, [both], servers);
+    expect(targets.map((t) => t.account.id)).toEqual(["acc-1"]);
+  });
+
+  it("prefers a ticked login over one open at quit on the same host", () => {
+    const open = { ...account, id: "a1", openAtQuit: true, lastUsedAt: 9 };
+    const ticked = {
+      ...account,
+      id: "a2",
+      username: "second",
+      connectOnStartup: true,
+      lastUsedAt: 1,
+    };
+    const targets = autoConnectTargets(true, null, [open, ticked], servers);
+    expect(targets.map((t) => t.account.id)).toEqual(["a2"]);
+  });
 });
 
 describe("rememberedLogins", () => {

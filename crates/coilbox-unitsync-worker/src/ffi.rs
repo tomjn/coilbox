@@ -18,6 +18,14 @@ use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_float, c_int, c_uint};
 use std::path::{Path, PathBuf};
 
+#[cfg(test)]
+pub(crate) mod stub;
+
+/// Held while `Init` or `UnInit` runs, which is while the archive cache may be
+/// being rewritten. A running worker told to exit in the middle of a request
+/// takes this first, so it never stops partway through that rewrite.
+pub static CACHE_WRITE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 // --- C ABI signatures (reused across same-shaped symbols) -------------------
 
 type InitFn = unsafe extern "C" fn(bool, c_int) -> c_int;
@@ -62,31 +70,7 @@ type ReadFileFn = unsafe extern "C" fn(c_int, c_int, *mut u8, c_int) -> c_int; /
 type FindFilesVfsFn = unsafe extern "C" fn(c_int, *mut c_char, c_int) -> c_int; // FindFilesVFS(idx, buf, size)
 type ReadVfsFileFn = unsafe extern "C" fn(c_int, *mut u8, c_int) -> c_int; // ReadFileVFS(file, buf, numBytes)
 
-/// A map's visual appearance, parsed from `mapinfo.lua` (see [`Unitsync::map_appearance`]).
-/// Colours are `[r, g, b]` in 0..1. Any field the map omits is `None`.
-#[derive(Default)]
-pub struct MapAppearance {
-    pub void_water: Option<bool>,
-    pub void_ground: Option<bool>,
-    pub void_alpha_min: Option<f32>,
-    pub water_color: Option<[f32; 3]>,
-    pub water_alpha: Option<f32>,
-    pub water_plane_color: Option<[f32; 3]>,
-    pub water_absorb: Option<[f32; 3]>,
-    pub water_base_color: Option<[f32; 3]>,
-    pub water_min_color: Option<[f32; 3]>,
-    pub force_rendering: Option<bool>,
-    pub sky_color: Option<[f32; 3]>,
-    pub fog_color: Option<[f32; 3]>,
-    pub cloud_color: Option<[f32; 3]>,
-    pub cloud_density: Option<f32>,
-    pub sun_dir: Option<[f32; 3]>,
-    pub sun_color: Option<[f32; 3]>,
-    pub ground_ambient_color: Option<[f32; 3]>,
-    pub ground_diffuse_color: Option<[f32; 3]>,
-    pub ground_specular_color: Option<[f32; 3]>,
-    pub ground_shadow_density: Option<f32>,
-}
+pub use coilbox_unitsync_worker::model::MapAppearance;
 
 /// The raw four-field read-back from a REPL wrapper script (see
 /// [`Unitsync::run_lua_repl`] and [`crate::lua::wrap_chunks`]). Each field is
@@ -287,6 +271,10 @@ pub struct Unitsync {
     set_spring_config_int_fn: Option<VoidByStrIntFn>,
     set_spring_config_float_fn: Option<VoidByStrFloatFn>,
     spring_config_file_fn: Option<StrFn>,
+    // The data directories `Init` settled on, which is where the archive
+    // scanner looked. Read by `session` to tell whether an `Init` still stands.
+    data_dir_count_fn: Option<CountFn>,
+    data_dir_fn: Option<StrByIntFn>,
 }
 
 unsafe fn req<T: Copy>(lib: &Library, name: &[u8]) -> Result<T, String> {
@@ -411,6 +399,8 @@ impl Unitsync {
             set_spring_config_int_fn: opt(&lib, b"SetSpringConfigInt\0"),
             set_spring_config_float_fn: opt(&lib, b"SetSpringConfigFloat\0"),
             spring_config_file_fn: opt(&lib, b"GetSpringConfigFile\0"),
+            data_dir_count_fn: opt(&lib, b"GetDataDirectoryCount\0"),
+            data_dir_fn: opt(&lib, b"GetDataDirectory\0"),
             init_lock: crate::initlock::path_for(libpath),
             _lib: lib,
         };
@@ -423,22 +413,143 @@ impl Unitsync {
     /// Held under the engine's init lock, because `Init` reads the archive cache
     /// and rewrites it in place, and a read that overlaps another worker's
     /// rewrite rescans archives for seconds (issue #1916).
+    ///
+    /// In a worker that stays running this is a real `Init` only when there is
+    /// none to reuse. See `session`.
     pub fn init(&self, is_server: bool, id: i32) -> i32 {
-        let _lock = crate::initlock::acquire(&self.init_lock, crate::initlock::WAIT);
-        unsafe { (self.init_fn)(is_server, id) }
+        crate::session::read_game(None);
+        self.init_shared(is_server, id)
+    }
+
+    /// `Init` for a read that mounts `game_archive`'s archive set and nothing
+    /// else, through [`Unitsync::add_all_archives`].
+    ///
+    /// Saying so is what lets a worker that stays running answer it from the
+    /// mount the read before it left, when that read was of the same game
+    /// (issue #3728). A read that starts with [`Unitsync::init`] never sees a
+    /// mount it did not make. `session` has the whole rule.
+    pub fn init_game(&self, game_archive: &str) -> i32 {
+        crate::session::read_game(Some(game_archive));
+        self.init_shared(false, 0)
+    }
+
+    fn init_shared(&self, is_server: bool, id: i32) -> i32 {
+        if crate::session::reuse(self) {
+            return 1;
+        }
+        for archive in crate::session::take_open_archives() {
+            self.close_archive(archive);
+        }
+        // `Init` frees the file system and builds an empty one.
+        crate::session::unmounted();
+        let before = crate::session::before_init();
+        let started = std::time::SystemTime::now();
+        let asked = std::time::Instant::now();
+        let lock = crate::initlock::acquire(&self.init_lock, crate::initlock::WAIT);
+        let locked = std::time::Instant::now();
+        let ok = {
+            let _writing = CACHE_WRITE.lock().unwrap_or_else(|e| e.into_inner());
+            unsafe { (self.init_fn)(is_server, id) }
+        };
+        let lock_wait_ms = (locked - asked).as_millis() as u64;
+        let call_ms = locked.elapsed().as_millis() as u64;
+        // Let the next process in before anything below runs. What follows walks
+        // every scanned folder, and none of it touches the archive cache.
+        drop(lock);
+        if crate::session::serving() {
+            // The plugin is told in the reply instead (issue #3722).
+            let timing = coilbox_unitsync_worker::protocol::InitTiming {
+                lock_wait_ms,
+                call_ms,
+            };
+            crate::session::after_init(self, ok != 0, before, started, timing);
+        } else if std::env::var_os("COILBOX_UNITSYNC_TIMINGS").is_some() {
+            // How long this run queued behind another worker's `Init`, and how
+            // long its own took. Only when asked, and the plugin asks in dev
+            // builds only (issue #3713).
+            eprintln!("[unitsync-timing] init_lock_wait={lock_wait_ms}ms init_call={call_ms}ms");
+        }
+        ok
     }
 
     /// `UnInit`, under the same lock as `init`, because it writes the archive
     /// cache again when anything worked out a checksum.
+    ///
+    /// A worker that stays running keeps its `Init` for the next request, so
+    /// there this only puts the library back as a fresh `Init` leaves it.
     pub fn uninit(&self) {
+        if crate::session::serving() {
+            self.reset();
+            return;
+        }
         let _lock = crate::initlock::acquire(&self.init_lock, crate::initlock::WAIT);
+        let _writing = CACHE_WRITE.lock().unwrap_or_else(|e| e.into_inner());
         unsafe { (self.uninit_fn)() }
+    }
+
+    /// The real `UnInit` of a worker that stays running, for when it exits.
+    pub fn shutdown(&self) {
+        if !crate::session::ready() {
+            return;
+        }
+        self.release();
+        let _lock = crate::initlock::acquire(&self.init_lock, crate::initlock::WAIT);
+        let _writing = CACHE_WRITE.lock().unwrap_or_else(|e| e.into_inner());
+        unsafe { (self.uninit_fn)() }
+    }
+
+    /// Whether [`Unitsync::reset`] can empty the file system. Without that a
+    /// request would read through the archives the one before it mounted, so an
+    /// engine build that lacks the call gets an `Init` per request.
+    pub fn can_reset(&self) -> bool {
+        self.remove_all_archives_fn.is_some()
+    }
+
+    /// Put the library back as a fresh `Init` leaves it: no archive open, no Lua
+    /// parser, an empty file system and no error waiting to be read.
+    ///
+    /// The one thing it can leave is the archive set of the game the request in
+    /// hand reads, which `session` decides.
+    pub fn reset(&self) {
+        for archive in crate::session::take_open_archives() {
+            if let Some(f) = self.close_archive_fn {
+                unsafe { f(archive) }
+            }
+        }
+        if let Some(f) = self.lp_close_fn {
+            unsafe { f() }
+        }
+        if !crate::session::keeping() {
+            self.empty_file_system();
+        }
+        self.drain_errors();
+    }
+
+    /// Empty the file system whatever was being kept in it. For a worker that
+    /// stays running, when no read is waiting for it.
+    pub fn release(&self) {
+        crate::session::read_game(None);
+        self.reset();
+    }
+
+    /// The data directories `Init` settled on, or `None` on an engine build
+    /// that cannot say.
+    pub fn data_dirs(&self) -> Option<Vec<PathBuf>> {
+        let (count, dir) = (self.data_dir_count_fn?, self.data_dir_fn?);
+        let n = unsafe { count() };
+        Some(
+            (0..n)
+                .filter_map(|i| unsafe { cstr(dir(i)) })
+                .filter(|d| !d.is_empty())
+                .map(PathBuf::from)
+                .collect(),
+        )
     }
 
     /// Drain the asynchronous error queue (call `GetNextError` until it returns
     /// null/empty).
     pub fn drain_errors(&self) -> Vec<String> {
-        let mut errs = Vec::new();
+        let mut errs = crate::session::take_held_errors();
         loop {
             match unsafe { cstr((self.get_next_error_fn)()) } {
                 Some(s) if !s.is_empty() => errs.push(s),
@@ -753,6 +864,9 @@ impl Unitsync {
         let f = self.open_archive_fn?;
         let c = CString::new(name).ok()?;
         let h = unsafe { f(c.as_ptr()) };
+        if h != 0 {
+            crate::session::opened(h);
+        }
         (h != 0).then_some(h)
     }
 
@@ -819,6 +933,7 @@ impl Unitsync {
     }
 
     pub fn close_archive(&self, archive: i32) {
+        crate::session::closed(archive);
         if let Some(f) = self.close_archive_fn {
             unsafe { f(archive) }
         }
@@ -935,19 +1050,93 @@ impl Unitsync {
 
     /// Load a game's archive set (its primary archive plus dependencies) into the
     /// VFS so its sides/units become queryable. Returns false if unsupported.
+    ///
+    /// In a worker that stays running this mounts nothing when the file system
+    /// already holds exactly this archive set. See `session`.
     pub fn add_all_archives(&self, archive: &str) -> bool {
         let (Some(f), Ok(c)) = (self.add_all_archives_fn, CString::new(archive)) else {
             return false;
         };
+        let serving = crate::session::serving();
+        // What the archive is on disk now. A kept mount is used only while this
+        // is what it was when the mount was made, so the file a read keys its
+        // cache entry on is the file its answer came out of.
+        let stamp = serving
+            .then(|| crate::infocache::archive_stamp(self, archive))
+            .flatten();
+        match crate::session::before_mount(archive, stamp.as_ref()) {
+            crate::session::Mount::Held => return true,
+            crate::session::Mount::AfterEmptying => self.empty_file_system(),
+            crate::session::Mount::Add => {}
+        }
+        let asked = std::time::Instant::now();
         unsafe { f(c.as_ptr()) };
+        let ms = asked.elapsed().as_millis() as u64;
+        if serving {
+            // A mount that raised an error is a file system with part of the
+            // set in it. The engine adds the archives one at a time and stops at
+            // the first that fails. Kept, it would be read again by a request
+            // that never called `AddAllArchives` and so never heard the error.
+            // The errors are handed back by the next `drain_errors`, which is
+            // where the read looks for them.
+            let failed = self.drain_errors();
+            let keep = failed.is_empty()
+                && stamp.is_some()
+                && crate::session::wants_kept(archive)
+                && self.mounts_only_files(archive);
+            // Whatever the question above raised is not the read's to report.
+            let _ = self.drain_errors();
+            crate::session::hold_errors(failed);
+            // The plugin is told the time in the reply, as it is for `Init`.
+            crate::session::mounted(archive, stamp.filter(|_| keep), ms);
+        } else if std::env::var_os("COILBOX_UNITSYNC_TIMINGS").is_some() {
+            eprintln!("[unitsync-timing] mount={ms}ms");
+        }
         true
     }
 
+    /// Whether `game_archive` is a game whose whole archive set is files. A
+    /// folder archive lists its members when it is mounted, so a mount of one
+    /// that is kept would not show a file added to the folder since.
+    ///
+    /// `GetPrimaryModArchiveList` gives the set as versioned names, such as
+    /// "Spring Features v1.9", and unitsync has no export that turns a name
+    /// into a file. `GetMapArchiveCount` runs the same lookup on any archive
+    /// file, and the first name it gives is that archive's own. So each folder
+    /// archive the scanner found is asked its name, and the set must hold none
+    /// of them. A game unitsync does not list is taken to be unsafe to keep.
+    fn mounts_only_files(&self, game_archive: &str) -> bool {
+        if crate::session::is_folder_archive(game_archive) {
+            return false;
+        }
+        let index =
+            (0..self.mod_count()).find(|&i| self.mod_archive(i).as_deref() == Some(game_archive));
+        let set = index.map(|i| self.mod_archives(i)).unwrap_or_default();
+        if set.is_empty() {
+            return false;
+        }
+        !crate::session::folder_archives()
+            .iter()
+            .filter_map(|folder| self.map_archives(folder).into_iter().next())
+            .any(|name| set.contains(&name))
+    }
+
     /// Reset the VFS to just the base archives (undo `add_all_archives`).
+    ///
+    /// In a worker that stays running the archive set of the game the request
+    /// in hand reads is left mounted for the next request. See `session`.
     pub fn remove_all_archives(&self) {
+        if !crate::session::keeping() {
+            self.empty_file_system();
+        }
+    }
+
+    /// `RemoveAllArchives`, whatever is mounted.
+    fn empty_file_system(&self) {
         if let Some(f) = self.remove_all_archives_fn {
             unsafe { f() }
         }
+        crate::session::unmounted();
     }
 
     pub fn side_count(&self) -> i32 {

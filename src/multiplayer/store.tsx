@@ -94,6 +94,7 @@ import {
   type Connections,
   connectionsReducer,
   hasLiveLogin,
+  liveConnectionKeys,
   newRuntime,
   pendingAgreement as pickPendingAgreement,
   pendingDebriefing as pickPendingDebriefing,
@@ -153,6 +154,22 @@ export function serverNameFor(
 ): string {
   const server = serverForKey(serverKey, servers);
   return server?.name ?? serverAddressFromKey(serverKey);
+}
+
+/**
+ * "alice on Recoil Official" for a connection, or null unless more than one
+ * connection is live. With one there is nothing to tell apart, so a screen
+ * that belongs to a single connection stays as it was.
+ */
+export function connectionLabelIfSeveral(
+  serverKey: string | null,
+  connections: Connections,
+  servers: LobbyServer[],
+): string | null {
+  if (!serverKey || liveConnectionKeys(connections, null).length < 2) {
+    return null;
+  }
+  return `${usernameFromKey(serverKey)} on ${serverNameFor(serverKey, servers)}`;
 }
 
 /**
@@ -386,7 +403,7 @@ interface MultiplayerContextValue {
   /**
    * The wire protocol the live connection speaks, `tasserver` when there is none.
    * Surfaces with no Tachyon equivalent read this and hide themselves: named
-   * channels, moderation, and hosting a battle. See `docs/tachyon-protocol.md`.
+   * channels, moderation, and hosting a battle. See `docs/internal/tachyon-protocol.md`.
    */
   protocol: LobbyProtocol;
   /**
@@ -721,7 +738,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // built-in catalog plus the user's own servers rather than the profile-filtered
   // list, so a profile that hides a server can't quietly turn a Tachyon connection
   // into a TASServer one. Everything TASServer has and Tachyon does not gates on
-  // this: see `docs/tachyon-protocol.md`.
+  // this: see `docs/internal/tachyon-protocol.md`.
   const [customCfg] = useCustomServers();
   const protocolServers = useMemo(
     () => [...BUILTIN_SERVERS, ...customCfg.servers],

@@ -6,7 +6,7 @@
  * for a player upgrading from a version that tracked only `lastLogin`, that
  * one login alone.
  *
- * The mock setup is copied from `reattachAll.dom.test.tsx`, extended with a
+ * The shared mock pieces are in `lobbyStoreMocks.testhelper.ts`, extended here with a
  * `notified` log (title + body, so a per-login failure is distinguishable), a
  * `failKeys` set so one login's connect can be made to reject, and a
  * `signedIn` map so a Tachyon login's stored sign-in can be made to answer no.
@@ -14,11 +14,6 @@
 
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { LobbyEvent, LobbyState } from "./bindings";
-
-interface FakeChannel {
-  onmessage?: (ev: LobbyEvent) => void;
-}
 
 const wire = vi.hoisted(() => ({
   /** The event channel each connect handed the Rust side, by server key. */
@@ -57,11 +52,9 @@ const settings = vi.hoisted(() => ({
   autoConnect: false,
 }));
 
-vi.mock("@tauri-apps/api/core", () => ({
-  Channel: class {
-    onmessage?: (ev: LobbyEvent) => void;
-  },
-}));
+vi.mock("@tauri-apps/api/core", async () =>
+  (await import("./lobbyStoreMocks.testhelper")).tauriCoreStub(),
+);
 
 vi.mock("@picoframe/frame", async () => {
   const react = await import("react");
@@ -95,26 +88,8 @@ vi.mock("./VerificationCodeDialog", () => ({
   VerificationCodeDialog: () => null,
 }));
 
-const emptyState = (): LobbyState =>
-  ({
-    myUsername: "AF",
-    compflags: [],
-    users: {},
-    channels: {},
-    dms: {},
-    battles: {},
-    currentBattle: null,
-    lastBattle: null,
-    hostPort: null,
-    channelDirectory: [],
-    currentVote: null,
-    serverIgnores: [],
-    friends: [],
-    friendRequests: [],
-    party: null,
-  }) as unknown as LobbyState;
-
-vi.mock("./bindings", () => ({
+vi.mock("./bindings", async () => ({
+  ...(await import("./lobbyStoreMocks.testhelper")).inertBindings(),
   mpConnect: async (args: { serverKey: string; onEvent: FakeChannel }) => {
     wire.opened.push(args.serverKey);
     if (wire.failKeys.has(args.serverKey)) {
@@ -134,26 +109,13 @@ vi.mock("./bindings", () => ({
     wire.channels.set(args.serverKey, args.onEvent);
     return { connected: true };
   },
-  mpConnectZerok: async () => ({ connected: true }),
-  mpSnapshot: async () => ({ state: emptyState() }),
+  mpSnapshot: async () => ({ state: emptyLobbyState() }),
   mpDisconnect: async () => ({ disconnected: true }),
-  mpWaitUntilReady: async () => ({ ready: true }),
   mpActiveKeys: async () => ({ keys: wire.activeKeys }),
   mpReattach: async (args: { serverKey: string; onEvent: FakeChannel }) => {
     wire.channels.set(args.serverKey, args.onEvent);
     return { reattached: true };
   },
-  mpCancelConnect: async () => ({ cancelled: true }),
-  mpConfirmAgreement: async () => ({}),
-  mpFriendList: async () => ({}),
-  mpFriendRequestList: async () => ({}),
-  mpIgnore: async () => ({}),
-  mpIgnoreList: async () => ({}),
-  mpJoinBattle: async () => ({}),
-  mpJoinChannel: async () => ({}),
-  mpRegister: async () => ({}),
-  mpRegisterZerok: async () => ({}),
-  mpSetStatus: async () => ({}),
   mpTachyonSignedIn: async ({
     serverId,
     username,
@@ -166,10 +128,14 @@ vi.mock("./bindings", () => ({
   },
 }));
 
-vi.mock("../lobby-servers/bindings", () => ({
-  lsGetCredential: async () => ({ secret: "hunter2" }),
-}));
+vi.mock("../lobby-servers/bindings", async () =>
+  (await import("./lobbyStoreMocks.testhelper")).lobbyServerBindings(),
+);
 
+import {
+  emptyLobbyState,
+  type FakeChannel,
+} from "./lobbyStoreMocks.testhelper";
 import { MultiplayerProvider, useConnection, useMultiplayer } from "./store";
 
 // Two built-in TASServer entries, distinct hosts, so a connect to one never

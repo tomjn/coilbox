@@ -11,11 +11,11 @@
  * has no founder-direct equivalent: nothing in this codebase computes a
  * colour-conflict layout the way `balanceLayout` computes a seating one, and
  * building one speculatively for this ticket would be new colour-assignment
- * logic, not wiring. Ring unready pings a player's own client to remind them
- * they're not ready, and coilbox has no way to reach into another member's
- * session to do that. Both stay plain, unanswered chat lines, on the same
+ * logic, not wiring. It stays a plain, unanswered chat line, on the same
  * "a button that does nothing is worse than no button" reasoning that hid
- * this whole panel in #2738.
+ * this whole panel in #2738. `!ring` needs no Accept from anybody: the
+ * founder's client answers it as it arrives (`RingHost` in the lobby protocol
+ * crate), the way SPADS does.
  */
 
 export type HostSuggestionKind = "balance" | "lock" | "unlock";

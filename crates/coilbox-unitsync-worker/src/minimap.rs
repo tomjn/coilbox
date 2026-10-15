@@ -29,6 +29,10 @@ use crate::model::{MapMinimapRow, MapMinimapSkip, MapMinimapSkipped, MapMinimaps
 use crate::model::{MapOverlayAsset, MapOverlaySkip, MinimapOutput, StartPos};
 use crate::model::{Thumbnail, ThumbnailsOutput};
 use base64::Engine;
+use coilbox_unitsync_worker::cached::{
+    self, dims_elmos, mip_side, read_detail, CachedDetail, CachedDims, DETAIL_VERSION,
+};
+use coilbox_unitsync_worker::cachekey;
 use image::{DynamicImage, ImageFormat, RgbImage};
 use serde::{Deserialize, Serialize};
 use std::io::Cursor;
@@ -57,50 +61,22 @@ const ASSET_MINIMAP_MIP: i32 = 1;
 /// its name, so a stale image can persist until a rescan. That is an acceptable
 /// trade for a cosmetic minimap that re-renders in about 80ms.
 pub(crate) fn map_cache_key(us: &Unitsync, index: Option<i32>, map_name: &str) -> Option<String> {
-    archive_identity(us, map_name).or_else(|| name_identity(us, index, map_name))
-}
-
-/// File identity of the map's own archive: path + size + mtime.
-///
-/// Only resolves when `GetArchivePath` recognises the name `GetMapArchiveName`
-/// gave us, which is not the general case: a map's archives come back under their
-/// versioned *human* names ("AcidicQuarry 5.17") while `GetArchivePath` looks up
-/// *file* names ("acidicquarry_5.17.sd7"). Kept as the preferred route because
-/// where it does resolve it catches an in-place edit that the name route cannot.
-fn archive_identity(us: &Unitsync, map_name: &str) -> Option<String> {
-    use std::hash::{Hash, Hasher};
-    let archive = us.map_archives(map_name).into_iter().next()?;
-    let dir = us.archive_path(&archive)?;
-    let path = Path::new(&dir).join(&archive);
-    let md = std::fs::metadata(&path).ok()?;
-    let mtime = md
-        .modified()
-        .ok()
-        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    let mut h = std::collections::hash_map::DefaultHasher::new();
-    path.hash(&mut h);
-    md.len().hash(&mut h);
-    mtime.hash(&mut h);
-    Some(format!("{:016x}", h.finish()))
-}
-
-/// The map's versioned name plus the map file inside its archive.
-///
-/// Needs no path and no hashing, so it costs nothing on a cold library. It works
-/// because the versioned name carries the archive version: installing a new
-/// release of a map yields a new name, so the key changes with it. `GetMapChecksum`
-/// would be a stronger identity but hashes the whole archive, which on a 5.5 GB
-/// library takes minutes.
-fn name_identity(us: &Unitsync, index: Option<i32>, map_name: &str) -> Option<String> {
-    use std::hash::{Hash, Hasher};
+    // The archive's own stamp only resolves when `GetArchivePath` recognises the
+    // name `GetMapArchiveName` gave us, which is not the general case: a map's
+    // archives come back under their versioned *human* names ("AcidicQuarry
+    // 5.17") while `GetArchivePath` looks up *file* names
+    // ("acidicquarry_5.17.sd7"). It stays the preferred route because where it
+    // does resolve it catches an in-place edit that the name route cannot.
+    if let Some(stamp) = crate::infocache::map_archive_stamp(us, map_name) {
+        return cachekey::thumb_key(Some(&stamp), map_name, None);
+    }
+    // The map's versioned name plus the map file inside its archive. It works
+    // because the versioned name carries the archive version: installing a new
+    // release of a map yields a new name, so the key changes with it.
+    // `GetMapChecksum` would be a stronger identity but hashes the whole archive,
+    // which on a 5.5 GB library takes minutes.
     let i = index.or_else(|| map_index(us, map_name))?;
-    let file = us.map_file_name(i)?;
-    let mut h = std::collections::hash_map::DefaultHasher::new();
-    map_name.hash(&mut h);
-    file.hash(&mut h);
-    Some(format!("n{:016x}", h.finish()))
+    cachekey::thumb_key(None, map_name, us.map_file_name(i).as_deref())
 }
 
 /// A map's index, for callers that only have its name. `GetMapFileName` is
@@ -163,42 +139,12 @@ pub(crate) fn sweep_pictures(cache_dir: Option<&Path>, keep: &[PathBuf]) {
 /// Cache file for a map's minimap: `<cache_dir>/<key>-<mip>.png`. `None` (no
 /// cache dir, or no cache key) disables caching for that map.
 fn cache_file(cache_dir: Option<&Path>, key: Option<&str>, mip: i32) -> Option<PathBuf> {
-    let dir = cache_dir?;
-    let key = key?;
-    Some(dir.join(format!("{key}-{mip}.png")))
+    Some(cached::minimap_file(cache_dir?, key?, mip))
 }
 
-/// A map's proportions, cached beside its minimap PNG.
-#[derive(Serialize, Deserialize)]
-struct CachedDims {
-    width: u32,
-    height: u32,
-}
-
-/// Cache file for a map's proportions: `<cache_dir>/<key>-dims.json`. Unlike the
-/// PNG this is mip-independent, because proportions don't vary with mip level.
+/// Cache file for a map's proportions.
 fn dims_file(cache_dir: Option<&Path>, key: Option<&str>) -> Option<PathBuf> {
-    let dir = cache_dir?;
-    let key = key?;
-    Some(dir.join(format!("{key}-dims.json")))
-}
-
-/// A map's size in elmos, from the same cached proportions the display path
-/// uses (issue #1629).
-///
-/// Kept as a derivation rather than another cached field so the two can never
-/// disagree, and so every `<key>-dims.json` already on disk answers this without
-/// a rescan. What is cached is metal infomap samples, and
-/// [`coilbox_assets::map_extent_elmos`] carries which of the map's several
-/// sample counts that is and what one of them is worth.
-fn dims_elmos(dims: Option<(u32, u32)>) -> (Option<u32>, Option<u32>) {
-    match dims {
-        Some((w, h)) => {
-            let (width, height) = coilbox_assets::map_extent_elmos(w, h);
-            (Some(width), Some(height))
-        }
-        None => (None, None),
-    }
+    Some(cached::dims_file(cache_dir?, key?))
 }
 
 /// A map's proportions, from cache when `file` holds them and from `compute`
@@ -229,10 +175,87 @@ fn cached_dims(
     Some((width, height))
 }
 
-/// The side of the square texture unitsync returns at `mip`, which is what
-/// `GetMinimap` fills and how many words come back with it.
-fn mip_side(mip: i32) -> u32 {
-    1024u32 >> mip.clamp(0, 10) as u32
+/// A map's proportions for the thumbnail walk: from `file` or `compute` as
+/// [`cached_dims`] does, and when there are none, a marker saying so (issue
+/// #3736).
+///
+/// The plugin answers the walk from disk only when every map has its picture and
+/// its proportions saved. A map with no proportions has no file to find, so
+/// without a marker it would send the whole walk to a worker on every launch. The
+/// marker is left only when `clean` says reading them raised nothing, since an
+/// error can be a failure that a later run gets past.
+fn dims_or_marker(
+    file: Option<PathBuf>,
+    none_file: Option<PathBuf>,
+    compute: impl FnOnce() -> Option<(u32, u32)>,
+    clean: impl FnOnce() -> bool,
+) -> Option<(u32, u32)> {
+    if none_file.as_deref().is_some_and(Path::exists) {
+        return None;
+    }
+    let dims = cached_dims(file, compute);
+    if dims.is_none() && clean() {
+        if let Some(marker) = none_file.as_deref() {
+            if let Some(dir) = marker.parent() {
+                let _ = std::fs::create_dir_all(dir);
+            }
+            let _ = std::fs::write(marker, b"");
+        }
+    }
+    dims
+}
+
+/// Cache file for a map's detail. Not a picture, so `sweep_pictures` leaves it
+/// alone.
+fn detail_file(cache_dir: Option<&Path>, key: Option<&str>) -> Option<PathBuf> {
+    Some(cached::detail_file(cache_dir?, key?))
+}
+
+/// Best effort, like every other write here: an unwritable cache dir costs a
+/// re-read next time and nothing else.
+fn write_detail(file: Option<&Path>, detail: &CachedDetail) {
+    let Some(file) = file else { return };
+    if let Some(dir) = file.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    if let Ok(bytes) = serde_json::to_vec(detail) {
+        let _ = std::fs::write(file, bytes);
+    }
+}
+
+/// Read a map's detail from unitsync. Start positions, environment (wind and
+/// tidal) and appearance (water, sky, sun) all live in `mapinfo.lua`, so this
+/// mounts the map's archives and parses them with unitsync's Lua parser.
+///
+/// The flag says whether the map had an archive to mount, because a detail read
+/// with nothing mounted is empty rather than true.
+fn read_detail_from(
+    us: &Unitsync,
+    map_name: &str,
+    cache_dir: Option<&Path>,
+) -> (CachedDetail, bool) {
+    let (width_elmos, height_elmos) = map_elmos(us, map_name, cache_dir);
+    let mut detail = CachedDetail {
+        version: DETAIL_VERSION,
+        width_elmos,
+        height_elmos,
+        start_positions: Vec::new(),
+        wind: None,
+        tidal: None,
+        appearance: crate::ffi::MapAppearance::default(),
+    };
+    let Some(first_archive) = us.map_archives(map_name).into_iter().next() else {
+        return (detail, false);
+    };
+    us.add_all_archives(&first_archive);
+    detail.start_positions = us
+        .start_positions()
+        .into_iter()
+        .map(|(x, z)| StartPos { x, z })
+        .collect();
+    (detail.wind, detail.tidal) = us.map_env();
+    detail.appearance = us.map_appearance();
+    (detail, true)
 }
 
 /// The texture as unitsync handed it over: RGB565 words, little endian, row
@@ -689,9 +712,21 @@ pub fn render(
             }
         }
     };
+    render_with(&us, map_name, mip, cache_dir, asset_dir)
+}
+
+/// [`render`] against a library that is already loaded, which is the seam the
+/// tests use to count what a hit asks unitsync for.
+fn render_with(
+    us: &Unitsync,
+    map_name: &str,
+    mip: i32,
+    cache_dir: Option<&Path>,
+    asset_dir: Option<&Path>,
+) -> MinimapOutput {
     us.init(false, 0);
     let _ = us.drain_errors();
-    let key = map_cache_key(&us, None, map_name);
+    let key = map_cache_key(us, None, map_name);
     let file = cache_file(cache_dir, key.as_deref(), mip);
 
     // The asset's own read, at its own mip. Only an asset run pays for it, and
@@ -706,71 +741,32 @@ pub fn render(
         Some(dir) => asset_from_pixels(
             dir,
             asset_pixels.as_deref(),
-            &crate::archive::archive_name_for_map(&us, map_name),
+            &crate::archive::archive_name_for_map(us, map_name),
         ),
     };
 
     let shared = asset_pixels.as_deref().filter(|_| mip == ASSET_MINIMAP_MIP);
-    let result = render_one(&us, map_name, mip, file.clone(), shared);
+    let result = render_one(us, map_name, mip, file.clone(), shared);
     sweep_pictures(cache_dir, file.as_slice());
 
-    let (width_elmos, height_elmos) = map_elmos(&us, map_name, cache_dir);
-
-    // Start positions, environment (wind/tidal) and appearance (water/sky/sun) all
-    // live in mapinfo.lua, so load the map's archives and parse them via unitsync's
-    // Lua parser.
-    let mut start_positions = Vec::new();
-    let mut wind = None;
-    let mut tidal = None;
-    let mut app = crate::ffi::MapAppearance::default();
-    if let Some(first_archive) = us.map_archives(map_name).into_iter().next() {
-        us.add_all_archives(&first_archive);
-        start_positions = us
-            .start_positions()
-            .into_iter()
-            .map(|(x, z)| StartPos { x, z })
-            .collect();
-        (wind, tidal) = us.map_env();
-        app = us.map_appearance();
-    }
-
-    let errors = us.drain_errors();
-    us.uninit();
-    let (min_wind, max_wind) = match wind {
-        Some((mn, mx)) => (Some(mn), Some(mx)),
-        None => (None, None),
+    let detail_at = detail_file(cache_dir, key.as_deref());
+    let held = detail_at.as_deref().and_then(read_detail);
+    let (detail, mounted) = match held {
+        Some(detail) => (detail, false),
+        None => read_detail_from(us, map_name, cache_dir),
     };
 
+    let errors = us.drain_errors();
+    // Only a read that answered is kept, so a failure is read again next time.
+    if mounted && errors.is_empty() && detail.width_elmos.is_some() && detail.height_elmos.is_some()
+    {
+        write_detail(detail_at.as_deref(), &detail);
+    }
+    us.uninit();
     let base = MinimapOutput {
-        width_elmos,
-        height_elmos,
         asset,
         asset_skipped,
-        start_positions,
-        min_wind,
-        max_wind,
-        tidal_strength: tidal,
-        void_water: app.void_water,
-        void_ground: app.void_ground,
-        void_alpha_min: app.void_alpha_min,
-        water_color: app.water_color,
-        water_alpha: app.water_alpha,
-        water_plane_color: app.water_plane_color,
-        water_absorb: app.water_absorb,
-        water_base_color: app.water_base_color,
-        water_min_color: app.water_min_color,
-        force_rendering: app.force_rendering,
-        sky_color: app.sky_color,
-        fog_color: app.fog_color,
-        cloud_color: app.cloud_color,
-        cloud_density: app.cloud_density,
-        sun_dir: app.sun_dir,
-        sun_color: app.sun_color,
-        ground_ambient_color: app.ground_ambient_color,
-        ground_diffuse_color: app.ground_diffuse_color,
-        ground_specular_color: app.ground_specular_color,
-        ground_shadow_density: app.ground_shadow_density,
-        ..Default::default()
+        ..detail.into_output()
     };
     match result {
         Ok((image, side)) => MinimapOutput {
@@ -817,9 +813,24 @@ pub fn render_all(lib: &str, mip: i32, cache_dir: Option<&Path>) -> ThumbnailsOu
         }
         match render_one(&us, &name, mip, file, None) {
             Ok((image, _)) => {
-                let dims = cached_dims(dims_file(cache_dir, key.as_deref()), || {
-                    us.map_dimensions(&name)
-                });
+                let dims_errors = std::cell::RefCell::new(Vec::new());
+                let dims = dims_or_marker(
+                    dims_file(cache_dir, key.as_deref()),
+                    cache_dir
+                        .zip(key.as_deref())
+                        .map(|(dir, key)| cached::dims_none_file(dir, key)),
+                    || us.map_dimensions(&name),
+                    || {
+                        *dims_errors.borrow_mut() = us.drain_errors();
+                        dims_errors.borrow().is_empty()
+                    },
+                );
+                errors.extend(
+                    dims_errors
+                        .into_inner()
+                        .into_iter()
+                        .map(|e| format!("{name}: {e}")),
+                );
                 let (width_elmos, height_elmos) = dims_elmos(dims);
                 thumbnails.push(Thumbnail {
                     name,
@@ -1224,6 +1235,39 @@ mod tests {
     }
 
     #[test]
+    fn a_map_with_no_proportions_is_marked_so_it_is_not_asked_again() {
+        let dir = temp_dir("dims-marker");
+        let file = dims_file(Some(dir.as_path()), Some("abc"));
+        let none = Some(cached::dims_none_file(&dir, "abc"));
+        let calls = Cell::new(0);
+        let compute = || {
+            calls.set(calls.get() + 1);
+            None
+        };
+
+        assert_eq!(
+            dims_or_marker(file.clone(), none.clone(), compute, || true),
+            None
+        );
+        assert_eq!(calls.get(), 1);
+        assert!(none.as_deref().unwrap().exists());
+        // The second walk trusts the marker and reads nothing.
+        assert_eq!(dims_or_marker(file, none, compute, || true), None);
+        assert_eq!(calls.get(), 1);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_read_that_raised_errors_leaves_no_marker() {
+        let dir = temp_dir("dims-marker-errors");
+        let file = dims_file(Some(dir.as_path()), Some("abc"));
+        let none = Some(cached::dims_none_file(&dir, "abc"));
+        assert_eq!(dims_or_marker(file, none.clone(), || None, || false), None);
+        assert!(!none.as_deref().unwrap().exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn cached_dims_recomputes_when_there_is_no_cache_file() {
         let calls = Cell::new(0);
         let compute = || {
@@ -1397,5 +1441,170 @@ mod tests {
 
         assert_eq!(asset.source_hash, surveyed);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // ---- a cached read mounts nothing (issue #3724)
+
+    use crate::ffi::stub::{calls, install, World};
+
+    /// A stand-in library holding one map, whose archive and cache live under a
+    /// fresh directory.
+    fn stub_session(tag: &str) -> (Unitsync, PathBuf) {
+        let dir = temp_dir(tag);
+        install(World::with_map(&dir.join("maps")));
+        (Unitsync::stub(), dir.join("cache"))
+    }
+
+    fn json(out: &MinimapOutput) -> serde_json::Value {
+        serde_json::to_value(out).expect("serialize")
+    }
+
+    #[test]
+    fn a_cached_minimap_does_not_mount_the_maps_archive() {
+        let (us, cache) = stub_session("hit");
+        let first = render_with(&us, World::MAP, 3, Some(&cache), None);
+        assert!(first.errors.is_empty(), "{:?}", first.errors);
+        assert_eq!(calls("AddAllArchives"), 1, "a miss reads mapinfo.lua");
+
+        let second = render_with(&us, World::MAP, 3, Some(&cache), None);
+        assert_eq!(calls("AddAllArchives"), 1, "a hit mounted the archive");
+        assert_eq!(calls("GetMinimap"), 1, "a hit decoded the texture again");
+        assert_eq!(calls("lpOpenFile"), 3, "a hit parsed mapinfo.lua again");
+        assert_eq!(calls("GetInfoMapSize"), 1, "a hit read the map size again");
+        assert!(second.file.is_some());
+        let _ = std::fs::remove_dir_all(cache.parent().unwrap());
+    }
+
+    /// The point of caching the record is that it is the answer, so what a
+    /// caller reads off a hit has to be what a fresh read gave it.
+    #[test]
+    fn start_positions_wind_and_appearance_survive_the_cache() {
+        let (us, cache) = stub_session("same");
+        let fresh = render_with(&us, World::MAP, 3, Some(&cache), None);
+        let cached = render_with(&us, World::MAP, 3, Some(&cache), None);
+
+        assert_eq!(fresh.start_positions.len(), 2);
+        assert_eq!(fresh.min_wind, Some(4.5));
+        assert_eq!(fresh.tidal_strength, Some(13.0));
+        assert_eq!(fresh.void_water, Some(true));
+        assert_eq!(fresh.water_color, Some([0.1, 0.2, 0.3]));
+        assert_eq!(json(&fresh), json(&cached));
+        let _ = std::fs::remove_dir_all(cache.parent().unwrap());
+    }
+
+    // ---- the plugin answers a cached minimap itself (issue #3714)
+
+    /// The key the plugin builds from what the content scan holds, which is the
+    /// map's archive path where it resolved and its map file's name.
+    fn plugin_key(cache: &Path, archive_resolves: bool) -> String {
+        let archive = cache
+            .parent()
+            .unwrap()
+            .join("maps")
+            .join(World::MAP_ARCHIVE);
+        cached::thumb_key_for(
+            World::MAP,
+            archive_resolves.then_some(archive.as_path()),
+            Some("maps/stubmap.smf"),
+        )
+        .expect("a key")
+    }
+
+    /// The same answer the worker gives, for a map keyed on its archive and for
+    /// the usual map keyed on its name.
+    #[test]
+    fn the_plugin_answers_a_cached_minimap_as_the_worker_does() {
+        for (tag, archive_resolves) in [("plugin-path", true), ("plugin-name", false)] {
+            let dir = temp_dir(tag);
+            let mut world = World::with_map(&dir.join("maps"));
+            if !archive_resolves {
+                world.archives.clear();
+            }
+            install(world);
+            let us = Unitsync::stub();
+            let cache = dir.join("cache");
+
+            let fresh = render_with(&us, World::MAP, 3, Some(&cache), None);
+            let worker_hit = render_with(&us, World::MAP, 3, Some(&cache), None);
+            let key = plugin_key(&cache, archive_resolves);
+            assert_eq!(key.starts_with('n'), !archive_resolves);
+            let plugin = cached::minimap(&cache, &key, 3).expect("a hit");
+
+            assert_eq!(json(&plugin), json(&worker_hit), "{tag}");
+            assert_eq!(json(&plugin), json(&fresh), "{tag}");
+            assert_eq!(plugin.start_positions.len(), 2);
+            let _ = std::fs::remove_dir_all(&dir);
+        }
+    }
+
+    #[test]
+    fn the_plugin_leaves_a_changed_archive_to_a_worker() {
+        let (us, cache) = stub_session("plugin-changed");
+        render_with(&us, World::MAP, 3, Some(&cache), None);
+        let before = plugin_key(&cache, true);
+        assert!(cached::minimap(&cache, &before, 3).is_some());
+
+        let archive = cache
+            .parent()
+            .unwrap()
+            .join("maps")
+            .join(World::MAP_ARCHIVE);
+        std::fs::write(&archive, b"a map archive, now a different size").expect("rewrite");
+        let after = plugin_key(&cache, true);
+        assert_ne!(before, after);
+        assert!(cached::minimap(&cache, &after, 3).is_none());
+        let _ = std::fs::remove_dir_all(cache.parent().unwrap());
+    }
+
+    #[test]
+    fn the_plugin_leaves_a_map_without_its_picture_or_detail_to_a_worker() {
+        let (us, cache) = stub_session("plugin-partial");
+        render_with(&us, World::MAP, 3, Some(&cache), None);
+        let key = plugin_key(&cache, true);
+        assert!(cached::minimap(&cache, &key, 2).is_none(), "another mip");
+
+        std::fs::remove_file(cached::detail_file(&cache, &key)).expect("remove detail");
+        assert!(cached::minimap(&cache, &key, 3).is_none());
+        let _ = std::fs::remove_dir_all(cache.parent().unwrap());
+    }
+
+    #[test]
+    fn a_changed_archive_is_read_again() {
+        let (us, cache) = stub_session("changed");
+        render_with(&us, World::MAP, 3, Some(&cache), None);
+        let archive = cache
+            .parent()
+            .unwrap()
+            .join("maps")
+            .join(World::MAP_ARCHIVE);
+        std::fs::write(&archive, b"a map archive, now a different size").expect("rewrite");
+
+        render_with(&us, World::MAP, 3, Some(&cache), None);
+        assert_eq!(
+            calls("AddAllArchives"),
+            2,
+            "a changed archive was served from cache"
+        );
+        let _ = std::fs::remove_dir_all(cache.parent().unwrap());
+    }
+
+    #[test]
+    fn a_record_from_an_older_version_is_read_again() {
+        let (us, cache) = stub_session("version");
+        render_with(&us, World::MAP, 3, Some(&cache), None);
+        let record = std::fs::read_dir(&cache)
+            .expect("cache dir")
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .find(|p| p.to_string_lossy().ends_with("-detail.json"))
+            .expect("the first read stored a record");
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&record).unwrap()).unwrap();
+        value["version"] = serde_json::json!(0);
+        std::fs::write(&record, value.to_string()).unwrap();
+
+        render_with(&us, World::MAP, 3, Some(&cache), None);
+        assert_eq!(calls("AddAllArchives"), 2, "an old record was served");
+        let _ = std::fs::remove_dir_all(cache.parent().unwrap());
     }
 }

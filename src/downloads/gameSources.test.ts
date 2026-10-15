@@ -8,11 +8,6 @@ const at = (order: GameSource[], src: GameSource) => {
 };
 
 describe("gameSourceOrder (issue #500)", () => {
-  it("tries a declared GitHub source before pr-downloader (rapid)", () => {
-    const order = gameSourceOrder({ hasGithubRepo: true, hasWritePath: true });
-    expect(at(order, "github")).toBeLessThan(at(order, "rapid"));
-  });
-
   it("tries known mirrors before pr-downloader (rapid)", () => {
     const order = gameSourceOrder({ hasGithubRepo: true, hasWritePath: true });
     expect(at(order, "github")).toBeLessThan(at(order, "rapid"));

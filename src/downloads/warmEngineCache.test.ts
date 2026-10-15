@@ -13,6 +13,7 @@ vi.mock("../content/config", async (importOriginal) => ({
   primeScan,
 }));
 
+import { resetContentState } from "../content/contentState";
 import { addedTargets, installEngine } from "./warmEngineCache";
 
 /** A content snapshot with the given engine dirs under the given roots. */
@@ -30,6 +31,7 @@ const TWO = state({ "/data": ["/engines/a", "/engines/b"] });
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetContentState();
   contentStateLoad.mockResolvedValue({ state: ONE });
   contentRescan.mockResolvedValue({ state: TWO });
   primeScan.mockResolvedValue({ maps: [], games: [] });

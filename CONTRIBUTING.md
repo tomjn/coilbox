@@ -131,7 +131,7 @@ The release version comes from the git tag, not from source — CI writes the pu
 
 ## Licensing
 
-Coilbox's own code is MIT (see [LICENSE](LICENSE)). It bundles `pr-downloader`, which is GPL-2.0-or-later; that source is at <https://github.com/beyond-all-reason/pr-downloader>. By contributing you agree your contribution is licensed under the repository's MIT license.
+Coilbox's own code is MIT (see [LICENSE](LICENSE)). The Lua under `lua/` is offered under the MIT licence or the GNU General Public License version 2 or any later version, at your choice (see [lua/LICENSE.md](lua/LICENSE.md)). Give every new gadget and widget the `license` string the notice names. Coilbox bundles `pr-downloader`, which is GPL-2.0-or-later; that source is at <https://github.com/beyond-all-reason/pr-downloader>. By contributing you agree your contribution is licensed under the repository's MIT license.
 
 ## Security
 

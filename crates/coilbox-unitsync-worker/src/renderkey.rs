@@ -70,7 +70,7 @@ pub fn render(
             }
         }
     };
-    us.init(false, 0);
+    us.init_game(game_archive);
     let out = resolve(&us, game_archive, requests, &variants, renderer_version);
     us.uninit();
     out

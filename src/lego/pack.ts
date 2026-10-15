@@ -18,7 +18,7 @@
  * searchable index, so filtering never touches the geometry blob, and the
  * picker can render as soon as the manifests arrive.
  *
- * Format: docs/lego-parts-pack.md.
+ * Format: docs/reference/lego-parts-pack.md.
  */
 
 import { gunzipSync } from "fflate";

@@ -15,6 +15,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useAdvancedMode } from "@/general/advanced";
+import type { MapScene3D } from "@/lib/mapScene";
 import { notify } from "@/notify/notify";
 import { isProfileHidden } from "@/profile/hidden";
 import { MapPreview3D } from "../../mapconv/pages/components/MapPreview3D";
@@ -41,11 +42,14 @@ import {
 import { isDeletableArchive } from "../format";
 import { useMapEligibility } from "../mapEligibility";
 import { mergeMapTiers } from "../mapTiers";
+import { type MapSize, sameMapFamily } from "../mapVersions";
 import { refightFilenames, useReplayUserState } from "../replayUserState";
 import { allPlayers, guessPrimaryPlayer, mapRecordFor } from "../stats";
 import { usePlayMap } from "../usePlayMap";
+import { useStartNames } from "../useStartNames";
 import { ArchiveRow } from "./components/ArchiveRow";
 import { DeleteArchiveButton } from "./components/DeleteArchiveButton";
+import { MapAggregate } from "./components/MapAggregate";
 import { mapSizeLabel } from "./components/MapThumb";
 import { OptionsList } from "./components/OptionsList";
 import { StatCard } from "./components/StatWidgets";
@@ -72,6 +76,8 @@ export default function MapDetailPage() {
   const playMap = usePlayMap();
   const advanced = useAdvancedMode();
   const [decompiling, setDecompiling] = useState(false);
+  // The 3D preview's scene, which the picture of every match drapes over.
+  const [scene, setScene] = useState<MapScene3D | null>(null);
   const { selected } = useScanTargetSelection();
   const { data, loading, error, run } = useUnitsyncScan(
     selected?.enginePath,
@@ -123,6 +129,9 @@ export default function MapDetailPage() {
   // Per-map record (#460): a distribution profile can hide stats entirely, in
   // which case the roots stay empty so `useReplayStats` never ingests.
   const statsHidden = isProfileHidden("multiplayer.stats");
+  // The picture of every match on this map (#1161). It is built from the same
+  // records, so hiding the stats hides it too.
+  const insightShown = !statsHidden && !isProfileHidden("analytics.mapInsight");
   const { state: contentState } = useContentState();
   const statsRoots = useMemo(
     () => (statsHidden ? [] : (contentState?.roots ?? []).map((r) => r.path)),
@@ -132,6 +141,9 @@ export default function MapDetailPage() {
     statsRoots,
     selected?.enginePath,
   );
+  // The player's names for this map's start positions, which the markers on
+  // the preview use for the positions the map declares.
+  const { stored: startNames } = useStartNames(decoded);
   const { state: replayUserState } = useReplayUserState();
   const refights = useMemo(
     () => refightFilenames(replayUserState),
@@ -166,6 +178,17 @@ export default function MapDetailPage() {
   // those tiers has landed.
   const [map] = mergeMapTiers([scanned], thumbs, meta);
 
+  // The size of every installed version of this map, so the section can leave
+  // out one whose coordinates would not fit this map. Not installed means no size.
+  const mapSizes: Record<string, MapSize> = {};
+  for (const m of mergeMapTiers(
+    data.maps.filter((x) => sameMapFamily(x.name, decoded)),
+    thumbs,
+    meta,
+  ))
+    if (m.width && m.height)
+      mapSizes[m.name] = { width: m.width, height: m.height };
+
   const otherInfo = Object.entries(map.info).filter(
     ([k]) => !HEADLINE_KEYS.has(k),
   );
@@ -185,9 +208,24 @@ export default function MapDetailPage() {
         }))
       : [];
 
+  // The size the 3D preview gives the map: the heightmap has one sample more
+  // than it has squares, and a square is 8 elmos.
+  const world = {
+    worldWidth: heightmap.data?.width
+      ? (heightmap.data.width - 1) * 8
+      : (map.width ?? 0) * 16,
+    worldHeight: heightmap.data?.height
+      ? (heightmap.data.height - 1) * 8
+      : (map.height ?? 0) * 16,
+  };
+
   // Aspect ratio of the map (unitsync minimaps are square, so the box carries the
   // true shape and `object-fill` stretches the square source back into it).
   const ratio = map.width && map.height ? map.width / map.height : 1;
+
+  // While the full minimap renders, show the list's thumbnail in the same box.
+  const previewUrl =
+    minimap.url ?? (minimap.loading ? thumbs.get(decoded)?.url : undefined);
 
   // Resolve the map's backing archive to its on-disk path and hand it to mapconv
   // decompile. The scan reports map archives by a versioned display name (no path),
@@ -360,11 +398,11 @@ export default function MapDetailPage() {
         </div>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
           <div className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border/50 bg-card">
-            {minimap.loading ? (
+            {minimap.loading && !previewUrl ? (
               <div className="flex size-64 max-w-full items-center justify-center">
                 <Skeleton className="size-32 rounded bg-muted" />
               </div>
-            ) : minimap.url ? (
+            ) : previewUrl ? (
               // Give the box a definite width derived from the 32rem height cap
               // (`width = ratio * 32rem` ⇒ `height = 32rem`), capped by `max-w-sm`
               // for wide maps (then `max-w` binds and the height shrinks instead —
@@ -380,7 +418,7 @@ export default function MapDetailPage() {
                 }}
               >
                 <img
-                  src={minimap.url}
+                  src={previewUrl}
                   alt={`Minimap of ${map.name}`}
                   className={`absolute inset-0 size-full object-fill${
                     overlay.overlayUrl ? " brightness-[0.55]" : ""
@@ -394,7 +432,10 @@ export default function MapDetailPage() {
                     key={m.key}
                     className="absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white bg-primary shadow"
                     style={{ left: `${m.left}%`, top: `${m.top}%` }}
-                    title={`Start position ${i + 1}`}
+                    title={
+                      startNames.find((e) => e.key === `d${i + 1}`)?.name ??
+                      `Start position ${i + 1}`
+                    }
                   />
                 ))}
               </div>
@@ -416,20 +457,30 @@ export default function MapDetailPage() {
               skyboxSrc={skybox.dataUrl}
               minHeight={heightmap.data.minHeight ?? 0}
               maxHeight={heightmap.data.maxHeight ?? 0}
-              worldWidth={
-                heightmap.data.width
-                  ? (heightmap.data.width - 1) * 8
-                  : (map.width ?? 1) * 16
-              }
-              worldHeight={
-                heightmap.data.height
-                  ? (heightmap.data.height - 1) * 8
-                  : (map.height ?? 1) * 16
-              }
+              worldWidth={world.worldWidth || 16}
+              worldHeight={world.worldHeight || 16}
+              onScene={insightShown ? setScene : undefined}
             />
           )}
         </div>
       </section>
+
+      {insightShown && (
+        <MapAggregate
+          // Keyed, so the filters and the layer of one map do not carry to
+          // the next when the route changes under the same page.
+          key={map.name}
+          mapName={map.name}
+          world={world}
+          minimapUrl={minimap.url ?? undefined}
+          records={statRecords}
+          ingesting={statsIngesting}
+          scene={scene}
+          declared={minimap.startPositions}
+          refights={refights}
+          mapSizes={mapSizes}
+        />
+      )}
 
       <MapEligibilitySection mapName={map.name} />
 

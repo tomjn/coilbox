@@ -123,6 +123,7 @@ export function ParticipantsTable({
   onSetTeam,
   onRemove,
   onAddAi,
+  onClearAis,
   onSetAiBonus,
   onSetAllAiBonus,
   bonusSuggestions,
@@ -145,6 +146,9 @@ export function ParticipantsTable({
   onSetTeam: (id: string, team: number) => void;
   onRemove: (id: string) => void;
   onAddAi: () => void;
+  /** Remove every AI at once, leaving only the human row. Left out where a
+   * removal needs a decision per row, which hides the button. */
+  onClearAis?: () => void;
   /** Set one AI's resource bonus, 0 to 100 percent (0 clears it). */
   onSetAiBonus: (id: string, percent: number) => void;
   /** Set the same resource bonus on every AI. */
@@ -200,7 +204,7 @@ export function ParticipantsTable({
   // Offer allies up to the participant count so any FFA/teams split is reachable.
   const allyOptions = participants.map((_, i) => ({
     value: String(i),
-    label: `Ally ${allyLetter(i)}`,
+    label: allyLetter(i),
   }));
   // Offer team slots up to the active count: enough for full FFA, and picking a
   // taken number is how two rows come to share a team (shared unit control).
@@ -290,6 +294,9 @@ export function ParticipantsTable({
             // A non-leader row sharing a team: its team-level controls (colour,
             // side, ally) are hidden — the leader's row above carries them.
             const sharer = teamIdx !== undefined && leader.id !== p.id;
+            // An AI row is taller than its picker, which has the bonus under it.
+            // Its other cells sit at the top so every picker shares one line.
+            const top = p.kind === "ai" && "align-top";
             const sharedTitle = sharer
               ? `Shares a team with ${leader.name} — team settings come from the first member`
               : undefined;
@@ -299,7 +306,13 @@ export function ParticipantsTable({
                 className="border-border/40 hover:bg-transparent"
               >
                 <TableCell className="px-3 py-2">
-                  <div className="flex items-center gap-2.5">
+                  <div
+                    className={cn(
+                      "flex items-center gap-2.5",
+                      // The swatch lines up with the picker, not the whole cell.
+                      top && "items-start [&>:first-child]:mt-1",
+                    )}
+                  >
                     {sharer ? (
                       // A file-explorer-style branch in the team colour, marking
                       // this row as a member of the leader's team above it.
@@ -434,7 +447,7 @@ export function ParticipantsTable({
                 </TableCell>
 
                 {showFaction && (
-                  <TableCell className="px-2 py-2">
+                  <TableCell className={cn("px-2 py-2", !sharer && top)}>
                     {p.kind === "you" && p.spectator ? (
                       <span className="text-xs text-muted-foreground">–</span>
                     ) : sharer ? (
@@ -464,7 +477,7 @@ export function ParticipantsTable({
                   </TableCell>
                 )}
 
-                <TableCell className="px-2 py-2">
+                <TableCell className={cn("px-2 py-2", top)}>
                   {teamIdx === undefined ? (
                     <span className="text-xs text-muted-foreground">–</span>
                   ) : (
@@ -492,14 +505,15 @@ export function ParticipantsTable({
                   )}
                 </TableCell>
 
-                <TableCell className="px-2 py-2">
+                <TableCell className={cn("px-2 py-2", top)}>
                   {p.kind === "you" && p.spectator ? (
                     <span className="text-xs text-muted-foreground">–</span>
                   ) : sharer ? null : (
                     <OptionSelect
                       value={String(p.allyTeam)}
                       size="sm"
-                      className="w-24"
+                      className="w-16"
+                      ariaLabel={`${p.name} ally`}
                       disabled={disabled}
                       options={allyOptions}
                       onValueChange={(v) =>
@@ -509,7 +523,7 @@ export function ParticipantsTable({
                   )}
                 </TableCell>
 
-                <TableCell className="py-2 pl-1 pr-2 text-right">
+                <TableCell className={cn("py-2 pl-1 pr-2 text-right", top)}>
                   {p.kind === "you" ? null : (
                     <Button
                       variant="ghost"
@@ -557,6 +571,17 @@ export function ParticipantsTable({
               disabled={disabled}
             />
           </div>
+        )}
+        {onClearAis && aiRows.length > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto"
+            disabled={disabled}
+            onClick={onClearAis}
+          >
+            Clear AIs
+          </Button>
         )}
         {bonusSuggestions?.all && aiRows[0]?.ai && (
           <div className="basis-full">

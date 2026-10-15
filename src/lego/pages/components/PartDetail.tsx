@@ -13,7 +13,6 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 import { useCanvas3D } from "@/lib/useCanvas3D";
-import { useReduceMotion } from "../../../general/display";
 import { baseAtlas } from "../../atlas";
 import { addStandardLights, partMaterial } from "../../geometry";
 import {
@@ -127,7 +126,6 @@ function PartViewport({
   part: LegoPartInfo;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const reduceMotion = useReduceMotion();
 
   useCanvas3D(
     containerRef,
@@ -151,25 +149,12 @@ function PartViewport({
       camera.position.set(radius * 1.6, radius * 1.2, radius * 1.9);
 
       const controls = new OrbitControls(camera, renderer.domElement);
-      controls.enableDamping = !reduceMotion;
       controls.enablePan = false;
       controls.minDistance = radius * 0.8;
       controls.maxDistance = radius * 6;
 
       const render = () => renderer.render(scene, camera);
       controls.addEventListener("change", render);
-
-      // Damping needs a frame loop to settle. Without it the view still moves,
-      // it just stops the moment the pointer does.
-      let frame = 0;
-      if (!reduceMotion) {
-        const tick = () => {
-          controls.update();
-          render();
-          frame = requestAnimationFrame(tick);
-        };
-        frame = requestAnimationFrame(tick);
-      }
 
       return {
         render,
@@ -178,13 +163,12 @@ function PartViewport({
           camera.updateProjectionMatrix();
         },
         dispose: () => {
-          cancelAnimationFrame(frame);
           controls.removeEventListener("change", render);
           controls.dispose();
         },
       };
     },
-    [pack, part, reduceMotion],
+    [pack, part],
   );
 
   return (

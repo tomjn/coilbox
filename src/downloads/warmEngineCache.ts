@@ -1,14 +1,10 @@
+import { type ContentState, contentRescan } from "../content/bindings";
 import {
-  type ContentState,
-  contentRescan,
-  contentStateLoad,
-} from "../content/bindings";
-import {
-  announceContentState,
   primeScan,
   type ScanTarget,
   targetsFromState,
 } from "../content/config";
+import { loadContentState, setContentState } from "../content/contentState";
 
 /**
  * The engines in `after` that `before` did not have, as scan targets.
@@ -51,13 +47,11 @@ export async function installEngine(
 ): Promise<void> {
   // Read the engines before downloading: this is the only thing that says which
   // of them the install went on to add.
-  const before = await contentStateLoad(undefined).catch(() => null);
+  const before = await loadContentState().catch(() => null);
   await download();
   const after = await contentRescan(undefined).catch(() => null);
-  announceContentState();
-  warm(addedTargets(before?.state ?? null, after?.state ?? null)).catch(
-    () => {},
-  );
+  if (after) setContentState(after.state);
+  warm(addedTargets(before, after?.state ?? null)).catch(() => {});
 }
 
 /** Scan each target in turn, so two new engines never load two libraries at once. */

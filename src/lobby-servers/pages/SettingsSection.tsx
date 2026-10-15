@@ -339,7 +339,7 @@ export default function LobbyServersSettings() {
         <div className="space-y-3 rounded-md border border-border p-3">
           <CheckField
             label="Connect automatically on startup"
-            hint="When Coilbox starts, log in to your last-used account without opening the topbar."
+            hint="When Coilbox starts, log back in to every account that was connected when it last closed. To connect one account every time, tick Connect on startup on that login."
             checked={autoConnect}
             onChange={setAutoConnect}
           />
@@ -1131,8 +1131,25 @@ function AccountForm({
             />
           </Field>
         )}
+        {/* A login with nothing in the keychain cannot connect unattended, so it
+            cannot be ticked. One already ticked stays editable, so losing the
+            password never leaves a tick that cannot be cleared. */}
+        <CheckField
+          label="Connect on startup"
+          hint={
+            saved === false
+              ? "Save a password first. Coilbox cannot log in at startup without one."
+              : "Log in with this account every time Coilbox starts."
+          }
+          checked={a.connectOnStartup === true}
+          onChange={(v) => {
+            onChange({ connectOnStartup: v });
+            setStatus(SAVED);
+          }}
+          disabled={saved === false && !a.connectOnStartup}
+        />
         {/* A Tachyon server has no named channels, so there is nothing to auto-join
-            (see `docs/tachyon-protocol.md`). */}
+            (see `docs/internal/tachyon-protocol.md`). */}
         {server &&
           serverProtocol(server) !== "tachyon" &&
           a.username.trim() !== "" && (
@@ -1163,7 +1180,7 @@ function AccountForm({
  * because it is half the key the token is stored under.
  *
  * Signing out forgets the stored token. That is all a client can do, because the
- * server offers no revocation endpoint (see `docs/tachyon-protocol.md`).
+ * server offers no revocation endpoint (see `docs/internal/tachyon-protocol.md`).
  */
 function TachyonSignIn({
   account: a,

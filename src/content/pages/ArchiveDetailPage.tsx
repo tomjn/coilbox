@@ -156,7 +156,7 @@ export default function ArchiveDetailPage() {
           {isSdd(archive) && <SddBadge />}
           {archive.primary && <PrimaryBadge />}
           <ArchiveTypeBadge kind={archive.kind} />
-          <div className="ml-auto flex shrink-0 gap-2">
+          <div className="ml-auto flex max-w-full shrink-0 flex-wrap gap-2">
             {selected?.enginePath && selected?.rootPath && legacyModels > 0 && (
               <Button
                 size="sm"

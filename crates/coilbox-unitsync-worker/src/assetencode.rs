@@ -41,9 +41,9 @@ use image::{DynamicImage, ImageBuffer, Luma};
 use sha2::{Digest, Sha256};
 
 /// The one variant [`encode_height_picture`] produces, and the one
-/// [`encode_variant`] refuses. Spelled once so the row's `variant` and the class
-/// the bytes were encoded to cannot come apart.
-pub const HEIGHT_OVERLAY_VARIANT: &str = "overlay:height";
+/// [`encode_variant`] refuses. Defined in the library crate, because the height
+/// picture's cache file names are made from the class it names.
+pub use coilbox_unitsync_worker::cached::HEIGHT_OVERLAY_VARIANT;
 
 /// What the hub's `origin` column says about bytes read out of an archive as the
 /// archive stored them: every build pic and every map infomap layer.
@@ -182,36 +182,7 @@ pub fn encode_variant(variant: &str, image: &DynamicImage) -> Result<EncodedAsse
     })
 }
 
-/// The window a height picture's 0 and its 255 stand for, in the raw sample
-/// words the map stores.
-///
-/// Without it the picture is a shape rather than a terrain. It comes back from
-/// [`encode_height_picture`] because only the encoder knows it: the window is the
-/// extremes of the samples that survived the downscale, not the extremes of the
-/// grid that went in.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct HeightWindow {
-    pub low: u16,
-    pub high: u16,
-}
-
-impl HeightWindow {
-    /// The world heights the picture's 0 and 255 stand for, given the pair
-    /// unitsync reports for the whole map.
-    ///
-    /// `CSMFMapFile::ReadHeightmap`'s own arithmetic, which
-    /// `rts/Map/SMF/SMFReadMap.cpp:157` spells as
-    /// `minHeight + word * (maxHeight - minHeight) / 65536`. A reader that
-    /// follows it back holds the height the engine holds, to within the step the
-    /// eight bits cost.
-    pub fn elmos(self, min_height: f32, max_height: f32) -> (f32, f32) {
-        let step = (max_height - min_height) / 65536.0;
-        (
-            min_height + f32::from(self.low) * step,
-            min_height + f32::from(self.high) * step,
-        )
-    }
-}
+pub use coilbox_unitsync_worker::model::HeightWindow;
 
 /// Encode a map's height samples as the hub's `overlay:height` asset: 8 bit grey
 /// lossless WebP, rescaled into the window the samples occupy (issue #1730).

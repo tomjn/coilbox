@@ -14,6 +14,11 @@ vi.mock("@picoframe/plugin-sdk", () => ({
   onSidecarProgress: () => () => {},
 }));
 vi.mock("../content/bindings", () => ({ unitsyncMinimap: vi.fn() }));
+// A scan is what a minimap read waits for. The rest of the module stays real.
+vi.mock("../content/config", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../content/config")>()),
+  currentScan: vi.fn(async () => ({})),
+}));
 // The lobby store the resume collector reads attaches window listeners at module
 // top level, and the node environment has no window. Same stubs as
 // `continue.test.ts`, for the same reason.
@@ -29,6 +34,8 @@ import type {
   ProgressFile,
 } from "../campaign/model";
 import { unitsyncMinimap } from "../content/bindings";
+import { currentScan } from "../content/config";
+import { forgetScanHints, rememberScanHints } from "../content/scanHints";
 import { resolveCardArt } from "./art";
 import {
   assignPicks,
@@ -60,7 +67,7 @@ import {
   subscribeContentArt,
   validateRememberedArt,
 } from "./contentArt";
-import { resetResolvedMinimaps, resolvePicks } from "./useContentCardArt";
+import { resolvePicks } from "./useContentCardArt";
 
 /* -------------------------------------------------------------------------- *
  * Fixtures, shaped from the real files on a machine that has played each mode.
@@ -1180,8 +1187,66 @@ function parseLikeProtocol(url: string): string[] | null {
 describe("resolvePicks", () => {
   beforeEach(() => {
     minimap.mockReset();
-    resetResolvedMinimaps();
     resetContentArt();
+  });
+
+  it("starts no worker for a map the scan does not list", async () => {
+    rememberScanHints("/root", "/engine", {
+      maps: [
+        {
+          name: "Installed Map 1.0",
+          archives: [],
+          info: {},
+          fileName: "a.smf",
+        },
+      ],
+      games: [],
+      errors: [],
+    });
+    minimap.mockResolvedValue({
+      file: "n1-3.png",
+      startPositions: [],
+      errors: [],
+    });
+    const resolved = await resolvePicks(
+      mapPicks([
+        ["play.skirmish", "Missing Map 2.0"],
+        ["play.conquest", "Installed Map 1.0"],
+      ]),
+      "/engine",
+      "/root",
+      new Map(),
+    );
+    expect(minimap).toHaveBeenCalledTimes(1);
+    expect(minimap.mock.calls[0][0].mapName).toBe("Installed Map 1.0");
+    expect(resolved.has("play.skirmish")).toBe(false);
+    expect(resolved.has("play.conquest")).toBe(true);
+    forgetScanHints();
+  });
+
+  it("waits for the scan before asking for a minimap", async () => {
+    let finishScan: () => void = () => {};
+    vi.mocked(currentScan).mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishScan = () => resolve({} as never);
+      }),
+    );
+    minimap.mockResolvedValue({
+      file: "n1-3.png",
+      startPositions: [],
+      errors: [],
+    });
+    const pending = resolvePicks(
+      mapPicks([["play.skirmish", "Waits For Scan"]]),
+      "/engine",
+      "/root",
+      new Map(),
+    );
+    await Promise.resolve();
+    expect(minimap).not.toHaveBeenCalled();
+    finishScan();
+    await pending;
+    expect(minimap).toHaveBeenCalledTimes(1);
   });
 
   it("turns a cached render into a coilbox:// URL the protocol can parse", async () => {
@@ -1191,7 +1256,7 @@ describe("resolvePicks", () => {
       errors: [],
     });
     const out = await resolvePicks(
-      mapPicks([["play.skirmish", "Valles Marineris 2.6.1"]]),
+      mapPicks([["play.skirmish", "Cached Render"]]),
       "/engine",
       "/root",
       new Map(),
@@ -1212,9 +1277,8 @@ describe("resolvePicks", () => {
     // parsing rules rather than eyeballed.
     for (const file of ["a b-3.png", "Ünïcode-3.png", "100%-3.png"]) {
       minimap.mockResolvedValue({ file, startPositions: [], errors: [] });
-      resetResolvedMinimaps();
       const out = await resolvePicks(
-        mapPicks([["play.skirmish", "M"]]),
+        mapPicks([["play.skirmish", `Escape ${file}`]]),
         "/engine",
         "/root",
         new Map(),
@@ -1234,8 +1298,8 @@ describe("resolvePicks", () => {
     });
     const out = await resolvePicks(
       mapPicks([
-        ["play.skirmish", "Valles Marineris 2.6.1"],
-        ["play.replays", "Valles Marineris 2.6.1"],
+        ["play.skirmish", "Shared Map"],
+        ["play.replays", "Shared Map"],
       ]),
       "/engine",
       "/root",
@@ -1259,7 +1323,7 @@ describe("resolvePicks", () => {
     expect(out.has("play.skirmish")).toBe(false);
   });
 
-  it("leaves a map out when the worker throws, and does not retry it", async () => {
+  it("leaves a map out when the worker throws, and asks again next time", async () => {
     minimap.mockRejectedValue(new Error("worker died"));
     const args = [
       mapPicks([["play.skirmish", "Broken"]]),
@@ -1269,7 +1333,7 @@ describe("resolvePicks", () => {
     ] as const;
     expect((await resolvePicks(...args)).has("play.skirmish")).toBe(false);
     expect((await resolvePicks(...args)).has("play.skirmish")).toBe(false);
-    expect(minimap).toHaveBeenCalledTimes(1);
+    expect(minimap).toHaveBeenCalledTimes(2);
   });
 
   it("takes a game's header art from the batch the Games grid already fetched", async () => {

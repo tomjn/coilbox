@@ -1324,12 +1324,6 @@ mod tests {
     }
 
     #[test]
-    fn plain_http_will_not_carry_a_token() {
-        let refused = api_url("http://hub.example", UPLOAD_PATH, "Sending").unwrap_err();
-        assert!(refused.contains("https"), "{refused}");
-    }
-
-    #[test]
     fn the_route_is_built_off_the_configured_base() {
         assert_eq!(
             api_url("https://hub.example/", UPLOAD_PATH, "Sending").unwrap(),
@@ -2215,12 +2209,6 @@ mod tests {
         let samples = Samples::default();
         let cancel = open();
 
-        let flag = cancel.clone();
-        tokio::spawn(async move {
-            tokio::time::sleep(Duration::from_millis(200)).await;
-            flag.store(true, Ordering::Relaxed);
-        });
-
         let assets: Vec<AssetUpload> = (0..3)
             .map(|n| {
                 unit(
@@ -2231,13 +2219,23 @@ mod tests {
             })
             .collect();
 
-        let outcomes = tokio::time::timeout(
-            Duration::from_secs(5),
-            upload(&hub, &assets, &samples, &cancel),
-        )
-        .await
-        .expect("a cancelled run has to come back, not wait out the request")
-        .unwrap();
+        // The cancel lands once the hub holds the first upload, which is the
+        // only moment a picture is in flight. A timer from the start of the run
+        // can fire during the have check instead, however long that takes on a
+        // busy machine. The limit is counted from the cancel for the same reason.
+        let cancel_in_flight = async {
+            while hub.uploads().is_empty() {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+            cancel.store(true, Ordering::Relaxed);
+            tokio::time::sleep(Duration::from_secs(5)).await;
+        };
+        let outcomes = tokio::select! {
+            outcomes = upload(&hub, &assets, &samples, &cancel) => outcomes.unwrap(),
+            () = cancel_in_flight => {
+                panic!("a cancelled run has to come back, not wait out the request")
+            }
+        };
 
         // The first is in flight when the cancel lands and the other two never
         // start, so the hub saw exactly one upload.

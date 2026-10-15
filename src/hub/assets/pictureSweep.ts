@@ -32,8 +32,8 @@ import {
   writesLeftNow,
 } from "./budget";
 import { type AssetKey, assetsTheHubWants } from "./have";
-import { RENDER_VERSION } from "./renderTop";
 import { type AssetUpload, uploadAssetsToHub } from "./upload";
+import { RENDER_VERSION } from "./vocabulary";
 
 /**
  * Filling in the pictures the hub has none of, for the games on this computer

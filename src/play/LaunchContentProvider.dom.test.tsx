@@ -23,6 +23,7 @@ import { type ReactNode, useSyncExternalStore } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DownloadQueueProvider } from "@/downloads/DownloadQueueProvider";
+import { invalidateEngineLists } from "@/downloads/engineLists";
 import type { PlayTarget } from "./config";
 import {
   LaunchContentProvider,
@@ -128,7 +129,9 @@ vi.mock("@/content/rapidPoolWarm", () => ({
 }));
 
 vi.mock("@/content/config", () => ({
+  forgetScans: vi.fn(),
   invalidateScans: vi.fn(),
+  rescanMounted: vi.fn(),
   useContentTargets: () => ({
     targets: useMachine().engines.map((engineVersion) => ({ engineVersion })),
     loading: false,
@@ -219,6 +222,7 @@ beforeEach(() => {
     scanError: null,
   });
   downloads.recoilCatalog = [];
+  invalidateEngineLists();
   render(<Caller />, { wrapper });
 });
 
@@ -329,7 +333,9 @@ describe("ensureContent", () => {
       requirements: launchRequirements({ map: "Tabula" }),
     });
 
-    await screen.findByText(/Set a download folder in Downloads settings/);
+    await screen.findByText(
+      /Set a download folder in Content folders settings/,
+    );
     expect(
       (screen.getByRole("button", { name: "Download" }) as HTMLButtonElement)
         .disabled,

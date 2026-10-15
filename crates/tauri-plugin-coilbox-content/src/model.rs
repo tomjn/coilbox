@@ -151,28 +151,107 @@ pub struct ReplayFile {
     /// True when this file carries coilbox's remix marker — a copy rewritten to run
     /// on a different local build, not an engine-recorded demo.
     pub remixed: bool,
+    /// True for a zero byte file. The engine holds a whole recording in memory
+    /// and writes the file when the game ends (`CDemoRecorder::WriteDemoFile`),
+    /// so a game that was killed or crashed leaves one behind, and a game that is
+    /// still running has one too. Nothing in the file says which it is.
+    pub unfinished: bool,
+    /// True for a remix whose header names one game and whose first packet
+    /// names another, so the engine plays it on the game it was recorded with.
+    /// Only coilbox before the fix for issue #3861 made these.
+    pub stale_remix: bool,
+    /// The match's game id, for a replay that has a usable one and is not a
+    /// remix. A remix carries its original's id but has no analysis of its own,
+    /// so it does not hold the original's analysis in place. The list joins
+    /// stored tracks to replays by it (issue #3786).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub game_id: Option<String>,
 }
 
-/// One chat/system line from a demo's network stream (via `demotool --dump`).
-#[derive(Serialize)]
+/// One chat or system line from a demo's network stream.
+#[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatLine {
-    /// The speaking player's number, when the line names one.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub player: Option<u32>,
-    /// The player's name resolved from the start-script, when known.
+    /// The simulation frame the line arrived in, [`PREGAME_FRAME`] before the
+    /// match started. 30 frames are one second of match time.
+    pub frame: i32,
+    /// The packet's `modGameTime`, in seconds. It orders pregame lines, which
+    /// share one frame, and is not match time.
+    pub time: f32,
+    /// The speaking player's number. 255 is the server.
+    pub player: u8,
+    /// The player's name, from the start script or a name packet in the
+    /// stream. Absent when neither names this number.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub player_name: Option<String>,
+    /// Who a player's line was addressed to. Absent for system lines.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dest: Option<ChatDest>,
     pub text: String,
-    /// True for engine `SYSTEMMSG` lines (vs a player `CHAT` line).
+    /// True for engine `SYSTEMMSG` lines (vs a player chat line).
     pub system: bool,
 }
 
-/// A demo's chat log (its `NETMSG_CHAT`/`NETMSG_SYSTEMMSG` lines).
-#[derive(Serialize, Default)]
+/// A demo's chat log, in the order the engine recorded it.
+#[derive(Serialize, Default, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct DemoChat {
     pub messages: Vec<ChatLine>,
+    /// True when the stream walk stopped before the end, so lines after that
+    /// point are missing. The lines before it are good.
+    pub incomplete: bool,
+    /// Resignations, departures, pauses and the like, from the same walk as
+    /// `messages`, so the timeline needs no second read of the file.
+    pub events: Vec<TimelineEvent>,
+}
+
+/// Something that happened to the match or its players, worth a mark on the
+/// replay's timeline. It is built from the typed stream events, never from the
+/// engine's English system text.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TimelineEvent {
+    /// The simulation frame it arrived in. 30 frames are one second.
+    pub frame: i32,
+    /// The packet's `modGameTime` in seconds. Orders events that share a frame.
+    pub time: f32,
+    /// The player it concerns, by `[playerN]` number. For
+    /// [`TimelineEventKind::TeamDied`] it is the player who reported the death.
+    pub player: u8,
+    /// That player's name, from the start script or the stream, as it stood
+    /// when the event arrived.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub player_name: Option<String>,
+    #[serde(flatten)]
+    pub kind: TimelineEventKind,
+}
+
+/// What a [`TimelineEvent`] is. `JoinTeam` is left out: it is how a match
+/// starts, not something that happened in it.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum TimelineEventKind {
+    /// The player stopped playing.
+    Resigned,
+    /// A team died. Every player reports a death, so only the first report
+    /// for a team is kept, and `player` on the event is that reporter. `players`
+    /// are the names of whoever controlled the team, empty for a team no named
+    /// player controlled, such as a bot's.
+    #[serde(rename_all = "camelCase")]
+    TeamDied { team: u8, players: Vec<String> },
+    /// The player dropped out of the game.
+    PlayerLeft { reason: LeaveReason },
+    /// The player paused (`true`) or unpaused the game.
+    Paused { paused: bool },
+    /// A player not in the start script joined mid game.
+    #[serde(rename_all = "camelCase")]
+    Joined { spectator: bool, team: u8 },
+    /// Everything `from_team` owned went to `to_team`.
+    #[serde(rename_all = "camelCase")]
+    GiveAway { to_team: u8, from_team: u8 },
+    /// A team action the engine does not define, carried as sent.
+    #[serde(rename_all = "camelCase")]
+    Other { action: u8, param1: u8, param2: u8 },
 }
 
 /// One player (or spectator) from a demo's start-script, with the side/ally-team
@@ -180,6 +259,9 @@ pub struct DemoChat {
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayerInfo {
+    /// The `[playerN]` number, which is what a chat line's or a timeline
+    /// event's `player` holds.
+    pub player: i32,
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub team: Option<i32>,
@@ -198,6 +280,10 @@ pub struct PlayerInfo {
     pub won: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub skill: Option<String>,
+    /// The `skilluncertainty` the lobby wrote beside `skill`, as the number the
+    /// script holds. `None` when the key is absent or is not a number.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub skill_uncertainty: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub country_code: Option<String>,
     /// This seat's five counters from the trailer. Absent when the recording
@@ -279,6 +365,19 @@ pub struct AllyTeamInfo {
     pub color: Option<[f32; 3]>,
 }
 
+/// Where one team started, in world units (elmos): `x` and `z` across the map,
+/// `y` up. Not scaled to the map, which a replay does not state the size of.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TeamStartPosition {
+    /// The `[teamN]` index, the same number `PlayerInfo::team` and
+    /// `AiInfo::team` carry.
+    pub team: i32,
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+}
+
 /// Decoded replay metadata: native header + start-script + trailer, with
 /// demotool as a fallback for the winner when the trailer's format is one the
 /// decoder refuses.
@@ -316,9 +415,27 @@ pub struct DemoInfo {
     /// to reproduce the battle's options (e.g. refight-as-skirmish, #368). Empty
     /// when the script carried no `[modoptions]` section.
     pub mod_options: std::collections::HashMap<String, String>,
+    /// The `[mapoptions]` section verbatim, as `mod_options` is. A refight that
+    /// leaves these out runs on the map's current defaults, not the values the
+    /// match was played with (#1886).
+    pub map_options: std::collections::HashMap<String, String>,
+    /// The match's setup as the engine held it, for reading the unit list the
+    /// engine built for this match (#3847). Absent for a start script the
+    /// engine would have refused.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub match_setup: Option<crate::demo::match_setup::MatchSetup>,
+    /// Where each team started, by team id, from the replay's stream (#1146).
+    /// A team with no recorded position is absent, since 0,0,0 is a real map
+    /// corner. Empty, and left out of the JSON, when the stream has none, is
+    /// missing or is in a format this decoder refuses, and always empty from
+    /// the cheap decodes the replay list and the stats ingest use.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub start_positions: Vec<TeamStartPosition>,
     /// True when this file carries coilbox's remix marker (a rewritten copy, not an
     /// engine-recorded demo).
     pub remixed: bool,
+    /// See [`ReplayFile::stale_remix`].
+    pub stale_remix: bool,
     /// For a remix, the `gametype` the replay was originally recorded on (before it
     /// was pointed at a local build).
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -420,6 +537,414 @@ pub struct DemoTrailer {
     /// block is not evidence, and the decoder refuses to hand it over rather
     /// than leave every caller to remember why.
     pub players: Option<Vec<PlayerStats>>,
+}
+
+/// The frame every event carries until the simulation starts. It is the
+/// engine's own `gs->frameNum` before the first `NETMSG_KEYFRAME`, so a start
+/// position or a line of lobby chat sits at -1 and the first order at 0 or later.
+pub const PREGAME_FRAME: i32 = -1;
+
+/// What a walk over a replay's demo stream found: what each player did, in the
+/// order the engine recorded it.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DemoStream {
+    pub events: Vec<StreamEvent>,
+    /// The last simulation frame the stream reached, or [`PREGAME_FRAME`] when
+    /// the match never started. 30 frames are one second of match time.
+    ///
+    /// It can be later than the header's game time. A client writes that field
+    /// when the game ends and keeps recording until the player leaves.
+    pub last_frame: i32,
+    /// How many packets the walk stepped over, of every kind.
+    pub packets: u32,
+    /// Packets of a kind the walk reads whose bytes did not fit that kind's
+    /// layout. Each was skipped by its declared length and produced no event.
+    pub undecoded: u32,
+    /// Set when the walk stopped before the end of the stream. The events up to
+    /// that point are still good, and so is the trailer, which is found from
+    /// the header and not from where the walk got to.
+    pub stopped: Option<StreamStop>,
+}
+
+/// Where and why a stream walk stopped early.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct StreamStop {
+    /// Bytes into the stream, counted from its first packet.
+    pub offset: usize,
+    pub reason: String,
+}
+
+/// One thing a player did, with the match time it happened at.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct StreamEvent {
+    /// The simulation frame the event arrived in. [`PREGAME_FRAME`] before the
+    /// match starts.
+    pub frame: i32,
+    /// The packet's `modGameTime`, in seconds. It runs from before the match
+    /// starts and does not advance while the game is paused, so it orders the
+    /// pregame events that all share one frame. It is not match time.
+    pub time: f32,
+    #[serde(flatten)]
+    pub kind: StreamEventKind,
+}
+
+/// The messages the walk reads. `player` is the number the start script's
+/// `[playerN]` sections use, and 255 is the server.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum StreamEventKind {
+    /// `NETMSG_PLAYERNAME`. A player connected under this name.
+    #[serde(rename_all = "camelCase")]
+    PlayerName { player: u8, name: String },
+    /// `NETMSG_CHAT`.
+    #[serde(rename_all = "camelCase")]
+    Chat {
+        from: u8,
+        dest: ChatDest,
+        text: String,
+    },
+    /// `NETMSG_SYSTEMMSG`. A line the server said, such as a connection attempt.
+    #[serde(rename_all = "camelCase")]
+    SystemMessage { player: u8, text: String },
+    /// One packet of orders: `NETMSG_COMMAND`, `NETMSG_AICOMMAND`,
+    /// `NETMSG_AICOMMAND_TRACKED` or `NETMSG_AICOMMANDS`. One packet is one
+    /// action by the player, however many orders it carries.
+    #[serde(rename_all = "camelCase")]
+    Command {
+        player: u8,
+        origin: CommandOrigin,
+        /// The units the orders are for. Empty when the origin is
+        /// [`CommandOrigin::Selection`], where they go to whatever that player
+        /// last selected.
+        units: Vec<u16>,
+        /// True when `orders[i]` goes to `units[i]`. Otherwise every order goes
+        /// to every unit.
+        pairwise: bool,
+        orders: Vec<Order>,
+    },
+    /// `NETMSG_SELECT`. The player's selection is now exactly these units.
+    #[serde(rename_all = "camelCase")]
+    Select { player: u8, units: Vec<u16> },
+    /// `NETMSG_GAMEOVER`. Each player's client reports the result it saw, so a
+    /// match has several of these and they can disagree.
+    #[serde(rename_all = "camelCase")]
+    GameOver {
+        player: u8,
+        winning_ally_teams: Vec<u8>,
+    },
+    /// `NETMSG_STARTPOS`. Where a team asked to start, in world coordinates.
+    /// A team can send many, and the last one is the one that counted. The
+    /// server sends it for a team no player controls.
+    #[serde(rename_all = "camelCase")]
+    StartPos {
+        player: u8,
+        team: u8,
+        /// `CPlayer::PLAYER_RDYSTATE_*` in `rts/Game/Players/Player.h`: 0 the
+        /// player moved their marker without readying, 1 readied, 2 the server
+        /// forced the start, 3 the player never readied.
+        ready: u8,
+        x: f32,
+        y: f32,
+        z: f32,
+    },
+    /// `NETMSG_PAUSE`. `player` paused or unpaused the game.
+    #[serde(rename_all = "camelCase")]
+    Pause { player: u8, paused: bool },
+    /// `NETMSG_PLAYERLEFT`. `player` dropped out of the game.
+    #[serde(rename_all = "camelCase")]
+    PlayerLeft { player: u8, reason: LeaveReason },
+    /// `NETMSG_TEAM`. `player` did something that changes who controls a team.
+    #[serde(rename_all = "camelCase")]
+    Team { player: u8, action: TeamAction },
+    /// `NETMSG_CREATE_NEWPLAYER`. A player who is not in the start script
+    /// joined mid game, and this is the only place their name is.
+    #[serde(rename_all = "camelCase")]
+    NewPlayer {
+        player: u8,
+        spectator: bool,
+        team: u8,
+        name: String,
+    },
+}
+
+/// Why a player left, from `NETMSG_PLAYERLEFT`'s `bIntended` byte.
+#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum LeaveReason {
+    LostConnection,
+    Left,
+    Kicked,
+    /// A value the engine does not define, carried as sent.
+    Other {
+        code: u8,
+    },
+}
+
+/// The sub action of a `NETMSG_TEAM` packet, from the `TEAMMSG_*` enum.
+#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum TeamAction {
+    /// `TEAMMSG_GIVEAWAY`. Everything `from_team` owns goes to `to_team`.
+    #[serde(rename_all = "camelCase")]
+    GiveAway { to_team: u8, from_team: u8 },
+    /// `TEAMMSG_RESIGN`. The player stops playing. The packet carries no team.
+    Resign,
+    /// `TEAMMSG_JOIN_TEAM`. The player asks to join `team`.
+    #[serde(rename_all = "camelCase")]
+    JoinTeam { team: u8 },
+    /// `TEAMMSG_TEAM_DIED`. The player reports `team` has died. Every player
+    /// sends one, so a team's death arrives once per player.
+    #[serde(rename_all = "camelCase")]
+    TeamDied { team: u8 },
+    /// An action the engine does not define, carried as sent.
+    #[serde(rename_all = "camelCase")]
+    Other { action: u8, param1: u8, param2: u8 },
+}
+
+/// Who a chat line was addressed to.
+#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum ChatDest {
+    Player { player: u8 },
+    Allies,
+    Spectators,
+    Everyone,
+}
+
+/// What issued a packet of orders.
+///
+/// The message id alone does not say. Every `NETMSG_AICOMMAND` in the replays
+/// measured came from a player's own Lua widgets, not from an AI, so counting
+/// that message as AI activity would hand a human's orders to a bot.
+#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum CommandOrigin {
+    /// The player ordered their current selection through the engine's own
+    /// interface.
+    Selection,
+    /// A Lua widget on the player's machine ordered named units.
+    Lua,
+    /// A skirmish AI hosted by `player` ordered a unit of its own team.
+    Ai { ai: u8, team: u8 },
+}
+
+/// One order as the engine's `Command` holds it.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Order {
+    /// The command id. Negative means build, and the unit definition id is the
+    /// absolute value.
+    pub id: i32,
+    /// The engine's option bits: 4 meta, 8 internal, 16 right mouse, 32 shift,
+    /// 64 control, 128 alt.
+    pub options: u8,
+    pub params: Vec<f32>,
+}
+
+/// Every order to build something in a replay, in the order the engine
+/// recorded them (#1145).
+///
+/// These are orders given, not buildings completed. The stream does not say
+/// whether an order was carried out, cancelled or refused by the engine.
+#[derive(Serialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DemoBuildOrders {
+    pub orders: Vec<BuildOrder>,
+    /// A name for each player number in `orders`, where the start script or the
+    /// stream gives one.
+    pub players: Vec<BuildOrderPlayer>,
+    /// Factory queue orders that took units off a queue. They are not orders to
+    /// build, so they are counted here and left out of `orders`.
+    pub removals: u32,
+    /// The last simulation frame the stream reached. 30 frames are one second.
+    pub last_frame: i32,
+    /// True when the stream walk stopped before the end, so orders after that
+    /// point are missing. The ones before it are good.
+    pub incomplete: bool,
+}
+
+/// What sent an order, without the ids [`CommandOrigin`] carries. The stream
+/// walk can tell all three apart, and they are three different things: the
+/// player's own click, a widget acting for them, and a skirmish AI.
+#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "camelCase")]
+pub enum OrderSource {
+    Selection,
+    Lua,
+    Ai,
+}
+
+impl From<&CommandOrigin> for OrderSource {
+    fn from(origin: &CommandOrigin) -> Self {
+        match origin {
+            CommandOrigin::Selection => OrderSource::Selection,
+            CommandOrigin::Lua => OrderSource::Lua,
+            CommandOrigin::Ai { .. } => OrderSource::Ai,
+        }
+    }
+}
+
+/// Every order in a replay that points at a place on the map, packed (#1152).
+///
+/// There can be ninety thousand of them, so they are not objects and not a JSON
+/// array. Each field is one column, as little endian bytes in standard base64,
+/// and the columns are parallel: entry `i` of each is the same order. `count`
+/// is how many entries each holds.
+///
+/// - `x`, `z`: `f32`, in elmos from the map's north west corner.
+/// - `frame`: `i32`, the simulation frame, 30 to a second. -1 is before the
+///   game started.
+/// - `team`: `i16`, the engine team, or -1 when the stream does not say.
+/// - `player`: `u8`, the player number, 255 being the server.
+/// - `kind`: `u8`, an [`OrderKind`] as its number.
+/// - `source`: `u8`, 0 the player's own selection, 1 a widget, 2 an AI.
+///
+/// The rest are counts of the orders that left no entry, by why.
+#[derive(Serialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DemoOrderPoints {
+    pub count: u32,
+    pub x: String,
+    pub z: String,
+    pub frame: String,
+    pub team: String,
+    pub player: String,
+    pub kind: String,
+    pub source: String,
+    /// Orders aimed at a unit or a feature, which the stream gives an id for and
+    /// not a place.
+    pub unit_aimed: u32,
+    /// Orders with no target at all: a stop, a wait, a fire state, a factory
+    /// queue entry.
+    pub no_target: u32,
+    /// Orders with an id the engine does not define, which a game or a widget
+    /// registered. What their parameters mean is not known, so none is read.
+    pub custom: u32,
+    /// Orders with an id the engine defines and parameters that fit none of
+    /// that command's forms.
+    pub malformed: u32,
+    /// The last simulation frame the replay reached.
+    pub last_frame: i32,
+    /// True when the stream walk stopped before the end, so later orders are
+    /// missing.
+    pub incomplete: bool,
+}
+
+/// One team's commands in each bucket of match time, from one kind of sender.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CommandSeries {
+    /// The engine team. Players sharing a team are added together.
+    pub team: i32,
+    pub source: OrderSource,
+    /// Orders given in each bucket. Bucket `i` covers the `i`th stretch of
+    /// `period_sec` seconds from frame 0.
+    pub counts: Vec<u32>,
+}
+
+/// How many orders each team gave in each stretch of the match (#1149).
+#[derive(Serialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DemoCommandRates {
+    /// How long a bucket is. The replay's own team statistics period.
+    pub period_sec: u32,
+    /// True when the header named no period and the engine's default is used.
+    pub period_is_default: bool,
+    /// How many whole buckets there are. A match rarely ends on a boundary, and
+    /// the stretch after the last one is left out: its count over its own,
+    /// shorter, length is a noisy rate.
+    pub buckets: u32,
+    pub series: Vec<CommandSeries>,
+    /// Orders given before the game started.
+    pub pregame: u32,
+    /// Orders in the stretch after the last whole bucket.
+    pub trailing: u32,
+    /// Orders from a player with no team, such as a spectator.
+    pub unattributed: u32,
+    pub last_frame: i32,
+    pub incomplete: bool,
+}
+
+/// The name behind a player number in [`DemoBuildOrders::orders`].
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct BuildOrderPlayer {
+    pub player: u8,
+    pub name: String,
+}
+
+/// One order to build a unit, as a player gave it.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct BuildOrder {
+    /// The simulation frame the order arrived in. 30 frames are one second.
+    pub frame: i32,
+    /// The player who sent the order, by `[playerN]` number.
+    pub player: u8,
+    /// The `[teamN]` index that player was on when the order arrived. For an
+    /// order from a skirmish AI it is the AI's team. Absent when neither the
+    /// start script nor the stream seats the player.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub team: Option<i32>,
+    pub origin: CommandOrigin,
+    /// The engine's unit definition id. It means something only inside the
+    /// build of the game the replay was played on.
+    pub unit_def_id: i32,
+    /// Where the building was placed, in world units (elmos). Absent for an
+    /// order with no position, which is one given to a factory's queue.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub position: Option<BuildPosition>,
+    /// Which way the building faces: 0 south, 1 east, 2 north, 3 west. Absent
+    /// when the order does not say, and the engine then builds it facing south.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub facing: Option<u8>,
+    /// How many units the order asks for. Always 1 for a placed building. A
+    /// factory queue order asks for 5 with shift, 20 with control and 100 with
+    /// both.
+    pub count: u32,
+    /// Where in the builder's queue the order went.
+    pub slot: BuildSlot,
+    /// How many units were given the order: the player's selection, or the
+    /// units a widget or an AI named. One order to several builders is one
+    /// order. Zero when the player had selected nothing the stream recorded.
+    pub builders: u32,
+    /// The build command's option bits as sent, see [`Order::options`].
+    pub options: u8,
+}
+
+/// A placed building's position, in world units (elmos): `x` and `z` across
+/// the map, `y` up.
+#[derive(Serialize, Clone, Copy, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct BuildPosition {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+}
+
+/// Where in a builder's queue a build order went.
+#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum BuildSlot {
+    /// A placed building given without shift. It replaces everything the
+    /// builder had queued.
+    Replace,
+    /// Added to the end of the queue: a placed building given with shift, or a
+    /// factory order.
+    Append,
+    /// A factory order given with alt, which goes to the front of the queue.
+    Front,
+    /// `CMD_INSERT` by queue position. 0 is the front, so "build this next",
+    /// and a negative position counts back from the end, so -1 is last.
+    #[serde(rename_all = "camelCase")]
+    InsertAt { position: i32 },
+    /// `CMD_INSERT` beside the queued command carrying `tag`: before it, or
+    /// after it when `after` is true.
+    #[serde(rename_all = "camelCase")]
+    InsertAtTag { tag: u32, after: bool },
 }
 
 pub const SCHEMA_VERSION: u32 = 1;

@@ -44,7 +44,10 @@ class FakeAudio {
   }
 }
 
+const originalPlay = FakeAudio.prototype.play;
+
 beforeEach(() => {
+  FakeAudio.prototype.play = originalPlay;
   vi.resetModules();
   FakeAudio.last = null;
   profileSound.mockReturnValue({ tracks: ["sounds/a.ogg", "sounds/b.ogg"] });
@@ -261,5 +264,170 @@ describe("background music", () => {
     el?.listeners.get("error")?.();
     await flush();
     expect(el?.src).toBe("coilbox://localhost/portable/sounds/b.ogg");
+  });
+
+  describe("attempt marker", () => {
+    /**
+     * A settings store whose flush the test releases by hand, so the order of
+     * "marker on disk" and "play() called" can be read off rather than assumed.
+     */
+    async function guarded() {
+      const store = await import("@/lib/storedSetting");
+      const data = new Map<string, string>();
+      const log: string[] = [];
+      // Oldest first, since two attempts can each be waiting on their own.
+      const flushes: (() => void)[] = [];
+      store.installSettingsStorage({
+        get: (k) => data.get(k) ?? null,
+        set: (k, v) => {
+          data.set(k, v);
+          log.push(`${k}=${v}`);
+        },
+        flush: () =>
+          new Promise<void>((resolve) => {
+            flushes.push(resolve);
+          }),
+      });
+      return { data, log, release: () => flushes.shift()?.() };
+    }
+    const KEY = "sound.music.attempting";
+
+    it("is on disk before the element is made, and cleared once play resolves", async () => {
+      const { data, release } = await guarded();
+      const music = await load();
+      music.setMusicWanted(true);
+      await flush();
+      // Written, but the flush has not landed, so nothing risky has run yet.
+      expect(data.get(KEY)).toBe("true");
+      expect(FakeAudio.last).toBeNull();
+
+      release();
+      await flush();
+      expect(FakeAudio.last?.played).toHaveLength(1);
+      expect(data.get(KEY)).toBe("false");
+    });
+
+    it("is cleared when play is refused", async () => {
+      const { data, release } = await guarded();
+      FakeAudio.prototype.play = async () => {
+        throw new Error("NotAllowedError");
+      };
+      const music = await load();
+      music.setMusicWanted(true);
+      await flush();
+      release();
+      await flush();
+      expect(data.get(KEY)).toBe("false");
+    });
+
+    it("stays set when play never settles, which is the hang", async () => {
+      const { data, release } = await guarded();
+      FakeAudio.prototype.play = () => new Promise<void>(() => {});
+      const music = await load();
+      music.setMusicWanted(true);
+      await flush();
+      release();
+      await flush();
+      expect(data.get(KEY)).toBe("true");
+    });
+
+    it("does not rewrite the marker for later tracks", async () => {
+      const { log, release } = await guarded();
+      const music = await load();
+      music.setMusicWanted(true);
+      await flush();
+      release();
+      await flush();
+      const el = FakeAudio.last;
+      el?.listeners.get("ended")?.();
+      await flush();
+      expect(log).toEqual([`${KEY}=true`, `${KEY}=false`]);
+    });
+
+    it("is cleared when the player pauses while the marker is being written", async () => {
+      // Otherwise the next launch finds it and turns music off for a hang
+      // that never happened.
+      const { data, release } = await guarded();
+      const music = await load();
+      music.setMusicWanted(true);
+      await flush();
+      expect(data.get(KEY)).toBe("true");
+
+      music.setMusicWanted(false);
+      release();
+      await flush();
+      expect(FakeAudio.last).toBeNull();
+      expect(data.get(KEY)).toBe("false");
+    });
+
+    it("guards the next attempt too when play was refused, which proves nothing", async () => {
+      const { log, release } = await guarded();
+      FakeAudio.prototype.play = async () => {
+        throw new Error("NotAllowedError");
+      };
+      const music = await load();
+      music.setMusicWanted(true);
+      await flush();
+      release();
+      await flush();
+
+      FakeAudio.prototype.play = originalPlay;
+      music.setMusicWanted(false);
+      music.setMusicWanted(true);
+      await flush();
+      expect(log).toEqual([`${KEY}=true`, `${KEY}=false`, `${KEY}=true`]);
+      release();
+      await flush();
+      expect(log.at(-1)).toBe(`${KEY}=false`);
+    });
+
+    it("keeps the marker while a second attempt is still in flight", async () => {
+      // Two loads overlap when the track list changes mid-attempt. The first
+      // one ending must not clear the marker the second is relying on.
+      const { data, release } = await guarded();
+      const music = await load();
+      music.setMusicWanted(true);
+      await flush();
+      music.setTracks([{ kind: "portable", path: "sounds/c.ogg" }]);
+      await flush();
+
+      // The first attempt's write lands. It was for a list since replaced, so
+      // it is dropped, and the second is still waiting on its own write.
+      release();
+      await flush();
+      expect(FakeAudio.last).toBeNull();
+      expect(data.get(KEY)).toBe("true");
+
+      release();
+      await flush();
+      expect(FakeAudio.last?.src).toBe(
+        "coilbox://localhost/portable/sounds/c.ogg",
+      );
+      expect(data.get(KEY)).toBe("false");
+    });
+
+    it("turns music off at boot when the last attempt never returned", async () => {
+      const { data } = await guarded();
+      data.set(KEY, "true");
+      const music = await load();
+      expect(music.recoverFromHungAttempt()).toBe(true);
+      expect(data.get(KEY)).toBe("false");
+      expect(music.getTurnedOffByHang()).toBe(true);
+
+      // Held off even when the stored setting or the profile still asks for it.
+      music.setMusicWanted(true);
+      await flush();
+      expect(FakeAudio.last).toBeNull();
+
+      music.clearTurnedOffByHang();
+      expect(music.getTurnedOffByHang()).toBe(false);
+    });
+
+    it("leaves a clean boot alone", async () => {
+      await guarded();
+      const music = await load();
+      expect(music.recoverFromHungAttempt()).toBe(false);
+      expect(music.getTurnedOffByHang()).toBe(false);
+    });
   });
 });

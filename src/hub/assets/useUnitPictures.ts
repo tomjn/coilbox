@@ -29,7 +29,6 @@ import { isHubEnabled } from "@/profile/profile";
 import { useHubUrl } from "../config";
 import { heldPicture } from "./heldPictures";
 import { localPlanPicture, localRenders } from "./localRenders";
-import { RENDER_VERSION } from "./renderTop";
 import { assetCdnBase } from "./tier";
 import {
   PLAN_VARIANT,
@@ -37,6 +36,7 @@ import {
   planPicture,
   unitPictureIdentity,
 } from "./unitPictures";
+import { RENDER_VERSION } from "./vocabulary";
 
 /** Every building's picture, keyed on the lower cased def, and empty until the
  *  answers are in. A def nothing holds a picture of is absent rather than null, so

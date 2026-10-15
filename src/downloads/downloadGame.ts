@@ -1,10 +1,5 @@
 import { loadGithubGameRepos } from "../content/branding";
-import {
-  dlDownloadFileRaw,
-  dlDownloadRaw,
-  dlGithubReleaseArchives,
-  dlSpringfilesList,
-} from "./bindings";
+import { dlDownloadFileRaw, dlDownloadRaw } from "./bindings";
 import { withDownloadNotify } from "./downloadNotify";
 import {
   GAME_REPOS,
@@ -13,6 +8,8 @@ import {
   norm,
 } from "./gameRepos";
 import { type GameSource, gameSourceOrder } from "./gameSources";
+import { loadGithubReleases } from "./githubReleases";
+import { findInIndex, indexTick, loadSpringfilesList } from "./mirrorIndex";
 import { type ProgressSink, progressChannel } from "./progressChannel";
 import { DEFAULT_RAPID_MASTERS } from "./rapidMasters";
 
@@ -38,6 +35,10 @@ const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
  * branding catalog is authoritative, `GAME_REPOS` in `gameRepos.ts` is the
  * in-code fallback seed. See `mergeGameRepos`.
  *
+ * The springfiles index comes from `mirrorIndex`, which holds it for the
+ * session. A game missing from it refetches it once, unless the held copy loaded
+ * after `askedAt`, when the download was asked for.
+ *
  * Progress arrives as a sink rather than a channel, because each attempt needs a
  * channel of its own: see `progressChannel` for what sharing one costs.
  */
@@ -47,8 +48,11 @@ async function downloadGameAnySourceImpl(opts: {
   /** Pass a stable id to make the active download cancellable via dlCancel. */
   opId?: string;
   onProgress: ProgressSink;
+  /** The `indexTick` when the download was asked for. Defaults to now. */
+  askedAt?: number;
 }): Promise<string> {
   const { gameName, writePath, opId, onProgress } = opts;
+  const askedAt = opts.askedAt ?? indexTick();
   const target = norm(gameName);
   const errors: string[] = [];
 
@@ -63,7 +67,7 @@ async function downloadGameAnySourceImpl(opts: {
       case "github": {
         const repo = githubRepoForGame(repos, gameName);
         if (!repo || !writePath) return null;
-        const { archives } = await dlGithubReleaseArchives({ repo });
+        const archives = await loadGithubReleases(repo);
         // No releases at all: this source genuinely has nothing, same as any
         // other step finding no candidate. Move on to the next source.
         if (archives.length === 0) return null;
@@ -93,9 +97,13 @@ async function downloadGameAnySourceImpl(opts: {
       // springfiles catalog: match by springname or name, fetch the first mirror.
       case "springfiles": {
         if (!writePath) return null;
-        const { results } = await dlSpringfilesList({ category: "game" });
-        const found = results.find(
-          (f) => norm(f.springname) === target || norm(f.name) === target,
+        const found = await findInIndex(
+          (refresh) => loadSpringfilesList("game", refresh),
+          ({ results }) =>
+            results.find(
+              (f) => norm(f.springname) === target || norm(f.name) === target,
+            ),
+          askedAt,
         );
         const url = found?.mirrors?.[0];
         if (!found || !url) return null;

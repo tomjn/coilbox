@@ -4,6 +4,8 @@
 // `coilbox-unitsync:default`.
 const COMMANDS: &[&str] = &[
     "unitsync_scan",
+    "unitsync_last_scan_write",
+    "unitsync_last_scan_read",
     "unitsync_minimap",
     "unitsync_heightmap",
     "unitsync_height_field",

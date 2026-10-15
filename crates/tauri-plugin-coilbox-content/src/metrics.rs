@@ -100,12 +100,12 @@ use MetricUnit::{Count, Damage, Energy, Metal};
 
 /// Every metric, in the order the engine writes the fields.
 ///
-/// The roster set is deliberately six columns wide, because the table already
+/// The roster set is deliberately seven columns wide, because the table already
 /// carries a name, a faction, a rating and an actions-per-minute figure, and in
-/// a 16-player match every extra column costs a scroll. The six are the two
+/// a 16-player match every extra column costs a scroll. The seven are the two
 /// economy totals players argue about, the damage pair (which separates the side
-/// that attacked from the side that was attacked), and what each seat built and
-/// destroyed. Everything else is one click away in the sparkline grid.
+/// that attacked from the side that was attacked), and what each seat built,
+/// lost and destroyed. Everything else is one click away in the sparkline grid.
 ///
 /// The two headline figures are damage dealt and units built, summed across
 /// teams: the size of the fight, and the size of the game.
@@ -141,7 +141,7 @@ pub const METRICS: &[Metric] = &[
         Count,
         ROSTER | HEADLINE,
     ),
-    metric("unitsDied", "Units lost", Units, Count, CHART),
+    metric("unitsDied", "Units lost", Units, Count, ROSTER),
     metric("unitsReceived", "Units received", Units, Count, HIDDEN),
     metric("unitsSent", "Units given away", Units, Count, HIDDEN),
     metric("unitsCaptured", "Units captured", Units, Count, HIDDEN),
@@ -154,6 +154,53 @@ pub const METRICS: &[Metric] = &[
     ),
     metric("unitsKilled", "Units killed", Military, Count, ROSTER),
 ];
+
+/// A figure worked out from two metrics: one divided by the other.
+///
+/// It lives beside the metrics rather than on one of them because a ratio
+/// belongs to neither half, and because a second ratio is then one more entry
+/// in [`RATIOS`]. Both halves must be `roster` metrics, since those are the
+/// ones the stats store keeps (see [`roster_totals`]).
+///
+/// A ratio has no unit and is not a rate, so a surface must not say "per
+/// minute" about it. A match whose denominator is zero has no ratio. That is
+/// not infinity and not zero, and the surface decides how to count such a
+/// match.
+#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Ratio {
+    /// What the ratio is called everywhere. It is never a metric key.
+    pub key: &'static str,
+    /// What to call it in the interface.
+    pub label: &'static str,
+    /// The metric on top, by key.
+    pub numerator: &'static str,
+    /// The metric underneath, by key.
+    pub denominator: &'static str,
+}
+
+const fn ratio(
+    key: &'static str,
+    label: &'static str,
+    numerator: &'static str,
+    denominator: &'static str,
+) -> Ratio {
+    Ratio {
+        key,
+        label,
+        numerator,
+        denominator,
+    }
+}
+
+/// Every ratio. Units lost per unit killed is the one the player dossier
+/// asks for (#1166). Damage received per damage dealt would be one more line.
+pub const RATIOS: &[Ratio] = &[ratio(
+    "unitsLostPerUnitKilled",
+    "Units lost per unit killed",
+    "unitsDied",
+    "unitsKilled",
+)];
 
 /// One team's end-of-match totals for the metrics the registry marks `roster`.
 ///
@@ -209,13 +256,14 @@ pub fn match_totals(trailer: &DemoTrailer) -> Vec<TeamTotals> {
 
 /// `content_metric_registry`: what every `TeamStatistics` field decoded by
 /// `content_replay_trailer` is called, which group it belongs to, what it
-/// counts, and whether it belongs on the roster or in a headline tile. Static
-/// data, no file access. Every match-statistics surface builds itself from this
-/// rather than from a list of its own, so adding a metric is one line in
-/// `metrics.rs`. See [`METRICS`].
+/// counts, and whether it belongs on the roster or in a headline tile. It also
+/// carries the ratios between two metrics. Static data, no file access. Every
+/// match-statistics surface builds itself from this rather than from a list of
+/// its own, so adding a metric is one line in `metrics.rs`. See [`METRICS`] and
+/// [`RATIOS`].
 #[tauri::command]
 pub(crate) async fn content_metric_registry() -> CliResult {
-    CliResult::ok(json!({ "metrics": METRICS }))
+    CliResult::ok(json!({ "metrics": METRICS, "ratios": RATIOS }))
 }
 
 #[cfg(test)]
@@ -316,7 +364,7 @@ mod tests {
     }
 
     #[test]
-    fn the_roster_carries_six_columns() {
+    fn the_roster_carries_seven_columns() {
         let roster: Vec<&str> = METRICS.iter().filter(|m| m.roster).map(|m| m.key).collect();
         assert_eq!(
             roster,
@@ -326,6 +374,7 @@ mod tests {
                 "damageDealt",
                 "damageReceived",
                 "unitsProduced",
+                "unitsDied",
                 "unitsKilled",
             ]
         );
@@ -420,6 +469,35 @@ mod tests {
                 "\"energy\"".to_string(),
                 "\"metal\"".to_string(),
             ])
+        );
+    }
+
+    #[test]
+    fn a_ratio_is_made_of_two_stored_metrics_and_is_not_one_itself() {
+        let mut seen = BTreeSet::new();
+        for r in RATIOS {
+            assert!(seen.insert(r.key), "{} appears twice", r.key);
+            assert!(!keys().contains(r.key), "{} is a ratio and a metric", r.key);
+            assert_ne!(r.numerator, r.denominator, "{} divides by itself", r.key);
+            for half in [r.numerator, r.denominator] {
+                let m = METRICS.iter().find(|m| m.key == half);
+                let m = m.unwrap_or_else(|| panic!("{} names no metric {half}", r.key));
+                assert!(m.roster, "{half} is not stored, so {} cannot use it", r.key);
+            }
+        }
+    }
+
+    #[test]
+    fn units_lost_per_unit_killed_is_declared_and_published() {
+        let json = serde_json::to_value(RATIOS).expect("ratios serialize");
+        assert_eq!(
+            json,
+            serde_json::json!([{
+                "key": "unitsLostPerUnitKilled",
+                "label": "Units lost per unit killed",
+                "numerator": "unitsDied",
+                "denominator": "unitsKilled",
+            }])
         );
     }
 

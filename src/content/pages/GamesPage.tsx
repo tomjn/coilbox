@@ -1,16 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { dlInstalledContent } from "../../downloads/bindings";
 import { useContentRootPaths, useWriteRoot } from "../../downloads/config";
 import {
   filterUninstalledGames,
   useBrandingCatalog,
   useSuggestedGames,
 } from "../branding";
-import {
-  useScanTargetSelection,
-  useUnitsyncGameHeaders,
-  useUnitsyncScan,
-} from "../config";
+import { useScanTargetSelection, useUnitsyncGameHeaders } from "../config";
+import { installedContent } from "../installedContent";
+import { useScanWithLastKnown } from "../lastKnownScan";
 import { usePlayGame } from "../usePlayGame";
 import { BrowserToolbar } from "./components/BrowserToolbar";
 import { FilterBar } from "./components/FilterBar";
@@ -20,6 +17,7 @@ import {
   Diagnostics,
   EmptyState,
   ErrorBanner,
+  SavedListStatus,
   ScanFailed,
   SkeletonList,
 } from "./components/states";
@@ -41,8 +39,18 @@ const SORT_OPTIONS = [
 export default function GamesPage() {
   const { targets, selected, selectedKey, setSelectedKey } =
     useScanTargetSelection();
-  const { data, unvouched, loading, error, cancelled, run, cancel } =
-    useUnitsyncScan(selected?.enginePath, selected?.rootPath);
+  const {
+    data,
+    unvouched,
+    result,
+    unchecked,
+    status,
+    loading,
+    error,
+    cancelled,
+    run,
+    cancel,
+  } = useScanWithLastKnown(selected?.enginePath, selected?.rootPath);
   const { headers, loading: headersLoading } = useUnitsyncGameHeaders(
     selected?.enginePath,
     selected?.rootPath,
@@ -53,24 +61,25 @@ export default function GamesPage() {
   const [sort, setSort] = useState<SortKey>("name-asc");
 
   // A failed Init leaves data null and the engine's reason in error. The raw
-  // result stays in unvouched, which this page still lists from.
-  const result = data ?? unvouched;
-  const scanFailure = unvouched ? error : null;
+  // result stays in unvouched, which this page still lists from, unless there
+  // is a saved list to show instead (unchecked).
+  const scanFailure = unvouched && !unchecked ? error : null;
   const games = result?.games ?? [];
   const busy = loading || (!!selected && !data && !error && !cancelled);
 
   // Curated download suggestions shown when this engine sees no games.
-  const writeRoot = useWriteRoot();
+  const writeRoot = useWriteRoot("games");
   const suggested = useSuggestedGames();
   const entries = useBrandingCatalog();
   const rootPaths = useContentRootPaths();
   const [installed, setInstalled] = useState<Set<string>>(new Set());
+  const wantInstalled = !busy && games.length === 0;
   useEffect(() => {
-    if (rootPaths.length === 0) return;
-    dlInstalledContent({ paths: rootPaths })
+    if (!wantInstalled || rootPaths.length === 0) return;
+    installedContent({ paths: rootPaths })
       .then(({ games }) => setInstalled(new Set(games)))
       .catch(() => setInstalled(new Set()));
-  }, [rootPaths]);
+  }, [wantInstalled, rootPaths]);
   const suggestions = useMemo(
     () => filterUninstalledGames(suggested, entries, installed, games),
     [suggested, entries, installed, games],
@@ -122,7 +131,11 @@ export default function GamesPage() {
         onCancel={cancel}
       />
 
-      {!busy && games.length > 0 && (
+      {unchecked && (
+        <SavedListStatus checking={status === "checking"} reason={error} />
+      )}
+
+      {(!busy || unchecked) && games.length > 0 && (
         <FilterBar
           search={filter}
           onSearch={setFilter}
@@ -137,10 +150,10 @@ export default function GamesPage() {
         />
       )}
 
-      {error && !scanFailure && <ErrorBanner message={error} />}
+      {error && !scanFailure && !unchecked && <ErrorBanner message={error} />}
       {result?.errors?.length ? <Diagnostics errors={result.errors} /> : null}
 
-      {targets.length === 0 ? null : busy ? (
+      {targets.length === 0 ? null : busy && !unchecked ? (
         <SkeletonList />
       ) : cancelled && games.length === 0 ? (
         <EmptyState label="Scan cancelled. Press Rescan to load games." />
@@ -172,6 +185,7 @@ export default function GamesPage() {
                 artUrl={headers.get(g.name)}
                 loading={headersLoading && !headers.get(g.name)}
                 onPlay={() => playGame(g.name)}
+                playDisabled={unchecked}
               />
             </li>
           ))}

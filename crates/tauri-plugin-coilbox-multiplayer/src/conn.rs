@@ -13,7 +13,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use coilbox_lobby_protocol::{
     command, parse_line, record_outgoing_private, redact_line, reduce_at, ChatKind, Delta,
-    LobbyState, LoginConfig, LoginMachine, LoginPhase, ServerMessage,
+    LobbyState, LoginConfig, LoginMachine, LoginPhase, RingHost, ServerMessage,
 };
 use futures_util::{SinkExt, StreamExt};
 use serde::Serialize;
@@ -276,6 +276,11 @@ pub struct ServerConn {
     /// `watch` would keep only the second. See
     /// [`crate::relay_host::RefusedRelayAddress`].
     pub relay_refused: crate::relay_host::RefusedRelayAddress,
+    /// Who this connection's battle has rung and when, shared between the
+    /// loop, which answers `!ring` typed in the battle, and `mp_ring`, which is
+    /// the founder ringing by hand. One memory, so the delay between rings of
+    /// a player holds whichever way they were rung.
+    pub ring: Arc<Mutex<RingHost>>,
 }
 
 /// The registry of live connections, keyed by a frontend-supplied `serverKey`
@@ -352,6 +357,7 @@ pub fn spawn_connection(
     // through the relay after all. A note rather than a third slot, because it
     // arrives in the same read as the answer above and a slot would lose it.
     let relay_refused = crate::relay_host::RefusedRelayAddress::default();
+    let ring = Arc::new(Mutex::new(RingHost::default()));
 
     tokio::spawn(run_loop(
         stream,
@@ -368,6 +374,7 @@ pub fn spawn_connection(
             opened_slot: opened_tx,
             relay_refused: relay_refused.clone(),
             relay: relay.clone(),
+            ring: ring.clone(),
             dm_log,
             chan_log,
         },
@@ -395,6 +402,7 @@ pub fn spawn_connection(
             relay,
             opened,
             relay_refused,
+            ring,
         },
     );
 }
@@ -439,6 +447,7 @@ struct ConnContext {
     opened_slot: watch::Sender<OpenAnswer>,
     relay_refused: crate::relay_host::RefusedRelayAddress,
     relay: HostedRelay,
+    ring: Arc<Mutex<RingHost>>,
     dm_log: DmLog,
     chan_log: DmLog,
 }
@@ -459,6 +468,7 @@ async fn run_loop(stream: Box<dyn AsyncReadWrite>, login_cfg: LoginConfig, ctx: 
         opened_slot,
         relay_refused,
         relay,
+        ring,
         dm_log,
         chan_log,
     } = ctx;
@@ -594,6 +604,26 @@ async fn run_loop(stream: Box<dyn AsyncReadWrite>, login_cfg: LoginConfig, ctx: 
                                 );
                             },
                         );
+                    }
+
+                    // A battle this client founded has no autohost in it, so
+                    // `!ring` typed there is ours to answer. Read off the line
+                    // rather than in the frontend, so it is answered whichever
+                    // page the host has open.
+                    if let ServerMessage::SaidBattle { username, message } = &msg {
+                        let answer = {
+                            let state = lock_or_recover(&state);
+                            lock_or_recover(&ring).hear(&state, username, message, now_ms())
+                        };
+                        outbound.extend(answer.send);
+                        if let Some(from) = answer.ring_me {
+                            emit(
+                                &sink,
+                                LobbyEvent::Delta {
+                                    delta: Delta::Ring { from },
+                                },
+                            );
+                        }
                     }
 
                     // We just joined a channel and it starts empty: ask for its stored

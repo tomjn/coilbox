@@ -1,16 +1,9 @@
 import { Button } from "@picoframe/frame";
 import { Play } from "lucide-react";
-import { useState } from "react";
-import { useReplayTarget } from "../../../play/config";
-import { useLaunchContent } from "../../../play/LaunchContentProvider";
 import { usePlay } from "../../../play/PlayProvider";
-import { type ReplayWatch, replayEngineRequirement } from "../../replayEngine";
-import { useReplayUserState } from "../../replayUserState";
-
-const isBlocked = (watch: ReplayWatch) =>
-  watch.kind === "wait" ||
-  watch.kind === "none" ||
-  watch.kind === "unavailable";
+import type { ReplayWatch } from "../../replayEngine";
+import { useWatchReplay } from "./useWatchReplay";
+import { isBlocked, launchBlockedReason } from "./useWatchTarget";
 
 /**
  * Launch the engine to watch a replay, on the engine the replay was recorded on
@@ -37,65 +30,16 @@ export function WatchButton({
   /** `replayDependencyBlock`: why the replay's game cannot run, or null. */
   dependencyBlock?: string | null;
 }) {
-  const { resolved } = useReplayTarget(engineVersion);
-  const { ensureContent } = useLaunchContent();
-  const { running, launchReplay } = usePlay();
-  const userState = useReplayUserState();
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { running } = usePlay();
+  const {
+    watchReplay: onWatch,
+    pending,
+    error,
+  } = useWatchReplay(replayPath, engineVersion, watch, dependencyBlock);
 
-  async function onWatch() {
-    if (isBlocked(watch) || dependencyBlock) return;
-    setPending(true);
-    setError(null);
-    try {
-      let target = resolved?.target;
-      // `verify` is an engine in a folder named for the recorded version that has
-      // not said what it is. The shared check asks it, and offers the download if
-      // it is another build (issues #3405, #3452). This is the only place the
-      // replay page starts an engine to ask.
-      if (watch.kind === "download" || watch.kind === "verify") {
-        const check = await ensureContent({
-          requirements: [replayEngineRequirement(engineVersion)],
-          title: "Download the engine this replay needs",
-        });
-        // Closed the drawer, so the replay is not watched and not marked so.
-        if (!check.ready) return;
-        target = check.target;
-      }
-      // `recorded` means the decision found the engine installed. A read of the
-      // engines that has not caught up must not fall through to another one.
-      if (watch.kind === "recorded" && !resolved?.matched) return;
-      if (!target) return;
-      // Watching a replay marks it watched (keyed by filename, as the list is).
-      const filename = replayPath.split(/[\\/]/).pop();
-      if (filename) userState.setWatched(filename, true);
-      const res = await launchReplay({
-        demoPath: replayPath,
-        executable: target.executable,
-        dataDir: target.dataDir,
-      });
-      if (res.exitCode && res.exitCode !== 0) {
-        setError(`Engine exited with code ${res.exitCode}.`);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setPending(false);
-    }
-  }
-
-  const title = dependencyBlock
-    ? dependencyBlock
-    : watch.kind === "none"
-      ? "Install an engine to watch replays."
-      : watch.kind === "unavailable"
-        ? `This replay needs engine ${watch.version}, which is not installed and cannot be downloaded here.`
-        : watch.kind === "wait"
-          ? "Checking for the engine this replay needs."
-          : running && !pending
-            ? "A game is already running."
-            : undefined;
+  const title =
+    launchBlockedReason(watch, dependencyBlock) ??
+    (running && !pending ? "A game is already running." : undefined);
 
   return (
     <div className="flex flex-col items-end gap-1">

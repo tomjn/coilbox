@@ -103,6 +103,7 @@ fn worker(
 }
 
 #[test]
+#[ignore = "needs balanced_annihilation-v15.9.8.sdz in ~/.spring/games, an installed engine with libunitsync, a built coilbox-unitsync-worker in target/debug"]
 fn a_typed_crater_multiplier_loads_as_typed_in_the_engine() {
     let (engine, data) = match setup() {
         Ok(v) => v,

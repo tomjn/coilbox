@@ -39,6 +39,7 @@ import { useOneShotParam } from "@/deeplink/useOneShotParam";
 import { EmptyState } from "@/downloads/pages/components/states";
 import { resolveHome } from "@/home/config";
 import { useHomeBackdropStyle } from "@/home/useHomeBackdropStyle";
+import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { isTypingTarget } from "@/lib/scenarioEditing/history";
 import { getGameMatcher, getProfile } from "@/profile/profile";
 import {
@@ -326,7 +327,7 @@ export default function BrowsePage() {
   );
   const gameOptions = useMemo(() => {
     const byKey = new Map<string, string>();
-    for (const g of scanData?.games ?? []) {
+    for (const g of withoutGeneratedGames(scanData?.games ?? [])) {
       const key = g.info?.shortname?.trim();
       if (!key) continue;
       if (byKey.has(key)) continue;

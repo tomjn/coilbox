@@ -203,12 +203,14 @@ offered to users who have none yet (or from the Maps download page):
   normal download queue (already-present maps are skipped).
 - A distribution profile can ship its own packs too, via `mapLists` in
   `.coilbox/profile.json` — see
-  [Distribution profile](docs/distribution-profile.md). Catalog packs are listed
+  [Distribution profile](docs/developers/distribution-profile.md). Catalog packs are listed
   first, then profile packs, deduped by `id`.
 
 ## Licensing
 
-Coilbox's own code is MIT. It bundles **`pr-downloader`**, which is licensed
+Coilbox's own code is MIT. The Lua under `lua/`, which runs inside the engine, is
+offered under the MIT licence or the GNU General Public License version 2 or any
+later version, at your choice. See [lua/LICENSE.md](lua/LICENSE.md). The installed app carries the notice and both licence texts in a `coilbox-licence` folder beside the Lua it ships, and coilbox writes the same folder when it installs the blueprint widget into a content folder. Coilbox bundles **`pr-downloader`**, which is licensed
 **GPL-2.0-or-later** (© the Spring/Recoil authors). `pr-downloader` is invoked as a
 separate process (a sidecar), i.e. mere aggregation — but redistributing the
 binary carries the GPL obligation to make its corresponding source available. The

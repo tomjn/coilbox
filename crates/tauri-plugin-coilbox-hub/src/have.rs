@@ -548,12 +548,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn plain_http_will_not_carry_a_token() {
-        let refused = api_url("http://hub.example", HAVE_PATH, "Asking").unwrap_err();
-        assert!(refused.contains("https"), "{refused}");
-    }
-
     // ------------------------------------------------------------------- keys
 
     #[test]

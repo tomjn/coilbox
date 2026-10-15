@@ -1,0 +1,11 @@
+[package]
+name = "coilbox-track"
+version = "0.0.0"
+description = "Reads and writes the replay track file (.cbtrack), the recording coilbox plays back in either direction. It works on byte slices and on Read, Write and Seek, with no IO of its own."
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+# The chunks are zlib streams (RFC 1950), because the engine's VFS.ZlibDecompress
+# reads nothing else. flate2 is already a dependency of four other members.
+flate2 = "1"

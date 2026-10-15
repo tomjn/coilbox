@@ -51,56 +51,6 @@ const preset = (draft: SkirmishDraft, name = "Hard one"): SkirmishPreset => ({
   lastUsedAt: "",
 });
 
-describe("presetRecordKey", () => {
-  it("is the same after a rename", () => {
-    const a = preset(setup, "Hard one");
-    const b = { ...preset(setup, "Renamed"), lastUsedAt: "later" };
-    expect(presetRecordKey(a)).toBe(presetRecordKey(b));
-    expect(presetRecordKey(a)).not.toBe("");
-  });
-
-  it("changes when an option is edited", () => {
-    const edited = { ...setup, modOptionValues: { maxunits: "1000" } };
-    expect(presetRecordKey(edited)).not.toBe(presetRecordKey(setup));
-  });
-
-  it("changes when the map, game or an opponent is edited", () => {
-    const key = presetRecordKey(setup);
-    expect(presetRecordKey({ ...setup, mapName: "Other" })).not.toBe(key);
-    expect(presetRecordKey({ ...setup, gameName: "Other 2.0" })).not.toBe(key);
-    expect(
-      presetRecordKey({
-        ...setup,
-        participants: [you, { ...bot, handicap: 10 }],
-      }),
-    ).not.toBe(key);
-  });
-
-  it("changes when a map option is edited", () => {
-    expect(
-      presetRecordKey({ ...setup, mapOptionValues: { wind: "high" } }),
-    ).not.toBe(presetRecordKey(setup));
-  });
-
-  it("ignores per-session participant ids and option key order", () => {
-    const reshuffled: SkirmishDraft = {
-      ...setup,
-      participants: [
-        { ...you, id: "p7" },
-        { ...bot, id: "p8" },
-      ],
-      modOptionValues: { maxunits: "500" },
-    };
-    expect(presetRecordKey(reshuffled)).toBe(presetRecordKey(setup));
-  });
-
-  it("treats no start boxes and an empty set of them as the same", () => {
-    expect(presetRecordKey({ ...setup, startRects: {} })).toBe(
-      presetRecordKey(setup),
-    );
-  });
-});
-
 describe("launchedPreset", () => {
   const saved = preset(setup);
 

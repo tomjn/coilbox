@@ -30,6 +30,7 @@ import {
 import { DifficultyPips } from "@/play/pages/components/DifficultyPips";
 import { usePlayerActions } from "../chat/usePlayerActions";
 import { NoteButton } from "../NoteButton";
+import type { NameMark } from "../nameMark";
 import { useConnection } from "../store";
 import { CountryFlag, RankBadge } from "../UserBadges";
 import { allyLetter, isAiUnavailable, type MemberRow as Row } from "./config";
@@ -73,6 +74,7 @@ export function BattleMembersTable({
   onTeam,
   onAlly,
   onColor,
+  markFor,
 }: {
   rows: Row[];
   sides: Side[];
@@ -107,6 +109,7 @@ export function BattleMembersTable({
     forceColor: (user: string, hex: string) => void;
     forceSpectator: (user: string) => void;
     kick: (user: string) => void;
+    ring: (user?: string) => void;
     appointBoss: (user: string) => void;
     unboss: (user: string) => void;
     removeBot: (name: string) => void;
@@ -151,6 +154,9 @@ export function BattleMembersTable({
   /** The connection this battle is on, whose players' launches flash their
    *  rows (issue #2844). */
   serverKey: string | null;
+  /** Who a name is to the player (themselves, a friend, in their party), from
+   * `useNameMark` on this battle's connection (issue #336). */
+  markFor?: (name: string) => NameMark | null;
 }) {
   const justWentIngame = useConnection(serverKey)?.justWentIngame ?? NO_NAMES;
   // The AI the host will add next; defaults to the first available.
@@ -203,6 +209,7 @@ export function BattleMembersTable({
         onForceSpectator: selfHost
           ? () => hostControls.forceSpectator(row.name)
           : undefined,
+        onRing: selfHost ? () => hostControls.ring(row.name) : undefined,
         onKick: () => hostControls.kick(row.name),
         onAppointBoss:
           canBoss && !row.boss
@@ -408,6 +415,14 @@ export function BattleMembersTable({
                   key={`${row.kind}:${row.name}`}
                   row={row}
                   editable={row.self}
+                  // A bot is nobody to the player, whatever it is called.
+                  mark={
+                    row.self
+                      ? "you"
+                      : row.kind === "human"
+                        ? (markFor?.(row.name) ?? null)
+                        : null
+                  }
                   aiInvalid={aiInvalid}
                   control={control}
                   personal={personalFor(row)}

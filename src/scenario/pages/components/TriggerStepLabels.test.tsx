@@ -19,32 +19,43 @@ afterEach(cleanup);
 
 const noop = () => {};
 
+/**
+ * One step row, in a fresh scenario, with the props these tests never vary
+ * filled in. `list` is the list the step sits in.
+ */
+function renderStep(
+  step: TriggerStep,
+  list: "conditions" | "actions" = "conditions",
+  extensions: ExtensionTypes = NO_EXTENSIONS,
+) {
+  return render(
+    <StepRow
+      step={step}
+      at={{ triggerId: "trigger-1", list, index: 0 }}
+      scenario={newScenario("Test")}
+      extensions={extensions}
+      unsupported={undefined}
+      units={[]}
+      unitsLoading={false}
+      issues={[]}
+      picking={null}
+      onPick={noop}
+      onNegate={null}
+      onParam={noop}
+      onMove={null}
+      onRemove={noop}
+    />,
+  );
+}
+
 describe("trigger parameter labels", () => {
   it("shows the plain label instead of the key, and keeps the key in the accessible name when it differs", () => {
-    const scenario = newScenario("Test");
     const step: TriggerStep = {
       type: "unit_health_below",
       params: { actor: "", fraction: 0.5 },
     };
 
-    render(
-      <StepRow
-        step={step}
-        at={{ triggerId: "trigger-1", list: "conditions", index: 0 }}
-        scenario={scenario}
-        extensions={NO_EXTENSIONS}
-        unsupported={undefined}
-        units={[]}
-        unitsLoading={false}
-        issues={[]}
-        picking={null}
-        onPick={noop}
-        onNegate={null}
-        onParam={noop}
-        onMove={null}
-        onRemove={noop}
-      />,
-    );
+    renderStep(step);
 
     // "fraction" is relabelled, and the key stays in the spoken name.
     expect(screen.getByText("health fraction")).toBeTruthy();
@@ -60,30 +71,12 @@ describe("trigger parameter labels", () => {
   });
 
   it("puts a known runtime default in the placeholder instead of the bare word", () => {
-    const scenario = newScenario("Test");
     const step: TriggerStep = {
       type: "camera_pan",
       params: { pos: { x: 0, z: 0 } },
     };
 
-    render(
-      <StepRow
-        step={step}
-        at={{ triggerId: "trigger-1", list: "actions", index: 0 }}
-        scenario={scenario}
-        extensions={NO_EXTENSIONS}
-        unsupported={undefined}
-        units={[]}
-        unitsLoading={false}
-        issues={[]}
-        picking={null}
-        onPick={noop}
-        onNegate={null}
-        onParam={noop}
-        onMove={null}
-        onRemove={noop}
-      />,
-    );
+    renderStep(step, "actions");
 
     const seconds = screen.getByLabelText(
       "Camera pan seconds",
@@ -97,7 +90,6 @@ describe("trigger parameter labels", () => {
   });
 
   it("falls back to the schema key for a game-declared parameter that ships no label", () => {
-    const scenario = newScenario("Test");
     const extensions: ExtensionTypes = {
       conditions: {
         custom_condition: {
@@ -111,54 +103,19 @@ describe("trigger parameter labels", () => {
     };
     const step: TriggerStep = { type: "custom_condition", params: { foo: 1 } };
 
-    render(
-      <StepRow
-        step={step}
-        at={{ triggerId: "trigger-1", list: "conditions", index: 0 }}
-        scenario={scenario}
-        extensions={extensions}
-        unsupported={undefined}
-        units={[]}
-        unitsLoading={false}
-        issues={[]}
-        picking={null}
-        onPick={noop}
-        onNegate={null}
-        onParam={noop}
-        onMove={null}
-        onRemove={noop}
-      />,
-    );
+    renderStep(step, "conditions", extensions);
 
     expect(screen.getByText("foo")).toBeTruthy();
     expect(screen.getByLabelText("Custom condition foo")).toBeTruthy();
   });
 
   it("names the enum branch's select the same way as the other fields (issue #2299)", () => {
-    const scenario = newScenario("Test");
     const step: TriggerStep = {
       type: "var",
       params: { name: "score", op: "eq", value: 0 },
     };
 
-    render(
-      <StepRow
-        step={step}
-        at={{ triggerId: "trigger-1", list: "conditions", index: 0 }}
-        scenario={scenario}
-        extensions={NO_EXTENSIONS}
-        unsupported={undefined}
-        units={[]}
-        unitsLoading={false}
-        issues={[]}
-        picking={null}
-        onPick={noop}
-        onNegate={null}
-        onParam={noop}
-        onMove={null}
-        onRemove={noop}
-      />,
-    );
+    renderStep(step);
 
     // "op" is relabelled to "comparison", so the key stays in the spoken name.
     expect(screen.getByLabelText("Var comparison, op")).toBeTruthy();
@@ -170,27 +127,7 @@ describe("trigger parameter labels", () => {
    * scenario's own actors, and the command from a fixed list.
    */
   it("offers a team, a unit type and a placed unit for a selection, and a command for an order", () => {
-    const scenario = newScenario("Test");
-    const row = (step: TriggerStep) => (
-      <StepRow
-        step={step}
-        at={{ triggerId: "trigger-1", list: "conditions", index: 0 }}
-        scenario={scenario}
-        extensions={NO_EXTENSIONS}
-        unsupported={undefined}
-        units={[]}
-        unitsLoading={false}
-        issues={[]}
-        picking={null}
-        onPick={noop}
-        onNegate={null}
-        onParam={noop}
-        onMove={null}
-        onRemove={noop}
-      />
-    );
-
-    render(row({ type: "unit_selected", params: {} }));
+    renderStep({ type: "unit_selected", params: {} });
     expect(screen.getByText("team")).toBeTruthy();
     expect(screen.getByText("unit type")).toBeTruthy();
     expect(
@@ -198,36 +135,18 @@ describe("trigger parameter labels", () => {
     ).toBeTruthy();
     cleanup();
 
-    render(row({ type: "command_given", params: { command: "move" } }));
+    renderStep({ type: "command_given", params: { command: "move" } });
     expect(screen.getByLabelText("Command given command")).toBeTruthy();
     expect(screen.getByText("unit to build")).toBeTruthy();
   });
 
   it("names the point picker's group rather than either of its two parts (issue #2299)", () => {
-    const scenario = newScenario("Test");
     const step: TriggerStep = {
       type: "camera_pan",
       params: { pos: { x: 0, z: 0 } },
     };
 
-    render(
-      <StepRow
-        step={step}
-        at={{ triggerId: "trigger-1", list: "actions", index: 0 }}
-        scenario={scenario}
-        extensions={NO_EXTENSIONS}
-        unsupported={undefined}
-        units={[]}
-        unitsLoading={false}
-        issues={[]}
-        picking={null}
-        onPick={noop}
-        onNegate={null}
-        onParam={noop}
-        onMove={null}
-        onRemove={noop}
-      />,
-    );
+    renderStep(step, "actions");
 
     // "pos" is relabelled to "position", so the key stays in the spoken name
     // the same way #2274 already does for a text or number field.
@@ -237,30 +156,12 @@ describe("trigger parameter labels", () => {
   });
 
   it("names the orders list's group rather than any one row inside it (issue #2299)", () => {
-    const scenario = newScenario("Test");
     const step: TriggerStep = {
       type: "give_orders",
       params: { group: "", orders: [] },
     };
 
-    render(
-      <StepRow
-        step={step}
-        at={{ triggerId: "trigger-1", list: "actions", index: 0 }}
-        scenario={scenario}
-        extensions={NO_EXTENSIONS}
-        unsupported={undefined}
-        units={[]}
-        unitsLoading={false}
-        issues={[]}
-        picking={null}
-        onPick={noop}
-        onNegate={null}
-        onParam={noop}
-        onMove={null}
-        onRemove={noop}
-      />,
-    );
+    renderStep(step, "actions");
 
     // "orders" has no label of its own, so the key stands in for the friendly
     // name and is not doubled up the way #2274 already covers for "actor".
@@ -270,30 +171,12 @@ describe("trigger parameter labels", () => {
   });
 
   it("says a text field is optional instead of the bare word 'default' (issue #2299)", () => {
-    const scenario = newScenario("Test");
     const step: TriggerStep = {
       type: "map_marker",
       params: { pos: { x: 0, z: 0 } },
     };
 
-    render(
-      <StepRow
-        step={step}
-        at={{ triggerId: "trigger-1", list: "actions", index: 0 }}
-        scenario={scenario}
-        extensions={NO_EXTENSIONS}
-        unsupported={undefined}
-        units={[]}
-        unitsLoading={false}
-        issues={[]}
-        picking={null}
-        onPick={noop}
-        onNegate={null}
-        onParam={noop}
-        onMove={null}
-        onRemove={noop}
-      />,
-    );
+    renderStep(step, "actions");
 
     const text = screen.getByLabelText("Map marker text") as HTMLInputElement;
     expect(text.placeholder).toBe("optional");

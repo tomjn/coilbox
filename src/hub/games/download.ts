@@ -1,5 +1,5 @@
-import { dlGithubReleaseArchives } from "../../downloads/bindings";
 import type { EnqueueInput } from "../../downloads/DownloadQueueProvider";
+import { loadGithubReleases } from "../../downloads/githubReleases";
 import type { HubGameDownload } from "../api";
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -50,7 +50,7 @@ export async function hubGameDownloadRequest(
 
     // github: the only kind that can genuinely come up empty ahead of time.
     try {
-      const { archives } = await dlGithubReleaseArchives({ repo: dl.value });
+      const archives = await loadGithubReleases(dl.value);
       if (archives.length === 0) {
         errors.push(`${dl.value}: no release archives`);
         continue;

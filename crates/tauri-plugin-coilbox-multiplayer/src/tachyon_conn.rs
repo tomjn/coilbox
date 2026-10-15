@@ -56,7 +56,7 @@ use crate::{
 
 /// The path the WebSocket sits at. The specification carries an open question about
 /// advertising it in the OAuth metadata, and nothing advertises it today, so this
-/// convention is hardcoded (see `docs/tachyon-protocol.md`).
+/// convention is hardcoded (see `docs/internal/tachyon-protocol.md`).
 const TACHYON_PATH: &str = "/tachyon";
 
 /// How long a graceful disconnect waits for the close handshake before dropping the
@@ -162,6 +162,7 @@ pub fn spawn_connection(
             relay: crate::conn::HostedRelay::default(),
             opened: watch::channel(crate::relay_host::OpenAnswer::Unasked).1,
             relay_refused: crate::relay_host::RefusedRelayAddress::default(),
+            ring: Default::default(),
         },
     );
 }

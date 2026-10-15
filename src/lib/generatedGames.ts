@@ -1,18 +1,19 @@
 /**
  * The games coilbox writes for itself.
  *
- * Three flows need a game the engine can launch that the player never
+ * Four flows need a game the engine can launch that the player never
  * installed. The unit builder tests a built unit in one
  * (`src/lego/scratchGame.ts`), a scenario is tested in one when the real game
- * cannot play missions (`src/scenario/mutator.ts`), and a workshop project is
+ * cannot play missions (`src/scenario/mutator.ts`), a workshop project is
  * tested in one on every game, since a mutator archive is the one route that
- * works everywhere (`src/workshop/mutator.ts`, issue #1278). All three are
+ * works everywhere (`src/workshop/mutator.ts`, issue #1278), and a replay's
+ * recorded track is played back in one (issue #3793). All four are
  * loose `.sdd` folders under the content root's `games/`, so unitsync scans
  * them and reports them as games like any other, and every game list picks
  * them up.
  *
  * That is the whole reason this module exists. Each flow already recognised its
- * own folder, and nothing recognised all three, so a picker that filtered one
+ * own folder, and nothing recognised all of them, so a picker that filtered one
  * still offered the others. Every name, every predicate and the union of them
  * live here, and every list asks this one module.
  *
@@ -40,6 +41,12 @@ export const MUTATOR_FOLDER = "coilbox-mission-test.sdd";
  */
 export const WORKSHOP_MUTATOR_FOLDER = "coilbox-workshop-test.sdd";
 
+/**
+ * The replay playback game's folder (issue #3793), matching `playback::FOLDER`
+ * in `tauri-plugin-coilbox-content`.
+ */
+export const PLAYBACK_FOLDER = "coilbox-replay-playback.sdd";
+
 /** Whether a scanned archive is the unit builder's scratch game. */
 export function isScratchArchive(archiveName: string): boolean {
   return archiveName.toLowerCase() === SCRATCH_FOLDER;
@@ -53,6 +60,11 @@ export function isMutatorArchive(archiveName: string): boolean {
 /** Whether a scanned archive is the workshop's local test mutator. */
 export function isWorkshopMutatorArchive(archiveName: string): boolean {
   return archiveName.toLowerCase() === WORKSHOP_MUTATOR_FOLDER;
+}
+
+/** Whether a scanned archive is the replay playback game. */
+export function isPlaybackArchive(archiveName: string): boolean {
+  return archiveName.toLowerCase() === PLAYBACK_FOLDER;
 }
 
 const UNDO = "Deleting its folder undoes it.";
@@ -71,6 +83,8 @@ export function generatedGameNote(archiveName: string): string | null {
     return `Coilbox writes this game to test a scenario in when the real game cannot play one, and rewrites it on every test launch. It is not a game to play. ${UNDO}`;
   if (isWorkshopMutatorArchive(archiveName))
     return `Coilbox writes this game to test a workshop project in, and rewrites it on every test launch. It is not a game to play. ${UNDO}`;
+  if (isPlaybackArchive(archiveName))
+    return `Coilbox writes this game to play a recorded replay back in, and rewrites it on every playback. It is not a game to play. ${UNDO}`;
   return null;
 }
 

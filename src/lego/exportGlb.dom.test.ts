@@ -6,17 +6,19 @@
  * The writer is three.js's `GLTFExporter` on this side of the IPC and the
  * reader is hand-written Rust on the other, and neither half's own tests say
  * anything about the other. So this runs the real exporter and drops what it
- * produces at `crates/tauri-plugin-coilbox-lego/tests/exported.glb`, which
+ * produces against `crates/tauri-plugin-coilbox-lego/tests/exported.glb`, which
  * `glb.rs`'s `opens_the_file_coilboxs_own_exporter_writes` opens. Change the
- * exporter and this rewrites the fixture, so `cargo test` is what tells you the
- * reader can no longer keep up.
+ * exporter and this fails until the fixture is regenerated with
+ *   UPDATE_LEGO_FIXTURE=1 bun run test exportGlb.dom
+ * and then `cargo test` is what tells you the reader can no longer keep up.
+ * Read the diff before committing the new file.
  *
  * A DOM because `GLTFExporter` reaches for one. No texture, because embedding
  * one goes through a canvas that happy-dom does not have. The embedded picture
  * is covered by `glb.rs`'s own tests, which build a container by hand.
  */
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -109,7 +111,9 @@ describe("exportGlb", () => {
     expect(header.getUint32(4, true)).toBe(2);
     expect(header.getUint32(8, true)).toBe((bytes as ArrayBuffer).byteLength);
 
-    mkdirSync(dirname(FIXTURE), { recursive: true });
-    writeFileSync(FIXTURE, new Uint8Array(bytes as ArrayBuffer));
+    const emitted = new Uint8Array(bytes as ArrayBuffer);
+    if (process.env.UPDATE_LEGO_FIXTURE) writeFileSync(FIXTURE, emitted);
+
+    expect(Buffer.from(emitted).equals(readFileSync(FIXTURE))).toBe(true);
   });
 });

@@ -126,14 +126,49 @@ export interface Participant {
   team?: number;
 }
 
-let idSeq = 0;
-const nextId = () => `p${idSeq++}`;
+/**
+ * An id no row in `taken` has. Drawn at random and checked against the roster
+ * it is joining, because a roster is saved and comes back in a later session:
+ * a counter starts again from nothing there and hands out ids the saved rows
+ * already hold. Kept to a letter and hex digits, the shape ids have always had,
+ * since a scenario writes them into its Lua as team keys.
+ */
+function freshId(taken: ReadonlySet<string>): string {
+  for (;;) {
+    const id = `p${crypto.randomUUID().slice(0, 8)}`;
+    if (!taken.has(id)) return id;
+  }
+}
+
+/**
+ * Give every row that repeats an earlier row's id an id of its own, for a
+ * roster saved while ids could still collide. The first row keeps the id, so
+ * whatever refers to it by id still finds a row. Returns the same array
+ * reference when no id repeats.
+ */
+export function uniqueParticipantIds(
+  participants: Participant[],
+): Participant[] {
+  const taken = new Set(participants.map((p) => p.id));
+  if (taken.size === participants.length) return participants;
+  const seen = new Set<string>();
+  return participants.map((p) => {
+    if (!seen.has(p.id)) {
+      seen.add(p.id);
+      return p;
+    }
+    const id = freshId(taken);
+    taken.add(id);
+    return { ...p, id };
+  });
+}
 
 /** The initial two-participant setup: you (ally 0) vs one AI (ally 1). */
 export function initialParticipants(): Participant[] {
+  const youId = freshId(new Set());
   return [
     {
-      id: nextId(),
+      id: youId,
       kind: "you",
       name: "You",
       side: "",
@@ -142,7 +177,7 @@ export function initialParticipants(): Participant[] {
       spectator: false,
     },
     {
-      id: nextId(),
+      id: freshId(new Set([youId])),
       kind: "ai",
       name: "AI 1",
       side: "",
@@ -165,7 +200,7 @@ export function makeAiParticipant(
 ): Participant {
   const aiCount = existing.filter((p) => p.kind === "ai").length;
   return {
-    id: nextId(),
+    id: freshId(new Set(existing.map((p) => p.id))),
     kind: "ai",
     name: `AI ${aiCount + 1}`,
     ai,

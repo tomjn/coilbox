@@ -26,4 +26,12 @@ export interface MapScene3D {
   /** Terrain extent in scene units. */
   planeWidth: number;
   planeDepth: number;
+  /**
+   * The terrain itself, for a layer that lies on the ground as a texture and
+   * not as objects standing on it (`heatmapLayer.ts`). Its geometry is a flat
+   * plane and its material's `displacementMap` is what gives it relief, so a
+   * layer that reuses both sits exactly on the surface. The preview owns and
+   * disposes it. Absent on the map-free grid, which is flat.
+   */
+  terrain?: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
 }

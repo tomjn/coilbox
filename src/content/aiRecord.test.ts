@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aiGameFor, aiRecordFor, bonusLabel } from "./aiRecord";
+import { aiGameFor, aiRecordFor, aiWinFacts, bonusLabel } from "./aiRecord";
 import type { StatAi, StatPlayer, StatRecord } from "./bindings";
 
 let seq = 0;
@@ -281,5 +281,59 @@ describe("aiRecordFor", () => {
     ];
     const { rows } = aiRecordFor(records, "me", none, none);
     expect(rows.map((r) => r.ai)).toEqual(["Zed", "Alpha"]);
+  });
+});
+
+describe("aiWinFacts", () => {
+  const none: ReadonlySet<string> = new Set();
+
+  it("lists only games I won against AI, with the AIs beaten once each", () => {
+    const records = [
+      duel(true),
+      duel(false),
+      duel(undefined),
+      rec([human("me", 0, true)], [bot("BARb", 1), bot("BARb", 2)]),
+    ];
+    const facts = aiWinFacts(records, "me", none, none);
+    expect(facts).toHaveLength(2);
+    expect(facts[1].ais).toEqual(["BARb"]);
+  });
+
+  it("ignores an AI on my own ally team", () => {
+    const r = rec([human("me", 0, true)], [bot("Ally", 0), bot("Foe", 1)]);
+    expect(aiWinFacts([r], "me", none, none)[0].ais).toEqual(["Foe"]);
+  });
+
+  it("ignores a win with a human opponent in the game", () => {
+    const r = rec(
+      [human("me", 0, true), human("foe", 1, false)],
+      [bot("B", 2)],
+    );
+    expect(aiWinFacts([r], "me", none, none)).toEqual([]);
+  });
+
+  it("applies the remix, refight and scripted filters", () => {
+    const remix = rec([human("me", 0, true)], [bot("A", 1)], { remixed: true });
+    const refight = duel(true);
+    const scripted = duel(true);
+    const facts = aiWinFacts(
+      [remix, refight, scripted, duel(true)],
+      "me",
+      new Set([refight.filename]),
+      new Set([scripted.filename]),
+    );
+    expect(facts).toHaveLength(1);
+  });
+
+  it("gives nothing for records with no AIs", () => {
+    const r = rec([human("me", 0, true)], []);
+    expect(aiWinFacts([r], "me", none, none)).toEqual([]);
+  });
+
+  it("is chronological", () => {
+    const late = { ...duel(true), startTimeMs: 99_000 };
+    const early = { ...duel(true), startTimeMs: 1_000 };
+    const facts = aiWinFacts([late, early], "me", none, none);
+    expect(facts.map((f) => f.startTimeMs)).toEqual([1_000, 99_000]);
   });
 });

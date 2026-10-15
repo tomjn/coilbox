@@ -41,6 +41,18 @@ describe("the rating badge", () => {
     expect(screen.getByText("1650")).toBeTruthy();
   });
 
+  it("adds a caveat after the summary when a surface gives one", () => {
+    render(
+      <RatingBadge
+        rating={rating({ overall: 25 })}
+        detail="Lobby's own text."
+      />,
+    );
+    expect(screen.getByRole("img").getAttribute("title")).toBe(
+      "Rating 25. Lobby's own text.",
+    );
+  });
+
   // One number on screen and two in the record, so the label has to say which
   // is which. Without it the row shows a figure nobody can name.
   it("names both of them to anybody who asks", () => {

@@ -131,6 +131,55 @@ fn unwritable_script_fails_to_recompile() {
     assert!(compile_bos(&decompiled.source, &fixtures()).is_err());
 }
 
+/// An instruction only Total Annihilation runs is read rather than refused,
+/// and the script it is in is kept as a listing that says why.
+#[test]
+fn a_total_annihilation_instruction_is_named_and_kept_as_a_listing() {
+    // CARRIER_UNIT_ID, POP_STACK, PUSH_CONSTANT 0, RETURN.
+    let words: [u32; 5] = [0x10045000, 0x10024000, 0x10021001, 0, 0x10065000];
+    let mut code = Vec::new();
+    for w in words {
+        code.extend_from_slice(&w.to_le_bytes());
+    }
+    let cob = cob_with_one_script("Create", &code, &["base"]);
+    let decompiled = decompile_cob(&cob).expect("decompile");
+    assert_eq!(decompiled.warnings.len(), 1, "{:?}", decompiled.warnings);
+    assert!(
+        decompiled.warnings[0].contains("only Total Annihilation"),
+        "{:?}",
+        decompiled.warnings
+    );
+    assert!(
+        decompiled.source.contains("CARRIER_UNIT_ID"),
+        "{}",
+        decompiled.source
+    );
+}
+
+/// Another compiler leaves `256 | 2` as three instructions where this one
+/// folds it to 258, so the BOS is right and still does not compile back to the
+/// file it came from. That is said rather than left for someone to find.
+#[test]
+fn a_recompile_that_differs_from_the_original_is_said() {
+    // PUSH_CONSTANT 256, PUSH_CONSTANT 2, BITWISE_OR, SLEEP, PUSH_CONSTANT 0, RETURN.
+    let words: [u32; 9] = [
+        0x10021001, 256, 0x10021001, 2, 0x10036000, 0x10013000, 0x10021001, 0, 0x10065000,
+    ];
+    let mut code = Vec::new();
+    for w in words {
+        code.extend_from_slice(&w.to_le_bytes());
+    }
+    let cob = cob_with_one_script("Create", &code, &["base"]);
+    let decompiled = decompile_cob(&cob).expect("decompile");
+    assert_eq!(decompiled.warnings.len(), 1, "{:?}", decompiled.warnings);
+    assert!(
+        decompiled.warnings[0].contains("byte for byte"),
+        "{:?}",
+        decompiled.warnings
+    );
+    assert!(compile_bos(&decompiled.source, &fixtures()).is_ok());
+}
+
 /// COBBLER writes its own name into the stream after the first script's last
 /// `RETURN`. That is data, not code, so the script still reads as BOS.
 #[test]

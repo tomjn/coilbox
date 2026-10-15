@@ -1,5 +1,5 @@
 import { Input } from "@picoframe/frame";
-import { Hash, MessageSquare, Search, User } from "lucide-react";
+import { Hash, MessageSquare, Search, Swords, User } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   type ChatLogAccount,
@@ -8,7 +8,10 @@ import {
   mpChatLogOpen,
   mpChatLogs,
 } from "../bindings";
+import { isBattleChannel } from "../chat/conversation";
 import { FormattedText } from "../chat/FormattedText";
+import { accountLabel, threadLabel } from "../chatLogNames";
+import { useMultiplayer, useProtocolServers } from "../store";
 
 /** A thread selection: which account + thread is open. */
 interface Selection {
@@ -35,6 +38,29 @@ export default function ChatLogPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const { connections } = useMultiplayer();
+  const servers = useProtocolServers();
+
+  // Live battle lists, so a battle's chat can be named by its title.
+  const liveStates = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(connections).map(([k, c]) => [k, c.mirror.state]),
+      ),
+    [connections],
+  );
+  const labelFor = (account: string, t: ChatLogThread) =>
+    threadLabel(t, account, liveStates);
+  const iconFor = (t: ChatLogThread) =>
+    t.kind === "channel" ? (
+      isBattleChannel(t.name) ? (
+        <Swords className="size-4 shrink-0 text-muted-foreground" />
+      ) : (
+        <Hash className="size-4 shrink-0 text-muted-foreground" />
+      )
+    ) : (
+      <User className="size-4 shrink-0 text-muted-foreground" />
+    );
 
   useEffect(() => {
     mpChatLogs({})
@@ -108,7 +134,7 @@ export default function ChatLogPage() {
             accounts.map((acc) => (
               <div key={acc.account}>
                 <h2 className="mb-1 truncate px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {acc.account}
+                  {accountLabel(acc.account, servers)}
                 </h2>
                 <ul className="flex flex-col gap-0.5">
                   {acc.threads.map((t) => {
@@ -125,13 +151,9 @@ export default function ChatLogPage() {
                           }
                           className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"}`}
                         >
-                          {t.kind === "channel" ? (
-                            <Hash className="size-4 shrink-0 text-muted-foreground" />
-                          ) : (
-                            <User className="size-4 shrink-0 text-muted-foreground" />
-                          )}
+                          {iconFor(t)}
                           <span className="min-w-0 flex-1 truncate">
-                            {t.name}
+                            {labelFor(acc.account, t)}
                           </span>
                           <span className="shrink-0 text-xs text-muted-foreground">
                             {t.messageCount}
@@ -152,12 +174,10 @@ export default function ChatLogPage() {
             <>
               <div className="flex items-center gap-2 border-b border-border px-4 py-2">
                 <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
-                  {selection.thread.kind === "channel" ? (
-                    <Hash className="size-4 text-muted-foreground" />
-                  ) : (
-                    <User className="size-4 text-muted-foreground" />
-                  )}
-                  <span className="truncate">{selection.thread.name}</span>
+                  {iconFor(selection.thread)}
+                  <span className="truncate">
+                    {labelFor(selection.account, selection.thread)}
+                  </span>
                 </span>
                 <div className="relative ml-auto w-56">
                   <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />

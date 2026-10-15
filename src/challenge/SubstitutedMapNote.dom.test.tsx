@@ -48,7 +48,9 @@ vi.mock("../content/config", () => ({
     run: vi.fn(),
     cancel: vi.fn(),
   }),
+  forgetScans: vi.fn(),
   invalidateScans: vi.fn(),
+  rescanMounted: vi.fn(),
 }));
 
 vi.mock("../content/mapEligibility", () => ({

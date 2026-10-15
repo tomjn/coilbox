@@ -1,6 +1,8 @@
 import { defineCommand } from "@picoframe/plugin-sdk";
 import type { Channel } from "@tauri-apps/api/core";
 import type { DownloadProgress } from "../downloads/bindings";
+import type { LaunchEvent, LaunchOutcome } from "../play/bindings";
+import { gameArchivePath, gameRefs, mapHint, mapRefs } from "./scanHints";
 
 /**
  * Typed bindings to `plugin:coilbox-content|*` (crate `tauri-plugin-coilbox-content`,
@@ -315,6 +317,15 @@ export interface ReplayFile {
   skillMax?: number;
   /** True when this file is a coilbox remix (rewritten to run on a local build). */
   remixed?: boolean;
+  /** A remix whose header names one game and whose first packet another, so
+   * the engine plays it on the game it was recorded with. Made by a coilbox
+   * older than the fix for issue #3861. */
+  staleRemix?: boolean;
+  /** A zero byte file: a recording that did not finish, or one still being
+   * written. The engine writes a replay only when its game ends. */
+  unfinished?: boolean;
+  /** The match's game id, absent for a remix or a replay without a usable one. */
+  gameId?: string;
 }
 
 /**
@@ -427,8 +438,30 @@ export interface Metric {
   surfaced: boolean;
 }
 
+/**
+ * One metric divided by another, declared in the registry beside the metrics
+ * (`RATIOS` in `metrics.rs`). It has no unit and is not a rate, so never say
+ * "per minute" about it. A match whose `denominator` is zero has no ratio:
+ * that is neither infinity nor zero. Both halves are `roster` metrics, the ones
+ * the stats store keeps totals for.
+ */
+export interface MetricRatio {
+  /** What the ratio is called. It is never a metric key. */
+  key: string;
+  /** What to call it in the interface. */
+  label: string;
+  /** The metric on top. */
+  numerator: MetricKey;
+  /** The metric underneath. */
+  denominator: MetricKey;
+}
+
 /** One player/spectator from a demo, with side + ally-team resolved from their team. */
 export interface ReplayPlayer {
+  /** The `[playerN]` number, which a chat line's or a timeline event's
+   * `player` holds. The decoder always sends it. It is optional here only so
+   * that the many hand built players in tests need not carry one. */
+  player?: number;
   name: string;
   team?: number;
   allyTeam?: number;
@@ -440,6 +473,9 @@ export interface ReplayPlayer {
   /** Set only when the winner is known and the player isn't a spectator. */
   won?: boolean;
   skill?: string;
+  /** The `skilluncertainty` the lobby wrote beside `skill`, as the script
+   * holds it. Absent when the script has none or it is not a number. */
+  skillUncertainty?: number;
   countryCode?: string;
   /** This seat's counters, absent when the match has none to show. */
   stats?: PlayerStats;
@@ -491,6 +527,16 @@ export interface AllyTeamInfo {
   color?: [number, number, number];
 }
 
+/** Where one team started, in world units (elmos): `x` and `z` across the map,
+ * `y` up. Not scaled to the map, which a replay does not state the size of. */
+export interface TeamStartPosition {
+  /** The `[teamN]` index, the same number `ReplayPlayer.team` and `ReplayAi.team` carry. */
+  team: number;
+  x: number;
+  y: number;
+  z: number;
+}
+
 /** Decoded replay metadata (native header + start-script + trailer, with
  * demotool as a fallback for a trailer format the decoder refuses). */
 export interface DemoInfo {
@@ -520,6 +566,8 @@ export interface DemoInfo {
   ais: ReplayAi[];
   /** True when this file is a coilbox remix (rewritten to run on a local build). */
   remixed?: boolean;
+  /** See `ReplayFile.staleRemix`. */
+  staleRemix?: boolean;
   /** For a remix, the gametype it was originally recorded on. */
   sourceGametype?: string;
   /** For a remix, the filename of the original replay it was made from. */
@@ -528,6 +576,16 @@ export interface DemoInfo {
    * to reproduce the battle's options (e.g. refight-as-skirmish, #368). Empty
    * when the script carried no `[modoptions]` section. */
   modOptions: Record<string, string>;
+  /** The `[mapoptions]` section verbatim, as `modOptions` is. Empty when the
+   * script carried none. */
+  mapOptions: Record<string, string>;
+  /** The match's setup as the engine held it, which the game's unit list is
+   * read with (#3847). Absent for a start script the engine would refuse. */
+  matchSetup?: MatchSetup;
+  /** Where each team started, by team id, from the replay's stream (#1146). A
+   * team with no recorded position is absent, since 0,0,0 is a real map corner.
+   * Absent altogether when the stream has none or cannot be read. */
+  startPositions?: TeamStartPosition[];
 }
 
 /**
@@ -572,12 +630,19 @@ export const contentReplayTrailer = defineCommand<
  */
 export const contentMetricRegistry = defineCommand<
   undefined,
-  { metrics: Metric[] }
+  { metrics: Metric[]; ratios: MetricRatio[] }
 >("coilbox-content", "content_metric_registry");
 
 /** One player as recorded in a stats-database game (flattened from the demo). */
 export interface StatPlayer {
   name: string;
+  /**
+   * The `[teamN]` index this seat plays for: the key of its team's entry in
+   * `StatRecord.teamTotals`. Absent for a spectator, and for a record ingested
+   * before schema 5 until the next pass re-decodes it. Team 0 is a real team,
+   * so test for `undefined` and never for falsy.
+   */
+  team?: number;
   allyTeam?: number;
   /** Faction (the team's `side`). */
   side?: string;
@@ -606,6 +671,9 @@ export interface StatAi {
   /** The AI's identity (`name` is usually just a slot label like `AI 1`). */
   shortName: string;
   version?: string;
+  /** The `[teamN]` index the bot plays for. Absent on a record from before
+   * schema 5. See `StatPlayer.team`. */
+  team?: number;
   allyTeam?: number;
   /** Faction (the team's `side`). */
   side?: string;
@@ -704,25 +772,313 @@ export const contentStatsWatchStop = defineCommand<
   { watching: boolean }
 >("coilbox-content", "content_stats_watch_stop");
 
+/** Who a chat line was addressed to. */
+export type ChatDest =
+  | { kind: "player"; player: number }
+  | { kind: "allies" }
+  | { kind: "spectators" }
+  | { kind: "everyone" };
+
 /** One chat/system line from a replay's network stream. */
 export interface ChatLine {
-  /** The speaking player's number, when the line names one. */
-  player?: number;
-  /** Player name resolved from the start-script, when known. */
+  /** Simulation frame the line arrived in, `-1` before the match started.
+   * 30 frames are one second of match time. */
+  frame: number;
+  /** The packet's `modGameTime` in seconds. Orders pregame lines. Not match
+   * time. */
+  time: number;
+  /** The speaking player's number. 255 is the server. */
+  player: number;
+  /** Player name from the start script or the stream, when either names them. */
   playerName?: string;
+  /** Who a player's line was for. Absent on system lines. */
+  dest?: ChatDest;
   text: string;
   /** True for engine system messages (vs a player chat line). */
   system: boolean;
 }
 
+/** Why a player left, from the engine's `bIntended` byte. `other` is a value
+ * the engine does not define, carried as sent. */
+export type LeaveReason =
+  | { kind: "lostConnection" }
+  | { kind: "left" }
+  | { kind: "kicked" }
+  | { kind: "other"; code: number };
+
+/** What a {@link TimelineEvent} is. The engine's `JoinTeam` message is left
+ * out, since every match opens with them. */
+export type TimelineEventKind =
+  /** The player stopped playing. */
+  | { type: "resigned" }
+  /** A team died. `players` are the names of whoever controlled it, empty when
+   * no named player did (a bot's team). The event's own `player` is only the
+   * one who reported it, so do not name them. */
+  | { type: "teamDied"; team: number; players: string[] }
+  | { type: "playerLeft"; reason: LeaveReason }
+  | { type: "paused"; paused: boolean }
+  /** A player who was not in the start script joined mid game. */
+  | { type: "joined"; spectator: boolean; team: number }
+  /** Everything `fromTeam` owned went to `toTeam`. */
+  | { type: "giveAway"; toTeam: number; fromTeam: number }
+  /** A team action the engine does not define, carried as sent. */
+  | { type: "other"; action: number; param1: number; param2: number };
+
+/** Something that happened to the match or its players, from the typed
+ * messages in the replay's stream. */
+export type TimelineEvent = {
+  /** Simulation frame, `-1` before the match started. 30 frames are one second. */
+  frame: number;
+  /** The packet's `modGameTime` in seconds. Orders events that share a frame. */
+  time: number;
+  /** The player it concerns. */
+  player: number;
+  /** That player's name as it stood when the event arrived, when known. */
+  playerName?: string;
+} & TimelineEventKind;
+
 /**
- * Extract a replay's chat log (its `NETMSG_CHAT`/`SYSTEMMSG` lines) via
- * `demotool --dump`. Read on demand — it walks the whole demo stream.
+ * Extract a replay's chat log (its `NETMSG_CHAT`/`SYSTEMMSG` lines) and its
+ * timeline events (resignations, departures, pauses, late joiners, team
+ * deaths) from one native stream walk. Needs no engine folder. Read on demand,
+ * it walks the whole demo stream. `incomplete` is set when the walk stopped
+ * early, so lines and events after that point are missing.
  */
 export const contentDemoChat = defineCommand<
-  { enginePath: string; replayPath: string },
-  { messages: ChatLine[] }
+  { replayPath: string },
+  { messages: ChatLine[]; incomplete: boolean; events: TimelineEvent[] }
 >("coilbox-content", "content_demo_chat");
+
+/** What issued an order. `lua` is a widget on the player's own machine acting
+ *  for that player, not a bot. `ai` is a skirmish AI the player's machine hosts. */
+export type CommandOrigin =
+  | { kind: "selection" }
+  | { kind: "lua" }
+  | { kind: "ai"; ai: number; team: number };
+
+/** Where in a builder's queue a build order went. */
+export type BuildSlot =
+  /** A placed building given without shift, which replaces the queue. */
+  | { kind: "replace" }
+  /** The end of the queue: a placed building given with shift, or a factory order. */
+  | { kind: "append" }
+  /** A factory order given with alt, which goes to the front. */
+  | { kind: "front" }
+  /** The engine's insert command by position. 0 is "build this next", and a
+   *  negative position counts back from the end. */
+  | { kind: "insertAt"; position: number }
+  /** The engine's insert command beside the queued command carrying `tag`. */
+  | { kind: "insertAtTag"; tag: number; after: boolean };
+
+/** One order to build a unit, as a player gave it. An order, not a building:
+ *  the replay does not say whether it was carried out. */
+export interface BuildOrder {
+  /** Simulation frame. 30 frames are one second of match time. */
+  frame: number;
+  /** The `[playerN]` number of whoever sent it. */
+  player: number;
+  /** The `[teamN]` index that player was on at the time, or the AI's team. */
+  team?: number;
+  origin: CommandOrigin;
+  /** The engine's unit definition id, which means something only inside the
+   *  build of the game the replay was played on. See `resolveBuildUnit`. */
+  unitDefId: number;
+  /** Where the building was placed, in elmos. Absent for a factory queue order. */
+  position?: { x: number; y: number; z: number };
+  /** 0 south, 1 east, 2 north, 3 west. Absent when the order does not say. */
+  facing?: number;
+  /** How many units the order asks for: 1 for a placed building, and 1, 5, 20
+   *  or 100 for a factory queue order. */
+  count: number;
+  slot: BuildSlot;
+  /** How many units were given the order. One order to several builders is
+   *  one order. */
+  builders: number;
+  /** The build command's option bits as the engine sent them. */
+  options: number;
+}
+
+export interface DemoBuildOrders {
+  /** Every build order, in the order the engine recorded them. */
+  orders: BuildOrder[];
+  /** A name for each player number in `orders` that has one. */
+  players: { player: number; name: string }[];
+  /** Factory queue orders that took units off a queue. Counted, not listed. */
+  removals: number;
+  /** The last simulation frame the replay reached. */
+  lastFrame: number;
+  /** True when the walk stopped early, so later orders are missing. */
+  incomplete: boolean;
+}
+
+/**
+ * Read every order to build something out of a replay (#1145). Needs no engine
+ * folder and no installed game: the unit definition ids come back as the
+ * engine recorded them. Read on demand, it walks the whole demo stream.
+ */
+export const contentDemoBuildOrders = defineCommand<
+  { replayPath: string },
+  DemoBuildOrders
+>("coilbox-content", "content_demo_build_orders");
+
+/**
+ * Every order in a replay that points at a place on the map, packed (#1152).
+ *
+ * Not objects and not a JSON array: each field is one column of little endian
+ * bytes in standard base64, and the columns are parallel, so entry `i` of each
+ * is one order. Decode with `decodeOrderPoints` in `replayOrderPoints.ts`.
+ * `count` is how many entries each column holds.
+ */
+export interface DemoOrderPoints {
+  count: number;
+  /** `f32`, elmos from the map's north west corner. */
+  x: string;
+  /** `f32`. */
+  z: string;
+  /** `i32`, a simulation frame (30 to a second). -1 is before the game began. */
+  frame: string;
+  /** `i16`, the engine team, or -1 when the stream does not say. */
+  team: string;
+  /** `u8`, the player number. 255 is the server. */
+  player: string;
+  /** `u8`: 0 move, 1 attack or fight, 2 build, 3 support, 4 other positioned. */
+  kind: string;
+  /** `u8`: 0 the player's own selection, 1 a widget, 2 a skirmish AI. */
+  source: string;
+  /** Orders aimed at a unit or a feature. The stream has an id and no place. */
+  unitAimed: number;
+  /** Orders with no target: a stop, a wait, a fire state, a factory queue entry. */
+  noTarget: number;
+  /** Orders with an id the engine does not define. None is read for a place. */
+  custom: number;
+  /** Orders with an id the engine defines and parameters that fit none of its forms. */
+  malformed: number;
+  lastFrame: number;
+  /** True when the walk stopped early, so later orders are missing. */
+  incomplete: boolean;
+}
+
+/**
+ * Read every positioned order out of a replay, packed. Needs no engine folder.
+ * Read on demand, it walks the whole demo stream.
+ */
+export const contentDemoOrderPoints = defineCommand<
+  { replayPath: string },
+  DemoOrderPoints
+>("coilbox-content", "content_demo_order_points");
+
+/**
+ * How many events fell in each cell of a map's grid in each minute of a match,
+ * packed (#1161). The columns are parallel, little endian in standard base64,
+ * and `entries` is how many each holds. See `mapAggregate.ts` for the decode.
+ */
+export interface MapCountLayer {
+  entries: number;
+  /** `u32`: the row times the grid's width plus the column. */
+  cell: string;
+  /** `u16`: the minute of the match, 0 for the first. */
+  slice: string;
+  /** `u16`: how many events. */
+  count: string;
+  /** `u32`: the unit definition id. On the buildings layer only. */
+  def?: string;
+  /** How many events are in the entries. */
+  total: number;
+  /** How many had a place off the map and were left out. */
+  offMap: number;
+}
+
+/** One replay reduced to counts on its map's grid (#1161). */
+export interface ReplayMapGrids {
+  path: string;
+  /** Absent for a remix, which carries its original's id. */
+  gameId?: string;
+  remixed: boolean;
+  mapName: string;
+  gameType: string;
+  lastFrame: number;
+  /** True when the walk stopped early, so later events are missing. */
+  incomplete: boolean;
+  /** Where each team started, by engine team, in elmos. */
+  starts: { team: number; x: number; z: number }[];
+  /** Orders to place a building, with each one's unit definition id. */
+  buildings: MapCountLayer;
+  /** Every order aimed at a place on the map. */
+  orders: MapCountLayer;
+  unitAimed: number;
+  custom: number;
+  /** Where units died. Absent when the match has no analysis with events. */
+  deaths?: {
+    layer: MapCountLayer;
+    /** Deaths the log names no attacker for. Counted in `layer` all the same. */
+    unattacked: number;
+    /** Deaths the log puts at exactly 0,0, which are left out. */
+    noPosition: number;
+  };
+  /** Whether the counts came from a kept file and not from walking the replay. */
+  fromCache: boolean;
+}
+
+/**
+ * Reduce replays to counts on their map's grid. `worldWidth` and `worldHeight`
+ * are the map's size in elmos. A path must be a replay in a folder the Replays
+ * list reads. One that is not, or will not read, comes back in `failed`.
+ * Replays are walked one at a time, so ask for one path a call to show progress.
+ */
+export const contentReplayMapGrids = defineCommand<
+  { paths: string[]; worldWidth: number; worldHeight: number },
+  {
+    grid: {
+      width: number;
+      height: number;
+      worldWidth: number;
+      worldHeight: number;
+    };
+    replays: ReplayMapGrids[];
+    failed: { path: string; error: string }[];
+  }
+>("coilbox-content", "content_replay_map_grids");
+
+/** Who sent a run of orders. A widget is the player's Lua acting for them. */
+export type OrderSource = "selection" | "lua" | "ai";
+
+/** One team's order count in each bucket of match time, from one sender. */
+export interface CommandSeries {
+  /** The engine team. Players sharing a team are already added together. */
+  team: number;
+  source: OrderSource;
+  /** Bucket `i` covers `periodSec` seconds from `i * periodSec`. */
+  counts: number[];
+}
+
+/** How many orders each team gave in each period of a replay (#1149). */
+export interface DemoCommandRates {
+  /** The bucket length: the replay's own team statistics period. */
+  periodSec: number;
+  /** True when the header named no period and the engine's default was used. */
+  periodIsDefault: boolean;
+  /** Whole buckets. The stretch after the last is left out. */
+  buckets: number;
+  series: CommandSeries[];
+  /** Orders given before the game started. */
+  pregame: number;
+  /** Orders in the stretch after the last whole bucket. */
+  trailing: number;
+  /** Orders from a player with no team, such as a spectator. */
+  unattributed: number;
+  lastFrame: number;
+  /** True when the walk stopped early, so later orders are missing. */
+  incomplete: boolean;
+}
+
+/**
+ * Count the orders each team gave in each statistics period of a replay. Needs
+ * no engine folder. Read on demand, it walks the whole demo stream.
+ */
+export const contentDemoCommandRates = defineCommand<
+  { replayPath: string },
+  DemoCommandRates
+>("coilbox-content", "content_demo_command_rates");
 
 /**
  * Write a "remixed" **copy** of a replay whose embedded `gametype` is
@@ -735,10 +1091,864 @@ export const contentRewriteDemo = defineCommand<
   { path: string }
 >("coilbox-content", "content_rewrite_demo");
 
-/** Delete a replay file. `path` must be a `.sdfz`/`.sdf` from `content_list_replays`. */
-export const contentDeleteReplay = defineCommand<
-  { path: string },
+/** The replay logger's first line: what the gadget saw the run as. */
+export interface ReplayLogHeader {
+  /** The line format. A reader that knows a lower one should offer a new run. */
+  format: number;
+  /**
+   * `Game.gameName` during the run, which is the analysis game's name and not
+   * the game the replay was recorded on. That one is `StoredReplayAnalysis.game`.
+   */
+  game: string;
+  gameVersion: string;
+  gameShortName: string;
+  map: string;
+  engine: string;
+  /** The map's size in world units, which places an event's `x` and `z` on a map. */
+  mapSizeX: number;
+  mapSizeZ: number;
+  gaiaTeam: number;
+  /**
+   * How many frames lie between two `start_unit_position` lines for one unit.
+   * 0 from a logger that wrote none.
+   */
+  positionFrames: number;
+}
+
+/**
+ * A unit being created, finished, destroyed or handed to another team. `def` is
+ * a unit definition id as that run's engine numbered them. `x`, `y` and `z` are
+ * world coordinates.
+ */
+export interface ReplayUnitEvent {
+  frame: number;
+  unit: number;
+  def: number;
+  team: number;
+  x: number;
+  y: number;
+  z: number;
+  /**
+   * Present and true on a unit its team started with: one created for a team
+   * other than Gaia, by no builder, on the frame that team's first unit was
+   * created. The engine has no idea of a commander, so this is not one, and the
+   * interface says "starting unit". Absent on every other unit.
+   */
+  startUnit?: boolean;
+  /** On `unit_given`, the team the unit left. `team` is the one it went to. */
+  from?: number;
+  /** On `unit_given`, present and true for a capture and absent for a gift. */
+  captured?: boolean;
+  /** On `unit_created`, the unit that built it. Absent when nothing did. */
+  builder?: number;
+  /**
+   * On `unit_destroyed`, what destroyed it. All four are absent for a death
+   * with no attacker, such as a cancelled build.
+   */
+  attacker?: number;
+  attackerDef?: number;
+  attackerTeam?: number;
+  weapon?: number;
+}
+
+/**
+ * Where a living starting unit was. Written every
+ * `ReplayLogHeader.positionFrames` frames and left out when the unit has not
+ * moved since the last one, so a gap means it stood still. Its `unit_created`
+ * line is its first position and its `unit_destroyed` line its last.
+ */
+export interface ReplayStartUnitPosition {
+  frame: number;
+  unit: number;
+  /** The team the unit belonged to on that frame. */
+  team: number;
+  x: number;
+  z: number;
+}
+
+/**
+ * One team's totals when the game ended, as the engine reported them to Lua.
+ * The figures are `TeamStatSample`'s. `frame` is the frame the game ended on.
+ */
+export interface ReplayLoggedTeam extends TeamStatSample {
+  team: number;
+  /** How many statistics samples the team had. */
+  samples: number;
+}
+
+/**
+ * One line of an analysed replay's event log. A later logger adds kinds, which
+ * arrive as `unknown`, so switch on `kind` with a default.
+ */
+export type ReplayLogLine =
+  | ({ kind: "header" } & ReplayLogHeader)
+  | { kind: "game_start"; frame: number }
+  | ({ kind: "unit_created" } & ReplayUnitEvent)
+  | ({ kind: "unit_finished" } & ReplayUnitEvent)
+  | ({ kind: "unit_destroyed" } & ReplayUnitEvent)
+  | ({ kind: "unit_given" } & ReplayUnitEvent)
+  | ({ kind: "start_unit_position" } & ReplayStartUnitPosition)
+  | {
+      kind: "game_over";
+      frame: number;
+      winners: number[];
+      teams: ReplayLoggedTeam[];
+    }
+  | { kind: "unknown" };
+
+/** How many lines of each kind a run's log held. */
+export interface ReplayEventCounts {
+  header: number;
+  /** The engine's unit definitions the run listed. They are kept in the unit
+   *  definition store and not among the events. Absent from a file written
+   *  before the logger listed them. */
+  unitDef?: number;
+  gameStart: number;
+  unitCreated: number;
+  unitFinished: number;
+  unitDestroyed: number;
+  unitGiven: number;
+  startUnitPosition: number;
+  /** Absent from a file written before the logger followed a starting unit
+   *  through a replacement. */
+  startUnitReplaced?: number;
+  /** Absent from a file written before the logger recorded damage. */
+  damage?: number;
+  gameOver: number;
+  /** Lines of a kind this build does not know. */
+  unknown: number;
+}
+
+/** One figure an analysis run and its replay disagree on. */
+export interface ReplayDisagreement {
+  /**
+   * `winners`, `gameSeconds`, `teams`, `samples`, `desyncWarnings`,
+   * `unitCreatedLines`, `unitDestroyedLines`, `unitsReceivedLines`,
+   * `unitsSentLines`, `unitsCapturedLines`, `unitsOutCapturedLines`, or a
+   * `TeamStatSample` key such as `metalProduced`.
+   */
+  figure: string;
+  /** The team the figure belongs to, when it is a team's. */
+  team?: number;
+  /** What the replay recorded. */
+  recorded: string;
+  /** What the run observed. */
+  observed: string;
+  /** Observed minus recorded, for a figure that is a number. */
+  difference?: number;
+}
+
+/**
+ * How far a running job has got. In `thinning` the engine has exited and its
+ * dump is being made into a track, which reports no progress.
+ */
+export type ReplayAnalysisPhase =
+  | "starting"
+  | "loading"
+  | "playing"
+  | "thinning";
+
+/** The job that is running. It analyses the match and records it (#3962). */
+export interface ReplayAnalysisRunningJob {
+  id: number;
+  gameId: string;
+  /** The replay's file name. */
+  name: string;
+  replayPath: string;
+  matchSeconds: number;
+  startedAtMs: number;
+  phase: ReplayAnalysisPhase;
+  /**
+   * The frame of the last event the logger wrote. It stands still through a
+   * stretch of the match in which no unit is made or lost.
+   */
+  frame: number;
+  /**
+   * The match's last frame, from the whole seconds in the replay's header, so
+   * `frame` can end up to a second past it.
+   */
+  lastFrame: number;
+  /** A cancel has been asked for and the run is on its way out. */
+  cancelling: boolean;
+}
+
+/** A job waiting its turn. */
+export interface ReplayAnalysisQueuedJob {
+  id: number;
+  gameId: string;
+  name: string;
+  replayPath: string;
+}
+
+/**
+ * The last run of a match that failed this session. A failure is not a fact
+ * about the replay, so it is never stored.
+ *
+ * - `tookTooLong`: the run reached `limitSeconds` and was killed. Not a
+ *   divergence: it never got as far as being compared.
+ * - `engineFailed`: the engine stopped before the match ended.
+ * - `couldNotRun`: the run could not be started, its result not stored, or its
+ *   recorder wrote no file.
+ * - `thinFailed`: the playback was good and its recording could not be made
+ *   into a track. Any earlier track is kept, and so is the analysis.
+ *
+ * A playback that did not reproduce the match is not here: its analysis is
+ * stored as diverged, with the figures that differed.
+ */
+export interface ReplayAnalysisFailure {
+  gameId: string;
+  name: string;
+  reason: "tookTooLong" | "engineFailed" | "couldNotRun" | "thinFailed";
+  /** The detail: an error, or how the engine exited. */
+  message: string;
+  limitSeconds?: number;
+  /** What the engine said: its fatal lines, or its last lines. */
+  logExcerpt: string[];
+}
+
+/** The analysis queue, which belongs to the app and outlives any page. */
+export interface ReplayAnalysisQueue {
+  running: ReplayAnalysisRunningJob | null;
+  /** In the order they will run. */
+  queued: ReplayAnalysisQueuedJob[];
+  /** Nothing is running because a game is. The queue starts again when it ends. */
+  waitingForGame: boolean;
+  failures: ReplayAnalysisFailure[];
+  /**
+   * Counts up each time a run changes the store, so a listener knows to ask
+   * {@link contentReplayAnalyses} again.
+   */
+  stored: number;
+  /**
+   * Counts up each time a run stores a track, so a listener knows to ask
+   * {@link contentReplayTracks} again.
+   */
+  tracks: number;
+}
+
+/**
+ * The Tauri event every window is sent when the analysis queue changes. Its
+ * payload is a {@link ReplayAnalysisQueue}. A page asks
+ * {@link contentAnalysisQueue} once when it opens and then listens for this.
+ */
+export const ANALYSIS_QUEUE_EVENT = "coilbox-content://analysis-queue";
+
+/**
+ * Ask for a replay to be analysed and recorded as a track, in one headless
+ * playback under coilbox's analysis game (#1157, #3785, #3962). This is the
+ * only command that leads to an engine being run for either. Call it through
+ * `src/content/replayAnalysis.ts`, which is where the `analytics.run` profile
+ * key is checked, and only because a person pressed the button for that
+ * replay.
+ *
+ * `replayPath` is a `ReplayFile.path`. `enginePath` and `dataDir` are the
+ * `PlayTarget.enginePath` and `PlayTarget.dataDir` a replay launch would use,
+ * or those of another installed engine when the replay's own is not installed
+ * (#3869). `game` names another installed version of the replay's game to
+ * depend on instead of the one it names, and is left out for the recorded one.
+ * `force` asks for a run of a match that already has a current analysis and a
+ * current track. A match with only one of the two is run without it.
+ *
+ * - `queued`: a job was added.
+ * - `alreadyQueued`: a job for that match is already queued or running.
+ * - `alreadyDone`: the match has a current analysis and a current track, and
+ *   `force` was not set.
+ *
+ * It rejects, with the reason, for a replay that cannot be analysed: a remix,
+ * one with no recorded game over, or an engine folder with no headless engine.
+ * There is no time limit to pass: the queue allows the match's own length plus
+ * time for the engine to start.
+ */
+export const contentAnalysisEnqueue = defineCommand<
+  {
+    replayPath: string;
+    enginePath: string;
+    dataDir: string;
+    game?: string;
+    force?: boolean;
+  },
+  {
+    outcome: "queued" | "alreadyQueued" | "alreadyDone";
+    queue: ReplayAnalysisQueue;
+  }
+>("coilbox-content", "content_analysis_enqueue");
+
+/**
+ * Whether a replay can be analysed at all, read from the replay itself.
+ * `cannot` is null when it can. Whether its engine, game and map are installed
+ * is a separate question.
+ *
+ * - `remix`: a remix keeps its original's recorded result, so there is nothing
+ *   of its own to check a run against.
+ * - `noGameOver`: the match was quit before a game over was recorded.
+ * - `playbackGame`: the replay was recorded on the replay playback game, which
+ *   has no match of its own to record (#3793).
+ * - `noGameId`: the header holds no id to file a result under.
+ * - `unreadable`: the file does not read as a replay.
+ *
+ * `enginePaths` are installed engine folders (`Engine.path`), and `headless`
+ * answers which of them hold a headless engine, the only kind an analysis can
+ * run.
+ */
+export const contentAnalysisCheck = defineCommand<
+  { replayPath: string; enginePaths?: string[] },
+  {
+    cannot:
+      | "remix"
+      | "noGameId"
+      | "noGameOver"
+      | "playbackGame"
+      | "unreadable"
+      | null;
+    gameId: string | null;
+    matchSeconds: number;
+    headless: string[];
+  }
+>("coilbox-content", "content_analysis_check");
+
+/** The analysis queue as it is now. */
+export const contentAnalysisQueue = defineCommand<
+  undefined,
+  { queue: ReplayAnalysisQueue }
+>("coilbox-content", "content_analysis_queue");
+
+/**
+ * Cancel one analysis by its id, queued or running, or every one when no id is
+ * given. A running one has its engine killed and nothing of it is stored.
+ */
+export const contentAnalysisCancel = defineCommand<
+  { id?: number },
+  { cancelled: boolean }
+>("coilbox-content", "content_analysis_cancel");
+
+/**
+ * The last lines a running analysis's engine has written, oldest first. Null
+ * when that job is not the one running.
+ */
+export const contentAnalysisEngineOutput = defineCommand<
+  { id: number },
+  { lines: string[] | null }
+>("coilbox-content", "content_analysis_engine_output");
+
+/** Forget a match's last failed run, once it has been read. */
+export const contentAnalysisDismiss = defineCommand<
+  { gameId: string },
   { ok: boolean }
+>("coilbox-content", "content_analysis_dismiss");
+
+/**
+ * What a stored analysis means to a reader today (#1158).
+ *
+ * - `current`: events from the logger this build ships.
+ * - `outdated`: events from an earlier logger. They still read. A view that
+ *   needs something the earlier logger did not record offers a new run.
+ * - `diverged`: a run finished and did not reproduce the match. No events.
+ */
+export type ReplayAnalysisState = "current" | "outdated" | "diverged";
+
+/** One run that finished and did not reproduce the match. */
+export interface ReplayAnalysisAttempt {
+  engine: string;
+  game: string;
+  analysedAtMs: number;
+  disagreements: ReplayDisagreement[];
+}
+
+/**
+ * What is stored for one analysed match: what produced it, when, and how many
+ * events of each kind it holds. Never the events themselves.
+ */
+export interface StoredReplayAnalysis {
+  state: ReplayAnalysisState;
+  /** The stored file's size on disk, compressed. */
+  sizeBytes: number;
+  kind: "analysis";
+  storeFormat: number;
+  outcome: "reproduced" | "diverged";
+  /** The replay's game id, which is what `StatRecord.gameId` and `DemoInfo.gameId` hold. */
+  gameId: string;
+  /** The logger's line format, and which logger wrote the events. */
+  loggerFormat: number;
+  loggerVersion: number;
+  /** The engine the run used, as it named itself. */
+  engine: string;
+  /** The game the run depended on, name and version. */
+  game: string;
+  /**
+   * What the replay says it was recorded with. Empty in a file written before
+   * these were kept, which reads as unknown and never as the same.
+   */
+  recordedEngine?: string;
+  recordedGame?: string;
+  /** Whether the run used another engine or game version. Null when unknown. */
+  engineDiffers?: boolean | null;
+  gameDiffers?: boolean | null;
+  /** Every engine and game the match diverged on, oldest first. */
+  attempts?: ReplayAnalysisAttempt[];
+  map: string;
+  analysedAtMs: number;
+  /** The match's length, and how long the engine took to play it back. */
+  matchSeconds: number;
+  wallSeconds: number;
+  counts: ReplayEventCounts;
+  /** The figures the run and the replay disagreed on. Empty unless `diverged`. */
+  disagreements: ReplayDisagreement[];
+}
+
+/**
+ * Every stored analysis, to join to replay records by `gameId`. This is how
+ * the library knows which replays have event data: the answer changes when an
+ * analysis is run or deleted, so it is asked for and never stored in a
+ * `StatRecord`.
+ *
+ * A remix carries its original's game id and has no analysis of its own, so
+ * leave records with `remixed` set out of the join.
+ */
+export const contentReplayAnalyses = defineCommand<
+  undefined,
+  { analyses: StoredReplayAnalysis[] }
+>("coilbox-content", "content_replay_analyses");
+
+/** What is stored for one match, or null. Carries the counts per kind. */
+export const contentReplayAnalysis = defineCommand<
+  { gameId: string },
+  { analysis: StoredReplayAnalysis | null }
+>("coilbox-content", "content_replay_analysis");
+
+/**
+ * A match's stored events, in the order the logger wrote them. `kinds` keeps
+ * only lines of those kinds. `offset` and `limit` take a window of what was
+ * kept, and `total` is how many lines matched in all. A match can hold tens
+ * of thousands of lines, so ask for the kinds a view draws.
+ */
+export const contentReplayAnalysisEvents = defineCommand<
+  { gameId: string; kinds?: string[]; offset?: number; limit?: number },
+  { events: ReplayLogLine[]; total: number }
+>("coilbox-content", "content_replay_analysis_events");
+
+/**
+ * One recorded track on disk (issue #3786). `current` can be played. `stale`
+ * was made by an older or newer recorder, or does not read as a track, and is
+ * offered for recording again.
+ */
+export interface StoredReplayTrack {
+  gameId: string;
+  state: "current" | "stale";
+  sizeBytes: number;
+  /** When it was stored or last watched, in epoch milliseconds. */
+  lastWatchedMs: number;
+}
+
+/**
+ * What one recording cost on this machine (#3788), kept so the replay page can
+ * estimate the next one. `millis` runs from the job starting to the track being
+ * stored, so it includes the thinning, and it is what the running build
+ * measured.
+ */
+export interface RecordingCost {
+  /** The match it was of. Recording it again replaces the entry. */
+  gameId: string;
+  /** The game the replay was recorded on, as the replay names it. */
+  game: string;
+  /** The match's length in frames. */
+  frames: number;
+  millis: number;
+  /** The track's size on disk in bytes. */
+  trackBytes: number;
+}
+
+/**
+ * Every track on disk, to join to replay records by `gameId`. This is how the
+ * library knows which replays have a track: the answer changes when a track is
+ * stored or removed, so it is asked for and never stored in a `StatRecord`.
+ *
+ * A remix carries its original's game id and has no track of its own, so leave
+ * replays with `remixed` set out of the join.
+ */
+export const contentReplayTracks = defineCommand<
+  undefined,
+  {
+    tracks: StoredReplayTrack[];
+    /** What the tracks take together, stale ones included, in bytes. */
+    totalBytes: number;
+    /** The disk budget used until the user sets one (#3787), in bytes. */
+    defaultBudgetBytes: number;
+    /** What recordings made on this machine cost (#3788). */
+    recordingCosts: RecordingCost[];
+  }
+>("coilbox-content", "content_replay_tracks");
+
+/**
+ * Remove every track (#3787), leaving the replays alone. Call
+ * `refreshStoredTracks` afterwards so every replay's badge goes.
+ */
+export const contentReplayTracksClear = defineCommand<
+  undefined,
+  { cleared: { removed: number; freedBytes: number; kept: number } }
+>("coilbox-content", "content_replay_tracks_clear");
+
+/** A team in a track's info chunk (#3806). */
+export interface ReplayTrackTeam {
+  id: number;
+  allyTeam: number;
+  isAi: boolean;
+  /** Red, green and blue, 0 to 255. */
+  colour: [number, number, number];
+  side: string;
+  leader: string;
+}
+
+/**
+ * What a track says about itself (#3806). `features` is one array for each
+ * field, and a feature exists at frame `f` when `first[i] <= f <= last[i]`.
+ * Its `team` is 255 for none and `x` and `z` are elmos.
+ *
+ * See `src/content/replayTrack/`.
+ */
+export interface ReplayTrackHeader {
+  gameId: string;
+  formatVersion: number;
+  recorderVersion: number;
+  framesPerSecond: number;
+  firstFrame: number;
+  lastFrame: number;
+  /** `lastFrame - firstFrame`. */
+  lengthFrames: number;
+  windowLength: number;
+  windowCount: number;
+  /** In elmos. */
+  tolerance: number;
+  positionShift: number;
+  velocityShift: number;
+  rotationBits: number;
+  unitCount: number;
+  projectileCount: number;
+  featureCount: number;
+  engineVersion: string;
+  game: string;
+  map: string;
+  writer: string;
+  /** The map's size along x and z, in elmos. */
+  mapSize: [number, number];
+  /** A unit's `def` in a window indexes this. */
+  unitDefs: string[];
+  /**
+   * Each unit definition's footprint in elmos, in the order of `unitDefs`:
+   * across the unit, then along the way it faces. The map view sizes a unit's
+   * mark from it (#3807).
+   */
+  unitFootprints: [number, number][];
+  weaponDefs: string[];
+  featureDefs: string[];
+  teams: ReplayTrackTeam[];
+  features: {
+    def: number[];
+    team: number[];
+    x: number[];
+    z: number[];
+    first: number[];
+    last: number[];
+  };
+}
+
+/**
+ * Why a track or a window could not be read (#3806). The kind is what the page
+ * tells apart:
+ *
+ * - `missing`: no track for this replay.
+ * - `stale`: another recorder version made it. Offer to record again.
+ * - `otherGame`: the file in this replay's place is for another game.
+ * - `unknownFormat`: a layout this build does not read.
+ * - `unreadable`: the header, index or info could not be read.
+ * - `corruptWindow`: one window is bad and every other still reads.
+ * - `noSuchWindow`: the index is past the track's last window.
+ * - `io`: the file could not be opened or read.
+ */
+export type ReplayTrackFault =
+  | { kind: "missing" }
+  | { kind: "stale"; recorderVersion: number; current: number }
+  | { kind: "otherGame" }
+  | { kind: "unknownFormat"; field: string; found: string; expected: string }
+  | { kind: "unreadable"; message: string }
+  | { kind: "corruptWindow"; window: number; message: string }
+  | { kind: "noSuchWindow"; window: number; windowCount: number }
+  | { kind: "io"; message: string };
+
+/** A fault arrives as data in a successful answer, so the kinds stay apart. */
+export type ReplayTrackHeaderAnswer =
+  | { ok: true; header: ReplayTrackHeader }
+  | { ok: false; fault: ReplayTrackFault };
+
+export type ReplayTrackWindowAnswer =
+  | {
+      ok: true;
+      window: number;
+      startFrame: number;
+      endFrame: number;
+      /** The bytes sent down `onWindow`. */
+      byteLength: number;
+    }
+  | { ok: false; fault: ReplayTrackFault };
+
+/**
+ * Write the playback game and its start script for a replay, and launch the
+ * engine on it (#3793). Resolves when the engine exits, like `playLaunchReplay`,
+ * and goes in the same run registry: it is refused while any game is running,
+ * and `playCancel` with the same `runId` ends it.
+ *
+ * `executable` is the engine the replay was recorded on and `dataDir` the
+ * content folder the game is written under (`games/coilbox-replay-playback.sdd`,
+ * replaced on every launch). `game` names another installed version of the
+ * replay's game to depend on when the exact one is not installed. Rejects, with
+ * the reason, for a replay with no current track, a remix and a replay of the
+ * playback game. `startFrame` is the frame to open on, a whole number the
+ * player holds inside the track, and `paused` opens on the player's own pause.
+ * Without them the game opens on the track's first frame, playing.
+ */
+export const contentReplayPlaybackLaunch = defineCommand<
+  {
+    replayPath: string;
+    executable: string;
+    dataDir: string;
+    runId: string;
+    onEvent: Channel<LaunchEvent>;
+    game?: string;
+    startFrame?: number;
+    paused?: boolean;
+  },
+  LaunchOutcome
+>("coilbox-content", "content_replay_playback_launch");
+
+/**
+ * Read a replay's track header (#3806) and mark the track watched. Call it
+ * through `src/content/replayTrack/`.
+ */
+export const contentReplayTrackHeader = defineCommand<
+  { gameId: string },
+  ReplayTrackHeaderAnswer
+>("coilbox-content", "content_replay_track_header");
+
+/**
+ * Read one window of a track (#3806). The window's bytes arrive on `onWindow`
+ * as one `ArrayBuffer`, and the answer says what was sent. Nothing is sent when
+ * the answer is a fault. Give every call its own channel: a channel handed to a
+ * second command stops delivering. Call it through
+ * `src/content/replayTrack/`.
+ */
+export const contentReplayTrackWindow = defineCommand<
+  { gameId: string; window: number; onWindow: Channel<ArrayBuffer> },
+  ReplayTrackWindowAnswer
+>("coilbox-content", "content_replay_track_window");
+
+/** Delete what is stored for one match, leaving the replay alone. */
+export const contentReplayAnalysisDelete = defineCommand<
+  { gameId: string },
+  { deleted: boolean }
+>("coilbox-content", "content_replay_analysis_delete");
+
+/**
+ * One unit definition as the unit definition store keeps it (#1176): what the
+ * replay page reads of a unit and no more. A number that is absent is one the
+ * source did not give, which is not the same as zero.
+ */
+export interface StoredUnitDef {
+  /** The definition's key. */
+  name: string;
+  /** What a player calls it. Absent when the source gave none. */
+  humanName?: string;
+  metalCost?: number;
+  energyCost?: number;
+  /** Whether it moves. Left out when false, like the three below. */
+  mobile?: boolean;
+  /** Whether the definition says it builds. */
+  builder?: boolean;
+  /** Whether it has a build menu. */
+  builds?: boolean;
+  /** Whether it has a weapon. */
+  armed?: boolean;
+  transportCapacity?: number;
+  metalMake?: number;
+  energyMake?: number;
+  makesMetal?: number;
+  extractsMetal?: number;
+  windGenerator?: number;
+  tidalGenerator?: number;
+  metalUpkeep?: number;
+  energyUpkeep?: number;
+  metalStorage?: number;
+  energyStorage?: number;
+  radarDistance?: number;
+  sonarDistance?: number;
+  radarDistanceJam?: number;
+  sonarDistanceJam?: number;
+  seismicDistance?: number;
+}
+
+/**
+ * Where a stored unit list came from, least trusted first. `folder` and
+ * `archive` were read through unitsync from an installed game matched by name:
+ * a loose folder can change under its name and a packaged archive cannot.
+ * `engine` is the engine's own list, written during an analysis run.
+ */
+export type UnitDefOrigin = "folder" | "archive" | "engine";
+
+/** One unit list recorded for a replay. */
+export interface UnitDefLink {
+  /** `sha256:` and 64 hex digits, the list's name. */
+  digest: string;
+  origin: UnitDefOrigin;
+  /** The game the list was read from, name and version. */
+  game: string;
+  takenAtMs: number;
+  /** For an engine's list: whether the run used a game other than the one the
+   *  replay names. Absent when that is not known. */
+  gameDiffers?: boolean;
+}
+
+/** What is recorded for one replay. */
+export interface ReplayUnitDefSets {
+  links: UnitDefLink[];
+  /** The link that names the ids in the replay's own stream, if any. */
+  stream: UnitDefLink | null;
+  /** The link that names the ids in the replay's analysis events, if any. */
+  events: UnitDefLink | null;
+  /** The lists `stream` and `events` name, by digest, each in id order. */
+  sets: Record<string, StoredUnitDef[]>;
+}
+
+/**
+ * The unit lists recorded for one replay. `gameId` is the replay's own, which
+ * for a remix is its original's, so a remix reads its original's lists.
+ */
+export const contentUnitDefSet = defineCommand<
+  { gameId: string },
+  ReplayUnitDefSets
+>("coilbox-content", "content_unit_def_set");
+
+/**
+ * Keep the unit list a replay was just read against. Only for a game installed
+ * under the exact name the replay records. `archive` is the installed game's
+ * archive name, which says whether it is a loose folder. A replay that already
+ * has a list from that kind of read keeps it, and `digest` is the one it kept.
+ */
+export const contentUnitDefSetStore = defineCommand<
+  { gameId: string; game: string; archive: string; units: StoredUnitDef[] },
+  { digest: string | null; origin: UnitDefOrigin; links: UnitDefLink[] }
+>("coilbox-content", "content_unit_def_set_store");
+
+/** How many unit lists are kept, for how many replays, and their size on disk. */
+export const contentUnitDefSetsUsage = defineCommand<
+  undefined,
+  { sets: number; replays: number; bytes: number }
+>("coilbox-content", "content_unit_def_sets_usage");
+
+/** What one seat ordered of one unit definition in a replay (#1167). */
+export interface UnitDefOrders {
+  /** The unit definition id, as the recorded game's engine numbered it. */
+  def: number;
+  /** Orders that placed a building: the ones with a position. */
+  placed: number;
+  /** Orders to a factory queue: the ones with none. */
+  queued: number;
+  /** Units asked for, the sum of each order's count. */
+  units: number;
+}
+
+/** One seat's build orders in a replay, totalled by unit definition. */
+export interface UnitOrderSeat {
+  /** The player number the orders arrived from. */
+  player: number;
+  /** The player's name. Absent for an AI's seat, and where none is recorded. */
+  name?: string;
+  /** The team of the skirmish AI the orders were for. Absent for a player. */
+  aiTeam?: number;
+  defs: UnitDefOrders[];
+}
+
+/** What a team finished and lost of one unit definition in an analysis. */
+export interface UnitDefEvents {
+  /** The unit definition id, as the analysis run's engine numbered it. */
+  def: number;
+  /** Units the team finished building. */
+  finished: number;
+  /** Finished units destroyed while the team had them. */
+  died: number;
+}
+
+/**
+ * One match's setup as the engine held it once it had read the start script:
+ * players, teams and ally teams numbered from zero with no gaps (#3847).
+ *
+ * The engine builds a match's unit list with these to hand, so a replay's unit
+ * ids only count into a list read with them. Nothing here reads the fields. It
+ * is taken from a replay and handed to {@link unitsyncUnitDataset} whole.
+ */
+export interface MatchSetup {
+  modOptions: Record<string, string>;
+  mapOptions: Record<string, string>;
+  teams: {
+    leader: number;
+    allyTeam: number;
+    side: string;
+    incomeMultiplier: number;
+    custom: Record<string, string>;
+  }[];
+  allyTeams: { allies: number[]; custom: Record<string, string> }[];
+  players: { team: number; spectator: boolean }[];
+  ais: { team: number; shortName: string; name: string; host: number }[];
+}
+
+/** One replay's build orders reduced to totals (#1167). */
+export interface ReplayUnitOrders {
+  path: string;
+  /** Absent for a remix, which carries its original's id. */
+  gameId?: string;
+  remixed: boolean;
+  /** The game and version whose build numbered the ids in `seats`. */
+  gameType: string;
+  /** The match's setup, which the game's unit list is read with (#3847). */
+  matchSetup?: MatchSetup;
+  lastFrame: number;
+  /** True when the walk stopped early, so later orders are missing. */
+  incomplete: boolean;
+  /** Factory queue orders that took units off a queue. Not in `seats`. */
+  removals: number;
+  seats: UnitOrderSeat[];
+  /** By team. Absent when the match has no stored analysis with events. */
+  events?: { team: number; defs: UnitDefEvents[] }[];
+  /** The kept unit list that names the ids in `seats`, if one is kept. */
+  streamList?: UnitDefLink;
+  /** The kept unit list that names the ids in `events`, if one is kept. */
+  eventsList?: UnitDefLink;
+  /** Whether the orders came from a kept file and not from walking the replay. */
+  fromCache: boolean;
+}
+
+/**
+ * Reduce replays to what each seat ordered of each unit definition, with the
+ * kept unit lists that name the ids, each once in `sets` by digest. A path
+ * must be a replay in a folder the Replays list reads. One that is not, or
+ * will not read, comes back in `failed`. Each replay is walked once and kept
+ * on disk, so a second call reads no replay.
+ */
+export const contentReplayUnitOrders = defineCommand<
+  { paths: string[] },
+  {
+    replays: ReplayUnitOrders[];
+    sets: Record<string, StoredUnitDef[]>;
+    failed: { path: string; error: string }[];
+  }
+>("coilbox-content", "content_replay_unit_orders");
+
+/**
+ * Delete a replay file. `path` must be a `.sdfz`/`.sdf` from
+ * `content_list_replays`. Its stored analysis and track go with it. With
+ * `onlyUnfinished` a file that is no longer empty is left alone. The backend
+ * refuses an empty file while a game coilbox launched is running.
+ */
+export const contentDeleteReplay = defineCommand<
+  { path: string; onlyUnfinished?: boolean },
+  { ok: boolean; analysisDeleted: boolean; trackDeleted: boolean }
 >("coilbox-content", "content_delete_replay");
 
 /** What a bulk replay delete removed, or would remove. */
@@ -749,6 +1959,12 @@ export interface ReplayDeleteSummary {
   bytes: number;
   /** One sentence per path left alone, saying why. */
   skipped: string[];
+  /** How many of the replays had a stored analysis, which goes with them. */
+  analyses: number;
+  analysisBytes: number;
+  /** How many had a recorded track, which goes with them, and what it frees. */
+  tracks: number;
+  trackBytes: number;
 }
 
 /**
@@ -757,7 +1973,7 @@ export interface ReplayDeleteSummary {
  * reason instead of failing the batch. `apply` false sizes it without deleting.
  */
 export const contentDeleteReplays = defineCommand<
-  { paths: string[]; apply: boolean },
+  { paths: string[]; apply: boolean; onlyUnfinished?: boolean },
   { summary: ReplayDeleteSummary }
 >("coilbox-content", "content_delete_replays");
 
@@ -1193,6 +2409,106 @@ export interface UnitEntry {
   fullName?: string;
 }
 
+/**
+ * What a read of a game takes. `archivePath` is the game's primary archive as a
+ * full path, and it is what lets the plugin answer from the cache without starting
+ * a worker (issue #3714). Callers leave it out. It is filled in from the content
+ * scan, and a game the scan has not placed is read by a worker as it always was.
+ */
+type GameReadArgs = {
+  enginePath: string;
+  dataDir: string;
+  gameArchive: string;
+  archivePath?: string;
+};
+
+/** What a read of a map takes. `archivePath` and `fileName` are what the map's
+ *  cache key is made from, filled in from the content scan like a game's. */
+type MapReadArgs = {
+  enginePath: string;
+  dataDir: string;
+  mapName: string;
+  archivePath?: string;
+  fileName?: string;
+};
+
+/** One map of the last scan, as the plugin needs it to find the map's saved
+ *  answer. At least one of `archivePath` and `fileName` is set. */
+export type MapRef = {
+  name: string;
+  archivePath?: string;
+  fileName?: string;
+};
+
+/** One game of the last scan. `name` is the game's name and `archivePath` its
+ *  primary archive as a full path. */
+export type GameRef = { name: string; archivePath: string };
+
+type SkirmishAisArgs = {
+  enginePath: string;
+  dataDir: string;
+  gameArchive?: string;
+  archivePath?: string;
+};
+
+function withGameArchivePath<T extends GameReadArgs>(args: T): T {
+  if (args.archivePath !== undefined) return args;
+  const archivePath = gameArchivePath(
+    args.dataDir,
+    args.enginePath,
+    args.gameArchive,
+  );
+  return archivePath === undefined ? args : { ...args, archivePath };
+}
+
+function withMapHint<T extends MapReadArgs>(args: T): T {
+  if (args.archivePath !== undefined || args.fileName !== undefined) {
+    return args;
+  }
+  const hint = mapHint(args.dataDir, args.enginePath, args.mapName);
+  return hint === undefined ? args : { ...args, ...hint };
+}
+
+function withMapRefs<
+  T extends { enginePath: string; dataDir: string; maps?: MapRef[] },
+>(args: T): T {
+  if (args.maps !== undefined) return args;
+  const maps = mapRefs(args.dataDir, args.enginePath);
+  return maps === undefined ? args : { ...args, maps };
+}
+
+function withGameRefs<
+  T extends { enginePath: string; dataDir: string; games?: GameRef[] },
+>(args: T): T {
+  if (args.games !== undefined) return args;
+  const games = gameRefs(args.dataDir, args.enginePath);
+  return games === undefined ? args : { ...args, games };
+}
+
+/** A tree read names a game by its archive file name or a map by its name, so
+ *  try the game lookup first and then the map lookup. */
+function withArchiveTreeHint<
+  T extends {
+    enginePath: string;
+    dataDir: string;
+    archive: string;
+    archivePath?: string;
+    fileName?: string;
+  },
+>(args: T): T {
+  if (args.archivePath !== undefined || args.fileName !== undefined) {
+    return args;
+  }
+  const archivePath = gameArchivePath(
+    args.dataDir,
+    args.enginePath,
+    args.archive,
+  );
+  if (archivePath !== undefined) return { ...args, archivePath };
+  const hint = mapHint(args.dataDir, args.enginePath, args.archive);
+  return hint === undefined ? args : { ...args, ...hint };
+}
+
 export interface GameInfoResult {
   sides: Side[];
   unitCount: number;
@@ -1210,10 +2526,12 @@ export interface GameInfoResult {
  * lazy, since it loads the whole game's archive set. `gameArchive` is the game's
  * primary archive name.
  */
-export const unitsyncGameInfo = defineCommand<
-  { enginePath: string; dataDir: string; gameArchive: string },
-  GameInfoResult
->("coilbox-unitsync", "unitsync_game_info");
+export const unitsyncGameInfo = (args: GameReadArgs) =>
+  gameInfoCommand(withGameArchivePath(args));
+const gameInfoCommand = defineCommand<GameReadArgs, GameInfoResult>(
+  "coilbox-unitsync",
+  "unitsync_game_info",
+);
 
 /** One resolved start unit: its friendly name and/or build icon. */
 export interface UnitDisplay {
@@ -1289,14 +2607,11 @@ export interface UnitBuildpicsResult {
  * where the uploader can read it. Only the blueprint backfill asks for that
  * (#1636): a page drawing icons would be paying for a WebP encode nobody sends.
  */
-export const unitsyncUnitBuildpics = defineCommand<
-  {
-    enginePath: string;
-    dataDir: string;
-    gameArchive: string;
-    units: string[];
-    assets?: boolean;
-  },
+export const unitsyncUnitBuildpics = (args: UnitBuildpicsArgs) =>
+  unitBuildpicsCommand(withGameArchivePath(args));
+type UnitBuildpicsArgs = GameReadArgs & { units: string[]; assets?: boolean };
+const unitBuildpicsCommand = defineCommand<
+  UnitBuildpicsArgs,
   UnitBuildpicsResult
 >("coilbox-unitsync", "unitsync_unit_buildpics");
 
@@ -1323,15 +2638,13 @@ export interface FactionLogosResult {
  * lazy, since it mounts the game's archive set. `sides` are the side names (from
  * {@link unitsyncGameInfo}).
  */
-export const unitsyncFactionLogos = defineCommand<
-  {
-    enginePath: string;
-    dataDir: string;
-    gameArchive: string;
-    sides: string[];
-  },
-  FactionLogosResult
->("coilbox-unitsync", "unitsync_faction_logos");
+export const unitsyncFactionLogos = (args: FactionLogosArgs) =>
+  factionLogosCommand(withGameArchivePath(args));
+type FactionLogosArgs = GameReadArgs & { sides: string[] };
+const factionLogosCommand = defineCommand<FactionLogosArgs, FactionLogosResult>(
+  "coilbox-unitsync",
+  "unitsync_faction_logos",
+);
 
 /** One unit in the reusable unit dataset: its names plus the internal names of the
  * units it can build (`buildoptions`, lowercased). */
@@ -1391,8 +2704,11 @@ export interface UnitDatasetEntry {
   /**
    * Everything else the unitdef declares that is worth reading next to the
    * unit: `health`, `metalCost`, `energyCost`, `buildTime`, `sightDistance`,
-   * `maxVelocity`, `range`, and a `weapons` array of one object per weapon.
-   * `shared/unitdef-stats.json` writes the list down.
+   * `maxVelocity`, `range`, and a `weapons` array of one object per weapon,
+   * plus what a unit makes, stores and senses and whether it builds (the
+   * engine's own keys, such as `energyMake`, `extractsMetal`, `energyStorage`,
+   * `radarDistance` and `builder`). `classifyUnit` in `unitCategory.ts` reads
+   * those. `shared/unitdef-stats.json` writes the list down.
    *
    * Untyped on purpose. The hub stores these as schemaless JSON and renders
    * what arrives, so a stat added to the worker's Lua shim reaches a unit page
@@ -1420,15 +2736,25 @@ export interface UnitDatasetResult {
   errors: string[];
 }
 
+/** A unit dataset read, which may be for one match. */
+type UnitDatasetArgs = GameReadArgs & {
+  /** Read the unit list the engine built for this match, and not the game's
+   *  own (#3847). Entry `n - 1` is then the unit a replay of the match calls
+   *  id `n`. */
+  matchSetup?: MatchSetup;
+};
+
 /**
  * Load a game's reusable unit graph (units + their `buildoptions` edges) — lazy,
  * since it mounts the game's archive set. Powers the per-faction build-tree viewer
  * and unit include/exclude filters. `gameArchive` is the primary archive name.
  */
-export const unitsyncUnitDataset = defineCommand<
-  { enginePath: string; dataDir: string; gameArchive: string },
-  UnitDatasetResult
->("coilbox-unitsync", "unitsync_unit_dataset");
+export const unitsyncUnitDataset = (args: UnitDatasetArgs) =>
+  unitDatasetCommand(withGameArchivePath(args));
+const unitDatasetCommand = defineCommand<UnitDatasetArgs, UnitDatasetResult>(
+  "coilbox-unitsync",
+  "unitsync_unit_dataset",
+);
 
 /**
  * Every key a game declares for every unit, read out of the game's own def
@@ -1780,15 +3106,13 @@ export interface UnitModelsResult {
  * archive mount however many objects it names, which on a game like Beyond All
  * Reason is a second or more saved per unit past the first.
  */
-export const unitsyncUnitModels = defineCommand<
-  {
-    enginePath: string;
-    dataDir: string;
-    gameArchive: string;
-    objects: string[];
-  },
-  UnitModelsResult
->("coilbox-unitsync", "unitsync_unit_models");
+export const unitsyncUnitModels = (args: UnitModelsArgs) =>
+  unitModelsCommand(withGameArchivePath(args));
+type UnitModelsArgs = GameReadArgs & { objects: string[] };
+const unitModelsCommand = defineCommand<UnitModelsArgs, UnitModelsResult>(
+  "coilbox-unitsync",
+  "unitsync_unit_models",
+);
 
 /** Why a unit produced no render asset. */
 export type RenderSkip =
@@ -2256,10 +3580,12 @@ export interface MapInfoResult {
 /**
  * Load a map's options + warnings — lazy, since it mounts the map's archive.
  */
-export const unitsyncMapInfo = defineCommand<
-  { enginePath: string; dataDir: string; mapName: string },
-  MapInfoResult
->("coilbox-unitsync", "unitsync_map_info");
+export const unitsyncMapInfo = (args: MapReadArgs) =>
+  mapInfoCommand(withMapHint(args));
+const mapInfoCommand = defineCommand<MapReadArgs, MapInfoResult>(
+  "coilbox-unitsync",
+  "unitsync_map_info",
+);
 
 /** A skirmish AI available to play against: a native engine AI or a game Lua AI. */
 export interface SkirmishAi {
@@ -2282,10 +3608,16 @@ export interface SkirmishAisResult {
  * selected game's bundled Lua AIs when `gameArchive` is given. The list changes
  * per game (Lua AIs live inside each game's archive).
  */
-export const unitsyncSkirmishAis = defineCommand<
-  { enginePath: string; dataDir: string; gameArchive?: string },
-  SkirmishAisResult
->("coilbox-unitsync", "unitsync_skirmish_ais");
+export const unitsyncSkirmishAis = (args: SkirmishAisArgs) =>
+  skirmishAisCommand(
+    args.gameArchive
+      ? withGameArchivePath({ ...args, gameArchive: args.gameArchive })
+      : args,
+  );
+const skirmishAisCommand = defineCommand<SkirmishAisArgs, SkirmishAisResult>(
+  "coilbox-unitsync",
+  "unitsync_skirmish_ais",
+);
 
 export interface ScanResult {
   maps: MapItem[];
@@ -2310,6 +3642,22 @@ export const unitsyncScan = defineCommand<
   { enginePath: string; dataDir: string; opId?: string },
   ScanResult
 >("coilbox-unitsync", "unitsync_scan");
+
+/**
+ * The scan last saved for a target, or null when there is none, it is unreadable
+ * or it is from another format version. A first paint only: it can name an
+ * archive deleted since.
+ */
+export const unitsyncLastScanRead = defineCommand<
+  { enginePath: string; dataDir: string },
+  ScanResult | null
+>("coilbox-unitsync", "unitsync_last_scan_read");
+
+/** Save a scan that succeeded as the target's first paint at the next launch. */
+export const unitsyncLastScanWrite = defineCommand<
+  { enginePath: string; dataDir: string; scan: ScanResult },
+  null
+>("coilbox-unitsync", "unitsync_last_scan_write");
 
 /** Signal the matching in-flight `unitsync_scan`/`unitsync_thumbnails` worker to stop. */
 export const unitsyncCancel = defineCommand<{ opId: string }, unknown>(
@@ -2374,10 +3722,13 @@ export interface MinimapResult {
  * Render one map's minimap as a PNG data URL (lazy — a separate unitsync session
  * from the scan). `mip` selects resolution: `1024 >> mip` px per side (default 1).
  */
-export const unitsyncMinimap = defineCommand<
-  { enginePath: string; dataDir: string; mapName: string; mip?: number },
-  MinimapResult
->("coilbox-unitsync", "unitsync_minimap");
+export const unitsyncMinimap = (args: MinimapArgs) =>
+  minimapCommand(withMapHint(args));
+type MinimapArgs = MapReadArgs & { mip?: number };
+const minimapCommand = defineCommand<MinimapArgs, MinimapResult>(
+  "coilbox-unitsync",
+  "unitsync_minimap",
+);
 
 export interface HeightmapResult {
   /** Cache file name, served over `coilbox://unitsyncthumb/`. Set whenever the
@@ -2413,10 +3764,12 @@ export interface HeightmapResult {
  * is where the preview mesh stops being able to show more, and it is the same
  * cap the hub's `overlay:height` asset is stored at.
  */
-export const unitsyncHeightmap = defineCommand<
-  { enginePath: string; dataDir: string; mapName: string },
-  HeightmapResult
->("coilbox-unitsync", "unitsync_heightmap");
+export const unitsyncHeightmap = (args: MapReadArgs) =>
+  heightmapCommand(withMapHint(args));
+const heightmapCommand = defineCommand<MapReadArgs, HeightmapResult>(
+  "coilbox-unitsync",
+  "unitsync_heightmap",
+);
 
 export interface HeightFieldResult {
   /** Cache file name, served over `coilbox://unitsyncthumb/`. Little endian
@@ -2477,10 +3830,12 @@ export interface MapSkyboxResult {
  * for the 3D preview's sky. Lazy — a separate unitsync session. Absent for the
  * common case of a map with no skybox.
  */
-export const unitsyncMapSkybox = defineCommand<
-  { enginePath: string; dataDir: string; mapName: string },
-  MapSkyboxResult
->("coilbox-unitsync", "unitsync_map_skybox");
+export const unitsyncMapSkybox = (args: MapReadArgs) =>
+  mapSkyboxCommand(withMapHint(args));
+const mapSkyboxCommand = defineCommand<MapReadArgs, MapSkyboxResult>(
+  "coilbox-unitsync",
+  "unitsync_map_skybox",
+);
 
 export interface ThumbnailsResult {
   thumbnails: {
@@ -2561,14 +3916,26 @@ export const unitsyncEngineConfigSet = defineCommand<
   EngineConfigWriteResult
 >("coilbox-unitsync", "unitsync_engine_config_set");
 
+type ThumbnailsArgs = {
+  enginePath: string;
+  dataDir: string;
+  mip?: number;
+  opId?: string;
+  maps?: MapRef[];
+};
+
 /**
  * Render a small minimap thumbnail for every map in one unitsync session (for the
  * Maps grid). `mip` selects resolution: `1024 >> mip` px (default 3 = 128px).
+ * `maps` lists every map of the last scan, filled in from it. The plugin answers
+ * from the disk cache only when every listed map has a saved answer.
  */
-export const unitsyncThumbnails = defineCommand<
-  { enginePath: string; dataDir: string; mip?: number; opId?: string },
-  ThumbnailsResult
->("coilbox-unitsync", "unitsync_thumbnails");
+export const unitsyncThumbnails = (args: ThumbnailsArgs) =>
+  thumbnailsCommand(withMapRefs(args));
+const thumbnailsCommand = defineCommand<ThumbnailsArgs, ThumbnailsResult>(
+  "coilbox-unitsync",
+  "unitsync_thumbnails",
+);
 
 /** One map's mapinfo metadata from the batch map-meta pass. */
 export interface MapMeta {
@@ -2582,15 +3949,25 @@ export interface MapMetaResult {
   errors: string[];
 }
 
+type MapMetaArgs = {
+  enginePath: string;
+  dataDir: string;
+  opId?: string;
+  maps?: MapRef[];
+};
+
 /**
  * Read every map's mapinfo metadata in one session. Kept out of the scan because
  * it opens each map's archive, and only the map detail page and the singleplayer
- * map card read it. Disk-cached per map by the worker.
+ * map card read it. Disk-cached per map by the worker. `maps` is filled in from
+ * the last scan like {@link unitsyncThumbnails}.
  */
-export const unitsyncMapMeta = defineCommand<
-  { enginePath: string; dataDir: string; opId?: string },
-  MapMetaResult
->("coilbox-unitsync", "unitsync_map_meta");
+export const unitsyncMapMeta = (args: MapMetaArgs) =>
+  mapMetaCommand(withMapRefs(args));
+const mapMetaCommand = defineCommand<MapMetaArgs, MapMetaResult>(
+  "coilbox-unitsync",
+  "unitsync_map_meta",
+);
 
 /** One member of an archive's file tree. */
 export interface ArchiveFileEntry {
@@ -2608,15 +3985,27 @@ export interface ArchiveTreeResult {
   errors: string[];
 }
 
+type ArchiveTreeArgs = {
+  enginePath: string;
+  dataDir: string;
+  archive: string;
+  archivePath?: string;
+  fileName?: string;
+};
+
 /**
  * List one archive's member tree (and resolve its on-disk path). Reads through
  * unitsync's VFS, so `.sd7`/`.sdz`/`.sdd` and rapid-pool `.sdp` packages all
- * work. `archive` is the archive name as unitsync knows it.
+ * work. `archive` is the archive name as unitsync knows it. When it is a game's
+ * primary archive or a map's name from the last scan, the archive path and map
+ * file name are filled in so the plugin can answer from the disk cache.
  */
-export const unitsyncArchiveTree = defineCommand<
-  { enginePath: string; dataDir: string; archive: string },
-  ArchiveTreeResult
->("coilbox-unitsync", "unitsync_archive_tree");
+export const unitsyncArchiveTree = (args: ArchiveTreeArgs) =>
+  archiveTreeCommand(withArchiveTreeHint(args));
+const archiveTreeCommand = defineCommand<ArchiveTreeArgs, ArchiveTreeResult>(
+  "coilbox-unitsync",
+  "unitsync_archive_tree",
+);
 
 export interface ArchiveFileResult {
   /** `"text"`, `"image"`, `"audio"`, or `"binary"`. */
@@ -2662,16 +4051,26 @@ export interface GameHeadersResult {
   errors: string[];
 }
 
+type GameHeadersArgs = {
+  enginePath: string;
+  dataDir: string;
+  games?: GameRef[];
+};
+
 /**
  * Resolve loading-screen art for every game in one unitsync session (for the
  * Games grid). Keyed on cheap file identity and disk-cached by the worker, so it
  * stays cheap on later launches. Games with no usable art come back with neither
- * a `file` nor a `dataUrl`, and the UI shows a gradient placeholder.
+ * a `file` nor a `dataUrl`, and the UI shows a gradient placeholder. `games`
+ * lists every game of the last scan, filled in from it. The plugin answers from
+ * the disk cache only when every listed game has a saved answer.
  */
-export const unitsyncGameHeaders = defineCommand<
-  { enginePath: string; dataDir: string },
-  GameHeadersResult
->("coilbox-unitsync", "unitsync_game_headers");
+export const unitsyncGameHeaders = (args: GameHeadersArgs) =>
+  gameHeadersCommand(withGameRefs(args));
+const gameHeadersCommand = defineCommand<GameHeadersArgs, GameHeadersResult>(
+  "coilbox-unitsync",
+  "unitsync_game_headers",
+);
 
 export interface LuaExecResult {
   /** The pretty-printed value the script returned (set on success). */

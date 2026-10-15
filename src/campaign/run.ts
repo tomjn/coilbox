@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
-import { contentListReplays } from "../content/bindings";
 import { useUnitsyncScan } from "../content/config";
 import { dependencyBlockReason } from "../content/gameDependencies";
+import { loadReplays } from "../content/replayList";
 import { useReplayUserState } from "../content/replayUserState";
 import type { BattleConfig } from "../play/bindings";
 import {
@@ -220,7 +220,7 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
     // blocks the launch itself.
     let beforePaths: Set<string> | null = null;
     try {
-      const { replays } = await contentListReplays({ root: target.dataDir });
+      const replays = await loadReplays(target.dataDir, true);
       beforePaths = new Set(replays.map((r) => r.path));
     } catch {
       beforePaths = null;

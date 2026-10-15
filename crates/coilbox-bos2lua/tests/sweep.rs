@@ -38,6 +38,7 @@ fn event(frame: u32, callin: &str, args: &[f64]) -> ScriptEvent {
 }
 
 #[test]
+#[ignore = "needs COILBOX_BOS_SWEEP set to a folder of BOS scripts"]
 fn every_script_in_the_folder_converts_and_runs() {
     let Ok(root) = std::env::var("COILBOX_BOS_SWEEP") else {
         eprintln!("COILBOX_BOS_SWEEP is not set, so there is nothing to sweep.");

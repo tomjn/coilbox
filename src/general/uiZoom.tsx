@@ -13,12 +13,14 @@
 
 import { useSetting } from "@picoframe/frame";
 import { type ReactNode, useEffect } from "react";
+import { showFrameRates } from "../lib/frameRate";
 import {
   applyUiZoom,
   DEFAULT_UI_ZOOM,
   stepUiZoom,
   UI_ZOOM_KEY,
 } from "../lib/uiZoom";
+import { useShowFrameRateSetting } from "./display";
 import { CloseDrawerOnNavigate } from "./drawer";
 
 /** `[zoom, setZoom]` for the UI zoom level, as a scale factor where 1 is 100%. */
@@ -28,7 +30,8 @@ export function useUiZoomSetting() {
 
 /**
  * The general plugin's Provider: keeps the webview at the stored zoom, listens
- * for the zoom keys, and closes the drawer on a navigation.
+ * for the zoom keys, closes the drawer on a navigation, and shows the frame
+ * rate on 3D views when that is switched on.
  *
  * Composed here rather than in `index.ts` because that file has no JSX, and
  * because both halves are the same kind of thing: app-wide behaviour with no UI
@@ -71,6 +74,11 @@ export function GeneralProvider({ children }: { children: ReactNode }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [zoom, setZoom]);
+
+  const [showFrameRate] = useShowFrameRateSetting();
+  useEffect(() => {
+    if (showFrameRate) return showFrameRates();
+  }, [showFrameRate]);
 
   return <CloseDrawerOnNavigate>{children}</CloseDrawerOnNavigate>;
 }

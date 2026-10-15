@@ -1558,6 +1558,13 @@ export const mpKick = defineCommand<
   { sent: boolean }
 >("coilbox-multiplayer", "mp_kick");
 
+/** Host: ring one member, or with no `username` everybody who is not ready.
+ *  Fails with the reason when there is nobody to ring. */
+export const mpRing = defineCommand<
+  { serverKey: string; username?: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_ring");
+
 /** How a member votes, in the words `lobby/voteSubmit` uses. */
 export type VoteChoice = "yes" | "no" | "abstain";
 

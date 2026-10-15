@@ -24,6 +24,8 @@ const COMMANDS: &[&str] = &[
     "dl_path_writable",
     "dl_fetch_text",
     "dl_rapid_release_archives",
+    "dl_inspect_archive",
+    "dl_install_archive",
 ];
 
 fn main() {

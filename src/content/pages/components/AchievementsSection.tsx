@@ -5,6 +5,7 @@ import {
   type AchievementResult,
   evaluateAchievements,
 } from "../../achievements";
+import { aiWinFacts } from "../../aiRecord";
 import type { StatRecord } from "../../bindings";
 import { playerGameFacts } from "../../stats";
 import { TallyBar } from "./StatWidgets";
@@ -78,14 +79,21 @@ export function AchievementsSection({
   records,
   playerName,
   refights,
+  scripted,
 }: {
   records: StatRecord[];
   playerName: string;
   refights: ReadonlySet<string>;
+  /** Replays from campaign, Conquest and Warpath, which AI wins leave out. */
+  scripted: ReadonlySet<string>;
 }) {
   const results = useMemo(
-    () => evaluateAchievements(playerGameFacts(records, playerName, refights)),
-    [records, playerName, refights],
+    () =>
+      evaluateAchievements(
+        playerGameFacts(records, playerName, refights),
+        aiWinFacts(records, playerName, refights, scripted),
+      ),
+    [records, playerName, refights, scripted],
   );
 
   const earnedCount = results.filter((r) => r.earned).length;

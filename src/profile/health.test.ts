@@ -23,6 +23,7 @@ function base(): HealthInputs {
     hideableNavIds: ["library.games", "downloads.browse", "downloads.games"],
     hideSettings: [],
     settingsIds: ["content-folders", "engines", "uberstress"],
+    appIcon: null,
     linkIcons: [],
     validIconNames: ["discord", "globe", "docs"],
     home: null,
@@ -163,6 +164,23 @@ describe("deriveHealthChecks", () => {
     );
     expect(c.status).toBe("error");
     expect(c.hint).toContain("read-only");
+  });
+
+  it("errors when the folder games or maps go to is read-only", () => {
+    for (const own of ["gamesRoot", "mapsRoot"] as const) {
+      const c = byId(
+        {
+          ...base(),
+          writable: {
+            writeRoot: { writable: true },
+            [own]: { writable: false, error: "denied" },
+            dataDir: { writable: true },
+          },
+        },
+        "writable",
+      );
+      expect(c.status).toBe("error");
+    }
   });
 
   it("warns when a campaign failed to load, naming it and the error", () => {
@@ -348,6 +366,36 @@ describe("deriveHealthChecks", () => {
 
     it("adds no hideSettings row when empty", () => {
       expect(maybeById(base(), "hideSettings")).toBeUndefined();
+    });
+  });
+
+  describe("app icon", () => {
+    it("names the icon that was applied", () => {
+      const c = byId(
+        { ...base(), appIcon: { path: "art/icon.png", error: "" } },
+        "appIcon",
+      );
+      expect(c.status).toBe("ok");
+      expect(c.label).toContain("art/icon.png");
+    });
+
+    it("warns with the reason an icon was not applied", () => {
+      const c = byId(
+        {
+          ...base(),
+          appIcon: {
+            path: "art/icon.jpg",
+            error: "art/icon.jpg is not a PNG file",
+          },
+        },
+        "appIcon",
+      );
+      expect(c.status).toBe("warn");
+      expect(c.hint).toContain("art/icon.jpg is not a PNG file");
+    });
+
+    it("adds no app-icon row when the profile names no icon", () => {
+      expect(maybeById(base(), "appIcon")).toBeUndefined();
     });
   });
 

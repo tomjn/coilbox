@@ -3,9 +3,10 @@
 /**
  * `AutohostControls` in a real lobby battle vs a direct room (issue #2871).
  * A direct room has no autohost, so Balance and Lock/Unlock become requests
- * worded as asks, and Fix colours/Ring unready drop out entirely since the
- * founder has no direct way to honour either (same reasoning #2738 used to
- * hide this whole panel).
+ * worded as asks, and Fix colours drops out entirely since the founder has no
+ * direct way to honour it (same reasoning #2738 used to hide this whole
+ * panel). Ring unready stays, because the host's own client answers `!ring`,
+ * and it is the one command a self-hosting founder is offered.
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -34,7 +35,9 @@ describe("AutohostControls in an ordinary lobby battle", () => {
       <AutohostControls
         locked={false}
         directRoom={false}
+        selfHost={false}
         onCommand={vi.fn()}
+        onRing={vi.fn()}
       />,
     );
     expect(screen.getByText("Host commands")).toBeTruthy();
@@ -50,7 +53,9 @@ describe("AutohostControls in an ordinary lobby battle", () => {
       <AutohostControls
         locked={false}
         directRoom={false}
+        selfHost={false}
         onCommand={onCommand}
+        onRing={vi.fn()}
       />,
     );
     fireEvent.click(screen.getByText("Balance"));
@@ -59,16 +64,36 @@ describe("AutohostControls in an ordinary lobby battle", () => {
 });
 
 describe("AutohostControls in a direct room", () => {
-  it("keeps only Balance and Lock, worded as requests", () => {
+  it("keeps Balance and Lock, worded as requests, and Ring unready", () => {
     render(
-      <AutohostControls locked={false} directRoom={true} onCommand={vi.fn()} />,
+      <AutohostControls
+        locked={false}
+        directRoom={true}
+        selfHost={false}
+        onCommand={vi.fn()}
+        onRing={vi.fn()}
+      />,
     );
     expect(screen.getByText("Ask the host")).toBeTruthy();
     expect(screen.getByText("Suggest balance")).toBeTruthy();
     expect(screen.getByText("Suggest lock")).toBeTruthy();
     expect(screen.queryByText("Fix colours")).toBeNull();
-    expect(screen.queryByText("Ring unready")).toBeNull();
     expect(screen.queryByText("Balance")).toBeNull();
+  });
+
+  it("sends !ring, which the host's client answers", () => {
+    const onCommand = vi.fn();
+    render(
+      <AutohostControls
+        locked={false}
+        directRoom={true}
+        selfHost={false}
+        onCommand={onCommand}
+        onRing={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByText("Ring unready"));
+    expect(onCommand).toHaveBeenCalledWith("!ring");
   });
 
   it("still sends the plain !balance/!lock text, unchanged for a real autohost elsewhere", () => {
@@ -77,7 +102,9 @@ describe("AutohostControls in a direct room", () => {
       <AutohostControls
         locked={false}
         directRoom={true}
+        selfHost={false}
         onCommand={onCommand}
+        onRing={vi.fn()}
       />,
     );
     fireEvent.click(screen.getByText("Suggest balance"));
@@ -88,8 +115,38 @@ describe("AutohostControls in a direct room", () => {
 
   it("suggests unlock when the room is locked", () => {
     render(
-      <AutohostControls locked={true} directRoom={true} onCommand={vi.fn()} />,
+      <AutohostControls
+        locked={true}
+        directRoom={true}
+        selfHost={false}
+        onCommand={vi.fn()}
+        onRing={vi.fn()}
+      />,
     );
     expect(screen.getByText("Suggest unlock")).toBeTruthy();
+  });
+});
+
+describe("AutohostControls for a founder hosting the battle themselves", () => {
+  it.each([
+    false,
+    true,
+  ])("offers Ring unready alone, and rings without a chat command (direct room: %s)", (directRoom) => {
+    const onCommand = vi.fn();
+    const onRing = vi.fn();
+    render(
+      <AutohostControls
+        locked={false}
+        directRoom={directRoom}
+        selfHost={true}
+        onCommand={onCommand}
+        onRing={onRing}
+      />,
+    );
+    expect(screen.getByText("Host commands")).toBeTruthy();
+    expect(screen.getAllByRole("button")).toHaveLength(1);
+    fireEvent.click(screen.getByText("Ring unready"));
+    expect(onRing).toHaveBeenCalledTimes(1);
+    expect(onCommand).not.toHaveBeenCalled();
   });
 });

@@ -17,7 +17,6 @@ import { Button, Input } from "@picoframe/frame";
 import { Blocks, ChevronLeft, Search, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useMemo, useRef, useState } from "react";
-
 import { Badge } from "@/components/ui/badge";
 import type { GameItem, UnitDisplay } from "@/content/bindings";
 import {
@@ -30,6 +29,7 @@ import { isSdd } from "@/content/format";
 import { SddBadge } from "@/content/pages/components/SddBadge";
 import { ScanFailed } from "@/content/pages/components/states";
 import { UnitIcon } from "@/content/pages/components/UnitIcon";
+import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { usePreferredTarget } from "@/play/config";
 import {
   type AdoptedScript,
@@ -110,7 +110,10 @@ export function GameModelDrawer({
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const { projects } = useLegoProjects();
 
-  const games = useMemo(() => sortedGames(scan.data?.games ?? []), [scan.data]);
+  const games = useMemo(
+    () => sortedGames(withoutGeneratedGames(scan.data?.games ?? [])),
+    [scan.data],
+  );
 
   // Only once a game is chosen, so a closed drawer and the games list cost
   // nothing. Both are session cached, so going back and forth is free.

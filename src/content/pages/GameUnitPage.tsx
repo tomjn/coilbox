@@ -186,6 +186,7 @@ export default function GameUnitPage() {
     unit?.footprintX ?? 1,
     unit?.footprintZ ?? 1,
     model,
+    game?.name,
   );
 
   if (error && !data)

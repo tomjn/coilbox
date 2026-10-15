@@ -181,17 +181,22 @@ pub fn build_faction_logos_args(
 /// The mode's fields live once in `coilbox_unitsync_worker::UnitDatasetArgs`,
 /// so this function only has to add `--lib`/`--datadir`, which every mode
 /// takes and `Mode::to_args` does not include (issue #2448).
+///
+/// `match_setup_file` names a file holding one match's setup, which makes the
+/// read that match's unit list and not the game's own (issue #3847).
 pub fn build_unit_dataset_args(
     lib: &str,
     datadir: &str,
     game: &str,
     cache_dir: Option<&str>,
+    match_setup_file: Option<&str>,
 ) -> Vec<String> {
     let mut args = build_args(lib, datadir);
     args.extend(
         coilbox_unitsync_worker::Mode::UnitDataset(coilbox_unitsync_worker::UnitDatasetArgs {
             game: game.into(),
             cache_dir: cache_dir.map(String::from),
+            match_setup_file: match_setup_file.map(String::from),
         })
         .to_args(),
     );
@@ -692,11 +697,17 @@ pub fn build_map_minimaps_args(
 /// `coilbox_unitsync_worker::MapSkyboxArgs`, so this function only has to
 /// add `--lib`/`--datadir`, which every mode takes and `Mode::to_args` does
 /// not include (issue #2448).
-pub fn build_map_skybox_args(lib: &str, datadir: &str, map_name: &str) -> Vec<String> {
+pub fn build_map_skybox_args(
+    lib: &str,
+    datadir: &str,
+    map_name: &str,
+    cache_dir: Option<&str>,
+) -> Vec<String> {
     let mut args = build_args(lib, datadir);
     args.extend(
         coilbox_unitsync_worker::Mode::MapSkybox(coilbox_unitsync_worker::MapSkyboxArgs {
             map: map_name.into(),
+            cache_dir: cache_dir.map(String::from),
         })
         .to_args(),
     );
@@ -761,7 +772,12 @@ pub fn build_config_set_args(lib: &str, datadir: &str, key: &str, value: &str) -
 /// The mode's fields live once in `coilbox_unitsync_worker::ArchiveArgs`, so
 /// this function only has to add `--lib`/`--datadir`, which every mode takes
 /// and `Mode::to_args` does not include (issue #2448).
-pub fn build_archive_tree_args(lib: &str, datadir: &str, archive: &str) -> Vec<String> {
+pub fn build_archive_tree_args(
+    lib: &str,
+    datadir: &str,
+    archive: &str,
+    cache_dir: Option<&str>,
+) -> Vec<String> {
     let mut args = build_args(lib, datadir);
     args.extend(
         coilbox_unitsync_worker::Mode::Archive(coilbox_unitsync_worker::ArchiveArgs {
@@ -769,6 +785,7 @@ pub fn build_archive_tree_args(lib: &str, datadir: &str, archive: &str) -> Vec<S
             file: None,
             extract: None,
             raw: false,
+            cache_dir: cache_dir.map(String::from),
         })
         .to_args(),
     );
@@ -791,6 +808,7 @@ pub fn build_archive_file_args(
             file: Some(file.into()),
             extract: None,
             raw,
+            cache_dir: None,
         })
         .to_args(),
     );
@@ -853,6 +871,7 @@ pub fn build_archive_extract_args(
             file: Some(file.into()),
             extract: Some(dest.into()),
             raw: false,
+            cache_dir: None,
         })
         .to_args(),
     );
@@ -1063,13 +1082,19 @@ mod tests {
     fn build_map_skybox_args_round_trips_through_the_worker_s_own_parser() {
         use coilbox_unitsync_worker::MapSkyboxArgs;
 
-        let a = build_map_skybox_args("/eng/libunitsync.so", "/data", "Map v1");
+        let a = build_map_skybox_args(
+            "/eng/libunitsync.so",
+            "/data",
+            "Map v1",
+            Some("/cache/info"),
+        );
         assert!(a.contains(&"--lib".to_string()) && a.contains(&"--datadir".to_string()));
         let recovered = MapSkyboxArgs::from_args(&a).expect("valid argv");
         assert_eq!(
             recovered,
             MapSkyboxArgs {
-                map: "Map v1".into()
+                map: "Map v1".into(),
+                cache_dir: Some("/cache/info".into()),
             }
         );
     }
@@ -1307,7 +1332,12 @@ mod tests {
     fn build_archive_args_round_trip_through_the_worker_s_own_parser() {
         use coilbox_unitsync_worker::ArchiveArgs;
 
-        let tree = build_archive_tree_args("/eng/libunitsync.so", "/data", "Map.sd7");
+        let tree = build_archive_tree_args(
+            "/eng/libunitsync.so",
+            "/data",
+            "Map.sd7",
+            Some("/cache/info"),
+        );
         assert_eq!(
             ArchiveArgs::from_args(&tree).expect("valid argv"),
             ArchiveArgs {
@@ -1315,6 +1345,7 @@ mod tests {
                 file: None,
                 extract: None,
                 raw: false,
+                cache_dir: Some("/cache/info".into()),
             }
         );
 
@@ -1332,6 +1363,7 @@ mod tests {
                 file: Some("maps/x.smd".into()),
                 extract: None,
                 raw: false,
+                cache_dir: None,
             }
         );
 
@@ -1349,6 +1381,7 @@ mod tests {
                 file: Some("maps/x.glb".into()),
                 extract: None,
                 raw: true,
+                cache_dir: None,
             }
         );
 
@@ -1366,6 +1399,7 @@ mod tests {
                 file: Some("maps/x.smd".into()),
                 extract: Some("/out/x.smd".into()),
                 raw: false,
+                cache_dir: None,
             }
         );
     }
@@ -1425,7 +1459,7 @@ mod tests {
         };
 
         let cases = [
-            build_archive_tree_args("/no/such/libunitsync.so", "/tmp", "Map.sd7"),
+            build_archive_tree_args("/no/such/libunitsync.so", "/tmp", "Map.sd7", None),
             build_archive_file_args(
                 "/no/such/libunitsync.so",
                 "/tmp",
@@ -1582,6 +1616,7 @@ mod tests {
             "/data",
             "BAR.sdd",
             Some("/cache/info"),
+            Some("/tmp/setup.json"),
         );
         assert!(a.contains(&"--unit-dataset".to_string()));
         let recovered = UnitDatasetArgs::from_args(&a).expect("valid argv");
@@ -1590,14 +1625,18 @@ mod tests {
             UnitDatasetArgs {
                 game: "BAR.sdd".into(),
                 cache_dir: Some("/cache/info".into()),
+                match_setup_file: Some("/tmp/setup.json".into()),
             }
         );
 
-        let without = build_unit_dataset_args("/eng/libunitsync.so", "/data", "BAR.sdd", None);
+        let without =
+            build_unit_dataset_args("/eng/libunitsync.so", "/data", "BAR.sdd", None, None);
         assert!(without.contains(&"--unit-dataset".to_string()));
         assert!(!without.iter().any(|x| x == "--cache-dir"));
+        assert!(!without.iter().any(|x| x == "--match-setup-file"));
         let recovered = UnitDatasetArgs::from_args(&without).expect("valid argv");
         assert_eq!(recovered.cache_dir, None);
+        assert_eq!(recovered.match_setup_file, None);
     }
 
     /// What `build_unit_defs_args` writes, the worker's own `from_args` reads

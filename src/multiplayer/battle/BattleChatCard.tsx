@@ -5,6 +5,7 @@ import type { Battle, ChatMsg } from "../bindings";
 import { ChatPane } from "../chat/ChatPane";
 import { type ConversationDescriptor, convId } from "../chat/conversation";
 import { useConversation } from "../chat/useConversation";
+import type { NameMark } from "../nameMark";
 import { initialMirror, useConnection, useMultiplayer } from "../store";
 import { colorIntToHex, type MemberRow } from "./config";
 import { applyLayoutDirectly, balanceLayoutForRows } from "./gameTypePresets";
@@ -56,6 +57,7 @@ export function BattleChatCard({
   hostControls,
   onSetBattleStatusBatch,
   onSetLocked,
+  markFor,
 }: {
   battle: Battle;
   enginePath: string | undefined;
@@ -82,6 +84,9 @@ export function BattleChatCard({
   onSetLocked: (locked: boolean) => void;
   /** The connection this battle is on (issue #2844). */
   serverKey: string | null;
+  /** Who a name is to the player (themselves, a friend, in their party), from
+   * `useNameMark` on this battle's connection (issue #336). */
+  markFor?: (name: string) => NameMark | null;
 }) {
   const { markSeen } = useMultiplayer();
   const mirror = useConnection(serverKey)?.mirror ?? initialMirror;
@@ -210,6 +215,7 @@ export function BattleChatCard({
         messages={conv.messages}
         currentUser={me}
         senderColor={senderColor}
+        markFor={markFor}
         isBot={isBot}
         maxChars={conv.maxChars}
         onSend={conv.send}

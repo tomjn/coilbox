@@ -14,6 +14,13 @@
  * step is what the old build-tree "Render" button never took, which was the
  * whole of why a render it produced vanished the moment you navigated away.
  *
+ * What a drawn render is named after is read out of the game's archive, the
+ * same model digest for every angle. It is asked for once, as soon as the cache
+ * read finds an angle missing and without waiting for the model, and handed to
+ * each encode so none of them mounts the game. Asked for while the model read is
+ * still running, it is queued behind it and the worker keeps that read's mount
+ * (issue #3770).
+ *
  * The cache read has to finish, one way or the other, before the draw pass
  * starts. Racing them would mean the draw pass claims an angle before the
  * cache read has said whether it already exists, which is exactly the
@@ -21,8 +28,8 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import type { UnitModelResult } from "@/content/bindings";
-import { unitsyncUnitRender } from "@/content/bindings";
+import type { UnitModelResult, UnitRenderKeysResult } from "@/content/bindings";
+import { unitsyncUnitRender, unitsyncUnitRenderKeys } from "@/content/bindings";
 import { localRenders, rememberLocalRender } from "@/hub/assets/localRenders";
 import { RENDER_VERSION, renderUnit } from "@/hub/assets/renderTop";
 import { RENDER_ANGLES, renderVariant } from "@/hub/assets/vocabulary";
@@ -88,6 +95,12 @@ function unavailableRenders(message: string): Record<string, AngleRender> {
  * still draws every angle fresh each visit rather than persisting them, and
  * says so nowhere on screen because a missing shortname is not something a
  * player did wrong.
+ *
+ * `gameName` is the name the game declares for itself (`GameItem.name`), which
+ * is what a render is recorded against as its source archive. It is not
+ * `gameArchive`, the file name: asking the cache with the file name matches no
+ * record, so every visit drew all four angles again. Left out, the cache read
+ * checks the renderer version alone.
  */
 export function useUnitRenders(
   enginePath?: string,
@@ -99,6 +112,7 @@ export function useUnitRenders(
   footprintX?: number,
   footprintZ?: number,
   model?: UnitModelResult | null,
+  gameName?: string,
 ): Record<string, AngleRender> {
   const [renders, setRenders] = useState<Record<string, AngleRender>>(
     initialRenders(),
@@ -108,12 +122,15 @@ export function useUnitRenders(
   // cache read that runs alongside it.
   const settled = useRef<Set<string>>(new Set());
   const [cacheChecked, setCacheChecked] = useState(false);
+  // What the missing angles are named after, asked for once per unit.
+  const keys = useRef<Promise<UnitRenderKeysResult | null> | null>(null);
 
   // A different unit (or a game update swapping the archive) starts over:
   // nothing carries across from whatever the previous unit had found or drawn.
   // biome-ignore lint/correctness/useExhaustiveDependencies: unitId and gameArchive are the reset trigger, not read by the body
   useEffect(() => {
     settled.current = new Set();
+    keys.current = null;
     setCacheChecked(false);
     setRenders(initialRenders());
   }, [unitId, gameArchive]);
@@ -141,7 +158,7 @@ export function useUnitRenders(
               renderVariant(angle),
               RENDER_VERSION,
               [unitId],
-              gameArchive,
+              gameName,
             );
             return { angle, render: held.get(unitId) };
           }),
@@ -156,12 +173,39 @@ export function useUnitRenders(
           }));
         }
       }
-      if (!cancelled) setCacheChecked(true);
+      if (cancelled) return;
+      if (RENDER_ANGLES.some((angle) => !settled.current.has(angle))) {
+        // The digest does not depend on the footprint, so any will do. A
+        // failed read leaves the encodes to work the names out themselves.
+        keys.current = unitsyncUnitRenderKeys({
+          enginePath,
+          dataDir,
+          gameArchive,
+          rendererVersion: RENDER_VERSION,
+          units: [
+            {
+              unit: unitId,
+              object,
+              footprintX: 1,
+              footprintZ: 1,
+            },
+          ],
+        }).catch(() => null);
+      }
+      setCacheChecked(true);
     })();
     return () => {
       cancelled = true;
     };
-  }, [enginePath, dataDir, gameArchive, gameShortname, unitId, object]);
+  }, [
+    enginePath,
+    dataDir,
+    gameArchive,
+    gameName,
+    gameShortname,
+    unitId,
+    object,
+  ]);
 
   // Step 2: draw whatever the cache did not have, once the cache read has had
   // its say and the model (already loading for the hero above) has arrived.
@@ -202,6 +246,16 @@ export function useUnitRenders(
           footprintX ?? 1,
           footprintZ ?? 1,
         );
+        const read = await keys.current;
+        const key = read?.keys[unitId as string]?.[renderVariant(angle)];
+        const known =
+          key?.modelDigest && key.sourceMember && read?.sourceArchive
+            ? {
+                modelDigest: key.modelDigest,
+                sourceMember: key.sourceMember,
+                sourceArchive: read.sourceArchive,
+              }
+            : {};
         const encoded = await unitsyncUnitRender({
           enginePath: enginePath as string,
           dataDir: dataDir as string,
@@ -214,6 +268,7 @@ export function useUnitRenders(
           pixels: toBase64(drawn.rgba),
           width: drawn.width,
           height: drawn.height,
+          ...known,
         });
         if (cancelled) return;
         if (encoded.asset) {

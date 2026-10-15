@@ -106,6 +106,25 @@ pub fn candidate_dirs(os: Os, base: &LogBaseDirs, data_dir: &str) -> Vec<PathBuf
     out
 }
 
+/// The engine folders in content root `root`, one and two levels under `engine/`
+/// because an install may nest versions under a platform folder.
+///
+/// An engine with a `springsettings.cfg` beside it writes to its own folder, and
+/// so does every engine a portable coilbox launches, which it isolates there.
+pub fn engine_dirs(root: &Path) -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    let Ok(entries) = std::fs::read_dir(root.join("engine")) else {
+        return dirs;
+    };
+    for path in entries.flatten().map(|e| e.path()).filter(|p| p.is_dir()) {
+        if let Ok(inner) = std::fs::read_dir(&path) {
+            dirs.extend(inner.flatten().map(|e| e.path()).filter(|p| p.is_dir()));
+        }
+        dirs.push(path);
+    }
+    dirs
+}
+
 /// The platform this build runs on, for the live command.
 pub fn current_os() -> Os {
     if cfg!(target_os = "windows") {
@@ -240,6 +259,26 @@ mod tests {
     #[test]
     fn an_empty_content_root_adds_nothing() {
         assert_eq!(candidate_dirs(Os::Unix, &base(), "").len(), 2);
+    }
+
+    #[test]
+    fn engine_dirs_finds_flat_and_platform_nested_engines() {
+        let root = tmp("engine_dirs");
+        let flat = root.join("engine").join("105.0");
+        let nested = root.join("engine").join("linux64").join("2025.01");
+        fs::create_dir_all(&flat).unwrap();
+        fs::create_dir_all(&nested).unwrap();
+        fs::write(root.join("engine").join("notes.txt"), b"").unwrap();
+
+        let dirs = engine_dirs(&root);
+        assert!(dirs.contains(&flat));
+        assert!(dirs.contains(&nested));
+        assert_eq!(dirs.len(), 3, "the two engines and the platform folder");
+    }
+
+    #[test]
+    fn a_root_with_no_engine_folder_has_no_engine_dirs() {
+        assert!(engine_dirs(&tmp("no_engine")).is_empty());
     }
 
     #[test]

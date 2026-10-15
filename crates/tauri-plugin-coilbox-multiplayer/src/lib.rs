@@ -2958,6 +2958,35 @@ fn mp_kick(registry: State<'_, Registry>, server_key: String, username: String) 
     )
 }
 
+/// Ring from the battle this connection founded: one member by name, or
+/// everybody who is not ready. A ring that would reach nobody is an error the
+/// founder reads, and nothing is said in the battle about it.
+fn ring_from_host(registry: &Registry, server_key: &str, username: Option<&str>) -> CliResult {
+    let lines = {
+        let map = lock_or_recover(registry);
+        let Some(conn) = map.get(server_key) else {
+            return CliResult::err(format!("not connected: {server_key}"));
+        };
+        let state = lock_or_recover(&conn.state);
+        let rung = lock_or_recover(&conn.ring).host_rings(&state, username, conn::now_ms());
+        rung
+    };
+    match lines {
+        Ok(lines) => enqueue_all(registry, server_key, lines),
+        Err(why) => CliResult::err(why),
+    }
+}
+
+/// `mp_ring`: host: ring a member, or with no name everybody who is not ready.
+#[tauri::command]
+fn mp_ring(
+    registry: State<'_, Registry>,
+    server_key: String,
+    username: Option<String>,
+) -> CliResult {
+    ring_from_host(registry.inner(), &server_key, username.as_deref())
+}
+
 /// `mp_cast_vote`: vote yes, no or abstain in the battle's open vote.
 #[tauri::command]
 fn mp_cast_vote(
@@ -3706,6 +3735,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_force_color,
             mp_force_spectator,
             mp_kick,
+            mp_ring,
             mp_cast_vote,
             tachyon_room::mp_appoint_boss,
             tachyon_room::mp_unboss,
@@ -4305,6 +4335,7 @@ mod tests {
                 relay: conn::HostedRelay::default(),
                 opened,
                 relay_refused: relay_host::RefusedRelayAddress::default(),
+                ring: Default::default(),
             },
         );
         (registry, sent, answers)
@@ -5610,6 +5641,7 @@ mod tests {
             relay: conn::HostedRelay::default(),
             opened: tokio::sync::watch::channel(relay_host::OpenAnswer::Unasked).1,
             relay_refused: relay_host::RefusedRelayAddress::default(),
+            ring: Default::default(),
         }
     }
 

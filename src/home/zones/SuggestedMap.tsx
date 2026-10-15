@@ -204,9 +204,9 @@ export function SuggestedMapCard({
           Set a download folder in{" "}
           <Link
             className="underline underline-offset-4"
-            to="/settings/downloads"
+            to="/settings/content-folders"
           >
-            Downloads settings
+            Content folders settings
           </Link>{" "}
           to install it.
         </p>

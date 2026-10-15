@@ -12,10 +12,18 @@ links = "tauri-plugin-coilbox-profile"
 tauri-plugin = { version = "2", features = ["build"] }
 
 [dependencies]
-tauri = { version = "2" }
+# `image-png` decodes the profile's `icon` for the window icon on Windows and Linux.
+tauri = { version = "2", features = ["image-png"] }
 tauri-plugin-opener = "2"
 serde = { workspace = true }
 serde_json = { workspace = true }
 base64 = { workspace = true }
 picoframe-core = "0.0.4"
 coilbox-portable = { path = "../coilbox-portable" }
+
+# The dock icon. Tauri has no call for it, so this is the AppKit one it uses itself
+# for the icon of a dev build.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSImage", "NSResponder"] }
+objc2-foundation = { version = "0.3", features = ["NSData"] }

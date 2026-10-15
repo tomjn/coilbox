@@ -52,7 +52,12 @@ import { useMpRevealed } from "../navPredicates";
 import { useNoteActions } from "../notes";
 import { useStatsRelations } from "../statsRelation";
 import { relationSummary } from "../statsRelationSummary";
-import { useMultiplayer } from "../store";
+import {
+  connectionLabelIfSeveral,
+  useMultiplayer,
+  useProtocolServers,
+} from "../store";
+import { useNameMark } from "../useNameMark";
 
 /**
  * The battle room for a joined multiplayer battle. Reads the live battle from the
@@ -66,7 +71,8 @@ import { useMultiplayer } from "../store";
  */
 function BattleRoomPage() {
   const room = useBattleRoom(useBattleRoomKey());
-  const { disconnect } = useMultiplayer();
+  const { disconnect, connections } = useMultiplayer();
+  const servers = useProtocolServers();
   // The room's own connection, which is the one a battle in our own LAN room
   // is on, rather than whichever connection is focused.
   const disconnectRoom = () => disconnect(room.serverKey ?? undefined);
@@ -117,6 +123,7 @@ function BattleRoomPage() {
   const joins = usePendingJoins();
   // Private, client-side per-player notes (issue #341), scoped to this server.
   const { get: getNote, set: setNote } = useNoteActions(room.serverKey);
+  const markFor = useNameMark(room.serverKey);
   // "N games with this player…" line for the note popover, from the local
   // replay-stats database (#375) — purely a read, no server involvement.
   const relationFor = useStatsRelations(room.me);
@@ -488,6 +495,11 @@ function BattleRoomPage() {
         // The addresses to hand out, from the moment the room is up. Only in
         // the battle inside our own room, which is the one `endsTheRoom` names.
         sharedRoom={endsTheRoom ? hostedRoom : null}
+        connectionLabel={connectionLabelIfSeveral(
+          room.serverKey,
+          connections,
+          servers,
+        )}
       />
 
       {/* Above everything else on the page: somebody is sitting on a spinner
@@ -540,6 +552,7 @@ function BattleRoomPage() {
         <div className="flex min-w-0 flex-1 flex-col gap-4 p-4">
           <BattleMembersTable
             serverKey={room.serverKey}
+            markFor={markFor}
             rows={room.rows}
             sides={room.sides}
             factionLogos={factionLogos}
@@ -570,6 +583,7 @@ function BattleRoomPage() {
           />
           <BattleChatCard
             serverKey={room.serverKey}
+            markFor={markFor}
             battle={battle}
             enginePath={room.enginePath}
             dataDir={room.dataDir}
@@ -764,20 +778,21 @@ function BattleRoomPage() {
             onSetBattleStatusBatch={room.setBattleStatusBatch}
             onAutohostSend={room.autohostSend}
           />
-          {/* The `!`-command panel only makes sense for somebody who isn't
-              hosting the battle themselves: self-hosted, those commands are
-              inert (lock moves to the header, map changes go through the map
-              card). A direct room runs no SPADS, so here it reads as
+          {/* The `!`-command panel is mostly for somebody who isn't hosting
+              the battle themselves: self-hosted, those commands are inert
+              (lock moves to the header, map changes go through the map card)
+              and only Ring unready is left, which the founder's own client
+              answers. A direct room runs no SPADS, so here it reads as
               requests the founder answers in the battle chat rather than
               commands a bot answers (issue #2871, replacing #2738's outright
               hiding of this panel there). */}
-          {!room.selfHost && (
-            <AutohostControls
-              locked={battle.locked}
-              directRoom={room.directRoom}
-              onCommand={room.autohostSend}
-            />
-          )}
+          <AutohostControls
+            locked={battle.locked}
+            directRoom={room.directRoom}
+            selfHost={room.selfHost}
+            onCommand={room.autohostSend}
+            onRing={() => room.hostControls.ring()}
+          />
           <BattleGameCard
             enginePath={room.enginePath}
             dataDir={room.dataDir}

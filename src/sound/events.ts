@@ -57,7 +57,7 @@ type EventDef = {
 export const EVENTS = {
   ring: {
     label: "Rung by the host",
-    description: "An autohost rings the battle room to round up idle players.",
+    description: "The host rings the battle room to round up idle players.",
     group: "alerts",
     sound: "gong",
   },

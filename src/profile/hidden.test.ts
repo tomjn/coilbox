@@ -2,7 +2,11 @@ import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { HIDEABLE_NAV_IDS } from "./hidden";
+import {
+  ANALYTICS_HIDE_IDS,
+  HIDEABLE_NAV_IDS,
+  UNWIRED_ANALYTICS_IDS,
+} from "./hidden";
 
 /**
  * `HIDEABLE_NAV_IDS`'s doc comment asks a human to keep it in sync with every
@@ -63,7 +67,10 @@ describe("HIDEABLE_NAV_IDS", () => {
     const listedIds = new Set(HIDEABLE_NAV_IDS);
 
     const missingFromList = [...callSiteIds].filter((id) => !listedIds.has(id));
-    const deadInList = [...listedIds].filter((id) => !callSiteIds.has(id));
+    const unwired = new Set(UNWIRED_ANALYTICS_IDS);
+    const deadInList = [...listedIds].filter(
+      (id) => !callSiteIds.has(id) && !unwired.has(id),
+    );
 
     expect(
       missingFromList,
@@ -73,5 +80,21 @@ describe("HIDEABLE_NAV_IDS", () => {
       deadInList,
       "listed in HIDEABLE_NAV_IDS but nothing gates on it",
     ).toEqual([]);
+  });
+
+  it("lists every analytics key as hideable", () => {
+    for (const id of ANALYTICS_HIDE_IDS) expect(HIDEABLE_NAV_IDS).toContain(id);
+  });
+
+  it("only marks an analytics key unwired while nothing gates on it", () => {
+    const callSiteIds = hideCallSiteIds();
+    const wired = UNWIRED_ANALYTICS_IDS.filter((id) => callSiteIds.has(id));
+    expect(wired, "gated in code but still listed as unwired").toEqual([]);
+    for (const id of UNWIRED_ANALYTICS_IDS)
+      expect(ANALYTICS_HIDE_IDS).toContain(id);
+  });
+
+  it("gates the match statistics key", () => {
+    expect(hideCallSiteIds().has("analytics.matchStats")).toBe(true);
   });
 });

@@ -37,6 +37,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 import type { DownloadProgress } from "./bindings";
 import { downloadGameAnySource } from "./downloadGame";
+import { invalidateGithubReleases } from "./githubReleases";
 import { DEFAULT_RAPID_MASTERS } from "./rapidMasters";
 
 /** A game with no GitHub repo and no springfiles entry, so only rapid is tried. */
@@ -50,6 +51,7 @@ const run = () =>
   });
 
 beforeEach(() => {
+  invalidateGithubReleases();
   vi.clearAllMocks();
   loadGithubGameRepos.mockResolvedValue([]);
   dlSpringfilesList.mockResolvedValue({ results: [] });

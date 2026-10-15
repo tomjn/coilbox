@@ -31,6 +31,7 @@ vi.mock("../config", () => ({
       players: [],
       ais: [],
       modOptions: {},
+      mapOptions: {},
     },
     loading: false,
     error: null,
@@ -82,6 +83,9 @@ vi.mock("../useReplayEngine", () => ({
     notice: { kind: "none" },
   }),
 }));
+vi.mock("../replaySets", () => ({
+  useReplaySets: () => ({ sets: [] }),
+}));
 vi.mock("../replayUserState", () => ({
   useReplayUserState: () => ({
     get: () => ({ provenance: null, tags: [], watched: false }),
@@ -106,6 +110,9 @@ vi.mock("./components/MatchStatsSection", () => ({
 }));
 vi.mock("./components/RefightPanel", () => ({ RefightPanel: () => null }));
 vi.mock("./components/RemixPanel", () => ({ RemixPanel: () => null }));
+vi.mock("./components/ReplayBuildOrders", () => ({
+  ReplayBuildOrders: () => null,
+}));
 vi.mock("../../play/LaunchContentProvider", () => ({
   useLaunchContent: () => ({ ensureContent: async () => ({ ready: true }) }),
 }));

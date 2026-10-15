@@ -144,6 +144,8 @@ pub enum ClientCommand {
     ForceSpectatorMode { username: String },
     /// `KICKFROMBATTLE <user>`
     KickFromBattle { username: String },
+    /// `RING <user>`
+    Ring { username: String },
     /// `ADDSTARTRECT <ally> <left> <top> <right> <bottom>`
     AddStartRect {
         ally: u8,
@@ -361,6 +363,9 @@ pub fn parse_client_line(line: &str) -> ClientCommand {
             username: rest.to_string(),
         },
         "KICKFROMBATTLE" if !rest.is_empty() => ClientCommand::KickFromBattle {
+            username: rest.to_string(),
+        },
+        "RING" if !rest.is_empty() => ClientCommand::Ring {
             username: rest.to_string(),
         },
         "ADDSTARTRECT" => match fields::<5>(rest) {

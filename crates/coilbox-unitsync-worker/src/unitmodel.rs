@@ -18,6 +18,9 @@
 
 use crate::ffi::Unitsync;
 use crate::model::{ModelGroup, ModelPiece, ModelTexture, UnitModelOutput};
+pub(crate) use coilbox_unitsync_worker::cached::{cache_file_name, read_model_entry as read_entry};
+use coilbox_unitsync_worker::cached::{entry_file, entry_object, ModelEntry, ENTRY_VERSION};
+use coilbox_unitsync_worker::cachekey;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -35,10 +38,9 @@ use std::rc::Rc;
 /// lets `tauri-plugin-coilbox-unitsync`'s startup sweep (`modelcache.rs`, issue
 /// #1919) tell a live file from an orphan without opening an archive: bump this
 /// and the sweep deletes everything written under the old number on its next
-/// launch. That module keeps its own copy of this number, since there is no
-/// library dependency between this sidecar and the plugin crate, so bump both
-/// together.
-pub(crate) const CACHE_VERSION: u32 = 3;
+/// launch. The number is defined in [`cachekey::MODEL_CACHE_VERSION`], which the
+/// plugin crate reads too, so the two cannot drift.
+pub(crate) const CACHE_VERSION: u32 = cachekey::MODEL_CACHE_VERSION;
 
 /// Models are a few megabytes at most: the largest in the games checked is a
 /// 3.2 MiB `.s3o`. Bound the read anyway.
@@ -250,8 +252,30 @@ pub fn render(
             }
         }
     };
-    us.init(false, 0);
+    render_with(&us, game_archive, object_name, cache_dir)
+}
+
+/// [`render`] against a library that is already loaded, which is the seam the
+/// tests use to count what a hit asks unitsync for.
+pub(crate) fn render_with(
+    us: &Unitsync,
+    game_archive: &str,
+    object_name: &str,
+    cache_dir: Option<&Path>,
+) -> UnitModelOutput {
+    us.init_game(game_archive);
     let mut errors = us.drain_errors();
+
+    // The key needs the archive's path and nothing mounted, so a model already
+    // written under it is the whole answer (issue #3724).
+    let key_base = cache_key_base(us, game_archive, cache_dir);
+    if let Some(out) = cache_dir
+        .zip(key_base.as_deref())
+        .and_then(|(dir, base)| read_cached_model(dir, base, object_name))
+    {
+        us.uninit();
+        return out;
+    }
 
     if !us.add_all_archives(game_archive) {
         errors.push("this engine's libunitsync can't load game archives".into());
@@ -263,7 +287,7 @@ pub fn render(
     }
     errors.extend(us.drain_errors());
 
-    let handle = crate::archive::resolve_open_path(&us, game_archive)
+    let handle = crate::archive::resolve_open_path(us, game_archive)
         .as_deref()
         .and_then(|p| us.open_archive(p));
     let Some(handle) = handle else {
@@ -282,13 +306,12 @@ pub fn render(
         .map(|(path, _)| (path.to_lowercase(), path))
         .collect();
 
-    let teamtex = read_teamtex(&us, handle, &list);
-    let palette = read_palette(&us);
-    let key_base = cache_key_base(&us, game_archive, cache_dir);
+    let teamtex = read_teamtex(us, handle, &list);
+    let palette = read_palette(us);
     let cache = cache_dir.zip(key_base.as_deref());
-    let fallbacks = fallback_archives(&us, game_archive);
+    let fallbacks = fallback_archives(us, game_archive);
     let mut out = read_model(
-        &us,
+        us,
         handle,
         &list,
         &teamtex,
@@ -300,13 +323,24 @@ pub fn render(
     );
 
     for archive in fallbacks {
-        archive.close(&us);
+        archive.close(us);
     }
     us.close_archive(handle);
     errors.extend(us.drain_errors());
     us.remove_all_archives();
     us.uninit();
 
+    // Stored before the session's errors go on, which describe this mount and
+    // not the model.
+    if let Some((dir, base)) = cache {
+        let _ = crate::unitmodels::write_model(
+            dir,
+            base,
+            object_name,
+            &out,
+            &mut std::collections::BTreeSet::new(),
+        );
+    }
     out.errors.splice(0..0, errors);
     out
 }
@@ -1250,6 +1284,57 @@ fn resolve_texture(
     }
 }
 
+/// Record where `model` was written, so [`read_entry`] finds it. Skipped for a
+/// model that did not read, and for one with a texture that resolved to a member
+/// but failed to reach the cache dir: either is a read worth trying again, not
+/// an answer.
+pub(crate) fn write_entry(
+    cache_dir: &Path,
+    base: &str,
+    object: &str,
+    model: &UnitModelOutput,
+    file: &str,
+) {
+    let textures = model.textures.iter().chain(model.texture2.iter());
+    if model.root.is_none()
+        || textures
+            .clone()
+            .any(|t| !t.source.is_empty() && t.file.is_empty())
+    {
+        return;
+    }
+    let entry = ModelEntry {
+        version: ENTRY_VERSION,
+        object: entry_object(object),
+        file: file.to_string(),
+        path: model.path.clone(),
+        format: model.format.clone(),
+        textures: textures
+            .filter(|t| !t.file.is_empty())
+            .map(|t| t.file.clone())
+            .collect(),
+    };
+    let Ok(json) = serde_json::to_vec(&entry) else {
+        return;
+    };
+    let name = entry_file(base, object);
+    let tmp = cache_dir.join(format!("{name}.{}.tmp", std::process::id()));
+    let written = std::fs::create_dir_all(cache_dir)
+        .and_then(|()| std::fs::write(&tmp, json))
+        .and_then(|()| std::fs::rename(&tmp, cache_dir.join(&name)));
+    if written.is_err() {
+        let _ = std::fs::remove_file(&tmp);
+    }
+}
+
+/// A model read back whole, as [`render`] would have returned it. `None` when
+/// there is no entry, a file is missing, or the JSON does not parse as a model.
+fn read_cached_model(cache_dir: &Path, base: &str, object: &str) -> Option<UnitModelOutput> {
+    let entry = read_entry(cache_dir, base, object)?;
+    let raw = std::fs::read(cache_dir.join(entry.file)).ok()?;
+    serde_json::from_slice(&raw).ok()
+}
+
 /// Re-encode a texture the webview cannot decode, or `None` to write the bytes
 /// through untouched.
 ///
@@ -1353,24 +1438,10 @@ pub(crate) fn cache_key_base(
     archive_name: &str,
     cache_dir: Option<&Path>,
 ) -> Option<String> {
-    use std::hash::{Hash, Hasher};
-    let dir = us.archive_path(archive_name)?;
-    let path = Path::new(&dir).join(archive_name);
-    let md = std::fs::metadata(&path).ok()?;
-    let mtime = md
-        .modified()
-        .ok()
-        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    let mut h = std::collections::hash_map::DefaultHasher::new();
-    CACHE_VERSION.hash(&mut h);
-    path.hash(&mut h);
-    md.len().hash(&mut h);
-    mtime.hash(&mut h);
-    let key = format!("{:016x}", h.finish());
+    let stamp = crate::infocache::archive_stamp(us, archive_name)?;
+    let key = cachekey::model_key(&stamp);
     if let Some(cache_dir) = cache_dir {
-        record_source(cache_dir, &key, &path, md.len(), mtime);
+        record_source(cache_dir, &key, stamp.path(), stamp.size(), stamp.mtime());
     }
     Some(key)
 }
@@ -1400,49 +1471,6 @@ pub(crate) fn record_source(cache_dir: &Path, key: &str, archive: &Path, size: u
     let record = serde_json::json!({ "path": archive, "size": size, "mtime": mtime });
     let _ = std::fs::create_dir_all(cache_dir);
     let _ = std::fs::write(dest, record.to_string());
-}
-
-/// The cache file for one archive member:
-/// `v<CACHE_VERSION>-<gamekey>_<sanitised path>.<ext>`. One flat segment,
-/// because the asset protocol's root for these serves a single folder. The
-/// extension is the one the file is written in, which is not the source's when
-/// it was transcoded, so the webview can pick a loader from it and the asset
-/// protocol can put a content type on it.
-///
-/// Every extension [`to_webview_format`] re-encodes is listed here. A file
-/// written as PNG under its source's name is served as an octet stream, and a
-/// webview that sniffs it anyway is doing us a favour rather than being asked.
-///
-/// The extension the archive gives is the artist's own case, and 1086 of the
-/// installed games' 1680 `.bmp` textures are spelled `.BMP`. Every one of those
-/// was written through raw while its lower-case neighbour was re-encoded, so the
-/// name is settled in lower case before anything is decided from it.
-///
-/// The `v<CACHE_VERSION>-` prefix is spelled out in the clear rather than left
-/// folded into `base`'s hash, so the startup sweep (issue #1919) can tell a
-/// current file from an orphan by string comparison alone, with no archive to
-/// open and no hash to recompute.
-pub(crate) fn cache_file_name(base: &str, member: &str, source_ext: &str) -> String {
-    let lower = member.to_lowercase();
-    let source_ext = source_ext.to_lowercase();
-    // `source_ext` comes from `rsplit_once('.')` on the archive member's own
-    // path, which can never hold a dot but can hold a `/`, `\` or `:`: a slash
-    // sends the write to a directory that does not exist, and a colon fails
-    // outright on Windows and picks an NTFS alternate data stream elsewhere.
-    // Sanitised the same way `safe` below sanitises the stem.
-    let ext = if !source_ext.is_empty() && source_ext.chars().all(|c| c.is_ascii_alphanumeric()) {
-        match source_ext.as_str() {
-            "bmp" | "tga" | "tif" | "tiff" | "pcx" => "png".to_string(),
-            other => other.to_string(),
-        }
-    } else {
-        "bin".to_string()
-    };
-    let safe: String = lower
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
-        .collect();
-    format!("v{CACHE_VERSION}-{base}_{safe}.{ext}")
 }
 
 #[cfg(test)]
@@ -2213,5 +2241,94 @@ mod tests {
 
         assert_eq!(out.textures.len(), 1);
         assert_eq!(out.root.expect("root").groups.len(), 1);
+    }
+
+    // ---- a cached model mounts nothing (issue #3724)
+
+    use crate::ffi::stub::{calls, install, World};
+
+    fn stub_session(tag: &str) -> (Unitsync, std::path::PathBuf) {
+        let dir = std::env::temp_dir().join(format!(
+            "coilbox-unitmodel-test-{}-{tag}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        install(World::with_game(&dir.join("games")));
+        (Unitsync::stub(), dir.join("cache"))
+    }
+
+    fn files_ending(dir: &std::path::Path, suffix: &str) -> Vec<std::path::PathBuf> {
+        std::fs::read_dir(dir)
+            .expect("cache dir")
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|p| p.to_string_lossy().ends_with(suffix))
+            .collect()
+    }
+
+    #[test]
+    fn a_cached_model_does_not_mount_the_game() {
+        let (us, cache) = stub_session("hit");
+        let fresh = render_with(&us, World::GAME, "ArmCom", Some(&cache));
+        assert!(fresh.root.is_some(), "{:?}", fresh.errors);
+        assert_eq!(calls("AddAllArchives"), 1, "a miss mounts the game");
+        assert_eq!(calls("OpenArchive"), 1);
+
+        let cached = render_with(&us, World::GAME, "ArmCom", Some(&cache));
+        assert_eq!(calls("AddAllArchives"), 1, "a hit mounted the game");
+        assert_eq!(calls("OpenArchive"), 1, "a hit opened the archive");
+        assert_eq!(
+            serde_json::to_value(&fresh).unwrap(),
+            serde_json::to_value(&cached).unwrap()
+        );
+        let _ = std::fs::remove_dir_all(cache.parent().unwrap());
+    }
+
+    #[test]
+    fn a_changed_archive_is_read_again() {
+        let (us, cache) = stub_session("changed");
+        render_with(&us, World::GAME, "ArmCom", Some(&cache));
+        let archive = cache.parent().unwrap().join("games").join(World::GAME);
+        std::fs::write(&archive, b"a game archive, now a different size").expect("rewrite");
+
+        render_with(&us, World::GAME, "ArmCom", Some(&cache));
+        assert_eq!(
+            calls("AddAllArchives"),
+            2,
+            "a changed archive was served from cache"
+        );
+        let _ = std::fs::remove_dir_all(cache.parent().unwrap());
+    }
+
+    #[test]
+    fn a_record_from_an_older_version_is_read_again() {
+        let (us, cache) = stub_session("version");
+        render_with(&us, World::GAME, "ArmCom", Some(&cache));
+        let records = files_ending(&cache, ".entry");
+        assert_eq!(records.len(), 1, "the first read stored a record");
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&records[0]).unwrap()).unwrap();
+        value["version"] = serde_json::json!(0);
+        std::fs::write(&records[0], value.to_string()).unwrap();
+
+        render_with(&us, World::GAME, "ArmCom", Some(&cache));
+        assert_eq!(calls("AddAllArchives"), 2, "an old record was served");
+        let _ = std::fs::remove_dir_all(cache.parent().unwrap());
+    }
+
+    /// The model names a texture file, so a hit whose texture was swept away
+    /// would draw a model with a missing skin and nothing to say why.
+    #[test]
+    fn a_model_whose_texture_file_is_gone_is_read_again() {
+        let (us, cache) = stub_session("texture");
+        let fresh = render_with(&us, World::GAME, "ArmCom", Some(&cache));
+        let texture = &fresh.textures[0].file;
+        assert!(!texture.is_empty());
+        std::fs::remove_file(cache.join(texture)).expect("drop the texture");
+
+        let again = render_with(&us, World::GAME, "ArmCom", Some(&cache));
+        assert_eq!(calls("AddAllArchives"), 2, "served a model with no texture");
+        assert!(cache.join(&again.textures[0].file).is_file());
+        let _ = std::fs::remove_dir_all(cache.parent().unwrap());
     }
 }

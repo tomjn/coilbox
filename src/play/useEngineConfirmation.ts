@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { contentVerifyEngine } from "@/content/bindings";
+import { refreshContentState } from "@/content/contentState";
 import type {
   ContentRequirement,
   EngineReading,
@@ -81,6 +82,8 @@ export function useEngineConfirmation(
       let answer: Verification;
       try {
         const { engine } = await contentVerifyEngine({ path: toAsk });
+        // The verified version is now stored, so screens holding the state see it.
+        refreshContentState().catch(() => {});
         answer = engine.syncVersion?.trim()
           ? { executable: toAsk, reported: engine.syncVersion.trim() }
           : { executable: toAsk, reported: null };

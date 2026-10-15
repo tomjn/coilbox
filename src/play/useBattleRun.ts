@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { GameRef, NodeScenario } from "../conquest/model";
-import { contentListReplays, type SkirmishAi } from "../content/bindings";
+import type { SkirmishAi } from "../content/bindings";
 import { useBrandingEntry } from "../content/branding";
 import { useUnitsyncScan } from "../content/config";
+import { loadReplays } from "../content/replayList";
 import type { ReplayProvenance } from "../content/replayUserState";
 import { useReplayUserState } from "../content/replayUserState";
 import { getProfile } from "../profile/profile";
@@ -362,7 +363,7 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
     // only disables detection, never the launch.
     let beforePaths: Set<string> | null = null;
     try {
-      const { replays } = await contentListReplays({ root: target.dataDir });
+      const replays = await loadReplays(target.dataDir, true);
       beforePaths = new Set(replays.map((r) => r.path));
     } catch {
       beforePaths = null;

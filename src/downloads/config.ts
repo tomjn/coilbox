@@ -1,11 +1,16 @@
 import { useSetting } from "@picoframe/frame";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { ContentState } from "../content/bindings";
-import { contentStateLoad } from "../content/bindings";
+import { loadContentState, useContentState } from "../content/contentState";
 import { getProfileRoot } from "../profile/profile";
 import { dlSetEngineDirs } from "./bindings";
 import { DEFAULT_RAPID_MASTERS } from "./rapidMasters";
-import { healWriteRoot, packageDirOf } from "./writeRoot";
+import {
+  healWriteRoot,
+  packageDirOf,
+  pickWriteRoot,
+  type WriteRootKind,
+} from "./writeRoot";
 
 /** A user-configured rapid master. `url` is the base; `dl_repos` appends `/repos.gz`. */
 export interface RapidRepo {
@@ -23,6 +28,10 @@ export interface DownloadsConfig {
   rapidRepos: RapidRepo[];
   /** Id of the content-plugin root downloads write into (`--filesystem-writepath`). */
   writeRootId?: string;
+  /** Id of the root games go to instead. Unset means they follow `writeRootId`. */
+  gamesRootId?: string;
+  /** Id of the root maps go to instead. Unset means they follow `writeRootId`. */
+  mapsRootId?: string;
 }
 
 /** The Spring rapid master ships pre-configured, and the user can add more. */
@@ -52,18 +61,14 @@ export function useContentRootPaths(): string[] {
  * as {@link useWriteRoot}'s `loading` (issue #1099).
  */
 export function useContentRoots(): { paths: string[]; loading: boolean } {
-  const [roots, setRoots] = useState<{ paths: string[]; loading: boolean }>({
-    paths: [],
-    loading: true,
-  });
-  useEffect(() => {
-    contentStateLoad(undefined)
-      .then(({ state }) =>
-        setRoots({ paths: state.roots.map((r) => r.path), loading: false }),
-      )
-      .catch(() => setRoots({ paths: [], loading: false }));
-  }, []);
-  return roots;
+  const { state, error } = useContentState();
+  return useMemo(
+    () => ({
+      paths: state?.roots.map((r) => r.path) ?? [],
+      loading: state === null && error === null,
+    }),
+    [state, error],
+  );
 }
 
 /**
@@ -95,8 +100,8 @@ export function useDefaultWriteRoot(): (state: ContentState) => void {
  */
 export function useRegisterEngineDirs(): void {
   useEffect(() => {
-    contentStateLoad(undefined)
-      .then(({ state }) => {
+    loadContentState()
+      .then((state) => {
         const dirs = Array.from(
           new Set(state.roots.flatMap((r) => r.engines.map((e) => e.path))),
         );
@@ -123,10 +128,14 @@ export interface WriteRoot {
 }
 
 /**
- * Resolve the configured write-root id (Downloads settings) to its on-disk path,
- * via the content plugin's detected roots. Shared by every download screen so
- * they all write into the same chosen folder. `undefined` when none is set or
- * the root no longer exists.
+ * Resolve the configured write-root id (Content folders settings) to its
+ * on-disk path, via the content plugin's detected roots. Shared by every
+ * download screen so they all write into the same chosen folder. `undefined`
+ * when none is set or the root no longer exists.
+ *
+ * Pass `kind` for a game or a map, which can each have a folder of their own
+ * and otherwise follow the default. Everything else, engines included, asks
+ * with no kind and gets the default. See {@link pickWriteRoot}.
  *
  * A read that fails is `loading: false` with no path: the content plugin could
  * not name a single root, so there is nowhere to download to, which is the same
@@ -137,32 +146,58 @@ export interface WriteRoot {
  * to an in-package root and persists that correction, so downloads can't silently
  * land next to the wrong folder. See {@link healWriteRoot}.
  */
-export function useWriteRoot(): WriteRoot {
+export function useWriteRoot(kind?: WriteRootKind): WriteRoot {
   const [cfg, setCfg] = useDownloadsConfig();
   // Latest config for the heal-persist below, without re-running the load every
   // render (the effect keys on the writeRootId primitive, not the cfg object).
   const cfgRef = useRef(cfg);
   cfgRef.current = cfg;
-  const [root, setRoot] = useState<WriteRoot>({ loading: true });
+  const { state, error } = useContentState();
+  const healed = useMemo(
+    () =>
+      state
+        ? healWriteRoot(
+            state.roots,
+            cfg.writeRootId,
+            packageDirOf(getProfileRoot()),
+          )
+        : undefined,
+    [state, cfg.writeRootId],
+  );
+  // Persist the correction so downstream readers of `writeRootId` agree and the
+  // stale id doesn't linger. One-shot: once the id matches, this stops firing.
+  // Spread the latest config (via ref) so a concurrent rapid-repo edit isn't lost.
   useEffect(() => {
-    contentStateLoad(undefined)
-      .then(({ state }) => {
-        const packageDir = packageDirOf(getProfileRoot());
-        const chosen = healWriteRoot(state.roots, cfg.writeRootId, packageDir);
-        setRoot({ path: chosen?.path, loading: false });
-        // Persist the correction so downstream readers of `writeRootId` agree and the
-        // stale id doesn't linger. One-shot: once the id matches, this stops firing.
-        // Spread the latest config (via ref) so a concurrent rapid-repo edit isn't lost.
-        if (chosen && chosen.id !== cfg.writeRootId) {
-          setCfg({ ...cfgRef.current, writeRootId: chosen.id });
-        }
-      })
-      .catch(() => setRoot({ loading: false }));
-    // A later re-read (the heal above, or a settings change) does not go back to
-    // loading. The previous answer stands until the new one lands, which is what
-    // every caller already saw and is a definite answer either way.
-  }, [cfg.writeRootId, setCfg]);
-  return root;
+    if (healed && healed.id !== cfg.writeRootId) {
+      setCfg({ ...cfgRef.current, writeRootId: healed.id });
+    }
+  }, [healed, cfg.writeRootId, setCfg]);
+  const chosen = useMemo(
+    () =>
+      state
+        ? pickWriteRoot(
+            state.roots,
+            {
+              writeRootId: cfg.writeRootId,
+              gamesRootId: cfg.gamesRootId,
+              mapsRootId: cfg.mapsRootId,
+            },
+            kind,
+            packageDirOf(getProfileRoot()),
+          )
+        : undefined,
+    [state, cfg.writeRootId, cfg.gamesRootId, cfg.mapsRootId, kind],
+  );
+  // A later re-read (the heal above, or a settings change) does not go back to
+  // loading. The previous answer stands until the new one lands, which is what
+  // every caller already saw and is a definite answer either way.
+  return useMemo(
+    () => ({
+      path: chosen?.path,
+      loading: state === null && error === null,
+    }),
+    [chosen, state, error],
+  );
 }
 
 /**
@@ -170,8 +205,8 @@ export function useWriteRoot(): WriteRoot {
  * put under it. They read `undefined` before the load lands exactly as they did
  * before {@link useWriteRoot} existed.
  */
-export function useWriteRootPath(): string | undefined {
-  return useWriteRoot().path;
+export function useWriteRootPath(kind?: WriteRootKind): string | undefined {
+  return useWriteRoot(kind).path;
 }
 
 // `useBarMap` lived here: BAR's maps-metadata list keyed by springName, read for

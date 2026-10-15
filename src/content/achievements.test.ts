@@ -230,6 +230,36 @@ describe("activity", () => {
   });
 });
 
+describe("distinct AIs beaten", () => {
+  const wins = (...names: string[][]) =>
+    names.map((ais, i) => ({ startTimeMs: (i + 1) * 1000, ais }));
+
+  it("counts each AI once however often it is beaten", () => {
+    const results = evaluateAchievements(
+      [],
+      wins(["BARb"], ["BARb"], ["SurvivalAI", "BARb"]),
+    );
+    expect(byId(results, "ais-3").current).toBe(2);
+    expect(byId(results, "ais-3").earned).toBe(false);
+  });
+
+  it("earns each tier on the win that adds the target-th AI", () => {
+    const results = evaluateAchievements(
+      [],
+      wins(["A"], ["B"], ["C"], ["C"], ["D", "E"]),
+    );
+    expect(byId(results, "ais-3").earnedAtMs).toBe(3000);
+    expect(byId(results, "ais-5").earnedAtMs).toBe(5000);
+    expect(byId(results, "ais-5").current).toBe(5);
+  });
+
+  it("reads zero with no AI wins, as for records with no AIs", () => {
+    const results = evaluateAchievements(facts([{ won: true }]));
+    expect(byId(results, "ais-3").current).toBe(0);
+    expect(byId(results, "ais-5").earned).toBe(false);
+  });
+});
+
 describe("genuine-match filter (via playerGameFacts)", () => {
   it("excludes remixed and refought reruns from the games it counts", () => {
     seq = 0;

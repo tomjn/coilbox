@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   healWriteRoot,
   packageDirOf,
+  pickWriteRoot,
   type WriteRootCandidate,
 } from "./writeRoot";
 
@@ -76,5 +77,75 @@ describe("healWriteRoot", () => {
     expect(healWriteRoot([bundle, inside], "bundle", pkg)).toBe(inside);
     expect(healWriteRoot([bundle, insideSub], undefined, pkg)).toBe(insideSub);
     expect(healWriteRoot([bundle], "bundle", null)).toBeUndefined();
+  });
+});
+
+describe("pickWriteRoot", () => {
+  const a: WriteRootCandidate = { id: "a", path: "/data/a", portable: false };
+  const b: WriteRootCandidate = { id: "b", path: "/data/b", portable: false };
+  const c: WriteRootCandidate = { id: "c", path: "/data/c", portable: false };
+  const roots = [a, b, c];
+
+  it("answers the default when no kind is asked for", () => {
+    const ids = { writeRootId: "a", gamesRootId: "b", mapsRootId: "c" };
+    expect(pickWriteRoot(roots, ids, undefined, null)).toBe(a);
+  });
+
+  it("answers each kind's own folder when one is set", () => {
+    const ids = { writeRootId: "a", gamesRootId: "b", mapsRootId: "c" };
+    expect(pickWriteRoot(roots, ids, "games", null)).toBe(b);
+    expect(pickWriteRoot(roots, ids, "maps", null)).toBe(c);
+  });
+
+  it("follows the default for a kind with no folder of its own", () => {
+    const ids = { writeRootId: "a", mapsRootId: "c" };
+    expect(pickWriteRoot(roots, ids, "games", null)).toBe(a);
+    expect(pickWriteRoot(roots, { writeRootId: "b" }, "maps", null)).toBe(b);
+  });
+
+  it("falls back to the default when a kind's folder is gone", () => {
+    const ids = { writeRootId: "a", gamesRootId: "removed" };
+    expect(pickWriteRoot(roots, ids, "games", null)).toBe(a);
+  });
+
+  it("never answers the bundled content folder for a kind", () => {
+    const bundle: WriteRootCandidate = {
+      id: "bundle",
+      path: "/data/bundle",
+      portable: false,
+      bundled: true,
+    };
+    const ids = { writeRootId: "a", mapsRootId: "bundle" };
+    expect(pickWriteRoot([a, bundle], ids, "maps", null)).toBe(a);
+  });
+
+  it("keeps a portable install's kind folders inside the package", () => {
+    const pkg = "/opt/game";
+    const inside: WriteRootCandidate = {
+      id: "in",
+      path: "/opt/game",
+      portable: true,
+    };
+    const insideSub: WriteRootCandidate = {
+      id: "sub",
+      path: "/opt/game/extra",
+      portable: false,
+    };
+    const outside: WriteRootCandidate = {
+      id: "out",
+      path: "/home/me/spring",
+      portable: false,
+    };
+    const all = [inside, insideSub, outside];
+    expect(
+      pickWriteRoot(all, { writeRootId: "in", mapsRootId: "out" }, "maps", pkg),
+    ).toBe(inside);
+    expect(
+      pickWriteRoot(all, { writeRootId: "in", mapsRootId: "sub" }, "maps", pkg),
+    ).toBe(insideSub);
+  });
+
+  it("is undefined when there is no default and no folder for the kind", () => {
+    expect(pickWriteRoot(roots, {}, "games", null)).toBeUndefined();
   });
 });

@@ -399,7 +399,7 @@ export default function RunPage() {
     );
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="@container flex h-full flex-col">
       <PageHeader
         className="border-b border-border px-6 py-4"
         title={
@@ -433,9 +433,9 @@ export default function RunPage() {
         }
       />
 
-      <div className="grid min-h-0 flex-1 grid-cols-[28rem_1fr]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-2 @3xl:grid-cols-[28rem_1fr] @3xl:grid-rows-1">
         {/* Left: form */}
-        <div className="min-h-0 space-y-5 overflow-auto border-r border-border px-6 py-5">
+        <div className="min-h-0 space-y-5 overflow-auto border-b border-border px-6 py-5 @3xl:border-r @3xl:border-b-0">
           {/* Mode toggle */}
           <ToggleGroup
             type="single"

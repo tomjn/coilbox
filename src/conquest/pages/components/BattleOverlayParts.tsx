@@ -3,7 +3,7 @@ import { Download, Loader2, Swords } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import type { MapDownloadHint } from "../../../campaign/model";
-import { invalidateMapPreview, invalidateScans } from "../../../content/config";
+import { invalidateMapPreview } from "../../../content/config";
 import {
   ErrorBanner,
   ScanFailed,
@@ -149,7 +149,7 @@ function MissingContentGate({
   const download = async () => {
     const settled = await mapDl.start();
     if (settled?.status !== "done") return;
-    invalidateScans();
+    // The queue forgot the scans when the download finished.
     if (target?.enginePath && target?.dataDir && mapName) {
       invalidateMapPreview(target.enginePath, target.dataDir, mapName);
     }

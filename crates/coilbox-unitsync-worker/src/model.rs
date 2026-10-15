@@ -43,8 +43,65 @@ pub struct ConfigOption {
     pub list_items: Vec<OptionListItem>,
 }
 
+/// A map's visual appearance, parsed from `mapinfo.lua` (see `Unitsync::map_appearance` in the binary).
+/// Colours are `[r, g, b]` in 0..1. Any field the map omits is `None`.
+#[derive(Default, Clone, serde::Serialize, serde::Deserialize)]
+pub struct MapAppearance {
+    pub void_water: Option<bool>,
+    pub void_ground: Option<bool>,
+    pub void_alpha_min: Option<f32>,
+    pub water_color: Option<[f32; 3]>,
+    pub water_alpha: Option<f32>,
+    pub water_plane_color: Option<[f32; 3]>,
+    pub water_absorb: Option<[f32; 3]>,
+    pub water_base_color: Option<[f32; 3]>,
+    pub water_min_color: Option<[f32; 3]>,
+    pub force_rendering: Option<bool>,
+    pub sky_color: Option<[f32; 3]>,
+    pub fog_color: Option<[f32; 3]>,
+    pub cloud_color: Option<[f32; 3]>,
+    pub cloud_density: Option<f32>,
+    pub sun_dir: Option<[f32; 3]>,
+    pub sun_color: Option<[f32; 3]>,
+    pub ground_ambient_color: Option<[f32; 3]>,
+    pub ground_diffuse_color: Option<[f32; 3]>,
+    pub ground_specular_color: Option<[f32; 3]>,
+    pub ground_shadow_density: Option<f32>,
+}
+
+/// The window a height picture's 0 and its 255 stand for, in the raw sample
+/// words the map stores.
+///
+/// Without it the picture is a shape rather than a terrain. It comes back from
+/// `encode_height_picture` because only the encoder knows it: the window is the
+/// extremes of the samples that survived the downscale, not the extremes of the
+/// grid that went in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HeightWindow {
+    pub low: u16,
+    pub high: u16,
+}
+
+impl HeightWindow {
+    /// The world heights the picture's 0 and 255 stand for, given the pair
+    /// unitsync reports for the whole map.
+    ///
+    /// `CSMFMapFile::ReadHeightmap`'s own arithmetic, which
+    /// `rts/Map/SMF/SMFReadMap.cpp:157` spells as
+    /// `minHeight + word * (maxHeight - minHeight) / 65536`. A reader that
+    /// follows it back holds the height the engine holds, to within the step the
+    /// eight bits cost.
+    pub fn elmos(self, min_height: f32, max_height: f32) -> (f32, f32) {
+        let step = (max_height - min_height) / 65536.0;
+        (
+            min_height + f32::from(self.low) * step,
+            min_height + f32::from(self.high) * step,
+        )
+    }
+}
+
 /// A team start position in map world coordinates (elmos).
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct StartPos {
     pub x: f32,
@@ -905,7 +962,7 @@ pub struct CustomParamsOutput {
 /// sample the same texture. An `.s3o` piece is always one batch, because the
 /// format binds one texture per model. A `.3do` piece is one batch per distinct
 /// texture its faces name, which is what makes both formats fit this shape.
-#[derive(Serialize, Default)]
+#[derive(Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelGroup {
     /// Which entry of [`UnitModelOutput::textures`] this batch samples. `None`
@@ -927,7 +984,7 @@ pub struct ModelGroup {
 /// One piece of the model tree, with its geometry already triangulated. Mirrors
 /// the `Piece` both reader crates expose: a name, a translation from the parent,
 /// and children. A piece with no groups is hierarchy only (a flare or aim point).
-#[derive(Serialize, Default)]
+#[derive(Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelPiece {
     pub name: String,
@@ -939,7 +996,7 @@ pub struct ModelPiece {
 /// One texture the model asks for, and what became of it. `file` empty means
 /// nothing in the archive matched, which the viewer says on screen rather than
 /// drawing an untextured mesh that looks like a bug.
-#[derive(Serialize, Default)]
+#[derive(Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelTexture {
     /// The name as the model file gives it, and the key groups refer to.
@@ -965,7 +1022,7 @@ pub struct ModelTexture {
 
 /// Output of `--unit-model`: one unit's model, read out of a game archive and
 /// flattened so the viewer draws `.s3o` and `.3do` the same way.
-#[derive(Serialize, Default)]
+#[derive(Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct UnitModelOutput {
     /// `"s3o"` or `"3do"`. Empty when nothing was read.
@@ -1434,7 +1491,7 @@ pub struct EngineConfigWriteOutput {
 }
 
 /// One member of an archive's file tree.
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ArchiveFileEntry {
     /// Slash-separated path within the archive.

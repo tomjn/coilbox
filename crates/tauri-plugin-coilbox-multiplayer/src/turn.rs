@@ -569,6 +569,7 @@ pub(crate) mod tests {
                 relay: crate::conn::HostedRelay::default(),
                 opened: watch::channel(crate::relay_host::OpenAnswer::Unasked).1,
                 relay_refused: crate::relay_host::RefusedRelayAddress::default(),
+                ring: Default::default(),
             },
         );
         Wired {
@@ -943,7 +944,12 @@ pub(crate) mod tests {
                 .expect("a free port");
             socket.local_addr().expect("a bound address")
         };
-        minted_at(&w.state, &format!("turn:{silent}"), 86_400, NOW);
+        minted_at(
+            &w.state,
+            &format!("turn:{silent}"),
+            86_400,
+            crate::conn::now_ms(),
+        );
 
         let got = relay_ping(&w.registry, KEY).await;
         assert_eq!(

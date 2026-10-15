@@ -14,6 +14,7 @@ import {
   primeScan,
   useScanTargetSelection,
 } from "../../config";
+import { setContentState } from "../../contentState";
 
 const msg = (e: unknown): string =>
   e instanceof Error ? e.message : String(e);
@@ -58,10 +59,12 @@ export function DeleteArchiveButton({
       // forced unitsync rescan is what takes it out of the grids. It is not
       // awaited because a rescan can run for minutes, and the page the user
       // lands on joins the same in-flight scan.
-      invalidateScans();
+      invalidateScans(true);
       if (selected)
         primeScan(selected.enginePath, selected.rootPath, true).catch(() => {});
-      await contentRescan({ withCounts: true }).catch(() => {});
+      await contentRescan({ withCounts: true })
+        .then((r) => setContentState(r.state))
+        .catch(() => {});
       setOpen(false);
       onDeleted();
     } catch (e) {

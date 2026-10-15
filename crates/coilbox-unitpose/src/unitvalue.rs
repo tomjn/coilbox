@@ -268,6 +268,14 @@ pub const UNIT_XZ: i32 = 9;
 pub const UNIT_Y: i32 = 10;
 pub const UNIT_HEIGHT: i32 = 11;
 pub const GROUND_HEIGHT: i32 = 16;
+/// The highest unit id there can be, which a script loops up to when it looks
+/// for units around it.
+pub const MAX_ID: i32 = 70;
+
+/// Ids that ask what another unit is to this one, from `CobDefines.h`.
+pub const UNIT_TEAM: i32 = 72;
+pub const UNIT_BUILD_PERCENT_LEFT: i32 = 73;
+pub const UNIT_ALLIED: i32 = 74;
 
 /// What a question about the scene was answered with, and what the preview
 /// wants said about it.
@@ -317,11 +325,19 @@ pub fn world(
     awaiting_build: bool,
 ) -> Option<Answer> {
     let plain = |value: i32| Answer { value, note: None };
-    if !matches!(id, UNIT_XZ | UNIT_Y | UNIT_HEIGHT | GROUND_HEIGHT) {
+    if !matches!(id, UNIT_XZ | UNIT_Y | UNIT_HEIGHT | GROUND_HEIGHT | MAX_ID) {
         return None;
     }
     if id == GROUND_HEIGHT {
         return Some(plain(0));
+    }
+    // The engine answers the size of its unit table less one
+    // (`UnitScript.cpp:1123`), and a script loops from nothing up to it asking
+    // about each id. The scene holds two units at most, so the highest id in
+    // it covers every unit there is and keeps that loop short.
+    if id == MAX_ID {
+        let stand_in = world.and_then(|world| world.stand_in.as_ref());
+        return Some(plain(stand_in.map_or(UNIT_ID, |s| s.id.max(UNIT_ID))));
     }
     let asks_itself = p1 <= 0 || p1 == UNIT_ID;
     if asks_itself && id != UNIT_HEIGHT {
@@ -354,6 +370,60 @@ pub fn world(
     }))
 }
 
+/// What another unit is to this one: its team, whether it is an ally and how
+/// much of it is still to build (`UnitScript.cpp:1128-1147`).
+///
+/// Unlike the questions [`world`] answers, the engine looks the id up as it is,
+/// so 0 is unit 0 here and not the unit asking. The preview's unit is
+/// [`UNIT_ID`], on team 0.
+///
+/// The stand-in is an ally until the scenario aims or fires a weapon, and the
+/// enemy those weapons point at from then on. While a factory is building it,
+/// what is left of it to build comes from [`crate::Model::build_percent_left`]. A unit that is not in the scene
+/// reads 0 for all three, which is the engine's answer for one that does not
+/// exist. `None` for any other id, and for the stand-in when no scene came.
+pub fn relation(
+    id: i32,
+    p1: i32,
+    world: Option<&crate::World>,
+    model: &crate::Model,
+    frame: u32,
+) -> Option<Answer> {
+    let plain = |value: i32| Answer { value, note: None };
+    if !matches!(id, UNIT_TEAM | UNIT_BUILD_PERCENT_LEFT | UNIT_ALLIED) {
+        return None;
+    }
+    if p1 == UNIT_ID {
+        return Some(plain(i32::from(id == UNIT_ALLIED)));
+    }
+    let world = world?;
+    let there = world
+        .stand_in
+        .as_ref()
+        .is_some_and(|stand_in| stand_in.id == p1)
+        && !model.awaiting_build;
+    if !there {
+        return Some(plain(0));
+    }
+    Some(match id {
+        // The engine answers with the asking unit's team, not the other
+        // unit's (`UnitScript.cpp:1130`), and the preview's unit is on team 0.
+        UNIT_TEAM => plain(0),
+        UNIT_ALLIED => plain(i32::from(!model.targeted)),
+        _ if model.building => match model.build_percent_left(frame) {
+            Some(left) => plain(left),
+            None => Answer {
+                value: 0,
+                note: Some(
+                    "This script asks how much of the unit being built is left to build, and the scenario never finishes the build, so it read 0."
+                        .to_string(),
+                ),
+            },
+        },
+        _ => plain(0),
+    })
+}
+
 /// Ids [`crate::Timeline::asked`] leaves out, because none of them is a
 /// question about the unit that a control could stand in for: the arithmetic
 /// call-outs, the shared values Spring stopped keeping, the running frame, the
@@ -374,7 +444,17 @@ fn excluded_from_asked(id: i32) -> bool {
         || id == PIECE_XZ
         || id == PIECE_Y
         || (LUA0..=LUA9).contains(&id)
-        || matches!(id, UNIT_XZ | UNIT_Y | UNIT_HEIGHT | GROUND_HEIGHT)
+        || matches!(
+            id,
+            UNIT_XZ
+                | UNIT_Y
+                | UNIT_HEIGHT
+                | GROUND_HEIGHT
+                | MAX_ID
+                | UNIT_TEAM
+                | UNIT_BUILD_PERCENT_LEFT
+                | UNIT_ALLIED
+        )
 }
 
 /// Note that a script read unit value `id`, unless it is one [`Timeline::asked`]
@@ -664,6 +744,133 @@ mod tests {
         assert_eq!(value(UNIT_XZ, 2, None), None);
     }
 
+    /// A script looking for units loops up to `MAX_ID`, so it has to reach the
+    /// stand-in, and with no scene there is only the unit itself.
+    #[test]
+    fn the_highest_id_is_the_highest_in_the_scene() {
+        assert_eq!(value(MAX_ID, 0, Some(&scene(None))), Some(2));
+        assert_eq!(value(MAX_ID, 0, None), Some(UNIT_ID));
+        let mut alone = scene(None);
+        alone.stand_in = None;
+        assert_eq!(value(MAX_ID, 0, Some(&alone)), Some(UNIT_ID));
+    }
+
+    fn asked_of(id: i32, p1: i32, model: &crate::Model) -> Option<i32> {
+        relation(id, p1, Some(&scene(None)), model, 0).map(|answer| answer.value)
+    }
+
+    /// `UnitScript.cpp:1128-1147`, for the unit itself, the stand-in and a
+    /// unit that is not there.
+    #[test]
+    fn says_what_another_unit_is_to_this_one() {
+        let model = crate::Model::default();
+        for (id, own, stand_in) in [
+            (UNIT_TEAM, 0, 0),
+            (UNIT_ALLIED, 1, 1),
+            (UNIT_BUILD_PERCENT_LEFT, 0, 0),
+        ] {
+            assert_eq!(asked_of(id, UNIT_ID, &model), Some(own));
+            assert_eq!(asked_of(id, 2, &model), Some(stand_in));
+            assert_eq!(asked_of(id, 7, &model), Some(0));
+            // Unit 0 is a unit of its own here, and the scene has none.
+            assert_eq!(asked_of(id, 0, &model), Some(0));
+        }
+    }
+
+    #[test]
+    fn the_stand_in_stops_being_an_ally_once_a_weapon_is_aimed_or_fired() {
+        let event = |callin: &str, engine| crate::ScriptEvent {
+            frame: 0,
+            callin: callin.into(),
+            args: Vec::new(),
+            ambient: false,
+            world: None,
+            engine,
+        };
+        for hostile in [
+            event("AimWeapon1", None),
+            event("aimprimary", None),
+            event("", Some(crate::EngineAction::Fire)),
+        ] {
+            let mut model = crate::Model::default();
+            model.see(&hostile);
+            assert_eq!(asked_of(UNIT_ALLIED, 2, &model), Some(0), "{hostile:?}");
+            assert_eq!(asked_of(UNIT_ALLIED, UNIT_ID, &model), Some(1));
+        }
+        let mut model = crate::Model::default();
+        model.see(&event("TransportPickup", None));
+        model.see(&event("", Some(crate::EngineAction::Attach)));
+        assert_eq!(asked_of(UNIT_ALLIED, 2, &model), Some(1));
+    }
+
+    /// A buildee the factory has not started on does not exist yet, and one it
+    /// is building has a share left that the preview cannot put a number on.
+    #[test]
+    fn a_unit_being_built_is_not_there_until_the_build_starts() {
+        let waiting = crate::Model {
+            awaiting_build: true,
+            ..Default::default()
+        };
+        assert_eq!(asked_of(UNIT_ALLIED, 2, &waiting), Some(0));
+        let model = crate::Model {
+            building: true,
+            ..Default::default()
+        };
+        let answer = relation(UNIT_BUILD_PERCENT_LEFT, 2, Some(&scene(None)), &model, 0).unwrap();
+        assert_eq!(answer.value, 0);
+        assert!(answer.note.is_some());
+    }
+
+    /// All of it is left on the frame the build starts and none on the frame
+    /// the scenario finishes it, counted down evenly between.
+    #[test]
+    fn a_build_under_way_counts_down_to_the_frame_the_scenario_finishes_it() {
+        let finish = |frame| crate::ScriptEvent {
+            frame,
+            callin: String::new(),
+            args: Vec::new(),
+            ambient: false,
+            world: None,
+            engine: Some(crate::EngineAction::FactoryFinish),
+        };
+        let mut model = crate::Model {
+            building: true,
+            ..Default::default()
+        };
+        // An earlier build's finish is not this one's.
+        model.build_start(100, &[finish(40), finish(300), finish(500)]);
+        let left = |frame| {
+            let answer = relation(
+                UNIT_BUILD_PERCENT_LEFT,
+                2,
+                Some(&scene(None)),
+                &model,
+                frame,
+            )
+            .unwrap();
+            assert_eq!(answer.note, None);
+            answer.value
+        };
+        assert_eq!(left(100), 100);
+        assert_eq!(left(150), 75);
+        assert_eq!(left(200), 50);
+        assert_eq!(left(300), 0);
+
+        model.building = false;
+        assert_eq!(model.build_percent_left(200), None);
+    }
+
+    #[test]
+    fn says_nothing_about_another_unit_without_a_scene() {
+        let model = crate::Model::default();
+        assert!(relation(UNIT_ALLIED, 2, None, &model, 0).is_none());
+        assert_eq!(
+            relation(UNIT_ALLIED, UNIT_ID, None, &model, 0).map(|a| a.value),
+            Some(1)
+        );
+        assert!(relation(HEALTH, 2, Some(&scene(None)), &model, 0).is_none());
+    }
+
     #[test]
     fn leaves_everything_else_to_the_caller() {
         assert!(world(HEALTH, 0, Some(&scene(None)), None, false).is_none());
@@ -672,7 +879,16 @@ mod tests {
     #[test]
     fn offers_no_control_for_a_question_about_the_world() {
         let mut asked = Vec::new();
-        for id in [UNIT_XZ, UNIT_Y, UNIT_HEIGHT, GROUND_HEIGHT] {
+        for id in [
+            UNIT_XZ,
+            UNIT_Y,
+            UNIT_HEIGHT,
+            GROUND_HEIGHT,
+            MAX_ID,
+            UNIT_TEAM,
+            UNIT_BUILD_PERCENT_LEFT,
+            UNIT_ALLIED,
+        ] {
             note_asked(&mut asked, id);
         }
         assert!(asked.is_empty(), "{asked:?}");

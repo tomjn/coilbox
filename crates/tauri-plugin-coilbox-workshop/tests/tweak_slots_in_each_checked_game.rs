@@ -112,6 +112,7 @@ fn with_spacing<T>(wanted: impl Fn(&T) -> bool, make: impl Fn(&str) -> T) -> T {
 }
 
 #[test]
+#[ignore = "needs Beyond All Reason test-30922-8064a43 and Zero-K v1.14.8.0 in ~/.spring/games, an installed engine with libunitsync, a built coilbox-unitsync-worker in target/debug"]
 fn a_field_change_lands_through_the_numbered_slots_in_each_checked_game() {
     let (engine, data) = match setup() {
         Ok(v) => v,
@@ -120,6 +121,7 @@ fn a_field_change_lands_through_the_numbered_slots_in_each_checked_game() {
             return;
         }
     };
+    let mut checked = 0;
     for (game, unit) in GAMES {
         let bare = load(
             &engine,
@@ -144,6 +146,7 @@ fn a_field_change_lands_through_the_numbered_slots_in_each_checked_game() {
             }
         }
         let own = bare.expect("loaded").remove(0).reads[0].value;
+        checked += 1;
         assert_ne!(
             own,
             Some(HEALTH),
@@ -213,4 +216,8 @@ fn a_field_change_lands_through_the_numbered_slots_in_each_checked_game() {
         );
         assert!(back[2].reads[0].equal, "{game}");
     }
+    assert!(
+        checked > 0,
+        "none of {GAMES:?} loaded, so nothing was checked"
+    );
 }

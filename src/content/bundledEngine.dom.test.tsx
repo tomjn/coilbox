@@ -79,7 +79,9 @@ const setup = vi.hoisted(() => ({
 }));
 vi.mock("./config", () => ({
   useSetupStatus: () => setup.status(),
+  forgetScans: vi.fn(),
   invalidateScans: vi.fn(),
+  rescanMounted: vi.fn(),
 }));
 
 const place = vi.hoisted(() => ({

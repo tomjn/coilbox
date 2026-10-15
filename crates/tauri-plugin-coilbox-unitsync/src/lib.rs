@@ -2,18 +2,27 @@
 //! the bundled `coilbox-unitsync-worker` sidecar, which loads the engine's
 //! `libunitsync` out-of-process so a unitsync crash can't take the app down.
 //!
-//! The single `unitsync_scan` command resolves the worker and the engine's
-//! library, sets the child's loader-path + `SPRING_DATADIR` env at launch (so the
-//! dynamic loader can resolve unitsync's sibling libraries on macOS, where env
-//! set *after* launch is ignored), runs it under a timeout, and passes its JSON
-//! straight through inside the [`CliResult`] envelope.
+//! Each command resolves the worker and the engine's library, sets the child's
+//! loader-path + `SPRING_DATADIR` env at launch (so the dynamic loader can
+//! resolve unitsync's sibling libraries on macOS, where env set *after* launch
+//! is ignored), has it answered under a timeout, and passes its JSON straight
+//! through inside the [`CliResult`] envelope.
+//!
+//! A read is answered by a worker that stays running between reads, so the
+//! engine's `Init` is paid once and not once per read (issue #3722). `pool`
+//! keeps those. A few reads still start a worker of their own: see [`Via`].
 
+#[cfg(debug_assertions)]
+mod devstats;
+mod lastscan;
 mod modelcache;
+mod pool;
 mod renderindex;
 mod sidecar;
 
 use base64::Engine;
-use coilbox_unitsync_worker::RenderSource;
+use coilbox_unitsync_worker::matchsetup::MatchSetup;
+use coilbox_unitsync_worker::{cached, RenderSource};
 use picoframe_core::CliResult;
 use sidecar::{
     build_archive_extract_args, build_archive_file_args, build_archive_tree_args, build_args,
@@ -95,6 +104,9 @@ const HEADER_CACHE_SUBDIR: &str = "coilbox-unitsync-headers";
 const BUILDPIC_CACHE_SUBDIR: &str = "coilbox-unitsync-buildpics";
 const FACTION_LOGO_CACHE_SUBDIR: &str = "coilbox-unitsync-faction-logos";
 const INFO_CACHE_SUBDIR: &str = "coilbox-unitsync-info";
+
+/// Subdirectory of the app cache dir holding the last good scan of each target.
+const LAST_SCAN_SUBDIR: &str = "coilbox-unitsync-last-scan";
 
 /// Subdirectory of the app cache dir holding textures copied out of a game
 /// archive for the unit-model viewer, raw and undecoded.
@@ -204,18 +216,23 @@ fn loader_envs(engine_dir: &Path, datadir: &str) -> Vec<(String, String)> {
     } else {
         format!("{dir}{sep}{existing}")
     };
-    vec![
+    let mut envs = vec![
         ("SPRING_DATADIR".into(), datadir.to_string()),
         (
             "COILBOX_EXTRA_DATADIRS".into(),
             coilbox_proc::extra_datadirs(datadir),
         ),
         (var.to_string(), value),
-    ]
+    ];
+    envs.extend(coilbox_proc::isolation_env(
+        coilbox_portable::is_portable(),
+        engine_dir,
+    ));
+    envs
 }
 
-/// Run the worker to completion, reading stdout on a thread (so a large JSON
-/// dump can't deadlock against a full pipe) and killing it past the timeout. The
+/// Run a one-shot worker to completion, reading stdout on a thread (so a large
+/// JSON dump can't deadlock against a full pipe) and killing it past the timeout. The
 /// worker emits its JSON — including any in-band error list — on stdout even when
 /// it exits non-zero, so non-empty stdout is always preferred.
 fn run_worker_blocking(
@@ -233,10 +250,16 @@ fn run_worker_blocking(
     for (k, v) in &envs {
         cmd.env(k, v);
     }
+    #[cfg(debug_assertions)]
+    cmd.env(devstats::TIMINGS_ENV, "1");
+    #[cfg(debug_assertions)]
+    let mut dev_run = devstats::WorkerRun::start(&what);
 
     let mut child = cmd
         .spawn()
         .map_err(|e| format!("failed to start unitsync worker: {e}"))?;
+    #[cfg(debug_assertions)]
+    devstats::worker_started(child.id(), "one-shot");
 
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();
@@ -266,6 +289,8 @@ fn run_worker_blocking(
 
     let out = out_handle.join().unwrap_or_default();
     let err = err_handle.join().unwrap_or_default();
+    #[cfg(debug_assertions)]
+    let err = dev_run.take_timings(err);
 
     #[cfg(debug_assertions)]
     if !err.trim().is_empty() {
@@ -321,10 +346,16 @@ fn run_worker_streaming(
     for (k, v) in &envs {
         cmd.env(k, v);
     }
+    #[cfg(debug_assertions)]
+    cmd.env(devstats::TIMINGS_ENV, "1");
+    #[cfg(debug_assertions)]
+    let mut dev_run = devstats::WorkerRun::start(&what);
 
     let mut child = cmd
         .spawn()
         .map_err(|e| format!("failed to start unitsync worker: {e}"))?;
+    #[cfg(debug_assertions)]
+    devstats::worker_started(child.id(), "one-shot");
 
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();
@@ -375,6 +406,8 @@ fn run_worker_streaming(
 
     let out = out_handle.join().unwrap_or_default();
     let err = err_handle.join().unwrap_or_default();
+    #[cfg(debug_assertions)]
+    let err = dev_run.take_timings(err);
 
     #[cfg(debug_assertions)]
     if !err.trim().is_empty() {
@@ -467,9 +500,130 @@ fn prepare(engine_path: &str) -> Result<(PathBuf, PathBuf, PathBuf), String> {
     Ok((bin, libpath, engine_dir))
 }
 
-/// Spawn the worker with the given args/env, parse its JSON stdout into a
-/// `CliResult`. `what` names the operation for error messages.
-async fn run_worker(
+/// The thumbnail cache key for a map, from what the content scan knows of it.
+fn thumb_key(
+    map_name: &str,
+    archive_path: Option<&str>,
+    file_name: Option<&str>,
+) -> Option<String> {
+    cached::thumb_key_for(map_name, archive_path.map(Path::new), file_name)
+}
+
+/// A read answered from the cache, or `None` when there is no answer there and a
+/// worker has to be asked (issue #3714). Dev builds log each one beside the
+/// worker runs, so a screen's cost can be counted from one log.
+fn answered(what: &str, hit: Option<serde_json::Value>) -> Option<CliResult> {
+    let value = hit?;
+    #[cfg(debug_assertions)]
+    devstats::cache_hit(what);
+    #[cfg(not(debug_assertions))]
+    let _ = what;
+    Some(CliResult::ok(value))
+}
+
+/// Which worker answers a read.
+#[derive(Clone, Copy)]
+enum Via {
+    /// One that stays running, of the kind named, unless the read ahead of this
+    /// one has held it for `patience` or longer. Nearly every read.
+    Running {
+        kind: pool::Kind,
+        patience: Duration,
+    },
+    /// One started for this read alone. Two sorts of read:
+    ///
+    /// The engine config read and write, which a running worker refuses
+    /// (`serve.rs` in the worker says why) and which run no `Init`, so there is
+    /// nothing to save.
+    ///
+    /// The Lua console, the Lua REPL and the defs probe, which run code the
+    /// user wrote. A loop that never ends there holds its worker until the
+    /// timeout, and in a worker of its own that holds up nothing else.
+    OneShot,
+}
+
+/// How long one read may hold a running worker before the reads queued behind
+/// it stop waiting and each start a worker of their own.
+///
+/// [`MINIMAP_TIMEOUT`], the time this file already gives a fast single read
+/// before calling it stuck. A read queued behind one that has run that long is
+/// behind a read that is stuck or as good as, and without this would wait out
+/// the whole of that read's timeout, up to [`SCAN_TIMEOUT`]. Over thirty
+/// uncached map pages the longest any read took from being asked for to being
+/// answered, its own wait in the queue included, was 13.4s, so ordinary reads
+/// stay well under it and still share one `Init`.
+const HELD_TOO_LONG: Duration = MINIMAP_TIMEOUT;
+
+/// The value given for `flag` in a worker argument list.
+fn flag_value<'a>(args: &'a [String], flag: &str) -> Option<&'a str> {
+    let at = args.iter().position(|a| a == flag)?;
+    args.get(at + 1).map(String::as_str)
+}
+
+/// Have a running worker answer one read, and return what it printed.
+///
+/// The same contract as [`run_worker_blocking`]: the worker prints its JSON,
+/// including any error list in it, whatever its exit code, so output is
+/// preferred and only a read that printed nothing is an error.
+fn run_served_blocking(
+    bin: PathBuf,
+    args: Vec<String>,
+    #[cfg_attr(not(debug_assertions), allow(unused_mut))] mut envs: Vec<(String, String)>,
+    timeout: Duration,
+    what: String,
+    cancel: Option<Arc<AtomicBool>>,
+    (kind, patience): (pool::Kind, Duration),
+) -> Result<String, String> {
+    let (Some(lib), Some(datadir)) = (flag_value(&args, "--lib"), flag_value(&args, "--datadir"))
+    else {
+        return run_worker_blocking(bin, args, envs, timeout, what, cancel);
+    };
+    #[cfg(debug_assertions)]
+    envs.push((devstats::TIMINGS_ENV.into(), "1".into()));
+    #[cfg(debug_assertions)]
+    let mut dev_run = devstats::WorkerRun::start(&what);
+
+    let ran = pool::lane(&bin, lib, datadir, &envs, kind).run(&pool::Job {
+        args: &args,
+        timeout,
+        what: &what,
+        cancel: cancel.as_deref(),
+        patience,
+    })?;
+    let served = match ran {
+        pool::Ran::Served(served) => served,
+        pool::Ran::Busy => {
+            // The one-shot run logs this read itself.
+            #[cfg(debug_assertions)]
+            dev_run.handed_on(kind.name());
+            return run_worker_blocking(bin, args, envs, timeout, what, cancel);
+        }
+    };
+    #[cfg(debug_assertions)]
+    {
+        if let Some(pid) = served.started {
+            devstats::worker_started(pid, kind.name());
+        }
+        if let Some(init) = served.init {
+            dev_run.ran_init(init.lock_wait_ms, init.call_ms);
+        }
+        dev_run.ran_mounts(&served.mount_ms);
+    }
+
+    if served.output.iter().all(u8::is_ascii_whitespace) {
+        return Err(format!(
+            "unitsync worker produced no output (exit {})",
+            served.code
+        ));
+    }
+    String::from_utf8(served.output)
+        .map_err(|e| format!("unitsync worker output is not valid UTF-8: {e}"))
+}
+
+/// Have a worker answer one read and parse its JSON into a `CliResult`. `what`
+/// names the operation for error messages.
+async fn run_via(
+    via: Via,
     bin: PathBuf,
     args: Vec<String>,
     envs: Vec<(String, String)>,
@@ -478,8 +632,12 @@ async fn run_worker(
     cancel: Option<Arc<AtomicBool>>,
 ) -> CliResult {
     let what_owned = what.to_string();
-    let result = tauri::async_runtime::spawn_blocking(move || {
-        run_worker_blocking(bin, args, envs, timeout, what_owned, cancel)
+    let result = tauri::async_runtime::spawn_blocking(move || match via {
+        Via::Running { kind, patience } => {
+            let queue = (kind, patience);
+            run_served_blocking(bin, args, envs, timeout, what_owned, cancel, queue)
+        }
+        Via::OneShot => run_worker_blocking(bin, args, envs, timeout, what_owned, cancel),
     })
     .await;
     match result {
@@ -490,6 +648,59 @@ async fn run_worker(
         Ok(Err(e)) => CliResult::err(e),
         Err(e) => CliResult::err(format!("{what} task failed: {e}")),
     }
+}
+
+/// A read of one map, game or archive, answered by the engine's page worker.
+async fn run_worker(
+    bin: PathBuf,
+    args: Vec<String>,
+    envs: Vec<(String, String)>,
+    timeout: Duration,
+    what: &str,
+    cancel: Option<Arc<AtomicBool>>,
+) -> CliResult {
+    let via = Via::Running {
+        kind: pool::Kind::Page,
+        patience: HELD_TOO_LONG,
+    };
+    run_via(via, bin, args, envs, timeout, what, cancel).await
+}
+
+/// A walk of every map or every game, answered by the engine's library worker
+/// so a page read never queues behind it.
+async fn run_library_worker(
+    bin: PathBuf,
+    args: Vec<String>,
+    envs: Vec<(String, String)>,
+    timeout: Duration,
+    what: &str,
+    cancel: Option<Arc<AtomicBool>>,
+) -> CliResult {
+    let via = Via::Running {
+        kind: pool::Kind::Library,
+        patience: HELD_TOO_LONG,
+    };
+    run_via(via, bin, args, envs, timeout, what, cancel).await
+}
+
+/// The scan, answered by the engine's library worker when that is free and by a
+/// worker of its own when it is not.
+///
+/// The lists on screen wait on the scan, and the walks that share the library
+/// worker ran for 27.9s, 14.4s and 3.6s with coilbox's caches empty. So a scan
+/// waits behind none of them. Its patience is zero, which costs it one `Init`
+/// when the worker is busy, the same as it cost before workers stayed running.
+async fn run_scan_worker(
+    bin: PathBuf,
+    args: Vec<String>,
+    envs: Vec<(String, String)>,
+    cancel: Option<Arc<AtomicBool>>,
+) -> CliResult {
+    let via = Via::Running {
+        kind: pool::Kind::Library,
+        patience: Duration::ZERO,
+    };
+    run_via(via, bin, args, envs, SCAN_TIMEOUT, "scan", cancel).await
 }
 
 /// `unitsync_scan` — scan one content root with one engine's libunitsync,
@@ -504,11 +715,47 @@ async fn unitsync_scan(engine_path: String, data_dir: String, op_id: Option<Stri
     let args = build_args(&libpath.to_string_lossy(), &data_dir);
     let envs = loader_envs(&engine_dir, &data_dir);
     let cancel = op_id.as_deref().map(register_cancel);
-    let res = run_worker(bin, args, envs, SCAN_TIMEOUT, "scan", cancel).await;
+    let res = run_scan_worker(bin, args, envs, cancel).await;
     if let Some(id) = op_id.as_deref() {
         unregister_cancel(id);
     }
     res
+}
+
+/// `unitsync_last_scan_write` keeps a good scan on disk as the next launch's first
+/// paint. The caller writes only a scan that succeeded, so a failed one never
+/// replaces a good one.
+#[tauri::command]
+async fn unitsync_last_scan_write<R: Runtime>(
+    app: AppHandle<R>,
+    engine_path: String,
+    data_dir: String,
+    scan: serde_json::Value,
+) -> CliResult {
+    let Some(dir) = coilbox_portable::cache_dir(&app)
+        .ok()
+        .map(|d| d.join(LAST_SCAN_SUBDIR))
+    else {
+        return CliResult::err("no cache directory on this platform".to_string());
+    };
+    match lastscan::save(&dir, &engine_path, &data_dir, &scan) {
+        Ok(()) => CliResult::ok(serde_json::Value::Null),
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// `unitsync_last_scan_read` returns the saved scan for a target, or null when
+/// there is none, it is unreadable, or it is from another format version.
+#[tauri::command]
+async fn unitsync_last_scan_read<R: Runtime>(
+    app: AppHandle<R>,
+    engine_path: String,
+    data_dir: String,
+) -> CliResult {
+    let saved = coilbox_portable::cache_dir(&app)
+        .ok()
+        .and_then(|d| lastscan::load(&d.join(LAST_SCAN_SUBDIR), &engine_path, &data_dir));
+    CliResult::ok(saved.unwrap_or(serde_json::Value::Null))
 }
 
 /// `unitsync_minimap` — render one map's minimap as a PNG data URL. `mip` selects
@@ -520,7 +767,22 @@ async fn unitsync_minimap<R: Runtime>(
     data_dir: String,
     map_name: String,
     mip: Option<i32>,
+    archive_path: Option<String>,
+    file_name: Option<String>,
 ) -> CliResult {
+    if let Some(hit) = answered(
+        "minimap",
+        thumb_cache_dir(&app)
+            .zip(thumb_key(
+                &map_name,
+                archive_path.as_deref(),
+                file_name.as_deref(),
+            ))
+            .and_then(|(dir, key)| cached::minimap(&dir, &key, mip.unwrap_or(1)))
+            .and_then(|out| serde_json::to_value(out).ok()),
+    ) {
+        return hit;
+    }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
@@ -548,7 +810,22 @@ async fn unitsync_heightmap<R: Runtime>(
     engine_path: String,
     data_dir: String,
     map_name: String,
+    archive_path: Option<String>,
+    file_name: Option<String>,
 ) -> CliResult {
+    if let Some(hit) = answered(
+        "heightmap",
+        thumb_cache_dir(&app)
+            .zip(thumb_key(
+                &map_name,
+                archive_path.as_deref(),
+                file_name.as_deref(),
+            ))
+            .and_then(|(dir, key)| cached::heightmap(&dir, &key))
+            .and_then(|out| serde_json::to_value(out).ok()),
+    ) {
+        return hit;
+    }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
@@ -618,6 +895,13 @@ async fn unitsync_metalmap<R: Runtime>(
 
 /// `unitsync_thumbnails` — render a small minimap for every map in one session,
 /// for the Maps grid. `mip` defaults to 3 (128px).
+///
+/// `maps` lists every map of the last scan with what its cache key is made from.
+/// When each one has a saved thumbnail the plugin answers for those maps itself,
+/// and when any one does not a worker answers for the whole library, as it does
+/// when no list is given (issue #3736). A map in the library but not in the list
+/// is not in the plugin's answer, which is fine for a caller that draws the maps
+/// its scan lists.
 #[tauri::command]
 async fn unitsync_thumbnails<R: Runtime>(
     app: AppHandle<R>,
@@ -625,7 +909,17 @@ async fn unitsync_thumbnails<R: Runtime>(
     data_dir: String,
     mip: Option<i32>,
     op_id: Option<String>,
+    maps: Option<Vec<cached::MapRef>>,
 ) -> CliResult {
+    if let Some(hit) = answered(
+        "thumbnails",
+        thumb_cache_dir(&app)
+            .zip(maps.as_deref())
+            .and_then(|(dir, maps)| cached::thumbnails(&dir, mip.unwrap_or(3), maps))
+            .and_then(|out| serde_json::to_value(out).ok()),
+    ) {
+        return hit;
+    }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
@@ -639,7 +933,7 @@ async fn unitsync_thumbnails<R: Runtime>(
     );
     let envs = loader_envs(&engine_dir, &data_dir);
     let cancel = op_id.as_deref().map(register_cancel);
-    let res = run_worker(bin, args, envs, SCAN_TIMEOUT, "thumbnails", cancel).await;
+    let res = run_library_worker(bin, args, envs, SCAN_TIMEOUT, "thumbnails", cancel).await;
     if let Some(id) = op_id.as_deref() {
         unregister_cancel(id);
     }
@@ -657,7 +951,17 @@ async fn unitsync_map_meta<R: Runtime>(
     engine_path: String,
     data_dir: String,
     op_id: Option<String>,
+    maps: Option<Vec<cached::MapRef>>,
 ) -> CliResult {
+    if let Some(hit) = answered(
+        "map metadata",
+        info_cache_dir(&app)
+            .zip(maps.as_deref())
+            .and_then(|(dir, maps)| cached::map_metas(&dir, maps))
+            .and_then(|out| serde_json::to_value(out).ok()),
+    ) {
+        return hit;
+    }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
@@ -666,7 +970,7 @@ async fn unitsync_map_meta<R: Runtime>(
     let args = build_map_meta_args(&libpath.to_string_lossy(), &data_dir, cache_dir.as_deref());
     let envs = loader_envs(&engine_dir, &data_dir);
     let cancel = op_id.as_deref().map(register_cancel);
-    let res = run_worker(bin, args, envs, SCAN_TIMEOUT, "map metadata", cancel).await;
+    let res = run_library_worker(bin, args, envs, SCAN_TIMEOUT, "map metadata", cancel).await;
     if let Some(id) = op_id.as_deref() {
         unregister_cancel(id);
     }
@@ -679,7 +983,16 @@ async fn unitsync_game_info<R: Runtime>(
     engine_path: String,
     data_dir: String,
     game_archive: String,
+    archive_path: Option<String>,
 ) -> CliResult {
+    if let Some(hit) = answered(
+        "game info",
+        info_cache_dir(&app)
+            .zip(archive_path.as_deref())
+            .and_then(|(dir, path)| cached::game_info(&dir, Path::new(path))),
+    ) {
+        return hit;
+    }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
@@ -712,7 +1025,20 @@ async fn unitsync_unit_buildpics<R: Runtime>(
     game_archive: String,
     units: Vec<String>,
     assets: Option<bool>,
+    archive_path: Option<String>,
 ) -> CliResult {
+    // An asset run wants files only a worker writes, so it never reads the cache.
+    if assets != Some(true) {
+        if let Some(hit) = answered(
+            "unit buildpics",
+            buildpic_cache_dir(&app)
+                .zip(archive_path.as_deref())
+                .and_then(|(dir, path)| cached::unit_buildpics(&dir, Path::new(path), &units))
+                .and_then(|out| serde_json::to_value(out).ok()),
+        ) {
+            return hit;
+        }
+    }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
@@ -751,7 +1077,17 @@ async fn unitsync_faction_logos<R: Runtime>(
     data_dir: String,
     game_archive: String,
     sides: Vec<String>,
+    archive_path: Option<String>,
 ) -> CliResult {
+    if let Some(hit) = answered(
+        "faction logos",
+        faction_logo_cache_dir(&app)
+            .zip(archive_path.as_deref())
+            .and_then(|(dir, path)| cached::faction_logos(&dir, Path::new(path), &sides))
+            .and_then(|out| serde_json::to_value(out).ok()),
+    ) {
+        return hit;
+    }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
@@ -772,16 +1108,43 @@ async fn unitsync_faction_logos<R: Runtime>(
 /// graph (every unit plus the internal names it can build, `buildoptions`). Feeds
 /// the per-faction build-tree viewer and unit include/exclude filters. Fetched on
 /// demand (mounts the game), disk-cached in the info-blob cache dir.
+///
+/// With `match_setup`, the read is of the unit list the engine built for one
+/// match, which is what a replay's unit ids count into (issue #3847). It is
+/// cached on the archive and the setup together, and the game's own dataset
+/// keeps its key and its blob.
 #[tauri::command]
 async fn unitsync_unit_dataset<R: Runtime>(
     app: AppHandle<R>,
     engine_path: String,
     data_dir: String,
     game_archive: String,
+    archive_path: Option<String>,
+    match_setup: Option<MatchSetup>,
 ) -> CliResult {
+    if let Some(hit) = answered(
+        "unit dataset",
+        info_cache_dir(&app).zip(archive_path.as_deref()).and_then(
+            |(dir, path)| match &match_setup {
+                Some(setup) => cached::match_unit_list(&dir, Path::new(path), setup),
+                None => cached::unit_dataset(&dir, Path::new(path)),
+            },
+        ),
+    ) {
+        return hit;
+    }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
+    };
+    // The setup goes over in a file: a start script's mod options can run past
+    // what a command line holds.
+    let setup_file = match &match_setup {
+        Some(setup) => match write_temp_list("match-setup", &setup.canonical()) {
+            Ok(path) => Some(path),
+            Err(e) => return CliResult::err(e),
+        },
+        None => None,
     };
     let cache_dir = info_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
     let args = build_unit_dataset_args(
@@ -789,9 +1152,14 @@ async fn unitsync_unit_dataset<R: Runtime>(
         &data_dir,
         &game_archive,
         cache_dir.as_deref(),
+        setup_file.as_deref().and_then(Path::to_str),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    run_worker(bin, args, envs, SCAN_TIMEOUT, "unit dataset", None).await
+    let result = run_worker(bin, args, envs, SCAN_TIMEOUT, "unit dataset", None).await;
+    if let Some(path) = setup_file {
+        let _ = std::fs::remove_file(path);
+    }
+    result
 }
 
 /// `unitsync_unit_defs`: load one game's archives and read every key it
@@ -925,7 +1293,17 @@ async fn unitsync_unit_models<R: Runtime>(
     data_dir: String,
     game_archive: String,
     objects: Vec<String>,
+    archive_path: Option<String>,
 ) -> CliResult {
+    if let Some(hit) = answered(
+        "unit models",
+        model_texture_dir(&app)
+            .zip(archive_path.as_deref())
+            .and_then(|(dir, path)| cached::unit_models(&dir, Path::new(path), &objects))
+            .and_then(|out| serde_json::to_value(out).ok()),
+    ) {
+        return hit;
+    }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
@@ -1362,7 +1740,7 @@ async fn unitsync_map_minimaps<R: Runtime>(
         asset_dir.as_deref(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    let out = run_worker(bin, args, envs, SCAN_TIMEOUT, "map minimaps", None).await;
+    let out = run_library_worker(bin, args, envs, SCAN_TIMEOUT, "map minimaps", None).await;
     if let Some(path) = maps_file {
         let _ = std::fs::remove_file(&path);
     }
@@ -1375,7 +1753,22 @@ async fn unitsync_map_info<R: Runtime>(
     engine_path: String,
     data_dir: String,
     map_name: String,
+    archive_path: Option<String>,
+    file_name: Option<String>,
 ) -> CliResult {
+    if let Some(hit) = answered(
+        "map info",
+        info_cache_dir(&app).and_then(|dir| {
+            cached::map_info(
+                &dir,
+                &map_name,
+                archive_path.as_deref().map(Path::new),
+                file_name.as_deref(),
+            )
+        }),
+    ) {
+        return hit;
+    }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
@@ -1396,12 +1789,40 @@ async fn unitsync_map_info<R: Runtime>(
 /// sky. Returns `{ dataUrl?, errors }`; `dataUrl` is absent for the common case of
 /// a map with no skybox.
 #[tauri::command]
-async fn unitsync_map_skybox(engine_path: String, data_dir: String, map_name: String) -> CliResult {
+async fn unitsync_map_skybox<R: Runtime>(
+    app: AppHandle<R>,
+    engine_path: String,
+    data_dir: String,
+    map_name: String,
+    archive_path: Option<String>,
+    file_name: Option<String>,
+) -> CliResult {
+    if let Some(hit) = answered(
+        "map skybox",
+        info_cache_dir(&app)
+            .and_then(|dir| {
+                cached::map_skybox(
+                    &dir,
+                    &map_name,
+                    archive_path.as_deref().map(Path::new),
+                    file_name.as_deref(),
+                )
+            })
+            .and_then(|out| serde_json::to_value(out).ok()),
+    ) {
+        return hit;
+    }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
     };
-    let args = build_map_skybox_args(&libpath.to_string_lossy(), &data_dir, &map_name);
+    let cache_dir = info_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
+    let args = build_map_skybox_args(
+        &libpath.to_string_lossy(),
+        &data_dir,
+        &map_name,
+        cache_dir.as_deref(),
+    );
     let envs = loader_envs(&engine_dir, &data_dir);
     run_worker(bin, args, envs, MINIMAP_TIMEOUT, "map skybox", None).await
 }
@@ -1416,11 +1837,27 @@ async fn unitsync_skirmish_ais<R: Runtime>(
     engine_path: String,
     data_dir: String,
     game_archive: Option<String>,
+    archive_path: Option<String>,
 ) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
     };
+    // A game named without its archive's path has no key to look under, and
+    // reading the list against the wrong archive is what the worker refuses to
+    // remember too.
+    let game_named = game_archive.as_deref().is_some_and(|g| !g.is_empty());
+    let game_path = archive_path.as_deref().map(Path::new);
+    if !game_named || game_path.is_some() {
+        if let Some(hit) = answered(
+            "skirmish ais",
+            info_cache_dir(&app).and_then(|dir| {
+                cached::skirmish_ais(&dir, &libpath, game_path.filter(|_| game_named))
+            }),
+        ) {
+            return hit;
+        }
+    }
     let cache_dir = info_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
     let args = build_skirmish_ai_args(
         &libpath.to_string_lossy(),
@@ -1443,7 +1880,8 @@ async fn unitsync_engine_config(engine_path: String, data_dir: String) -> CliRes
     };
     let args = build_config_args(&libpath.to_string_lossy(), &data_dir);
     let envs = loader_envs(&engine_dir, &data_dir);
-    run_worker(bin, args, envs, SCAN_TIMEOUT, "engine config", None).await
+    let via = Via::OneShot;
+    run_via(via, bin, args, envs, SCAN_TIMEOUT, "engine config", None).await
 }
 
 /// `unitsync_engine_config_set` — write one curated engine setting back to the
@@ -1463,22 +1901,60 @@ async fn unitsync_engine_config_set(
     };
     let args = build_config_set_args(&libpath.to_string_lossy(), &data_dir, &key, &value);
     let envs = loader_envs(&engine_dir, &data_dir);
-    run_worker(bin, args, envs, SCAN_TIMEOUT, "engine config write", None).await
+    let via = Via::OneShot;
+    run_via(
+        via,
+        bin,
+        args,
+        envs,
+        SCAN_TIMEOUT,
+        "engine config write",
+        None,
+    )
+    .await
 }
 
 /// `unitsync_archive_tree` — list the member tree of one archive (and resolve its
 /// on-disk path). `archive` is the archive name as unitsync knows it.
+///
+/// `archive_path` is the archive's own path where the scan placed it (a game), and
+/// `file_name` the map file where `archive` is a map's name. Either lets the
+/// plugin answer from a saved listing without starting a worker (issue #3736).
 #[tauri::command]
-async fn unitsync_archive_tree(
+async fn unitsync_archive_tree<R: Runtime>(
+    app: AppHandle<R>,
     engine_path: String,
     data_dir: String,
     archive: String,
+    archive_path: Option<String>,
+    file_name: Option<String>,
 ) -> CliResult {
+    if let Some(hit) = answered(
+        "archive tree",
+        info_cache_dir(&app)
+            .and_then(|dir| {
+                cached::archive_tree(
+                    &dir,
+                    &archive,
+                    archive_path.as_deref().map(Path::new),
+                    file_name.as_deref(),
+                )
+            })
+            .and_then(|out| serde_json::to_value(out).ok()),
+    ) {
+        return hit;
+    }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
     };
-    let args = build_archive_tree_args(&libpath.to_string_lossy(), &data_dir, &archive);
+    let cache_dir = info_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
+    let args = build_archive_tree_args(
+        &libpath.to_string_lossy(),
+        &data_dir,
+        &archive,
+        cache_dir.as_deref(),
+    );
     let envs = loader_envs(&engine_dir, &data_dir);
     run_worker(bin, args, envs, SCAN_TIMEOUT, "archive tree", None).await
 }
@@ -1518,7 +1994,17 @@ async fn unitsync_game_headers<R: Runtime>(
     app: AppHandle<R>,
     engine_path: String,
     data_dir: String,
+    games: Option<Vec<cached::GameRef>>,
 ) -> CliResult {
+    if let Some(hit) = answered(
+        "game headers",
+        header_cache_dir(&app)
+            .zip(games.as_deref())
+            .and_then(|(dir, games)| cached::game_headers(&dir, games))
+            .and_then(|out| serde_json::to_value(out).ok()),
+    ) {
+        return hit;
+    }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
@@ -1526,7 +2012,7 @@ async fn unitsync_game_headers<R: Runtime>(
     let cache_dir = header_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
     let args = build_game_headers_args(&libpath.to_string_lossy(), &data_dir, cache_dir.as_deref());
     let envs = loader_envs(&engine_dir, &data_dir);
-    run_worker(bin, args, envs, SCAN_TIMEOUT, "game headers", None).await
+    run_library_worker(bin, args, envs, SCAN_TIMEOUT, "game headers", None).await
 }
 
 /// `unitsync_lua_exec` — run a Lua snippet through the engine's Lua parser with
@@ -1555,7 +2041,8 @@ async fn unitsync_lua_exec(
         &script.to_string_lossy(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    let result = run_worker(bin, args, envs, MINIMAP_TIMEOUT, "lua exec", None).await;
+    let via = Via::OneShot;
+    let result = run_via(via, bin, args, envs, MINIMAP_TIMEOUT, "lua exec", None).await;
     let _ = std::fs::remove_file(&script);
     result
 }
@@ -1583,9 +2070,166 @@ pub fn defs_probe_blocking(
         &path.to_string_lossy(),
     );
     let envs = loader_envs(&engine_dir, data_dir);
+    // One-shot, like the Lua console: see [`Via::OneShot`].
     let out = run_worker_blocking(bin, args, envs, LUA_TIMEOUT, "defs probe".into(), None);
     let _ = std::fs::remove_file(&path);
     out
+}
+
+/// The modinfo `shortname` of the installed game named `game`, which is the
+/// name the engine builds for it: the game's `name`, a space and its `version`
+/// (issue #3943).
+///
+/// Blocking, and not a command of its own: the replay analysis calls it from a
+/// blocking task, to give the game it generates the short name of the game it
+/// depends on. It reads the scan the games list is built from, so the answer
+/// is the one every other screen shows.
+pub fn game_short_name_blocking(
+    engine_path: &str,
+    data_dir: &str,
+    game: &str,
+) -> Result<String, String> {
+    let (bin, libpath, engine_dir) = prepare(engine_path)?;
+    let args = build_args(&libpath.to_string_lossy(), data_dir);
+    let envs = loader_envs(&engine_dir, data_dir);
+    let out = run_worker_blocking(
+        bin,
+        args,
+        envs,
+        SCAN_TIMEOUT,
+        "game short name".into(),
+        None,
+    )?;
+    short_name_in_scan(&out, game)
+}
+
+/// What the scan says about an installed game, for matching an adapter to it
+/// (issue #3799).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct InstalledGame {
+    /// The modinfo `shortname`.
+    pub short_name: String,
+    /// The modinfo `version`, when the game declares one.
+    pub version: Option<String>,
+    /// The game's own archive, as unitsync names it, which is what a read of a
+    /// file inside the game is asked for by.
+    pub archive: String,
+}
+
+/// The installed game named `game`, as [`game_short_name_blocking`] finds it, with
+/// its version and archive too. Blocking, and one scan.
+pub fn installed_game_blocking(
+    engine_path: &str,
+    data_dir: &str,
+    game: &str,
+) -> Result<InstalledGame, String> {
+    let (bin, libpath, engine_dir) = prepare(engine_path)?;
+    let args = build_args(&libpath.to_string_lossy(), data_dir);
+    let envs = loader_envs(&engine_dir, data_dir);
+    let out = run_worker_blocking(bin, args, envs, SCAN_TIMEOUT, "installed game".into(), None)?;
+    installed_game_in_scan(&out, game)
+}
+
+/// The entry for the game named `game` in the scan's output.
+fn installed_game_in_scan(scan: &str, game: &str) -> Result<InstalledGame, String> {
+    let scan: serde_json::Value =
+        serde_json::from_str(scan).map_err(|e| format!("the scan did not read as JSON: {e}"))?;
+    let entry = scan["games"]
+        .as_array()
+        .and_then(|games| games.iter().find(|g| g["name"].as_str() == Some(game)))
+        .ok_or_else(|| format!("no installed game is named {game:?}"))?;
+    let text = |value: &serde_json::Value| {
+        value
+            .as_str()
+            .map(str::trim)
+            .filter(|text| !text.is_empty())
+            .map(str::to_string)
+    };
+    Ok(InstalledGame {
+        short_name: text(&entry["info"]["shortname"])
+            .ok_or_else(|| format!("the game {game:?} declares no short name in its modinfo"))?,
+        version: text(&entry["info"]["version"]),
+        archive: text(&entry["primaryArchive"]["name"])
+            .ok_or_else(|| format!("the scan names no archive for the game {game:?}"))?,
+    })
+}
+
+/// A text file inside the archive `archive`, or `None` when the archive holds
+/// no such file. Blocking.
+///
+/// It reads through the worker's archive preview, which gives text files up to
+/// its preview cap, so a file past that is an error and not a truncated read.
+pub fn archive_text_blocking(
+    engine_path: &str,
+    data_dir: &str,
+    archive: &str,
+    file: &str,
+) -> Result<Option<String>, String> {
+    let (bin, libpath, engine_dir) = prepare(engine_path)?;
+    let args = build_archive_file_args(&libpath.to_string_lossy(), data_dir, archive, file, false);
+    let envs = loader_envs(&engine_dir, data_dir);
+    let out = run_worker_blocking(
+        bin,
+        args,
+        envs,
+        MINIMAP_TIMEOUT,
+        "archive text".into(),
+        None,
+    )?;
+    text_in_archive_output(&out, archive, file)
+}
+
+/// The text in the worker's answer to a read of one archive file.
+fn text_in_archive_output(out: &str, archive: &str, file: &str) -> Result<Option<String>, String> {
+    let out: serde_json::Value = serde_json::from_str(out)
+        .map_err(|e| format!("the archive read did not come back as JSON: {e}"))?;
+    if let Some(text) = out["text"].as_str() {
+        return Ok(Some(text.to_string()));
+    }
+    let errors: Vec<&str> = out["errors"]
+        .as_array()
+        .map(|errors| errors.iter().filter_map(|e| e.as_str()).collect())
+        .unwrap_or_default();
+    if errors
+        .iter()
+        .any(|e| e.starts_with("could not open archive"))
+    {
+        return Err(format!("could not open the archive {archive}"));
+    }
+    if out["truncated"].as_bool() == Some(true) {
+        return Err(format!("{file} in {archive} is too large to read"));
+    }
+    // A file the archive does not hold comes back as an empty binary file with
+    // no error, because the worker's preview replaces the member's own error
+    // with unitsync's. A text file is never answered as binary.
+    let missing = out["size"].as_u64() == Some(0) && out["kind"].as_str() == Some("binary");
+    if missing
+        || errors
+            .iter()
+            .any(|e| e.starts_with("could not read member"))
+    {
+        return Ok(None);
+    }
+    Err(format!(
+        "{file} in {archive} did not read as text: {}",
+        errors.join("; ")
+    ))
+}
+
+/// The `shortname` in the scan's entry for the game named `game`.
+fn short_name_in_scan(scan: &str, game: &str) -> Result<String, String> {
+    let scan: serde_json::Value =
+        serde_json::from_str(scan).map_err(|e| format!("the scan did not read as JSON: {e}"))?;
+    let entry = scan["games"]
+        .as_array()
+        .and_then(|games| games.iter().find(|g| g["name"].as_str() == Some(game)))
+        .ok_or_else(|| format!("no installed game is named {game:?}"))?;
+    entry["info"]["shortname"]
+        .as_str()
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .map(str::to_string)
+        .ok_or_else(|| format!("the game {game:?} declares no short name in its modinfo"))
 }
 
 /// `unitsync_lua_repl_exec` — REPL replay: run `chunks` (the session's
@@ -1619,7 +2263,8 @@ async fn unitsync_lua_repl_exec(
         &script.to_string_lossy(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    let result = run_worker(bin, args, envs, LUA_TIMEOUT, "lua repl", None).await;
+    let via = Via::OneShot;
+    let result = run_via(via, bin, args, envs, LUA_TIMEOUT, "lua repl", None).await;
     let _ = std::fs::remove_file(&script);
     result
 }
@@ -1727,6 +2372,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         // Swept here, at the one moment nothing can be mid-render, against each
         // key's own archive on disk rather than unitsync: see `modelcache`.
         .setup(|app, _api| {
+            // Whatever deletes or replaces an engine folder asks for its files
+            // to be let go of first, and the workers here are what hold them.
+            coilbox_proc::on_engine_release(pool::shut_down_under);
             if let Some(dir) = model_texture_dir(app) {
                 modelcache::sweep(&dir);
             }
@@ -1734,6 +2382,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         })
         .invoke_handler(tauri::generate_handler![
             unitsync_scan,
+            unitsync_last_scan_write,
+            unitsync_last_scan_read,
             unitsync_minimap,
             unitsync_heightmap,
             unitsync_height_field,
@@ -1775,6 +2425,92 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const SCAN: &str = r#"{"maps":[],"games":[
+        {"name":"Other Game 1","info":{"shortname":"OG"}},
+        {"name":"Beyond All Reason test-1","info":{"shortname":" BYAR "}},
+        {"name":"No Short 1","info":{"name":"No Short 1"}}
+    ],"errors":[]}"#;
+
+    const SCAN_WITH_ARCHIVES: &str = r#"{"maps":[],"games":[
+        {"name":"Splinter 0.1.89","primaryArchive":{"name":"Splinter_0.1.89.sdz"},
+         "info":{"shortname":" SF ","version":"0.1.89"}},
+        {"name":"Dev","primaryArchive":{"name":"Dev.sdd"},"info":{"shortname":"SF","version":"  "}},
+        {"name":"No Archive","info":{"shortname":"NA"}}
+    ],"errors":[]}"#;
+
+    #[test]
+    fn an_installed_game_has_a_short_name_a_version_and_an_archive() {
+        let game = installed_game_in_scan(SCAN_WITH_ARCHIVES, "Splinter 0.1.89").unwrap();
+        assert_eq!(game.short_name, "SF");
+        assert_eq!(game.version.as_deref(), Some("0.1.89"));
+        assert_eq!(game.archive, "Splinter_0.1.89.sdz");
+    }
+
+    #[test]
+    fn a_blank_version_is_no_version() {
+        let game = installed_game_in_scan(SCAN_WITH_ARCHIVES, "Dev").unwrap();
+        assert_eq!(game.version, None);
+    }
+
+    #[test]
+    fn a_game_with_no_archive_or_not_installed_is_an_error() {
+        let none = installed_game_in_scan(SCAN_WITH_ARCHIVES, "No Archive").unwrap_err();
+        assert!(none.contains("no archive"), "{none}");
+        let absent = installed_game_in_scan(SCAN_WITH_ARCHIVES, "Absent").unwrap_err();
+        assert!(absent.contains("no installed game"), "{absent}");
+    }
+
+    #[test]
+    fn a_text_file_in_an_archive_is_its_text() {
+        let out = r#"{"kind":"text","text":"return {}","size":9,"truncated":false,"errors":[]}"#;
+        assert_eq!(
+            text_in_archive_output(out, "a.sdz", "f.lua"),
+            Ok(Some("return {}".to_string()))
+        );
+    }
+
+    #[test]
+    fn a_file_the_archive_does_not_hold_is_none() {
+        let out = r#"{"kind":"binary","size":0,"truncated":false,"errors":["could not read member f.lua"]}"#;
+        assert_eq!(text_in_archive_output(out, "a.sdz", "f.lua"), Ok(None));
+    }
+
+    /// What the worker gave for a missing file in SplinterFaction_0.1.89.sdz:
+    /// it drops the member error and leaves an empty binary file.
+    #[test]
+    fn the_answer_a_real_worker_gives_for_a_missing_file_is_none() {
+        let out = r#"{"kind":"binary","size":0,"truncated":false,"errors":[]}"#;
+        assert_eq!(text_in_archive_output(out, "a.sdz", "f.lua"), Ok(None));
+    }
+
+    #[test]
+    fn an_archive_that_will_not_open_or_a_file_too_large_is_an_error() {
+        let closed = r#"{"kind":"binary","size":0,"truncated":false,"errors":["could not open archive a.sdz"]}"#;
+        let err = text_in_archive_output(closed, "a.sdz", "f.lua").unwrap_err();
+        assert!(err.contains("could not open the archive a.sdz"), "{err}");
+        let large = r#"{"kind":"binary","size":900000,"truncated":true,"errors":[]}"#;
+        let err = text_in_archive_output(large, "a.sdz", "f.lua").unwrap_err();
+        assert!(err.contains("too large"), "{err}");
+        assert!(text_in_archive_output("nope", "a.sdz", "f.lua").is_err());
+    }
+
+    #[test]
+    fn a_game_s_short_name_is_read_from_the_scan_entry_with_its_name() {
+        assert_eq!(
+            short_name_in_scan(SCAN, "Beyond All Reason test-1").as_deref(),
+            Ok("BYAR")
+        );
+    }
+
+    #[test]
+    fn a_game_that_is_not_installed_or_declares_no_short_name_is_an_error() {
+        let missing = short_name_in_scan(SCAN, "Absent 1").unwrap_err();
+        assert!(missing.contains("no installed game"), "{missing}");
+        let none = short_name_in_scan(SCAN, "No Short 1").unwrap_err();
+        assert!(none.contains("no short name"), "{none}");
+        assert!(short_name_in_scan("not json", "x").is_err());
+    }
 
     #[test]
     fn timeout_message_names_op_and_seconds() {

@@ -1,21 +1,36 @@
-//! `coilbox-unitsync-worker` — a one-shot worker that loads an engine's
-//! `libunitsync`, scans a content root in a single `Init` session, and prints one
-//! JSON document describing its maps, games, and the archives they come from.
+//! `coilbox-unitsync-worker` — a worker that loads an engine's `libunitsync`
+//! and answers reads of its maps, games and archives as JSON.
 //!
 //! It runs out-of-process precisely because unitsync is an unstable global C
 //! singleton that can `abort()`/`exit()` on a malformed archive — here that only
-//! kills this throwaway process, which the parent reads as a failed scan.
+//! kills this process, which the parent reads as a failed read.
 //!
-//! unitsync's state (VFS, opened archives, the info/archive accessor buffers)
-//! lives for one `Init` and resets between processes, so we deliberately do
-//! everything in a single pass: `Init` once, enumerate maps and games and their
-//! archives, `UnInit`, emit, exit.
+//! Run with a mode's flags it is one-shot: `Init` once, read, `UnInit`, print
+//! one JSON document, exit. unitsync's state (VFS, opened archives, the
+//! info/archive accessor buffers) lives for one `Init` and resets between
+//! processes, so each mode does everything in a single pass.
+//!
+//! Run with `--serve` it stays running and answers one request after another
+//! over its standard input, keeping one `Init` between them (issue #3722). See
+//! `serve` for the loop and `session` for what is kept.
 //!
 //! Usage: `coilbox-unitsync-worker --lib <libunitsync.*> --datadir <content-root>`
 
+/// Every mode prints its answer with `println!`. This one sends it through
+/// `out`, which collects it when the worker is answering a request and prints
+/// it as before when it is not. Defined ahead of the modules so it is the
+/// `println!` each of them gets.
+macro_rules! println {
+    () => {
+        $crate::out::line(format_args!(""))
+    };
+    ($($arg:tt)*) => {
+        $crate::out::line(format_args!($($arg)*))
+    };
+}
+
 mod archive;
 mod assetencode;
-mod beforepost;
 mod buildpic;
 mod config;
 mod convert3do;
@@ -35,10 +50,12 @@ mod mapmeta;
 mod metalmap;
 mod metalspots;
 mod minimap;
-mod model;
+mod out;
 mod pcx;
 mod renderkey;
 mod seed;
+mod serve;
+mod session;
 mod skirmishai;
 mod smf;
 mod texture;
@@ -50,6 +67,7 @@ mod unitrender;
 mod unitscriptfile;
 
 use coilbox_unitsync_worker::Mode;
+use coilbox_unitsync_worker::{beforepost, model};
 use ffi::Unitsync;
 use model::{Archive, ConfigOption, GameItem, MapItem, OptionListItem, ScanOutput};
 use std::collections::HashSet;
@@ -259,6 +277,9 @@ fn run_mode<T>(
     match std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)) {
         Ok(out) => on_success(out),
         Err(_) => {
+            // Whatever unitsync was in the middle of, a running worker must not
+            // answer the next request from it.
+            session::give_up();
             on_panic();
             1
         }
@@ -275,7 +296,13 @@ fn print_ok<T: serde::Serialize>(out: T) -> i32 {
 }
 
 fn run() -> i32 {
-    let mut args = match parse_args() {
+    let raw: Vec<String> = std::env::args().skip(1).collect();
+    // Read before anything changes directory, so it is the caller's.
+    launch_dir();
+    if raw.first().map(String::as_str) == Some(coilbox_unitsync_worker::protocol::SERVE_FLAG) {
+        return serve::run(&raw[1..]);
+    }
+    let mut args = match parse_args(&raw) {
         Ok(v) => v,
         Err(e) => {
             emit_error(e);
@@ -288,20 +315,29 @@ fn run() -> i32 {
     // this a relative `--asset-dir assets` writes into the engine directory,
     // which is nobody's idea of where they asked for it.
     absolutize(&mut args);
+    enter_engine(&args.lib, &args.datadir);
+    dispatch(&args)
+}
 
+/// Point this process at one engine and one content root, which is for good:
+/// both are read from the environment by the loader and by unitsync's `Init`.
+fn enter_engine(lib: &str, datadir: &str) {
     // unitsync reads SPRING_DATADIR via getenv inside Init, so setting it now
     // points the scan at the chosen content root. COILBOX_EXTRA_DATADIRS is the
     // caller's list of other content folders, read after that one. The
     // loader-path var helps the dynamic loader find libunitsync's own sibling
     // libraries in the engine dir.
     let extras = std::env::var("COILBOX_EXTRA_DATADIRS").unwrap_or_default();
-    std::env::set_var("SPRING_DATADIR", spring_datadir(&args.datadir, &extras));
-    if let Some(dir) = Path::new(&args.lib).parent() {
+    std::env::set_var("SPRING_DATADIR", spring_datadir(datadir, &extras));
+    if let Some(dir) = Path::new(lib).parent() {
         prepend_loader_path(dir);
         // Best-effort: lets dependents that resolve relative to CWD load too.
         let _ = std::env::set_current_dir(dir);
     }
+}
 
+/// Run the mode `args` asks for, print its JSON, and return the exit code.
+fn dispatch(args: &Args) -> i32 {
     let cache_dir = args.cache_dir.as_deref().map(Path::new);
 
     // Lua console: mount one archive and run a user snippet through the parser.
@@ -440,6 +476,28 @@ fn run() -> i32 {
     // game-detail mode because it also keys off --game.
     if let Some(Mode::UnitDataset(mode)) = &args.unit_dataset {
         let cache_dir = mode.cache_dir.as_deref().map(Path::new);
+        // With a match's setup this is the unit list the engine built for that
+        // match (issue #3847), and the game's own dataset is left as it is.
+        if let Some(file) = &mode.match_setup_file {
+            let setup = std::fs::read_to_string(file)
+                .map_err(|e| format!("could not read the match setup: {e}"))
+                .and_then(|text| {
+                    serde_json::from_str::<coilbox_unitsync_worker::matchsetup::MatchSetup>(&text)
+                        .map_err(|e| format!("could not read the match setup: {e}"))
+                });
+            let setup = match setup {
+                Ok(setup) => setup,
+                Err(e) => {
+                    dataset::emit_error(e);
+                    return 1;
+                }
+            };
+            return run_mode(
+                || dataset::render_for_match(&args.lib, &mode.game, &setup, cache_dir),
+                print_ok,
+                || dataset::emit_error("worker panicked while reading a match's units".into()),
+            );
+        }
         return run_mode(
             || dataset::render(&args.lib, &mode.game, cache_dir),
             print_ok,
@@ -642,8 +700,9 @@ fn run() -> i32 {
                 || archive::emit_file_error("worker panicked while reading archive member".into()),
             );
         }
+        let cache_dir = mode.cache_dir.as_deref().map(Path::new);
         return run_mode(
-            || archive::tree(&args.lib, &mode.archive),
+            || archive::tree(&args.lib, &mode.archive, cache_dir),
             print_ok,
             || archive::emit_tree_error("worker panicked while listing archive".into()),
         );
@@ -720,8 +779,9 @@ fn run() -> i32 {
     // Map skybox: read one map's `atmosphere.skyBox` DDS cube map as raw bytes.
     // `--map` being required now lives in `MapSkyboxArgs::from_args`, not here.
     if let Some(Mode::MapSkybox(mode)) = &args.map_skybox {
+        let cache_dir = mode.cache_dir.as_deref().map(Path::new);
         return run_mode(
-            || archive::map_skybox(&args.lib, &mode.map),
+            || archive::map_skybox(&args.lib, &mode.map, cache_dir),
             print_ok,
             || archive::emit_skybox_error("worker panicked while reading map skybox".into()),
         );
@@ -874,7 +934,7 @@ fn run() -> i32 {
     )
 }
 
-fn parse_args() -> Result<Args, String> {
+fn parse_args(raw: &[String]) -> Result<Args, String> {
     let mut lib = None;
     let mut datadir = None;
     // `--map`'s presence alone (no other mode flag) is what gates
@@ -1021,7 +1081,6 @@ fn parse_args() -> Result<Args, String> {
     let mut asset_dir = None;
     let mut seed = false;
     let mut dry_run = false;
-    let raw: Vec<String> = std::env::args().skip(1).collect();
     let mut it = raw.iter().cloned();
     while let Some(a) = it.next() {
         match a.as_str() {
@@ -1131,6 +1190,10 @@ fn parse_args() -> Result<Args, String> {
             "--source-file" | "--chunks-file" => {
                 it.next();
             }
+            // Consumed by `Mode::UnitDataset`'s `from_args` below.
+            "--match-setup-file" => {
+                it.next();
+            }
             // Consumed by `Mode::Minimap`'s and `Mode::Thumbnails`'s
             // `from_args` below, not stored here.
             "--mip" => {
@@ -1145,42 +1208,42 @@ fn parse_args() -> Result<Args, String> {
         map: map.clone(),
         game: if game.is_some() {
             Some(Mode::Game(coilbox_unitsync_worker::GameArgs::from_args(
-                &raw,
+                raw,
             )?))
         } else {
             None
         },
         archive: if archive.is_some() {
             Some(Mode::Archive(
-                coilbox_unitsync_worker::ArchiveArgs::from_args(&raw)?,
+                coilbox_unitsync_worker::ArchiveArgs::from_args(raw)?,
             ))
         } else {
             None
         },
         thumbnails: if thumbnails_flag {
             Some(Mode::Thumbnails(
-                coilbox_unitsync_worker::ThumbnailsArgs::from_args(&raw)?,
+                coilbox_unitsync_worker::ThumbnailsArgs::from_args(raw)?,
             ))
         } else {
             None
         },
         heightmap: if heightmap_flag {
             Some(Mode::Heightmap(
-                coilbox_unitsync_worker::HeightmapArgs::from_args(&raw)?,
+                coilbox_unitsync_worker::HeightmapArgs::from_args(raw)?,
             ))
         } else {
             None
         },
         height_field: if height_field_flag {
             Some(Mode::HeightField(
-                coilbox_unitsync_worker::HeightFieldArgs::from_args(&raw)?,
+                coilbox_unitsync_worker::HeightFieldArgs::from_args(raw)?,
             ))
         } else {
             None
         },
         metalmap: if metalmap_flag {
             Some(Mode::Metalmap(
-                coilbox_unitsync_worker::MetalmapArgs::from_args(&raw)?,
+                coilbox_unitsync_worker::MetalmapArgs::from_args(raw)?,
             ))
         } else {
             None
@@ -1188,35 +1251,35 @@ fn parse_args() -> Result<Args, String> {
         typemap,
         map_catalog: if map_catalog_flag {
             Some(Mode::MapCatalog(
-                coilbox_unitsync_worker::MapCatalogArgs::from_args(&raw)?,
+                coilbox_unitsync_worker::MapCatalogArgs::from_args(raw)?,
             ))
         } else {
             None
         },
         map_minimaps: if map_minimaps_flag {
             Some(Mode::MapMinimaps(
-                coilbox_unitsync_worker::MapMinimapsArgs::from_args(&raw)?,
+                coilbox_unitsync_worker::MapMinimapsArgs::from_args(raw)?,
             ))
         } else {
             None
         },
         map_info: if map_info_flag {
             Some(Mode::MapInfo(
-                coilbox_unitsync_worker::MapInfoArgs::from_args(&raw)?,
+                coilbox_unitsync_worker::MapInfoArgs::from_args(raw)?,
             ))
         } else {
             None
         },
         map_meta: if map_meta_flag {
             Some(Mode::MapMeta(
-                coilbox_unitsync_worker::MapMetaArgs::from_args(&raw)?,
+                coilbox_unitsync_worker::MapMetaArgs::from_args(raw)?,
             ))
         } else {
             None
         },
         map_skybox: if map_skybox_flag {
             Some(Mode::MapSkybox(
-                coilbox_unitsync_worker::MapSkyboxArgs::from_args(&raw)?,
+                coilbox_unitsync_worker::MapSkyboxArgs::from_args(raw)?,
             ))
         } else {
             None
@@ -1228,119 +1291,117 @@ fn parse_args() -> Result<Args, String> {
         },
         config_set: if config_set_flag {
             Some(Mode::ConfigSet(
-                coilbox_unitsync_worker::ConfigSetArgs::from_args(&raw)?,
+                coilbox_unitsync_worker::ConfigSetArgs::from_args(raw)?,
             ))
         } else {
             None
         },
         skirmish_ais: if skirmish_ais_flag {
             Some(Mode::SkirmishAis(
-                coilbox_unitsync_worker::SkirmishAisArgs::from_args(&raw)?,
+                coilbox_unitsync_worker::SkirmishAisArgs::from_args(raw)?,
             ))
         } else {
             None
         },
         game_headers: if game_headers_flag {
             Some(Mode::GameHeaders(
-                coilbox_unitsync_worker::GameHeadersArgs::from_args(&raw)?,
+                coilbox_unitsync_worker::GameHeadersArgs::from_args(raw)?,
             ))
         } else {
             None
         },
         unit_buildpics: if unit_buildpics_flag {
             Some(Mode::UnitBuildpics(
-                coilbox_unitsync_worker::UnitBuildpicsArgs::from_args(&raw)?,
+                coilbox_unitsync_worker::UnitBuildpicsArgs::from_args(raw)?,
             ))
         } else {
             None
         },
         unit_dataset: if unit_dataset_flag {
             Some(Mode::UnitDataset(
-                coilbox_unitsync_worker::UnitDatasetArgs::from_args(&raw)?,
+                coilbox_unitsync_worker::UnitDatasetArgs::from_args(raw)?,
             ))
         } else {
             None
         },
         unit_defs: if unit_defs_flag {
             Some(Mode::UnitDefs(
-                coilbox_unitsync_worker::UnitDefsArgs::from_args(&raw)?,
+                coilbox_unitsync_worker::UnitDefsArgs::from_args(raw)?,
             ))
         } else {
             None
         },
         defs_probe: if defs_probe_flag {
             Some(Mode::DefsProbe(
-                coilbox_unitsync_worker::DefsProbeArgs::from_args(&raw)?,
+                coilbox_unitsync_worker::DefsProbeArgs::from_args(raw)?,
             ))
         } else {
             None
         },
         custom_params: if custom_params_flag {
             Some(Mode::CustomParams(
-                coilbox_unitsync_worker::CustomParamsArgs::from_args(&raw)?,
+                coilbox_unitsync_worker::CustomParamsArgs::from_args(raw)?,
             ))
         } else {
             None
         },
         unit_model: if unit_model_flag {
             Some(Mode::UnitModel(
-                coilbox_unitsync_worker::UnitModelArgs::from_args(&raw)?,
+                coilbox_unitsync_worker::UnitModelArgs::from_args(raw)?,
             ))
         } else {
             None
         },
         unit_script: if unit_script_flag {
             Some(Mode::UnitScript(
-                coilbox_unitsync_worker::UnitScriptArgs::from_args(&raw)?,
+                coilbox_unitsync_worker::UnitScriptArgs::from_args(raw)?,
             ))
         } else {
             None
         },
         unit_models: if unit_models_flag {
             Some(Mode::UnitModels(
-                coilbox_unitsync_worker::UnitModelsArgs::from_args(&raw)?,
+                coilbox_unitsync_worker::UnitModelsArgs::from_args(raw)?,
             ))
         } else {
             None
         },
         convert_3do: if convert_3do_flag {
             Some(Mode::Convert3do(
-                coilbox_unitsync_worker::Convert3doArgs::from_args(&raw)?,
+                coilbox_unitsync_worker::Convert3doArgs::from_args(raw)?,
             ))
         } else {
             None
         },
         unit_render: if unit_render_flag {
             Some(Mode::UnitRender(
-                coilbox_unitsync_worker::UnitRenderArgs::from_args(&raw)?,
+                coilbox_unitsync_worker::UnitRenderArgs::from_args(raw)?,
             ))
         } else {
             None
         },
         unit_render_keys: if unit_render_keys_flag {
             Some(Mode::UnitRenderKeys(
-                coilbox_unitsync_worker::UnitRenderKeysArgs::from_args(&raw)?,
+                coilbox_unitsync_worker::UnitRenderKeysArgs::from_args(raw)?,
             ))
         } else {
             None
         },
         faction_logos: if faction_logos_flag {
             Some(Mode::FactionLogos(
-                coilbox_unitsync_worker::FactionLogosArgs::from_args(&raw)?,
+                coilbox_unitsync_worker::FactionLogosArgs::from_args(raw)?,
             ))
         } else {
             None
         },
         lua: if lua_flag {
-            Some(Mode::Lua(coilbox_unitsync_worker::LuaArgs::from_args(
-                &raw,
-            )?))
+            Some(Mode::Lua(coilbox_unitsync_worker::LuaArgs::from_args(raw)?))
         } else {
             None
         },
         minimap: if map.is_some() {
             Some(Mode::Minimap(
-                coilbox_unitsync_worker::MinimapArgs::from_args(&raw)?,
+                coilbox_unitsync_worker::MinimapArgs::from_args(raw)?,
             ))
         } else {
             None
@@ -1472,8 +1533,16 @@ fn absolutize(args: &mut Args) {
             }
         }
     }
-    // `Mode::MapSkybox` has no path field of its own: `--map` is a unitsync
-    // name, not a path, so there is nothing here for it to do.
+    // `Mode::MapSkybox` holds its own copy of `--cache-dir`, read separately
+    // from `raw` in `parse_args`, so it needs the same treatment. `--map` is a
+    // unitsync name, not a path, so it is left alone.
+    if let Some(Mode::MapSkybox(mode)) = args.map_skybox.as_mut() {
+        if let Some(dir) = &mut mode.cache_dir {
+            if let Some(abs) = absolute_path(dir) {
+                *dir = abs;
+            }
+        }
+    }
     // `Mode::Heightmap` holds its own copy of `--cache-dir`/`--asset-dir`,
     // read separately from `raw` in `parse_args`, so it needs the same
     // treatment. `--map` is a unitsync name, not a path, so it is left
@@ -1615,14 +1684,17 @@ fn absolutize(args: &mut Args) {
             }
         }
     }
-    // `Mode::Archive` holds its own copy of `--extract`'s destination path,
-    // read separately from `raw` in `parse_args`, so it needs the same
-    // treatment. `--archive` and `--file` name an archive and a member
+    // `Mode::Archive` holds its own copy of `--extract`'s destination path and
+    // `--cache-dir`, read separately from `raw` in `parse_args`, so it needs the
+    // same treatment. `--archive` and `--file` name an archive and a member
     // inside it, not paths on this machine, so they are left alone.
     if let Some(Mode::Archive(mode)) = args.archive.as_mut() {
-        if let Some(dest) = &mut mode.extract {
-            if let Some(abs) = absolute_path(dest) {
-                *dest = abs;
+        for path in [mode.extract.as_mut(), mode.cache_dir.as_mut()]
+            .into_iter()
+            .flatten()
+        {
+            if let Some(abs) = absolute_path(path) {
+                *path = abs;
             }
         }
     }
@@ -1661,8 +1733,19 @@ fn absolutize(args: &mut Args) {
     }
 }
 
-/// `path` joined onto the current directory when it is relative, and `None`
-/// when it is already absolute or the current directory cannot be read.
+/// The directory the worker was started in, read once and kept.
+///
+/// `run` reads it before anything changes directory. A worker that stays
+/// running has long since moved into the engine's directory by the time a
+/// request names a path, and unitsync's `Init` moves it again.
+fn launch_dir() -> Option<std::path::PathBuf> {
+    static DIR: std::sync::OnceLock<Option<std::path::PathBuf>> = std::sync::OnceLock::new();
+    DIR.get_or_init(|| std::env::current_dir().ok()).clone()
+}
+
+/// `path` joined onto the directory the worker was started in when it is
+/// relative, and `None` when it is already absolute or that directory could not
+/// be read.
 ///
 /// Deliberately not `canonicalize`: an output directory that does not exist yet
 /// is the normal case for `--asset-dir`, and canonicalizing it would fail.
@@ -1670,7 +1753,7 @@ fn absolute_path(path: &str) -> Option<String> {
     if Path::new(path).is_absolute() {
         return None;
     }
-    let cwd = std::env::current_dir().ok()?;
+    let cwd = launch_dir()?;
     Some(cwd.join(path).to_string_lossy().into_owned())
 }
 

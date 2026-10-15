@@ -624,22 +624,58 @@ async fn content_candidates<R: Runtime>(
     CliResult::ok(json!({ "candidates": out }))
 }
 
+/// Logs one `[content-state-load] n=<count> ms=<wall time> t_end=<Unix ms>` line
+/// to stderr when dropped, so a call that returns early is counted too.
+#[cfg(debug_assertions)]
+struct DevStateLoadCall(std::time::Instant);
+
+#[cfg(debug_assertions)]
+fn dev_state_load_call() -> DevStateLoadCall {
+    DevStateLoadCall(std::time::Instant::now())
+}
+
+#[cfg(debug_assertions)]
+impl Drop for DevStateLoadCall {
+    fn drop(&mut self) {
+        static CALLS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let n = CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+        let t_end = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        eprintln!(
+            "[content-state-load] n={n} ms={} t_end={t_end}",
+            self.0.elapsed().as_millis()
+        );
+    }
+}
+
 /// `content_state_load` — the persisted snapshot (the cross-plugin read API),
 /// re-validated against disk so a folder/engine deleted between runs is reflected.
 #[tauri::command]
 async fn content_state_load<R: Runtime>(app: AppHandle<R>) -> CliResult {
+    // Dev builds only: count the calls and time each one (issue #3713).
+    #[cfg(debug_assertions)]
+    let _dev_call = dev_state_load_call();
     let path = match store_path(&app) {
         Ok(p) => p,
         Err(e) => return CliResult::err(e),
     };
-    let store = match load_store(&path) {
-        Ok(s) => s,
-        Err(e) => return CliResult::err(e),
-    };
-    let mut state = refresh_against_disk(store.snapshot.unwrap_or_default());
-    state.roots = ensure_portable_seed(state.roots);
-    publish_roots(&state);
-    CliResult::ok(json!({ "state": state }))
+    // Reading the store and scanning every root's engines is file work, so it
+    // runs off the async runtime.
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let store = load_store(&path)?;
+        let mut state = refresh_against_disk(store.snapshot.unwrap_or_default());
+        state.roots = ensure_portable_seed(state.roots);
+        publish_roots(&state);
+        Ok::<_, String>(state)
+    })
+    .await;
+    match result {
+        Ok(Ok(state)) => CliResult::ok(json!({ "state": state })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("state load task failed: {e}")),
+    }
 }
 
 /// `content_rescan` — recompute roots/engines from scratch and persist.
@@ -1085,6 +1121,15 @@ async fn content_import_container(src: String) -> CliResult {
 /// `contentbranding` root and calls this from outside the crate.
 pub use branding::branding_image_dir;
 
+/// The walk over a replay's demo stream and the events it returns (issue
+/// #1144). Exported because nothing inside the crate calls it yet: the build
+/// order, start position, chat and APM issues are its first callers.
+pub use demo::stream::read_stream;
+pub use model::{
+    ChatDest, CommandOrigin, DemoStream, Order, StreamEvent, StreamEventKind, StreamStop,
+    PREGAME_FRAME,
+};
+
 /// Build the plugin. Registered as `"coilbox-content"`; the frontend invokes
 /// `plugin:coilbox-content|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -1110,7 +1155,30 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             stats_watcher::content_stats_watch_start,
             stats_watcher::content_stats_watch_stop,
             demo::content_demo_chat,
+            demo::content_demo_build_orders,
+            demo::content_demo_order_points,
+            demo::content_replay_map_grids,
+            demo::unit_orders::content_replay_unit_orders,
+            demo::content_demo_command_rates,
             demo::content_rewrite_demo,
+            demo::analysis::queue::content_analysis_check,
+            demo::analysis::queue::content_analysis_enqueue,
+            demo::analysis::queue::content_analysis_queue,
+            demo::analysis::queue::content_analysis_cancel,
+            demo::analysis::queue::content_analysis_engine_output,
+            demo::analysis::queue::content_analysis_dismiss,
+            demo::analysis::store::content_replay_analyses,
+            demo::analysis::store::content_replay_analysis,
+            demo::analysis::store::content_replay_analysis_events,
+            demo::analysis::store::content_replay_analysis_delete,
+            demo::track_store::content_replay_tracks,
+            demo::playback::content_replay_playback_launch,
+            demo::track_budget::content_replay_tracks_clear,
+            demo::track_view::content_replay_track_header,
+            demo::track_view::content_replay_track_window,
+            demo::def_sets::content_unit_def_set,
+            demo::def_sets::content_unit_def_set_store,
+            demo::def_sets::content_unit_def_sets_usage,
             demo::content_delete_replay,
             demo::content_delete_replays,
             archives::content_delete_archive,
@@ -1159,14 +1227,19 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             if let Ok(sp) = store_path(app) {
                 std::thread::spawn(move || verify_unverified_engines(&sp));
             }
+            // Without its folders there is no queue, and the commands say so.
+            let _ = demo::analysis::queue::manage(app.app_handle());
             Ok(())
         })
         // Stop the replay watcher (#462) cleanly when the app is shutting
         // down, rather than leaving its background thread to be torn down by
         // process exit.
-        .on_event(|_app, event| {
+        .on_event(|app, event| {
             if let tauri::RunEvent::Exit = event {
                 stats_watcher::stop();
+                // A replay analysis is a headless engine at full speed, and
+                // nothing else would stop it once coilbox has gone.
+                demo::analysis::queue::shutdown(app);
             }
         })
         .build()

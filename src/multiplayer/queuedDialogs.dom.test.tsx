@@ -9,7 +9,8 @@
  * more than one to tell apart. With one connection they look exactly as
  * before.
  *
- * The mock setup is `reattachAll.dom.test.tsx`'s, with the three dialogs left
+ * The mock setup is `reattachAll.dom.test.tsx`'s (shared pieces in
+ * `lobbyStoreMocks.testhelper.ts`), with the three dialogs left
  * real (rather than stubbed to `null`) since their content is the subject
  * here, and a MemoryRouter added because `DebriefingDrawer` calls
  * `useNavigate`.
@@ -25,10 +26,6 @@ import {
 } from "../lib/storedSetting";
 import { BUILTIN_SERVERS } from "../lobby-servers/config";
 import type { LobbyEvent, LobbyState } from "./bindings";
-
-interface FakeChannel {
-  onmessage?: (ev: LobbyEvent) => void;
-}
 
 const wire = vi.hoisted(() => ({
   channels: new Map<string, FakeChannel>(),
@@ -46,11 +43,9 @@ const settings = vi.hoisted(() => ({
   autoConnect: false,
 }));
 
-vi.mock("@tauri-apps/api/core", () => ({
-  Channel: class {
-    onmessage?: (ev: LobbyEvent) => void;
-  },
-}));
+vi.mock("@tauri-apps/api/core", async () =>
+  (await import("./lobbyStoreMocks.testhelper")).tauriCoreStub(),
+);
 
 vi.mock("@picoframe/frame", async () => {
   const react = await import("react");
@@ -103,42 +98,28 @@ function emptyState(username: string): LobbyState {
   } as unknown as LobbyState;
 }
 
-vi.mock("./bindings", () => ({
+vi.mock("./bindings", async () => ({
+  ...(await import("./lobbyStoreMocks.testhelper")).inertBindings(),
   mpConnect: async (args: { serverKey: string; onEvent: FakeChannel }) => {
     wire.channels.set(args.serverKey, args.onEvent);
     return { connected: true };
   },
-  mpConnectTachyon: async () => ({ connected: true }),
-  mpConnectZerok: async () => ({ connected: true }),
   mpSnapshot: async ({ serverKey }: { serverKey: string }) => ({
     state: wire.states.get(serverKey) ?? emptyState(serverKey.split("@")[0]),
   }),
   mpDisconnect: async () => ({ disconnected: true }),
-  mpWaitUntilReady: async () => ({ ready: true }),
   mpActiveKeys: async () => ({ keys: wire.activeKeys }),
   mpReattach: async (args: { serverKey: string; onEvent: FakeChannel }) => {
     wire.channels.set(args.serverKey, args.onEvent);
     return { reattached: true };
   },
-  mpCancelConnect: async () => ({ cancelled: true }),
-  mpConfirmAgreement: async () => ({}),
-  mpFriendList: async () => ({}),
-  mpFriendRequestList: async () => ({}),
-  mpIgnore: async () => ({}),
-  mpIgnoreList: async () => ({}),
-  mpJoinBattle: async () => ({}),
-  mpJoinChannel: async () => ({}),
-  mpRegister: async () => ({}),
-  mpRegisterZerok: async () => ({}),
-  mpSetStatus: async () => ({}),
-  mpTachyonSignedIn: async () => ({ signedIn: true }),
-  mpTachyonSignIn: async () => ({}),
 }));
 
-vi.mock("../lobby-servers/bindings", () => ({
-  lsGetCredential: async () => ({ secret: "hunter2" }),
-}));
+vi.mock("../lobby-servers/bindings", async () =>
+  (await import("./lobbyStoreMocks.testhelper")).lobbyServerBindings(),
+);
 
+import type { FakeChannel } from "./lobbyStoreMocks.testhelper";
 import { MultiplayerProvider, serverNameFor } from "./store";
 
 const KEY_A = "AF@server4.beyondallreason.info:8201"; // bar-ssl

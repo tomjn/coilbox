@@ -1,10 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  dlRecoilEngines,
-  dlSpringfilesEngines,
-  type EngineRelease,
-  type SpringfilesEngine,
-} from "../downloads/bindings";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { EngineRelease, SpringfilesEngine } from "../downloads/bindings";
 import { useWriteRoot } from "../downloads/config";
 import {
   identityOf,
@@ -13,7 +8,13 @@ import {
   useDownloadComplete,
   useDownloadQueue,
 } from "../downloads/DownloadQueueProvider";
-import { useContentTargets, useUnitsyncScan } from "./config";
+import {
+  engineTick,
+  heldRecoilEngines,
+  heldSpringfilesEngines,
+  loadEngineCatalog,
+} from "../downloads/engineLists";
+import { rescanMounted, useContentTargets, useUnitsyncScan } from "./config";
 import {
   type ContentRequirement,
   type EngineReading,
@@ -66,8 +67,8 @@ export interface ResolveContentState {
  * Resolve a set of content requirements against the given engine/data-root
  * target (typically `usePreferredTarget()`'s target), offering downloads for
  * anything missing via the app-wide queue. Re-scans after every queue
- * completion so a just-downloaded item clears from `missing` without a manual
- * refresh.
+ * completion that added content, so a just-downloaded item clears from
+ * `missing` without a manual refresh.
  *
  * `targetLoading` is the caller's own target read still being in flight. Pass
  * it, or a caller that reaches here before its engine is known reads as a
@@ -88,6 +89,8 @@ export function useResolveContent(
   const contentTargets = useContentTargets();
   const writeRoot = useWriteRoot();
   const writePath = writeRoot.path;
+  const gamesPath = useWriteRoot("games").path;
+  const mapsPath = useWriteRoot("maps").path;
   const {
     enqueue,
     statusFor: queueStatusFor,
@@ -99,28 +102,47 @@ export function useResolveContent(
   const [engineCatalog, setEngineCatalog] = useState<{
     recoil: EngineRelease[];
     springfiles: SpringfilesEngine[];
-  } | null>(null);
+  } | null>(() => {
+    const recoil = heldRecoilEngines();
+    const springfiles = heldSpringfilesEngines();
+    return recoil && springfiles
+      ? { recoil: recoil.releases, springfiles: springfiles.engines }
+      : null;
+  });
+  // Taken once, when this hook first renders. A list that loaded after it is
+  // trusted, so re-rendering with a version no list has does not fetch again.
+  const askedAt = useRef<number | null>(null);
+  askedAt.current ??= engineTick();
+  const engineKeys = requirements
+    .filter((r) => r.kind === "engine")
+    .map((r) => r.downloadKey ?? r.label)
+    .join("\n");
   useEffect(() => {
-    if (!hasEngineReq || engineCatalog) return;
+    if (!hasEngineReq) return;
     let cancelled = false;
-    Promise.all([
-      dlRecoilEngines(undefined).catch(() => ({
-        releases: [] as EngineRelease[],
-      })),
-      dlSpringfilesEngines(undefined).catch(() => ({
-        engines: [] as SpringfilesEngine[],
-      })),
-    ]).then(([r, s]) => {
-      if (!cancelled)
-        setEngineCatalog({ recoil: r.releases, springfiles: s.engines });
-    });
+    loadEngineCatalog(engineKeys.split("\n"), askedAt.current ?? 0).then(
+      (next) => {
+        if (cancelled) return;
+        // Keep the same object when nothing changed, so no render is wasted.
+        setEngineCatalog((prev) =>
+          prev &&
+          prev.recoil === next.recoil &&
+          prev.springfiles === next.springfiles
+            ? prev
+            : next,
+        );
+      },
+    );
     return () => {
       cancelled = true;
     };
-  }, [hasEngineReq, engineCatalog]);
+  }, [hasEngineReq, engineKeys]);
 
+  // The queue forgot the scans when the download finished. Every mounted
+  // consumer asks here, and they share the one rescan a target gets. The scan
+  // hook takes its answer without being asked to run.
   useDownloadComplete(() => {
-    scan.run(true);
+    rescanMounted();
     contentTargets.refresh();
   });
 
@@ -154,28 +176,29 @@ export function useResolveContent(
 
   const enqueueInputFor = useCallback(
     (req: ContentRequirement) => {
-      if (!writePath) return null;
       const key = req.downloadKey ?? req.label;
       if (req.kind === "game") {
+        if (!gamesPath) return null;
         // Resolve across every source in policy order (GitHub and mirrors first,
         // pr-downloader last, per issue 500) so a GitHub-only game such as
         // SplinterFaction installs instead of failing on rapid.
         return {
           kind: "game" as const,
           label: `Game: ${req.label}`,
-          args: { gameName: key, writePath },
+          args: { gameName: key, writePath: gamesPath },
         };
       }
       if (req.kind === "map") {
+        if (!mapsPath) return null;
         // Resolve across every source in policy order (known mirrors first,
         // pr-downloader last, per issue 511), matching the game requirement above.
         return {
           kind: "mapAnySource" as const,
           label: `Map: ${req.label}`,
-          args: { mapName: key, writePath },
+          args: { mapName: key, writePath: mapsPath },
         };
       }
-      if (!engineCatalog) return null;
+      if (!writePath || !engineCatalog) return null;
       const recoil = engineCatalog.recoil.find((r) => r.version === key);
       if (recoil) {
         return {
@@ -198,7 +221,7 @@ export function useResolveContent(
       }
       return null;
     },
-    [writePath, engineCatalog],
+    [writePath, gamesPath, mapsPath, engineCatalog],
   );
 
   const download = useCallback(

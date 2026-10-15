@@ -38,9 +38,20 @@
       "legoparts": "legoparts",
       "../catalog.json": "catalog.json",
       "../lua/mission-runtime": "mission-runtime",
-      "../lua/blueprint-widget": "blueprint-widget"
+      "../lua/blueprint-widget": "blueprint-widget",
+      "../lua/GAME-NOTICE.md": "coilbox-licence/NOTICE.md",
+      "../LICENSE": "coilbox-licence/LICENSE-MIT",
+      "../lua/COPYING": "coilbox-licence/COPYING"
     },
     "active": true,
+    "fileAssociations": [
+      {
+        "ext": ["sdz", "sd7"],
+        "name": "Spring archive",
+        "description": "Spring game or map archive",
+        "role": "Viewer"
+      }
+    ],
     "createUpdaterArtifacts": true,
     "targets": ["appimage", "app", "dmg", "nsis"],
     "icon": [
@@ -50,6 +61,11 @@
       "icons/icon.icns",
       "icons/icon-windows.ico"
     ],
+    "linux": {
+      "appimage": {
+        "bundleMediaFramework": true
+      }
+    },
     "macOS": {
       "signingIdentity": "-",
       "entitlements": "entitlements.plist",

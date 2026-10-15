@@ -20,9 +20,9 @@ import { usePlay } from "@/play/PlayProvider";
 import { SaveAsPresetButton } from "@/play/pages/components/SaveAsPresetButton";
 import { tagAndIngestFreshReplay } from "../../../play/tagReplayProvenance";
 import type { DemoInfo } from "../../bindings";
-import { contentListReplays } from "../../bindings";
 import { demoInfoToSkirmishDraft } from "../../demoToSkirmish";
 import { useRefightSetup } from "../../refight";
+import { loadReplays } from "../../replayList";
 import { useReplayUserState } from "../../replayUserState";
 import { ScanFailed } from "./states";
 
@@ -92,6 +92,7 @@ function RefightForm({
     sides,
     options,
     optionsLoading,
+    mapOptions,
     ais,
   } = useRefightSetup(info);
   const { running, launch } = usePlay();
@@ -114,7 +115,14 @@ function RefightForm({
   }, [aiKey, ais]);
 
   const getDraft = (): SkirmishDraft | null =>
-    demoInfoToSkirmishDraft({ info, ais, sides, options, ai: chosenAi });
+    demoInfoToSkirmishDraft({
+      info,
+      ais,
+      sides,
+      options,
+      mapOptions,
+      ai: chosenAi,
+    });
 
   if (scanLoading) {
     return (
@@ -178,7 +186,7 @@ function RefightForm({
     setError(null);
     let beforePaths: Set<string> | null = null;
     try {
-      const { replays } = await contentListReplays({ root: target.dataDir });
+      const replays = await loadReplays(target.dataDir, true);
       beforePaths = new Set(replays.map((r) => r.path));
     } catch {
       beforePaths = null;
@@ -191,6 +199,7 @@ function RefightForm({
         gameType: draft.gameName,
         startPosType: draft.startPosType,
         modOptions: draft.modOptionValues,
+        mapOptions: draft.mapOptionValues,
         // The replay's own options win. This only supplies the target game's
         // defaults for anything the replay did not record.
         optionSchema: await gameOptionSchema(

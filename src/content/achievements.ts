@@ -1,3 +1,4 @@
+import type { AiWinFact } from "./aiRecord";
 import type { PlayerGameFact } from "./stats";
 
 /**
@@ -17,8 +18,9 @@ import type { PlayerGameFact } from "./stats";
  * is no writable achievements store - the stats table is the single source.
  *
  * Note: AI opponents are recorded in `record.ais` (#1148), but `playerGameFacts`
- * carries human seats only, so no achievement here counts wins against AIs. The
- * record against AI lives in `aiRecord.ts`.
+ * carries human seats only. Wins against AIs arrive as a second list, built by
+ * `aiWinFacts` in `aiRecord.ts` with the same rules as the record against AI,
+ * and only the AI achievements read it.
  */
 
 /** Grouping for the achievements UI. */
@@ -45,7 +47,7 @@ export interface Achievement {
   category: AchievementCategory;
   target: number;
   /** Compute progress over the player's chronological genuine-match games. */
-  measure: (games: PlayerGameFact[]) => Measurement;
+  measure: (games: PlayerGameFact[], aiWins: AiWinFact[]) => Measurement;
 }
 
 /** The evaluated state of one achievement for one player. */
@@ -102,6 +104,27 @@ function distinctMeasure(
       if (seen.has(key)) continue;
       seen.add(key);
       if (seen.size === target) earnedAtMs = g.startTimeMs;
+    }
+    return { current: seen.size, earnedAtMs };
+  };
+}
+
+/**
+ * Count of distinct AIs beaten. Earned when the target-th distinct AI is first
+ * beaten, dated by that game.
+ */
+function distinctAiMeasure(
+  target: number,
+): (games: PlayerGameFact[], aiWins: AiWinFact[]) => Measurement {
+  return (_games, aiWins) => {
+    const seen = new Set<string>();
+    let earnedAtMs: number | undefined;
+    for (const win of aiWins) {
+      for (const ai of win.ais) {
+        if (!ai || seen.has(ai)) continue;
+        seen.add(ai);
+        if (seen.size === target) earnedAtMs = win.startTimeMs;
+      }
     }
     return { current: seen.size, earnedAtMs };
   };
@@ -269,6 +292,22 @@ export const ACHIEVEMENTS: Achievement[] = [
     measure: distinctMeasure((g) => g.side, 3),
   },
   {
+    id: "ais-3",
+    name: "Bot basher",
+    description: "Beat 3 different AIs.",
+    category: "Variety",
+    target: 3,
+    measure: distinctAiMeasure(3),
+  },
+  {
+    id: "ais-5",
+    name: "Machine breaker",
+    description: "Beat 5 different AIs.",
+    category: "Variety",
+    target: 5,
+    measure: distinctAiMeasure(5),
+  },
+  {
     id: "week-10",
     name: "Busy week",
     description: "Play 10 games within 7 days.",
@@ -285,9 +324,10 @@ export const ACHIEVEMENTS: Achievement[] = [
  */
 export function evaluateAchievements(
   games: PlayerGameFact[],
+  aiWins: AiWinFact[] = [],
 ): AchievementResult[] {
   return ACHIEVEMENTS.map((a) => {
-    const { current, earnedAtMs } = a.measure(games);
+    const { current, earnedAtMs } = a.measure(games, aiWins);
     const earned = current >= a.target;
     return {
       id: a.id,

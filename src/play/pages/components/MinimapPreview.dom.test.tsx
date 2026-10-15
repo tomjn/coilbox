@@ -53,4 +53,43 @@ describe("MinimapPreview", () => {
     const marker = screen.getByTitle("Start position 1 (unclaimed)");
     expect(marker.style.background).toBe("");
   });
+
+  it("shows a spinner rather than a pulsing block while loading", () => {
+    const { container } = render(
+      <MinimapPreview loading startPositions={[]} alt="Test map" />,
+    );
+
+    const status = screen.getByRole("status", { name: "Loading minimap" });
+    expect(status.querySelector("svg")?.getAttribute("class")).toContain(
+      "animate-spin",
+    );
+    expect(container.innerHTML).not.toContain("animate-pulse");
+  });
+
+  it("shows the thumbnail instead of the spinner while the full minimap loads", () => {
+    render(
+      <MinimapPreview
+        loading
+        thumbUrl="thumb.png"
+        startPositions={[]}
+        alt="Test map"
+      />,
+    );
+
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.getByRole("img").getAttribute("src")).toBe("thumb.png");
+  });
+
+  it("prefers the full minimap once it arrives", () => {
+    render(
+      <MinimapPreview
+        url="full.png"
+        thumbUrl="thumb.png"
+        startPositions={[]}
+        alt="Test map"
+      />,
+    );
+
+    expect(screen.getByRole("img").getAttribute("src")).toBe("full.png");
+  });
 });

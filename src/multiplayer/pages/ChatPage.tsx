@@ -46,9 +46,11 @@ import { canChannelModerate, chanServInfo } from "../moderation";
 import { useMpRevealed } from "../navPredicates";
 import { useNoteActions } from "../notes";
 import { protocolForKey } from "../protocol";
+import { isUberserver } from "../serverAdmin";
 import { useStatsRelations } from "../statsRelation";
 import { relationSummary } from "../statsRelationSummary";
 import { useConnection, useMultiplayer, useProtocolServers } from "../store";
+import { useNameMark } from "../useNameMark";
 
 /**
  * Wrap an icon-only header button with a hover/focus tooltip so its purpose is
@@ -99,10 +101,11 @@ function ChatPage() {
   const connection = useConnection(activeServerKey);
   const state = connection?.mirror.state ?? null;
   const me = state?.myUsername ?? null;
+  const markFor = useNameMark(activeServerKey);
 
   // Named channels, and with them every ChanServ and moderator command below, exist
   // only on TASServer. On Tachyon the chat surface is direct messages plus battle
-  // chat, and the sidebar says so. See `docs/tachyon-protocol.md`. Read off the open
+  // chat, and the sidebar says so. See `docs/internal/tachyon-protocol.md`. Read off the open
   // conversation's own connection, not the app's globally focused one, so a channel
   // on one server never picks up another connection's protocol.
   const activeProtocol = protocolForKey(activeServerKey, servers);
@@ -152,7 +155,14 @@ function ChatPage() {
   // run moderator verbs and ChanServ channel-ops anywhere). For a plain user, the
   // channel-op controls appear only when we're that channel's founder/operator,
   // learned from ChanServ `:info` (auto-queried on open below).
+  // The access bit does not tell `mod` from `admin`, and this menu does not
+  // read `ConnectionState.adminLevel`, so admin-only verbs such as `BROADCAST`
+  // and `SETACCESS` are left to the Server admin page.
   const iAmServerMod = !!(me && state?.users[me]?.status.access);
+  // The Server admin page opens on uberserver only, so the look-up link
+  // follows the same check as the page and its sidebar entry (issue #4106).
+  // The other moderator actions are plain lobby commands.
+  const lookUpInAdmin = isUberserver(activeProtocol, state);
   const activeChannel =
     desc?.kind === "channel" ? state?.channels[desc.name] : undefined;
   const iAmChannelOp = canChannelModerate(activeChannel, me, iAmServerMod);
@@ -193,11 +203,15 @@ function ChatPage() {
           send={(line) => {
             void mpSend({ serverKey: activeServerKey, line }).catch(() => {});
           }}
-          onLookUp={() => {
-            navigate(
-              `/admin?server=${encodeURIComponent(activeServerKey)}&player=${encodeURIComponent(username)}`,
-            );
-          }}
+          onLookUp={
+            lookUpInAdmin
+              ? () => {
+                  navigate(
+                    `/admin?server=${encodeURIComponent(activeServerKey)}&player=${encodeURIComponent(username)}`,
+                  );
+                }
+              : undefined
+          }
           note={{
             text: getNote(user.userId, username),
             onSave: (text) => setNote(user.userId, username, text),
@@ -213,6 +227,7 @@ function ChatPage() {
       hasChannels,
       iAmChannelOp,
       iAmServerMod,
+      lookUpInAdmin,
       navigate,
       me,
       activeChannel,
@@ -397,6 +412,7 @@ function ChatPage() {
           messages={conv.messages}
           currentUser={me}
           senderColor={senderColor}
+          markFor={markFor}
           isBot={isBot}
           isHighlighted={isHighlighted}
           completions={completions}
@@ -542,6 +558,7 @@ function ChatPage() {
           }}
           colorFor={senderColor}
           presenceFor={presenceFor}
+          markFor={markFor}
           isIgnored={ignoredNow}
           noteFor={(u) => getNote(u.userId, u.name)}
           renderActions={renderMemberActions}

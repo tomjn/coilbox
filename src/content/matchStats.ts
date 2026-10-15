@@ -1,5 +1,11 @@
+import { CHART_PALETTE, pairsStayApart } from "@/lib/chartPalette";
 import { formatDuration } from "@/lib/format";
-import { isBlackHex } from "@/lib/teamColor";
+import {
+  isBlackHex,
+  NON_TEXT_CONTRAST,
+  readableTeamTextColor,
+  readsOnAnyCard,
+} from "@/lib/teamColor";
 import { PALETTE, rgbToHex } from "@/play/participants";
 import type {
   DemoInfo,
@@ -217,7 +223,7 @@ function seriesColor(rgb: [number, number, number] | undefined, team: number) {
 }
 
 /** Every seat that played, by the team it held: people first, then the bots. */
-function seatsByTeam(info: DemoInfo) {
+export function seatsByTeam(info: DemoInfo) {
   const seats = new Map<
     number,
     { name: string; rgbColor?: [number, number, number] }[]
@@ -415,6 +421,211 @@ export function allySeries(
     samples: mergeSamples(members.map((m) => m.samples)),
   }));
   return [...merged, ...loose];
+}
+
+/**
+ * Whose colours a chart line wears: coilbox's own palette, or what the game
+ * assigned in its start script (#1142).
+ */
+export type ChartColorMode = "palette" | "game";
+
+/**
+ * Whether the start script's colours say anything. A lobby can write one
+ * placeholder colour for every seat and broadcast the real assignment in game,
+ * and charting sixteen identical lines is worse than not using them, so colours
+ * that are all the same count as absent. Fewer than two seats can't disagree.
+ */
+function gameColoursPresent(info: DemoInfo): boolean {
+  const seen = new Set<string>();
+  let seats = 0;
+  for (const held of seatsByTeam(info).values())
+    for (const seat of held) {
+      seats++;
+      seen.add(seat.rgbColor ? rgbToHex(seat.rgbColor) : "");
+    }
+  return seats < 2 || seen.size > 1;
+}
+
+/**
+ * The mode a chart opens in when nobody has chosen one (#3830): the game's own
+ * colours when they already read well, the palette when they do not.
+ *
+ * "Read well" is the palette's own bar. Every colour reaches
+ * {@link NON_TEXT_CONTRAST} on the brightest card any preset gives under this
+ * theme, the surface the lightness correction uses, and every pair is far enough
+ * apart under normal, protan and deutan vision. The colours are tested as the
+ * game gave them, before any lightness correction, so the game's colours are only
+ * chosen when they need no help. Colours that are all one value count as absent,
+ * as in {@link colorSeries}.
+ *
+ * Both views are tested, each on its own lines, so the pick is one answer for the
+ * match and the colours do not change scheme when the view does. Pass the
+ * unpainted lines of {@link teamSeries} and {@link allySeries}.
+ */
+export function autoColorMode(
+  players: ChartSeries[],
+  sides: ChartSeries[],
+  info: DemoInfo,
+  theme: "dark" | "light",
+): ChartColorMode {
+  if (!gameColoursPresent(info)) return "palette";
+  const reads = (lines: ChartSeries[]) =>
+    lines.every((s) => readsOnAnyCard(s.color, theme)) &&
+    pairsStayApart(lines.map((s) => s.color));
+  return reads(players) && reads(sides) ? "game" : "palette";
+}
+
+/**
+ * The engine teams a chart line stands for: one for a player's line, every
+ * member for a side's. Emphasis is kept in these numbers rather than in line
+ * ids, so a line, a roster seat and a map dot all name the same thing whichever
+ * view the chart is on.
+ */
+export function seriesTeams(
+  series: Pick<ChartSeries, "id">,
+  info: DemoInfo,
+): number[] {
+  const found = SERIES_ID.exec(series.id);
+  if (!found) return [];
+  const num = Number(found[2]);
+  if (found[1] === "team") return [num];
+  return [...allyByTeam(info)]
+    .filter(([, ally]) => ally === num)
+    .map(([team]) => team)
+    .sort((a, b) => a - b);
+}
+
+/** The teams of a line that the chart measured, split by whether they are hidden. */
+function lineTeams(
+  series: Pick<ChartSeries, "id">,
+  info: DemoInfo,
+  charted: readonly number[],
+  hidden: readonly number[],
+) {
+  const teams = seriesTeams(series, info).filter((t) => charted.includes(t));
+  return {
+    shown: teams.filter((t) => !hidden.includes(t)).length,
+    hidden: teams.filter((t) => hidden.includes(t)).length,
+  };
+}
+
+/**
+ * The lines left once the roster's unchecked teams are removed. Call it on lines
+ * that are already painted, so a colour never depends on what is showing.
+ *
+ * A player's line has one team and goes when that team is unchecked. A side's
+ * line stays while any measured member is checked, and it is still the sum of
+ * every member, checked or not: a side total that left some players out would
+ * read as the side's score, so the Teams view narrows by whole sides only
+ * ({@link partlyHidden} names the ones a note is owed for).
+ */
+export function shownSeries(
+  series: ChartSeries[],
+  info: DemoInfo,
+  charted: readonly number[],
+  hidden: readonly number[],
+): ChartSeries[] {
+  if (hidden.length === 0) return series;
+  return series.filter((s) => {
+    const t = lineTeams(s, info, charted, hidden);
+    return t.shown > 0 || t.hidden === 0;
+  });
+}
+
+/** Lines still drawn that have a member unchecked, so their total counts someone not shown. */
+export function partlyHidden(
+  series: ChartSeries[],
+  info: DemoInfo,
+  charted: readonly number[],
+  hidden: readonly number[],
+): ChartSeries[] {
+  return series.filter((s) => {
+    const t = lineTeams(s, info, charted, hidden);
+    return t.shown > 0 && t.hidden > 0;
+  });
+}
+
+/**
+ * The team a named player held, for finding "me" in a replay. Matches the way
+ * the dossier does (`gamesFor` in `stats.ts`): a seated player with that name,
+ * never a spectator or a bot.
+ */
+export function playerTeam(info: DemoInfo, name: string): number | undefined {
+  return info.players.find((p) => !p.spectator && p.name === name)?.team;
+}
+
+const SERIES_ID = /^(team|ally)(\d+)$/;
+
+/**
+ * The one place a chart line gets its colour. Everything that draws a series
+ * (plot, legend, tooltip, table, tiles) reads `color` off what this returns,
+ * so a later feature that emphasises a series layers on this rather than
+ * choosing colours of its own.
+ *
+ * In `palette` mode each team owns a slot of {@link CHART_PALETTE}, numbered
+ * across every team the engine measured and not across the lines on screen. A
+ * team keeps its slot when the view changes or a line is switched off, so
+ * nobody else is repainted. A side takes the slot of its first member.
+ *
+ * Past the palette's size there are not enough colours for teams, so every team
+ * takes its ally side's slot and the sides are numbered instead. A match with
+ * more sides than slots has to reuse a slot, and the tooltip and the roster
+ * carry identity there.
+ *
+ * In `game` mode a line keeps the game's colour (as {@link teamSeries} and
+ * {@link allySeries} resolved it), unless the script's colours are all one
+ * value, when the palette stands in. Either way the colour is corrected in
+ * lightness only, until it reaches {@link NON_TEXT_CONTRAST} on the card.
+ */
+export function colorSeries(
+  series: ChartSeries[],
+  trailer: DemoTrailer,
+  info: DemoInfo,
+  mode: ChartColorMode,
+  theme: "dark" | "light",
+): ChartSeries[] {
+  const side = allyByTeam(info);
+  const teams = trailer.teams
+    .filter((t) => t.samples.length > 0)
+    .map((t) => t.team)
+    .sort((a, b) => a - b);
+  // Known sides in order, then each team no seat is recorded for, as allySeries.
+  const sideKey = (t: number) => (side.has(t) ? `a${side.get(t)}` : `t${t}`);
+  const allies = [...new Set(teams.flatMap((t) => side.get(t) ?? []))].sort(
+    (a, b) => a - b,
+  );
+  const sides = [
+    ...allies.map((a) => `a${a}`),
+    ...teams.filter((t) => !side.has(t)).map((t) => `t${t}`),
+  ];
+  const n = CHART_PALETTE.length;
+  const overflow = teams.length > n;
+
+  const slotOf = (id: string): number => {
+    const found = SERIES_ID.exec(id);
+    if (!found) return 0;
+    const num = Number(found[2]);
+    const first =
+      found[1] === "team"
+        ? num
+        : (teams.find((t) => side.get(t) === num) ?? num);
+    const key = found[1] === "team" ? sideKey(num) : `a${num}`;
+    return overflow
+      ? Math.max(sides.indexOf(key), 0) % n
+      : Math.max(teams.indexOf(first), 0);
+  };
+
+  const useGame = mode === "game" && gameColoursPresent(info);
+  return series.map((s) => {
+    const base = useGame ? s.color : CHART_PALETTE[slotOf(s.id)];
+    return {
+      ...s,
+      color:
+        mode === "game"
+          ? readableTeamTextColor(base, theme, "anyCard", NON_TEXT_CONTRAST)
+          : base,
+    };
+  });
 }
 
 /** Whether the chart draws a line per seat or a line per side. */

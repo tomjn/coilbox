@@ -47,7 +47,10 @@ use crate::model::DemoInfo;
 /// (`teamTotals`), per-player `apm`, and `statsKnown` for whether there was
 /// anything to measure at all.
 /// 4: a record's AIs carry their team's bonus (`advantage`, `incomeMultiplier`).
-pub const STATS_SCHEMA_VERSION: u32 = 4;
+/// 5: a record's players and AIs carry their team id (`team`), and the team
+/// totals include units lost. Both are read off a record by the same key
+/// (`teamTotals[].team`), so neither means anything without the other.
+pub const STATS_SCHEMA_VERSION: u32 = 5;
 
 /// One player (or spectator) as recorded in a game, flattened from the demo's
 /// start-script. `side` is the faction; `won` is set only for a decided game where
@@ -56,6 +59,11 @@ pub const STATS_SCHEMA_VERSION: u32 = 4;
 #[serde(rename_all = "camelCase")]
 pub struct StatPlayer {
     pub name: String,
+    /// The `[teamN]` index this seat plays for, which is the key of its team's
+    /// entry in `teamTotals`. Absent on a record from before schema 5 and for a
+    /// seat the script gives no team. Team 0 is a real team, so absent is not 0.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub team: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ally_team: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -81,6 +89,10 @@ pub struct StatAi {
     pub short_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
+    /// The `[teamN]` index the bot plays for. Absent on a record from before
+    /// schema 5. See [`StatPlayer::team`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub team: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ally_team: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -222,6 +234,8 @@ fn record_from(
         .into_iter()
         .map(|p| StatPlayer {
             name: p.name,
+            // A spectator is on no team, whatever the script wrote beside it.
+            team: if p.spectator { None } else { p.team },
             ally_team: p.ally_team,
             side: p.side,
             spectator: p.spectator,
@@ -237,6 +251,7 @@ fn record_from(
             name: a.name,
             short_name: a.short_name,
             version: a.version,
+            team: a.team,
             ally_team: a.ally_team,
             side: a.side,
             advantage: a.advantage,
@@ -343,6 +358,25 @@ pub(crate) fn stats_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, Stri
         .join("stats.json"))
 }
 
+/// Load the store, ingest into it and save it. The file is only rewritten when
+/// the pass changed something, or the stored schema was behind and the pass
+/// stamped it current. A pass that skipped every file leaves the file alone, so
+/// opening a view that ingests does not rewrite the whole store each time.
+fn ingest_and_save(
+    path: &Path,
+    roots: &[PathBuf],
+    engine_dir: &Path,
+    dry_run: bool,
+) -> Result<(IngestSummary, StatsStore), String> {
+    let mut store = load(path)?;
+    let was_behind = store.schema_version < STATS_SCHEMA_VERSION;
+    let summary = ingest(roots, engine_dir, &mut store);
+    if !dry_run && (was_behind || summary.added > 0 || summary.updated > 0) {
+        save(path, &store)?;
+    }
+    Ok((summary, store))
+}
+
 /// `content_stats_ingest`, incrementally parse every replay under `roots` into the
 /// local stats database, decoding only files new or changed since the last pass
 /// (idempotent, keyed by filename). The winner comes from each replay's own
@@ -365,14 +399,9 @@ pub(crate) async fn content_stats_ingest<R: Runtime>(
     let dry_run = dry_run.unwrap_or(false);
     let res = tauri::async_runtime::spawn_blocking(move || {
         with_store_lock(|| {
-            let mut store = load(&sp)?;
             let root_paths: Vec<PathBuf> = roots.iter().map(PathBuf::from).collect();
             let engine_dir = PathBuf::from(&engine_path);
-            let summary = ingest(&root_paths, &engine_dir, &mut store);
-            if !dry_run {
-                save(&sp, &store)?;
-            }
-            Ok::<_, String>((summary, store))
+            ingest_and_save(&sp, &root_paths, &engine_dir, dry_run)
         })
     })
     .await;
@@ -423,14 +452,19 @@ mod tests {
             players,
             ais: Vec::new(),
             remixed: false,
+            stale_remix: false,
             source_gametype: None,
             origin_filename: None,
             mod_options: std::collections::HashMap::new(),
+            map_options: std::collections::HashMap::new(),
+            match_setup: None,
+            start_positions: Vec::new(),
         }
     }
 
     fn player(name: &str, ally: i32, won: Option<bool>) -> PlayerInfo {
         PlayerInfo {
+            player: 0,
             name: name.into(),
             team: Some(ally),
             ally_team: Some(ally),
@@ -439,6 +473,7 @@ mod tests {
             spectator: false,
             won,
             skill: None,
+            skill_uncertainty: None,
             country_code: None,
             stats: None,
             apm: Some(42.5),
@@ -515,7 +550,7 @@ mod tests {
             [0, 1]
         );
         assert_eq!(rec.team_totals[0].totals["damageDealt"], 90_000.0);
-        assert_eq!(rec.team_totals[0].totals.len(), 6);
+        assert_eq!(rec.team_totals[0].totals.len(), 7);
     }
 
     /// Five of the nine replays on this machine measured nothing. That is an
@@ -637,6 +672,75 @@ mod tests {
         assert!(!store.records[0].stats_known);
         assert!(store.records[0].team_totals.is_empty());
         assert_eq!(store.records[0].players[0].apm, None);
+    }
+
+    /// A record from schema 4 has no `team` on a player or an AI. It loads with
+    /// the team unknown, not 0, and serialises back without inventing one.
+    #[test]
+    fn a_record_written_before_team_ids_loads_with_the_team_unknown() {
+        let json = r#"{"schemaVersion":4,"records":[{"filename":"a.sdfz","path":"/demos/a.sdfz",
+            "mapName":"M","gameType":"G","engineVersion":"105","durationSec":1,"startTimeMs":2,
+            "sizeBytes":3,"modifiedMs":4,"winnersKnown":false,"winningAllyTeams":[],
+            "remixed":false,"players":[{"name":"Alice","allyTeam":0,"spectator":false}],
+            "ais":[{"name":"AI 1","shortName":"BARb","allyTeam":1}],
+            "statsKnown":true,"teamTotals":[{"team":0,"totals":{"unitsProduced":5.0}}],
+            "ingestedAt":5}]}"#;
+        let store: StatsStore = serde_json::from_str(json).unwrap();
+        let rec = &store.records[0];
+        assert_eq!(rec.players[0].team, None);
+        assert_eq!(rec.ais[0].team, None);
+        let back = serde_json::to_value(rec).unwrap();
+        assert!(back["players"][0].get("team").is_none());
+        assert!(back["ais"][0].get("team").is_none());
+    }
+
+    /// The team id is the `[teamN]` index, which is what `teamTotals` is keyed
+    /// by, and it is not the ally team. Here the human sits on team 0 and the bot
+    /// on team 1 of ally team 5, so mixing them up fails.
+    #[test]
+    fn record_from_carries_each_seats_team_id() {
+        let mut human = player("Alice", 0, Some(true));
+        human.team = Some(0);
+        let mut other = player("Bob", 5, Some(false));
+        other.team = Some(3);
+        let mut spectator = player("Watcher", 0, None);
+        spectator.spectator = true;
+        spectator.team = Some(0);
+        let mut no_team = player("Nobody", 0, None);
+        no_team.team = None;
+        let mut info = demo_info("Comet", true, vec![human, other, spectator, no_team]);
+        info.ais = vec![crate::model::AiInfo {
+            name: "AI 1".into(),
+            short_name: "BARb".into(),
+            version: None,
+            team: Some(1),
+            ally_team: Some(5),
+            host: Some(0),
+            side: None,
+            rgb_color: None,
+            advantage: None,
+            income_multiplier: None,
+            won: None,
+        }];
+        let rec = record_from(&entry("a.sdfz", 10, 20), info, None);
+        let team = |n: &str| rec.players.iter().find(|p| p.name == n).unwrap().team;
+        // Team 0 is a real team and is kept as 0.
+        assert_eq!(team("Alice"), Some(0));
+        assert_eq!(team("Bob"), Some(3));
+        assert_eq!(rec.players[1].ally_team, Some(5));
+        // A spectator is on no team, whatever the script wrote.
+        assert_eq!(team("Watcher"), None);
+        assert_eq!(team("Nobody"), None);
+        assert_eq!(rec.ais[0].team, Some(1));
+        assert_eq!(rec.ais[0].ally_team, Some(5));
+    }
+
+    /// The units lost total is stored because the registry flags it, with no
+    /// change to the code that stores totals.
+    #[test]
+    fn a_teams_stored_totals_include_units_lost() {
+        let totals = totals(3).unwrap();
+        assert!(totals.iter().all(|t| t.totals.contains_key("unitsDied")));
     }
 
     #[test]
@@ -896,6 +1000,43 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    /// The bump this change makes. 4 is the version every store on disk is at
+    /// before it, with no team ids and no units lost total. A record that
+    /// already matches its file must still be decoded again, and gains the
+    /// team ids.
+    #[test]
+    fn ingest_redecodes_a_schema_4_record_and_gains_team_ids() {
+        let dir = std::env::temp_dir().join("coilbox_stats_ingest_schema4");
+        let _ = std::fs::remove_dir_all(&dir);
+        let (size, mtime) = write_test_demo(&dir, "a.sdfz");
+
+        let mut old = record_from(
+            &entry("a.sdfz", size, mtime),
+            demo_info("Old", true, vec![player("Alice", 0, Some(true))]),
+            None,
+        );
+        old.players[0].team = None;
+        let mut store = StatsStore {
+            schema_version: 4,
+            records: vec![old],
+        };
+
+        let summary = ingest(
+            std::slice::from_ref(&dir),
+            Path::new("/no/such/engine"),
+            &mut store,
+        );
+
+        assert_eq!(summary.updated, 1);
+        assert_eq!(summary.skipped, 0);
+        // The script puts Alice on team 0 and the bot on team 1.
+        assert_eq!(store.records[0].players[0].team, Some(0));
+        assert_eq!(store.records[0].ais[0].team, Some(1));
+        assert_eq!(store.schema_version, STATS_SCHEMA_VERSION);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn ingest_skips_unchanged_record_already_at_current_schema() {
         let dir = std::env::temp_dir().join("coilbox_stats_ingest_current");
@@ -923,6 +1064,62 @@ mod tests {
         // Unchanged: still carries the pre-ingest (unreal) shape, since the fast
         // path never re-decoded it.
         assert_eq!(store.records[0].map_name, "Current");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn ingest_and_save_leaves_the_file_alone_when_nothing_changed() {
+        let dir = std::env::temp_dir().join("coilbox_stats_ingest_no_rewrite");
+        let _ = std::fs::remove_dir_all(&dir);
+        write_test_demo(&dir, "a.sdfz");
+        let store_path = dir.join("stats.json");
+        let engine = Path::new("/no/such/engine");
+
+        let (first, _) =
+            ingest_and_save(&store_path, std::slice::from_ref(&dir), engine, false).unwrap();
+        assert_eq!(first.added, 1);
+
+        // Move the file's modified time into the past, so a rewrite shows as a
+        // newer time without the test having to wait for the clock.
+        let past = SystemTime::now() - std::time::Duration::from_secs(3600);
+        let file = std::fs::File::options()
+            .write(true)
+            .open(&store_path)
+            .unwrap();
+        file.set_modified(past).unwrap();
+        drop(file);
+        let before = std::fs::metadata(&store_path).unwrap().modified().unwrap();
+        let bytes = std::fs::read(&store_path).unwrap();
+
+        let (second, store) =
+            ingest_and_save(&store_path, std::slice::from_ref(&dir), engine, false).unwrap();
+        assert_eq!(second.skipped, 1);
+        assert_eq!(second.added + second.updated, 0);
+        assert_eq!(store.records.len(), 1);
+        assert_eq!(
+            std::fs::metadata(&store_path).unwrap().modified().unwrap(),
+            before
+        );
+        assert_eq!(std::fs::read(&store_path).unwrap(), bytes);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn ingest_and_save_writes_when_a_replay_is_new() {
+        let dir = std::env::temp_dir().join("coilbox_stats_ingest_rewrite");
+        let _ = std::fs::remove_dir_all(&dir);
+        write_test_demo(&dir, "a.sdfz");
+        let store_path = dir.join("stats.json");
+        let engine = Path::new("/no/such/engine");
+        ingest_and_save(&store_path, std::slice::from_ref(&dir), engine, false).unwrap();
+
+        write_test_demo(&dir, "b.sdfz");
+        let (summary, _) =
+            ingest_and_save(&store_path, std::slice::from_ref(&dir), engine, false).unwrap();
+        assert_eq!(summary.added, 1);
+        assert_eq!(load(&store_path).unwrap().records.len(), 2);
 
         let _ = std::fs::remove_dir_all(&dir);
     }

@@ -7,7 +7,6 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
-import { useEffect, useState } from "react";
 import { formatDuration } from "@/lib/format";
 import type {
   DemoInfo,
@@ -15,10 +14,11 @@ import type {
   Metric,
   MetricGroup,
 } from "../../bindings";
-import { contentMetricRegistry, contentReplayTrailer } from "../../bindings";
 import { hasStatistics, headlineTotals, seatCount } from "../../matchStats";
 import { teamResultLabel } from "../../replaySideLabel";
+import { useMatchStats } from "../../useMatchStats";
 import { MatchStatsChart } from "./MatchStatsChart";
+import { SectionHelp } from "./SectionHelp";
 import { StatCard } from "./StatWidgets";
 
 /**
@@ -32,60 +32,6 @@ import { StatCard } from "./StatWidgets";
  * Which totals get a tile is the registry's `headline` flag, read at runtime.
  * Nothing in this file names a metric.
  */
-
-const errMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
-
-/** Decoded trailers, kept for the session: decoding re-reads the whole file. */
-const trailerCache = new Map<string, DemoTrailer>();
-
-/** The registry is static, so every surface shares one fetch of it. */
-let registryPromise: Promise<Metric[]> | null = null;
-function metricRegistry(): Promise<Metric[]> {
-  registryPromise ??= contentMetricRegistry(undefined)
-    .then((r) => r.metrics)
-    .catch((e) => {
-      // Don't keep a failure: the next section to open should ask again.
-      registryPromise = null;
-      throw e;
-    });
-  return registryPromise;
-}
-
-function useMatchStats(replayPath: string) {
-  const [data, setData] = useState<{
-    trailer: DemoTrailer;
-    metrics: Metric[];
-  } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    setError(null);
-    setLoading(true);
-    const cached = trailerCache.get(replayPath);
-    const trailer = cached
-      ? Promise.resolve(cached)
-      : contentReplayTrailer({ replayPath }).then((r) => r.trailer);
-    Promise.all([trailer, metricRegistry()])
-      .then(([t, metrics]) => {
-        if (cancelled) return;
-        trailerCache.set(replayPath, t);
-        setData({ trailer: t, metrics });
-      })
-      .catch((e) => {
-        if (!cancelled) setError(errMessage(e));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [replayPath]);
-
-  return { data, loading, error };
-}
 
 /** A metric's icon comes from its group, so the next metric arrives with one. */
 const groupIcon: Record<MetricGroup, React.ReactNode> = {
@@ -191,14 +137,29 @@ export function MatchStatsSection({
           info={info}
           trailer={data.trailer}
           metrics={data.metrics}
+          replayPath={replayPath}
         />
       </>
     );
   }
 
+  const period = data?.trailer.teamStatPeriodSec ?? 0;
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="text-sm font-medium">Match statistics</h2>
+      <div className="flex items-center gap-1">
+        <h2 className="text-sm font-medium">Match statistics</h2>
+        {data && hasStatistics(data.trailer) && (
+          <SectionHelp
+            section="match statistics"
+            source="trailer"
+            detail={
+              period > 0
+                ? `Figures are sampled every ${period} seconds.`
+                : undefined
+            }
+          />
+        )}
+      </div>
       {body()}
     </section>
   );

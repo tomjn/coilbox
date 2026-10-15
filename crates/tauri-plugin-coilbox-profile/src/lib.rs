@@ -18,6 +18,7 @@
 //! behaviour untouched.
 
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use coilbox_portable::{is_safe_rel, mime_for};
@@ -25,7 +26,7 @@ use picoframe_core::CliResult;
 use serde_json::json;
 use tauri::{
     plugin::{Builder, TauriPlugin},
-    Runtime,
+    AppHandle, RunEvent, Runtime,
 };
 
 /// The empty profile used when no `profile.json` is present. Mirrors the schema's
@@ -56,17 +57,106 @@ fn resolve_profile() -> (String, &'static str) {
     })
 }
 
+/// Why the profile's `icon` was not applied, or `""` when it was or there is none.
+/// Written once, when the app is ready, and handed to the frontend by
+/// [`profile_load`] so the health panel can say what is wrong with the file.
+static ICON_ERROR: OnceLock<String> = OnceLock::new();
+
+/// The eight bytes every PNG file starts with.
+const PNG_SIGNATURE: &[u8] = b"\x89PNG\r\n\x1a\n";
+
+/// Pure core of [`apply_profile_icon`]: read the PNG the profile's `icon` names.
+/// `Ok(None)` when there is nothing to apply, which covers a non-portable install,
+/// a profile with no `icon`, and a `profile.json` that does not parse (the frontend
+/// reports that one). The path is relative to `.coilbox/`, the same as a splash
+/// image. Only PNG is accepted, on every OS, so an icon that works on the
+/// distributor's machine works on a player's.
+fn profile_icon_from(
+    root: Option<PathBuf>,
+    profile_json: &str,
+    read: impl Fn(&Path) -> std::io::Result<Vec<u8>>,
+) -> Result<Option<Vec<u8>>, String> {
+    let Some(root) = root else {
+        return Ok(None);
+    };
+    let Ok(profile) = serde_json::from_str::<serde_json::Value>(profile_json) else {
+        return Ok(None);
+    };
+    let Some(icon) = profile.get("icon") else {
+        return Ok(None);
+    };
+    let rel = icon
+        .as_str()
+        .ok_or_else(|| "`icon` is not a string".to_string())?;
+    let rel_path = Path::new(rel);
+    if !is_safe_rel(rel_path) {
+        return Err(format!("{rel} is not a path inside the .coilbox folder"));
+    }
+    let bytes = read(&root.join(rel_path)).map_err(|e| format!("could not read {rel}: {e}"))?;
+    if !bytes.starts_with(PNG_SIGNATURE) {
+        return Err(format!("{rel} is not a PNG file"));
+    }
+    Ok(Some(bytes))
+}
+
+/// Show `png` as the running app's icon: the dock icon on macOS, and the icon of
+/// every window on Windows and Linux, which is what their taskbars draw.
+#[cfg(target_os = "macos")]
+fn set_app_icon<R: Runtime>(_app: &AppHandle<R>, png: &[u8]) -> Result<(), String> {
+    use objc2::{AllocAnyThread, MainThreadMarker};
+    use objc2_app_kit::{NSApplication, NSImage};
+    use objc2_foundation::NSData;
+
+    let mtm = MainThreadMarker::new().ok_or("the icon was not set from the main thread")?;
+    let image = NSImage::initWithData(NSImage::alloc(), &NSData::with_bytes(png))
+        .ok_or("macOS could not read the icon as an image")?;
+    unsafe { NSApplication::sharedApplication(mtm).setApplicationIconImage(Some(&image)) };
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn set_app_icon<R: Runtime>(app: &AppHandle<R>, png: &[u8]) -> Result<(), String> {
+    use tauri::Manager;
+
+    let image = tauri::image::Image::from_bytes(png).map_err(|e| e.to_string())?;
+    for window in app.webview_windows().values() {
+        window.set_icon(image.clone()).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// Apply the profile's `icon` and record why it failed, if it did. Never stops the
+/// app starting: a bad icon leaves the Coilbox one in place.
+fn apply_profile_icon<R: Runtime>(app: &AppHandle<R>) {
+    let (profile_json, _) = resolve_profile();
+    let outcome = profile_icon_from(coilbox_portable::portable_root(), &profile_json, |p| {
+        std::fs::read(p)
+    })
+    .and_then(|png| png.map_or(Ok(()), |png| set_app_icon(app, &png)));
+    if let Err(e) = &outcome {
+        eprintln!("coilbox: profile icon not applied: {e}");
+    }
+    let _ = ICON_ERROR.set(outcome.err().unwrap_or_default());
+}
+
 /// `profile_load` — return the distribution profile JSON text, where it came from
 /// (`"file"` | `"default"`), and the portable root (`<app_dir>/.coilbox`, or `""`
 /// when not portable). The frontend parses/validates the JSON; `root` lets it write
 /// an updated `profile.json` back into the portable folder (game-updates feature).
+/// `iconError` says why the profile's `icon` was not applied, and is `""` otherwise.
 #[tauri::command]
 async fn profile_load() -> CliResult {
     let (json_text, source) = resolve_profile();
     let root = coilbox_portable::portable_root()
         .map(|p| p.display().to_string())
         .unwrap_or_default();
-    CliResult::ok(json!({ "json": json_text, "source": source, "root": root }))
+    let icon_error = ICON_ERROR.get().cloned().unwrap_or_default();
+    CliResult::ok(json!({
+        "json": json_text,
+        "source": source,
+        "root": root,
+        "iconError": icon_error,
+    }))
 }
 
 /// Pure core of [`profile_asset`]: resolve `<root>/<rel>`, read it via the supplied
@@ -344,12 +434,80 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             profile_scaffold,
             profile_open
         ])
+        // On `Ready` rather than in `setup`: the windows exist by then, and on macOS
+        // a dev build sets its own dock icon just before plugins hear this event.
+        .on_event(|app, event| {
+            if let RunEvent::Ready = event {
+                apply_profile_icon(app);
+            }
+        })
         .build()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const ROOT: &str = "/pkg/.coilbox";
+
+    fn icon_from(profile_json: &str, file: &[u8]) -> Result<Option<Vec<u8>>, String> {
+        profile_icon_from(Some(PathBuf::from(ROOT)), profile_json, |p| {
+            assert_eq!(p, Path::new("/pkg/.coilbox/art/icon.png"));
+            Ok(file.to_vec())
+        })
+    }
+
+    #[test]
+    fn reads_the_png_the_profile_names() {
+        let png = [PNG_SIGNATURE, b"rest"].concat();
+        assert_eq!(
+            icon_from(r#"{"version":1,"icon":"art/icon.png"}"#, &png),
+            Ok(Some(png))
+        );
+    }
+
+    #[test]
+    fn a_profile_with_no_icon_applies_nothing() {
+        let never = |_: &Path| -> std::io::Result<Vec<u8>> { panic!("must not read") };
+        let root = || Some(PathBuf::from(ROOT));
+        assert_eq!(
+            profile_icon_from(root(), r#"{"version":1}"#, never),
+            Ok(None)
+        );
+        assert_eq!(profile_icon_from(root(), "{ not json", never), Ok(None));
+        assert_eq!(
+            profile_icon_from(None, r#"{"version":1,"icon":"art/icon.png"}"#, never),
+            Ok(None)
+        );
+    }
+
+    #[test]
+    fn an_icon_that_cannot_be_used_says_why() {
+        let never = |_: &Path| -> std::io::Result<Vec<u8>> { panic!("must not read") };
+        let root = || Some(PathBuf::from(ROOT));
+        assert_eq!(
+            profile_icon_from(root(), r#"{"version":1,"icon":"../icon.png"}"#, never),
+            Err("../icon.png is not a path inside the .coilbox folder".to_string())
+        );
+        assert_eq!(
+            profile_icon_from(root(), r#"{"version":1,"icon":7}"#, never),
+            Err("`icon` is not a string".to_string())
+        );
+        assert_eq!(
+            icon_from(r#"{"version":1,"icon":"art/icon.png"}"#, b"GIF89a"),
+            Err("art/icon.png is not a PNG file".to_string())
+        );
+        let missing = profile_icon_from(root(), r#"{"version":1,"icon":"art/icon.png"}"#, |_| {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "no such file",
+            ))
+        });
+        assert_eq!(
+            missing,
+            Err("could not read art/icon.png: no such file".to_string())
+        );
+    }
 
     #[test]
     fn reads_profile_when_present() {

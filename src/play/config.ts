@@ -47,6 +47,7 @@ export {
   setParticipantTeam,
   showsFactionColumn,
   toBattleConfig,
+  uniqueParticipantIds,
 } from "./participants";
 
 /* -------------------------------------------------------------------------- *

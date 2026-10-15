@@ -165,6 +165,7 @@ export function MapCard({
     <div className="rounded-lg border border-border/50 bg-card p-3">
       <MinimapPreview
         url={minimapUrl}
+        thumbUrl={map ? thumbs.get(map.name)?.url : null}
         width={map?.width}
         height={map?.height}
         startPositions={startPositions}

@@ -61,10 +61,12 @@ export interface FrameWatch {
   framesPerSecond: number;
 }
 
-interface Registered {
+export interface Registered {
   renderer: THREE.WebGLRenderer;
   /** Draw one frame of this view. */
   render: () => void;
+  /** The element the canvas fills, where the frame rate label goes. */
+  host: HTMLElement;
 }
 
 const canvases = new Set<Registered>();
@@ -75,6 +77,11 @@ export function registerCanvas3D(entry: Registered): () => void {
   return () => {
     canvases.delete(entry);
   };
+}
+
+/** Every canvas registered right now. */
+export function registeredCanvases(): ReadonlySet<Registered> {
+  return canvases;
 }
 
 /**

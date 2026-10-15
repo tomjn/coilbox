@@ -185,6 +185,23 @@ describe("hub game list", () => {
     expect(hoisted.fetchHubGames).toHaveBeenCalledTimes(1);
   });
 
+  it("remembers a failed read by default, so a down hub is asked once", async () => {
+    hoisted.fetchHubGames.mockResolvedValue({ ok: false, reason: "down" });
+    await loadHubGames("https://hub.example");
+    await loadHubGames("https://hub.example");
+    expect(hoisted.fetchHubGames).toHaveBeenCalledTimes(1);
+  });
+
+  it("forgets a failed read when asked not to remember it", async () => {
+    hoisted.fetchHubGames.mockResolvedValueOnce({ ok: false, reason: "down" });
+    expect(await loadHubGames("https://hub.example", false)).toEqual([]);
+    hoisted.fetchHubGames.mockImplementation(() =>
+      answer([hubGame("SF", SF_LOGO)]),
+    );
+    expect(await loadHubGames("https://hub.example")).toHaveLength(1);
+    expect(hoisted.fetchHubGames).toHaveBeenCalledTimes(2);
+  });
+
   it("asks each hub once", async () => {
     hoisted.fetchHubGames.mockImplementation(() => answer([]));
     await loadHubGames("https://hub.example");

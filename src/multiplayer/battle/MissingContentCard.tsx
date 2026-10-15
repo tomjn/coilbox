@@ -33,7 +33,7 @@ export function MissingContentCard({
   gameName: string;
   onRescan: () => Promise<ContentPresence>;
 }) {
-  const writePath = useWriteRootPath();
+  const writePath = useWriteRootPath("games");
   const {
     active,
     queued,

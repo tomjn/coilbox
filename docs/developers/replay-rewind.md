@@ -1,0 +1,405 @@
+# Replay rewind for your game
+
+Replay rewind plays a recorded match back in the engine with time going in either direction. It works for any game without anything from you. This page is for a game maker who wants playback to look right for their game. That takes one small Lua file, an adapter, which you bundle in your game archive.
+
+For what a player sees and does, see [Replay rewind](../players/replay-rewind.md). For the file format of a recording, see the [replay track format](../reference/replay-track-format.md).
+
+## How a playback is built
+
+Coilbox records a replay by playing it once in the engine without a window. A gadget writes down where units, features and projectiles are as the match plays, and the result is a track. Playback never simulates the match again.
+
+To play a track, coilbox writes a game called Coilbox replay playback. It depends on your game and does not change it. It holds the rewind player's Lua, the track and the adapter in use. The start script has one spectator and no players or AIs. The spectator leads every team, which the engine allows and which lets a gadget create units on any team. Team numbers are the replay's own.
+
+The player holds a time, which is a frame of the track, and on every simulation frame it makes the world match the track at that time. It creates, moves and destroys units, features and projectiles, and it sets the terrain. Because it simulates nothing, the time can jump and run backward. The timeline is a widget that sends the player messages.
+
+Weapons never fire in a playback. The player creates each shot of the track itself.
+
+## What an adapter is
+
+Your game has gadgets and widgets that are right for a match and wrong for a recording. One ends the game when a team has no units. One creates a commander at the start. One offers a menu for gifting units. The player cannot know which of yours do that, so the adapter says.
+
+Without an adapter nothing is switched off and nothing is hidden. The match still plays. The player still undoes what it can, and the log says what it could not. [What the player does without an adapter](#what-the-player-does-without-an-adapter) lists it.
+
+## The format
+
+An adapter is a Lua file that returns a table. This is Splinter Faction's, which is the real one coilbox ships, in full:
+
+```lua
+-- Splinter Faction's playback adapter (issue #3800).
+--
+-- What is listed here is what fights a recording or offers a spectator of one
+-- something to do that means nothing. Everything that tells a viewer about the
+-- match stays: the resource bars, the tooltip and its unit descriptions, the
+-- minimap, the players list, the menu, health bars and the game's own effects.
+-- The menu keeps its Resign and Sharing buttons, because it is one widget with
+-- Settings and Quit in it. Neither does anything for a spectator.
+--
+-- gui_static_buildordermenu.lua stays too, though it shows a spectator the
+-- build and order buttons of a selected unit. It is what hides the engine's own
+-- command menu, which takes its place when it is gone, and
+-- game_buildHotkeys.lua raises without it.
+--
+-- The file names were read from the archives of 0.1.88 and 0.1.89 and from the
+-- game's repository at the commit of 24 August 2026, which declares no version.
+-- All three have every file below, so there is no version range. A range would
+-- also leave a game folder under development, which declares `$VERSION`, with
+-- no adapter at all.
+--
+-- lua/rewind-player/README.md has what each of these did to a playback.
+
+return {
+	name = "Splinter Faction",
+	shortname = "SF",
+
+	gadgets = {
+		-- Kills a team that has no units, which every team is before its first
+		-- unit and after its last.
+		"game_end.lua",
+		-- Kills a team that has no commander, on the same grounds.
+		"game_team_com_ends.lua",
+		-- Runs the start of a match: it waits for a faction and a start position
+		-- from each team, picks both itself when nobody answers, and creates a
+		-- commander for each team at frame 181. The track has the match's own.
+		"game_spawn.lua",
+		-- Leaves a container where a unit dies, picked at random. It hears of a
+		-- unit a seek removes as well, and the track has the containers the
+		-- match left.
+		"unit_deathContainerSpawn.lua",
+		-- The track owns health, and these two raise it. The first sets a
+		-- commander's health once a second after it has gone without damage, the
+		-- second heals the allied units around a heal station and draws the heal
+		-- effect on each. Neither tells anybody, and nothing a viewer reads depends
+		-- on them. The game turns the engine's own healing off in
+		-- alldefs_post.lua, so these are all there is.
+		"unit_auto_health_regeneration.lua",
+		"unit_area_heal_radius.lua",
+	},
+
+	widgets = {
+		-- The faction picker and the start position picker of a match's first
+		-- seconds, with their ready buttons.
+		"gui_static_factionchooser.lua",
+		"gui_static_placement.lua",
+		-- Gives units and resources to another team.
+		"gui_static_sharemenu.lua",
+		-- A strip of buttons for the selection at the bottom centre of the view,
+		-- which is where the timeline is, so the two draw over each other.
+		"gui_static_selected_units_buttons.lua",
+	},
+
+	-- The numbers on the game's resource bar that are the game's own and not the
+	-- engine's (issue #3982). gui_static_resourcebar.lua reads all three as team
+	-- rules parameters. unit_supply_requirement.lua writes the supply a team
+	-- uses and has, and game_researchpoints_ledger.lua its research points. Both
+	-- gadgets stay, since the game's build menu asks them what a team may
+	-- build. In a playback they count the units the player has placed, which is
+	-- not what the match had, so the recording has the last word on every frame.
+	--
+	-- Metal and energy need nothing here. The track has each team's own, storage
+	-- included, and the player sets them whatever the game.
+	teamParams = { "supplyUsed", "supplyMax", "researchPoints" },
+}
+```
+
+Every key is optional. A key that is not in this table is refused, so a misspelling cannot quietly switch nothing off.
+
+| Key | Value | Does |
+| --- | --- | --- |
+| `name` | text | The name the log line shows. `unnamed` without it. |
+| `shortname` | text | The game's `shortname` from its `modinfo.lua`, compared without regard to case. Coilbox uses it to match an adapter it ships to a game. It is required in a shipped adapter and ignored in one in your own archive. |
+| `versions` | `{ min = "...", max = "..." }` | The versions a shipped adapter is for, both ends included and either end optional. Without it every version matches. Ignored in your own archive. |
+| `gadgets` | list of file names | Gadgets to switch off, as paths inside `luarules/gadgets/`, such as `game_end.lua` or `sub/folder/other.lua`. |
+| `widgets` | list of file names | Widgets to switch off, as paths inside `luaui/widgets/`. |
+| `units` | list of names | Unit definitions the player never creates. |
+| `features` | list of names | Feature definitions the player never creates. |
+| `teamParams` | list of names | Team rules parameters that are the recording's to set, described under [Your game's own numbers](#your-games-own-numbers). |
+| `gameParams` | list of names | The same for game rules parameters. |
+| `matchTimeWidgets` | list of file names | Widgets told the match's time when they ask the engine for the game's frame or seconds, as paths inside `luaui/widgets/`, described under [The match's time](#the-matchs-time). |
+| `hooks` | table of functions | Three optional functions, described under [Hooks](#hooks). |
+
+Coilbox runs the file in `coilbox-springlua`, the sandboxed Spring Lua evaluator it uses for a game's other config. The file has no `io`, no `os` and no way to read another file, but it can compute its lists in Lua. Coilbox reads everything except `hooks` before the engine starts. The player reads the file again in the engine, for `units`, `features`, `teamParams`, `gameParams` and `hooks`.
+
+### What switching off does
+
+For each name in `gadgets` and `widgets`, coilbox writes a file at that path in the playback game, `luarules/gadgets/<name>` or `luaui/widgets/<name>`. The engine gives a depending game's file precedence over the same path in the game it depends on, and file names are not case sensitive, so your file is never read. The file is a comment and `return false`.
+
+This relies on your gadget and widget handlers treating a file that returns `false` as one that asked not to be loaded. The engine's own handlers do. So do Splinter Faction's, and the widget handler of THIS. So do Beyond All Reason's gadget and widget handlers, read and run on its version `test-30922-8064a43`. An empty file is not a substitute. Splinter Faction's gadget handler loads an empty file as a gadget with nothing in it and still lists it, and its widget handler refuses it with `Failed to load: <file>  (no GetInfo() call)`.
+
+Coilbox does not write over one of its own files and refuses an adapter that names one.
+
+### Hiding units and features
+
+The player never creates a unit of a definition in `units` or a feature of one in `features`. Names are compared without regard to case. The track still holds them, so a seek has no effect on them. A name that is not in the track is harmless, and a name your game does not have gets no log line, since leaving them out is the point.
+
+Use this for a definition the track holds that you do not want to show. It is separate from `gadgets`, which stops the code that creates things. Splinter Faction's adapter hides none.
+
+### Your game's own numbers
+
+Metal and energy are the engine's, and the player makes them the match's for every game with no adapter at all. Each team holds what it held in the match, with the match's storage and share level, at whatever frame is showing. Income, expense and pull follow within three seconds of a seek. The engine has no call that sets them, so the player adds what the match had more than the playback's own units make, and where the playback makes more the number reads high.
+
+Numbers your game keeps for itself are different. Supply, research points, a score or a wave counter live in rules parameters, and the recorder cannot tell which of a game's parameters a viewer reads. So the adapter names them: `teamParams` for the ones set with `Spring.SetTeamRulesParam` and `gameParams` for the ones set with `Spring.SetGameRulesParam`. Spell each name as your gadget does, since rules parameter names are case sensitive.
+
+The two lists are read twice.
+
+1. When a replay is recorded, coilbox passes the names to the recorder, which writes each parameter whenever its value changes. Only a number is recorded. A parameter that holds text or a boolean is left out.
+2. When the recording is played, the player sets each named parameter to the match's value once as it starts, before the first frame and before your widgets load, and then on every frame, and again when the frame is over, which is after your gadgets have run. An engine with no `GameFramePost` call-in has no second moment, and there a gadget of yours that writes the parameter later in the frame wins.
+
+A parameter the match had not set yet at the frame showing is left alone. The player does not change who can read a parameter, so one your gadget made public stays public.
+
+Name a parameter when a gadget that stays loaded would otherwise write the playback's own figure into it. Splinter Faction's supply gadget counts the units in the world, and in a playback those are the units the player has placed. Its adapter names `supplyUsed`, `supplyMax` and `researchPoints`, and keeps both gadgets, because the game's build menu asks them what a team may build.
+
+A recording made before a name was added to the adapter does not have that parameter. The player logs the name and leaves the parameter to your game. Clearing the track and recording the replay again adds it.
+
+### Hooks
+
+A hook is an optional function in `hooks`. The player calls the first three and no others. It logs a name in `hooks` that is not one of them, or is not a function, since it is most likely a misspelling. A hook that raises is logged once and not called again, and the player carries on.
+
+| Hook | Called | Arguments |
+| --- | --- | --- |
+| `started` | Once, when the player has opened the track, before the first frame and so before anything of the track is in the world. | None. |
+| `unitPlaced` | After the player created a unit and put it in place, and again for a unit made again after a seek. A seek that needs many units made spreads them over several frames, so this can come some frames after the seek. | The engine's unit id, the unit definition's engine id, the track frame, the clock, and `effect`, which is true when the player is about to show its arrival effect for the unit. Return true to say you showed your own. |
+| `afterFrame` | At the end of every simulation frame, after every stage. | The track frame and the clock. |
+| `drawQueuedBuilding` | Not the player's. The ghosts widget calls it in unsynced Lua, in `DrawWorld`, once for each queued building it would draw, inside a matrix of its own. It replaces the engine's own shape and the footprint outline, so use it to draw the building the way your game does. | The unit definition's engine id, the team, x, the height the engine would build at (`Spring.Pos2BuildPos`), z and the facing from 0 to 3. A facing of 0 is south, 1 east, 2 north and 3 west. |
+| `queuedBuildingsDrawn` | Not the player's. The ghosts widget calls it once at the end of every pass of `DrawWorld`, after the last `drawQueuedBuilding`, and once more when the widget shuts down. It is called for a pass that drew nothing too, and while the ghosts are switched off. | How many buildings the pass drew. 0 for a pass that drew none and for the call at shutdown. |
+
+The clock is the player's, and a hook only reads it. `clock.jumped` says the frame was reached by a seek or a step. `clock.direction` is 1 or -1. `clock.speed` is how many frames of the track one simulation frame covers.
+
+The first three run in synced Lua, in the gadget's environment. `drawQueuedBuilding` and `queuedBuildingsDrawn` run in the ghosts widget, which reads the adapter file itself, so `gl` and `WG` are there and the synced calls are not. A `drawQueuedBuilding` that raises is logged once and the engine's shape and outline take over. Coilbox does not read either. Write the hooks so that the same file still loads in synced Lua, where they are never called, and in coilbox's sandbox, which has no engine at all: reach for `Spring`, `UnitDefs`, `Game`, `gl` and `WG` only inside a hook.
+
+`queuedBuildingsDrawn` is for a game whose way of drawing a building keeps the shape until it is told to drop it, as Beyond All Reason's unit shape widget does. Hand a building to it the first time `drawQueuedBuilding` asks for it, note in each pass which ones were asked for, and drop the rest in `queuedBuildingsDrawn`. Beyond All Reason's adapter in `lua/rewind-player/adapters/beyond_all_reason.lua` does this.
+
+A frame of play allocates nothing in the player, so a hook that runs every frame should not allocate either.
+
+#### Your own arrival effect
+
+After a seek that takes more than one frame, the player shows a short effect where each unit in view appears: a column of light, a ring and dots in the team's colour. The player draws it itself with plain quads, so it works in your game with no adapter and does not touch how your units are drawn.
+
+To show your game's own spawn or warp effect instead, do it in `unitPlaced` and return true:
+
+```lua
+unitPlaced = function(unitID, unitDefID, t, clock, effect)
+	if effect then
+		local x, y, z = Spring.GetUnitPosition(unitID)
+		Spring.SpawnCEG("name-of-your-effect", x, y, z)
+		return true
+	end
+end,
+```
+
+- `effect` is true only for a unit made in a later frame than the one that showed the seek, inside the view, and not while the timeline's knob is being dragged. Spawn only when it is true. The hook is called for every unit the player makes, and a large seek makes hundreds outside the view.
+- A hook that returns true stops the player's effect for that unit. One that returns nothing leaves it, and so does one that raises.
+- The player shows at most 256 of its own effects at once. Your effect has no such cap, and a large seek makes dozens of units a frame, so look at what yours costs.
+
+#### Your build effect
+
+No unit builds anything in a playback, so the engine draws no build particles of its own. The player draws a builder's stream as the engine would, with your particle texture, and stops when your game sets `MaxNanoParticles` to 0 to draw its own (issue #4029). A build effect of your own that asks the engine in the unsynced half of a gadget gets the recording's answers from `Spring.GetUnitWorkerTask` and `Spring.GetUnitCurrentBuildPower`, with a power of 0 while paused or played backward. `Spring.GetUnitIsBuilding`, widgets and the synced half get nothing. Your builders' scripts are told `StartBuilding` and `StopBuilding` ([Units with COB scripts](#units-with-cob-scripts)), so an effect your script makes shows. For anything else, the player publishes each builder's recorded work in unit rules parameters, set when it changes. Read them with `Spring.GetUnitRulesParam(unitID, name)` from a widget, a gadget or a hook. A playback is running when `Spring.GetGameRulesParam("coilbox_rewind_first_frame")` is a number.
+
+| Parameter | Value |
+| --- | --- |
+| `coilbox_rewind_work_command` | what `Spring.GetUnitWorkerTask` gives first in a match: minus the unit definition's id while building it, `CMD.REPAIR` once it is finished, `CMD.RECLAIM`, `CMD.RESURRECT`, `CMD.CAPTURE`, `CMD.RESTORE`, and 0 for no work |
+| `coilbox_rewind_work_target` | what it gives second: the unit id, or the feature id plus `Game.maxUnits`, and -1 for none |
+| `coilbox_rewind_work_power` | the build power in use, from 0 to 1 |
+| `coilbox_rewind_work_x`, `coilbox_rewind_work_y`, `coilbox_rewind_work_z` | where the work is, when the command or the target last changed |
+
+The work follows the recording and not the clock, so a builder keeps its work while the playback is paused or played backward. No hook is needed for it.
+
+Splinter Faction's adapter has no hook. It had a `started` hook that gave each team its starting storage, which its switched off `game_spawn.lua` used to do. The track now holds each team's storage and the player sets it on every frame, so the hook went. Reach for a hook when your game needs something set that neither the track nor a rules parameter covers.
+
+## Where an adapter lives
+
+Put your adapter at `coilbox_rewind/adapter.lua` in your game's primary archive. Coilbox reads it through unitsync from the archive of the version being played, and not from archives your game depends on.
+
+Your own adapter wins. It applies whatever its `shortname` and `versions` say, because it is in the archive of the version being played. If it cannot be used, because it does not run or has a key that is not in the table, the launch carries on with an adapter coilbox ships for your game if one matches, and with none otherwise. The player's log line says why.
+
+Coilbox also ships adapters, in `lua/rewind-player/adapters/` in the coilbox repository. It ships two, for Splinter Faction and for Beyond All Reason. A file there is picked up by the next build, and it matches a game by `shortname` and `versions`. Of those, the first in file name order that matches wins, so give two adapters for one game ranges that do not overlap.
+
+Whichever adapter is chosen, the playback game holds it at `coilbox_rewind/adapter.lua`, written on every launch. When no adapter applies, that file returns `false`, so a file at that path in your base game never reaches the player.
+
+### How a shipped adapter is matched
+
+A shipped adapter matches a game when its `shortname` equals the game's, without regard to case, and the game's version is inside `versions`.
+
+A version is the numbers it starts with. Coilbox skips whatever comes before the first digit, reads numbers joined by single dots and stops at anything else. It compares numbers one at a time, and a missing number counts as 0.
+
+| The game declares | Is read as |
+| --- | --- |
+| `0.1.89` | 0.1.89 |
+| `V15.9.8` | 15.9.8 |
+| `v2.58` | 2.58 |
+| `stable-8405` | 8405 |
+| `test-30922-8064a43` | 30922 |
+| `1.7 (Beta 10.1)` | 1.7 |
+| `$VERSION`, `KRE $VERSION`, nothing | no version |
+
+An adapter with a `versions` range is for no game that has no version. A game folder under development declares `$VERSION`, so only an adapter without `versions`, or the game's own, applies to it. `min` and `max` are read the same way, and one with no number in it is refused. `max = "0.1"` means up to 0.1.0, so write `max = "0.1.99"` for every 0.1 release.
+
+## The match's time
+
+The engine counts its frames from when the playback was opened, and nothing can set that count. So `Spring.GetGameFrame` and `Spring.GetGameSeconds` give the playback's time, not the match's, and a seek to minute 10 can read as 0:30. A widget that prints the time, or works something out from it, such as a day and night cycle, then shows the wrong thing.
+
+Name such widgets in `matchTimeWidgets`. When a named widget asks either call, it is told the time of the match at the moment showing: it jumps with a seek, stands still while paused and goes back when the viewer plays backward. Splinter Faction's adapter names its players list and its weather widget, and Beyond All Reason's names the line under its players list.
+
+Every other widget, and every gadget, keeps the engine's count, which only goes up. Name only a widget that is fine with a time that jumps and runs backward. One that keeps a frame and waits for a later one, for a fade, a cooldown or a cache, would stop or misbehave when the time goes back. A widget that asks as a tail call, `return Spring.GetGameFrame()`, gets the engine's count, so keep the answer in a local first.
+
+If the widget also needs a number your game makes once per match, such as Splinter Faction's weather seed, name it in `gameParams` as well. The player sets those before your widgets load, so a widget that reads one as it starts gets the match's.
+
+## What to switch off
+
+Keep what tells a viewer about the match. Switch off only what fights the recording, what offers an action that makes no sense in playback, and what covers the timeline.
+
+Keep the resource bars, the tooltip with a unit's description, the minimap, the players list, health bars and build progress. Splinter Faction's adapter keeps all of these, along with the game's own effects, lights and weather. Both shipped adapters switch off the time left over a building under construction, `gui_build_eta.lua`, which works that time out from how fast build progress moves. In a playback build progress moves at the speed of play, backward too, and not at all while paused, so the time would not be the match's. Do the same for any widget of yours that works a rate out from the frames it watches.
+
+Switch off a gadget that fights the recording. These are the kinds Splinter Faction had:
+
+- A gadget that kills a team or ends the game, because the track already has the match's own end. An empty team looks beaten to it.
+- A gadget that creates units or features the track does not have, such as a start of match spawn or a container left where a unit dies.
+- A gadget that changes health, because the recording owns health. See [healing](#healing).
+
+Beyond All Reason had more kinds:
+
+- A gadget that destroys what the player places. Its guard against a lab trick destroys a unit created unfinished with no builder, which is every half built building the player places after a seek. Another clears the features under a new building, and the track's wrecks lie there later in the match.
+- A gadget that acts on a shot. The player creates every shot of the track, so a gadget that splits a shot into bomblets, moves it or creates units where it lands doubles what the track has.
+- A gadget that replaces one unit with two when it is finished. The track has both.
+- A gadget that does something a viewer sees at the start, such as hiding commanders until they warp in. Switch it off and do the part a viewer sees in the adapter's hooks: `unitPlaced` and `afterFrame` can hide a unit and show the game's effect, and `started` can set what the game's widgets read as they load.
+
+Switch off a widget that offers an action that makes no sense in playback. A faction picker, a start position picker and a menu that gives units to another team are of this kind. A spectator can do none of them.
+
+Switch off a widget that covers the timeline. The timeline sits at the bottom centre of the view and a player can drag it. Splinter Faction's strip of buttons for the selection was at the bottom centre too, so the two drew over each other. Beyond All Reason's order menu reaches under the timeline when a unit is selected, and its adapter switches the order menu and the build menu off. Look with a unit selected.
+
+Check your key bindings too. A key your game binds to an action one of its widgets handles is that widget's before the timeline hears it. Beyond All Reason binds Minus, Equals and the keypad's Plus to its volume, so they would change the volume there and not the speed. Its adapter switches off the Volume OSD widget, which handles those actions, so the timeline gets the keys.
+
+Two things stay in Splinter Faction because there is no way to take them out cleanly, and issue #3983 is about it.
+
+- The menu at the top right is one widget with Settings, Keybinds, Economy, Graph, Log and Quit in it, so it stays whole. Its Resign button sends the engine's `spectator` command, which does nothing for somebody who already is one.
+- The build menu and order buttons of a selected unit stay. A spectator's orders go nowhere. Switched off, the engine's own command menu takes its place and a gadget that depends on the widget raises. Both were seen in a window.
+
+## Finding what to switch off
+
+1. Play a recorded match with no adapter. Open the replay with "Watch with rewind" in coilbox, with no adapter of your own in the archive.
+2. Open `coilbox_rewind.log`, in the engine's write folder beside `infolog.txt`, and read the lines that start `COILBOX_REWIND_PLAYER`. Each says something the base game did that the track does not have. [The log](#the-log) lists them.
+3. Find the gadgets the engine loaded, in lines that read `Loaded SYNCED gadget:  <name>  <file>.lua`. Read the ones that end a game, spawn units or kill teams.
+4. Look at the screen. Note any widget that offers something a spectator cannot do, and any that draws at the bottom centre.
+5. Put the file names in `gadgets` and `widgets`, and the definitions in `units` and `features`.
+6. Bundle the file at `coilbox_rewind/adapter.lua` in your archive and run the match again. The log should say `adapter loaded:` and your game's name, and the lines you were reading should be gone.
+
+A gadget that an adapter switches off is not in the engine's `Loaded SYNCED gadget:` lines, and a log line that came from it does not appear.
+
+If you add an adapter to coilbox's own set instead, the steps and the tests that check a shipped adapter are in [`lua/rewind-player/README.md`](https://github.com/tomjn/coilbox/blob/main/lua/rewind-player/README.md), under "Writing one for a game".
+
+### The log
+
+The player, the timeline and the queued building ghosts write their lines to `coilbox_rewind.log` in the engine's write folder, beside `infolog.txt`. The file is emptied each time a playback starts. The lines are not in `infolog.txt` and not in the game's console, because a viewer would read them as errors, and the engine sends every line of its own log to the console too.
+
+The player logs which adapter it has, once, when it starts.
+
+```
+COILBOX_REWIND_PLAYER adapter loaded: Splinter Faction. 2 gadgets and 1 widgets are switched off by the playback game, 1 unit definitions are hidden, 1 feature definitions are skipped, hooks: afterFrame, unitPlaced
+COILBOX_REWIND_PLAYER adapter loaded: none
+COILBOX_REWIND_PLAYER adapter loaded: none. the game's own adapter could not be used: the adapter is not in the format: unknown field `gadget`, expected one of ...
+```
+
+The first line is an example of an adapter that switches off 2 gadgets and 1 widget and hides 1 unit definition and 1 feature definition, with two hooks. The counts come from your adapter. The second line is a game with no adapter. The third is what a misspelt key looks like.
+
+Other lines you may see.
+
+- `COILBOX_REWIND_PLAYER failed:` means there is no track or a bad one, and nothing plays. The timeline shows the reason too, since a viewer sees nothing of the log.
+- `COILBOX_REWIND_PLAYER this engine has no Spring.SetHeightMapFunc. Switched off: ground changes. ...` names a call the engine lacks and the one feature it switches off. The rest plays. A line that starts `COILBOX_REWIND_PLAYER cannot play:` means a call that cannot be done without, and nothing plays.
+- `COILBOX_REWIND_PLAYER the message "..." was refused:` and a reason is a message to the player it did not accept.
+- `COILBOX_REWIND_PLAYER the health of a unit of the track changed with no damage to hear of` means a gadget of your game raised a unit's health. Put that gadget in your adapter.
+- `COILBOX_REWIND_PLAYER slow frame:` means a frame's work took longer than a simulation frame lasts.
+- The player logs once by name a weapon your game does not have and a unit or feature definition it cannot find, and leaves them out.
+- Creating a unit for a dead team, or for one at its unit limit, gives nothing and no error. The player logs it once for each team and tries the unit again after the next seek.
+- The guard that stops the base game killing a team or ending the match logs the first ask of each, and a team that dies anyway. Without the player in the game, the guard's lines go to `infolog.txt`.
+
+## What the player does without an adapter
+
+These stay in place whatever an adapter says. An adapter makes them unnecessary for your game, and they are the safety net for a game with none.
+
+- The base game takes an empty team for a beaten one and calls `Spring.KillTeam`, and the engine creates nothing on a dead team again. A guard gadget, `!coilbox_rewind_guard.lua`, replaces `Spring.KillTeam` and `Spring.GameOver` as its file loads. The `!` makes its name sort before every letter, digit and underscore, so it loads before your gadgets. A gadget whose file sorts before that, or anything outside the gadgets, keeps the real call.
+- A unit or a feature that the track does not have is removed on the next frame. That covers the map's own features, a unit the game spawns and a feature a base game gadget creates.
+- A unit or a feature of the track that something else destroys is made again on the next frame.
+- The engine asks before it leaves a wreck, and is refused, because the track has every wreck of the match.
+- Nothing takes damage. Every hit does no damage and no push. Health that changes anyway is set again on the next frame.
+- A unit that dies with its death effect explodes, and the explosion reaches the features around it. The player gives that no damage, so a tree does not fall and a wreck stays. The explosion's effect and sound still show.
+
+### Healing
+
+No unit's health changes in a playback except when the player sets it. The player stops the engine's own healing for every game. It does this by giving a wounded unit a maximum equal to its health during the frame, so the engine finds nothing to heal and nothing to repair.
+
+The maximum is given back in the engine's `GameFramePost` call-in, so it is only lowered once that call has been seen to arrive. The player installs the call-in for itself in a game whose gadget handler does not pass it on. On an engine before `105.1.1-2590`, which has no such call-in, no maximum is touched, and health the engine adds in a frame is taken off on the next.
+
+A gadget of your game that sets health is not stopped this way. The player puts the health right in the frame it acts in and logs one line, and you should put the gadget in your adapter. Splinter Faction's two are `unit_auto_health_regeneration.lua` and `unit_area_heal_radius.lua`. A repair pad done in a gadget is the same kind of thing.
+
+A gadget of a higher layer than the player's that reads a unit's health in its `GameFrame` sees a wounded unit as whole in that frame. Nothing is drawn in that time.
+
+### Gadgets that react to a shot
+
+The game's gadgets hear of the player's shots as they would of a match's. In Splinter Faction's match, whose two weapons are a rocket and a laser bolt, none raised and none changed what the track has. Splinter Faction has more gadgets that act on a shot. Some create projectiles or a unit where a shot lands, one can destroy a unit and one leaves an area that damages. The match does not fire their weapons, so what they do to a playback has been read and not seen, and the adapter switches none of them off. This is issue #3989. Check your own gadgets that react to a projectile or an explosion.
+
+## What is recorded
+
+A recording is made in one headless run of the replay, by a recorder gadget with no synced code. It cannot change the match.
+
+Recorded:
+
+- Every unit, sampled every third frame and on the first frame recorded. A sample has its position, facing, health, build progress and whether it is on or off. Creation, destruction and a change of team are recorded too.
+- Weapon targets, and what each builder is working on.
+- The queue of buildings of each mobile builder. A factory's production queue is not recorded.
+- Piece poses. The pieces watched are each weapon's muzzle piece and every parent up to the root.
+- Every feature, and every projectile on every frame.
+- Terrain changes.
+- Team resources, read on every frame. For metal and for energy: what each team holds, its storage, income, expense, pull, share level, what it sent and received, and what it wasted with storage full.
+- The rules parameters your adapter names, whenever one changes. See [Your game's own numbers](#your-games-own-numbers).
+
+Positions in the track are within half an elmo of the sampled ones. That is the track's tolerance. What a team holds is within half a unit of the recorded figure, or within a 1,024th of the figure when that is more. Storage, share level and rules parameters are exact.
+
+Not recorded, or not exact:
+
+- Rules parameters no adapter names, and any that hold text or a boolean.
+- A team's running totals, such as all the metal it ever produced. The engine keeps those for its end of game statistics and no call sets them.
+- Shield power. The track holds none.
+- Which piece a unit script named as a weapon's muzzle. The engine does not tell Lua. The recorder takes the piece nearest the muzzle's place, and the deeper one in the tree when two sit on the same spot.
+- A script's turn on a model of any type other than `3do` or `s3o`. The engine gives an Assimp or glTF piece a rest rotation that Lua cannot read, so a reader cannot tell a script's turn from the model's own.
+- Chat and players leaving. They are in the replay file and not in a track.
+- Terrain changes that the engine does not report. The engine does not report every change, and the recorder reads the whole map on the first frame, every 900th frame and at the end. A change it never reported reaches the track up to 900 frames late.
+- The exact first and last frame of a unit, in a game where another gadget raises an error in `UnitCreated`. The recorder is then not told, and finds units by sampling. A unit can be up to 2 frames late, and one that lived less than 3 frames between two samples is missed.
+
+The recording is kept only if the playback matches the recorded match exactly, which is who won, how long it lasted and every team's final totals. A game whose engine or version differs from the replay's often fails this.
+
+### Units with COB scripts
+
+The player sets every aiming piece to its recorded pose on every frame, so a turret or torso points where it pointed in the match from the first frame after a seek. It does this the same way for a unit with a COB script and one with a Lua script, with `Spring.UnitScript.CallAsUnit` and the `Turn` and `Move` of the Lua unit script interface, and the recorded values are passed as they are for both. There is no COB specific step, and nothing for your game to do. It was run on Splinter Faction's units and on Balanced Annihilation's `armpw`, `armstump` and `armllt`, which have COB scripts, and every posed piece read back as recorded.
+
+What to know about your own scripts:
+
+- Your unit's script goes on running. The player sets its poses after the scripts have run in a frame, so the recorded pose is what is drawn, and the pieces the recording does not name are left to your script. Legs, wheels and idle motion are yours.
+- The pieces the recording names are each weapon's muzzle piece and every parent up to the root. A piece that did not move in the match is put at rest.
+- Nothing fires and no weapon aims by itself in a playback, so your script's aim and fire functions are not called (issue #4030).
+
+Your script is told what the engine would tell it in a match, from the recording: `StartMoving` and `StopMoving` as a unit starts and stops moving, and `StartBuilding` and `StopBuilding` as a builder starts and stops work, with the heading and pitch to the work as the engine gives them. A COB script is told through `Spring.CallCOBScript` and a Lua script through the call-ins your script framework handed the engine with `Spring.UnitScript.CreateScript`. Nothing is asked of your game, and `Spring.UnitScript.GetScriptEnv` is not used.
+
+- Paused, a moving unit is told it stopped, since time stands still. Your walk goes back to rest the way your script stops it.
+- Played backward, a unit moves against the way it faces, so `StartMoving` gets 1, as for a unit that reverses in a match. A script with no animation for reversing plays its walk.
+- At any speed a script is told the same. A unit's velocity is the speed it is shown moving at, so a script that reads `GET CURRENT_SPEED` or `Spring.GetUnitVelocity` to pace its steps keeps up with the ground.
+- A builder's work follows the recording at any speed and paused, so it goes on facing its work.
+- A script whose `StartMoving` starts turning a piece the recording has poses for gets that turn: the player leaves it to the script from then on, for every unit of the definition, and logs `the walk of <unit> turns <pieces>, which the track has poses for`.
+- A script that raises is logged once and that function of that unit is not called again.
+- A script framework that copies `Spring.UnitScript.CreateScript` into a local in a gadget file that sorts before `coilbox_rewind_player.lua` hides its scripts from the player, and those units are told nothing. The engine's own framework, which Splinter Faction uses, looks the call up each time.
+
+It was run headless on the whole Splinter Faction match, whose units have Lua scripts and whose land factory has a COB one, and on a crowd of Balanced Annihilation V15.9.8's `armcom`, `armpw`, `armstump` and `armflash`, which have COB scripts. Every call came on the frame the recording has it, and no script raised.
+
+The player sets poses from the engine's `GameFramePost` call-in. If your gadget handler does not pass that call-in on to gadgets, the player installs it for itself and logs one line saying so. Balanced Annihilation V15.9.8's handler is one that does not, and logs `UpdateCallIn: GameFramePost is not implemented` as its gadgets load, which is harmless. On an engine before `105.1.1-2590`, which has no such call-in, the player sets poses earlier in the frame, and a script that moves an aiming piece on its own can win until the next frame.
+
+A unit's own script still runs when the unit is created. Splinter Faction's commander stages work because of it. A stage is a unit definition of its own, with a script that hides the pieces the stage does not have. A morph destroys one unit and creates another, so the track has two units and the player creates each by its definition.
+
+## Engines
+
+The replay is played on the engine it was recorded on, and that can be old. Every engine call the player uses is in one table. If a call is missing, the player switches off the one feature that depends on it, logs a line and carries on, unless the call is one the player cannot work without. Then it stops and logs why. A note panel above the timeline says what is switched off, if a viewer would notice.
+
+The oldest engine tag read for any call is 105.0. No engine before 2025.03.9 has been run for this. Older paths are tested with a stand-in for the engine, which shows the logic and the log lines and not what an old engine does with the calls that are left.
+
+## Licence
+
+The rewind Lua and its adapters are offered under the MIT licence or the GNU General Public License version 2 or any later version, at your choice. Each file names this in its `license` field, and the notice is in `lua/LICENSE.md` in the coilbox repository.
+
+The playback game is written again on every launch and stays on your machine, so it carries no notice. A game you install the mission runtime into gets a `coilbox-licence/` folder with the notice and both licence texts. The installed app carries the same folder beside the Lua it ships.

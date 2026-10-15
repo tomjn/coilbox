@@ -48,14 +48,6 @@ describe("bundledCardArtSvg", () => {
     expect(bundledCardArtSvg("toString", THEME, DARK)).toBeUndefined();
   });
 
-  it("gives the same markup for the same tool and theme", () => {
-    for (const toolId of BUNDLED_ART_TOOL_IDS) {
-      expect(bundledCardArtSvg(toolId, THEME, DARK)).toBe(
-        bundledCardArtSvg(toolId, THEME, DARK),
-      );
-    }
-  });
-
   it("draws a different picture for each tool it covers", () => {
     // Compared with the id namespace removed. Gradient ids carry the tool id,
     // so raw markup differs between two tools even when they share a drawing,

@@ -16,7 +16,7 @@ import DownloadsSettings from "./pages/SettingsSection";
  * The downloads plugin's frontend half. Contributes a nav group and a single
  * lazy route: a rapid-repo explorer that lists downloadable content and triggers
  * downloads through the bundled `pr-downloader` sidecar. A settings section
- * (rapid repositories + download destination) is hosted in the frame settings
+ * (rapid repositories + downloading on join) is hosted in the frame settings
  * page at `/settings/downloads`. Pair it with the
  * `tauri-plugin-coilbox-downloads` crate (ACL id `coilbox-downloads`).
  *

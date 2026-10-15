@@ -1,6 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { StickyNote } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router";
 import {
   Popover,
   PopoverContent,
@@ -103,7 +104,15 @@ export function NoteForm({
     >
       <p className="px-1 text-sm font-medium">Note: {name}</p>
       {statsSummary && (
-        <p className="px-1 text-xs text-muted-foreground">{statsSummary}</p>
+        <p className="px-1 text-xs text-muted-foreground">
+          {statsSummary}{" "}
+          <Link
+            to={`/stats/${encodeURIComponent(name)}/matchup`}
+            className="text-primary hover:underline"
+          >
+            See the matchup
+          </Link>
+        </p>
       )}
       <Textarea
         value={draft}

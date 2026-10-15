@@ -413,3 +413,31 @@ export function renderPixels(
   const cap = ASSET_CLASSES[RENDER_CLASS].maxEdgePx ?? 0;
   return { widthPx: cap, heightPx: cap };
 }
+
+/**
+ * Which renderer drew a picture, and part of what its `source_hash` is over.
+ *
+ * **Bump this when a change here changes what a render looks like**: the camera,
+ * the lights, the team colour, the model reader or the texture handling. That is
+ * the whole mechanism for telling a renderer change from an encoder change. An
+ * encoder change moves `encode_profile` and must leave `source_hash` alone, or
+ * re-encoding the corpus reports every row in it as changed. A renderer change is
+ * the opposite case: the picture really is different and the hub should be told,
+ * so it moves `source_hash`, and this constant is how.
+ *
+ * Fixing something that does not change the picture is not a bump. **Adding an
+ * angle is not a bump either** (issue #1951): the angle is already part of a
+ * render's identity through its variant, so a new one is a picture the hub has
+ * never held rather than a change to one it has. Bumping for it would report
+ * every top down render in the corpus as changed and redraw the lot.
+ *
+ * 4: the plan's frame grows to cover the model rather than stopping at one build
+ * square (issue #2952). The pixel size is in the hash already, so on the hub the
+ * units whose frame grew would have moved on their own and the 87% that did not
+ * change would have been left alone. This machine's own render index is the
+ * reason that was not enough: `look_up` in `renderindex.rs` matches a record on
+ * the renderer version and nothing about the frame, so without a bump every unit
+ * somebody had already drawn would keep serving its old clipped picture and the
+ * fix would reach nobody who had used the feature.
+ */
+export const RENDER_VERSION = 4;

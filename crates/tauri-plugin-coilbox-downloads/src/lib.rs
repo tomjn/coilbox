@@ -4,6 +4,8 @@
 //! as a [`CliResult`]. Adds rapid-repo browsing (HTTP + gzip) so the frontend can
 //! list downloadable content before downloading a tag.
 
+mod github_cache;
+mod install;
 mod progress;
 mod rapid;
 mod sidecar;
@@ -115,7 +117,11 @@ fn timed_client() -> Result<reqwest::Client, String> {
 
 /// Fetch a gzipped rapid index over HTTPS and inflate it to text.
 async fn fetch_gz(url: String) -> Result<String, String> {
-    let resp = reqwest::get(&url).await.map_err(|e| e.to_string())?;
+    let resp = timed_client()?
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
     let resp = resp.error_for_status().map_err(|e| e.to_string())?;
     let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
     let mut decoder = flate2::read::GzDecoder::new(&bytes[..]);
@@ -553,10 +559,7 @@ async fn dl_download(
 /// Fetch a URL as text. springfiles/BAR serve plain (non-gzipped) JSON. The
 /// evolutionrts mirror answers 406 to a request with no `User-Agent`.
 async fn fetch_text(url: String) -> Result<String, String> {
-    let client = reqwest::Client::builder()
-        .user_agent("coilbox")
-        .build()
-        .map_err(|e| e.to_string())?;
+    let client = timed_client()?;
     let resp = client.get(&url).send().await.map_err(|e| e.to_string())?;
     let resp = resp.error_for_status().map_err(|e| e.to_string())?;
     resp.text().await.map_err(|e| e.to_string())
@@ -844,14 +847,49 @@ async fn dl_fetch_text(url: String) -> CliResult {
 }
 
 /// GitHub's API rejects requests without a `User-Agent`; set one explicitly.
+/// A stored copy of the last answer is revalidated with its ETag, and a 304 uses
+/// that copy. A rate limit refusal comes back as an error that says so.
 async fn fetch_github(url: &str) -> Result<String, String> {
-    let client = reqwest::Client::builder()
-        .user_agent("coilbox")
-        .build()
-        .map_err(|e| e.to_string())?;
-    let resp = client.get(url).send().await.map_err(|e| e.to_string())?;
+    let client = timed_client()?;
+    let owned = url.to_string();
+    let stored = tauri::async_runtime::spawn_blocking(move || github_cache::read_blocking(&owned))
+        .await
+        .ok()
+        .flatten();
+    let mut req = client.get(url);
+    if let Some(entry) = &stored {
+        req = req.header(reqwest::header::IF_NONE_MATCH, &entry.etag);
+    }
+    let resp = req.send().await.map_err(|e| e.to_string())?;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs());
+    match github_cache::verdict(resp.status(), resp.headers(), stored.is_some(), now) {
+        github_cache::Verdict::UseStored => {
+            return stored
+                .map(|e| e.body)
+                .ok_or_else(|| "no stored copy".into())
+        }
+        github_cache::Verdict::Refused(msg) => return Err(msg),
+        github_cache::Verdict::Read => {}
+    }
     let resp = resp.error_for_status().map_err(|e| e.to_string())?;
-    resp.text().await.map_err(|e| e.to_string())
+    let etag = resp
+        .headers()
+        .get(reqwest::header::ETAG)
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_string);
+    let body = resp.text().await.map_err(|e| e.to_string())?;
+    if let Some(etag) = etag {
+        let entry = github_cache::Entry {
+            url: url.to_string(),
+            etag,
+            body: body.clone(),
+        };
+        let _ = tauri::async_runtime::spawn_blocking(move || github_cache::write_blocking(&entry))
+            .await;
+    }
+    Ok(body)
 }
 
 /// `dl_recoil_engines` — Recoil engine releases whose assets match the running
@@ -953,6 +991,15 @@ fn engine_dirs(engine_root: &std::path::Path) -> Vec<std::path::PathBuf> {
         dirs.push(path);
     }
     dirs
+}
+
+/// The folders under `engine/` named after `version`, which is where a download
+/// of it extracts to: `engine/<version>` or `engine/<platform>/<version>`.
+fn installed_copies(engine_root: &std::path::Path, version: &str) -> Vec<std::path::PathBuf> {
+    engine_dirs(engine_root)
+        .into_iter()
+        .filter(|dir| dir.file_name().is_some_and(|name| name == version))
+        .collect()
 }
 
 /// Report a carry that could not be made, without failing the install.
@@ -1170,6 +1217,10 @@ async fn install_recoil_engine(
     let tmp_for_extract = tmp.clone();
     let dest_for_extract = dest.clone();
     let extracted = tauri::async_runtime::spawn_blocking(move || {
+        // Installing a version that is already there writes over its files, and
+        // Windows will not overwrite a library a unitsync worker has loaded
+        // (issue #3722).
+        coilbox_proc::release_engine(&dest_for_extract);
         sevenz_rust2::decompress_file(&tmp_for_extract, &dest_for_extract)
             .map_err(|e| format!("failed to extract engine archive: {e}"))
     })
@@ -1327,6 +1378,18 @@ async fn dl_download_engine_spring(
         std::path::Path::new(&wp).join("engine")
     });
     let before = engine_root.as_deref().map(loose_file_names);
+    // pr-downloader extracts over a version that is already installed, and
+    // Windows will not overwrite a library a unitsync worker has loaded (issue
+    // #3722). So any copy of this version lets go first.
+    if let Some(root) = engine_root.clone() {
+        let version = version.clone();
+        let _ = tauri::async_runtime::spawn_blocking(move || {
+            for installed in installed_copies(&root, &version) {
+                coilbox_proc::release_engine(&installed);
+            }
+        })
+        .await;
+    }
     let (cancel, child_slot) = cancel_slots(&op_id);
     let res = run_sidecar_streaming(args, Vec::new(), on_progress, cancel, child_slot).await;
     if let Some(id) = &op_id {
@@ -1428,6 +1491,68 @@ async fn dl_path_writable(path: String) -> CliResult {
     CliResult::ok(json!({ "writable": writable, "error": error }))
 }
 
+/// What `dl_inspect_archive` and `dl_install_archive` answer with.
+fn archive_plan_json(plan: &install::Plan) -> serde_json::Value {
+    json!({
+        "kind": plan.kind.as_str(),
+        "fileName": plan.file_name,
+        "destDir": plan.dest_dir.display().to_string(),
+    })
+}
+
+/// `dl_inspect_archive` — say whether the `.sdz` or `.sd7` at `path` is a game
+/// or a map and which folder it would be copied into, without copying it. The
+/// frontend asks this before it asks the player. Fails with the reason when the
+/// file is neither, has no folder chosen for its kind, or is already there.
+#[tauri::command]
+async fn dl_inspect_archive(
+    path: String,
+    games_root: Option<String>,
+    maps_root: Option<String>,
+) -> CliResult {
+    let planned = tauri::async_runtime::spawn_blocking(move || {
+        install::plan(
+            std::path::Path::new(&path),
+            games_root.as_deref(),
+            maps_root.as_deref(),
+        )
+    })
+    .await;
+    match planned {
+        Ok(Ok(plan)) => CliResult::ok(archive_plan_json(&plan)),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(e.to_string()),
+    }
+}
+
+/// `dl_install_archive` — copy the archive at `path` into `games/` or `maps/`
+/// under the root for its kind. The original is left where it is and a file
+/// already in the target folder is never replaced.
+#[tauri::command]
+async fn dl_install_archive(
+    path: String,
+    games_root: Option<String>,
+    maps_root: Option<String>,
+) -> CliResult {
+    let installed = tauri::async_runtime::spawn_blocking(move || {
+        install::install(
+            std::path::Path::new(&path),
+            games_root.as_deref(),
+            maps_root.as_deref(),
+        )
+    })
+    .await;
+    match installed {
+        Ok(Ok((plan, dest))) => {
+            let mut body = archive_plan_json(&plan);
+            body["path"] = json!(dest.display().to_string());
+            CliResult::ok(body)
+        }
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(e.to_string()),
+    }
+}
+
 /// Build the plugin. Registered as `"coilbox-downloads"` (crate name minus
 /// the `tauri-plugin-` prefix); the frontend invokes
 /// `plugin:coilbox-downloads|<cmd>`.
@@ -1438,6 +1563,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .setup(|app, _api| {
             use tauri::Manager;
             sidecar::set_resource_dir(app.path().resource_dir().ok());
+            github_cache::set_dir(coilbox_portable::cache_dir(app).ok());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -1461,7 +1587,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             dl_set_engine_dirs,
             dl_path_writable,
             dl_fetch_text,
-            dl_rapid_release_archives
+            dl_rapid_release_archives,
+            dl_inspect_archive,
+            dl_install_archive
         ])
         .build()
 }

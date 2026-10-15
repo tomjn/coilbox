@@ -33,7 +33,11 @@ vi.mock("@/downloads/downloadMap", () => ({ downloadMapAnySource: vi.fn() }));
 vi.mock("@/content/bindings", () => ({
   contentRescan: vi.fn(async () => {}),
 }));
-vi.mock("@/content/config", () => ({ invalidateScans: vi.fn() }));
+vi.mock("@/content/config", () => ({
+  forgetScans: vi.fn(),
+  invalidateScans: vi.fn(),
+  rescanMounted: vi.fn(),
+}));
 vi.mock("@/content/rapidPoolWarm", () => ({
   warmAllRoots: vi.fn(async () => {}),
 }));

@@ -93,6 +93,9 @@ export interface SpringFile {
   filename: string;
   category: string;
   size: number;
+  /** When the file was added, in the site's own time with no zone. Null on a
+   * few old rows. */
+  timestamp: string | null;
   mirrors: string[];
   /** Thumbnail/preview image URLs (may be empty, e.g. for games). */
   mapimages: string[];
@@ -172,6 +175,8 @@ export interface ReleaseArchive {
   url: string;
   size: number;
   tag: string;
+  /** When that release was published, or null when GitHub gave no date. */
+  publishedAt: string | null;
 }
 
 /** Content archives from an `owner/name` repo's recent GitHub releases, for the
@@ -250,6 +255,35 @@ export const dlPathWritable = defineCommand<
   { path: string },
   { writable: boolean; error: string | null }
 >("coilbox-downloads", "dl_path_writable");
+
+/** Where an archive goes, as `dl_inspect_archive` and `dl_install_archive` say it. */
+export interface ArchivePlan {
+  kind: "game" | "map";
+  fileName: string;
+  /** The `games/` or `maps/` folder it is copied into. */
+  destDir: string;
+}
+
+/**
+ * Read the `.sdz` or `.sd7` at `path` and say whether it is a game or a map and
+ * where it would be copied, without copying it. `gamesRoot` and `mapsRoot` are
+ * the content folders chosen for each kind. Throws the reason when the file is
+ * neither, has no folder chosen for its kind, or is already in that folder.
+ */
+export const dlInspectArchive = defineCommand<
+  { path: string; gamesRoot?: string; mapsRoot?: string },
+  ArchivePlan
+>("coilbox-downloads", "dl_inspect_archive");
+
+/**
+ * Copy the archive at `path` into `games/` or `maps/` under the root for its
+ * kind, leaving the original where it is. Runs every check
+ * {@link dlInspectArchive} does again and never replaces a file.
+ */
+export const dlInstallArchive = defineCommand<
+  { path: string; gamesRoot?: string; mapsRoot?: string },
+  ArchivePlan & { path: string }
+>("coilbox-downloads", "dl_install_archive");
 
 /**
  * Fetch a shared `coilbox://import?url=` payload as text over HTTPS from the

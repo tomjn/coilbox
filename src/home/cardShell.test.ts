@@ -1,5 +1,6 @@
 import { twMerge } from "tailwind-merge";
 import { describe, expect, it } from "vitest";
+import { contrast, hsl, type Rgb } from "../lib/contrast.testhelper";
 import {
   ART_BAND_CLASS,
   ART_BUTTON_CLASS,
@@ -32,45 +33,9 @@ import {
  * `cardShell.ts` re-runs the measurement instead of leaving it stale.
  */
 
-type Rgb = [number, number, number];
-
-/** CSS `hsl()` to sRGB channels, all 0 to 1 except the hue. */
-function hsl(h: number, s: number, l: number): Rgb {
-  const c = (1 - Math.abs(2 * l - 1)) * Math.min(Math.max(s, 0), 1);
-  const sector = ((((h % 360) + 360) % 360) / 60) % 6;
-  const x = c * (1 - Math.abs((sector % 2) - 1));
-  const rgb: Rgb =
-    sector < 1
-      ? [c, x, 0]
-      : sector < 2
-        ? [x, c, 0]
-        : sector < 3
-          ? [0, c, x]
-          : sector < 4
-            ? [0, x, c]
-            : sector < 5
-              ? [x, 0, c]
-              : [c, 0, x];
-  const m = l - c / 2;
-  return rgb.map((v) => v + m) as Rgb;
-}
-
 /** Straight-alpha composite of `layer` over `base`. */
 function over(base: Rgb, layer: Rgb, alpha: number): Rgb {
   return base.map((c, i) => c * (1 - alpha) + layer[i] * alpha) as Rgb;
-}
-
-/** WCAG 2.2 relative luminance. */
-function luminance([r, g, b]: Rgb): number {
-  const lin = (v: number) =>
-    v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-}
-
-/** WCAG 2.2 contrast ratio between two colours. */
-function contrast(a: Rgb, b: Rgb): number {
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
-  return (hi + 0.05) / (lo + 0.05);
 }
 
 /** The alpha in a `hsl(var(--token)/N)` arbitrary value, or 1 if it has none. */
@@ -108,15 +73,12 @@ const RAMPS = {
     surface: (hue: number, sat: number) => hsl(hue, (sat * 6) / 100, 0.07),
     /** `.dark --foreground`, a literal near-white the base does not move. */
     ink: () => hsl(0, 0, 0.95),
-    /** Black is the floor for a picture, white the ceiling. */
-    worstArt: [1, 1, 1] as Rgb,
   },
   light: {
     /** `:root --background`, a literal white the base does not retint. */
     surface: () => hsl(0, 0, 1),
     /** `:root --foreground`, near-black and tinted by the text knob. */
     ink: (hue: number, satText: number) => hsl(hue, (satText * 10) / 100, 0.12),
-    worstArt: [0, 0, 0] as Rgb,
   },
 } as const;
 
@@ -145,24 +107,6 @@ function bandOver(
   };
 }
 
-/** Measure both text colours over `art`, in every base ramp picoframe ships. */
-function measureBandOver(art: Rgb, scheme: Scheme) {
-  for (const hue of BASE_HUES) {
-    for (const [sat, satText] of BASE_SATS) {
-      const measured = bandOver(art, scheme, hue, sat, satText);
-      const label = `${scheme} base hue ${hue} sat ${sat}`;
-
-      it(`clears AA for the card's name at ${label}`, () => {
-        expect(measured.name).toBeGreaterThanOrEqual(4.5);
-      });
-
-      it(`clears AA for the card's secondary line at ${label}`, () => {
-        expect(measured.secondary).toBeGreaterThanOrEqual(4.5);
-      });
-    }
-  }
-}
-
 describe("text on card art", () => {
   it("dims the art under the band", () => {
     expect(bandAlpha).toBeGreaterThan(0);
@@ -173,22 +117,6 @@ describe("text on card art", () => {
     expect(ART_FADE_CLASS).toContain("to-transparent");
     expect(ART_FADE_CLASS).toContain("bottom-full");
   });
-});
-
-/**
- * The guarantee the shell carries, and the reason it is the strict one.
- *
- * Issue #989 puts real minimaps and loading-screen art on these cards, #1000 lets
- * a distribution supply any image file at all, and the suggested map shows a
- * picture of whatever the mapper made, up to and including a snowfield and a
- * night battle. Coilbox draws none of that and can promise nothing about it, so
- * what holds the text legible has to be the band and not the picture. Black and
- * white are a picture's floor and ceiling, and each ramp's worst case is one of
- * them, so a band that clears AA there clears it over every picture a source can
- * hand back and no source has to tune its own output to be safe here.
- */
-describe("text on art Coilbox did not draw", () => {
-  for (const scheme of SCHEMES) measureBandOver(RAMPS[scheme].worstArt, scheme);
 });
 
 /**

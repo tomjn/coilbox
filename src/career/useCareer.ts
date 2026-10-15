@@ -9,6 +9,7 @@ import {
   type AchievementResult,
   evaluateAchievements,
 } from "../content/achievements";
+import { aiWinFacts } from "../content/aiRecord";
 import {
   useContentState,
   useReplayStats,
@@ -193,9 +194,12 @@ export function useCareer(): CareerData {
   const achievements = useMemo(
     () =>
       aiReady && player
-        ? evaluateAchievements(playerGameFacts(stats.records, player, refights))
+        ? evaluateAchievements(
+            playerGameFacts(stats.records, player, refights),
+            aiWinFacts(stats.records, player, refights, scripted),
+          )
         : null,
-    [aiReady, player, stats.records, refights],
+    [aiReady, player, stats.records, refights, scripted],
   );
 
   return {

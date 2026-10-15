@@ -5,9 +5,14 @@ import {
   CSS2DObject,
   CSS2DRenderer,
 } from "three/addons/renderers/CSS2DRenderer.js";
+import { registerCanvas3D } from "../../lib/renderStats";
 import { drawingPixelRatio } from "../../lib/uiZoom";
 import type { GalaxyDoc, Incursion, NodeStar } from "../model";
 import { planetOf } from "../planets";
+import {
+  createAdaptiveResolution,
+  createDisplayClock,
+} from "./adaptiveResolution";
 import { buildBackdrop } from "./backdrop";
 import { bodyLabel, type VoidBody } from "./bodies";
 import { buildCityLayer } from "./cityLayer";
@@ -17,7 +22,13 @@ import { buildEndMarkerLayer } from "./endMarkerLayer";
 import { createFocus } from "./focus";
 import { createFrameScheduler, needsAnotherFrame } from "./frameDemand";
 import { buildGroundLayer, type GroundLayer } from "./groundLayer";
-import { declutterLabels, type LabelBox } from "./labelDeclutter";
+import {
+  type LabelElement,
+  type LabelInput,
+  type LabelSize,
+  placeLabels,
+  sameNumbers,
+} from "./labelDeclutter";
 import { hashString } from "./layout";
 import { createOwners } from "./owners";
 import { pickLocation } from "./picking";
@@ -40,7 +51,7 @@ import {
   VIEW_FOV_DEGREES,
 } from "./terrain";
 import { type TerrainPixels, useTerrainHeights } from "./terrainLoad";
-import { buildTerrainMesh } from "./terrainMesh";
+import { buildTerrainMesh, type TerrainSheet } from "./terrainMesh";
 import { paintsTowns } from "./townGate";
 import { buildTownLayer, type TownLayer, townsOnRoads } from "./townLayer";
 import type { Town } from "./towns";
@@ -216,8 +227,8 @@ interface GalaxyViewProps {
   terrainPixels?: TerrainPixels;
   /**
    * Where `galaxy.models` are read from: the installed game and the map's
-   * folder. A model whose source is absent is reported as missing. Keep it
-   * stable between renders, because a new object rebuilds the scene.
+   * folder. A model whose source is absent is reported as missing. A new
+   * object swaps the models only: the scene is not rebuilt.
    */
   modelSources?: PlacedModelSources;
   display?: Partial<GalaxyDisplay>;
@@ -487,6 +498,12 @@ export function GalaxyView({
   const applySelectionRef = useRef<(() => void) | null>(null);
   const applyVisibilityRef = useRef<(() => void) | null>(null);
   const applyFocusRef = useRef<(() => void) | null>(null);
+  // The scenery's sources arrive after the scene is built, so they reach the
+  // live scene through these instead of rebuilding it.
+  const modelSourcesRef = useRef(modelSources);
+  const attachModelsRef = useRef<
+    ((sources: PlacedModelSources | undefined) => void) | null
+  >(null);
   const renderRef = useRef<(() => void) | null>(null);
   // The warp-in plays on a fresh mount but not when only the previewed faction
   // changes. Comparing against the previous faction is robust to StrictMode's
@@ -500,6 +517,7 @@ export function GalaxyView({
   } | null>(null);
 
   onSelectRef.current = onSelect;
+  modelSourcesRef.current = modelSources;
 
   const reduceMotion =
     display?.reduceMotion ??
@@ -572,11 +590,38 @@ export function GalaxyView({
 
     /* ------------------------- decorative backdrop ------------------------- */
 
-    // Set where the scenery is built, for the markers that stand in for it.
+    // The scenery. It is added to the scene that is already built when its
+    // sources arrive, so a late source never rebuilds the terrain.
     let placedModels: PlacedModelsLayer | undefined;
+    let placedDisposables: { dispose(): void }[] = [];
+    disposables.push({
+      dispose: () => {
+        for (const d of placedDisposables) d.dispose();
+      },
+    });
+    // What the markers that stand in for the scenery wait on: it settles when
+    // the models do, whenever their sources arrive.
+    let settlePlaced: (() => void) | undefined;
+    const placedForMarkers:
+      | Pick<PlacedModelsLayer, "failed" | "settled">
+      | undefined = galaxy.models?.length
+      ? {
+          get failed() {
+            return placedModels?.failed ?? [];
+          },
+          settled: new Promise<void>((resolve) => {
+            settlePlaced = resolve;
+          }),
+        }
+      : undefined;
+    const unattached = Symbol("unattached");
+    let attachedSources: PlacedModelSources | undefined | typeof unattached =
+      unattached;
 
     // Roads painted into a terrain map's ground. See groundLayer.ts.
     let ground: GroundLayer | undefined;
+    // The ground itself, whose detail is baked over the first frames.
+    let terrainSheet: TerrainSheet | undefined;
     // A town at every location. See townLayer.ts.
     let towns: TownLayer | undefined;
     // Where each sea crossing runs. Its tracks to the shore are painted with
@@ -623,7 +668,7 @@ export function GalaxyView({
           !terrainColor,
         );
       }
-      buildTerrainMesh(
+      terrainSheet = buildTerrainMesh(
         scene,
         disposables,
         surface,
@@ -636,16 +681,28 @@ export function GalaxyView({
         terrainBiomes,
       );
       // Scenery. It loads in the background and never holds the map up.
-      if (galaxy.models?.length && !modelSources?.pending) {
-        placedModels = buildPlacedModels(
+      const models = galaxy.models;
+      const attachModels = (sources: PlacedModelSources | undefined) => {
+        if (!models?.length || sources?.pending) return;
+        if (sources === attachedSources) return;
+        attachedSources = sources;
+        for (const d of placedDisposables) d.dispose();
+        placedDisposables = [];
+        const layer = buildPlacedModels(
           scene,
-          disposables,
-          surface,
-          galaxy.models,
-          placedModelLoaders(modelSources),
+          placedDisposables,
+          terrain,
+          models,
+          placedModelLoaders(sources),
           renderRef,
         );
-      }
+        placedModels = layer;
+        void layer.settled.then(() => {
+          if (layer === placedModels) settlePlaced?.();
+        });
+      };
+      attachModelsRef.current = attachModels;
+      attachModels(modelSourcesRef.current);
     } else {
       buildBackdrop(
         scene,
@@ -807,7 +864,7 @@ export function GalaxyView({
             surface,
             identities,
             ownerColor,
-            placedModels,
+            placedForMarkers,
             renderRef,
           )
         : undefined;
@@ -850,6 +907,9 @@ export function GalaxyView({
     renderer = new THREE.WebGLRenderer({
       antialias: !performanceMode,
       alpha: true,
+      // Ask for the fast GPU on a machine with two. The map redraws every
+      // frame while it is panned, so it is the view that needs it most.
+      powerPreference: "high-performance",
     });
     renderer.setClearColor(0x000000, 0); // page background shows through
     container.appendChild(renderer.domElement);
@@ -931,7 +991,6 @@ export function GalaxyView({
       Object.assign(controls, terrainCameraLimits(surface, VIEW_FOV_DEGREES));
     }
     controls.zoomToCursor = true;
-    controls.enableDamping = !reduceMotion;
 
     // Spin snap-back: while the pointer is down the user may rotate freely;
     // on release the azimuth eases back to the default heading (instantly
@@ -1004,6 +1063,8 @@ export function GalaxyView({
     // placement reruns for those as well as for a moved camera.
     let labelEpoch = 0;
 
+    // Until the last tile of the ground's bake is drawn.
+    let baking = !!terrainSheet?.bake;
     const render = () => {
       if (!renderer || !labelRenderer) return;
       if (cities && controls) {
@@ -1011,9 +1072,37 @@ export function GalaxyView({
         cities.fitToCamera(distance);
         endMarkers?.fitToCamera(distance);
       }
+      // One tile of the ground's bake a frame, until it is done.
+      if (terrainSheet?.prepare(renderer)) requestRender();
+      else baking = false;
       renderer.render(scene, camera);
       declutter?.();
       labelRenderer.render(scene, camera);
+    };
+    // Fewer pixels while the camera moves and the frames run long, and all of
+    // them again once it stops (issue #3994). See adaptiveResolution.ts.
+    const fullPixelRatio = () => drawingPixelRatio(performanceMode ? 1 : 2);
+    const resolution = createAdaptiveResolution();
+    const displayClock = createDisplayClock();
+    const lastCameraPosition = camera.position.clone();
+    const lastCameraQuaternion = camera.quaternion.clone();
+    const adaptResolution = (waited: number) => {
+      if (!renderer) return;
+      const moving =
+        !camera.position.equals(lastCameraPosition) ||
+        !camera.quaternion.equals(lastCameraQuaternion);
+      lastCameraPosition.copy(camera.position);
+      lastCameraQuaternion.copy(camera.quaternion);
+      const ratio = resolution.frame(
+        {
+          waited,
+          moving,
+          baking,
+          displayInterval: displayClock.interval(),
+        },
+        fullPixelRatio(),
+      );
+      if (renderer.getPixelRatio() !== ratio) renderer.setPixelRatio(ratio);
     };
     // Draw on demand, at most once a frame (issue #3653). Anything that
     // changes the picture asks for a frame, and a frame asks for the next one
@@ -1021,13 +1110,24 @@ export function GalaxyView({
     // pointer handler and again from the loop's update, and each is one more
     // request for the same frame. The animation loop below replaces
     // `drawFrame` when motion is allowed. Under reduce-motion a frame only
-    // draws.
-    let drawFrame = (): boolean => {
+    // draws, and asks for one more after drawing below full resolution.
+    let drawFrame = (waited: number): boolean => {
+      adaptResolution(waited);
       render();
-      return false;
+      return resolution.reduced();
     };
-    const frames = createFrameScheduler(() => drawFrame());
-    const requestRender = frames.request;
+    // The display's interval is measured whenever the map comes to rest.
+    const frames = createFrameScheduler(
+      (waited) => drawFrame(waited),
+      requestAnimationFrame,
+      cancelAnimationFrame,
+      () => performance.now(),
+      displayClock.measure,
+    );
+    const requestRender = () => {
+      displayClock.cancel();
+      frames.request();
+    };
     renderRef.current = requestRender;
     controls.addEventListener("change", () => {
       clampTarget();
@@ -1142,47 +1242,54 @@ export function GalaxyView({
     // or the labels changed, not on every frame that draws.
     if (surface && labelObjects.length > 0) {
       const projected = new THREE.Vector3();
-      let placedFor = "";
+      const inputs: LabelInput[] = labelObjects.map((label) => ({
+        el: label.element as HTMLElement,
+        ndc: null,
+        center: label.center,
+        rank: 1,
+        pinned: false,
+      }));
+      // What the last pass ran for. The matrices are copied, since the camera
+      // rewrites its own in place.
+      const placedView = new Float32Array(16);
+      const placedProjection = new Float32Array(16);
+      let placedSize = "";
+      let placedEpoch = -1;
+      const keptSizes = new Map<LabelElement, LabelSize>();
       declutter = () => {
         const w = container.clientWidth || 1;
         const h = container.clientHeight || 1;
-        const key = `${w}x${h}|${labelEpoch}|${camera.matrixWorldInverse.elements.join()}|${camera.projectionMatrix.elements.join()}`;
-        if (key === placedFor) return;
-        placedFor = key;
+        const size = `${w}x${h}`;
+        if (
+          size === placedSize &&
+          labelEpoch === placedEpoch &&
+          sameNumbers(camera.matrixWorldInverse.elements, placedView) &&
+          sameNumbers(camera.projectionMatrix.elements, placedProjection)
+        ) {
+          return;
+        }
+        placedSize = size;
+        // A name's size changes with its text or style, not with the camera.
+        const remeasure = labelEpoch !== placedEpoch;
+        placedEpoch = labelEpoch;
+        placedView.set(camera.matrixWorldInverse.elements);
+        placedProjection.set(camera.projectionMatrix.elements);
         const selectedIndex = selection.getIndex();
-        const entries: { label: CSS2DObject; box: LabelBox }[] = [];
         labelObjects.forEach((label, i) => {
-          const el = label.element as HTMLElement;
-          // Reset first, so a name that stops colliding comes back.
-          el.style.visibility = "";
-          el.style.marginTop = "";
+          const input = inputs[i];
+          input.ndc = null;
           if (!label.visible) return;
           projected.copy(label.position).project(camera);
           if (projected.z < -1 || projected.z > 1) return;
-          const width = el.offsetWidth;
-          const height = el.offsetHeight;
           const node = galaxy.nodes[i];
-          entries.push({
-            label,
-            box: {
-              left: (projected.x * 0.5 + 0.5) * w - width * label.center.x,
-              top: (-projected.y * 0.5 + 0.5) * h - height * label.center.y,
-              width,
-              height,
-              rank: node.kind === "capital" ? 2 : 1,
-              pinned:
-                i === hovered ||
-                i === selectedIndex ||
-                (ownersRef.current[node.id] ?? node.owner) === playerFactionId,
-            },
-          });
+          input.rank = node.kind === "capital" ? 2 : 1;
+          input.pinned =
+            i === hovered ||
+            i === selectedIndex ||
+            (ownersRef.current[node.id] ?? node.owner) === playerFactionId;
+          input.ndc = { x: projected.x, y: projected.y };
         });
-        const placed = declutterLabels(entries.map((e) => e.box));
-        placed.forEach((p, k) => {
-          const el = entries[k].label.element as HTMLElement;
-          if (p.hidden) el.style.visibility = "hidden";
-          else if (p.dy !== 0) el.style.marginTop = `${p.dy}px`;
-        });
+        placeLabels(inputs, w, h, keptSizes, remeasure);
       };
     }
     let downAt: [number, number] | null = null;
@@ -1317,12 +1424,12 @@ export function GalaxyView({
     /* ---------------------------- animation loop --------------------------- */
 
     // Only when motion is allowed: the intro warp, twinkle time, binary
-    // orbits, ring pulses and control damping. A frame keeps the next one
+    // orbits and ring pulses. A frame keeps the next one
     // coming while any of them runs, see frameDemand.ts. A Galaxy or Theatre
     // map always has something moving. Under reduce-motion the scene draws
     // on demand and stays perfectly still.
     if (!reduceMotion) {
-      drawFrame = (): boolean => {
+      drawFrame = (waited: number): boolean => {
         // The clock the eases started on, not the frame's own timestamp,
         // which can sit a little before a start taken in the same frame.
         const now = performance.now();
@@ -1497,6 +1604,7 @@ export function GalaxyView({
           easeHeading();
           cameraMoved = controls?.update() ?? false;
         }
+        adaptResolution(waited);
         render();
         const selectedIdx = selection.getIndex();
         return needsAnotherFrame({
@@ -1510,6 +1618,7 @@ export function GalaxyView({
           selectionPulse: selectedIdx >= 0 && !!ownerRings[selectedIdx],
           combatFlashes: visibility.isFlashing(),
           effects,
+          reducedResolution: resolution.reduced(),
         });
       };
       requestRender();
@@ -1522,7 +1631,8 @@ export function GalaxyView({
       // Every resize, not once at build: UI zoom moves the pixel ratio and the
       // container's CSS size together, so the observer that reports the size
       // change is also when the ratio needs re-reading (see `lib/uiZoom`).
-      renderer.setPixelRatio(drawingPixelRatio(performanceMode ? 1 : 2));
+      resolution.reset();
+      renderer.setPixelRatio(fullPixelRatio());
       renderer.setSize(w, h, false);
       labelRenderer.setSize(w, h);
       camera.aspect = w / h;
@@ -1532,9 +1642,18 @@ export function GalaxyView({
     observer = new ResizeObserver(resize);
     observer.observe(container);
     resize();
+    // The map makes its own renderer rather than going through useCanvas3D,
+    // so it joins the list of 3D views here.
+    const unregisterStats = registerCanvas3D({
+      renderer,
+      render,
+      host: container,
+    });
 
     return () => {
+      unregisterStats();
       frames.cancel();
+      displayClock.cancel();
       // Remember the final pose so a faction-switch rebuild can ease from here.
       camPoseRef.current = {
         pos: camera.position.clone(),
@@ -1562,6 +1681,7 @@ export function GalaxyView({
       applyVisibilityRef.current = null;
       applyFocusRef.current = null;
       applyBurstRef.current = null;
+      attachModelsRef.current = null;
     };
   }, [
     galaxy,
@@ -1580,8 +1700,12 @@ export function GalaxyView({
     terrainColor,
     terrainExtension,
     terrainBiomes,
-    modelSources,
   ]);
+
+  // Models added to the scene that is already built.
+  useEffect(() => {
+    attachModelsRef.current?.(modelSources);
+  }, [modelSources]);
 
   // Prop changes mutate the live scene and ask for a frame. Fog changes touch both lanes (via owners.ts's
   // apply) and the per-node styling.

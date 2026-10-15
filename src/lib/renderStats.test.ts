@@ -34,6 +34,7 @@ function fakeCanvas(width: number, height: number, calls: number) {
       render: () => {
         drawn++;
       },
+      host: {} as HTMLElement,
     },
     drawn: () => drawn,
   };

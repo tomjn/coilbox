@@ -7,18 +7,14 @@
  * server actually said it changed.
  *
  * Modelled on `oneLobbyConnection.dom.test.tsx`: these drive the real provider
- * rather than a copy of its logic, so the mocking setup for
- * `@tauri-apps/api/core` and the fake `Channel` wiring is copied from there.
+ * rather than a copy of its logic. The shared mock pieces are in
+ * `lobbyStoreMocks.testhelper.ts`.
  */
 
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LobbyServer } from "../lobby-servers/config";
-import type { LobbyEvent, LobbyState } from "./bindings";
-
-interface FakeChannel {
-  onmessage?: (ev: LobbyEvent) => void;
-}
+import type { LobbyEvent } from "./bindings";
 
 const wire = vi.hoisted(() => ({
   /** The event channel each connect handed the Rust side, by server key. */
@@ -39,11 +35,9 @@ const bindingMocks = vi.hoisted(() => ({
   resendVerification: vi.fn(async () => ({ sent: true })),
 }));
 
-vi.mock("@tauri-apps/api/core", () => ({
-  Channel: class {
-    onmessage?: (ev: LobbyEvent) => void;
-  },
-}));
+vi.mock("@tauri-apps/api/core", async () =>
+  (await import("./lobbyStoreMocks.testhelper")).tauriCoreStub(),
+);
 
 // The settings store, as much of it as the provider reads: a value per key that
 // starts at the default and can be set. Every list the provider keeps (channels,
@@ -76,50 +70,19 @@ vi.mock("./VerificationCodeDialog", () => ({
   VerificationCodeDialog: () => null,
 }));
 
-const emptyState = (): LobbyState =>
-  ({
-    myUsername: "AF",
-    compflags: [],
-    users: {},
-    channels: {},
-    dms: {},
-    battles: {},
-    currentBattle: null,
-    lastBattle: null,
-    hostPort: null,
-    channelDirectory: [],
-    currentVote: null,
-    serverIgnores: [],
-    friends: [],
-    friendRequests: [],
-    party: null,
-  }) as unknown as LobbyState;
-
-vi.mock("./bindings", () => ({
+vi.mock("./bindings", async () => ({
+  ...(await import("./lobbyStoreMocks.testhelper")).inertBindings(),
   mpConnect: async (args: { serverKey: string; onEvent: FakeChannel }) => {
     wire.channels.set(args.serverKey, args.onEvent);
     return { connected: true };
   },
-  mpConnectTachyon: async () => ({ connected: true }),
-  mpConnectZerok: async () => ({ connected: true }),
-  mpSnapshot: async () => ({ state: emptyState() }),
+  mpSnapshot: async () => ({ state: emptyLobbyState() }),
   mpDisconnect: async (args: { serverKey: string }) => {
     wire.disconnected.push(args.serverKey);
     return { disconnected: true };
   },
-  mpWaitUntilReady: async () => ({ ready: true }),
   mpActiveKeys: async () => ({ keys: [] as string[] }),
   mpReattach: async () => ({ reattached: true }),
-  mpCancelConnect: async () => ({ cancelled: true }),
-  mpConfirmAgreement: async () => ({}),
-  mpFriendList: async () => ({}),
-  mpFriendRequestList: async () => ({}),
-  mpIgnore: async () => ({}),
-  mpIgnoreList: async () => ({}),
-  mpJoinBattle: async () => ({}),
-  mpJoinChannel: async () => ({}),
-  mpRegister: async () => ({}),
-  mpRegisterZerok: async () => ({}),
   mpRecoverPassword: async (args: {
     serverKey: string;
     onEvent: FakeChannel;
@@ -136,15 +99,16 @@ vi.mock("./bindings", () => ({
   mpChangeEmail: bindingMocks.changeEmail,
   mpResendVerification: bindingMocks.resendVerification,
   mpGetUserInfo: async () => ({ sent: true }),
-  mpSetStatus: async () => ({}),
-  mpTachyonSignedIn: async () => ({ signedIn: true }),
-  mpTachyonSignIn: async () => ({}),
 }));
 
-vi.mock("../lobby-servers/bindings", () => ({
-  lsGetCredential: async () => ({ secret: "hunter2" }),
-}));
+vi.mock("../lobby-servers/bindings", async () =>
+  (await import("./lobbyStoreMocks.testhelper")).lobbyServerBindings(),
+);
 
+import {
+  emptyLobbyState,
+  type FakeChannel,
+} from "./lobbyStoreMocks.testhelper";
 import {
   MultiplayerProvider,
   SERVER_REPLY_TIMEOUT_MS,

@@ -231,7 +231,7 @@ function gadget:GetInfo()
 		desc = "Runs a coilbox scenario as a mission",
 		author = "coilbox",
 		date = "2026",
-		license = "MIT",
+		license = "MIT or GNU GPL, v2 or later",
 		-- Behind the game's own gadgets. The runtime overrides the start the
 		-- game would otherwise give the player, so it needs the last word:
 		-- gadgetHandler runs low layers first, and whoever runs last is the one

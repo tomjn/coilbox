@@ -121,6 +121,81 @@ it("does not offer the Server admin look-up to a channel op who is not a server 
   ).toBeNull();
 });
 
+it("hides the Server admin look-up when no look-up is handed in, and keeps the other moderator actions", () => {
+  render(
+    <MemberActionsMenu
+      nick="bob"
+      channel="lobby"
+      channelOps={false}
+      serverMod={true}
+      targetIsOp={false}
+      send={send}
+    />,
+  );
+  expect(
+    screen.queryByRole("button", { name: "Look up in Server admin" }),
+  ).toBeNull();
+  for (const name of [
+    "Get IP",
+    "Get user ID",
+    "Kick from server…",
+    "Ban from server…",
+  ]) {
+    expect(screen.getByRole("button", { name })).toBeTruthy();
+  }
+});
+
+function openChannelForm(item: "Mute…" | "Ban from channel…") {
+  render(
+    <MemberActionsMenu
+      nick="bob"
+      channel="lobby"
+      channelOps={true}
+      serverMod={false}
+      targetIsOp={false}
+      send={send}
+      onLookUp={onLookUp}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: item }));
+}
+
+it.each([
+  ["Mute…", "SAYPRIVATE ChanServ :mute lobby bob 10m spamming"],
+  ["Ban from channel…", "SAYPRIVATE ChanServ :ban lobby bob 1d spamming"],
+] as const)("requires a reason for %s", (item, line) => {
+  openChannelForm(item);
+  const confirm = screen.getByRole("button", {
+    name: "Confirm",
+  }) as HTMLButtonElement;
+  expect(screen.queryByText(/optional/)).toBeNull();
+  expect(confirm.disabled).toBe(true);
+  fireEvent.submit(confirm.closest("form") as HTMLFormElement);
+  expect(send).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByLabelText("Reason"), {
+    target: { value: "spamming" },
+  });
+  expect(confirm.disabled).toBe(false);
+  fireEvent.click(confirm);
+  expect(send).toHaveBeenCalledWith(line);
+});
+
+it("sends Kick from channel straight away, with no form or reason", () => {
+  render(
+    <MemberActionsMenu
+      nick="bob"
+      channel="lobby"
+      channelOps={true}
+      serverMod={false}
+      targetIsOp={false}
+      send={send}
+      onLookUp={onLookUp}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Kick from channel" }));
+  expect(send).toHaveBeenCalledTimes(1);
+});
+
 // The personal actions everybody gets (issue #3695).
 
 function personalMenu(over: { text?: string; ignored?: boolean } = {}) {

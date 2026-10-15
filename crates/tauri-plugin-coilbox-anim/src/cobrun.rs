@@ -37,7 +37,7 @@ use coilbox_unitpose::{
 use serde::Serialize;
 
 use crate::cob;
-use crate::opcodes::opcode;
+use crate::opcodes::{mnemonic, opcode, ta_only};
 
 /// COB's fixed-point scale: 65536ths of an elmo for a distance, and 65536ths
 /// of a full circle for an angle.
@@ -202,6 +202,9 @@ struct Program {
     piece_names: Vec<String>,
     /// The sounds a TA:K file names, by the index `PLAY_SOUND` plays them by.
     sounds: Vec<String>,
+    /// How many static variables the file says it has. A slot past this is
+    /// not a variable, as in the engine (`CobThread.cpp:468-474`).
+    statics: usize,
 }
 
 impl Program {
@@ -218,6 +221,7 @@ impl Program {
             .map(|name| lookup.get(&name.to_lowercase()).copied())
             .collect();
         let offsets = decoded.offsets.clone();
+        let statics = decoded.header.num_static_vars as usize;
         let lengths = (0..offsets.len())
             .map(|i| {
                 offsets
@@ -238,6 +242,7 @@ impl Program {
             lengths,
             pieces,
             sounds: decoded.sounds,
+            statics,
             piece_names: decoded.pieces,
         })
     }
@@ -393,7 +398,9 @@ impl Thread {
 struct Run {
     program: Program,
     model: Model,
-    statics: Vec<i32>,
+    /// Static variables that have been written, by slot. Kept sparse because
+    /// the count comes from the file and nothing bounds it.
+    statics: HashMap<usize, i32>,
     threads: Vec<Thread>,
     /// Threads a running thread started. The engine queues these and adds them
     /// after the tick that made them, so a started script never runs inside the
@@ -452,7 +459,7 @@ impl Run {
         Ok(Self {
             program,
             model,
-            statics: vec![0; 256],
+            statics: HashMap::new(),
             threads: Vec::new(),
             queued: Vec::new(),
             frame: 0,
@@ -541,6 +548,7 @@ impl Run {
             if let Some(world) = &event.world {
                 self.world = Some(world.clone());
             }
+            self.model.see(event);
             if let Some(action) = event.engine {
                 self.tick_queued_call_ins(start)?;
                 if action == EngineAction::Fire {
@@ -596,7 +604,7 @@ impl Run {
                 self.model.awaiting_build = false;
                 self.model.building = true;
                 self.model.spraying = true;
-                self.model.build_start(frame);
+                self.model.build_start(frame, events);
                 let queued_at = self.threads.len();
                 self.start_callin("StartBuilding", &[])?;
                 self.tick_queued_call_ins(queued_at)?;
@@ -1076,6 +1084,13 @@ impl Run {
     fn execute(&mut self, i: usize, word: u32) -> Result<(), String> {
         let op = |name: &str| opcode(name).expect("mnemonic is in the opcode table");
 
+        if mnemonic(word).is_some_and(ta_only) {
+            self.model.note(
+                "This script uses an instruction only Total Annihilation's own engine runs. The preview runs it as Total Annihilation does, and Recoil stops the thread there."
+                    .to_string(),
+            );
+        }
+
         match word {
             // Stack.
             w if w == op("PUSH_CONSTANT") => {
@@ -1098,14 +1113,14 @@ impl Run {
             }
             w if w == op("PUSH_STATIC") => {
                 let slot = self.word(i)? as usize;
-                let value = self.statics.get(slot).copied().unwrap_or(0);
+                let value = self.statics.get(&slot).copied().unwrap_or(0);
                 self.push(i, value);
             }
             w if w == op("POP_STATIC") => {
                 let slot = self.word(i)? as usize;
                 let value = self.pop(i);
-                if let Some(held) = self.statics.get_mut(slot) {
-                    *held = value;
+                if slot < self.program.statics {
+                    self.statics.insert(slot, value);
                 }
             }
             w if w == op("POP_STACK") => {
@@ -1429,6 +1444,36 @@ impl Run {
                 self.model.drop_unit(self.frame, unit, self.world.as_ref());
             }
 
+            // Total Annihilation's own, as `CobScript::RunThread` runs them
+            // (`byte-tactics`, `src/units/cob.cpp:576-587,772-782,898-904`).
+            // The unit in the preview carries the stand-in or nothing, and
+            // nothing carries it.
+            w if w == op("IS_CARRYING_UNIT") => {
+                let unit = self.pop(i);
+                let held = self.model.passenger.held()
+                    && self
+                        .world
+                        .as_ref()
+                        .and_then(|world| world.stand_in.as_ref())
+                        .is_some_and(|stand_in| stand_in.id == unit);
+                self.push(i, i32::from(held));
+            }
+            w if w == op("CARRIER_UNIT_ID") => self.push(i, 0),
+            w if w == op("DISCARD_CALL") => {
+                self.word(i)?;
+                for _ in 0..self.word(i)? {
+                    self.pop(i);
+                }
+            }
+            w if w == op("PIECE_OP_09") => {
+                self.word(i)?;
+                self.pop(i);
+                self.pop(i);
+            }
+            w if w == op("PIECE_OP_0A") => {
+                self.word(i)?;
+            }
+
             // Renderer hints with one operand each, which the engine also
             // reads and discards.
             w if w == op("CACHE")
@@ -1637,6 +1682,14 @@ impl Run {
             self.model.passenger.at(),
             self.model.awaiting_build,
         ) {
+            if let Some(note) = answer.note {
+                self.model.note(note);
+            }
+            return answer.value;
+        }
+        if let Some(answer) =
+            unitvalue::relation(id, p1, self.world.as_ref(), &self.model, self.frame)
+        {
             if let Some(note) = answer.note {
                 self.model.note(note);
             }

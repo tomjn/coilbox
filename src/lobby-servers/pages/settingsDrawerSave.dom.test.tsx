@@ -375,6 +375,30 @@ describe("editing a login", () => {
     expect(storedAccounts()[0].hasSecret).toBe(true);
   });
 
+  it("saves Connect on startup on the login", async () => {
+    keychain.set(credKey(SRV1.id, "alice"), "hunter2");
+    show({ accounts: [alice] });
+    openRow("alice");
+    const d = drawer("alice");
+    const box = d.getByRole("checkbox", { name: /^Connect on startup/ });
+    await waitFor(() => expect(box).toHaveProperty("disabled", false));
+    fireEvent.click(box);
+
+    expect(storedAccounts()[0].connectOnStartup).toBe(true);
+    fireEvent.click(box);
+    expect(storedAccounts()[0].connectOnStartup).toBe(false);
+  });
+
+  it("will not tick Connect on startup on a login with no saved password", async () => {
+    show({ accounts: [{ ...alice, hasSecret: false }] });
+    openRow("alice");
+    const d = drawer("alice");
+    const box = d.getByRole("checkbox", { name: /^Connect on startup/ });
+
+    expect(box).toHaveProperty("disabled", true);
+    expect(d.getByText(/^Save a password first/)).toBeTruthy();
+  });
+
   it("moves the saved password when the login is renamed", async () => {
     keychain.set(credKey(SRV1.id, "alice"), "hunter2");
     show({ accounts: [alice] });

@@ -74,6 +74,7 @@ export function BattleRoomHeader({
   serverKey,
   directRoom,
   sharedRoom = null,
+  connectionLabel = null,
 }: {
   battle: Battle;
   myStatus: MemberStatus | undefined;
@@ -113,6 +114,10 @@ export function BattleRoomHeader({
   /** The room on this computer whose join addresses the Share button hands out,
    * or null when this battle is not in a room of our own (issue #3460). */
   sharedRoom?: DirectRoomStatus | null;
+  /** The account and server this battle is on, drawn above its name. Given
+   * only while several connections are live, which is when a player can lose
+   * track of which one they are in. */
+  connectionLabel?: string | null;
 }) {
   const ready = myStatus?.battleStatus.ready ?? false;
   // The route the battle hosted on this room's connection took. Read here
@@ -220,29 +225,36 @@ export function BattleRoomHeader({
   return (
     <header className="flex items-center justify-between gap-4 border-b border-border p-4">
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <h1 className="break-words text-lg font-semibold">
-          {battle.title
-            ? linkifyTitle(battle.title).map((part, i) =>
-                part.url ? (
-                  <a
+        <div>
+          {connectionLabel && (
+            <p className="break-words text-xs text-muted-foreground">
+              {connectionLabel}
+            </p>
+          )}
+          <h1 className="break-words text-lg font-semibold">
+            {battle.title
+              ? linkifyTitle(battle.title).map((part, i) =>
+                  part.url ? (
+                    <a
+                      // biome-ignore lint/suspicious/noArrayIndexKey: parts are derived fresh from the title on every render and never reorder
+                      key={i}
+                      href={part.url}
+                      className="underline"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        openUrl(part.url as string).catch(() => {});
+                      }}
+                    >
+                      {part.text}
+                    </a>
+                  ) : (
                     // biome-ignore lint/suspicious/noArrayIndexKey: parts are derived fresh from the title on every render and never reorder
-                    key={i}
-                    href={part.url}
-                    className="underline"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      openUrl(part.url as string).catch(() => {});
-                    }}
-                  >
-                    {part.text}
-                  </a>
-                ) : (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: parts are derived fresh from the title on every render and never reorder
-                  <span key={i}>{part.text}</span>
-                ),
-              )
-            : `Battle ${battle.id}`}
-        </h1>
+                    <span key={i}>{part.text}</span>
+                  ),
+                )
+              : `Battle ${battle.id}`}
+          </h1>
+        </div>
         {/* "Out of sync" on its own leaves the player hunting. Name the thing,
             but never on a green pill, where the label collapses into a tooltip
             and would read as a problem on a room that has none. */}

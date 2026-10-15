@@ -1,0 +1,5880 @@
+{
+  "_source": "SplinterFaction dev checkout (commit 1c312814, 26 August 2026), read on 10 October 2026 by coilbox-unitsync-worker --unit-dataset. All 154 units, unchanged. The game ships a CC-BY-SA-4.0 licence file; only unit names and numbers are kept here, as with src/workshop/fixtures/ba-units-slice.json. Regenerate by running the worker against the game and replacing units.",
+  "units": [
+    {
+      "name": "airscout",
+      "fullName": "Gnat",
+      "mobile": true,
+      "objectName": "airscout.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 89.0,
+      "floatOnWater": true,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 56,
+        "builder": false,
+        "energyCost": 600,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 313,
+        "maxVelocity": 270,
+        "metalCost": 100,
+        "metalStorage": 0,
+        "seismicDistance": 850,
+        "sightDistance": 500
+      }
+    },
+    {
+      "name": "airscoutxl",
+      "fullName": "Cicada",
+      "mobile": true,
+      "objectName": "airscoutxl.s3o",
+      "footprintX": 5,
+      "footprintZ": 5,
+      "maxSlope": 89.0,
+      "floatOnWater": true,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 354.1667,
+        "builder": false,
+        "energyCost": 120000,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 11000,
+        "maxVelocity": 225,
+        "metalCost": 5000,
+        "metalStorage": 0,
+        "range": 800,
+        "seismicDistance": 1500,
+        "sightDistance": 1500,
+        "weapons": [
+          {
+            "damage": 0,
+            "projectile": "Cannon",
+            "range": 800,
+            "reload": 5
+          }
+        ]
+      }
+    },
+    {
+      "name": "atm",
+      "fullName": "ATM Machine",
+      "mobile": false,
+      "objectName": "efusion2.s3o",
+      "footprintX": 8,
+      "footprintZ": 8,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 5000.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 500,
+        "builder": false,
+        "energyCost": 0,
+        "energyMake": 10000,
+        "energyStorage": 10000,
+        "energyUpkeep": 0,
+        "health": 100000,
+        "metalCost": 500,
+        "metalMake": 998,
+        "metalStorage": 900,
+        "radarDistance": 1715,
+        "sightDistance": 1000
+      }
+    },
+    {
+      "name": "beacon",
+      "fullName": "Spawn Beacon",
+      "mobile": false,
+      "objectName": "beacon.s3o",
+      "footprintX": 10,
+      "footprintZ": 10,
+      "maxSlope": 20.0,
+      "floatOnWater": true,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 10000000.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 6500,
+        "energyCost": 25000,
+        "energyStorage": 1000,
+        "health": 20000,
+        "maxVelocity": 0,
+        "metalCost": 4000,
+        "radarDistance": 0,
+        "sightDistance": 0
+      }
+    },
+    {
+      "name": "blackholepowerplant",
+      "fullName": "Black Hole Power Facility",
+      "mobile": false,
+      "objectName": "powerplant16x16.s3o",
+      "footprintX": 16,
+      "footprintZ": 16,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 1406.25,
+        "builder": false,
+        "energyCost": 810000,
+        "energyMake": 4000,
+        "energyStorage": 0,
+        "health": 270000,
+        "metalCost": 54000,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "sightDistance": 367
+      }
+    },
+    {
+      "name": "chickenanarchid",
+      "fullName": "Anarchid",
+      "mobile": true,
+      "objectName": "chickenanarchid.s3o",
+      "footprintX": 8,
+      "footprintZ": 8,
+      "maxSlope": 0.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 10000,
+        "builder": false,
+        "energyCost": 0,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 600,
+        "health": 50000,
+        "maxVelocity": 36,
+        "metalCost": 10000,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 1000,
+        "seismicDistance": 1,
+        "sightDistance": 1000,
+        "weapons": [
+          {
+            "damage": 400,
+            "projectile": "BeamLaser",
+            "range": 500,
+            "reload": 1
+          },
+          {
+            "damage": 125,
+            "projectile": "LaserCannon",
+            "range": 1000,
+            "reload": 0.5
+          },
+          {
+            "damage": 125,
+            "projectile": "LaserCannon",
+            "range": 1000,
+            "reload": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "name": "chickenbasher",
+      "fullName": "Basher",
+      "mobile": true,
+      "objectName": "chickenbasher.s3o",
+      "footprintX": 4,
+      "footprintZ": 4,
+      "maxSlope": 66.6667,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 1200,
+        "builder": false,
+        "energyCost": 0,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 3600,
+        "maxVelocity": 93,
+        "metalCost": 1200,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 700,
+        "seismicDistance": 850,
+        "sightDistance": 700,
+        "weapons": [
+          {
+            "damage": 210,
+            "projectile": "LaserCannon",
+            "range": 700,
+            "reload": 1.2
+          }
+        ]
+      }
+    },
+    {
+      "name": "chickendroplet",
+      "fullName": "Droplet",
+      "mobile": true,
+      "objectName": "chickendroplet.s3o",
+      "footprintX": 6,
+      "footprintZ": 6,
+      "maxSlope": 20.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 16000,
+        "builder": false,
+        "energyCost": 0,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 12000,
+        "maxVelocity": 45,
+        "metalCost": 16000,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 1300,
+        "seismicDistance": 1,
+        "sightDistance": 1300,
+        "weapons": [
+          {
+            "damage": 1000,
+            "projectile": "StarburstLauncher",
+            "range": 1300,
+            "reload": 25
+          }
+        ]
+      }
+    },
+    {
+      "name": "chickenemperormenlo",
+      "fullName": "Emperor Menlo",
+      "mobile": false,
+      "objectName": "chickenemperormenlo.s3o",
+      "footprintX": 6,
+      "footprintZ": 6,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 3600,
+        "builder": false,
+        "energyCost": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 21600,
+        "metalCost": 3600,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 1200,
+        "sightDistance": 1200,
+        "weapons": [
+          {
+            "damage": 400,
+            "projectile": "LaserCannon",
+            "range": 1200,
+            "reload": 0.1
+          }
+        ]
+      }
+    },
+    {
+      "name": "chickeneurypterid",
+      "fullName": "Eurypterid",
+      "mobile": true,
+      "objectName": "chickeneurypterid.s3o",
+      "footprintX": 8,
+      "footprintZ": 8,
+      "maxSlope": 0.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 325.5208,
+        "builder": false,
+        "energyCost": 187500,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 400,
+        "health": 31250,
+        "maxVelocity": 30,
+        "metalCost": 12500,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 750,
+        "seismicDistance": 1,
+        "sightDistance": 1600,
+        "weapons": [
+          {
+            "damage": 1500,
+            "projectile": "Cannon",
+            "range": 750,
+            "reload": 5
+          }
+        ]
+      }
+    },
+    {
+      "name": "chickenhealer_mk1",
+      "fullName": "ORB - Tech 1",
+      "mobile": true,
+      "objectName": "chickenhealer_mk1.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 0.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 92,
+        "builder": true,
+        "energyCost": 120,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 300,
+        "maxVelocity": 75,
+        "metalCost": 80,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "seismicDistance": 650,
+        "sightDistance": 500
+      }
+    },
+    {
+      "name": "chickenhealer_mk2",
+      "fullName": "ORB - Tech 2",
+      "mobile": true,
+      "objectName": "chickenhealer_mk2.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 0.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 184,
+        "builder": true,
+        "energyCost": 240,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 600,
+        "maxVelocity": 75,
+        "metalCost": 160,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "seismicDistance": 650,
+        "sightDistance": 500
+      }
+    },
+    {
+      "name": "chickenhealer_mk3",
+      "fullName": "ORB - Tech 3",
+      "mobile": true,
+      "objectName": "chickenhealer_mk3.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 0.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 368,
+        "builder": true,
+        "energyCost": 480,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 1200,
+        "maxVelocity": 75,
+        "metalCost": 320,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "seismicDistance": 650,
+        "sightDistance": 500
+      }
+    },
+    {
+      "name": "chickenhealer_mk4",
+      "fullName": "ORB - Tech 4",
+      "mobile": true,
+      "objectName": "chickenhealer_mk4.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 0.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 736,
+        "builder": true,
+        "energyCost": 960,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 2400,
+        "maxVelocity": 75,
+        "metalCost": 640,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "seismicDistance": 650,
+        "sightDistance": 500
+      }
+    },
+    {
+      "name": "chickenmossberg",
+      "fullName": "Mossberg",
+      "mobile": true,
+      "objectName": "chickenmossberg.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 66.6667,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 120,
+        "builder": false,
+        "energyCost": 0,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 180,
+        "maxVelocity": 96,
+        "metalCost": 120,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 490,
+        "seismicDistance": 640,
+        "sightDistance": 490,
+        "weapons": [
+          {
+            "damage": 40,
+            "projectile": "Cannon",
+            "range": 490,
+            "reload": 7
+          }
+        ]
+      }
+    },
+    {
+      "name": "chickenrecluse",
+      "fullName": "Recluse",
+      "mobile": true,
+      "objectName": "chickenrecluse.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 0.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 80,
+        "builder": false,
+        "energyCost": 0,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 200,
+        "maxVelocity": 159,
+        "metalCost": 80,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 450,
+        "seismicDistance": 600,
+        "sightDistance": 450,
+        "weapons": [
+          {
+            "damage": 45,
+            "projectile": "LaserCannon",
+            "range": 450,
+            "reload": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "chickensbeacon",
+      "fullName": "Beacon",
+      "mobile": false,
+      "objectName": "chickensbeacon.s3o",
+      "footprintX": 8,
+      "footprintZ": 8,
+      "maxSlope": 89.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 1,
+        "builder": false,
+        "energyCost": 0,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 250000,
+        "metalCost": 1,
+        "metalMake": 0,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "sightDistance": 50
+      }
+    },
+    {
+      "name": "chickensledge",
+      "fullName": "Sledge",
+      "mobile": true,
+      "objectName": "chickensledge.s3o",
+      "footprintX": 4,
+      "footprintZ": 4,
+      "maxSlope": 0.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 1800,
+        "builder": false,
+        "energyCost": 0,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 9000,
+        "maxVelocity": 45,
+        "metalCost": 1800,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 900,
+        "seismicDistance": 1,
+        "sightDistance": 900,
+        "weapons": [
+          {
+            "damage": 340,
+            "projectile": "LaserCannon",
+            "range": 900,
+            "reload": 1.7
+          }
+        ]
+      }
+    },
+    {
+      "name": "chickenvulture",
+      "fullName": "Vulture",
+      "mobile": true,
+      "objectName": "chickenvulture.s3o",
+      "footprintX": 10,
+      "footprintZ": 10,
+      "maxSlope": 89.0,
+      "floatOnWater": true,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 75000,
+        "builder": false,
+        "energyCost": 750000,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 19440,
+        "maxVelocity": 45,
+        "metalCost": 0,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 800,
+        "sightDistance": 1050,
+        "weapons": [
+          {
+            "damage": 1000,
+            "projectile": "BeamLaser",
+            "range": 800,
+            "reload": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "cloakingtower",
+      "fullName": "Cloaking Tower",
+      "mobile": false,
+      "objectName": "ejammer3.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 100,
+        "builder": false,
+        "energyCost": 3000,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 500,
+        "metalCost": 500,
+        "metalStorage": 0,
+        "radarDistanceJam": 300,
+        "sightDistance": 500,
+        "sonarDistance": 0
+      }
+    },
+    {
+      "name": "coldfusionpowerplant",
+      "fullName": "Cold Fusion Energy Generator",
+      "mobile": false,
+      "objectName": "coldfusionpowerplant2.s3o",
+      "footprintX": 17,
+      "footprintZ": 17,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 366.6667,
+        "builder": false,
+        "energyCost": 96000,
+        "energyMake": 1000,
+        "energyStorage": 0,
+        "health": 40000,
+        "metalCost": 8000,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "sightDistance": 367
+      }
+    },
+    {
+      "name": "condenser",
+      "fullName": "Geothermal Condenser Resource Storage and Supply Depot Facility",
+      "mobile": false,
+      "objectName": "condenser.s3o",
+      "footprintX": 6,
+      "footprintZ": 6,
+      "maxSlope": 50.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 260,
+        "builder": false,
+        "energyCost": 1200,
+        "energyStorage": 2000,
+        "energyUpkeep": 0,
+        "health": 2000,
+        "metalCost": 400,
+        "metalStorage": 2000,
+        "radarDistance": 0,
+        "sightDistance": 100
+      }
+    },
+    {
+      "name": "f1landfac",
+      "fullName": "Land Factory",
+      "buildOptions": [
+        "fedengineer_up1",
+        "fedak",
+        "fedstorm",
+        "fedequalizer",
+        "fedthud",
+        "fedcrasher",
+        "fedbear",
+        "feddominator",
+        "fedcobra",
+        "fedavalanche",
+        "fedphalanx",
+        "feddeleter",
+        "fedstriker",
+        "fedgoliath",
+        "fedjuggernaut"
+      ],
+      "mobile": false,
+      "objectName": "f1landfac.s3o",
+      "footprintX": 11,
+      "footprintZ": 11,
+      "maxSlope": 30.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 65,
+        "builder": true,
+        "energyCost": 300,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 2500,
+        "metalCost": 100,
+        "metalMake": 0,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "sightDistance": 500
+      }
+    },
+    {
+      "name": "f2landfac",
+      "fullName": "Land Factory",
+      "buildOptions": [
+        "lozengineer_up1",
+        "lozdiamondback",
+        "lozroach",
+        "lozscorpion",
+        "lozflashpoint",
+        "lozreaper",
+        "lozcauterizer",
+        "lozpulverizer",
+        "lozluger",
+        "lozprotector",
+        "lozmammoth",
+        "lozemperorscorpion",
+        "lozsilverback"
+      ],
+      "mobile": false,
+      "objectName": "f2landfac.s3o",
+      "footprintX": 12,
+      "footprintZ": 12,
+      "maxSlope": 20.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 65,
+        "builder": true,
+        "energyCost": 300,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 1250,
+        "metalCost": 100,
+        "metalMake": 0,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "sightDistance": 500
+      }
+    },
+    {
+      "name": "fedairengineer",
+      "fullName": "Originator",
+      "buildOptions": [
+        "f1landfac",
+        "fedairplant",
+        "fedseaplant",
+        "fedmetalextractor_up1",
+        "fissionpowerplant",
+        "fusionpowerplant",
+        "coldfusionpowerplant",
+        "blackholepowerplant",
+        "supplydepot",
+        "mediumsupplydepot",
+        "mediumstorage",
+        "largestorage",
+        "researchcenter",
+        "geometalmaker",
+        "geothermalpowerplant",
+        "condenser",
+        "cloakingtower",
+        "largecloakingtower",
+        "fedmenlo",
+        "fedstinger",
+        "fedimmolator",
+        "fedjavelin",
+        "fedguardian",
+        "healstation"
+      ],
+      "mobile": true,
+      "objectName": "fedairengineer.s3o",
+      "footprintX": 3,
+      "footprintZ": 3,
+      "maxSlope": 0.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 10.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 168,
+        "builder": true,
+        "energyCost": 1800,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 1406,
+        "maxVelocity": 150,
+        "metalCost": 300,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "sightDistance": 300
+      }
+    },
+    {
+      "name": "fedairplant",
+      "fullName": "VTOL Factory",
+      "buildOptions": [
+        "fedairengineer",
+        "airscout",
+        "fedsparrow",
+        "fedcrow",
+        "fedhawk",
+        "fedcondor",
+        "fedfalcon",
+        "fedeagle"
+      ],
+      "mobile": false,
+      "objectName": "fedairplant.s3o",
+      "footprintX": 9,
+      "footprintZ": 9,
+      "maxSlope": 89.0,
+      "floatOnWater": true,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 999999.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 80,
+        "builder": true,
+        "energyCost": 600,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 2500,
+        "metalCost": 100,
+        "metalMake": 0,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "sightDistance": 500
+      }
+    },
+    {
+      "name": "fedak",
+      "fullName": "A.K.",
+      "mobile": true,
+      "objectName": "fedakmk1.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 30.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 44,
+        "builder": false,
+        "energyCost": 204,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 68,
+        "maxVelocity": 150,
+        "metalCost": 68,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 400,
+        "seismicDistance": 950,
+        "sightDistance": 800,
+        "weapons": [
+          {
+            "damage": 5,
+            "projectile": "LaserCannon",
+            "range": 400,
+            "reload": 0.2333
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedavalanche",
+      "fullName": "Avalanche",
+      "mobile": true,
+      "objectName": "fedavalanche.s3o",
+      "footprintX": 3,
+      "footprintZ": 3,
+      "maxSlope": 30.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 168,
+        "builder": false,
+        "energyCost": 5040,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 2100,
+        "maxVelocity": 50.4,
+        "metalCost": 840,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 1300,
+        "seismicDistance": 800,
+        "sightDistance": 650,
+        "weapons": [
+          {
+            "damage": 440,
+            "projectile": "Cannon",
+            "range": 1300,
+            "reload": 35
+          },
+          {
+            "damage": 440,
+            "projectile": "Cannon",
+            "range": 1300,
+            "reload": 35
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedbear",
+      "fullName": "Bear",
+      "mobile": true,
+      "objectName": "fedbear.s3o",
+      "footprintX": 3,
+      "footprintZ": 3,
+      "maxSlope": 30.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 300,
+        "builder": false,
+        "energyCost": 9000,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 7500,
+        "maxVelocity": 72,
+        "metalCost": 1500,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 760,
+        "seismicDistance": 1000,
+        "sightDistance": 850,
+        "weapons": [
+          {
+            "damage": 50,
+            "projectile": "LaserCannon",
+            "range": 760,
+            "reload": 0.5
+          },
+          {
+            "damage": 230,
+            "projectile": "Cannon",
+            "range": 750,
+            "reload": 2.6
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedbertha",
+      "fullName": "Big Bertha",
+      "mobile": false,
+      "objectName": "fedbertha.s3o",
+      "footprintX": 16,
+      "footprintZ": 16,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 458.3333,
+        "builder": false,
+        "energyCost": 120000,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 5000,
+        "metalCost": 10000,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 8000,
+        "sightDistance": 500,
+        "weapons": [
+          {
+            "damage": 60,
+            "projectile": "Cannon",
+            "range": 8000,
+            "reload": 20
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedcobra",
+      "fullName": "Cobra",
+      "mobile": true,
+      "objectName": "fedcobra.s3o",
+      "footprintX": 3,
+      "footprintZ": 3,
+      "maxSlope": 30.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 340,
+        "builder": false,
+        "energyCost": 10200,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 5100,
+        "maxVelocity": 54,
+        "metalCost": 1700,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 950,
+        "seismicDistance": 1000,
+        "sightDistance": 850,
+        "weapons": [
+          {
+            "damage": 60,
+            "projectile": "Cannon",
+            "range": 950,
+            "reload": 5.4
+          },
+          {
+            "damage": 100,
+            "projectile": "MissileLauncher",
+            "range": 950,
+            "reload": 11.2
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedcolossus",
+      "fullName": "Colossus",
+      "mobile": true,
+      "objectName": "fedcolossus.s3o",
+      "footprintX": 6,
+      "footprintZ": 6,
+      "maxSlope": 60.0,
+      "floatOnWater": true,
+      "minWaterDepth": 5.0,
+      "maxWaterDepth": 5000.0,
+      "waterline": 8.0,
+      "stats": {
+        "buildTime": 600,
+        "builder": false,
+        "energyCost": 18000,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 9600,
+        "maxVelocity": 63,
+        "metalCost": 3000,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 1200,
+        "seismicDistance": 900,
+        "sightDistance": 750,
+        "weapons": [
+          {
+            "damage": 100,
+            "projectile": "Cannon",
+            "range": 1200,
+            "reload": 3
+          },
+          {
+            "damage": 100,
+            "projectile": "Cannon",
+            "range": 1200,
+            "reload": 3
+          },
+          {
+            "damage": 100,
+            "projectile": "Cannon",
+            "range": 1200,
+            "reload": 3
+          },
+          {
+            "damage": 120,
+            "projectile": "MissileLauncher",
+            "range": 1200,
+            "reload": 7
+          },
+          {
+            "damage": 120,
+            "projectile": "MissileLauncher",
+            "range": 1200,
+            "reload": 7
+          },
+          {
+            "damage": 1,
+            "projectile": "Cannon",
+            "range": 1200,
+            "reload": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedcommander",
+      "fullName": "Federation of Kala Command Unit",
+      "buildOptions": [
+        "f1landfac",
+        "fedairplant",
+        "fedseaplant",
+        "fedmetalextractor_up1",
+        "fissionpowerplant",
+        "fusionpowerplant",
+        "coldfusionpowerplant",
+        "blackholepowerplant",
+        "supplydepot",
+        "mediumsupplydepot",
+        "mediumstorage",
+        "largestorage",
+        "researchcenter",
+        "geometalmaker",
+        "geothermalpowerplant",
+        "condenser",
+        "cloakingtower",
+        "largecloakingtower",
+        "fedmenlo",
+        "fedstinger",
+        "fedimmolator",
+        "fedjavelin",
+        "fedguardian",
+        "healstation"
+      ],
+      "mobile": true,
+      "objectName": "fedcommander2.s3o",
+      "footprintX": 3,
+      "footprintZ": 3,
+      "maxSlope": 30.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 125,
+        "builder": true,
+        "energyCost": 500,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 2813,
+        "maxVelocity": 60,
+        "metalCost": 75,
+        "metalMake": 0,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 550,
+        "seismicDistance": 650,
+        "sightDistance": 500,
+        "weapons": [
+          {
+            "damage": 70,
+            "projectile": "LaserCannon",
+            "range": 550,
+            "reload": 1
+          }
+        ]
+      },
+      "morphTargets": [
+        {
+          "cmdname": "Tech 1\nUpgrade",
+          "energy": 0,
+          "into": "fedcommander_up1",
+          "metal": 0,
+          "research": 150,
+          "text": "Upgrade to Tech 1 with upgraded weapons and armor",
+          "time": 3
+        }
+      ]
+    },
+    {
+      "name": "fedcommander_up1",
+      "fullName": "Federation of Kala Command Unit",
+      "buildOptions": [
+        "f1landfac",
+        "fedairplant",
+        "fedseaplant",
+        "fedmetalextractor_up1",
+        "fissionpowerplant",
+        "fusionpowerplant",
+        "coldfusionpowerplant",
+        "blackholepowerplant",
+        "supplydepot",
+        "mediumsupplydepot",
+        "mediumstorage",
+        "largestorage",
+        "researchcenter",
+        "geometalmaker",
+        "geothermalpowerplant",
+        "condenser",
+        "cloakingtower",
+        "largecloakingtower",
+        "fedmenlo",
+        "fedstinger",
+        "fedimmolator",
+        "fedjavelin",
+        "fedguardian",
+        "healstation"
+      ],
+      "mobile": true,
+      "objectName": "fedcommander2_up1.s3o",
+      "footprintX": 4,
+      "footprintZ": 4,
+      "maxSlope": 30.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 545,
+        "builder": true,
+        "energyCost": 3200,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 8438,
+        "maxVelocity": 60,
+        "metalCost": 225,
+        "metalMake": 0,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 600,
+        "seismicDistance": 650,
+        "sightDistance": 500,
+        "weapons": [
+          {
+            "damage": 600,
+            "projectile": "LaserCannon",
+            "range": 600,
+            "reload": 1
+          }
+        ]
+      },
+      "morphTargets": [
+        {
+          "cmdname": "Tech 2\nUpgrade",
+          "energy": 0,
+          "into": "fedcommander_up2",
+          "metal": 0,
+          "require": "tech1",
+          "research": 300,
+          "text": "Upgrade to Tech 2 with upgraded weapons and armor",
+          "time": 3
+        }
+      ]
+    },
+    {
+      "name": "fedcommander_up2",
+      "fullName": "Federation of Kala Command Unit",
+      "buildOptions": [
+        "f1landfac",
+        "fedairplant",
+        "fedseaplant",
+        "fedmetalextractor_up1",
+        "fissionpowerplant",
+        "fusionpowerplant",
+        "coldfusionpowerplant",
+        "blackholepowerplant",
+        "supplydepot",
+        "mediumsupplydepot",
+        "mediumstorage",
+        "largestorage",
+        "researchcenter",
+        "geometalmaker",
+        "geothermalpowerplant",
+        "condenser",
+        "cloakingtower",
+        "largecloakingtower",
+        "fedmenlo",
+        "fedstinger",
+        "fedimmolator",
+        "fedjavelin",
+        "fedguardian",
+        "healstation"
+      ],
+      "mobile": true,
+      "objectName": "fedcommander2_up2.s3o",
+      "footprintX": 5,
+      "footprintZ": 5,
+      "maxSlope": 30.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 2825,
+        "builder": true,
+        "energyCost": 20000,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 15469,
+        "maxVelocity": 60,
+        "metalCost": 825,
+        "metalMake": 0,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 650,
+        "seismicDistance": 650,
+        "sightDistance": 500,
+        "weapons": [
+          {
+            "damage": 5400,
+            "projectile": "LaserCannon",
+            "range": 650,
+            "reload": 1
+          }
+        ]
+      },
+      "morphTargets": [
+        {
+          "cmdname": "Tech 3\nUpgrade",
+          "energy": 0,
+          "into": "fedcommander_up3",
+          "metal": 0,
+          "require": "tech2",
+          "research": 600,
+          "text": "Upgrade to Tech 3 with upgraded weapons and armor",
+          "time": 3
+        }
+      ]
+    },
+    {
+      "name": "fedcommander_up3",
+      "fullName": "Federation of Kala Command Unit",
+      "buildOptions": [
+        "f1landfac",
+        "fedairplant",
+        "fedseaplant",
+        "fedmetalextractor_up1",
+        "fissionpowerplant",
+        "fusionpowerplant",
+        "coldfusionpowerplant",
+        "blackholepowerplant",
+        "supplydepot",
+        "mediumsupplydepot",
+        "mediumstorage",
+        "largestorage",
+        "researchcenter",
+        "geometalmaker",
+        "geothermalpowerplant",
+        "condenser",
+        "cloakingtower",
+        "largecloakingtower",
+        "fedmenlo",
+        "fedstinger",
+        "fedimmolator",
+        "fedjavelin",
+        "fedguardian",
+        "healstation"
+      ],
+      "mobile": true,
+      "objectName": "fedcommander2_up3.s3o",
+      "footprintX": 6,
+      "footprintZ": 6,
+      "maxSlope": 30.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 9305,
+        "builder": true,
+        "energyCost": 66800,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 32813,
+        "maxVelocity": 60,
+        "metalCost": 2625,
+        "metalMake": 0,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 700,
+        "seismicDistance": 650,
+        "sightDistance": 500,
+        "weapons": [
+          {
+            "damage": 40000,
+            "projectile": "LaserCannon",
+            "range": 700,
+            "reload": 1
+          }
+        ]
+      },
+      "morphTargets": [
+        {
+          "cmdname": "Tech 4\nUpgrade",
+          "energy": 0,
+          "into": "fedcommander_up4",
+          "metal": 0,
+          "require": "tech3",
+          "research": 1200,
+          "text": "Upgrade into a Tech 4 BattleMech with Devestating weapons and armor",
+          "time": 3
+        }
+      ]
+    },
+    {
+      "name": "fedcommander_up4",
+      "fullName": "Federation of Kala Command Unit",
+      "buildOptions": [
+        "f1landfac",
+        "fedairplant",
+        "fedseaplant",
+        "fedmetalextractor_up1",
+        "fissionpowerplant",
+        "fusionpowerplant",
+        "coldfusionpowerplant",
+        "blackholepowerplant",
+        "supplydepot",
+        "mediumsupplydepot",
+        "mediumstorage",
+        "largestorage",
+        "researchcenter",
+        "geometalmaker",
+        "geothermalpowerplant",
+        "condenser",
+        "cloakingtower",
+        "largecloakingtower",
+        "fedmenlo",
+        "fedstinger",
+        "fedimmolator",
+        "fedjavelin",
+        "fedguardian",
+        "healstation"
+      ],
+      "mobile": true,
+      "objectName": "fedcommander2_up4.s3o",
+      "footprintX": 7,
+      "footprintZ": 7,
+      "maxSlope": 30.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 44585,
+        "builder": true,
+        "energyCost": 347600,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 61406,
+        "maxVelocity": 60,
+        "metalCost": 9825,
+        "metalMake": 0,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 750,
+        "seismicDistance": 650,
+        "sightDistance": 500,
+        "weapons": [
+          {
+            "damage": 150000,
+            "projectile": "LaserCannon",
+            "range": 750,
+            "reload": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedcondor",
+      "fullName": "Condor",
+      "mobile": true,
+      "objectName": "fedcondor.s3o",
+      "footprintX": 4,
+      "footprintZ": 4,
+      "maxSlope": 89.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 770,
+        "builder": false,
+        "energyCost": 16800,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 3150,
+        "maxVelocity": 247.5,
+        "metalCost": 1400,
+        "metalStorage": 0,
+        "range": 750,
+        "sightDistance": 575,
+        "transportCapacity": 100,
+        "weapons": [
+          {
+            "damage": 43,
+            "projectile": "LaserCannon",
+            "range": 750,
+            "reload": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedconqueror",
+      "fullName": "Conqueror",
+      "mobile": true,
+      "objectName": "fedconqueror.s3o",
+      "footprintX": 6,
+      "footprintZ": 6,
+      "maxSlope": 60.0,
+      "floatOnWater": true,
+      "minWaterDepth": 5.0,
+      "maxWaterDepth": 5000.0,
+      "waterline": 8.0,
+      "stats": {
+        "buildTime": 480,
+        "builder": false,
+        "energyCost": 14400,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 5760,
+        "maxVelocity": 48,
+        "metalCost": 2400,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 1550,
+        "seismicDistance": 650,
+        "sightDistance": 500,
+        "weapons": [
+          {
+            "damage": 250,
+            "projectile": "Cannon",
+            "range": 1550,
+            "reload": 8
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedcrasher",
+      "fullName": "Crasher",
+      "mobile": true,
+      "objectName": "fedcrasher.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 30.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 62,
+        "builder": false,
+        "energyCost": 285,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 119,
+        "maxVelocity": 90,
+        "metalCost": 95,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 800,
+        "seismicDistance": 800,
+        "sightDistance": 650,
+        "weapons": [
+          {
+            "damage": 160,
+            "projectile": "MissileLauncher",
+            "range": 800,
+            "reload": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedcrow",
+      "fullName": "Crow",
+      "mobile": true,
+      "objectName": "fedcrow.s3o",
+      "footprintX": 3,
+      "footprintZ": 3,
+      "maxSlope": 89.0,
+      "floatOnWater": true,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 246.4,
+        "builder": false,
+        "energyCost": 2640,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 1100,
+        "maxVelocity": 270,
+        "metalCost": 440,
+        "metalStorage": 0,
+        "range": 800,
+        "sightDistance": 800,
+        "weapons": [
+          {
+            "damage": 55,
+            "projectile": "MissileLauncher",
+            "range": 300,
+            "reload": 15
+          },
+          {
+            "damage": 5,
+            "projectile": "LaserCannon",
+            "range": 800,
+            "reload": 0.2
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedcrusader",
+      "fullName": "Crusader",
+      "mobile": true,
+      "objectName": "fedcrusader.s3o",
+      "footprintX": 4,
+      "footprintZ": 4,
+      "maxSlope": 60.0,
+      "floatOnWater": true,
+      "minWaterDepth": 5.0,
+      "maxWaterDepth": 5000.0,
+      "waterline": 3.0,
+      "stats": {
+        "buildTime": 195,
+        "builder": false,
+        "energyCost": 900,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 1320,
+        "maxVelocity": 90,
+        "metalCost": 300,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 700,
+        "seismicDistance": 750,
+        "sightDistance": 600,
+        "weapons": [
+          {
+            "damage": 35,
+            "projectile": "LaserCannon",
+            "range": 700,
+            "reload": 0.3
+          },
+          {
+            "damage": 50,
+            "projectile": "MissileLauncher",
+            "range": 700,
+            "reload": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "feddeleter",
+      "fullName": "Deleter",
+      "mobile": true,
+      "objectName": "feddeleter.s3o",
+      "footprintX": 4,
+      "footprintZ": 4,
+      "maxSlope": 30.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 500,
+        "builder": false,
+        "energyCost": 15000,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 4375,
+        "maxVelocity": 64.8,
+        "metalCost": 2500,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "radarDistanceJam": 300,
+        "range": 800,
+        "seismicDistance": 800,
+        "sightDistance": 650,
+        "weapons": [
+          {
+            "damage": 0,
+            "projectile": "LaserCannon",
+            "range": 800,
+            "reload": 100
+          }
+        ]
+      }
+    },
+    {
+      "name": "feddominator",
+      "fullName": "Dominator",
+      "mobile": true,
+      "objectName": "feddominator.s3o",
+      "footprintX": 3,
+      "footprintZ": 3,
+      "maxSlope": 30.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 300,
+        "builder": false,
+        "energyCost": 9000,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 7500,
+        "maxVelocity": 112.5,
+        "metalCost": 1500,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 650,
+        "seismicDistance": 1000,
+        "sightDistance": 850,
+        "weapons": [
+          {
+            "damage": 1500,
+            "projectile": "LaserCannon",
+            "range": 650,
+            "reload": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedeagle",
+      "fullName": "Eagle",
+      "mobile": true,
+      "objectName": "fedeagle.s3o",
+      "footprintX": 5,
+      "footprintZ": 5,
+      "maxSlope": 89.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 1770.8334,
+        "builder": false,
+        "energyCost": 600000,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 44000,
+        "maxVelocity": 225,
+        "metalCost": 25000,
+        "metalStorage": 0,
+        "range": 600,
+        "sightDistance": 600,
+        "transportCapacity": 100,
+        "weapons": [
+          {
+            "damage": 20,
+            "projectile": "MissileLauncher",
+            "range": 600,
+            "reload": 1.1
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedengineer",
+      "fullName": "Lifter - Tech 0",
+      "mobile": true,
+      "objectName": "fedengineer.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 0.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 46,
+        "builder": true,
+        "energyCost": 60,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 150,
+        "maxVelocity": 75,
+        "metalCost": 40,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "seismicDistance": 650,
+        "sightDistance": 500
+      }
+    },
+    {
+      "name": "fedengineer_up1",
+      "fullName": "Lifter",
+      "buildOptions": [
+        "f1landfac",
+        "fedairplant",
+        "fedseaplant",
+        "fedmetalextractor_up1",
+        "fissionpowerplant",
+        "fusionpowerplant",
+        "coldfusionpowerplant",
+        "blackholepowerplant",
+        "supplydepot",
+        "mediumsupplydepot",
+        "mediumstorage",
+        "largestorage",
+        "researchcenter",
+        "geometalmaker",
+        "geothermalpowerplant",
+        "condenser",
+        "cloakingtower",
+        "largecloakingtower",
+        "fedmenlo",
+        "fedstinger",
+        "fedimmolator",
+        "fedjavelin",
+        "fedguardian",
+        "healstation"
+      ],
+      "mobile": true,
+      "objectName": "fedengineer_up1.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 0.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 86,
+        "builder": true,
+        "energyCost": 113,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 281,
+        "maxVelocity": 75,
+        "metalCost": 75,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "seismicDistance": 650,
+        "sightDistance": 500
+      }
+    },
+    {
+      "name": "fedengineer_up2",
+      "fullName": "Lifter - Tech 2",
+      "mobile": true,
+      "objectName": "fedengineer_up2.s3o",
+      "footprintX": 3,
+      "footprintZ": 3,
+      "maxSlope": 0.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 32,
+        "builder": true,
+        "energyCost": 960,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 600,
+        "maxVelocity": 75,
+        "metalCost": 160,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "seismicDistance": 650,
+        "sightDistance": 500
+      }
+    },
+    {
+      "name": "fedengineer_up3",
+      "fullName": "Lifter - Tech 3",
+      "mobile": true,
+      "objectName": "fedengineer_up3.s3o",
+      "footprintX": 4,
+      "footprintZ": 4,
+      "maxSlope": 0.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 14.6667,
+        "builder": true,
+        "energyCost": 3840,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 1200,
+        "maxVelocity": 75,
+        "metalCost": 320,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "seismicDistance": 650,
+        "sightDistance": 500
+      }
+    },
+    {
+      "name": "fedequalizer",
+      "fullName": "Equalizer",
+      "mobile": true,
+      "objectName": "fedequalizer.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 30.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 84.5,
+        "builder": false,
+        "energyCost": 390,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 325,
+        "maxVelocity": 99,
+        "metalCost": 130,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 550,
+        "seismicDistance": 770,
+        "sightDistance": 620,
+        "weapons": [
+          {
+            "damage": 200,
+            "projectile": "LaserCannon",
+            "range": 550,
+            "reload": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedfalcon",
+      "fullName": "Falcon",
+      "mobile": true,
+      "objectName": "fedfalcon.s3o",
+      "footprintX": 6,
+      "footprintZ": 6,
+      "maxSlope": 89.0,
+      "floatOnWater": true,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 920.8334,
+        "builder": false,
+        "energyCost": 312000,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 20020,
+        "maxVelocity": 405,
+        "metalCost": 13000,
+        "metalStorage": 0,
+        "range": 500,
+        "sightDistance": 800,
+        "weapons": [
+          {
+            "damage": 13000,
+            "projectile": "MissileLauncher",
+            "range": 500,
+            "reload": 15
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedgoliath",
+      "fullName": "Goliath",
+      "mobile": true,
+      "objectName": "fedgoliath3.s3o",
+      "footprintX": 8,
+      "footprintZ": 8,
+      "maxSlope": 30.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 426.25,
+        "builder": false,
+        "energyCost": 111600,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 32550,
+        "maxVelocity": 63,
+        "metalCost": 9300,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 720,
+        "seismicDistance": 950,
+        "sightDistance": 800,
+        "weapons": [
+          {
+            "damage": 450,
+            "projectile": "LaserCannon",
+            "range": 720,
+            "reload": 1
+          },
+          {
+            "damage": 450,
+            "projectile": "LaserCannon",
+            "range": 720,
+            "reload": 1
+          },
+          {
+            "damage": 96,
+            "projectile": "Cannon",
+            "range": 720,
+            "reload": 5.8
+          },
+          {
+            "damage": 96,
+            "projectile": "Cannon",
+            "range": 720,
+            "reload": 5.8
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedguardian",
+      "fullName": "Guardian",
+      "mobile": false,
+      "objectName": "fedguardian2.s3o",
+      "footprintX": 6,
+      "footprintZ": 6,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 962.5,
+        "builder": false,
+        "energyCost": 252000,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 84000,
+        "metalCost": 21000,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 1200,
+        "sightDistance": 1000,
+        "weapons": [
+          {
+            "damage": 3500,
+            "projectile": "Cannon",
+            "range": 1200,
+            "reload": 8
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedharbinger",
+      "fullName": "Harbinger",
+      "mobile": true,
+      "objectName": "fedharbinger.s3o",
+      "footprintX": 8,
+      "footprintZ": 8,
+      "maxSlope": 60.0,
+      "floatOnWater": true,
+      "minWaterDepth": 5.0,
+      "maxWaterDepth": 5000.0,
+      "waterline": 8.0,
+      "stats": {
+        "buildTime": 401.0417,
+        "builder": false,
+        "energyCost": 105000,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 21000,
+        "maxVelocity": 75,
+        "metalCost": 8750,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 1400,
+        "seismicDistance": 650,
+        "sightDistance": 500,
+        "weapons": [
+          {
+            "damage": 230,
+            "projectile": "Cannon",
+            "range": 1400,
+            "reload": 2.6
+          },
+          {
+            "damage": 250,
+            "projectile": "Cannon",
+            "range": 1400,
+            "reload": 8
+          },
+          {
+            "damage": 250,
+            "projectile": "Cannon",
+            "range": 1400,
+            "reload": 8
+          },
+          {
+            "damage": 250,
+            "projectile": "Cannon",
+            "range": 1400,
+            "reload": 8
+          },
+          {
+            "damage": 250,
+            "projectile": "Cannon",
+            "range": 1400,
+            "reload": 8
+          },
+          {
+            "damage": 800,
+            "projectile": "StarburstLauncher",
+            "range": 1400,
+            "reload": 1
+          },
+          {
+            "damage": 10,
+            "projectile": "LaserCannon",
+            "range": 1400,
+            "reload": 0.1
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedhawk",
+      "fullName": "Hawk",
+      "mobile": true,
+      "objectName": "fedhawk.s3o",
+      "footprintX": 4,
+      "footprintZ": 4,
+      "maxSlope": 89.0,
+      "floatOnWater": true,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 1045,
+        "builder": false,
+        "energyCost": 22800,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 4750,
+        "maxVelocity": 270,
+        "metalCost": 1900,
+        "metalStorage": 0,
+        "range": 720,
+        "sightDistance": 720,
+        "weapons": [
+          {
+            "damage": 33,
+            "projectile": "MissileLauncher",
+            "range": 720,
+            "reload": 0.2
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedimmolator",
+      "fullName": "Immolator",
+      "mobile": false,
+      "objectName": "fedimmolator.s3o",
+      "footprintX": 4,
+      "footprintZ": 4,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 412,
+        "builder": false,
+        "energyCost": 24720,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 16480,
+        "metalCost": 4120,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 1200,
+        "sightDistance": 900,
+        "weapons": [
+          {
+            "damage": 2000,
+            "projectile": "Cannon",
+            "range": 1200,
+            "reload": 5
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedjavelin",
+      "fullName": "Javelin",
+      "mobile": false,
+      "objectName": "fedjavelin.s3o",
+      "footprintX": 4,
+      "footprintZ": 4,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 200,
+        "builder": false,
+        "energyCost": 12000,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 10000,
+        "metalCost": 2000,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 1650,
+        "sightDistance": 500,
+        "weapons": [
+          {
+            "damage": 475,
+            "projectile": "MissileLauncher",
+            "range": 1650,
+            "reload": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedjuggernaut",
+      "fullName": "Juggernaut",
+      "mobile": true,
+      "objectName": "fedjuggernaut2.s3o",
+      "footprintX": 12,
+      "footprintZ": 12,
+      "maxSlope": 30.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 1614.5834,
+        "builder": false,
+        "energyCost": 930000,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 217000,
+        "maxVelocity": 36,
+        "metalCost": 62000,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 1000,
+        "seismicDistance": 1,
+        "sightDistance": 1200,
+        "weapons": [
+          {
+            "damage": 400,
+            "projectile": "LaserCannon",
+            "range": 1000,
+            "reload": 0.5
+          },
+          {
+            "damage": 1670,
+            "projectile": "Cannon",
+            "range": 1000,
+            "reload": 3
+          },
+          {
+            "damage": 1670,
+            "projectile": "Cannon",
+            "range": 1000,
+            "reload": 3
+          },
+          {
+            "damage": 120,
+            "projectile": "MissileLauncher",
+            "range": 1000,
+            "reload": 0.2333
+          },
+          {
+            "damage": 120,
+            "projectile": "MissileLauncher",
+            "range": 1000,
+            "reload": 0.2333
+          },
+          {
+            "damage": 800,
+            "projectile": "StarburstLauncher",
+            "range": 1000,
+            "reload": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedmenlo",
+      "fullName": "Menlo",
+      "mobile": false,
+      "objectName": "fedmenlo.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 175.5,
+        "builder": false,
+        "energyCost": 1080,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 1800,
+        "metalCost": 360,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 630,
+        "sightDistance": 630,
+        "weapons": [
+          {
+            "damage": 10,
+            "projectile": "LaserCannon",
+            "range": 630,
+            "reload": 0.1
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedmenlomk2",
+      "fullName": "Menlo Mark II",
+      "mobile": false,
+      "objectName": "fedmenlomk2.s3o",
+      "footprintX": 4,
+      "footprintZ": 4,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 552.5,
+        "builder": false,
+        "energyCost": 2550,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 4250,
+        "metalCost": 850,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 840,
+        "sightDistance": 840,
+        "weapons": [
+          {
+            "damage": 53.2,
+            "projectile": "LaserCannon",
+            "range": 840,
+            "reload": 0.1
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedmetalextractor",
+      "fullName": "E->M Converter (Tech 0)",
+      "mobile": false,
+      "objectName": "newmetalextractor.s3o",
+      "footprintX": 5,
+      "footprintZ": 5,
+      "maxSlope": 89.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 5000.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 50,
+        "builder": false,
+        "energyCost": 0,
+        "energyStorage": 100,
+        "energyUpkeep": 0.1,
+        "health": 250,
+        "makesMetal": 0.1,
+        "metalCost": 50,
+        "metalStorage": 100,
+        "radarDistance": 0,
+        "sightDistance": 200
+      },
+      "morphTargets": [
+        {
+          "cmdname": "Tech 1\nUpgrade",
+          "energy": 0,
+          "into": "fedmetalextractor_up1",
+          "metal": 0,
+          "require": "tech1",
+          "research": 10,
+          "text": "Upgrade to Tech 1, x4 Metal Extraction rate",
+          "time": 3
+        }
+      ]
+    },
+    {
+      "name": "fedmetalextractor_up1",
+      "fullName": "E->M Converter (Tech 1)",
+      "mobile": false,
+      "objectName": "newmetalextractor.s3o",
+      "footprintX": 5,
+      "footprintZ": 5,
+      "maxSlope": 89.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 5000.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 97.5,
+        "builder": false,
+        "energyCost": 450,
+        "energyStorage": 100,
+        "energyUpkeep": 0.1,
+        "health": 750,
+        "makesMetal": 0.1,
+        "metalCost": 150,
+        "metalStorage": 100,
+        "radarDistance": 0,
+        "sightDistance": 200
+      },
+      "morphTargets": [
+        {
+          "cmdname": "Tech 2\nUpgrade",
+          "energy": 0,
+          "into": "fedmetalextractor_up2",
+          "metal": 0,
+          "require": "tech2",
+          "research": 25,
+          "text": "Upgrade to Tech 2, x8 Metal Extraction rate",
+          "time": 3
+        }
+      ]
+    },
+    {
+      "name": "fedmetalextractor_up2",
+      "fullName": "E->M Converter (Tech 2)",
+      "mobile": false,
+      "objectName": "newmetalextractor.s3o",
+      "footprintX": 5,
+      "footprintZ": 5,
+      "maxSlope": 89.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 5000.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 120,
+        "builder": false,
+        "energyCost": 3600,
+        "energyStorage": 100,
+        "energyUpkeep": 0.1,
+        "health": 3000,
+        "makesMetal": 0.1,
+        "metalCost": 600,
+        "metalStorage": 100,
+        "radarDistance": 0,
+        "sightDistance": 200
+      },
+      "morphTargets": [
+        {
+          "cmdname": "Tech 3\nUpgrade",
+          "energy": 0,
+          "into": "fedmetalextractor_up3",
+          "metal": 0,
+          "require": "tech3",
+          "research": 50,
+          "text": "Upgrade to Tech 3, x16 Metal Extraction rate",
+          "time": 3
+        }
+      ]
+    },
+    {
+      "name": "fedmetalextractor_up3",
+      "fullName": "E->M Converter (Tech 3)",
+      "mobile": false,
+      "objectName": "newmetalextractor.s3o",
+      "footprintX": 5,
+      "footprintZ": 5,
+      "maxSlope": 89.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 5000.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 55,
+        "builder": false,
+        "energyCost": 14400,
+        "energyStorage": 100,
+        "energyUpkeep": 0.1,
+        "health": 6000,
+        "makesMetal": 0.1,
+        "metalCost": 1200,
+        "metalStorage": 100,
+        "radarDistance": 0,
+        "sightDistance": 200
+      },
+      "morphTargets": [
+        {
+          "cmdname": "Tech 4\nUpgrade",
+          "energy": 0,
+          "into": "fedmetalextractor_up4",
+          "metal": 0,
+          "require": "tech4",
+          "research": 100,
+          "text": "Upgrade to Tech 4, x32 Metal Extraction rate",
+          "time": 3
+        }
+      ]
+    },
+    {
+      "name": "fedmetalextractor_up4",
+      "fullName": "E->M Converter (Tech 4)",
+      "mobile": false,
+      "objectName": "newmetalextractor.s3o",
+      "footprintX": 5,
+      "footprintZ": 5,
+      "maxSlope": 89.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 5000.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 62.5,
+        "builder": false,
+        "energyCost": 36000,
+        "energyStorage": 100,
+        "energyUpkeep": 0.1,
+        "health": 12000,
+        "makesMetal": 0.1,
+        "metalCost": 2400,
+        "metalStorage": 100,
+        "radarDistance": 0,
+        "sightDistance": 200
+      }
+    },
+    {
+      "name": "fedphalanx",
+      "fullName": "Phalanx",
+      "mobile": true,
+      "objectName": "fedphalanx.s3o",
+      "footprintX": 3,
+      "footprintZ": 3,
+      "maxSlope": 30.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 280,
+        "builder": false,
+        "energyCost": 8400,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 4200,
+        "maxVelocity": 57.6,
+        "metalCost": 1400,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 850,
+        "seismicDistance": 1000,
+        "sightDistance": 850,
+        "weapons": [
+          {
+            "damage": 32,
+            "projectile": "Cannon",
+            "range": 850,
+            "reload": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedpiranha",
+      "fullName": "Piranha",
+      "mobile": true,
+      "objectName": "fedpiranha.s3o",
+      "footprintX": 3,
+      "footprintZ": 3,
+      "maxSlope": 60.0,
+      "floatOnWater": true,
+      "minWaterDepth": 5.0,
+      "maxWaterDepth": 5000.0,
+      "waterline": 2.0,
+      "stats": {
+        "buildTime": 97.5,
+        "builder": false,
+        "energyCost": 450,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 360,
+        "maxVelocity": 126,
+        "metalCost": 150,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 550,
+        "seismicDistance": 650,
+        "sightDistance": 500,
+        "sonarDistance": 500,
+        "weapons": [
+          {
+            "damage": 250,
+            "projectile": "TorpedoLauncher",
+            "range": 550,
+            "reload": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedseaplant",
+      "fullName": "Sea Factory",
+      "buildOptions": [
+        "fedpiranha",
+        "fedcrusader",
+        "fedcolossus",
+        "fedconqueror",
+        "fedharbinger"
+      ],
+      "mobile": false,
+      "objectName": "fedseaplant.s3o",
+      "footprintX": 16,
+      "footprintZ": 16,
+      "maxSlope": 60.0,
+      "floatOnWater": true,
+      "minWaterDepth": 40.0,
+      "maxWaterDepth": 5000.0,
+      "waterline": 5.0,
+      "stats": {
+        "buildTime": 65,
+        "builder": true,
+        "energyCost": 300,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 2500,
+        "metalCost": 100,
+        "metalMake": 0,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "sightDistance": 500
+      }
+    },
+    {
+      "name": "fedsparrow",
+      "fullName": "Sparrow",
+      "mobile": true,
+      "objectName": "fedsparrow.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 89.0,
+      "floatOnWater": true,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 201.6,
+        "builder": false,
+        "energyCost": 2160,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 1125,
+        "maxVelocity": 337.5,
+        "metalCost": 360,
+        "metalStorage": 0,
+        "range": 800,
+        "sightDistance": 800,
+        "weapons": [
+          {
+            "damage": 80,
+            "projectile": "LaserCannon",
+            "range": 800,
+            "reload": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedstinger",
+      "fullName": "Stinger",
+      "mobile": false,
+      "objectName": "fedstinger.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 160.875,
+        "builder": false,
+        "energyCost": 990,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 1155,
+        "metalCost": 330,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 900,
+        "sightDistance": 700,
+        "weapons": [
+          {
+            "damage": 22,
+            "projectile": "Cannon",
+            "range": 900,
+            "reload": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedstorm",
+      "fullName": "Storm",
+      "mobile": true,
+      "objectName": "fedstorm.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 30.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 62,
+        "builder": false,
+        "energyCost": 285,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 238,
+        "maxVelocity": 135,
+        "metalCost": 95,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 500,
+        "seismicDistance": 770,
+        "sightDistance": 620,
+        "weapons": [
+          {
+            "damage": 80,
+            "projectile": "MissileLauncher",
+            "range": 500,
+            "reload": 1.2
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedstriker",
+      "fullName": "Striker",
+      "mobile": true,
+      "objectName": "fedstriker.s3o",
+      "footprintX": 7,
+      "footprintZ": 7,
+      "maxSlope": 30.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 121.4583,
+        "builder": false,
+        "energyCost": 31800,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 4638,
+        "maxVelocity": 117,
+        "metalCost": 2650,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 680,
+        "seismicDistance": 830,
+        "sightDistance": 680,
+        "weapons": [
+          {
+            "damage": 1500,
+            "projectile": "LaserCannon",
+            "range": 680,
+            "reload": 0.2333
+          },
+          {
+            "damage": 50,
+            "projectile": "LaserCannon",
+            "range": 680,
+            "reload": 0.2333
+          }
+        ]
+      }
+    },
+    {
+      "name": "fedthud",
+      "fullName": "Thud",
+      "mobile": true,
+      "objectName": "ehbotthud_legs.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 30.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 68.5,
+        "builder": false,
+        "energyCost": 315,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 158,
+        "maxVelocity": 108,
+        "metalCost": 105,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 650,
+        "seismicDistance": 800,
+        "sightDistance": 650,
+        "weapons": [
+          {
+            "damage": 150,
+            "projectile": "Cannon",
+            "range": 650,
+            "reload": 5
+          }
+        ]
+      }
+    },
+    {
+      "name": "fissionpowerplant",
+      "fullName": "Fission Energy Generator",
+      "mobile": false,
+      "objectName": "fissionpowerplant2.s3o",
+      "footprintX": 5,
+      "footprintZ": 5,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 65,
+        "builder": false,
+        "energyCost": 300,
+        "energyMake": 25,
+        "energyStorage": 0,
+        "health": 500,
+        "metalCost": 100,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "sightDistance": 367
+      }
+    },
+    {
+      "name": "fusionpowerplant",
+      "fullName": "Fusion Energy Generator",
+      "mobile": false,
+      "objectName": "fusionpowerplant2.s3o",
+      "footprintX": 9,
+      "footprintZ": 9,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 320,
+        "builder": false,
+        "energyCost": 9600,
+        "energyMake": 200,
+        "energyStorage": 0,
+        "health": 8000,
+        "metalCost": 1600,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "sightDistance": 367
+      }
+    },
+    {
+      "name": "geometalmaker",
+      "fullName": "Geothermal E->M Converter",
+      "mobile": false,
+      "objectName": "metalmaker_geo_t4.s3o",
+      "footprintX": 7,
+      "footprintZ": 7,
+      "maxSlope": 89.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 5000.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 125,
+        "builder": false,
+        "energyCost": 72000,
+        "energyStorage": 100,
+        "energyUpkeep": 0,
+        "health": 24000,
+        "makesMetal": 0,
+        "metalCost": 4800,
+        "metalMake": 0,
+        "metalStorage": 100,
+        "radarDistance": 0,
+        "sightDistance": 200
+      }
+    },
+    {
+      "name": "geothermalpowerplant",
+      "fullName": "Geothermal Energy Generator",
+      "mobile": false,
+      "objectName": "geothermalpowerplant.s3o",
+      "footprintX": 9,
+      "footprintZ": 9,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 422.5,
+        "builder": false,
+        "energyCost": 1950,
+        "energyMake": 350,
+        "energyStorage": 0,
+        "health": 3250,
+        "metalCost": 650,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "sightDistance": 367
+      }
+    },
+    {
+      "name": "healstation",
+      "fullName": "Healstation",
+      "mobile": false,
+      "objectName": "healstation.s3o",
+      "footprintX": 4,
+      "footprintZ": 4,
+      "maxSlope": 89.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 100,
+        "builder": false,
+        "energyCost": 3000,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 2500,
+        "metalCost": 500,
+        "metalMake": 0,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "sightDistance": 50
+      }
+    },
+    {
+      "name": "largecloakingtower",
+      "fullName": "Large Cloaking Tower",
+      "mobile": false,
+      "objectName": "largecloakingtower.s3o",
+      "footprintX": 6,
+      "footprintZ": 6,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 275,
+        "builder": false,
+        "energyCost": 72000,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 6000,
+        "metalCost": 6000,
+        "metalStorage": 0,
+        "radarDistanceJam": 800,
+        "sightDistance": 500,
+        "sonarDistance": 0
+      }
+    },
+    {
+      "name": "largeshieldgenerator",
+      "fullName": "Large Shield Generator",
+      "mobile": false,
+      "objectName": "largeshieldgenerator.s3o",
+      "footprintX": 5,
+      "footprintZ": 5,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 137.5,
+        "builder": false,
+        "energyCost": 36000,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 1500,
+        "metalCost": 3000,
+        "metalStorage": 0,
+        "sightDistance": 0,
+        "weapons": [
+          {
+            "damage": 1,
+            "projectile": "Shield"
+          }
+        ]
+      }
+    },
+    {
+      "name": "largestorage",
+      "fullName": "Large Resource Storage Facility and Supply Depot",
+      "mobile": false,
+      "objectName": "largestorage3.s3o",
+      "footprintX": 17,
+      "footprintZ": 17,
+      "maxSlope": 50.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 275,
+        "builder": false,
+        "energyCost": 72000,
+        "energyStorage": 20000,
+        "energyUpkeep": 0,
+        "health": 30000,
+        "metalCost": 6000,
+        "metalStorage": 20000,
+        "radarDistance": 0,
+        "sightDistance": 367
+      }
+    },
+    {
+      "name": "lootbox_t1",
+      "fullName": "Tier 1 Lootbox",
+      "mobile": false,
+      "objectName": "lootbox_t1.s3o",
+      "footprintX": 3,
+      "footprintZ": 3,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 200,
+        "builder": false,
+        "energyCost": 0,
+        "energyMake": 40,
+        "energyStorage": 0,
+        "health": 10000,
+        "metalCost": 200,
+        "metalMake": 4,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "sightDistance": 367
+      }
+    },
+    {
+      "name": "lootbox_t2",
+      "fullName": "Tier 2 Lootbox",
+      "mobile": false,
+      "objectName": "lootbox_t2.s3o",
+      "footprintX": 5,
+      "footprintZ": 5,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 200,
+        "builder": false,
+        "energyCost": 0,
+        "energyMake": 200,
+        "energyStorage": 0,
+        "health": 25000,
+        "metalCost": 200,
+        "metalMake": 8,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "sightDistance": 367
+      }
+    },
+    {
+      "name": "lootbox_t3",
+      "fullName": "Tier 3 Lootbox",
+      "mobile": false,
+      "objectName": "lootbox_t3.s3o",
+      "footprintX": 7,
+      "footprintZ": 7,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 200,
+        "builder": false,
+        "energyCost": 0,
+        "energyMake": 1000,
+        "energyStorage": 0,
+        "health": 50000,
+        "metalCost": 200,
+        "metalMake": 16,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "sightDistance": 367
+      }
+    },
+    {
+      "name": "lootbox_t4",
+      "fullName": "Tier 4 Lootbox",
+      "mobile": false,
+      "objectName": "lootbox_t4.s3o",
+      "footprintX": 5,
+      "footprintZ": 5,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 200,
+        "builder": false,
+        "energyCost": 0,
+        "energyMake": 4000,
+        "energyStorage": 9,
+        "health": 100000,
+        "metalCost": 200,
+        "metalMake": 32,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "sightDistance": 367
+      }
+    },
+    {
+      "name": "lootboxbronze",
+      "fullName": "Lootbox",
+      "mobile": true,
+      "objectName": "lootboxes/lootbox3x3.s3o",
+      "footprintX": 3,
+      "footprintZ": 3,
+      "maxSlope": 10.0,
+      "floatOnWater": true,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 569999680,
+        "energyCost": 518181504,
+        "energyMake": 20,
+        "health": 3000,
+        "metalCost": 518181504,
+        "metalMake": 1,
+        "sightDistance": 96
+      }
+    },
+    {
+      "name": "lootboxgold",
+      "fullName": "Lootbox",
+      "mobile": true,
+      "objectName": "lootboxes/lootbox5x5.s3o",
+      "footprintX": 5,
+      "footprintZ": 5,
+      "maxSlope": 10.0,
+      "floatOnWater": true,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 569999680,
+        "energyCost": 518181504,
+        "energyMake": 40,
+        "health": 5000,
+        "metalCost": 518181504,
+        "metalMake": 3,
+        "sightDistance": 96
+      }
+    },
+    {
+      "name": "lootboxplatinum",
+      "fullName": "Lootbox",
+      "mobile": true,
+      "objectName": "lootboxes/lootbox6x6.s3o",
+      "footprintX": 6,
+      "footprintZ": 6,
+      "maxSlope": 10.0,
+      "floatOnWater": true,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 569999680,
+        "energyCost": 518181504,
+        "energyMake": 80,
+        "health": 6000,
+        "metalCost": 518181504,
+        "metalMake": 4,
+        "sightDistance": 96
+      }
+    },
+    {
+      "name": "lootboxsilver",
+      "fullName": "Lootbox",
+      "mobile": true,
+      "objectName": "lootboxes/lootbox4x4.s3o",
+      "footprintX": 4,
+      "footprintZ": 4,
+      "maxSlope": 10.0,
+      "floatOnWater": true,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 569999680,
+        "energyCost": 518181504,
+        "energyMake": 30,
+        "health": 4000,
+        "metalCost": 518181504,
+        "metalMake": 2,
+        "sightDistance": 96
+      }
+    },
+    {
+      "name": "lootdroppod_gold",
+      "fullName": "Lootbox Droppod",
+      "mobile": false,
+      "objectName": "scavs/cube.s3o",
+      "footprintX": 1,
+      "footprintZ": 1,
+      "maxSlope": 0.0,
+      "floatOnWater": true,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 10000000.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 569999680,
+        "energyCost": 518181504,
+        "energyStorage": 1000,
+        "health": 1800,
+        "maxVelocity": 0,
+        "metalCost": 518181504,
+        "radarDistance": 900,
+        "range": 59999,
+        "sightDistance": 450,
+        "weapons": [
+          {
+            "damage": 1,
+            "projectile": "MissileLauncher",
+            "range": 59999,
+            "reload": 5
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozairengineer",
+      "fullName": "Fabricator",
+      "buildOptions": [
+        "f2landfac",
+        "lozairplant",
+        "lozseaplant",
+        "lozmetalextractor_up1",
+        "fissionpowerplant",
+        "fusionpowerplant",
+        "coldfusionpowerplant",
+        "blackholepowerplant",
+        "supplydepot",
+        "mediumsupplydepot",
+        "mediumstorage",
+        "largestorage",
+        "researchcenter",
+        "geometalmaker",
+        "geothermalpowerplant",
+        "condenser",
+        "smallshieldgenerator",
+        "largeshieldgenerator",
+        "lozjericho",
+        "lozrazor",
+        "lozinferno",
+        "lozrattlesnake",
+        "lozannihilator"
+      ],
+      "mobile": true,
+      "objectName": "lozairengineer.s3o",
+      "footprintX": 3,
+      "footprintZ": 3,
+      "maxSlope": 0.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 10.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 168,
+        "builder": true,
+        "energyCost": 1800,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 703,
+        "maxVelocity": 150,
+        "metalCost": 300,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "sightDistance": 300
+      }
+    },
+    {
+      "name": "lozairplant",
+      "fullName": "VTOL Factory",
+      "buildOptions": [
+        "lozairengineer",
+        "airscout",
+        "lozwasp",
+        "lozbumblebee",
+        "lozdragonfly",
+        "lozhornet",
+        "lozcrane",
+        "lozlocust",
+        "loztitan"
+      ],
+      "mobile": false,
+      "objectName": "lozairplant.s3o",
+      "footprintX": 9,
+      "footprintZ": 9,
+      "maxSlope": 89.0,
+      "floatOnWater": true,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 999999.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 80,
+        "builder": true,
+        "energyCost": 600,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 1250,
+        "metalCost": 100,
+        "metalMake": 0,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "sightDistance": 500
+      }
+    },
+    {
+      "name": "lozannihilator",
+      "fullName": "Annihilator",
+      "mobile": false,
+      "objectName": "lozannihilator2.s3o",
+      "footprintX": 6,
+      "footprintZ": 6,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 962.5,
+        "builder": false,
+        "energyCost": 252000,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 42000,
+        "metalCost": 21000,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 1200,
+        "sightDistance": 1000,
+        "weapons": [
+          {
+            "damage": 4700,
+            "projectile": "BeamLaser",
+            "range": 1200,
+            "reload": 8
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozbumblebee",
+      "fullName": "Bumblebee",
+      "mobile": true,
+      "objectName": "lozbumblebee.s3o",
+      "footprintX": 3,
+      "footprintZ": 3,
+      "maxSlope": 89.0,
+      "floatOnWater": true,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 246.4,
+        "builder": false,
+        "energyCost": 2640,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 550,
+        "maxVelocity": 270,
+        "metalCost": 440,
+        "metalStorage": 0,
+        "range": 800,
+        "sightDistance": 800,
+        "weapons": [
+          {
+            "damage": 300,
+            "projectile": "MissileLauncher",
+            "range": 300,
+            "reload": 15
+          },
+          {
+            "damage": 5,
+            "projectile": "LaserCannon",
+            "range": 800,
+            "reload": 0.2
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozcauterizer",
+      "fullName": "Cauterizer",
+      "mobile": true,
+      "objectName": "lozcauterizer.s3o",
+      "footprintX": 4,
+      "footprintZ": 4,
+      "maxSlope": 20.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 380,
+        "builder": false,
+        "energyCost": 11400,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 2375,
+        "maxVelocity": 97.2,
+        "metalCost": 1900,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 600,
+        "seismicDistance": 600,
+        "sightDistance": 450,
+        "weapons": [
+          {
+            "damage": 225,
+            "projectile": "LaserCannon",
+            "range": 600,
+            "reload": 9
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozcommander",
+      "fullName": "Loz Alliance Command Unit",
+      "buildOptions": [
+        "f2landfac",
+        "lozairplant",
+        "lozseaplant",
+        "lozmetalextractor_up1",
+        "fissionpowerplant",
+        "fusionpowerplant",
+        "coldfusionpowerplant",
+        "blackholepowerplant",
+        "supplydepot",
+        "mediumsupplydepot",
+        "mediumstorage",
+        "largestorage",
+        "researchcenter",
+        "geometalmaker",
+        "geothermalpowerplant",
+        "condenser",
+        "smallshieldgenerator",
+        "largeshieldgenerator",
+        "lozjericho",
+        "lozrazor",
+        "lozinferno",
+        "lozrattlesnake",
+        "lozannihilator"
+      ],
+      "mobile": true,
+      "objectName": "lozcommander.s3o",
+      "footprintX": 3,
+      "footprintZ": 3,
+      "maxSlope": 20.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 86,
+        "builder": true,
+        "energyCost": 113,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 1406.5,
+        "maxVelocity": 60,
+        "metalCost": 75,
+        "metalMake": 0,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 400,
+        "seismicDistance": 650,
+        "sightDistance": 500,
+        "weapons": [
+          {
+            "damage": 70,
+            "projectile": "LaserCannon",
+            "range": 400,
+            "reload": 5
+          }
+        ]
+      },
+      "morphTargets": [
+        {
+          "cmdname": "Tech 1\nUpgrade",
+          "energy": 0,
+          "into": "lozcommander_up1",
+          "metal": 0,
+          "research": 150,
+          "text": "Upgrade to Tech 1 with upgraded weapons and armor",
+          "time": 3
+        }
+      ]
+    },
+    {
+      "name": "lozcommander_up1",
+      "fullName": "Loz Alliance Command Unit",
+      "buildOptions": [
+        "f2landfac",
+        "lozairplant",
+        "lozseaplant",
+        "lozmetalextractor_up1",
+        "fissionpowerplant",
+        "fusionpowerplant",
+        "coldfusionpowerplant",
+        "blackholepowerplant",
+        "supplydepot",
+        "mediumsupplydepot",
+        "mediumstorage",
+        "largestorage",
+        "researchcenter",
+        "geometalmaker",
+        "geothermalpowerplant",
+        "condenser",
+        "smallshieldgenerator",
+        "largeshieldgenerator",
+        "lozjericho",
+        "lozrazor",
+        "lozinferno",
+        "lozrattlesnake",
+        "lozannihilator"
+      ],
+      "mobile": true,
+      "objectName": "lozcommander_up1.s3o",
+      "footprintX": 4,
+      "footprintZ": 4,
+      "maxSlope": 20.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 195,
+        "builder": true,
+        "energyCost": 450,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 2812.5,
+        "maxVelocity": 60,
+        "metalCost": 150,
+        "metalMake": 0,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 600,
+        "seismicDistance": 650,
+        "sightDistance": 500,
+        "weapons": [
+          {
+            "damage": 60,
+            "projectile": "LaserCannon",
+            "range": 600,
+            "reload": 5
+          }
+        ]
+      },
+      "morphTargets": [
+        {
+          "cmdname": "Tech 2\nUpgrade",
+          "energy": 0,
+          "into": "lozcommander_up2",
+          "metal": 0,
+          "require": "tech1",
+          "research": 300,
+          "text": "Upgrade to Tech 2 with upgraded weapons and armor",
+          "time": 3
+        }
+      ]
+    },
+    {
+      "name": "lozcommander_up2",
+      "fullName": "Loz Alliance Command Unit",
+      "buildOptions": [
+        "f2landfac",
+        "lozairplant",
+        "lozseaplant",
+        "lozmetalextractor_up1",
+        "fissionpowerplant",
+        "fusionpowerplant",
+        "coldfusionpowerplant",
+        "blackholepowerplant",
+        "supplydepot",
+        "mediumsupplydepot",
+        "mediumstorage",
+        "largestorage",
+        "researchcenter",
+        "geometalmaker",
+        "geothermalpowerplant",
+        "condenser",
+        "smallshieldgenerator",
+        "largeshieldgenerator",
+        "lozjericho",
+        "lozrazor",
+        "lozinferno",
+        "lozrattlesnake",
+        "lozannihilator"
+      ],
+      "mobile": true,
+      "objectName": "lozcommander_up2.s3o",
+      "footprintX": 5,
+      "footprintZ": 5,
+      "maxSlope": 20.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 960,
+        "builder": true,
+        "energyCost": 3600,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 5625,
+        "maxVelocity": 60,
+        "metalCost": 600,
+        "metalMake": 0,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 650,
+        "seismicDistance": 650,
+        "sightDistance": 500,
+        "weapons": [
+          {
+            "damage": 500,
+            "projectile": "LaserCannon",
+            "range": 650,
+            "reload": 5
+          }
+        ]
+      },
+      "morphTargets": [
+        {
+          "cmdname": "Tech 3\nUpgrade",
+          "energy": 0,
+          "into": "lozcommander_up3",
+          "metal": 0,
+          "require": "tech2",
+          "research": 600,
+          "text": "Upgrade to Tech 3 with upgraded weapons and armor",
+          "time": 3
+        }
+      ]
+    },
+    {
+      "name": "lozcommander_up3",
+      "fullName": "Loz Alliance Command Unit",
+      "buildOptions": [
+        "f2landfac",
+        "lozairplant",
+        "lozseaplant",
+        "lozmetalextractor_up1",
+        "fissionpowerplant",
+        "fusionpowerplant",
+        "coldfusionpowerplant",
+        "blackholepowerplant",
+        "supplydepot",
+        "mediumsupplydepot",
+        "mediumstorage",
+        "largestorage",
+        "researchcenter",
+        "geometalmaker",
+        "geothermalpowerplant",
+        "condenser",
+        "smallshieldgenerator",
+        "largeshieldgenerator",
+        "lozjericho",
+        "lozrazor",
+        "lozinferno",
+        "lozrattlesnake",
+        "lozannihilator"
+      ],
+      "mobile": true,
+      "objectName": "lozcommander_up3.s3o",
+      "footprintX": 6,
+      "footprintZ": 6,
+      "maxSlope": 20.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 3960,
+        "builder": true,
+        "energyCost": 21600,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 11250,
+        "maxVelocity": 60,
+        "metalCost": 1800,
+        "metalMake": 0,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 700,
+        "seismicDistance": 650,
+        "sightDistance": 500,
+        "weapons": [
+          {
+            "damage": 1750,
+            "projectile": "LaserCannon",
+            "range": 700,
+            "reload": 5
+          }
+        ]
+      },
+      "morphTargets": [
+        {
+          "cmdname": "Tech 4\nUpgrade",
+          "energy": 0,
+          "into": "lozcommander_up4",
+          "metal": 0,
+          "require": "tech3",
+          "research": 1200,
+          "text": "Upgrade to a Tech 4 BattleMech with Devestating weapons and armor",
+          "time": 3
+        }
+      ]
+    },
+    {
+      "name": "lozcommander_up4",
+      "fullName": "Loz Alliance Command Unit",
+      "buildOptions": [
+        "f2landfac",
+        "lozairplant",
+        "lozseaplant",
+        "lozmetalextractor_up1",
+        "fissionpowerplant",
+        "fusionpowerplant",
+        "coldfusionpowerplant",
+        "blackholepowerplant",
+        "supplydepot",
+        "mediumsupplydepot",
+        "mediumstorage",
+        "largestorage",
+        "researchcenter",
+        "geometalmaker",
+        "geothermalpowerplant",
+        "condenser",
+        "smallshieldgenerator",
+        "largeshieldgenerator",
+        "lozjericho",
+        "lozrazor",
+        "lozinferno",
+        "lozrattlesnake",
+        "lozannihilator"
+      ],
+      "mobile": true,
+      "objectName": "lozcommander_up4.s3o",
+      "footprintX": 7,
+      "footprintZ": 7,
+      "maxSlope": 20.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 18000,
+        "builder": true,
+        "energyCost": 108000,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 22500,
+        "maxVelocity": 60,
+        "metalCost": 7200,
+        "metalMake": 0,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 750,
+        "seismicDistance": 650,
+        "sightDistance": 500,
+        "weapons": [
+          {
+            "damage": 4650,
+            "projectile": "LaserCannon",
+            "range": 750,
+            "reload": 5
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozcrane",
+      "fullName": "Crane",
+      "mobile": true,
+      "objectName": "lozcrane.s3o",
+      "footprintX": 4,
+      "footprintZ": 4,
+      "maxSlope": 89.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 770,
+        "builder": false,
+        "energyCost": 16800,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 1575,
+        "maxVelocity": 247.5,
+        "metalCost": 1400,
+        "metalStorage": 0,
+        "range": 750,
+        "sightDistance": 575,
+        "transportCapacity": 100,
+        "weapons": [
+          {
+            "damage": 85,
+            "projectile": "LaserCannon",
+            "range": 750,
+            "reload": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozdiamondback",
+      "fullName": "Diamondback",
+      "mobile": true,
+      "objectName": "lozdiamondback.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 20.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 58.5,
+        "builder": false,
+        "energyCost": 270,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 45,
+        "maxVelocity": 120,
+        "metalCost": 90,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 400,
+        "seismicDistance": 800,
+        "sightDistance": 650,
+        "weapons": [
+          {
+            "damage": 7.5,
+            "projectile": "LaserCannon",
+            "range": 400,
+            "reload": 0.2333
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozdragonfly",
+      "fullName": "Dragonfly",
+      "mobile": true,
+      "objectName": "lozdragonfly.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 89.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 336,
+        "builder": false,
+        "energyCost": 3600,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 562.5,
+        "maxVelocity": 180,
+        "metalCost": 600,
+        "metalStorage": 0,
+        "sightDistance": 500,
+        "transportCapacity": 100
+      }
+    },
+    {
+      "name": "lozearthquakemine",
+      "fullName": "Earthquake Mine",
+      "mobile": false,
+      "objectName": "fedearthquakemine.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 32.5,
+        "builder": false,
+        "energyCost": 150,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 12.5,
+        "metalCost": 50,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 200,
+        "sightDistance": 100,
+        "weapons": [
+          {
+            "damage": 35,
+            "projectile": "Cannon",
+            "range": 200,
+            "reload": 10
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozemperorscorpion",
+      "fullName": "Emperor Scorpion",
+      "mobile": true,
+      "objectName": "lozemperorscorpion.s3o",
+      "footprintX": 6,
+      "footprintZ": 6,
+      "maxSlope": 20.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 293.3333,
+        "builder": false,
+        "energyCost": 76800,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 5600,
+        "maxVelocity": 54,
+        "metalCost": 6400,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 1200,
+        "seismicDistance": 1,
+        "sightDistance": 1000,
+        "weapons": [
+          {
+            "damage": 260,
+            "projectile": "LightningCannon",
+            "range": 1200,
+            "reload": 12
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozenforcer",
+      "fullName": "Enforcer",
+      "mobile": true,
+      "objectName": "lozenforcer.s3o",
+      "footprintX": 4,
+      "footprintZ": 4,
+      "maxSlope": 60.0,
+      "floatOnWater": true,
+      "minWaterDepth": 5.0,
+      "maxWaterDepth": 5000.0,
+      "waterline": 3.0,
+      "stats": {
+        "buildTime": 195,
+        "builder": false,
+        "energyCost": 900,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 660,
+        "maxVelocity": 90,
+        "metalCost": 300,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 700,
+        "seismicDistance": 750,
+        "sightDistance": 600,
+        "weapons": [
+          {
+            "damage": 230,
+            "projectile": "LaserCannon",
+            "range": 700,
+            "reload": 2
+          },
+          {
+            "damage": 12.5,
+            "projectile": "LightningCannon",
+            "range": 700,
+            "reload": 2.5
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozengineer",
+      "fullName": "Architect - Tech 0",
+      "mobile": true,
+      "objectName": "lozengineer.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 0.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 46,
+        "builder": true,
+        "energyCost": 60,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 75,
+        "maxVelocity": 75,
+        "metalCost": 40,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "seismicDistance": 650,
+        "sightDistance": 500
+      }
+    },
+    {
+      "name": "lozengineer_up1",
+      "fullName": "Architect",
+      "buildOptions": [
+        "f2landfac",
+        "lozairplant",
+        "lozseaplant",
+        "lozmetalextractor_up1",
+        "fissionpowerplant",
+        "fusionpowerplant",
+        "coldfusionpowerplant",
+        "blackholepowerplant",
+        "supplydepot",
+        "mediumsupplydepot",
+        "mediumstorage",
+        "largestorage",
+        "researchcenter",
+        "geometalmaker",
+        "geothermalpowerplant",
+        "condenser",
+        "smallshieldgenerator",
+        "largeshieldgenerator",
+        "lozjericho",
+        "lozrazor",
+        "lozinferno",
+        "lozrattlesnake",
+        "lozannihilator"
+      ],
+      "mobile": true,
+      "objectName": "lozengineer_up1.s3o",
+      "footprintX": 3,
+      "footprintZ": 3,
+      "maxSlope": 0.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 86,
+        "builder": true,
+        "energyCost": 113,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 140.5,
+        "maxVelocity": 75,
+        "metalCost": 75,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "seismicDistance": 650,
+        "sightDistance": 500
+      }
+    },
+    {
+      "name": "lozengineer_up2",
+      "fullName": "Architect - Tech 2",
+      "mobile": true,
+      "objectName": "lozengineer_up2.s3o",
+      "footprintX": 4,
+      "footprintZ": 4,
+      "maxSlope": 0.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 32,
+        "builder": true,
+        "energyCost": 960,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 300,
+        "maxVelocity": 75,
+        "metalCost": 160,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "seismicDistance": 650,
+        "sightDistance": 500
+      }
+    },
+    {
+      "name": "lozengineer_up3",
+      "fullName": "Architect - Tech 3",
+      "mobile": true,
+      "objectName": "lozengineer_up3.s3o",
+      "footprintX": 6,
+      "footprintZ": 6,
+      "maxSlope": 0.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 14.6667,
+        "builder": true,
+        "energyCost": 3840,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 600,
+        "maxVelocity": 75,
+        "metalCost": 320,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "seismicDistance": 650,
+        "sightDistance": 500
+      }
+    },
+    {
+      "name": "lozexecutioner",
+      "fullName": "Executioner",
+      "mobile": true,
+      "objectName": "lozexecutioner.s3o",
+      "footprintX": 6,
+      "footprintZ": 6,
+      "maxSlope": 60.0,
+      "floatOnWater": true,
+      "minWaterDepth": 5.0,
+      "maxWaterDepth": 5000.0,
+      "waterline": 5.0,
+      "stats": {
+        "buildTime": 640,
+        "builder": false,
+        "energyCost": 19200,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 5120,
+        "maxVelocity": 57,
+        "metalCost": 3200,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 1350,
+        "seismicDistance": 900,
+        "sightDistance": 750,
+        "sonarDistance": 750,
+        "weapons": [
+          {
+            "damage": 37.5,
+            "projectile": "BeamLaser",
+            "range": 1350,
+            "reload": 0.2333
+          },
+          {
+            "damage": 37.5,
+            "projectile": "BeamLaser",
+            "range": 1350,
+            "reload": 0.2333
+          },
+          {
+            "damage": 37.5,
+            "projectile": "BeamLaser",
+            "range": 1350,
+            "reload": 0.2333
+          },
+          {
+            "damage": 37.5,
+            "projectile": "BeamLaser",
+            "range": 1350,
+            "reload": 0.2333
+          },
+          {
+            "damage": 500,
+            "projectile": "TorpedoLauncher",
+            "range": 1350,
+            "reload": 4
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozflashpoint",
+      "fullName": "Flashpoint",
+      "mobile": true,
+      "objectName": "lozflashpoint.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 20.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 179,
+        "builder": false,
+        "energyCost": 825,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 344,
+        "maxVelocity": 157.5,
+        "metalCost": 275,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 400,
+        "seismicDistance": 470,
+        "sightDistance": 320,
+        "weapons": [
+          {
+            "damage": 100,
+            "projectile": "LaserCannon",
+            "range": 400,
+            "reload": 5
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozflea",
+      "fullName": "Flea",
+      "mobile": true,
+      "objectName": "lozflea2.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 20.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 42.5,
+        "builder": false,
+        "energyCost": 195,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 45,
+        "maxVelocity": 210,
+        "metalCost": 65,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "seismicDistance": 950,
+        "sightDistance": 800
+      }
+    },
+    {
+      "name": "lozhornet",
+      "fullName": "Hornet",
+      "mobile": true,
+      "objectName": "lozhornet.s3o",
+      "footprintX": 4,
+      "footprintZ": 4,
+      "maxSlope": 89.0,
+      "floatOnWater": true,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 1045,
+        "builder": false,
+        "energyCost": 22800,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 2375,
+        "maxVelocity": 270,
+        "metalCost": 1900,
+        "metalStorage": 0,
+        "range": 720,
+        "sightDistance": 720,
+        "weapons": [
+          {
+            "damage": 66,
+            "projectile": "MissileLauncher",
+            "range": 720,
+            "reload": 0.4
+          },
+          {
+            "damage": 135,
+            "projectile": "MissileLauncher",
+            "range": 720,
+            "reload": 3
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozinferno",
+      "fullName": "Inferno",
+      "mobile": false,
+      "objectName": "lozinferno.s3o",
+      "footprintX": 4,
+      "footprintZ": 4,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 428,
+        "builder": false,
+        "energyCost": 25680,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 8560,
+        "metalCost": 4280,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 1200,
+        "sightDistance": 900,
+        "weapons": [
+          {
+            "damage": 400,
+            "projectile": "BeamLaser",
+            "range": 1200,
+            "reload": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozintimidator",
+      "fullName": "Intimidator",
+      "mobile": false,
+      "objectName": "lozintimidator.s3o",
+      "footprintX": 16,
+      "footprintZ": 16,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 458.3333,
+        "builder": false,
+        "energyCost": 120000,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 2500,
+        "metalCost": 10000,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 8000,
+        "sightDistance": 500,
+        "weapons": [
+          {
+            "damage": 3000,
+            "projectile": "Cannon",
+            "range": 8000,
+            "reload": 20
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozjericho",
+      "fullName": "Jericho",
+      "mobile": false,
+      "objectName": "lozjericho.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 180.375,
+        "builder": false,
+        "energyCost": 1110,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 925,
+        "metalCost": 370,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 630,
+        "sightDistance": 630,
+        "weapons": [
+          {
+            "damage": 25,
+            "projectile": "BeamLaser",
+            "range": 630,
+            "reload": 0.2333
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozleviathan",
+      "fullName": "leviathan",
+      "mobile": true,
+      "objectName": "lozleviathan.s3o",
+      "footprintX": 8,
+      "footprintZ": 8,
+      "maxSlope": 60.0,
+      "floatOnWater": true,
+      "minWaterDepth": 5.0,
+      "maxWaterDepth": 5000.0,
+      "waterline": 5.0,
+      "stats": {
+        "buildTime": 437.7083,
+        "builder": false,
+        "energyCost": 114600,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 15280,
+        "maxVelocity": 30,
+        "metalCost": 9550,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 2100,
+        "seismicDistance": 650,
+        "sightDistance": 500,
+        "weapons": [
+          {
+            "damage": 260,
+            "projectile": "LightningCannon",
+            "range": 2100,
+            "reload": 12
+          },
+          {
+            "damage": 260,
+            "projectile": "LightningCannon",
+            "range": 2100,
+            "reload": 12
+          },
+          {
+            "damage": 1000,
+            "projectile": "BeamLaser",
+            "range": 2100,
+            "reload": 7
+          },
+          {
+            "damage": 1000,
+            "projectile": "BeamLaser",
+            "range": 2100,
+            "reload": 7
+          },
+          {
+            "damage": 1000,
+            "projectile": "BeamLaser",
+            "range": 2100,
+            "reload": 7
+          },
+          {
+            "damage": 1000,
+            "projectile": "BeamLaser",
+            "range": 2100,
+            "reload": 7
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozlocust",
+      "fullName": "Locust",
+      "mobile": true,
+      "objectName": "lozlocust.s3o",
+      "footprintX": 8,
+      "footprintZ": 8,
+      "maxSlope": 89.0,
+      "floatOnWater": true,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 920.8334,
+        "builder": false,
+        "energyCost": 312000,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 14300,
+        "maxVelocity": 180,
+        "metalCost": 13000,
+        "metalStorage": 0,
+        "range": 740,
+        "sightDistance": 800,
+        "weapons": [
+          {
+            "damage": 3075,
+            "projectile": "AircraftBomb",
+            "range": 740,
+            "reload": 15
+          },
+          {
+            "damage": 2.5,
+            "projectile": "LightningCannon",
+            "range": 740,
+            "reload": 1
+          },
+          {
+            "damage": 2.5,
+            "projectile": "LightningCannon",
+            "range": 740,
+            "reload": 1
+          },
+          {
+            "damage": 2.5,
+            "projectile": "LightningCannon",
+            "range": 740,
+            "reload": 1
+          },
+          {
+            "damage": 2.5,
+            "projectile": "LightningCannon",
+            "range": 740,
+            "reload": 1
+          },
+          {
+            "damage": 2.5,
+            "projectile": "LightningCannon",
+            "range": 740,
+            "reload": 1
+          },
+          {
+            "damage": 2.5,
+            "projectile": "LightningCannon",
+            "range": 740,
+            "reload": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozluger",
+      "fullName": "Luger",
+      "mobile": true,
+      "objectName": "lozluger.s3o",
+      "footprintX": 4,
+      "footprintZ": 4,
+      "maxSlope": 0.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 180,
+        "builder": false,
+        "energyCost": 5400,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 1125,
+        "maxVelocity": 46.8,
+        "metalCost": 900,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 1300,
+        "seismicDistance": 1000,
+        "sightDistance": 850,
+        "weapons": [
+          {
+            "damage": 8000,
+            "projectile": "Cannon",
+            "range": 1300,
+            "reload": 40
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozmammoth",
+      "fullName": "Mammoth",
+      "mobile": true,
+      "objectName": "lozmammoth.s3o",
+      "footprintX": 7,
+      "footprintZ": 7,
+      "maxSlope": 20.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 485.8333,
+        "builder": false,
+        "energyCost": 127200,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 18550,
+        "maxVelocity": 58.5,
+        "metalCost": 10600,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 800,
+        "seismicDistance": 950,
+        "sightDistance": 800,
+        "weapons": [
+          {
+            "damage": 1500,
+            "projectile": "BeamLaser",
+            "range": 800,
+            "reload": 4
+          },
+          {
+            "damage": 50,
+            "projectile": "LaserCannon",
+            "range": 800,
+            "reload": 0.5
+          },
+          {
+            "damage": 100,
+            "projectile": "LaserCannon",
+            "range": 800,
+            "reload": 5
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozmetalextractor",
+      "fullName": "E->M Converter (Tech 0)",
+      "mobile": false,
+      "objectName": "newmetalextractor.s3o",
+      "footprintX": 5,
+      "footprintZ": 5,
+      "maxSlope": 89.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 5000.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 50,
+        "builder": false,
+        "energyCost": 0,
+        "energyStorage": 100,
+        "energyUpkeep": 0.1,
+        "health": 125,
+        "makesMetal": 0.1,
+        "metalCost": 50,
+        "metalStorage": 100,
+        "radarDistance": 0,
+        "sightDistance": 200
+      },
+      "morphTargets": [
+        {
+          "cmdname": "Tech 1\nUpgrade",
+          "energy": 0,
+          "into": "lozmetalextractor_up1",
+          "metal": 0,
+          "require": "tech1",
+          "research": 10,
+          "text": "Upgrade to Tech 1, x4 Metal Extraction rate",
+          "time": 3
+        }
+      ]
+    },
+    {
+      "name": "lozmetalextractor_up1",
+      "fullName": "E->M Converter (Tech 1)",
+      "mobile": false,
+      "objectName": "newmetalextractor.s3o",
+      "footprintX": 5,
+      "footprintZ": 5,
+      "maxSlope": 89.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 5000.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 97.5,
+        "builder": false,
+        "energyCost": 450,
+        "energyStorage": 100,
+        "energyUpkeep": 0.1,
+        "health": 375,
+        "makesMetal": 0.1,
+        "metalCost": 150,
+        "metalStorage": 100,
+        "radarDistance": 0,
+        "sightDistance": 200
+      },
+      "morphTargets": [
+        {
+          "cmdname": "Tech 2\nUpgrade",
+          "energy": 0,
+          "into": "lozmetalextractor_up2",
+          "metal": 0,
+          "require": "tech2",
+          "research": 25,
+          "text": "Upgrade to Tech 2, x8 Metal Extraction rate",
+          "time": 3
+        }
+      ]
+    },
+    {
+      "name": "lozmetalextractor_up2",
+      "fullName": "E->M Converter (Tech 2)",
+      "mobile": false,
+      "objectName": "newmetalextractor.s3o",
+      "footprintX": 5,
+      "footprintZ": 5,
+      "maxSlope": 89.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 5000.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 120,
+        "builder": false,
+        "energyCost": 3600,
+        "energyStorage": 100,
+        "energyUpkeep": 0.1,
+        "health": 1500,
+        "makesMetal": 0.1,
+        "metalCost": 600,
+        "metalStorage": 100,
+        "radarDistance": 0,
+        "sightDistance": 200
+      },
+      "morphTargets": [
+        {
+          "cmdname": "Tech 3\nUpgrade",
+          "energy": 0,
+          "into": "lozmetalextractor_up3",
+          "metal": 0,
+          "require": "tech3",
+          "research": 50,
+          "text": "Upgrade to Tech 3, x16 Metal Extraction rate",
+          "time": 3
+        }
+      ]
+    },
+    {
+      "name": "lozmetalextractor_up3",
+      "fullName": "E->M Converter (Tech 3)",
+      "mobile": false,
+      "objectName": "newmetalextractor.s3o",
+      "footprintX": 5,
+      "footprintZ": 5,
+      "maxSlope": 89.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 5000.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 55,
+        "builder": false,
+        "energyCost": 14400,
+        "energyStorage": 100,
+        "energyUpkeep": 0.1,
+        "health": 3000,
+        "makesMetal": 0.1,
+        "metalCost": 1200,
+        "metalStorage": 100,
+        "radarDistance": 0,
+        "sightDistance": 200
+      },
+      "morphTargets": [
+        {
+          "cmdname": "Tech 4\nUpgrade",
+          "energy": 0,
+          "into": "lozmetalextractor_up4",
+          "metal": 0,
+          "require": "tech4",
+          "research": 100,
+          "text": "Upgrade to Tech 4, x32 Metal Extraction rate",
+          "time": 3
+        }
+      ]
+    },
+    {
+      "name": "lozmetalextractor_up4",
+      "fullName": "E->M Converter (Tech 4)",
+      "mobile": false,
+      "objectName": "newmetalextractor.s3o",
+      "footprintX": 5,
+      "footprintZ": 5,
+      "maxSlope": 89.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 5000.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 62.5,
+        "builder": false,
+        "energyCost": 36000,
+        "energyStorage": 100,
+        "energyUpkeep": 0.1,
+        "health": 6000,
+        "makesMetal": 0.1,
+        "metalCost": 2400,
+        "metalStorage": 100,
+        "radarDistance": 0,
+        "sightDistance": 200
+      }
+    },
+    {
+      "name": "lozprotector",
+      "fullName": "Protector",
+      "mobile": true,
+      "objectName": "lozprotector.s3o",
+      "footprintX": 5,
+      "footprintZ": 5,
+      "maxSlope": 20.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 360,
+        "builder": false,
+        "energyCost": 10800,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 1575,
+        "maxVelocity": 57.6,
+        "metalCost": 1800,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 800,
+        "seismicDistance": 1,
+        "sightDistance": 1000,
+        "weapons": [
+          {
+            "damage": 0,
+            "projectile": "LaserCannon",
+            "range": 800,
+            "reload": 100
+          },
+          {
+            "damage": 1,
+            "projectile": "Shield"
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozpulverizer",
+      "fullName": "Pulverizer",
+      "mobile": true,
+      "objectName": "lozpulverizer.s3o",
+      "footprintX": 4,
+      "footprintZ": 4,
+      "maxSlope": 20.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 300,
+        "builder": false,
+        "energyCost": 9000,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 2250,
+        "maxVelocity": 61.2,
+        "metalCost": 1500,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 850,
+        "seismicDistance": 1000,
+        "sightDistance": 850,
+        "weapons": [
+          {
+            "damage": 30,
+            "projectile": "LightningCannon",
+            "range": 850,
+            "reload": 3
+          },
+          {
+            "damage": 260,
+            "projectile": "Cannon",
+            "range": 850,
+            "reload": 4
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozrattlesnake",
+      "fullName": "Rattlesnake",
+      "mobile": false,
+      "objectName": "lozrattlesnake.s3o",
+      "footprintX": 4,
+      "footprintZ": 4,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 200,
+        "builder": false,
+        "energyCost": 12000,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 5000,
+        "metalCost": 2000,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 1650,
+        "sightDistance": 500,
+        "weapons": [
+          {
+            "damage": 1425,
+            "projectile": "Cannon",
+            "range": 1650,
+            "reload": 3
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozrazor",
+      "fullName": "Razor",
+      "mobile": false,
+      "objectName": "lozrazor.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 156,
+        "builder": false,
+        "energyCost": 960,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 560,
+        "metalCost": 320,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 900,
+        "sightDistance": 700,
+        "weapons": [
+          {
+            "damage": 22,
+            "projectile": "LightningCannon",
+            "range": 900,
+            "reload": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozreaper",
+      "fullName": "Reaper",
+      "mobile": true,
+      "objectName": "lozreaper2.s3o",
+      "footprintX": 5,
+      "footprintZ": 5,
+      "maxSlope": 20.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 320,
+        "builder": false,
+        "energyCost": 9600,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 4000,
+        "maxVelocity": 64.8,
+        "metalCost": 1600,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 850,
+        "seismicDistance": 1000,
+        "sightDistance": 850,
+        "weapons": [
+          {
+            "damage": 225,
+            "projectile": "LaserCannon",
+            "range": 850,
+            "reload": 3
+          },
+          {
+            "damage": 50,
+            "projectile": "LaserCannon",
+            "range": 850,
+            "reload": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozroach",
+      "fullName": "Roach",
+      "mobile": true,
+      "objectName": "lozroach.s3o",
+      "footprintX": 3,
+      "footprintZ": 3,
+      "maxSlope": 20.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 97.5,
+        "builder": false,
+        "energyCost": 450,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 187.5,
+        "maxVelocity": 94.5,
+        "metalCost": 150,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 620,
+        "seismicDistance": 770,
+        "sightDistance": 620,
+        "weapons": [
+          {
+            "damage": 60,
+            "projectile": "LaserCannon",
+            "range": 620,
+            "reload": 1.6
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozscorpion",
+      "fullName": "Scorpion",
+      "mobile": true,
+      "objectName": "lozscorpion.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 20.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 81.5,
+        "builder": false,
+        "energyCost": 375,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 47,
+        "maxVelocity": 90,
+        "metalCost": 125,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 650,
+        "seismicDistance": 800,
+        "sightDistance": 650,
+        "weapons": [
+          {
+            "damage": 30,
+            "projectile": "LightningCannon",
+            "range": 650,
+            "reload": 7
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozseaplant",
+      "fullName": "Sea Factory",
+      "buildOptions": [
+        "lozsnake",
+        "lozenforcer",
+        "lozexecutioner",
+        "lozwarlord",
+        "lozleviathan"
+      ],
+      "mobile": false,
+      "objectName": "sharedseaplant2.s3o",
+      "footprintX": 16,
+      "footprintZ": 16,
+      "maxSlope": 60.0,
+      "floatOnWater": true,
+      "minWaterDepth": 40.0,
+      "maxWaterDepth": 5000.0,
+      "waterline": 5.0,
+      "stats": {
+        "buildTime": 65,
+        "builder": true,
+        "energyCost": 300,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 1250,
+        "metalCost": 100,
+        "metalMake": 0,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "sightDistance": 500
+      }
+    },
+    {
+      "name": "lozsilverback",
+      "fullName": "Silverback",
+      "mobile": true,
+      "objectName": "lozsilverback.s3o",
+      "footprintX": 8,
+      "footprintZ": 8,
+      "maxSlope": 20.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 250.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 1953.125,
+        "builder": false,
+        "energyCost": 1125000,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 131250,
+        "maxVelocity": 36,
+        "metalCost": 75000,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 1200,
+        "seismicDistance": 1,
+        "sightDistance": 1200,
+        "weapons": [
+          {
+            "damage": 10000,
+            "projectile": "BeamLaser",
+            "range": 1200,
+            "reload": 10
+          },
+          {
+            "damage": 1000,
+            "projectile": "LaserCannon",
+            "range": 1200,
+            "reload": 0.6
+          },
+          {
+            "damage": 500,
+            "projectile": "BeamLaser",
+            "range": 1200,
+            "reload": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozsnake",
+      "fullName": "Snake",
+      "mobile": true,
+      "objectName": "lozsnake.s3o",
+      "footprintX": 3,
+      "footprintZ": 3,
+      "maxSlope": 60.0,
+      "floatOnWater": true,
+      "minWaterDepth": 5.0,
+      "maxWaterDepth": 5000.0,
+      "waterline": 2.0,
+      "stats": {
+        "buildTime": 97.5,
+        "builder": false,
+        "energyCost": 450,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 180,
+        "maxVelocity": 126,
+        "metalCost": 150,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 500,
+        "seismicDistance": 650,
+        "sightDistance": 500,
+        "sonarDistance": 500,
+        "weapons": [
+          {
+            "damage": 250,
+            "projectile": "TorpedoLauncher",
+            "range": 500,
+            "reload": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozsuperjericho",
+      "mobile": false,
+      "objectName": "empty.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 180,
+        "builder": false,
+        "energyCost": 5400,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 900,
+        "metalCost": 900,
+        "metalStorage": 0,
+        "sightDistance": 0
+      }
+    },
+    {
+      "name": "loztitan",
+      "fullName": "Titan",
+      "mobile": true,
+      "objectName": "loztitan.s3o",
+      "footprintX": 5,
+      "footprintZ": 5,
+      "maxSlope": 89.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 1770.8334,
+        "builder": false,
+        "energyCost": 600000,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 22000,
+        "maxVelocity": 225,
+        "metalCost": 25000,
+        "metalStorage": 0,
+        "range": 500,
+        "sightDistance": 500,
+        "transportCapacity": 100,
+        "weapons": [
+          {
+            "damage": 18,
+            "projectile": "BeamLaser",
+            "range": 500,
+            "reload": 0.1
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozwarlord",
+      "fullName": "Warlord",
+      "mobile": true,
+      "objectName": "lozwarlord.s3o",
+      "footprintX": 6,
+      "footprintZ": 6,
+      "maxSlope": 60.0,
+      "floatOnWater": true,
+      "minWaterDepth": 5.0,
+      "maxWaterDepth": 5000.0,
+      "waterline": 5.0,
+      "stats": {
+        "buildTime": 560,
+        "builder": false,
+        "energyCost": 16800,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 5040,
+        "maxVelocity": 42,
+        "metalCost": 2800,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 1700,
+        "seismicDistance": 650,
+        "sightDistance": 500,
+        "weapons": [
+          {
+            "damage": 571,
+            "projectile": "Cannon",
+            "range": 1700,
+            "reload": 7
+          },
+          {
+            "damage": 571,
+            "projectile": "Cannon",
+            "range": 1700,
+            "reload": 7
+          },
+          {
+            "damage": 571,
+            "projectile": "Cannon",
+            "range": 1700,
+            "reload": 7
+          },
+          {
+            "damage": 2.5,
+            "projectile": "LightningCannon",
+            "range": 1700,
+            "reload": 5
+          },
+          {
+            "damage": 2.5,
+            "projectile": "LightningCannon",
+            "range": 1700,
+            "reload": 5
+          }
+        ]
+      }
+    },
+    {
+      "name": "lozwasp",
+      "fullName": "Wasp",
+      "mobile": true,
+      "objectName": "lozwasp.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 89.0,
+      "floatOnWater": true,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 201.6,
+        "builder": false,
+        "energyCost": 2160,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 562.5,
+        "maxVelocity": 337.5,
+        "metalCost": 360,
+        "metalStorage": 0,
+        "range": 800,
+        "sightDistance": 800,
+        "weapons": [
+          {
+            "damage": 16,
+            "projectile": "LaserCannon",
+            "range": 800,
+            "reload": 0.2
+          }
+        ]
+      }
+    },
+    {
+      "name": "mediumstorage",
+      "fullName": "Medium Resource Storage Facility",
+      "mobile": false,
+      "objectName": "mediumstorage3.s3o",
+      "footprintX": 9,
+      "footprintZ": 9,
+      "maxSlope": 50.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 160,
+        "builder": false,
+        "energyCost": 4800,
+        "energyStorage": 2000,
+        "energyUpkeep": 0,
+        "health": 4000,
+        "metalCost": 800,
+        "metalStorage": 2000,
+        "radarDistance": 0,
+        "sightDistance": 100
+      }
+    },
+    {
+      "name": "mediumsupplydepot",
+      "fullName": "Medium Supply Depot",
+      "mobile": false,
+      "objectName": "mediumsupplydepot.s3o",
+      "footprintX": 9,
+      "footprintZ": 9,
+      "maxSlope": 50.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 160,
+        "builder": false,
+        "energyCost": 4800,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 4000,
+        "metalCost": 800,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "sightDistance": 100
+      }
+    },
+    {
+      "name": "neutralinferno",
+      "fullName": "Inferno",
+      "mobile": false,
+      "objectName": "lozinferno.s3o",
+      "footprintX": 4,
+      "footprintZ": 4,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 856,
+        "builder": false,
+        "energyCost": 25680,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 17120,
+        "metalCost": 4280,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 1200,
+        "sightDistance": 900,
+        "weapons": [
+          {
+            "damage": 400,
+            "projectile": "BeamLaser",
+            "range": 1200,
+            "reload": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "neutraljericho",
+      "fullName": "Jericho",
+      "mobile": false,
+      "objectName": "lozjericho.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 240.5,
+        "builder": false,
+        "energyCost": 1110,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 1850,
+        "metalCost": 370,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 630,
+        "sightDistance": 630,
+        "weapons": [
+          {
+            "damage": 25,
+            "projectile": "BeamLaser",
+            "range": 630,
+            "reload": 0.2333
+          }
+        ]
+      }
+    },
+    {
+      "name": "neutralrazor",
+      "fullName": "Razor",
+      "mobile": false,
+      "objectName": "lozrazor.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 208,
+        "builder": false,
+        "energyCost": 960,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 1120,
+        "metalCost": 320,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 900,
+        "sightDistance": 700,
+        "weapons": [
+          {
+            "damage": 22,
+            "projectile": "LightningCannon",
+            "range": 900,
+            "reload": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "nukesilo",
+      "fullName": "Eradicator",
+      "mobile": false,
+      "objectName": "esilo2.s3o",
+      "footprintX": 16,
+      "footprintZ": 16,
+      "maxSlope": 30.0,
+      "floatOnWater": true,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 5000.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 20000,
+        "builder": false,
+        "energyCost": 0,
+        "energyMake": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 100000,
+        "metalCost": 20000,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "range": 32000,
+        "sightDistance": 600,
+        "weapons": [
+          {
+            "damage": 100000,
+            "projectile": "StarburstLauncher",
+            "range": 32000,
+            "reload": 200
+          }
+        ]
+      }
+    },
+    {
+      "name": "researchcenter",
+      "fullName": "Research Center",
+      "mobile": false,
+      "objectName": "researchcenter.s3o",
+      "footprintX": 6,
+      "footprintZ": 6,
+      "maxSlope": 50.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 80,
+        "builder": false,
+        "energyCost": 2400,
+        "energyStorage": 0,
+        "energyUpkeep": 250,
+        "health": 2000,
+        "metalCost": 400,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "sightDistance": 100
+      }
+    },
+    {
+      "name": "scanner_probe",
+      "fullName": "Scanner Sweep",
+      "mobile": false,
+      "objectName": "emine.s3o",
+      "footprintX": 1,
+      "footprintZ": 1,
+      "maxSlope": 0.0,
+      "floatOnWater": true,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 10000000.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 569999680,
+        "energyCost": 518181504,
+        "energyStorage": 0,
+        "health": 50,
+        "metalCost": 518181504,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "sightDistance": 800,
+        "sonarDistance": 0
+      }
+    },
+    {
+      "name": "scavengerdroppod",
+      "fullName": "Scavenger Droppod",
+      "mobile": false,
+      "objectName": "scavs/cube.s3o",
+      "footprintX": 1,
+      "footprintZ": 1,
+      "maxSlope": 0.0,
+      "floatOnWater": true,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 10000000.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 569999680,
+        "energyCost": 518181504,
+        "energyStorage": 1000,
+        "health": 1800,
+        "maxVelocity": 0,
+        "metalCost": 518181504,
+        "radarDistance": 900,
+        "range": 29999,
+        "sightDistance": 450,
+        "weapons": [
+          {
+            "damage": 0,
+            "projectile": "MissileLauncher",
+            "range": 29999,
+            "reload": 5
+          }
+        ]
+      }
+    },
+    {
+      "name": "scavengerdroppodbeacon",
+      "fullName": "Scavenger Spawn Beacon",
+      "mobile": false,
+      "objectName": "scavs/scavbeacon.s3o",
+      "footprintX": 10,
+      "footprintZ": 10,
+      "maxSlope": 0.0,
+      "floatOnWater": true,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 10000000.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 569999680,
+        "energyCost": 518181504,
+        "energyStorage": 1000,
+        "health": 2000,
+        "maxVelocity": 0,
+        "metalCost": 518181504,
+        "radarDistance": 0,
+        "range": 256,
+        "sightDistance": 0,
+        "weapons": [
+          {
+            "damage": 0,
+            "projectile": "MissileLauncher",
+            "range": 256,
+            "reload": 5
+          }
+        ]
+      }
+    },
+    {
+      "name": "scavengerdroppodfriendly",
+      "fullName": "Friendly Droppod",
+      "mobile": false,
+      "objectName": "scavs/cube.s3o",
+      "footprintX": 1,
+      "footprintZ": 1,
+      "maxSlope": 0.0,
+      "floatOnWater": true,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 10000000.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 569999680,
+        "energyCost": 518181504,
+        "energyStorage": 1000,
+        "health": 1800,
+        "maxVelocity": 0,
+        "metalCost": 518181504,
+        "radarDistance": 900,
+        "range": 29999,
+        "sightDistance": 450,
+        "weapons": [
+          {
+            "damage": 0,
+            "projectile": "MissileLauncher",
+            "range": 29999,
+            "reload": 5
+          }
+        ]
+      }
+    },
+    {
+      "name": "sensortower",
+      "fullName": "Seismic Sensor",
+      "mobile": false,
+      "objectName": "sensortower.s3o",
+      "footprintX": 1,
+      "footprintZ": 1,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 10,
+        "builder": false,
+        "energyCost": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 50,
+        "metalCost": 10,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "seismicDistance": 300,
+        "sightDistance": 250
+      }
+    },
+    {
+      "name": "smallshieldgenerator",
+      "fullName": "Small Shield Generator",
+      "mobile": false,
+      "objectName": "smallshieldgenerator.s3o",
+      "footprintX": 2,
+      "footprintZ": 2,
+      "maxSlope": 60.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 140,
+        "builder": false,
+        "energyCost": 4200,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 350,
+        "metalCost": 700,
+        "metalStorage": 0,
+        "sightDistance": 0,
+        "weapons": [
+          {
+            "damage": 1,
+            "projectile": "Shield"
+          }
+        ]
+      }
+    },
+    {
+      "name": "supplydepot",
+      "fullName": "Basic Supply/Storage Depot",
+      "mobile": false,
+      "objectName": "supplydepot.s3o",
+      "footprintX": 6,
+      "footprintZ": 6,
+      "maxSlope": 50.0,
+      "floatOnWater": false,
+      "minWaterDepth": -10000000.0,
+      "maxWaterDepth": 0.0,
+      "waterline": 0.0,
+      "stats": {
+        "buildTime": 100,
+        "builder": false,
+        "energyCost": 0,
+        "energyStorage": 0,
+        "energyUpkeep": 0,
+        "health": 500,
+        "metalCost": 100,
+        "metalStorage": 0,
+        "radarDistance": 0,
+        "sightDistance": 100
+      }
+    }
+  ],
+  "checksum": "373c0f57",
+  "errors": []
+}

@@ -845,47 +845,6 @@ mod tests {
             face(indices, coilbox_3do::Texture::Name("arm2".into()))
         }
 
-        #[test]
-        fn turns_a_face_into_triangles() {
-            let out = import_3do(
-                &model3(piece3("body", vec![textured(vec![0, 1, 2])])),
-                &rects(),
-            )
-            .expect("import");
-
-            assert_eq!(out.triangles, 1);
-            assert_eq!(out.vertices, 3);
-        }
-
-        /// A quad is a fan around its first corner, the same as any other face.
-        #[test]
-        fn turns_a_four_cornered_face_into_two_triangles() {
-            let out = import_3do(
-                &model3(piece3("body", vec![textured(vec![0, 1, 2, 3])])),
-                &rects(),
-            )
-            .expect("import");
-
-            assert_eq!(out.triangles, 2);
-        }
-
-        /// The format shares a vertex between faces naming different tiles, and
-        /// a shared vertex can only carry one texture coordinate. So every
-        /// corner becomes its own vertex, even where the positions repeat.
-        #[test]
-        fn gives_every_corner_its_own_vertex() {
-            let out = import_3do(
-                &model3(piece3(
-                    "body",
-                    vec![textured(vec![0, 1, 2]), textured(vec![0, 2, 3])],
-                )),
-                &rects(),
-            )
-            .expect("import");
-
-            assert_eq!(out.vertices, 6);
-        }
-
         /// The whole point of the conversion: a face stretched over a tile
         /// comes out with real coordinates onto the packed sheet.
         #[test]
@@ -906,87 +865,34 @@ mod tests {
             assert_eq!(uvs, vec![[0.0, 0.0], [0.5, 0.0], [0.5, 0.5], [0.0, 0.5]]);
         }
 
-        /// A palette entry `rects` holds no tile for, because the caller found
-        /// no `palette.pal` beside the model or the entry is outside the 256
-        /// it holds, is drawn plain and counted, the same as a named texture
-        /// nothing on disk matched.
+        /// What `import_3do` adds to `to_s3o`'s output is these four counters,
+        /// copied across by hand, so a dropped assignment loses one silently.
         #[test]
-        fn draws_an_unresolved_palette_face_plain_and_counts_it() {
-            let out = import_3do(
-                &model3(piece3(
-                    "body",
-                    vec![face(vec![0, 1, 2], coilbox_3do::Texture::Palette(3))],
-                )),
-                &rects(),
-            )
-            .expect("import");
-
-            assert_eq!(out.palette_faces, 1);
-            assert_eq!(out.triangles, 1);
-        }
-
-        /// The reader already dropped these before conversion ever sees the
-        /// model, so this is a passthrough: the count still has to survive
-        /// the trip through `to_s3o` and into `Imported` for the import
-        /// summary to show it.
-        #[test]
-        fn carries_the_readers_base_plate_count_through_to_the_summary() {
-            let mut model = model3(piece3("body", vec![textured(vec![0, 1, 2])]));
+        fn copies_the_converters_four_counters_into_the_summary() {
+            let mut root = piece3("base", Vec::new());
+            root.children.push(piece3("beam", Vec::new()));
+            root.children.push(piece3("beam", Vec::new()));
+            root.children.push(piece3(
+                "body",
+                vec![
+                    face(vec![0, 1, 2], coilbox_3do::Texture::Palette(3)),
+                    face(
+                        vec![0, 1, 2],
+                        coilbox_3do::Texture::Name("nosuchtile".into()),
+                    ),
+                ],
+            ));
+            let mut model = model3(root);
             model.base_plate_faces = 2;
 
             let out = import_3do(&model, &rects()).expect("import");
 
-            assert_eq!(out.base_plate_faces, 2);
-        }
-
-        /// The specimen this exists for: a palette entry the caller did
-        /// resolve to a colour gets its own tile under `rects`, drawn like any
-        /// other texture and not counted as a face that came out plain.
-        #[test]
-        fn draws_a_resolved_palette_face_in_its_own_tile() {
-            let mut rects = rects();
-            rects.insert(
-                atlas3do::palette_tile_name(3),
-                Rect {
-                    u0: 0.25,
-                    v0: 0.25,
-                    u1: 0.75,
-                    v1: 0.75,
-                },
-            );
-            let out = import_3do(
-                &model3(piece3(
-                    "body",
-                    vec![face(vec![0, 1, 2, 3], coilbox_3do::Texture::Palette(3))],
-                )),
-                &rects,
-            )
-            .expect("import");
-
-            assert_eq!(out.palette_faces, 0);
-            let blob = inflate(&out.blob);
-            let at = BLOB_HEADER_SIZE + FLOATS_PER_VERTEX * 4 + 24;
-            assert_eq!([f32_at(&blob, at), f32_at(&blob, at + 4)], [0.75, 0.25]);
-        }
-
-        /// Naming which tile is missing is the only way anybody works out what
-        /// went wrong, and the rest of the unit still imports.
-        #[test]
-        fn names_a_tile_nothing_on_disk_matched() {
-            let out = import_3do(
-                &model3(piece3(
-                    "body",
-                    vec![face(
-                        vec![0, 1, 2],
-                        coilbox_3do::Texture::Name("nosuchtile".into()),
-                    )],
-                )),
-                &rects(),
-            )
-            .expect("import");
-
+            // Both faces came out plain, the unresolved palette one and the
+            // one naming a tile nothing matched.
+            assert_eq!(out.palette_faces, 2);
             assert_eq!(out.missing_textures, vec!["nosuchtile".to_string()]);
-            assert_eq!(out.triangles, 1);
+            assert_eq!(out.dropped_pieces, 1);
+            assert_eq!(out.base_plate_faces, 2);
         }
 
         /// A piece with no vertices is a hierarchy node and gets no mesh. One

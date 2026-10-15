@@ -83,6 +83,78 @@ pub fn command_that_outlives_us<S: AsRef<OsStr>>(program: S) -> Command {
     cmd
 }
 
+/// Asks the kernel to kill the child outright if coilbox dies without a chance
+/// to clean up (a crash, `kill -9`, a force quit, `tauri dev` restarting the
+/// app).
+///
+/// Linux only, through `PR_SET_PDEATHSIG`. macOS has no equivalent, so a child
+/// started there outlives a coilbox killed outright and has to be found at the
+/// next start, which is what [`kill_if_command_line_has`] is for. Windows
+/// children die with coilbox through the job object in `src-tauri/src/win_job.rs`.
+///
+/// The kernel ties the signal to the thread that spawned the child, not the
+/// process, so call this only where that thread stays alive for as long as the
+/// child does. A thread that waits on its own child does.
+pub fn die_with_parent(cmd: &mut Command) -> &mut Command {
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::unix::process::CommandExt;
+        let parent = std::process::id() as libc::pid_t;
+        // Only calls async-signal-safe functions, as `pre_exec` requires.
+        unsafe {
+            cmd.pre_exec(move || {
+                if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL) == -1 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                // The parent may have died between the fork and the call above,
+                // in which case no signal is ever sent.
+                if libc::getppid() != parent {
+                    return Err(std::io::Error::from_raw_os_error(libc::ESRCH));
+                }
+                Ok(())
+            });
+        }
+    }
+    cmd
+}
+
+/// The command line of process `pid`, arguments included, or `None` when there
+/// is no such process. Unix only.
+#[cfg(unix)]
+pub fn command_line(pid: u32) -> Option<String> {
+    let out = Command::new("ps")
+        .args(["-ww", "-o", "command=", "-p", &pid.to_string()])
+        .output()
+        .ok()?;
+    let line = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    (out.status.success() && !line.is_empty()).then_some(line)
+}
+
+/// Kills process `pid` with SIGKILL, but only when it is running and its
+/// command line contains every one of `needles`. Returns whether it sent the
+/// signal.
+///
+/// For a process left by a coilbox that no longer exists. A pid is reused by
+/// the OS, so a pid on its own is not safe to signal. A path only that run
+/// used is, which is why the caller names one. Always false off unix.
+pub fn kill_if_command_line_has(pid: u32, needles: &[&str]) -> bool {
+    #[cfg(unix)]
+    {
+        let Some(line) = command_line(pid) else {
+            return false;
+        };
+        if !needles.iter().all(|n| line.contains(n)) {
+            return false;
+        }
+        unsafe { libc::kill(pid as libc::pid_t, libc::SIGKILL) == 0 }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (pid, needles);
+        false
+    }
+}
+
 /// Whether process `pid` is still running.
 ///
 /// For a process this one did not spawn and therefore holds no `Child` for:
@@ -235,6 +307,76 @@ fn spawned_file(program: &OsStr) -> Option<&std::path::Path> {
     named_a_directory.then_some(path)
 }
 
+/// Lets go of whatever it holds open inside an engine folder, and returns once
+/// it has.
+type EngineHolder = Box<dyn Fn(&std::path::Path) + Send + Sync>;
+
+/// Everything that holds files open inside engine folders between uses. Today
+/// that is the unitsync plugin, whose workers keep an engine's `unitsync`
+/// library loaded while they run.
+///
+/// Here for the same reason [`CONTENT_ROOTS`] is: the plugin that deletes or
+/// replaces an engine folder and the plugin that holds it open do not depend on
+/// each other, and both depend on this crate.
+static ENGINE_HOLDERS: std::sync::RwLock<Vec<EngineHolder>> = std::sync::RwLock::new(Vec::new());
+
+/// Register something to call before an engine folder is deleted or replaced.
+pub fn on_engine_release(holder: impl Fn(&std::path::Path) + Send + Sync + 'static) {
+    ENGINE_HOLDERS
+        .write()
+        .unwrap_or_else(|e| e.into_inner())
+        .push(Box::new(holder));
+}
+
+/// Have every registered holder let go of the files under `dir`, an engine's
+/// folder or a folder of engines. Call it before deleting, overwriting or
+/// renaming anything in there.
+///
+/// It matters on Windows, which will not delete or overwrite a library a
+/// process has loaded: a recursive delete removes what it can and stops,
+/// leaving half an engine. It blocks until the holders have let go, which can
+/// take as long as a read they are in the middle of, so call it from a blocking
+/// task.
+pub fn release_engine(dir: &std::path::Path) {
+    for holder in ENGINE_HOLDERS
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .iter()
+    {
+        holder(dir);
+    }
+}
+
+/// How many games the player is in right now.
+static GAMES_RUNNING: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// Held for as long as a game the player launched is running. See
+/// [`game_started`].
+pub struct GameRunning(());
+
+impl Drop for GameRunning {
+    fn drop(&mut self) {
+        GAMES_RUNNING.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+/// Say that a game the player is in has started. It counts as running until
+/// what this returns is dropped.
+///
+/// Here for the same reason [`CONTENT_ROOTS`] is. The play plugin launches
+/// games and the content plugin runs replay analyses, a headless engine at
+/// full speed, and neither depends on the other. An analysis must not run
+/// under a game somebody is playing, so the one tells the other through this.
+pub fn game_started() -> GameRunning {
+    GAMES_RUNNING.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    GameRunning(())
+}
+
+/// Whether a game the player launched is running.
+pub fn game_running() -> bool {
+    GAMES_RUNNING.load(std::sync::atomic::Ordering::SeqCst) > 0
+}
+
 /// What the engine splits a `SPRING_DATADIR` list on (`cPD` in its
 /// `DataDirLocater.cpp`).
 pub const DATADIR_SEP: char = if cfg!(windows) { ';' } else { ':' };
@@ -248,6 +390,11 @@ static CONTENT_ROOTS: std::sync::RwLock<Vec<String>> = std::sync::RwLock::new(Ve
 /// Replace the published content folders.
 pub fn set_content_roots(roots: Vec<String>) {
     *CONTENT_ROOTS.write().unwrap() = roots;
+}
+
+/// The content folders last published with [`set_content_roots`].
+pub fn content_roots() -> Vec<String> {
+    CONTENT_ROOTS.read().unwrap().clone()
 }
 
 /// The published content folders other than `primary`, as a `SPRING_DATADIR`
@@ -267,6 +414,17 @@ pub fn spring_datadir(primary: &str) -> String {
     }
 }
 
+/// The env that stops an engine, or unitsync, reading the player's other Spring
+/// folders (`~/.spring`, `My Games\Spring`), for a portable coilbox. It still
+/// reads every folder in `SPRING_DATADIR`.
+///
+/// The folder named is the engine's own, never a content folder: it is the only
+/// place the engine's base content is, and isolation drops it unless it is the
+/// folder named.
+pub fn isolation_env(portable: bool, engine_dir: &std::path::Path) -> Option<(String, String)> {
+    portable.then(|| ("SPRING_ISOLATED".into(), engine_dir.display().to_string()))
+}
+
 fn join_extras(primary: &str, roots: &[String]) -> String {
     roots
         .iter()
@@ -276,6 +434,25 @@ fn join_extras(primary: &str, roots: &[String]) -> String {
         .map(String::as_str)
         .collect::<Vec<_>>()
         .join(&DATADIR_SEP.to_string())
+}
+
+#[cfg(test)]
+mod game_running {
+    use super::*;
+
+    /// The only test in this crate that says a game started, so the count is
+    /// its own.
+    #[test]
+    fn a_game_counts_as_running_until_what_it_was_given_is_dropped() {
+        assert!(!game_running());
+        let first = game_started();
+        let second = game_started();
+        assert!(game_running());
+        drop(first);
+        assert!(game_running(), "one of two games ending is not both");
+        drop(second);
+        assert!(!game_running());
+    }
 }
 
 #[cfg(test)]
@@ -305,6 +482,48 @@ mod datadirs {
     fn a_folder_the_engine_would_split_is_dropped() {
         let split = format!("/b{DATADIR_SEP}c");
         assert_eq!(join_extras("/a", &roots(&[&split, "/d"])), "/d");
+    }
+
+    #[test]
+    fn a_portable_coilbox_isolates_the_engine_to_its_own_folder() {
+        let engine = std::path::Path::new("/pkg/engine/105");
+        assert_eq!(
+            isolation_env(true, engine),
+            Some(("SPRING_ISOLATED".to_string(), "/pkg/engine/105".to_string()))
+        );
+    }
+
+    #[test]
+    fn an_installed_coilbox_leaves_the_engine_its_usual_folders() {
+        assert_eq!(isolation_env(false, std::path::Path::new("/e")), None);
+    }
+}
+
+#[cfg(test)]
+mod engine_release {
+    use super::*;
+    use std::path::{Path, PathBuf};
+    use std::sync::{Arc, Mutex};
+
+    #[test]
+    fn every_holder_is_told_which_folder_to_let_go_of() {
+        let told: Arc<Mutex<Vec<(u8, PathBuf)>>> = Arc::default();
+        for holder in [1, 2] {
+            let told = told.clone();
+            on_engine_release(move |dir| {
+                // Other tests in this process may release folders of their own.
+                if dir.ends_with("engine-release-test") {
+                    told.lock().unwrap().push((holder, dir.to_path_buf()));
+                }
+            });
+        }
+        let dir = Path::new("/content/engine/engine-release-test");
+        release_engine(dir);
+        assert_eq!(
+            *told.lock().unwrap(),
+            vec![(1, dir.to_path_buf()), (2, dir.to_path_buf())],
+            "both were called, and before release_engine returned"
+        );
     }
 }
 
@@ -357,6 +576,39 @@ mod free_space_tests {
         let dir = tempfile::tempdir().unwrap();
         assert!(super::free_space(dir.path()).unwrap() > 0);
         assert!(super::free_space(&dir.path().join("not-there")).is_err());
+    }
+}
+
+#[cfg(all(test, unix))]
+mod leftover_tests {
+    use super::*;
+
+    /// A long sleep with an argument nothing else on the machine has.
+    fn sleeper(marker: &str) -> std::process::Child {
+        Command::new("sleep").arg(marker).spawn().unwrap()
+    }
+
+    #[test]
+    fn a_process_is_killed_only_when_its_command_line_has_every_needle() {
+        let mut child = sleeper("4242.5");
+        let pid = child.id();
+
+        assert!(!kill_if_command_line_has(pid, &["4242.5", "not-there"]));
+        assert!(child.try_wait().unwrap().is_none(), "still running");
+
+        assert!(kill_if_command_line_has(pid, &["sleep", "4242.5"]));
+        assert!(!child.wait().unwrap().success());
+    }
+
+    #[test]
+    fn a_pid_with_no_process_is_left_alone() {
+        let mut child = sleeper("4242.6");
+        let pid = child.id();
+        child.kill().unwrap();
+        child.wait().unwrap();
+
+        assert_eq!(command_line(pid), None);
+        assert!(!kill_if_command_line_has(pid, &[""]));
     }
 }
 

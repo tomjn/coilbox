@@ -1,22 +1,19 @@
 import { Button, Input, useSetting } from "@picoframe/frame";
-import { FolderDown, Plus, Server, Swords, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { Link } from "react-router";
+import { Plus, Server, Swords, Trash2 } from "lucide-react";
 import { Field } from "@/components/Field";
-import { OptionSelect } from "@/components/OptionSelect";
 import { Switch } from "@/components/ui/switch";
-import { type ContentRoot, contentStateLoad } from "../../content/bindings";
 import { AUTO_DOWNLOAD_ON_JOIN_KEY } from "../../multiplayer/battle/autoDownload";
 import { useDownloadsConfig } from "../config";
 
 /**
  * The downloads plugin's settings section (frame settings page at
- * `/settings/downloads`). Three concerns, all persisted immediately (no Save
+ * `/settings/downloads`). Two concerns, both persisted immediately (no Save
  * button):
  *  - the list of rapid masters offered in the Browse Rapid / Games dropdowns
  *  - whether joining a battle fetches missing content on its own (issue #439)
- *  - the content root every download writes into (`--filesystem-writepath`),
- *    chosen from the content plugin's detected roots.
+ *
+ * Where downloads are written is not here. It is chosen beside the folders
+ * themselves, in the content plugin's Content folders page.
  *
  * The auto-download opt-out was a settings page of its own holding one switch,
  * which is not a page. It reads the multiplayer plugin's setting key, so the
@@ -24,25 +21,14 @@ import { useDownloadsConfig } from "../config";
  * lives here, next to the other answers to "what does downloading do".
  *
  * Engine downloads live in the content plugin's Engines settings page (below the
- * engine list) but write into the destination chosen here.
+ * engine list).
  */
 export default function DownloadsSettings() {
   const [cfg, setCfg] = useDownloadsConfig();
-  const [roots, setRoots] = useState<ContentRoot[]>([]);
   const [autoOnJoin, setAutoOnJoin] = useSetting<boolean>(
     AUTO_DOWNLOAD_ON_JOIN_KEY,
     true,
   );
-
-  useEffect(() => {
-    contentStateLoad(undefined)
-      // The bundled content folder is read-only to coilbox, so it is never
-      // offered as somewhere to download to.
-      .then(({ state }) => setRoots(state.roots.filter((r) => !r.bundled)))
-      .catch(() => {
-        // best-effort: the picker just shows no roots if content state is unavailable
-      });
-  }, []);
 
   const addRepo = () =>
     setCfg({
@@ -136,49 +122,6 @@ export default function DownloadsSettings() {
             onCheckedChange={setAutoOnJoin}
           />
         </label>
-      </section>
-
-      {/* Download destination */}
-      <section className="space-y-3">
-        <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          <FolderDown size={15} /> Download destination
-        </h2>
-        <p className="text-xs text-muted-foreground">
-          The content folder downloads are written into. Detected folders come
-          from{" "}
-          <Link
-            className="underline underline-offset-4"
-            to="/settings/content-folders"
-          >
-            Content folders
-          </Link>
-          . Pick one so games, maps, and engines land where the engine can find
-          them.
-        </p>
-        {roots.length === 0 ? (
-          <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-            No content folders detected yet. Add or scan one in{" "}
-            <Link
-              className="underline underline-offset-4"
-              to="/settings/content-folders"
-            >
-              Content folders
-            </Link>
-            .
-          </p>
-        ) : (
-          <Field label="Write to" className="max-w-md">
-            <OptionSelect
-              value={cfg.writeRootId ?? ""}
-              onValueChange={(v) => setCfg({ ...cfg, writeRootId: v })}
-              placeholder="Select a content folder…"
-              options={roots.map((root) => ({
-                value: root.id,
-                label: root.label ? `${root.label} — ${root.path}` : root.path,
-              }))}
-            />
-          </Field>
-        )}
       </section>
     </div>
   );

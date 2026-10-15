@@ -457,6 +457,9 @@ pub(crate) fn build(
                 ..types::Say::default()
             })?]
         }
+        // The server refuses a join for a channel we are in, and it puts every
+        // account in its default channels itself while logging it in.
+        ChatAction::JoinChannel { channel, .. } if state.channels.contains_key(channel) => vec![],
         ChatAction::JoinChannel { channel, password } => vec![line(&types::JoinChannel {
             channel_name: Some(channel.clone()),
             password: password.clone().filter(|key| !key.is_empty()),

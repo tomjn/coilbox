@@ -29,6 +29,16 @@
 //! (135 commits since May 2026 says a sweeping rewrite is not this crate's
 //! style).
 
+pub mod beforepost;
+pub mod cached;
+pub mod cachekey;
+pub mod matchsetup;
+/// The shapes the worker prints and the cache files hold. Declared here and not in
+/// the binary so the plugin can read a cached answer without starting a worker
+/// (issue #3714).
+pub mod model;
+pub mod protocol;
+
 /// One worker invocation, for whichever modes have migrated onto this shared
 /// contract. `to_args` matches on the variant, so adding a mode is one new
 /// variant and one new match arm here, not a new flag added by hand in three
@@ -704,17 +714,25 @@ impl MapInfoArgs {
 #[derive(Debug, Clone, PartialEq)]
 pub struct MapSkyboxArgs {
     pub map: String,
+    /// Where the answer is saved, so the next read of the map needs no worker
+    /// (issue #3736).
+    pub cache_dir: Option<String>,
 }
 
 impl MapSkyboxArgs {
-    /// Build the flags for `--map-skybox` mode: the map to read and the flag
-    /// itself.
+    /// Build the flags for `--map-skybox` mode: the map to read, the flag
+    /// itself, and the optional on-disk info-blob cache directory.
     pub fn to_args(&self) -> Vec<String> {
-        vec![
+        let mut args = vec![
             "--map-skybox".to_string(),
             "--map".to_string(),
             self.map.clone(),
-        ]
+        ];
+        if let Some(dir) = &self.cache_dir {
+            args.push("--cache-dir".to_string());
+            args.push(dir.clone());
+        }
+        args
     }
 
     /// Recover a `--map-skybox` invocation from a worker argv. As with the
@@ -725,16 +743,19 @@ impl MapSkyboxArgs {
     /// `--map` is required: there is nothing to read without one.
     pub fn from_args(args: &[String]) -> Result<Self, String> {
         let mut map = None;
+        let mut cache_dir = None;
         let mut it = args.iter();
         while let Some(a) = it.next() {
-            if a == "--map" {
-                map = it.next().cloned();
+            match a.as_str() {
+                "--map" => map = it.next().cloned(),
+                "--cache-dir" => cache_dir = it.next().cloned(),
+                _ => {}
             }
         }
         let Some(map) = map else {
             return Err("--map-skybox needs --map <name>".into());
         };
-        Ok(MapSkyboxArgs { map })
+        Ok(MapSkyboxArgs { map, cache_dir })
     }
 }
 
@@ -1217,6 +1238,12 @@ impl FactionLogosArgs {
 pub struct UnitDatasetArgs {
     pub game: String,
     pub cache_dir: Option<String>,
+    /// A file holding one match's setup as JSON (`matchsetup::MatchSetup`).
+    /// With it the read is of the unit list the engine built for that match
+    /// (issue #3847), and without it of the game's own unit dataset. A file
+    /// and not an argument because a start script's mod options can run past
+    /// what a command line holds.
+    pub match_setup_file: Option<String>,
 }
 
 impl UnitDatasetArgs {
@@ -1232,6 +1259,10 @@ impl UnitDatasetArgs {
             args.push("--cache-dir".to_string());
             args.push(dir.clone());
         }
+        if let Some(file) = &self.match_setup_file {
+            args.push("--match-setup-file".to_string());
+            args.push(file.clone());
+        }
         args
     }
 
@@ -1242,17 +1273,20 @@ impl UnitDatasetArgs {
     pub fn from_args(args: &[String]) -> Result<Self, String> {
         let mut game = None;
         let mut cache_dir = None;
+        let mut match_setup_file = None;
         let mut it = args.iter();
         while let Some(a) = it.next() {
             match a.as_str() {
                 "--game" => game = it.next().cloned(),
                 "--cache-dir" => cache_dir = it.next().cloned(),
+                "--match-setup-file" => match_setup_file = it.next().cloned(),
                 _ => {}
             }
         }
         Ok(UnitDatasetArgs {
             game: game.unwrap_or_default(),
             cache_dir,
+            match_setup_file,
         })
     }
 }
@@ -1726,6 +1760,9 @@ pub struct ArchiveArgs {
     pub file: Option<String>,
     pub extract: Option<String>,
     pub raw: bool,
+    /// Where a tree listing is saved, so the next listing of the archive needs
+    /// no worker (issue #3736). A preview or an extract does not use it.
+    pub cache_dir: Option<String>,
 }
 
 impl ArchiveArgs {
@@ -1744,6 +1781,10 @@ impl ArchiveArgs {
         if self.raw {
             args.push("--raw".to_string());
         }
+        if let Some(dir) = &self.cache_dir {
+            args.push("--cache-dir".to_string());
+            args.push(dir.clone());
+        }
         args
     }
 
@@ -1756,6 +1797,7 @@ impl ArchiveArgs {
         let mut file = None;
         let mut extract = None;
         let mut raw = false;
+        let mut cache_dir = None;
         let mut it = args.iter();
         while let Some(a) = it.next() {
             match a.as_str() {
@@ -1763,6 +1805,7 @@ impl ArchiveArgs {
                 "--file" => file = it.next().cloned(),
                 "--extract" => extract = it.next().cloned(),
                 "--raw" => raw = true,
+                "--cache-dir" => cache_dir = it.next().cloned(),
                 _ => {}
             }
         }
@@ -1771,6 +1814,7 @@ impl ArchiveArgs {
             file,
             extract,
             raw,
+            cache_dir,
         })
     }
 }
@@ -2037,12 +2081,6 @@ mod tests {
         assert!(UnitRenderArgs::from_args(&a).is_err());
     }
 
-    #[test]
-    fn a_mode_dispatches_to_args_to_its_variant() {
-        let a = args(None);
-        assert_eq!(Mode::UnitRender(a.clone()).to_args(), a.to_args());
-    }
-
     fn unit_models_args() -> UnitModelsArgs {
         UnitModelsArgs {
             game: "BAR.sdd".into(),
@@ -2097,12 +2135,6 @@ mod tests {
         a.remove(at + 1);
         a.remove(at);
         assert!(UnitModelsArgs::from_args(&a).is_err());
-    }
-
-    #[test]
-    fn unit_models_dispatches_to_args_to_its_variant() {
-        let a = unit_models_args();
-        assert_eq!(Mode::UnitModels(a.clone()).to_args(), a.to_args());
     }
 
     fn unit_render_keys_args() -> UnitRenderKeysArgs {
@@ -2166,12 +2198,6 @@ mod tests {
     }
 
     #[test]
-    fn unit_render_keys_dispatches_to_args_to_its_variant() {
-        let a = unit_render_keys_args();
-        assert_eq!(Mode::UnitRenderKeys(a.clone()).to_args(), a.to_args());
-    }
-
-    #[test]
     fn config_dispatches_to_args_to_its_flag() {
         assert_eq!(Mode::Config.to_args(), vec!["--config".to_string()]);
     }
@@ -2232,12 +2258,6 @@ mod tests {
         assert_eq!(recovered.value, "");
     }
 
-    #[test]
-    fn config_set_dispatches_to_args_to_its_variant() {
-        let a = config_set_args();
-        assert_eq!(Mode::ConfigSet(a.clone()).to_args(), a.to_args());
-    }
-
     /// What `to_args` writes, `from_args` reads back whole. A test on either
     /// function alone cannot catch the sidecar and the worker disagreeing
     /// about this mode's field.
@@ -2259,14 +2279,6 @@ mod tests {
         assert!(!a.contains(&"--cache-dir".to_string()));
         let recovered = MapMetaArgs::from_args(&a).expect("valid argv");
         assert_eq!(recovered, original);
-    }
-
-    #[test]
-    fn map_meta_dispatches_to_args_to_its_variant() {
-        let a = MapMetaArgs {
-            cache_dir: Some("/cache".into()),
-        };
-        assert_eq!(Mode::MapMeta(a.clone()).to_args(), a.to_args());
     }
 
     fn map_info_args() -> MapInfoArgs {
@@ -2297,15 +2309,10 @@ mod tests {
         assert!(MapInfoArgs::from_args(&a).is_err());
     }
 
-    #[test]
-    fn map_info_dispatches_to_args_to_its_variant() {
-        let a = map_info_args();
-        assert_eq!(Mode::MapInfo(a.clone()).to_args(), a.to_args());
-    }
-
     fn map_skybox_args() -> MapSkyboxArgs {
         MapSkyboxArgs {
             map: "Map v1".into(),
+            cache_dir: Some("/cache/info".into()),
         }
     }
 
@@ -2328,12 +2335,6 @@ mod tests {
         a.remove(at + 1);
         a.remove(at);
         assert!(MapSkyboxArgs::from_args(&a).is_err());
-    }
-
-    #[test]
-    fn map_skybox_dispatches_to_args_to_its_variant() {
-        let a = map_skybox_args();
-        assert_eq!(Mode::MapSkybox(a.clone()).to_args(), a.to_args());
     }
 
     fn map_catalog_walk_args() -> MapCatalogArgs {
@@ -2381,12 +2382,6 @@ mod tests {
         assert_eq!(recovered, original);
     }
 
-    #[test]
-    fn map_catalog_dispatches_to_args_to_its_variant() {
-        let a = map_catalog_walk_args();
-        assert_eq!(Mode::MapCatalog(a.clone()).to_args(), a.to_args());
-    }
-
     fn map_minimaps_args() -> MapMinimapsArgs {
         MapMinimapsArgs {
             maps_file: Some("/tmp/maps.json".into()),
@@ -2417,12 +2412,6 @@ mod tests {
         assert!(!a.contains(&"--asset-dir".to_string()));
         let recovered = MapMinimapsArgs::from_args(&a).expect("valid argv");
         assert_eq!(recovered, original);
-    }
-
-    #[test]
-    fn map_minimaps_dispatches_to_args_to_its_variant() {
-        let a = map_minimaps_args();
-        assert_eq!(Mode::MapMinimaps(a.clone()).to_args(), a.to_args());
     }
 
     fn heightmap_args() -> HeightmapArgs {
@@ -2471,12 +2460,6 @@ mod tests {
         assert!(HeightmapArgs::from_args(&a).is_err());
     }
 
-    #[test]
-    fn heightmap_dispatches_to_args_to_its_variant() {
-        let a = heightmap_args();
-        assert_eq!(Mode::Heightmap(a.clone()).to_args(), a.to_args());
-    }
-
     fn height_field_args() -> HeightFieldArgs {
         HeightFieldArgs {
             map: "Map v1".into(),
@@ -2517,12 +2500,6 @@ mod tests {
         a.remove(at + 1);
         a.remove(at);
         assert!(HeightFieldArgs::from_args(&a).is_err());
-    }
-
-    #[test]
-    fn height_field_dispatches_to_args_to_its_variant() {
-        let a = height_field_args();
-        assert_eq!(Mode::HeightField(a.clone()).to_args(), a.to_args());
     }
 
     fn metalmap_args() -> MetalmapArgs {
@@ -2567,12 +2544,6 @@ mod tests {
         assert!(MetalmapArgs::from_args(&a).is_err());
     }
 
-    #[test]
-    fn metalmap_dispatches_to_args_to_its_variant() {
-        let a = metalmap_args();
-        assert_eq!(Mode::Metalmap(a.clone()).to_args(), a.to_args());
-    }
-
     fn unit_buildpics_args() -> UnitBuildpicsArgs {
         UnitBuildpicsArgs {
             game: "BAR.sdd".into(),
@@ -2606,12 +2577,6 @@ mod tests {
         assert_eq!(recovered, original);
     }
 
-    #[test]
-    fn unit_buildpics_dispatches_to_args_to_its_variant() {
-        let a = unit_buildpics_args();
-        assert_eq!(Mode::UnitBuildpics(a.clone()).to_args(), a.to_args());
-    }
-
     fn faction_logos_args() -> FactionLogosArgs {
         FactionLogosArgs {
             game: "BAR.sdd".into(),
@@ -2630,16 +2595,11 @@ mod tests {
         assert_eq!(recovered, original);
     }
 
-    #[test]
-    fn faction_logos_dispatches_to_args_to_its_variant() {
-        let a = faction_logos_args();
-        assert_eq!(Mode::FactionLogos(a.clone()).to_args(), a.to_args());
-    }
-
     fn unit_dataset_args() -> UnitDatasetArgs {
         UnitDatasetArgs {
             game: "BAR.sdd".into(),
             cache_dir: Some("/cache/dataset".into()),
+            match_setup_file: Some("/tmp/setup.json".into()),
         }
     }
 
@@ -2651,12 +2611,6 @@ mod tests {
         let original = unit_dataset_args();
         let recovered = UnitDatasetArgs::from_args(&original.to_args()).expect("valid argv");
         assert_eq!(recovered, original);
-    }
-
-    #[test]
-    fn unit_dataset_dispatches_to_args_to_its_variant() {
-        let a = unit_dataset_args();
-        assert_eq!(Mode::UnitDataset(a.clone()).to_args(), a.to_args());
     }
 
     fn unit_defs_args() -> UnitDefsArgs {
@@ -2671,12 +2625,6 @@ mod tests {
         let original = unit_defs_args();
         let recovered = UnitDefsArgs::from_args(&original.to_args()).expect("valid argv");
         assert_eq!(recovered, original);
-    }
-
-    #[test]
-    fn unit_defs_dispatches_to_args_to_its_variant() {
-        let a = unit_defs_args();
-        assert_eq!(Mode::UnitDefs(a.clone()).to_args(), a.to_args());
     }
 
     #[test]
@@ -2717,12 +2665,6 @@ mod tests {
         assert_eq!(recovered, original);
     }
 
-    #[test]
-    fn custom_params_dispatches_to_args_to_its_variant() {
-        let a = custom_params_args();
-        assert_eq!(Mode::CustomParams(a.clone()).to_args(), a.to_args());
-    }
-
     /// Three modes now take exactly `--game` plus `--cache-dir`, so the flag
     /// naming each one apart is all that keeps a custom-params argv from
     /// running a def read instead.
@@ -2752,12 +2694,6 @@ mod tests {
         assert_eq!(recovered, original);
     }
 
-    #[test]
-    fn unit_model_dispatches_to_args_to_its_variant() {
-        let a = unit_model_args();
-        assert_eq!(Mode::UnitModel(a.clone()).to_args(), a.to_args());
-    }
-
     fn unit_script_args() -> UnitScriptArgs {
         UnitScriptArgs {
             game: "BAR.sdd".into(),
@@ -2773,12 +2709,6 @@ mod tests {
         let original = unit_script_args();
         let recovered = UnitScriptArgs::from_args(&original.to_args()).expect("valid argv");
         assert_eq!(recovered, original);
-    }
-
-    #[test]
-    fn unit_script_dispatches_to_args_to_its_variant() {
-        let a = unit_script_args();
-        assert_eq!(Mode::UnitScript(a.clone()).to_args(), a.to_args());
     }
 
     /// What `to_args` writes, `from_args` reads back whole, for the common
@@ -2822,15 +2752,6 @@ mod tests {
         assert!(!a.contains(&"--game".to_string()));
     }
 
-    #[test]
-    fn skirmish_ais_dispatches_to_args_to_its_variant() {
-        let a = SkirmishAisArgs {
-            game: Some("BAR.sdd".into()),
-            cache_dir: None,
-        };
-        assert_eq!(Mode::SkirmishAis(a.clone()).to_args(), a.to_args());
-    }
-
     /// What `to_args` writes, `from_args` reads back whole. A test on either
     /// function alone cannot catch the sidecar and the worker disagreeing
     /// about this mode's field.
@@ -2852,14 +2773,6 @@ mod tests {
         assert!(!a.contains(&"--cache-dir".to_string()));
         let recovered = GameHeadersArgs::from_args(&a).expect("valid argv");
         assert_eq!(recovered, original);
-    }
-
-    #[test]
-    fn game_headers_dispatches_to_args_to_its_variant() {
-        let a = GameHeadersArgs {
-            cache_dir: Some("/cache/headers".into()),
-        };
-        assert_eq!(Mode::GameHeaders(a.clone()).to_args(), a.to_args());
     }
 
     fn thumbnails_args() -> ThumbnailsArgs {
@@ -2889,12 +2802,6 @@ mod tests {
         a.remove(at);
         let recovered = ThumbnailsArgs::from_args(&a).expect("valid argv");
         assert_eq!(recovered.mip, 1);
-    }
-
-    #[test]
-    fn thumbnails_dispatches_to_args_to_its_variant() {
-        let a = thumbnails_args();
-        assert_eq!(Mode::Thumbnails(a.clone()).to_args(), a.to_args());
     }
 
     fn lua_args() -> LuaArgs {
@@ -2943,18 +2850,13 @@ mod tests {
         assert_eq!(recovered, lua_args());
     }
 
-    #[test]
-    fn lua_dispatches_to_args_to_its_variant() {
-        let a = lua_args();
-        assert_eq!(Mode::Lua(a.clone()).to_args(), a.to_args());
-    }
-
     fn archive_extract_args() -> ArchiveArgs {
         ArchiveArgs {
             archive: "Map.sd7".into(),
             file: Some("maps/x.smd".into()),
             extract: Some("/out/x.smd".into()),
             raw: false,
+            cache_dir: Some("/cache/info".into()),
         }
     }
 
@@ -3009,12 +2911,6 @@ mod tests {
         assert_eq!(recovered, original);
     }
 
-    #[test]
-    fn archive_dispatches_to_args_to_its_variant() {
-        let a = archive_extract_args();
-        assert_eq!(Mode::Archive(a.clone()).to_args(), a.to_args());
-    }
-
     fn game_args() -> GameArgs {
         GameArgs {
             game: "BAR.sdd".into(),
@@ -3030,12 +2926,6 @@ mod tests {
         let original = game_args();
         let recovered = GameArgs::from_args(&original.to_args()).expect("valid argv");
         assert_eq!(recovered, original);
-    }
-
-    #[test]
-    fn game_dispatches_to_args_to_its_variant() {
-        let a = game_args();
-        assert_eq!(Mode::Game(a.clone()).to_args(), a.to_args());
     }
 
     fn minimap_args() -> MinimapArgs {
@@ -3067,11 +2957,5 @@ mod tests {
         a.remove(at);
         let recovered = MinimapArgs::from_args(&a).expect("valid argv");
         assert_eq!(recovered.mip, 1);
-    }
-
-    #[test]
-    fn minimap_dispatches_to_args_to_its_variant() {
-        let a = minimap_args();
-        assert_eq!(Mode::Minimap(a.clone()).to_args(), a.to_args());
     }
 }

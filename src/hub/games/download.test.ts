@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { invalidateGithubReleases } from "../../downloads/githubReleases";
 import type { HubGameDownload } from "../api";
 
 const dlGithubReleaseArchives = vi.hoisted(() => vi.fn());
@@ -10,6 +11,7 @@ const { hubGameDownloadRequest } = await import("./download");
 const DEST = "/content/games";
 
 afterEach(() => {
+  invalidateGithubReleases();
   vi.clearAllMocks();
 });
 

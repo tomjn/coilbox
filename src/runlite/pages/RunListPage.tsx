@@ -342,8 +342,8 @@ function RunCard({
         : "Warpath in progress";
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/40 bg-primary/5 p-4">
-      <div className="flex items-center gap-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/40 bg-primary/5 p-4">
+      <div className="flex min-w-0 items-center gap-3">
         {logo && (
           <FactionLogo
             logo={logo}
@@ -381,7 +381,7 @@ function RunCard({
           </div>
         </div>
       </div>
-      <div className="flex gap-2">
+      <div className="flex shrink-0 gap-2">
         <Button
           variant="ghost"
           size="icon"

@@ -14,14 +14,26 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { dlRecoilEngines } from "../downloads/bindings";
 import {
   DownloadQueueProvider,
   useDownloadQueue,
 } from "../downloads/DownloadQueueProvider";
-import { exactGameRequirement } from "./resolveContent";
+import {
+  invalidateEngineLists,
+  loadRecoilEngines,
+  loadSpringfilesEngines,
+} from "../downloads/engineLists";
+import {
+  engineVersionRequirement,
+  exactGameRequirement,
+  exactMapRequirement,
+} from "./resolveContent";
 import { useResolveContent } from "./useResolveContent";
 
 const downloadGameAnySource = vi.hoisted(() => vi.fn());
+const downloadMapAnySource = vi.hoisted(() => vi.fn());
+const scanRun = vi.hoisted(() => vi.fn());
 const { installEngine } = vi.hoisted(() => ({
   installEngine: vi.fn(async (download: () => Promise<unknown>) => {
     await download();
@@ -39,10 +51,15 @@ vi.mock("../downloads/bindings", () => ({
   dlSpringfilesEngines: vi.fn(async () => ({ engines: [] })),
 }));
 vi.mock("../downloads/downloadGame", () => ({ downloadGameAnySource }));
-vi.mock("../downloads/downloadMap", () => ({ downloadMapAnySource: vi.fn() }));
+vi.mock("../downloads/downloadMap", () => ({ downloadMapAnySource }));
 vi.mock("../downloads/warmEngineCache", () => ({ installEngine }));
 vi.mock("../downloads/config", () => ({
-  useWriteRoot: () => ({ path: "/content", loading: false }),
+  // Games and maps each have a folder of their own here, so a download sent to
+  // the wrong one shows up as the wrong path.
+  useWriteRoot: (kind?: "games" | "maps") => ({
+    path: kind ? `/content-${kind}` : "/content",
+    loading: false,
+  }),
 }));
 
 vi.mock("./config", () => ({
@@ -57,9 +74,11 @@ vi.mock("./config", () => ({
     loading: false,
     error: null,
     cancelled: false,
-    run: vi.fn(),
+    run: scanRun,
   }),
+  forgetScans: vi.fn(),
   invalidateScans: vi.fn(),
+  rescanMounted: vi.fn(),
 }));
 vi.mock("./rapidPoolWarm", () => ({ warmAllRoots: vi.fn(async () => {}) }));
 
@@ -132,5 +151,82 @@ describe("useResolveContent's errorFor", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("useResolveContent's download folder", () => {
+  it("sends a game and a map each to the folder chosen for its kind", async () => {
+    const game = exactGameRequirement("Beyond All Reason");
+    const map = exactMapRequirement("Red Comet");
+    const { result } = renderHook(
+      () => useResolveContent([game, map], undefined, false),
+      { wrapper },
+    );
+
+    act(() => {
+      result.current.download(game);
+      result.current.download(map);
+    });
+
+    await waitFor(() => expect(downloadMapAnySource).toHaveBeenCalled());
+    expect(downloadGameAnySource).toHaveBeenCalledWith(
+      expect.objectContaining({ writePath: "/content-games" }),
+    );
+    expect(downloadMapAnySource).toHaveBeenCalledWith(
+      expect.objectContaining({ writePath: "/content-maps" }),
+    );
+  });
+});
+
+describe("useResolveContent after a download", () => {
+  const requirement = exactGameRequirement("Beyond All Reason");
+
+  it("asks for the shared rescan and forces no scan of its own", async () => {
+    const { forgetScans, rescanMounted } = await import("./config");
+    downloadGameAnySource.mockResolvedValueOnce(undefined);
+    const { result } = renderHook(
+      () => ({
+        first: useResolveContent([requirement], undefined, false),
+        second: useResolveContent([requirement], undefined, false),
+      }),
+      { wrapper },
+    );
+
+    act(() => {
+      result.current.first.download(requirement);
+    });
+
+    // Once from each consumer and once from the queue. They are one scan,
+    // which `scanRefresh.dom.test.tsx` counts against the real scan cache.
+    await waitFor(() => expect(rescanMounted).toHaveBeenCalledTimes(3));
+    expect(forgetScans).toHaveBeenCalledTimes(1);
+    expect(scanRun).not.toHaveBeenCalled();
+  });
+});
+
+describe("useResolveContent's engine lookup", () => {
+  const engine = engineVersionRequirement("2026.1");
+
+  it("refetches once for a missing version and not on re-render", async () => {
+    invalidateEngineLists();
+    vi.mocked(dlRecoilEngines).mockResolvedValue({
+      releases: [],
+      platform: "linux",
+    } as never);
+    // Held before the hook asks, as when the app has been open a while.
+    await loadRecoilEngines();
+    await loadSpringfilesEngines();
+    vi.mocked(dlRecoilEngines).mockClear();
+    const { result, rerender } = renderHook(
+      () => useResolveContent([engine], undefined, false),
+      { wrapper },
+    );
+    // One refetch for the miss.
+    await waitFor(() => expect(dlRecoilEngines).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(result.current.canDownload(engine)).toBe(false));
+    rerender();
+    rerender();
+    await act(async () => {});
+    expect(dlRecoilEngines).toHaveBeenCalledTimes(1);
   });
 });

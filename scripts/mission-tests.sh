@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Run every Lua test suite: the mission runtime's and the blueprint widget's.
+# Run every Lua test suite: the mission runtime's, the blueprint widget's and the
+# replay logger's.
 #
 # The suites are whatever lua/*/tests/ holds, so adding one is adding a file.
 # Each runs on its own in luajit and prints "all passed", the way a single suite

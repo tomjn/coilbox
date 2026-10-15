@@ -61,7 +61,7 @@ const scenarioPlugin: FramePlugin = {
         {
           id: "scenario.guide",
           label: "Scenarios guide",
-          href: "https://tomjn.github.io/coilbox/scenarios",
+          href: "https://tomjn.github.io/coilbox/developers/scenarios",
           icon: CoilMark,
           sidebar: false,
           order: 4,

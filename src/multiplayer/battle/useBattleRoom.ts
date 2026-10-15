@@ -29,6 +29,7 @@ import {
   mpRemoveBot,
   mpRemoveScriptTags,
   mpRemoveStartRect,
+  mpRing,
   mpSayBattle,
   mpSetBattleStatus,
   mpSetScriptTags,
@@ -304,6 +305,8 @@ export interface BattleRoomView {
     forceColor: (user: string, hex: string) => void;
     forceSpectator: (user: string) => void;
     kick: (user: string) => void;
+    /** Ring one member, or with no name everybody who is not ready. */
+    ring: (user?: string) => void;
     /** Tachyon only: make a member a boss, so they may change the lobby. */
     appointBoss: (user: string) => void;
     /** Tachyon only: stand a boss down. */
@@ -872,6 +875,13 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
       kick: (user: string) => {
         if (activeKey)
           mpKick({ serverKey: activeKey, username: user }).then(
+            clearErr,
+            setErr,
+          );
+      },
+      ring: (user?: string) => {
+        if (activeKey)
+          mpRing({ serverKey: activeKey, username: user }).then(
             clearErr,
             setErr,
           );

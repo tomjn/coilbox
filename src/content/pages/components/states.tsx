@@ -46,6 +46,42 @@ export function ScanFailed({ noun, reason }: { noun: string; reason: string }) {
 }
 
 /**
+ * The state of a list drawn from the last saved scan. While the live scan runs
+ * it says the list is being checked. If the scan failed or was cancelled it says
+ * the list may be out of date. The list stays on screen either way.
+ */
+export function SavedListStatus({
+  checking,
+  reason,
+}: {
+  checking: boolean;
+  reason: string | null;
+}) {
+  if (checking) {
+    return (
+      <p
+        role="status"
+        className="flex items-center gap-1.5 text-xs text-muted-foreground"
+      >
+        <Loader2 className="size-3.5 motion-safe:animate-spin" />
+        Checking
+      </p>
+    );
+  }
+  return (
+    <Alert variant="warning">
+      <TriangleAlert />
+      <AlertTitle>This list could not be checked</AlertTitle>
+      <AlertDescription className="break-words">
+        It shows the last saved scan, which may be out of date. Playing is off
+        until a scan succeeds.
+        {reason ? ` ${reason}` : " The scan was cancelled."}
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+/**
  * A launch stopped because an installed game depends on an archive that is not
  * installed (issue #3489). `reason` is `dependencyBlockReason`. There is no
  * download button, because the engine names the archive in lower case and the

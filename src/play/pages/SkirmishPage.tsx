@@ -70,8 +70,8 @@ import {
 import { StartBoxEditor } from "@/startbox/StartBoxEditor";
 import { StartBoxOverlay } from "@/startbox/StartBoxOverlay";
 import { StartPosCard } from "@/startbox/StartPosCard";
-import { contentListReplays } from "../../content/bindings";
 import { useBrandingEntry } from "../../content/branding";
+import { loadReplays } from "../../content/replayList";
 import { useReplayUserState } from "../../content/replayUserState";
 import { buildImportCodeLink } from "../../deeplink/build";
 import { copyDeepLink } from "../../deeplink/copyLink";
@@ -101,6 +101,7 @@ import {
   setAllAiBonus,
   setParticipantTeam,
   toBattleConfig,
+  uniqueParticipantIds,
   useLastAi,
   usePreferredTarget,
   useSkirmishAis,
@@ -174,7 +175,7 @@ export default function SkirmishPage() {
   } = usePreferredTarget();
   const enginePath = target?.enginePath;
   const dataDir = target?.dataDir;
-  const { running, launch } = usePlay();
+  const { running, relayed, launch, cancel } = usePlay();
   const { setProvenance } = useReplayUserState();
   const {
     debrief,
@@ -195,7 +196,9 @@ export default function SkirmishPage() {
   // survives navigation and restarts. The debounced effect below writes it back.
   const [draft, setDraft] = useSkirmishDraft();
   const [participants, setParticipants] = useState<Participant[]>(() =>
-    draft.participants.length > 0 ? draft.participants : initialParticipants(),
+    draft.participants.length > 0
+      ? uniqueParticipantIds(draft.participants)
+      : initialParticipants(),
   );
   const [gameName, setGameName] = useState(() => draft.gameName);
   const bonusSuggestions = useAiBonusSuggestions(participants, gameName);
@@ -252,7 +255,7 @@ export default function SkirmishPage() {
   // that can host counts (issue #514, #2847): `hostableKeys` is every live lobby
   // login that is not Tachyon, focused first. Under Tachyon the server allocates a
   // dedicated autohost from its own pool and a client cannot host at all (see
-  // `docs/tachyon-protocol.md`). A room is a connection too once it is up, but
+  // `docs/internal/tachyon-protocol.md`). A room is a connection too once it is up, but
   // hosting on one that is already open opens nothing, so it is left out.
   const { connections, activeKey } = useMultiplayer();
   const hostServers = useProtocolServers();
@@ -526,6 +529,8 @@ export default function SkirmishPage() {
   };
   const removeParticipant = (id: string) =>
     setParticipants((ps) => ps.filter((p) => p.id !== id));
+  const clearAis = () =>
+    setParticipants((ps) => ps.filter((p) => p.kind !== "ai"));
   // Added before the game's AI list settles, the slot is left blank for the fill
   // pass rather than seeded from the engine's natives.
   const addAi = () =>
@@ -661,7 +666,7 @@ export default function SkirmishPage() {
     // failure here just disables tagging/detection, never the launch itself.
     let beforePaths: Set<string> | null = null;
     try {
-      const { replays } = await contentListReplays({ root: target.dataDir });
+      const replays = await loadReplays(target.dataDir, true);
       beforePaths = new Set(replays.map((r) => r.path));
     } catch {
       beforePaths = null;
@@ -779,7 +784,7 @@ export default function SkirmishPage() {
     prevArchive.current = games.find(
       (g) => g.name === next.gameName,
     )?.primaryArchive.name;
-    setParticipants(next.participants);
+    setParticipants(uniqueParticipantIds(next.participants));
     setGameName(next.gameName);
     setMapName(next.mapName);
     setStartPosType(next.startPosType);
@@ -940,9 +945,9 @@ export default function SkirmishPage() {
   return (
     <div className="flex flex-col gap-5 p-4">
       <TooltipProvider>
-        <header className="flex items-center justify-between gap-4">
+        <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <h1 className="text-lg font-semibold">Singleplayer</h1>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             {you && (
               <label
                 htmlFor="spectate-you"
@@ -1156,9 +1161,17 @@ export default function SkirmishPage() {
       )}
 
       {running && (
-        <p className="rounded-md border border-border/50 bg-card p-3 text-sm text-muted-foreground">
-          Game running — settings are frozen until the engine exits.
-        </p>
+        <div className="flex items-center justify-between gap-3 rounded-md border border-border/50 bg-card p-3 text-sm text-muted-foreground">
+          <p>Game running — settings are frozen until the engine exits.</p>
+          {/* An engine that hangs on the way out never reports ending, and
+              the setup stays frozen with it. A relayed game is left to the top
+              bar, which asks first because ending it ends it for everybody. */}
+          {!relayed && (
+            <Button variant="outline" size="sm" onClick={cancel}>
+              End game
+            </Button>
+          )}
+        </div>
       )}
 
       {checkingResult && (
@@ -1216,6 +1229,7 @@ export default function SkirmishPage() {
             }
             onRemove={removeParticipant}
             onAddAi={addAi}
+            onClearAis={clearAis}
             onSetAiBonus={(id, percent) =>
               setParticipants((ps) => setAiBonus(ps, id, percent))
             }

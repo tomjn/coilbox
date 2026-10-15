@@ -527,6 +527,7 @@ fn equipped_in_place(game: &Game, name: &str, units: &[&str]) -> (usize, Vec<Str
 /// report). What this issue can put right is the weapon: it is in the table
 /// under the name the slot is given.
 #[test]
+#[ignore = "needs SpringMCLegacy.sdd in ~/.spring/games and an engine's springcontent.sdz. No machine has SpringMCLegacy.sdd, so this runs nowhere"]
 fn a_library_weapon_reaches_the_weapon_table_through_the_mutator_in_springmclegacy() {
     let Some(game) = installed("SpringMCLegacy.sdd") else {
         return;
@@ -559,6 +560,7 @@ fn a_library_weapon_reaches_the_weapon_table_through_the_mutator_in_springmclega
 }
 
 #[test]
+#[ignore = "needs THIS.sdd in ~/.spring/games and an engine's springcontent.sdz"]
 fn a_library_weapon_reaches_the_weapon_table_through_the_mutator_in_this() {
     let Some(game) = installed("THIS.sdd") else {
         return;
@@ -572,6 +574,7 @@ fn a_library_weapon_reaches_the_weapon_table_through_the_mutator_in_this() {
 /// write refuses to change for one of them and says so. Every one it does
 /// write has to load.
 #[test]
+#[ignore = "needs SpringMCLegacy.sdd in ~/.spring/games and an engine's springcontent.sdz. No machine has SpringMCLegacy.sdd, so this runs nowhere"]
 fn a_library_weapon_written_in_place_reaches_the_weapon_table_in_springmclegacy() {
     let Some(game) = installed("SpringMCLegacy.sdd") else {
         return;
@@ -587,6 +590,7 @@ fn a_library_weapon_written_in_place_reaches_the_weapon_table_in_springmclegacy(
 /// THIS writes most of its units in the `.fbi` format, which has no table for
 /// a unit's own weapons, so the weapon file is the only way one reaches them.
 #[test]
+#[ignore = "needs THIS.sdd in ~/.spring/games and an engine's springcontent.sdz"]
 fn a_library_weapon_written_in_place_reaches_the_weapon_table_in_this() {
     let Some(game) = installed("THIS.sdd") else {
         return;
@@ -600,6 +604,7 @@ fn a_library_weapon_written_in_place_reaches_the_weapon_table_in_this() {
 /// own post file takes the place of the game's `unitdefs_post.lua`. The copy
 /// still has to load equal to its source.
 #[test]
+#[ignore = "needs SplinterFaction.sdd in ~/.spring/games and an engine's springcontent.sdz. Takes about four minutes"]
 fn a_library_weapon_reaches_the_weapon_table_through_the_mutator_in_splinterfaction() {
     let Some(game) = installed("SplinterFaction.sdd") else {
         return;
@@ -622,6 +627,7 @@ fn a_library_weapon_reaches_the_weapon_table_through_the_mutator_in_splinterfact
 /// also sets `selfDestructAs` from it) moves to match. Only a unit whose
 /// basedef another unit file also includes is still left to the mutator.
 #[test]
+#[ignore = "needs SplinterFaction.sdd in ~/.spring/games and an engine's springcontent.sdz. Takes about four minutes"]
 fn a_library_weapon_written_in_place_reaches_the_weapon_table_in_splinterfaction() {
     let Some(game) = installed("SplinterFaction.sdd") else {
         return;
@@ -642,6 +648,7 @@ fn a_library_weapon_written_in_place_reaches_the_weapon_table_in_splinterfaction
 /// entry over each one under the same name, so every unit and weapon loads
 /// the same with them as without them.
 #[test]
+#[ignore = "needs an engine's springcontent.sdz under ~/.spring/engine"]
 fn weapon_files_change_nothing_under_the_base_contents_own_post_file() {
     let Some(base) = springcontent() else {
         eprintln!("no engine's springcontent.sdz is installed, so this checks nothing");

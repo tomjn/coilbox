@@ -1,5 +1,5 @@
-import { useTheme } from "@picoframe/frame";
-import { useMemo, useState } from "react";
+import { Button, useTheme } from "@picoframe/frame";
+import { useEffect, useMemo, useState } from "react";
 import {
   CartesianGrid,
   Legend,
@@ -13,6 +13,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { CheckField } from "@/components/Field";
 import {
   Select,
   SelectContent,
@@ -26,14 +27,18 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { formatDuration } from "@/lib/format";
 import { readableTeamTextColor } from "@/lib/teamColor";
 import type { DemoInfo, DemoTrailer, Metric } from "../../bindings";
+import { useStoredColorMode } from "../../chartColorMode";
+import { useStoredHighlightMe } from "../../highlightMe";
 import {
   allySeries,
+  autoColorMode,
   type ChartDisplay,
   type ChartMode,
   type ChartRow,
   type ChartSeries,
   type ChartView,
   chartHeight,
+  colorSeries,
   createTileCache,
   defaultChartView,
   defaultMetric,
@@ -44,14 +49,24 @@ import {
   formatRate,
   metricGroups,
   modeRows,
+  partlyHidden,
+  playerTeam,
   secondsPerFrame,
+  seriesTeams,
+  shownSeries,
   spreadLabels,
   teamSeries,
   tooltipRows,
   valueTable,
 } from "../../matchStats";
+import { usePrimaryPlayer } from "../../usePrimaryPlayer";
+import { useSeriesEmphasis } from "../../useSeriesEmphasis";
+import { CommandRateChart } from "./CommandRateChart";
+import { LivingValueChart } from "./LivingValueChart";
+import { MatchStatsExportButton } from "./MatchStatsExportButton";
 import { MatchStatsPicker } from "./MatchStatsPicker";
 import { MatchStatsTable } from "./MatchStatsTable";
+import { type LegendEntry, SeriesLegend } from "./SeriesLegend";
 
 /**
  * The match's chart: a line per seat or a line per side over match time, a
@@ -239,6 +254,25 @@ function SeriesTooltip({
   );
 }
 
+/** Line widths, in pixels. Emphasis widens a line and adds a halo, never a new colour. */
+const LINE_WIDTH = 2;
+const LIT_LINE_WIDTH = 3.5;
+const HALO_WIDTH = 9;
+const HALO_OPACITY = 0.25;
+/** Opacity of every line that is not the emphasised one, while one is. */
+const DIM_OPACITY = 0.2;
+/** A wide invisible stroke over each line, so the pointer doesn't have to hit 2px. */
+const HIT_WIDTH = 12;
+
+/**
+ * recharts paints lines in the order they registered, not the order they are
+ * written, so raising one is done with z-index. The halo sits with the dimmed
+ * lines, the emphasised line above it, and the hit lines above everything.
+ */
+const Z_LINE = 400;
+const Z_LIT = 401;
+const Z_HIT = 402;
+
 /** Vertical room one end-point label needs, in pixels. */
 const END_LABEL_GAP = 14;
 
@@ -251,7 +285,15 @@ const LEADER_THRESHOLD = 2;
  * recharts' own `LabelList` places each series on its own, which is exactly the
  * case a duel produces, so this reads the axis scales instead.
  */
-function EndLabels({ points }: { points: EndPoint[] }) {
+function EndLabels({
+  points,
+  isLit,
+  dimming,
+}: {
+  points: EndPoint[];
+  isLit: (id: string) => boolean;
+  dimming: boolean;
+}) {
   const xScale = useXAxisScale();
   const yScale = useYAxisScale();
   const plot = usePlotArea();
@@ -281,7 +323,10 @@ function EndLabels({ points }: { points: EndPoint[] }) {
       {spread.map((p) => {
         const from = lineY.get(p.id) ?? p.y;
         return (
-          <g key={p.id}>
+          <g
+            key={p.id}
+            opacity={dimming && !isLit(p.id) ? DIM_OPACITY + 0.15 : 1}
+          >
             {Math.abs(from - p.y) > LEADER_THRESHOLD && (
               <polyline
                 points={`${p.x},${from} ${p.x + 4},${p.y}`}
@@ -297,6 +342,7 @@ function EndLabels({ points }: { points: EndPoint[] }) {
               dy={4}
               fill={readableTeamTextColor(p.color, theme, "card")}
               fontSize={11}
+              fontWeight={isLit(p.id) ? 700 : 400}
             >
               {clip(p.label)}
             </text>
@@ -311,10 +357,13 @@ export function MatchStatsChart({
   info,
   trailer,
   metrics,
+  replayPath,
 }: {
   info: DemoInfo;
   trailer: DemoTrailer;
   metrics: Metric[];
+  /** Where to read commands per minute from. Left out, the chart has none. */
+  replayPath?: string;
 }) {
   const opening = defaultMetric(metrics);
   const [key, setKey] = useState(opening?.key ?? "");
@@ -325,17 +374,59 @@ export function MatchStatsChart({
   const [display, setDisplay] = useState<ChartDisplay>("chart");
   const metric = metrics.find((m) => m.key === key) ?? opening;
 
+  const [storedMode, setColorMode] = useStoredColorMode();
+  const [highlightMe, setHighlightMe] = useStoredHighlightMe();
+  const { resolved: theme } = useTheme();
+
   const players = useMemo(() => teamSeries(trailer, info), [trailer, info]);
   const sides = useMemo(() => allySeries(trailer, info), [trailer, info]);
   const view = chosen ?? defaultChartView(players, sides);
-  const series = view === "teams" ? sides : players;
+  // Until the toggle has been used the mode is the match's own pick, which also
+  // follows the theme because contrast depends on the card.
+  const colorMode = useMemo(
+    () => storedMode ?? autoColorMode(players, sides, info, theme),
+    [storedMode, players, sides, info, theme],
+  );
+  // Painted last, from the view's lines, so the colour a team wears depends on
+  // the match and the mode and never on which lines are showing.
+  const series = useMemo(
+    () =>
+      colorSeries(
+        view === "teams" ? sides : players,
+        trailer,
+        info,
+        colorMode,
+        theme,
+      ),
+    [view, sides, players, trailer, info, colorMode, theme],
+  );
+
+  // Every team the chart measures, whether its line is showing or not.
+  const chartedTeams = useMemo(
+    () => players.flatMap((s) => seriesTeams(s, info)).sort((a, b) => a - b),
+    [players, info],
+  );
+  const emphasis = useSeriesEmphasis();
+  const { hidden } = emphasis.state;
+  // The roster's unchecked teams come out here, after the painting above, so a
+  // line keeps its colour whatever else is showing. Everything below draws from
+  // `drawn`. `series` is only there to say how many lines the match has.
+  const drawn = useMemo(
+    () => shownSeries(series, info, chartedTeams, hidden),
+    [series, info, chartedTeams, hidden],
+  );
+  const noneDrawn = drawn.length === 0;
+  const partial = useMemo(
+    () => partlyHidden(drawn, info, chartedTeams, hidden),
+    [drawn, info, chartedTeams, hidden],
+  );
 
   const rows = useMemo(
     () =>
-      metric
-        ? modeRows(series, metric.key, secondsPerFrame(trailer), mode)
+      metric && !noneDrawn
+        ? modeRows(drawn, metric.key, secondsPerFrame(trailer), mode)
         : [],
-    [series, metric, trailer, mode],
+    [drawn, noneDrawn, metric, trailer, mode],
   );
   const formatValue = mode === "perMinute" ? formatRate : formatChartValue;
   // One cache for the life of this chart. Every tile is `modeRows` over the same
@@ -346,26 +437,62 @@ export function MatchStatsChart({
     () =>
       tileCache({
         metrics,
-        series,
+        series: drawn,
         secPerFrame: secondsPerFrame(trailer),
         mode,
         view,
       }),
-    [tileCache, metrics, series, trailer, mode, view],
+    [tileCache, metrics, drawn, trailer, mode, view],
   );
   // The same rows the plot draws, printed. Nothing is asked of the trailer a
   // second time, so the two can't answer different questions.
   const table = useMemo(
-    () => (metric ? valueTable(series, rows, { metric, mode, view }) : null),
-    [series, rows, metric, mode, view],
+    () =>
+      metric && !noneDrawn
+        ? valueTable(drawn, rows, { metric, mode, view })
+        : null,
+    [drawn, noneDrawn, rows, metric, mode, view],
   );
 
-  if (!metric || !table || series.length === 0 || rows.length === 0)
-    return null;
+  // Which engine teams each line stands for, so a line, a roster seat and a
+  // legend entry can all be compared by the same numbers.
+  const teamsOf = useMemo(
+    () => new Map(drawn.map((s) => [s.id, seriesTeams(s, info)])),
+    [drawn, info],
+  );
+  // "Me" is the library's player when they sat in this match and have a line.
+  // Only the Players view can show one person's line, so the control and the
+  // resting emphasis both go away on Teams.
+  const primary = usePrimaryPlayer();
+  const meTeam = primary ? playerTeam(info, primary) : undefined;
+  const canHighlightMe =
+    view === "players" && meTeam !== undefined && chartedTeams.includes(meTeam);
+  const resting = canHighlightMe && highlightMe ? [meTeam] : null;
+  const restingKey = resting?.join(",") ?? "";
+  const { setPlot } = emphasis.store;
+  // Hands the roster, and later the map, what this chart draws and who is the
+  // resting emphasis. Cleared on the way out so a gone chart leaves no toggles.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: restingKey stands for resting
+  useEffect(() => {
+    setPlot({ charted: chartedTeams, resting });
+    return () => setPlot({ charted: [], resting: null });
+  }, [setPlot, chartedTeams, restingKey]);
+
+  if (!metric || series.length === 0) return null;
+  // With every line unchecked the controls stay, so there is a way back.
+  if (!noneDrawn && (!table || rows.length === 0)) return null;
+
+  const litLine = (id: string) => emphasis.isLit(teamsOf.get(id));
+  const legendEntries: LegendEntry[] = drawn.map((s) => ({
+    id: s.id,
+    label: s.label,
+    color: s.color,
+    teams: teamsOf.get(s.id) ?? [],
+  }));
 
   // Four or fewer lines get their names at their end points, and the legend's
   // colour-matching job disappears with them.
-  const labelled = series.length <= END_LABEL_MAX_SERIES;
+  const labelled = drawn.length <= END_LABEL_MAX_SERIES;
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card p-3">
@@ -392,89 +519,217 @@ export function MatchStatsChart({
           label="Shown as"
           onChange={setDisplay}
         />
-      </div>
-
-      {/* The picker and what it enlarges. Beside each other where there is room
-       * for both, and the picker under the plot where there isn't. */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
-        <MatchStatsPicker
-          groups={tiles}
-          value={metric.key}
-          plotHeight={chartHeight(series.length)}
-          onChange={setKey}
+        <CheckField
+          label="In-game colours"
+          checked={colorMode === "game"}
+          onChange={(on) => setColorMode(on ? "game" : "palette")}
         />
-        <div className="order-first min-w-0 flex-1 lg:order-last">
-          {display === "table" ? (
-            <MatchStatsTable table={table} />
-          ) : (
-            <ResponsiveContainer
-              width="100%"
-              height={chartHeight(series.length)}
-            >
-              <LineChart
-                data={rows}
-                margin={{
-                  top: 8,
-                  right: labelled ? END_LABEL_GUTTER : 8,
-                  bottom: 0,
-                  left: 0,
-                }}
-              >
-                {/* Horizontal only. A vertical grid over a time axis adds lines
-                 * without adding a reading. */}
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="currentColor"
-                  opacity={0.12}
-                  vertical={false}
-                />
-                <XAxis
-                  dataKey="timeSec"
-                  type="number"
-                  domain={[0, "dataMax"]}
-                  tickFormatter={axisTime}
-                  tick={axisTick}
-                  tickLine={false}
-                  axisLine={false}
-                  minTickGap={32}
-                />
-                {/* Anchored at zero. A chart of resources that starts at 40,000 tells
-                 * a lie about the first ten minutes. */}
-                <YAxis
-                  domain={[0, "auto"]}
-                  tickFormatter={formatValue}
-                  tick={axisTick}
-                  tickLine={false}
-                  axisLine={false}
-                  width={52}
-                />
-                <Tooltip
-                  content={
-                    <SeriesTooltip series={series} format={formatValue} />
-                  }
-                  cursor={{ stroke: "currentColor", strokeOpacity: 0.35 }}
-                  isAnimationActive={false}
-                />
-                {!labelled && <Legend wrapperStyle={{ fontSize: 12 }} />}
-                {series.map((s) => (
-                  <Line
-                    key={s.id}
-                    type="monotone"
-                    dataKey={s.id}
-                    name={s.label}
-                    stroke={s.color}
-                    strokeWidth={2}
-                    dot={false}
-                    activeDot={{ r: 3 }}
-                    isAnimationActive={false}
-                  />
-                ))}
-                {labelled && <EndLabels points={endPoints(series, rows)} />}
-              </LineChart>
-            </ResponsiveContainer>
-          )}
+        {canHighlightMe && (
+          <CheckField
+            label="Highlight me"
+            checked={highlightMe}
+            onChange={setHighlightMe}
+          />
+        )}
+        <div className="ml-auto">
+          <MatchStatsExportButton
+            input={{
+              info,
+              metric,
+              mode,
+              view,
+              series: drawn,
+              allSeries: series,
+              rows,
+            }}
+            hiddenCount={series.length - drawn.length}
+          />
         </div>
       </div>
+
+      {view === "teams" && partial.length > 0 && (
+        // A side's line is every member added up. Unchecking one member of a
+        // side leaves the side's line as it was, and this says so.
+        <p className="text-xs text-muted-foreground">
+          Unchecked players still count in the total for{" "}
+          {partial.map((s) => s.label).join(", ")}.
+        </p>
+      )}
+
+      {noneDrawn || !table ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed p-4 text-sm">
+          Every line is unchecked in the roster.
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => emphasis.setShown(chartedTeams, true)}
+          >
+            Show all
+          </Button>
+        </div>
+      ) : (
+        /* The picker and what it enlarges. Beside each other where there is room
+         * for both, and the picker under the plot where there isn't. */
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
+          <MatchStatsPicker
+            groups={tiles}
+            value={metric.key}
+            plotHeight={chartHeight(drawn.length)}
+            onChange={setKey}
+          />
+          <div className="order-first min-w-0 flex-1 lg:order-last">
+            {display === "table" ? (
+              <MatchStatsTable table={table} />
+            ) : (
+              <ResponsiveContainer
+                width="100%"
+                height={chartHeight(drawn.length)}
+              >
+                <LineChart
+                  data={rows}
+                  margin={{
+                    top: 8,
+                    right: labelled ? END_LABEL_GUTTER : 8,
+                    bottom: 0,
+                    left: 0,
+                  }}
+                >
+                  {/* Horizontal only. A vertical grid over a time axis adds lines
+                   * without adding a reading. */}
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="currentColor"
+                    opacity={0.12}
+                    vertical={false}
+                  />
+                  <XAxis
+                    dataKey="timeSec"
+                    type="number"
+                    domain={[0, "dataMax"]}
+                    tickFormatter={axisTime}
+                    tick={axisTick}
+                    tickLine={false}
+                    axisLine={false}
+                    minTickGap={32}
+                  />
+                  {/* Anchored at zero. A chart of resources that starts at 40,000 tells
+                   * a lie about the first ten minutes. */}
+                  <YAxis
+                    domain={[0, "auto"]}
+                    tickFormatter={formatValue}
+                    tick={axisTick}
+                    tickLine={false}
+                    axisLine={false}
+                    width={52}
+                  />
+                  <Tooltip
+                    content={
+                      <SeriesTooltip series={drawn} format={formatValue} />
+                    }
+                    cursor={{ stroke: "currentColor", strokeOpacity: 0.35 }}
+                    isAnimationActive={false}
+                  />
+                  {!labelled && (
+                    <Legend
+                      wrapperStyle={{ fontSize: 12 }}
+                      content={<SeriesLegend entries={legendEntries} />}
+                    />
+                  )}
+                  {/* The halo, the lines (dimmed or not) and the invisible hit
+                   * lines the pointer lands on, stacked by z-index. Only the
+                   * real lines report to the tooltip. */}
+                  {drawn
+                    .filter((s) => litLine(s.id))
+                    .map((s) => (
+                      <Line
+                        key={`halo-${s.id}`}
+                        type="monotone"
+                        dataKey={s.id}
+                        stroke={s.color}
+                        strokeWidth={HALO_WIDTH}
+                        strokeOpacity={HALO_OPACITY}
+                        zIndex={Z_LINE}
+                        strokeLinecap="round"
+                        dot={false}
+                        activeDot={false}
+                        legendType="none"
+                        tooltipType="none"
+                        isAnimationActive={false}
+                      />
+                    ))}
+                  {drawn.map((s) => {
+                    const lit = litLine(s.id);
+                    return (
+                      <Line
+                        key={s.id}
+                        type="monotone"
+                        dataKey={s.id}
+                        name={s.label}
+                        stroke={s.color}
+                        strokeWidth={lit ? LIT_LINE_WIDTH : LINE_WIDTH}
+                        strokeOpacity={
+                          emphasis.dimming && !lit ? DIM_OPACITY : 1
+                        }
+                        zIndex={lit ? Z_LIT : Z_LINE}
+                        dot={false}
+                        activeDot={{ r: 3 }}
+                        isAnimationActive={false}
+                      />
+                    );
+                  })}
+                  {drawn.map((s) => {
+                    const teams = teamsOf.get(s.id) ?? [];
+                    return (
+                      <Line
+                        key={`hit-${s.id}`}
+                        type="monotone"
+                        dataKey={s.id}
+                        stroke="transparent"
+                        strokeWidth={HIT_WIDTH}
+                        zIndex={Z_HIT}
+                        dot={false}
+                        activeDot={false}
+                        legendType="none"
+                        tooltipType="none"
+                        isAnimationActive={false}
+                        style={{ cursor: "pointer" }}
+                        onMouseEnter={() => emphasis.hover(teams)}
+                        onMouseLeave={() => emphasis.hover(null)}
+                        onClick={() => emphasis.toggleSelected(teams)}
+                      />
+                    );
+                  })}
+                  {labelled && (
+                    <EndLabels
+                      points={endPoints(drawn, rows)}
+                      isLit={litLine}
+                      dimming={emphasis.dimming}
+                    />
+                  )}
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+      )}
+
+      {replayPath && !noneDrawn && (
+        <CommandRateChart
+          info={info}
+          replayPath={replayPath}
+          series={drawn}
+          endSec={rows[rows.length - 1]?.timeSec ?? 0}
+        />
+      )}
+      {!noneDrawn && (
+        <LivingValueChart
+          info={info}
+          series={drawn}
+          endSec={rows[rows.length - 1]?.timeSec ?? 0}
+          periodSec={trailer.teamStatPeriodSec}
+        />
+      )}
     </div>
   );
 }

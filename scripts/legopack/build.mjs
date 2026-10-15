@@ -38,7 +38,7 @@ const LICENCE = [
   "",
   'KaiserJ released the parts in that thread with "do whatever the heck you\'d like with these".',
   "",
-  "The pack format is documented in docs/lego-parts-pack.md. Any pack following it can replace this one.",
+  "The pack format is documented in docs/reference/lego-parts-pack.md. Any pack following it can replace this one.",
 ].join("\n");
 
 main();

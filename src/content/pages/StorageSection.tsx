@@ -21,6 +21,7 @@ import {
   contentOpenPath,
   contentScanRoot,
   contentStorageOverview,
+  contentUnitDefSetsUsage,
   type StorageOverview,
 } from "../bindings";
 import { useContentState, usePreferredEngine } from "../config";
@@ -29,6 +30,7 @@ import { BulkDeleteReplaysPanel } from "./components/BulkDeleteReplaysPanel";
 import { DeleteEngineButton } from "./components/DeleteEngineButton";
 import { ReclaimCachesButton } from "./components/ReclaimCachesButton";
 import { ReclaimSpaceButton } from "./components/ReclaimSpaceButton";
+import { ReplayTracksStorage } from "./components/ReplayTracksStorage";
 
 const msg = (e: unknown): string =>
   e instanceof Error ? e.message : String(e);
@@ -145,10 +147,13 @@ export default function StorageSection() {
 
   if (roots.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-10 text-center">
-        <p className="text-sm text-muted-foreground">
-          No content folders to measure yet. Add one in Content folders.
-        </p>
+      <div className="space-y-8">
+        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-10 text-center">
+          <p className="text-sm text-muted-foreground">
+            No content folders to measure yet. Add one in Content folders.
+          </p>
+        </div>
+        <ReplayTracksStorage />
       </div>
     );
   }
@@ -203,7 +208,52 @@ export default function StorageSection() {
           <ReclaimCachesButton />
         </div>
       </section>
+
+      <ReplayTracksStorage />
+
+      <ReplayUnitLists />
     </div>
+  );
+}
+
+/**
+ * What the unit lists kept for replays cost (#1176). They are not a cache:
+ * a list is what lets a replay still name its units once its game has been
+ * updated or removed, so there is nothing here to clear. A list goes when the
+ * last replay that uses it is deleted.
+ */
+function ReplayUnitLists() {
+  const [usage, setUsage] = useState<{
+    sets: number;
+    replays: number;
+    bytes: number;
+  } | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    contentUnitDefSetsUsage(undefined)
+      .then((found) => {
+        if (live) setUsage(found);
+      })
+      // The line is left out. Nothing else on the screen depends on it.
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  if (!usage) return null;
+  return (
+    <section className="space-y-1">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        Replay unit lists
+      </h2>
+      <p className="text-xs text-muted-foreground">
+        {usage.sets === 0
+          ? "No unit lists are kept yet. One is kept the first time a replay's build orders are read against its installed game, or when a replay is analysed."
+          : `${usage.sets.toLocaleString()} unit ${usage.sets === 1 ? "list is" : "lists are"} kept for ${usage.replays.toLocaleString()} ${usage.replays === 1 ? "replay" : "replays"}, using ${formatBytes(usage.bytes)}. They let a replay name its units after its game is updated or removed, and each goes when the last replay that uses it is deleted.`}
+      </p>
+    </section>
   );
 }
 
@@ -322,7 +372,7 @@ function RootStorageCard({
                 {state.overview.engines.map((engine) => (
                   <li
                     key={engine.path}
-                    className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-border/50 p-3"
+                    className="relative flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-border/50 p-3"
                   >
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="font-medium">{engine.version}</span>

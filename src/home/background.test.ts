@@ -1,6 +1,13 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  BASES,
+  contrastOfLuminances,
+  hsl,
+  luminance,
+  type Rgb,
+} from "../lib/contrast.testhelper";
 
 // background.ts reuses the profile's `@`-reference parser, which imports
 // defineCommand from @picoframe/plugin-sdk for its file-read binding. That
@@ -259,76 +266,9 @@ describe("backdropStyle", () => {
  */
 
 /** Straight-alpha composite of `layer` over `base`, both linear in sRGB space. */
-type Rgb = [number, number, number];
 function over(base: Rgb, layer: Rgb, alpha: number): Rgb {
   return base.map((c, i) => c * (1 - alpha) + layer[i] * alpha) as Rgb;
 }
-
-/** CSS `hsl()` to sRGB channels, all inputs and outputs 0 to 1 except the hue. */
-function hsl(h: number, s: number, l: number): Rgb {
-  const sat = Math.min(Math.max(s, 0), 1);
-  const c = (1 - Math.abs(2 * l - 1)) * sat;
-  const sector = ((((h % 360) + 360) % 360) / 60) % 6;
-  const x = c * (1 - Math.abs((sector % 2) - 1));
-  const rgb: Rgb =
-    sector < 1
-      ? [c, x, 0]
-      : sector < 2
-        ? [x, c, 0]
-        : sector < 3
-          ? [0, c, x]
-          : sector < 4
-            ? [0, x, c]
-            : sector < 5
-              ? [x, 0, c]
-              : [c, 0, x];
-  const m = l - c / 2;
-  return rgb.map((v) => v + m) as Rgb;
-}
-
-/** WCAG 2.2 relative luminance. */
-function luminance([r, g, b]: Rgb): number {
-  const lin = (v: number) =>
-    v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-}
-
-/** WCAG 2.2 contrast ratio between two relative luminances. */
-function contrast(a: number, b: number): number {
-  const [hi, lo] = a > b ? [a, b] : [b, a];
-  return (hi + 0.05) / (lo + 0.05);
-}
-
-/**
- * Every base preset picoframe ships, as `[name, --base-hue, --base-sat,
- * --base-sat-text]`. The two saturation knobs are separate because the vivid tier
- * pins the text one near the subtle tier's level, and the inks below are written
- * in terms of the text knob, so collapsing them models bases that do not exist.
- */
-const BASES: readonly [string, number, number, number][] = [
-  ["zinc", 240, 1, 1],
-  ["slate", 215, 1.6, 1.6],
-  ["gray", 220, 0.5, 0.5],
-  ["stone", 30, 1.5, 1.5],
-  ["neutral", 0, 0, 0],
-  ["rose", 345, 2.4, 2.4],
-  ["red", 2, 2.4, 2.4],
-  ["amber", 40, 2.4, 2.4],
-  ["green", 150, 2.2, 2.2],
-  ["teal", 185, 2.2, 2.2],
-  ["blue", 214, 2.6, 2.6],
-  ["indigo", 250, 2.4, 2.4],
-  ["violet", 276, 2.4, 2.4],
-  ["purple", 280, 7, 2],
-  ["sky", 208, 6, 2],
-  ["navy", 225, 11, 2],
-  ["fuchsia", 330, 6, 2],
-  ["orange", 25, 6, 2],
-  ["lime", 95, 5.5, 2],
-  ["emerald", 160, 6.5, 2],
-  ["yellow", 50, 6, 2],
-  ["crimson", 350, 6.5, 2],
-];
 
 /**
  * The lightness `src/index.css` ships for the light `--muted-foreground`, read
@@ -413,7 +353,10 @@ describe("backdrop dimming", () => {
       for (const [token, colour] of Object.entries(text)) {
         const label = `${mode} ${token} on the ${base} base`;
         const ink = luminance(colour);
-        const worst = Math.min(contrast(ink, darkest), contrast(ink, lightest));
+        const worst = Math.min(
+          contrastOfLuminances(ink, darkest),
+          contrastOfLuminances(ink, lightest),
+        );
 
         it(`never swallows ${label}`, () => {
           // Text luminance inside the reachable range would mean some image
@@ -450,7 +393,10 @@ describe("backdrop dimming", () => {
           ] as Rgb[]) {
             const surface = luminance(over(background, extreme, alpha));
             for (const colour of Object.values(text))
-              worst = Math.min(worst, contrast(luminance(colour), surface));
+              worst = Math.min(
+                worst,
+                contrastOfLuminances(luminance(colour), surface),
+              );
           }
         }
       if (worst >= AA_SMALL) ceiling = alpha;

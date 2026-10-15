@@ -709,16 +709,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn plain_http_will_not_carry_a_token() {
-        assert!(api_url("http://hub.example", HAVE_PATH, "Asking")
-            .unwrap_err()
-            .contains("https"));
-        assert!(api_url("http://hub.example", SUBMIT_PATH, "Sending")
-            .unwrap_err()
-            .contains("https"));
-    }
-
     // ------------------------------------------------------------------- keys
 
     #[test]

@@ -304,6 +304,11 @@ export function useBrandingCatalog(): CompiledEntry[] {
   return entries;
 }
 
+/** The catalog's game suggestions once per session, for non-React callers. */
+export function loadSuggestedGames(): Promise<SuggestedGame[]> {
+  return loadCatalog().then((c) => c.games);
+}
+
 /** The curated game suggestions from the catalog (empty on load failure). */
 export function useSuggestedGames(): SuggestedGame[] {
   const [games, setGames] = useState<SuggestedGame[]>([]);
