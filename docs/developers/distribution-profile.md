@@ -1031,9 +1031,57 @@ Keeps maps out of warpath and galactic conquest, the two modes that pick maps on
 
 An excluded map stays visible in Content and stays playable in skirmish and multiplayer. A player can opt further maps out themselves on the map detail page, but cannot re-enable one your profile or the catalog excluded. Same shape as the branding catalog's `excludedMaps`, documented in [Branding catalog](branding-catalog.md#excluding-maps-from-warpath-and-conquest).
 
+### `fullscreen` (boolean)
+
+Opens Coilbox fullscreen until the player chooses otherwise. Off by default.
+
+```json
+{ "version": 1, "fullscreen": true }
+```
+
+This sets the starting state and nothing more. The player can still leave fullscreen with F11, the top-bar button or the Fullscreen switch in Settings > General. Coilbox remembers that choice, and it wins over this field on every launch after.
+
+To force fullscreen instead, use [`fullscreenLocked`](#fullscreenlocked-boolean).
+
+### `fullscreenLocked` (boolean)
+
+Forces Coilbox fullscreen on every launch and removes the ways to turn it off. Off by default. Use it for a kiosk build, such as a game on a show floor.
+
+```json
+{ "version": 1, "fullscreenLocked": true, "quit": true }
+```
+
+While it is `true`:
+
+- the window opens fullscreen, whatever [`fullscreen`](#fullscreen-boolean) says
+- the top-bar fullscreen button is gone
+- F11 does nothing
+- the Fullscreen switch in Settings > General is gone
+
+The player's own fullscreen choice is ignored but not erased. Take the field out and their choice comes back on the next launch.
+
+Coilbox sets fullscreen when it starts and does not watch the window after that. If the operating system takes the window out of fullscreen, Coilbox does not put it back until the next launch.
+
+It differs from the other two fullscreen settings:
+
+- `fullscreen` sets the starting state, and the player can change it.
+- [`layout.fullscreenButton`](#layout-object) set to `false` hides the button and turns off F11, but does not force fullscreen. The Settings switch stays.
+
+The lock does not hide the [`quit`](#quit-boolean) button. Set `quit` to `true` alongside it, so a player has a way out of a window that fills the screen.
+
+### `advanced` (boolean)
+
+Starts Coilbox with Advanced mode on, which shows the developer and modding tools in the sidebar: uberstress, mapconv, animation and the archive explorer. Off by default.
+
+```json
+{ "version": 1, "advanced": true }
+```
+
+This sets the starting state, like [`fullscreen`](#fullscreen-boolean). The player can turn Advanced mode off in Settings > General, and their choice wins on every launch after.
+
 ### `quit` (boolean)
 
-Adds a **Quit** button to the bottom of the sidebar that closes Coilbox. Off by default. It's an escape hatch for fullscreen or kiosk (`fullscreenLocked`) builds, where a player may otherwise have no obvious way out — so unlike the fullscreen toggle, this button is **not** removed by the kiosk lock.
+Adds a **Quit** button to the bottom of the sidebar that closes Coilbox. Off by default. It's an escape hatch for fullscreen or kiosk ([`fullscreenLocked`](#fullscreenlocked-boolean)) builds, where a player may otherwise have no obvious way out — so unlike the fullscreen toggle, this button is **not** removed by the kiosk lock.
 
 ```json
 { "version": 1, "fullscreen": true, "quit": true }
@@ -1070,7 +1118,7 @@ Controls the app-frame chrome — the sidebar mode, the breadcrumb, the top-bar 
 | `sidebarCollapsed` | boolean | **Seed** the sidebar to start collapsed. The user can still expand it, and their choice persists. Only meaningful when `popover` is off. |
 | `hideBreadcrumb`   | boolean | Hide the breadcrumb region in the top bar entirely.                     |
 | `historyButtons`   | boolean | Force the top-bar back/forward buttons on (`true`) or off (`false`).    |
-| `fullscreenButton` | boolean | `false` hides the top-bar fullscreen button and makes F11 inert (does **not** force fullscreen — that's `fullscreenLocked`). Default `true`. |
+| `fullscreenButton` | boolean | `false` hides the top-bar fullscreen button and makes F11 inert. It does not force fullscreen, which is what [`fullscreenLocked`](#fullscreenlocked-boolean) does. Default `true`. |
 | `menu`             | object  | Branding for the popover menu button (see below).                       |
 | `left` / `center` / `right` | object | A logo/text in the corresponding top-bar slot (see below).     |
 
