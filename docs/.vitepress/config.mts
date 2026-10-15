@@ -135,6 +135,7 @@ export default defineConfig({
               text: "Get games, maps and engines",
               link: "/players/downloads",
             },
+            { text: "Settings and keybinds", link: "/players/settings" },
             { text: "Portable mode", link: "/players/portable-mode" },
           ],
         },
