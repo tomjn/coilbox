@@ -15,6 +15,10 @@ Guides for people who play games through coilbox. To install it, see [Install](.
 - [Warpath](warpath.md). Cross a map once, unlocking units and perks as you go, until you beat the boss or run out of health.
 - [Replay rewind](replay-rewind.md). Watch a replay in the engine and seek, play backward and change speed, and what recording costs in time and disk.
 
+## Library
+
+- [Maps, games and units](library.md). Look through the maps and games you have installed, see how a map is played, read and compare a game's units, and find a game or map that is not listed.
+
 ## Set up
 
 - [Portable mode](portable-mode.md). Run coilbox from one folder, next to skylobby or another lobby, without touching your other settings.
