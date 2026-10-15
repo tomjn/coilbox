@@ -59,7 +59,13 @@ Inside each package's `.coilbox/`:
   images/ ...     # optional media referenced by the profile/campaigns
 ```
 
-Coilbox creates `data/` and `cache/` inside `.coilbox/` on first run — you don't ship those. See [portable-mode.md](../players/portable-mode.md#what-is-in-the-coilbox-folder) for the full breakdown. The engine, the game and maps go in `content/`, described in [Bundle the engine, the game and maps](#bundle-the-engine-the-game-and-maps).
+Coilbox creates `data/` and `cache/` inside `.coilbox/` on first run, so you do not ship those. [Portable mode](../players/portable-mode.md#what-is-in-the-coilbox-folder) says what they hold.
+
+Media folders such as `images/`, `briefings/` and `fonts/` can have any name the profile or a campaign refers to. Coilbox reads everything you ship in `.coilbox/` and does not edit it.
+
+On Windows the installer also puts coilbox's helper programs, and a `resources/` folder of its own read only data, inside `.coilbox/`. They belong to the installer and an update replaces them, so do not put your own files in `resources/`.
+
+The engine, the game and maps go in `content/`, described in [Bundle the engine, the game and maps](#bundle-the-engine-the-game-and-maps).
 
 > **A bundled scenario needs a game that can play it.** A file in `.coilbox/scenarios/` is the authored document and nothing else. It is played by [the mission runtime](mission-runtime.md), which lives in the game, so the game you ship with it, in a `games/` folder next to the binary, has to carry the runtime and the two guards from [the adoption contract](mission-runtime.md#the-adoption-contract). It also has to be a loose `.sdd`, because coilbox writes each compiled mission into the game's own `missions/` folder as it launches and cannot write into a packaged archive. For the same reason that `.sdd` cannot go in `.coilbox/content/`, which coilbox never writes into. Ship the game as a `.sd7` or `.sdz` and every scenario in the package falls back to a generated test game. They play, but your end conditions and opening phases run over the top of the mission. See [what a player needs to play your scenario](scenarios.md#what-a-player-needs-to-play-your-scenario).
 
