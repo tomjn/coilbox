@@ -190,6 +190,15 @@ export default defineConfig({
           ],
         },
         {
+          text: "Maps",
+          items: [
+            {
+              text: "Compile and decompile maps",
+              link: "/developers/mapping-tools",
+            },
+          ],
+        },
+        {
           text: "Units",
           items: [{ text: "Unit builder", link: "/developers/lego-builder" }],
         },
