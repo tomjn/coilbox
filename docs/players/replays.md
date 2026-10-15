@@ -81,7 +81,7 @@ The result names the winning side, for example "Team 1 won". It can also say "No
 
 Players lists everyone who played, grouped by side. The winning side has a Winner badge, and each player's row says Won or Lost.
 
-- Select a player's name to open their page in Player stats.
+- Select a player's name to open their page in Player stats. See [Career and player stats](career-and-stats.md#another-player-s-page).
 - Rating appears when the lobby recorded one.
 - APM is actions per minute.
 - The other columns are each player's totals at the end of the match, such as Metal produced, Damage dealt and Units lost. Select a column's name to sort by it.

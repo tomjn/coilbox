@@ -9,6 +9,7 @@ Guides for people who play games through coilbox. To install it, see [Install](.
 - [Multiplayer battles](multiplayer.md). Find and join a battle, host one on a lobby server or straight from your computer, and play with other people.
 - [Campaigns and scenarios](campaigns-and-scenarios.md). Play a campaign one mission at a time, play a scenario on its own, and import ones somebody shared.
 - [Replays](replays.md). Find a replay, watch it, read its players, chart, build orders, map and chat, and analyse it.
+- [Career and player stats](career-and-stats.md). See your progress in each game, your record and achievements, and your record against another player.
 - [Battle presets](presets.md). Save a battle setup, from singleplayer, a multiplayer room, a conquest or a Warpath fight, and play it again.
 - [Galactic conquest](conquest.md). Take a map one battle at a time, on a galaxy of stars, a theatre chart, cities or provinces.
 - [Warpath](warpath.md). Cross a map once, unlocking units and perks as you go, until you beat the boss or run out of health.
