@@ -234,6 +234,7 @@ export default defineConfig({
           items: [
             { text: "Server admin", link: "/staff/server-admin" },
             { text: "Lobby moderation", link: "/staff/lobby-moderation" },
+            { text: "Load testing", link: "/staff/uberstress" },
           ],
         },
       ],

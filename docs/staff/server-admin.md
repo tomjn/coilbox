@@ -29,6 +29,8 @@ The page lists tools down the left, one open at a time, acting on whichever conn
 - **Staff** (admin only): the list of every moderator and admin, and the action to move an account between `user`, `mod` and `admin`.
 - **Announcements** (admin only): the three ways to message everyone at once. A broadcast, a broadcast that opens as a dialog for the recipient, and one that echoes back to you as confirmation.
 
+To find out how many players your own server can take, see [Load test a lobby server with uberstress](uberstress.md).
+
 ## What uberserver cleans up by itself
 
 uberserver runs its own maintenance on a schedule, independent of anything staff do in Coilbox or anywhere else. None of this can be changed from a client.
