@@ -18,6 +18,7 @@ import {
 } from "@testing-library/react";
 import type * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { unitScript } from "../../luaScript";
 import { type LegoProject, newProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import type { ScriptOutput, ScriptTimeline } from "../../scriptPlayback";
@@ -213,6 +214,51 @@ describe("a unit on the presets", () => {
     expect(screen.queryByText(/What happens to the unit/)).toBeNull();
     expect(runCob).not.toHaveBeenCalled();
     expect(runLua).not.toHaveBeenCalled();
+  });
+});
+
+describe("a unit on the presets, once played", () => {
+  const withPreset = () =>
+    project({
+      pieces: [
+        {
+          id: "p0",
+          name: "base",
+          parentId: null,
+          partId: null,
+          position: [0, 0, 0],
+          rotation: [0, 0, 0],
+          scale: [1, 1, 1],
+          role: "base",
+        },
+      ],
+      animations: [{ presetId: "idle.sway", params: {} }],
+    });
+
+  /** The preview exists to show what the engine will run, and the engine runs
+   *  the generated text, so that text is what the runtime is given. */
+  it("runs the script its presets generate", async () => {
+    const value = withPreset();
+    const onScriptTimeline = vi.fn();
+    show(value, { onScriptTimeline });
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+
+    await waitFor(() => expect(runLua).toHaveBeenCalled());
+    expect(runLua.mock.calls[0][0]).toMatchObject({
+      script: unitScript(value),
+      pieces: ["base"],
+    });
+    expect(unitScript(value)).not.toBe("");
+    expect(runCob).not.toHaveBeenCalled();
+    await waitFor(() => expect(onScriptTimeline).toHaveBeenCalled());
+  });
+
+  it("says so when the generated script stops", async () => {
+    runLua.mockResolvedValue(timeline({ error: "attempt to call nil" }));
+    show(withPreset());
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+
+    expect(await screen.findByText(/attempt to call nil/)).toBeTruthy();
   });
 });
 

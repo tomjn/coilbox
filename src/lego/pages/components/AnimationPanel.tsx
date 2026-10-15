@@ -52,6 +52,7 @@ import {
 } from "../../animPresets";
 import { legoProbeScript, legoRunScript } from "../../bindings";
 import { type UnitMotion, unitMotion } from "../../effects";
+import { unitScript } from "../../luaScript";
 import {
   DEFAULT_BUILDER,
   type LegoBuilder,
@@ -344,8 +345,6 @@ export function AnimationPanel({
    */
   const runEvents = useCallback(
     async (events: ScriptEvent[], withValues: Record<number, number>) => {
-      const script = project.script;
-      if (script === undefined && !compiled) return;
       setRunning(true);
       setFailure(null);
       try {
@@ -372,7 +371,9 @@ export function AnimationPanel({
               values: withValues,
             })
           : await legoRunScript({
-              script: script ?? "",
+              // What the unit's script is: its own text, or the one its presets
+              // generate, so the preview runs what an export would write.
+              script: unitScript(project),
               unitName: project.unitName,
               pieces,
               events: sent,
@@ -448,7 +449,7 @@ export function AnimationPanel({
         compiled
           ? animCobProbe({ bytes: compiled.bytes, pieces, callins })
           : legoProbeScript({
-              script: project.script ?? "",
+              script: unitScript(project),
               unitName: project.unitName,
               pieces,
               callins,
@@ -611,12 +612,14 @@ export function AnimationPanel({
   // Held in a ref because the callbacks are rebuilt on every render.
   const stopRef = useRef(stop);
   stopRef.current = stop;
-  const lastScript = useRef(project.script);
+  // A preset unit's script is generated, so editing its presets changes it too.
+  const currentScript = useMemo(() => unitScript(project), [project]);
+  const lastScript = useRef(currentScript);
   useEffect(() => {
-    if (lastScript.current === project.script) return;
-    lastScript.current = project.script;
+    if (lastScript.current === currentScript) return;
+    lastScript.current = currentScript;
     stopRef.current();
-  }, [project.script]);
+  }, [currentScript]);
 
   function apply(presetId: string) {
     onChange([...applied, { presetId, params: {} }]);
@@ -993,11 +996,11 @@ export function AnimationPanel({
         <Button
           size="sm"
           variant={playing ? "default" : "outline"}
-          onClick={() => onPlayingChange(!playing)}
-          disabled={applied.length === 0 || reduceMotion}
+          onClick={() => (playing ? stop() : void start(scenarioId))}
+          disabled={applied.length === 0 || reduceMotion || running}
         >
           {playing ? <Pause size={14} /> : <Play size={14} />}
-          {playing ? "Stop" : "Play"}
+          {playing ? "Stop" : running ? "Running" : "Play"}
         </Button>
         <span className="text-xs text-muted-foreground">
           {reduceMotion
@@ -1021,6 +1024,13 @@ export function AnimationPanel({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
+        {failure || timeline?.error ? (
+          <p className="border-b border-border/60 px-3 py-2 text-xs text-destructive">
+            {failure
+              ? `The script could not be run: ${failure}`
+              : `The script stopped: ${timeline?.error}`}
+          </p>
+        ) : null}
         {/* Above the presets, because it is what makes them mean anything: a
             unit with a build arm and no builder keys animates a job it can
             never be given. Only for a unit that has one, since the roles are
