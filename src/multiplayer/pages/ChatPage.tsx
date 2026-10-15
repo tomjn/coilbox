@@ -53,6 +53,7 @@ import { canChannelModerate, chanServInfo } from "../moderation";
 import { useMpRevealed } from "../navPredicates";
 import { useNoteActions } from "../notes";
 import { protocolForKey } from "../protocol";
+import { isUberserver } from "../serverAdmin";
 import { useStatsRelations } from "../statsRelation";
 import { relationSummary } from "../statsRelationSummary";
 import { useConnection, useMultiplayer, useProtocolServers } from "../store";
@@ -164,6 +165,10 @@ function ChatPage() {
   // read `ConnectionState.adminLevel`, so admin-only verbs such as `BROADCAST`
   // and `SETACCESS` are left to the Server admin page.
   const iAmServerMod = !!(me && state?.users[me]?.status.access);
+  // The Server admin page opens on uberserver only, so the look-up link
+  // follows the same check as the page and its sidebar entry (issue #4106).
+  // The other moderator actions are plain lobby commands.
+  const lookUpInAdmin = isUberserver(activeProtocol, state);
   const activeChannel =
     desc?.kind === "channel" ? state?.channels[desc.name] : undefined;
   const iAmChannelOp = canChannelModerate(activeChannel, me, iAmServerMod);
@@ -204,11 +209,15 @@ function ChatPage() {
           send={(line) => {
             void mpSend({ serverKey: activeServerKey, line }).catch(() => {});
           }}
-          onLookUp={() => {
-            navigate(
-              `/admin?server=${encodeURIComponent(activeServerKey)}&player=${encodeURIComponent(username)}`,
-            );
-          }}
+          onLookUp={
+            lookUpInAdmin
+              ? () => {
+                  navigate(
+                    `/admin?server=${encodeURIComponent(activeServerKey)}&player=${encodeURIComponent(username)}`,
+                  );
+                }
+              : undefined
+          }
           note={{
             text: getNote(user.userId, username),
             onSave: (text) => setNote(user.userId, username, text),
@@ -236,6 +245,7 @@ function ChatPage() {
       hasChannels,
       iAmChannelOp,
       iAmServerMod,
+      lookUpInAdmin,
       navigate,
       me,
       activeChannel,

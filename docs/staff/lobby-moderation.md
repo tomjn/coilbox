@@ -26,13 +26,11 @@ These act on one channel only. ChanServ carries them out and answers in a direct
 
 - Make operator gives the player operator rights in this channel. Only the channel's founder or a server moderator can do this. ChanServ refuses an operator who tries.
 - Remove operator takes those rights away. It shows instead of Make operator when the player is already an operator. Nobody can remove the founder.
-- Mute stops the player talking in this channel for the time you set. Type a Duration and a Reason, then select Confirm.
+- Mute stops the player talking in this channel for the time you set. Type a Duration and a Reason, then select Confirm. Confirm stays greyed out until you type a reason.
 - Unmute lets a muted player talk again.
 - Kick from channel removes the player from this channel straight away. They can join again.
-- Ban from channel removes the player and stops them joining again for the time you set. It also bans the address they last connected from. Type a Duration and a Reason, then select Confirm.
+- Ban from channel removes the player and stops them joining again for the time you set. It also bans the address they last connected from. Type a Duration and a Reason, then select Confirm. Confirm stays greyed out until you type a reason.
 - Unban from channel lifts a channel ban.
-
-Always give a reason for a mute or a ban. The form marks Reason as optional, but ChanServ refuses a mute or a ban without one.
 
 ChanServ will not mute, kick or ban another operator. Remove their operator rights first.
 
@@ -46,7 +44,7 @@ ChanServ will not mute, kick or ban another operator. Remove their operator righ
 
 These act on the player's whole account, across the server.
 
-- Look up in Server admin opens the Server admin page at the player's details, with their name filled in. See [Server admin](server-admin.md#the-tools) for what it shows.
+- Look up in Server admin opens the Server admin page at the player's details, with their name filled in. See [Server admin](server-admin.md#the-tools) for what it shows. It only shows on uberserver servers, because the Server admin page only opens there.
 - Get IP asks the server for the address the player is connected from, or last connected from.
 - Get user ID asks the server for the player's hardware and system IDs. Use them to spot one person on two accounts.
 - Kick from server disconnects the player, and takes them out of any battle they are in. They see your reason in a message box and can log in again. Type a Reason, then select Confirm.
