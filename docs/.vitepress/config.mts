@@ -200,7 +200,13 @@ export default defineConfig({
         },
         {
           text: "Units",
-          items: [{ text: "Unit builder", link: "/developers/lego-builder" }],
+          items: [
+            { text: "Unit builder", link: "/developers/lego-builder" },
+            {
+              text: "Convert and compile unit scripts",
+              link: "/developers/animation-tools",
+            },
+          ],
         },
         {
           text: "Replays",
