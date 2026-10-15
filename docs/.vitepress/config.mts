@@ -123,7 +123,10 @@ export default defineConfig({
         },
         {
           text: "Library",
-          items: [{ text: "Maps, games and units", link: "/players/library" }],
+          items: [
+            { text: "Maps, games and units", link: "/players/library" },
+            { text: "Base blueprints", link: "/players/blueprints" },
+          ],
         },
         {
           text: "Set up",
