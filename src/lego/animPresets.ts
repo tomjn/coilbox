@@ -549,6 +549,25 @@ function walkEmit(preset: AnimPreset, ctx: EmitContext): EmitResult | null {
   };
 }
 
+/**
+ * How fast an aim preset turns and lifts, in radians per second, as Lua.
+ *
+ * Fast enough to land when the preview does. Its sweep is furthest out, at the
+ * full turn and the full lift, a quarter of the sweep time in, and a Turn goes
+ * at one speed, so each angle over that quarter is its own speed. An angle of
+ * nothing gives a speed of nothing, which the engine takes as instant.
+ */
+function aimSpeeds(
+  preset: AnimPreset,
+  params: Record<string, number>,
+): { turn: string; lift: string } {
+  const quarter = Math.max(value(preset, params, "period"), 0.05) / 4;
+  return {
+    turn: lua(deg(value(preset, params, "sweep")) / quarter),
+    lift: lua(deg(value(preset, params, "pitch")) / quarter),
+  };
+}
+
 export const TURRET_TRACK: AnimPreset = {
   id: "turret.track",
   label: "Turret sweep",
@@ -610,13 +629,13 @@ export const TURRET_TRACK: AnimPreset = {
     if (!turret) return null;
     const barrel = ctx.pieces("barrel")[0];
     const flare = ctx.pieces("flare")[0];
-    const speed = lua(deg(value(this, ctx.params, "sweep")));
+    const speed = aimSpeeds(this, ctx.params);
 
     const aim = [
       `  Signal(${ctx.signal})`,
       `  SetSignalMask(${ctx.signal})`,
-      `  Turn(${turret}, y_axis, heading, ${speed})`,
-      ...(barrel ? [`  Turn(${barrel}, x_axis, -pitch, ${speed})`] : []),
+      `  Turn(${turret}, y_axis, heading, ${speed.turn})`,
+      ...(barrel ? [`  Turn(${barrel}, x_axis, -pitch, ${speed.lift})`] : []),
       `  WaitForTurn(${turret}, y_axis)`,
       ...(barrel ? [`  WaitForTurn(${barrel}, x_axis)`] : []),
       "  return true",
@@ -1174,7 +1193,7 @@ export const AIM_TRACK: AnimPreset = {
   emit(ctx) {
     const aim = ctx.pieces("aim")[0];
     if (!aim) return null;
-    const speed = lua(deg(value(this, ctx.params, "sweep")));
+    const speed = aimSpeeds(this, ctx.params);
 
     return {
       functions: [],
@@ -1182,8 +1201,8 @@ export const AIM_TRACK: AnimPreset = {
         AimWeapon1: [
           `  Signal(${ctx.signal})`,
           `  SetSignalMask(${ctx.signal})`,
-          `  Turn(${aim}, y_axis, heading, ${speed})`,
-          `  Turn(${aim}, x_axis, -pitch, ${speed})`,
+          `  Turn(${aim}, y_axis, heading, ${speed.turn})`,
+          `  Turn(${aim}, x_axis, -pitch, ${speed.lift})`,
           `  WaitForTurn(${aim}, y_axis)`,
           `  WaitForTurn(${aim}, x_axis)`,
           "  return true",

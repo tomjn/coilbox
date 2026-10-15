@@ -186,6 +186,10 @@ function aimPlan(preset: AnimPreset, params: Record<string, number>): Plan {
   const lands = period / 4;
   const landFrame = CALLIN + Math.round(lands * FPS);
   const frames = landFrame + FPS + 1;
+  // Half a turn is as short one way round as the other, and the engine's
+  // `CUnitScript::TurnToward` and the runtime both take it as backwards, where
+  // the preview sweeps forwards. Either is a fair way to get behind the unit.
+  const halfTurn = param(preset, params, "sweep") >= 180;
   return {
     events: [
       ...CREATED,
@@ -200,12 +204,19 @@ function aimPlan(preset: AnimPreset, params: Record<string, number>): Plan {
     ],
     frames,
     spans: [
-      { from: CALLIN, to: landFrame, t0: 0, knots: [0, lands] },
+      ...(halfTurn
+        ? []
+        : [{ from: CALLIN, to: landFrame, t0: 0, knots: [0, lands] }]),
       { from: landFrame, to: frames - 1, t0: lands, hold: true },
     ],
     exceptions: [
       "Aimed at the sweep's furthest point, which is the pose the preview stands for. On the way there the preview follows a curve and Turn moves at one speed, so the gap between the two is part of the allowance.",
       "After it lands the preview sweeps back for its demonstration. The Lua holds until it is aimed again, so it is compared with the landing pose.",
+      ...(halfTurn
+        ? [
+            "A sweep of half a turn is as short backwards as forwards, and the engine turns backwards where the preview sweeps forwards, so only the landing is compared.",
+          ]
+        : []),
     ],
   };
 }
