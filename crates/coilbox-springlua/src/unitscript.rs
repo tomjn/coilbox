@@ -2721,11 +2721,14 @@ fn install_unit_value(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
             // other piece a Lua script names, because the engine hands this
             // argument to `GetUnitVal` untouched (`LuaUnitScript.cpp:1262-1286`).
             // The unit stands at the origin facing forwards, so a piece's place
-            // in the unit is its place in the world.
+            // in the unit is its place in the world once the unit has turned to
+            // the ground it stands on.
             if id == unitvalue::PIECE_XZ || id == unitvalue::PIECE_Y {
+                let ground = sim.world.as_ref().and_then(|world| world.ground);
                 let at = usize::try_from(p1)
                     .ok()
-                    .and_then(|index| sim.model.piece_position(index));
+                    .and_then(|index| sim.model.piece_position(index))
+                    .map(|at| ground.map_or(at, |ground| ground.place(at)));
                 let Some(at) = at else {
                     sim.model.note(
                         "This script asks where one of its pieces is, and the preview was not told where this unit's pieces sit.".to_string(),

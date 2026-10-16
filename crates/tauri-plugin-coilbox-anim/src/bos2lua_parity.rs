@@ -537,6 +537,7 @@ fn pickup_at(frame: u32) -> ScriptEvent {
         args: vec![2.0],
         ambient: false,
         world: Some(coilbox_unitpose::World {
+            ground: None,
             stand_in: Some(coilbox_unitpose::StandIn {
                 id: 2,
                 pos: Some([30.0, 0.0, 40.0]),

@@ -664,6 +664,7 @@ mod what_it_says_about_itself {
 
     fn scene(pos: Option<[f64; 3]>) -> coilbox_unitpose::World {
         coilbox_unitpose::World {
+            ground: None,
             stand_in: Some(coilbox_unitpose::StandIn {
                 id: 2,
                 pos,
@@ -985,6 +986,55 @@ mod what_it_says_about_itself {
         assert!(close(pose(&timeline, 0, "barrel")[2], 7.0));
     }
 
+    /// A unit turned to stand on a slope carries its pieces round with it, and
+    /// the engine answers where a piece is in the world
+    /// (`GetObjectSpacePos`, `UnitScript.cpp:1032-1040`).
+    #[test]
+    fn asks_where_a_piece_is_once_the_unit_tilts() {
+        // get PIECE_Y(1, 0, 0, 0), then move the barrel up by it.
+        let mut code = push(8);
+        code.extend(push(1));
+        code.extend(push(0));
+        code.extend(push(0));
+        code.extend(push(0));
+        code.push(op("GET"));
+        code.extend([op("MOVE_NOW"), 2, 1, op("RETURN")]);
+        // The turret ten ahead of the base.
+        let rest = [
+            Rest {
+                parent: None,
+                position: [0.0, 0.0, 0.0],
+            },
+            Rest {
+                parent: Some(0),
+                position: [0.0, 0.0, 10.0],
+            },
+            Rest::default(),
+        ];
+        let angle = 30f64.to_radians();
+        let mut events = created();
+        events[0].world = Some(coilbox_unitpose::World {
+            ground: Some(coilbox_unitpose::Ground {
+                shape: coilbox_unitpose::ground::Shape::Slope { degrees: 30.0 },
+                up: Some([0.0, angle.cos(), -angle.sin()]),
+            }),
+            stand_in: None,
+            own: coilbox_unitpose::Size::default(),
+        });
+
+        let timeline = run(
+            &create_only(code),
+            &model_pieces(),
+            &events,
+            2,
+            &rest,
+            &HashMap::new(),
+        );
+
+        assert_eq!(timeline.error, None);
+        assert!((pose(&timeline, 0, "barrel")[1] - 5.0).abs() < 1e-4);
+    }
+
     /// The engine stopped keeping shared values in Spring 102.0. The preview
     /// still keeps what a script stores, so a `.cob` and its converted Lua play
     /// the same, but says the game will not, rather than calling a shared value
@@ -1054,6 +1104,7 @@ mod announcements {
 
     fn scene() -> coilbox_unitpose::World {
         coilbox_unitpose::World {
+            ground: None,
             stand_in: Some(coilbox_unitpose::StandIn {
                 id: 2,
                 pos: Some([30.0, 0.0, 40.0]),
@@ -1237,6 +1288,7 @@ mod engine_attach {
 
     fn scene(height: f64) -> coilbox_unitpose::World {
         coilbox_unitpose::World {
+            ground: None,
             stand_in: Some(coilbox_unitpose::StandIn {
                 id: 2,
                 pos: Some([30.0, 0.0, 40.0]),
@@ -1764,6 +1816,7 @@ mod engine_factory {
         let bytes = build(&[("Activate", activate_now()), ("Probe", probe)], PIECES, 0);
         let mut start = action(0, EngineAction::FactoryBuild);
         start.world = Some(coilbox_unitpose::World {
+            ground: None,
             stand_in: Some(coilbox_unitpose::StandIn {
                 id: 2,
                 pos: Some([0.0, 0.0, 40.0]),
@@ -1831,6 +1884,7 @@ mod engine_factory {
 
     fn scene(pos: Option<[f64; 3]>) -> coilbox_unitpose::World {
         coilbox_unitpose::World {
+            ground: None,
             stand_in: Some(coilbox_unitpose::StandIn {
                 id: 2,
                 pos,
@@ -2225,6 +2279,7 @@ mod total_annihilation {
 
     fn scene() -> coilbox_unitpose::World {
         coilbox_unitpose::World {
+            ground: None,
             stand_in: Some(coilbox_unitpose::StandIn {
                 id: 2,
                 pos: Some([30.0, 0.0, 40.0]),

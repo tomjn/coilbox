@@ -15,10 +15,12 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod ground;
 pub mod nanopiece;
 pub mod passenger;
 pub mod unitvalue;
 
+pub use ground::Ground;
 pub use nanopiece::NanoPieces;
 pub use passenger::Passenger;
 
@@ -151,6 +153,9 @@ pub struct World {
     /// The unit the script runs on, which stands at the origin facing +z.
     #[serde(rename = "self")]
     pub own: Size,
+    /// The ground the viewport draws under it, or none for flat ground at 0.
+    #[serde(default)]
+    pub ground: Option<Ground>,
 }
 
 /// The stand-in, in elmos, in the unit's own space, which is world space
@@ -943,6 +948,7 @@ mod tests {
 
     fn scene(pos: [f64; 3]) -> World {
         World {
+            ground: None,
             stand_in: Some(StandIn {
                 id: 2,
                 pos: Some(pos),
