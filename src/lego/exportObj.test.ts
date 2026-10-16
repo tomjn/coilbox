@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildObj } from "./exportObj";
 import { type LegoPiece, type LegoProject, newProject } from "./model";
 import type { LegoPartInfo, LoadedPack } from "./pack";
+import type { RawGeometry } from "./rawGeometry";
 
 /**
  * A pack holding one part: a single triangle on the x/z plane, one metre out
@@ -109,6 +110,62 @@ describe("buildObj", () => {
       "vt 1.000000 0.000000",
       "vt 0.000000 1.000000",
     ]);
+  });
+
+  describe("an imported unit's UVs (#4174)", () => {
+    /** One triangle, as `rawGeometry.ts` hands an imported mesh over. */
+    const raw: RawGeometry = {
+      byId: new Map([
+        [
+          "m1",
+          {
+            id: "m1",
+            vFirst: 0,
+            vCount: 3,
+            iFirst: 0,
+            iCount: 3,
+            bbox: { min: [0, 0, 0], max: [0, 2, 2] },
+          },
+        ],
+      ]),
+      // x, y, z, nx, ny, nz, u, v
+      vertices: new Float32Array([
+        0, 0, 0, 1, 0, 0, 0, 0, 0, 2, 0, 1, 0, 0, 0.5, 0, 0, 0, 2, 1, 0, 0,
+        0.5, 0.25,
+      ]),
+      indices: new Uint32Array([0, 1, 2]),
+    };
+
+    function imported(key: string): LegoProject {
+      return {
+        ...project([{ id: "hull", name: "hull", partId: null, meshId: "m1" }]),
+        imported: { source: "probe.s3o", texture: { key, name: key } },
+      };
+    }
+
+    const vts = (doc: LegoProject) =>
+      (buildObj(doc, pack(), raw, OPTIONS)?.obj.split("\n") ?? []).filter(
+        (l) => l.startsWith("vt "),
+      );
+
+    // The engine reads v = 0 as the top of a PNG and an .obj reads it as the
+    // bottom, so the file turns v round to show the picture the game shows.
+    it("turns v round for a texture the engine reads top row first", () => {
+      expect(vts(imported("abc.png"))).toEqual([
+        "vt 0.000000 1.000000",
+        "vt 0.500000 1.000000",
+        "vt 0.500000 0.750000",
+      ]);
+    });
+
+    // The engine flips a .dds on load, so v = 0 is its bottom, as in an .obj.
+    it("writes v as it came for a .dds", () => {
+      expect(vts(imported("abc.dds"))).toEqual([
+        "vt 0.000000 0.000000",
+        "vt 0.500000 0.000000",
+        "vt 0.500000 0.250000",
+      ]);
+    });
   });
 
   it("bakes a piece's offset into its vertices, since obj has no hierarchy", () => {

@@ -15,6 +15,7 @@
  * gives back real parts and is tried first.
  */
 
+import { vZeroAtTop } from "../lib/springTexture";
 import type {
   ImportedPiece,
   ImportedTexture,
@@ -200,6 +201,20 @@ export function storedTexture(texture: {
 /** Whether a unit was imported whole rather than built out of the parts pack. */
 export function isImported(project: LegoProject): boolean {
   return project.imported !== undefined;
+}
+
+/**
+ * Whether an imported unit's meshes sample their texture with v = 0 at its top
+ * row, which is how the engine reads anything but a `.dds` (see `vZeroAtTop`).
+ *
+ * Judged by the stored file, which is what the builder draws, and by the name
+ * the header gave when there is no file. False for a unit built out of parts,
+ * whose UVs are the pack's own and count v from the bottom.
+ */
+export function importedVZeroAtTop(project: LegoProject): boolean {
+  const imported = project.imported;
+  const file = imported?.texture?.key || imported?.missingTexture;
+  return file ? vZeroAtTop(file) : false;
 }
 
 /**

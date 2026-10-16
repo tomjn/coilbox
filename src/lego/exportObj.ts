@@ -13,7 +13,8 @@
 
 import { childrenOf, type LegoProject, pieceById } from "./model";
 import type { LoadedPack } from "./pack";
-import type { RawGeometry } from "./rawGeometry";
+import { pieceMesh, type RawGeometry } from "./rawGeometry";
+import { importedVZeroAtTop } from "./rawImport";
 import { bakedPieces } from "./s3oBuild";
 
 export interface ObjBuild {
@@ -49,6 +50,11 @@ export function buildObj(
 ): ObjBuild | null {
   if (!pieceById(project, project.rootPieceId)) return null;
   const { pieces } = bakedPieces(project, pack, raw);
+  // An .obj counts v from the bottom of the picture. A part's UVs already do,
+  // and so does an imported mesh painted with a .dds, which the engine flips on
+  // load. Any other texture the engine reads top row first, so an imported
+  // mesh painted with one is turned round to show what the game shows (#4174).
+  const turnImported = importedVZeroAtTop(project);
 
   const lines: string[] = [
     `# ${options.unitName}, exported from coilbox's lego unit builder`,
@@ -72,6 +78,9 @@ export function buildObj(
 
     if (baked.vertices.length > 0) {
       const base = nextIndex;
+      const piece = pieceById(project, pieceId);
+      const turned =
+        turnImported && piece !== undefined && pieceMesh(raw, piece) !== null;
       lines.push(`o ${baked.name}`, `usemtl ${MATERIAL_NAME}`);
       for (const vertex of baked.vertices) {
         lines.push(
@@ -79,7 +88,8 @@ export function buildObj(
         );
       }
       for (const vertex of baked.vertices) {
-        lines.push(`vt ${fmt(vertex.uv[0])} ${fmt(vertex.uv[1])}`);
+        const v = turned ? 1 - vertex.uv[1] : vertex.uv[1];
+        lines.push(`vt ${fmt(vertex.uv[0])} ${fmt(v)}`);
       }
       for (const vertex of baked.vertices) {
         lines.push(
