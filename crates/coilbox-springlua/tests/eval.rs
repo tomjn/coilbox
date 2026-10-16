@@ -304,3 +304,32 @@ fn non_returning_chunk_errors() {
         "a chunk that returns nothing is an error (caller falls back)"
     );
 }
+
+/// `Game` is absent until a caller sets it, and then holds the map constants a
+/// map file reads, under the engine's names.
+#[test]
+fn set_game_puts_the_map_constants_on_game() {
+    let dir = fixture("selfcontained");
+    let lua = SpringLua::new(&dir).unwrap();
+    let before = lua
+        .eval_value_raw("return { game = Game == nil }", "before")
+        .expect("eval");
+    assert_eq!(before["game"], serde_json::json!(true));
+
+    lua.set_game(&coilbox_springlua::GameConstants {
+        map_name: "Dockside v2".into(),
+        map_size_x: 7168.0,
+        map_size_z: 6144.0,
+    })
+    .unwrap();
+    let after = lua
+        .eval_value_raw(
+            "return { name = Game.mapName, half = Game.mapSizeX / 2, z = Game.mapSizeZ }",
+            "after",
+        )
+        .expect("eval");
+    assert_eq!(
+        after,
+        serde_json::json!({ "name": "Dockside v2", "half": 3584, "z": 6144 })
+    );
+}

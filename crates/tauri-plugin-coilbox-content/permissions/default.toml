@@ -46,6 +46,7 @@ permissions = [
   "allow-content-replay-track-header",
   "allow-content-replay-track-window",
   "allow-content-replay-playback-launch",
+  "allow-content-start-boxes",
   "allow-content-unit-def-set",
   "allow-content-unit-def-set-store",
   "allow-content-unit-def-sets-usage",

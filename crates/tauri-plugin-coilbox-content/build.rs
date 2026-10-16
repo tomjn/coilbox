@@ -46,6 +46,7 @@ const COMMANDS: &[&str] = &[
     "content_replay_track_header",
     "content_replay_track_window",
     "content_replay_playback_launch",
+    "content_start_boxes",
     "content_unit_def_set",
     "content_unit_def_set_store",
     "content_unit_def_sets_usage",

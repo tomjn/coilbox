@@ -620,6 +620,7 @@ function BattleRoomPage() {
             rows={room.rows}
             enginePath={room.enginePath}
             dataDir={room.dataDir}
+            game={room.localGame}
             maps={room.maps}
             mapsLoading={room.mapsLoading}
             localMap={room.localMap}
