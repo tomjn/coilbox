@@ -319,7 +319,7 @@ export function BattleMembersTable({
   });
   const allyOptions = range(slots).map((i) => ({
     value: String(i),
-    label: `Ally ${allyLetter(i)}`,
+    label: allyLetter(i),
   }));
   // The AI options, shared by the Add AI dropdown and each bot row's in-place AI
   // picker (issue #532), so both offer exactly the game's addable AIs.
