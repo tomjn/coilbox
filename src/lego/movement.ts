@@ -1,0 +1,258 @@
+/**
+ * How a built unit moves, worked out from how it is built and from the game it
+ * is going into (issue #3255).
+ *
+ * The roles say what kind of mover it is: a piece in the `wheel` role makes a
+ * wheeled or tracked vehicle, a piece in any `leg.*` role a walker. The game says
+ * which of its movement classes are that kind. Only a class the game declares can
+ * go into the definition, because `UnitDef.cpp` throws the unit away when its
+ * `movementClass` does not resolve, so this never makes up a name.
+ *
+ * Speed and turn rate come from the game too, as the median of the game's own
+ * units on the chosen class, so the numbers a unit starts with are ones the game
+ * already plays with. The preview's driving mode reads them back off
+ * `LegoProject.movement` (issue #3324).
+ */
+
+import {
+  type MoveKind,
+  moveClassesOf,
+  moveClassOf,
+  moveDefsOf,
+  requiresMoveDef,
+  unitSpeedOf,
+  unitTurnRateOf,
+} from "@/workshop/moveClasses";
+import type { LegoMovement, LegoProject } from "./model";
+
+/**
+ * The kinds of mover the build is. Empty for a unit with neither wheels nor legs,
+ * which stays static unless the game maker picks a class anyway.
+ */
+export function movementKinds(project: LegoProject): MoveKind[] {
+  const roles = project.pieces.map((piece) => piece.role ?? "");
+  const kinds: MoveKind[] = [];
+  if (roles.some((role) => role.startsWith("leg."))) kinds.push("kbot");
+  if (roles.includes("wheel")) kinds.push("tank");
+  return kinds;
+}
+
+/** One class the picker offers. */
+export interface OfferedClass {
+  name: string;
+  /** Absent when the class came off the unit table, which carries no kind. */
+  kind?: MoveKind;
+  /** Absent for the same reason. */
+  footprint?: number;
+  /** How many of the game's units use it. */
+  units: number;
+}
+
+/**
+ * What the picker has to offer. `movedefs` means the game's own
+ * `gamedata/movedefs.lua`, narrowed to the build's kinds. `units` means the
+ * classes the game's units use, because the move definitions could not be read,
+ * and those carry no kind to narrow by.
+ */
+export interface MoveClassOffer {
+  source: "movedefs" | "units";
+  classes: OfferedClass[];
+}
+
+/** The two halves of the unit-defs read this needs. */
+export interface GameMovementData {
+  units: Record<string, Record<string, unknown>>;
+  moveDefs: unknown[];
+}
+
+function unitsOn(
+  units: GameMovementData["units"],
+  names: Set<string>,
+): Record<string, unknown>[] {
+  return Object.values(units).filter(
+    (def) => requiresMoveDef(def) && names.has(moveClassOf(def).toLowerCase()),
+  );
+}
+
+/**
+ * The classes to offer a unit of these kinds, nearest the unit's own footprint
+ * first. A unit of no kind is offered every class, since nothing in the build
+ * narrows it.
+ */
+export function offerMoveClasses(
+  game: GameMovementData,
+  kinds: MoveKind[],
+  footprint: number,
+): MoveClassOffer {
+  const declared = moveDefsOf(game.moveDefs);
+  const used = moveClassesOf(game.units);
+  if (declared.length === 0) {
+    return { source: "units", classes: used };
+  }
+  const counts = new Map<string, number>();
+  for (const entry of used) {
+    const key = entry.name.toLowerCase();
+    counts.set(key, (counts.get(key) ?? 0) + entry.units);
+  }
+  const classes = declared
+    .filter((entry) => kinds.length === 0 || kinds.includes(entry.kind))
+    .map((entry) => ({
+      ...entry,
+      units: counts.get(entry.name.toLowerCase()) ?? 0,
+    }))
+    .sort(
+      (a, b) =>
+        Math.abs(a.footprint - footprint) - Math.abs(b.footprint - footprint) ||
+        a.name.localeCompare(b.name),
+    );
+  return { source: "movedefs", classes };
+}
+
+function median(values: number[]): number | undefined {
+  if (values.length === 0) return undefined;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  const value =
+    sorted.length % 2 === 1
+      ? sorted[middle]
+      : (sorted[middle - 1] + sorted[middle]) / 2;
+  // The parser holds numbers as 32 bit floats, so a game's 96 arrives as
+  // 96.0000015. A tenth is finer than any speed or turn rate a game writes.
+  return Math.round(value * 10) / 10;
+}
+
+/**
+ * Starting speed and turn rate for a class, with where each came from: the
+ * game's units on that class, or failing that its units on any class of the
+ * same kind. Absent when no unit in the game moves that way, which leaves the
+ * game maker to set it.
+ */
+export function suggestMotion(
+  game: GameMovementData,
+  gameName: string,
+  moveClass: string,
+): LegoMovement {
+  const target = moveClass.toLowerCase();
+  const declared = moveDefsOf(game.moveDefs);
+  const kind = declared.find(
+    (entry) => entry.name.toLowerCase() === target,
+  )?.kind;
+  const pools: { units: Record<string, unknown>[]; label: string }[] = [
+    {
+      units: unitsOn(game.units, new Set([target])),
+      label: `on ${moveClass}`,
+    },
+  ];
+  if (kind) {
+    const sameKind = declared.filter((entry) => entry.kind === kind);
+    pools.push({
+      units: unitsOn(
+        game.units,
+        new Set(sameKind.map((entry) => entry.name.toLowerCase())),
+      ),
+      label: `on ${KIND_LABEL[kind]} classes`,
+    });
+  }
+
+  const movement: LegoMovement = { moveClass };
+  for (const pool of pools) {
+    const speed = median(pool.units.map(unitSpeedOf));
+    if (speed === undefined) continue;
+    movement.speed = speed;
+    movement.speedFrom = `Median of ${pool.units.length} ${gameName} units ${pool.label}`;
+    break;
+  }
+  for (const pool of pools) {
+    const rates = pool.units
+      .map(unitTurnRateOf)
+      .filter((rate): rate is number => rate !== undefined);
+    const turnRate = median(rates);
+    if (turnRate === undefined) continue;
+    movement.turnRate = turnRate;
+    movement.turnRateFrom = `Median of ${rates.length} ${gameName} units ${pool.label}`;
+    break;
+  }
+  return movement;
+}
+
+/** The kinds in words, for the picker and for where a number came from. */
+export const KIND_LABEL: Record<MoveKind, string> = {
+  tank: "vehicle",
+  kbot: "walker",
+  hover: "hover",
+  ship: "ship",
+};
+
+/**
+ * Whether the definition is written as a unit that moves. A class and a speed
+ * above zero, because `UnitDef::RequireMoveDef` is `canmove && speed > 0`, and a
+ * unit with `canmove` and no speed is static to the engine anyway.
+ */
+export function movesInGame(
+  movement: LegoMovement | undefined,
+): movement is LegoMovement & { speed: number } {
+  return (
+    !!movement &&
+    movement.moveClass.trim() !== "" &&
+    typeof movement.speed === "number" &&
+    movement.speed > 0
+  );
+}
+
+/**
+ * Whether the game has a class by this name, matched case blind as
+ * `MoveDefHandler::GetMoveDefByName` matches it. Against the unit table when the
+ * game's move definitions could not be read.
+ */
+export function declaresMoveClass(
+  game: GameMovementData,
+  moveClass: string,
+): boolean {
+  const target = moveClass.toLowerCase();
+  const declared = moveDefsOf(game.moveDefs);
+  const names =
+    declared.length > 0
+      ? declared.map((entry) => entry.name)
+      : moveClassesOf(game.units).map((entry) => entry.name);
+  return names.some((name) => name.toLowerCase() === target);
+}
+
+/** What the movement picker can show, given what is known about the game. */
+export type MovementState =
+  | { state: "no-game"; reason: string }
+  | { state: "loading"; gameName: string }
+  | { state: "error"; gameName: string; message: string }
+  | { state: "none-fit"; gameName: string; kinds: MoveKind[] }
+  | { state: "offer"; gameName: string; offer: MoveClassOffer };
+
+/**
+ * Where the picker stands. `gameName` is null when there is no game to read,
+ * and `noGame` then says why in a line the panel can show.
+ */
+export function movementState(input: {
+  gameName: string | null;
+  noGame: string;
+  status: "idle" | "loading" | "ready" | "error";
+  error: string | null;
+  game: GameMovementData | null;
+  kinds: MoveKind[];
+  footprint: number;
+}): MovementState {
+  const { gameName } = input;
+  if (!gameName) return { state: "no-game", reason: input.noGame };
+  if (input.status === "error") {
+    return {
+      state: "error",
+      gameName,
+      message: input.error ?? "The game's definitions could not be read.",
+    };
+  }
+  if (input.status !== "ready" || !input.game) {
+    return { state: "loading", gameName };
+  }
+  const offer = offerMoveClasses(input.game, input.kinds, input.footprint);
+  if (offer.classes.length === 0) {
+    return { state: "none-fit", gameName, kinds: input.kinds };
+  }
+  return { state: "offer", gameName, offer };
+}

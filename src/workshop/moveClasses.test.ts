@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { moveClassesOf, moveClassOf, moveClassProblem } from "./moveClasses";
+import {
+  moveClassesOf,
+  moveClassOf,
+  moveClassProblem,
+  moveDefKind,
+  moveDefsOf,
+  requiresMoveDef,
+  unitSpeedOf,
+} from "./moveClasses";
 
 /** A game's table as the worker hands it over: every key lowercased. */
 const GAME: Record<string, Record<string, unknown>> = {
@@ -82,5 +90,59 @@ describe("moveClassProblem", () => {
 
   it("is quiet about a unit that is not there", () => {
     expect(moveClassProblem(undefined)).toBeUndefined();
+  });
+});
+
+// ParseSpeedModClass in RecoilEngine's MoveDefHandler.cpp (issue #3255).
+describe("moveDefKind", () => {
+  it("takes the speedModClass number when the class has one", () => {
+    expect(moveDefKind({ name: "TANK2", speedmodclass: 1 })).toBe("kbot");
+    expect(moveDefKind({ name: "x", speedModClass: 2 })).toBe("hover");
+    expect(moveDefKind({ name: "x", speedmodclass: "3" })).toBe("ship");
+  });
+
+  it("clamps a number outside the four kinds the way the engine does", () => {
+    expect(moveDefKind({ name: "x", speedmodclass: 9 })).toBe("ship");
+    expect(moveDefKind({ name: "x", speedmodclass: -4 })).toBe("tank");
+  });
+
+  it("falls back on the lowercased name, ship before hover before tank", () => {
+    expect(moveDefKind({ name: "BOAT4" })).toBe("ship");
+    expect(moveDefKind({ name: "hovership" })).toBe("ship");
+    expect(moveDefKind({ name: "HOVER3" })).toBe("hover");
+    expect(moveDefKind({ name: "WALKERTANK3" })).toBe("tank");
+    expect(moveDefKind({ name: "KBOT2", speedmodclass: -1 })).toBe("kbot");
+  });
+});
+
+describe("moveDefsOf", () => {
+  it("reads name, kind and footprint, and skips a class with no name", () => {
+    expect(
+      moveDefsOf([
+        { name: "WHEELEDTANK2", footprintx: 2 },
+        { name: "KBOT1" },
+        { footprintx: 3 },
+        "not a table",
+      ]),
+    ).toEqual([
+      { name: "WHEELEDTANK2", kind: "tank", footprint: 2 },
+      { name: "KBOT1", kind: "kbot", footprint: 1 },
+    ]);
+  });
+});
+
+describe("unitSpeedOf and requiresMoveDef", () => {
+  it("reads speed, or maxVelocity in elmos a frame", () => {
+    expect(unitSpeedOf({ speed: 60 })).toBe(60);
+    expect(unitSpeedOf({ maxvelocity: 2 })).toBe(60);
+    expect(unitSpeedOf({})).toBe(0);
+  });
+
+  it("is canmove and a speed and not a flier", () => {
+    expect(requiresMoveDef({ canmove: true, speed: 60 })).toBe(true);
+    expect(requiresMoveDef({ canmove: true, speed: 0 })).toBe(false);
+    expect(requiresMoveDef({ canmove: true, speed: 60, canfly: true })).toBe(
+      false,
+    );
   });
 });

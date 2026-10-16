@@ -864,6 +864,12 @@ pub struct UnitDefsOutput {
     /// game writes here, so a unit named nowhere in this table is in that
     /// class rather than in none (issue #2645).
     pub armor_defs: serde_json::Map<String, serde_json::Value>,
+    /// The game's movement classes, from `gamedata/movedefs.lua`, each as the
+    /// table the game wrote, in the order the engine numbers them. Only the run
+    /// from the first entry to the first gap, because that is all
+    /// `MoveDefHandler::Init` in RecoilEngine reads. A unit's `movementclass`
+    /// has to name one of these or the engine drops the unit (issue #3255).
+    pub move_defs: Vec<serde_json::Value>,
     /// The units the game's own def loader could not read, in its own words.
     ///
     /// The loader runs each unit file under `pcall` and logs the ones that

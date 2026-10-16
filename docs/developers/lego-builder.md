@@ -8,7 +8,7 @@ The builder is a modding tool, so it is hidden until you turn on **Advanced mode
 
 Two things to know before you spend an evening on this:
 
-- A unit you export arrives in the game static and unbuildable. Giving it a movement class and putting it on a builder's menu happens in the workshop afterwards. See [making the game use the unit](#making-the-game-use-the-unit).
+- A unit you export arrives in the game unbuildable, and static unless you picked a movement class for it in the Animation panel. Putting it on a builder's menu happens in the workshop afterwards. See [making the game use the unit](#making-the-game-use-the-unit).
 - An exported unit has been loaded in a headless engine, which proves its pieces, its size and its script are right. Nobody has yet seen one drawn, so nothing has confirmed it looks right. See [the engine load checklist](#the-engine-load-checklist).
 
 ## Build a unit
@@ -179,7 +179,7 @@ It writes, if you leave the boxes ticked:
 
 It can also write a `.glb`, or an `.obj` with its `.mtl` and a copy of the atlas beside them. Neither is read by the engine. Both go into a `blender` folder alongside the game's own, for taking the unit into Blender to check it against the `.s3o` or finish it by hand.
 
-**The script, the unit definition and the texture are all written once and then left alone.** If any is already there, export keeps yours and says so. The script and the unit definition are meant to be edited: the unit definition coilbox writes is the minimum the engine needs to accept the unit, and adding weapons, cost, a build picture or a movement class is a hand edit that has to survive re-exporting the model. Only the model is overwritten every time, because it is the one file the builder alone owns.
+**The script, the unit definition and the texture are all written once and then left alone.** If any is already there, export keeps yours and says so. The script and the unit definition are meant to be edited: the unit definition coilbox writes is the minimum the engine needs to accept the unit, and adding weapons, cost or a build picture is a hand edit that has to survive re-exporting the model. Only the model is overwritten every time, because it is the one file the builder alone owns.
 
 The one exception is coilbox's own scratch game, below, which is a throwaway and is always rewritten in full.
 
@@ -217,7 +217,7 @@ In the workshop, a unit left behind this way is marked `stale` in the unit list,
 
 Its name in `language/<code>/coilbox.json` is not removed. That unit is still in the game until you clear it, and a leftover with a name reads better than a leftover called `units.names.mytank`. Exporting under the new name adds a key beside it rather than replacing one.
 
-**What it deliberately does not write:** anything about the game around the unit. No weapon definitions, no cost, no build picture, no side or category, no movement class, and no edit to any other unit's `buildoptions`. Export puts a unit in a game folder. [Making the game use it](#making-the-game-use-the-unit) happens in the workshop, against the game itself.
+**What it deliberately does not write:** anything about the game around the unit. No weapon definitions, no cost, no build picture, no side or category, and no edit to any other unit's `buildoptions`. Export puts a unit in a game folder. [Making the game use it](#making-the-game-use-the-unit) happens in the workshop, against the game itself.
 
 ## The collision volume
 
@@ -301,7 +301,7 @@ After an edit you quit and test again. [What the engine reloads in a running gam
 
 ### Check it loads
 
-**Check it loads**, under Launch in the same drawer, plays the same scratch game with no window. It spawns the unit, runs it for 15 seconds of game time, the same stretch the animation preview plays, and lists what the engine said about it: a script that threw or did not compile, a piece the script names and the model lacks, a model file that is missing, a definition that did not parse, and a texture the model names that is not there. When the game itself fails to start with the unit in it, the drawer shows the engine's reason.
+**Check it loads**, under Launch in the same drawer, plays the same scratch game with no window. It spawns the unit, runs it for 15 seconds of game time, the same stretch the animation preview plays, and lists what the engine said about it: a script that threw or did not compile, a piece the script names and the model lacks, a model file that is missing, a definition that did not parse, and a texture the model names that is not there. When the game itself fails to start with the unit in it, the drawer shows the engine's reason. A unit with a movement class is also ordered to drive towards a corner of the map, and the drawer says how far it got and on which class. One that does not move at all is listed as a problem.
 
 It proves the unit loads and runs. It does not show how it looks.
 
@@ -339,13 +339,21 @@ Coilbox reaches the running game through the engine's autohost interface, and th
 
 ## Making the game use the unit
 
-Straight out of export, a unit cannot be played normally. Its definition sets `canmove = false`, and nothing lists it in any unit's `buildoptions`, so nothing can build it and it cannot move. `/cheat` and `/give` is the only way to get one onto a map.
+Straight out of export, nothing lists the unit in any unit's `buildoptions`, so nothing can build it. `/cheat` and `/give` is the only way to get one onto a map.
 
-That is on purpose, and it is not the end of the road. A movement class names an entry in the game's own move definitions, and the engine drops a unit that can move but names a class that does not resolve. The builder does not know which game the unit is going to, so writing a class here would be a guess, and a wrong guess is a unit that silently is not in the game. Leaving movement off is what keeps every export loadable everywhere.
+### Movement
+
+A movement class names an entry in the game's own move definitions, and the engine drops a unit that can move but names a class that does not resolve. So the builder never writes a class it made up. **Movement**, in the Animation panel, offers the classes of the game the Test drawer builds on, read out of that game's `gamedata/movedefs.lua`.
+
+The build decides which classes fit. A piece in the Wheel role makes a vehicle, and a piece in a leg role makes a walker. The engine decides which kind a class is, from its `speedModClass` or else from its name, and the picker uses the same rule. That rule can surprise you. Splinter Faction calls its walker classes `WALKERTANK`, so to the engine they are vehicles and the game has no walker class at all. A unit with neither wheels nor legs is offered every class and starts as **Does not move**.
+
+Picking a class fills in the speed and the turn rate with the median of the game's own units on that class, and says so under each field. Type over either to set your own. With a class and a speed the definition is written with `canmove = true`, `movementclass`, `speed` and `turnrate`, and without one it is written static, as `canmove = false`.
+
+When the game's `movedefs.lua` cannot be read, the picker falls back on the classes the game's units use, and says it has not narrowed them.
 
 The decisions the builder cannot make are made in **Unit tweaks**, under **workshop** in the sidebar. Pick the game you exported into and your unit is in the list, alongside the game's own:
 
-- **Give it a movement class.** The field is a picker, and what it offers is the classes this game's units already move on. Turn **Can move** on beside it. The page says so if only one of the two is set, because either half on its own is wrong.
+- **Change its movement class.** The field is a picker, and what it offers is the classes this game's units already move on. Turn **Can move** on beside it. The page says so if only one of the two is set, because either half on its own is wrong.
 - **Put it on a builder's menu.** Open the factory or the commander that should build it and add it to the roster. That is the answer to "which builder gains it as an option", and it is the same editor you would use to change any of the game's own build menus.
 - **Change any other number.** Health, cost, categories, weapons: the unit edits exactly like a unit the game shipped.
 

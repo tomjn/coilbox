@@ -1448,6 +1448,11 @@ export interface UnitCheckReport {
   outcome: "loaded" | "problems" | "gameDidNotLoad" | "unfinished";
   spawnedPieces: number | null;
   doneFrame: number | null;
+  /** How far the unit got when ordered to move, in whole elmos. Null for a
+   *  unit the engine gave no move class (issue #3255). */
+  movedElmos: number | null;
+  /** The move class the engine gave the unit, as the engine names it. */
+  moveClass: string | null;
   problems: UnitCheckEntry[];
   warnings: UnitCheckEntry[];
   fatal: UnitCheckEntry[];
@@ -2857,6 +2862,12 @@ export interface UnitDefsResult {
    * that class rather than in none (issue #2645).
    */
   armorDefs: Record<string, unknown>;
+  /**
+   * The game's movement classes, from `gamedata/movedefs.lua`, each as the
+   * table the game wrote, in the order the engine numbers them (issue #3255).
+   * `moveDefsOf` in `src/workshop/moveClasses.ts` reads them.
+   */
+  moveDefs: unknown[];
   /**
    * The units the game's own def loader could not read, in its own words. The
    * loader runs each unit file separately and logs the ones that raise, so a

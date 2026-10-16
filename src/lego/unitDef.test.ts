@@ -101,6 +101,48 @@ describe("legoUnitDef", () => {
     expect(buildUnitDef(p, b)).toContain("maxslope = 20,");
   });
 
+  // Issue #3255. A class picked from the game's own movedefs, with a speed,
+  // makes `UnitDef::RequireMoveDef` true. The building's maxslope goes,
+  // because a mobile unit's slope comes off its move class.
+  it("writes a unit that moves once a class and a speed are picked", () => {
+    const p = {
+      ...project("Rover", "rover"),
+      movement: { moveClass: "WHEELEDTANK2", speed: 120, turnRate: 600 },
+    };
+    const def = legoUnitDef(p, bounds({ x: 32, z: 32 }));
+    expect(def).toMatchObject({
+      canmove: true,
+      movementclass: "WHEELEDTANK2",
+      speed: 120,
+      turnrate: 600,
+    });
+    expect(def).not.toHaveProperty("maxslope");
+    expect(buildUnitDef(p, bounds({ x: 32, z: 32 }))).toContain(
+      'movementclass = "WHEELEDTANK2",',
+    );
+  });
+
+  it("stays static while the picked class has no speed", () => {
+    const p = {
+      ...project("Rover", "rover"),
+      movement: { moveClass: "WHEELEDTANK2" },
+    };
+    const def = legoUnitDef(p, bounds({ x: 32, z: 32 }));
+    expect(def.canmove).toBe(false);
+    expect(def).not.toHaveProperty("movementclass");
+    expect(def.maxslope).toBe(20);
+  });
+
+  it("leaves turnrate out when nothing gave it one", () => {
+    const p = {
+      ...project("Rover", "rover"),
+      movement: { moveClass: "WHEELEDTANK2", speed: 90 },
+    };
+    expect(legoUnitDef(p, bounds({ x: 32, z: 32 }))).not.toHaveProperty(
+      "turnrate",
+    );
+  });
+
   it("writes customparams as a Lua table with its keys in the file", () => {
     const text = buildUnitDef(
       project("Sky Fortress", "skyfort"),

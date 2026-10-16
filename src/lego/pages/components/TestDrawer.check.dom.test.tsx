@@ -85,6 +85,8 @@ function report(over: Partial<UnitCheckReport>): UnitCheckReport {
     outcome: "loaded",
     spawnedPieces: 5,
     doneFrame: 480,
+    movedElmos: null,
+    moveClass: null,
     problems: [],
     warnings: [],
     fatal: [],

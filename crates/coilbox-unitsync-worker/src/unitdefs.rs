@@ -111,6 +111,11 @@ local wd = (type(defs) == 'table') and defs.weapondefs or nil
 if type(wd) ~= 'table' then wd = {} end
 local ad = (type(defs) == 'table') and defs.armordefs or nil
 if type(ad) ~= 'table' then ad = {} end
+-- The game's movement classes (issue #3255). The engine reads them as a list,
+-- from the first entry to the first gap (`MoveDefHandler::Init`), so that run
+-- is what is kept.
+local md = (type(defs) == 'table') and defs.movedefs or nil
+if type(md) ~= 'table' then md = {} end
 
 -- A JSON string, in ASCII only. The fast path is every string a def actually
 -- holds: no quote, no backslash, no control character and no high byte.
@@ -249,6 +254,17 @@ local weapons = {}
 encode_all(wd, 'weapondef', weapons, notes)
 local armor = {}
 encode_all(ad, 'armor class', armor, notes)
+local moves = {}
+local move_index = 1
+while type(md[move_index]) == 'table' do
+  local encoded_ok, encoded = pcall(json_value, md[move_index], {}, 0)
+  if encoded_ok and type(encoded) == 'string' then
+    moves[#moves + 1] = encoded
+  else
+    notes[#notes + 1] = json_string('movedef ' .. move_index .. ': ' .. tostring(encoded))
+  end
+  move_index = move_index + 1
+end
 
 -- The tables from before the post files ran, when the loader handed them over.
 -- Rust compares them with the two above and keeps only the difference.
@@ -267,7 +283,8 @@ end
 local doc = '{"units":{' .. table.concat(units, ',')
   .. '},"weaponDefs":{' .. table.concat(weapons, ',')
   .. '},"armorDefs":{' .. table.concat(armor, ',')
-  .. '},"unitErrors":[' .. table.concat(notes, ',') .. ']' .. raw .. '}'
+  .. '},"moveDefs":[' .. table.concat(moves, ',')
+  .. '],"unitErrors":[' .. table.concat(notes, ',') .. ']' .. raw .. '}'
 -- The document is megabytes on a full game, so it goes back in pieces.
 return __cb_chunk(doc)
 "#;
@@ -285,6 +302,9 @@ struct ShimDoc {
     /// its members, unshaped, since a class is expected to be an array of unit
     /// names but nothing here enforces that (issue #2645).
     armor_defs: Map<String, Value>,
+    /// The game's movement classes, from `gamedata/movedefs.lua` by way of
+    /// `defs.lua`'s `movedefs` key, in the engine's order (issue #3255).
+    move_defs: Vec<Value>,
     unit_errors: Vec<String>,
     /// The units as they stood before the game's post files ran. Absent when
     /// the game's loader never included `gamedata/unitdefs_post.lua`.
@@ -395,6 +415,7 @@ pub(crate) fn resolve(
         units: doc.units,
         weapon_defs: doc.weapon_defs,
         armor_defs: doc.armor_defs,
+        move_defs: doc.move_defs,
         unit_errors: doc.unit_errors,
         language_text: language,
         checksum,
@@ -516,6 +537,44 @@ mod tests {
             serde_json::json!(["armcom", "corcom"])
         );
         assert_eq!(doc.armor_defs["else"], serde_json::json!(["armvader"]));
+    }
+
+    /// The shim itself, run in a plain Lua 5.1 with `defs.lua` stubbed out, so
+    /// what reaches Rust is what the Lua wrote rather than a hand-made document.
+    /// The fourth class sits after a gap, and the engine never reads it.
+    #[test]
+    fn the_shim_hands_back_the_movement_classes_up_to_the_first_gap() {
+        let lua = mlua::Lua::new();
+        lua.load(
+            r#"
+            Spring = { Echo = function() end, Log = function() end }
+            Engine = { gameSpeed = 30 }
+            VFS = { Include = function(name)
+              if name ~= 'gamedata/defs.lua' then return nil end
+              return { unitdefs = {}, weapondefs = {}, armordefs = {}, movedefs = {
+                { name = 'tank3', maxslope = 22 },
+                { name = 'kbot2', speedmodclass = 1 },
+                [4] = { name = 'unreachable' },
+              } }
+            end }
+            "#,
+        )
+        .exec()
+        .unwrap();
+        let script = format!(
+            "{}{}{UNIT_DEFS_SHIM_SCRIPT}",
+            crate::lua::CHUNKED_RESULT,
+            crate::lua::DEFS_ENV_SHIM
+        );
+        let out: mlua::Table = lua.load(script).eval().unwrap();
+        let doc = parse_shim_doc(&out.get::<String>("result1").unwrap()).unwrap();
+        assert_eq!(
+            doc.move_defs,
+            vec![
+                serde_json::json!({ "name": "tank3", "maxslope": 22 }),
+                serde_json::json!({ "name": "kbot2", "speedmodclass": 1 }),
+            ]
+        );
     }
 
     #[test]

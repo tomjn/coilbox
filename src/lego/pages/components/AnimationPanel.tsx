@@ -67,6 +67,7 @@ import { unitScript } from "../../luaScript";
 import {
   DEFAULT_BUILDER,
   type LegoBuilder,
+  type LegoMovement,
   type LegoProject,
 } from "../../model";
 import type { LoadedPack } from "../../pack";
@@ -109,6 +110,7 @@ import {
 } from "../../targetMotion";
 import { isBuilder } from "../../unitDef";
 import { controlFor } from "../../unitValueControls";
+import { MovementSection } from "./MovementSection";
 import { ScrubberMarks } from "./ScrubberMarks";
 
 /** The scenario Select's own entry for firing an arbitrary function by name,
@@ -254,6 +256,9 @@ interface Props {
   /** What the unit builds with, written into its definition. Only asked for
    *  when the unit has a build arm on it. */
   onBuilderChange: (builder: LegoBuilder) => void;
+  /** The movement class, speed and turn rate, or nothing for a unit that
+   *  does not move (issue #3255). */
+  onMovementChange: (movement: LegoMovement | undefined) => void;
   /**
    * The poses a run of the unit's own script produced, for the viewport to
    * play. Null whenever the presets are what is playing, or nothing is.
@@ -312,6 +317,7 @@ export function AnimationPanel({
   onChange,
   onShowScript,
   onBuilderChange,
+  onMovementChange,
   onScriptTimeline,
   onScriptRun,
   scriptPaused,
@@ -1422,6 +1428,12 @@ export function AnimationPanel({
               </div>
             </div>
           ) : null}
+
+          <MovementSection
+            project={project}
+            bounds={bounds}
+            onMovementChange={onMovementChange}
+          />
 
           {PRESETS.map((preset) => {
             const entry = applied.find((a) => a.presetId === preset.id);
