@@ -16,6 +16,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { exportGlb } from "./exportGlb";
 import { type LegoPiece, type LegoProject, newProject } from "./model";
 import type { LegoPartInfo, LoadedPack } from "./pack";
+import type { RawGeometry } from "./rawGeometry";
 
 type Rgba = [number, number, number, number];
 
@@ -322,5 +323,71 @@ describe("exportGlb colours", () => {
     for (let i = 0; i < glb.data.length; i += 4) {
       expect(Array.from(glb.data.subarray(i, i + 4))).toEqual(TEAM);
     }
+  });
+});
+
+/**
+ * An imported unit, whose UVs are its model's own and whose texture the engine
+ * reads one way up or the other by its format (#4174).
+ */
+describe("exportGlb on an imported unit", () => {
+  /** One triangle with all three corners at (u, v), as `rawGeometry.ts` hands
+   *  an imported mesh over. */
+  function raw(u: number, v: number): RawGeometry {
+    const corner = [0, 0, 0, 0, 1, 0, u, v];
+    return {
+      byId: new Map([
+        [
+          "m1",
+          {
+            id: "m1",
+            vFirst: 0,
+            vCount: 3,
+            iFirst: 0,
+            iCount: 3,
+            bbox: { min: [0, 0, 0], max: [1, 0, 1] },
+          },
+        ],
+      ]),
+      vertices: new Float32Array([...corner, ...corner, ...corner]),
+      indices: new Uint32Array([0, 1, 2]),
+    };
+  }
+
+  async function importedGlb(key: string, u: number, v: number) {
+    const base = project();
+    const doc: LegoProject = {
+      ...base,
+      pieces: base.pieces.map((piece) =>
+        piece.id === "hull" ? { ...piece, partId: null, meshId: "m1" } : piece,
+      ),
+      imported: { source: "probe.s3o", texture: { key, name: key } },
+    };
+    const bytes = await exportGlb(doc, pack(0, 0), raw(u, v), "imported");
+    return readGlb(bytes as ArrayBuffer);
+  }
+
+  /** The engine reads v = 0 as the top row of a PNG, the way glTF does. */
+  it("samples a PNG's top left from a face at the top left", async () => {
+    pictures.set("imported", atlas());
+
+    expect(sampled(await importedGlb("abc.png", 0.25, 0.25))).toEqual([
+      255, 0, 0, 255,
+    ]);
+    expect(sampled(await importedGlb("abc.png", 0.75, 0.75))).toEqual([
+      255, 255, 0, 255,
+    ]);
+  });
+
+  /** The engine flips a `.dds` on load, so its v = 0 is the bottom row. */
+  it("samples a DDS's bottom left from a face at v = 0.25", async () => {
+    pictures.set("imported", atlas());
+
+    expect(sampled(await importedGlb("abc.dds", 0.25, 0.25))).toEqual([
+      0, 0, 255, 255,
+    ]);
+    expect(sampled(await importedGlb("abc.dds", 0.75, 0.75))).toEqual([
+      0, 255, 0, 255,
+    ]);
   });
 });
