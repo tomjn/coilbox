@@ -10,11 +10,13 @@
  */
 
 import {
+  act,
   cleanup,
   fireEvent,
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import type * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -23,6 +25,7 @@ import { type LegoProject, newProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import type { ScriptOutput, ScriptTimeline } from "../../scriptPlayback";
 import { soloProject } from "../../soloPreset";
+import { standInAt } from "../../standIn";
 import { AnimationPanel } from "./AnimationPanel";
 
 const runLua = vi.fn();
@@ -633,6 +636,122 @@ describe("a scenario that moves the unit", () => {
     await waitFor(() =>
       expect(lastMotion(onStandIn)?.speed).toBeCloseTo(0.95, 4),
     );
+  });
+});
+
+describe("a target the game maker sets moving", () => {
+  /** An empty unit's stand-in is the smallest it goes, `MIN_RADIUS`. */
+  const RADIUS = 4.2;
+  const lastPlacement = (onStandIn: ReturnType<typeof vi.fn>) =>
+    onStandIn.mock.calls.at(-1)?.[0];
+
+  async function firing(onStandIn = vi.fn()) {
+    show(project({ compiledScript: COMPILED }), { onStandIn });
+    await pick();
+    return onStandIn;
+  }
+  async function pick() {
+    fireEvent.click(
+      screen.getByRole("combobox", { name: "What happens to the unit" }),
+    );
+    fireEvent.click(await screen.findByText("Aiming and firing"));
+  }
+  /** Radix names the slider's root, and the thumb inside it is the slider. */
+  const speedSlider = () =>
+    within(screen.getByLabelText("Target speed")).getByRole("slider");
+
+  it("offers how it moves and how fast for the firing scenario only", async () => {
+    show(project({ compiledScript: COMPILED }));
+    expect(
+      screen.queryByRole("combobox", { name: "How the target moves" }),
+    ).toBeNull();
+    await pick();
+    expect(
+      screen.getByRole("combobox", { name: "How the target moves" }),
+    ).toBeTruthy();
+    expect(speedSlider()).toBeTruthy();
+  });
+
+  /** The fixed track this replaces stood still at two spots for most of the
+   *  preview. Every aim now finds the target somewhere new. */
+  it("keeps the target moving through the run", async () => {
+    await firing();
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+    await waitFor(() => expect(runCob).toHaveBeenCalled());
+
+    const aims = runCob.mock.calls
+      .at(-1)?.[0]
+      .events.filter(
+        (event: { callin?: string }) => event.callin === "AimWeapon1",
+      );
+    expect(aims.length).toBeGreaterThan(10);
+    const spots = aims.map(
+      (event: { world: { standIn: { pos: number[] } } }) =>
+        event.world.standIn.pos,
+    );
+    for (let i = 1; i < spots.length; i++) {
+      expect(spots[i]).not.toEqual(spots[i - 1]);
+    }
+  });
+
+  it("runs again with the target where it was let go after a drag", async () => {
+    const onStandIn = await firing();
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+    await waitFor(() => expect(lastPlacement(onStandIn)?.onDrag).toBeTruthy());
+    const runs = runCob.mock.calls.length;
+
+    act(() => lastPlacement(onStandIn).onDrag([20, 30], 120));
+
+    await waitFor(() => expect(runCob.mock.calls.length).toBe(runs + 1));
+    const pose = standInAt(lastPlacement(onStandIn).track, 120, RADIUS);
+    expect(pose?.pos[0]).toBeCloseTo(20);
+    expect(pose?.pos[2]).toBeCloseTo(30);
+  });
+
+  it("runs again on a new path", async () => {
+    const onStandIn = await firing();
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+    await waitFor(() => expect(runCob).toHaveBeenCalled());
+    const crossing = lastPlacement(onStandIn).track;
+
+    fireEvent.click(
+      screen.getByRole("combobox", { name: "How the target moves" }),
+    );
+    fireEvent.click(await screen.findByText("Circling the unit"));
+
+    await waitFor(() =>
+      expect(lastPlacement(onStandIn).track).not.toBe(crossing),
+    );
+    const track = lastPlacement(onStandIn).track;
+    for (const frame of [0, 100, 300]) {
+      const pos = standInAt(track, frame, RADIUS)?.pos ?? [0, 0, 0];
+      expect(Math.hypot(pos[0], pos[2])).toBeCloseTo(10 * RADIUS);
+    }
+  });
+
+  /** A drag of the slider is a burst of changes, and it runs once for them
+   *  rather than once each. */
+  it("runs once for a drag of the speed slider, once it settles", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      await firing();
+      fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+      await waitFor(() => expect(runCob).toHaveBeenCalled());
+      const runs = runCob.mock.calls.length;
+
+      const slider = speedSlider();
+      fireEvent.keyDown(slider, { key: "ArrowRight" });
+      fireEvent.keyDown(slider, { key: "ArrowRight" });
+      expect(screen.getByText("1.5× the unit's")).toBeTruthy();
+      expect(runCob.mock.calls.length).toBe(runs);
+
+      await act(async () => {
+        vi.advanceTimersByTime(500);
+      });
+      await waitFor(() => expect(runCob.mock.calls.length).toBe(runs + 1));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

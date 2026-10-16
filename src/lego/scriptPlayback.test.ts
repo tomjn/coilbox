@@ -144,8 +144,16 @@ describe("scenarios", () => {
       (e) => e.callin === "AimWeapon1",
     );
 
-    expect(aim?.aimAtStandIn).toEqual({ from: "AimFromWeapon" });
+    expect(aim?.aimAtStandIn).toMatchObject({ from: "AimFromWeapon" });
     expect(aim?.args).toBeUndefined();
+  });
+
+  /** The track comes from the target controls rather than from a fixed list
+   *  of keys, so the weapon always has a moving target to chase. */
+  it("sets the firing scenario's target moving rather than at fixed spots", () => {
+    const firing = scenarioById("firing");
+    expect(firing?.movingTarget).toBe(true);
+    expect(firing?.standIn).toBeUndefined();
   });
 
   it("fires weapon 1 through the engine in the firing scenario", () => {
@@ -166,25 +174,24 @@ describe("scenarios", () => {
     );
   });
 
-  /** The engine calls a weapon's `AimWeapon` again every `reaimTime` frames,
-   *  15 by default, while it still has a target (`Weapon.cpp:137,352-357,380`),
-   *  whether or not the target is moving, so the arm keeps following the
-   *  stand-in for the whole preview rather than only during a volley. */
-  it("re-aims the weapon every 15 frames for the whole preview", () => {
+  /** The engine calls a weapon's `AimWeapon` again for as long as it has a
+   *  target (`Weapon.cpp:352-357`), so the arm keeps following the stand-in
+   *  for the whole preview rather than only during a volley. When it calls
+   *  it is the resolver's to work out, because that depends on where the
+   *  target goes. */
+  it("keeps aiming the weapon for the whole preview", () => {
     const firing = scenarioById("firing");
     const aims = firing?.events.filter(
       (event) => event.callin === "AimWeapon1",
     );
 
-    const expected: number[] = [];
-    for (let frame = at(0.5); frame <= PREVIEW_FRAMES - 1; frame += 15) {
-      expected.push(frame);
-    }
-
-    expect(aims?.map((event) => event.frame)).toEqual(expected);
-    for (const aim of aims ?? []) {
-      expect(aim.aimAtStandIn).toEqual({ from: "AimFromWeapon" });
-    }
+    expect(aims).toEqual([
+      {
+        frame: at(0.5),
+        callin: "AimWeapon1",
+        aimAtStandIn: { from: "AimFromWeapon", until: PREVIEW_FRAMES - 1 },
+      },
+    ]);
   });
 
   it("aims before firing when an aim and a fire land on the same frame", () => {
@@ -209,7 +216,7 @@ describe("scenarios", () => {
   it("never aims at a stand-in a scenario does not place", () => {
     for (const scenario of SCENARIOS) {
       for (const event of scenario.events) {
-        if (!event.aimAtStandIn) continue;
+        if (!event.aimAtStandIn || scenario.movingTarget) continue;
         expect(scenario.standIn?.keys.length ?? 0).toBeGreaterThan(0);
       }
       for (const key of scenario.standIn?.keys ?? []) {
