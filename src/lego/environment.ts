@@ -27,9 +27,11 @@
 import * as THREE from "three";
 
 import { GROUND_ELMOS } from "./buildPlate";
+import type { UnitBounds } from "./s3oBuild";
+import { ELMOS_PER_FOOTPRINT, footprintSteps } from "./unitDef";
 
 export type BackdropId = "studio" | "sky";
-export type GroundId = "grid" | "terrain" | "water";
+export type GroundId = "grid" | "terrain" | "water" | "slope" | "uneven";
 
 /** A gradient stop, measured from the top of the sky down. 0.5 is the horizon. */
 interface SkyStop {
@@ -89,11 +91,16 @@ export interface GroundSurface {
 }
 
 /**
- * Three grounds. The grid alone is see-through, which is what makes a piece
+ * Five grounds. The grid alone is see-through, which is what makes a piece
  * hanging under the ground plane obvious. Terrain is opaque, which is what the
  * engine will actually put under the unit. Water is for a ship or a hovercraft:
  * the engine's sea level is also y = 0, and a translucent surface shows how
  * much of a hull sits under it.
+ *
+ * Slope and uneven are for previewing movement rather than for building: a
+ * walker's feet reach different heights on them, and a unit that is not
+ * upright turns to follow them. Both are at height 0 under the unit's origin,
+ * so the unit stands where it always does.
  */
 export const GROUND_SURFACES: GroundSurface[] = [
   {
@@ -111,7 +118,154 @@ export const GROUND_SURFACES: GroundSurface[] = [
     label: "Water",
     hint: "A see-through sea at y = 0, for how a hull sits in it.",
   },
+  {
+    id: "slope",
+    label: "Slope",
+    hint: "A hill rising ahead of the unit.",
+  },
+  {
+    id: "uneven",
+    label: "Uneven",
+    hint: "Rows of bumps, steepest under the unit.",
+  },
 ];
+
+/**
+ * A ground with height in it. Mirrors `Shape` in
+ * `crates/coilbox-unitpose/src/ground.rs`, which answers a script asking where
+ * the ground is, so the two have to agree to the number.
+ */
+export type GroundShape =
+  | {
+      /** A plane through the origin rising towards +z, ahead of the unit. */
+      kind: "slope";
+      degrees: number;
+    }
+  | {
+      /** Bumps and hollows `width` elmos apart, steepest at the origin, where
+       *  they rise towards +x at `degrees`. */
+      kind: "uneven";
+      degrees: number;
+      width: number;
+    };
+
+/** What the ground picker holds. A view setting, like the rest of this. */
+export interface GroundChoice {
+  id: GroundId;
+  /** How steep a slope or uneven ground is, in degrees from level. */
+  degrees: number;
+  /** How far apart the bumps are, in elmos, or null to follow the unit's
+   *  footprint as it changes. */
+  width: number | null;
+  /** Whether the unit stays upright rather than turning to the ground. */
+  upright: boolean;
+}
+
+/**
+ * The angle a slope opens at: 22.5 degrees, the steepest ground a hover can
+ * climb with the engine's default `maxSlope` of 15. The engine multiplies a
+ * movement class's `maxSlope` by 1.5 before comparing it to the ground
+ * (`DegreesToMaxSlope` in `rts/Sim/MoveTypes/MoveDefHandler.cpp`), and 15 is
+ * the hover default there.
+ */
+export const DEFAULT_GROUND_DEGREES = 15 * 1.5;
+
+/**
+ * Off, so a unit turns to follow a slope. That is the engine's own default
+ * for `upright` (`UnitDef.cpp:419`), and the one a unit with a movement class
+ * keeps. A unit with no movement class is made upright unless it flies, but
+ * these grounds are for a unit that moves.
+ */
+export const DEFAULT_GROUND: GroundChoice = {
+  id: "grid",
+  degrees: DEFAULT_GROUND_DEGREES,
+  width: null,
+  upright: false,
+};
+
+/** Whether `degrees` is a slope there is a ground for: level, up to but not
+ *  including a wall. */
+export function validGroundDegrees(degrees: number): boolean {
+  return Number.isFinite(degrees) && degrees >= 0 && degrees < 90;
+}
+
+/**
+ * The narrowest bumps there can be, in elmos: two of the engine's heightmap
+ * squares (`SQUARE_SIZE`, 8 elmos, in `rts/Sim/Misc/GlobalConstants.h`),
+ * which is one rise and one fall. A map has
+ * no height between its squares' corners, so it cannot hold a narrower one.
+ */
+export const MIN_BUMP_WIDTH = 2 * 8;
+
+/** The width uneven ground opens at: the unit's own footprint, the larger way
+ *  round, so the bumps are sized to the unit standing on them. */
+export function footprintWidth(bounds: UnitBounds): number {
+  return (
+    Math.max(footprintSteps(bounds.sizeX), footprintSteps(bounds.sizeZ)) *
+    ELMOS_PER_FOOTPRINT
+  );
+}
+
+/** The shape the choice draws, or null for a flat one. */
+export function groundShape(
+  choice: Pick<GroundChoice, "id" | "degrees" | "width">,
+  footprint: number,
+): GroundShape | null {
+  if (choice.id === "slope") return { kind: "slope", degrees: choice.degrees };
+  if (choice.id === "uneven")
+    return {
+      kind: "uneven",
+      degrees: choice.degrees,
+      width: choice.width ?? footprint,
+    };
+  return null;
+}
+
+/** The ground's height at `x`, `z`, in elmos. */
+export function groundHeight(shape: GroundShape, x: number, z: number): number {
+  const tan = Math.tan((shape.degrees * Math.PI) / 180);
+  if (shape.kind === "slope") return z * tan;
+  const k = (2 * Math.PI) / shape.width;
+  // `sin(kx) cos(kz)` is steepest at the origin, with a gradient of `k` along
+  // x, so this amplitude makes that `tan(degrees)`.
+  return (tan / k) * Math.sin(k * x) * Math.cos(k * z);
+}
+
+/** Which way is up off the ground at `x`, `z`, as a unit vector. */
+export function groundNormal(
+  shape: GroundShape,
+  x: number,
+  z: number,
+): [number, number, number] {
+  const tan = Math.tan((shape.degrees * Math.PI) / 180);
+  let dx = 0;
+  let dz = tan;
+  if (shape.kind === "uneven") {
+    const k = (2 * Math.PI) / shape.width;
+    dx = tan * Math.cos(k * x) * Math.cos(k * z);
+    dz = -tan * Math.sin(k * x) * Math.sin(k * z);
+  }
+  const length = Math.hypot(dx, 1, dz);
+  return [-dx / length, 1 / length, -dz / length];
+}
+
+/**
+ * Which way is up for the unit standing at the origin, or null for straight
+ * up.
+ *
+ * The engine turns a ground unit that is not upright to the ground's normal
+ * under it (`GroundMoveType.cpp` calls `UpdateDirVectors(!owner->upright &&
+ * owner->IsOnGround(), ...)`, and `CSolidObject::GetWantedUpDir` reads
+ * `CGround::GetSmoothNormal`). `upDirSmoothing` only slows the turn on the way
+ * there, and a unit standing still has already arrived, so it has no say.
+ */
+export function unitUp(
+  shape: GroundShape | null,
+  upright: boolean,
+): [number, number, number] | null {
+  if (!shape || upright) return null;
+  return groundNormal(shape, 0, 0);
+}
 
 export function backdropById(id: string): Backdrop {
   return BACKDROPS.find((backdrop) => backdrop.id === id) ?? BACKDROPS[0];
@@ -279,11 +433,68 @@ function terrainTexture(): THREE.CanvasTexture | null {
   return texture;
 }
 
-/** Frees what `buildTerrain` or `buildWater` allocated. They are built from
- *  the same parts. */
+/**
+ * Rows of the shaped ground's mesh per bump. A drawing resolution only: the
+ * answer a script gets comes from `groundHeight`, not from the mesh.
+ */
+const SEGMENTS_PER_BUMP = 16;
+
+/**
+ * A ground with height in it, in its own mesh: the terrain's mottle and fade
+ * over a displaced plane.
+ *
+ * Lit, unlike the flat terrain, because an unlit surface with height in it
+ * shows no height: the mottle is all there is to see. And it writes depth, so
+ * a foot that reaches into a hill disappears into it, which is the point of
+ * standing a unit on one.
+ */
+export function buildShapedTerrain(shape: GroundShape): THREE.Mesh {
+  const material = new THREE.MeshLambertMaterial({
+    map: terrainTexture(),
+    transparent: true,
+  });
+  const mesh = new THREE.Mesh(shapedGeometry(shape), material);
+  mesh.renderOrder = -1;
+  mesh.raycast = () => {};
+  return mesh;
+}
+
+/** Swap the shaped ground's surface for another shape's, keeping its
+ *  texture, which is the expensive part. */
+export function reshapeTerrain(mesh: THREE.Mesh, shape: GroundShape): void {
+  mesh.geometry.dispose();
+  mesh.geometry = shapedGeometry(shape);
+}
+
+function shapedGeometry(shape: GroundShape): THREE.PlaneGeometry {
+  // A slope is flat, so the plane's own two triangles are already exact.
+  const segments =
+    shape.kind === "slope"
+      ? 1
+      : Math.ceil((TERRAIN_ELMOS / shape.width) * SEGMENTS_PER_BUMP);
+  const geometry = new THREE.PlaneGeometry(
+    TERRAIN_ELMOS,
+    TERRAIN_ELMOS,
+    segments,
+    segments,
+  );
+  geometry.rotateX(-Math.PI / 2);
+  const position = geometry.getAttribute("position");
+  for (let i = 0; i < position.count; i++) {
+    const height = groundHeight(shape, position.getX(i), position.getZ(i));
+    position.setY(i, height + TERRAIN_Y);
+  }
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+/** Frees what `buildTerrain`, `buildWater` or `buildShapedTerrain`
+ *  allocated. They are built from the same parts. */
 export function disposeTerrain(mesh: THREE.Mesh): void {
   mesh.geometry.dispose();
-  const material = mesh.material as THREE.MeshBasicMaterial;
+  const material = mesh.material as
+    | THREE.MeshBasicMaterial
+    | THREE.MeshLambertMaterial;
   material.map?.dispose();
   material.dispose();
 }

@@ -251,7 +251,7 @@ export function buildUnitDef(
  * The `1e-9` slack absorbs float error from the box measurement so a size
  * that lands exactly on a step boundary is not pushed into the next one.
  */
-function footprintSteps(size: number): number {
+export function footprintSteps(size: number): number {
   return Math.max(1, Math.ceil(size / ELMOS_PER_FOOTPRINT - 1e-9));
 }
 
