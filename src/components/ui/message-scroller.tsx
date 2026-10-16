@@ -62,20 +62,29 @@ function MessageScroller({
 }
 
 /**
+ * Keys that scroll the view toward the end. The library also stops following on
+ * the keys that scroll toward the start, but those can only move a view that is
+ * at the bottom upward, so the `scroll` event they cause resets the mode.
+ */
+const KEYS_TOWARD_END = new Set(["ArrowDown", "End", "PageDown", " "]);
+
+/**
  * Workaround for shadcn-ui/ui#11224, fixed upstream by the unreleased
  * shadcn-ui/ui#11223.
  *
- * `@shadcn/react` stops following new messages on every wheel or touchmove, and
- * only starts again from a `scroll` event. A gesture that moves nothing (wheel
- * momentum after the view hits the bottom, a sideways pan, a wheel used by a
- * scrollable inside a message) fires no `scroll` event, so following stays off
- * while the view sits at the bottom.
+ * `@shadcn/react` stops following new messages on every wheel, touchmove or
+ * scroll key, and only starts again from a `scroll` event. A gesture that moves
+ * nothing (wheel momentum after the view hits the bottom, a sideways pan, a
+ * wheel used by a scrollable inside a message, End or Page Down pressed at the
+ * bottom) fires no `scroll` event, so following stays off while the view sits at
+ * the bottom.
  *
- * The library calls its handler from its own `onWheel` and `onTouchMove`, which
- * the wrapper cannot reach, so this listens in the capture phase, records
- * whether the view was at the bottom, and on the next frame calls the public
- * `scrollToEnd` if the gesture did not scroll the view up. A real scroll-away
- * delivers its `scroll` event before that frame, so it is left alone.
+ * The library calls its handler from its own `onWheel`, `onTouchMove` and
+ * `onKeyDown`, which the wrapper cannot reach, so this listens in the capture
+ * phase, records whether the view was at the bottom, and on the next frame calls
+ * the public `scrollToEnd` if the gesture did not scroll the view up. A real
+ * scroll-away delivers its `scroll` event before that frame, so it is left
+ * alone.
  *
  * Remove once a released `@shadcn/react` contains the fix for #11224, and
  * confirm the "keeps following" tests in message-scroller.dom.test.tsx still
@@ -119,9 +128,20 @@ function useKeepFollowingAfterGestures(
       capture: true,
       passive: true,
     });
+    const onKey = (event: KeyboardEvent) => {
+      // Shift+Space scrolls up.
+      if (
+        !KEYS_TOWARD_END.has(event.key) ||
+        (event.key === " " && event.shiftKey)
+      )
+        return;
+      onGesture();
+    };
+    viewport.addEventListener("keydown", onKey, { capture: true });
     return () => {
       viewport.removeEventListener("wheel", onGesture, { capture: true });
       viewport.removeEventListener("touchmove", onGesture, { capture: true });
+      viewport.removeEventListener("keydown", onKey, { capture: true });
       if (frame !== null) window.cancelAnimationFrame(frame);
     };
   }, [autoScroll, scrollEdgeThreshold, scrollToEnd, viewportRef]);

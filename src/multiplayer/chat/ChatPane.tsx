@@ -24,6 +24,7 @@ import {
   MessageScrollerItem,
   MessageScrollerProvider,
   MessageScrollerViewport,
+  useMessageScroller,
 } from "@/components/ui/message-scroller";
 import { Textarea } from "@/components/ui/textarea";
 import { readableTeamTextColor } from "@/lib/teamColor";
@@ -200,6 +201,20 @@ export interface ChatPaneProps {
  * bottom composer. Presentational only - it imports no store, so the hub and the
  * future battle GUI render the identical component for visual consistency.
  */
+/**
+ * Scrolls the log to the newest message each time `sent` goes up, so sending
+ * from the composer brings a reader who scrolled up back to the bottom and
+ * resumes following. Draws nothing. It sits inside the provider because the
+ * composer is outside it.
+ */
+function ScrollToEndOnSend({ sent }: { sent: number }) {
+  const { scrollToEnd } = useMessageScroller();
+  useEffect(() => {
+    if (sent > 0) scrollToEnd({ behavior: "auto" });
+  }, [sent, scrollToEnd]);
+  return null;
+}
+
 export function ChatPane({
   title,
   subtitle,
@@ -288,6 +303,8 @@ export function ChatPane({
   };
   const [draft, setDraft] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
+  /** How many times the composer has sent, which scrolls the log to the end. */
+  const [sent, setSent] = useState(0);
   // Tab-completion: cycle state persists across Tabs; the input element and a
   // pending selection let us restore the caret after the controlled re-render.
   // A range rather than an offset because the formatting buttons re-select the
@@ -474,6 +491,7 @@ export function ChatPane({
     if (lines.length === 0) return;
     setDraft("");
     setSendError(null);
+    setSent((n) => n + 1);
     // One command per line, awaited in turn: concurrent sends can reach the
     // socket out of order and scramble the message. On a failure only the lines
     // that never went out are restored - putting the whole draft back would
@@ -534,6 +552,7 @@ export function ChatPane({
           already at the bottom, and surfaces a scroll-to-latest button otherwise
           (via @shadcn/react's headless message-scroller). */}
       <MessageScrollerProvider autoScroll>
+        <ScrollToEndOnSend sent={sent} />
         <MessageScroller className="min-h-0 flex-1">
           <MessageScrollerViewport className="px-4 py-3">
             <MessageScrollerContent>

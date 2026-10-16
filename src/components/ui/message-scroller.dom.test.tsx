@@ -18,9 +18,13 @@ import {
   MessageScrollerProvider,
   MessageScrollerViewport,
 } from "./message-scroller";
-
-const ITEM_HEIGHT = 100;
-const VIEWPORT_HEIGHT = 300;
+import {
+  distanceToBottom,
+  frame,
+  ITEM_HEIGHT,
+  installMessageScrollerLayout,
+  restoreMessageScrollerLayout,
+} from "./messageScrollerLayoutStub";
 
 function Thread({ count }: { count: number }) {
   return (
@@ -41,93 +45,8 @@ function Thread({ count }: { count: number }) {
   );
 }
 
-const scrollTops = new WeakMap<Element, number>();
-const proto = HTMLElement.prototype;
-const original = {
-  scrollHeight: Object.getOwnPropertyDescriptor(proto, "scrollHeight"),
-  clientHeight: Object.getOwnPropertyDescriptor(proto, "clientHeight"),
-  scrollTop: Object.getOwnPropertyDescriptor(proto, "scrollTop"),
-  scrollTo: Object.getOwnPropertyDescriptor(proto, "scrollTo"),
-  getBoundingClientRect: Object.getOwnPropertyDescriptor(
-    proto,
-    "getBoundingClientRect",
-  ),
-};
-
-function isViewport(el: Element) {
-  return el.getAttribute("data-slot") === "message-scroller-viewport";
-}
-
-beforeEach(() => {
-  Object.defineProperty(proto, "scrollHeight", {
-    configurable: true,
-    get(this: HTMLElement) {
-      return isViewport(this)
-        ? (this.querySelectorAll("[data-message-id]").length || 0) * ITEM_HEIGHT
-        : 0;
-    },
-  });
-  Object.defineProperty(proto, "clientHeight", {
-    configurable: true,
-    get(this: HTMLElement) {
-      return isViewport(this) ? VIEWPORT_HEIGHT : 0;
-    },
-  });
-  Object.defineProperty(proto, "scrollTop", {
-    configurable: true,
-    get(this: HTMLElement) {
-      return scrollTops.get(this) ?? 0;
-    },
-    set(this: HTMLElement, value: number) {
-      scrollTops.set(this, value);
-    },
-  });
-  // The library measures content height from each message's rect.
-  Object.defineProperty(proto, "getBoundingClientRect", {
-    configurable: true,
-    value(this: HTMLElement) {
-      let top = 0;
-      let height = 0;
-      if (isViewport(this)) {
-        height = VIEWPORT_HEIGHT;
-      } else if (this.hasAttribute("data-message-id")) {
-        const viewport = this.closest("[data-slot=message-scroller-viewport]");
-        const index = Array.from(this.parentElement?.children ?? []).indexOf(
-          this,
-        );
-        top = index * ITEM_HEIGHT - (viewport?.scrollTop ?? 0);
-        height = ITEM_HEIGHT;
-      }
-      return new DOMRect(0, top, 100, height);
-    },
-  });
-  Object.defineProperty(proto, "scrollTo", {
-    configurable: true,
-    value(this: HTMLElement, options: ScrollToOptions) {
-      scrollTops.set(this, options.top ?? 0);
-    },
-  });
-});
-
-afterEach(() => {
-  for (const [key, descriptor] of Object.entries(original)) {
-    if (descriptor) Object.defineProperty(proto, key, descriptor);
-    else delete (proto as unknown as Record<string, unknown>)[key];
-  }
-});
-
-function frame() {
-  return act(
-    () =>
-      new Promise<void>((resolve) => {
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-      }),
-  );
-}
-
-function distanceToBottom(viewport: HTMLElement) {
-  return viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop;
-}
+beforeEach(installMessageScrollerLayout);
+afterEach(restoreMessageScrollerLayout);
 
 async function mountAtBottom() {
   const view = render(<Thread count={8} />);
@@ -189,5 +108,73 @@ describe("MessageScrollerViewport keeps following", () => {
     await frame();
 
     expect(viewport.scrollTop).toBe(2 * ITEM_HEIGHT);
+  });
+
+  it.each([
+    "ArrowDown",
+    "End",
+    "PageDown",
+    " ",
+  ])("after %j pressed at the bottom, where it moves nothing", async (key) => {
+    const { viewport, rerender } = await mountAtBottom();
+
+    act(() => {
+      viewport.dispatchEvent(
+        new KeyboardEvent("keydown", { key, bubbles: true }),
+      );
+    });
+    await frame();
+
+    rerender(<Thread count={9} />);
+    await frame();
+
+    expect(distanceToBottom(viewport)).toBe(0);
+  });
+
+  it("but not after ArrowUp scrolls the view up", async () => {
+    const { viewport, rerender } = await mountAtBottom();
+
+    act(() => {
+      viewport.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }),
+      );
+      viewport.scrollTop = 2 * ITEM_HEIGHT;
+      viewport.dispatchEvent(new Event("scroll", { bubbles: true }));
+    });
+    await frame();
+
+    rerender(<Thread count={9} />);
+    await frame();
+
+    expect(viewport.scrollTop).toBe(2 * ITEM_HEIGHT);
+  });
+});
+
+describe("MessageScrollerViewport resumes following", () => {
+  it("when the keyboard scrolls back to the bottom", async () => {
+    const { viewport, rerender } = await mountAtBottom();
+
+    act(() => {
+      viewport.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "PageUp", bubbles: true }),
+      );
+      viewport.scrollTop = 2 * ITEM_HEIGHT;
+      viewport.dispatchEvent(new Event("scroll", { bubbles: true }));
+    });
+    await frame();
+
+    act(() => {
+      viewport.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "End", bubbles: true }),
+      );
+      viewport.scrollTop = viewport.scrollHeight - viewport.clientHeight;
+      viewport.dispatchEvent(new Event("scroll", { bubbles: true }));
+    });
+    await frame();
+
+    rerender(<Thread count={9} />);
+    await frame();
+
+    expect(distanceToBottom(viewport)).toBe(0);
   });
 });
