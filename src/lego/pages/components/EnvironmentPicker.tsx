@@ -21,6 +21,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useUnitDefs } from "@/workshop/config";
 import {
   BACKDROPS,
   type BackdropId,
@@ -33,6 +34,9 @@ import {
   MIN_BUMP_WIDTH,
   validGroundDegrees,
 } from "../../environment";
+import type { LegoMovement } from "../../model";
+import { slopeVerdict } from "../../movement";
+import { useTestGame } from "./useTestGame";
 
 const ITEM_CLASS =
   "rounded-md border border-border/60 px-3 py-1 text-xs data-[state=on]:border-primary data-[state=on]:bg-primary/10";
@@ -43,6 +47,7 @@ export function EnvironmentPicker({
   ground,
   onGround,
   shape,
+  movement,
 }: {
   backdrop: BackdropId;
   onBackdrop: (id: BackdropId) => void;
@@ -50,6 +55,8 @@ export function EnvironmentPicker({
   onGround: (choice: GroundChoice) => void;
   /** What the choice draws, null for a flat ground. */
   shape: GroundShape | null;
+  /** The unit's movement class, absent for a unit that does not move. */
+  movement?: LegoMovement;
 }) {
   return (
     <Popover>
@@ -127,6 +134,9 @@ export function EnvironmentPicker({
                 />
               )}
             </div>
+            {movement && (
+              <SlopeVerdict movement={movement} degrees={ground.degrees} />
+            )}
             <CheckField
               label="Upright"
               checked={ground.upright}
@@ -141,6 +151,30 @@ export function EnvironmentPicker({
       </PopoverContent>
     </Popover>
   );
+}
+
+/** Whether the unit's class climbs the slope drawn. Reads the game only once
+ *  the unit has a class, so a static unit asks for nothing. */
+function SlopeVerdict({
+  movement,
+  degrees,
+}: {
+  movement: LegoMovement;
+  degrees: number;
+}) {
+  const { target, game } = useTestGame();
+  const { defs, defsFor } = useUnitDefs(
+    target?.enginePath,
+    target?.dataDir,
+    game?.primaryArchive.name,
+  );
+  const read =
+    defs && defsFor === game?.primaryArchive.name
+      ? { moveDefs: defs.moveDefs }
+      : null;
+  const verdict = slopeVerdict(movement, read, degrees);
+  if (!verdict) return null;
+  return <p className="text-xs text-muted-foreground">{verdict}</p>;
 }
 
 /**
