@@ -282,6 +282,7 @@ describe("unitGame", () => {
     at: "2026-10-16T00:00:00Z",
     unitName: "rover",
     def: {},
+    files: [],
   };
 
   it("is null for a unit that belongs to no game", () => {

@@ -128,6 +128,7 @@ describe("MovementSection", () => {
             at: "2026-10-16T00:00:00Z",
             unitName: "rover",
             def: {},
+            files: [],
           },
         })}
         bounds={BOUNDS}
@@ -196,7 +197,9 @@ describe("MovementSection", () => {
       ),
     ).toBeTruthy();
     expect(onMovementChange).not.toHaveBeenCalled();
-    expect(screen.getByRole("combobox", { name: "Movement class" })).toBeTruthy();
+    expect(
+      screen.getByRole("combobox", { name: "Movement class" }),
+    ).toBeTruthy();
   });
 
   it("says when there is no game to read classes from", () => {
