@@ -26,6 +26,7 @@ export function NoteButton({
   note,
   onSave,
   statsSummary,
+  className,
 }: {
   name: string;
   /** Current saved note text; "" means none. */
@@ -34,6 +35,8 @@ export function NoteButton({
   /** "N games with this player…" summary from the local stats database, or
    * undefined when there's nothing to say (no shared replays, or unavailable). */
   statsSummary?: string | null;
+  /** Classes for the trigger button, to size it for a denser list. */
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   const hasNote = note.trim().length > 0;
@@ -52,6 +55,7 @@ export function NoteButton({
           className={cn(
             "inline-flex size-7 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground",
             hasNote && "text-amber-600 dark:text-amber-400",
+            className,
           )}
         >
           <StickyNote
