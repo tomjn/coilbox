@@ -170,6 +170,14 @@ export function legoUnitDef(
     // once the game's own read comes back with the exported file. For that game
     // the words go to `language/en/coilbox.json` instead (issue #2683).
     ...(home === "def" ? unitWords(project) : {}),
+    // Three fields Splinter Faction's `alldefs_post.lua` reads on every unit
+    // and the engine quits without (issue #4137). `unitname` is the key the
+    // definition is filed under. `sightdistance` is the engine's own default
+    // (`UnitDef.cpp`: `udTable.GetFloat("sightDistance", 0.0f)`). `customparams`
+    // is read as a table, so it has to exist.
+    unitname: project.unitName,
+    sightdistance: 0,
+    customparams: {},
     objectname: project.unitName,
     script: `${project.unitName}.lua`,
     footprintx: footprintSteps(bounds.sizeX),
@@ -216,8 +224,12 @@ export function unitWords(project: LegoProject): {
   };
 }
 
-/** One field's value as Lua source. Only the three scalar types reach here. */
+/**
+ * One field's value as Lua source. The three scalar types, and an empty table
+ * for a field the game reads as a table but nothing fills in yet.
+ */
 function luaValue(value: unknown): string {
+  if (typeof value === "object" && value !== null) return "{}";
   if (typeof value === "boolean") return value ? "true" : "false";
   if (typeof value === "number") return String(value);
   return luaString(String(value));
