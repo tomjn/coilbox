@@ -67,6 +67,17 @@ local function __keys(value)
 end
 "#;
 
+/// The values [`SpringLua::set_game`] puts on `Game`, named as the engine's
+/// `LuaConstGame.cpp` names them. `map_name` is the map's versioned name, the
+/// one a lobby and unitsync use. The sizes are in world units, so a map 16 map
+/// size units wide is 8192.
+#[derive(Clone, Debug, PartialEq)]
+pub struct GameConstants {
+    pub map_name: String,
+    pub map_size_x: f64,
+    pub map_size_z: f64,
+}
+
 /// A sandboxed Lua VM whose `VFS` resolves files under one root directory.
 ///
 /// Construct once per file (or per file-tree, since `VFS.Include` chases
@@ -100,6 +111,17 @@ impl SpringLua {
     /// The VFS root this VM resolves against.
     pub fn root(&self) -> &Path {
         &self.root
+    }
+
+    /// Install the engine's `Game` table with the map constants a map or game
+    /// file may read while it is evaluated. Only these three: anything else on
+    /// `Game` reads as nil, as it does without this call.
+    pub fn set_game(&self, game: &GameConstants) -> Result<()> {
+        let table = self.lua.create_table()?;
+        table.set("mapName", game.map_name.as_str())?;
+        table.set("mapSizeX", game.map_size_x)?;
+        table.set("mapSizeZ", game.map_size_z)?;
+        self.lua.globals().set("Game", table)
     }
 
     /// Evaluate `src` (which must `return` a table, as Spring config does) and
