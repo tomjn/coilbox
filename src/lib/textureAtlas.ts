@@ -133,9 +133,10 @@ function better(width: number, height: number, best: AtlasLayout): boolean {
  * A tile's place in the sheet as a UV transform: `u + s * du` for a `s` that was
  * a coordinate into the tile on its own.
  *
- * `v` counts up from the bottom, because that is where a texture's own `v` zero
- * is once the webview has flipped it for OpenGL, while `rect.y` counts down from
- * the top the way a canvas does.
+ * `v` counts down from the top, the same way `rect.y` does, because the sheet
+ * is sampled the way `springTexture` samples each tile on its own: with v = 0
+ * at the top, which is what the engine does with a texture that is not a
+ * `.dds`.
  */
 export interface AtlasPlace {
   u: number;
@@ -152,7 +153,7 @@ export function atlasPlace(
 ): AtlasPlace {
   return {
     u: rect.x / width,
-    v: (height - rect.y - rect.h) / height,
+    v: rect.y / height,
     du: rect.w / width,
     dv: rect.h / height,
   };

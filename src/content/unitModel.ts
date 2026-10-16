@@ -234,6 +234,9 @@ async function buildTextureAtlas(
   );
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 4;
+  // The same way up as each tile on its own, so a face lands on its tile the
+  // way it does when the model is drawn without the sheet. See atlasPlace.
+  texture.flipY = false;
   const place = new Map<string, AtlasPlace>();
   packable.forEach((one, index) => {
     place.set(

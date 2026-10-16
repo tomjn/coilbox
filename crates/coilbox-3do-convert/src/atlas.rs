@@ -106,14 +106,15 @@ impl Rect {
     /// Half a texel in from each edge, which is where a filter samples the
     /// outermost pixel's centre rather than the boundary between two.
     ///
-    /// Rows counted from the bottom, because that is how a texture is sampled:
-    /// the engine flips every texture to OpenGL's order on load and three does
-    /// the same for anything it decodes, so `v` of one is the top row of the
-    /// file. Measuring from the top instead points every face at the empty
-    /// space below the packed tiles and the whole unit draws black.
+    /// Rows counted from the top, because the sheet is a PNG and the engine
+    /// loads a PNG top row first: `CBitmap::Load` sets `IL_ORIGIN_UPPER_LEFT`
+    /// for anything that is not a `.dds` (`rts/Rendering/Textures/Bitmap.cpp`
+    /// line 1308), and an `.s3o`'s UVs reach the shader as they are written. So
+    /// `v` of zero is the top row of the file. Seen in a windowed engine for
+    /// #4174, on a Splinter Faction unit painted with a PNG.
     pub fn for_tile(left: u32, top: u32, width: u32, height: u32, side: u32) -> Self {
         let scale = side as f32;
-        let row = |y: f32| 1.0 - y / scale;
+        let row = |y: f32| y / scale;
         Self {
             u0: (left as f32 + 0.5) / scale,
             v0: row(top as f32 + 0.5),
@@ -285,22 +286,18 @@ mod tests {
         }
     }
 
-    /// The one that made every converted unit render jet black.
-    ///
-    /// A texture is sampled bottom-up: `springTexture.ts` says the engine flips
-    /// every texture to OpenGL's order on load, and three does the same for
-    /// anything it decodes. So `v` of one is the top row of the file. Measuring
-    /// rows from the top instead pointed every face at the empty space below
-    /// the packed tiles, which is transparent black.
+    /// The engine samples a PNG with `v` of zero at its top row (#4174), so a
+    /// face measured the other way points at the empty space below the packed
+    /// tiles, which is transparent black.
     #[test]
-    fn measures_rows_from_the_bottom_the_way_a_texture_is_sampled() {
+    fn measures_rows_from_the_top_the_way_the_engine_samples_a_png() {
         // One small tile on a sheet with room to spare, so it packs at the top
         // and the difference between the two conventions is unmissable.
         let packed = pack(&[tile("a", 8, 10)]).unwrap();
         let a = packed.rects["a"];
 
-        assert!(a.v0 > 0.9, "the top of a tile packed at the top: {a:?}");
-        assert!(a.v1 < a.v0, "a tile's bottom is below its top: {a:?}");
+        assert!(a.v0 < 0.1, "the top of a tile packed at the top: {a:?}");
+        assert!(a.v1 > a.v0, "a tile's bottom is below its top: {a:?}");
     }
 
     #[test]
@@ -341,14 +338,7 @@ mod tests {
         let boxes: Vec<[f32; 4]> = packed
             .rects
             .values()
-            .map(|r| {
-                [
-                    r.u0 * side,
-                    (1.0 - r.v0) * side,
-                    r.u1 * side,
-                    (1.0 - r.v1) * side,
-                ]
-            })
+            .map(|r| [r.u0 * side, r.v0 * side, r.u1 * side, r.v1 * side])
             .collect();
         for (i, a) in boxes.iter().enumerate() {
             for b in &boxes[i + 1..] {
@@ -369,7 +359,7 @@ mod tests {
         // Just outside the tile's own coordinates, which is where a filter
         // reaches and where the border has to be.
         let x = (a.u0 * side - 1.0).round().max(0.0) as u32;
-        let y = ((1.0 - a.v0) * side).round() as u32;
+        let y = (a.v0 * side).round() as u32;
         assert_eq!(packed.image.get_pixel(x, y).0, [10, 10, 10, 255]);
     }
 
@@ -409,8 +399,8 @@ mod tests {
         let packed = pack(&[tile("a", 32, 10), tile("b", 32, 20)]).unwrap();
         let a = packed.rects["a"];
 
-        // Either way round for `v`, because rows are counted from the bottom
-        // and so a tile's top edge is the larger of the two.
+        // Either way round for `v`, so the test says nothing about which edge
+        // is the top. `measures_rows_from_the_top...` says that.
         for (u, v) in [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)] {
             let [su, sv] = a.at(u, v);
             assert!((a.u0..=a.u1).contains(&su), "{su} outside {a:?}");

@@ -296,6 +296,62 @@ describe("newProject", () => {
   });
 });
 
+/**
+ * A unit opened from a `.3do` before #4174 holds UVs that count its sheet's
+ * rows from the bottom. The engine and the builder both count them from the
+ * top now, so those meshes are turned round once, through the same flag the
+ * Flip UVs button sets.
+ */
+describe("parseLegoProjectJson on a .3do imported before #4174", () => {
+  function opened(source: string, extra: Record<string, unknown> = {}) {
+    return {
+      ...project([
+        piece("root", null),
+        { ...piece("hull", "root"), meshId: "m1" },
+        { ...piece("gun", "root"), meshId: "m2", uvFlip: true },
+        piece("flare", "root"),
+      ]),
+      imported: { source, ...extra },
+    };
+  }
+
+  const flips = (doc: unknown) =>
+    parseLegoProjectJson(JSON.stringify(doc))?.pieces.map(
+      (p) => p.uvFlip ?? false,
+    );
+
+  it("turns every imported mesh round, undoing a flip somebody made", () => {
+    const doc = opened("/games/ba.sdd/objects3d/armcom.3do");
+    expect(flips(doc)).toEqual([false, true, false, false]);
+    expect(
+      parseLegoProjectJson(JSON.stringify(doc))?.imported?.sheetFromTop,
+    ).toBe(true);
+  });
+
+  it("does it once, so the document it saves is left alone", () => {
+    const once = parseLegoProjectJson(
+      JSON.stringify(opened("/games/ba.sdd/objects3d/ARMCOM.3DO")),
+    );
+    expect(flips(once)).toEqual([false, true, false, false]);
+  });
+
+  it("leaves a .3do imported since alone", () => {
+    const doc = opened("/games/ba.sdd/objects3d/armcom.3do", {
+      sheetFromTop: true,
+    });
+    expect(flips(doc)).toEqual([false, false, true, false]);
+  });
+
+  it("leaves an .s3o alone, whose UVs were never the sheet's", () => {
+    expect(flips(opened("/games/sf.sdd/objects3d/enuke.s3o"))).toEqual([
+      false,
+      false,
+      true,
+      false,
+    ]);
+  });
+});
+
 describe("parseLegoProjectJson", () => {
   it("round-trips a project it wrote", () => {
     const doc = project([

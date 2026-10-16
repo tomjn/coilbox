@@ -26,6 +26,7 @@ import { hexToRgb, mixTeamColourInto } from "../lib/textureTeamColour";
 import { childrenOf, type LegoProject, pieceById } from "./model";
 import type { LoadedPack } from "./pack";
 import type { RawGeometry } from "./rawGeometry";
+import { importedVZeroAtTop } from "./rawImport";
 import { type BakedPiece, bakedPieces } from "./s3oBuild";
 
 /**
@@ -154,6 +155,12 @@ export async function exportGlb(
     // reason partMaterial in geometry.ts repeats rather than clamps.
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
+    // glTF counts v down from the top, and `GLTFExporter` flips the picture
+    // when the texture asks to be flipped. A part's UVs count up from the
+    // bottom, and so does an imported mesh painted with a .dds, which the
+    // engine flips on load. One painted with anything else is read top row
+    // first by the engine already, so its picture goes in as it is (#4174).
+    texture.flipY = !importedVZeroAtTop(project);
   }
   const material = new THREE.MeshStandardMaterial({ map: texture });
 

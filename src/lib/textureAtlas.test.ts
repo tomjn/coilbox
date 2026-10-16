@@ -123,19 +123,20 @@ describe("packTiles", () => {
 
 describe("atlasPlace", () => {
   /**
-   * A rectangle is measured down from the top of the canvas and a UV up from
-   * the bottom of the texture, because the webview flips a texture on upload.
+   * v counts down from the top of the sheet, the way the canvas's y does,
+   * because the sheet is sampled the way the engine samples a texture it did
+   * not get as a `.dds` (#4174).
    */
-  it("measures v up from the bottom while y counts down from the top", () => {
+  it("measures v down from the top, the same way y counts", () => {
     expect(atlasPlace({ x: 0, y: 0, w: 128, h: 128 }, 512, 512)).toEqual({
       u: 0,
-      v: 0.75,
+      v: 0,
       du: 0.25,
       dv: 0.25,
     });
     expect(atlasPlace({ x: 384, y: 384, w: 128, h: 128 }, 512, 512)).toEqual({
       u: 0.75,
-      v: 0,
+      v: 0.75,
       du: 0.25,
       dv: 0.25,
     });
@@ -151,7 +152,7 @@ describe("placeUvs", () => {
   it("puts the corners of a texture on the corners of its tile", () => {
     const place = atlasPlace({ x: 128, y: 64, w: 64, h: 32 }, 256, 256);
     expect(placeUvs([0, 0, 1, 0, 1, 1, 0, 1], place)).toEqual([
-      0.5, 0.625, 0.75, 0.625, 0.75, 0.75, 0.5, 0.75,
+      0.5, 0.25, 0.75, 0.25, 0.75, 0.375, 0.5, 0.375,
     ]);
   });
 
