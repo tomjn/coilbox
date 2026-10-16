@@ -129,6 +129,9 @@ export interface GameMoveClass {
   kind: MoveKind;
   /** `footprintx`, the width of ground the class paths with, in steps. */
   footprint: number;
+  /** `maxSlope` as the game wrote it, in degrees. Absent when the class does
+   *  not set one, which leaves the kind's default. */
+  maxSlope?: number;
 }
 
 /**
@@ -170,13 +173,57 @@ export function moveDefsOf(moveDefs: unknown[]): GameMoveClass[] {
     const name = field(def, "name");
     if (typeof name !== "string" || name.trim() === "") continue;
     const footprint = Number(field(def, "footprintx"));
+    const rawSlope = field(def, "maxslope");
+    const maxSlope =
+      typeof rawSlope === "string" && rawSlope.trim() === ""
+        ? Number.NaN
+        : Number(rawSlope);
     out.push({
       name: name.trim(),
       kind: moveDefKind(def),
       footprint: Number.isFinite(footprint) ? Math.max(1, footprint) : 1,
+      ...(rawSlope !== undefined &&
+      rawSlope !== null &&
+      Number.isFinite(maxSlope)
+        ? { maxSlope }
+        : {}),
     });
   }
   return out;
+}
+
+/**
+ * The `maxSlope` a class gets when its definition sets none, from
+ * `MoveDefHandler.cpp` lines 233 (tank and kbot, 60) and 238 (hover, 15). A
+ * ship has none (line 243).
+ */
+export const DEFAULT_MAX_SLOPE: Record<MoveKind, number | null> = {
+  tank: 60,
+  kbot: 60,
+  hover: 15,
+  ship: null,
+};
+
+/** The most a `maxSlope` can say, in degrees: the clamp in `DegreesToMaxSlope`
+ *  (`MoveDefHandler.cpp:91`). */
+export const MAX_SLOPE_LIMIT = 60;
+
+/**
+ * The steepest ground a class climbs, in degrees from level, or null for a ship.
+ *
+ * `DegreesToMaxSlope` (`MoveDefHandler.cpp:84`) clamps `maxSlope` to 0 to 60
+ * and multiplies it by 1.5 before the engine compares it with the ground, so
+ * `maxSlope = 15` climbs 22.5 degrees and the most any class climbs is 90.
+ * Ground steeper than the limit is blocked (`slope > maxSlope`,
+ * `GroundMoveMath.cpp:18`), so ground exactly at the limit is climbed.
+ */
+export function climbableDegrees(
+  move: Pick<GameMoveClass, "kind" | "maxSlope">,
+): number | null {
+  const fallback = DEFAULT_MAX_SLOPE[move.kind];
+  if (fallback === null) return null;
+  const set = move.maxSlope ?? fallback;
+  return Math.min(MAX_SLOPE_LIMIT, Math.max(0, set)) * 1.5;
 }
 
 /**

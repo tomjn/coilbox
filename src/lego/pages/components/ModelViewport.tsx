@@ -1464,6 +1464,7 @@ export function ModelViewport({
               ground={ground.choice}
               onGround={ground.onChange}
               shape={ground.shape}
+              movement={project.movement}
             />
             <ReferencePicker
               unit={{ project, pack, raw }}

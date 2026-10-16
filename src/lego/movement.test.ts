@@ -6,6 +6,7 @@ import {
   movementState,
   movesInGame,
   offerMoveClasses,
+  slopeVerdict,
   suggestMotion,
 } from "./movement";
 
@@ -215,6 +216,61 @@ describe("a project's movement", () => {
     };
     expect(parseLegoProjectJson(JSON.stringify(saved))?.movement).toEqual(
       saved.movement,
+    );
+  });
+});
+
+describe("slopeVerdict", () => {
+  const moveDefs = [
+    { name: "HOVER2", maxslope: 15 },
+    { name: "TANK2" },
+    { name: "TANK3", maxslope: 20 },
+    { name: "BOAT2" },
+  ];
+
+  it("compares the angle with 1.5 times maxSlope", () => {
+    const movement = { moveClass: "HOVER2" };
+    expect(slopeVerdict(movement, { moveDefs }, 22.5)).toBe(
+      "HOVER2 can climb this: it climbs up to 22.5\u00b0 (maxSlope 15).",
+    );
+    expect(slopeVerdict(movement, { moveDefs }, 22.6)).toBe(
+      "HOVER2 cannot climb this: it climbs up to 22.5\u00b0 (maxSlope 15).",
+    );
+    expect(slopeVerdict(movement, { moveDefs }, 15)).toContain("can climb");
+  });
+
+  it("clamps maxSlope at 60, so the most a class climbs is 90", () => {
+    const hill = [{ name: "TANK9", maxslope: 200 }];
+    expect(
+      slopeVerdict({ moveClass: "TANK9" }, { moveDefs: hill }, 89),
+    ).toContain("can climb this: it climbs up to 90\u00b0");
+  });
+
+  it("says when the maxSlope is the kind's default", () => {
+    expect(slopeVerdict({ moveClass: "tank2" }, { moveDefs }, 45)).toBe(
+      "tank2 can climb this: it climbs up to 90\u00b0 (default maxSlope 60).",
+    );
+  });
+
+  it("does not assume the default when the class cannot be read", () => {
+    const unknown = "Climbing limit unknown";
+    expect(
+      slopeVerdict({ moveClass: "TANK2" }, { moveDefs: [] }, 30),
+    ).toContain(unknown);
+    expect(slopeVerdict({ moveClass: "NOPE" }, { moveDefs }, 30)).toContain(
+      unknown,
+    );
+    expect(slopeVerdict({ moveClass: "TANK2" }, null, 30)).toContain(unknown);
+  });
+
+  it("says nothing about climbing for a static unit", () => {
+    expect(slopeVerdict(undefined, { moveDefs }, 30)).toBeNull();
+    expect(slopeVerdict({ moveClass: " " }, { moveDefs }, 30)).toBeNull();
+  });
+
+  it("says a ship has no maxSlope", () => {
+    expect(slopeVerdict({ moveClass: "BOAT2" }, { moveDefs }, 10)).toBe(
+      "BOAT2 is a ship class, which has no maxSlope.",
     );
   });
 });

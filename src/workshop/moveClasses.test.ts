@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  climbableDegrees,
   moveClassesOf,
   moveClassOf,
   moveClassProblem,
@@ -128,6 +129,35 @@ describe("moveDefsOf", () => {
       { name: "WHEELEDTANK2", kind: "tank", footprint: 2 },
       { name: "KBOT1", kind: "kbot", footprint: 1 },
     ]);
+  });
+});
+
+describe("maxSlope", () => {
+  it("is carried through when the class sets one, and absent when not", () => {
+    expect(
+      moveDefsOf([
+        { name: "HOVER2", maxslope: 15 },
+        { name: "TANK2", maxSlope: "30" },
+        { name: "KBOT1" },
+      ]).map((entry) => entry.maxSlope),
+    ).toEqual([15, 30, undefined]);
+  });
+
+  it("climbs 1.5 times the maxSlope written", () => {
+    expect(climbableDegrees({ kind: "hover", maxSlope: 15 })).toBe(22.5);
+    expect(climbableDegrees({ kind: "tank", maxSlope: 20 })).toBe(30);
+  });
+
+  it("clamps the maxSlope to 0 to 60 before the factor", () => {
+    expect(climbableDegrees({ kind: "tank", maxSlope: 80 })).toBe(90);
+    expect(climbableDegrees({ kind: "tank", maxSlope: -5 })).toBe(0);
+  });
+
+  it("falls back to the kind's default, and a ship has none", () => {
+    expect(climbableDegrees({ kind: "hover" })).toBe(22.5);
+    expect(climbableDegrees({ kind: "tank" })).toBe(90);
+    expect(climbableDegrees({ kind: "kbot" })).toBe(90);
+    expect(climbableDegrees({ kind: "ship", maxSlope: 10 })).toBeNull();
   });
 });
 
