@@ -34,6 +34,10 @@ export interface SceneState {
   controls: OrbitControls;
   gizmo: TransformControls;
   root: THREE.Group;
+  /** Holds the collision volume, the piece boxes, their handles and the aim
+   *  point, and is posed like `root` so they sit on the unit while a preview
+   *  drives or tilts it. At the origin, untouched, the rest of the time. */
+  overlay: THREE.Group;
   /** What the gizmo drags for a set: an empty object at the set's midpoint.
    *  Never in the document, never exported. */
   groupPivot: THREE.Object3D;

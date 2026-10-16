@@ -60,7 +60,7 @@ export function showCollisionVolume(
   lines.renderOrder = 4;
   lines.raycast = () => {};
   state.collision = lines;
-  state.scene.add(lines);
+  state.overlay.add(lines);
 }
 
 /**
@@ -133,7 +133,7 @@ export function showPieceCollisionVolumes(
     state.pieceCollisionBoxes.set(pieceId, lines);
   }
   state.pieceCollision = group;
-  state.scene.add(group);
+  state.overlay.add(group);
 }
 
 /** Free the per-piece boxes. Each carries its own geometry, and they share the

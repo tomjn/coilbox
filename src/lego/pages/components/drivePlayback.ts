@@ -38,6 +38,16 @@ function poseOn(state: SceneState, frame: number): DriveFrame | null {
 }
 
 /**
+ * Put the overlay group where the unit is. The collision volume, the piece
+ * boxes, their handles and the aim point live in it, so they are drawn on the
+ * unit while it drives or tilts, and at the origin the rest of the time.
+ */
+export function syncOverlay(state: Pick<SceneState, "root" | "overlay">) {
+  state.overlay.position.copy(state.root.position);
+  state.overlay.quaternion.copy(state.root.quaternion);
+}
+
+/**
  * Say which drive is playing, or that none is. Ending one puts the unit and
  * the camera back, which a scenario switched mid-playback needs as much as a
  * stop does.
@@ -61,6 +71,7 @@ export function poseRoot(state: SceneState, frame: number) {
   if (pose.up) TILT.setFromUnitVectors(UP, NORMAL.set(...pose.up));
   else TILT.identity();
   state.root.quaternion.multiplyQuaternions(TILT, YAW);
+  syncOverlay(state);
 }
 
 /**
@@ -103,6 +114,7 @@ export function restoreFromDrive(state: SceneState) {
   state.drive = null;
   state.root.position.set(0, 0, 0);
   state.root.quaternion.copy(state.restTilt);
+  syncOverlay(state);
   returnCamera(state);
 }
 

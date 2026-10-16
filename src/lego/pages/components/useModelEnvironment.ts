@@ -8,6 +8,7 @@ import {
   disposeReferenceUnit,
 } from "../../referenceObject";
 import { applySceneScale } from "./cameraFraming";
+import { syncOverlay } from "./drivePlayback";
 import type { GameReferenceChoice } from "./ReferencePicker";
 import {
   applyBackdrop,
@@ -138,7 +139,10 @@ export function useModelEnvironment(
       state.restTilt.identity();
     }
     // A drive turns the unit itself, on every frame it poses.
-    if (!state.drive) state.root.quaternion.copy(state.restTilt);
+    if (!state.drive) {
+      state.root.quaternion.copy(state.restTilt);
+      syncOverlay(state);
+    }
     state.render();
   }, [sceneRef, previewing, upX, upY, upZ]);
 }
