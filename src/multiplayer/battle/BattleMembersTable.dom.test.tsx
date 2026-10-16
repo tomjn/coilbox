@@ -333,3 +333,24 @@ describe("compact rows (#4187)", () => {
     expect(subtitle.parentElement).toBe(name.parentElement);
   });
 });
+
+describe("giving way to the chat (#4186)", () => {
+  const card = (container: HTMLElement) => container.firstElementChild;
+
+  it("scrolls inside a floor instead of a fixed viewport cap", () => {
+    const { container } = renderTable([row({ name: "me", self: true })]);
+    const cls = card(container)?.className ?? "";
+    expect(cls).toContain("overflow-auto");
+    expect(cls).toContain("min-h-24");
+    expect(cls).not.toContain("max-h-");
+  });
+
+  it("scrolls the spectator list with the table", () => {
+    const { container } = renderTable([
+      row({ name: "me", self: true }),
+      row({ name: "watcher", spectator: true }),
+    ]);
+    const chips = screen.getByText("Spectating").parentElement;
+    expect(card(container)?.contains(chips)).toBe(true);
+  });
+});
