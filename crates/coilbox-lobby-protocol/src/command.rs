@@ -634,6 +634,33 @@ mod tests {
     }
 
     #[test]
+    fn bot_lines_carry_the_faction_in_the_battle_status() {
+        // Mode (bit 10) is 1024 and side (bits 24 to 27) is 1 << 24, so a bot
+        // on faction 1 packs to 16778240 and faction 0 to 1024.
+        let status = |side| BattleStatus {
+            ready: false,
+            team_id: 0,
+            ally: 0,
+            mode: true,
+            handicap: 0,
+            sync: 0,
+            side,
+        };
+        assert_eq!(
+            update_bot("Bot1", status(1), 255),
+            "UPDATEBOT Bot1 16778240 255"
+        );
+        assert_eq!(
+            update_bot("Bot1", status(0), 255),
+            "UPDATEBOT Bot1 1024 255"
+        );
+        assert_eq!(
+            add_bot("Bot1", status(1), 255, "BARb"),
+            "ADDBOT Bot1 16778240 255 BARb"
+        );
+    }
+
+    #[test]
     fn my_battle_status_line() {
         let l = my_battle_status(default_battle_status(), 255);
         let expected = format!("MYBATTLESTATUS {} 255", default_battle_status().to_int());
