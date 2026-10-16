@@ -560,12 +560,15 @@ function walkEmit(preset: AnimPreset, ctx: EmitContext): EmitResult | null {
 function aimSpeeds(
   preset: AnimPreset,
   params: Record<string, number>,
-): { turn: string; lift: string } {
+): { turn: string | null; lift: string | null } {
   const quarter = Math.max(value(preset, params, "period"), 0.05) / 4;
-  return {
-    turn: lua(deg(value(preset, params, "sweep")) / quarter),
-    lift: lua(deg(value(preset, params, "pitch")) / quarter),
+  // A Turn at speed 0 is the engine's "turn there now", so a slider at 0 gets
+  // no Turn at all and the piece holds still, as it does in the preview.
+  const speed = (id: string) => {
+    const angle = value(preset, params, id);
+    return angle > 0 ? lua(deg(angle) / quarter) : null;
   };
+  return { turn: speed("sweep"), lift: speed("pitch") };
 }
 
 export const TURRET_TRACK: AnimPreset = {
@@ -634,10 +637,14 @@ export const TURRET_TRACK: AnimPreset = {
     const aim = [
       `  Signal(${ctx.signal})`,
       `  SetSignalMask(${ctx.signal})`,
-      `  Turn(${turret}, y_axis, heading, ${speed.turn})`,
-      ...(barrel ? [`  Turn(${barrel}, x_axis, -pitch, ${speed.lift})`] : []),
-      `  WaitForTurn(${turret}, y_axis)`,
-      ...(barrel ? [`  WaitForTurn(${barrel}, x_axis)`] : []),
+      ...(speed.turn
+        ? [`  Turn(${turret}, y_axis, heading, ${speed.turn})`]
+        : []),
+      ...(barrel && speed.lift
+        ? [`  Turn(${barrel}, x_axis, -pitch, ${speed.lift})`]
+        : []),
+      ...(speed.turn ? [`  WaitForTurn(${turret}, y_axis)`] : []),
+      ...(barrel && speed.lift ? [`  WaitForTurn(${barrel}, x_axis)`] : []),
       "  return true",
     ];
 
@@ -1215,10 +1222,14 @@ export const AIM_TRACK: AnimPreset = {
         AimWeapon1: [
           `  Signal(${ctx.signal})`,
           `  SetSignalMask(${ctx.signal})`,
-          `  Turn(${aim}, y_axis, heading, ${speed.turn})`,
-          `  Turn(${aim}, x_axis, -pitch, ${speed.lift})`,
-          `  WaitForTurn(${aim}, y_axis)`,
-          `  WaitForTurn(${aim}, x_axis)`,
+          ...(speed.turn
+            ? [`  Turn(${aim}, y_axis, heading, ${speed.turn})`]
+            : []),
+          ...(speed.lift
+            ? [`  Turn(${aim}, x_axis, -pitch, ${speed.lift})`]
+            : []),
+          ...(speed.turn ? [`  WaitForTurn(${aim}, y_axis)`] : []),
+          ...(speed.lift ? [`  WaitForTurn(${aim}, x_axis)`] : []),
           "  return true",
         ],
         AimFromWeapon1: [`  return ${aim}`],

@@ -64,6 +64,14 @@ const LUA_ROUNDING = 0.5e-4;
 /** When the call-in that starts a preset fires, after `Create` has finished. */
 const CALLIN = at(0.5);
 
+/**
+ * Where a target sits when a sweep or lift slider is at 0. The piece is meant
+ * to hold still, so the call-in is given a heading and pitch it would snap to
+ * if the script turned it (#4120).
+ */
+const UNTRAVELLED_HEADING = 30;
+const UNTRAVELLED_PITCH = 10;
+
 const deg = (degrees: number) => (degrees * Math.PI) / 180;
 
 function param(
@@ -197,8 +205,8 @@ function aimPlan(preset: AnimPreset, params: Record<string, number>): Plan {
         frame: CALLIN,
         callin: "AimWeapon1",
         args: [
-          deg(param(preset, params, "sweep")),
-          deg(param(preset, params, "pitch")),
+          deg(param(preset, params, "sweep") || UNTRAVELLED_HEADING),
+          deg(param(preset, params, "pitch") || UNTRAVELLED_PITCH),
         ],
       },
     ],
@@ -486,6 +494,14 @@ function paramSets(
   const timing = new Set(["s", "hz", "deg/s"]);
   return [
     { label: "defaults", params: {} },
+    ...(preset.params.some((entry) => entry.id === "sweep")
+      ? [
+          {
+            label: "no travel",
+            params: { sweep: 0, pitch: 0 },
+          },
+        ]
+      : []),
     {
       label: "lowest",
       params: Object.fromEntries(
