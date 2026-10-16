@@ -179,12 +179,83 @@ function value(
 
 const AXES = ["x_axis", "y_axis", "z_axis"];
 /**
- * Poses per cycle in a generated thread.
+ * The fewest poses per cycle in a generated thread.
  *
  * Four is the fewest that reads as motion. Two would sample a sine at its
- * zero crossings and emit a thread that stands still.
+ * zero crossings and emit a thread that stands still. `cycleSteps` adds more
+ * where four would cut the curve's corners by more than a frame.
  */
 const CYCLE_STEPS = 4;
+
+/** Sim frames per second, the engine's `GAME_SPEED`. */
+const ENGINE_FPS = 30;
+
+/**
+ * Milliseconds per frame as `Sleep` counts them. The framework's `Sleep` waits
+ * `floor(ms / 33)` frames (`LuaGadgets/Gadgets/unit_script.lua`), so a sleep
+ * written as a whole number of these lasts exactly that many frames.
+ */
+const SLEEP_FRAME_MS = 33;
+
+/**
+ * The frames a cycle thread's poses fall on, from 0 to one whole cycle.
+ *
+ * Whole frames, because the engine moves a piece once a frame and `Sleep`
+ * waits whole frames. A step whose length is not a whole number of frames
+ * sleeps short, and the cycle runs faster than `track` says.
+ *
+ * A Turn or a Move goes at one speed, so between two poses the piece moves in
+ * a straight line while `track` follows a curve. This takes the fewest steps,
+ * starting at `CYCLE_STEPS`, for which no piece strays from the curve by more
+ * than the curve itself moves in one frame. Closer than that is finer than the
+ * engine can show. A slow cycle needs more steps than a fast one, because its
+ * one frame of motion is smaller.
+ */
+export function cycleSteps(
+  preset: AnimPreset,
+  params: Record<string, number>,
+  period: number,
+): number[] {
+  const frames = Math.max(1, Math.round(period * ENGINE_FPS));
+  const curves: number[][] = [];
+  for (const role of preset.animates) {
+    const samples = Array.from({ length: frames + 1 }, (_, frame) =>
+      preset.track(frame / ENGINE_FPS, params, role),
+    );
+    for (const key of ["position", "rotation"] as const) {
+      for (let axis = 0; axis < 3; axis++) {
+        curves.push(samples.map((delta) => delta?.[key]?.[axis] ?? 0));
+      }
+    }
+  }
+
+  for (let steps = Math.min(CYCLE_STEPS, frames); ; steps++) {
+    const bounds = [
+      ...new Set(
+        Array.from({ length: steps + 1 }, (_, step) =>
+          Math.round((step * frames) / steps),
+        ),
+      ),
+    ];
+    if (steps >= frames) return bounds;
+    const close = curves.every((curve) => {
+      let travel = 0;
+      for (let frame = 1; frame <= frames; frame++) {
+        travel = Math.max(travel, Math.abs(curve[frame] - curve[frame - 1]));
+      }
+      for (let index = 1; index < bounds.length; index++) {
+        const [a, b] = [bounds[index - 1], bounds[index]];
+        for (let frame = a; frame <= b; frame++) {
+          const line =
+            curve[a] + ((curve[b] - curve[a]) * (frame - a)) / (b - a);
+          if (Math.abs(curve[frame] - line) > travel) return false;
+        }
+      }
+      return true;
+    });
+    if (close) return bounds;
+  }
+}
 
 function lua(n: number): string {
   // Fixed precision, so the same project always writes the same file.
@@ -204,6 +275,11 @@ interface CyclePose {
  * Turn and Move speeds are worked out from how far each piece has to travel in
  * the time the step allows, so the pose is reached rather than overshot or
  * lagged.
+ *
+ * Each step turns towards the next pose and sleeps until it is there, so the
+ * thread is where `track` is at the same time after it starts, once the first
+ * lap has brought it in from rest. `presetParity.test.ts` checks that against
+ * the runtime.
  */
 function cycleThread(
   preset: AnimPreset,
@@ -215,14 +291,15 @@ function cycleThread(
   );
   if (targets.length === 0) return null;
 
-  const stepSeconds = options.period / CYCLE_STEPS;
+  const bounds = cycleSteps(preset, ctx.params, options.period);
+  const count = bounds.length - 1;
 
   // Sample the whole cycle before writing any of it. A step's move is measured
   // against the step before it, and the first step follows the last, because
   // the thread loops. Measuring the first against a rest pose would be right
   // once and wrong on every lap after that.
-  const poses = Array.from({ length: CYCLE_STEPS }, (_, step) => {
-    const t = (step / CYCLE_STEPS) * options.period;
+  const poses = Array.from({ length: count }, (_, step) => {
+    const t = bounds[step] / ENGINE_FPS;
     const pose = new Map<string, CyclePose>();
     for (const { role, piece } of targets) {
       const delta = preset.track(t, ctx.params, role);
@@ -242,9 +319,13 @@ function cycleThread(
   const movedRotation = new Map<string, Set<number>>();
   const movedPosition = new Map<string, Set<number>>();
 
-  for (let step = 0; step < CYCLE_STEPS; step++) {
-    const before = poses[(step + CYCLE_STEPS - 1) % CYCLE_STEPS];
-    for (const [piece, pose] of poses[step]) {
+  // Step k heads for pose k, from pose k - 1, and the last heads back round to
+  // the first, which is what the loop then starts from again.
+  for (let step = 1; step <= count; step++) {
+    const frames = bounds[step] - bounds[step - 1];
+    const stepSeconds = frames / ENGINE_FPS;
+    const before = poses[step - 1];
+    for (const [piece, pose] of poses[step % count]) {
       const was = before.get(piece);
       if (pose.rotation) {
         const from = was?.rotation ?? [0, 0, 0];
@@ -277,7 +358,7 @@ function cycleThread(
         }
       }
     }
-    body.push(`    Sleep(${Math.round(stepSeconds * 1000)})`);
+    body.push(`    Sleep(${frames * SLEEP_FRAME_MS})`);
   }
 
   // Back to rest on stop, or the unit keeps whatever pose it stopped in. Only
@@ -468,6 +549,25 @@ function walkEmit(preset: AnimPreset, ctx: EmitContext): EmitResult | null {
   };
 }
 
+/**
+ * How fast an aim preset turns and lifts, in radians per second, as Lua.
+ *
+ * Fast enough to land when the preview does. Its sweep is furthest out, at the
+ * full turn and the full lift, a quarter of the sweep time in, and a Turn goes
+ * at one speed, so each angle over that quarter is its own speed. An angle of
+ * nothing gives a speed of nothing, which the engine takes as instant.
+ */
+function aimSpeeds(
+  preset: AnimPreset,
+  params: Record<string, number>,
+): { turn: string; lift: string } {
+  const quarter = Math.max(value(preset, params, "period"), 0.05) / 4;
+  return {
+    turn: lua(deg(value(preset, params, "sweep")) / quarter),
+    lift: lua(deg(value(preset, params, "pitch")) / quarter),
+  };
+}
+
 export const TURRET_TRACK: AnimPreset = {
   id: "turret.track",
   label: "Turret sweep",
@@ -529,13 +629,13 @@ export const TURRET_TRACK: AnimPreset = {
     if (!turret) return null;
     const barrel = ctx.pieces("barrel")[0];
     const flare = ctx.pieces("flare")[0];
-    const speed = lua(deg(value(this, ctx.params, "sweep")));
+    const speed = aimSpeeds(this, ctx.params);
 
     const aim = [
       `  Signal(${ctx.signal})`,
       `  SetSignalMask(${ctx.signal})`,
-      `  Turn(${turret}, y_axis, heading, ${speed})`,
-      ...(barrel ? [`  Turn(${barrel}, x_axis, -pitch, ${speed})`] : []),
+      `  Turn(${turret}, y_axis, heading, ${speed.turn})`,
+      ...(barrel ? [`  Turn(${barrel}, x_axis, -pitch, ${speed.lift})`] : []),
       `  WaitForTurn(${turret}, y_axis)`,
       ...(barrel ? [`  WaitForTurn(${barrel}, x_axis)`] : []),
       "  return true",
@@ -669,35 +769,28 @@ export const BUILDARM: AnimPreset = {
  * one that only showed the hold would look like nothing. Each leg is a swing
  * followed by a hold, and the two legs aim opposite ways.
  */
-const BUILD_PREVIEW_LEG = 3;
-/** The most of a leg the swing may take, so there is always a hold to see. */
-const BUILD_PREVIEW_SWING = 2 / 3;
+export const BUILD_PREVIEW_LEG = 3;
 
 /** Where the preview aims on each leg, in degrees of heading and pitch. */
-const BUILD_PREVIEW_AIM: [number, number][] = [
+export const BUILD_PREVIEW_AIM: [number, number][] = [
   [40, -12],
   [-35, 8],
 ];
 
 /**
- * Eased 0 to 1 over the swing, then held at 1, given a position within one leg.
+ * How far through its swing a piece is, 0 to 1, given a position within one
+ * leg.
  *
- * How long the swing takes is the angle divided by the speed, which is what
- * `Turn` does in a game, so the sliders change the preview and not only the
- * exported script. Capped at part of a leg, because a preview whose swing fills
- * the whole leg never shows the hold, and a hold is most of what a builder does.
- *
- * Cosine rather than linear, because a piece starts and stops against the rest
- * of the model, and a linear ramp in a six second loop reads as a machine part
- * sliding rather than an arm swinging.
+ * At one speed from start to finish, the angle divided by the speed, because
+ * that is what `Turn` does in a game. The sliders change the preview and not
+ * only the exported script, and a slow arm that would still be swinging when
+ * the leg ends is still swinging in the preview too. This used to ease in and
+ * out along a cosine and to cap the swing at two seconds, and neither has a
+ * counterpart in the engine.
  */
 function buildSwing(phase: number, angle: number, speed: number): number {
-  const swing = Math.min(
-    BUILD_PREVIEW_LEG * BUILD_PREVIEW_SWING,
-    Math.abs(angle) / Math.max(speed, 1),
-  );
-  if (phase >= swing) return 1;
-  return (1 - Math.cos((phase / swing) * Math.PI)) * 0.5;
+  if (angle === 0) return 1;
+  return Math.min(1, (phase * Math.max(speed, 1)) / Math.abs(angle));
 }
 
 export const BUILD_AIM: AnimPreset = {
@@ -807,6 +900,25 @@ export const BUILD_AIM: AnimPreset = {
   },
 };
 
+/**
+ * The widest a factory's doors open, in degrees.
+ *
+ * Short of half a turn, because `Turn` takes the shortest way round
+ * (`CUnitScript::TurnToward`), and from shut half a turn is as short backwards
+ * as forwards. At 180 the engine swung the doors open the wrong way. 170 is
+ * where the Doors preset's own slider stops.
+ */
+const FACTORY_MAX_OPEN = 170;
+
+/** The opening a factory preset asks for, held under `FACTORY_MAX_OPEN` so a
+ *  project saved while the slider went to 180 opens the right way too. */
+function factoryOpening(
+  preset: AnimPreset,
+  params: Record<string, number>,
+): number {
+  return Math.min(value(preset, params, "open"), FACTORY_MAX_OPEN);
+}
+
 export const BUILD_FACTORY: AnimPreset = {
   id: "build.factory",
   label: "Factory build cycle",
@@ -820,7 +932,7 @@ export const BUILD_FACTORY: AnimPreset = {
       label: "Opening",
       unit: "deg",
       min: 10,
-      max: 180,
+      max: FACTORY_MAX_OPEN,
       step: 5,
       fallback: 100,
     },
@@ -842,19 +954,21 @@ export const BUILD_FACTORY: AnimPreset = {
     const at = t - Math.floor(t / cycle) * cycle;
     const building = at < BUILD_PREVIEW_LEG;
     const phase = at - (building ? 0 : BUILD_PREVIEW_LEG);
-    const open = value(this, params, "open");
     // The doors travel their whole opening in the time the slider asks for,
     // whichever way they are going, so the preview matches the emitted speed.
-    const speed = open / Math.max(value(this, params, "openTime"), 0.05);
+    // Doors slower than a leg are still opening when the build stops, and
+    // `StopBuilding` shuts them from there, so the gap does too.
+    const openTime = Math.max(value(this, params, "openTime"), 0.05);
+    const reached = Math.min(1, BUILD_PREVIEW_LEG / openTime);
     const towards = building
-      ? buildSwing(phase, open, speed)
-      : 1 - buildSwing(phase, open, speed);
-    return { rotation: [0, deg(open) * towards, 0] };
+      ? Math.min(1, phase / openTime)
+      : Math.max(0, reached - phase / openTime);
+    return { rotation: [0, deg(factoryOpening(this, params)) * towards, 0] };
   },
   emit(ctx) {
     const doors = ctx.pieces("door");
     if (doors.length === 0) return null;
-    const open = value(this, ctx.params, "open");
+    const open = factoryOpening(this, ctx.params);
     const speed = lua(
       deg(open) / Math.max(value(this, ctx.params, "openTime"), 0.05),
     );
@@ -1093,7 +1207,7 @@ export const AIM_TRACK: AnimPreset = {
   emit(ctx) {
     const aim = ctx.pieces("aim")[0];
     if (!aim) return null;
-    const speed = lua(deg(value(this, ctx.params, "sweep")));
+    const speed = aimSpeeds(this, ctx.params);
 
     return {
       functions: [],
@@ -1101,8 +1215,8 @@ export const AIM_TRACK: AnimPreset = {
         AimWeapon1: [
           `  Signal(${ctx.signal})`,
           `  SetSignalMask(${ctx.signal})`,
-          `  Turn(${aim}, y_axis, heading, ${speed})`,
-          `  Turn(${aim}, x_axis, -pitch, ${speed})`,
+          `  Turn(${aim}, y_axis, heading, ${speed.turn})`,
+          `  Turn(${aim}, x_axis, -pitch, ${speed.lift})`,
           `  WaitForTurn(${aim}, y_axis)`,
           `  WaitForTurn(${aim}, x_axis)`,
           "  return true",
@@ -1121,7 +1235,7 @@ export const AIM_TRACK: AnimPreset = {
  * whenever the weapon does and nothing else. It only exists so a preview at
  * rest keeps demonstrating the motion instead of firing once and going still.
  */
-const RECOIL_PREVIEW_PAUSE = 0.6;
+export const RECOIL_PREVIEW_PAUSE = 0.6;
 
 export const RECOIL: AnimPreset = {
   id: "recoil",

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   AIM_TRACK,
+  BUILD_FACTORY,
   BUILDARM,
   countRoles,
   ENGINE_ROTATION_ORDER,
@@ -429,6 +430,16 @@ describe("wreck.pose", () => {
 
   it("leaves every other role alone", () => {
     expect(WRECK_POSE.track(0, params, "turret")).toBeNull();
+  });
+});
+
+describe("build.factory", () => {
+  it("opens a door saved at half a turn no wider than the slider allows", () => {
+    // Half a turn is as short backwards as forwards, so the engine opened a
+    // door asked for 180 degrees the wrong way round.
+    const max = BUILD_FACTORY.params.find((p) => p.id === "open")?.max ?? 0;
+    expect(max).toBeLessThan(180);
+    expect(yaw(BUILD_FACTORY, 2.5, "door", { open: 180 })).toBe(max);
   });
 });
 
