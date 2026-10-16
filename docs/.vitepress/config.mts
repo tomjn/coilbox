@@ -202,6 +202,10 @@ export default defineConfig({
           text: "Units",
           items: [
             { text: "Unit builder", link: "/developers/lego-builder" },
+            {
+              text: "What the engine reloads",
+              link: "/developers/engine-reload",
+            },
             { text: "Unit tweaks", link: "/developers/unit-tweaks" },
             {
               text: "Convert and compile unit scripts",

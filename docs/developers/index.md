@@ -30,6 +30,7 @@ Most of the tools here are hidden until you turn on Advanced mode in Settings > 
 ## Units
 
 - [Unit builder](lego-builder.md). Assemble a unit from textured parts, animate it from a preset and write it into a game.
+- [What the engine reloads in a running game](engine-reload.md). Which parts of a unit the engine can swap while a game runs, how, and what a restart costs.
 - [Unit tweaks](unit-tweaks.md). Change a game's units and weapons in a project, compare them in a table, test the result and package it as a game of its own or as tweak slot lines for a lobby.
 - [Convert and compile unit scripts](animation-tools.md). Turn a BOS script into a Lua unit script, compile BOS to COB, and read a COB file back as source.
 

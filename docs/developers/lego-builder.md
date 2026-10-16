@@ -297,6 +297,8 @@ Cheats have to be on before `/give` does anything. Spawning is left to you: `/gi
 
 You need an engine, at least one game and at least one map installed. The drawer says which of those is missing rather than failing at launch.
 
+After an edit you quit and test again. [What the engine reloads in a running game](engine-reload.md) explains why only a script could be swapped into a running game.
+
 ### Check it loads
 
 **Check it loads**, under Launch in the same drawer, plays the same scratch game with no window. It spawns the unit, runs it for 15 seconds of game time, the same stretch the animation preview plays, and lists what the engine said about it: a script that threw or did not compile, a piece the script names and the model lacks, a model file that is missing, a definition that did not parse, and a texture the model names that is not there. When the game itself fails to start with the unit in it, the drawer shows the engine's reason.
