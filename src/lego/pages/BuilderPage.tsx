@@ -7,6 +7,7 @@ import {
   Copy,
   FlipHorizontal2,
   FlipVertical2,
+  ImageIcon,
   Maximize2,
   Minimize2,
   PanelRightClose,
@@ -49,6 +50,7 @@ import { addAnchor, removeAnchor, updateAnchor } from "../anchors";
 import { ROLES, restAngleWarnings } from "../animPresets";
 import { unitAtlas } from "../atlas";
 import { legoTexturePrune } from "../bindings";
+import { pictureIsStale } from "../buildPicture";
 import { parseClipboardPiece, serializeClipboardPiece } from "../clipboard";
 import { reanchorCollisionVolume } from "../collisionVolume";
 import { selectionAsCompound } from "../compounds";
@@ -113,6 +115,7 @@ import { AimPointPanel } from "./components/AimPointPanel";
 import { AnchorList } from "./components/AnchorList";
 import { AnimationPanel } from "./components/AnimationPanel";
 import { AtlasPicker } from "./components/AtlasPicker";
+import { BuildPictureDrawer } from "./components/BuildPictureDrawer";
 import { CollisionPanel } from "./components/CollisionPanel";
 import { CompoundPicker } from "./components/CompoundPicker";
 import { ExportDrawer } from "./components/ExportDrawer";
@@ -208,6 +211,7 @@ function Builder({ id }: { id: string | undefined }) {
   >("pieces");
   const [exporting, setExporting] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [picturing, setPicturing] = useState(false);
   const [playing, setPlaying] = useState(false);
   /**
    * What playing means for a unit that owns its script: the poses a run of that
@@ -926,6 +930,14 @@ function Builder({ id }: { id: string | undefined }) {
           onStale={setStaleExports}
         />
 
+        <BuildPictureDrawer
+          open={picturing}
+          onOpenChange={setPicturing}
+          project={draft}
+          capture={doc.capture}
+          onTaken={(picture) => edit((project) => ({ ...project, picture }))}
+        />
+
         <TestDrawer
           open={testing}
           onOpenChange={setTesting}
@@ -1081,6 +1093,30 @@ function Builder({ id }: { id: string | undefined }) {
                               </TooltipTrigger>
                               <TooltipContent side="bottom">
                                 Test in game
+                              </TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  className="relative"
+                                  onClick={() => setPicturing(true)}
+                                  aria-label="Build picture"
+                                >
+                                  <ImageIcon size={14} />
+                                  {pictureIsStale(draft) ? (
+                                    <span
+                                      aria-hidden="true"
+                                      className="absolute top-1 right-1 size-2 rounded-full bg-primary"
+                                    />
+                                  ) : null}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">
+                                {pictureIsStale(draft)
+                                  ? "Build picture - the unit has changed since it was taken"
+                                  : "Build picture"}
                               </TooltipContent>
                             </Tooltip>
                             {/* Only a unit that came from a file has a model to save

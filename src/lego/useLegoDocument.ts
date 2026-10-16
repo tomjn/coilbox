@@ -26,6 +26,7 @@ import {
   saveThumbnail,
   useLegoProjects,
 } from "./projects";
+import type { Capture } from "./thumbnail";
 
 /**
  * How long the first look at a unit waits for it to become drawable. Long
@@ -70,7 +71,10 @@ export interface LegoDocumentSession {
   duplicate: (pieceIds: string[]) => string[];
   /** How the viewport hands over the means to grab a thumbnail. The capture
    *  answers null while there is nothing to photograph. */
-  onCapture: (capture: () => HTMLCanvasElement | null) => void;
+  onCapture: (capture: Capture) => void;
+  /** Takes a picture of the unit now, or answers null while there is none to
+   *  take. With a shot it is a build picture rather than the thumbnail. */
+  capture: Capture;
 }
 
 /**
@@ -83,8 +87,14 @@ export function useLegoDocument(id: string | undefined): LegoDocumentSession {
 
   const [state, dispatch] = useReducer(reduceDocument, emptyDocument);
   const [saving, setSaving] = useState(false);
-  const captureRef = useRef<(() => HTMLCanvasElement | null) | null>(null);
+  const captureRef = useRef<Capture | null>(null);
   const project = state.project;
+  // Stable, because the build picture drawer takes a fresh preview whenever this
+  // changes.
+  const capture = useCallback<Capture>(
+    (shot) => captureRef.current?.(shot) ?? null,
+    [],
+  );
 
   useEffect(() => {
     if (stored) dispatch({ type: "open", project: stored });
@@ -266,5 +276,6 @@ export function useLegoDocument(id: string | undefined): LegoDocumentSession {
     onCapture: (capture) => {
       captureRef.current = capture;
     },
+    capture,
   };
 }
