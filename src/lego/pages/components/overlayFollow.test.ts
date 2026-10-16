@@ -21,12 +21,12 @@ function scene() {
     ["arm", [10, 0, 0]],
   ] as const) {
     const group = new THREE.Group();
-    group.position.set(...at);
+    group.position.set(at[0], at[1], at[2]);
     group.add(new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2)));
     (id === "arm" ? groups.get("body") : undefined)?.add(group);
     if (id === "body") root.add(group);
     groups.set(id, group);
-    rest.set(id, [...at]);
+    rest.set(id, [at[0], at[1], at[2]]);
   }
   const arm = groups.get("arm") as THREE.Group;
 
