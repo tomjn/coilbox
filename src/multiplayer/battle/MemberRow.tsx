@@ -41,6 +41,8 @@ import { allyLetter, type MemberRow as Row } from "./config";
 export interface MemberControls {
   onForceTeam?: (team: number) => void;
   onForceAlly?: (ally: number) => void;
+  /** Bots we own/host only: set the bot's faction. TASServer alone carries it. */
+  onForceSide?: (side: number) => void;
   onForceColor?: (hex: string) => void;
   onForceSpectator?: () => void;
   /** Host only: ring this member's client to get their attention. */
@@ -211,7 +213,8 @@ export function MemberRow({
   // Faction and team are ours on our own row and the host's on another, and a
   // server that assigns them takes both away. The ally team is the one seat
   // field every protocol lets a player choose, so it is gated on its own.
-  const canEditSide = editable && !serverAssignsSeat;
+  const canEditSide =
+    (editable && !serverAssignsSeat) || !!control?.onForceSide;
   const canEditTeam =
     (editable && !serverAssignsSeat) || !!control?.onForceTeam;
   const canEditAlly = editable || !!control?.onForceAlly;
@@ -225,6 +228,8 @@ export function MemberRow({
     aiOptions.length > 0;
   const setTeam = (v: number) =>
     editable ? onTeam(v) : control?.onForceTeam?.(v);
+  const setSide = (v: number) =>
+    editable ? onSide(v) : control?.onForceSide?.(v);
   const setAlly = (v: number) =>
     editable ? onAlly(v) : control?.onForceAlly?.(v);
   const setColor = (hex: string) =>
@@ -398,7 +403,7 @@ export function MemberRow({
               className={cn(SELECT_SIZE, "w-auto min-w-28")}
               disabled={sideOptions.length === 0}
               options={sideOptions}
-              onValueChange={(v) => onSide(Number(v))}
+              onValueChange={(v) => setSide(Number(v))}
             />
           ) : (
             (() => {

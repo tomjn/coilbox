@@ -325,10 +325,10 @@ export interface BattleRoomView {
     /** Tachyon only: stand a boss down. */
     unboss: (user: string) => void;
     removeBot: (name: string) => void;
-    /** Change a bot we own/host (team/ally) via UPDATEBOT; colour stays read-only. */
+    /** Change a bot we own/host (team/ally/faction) via UPDATEBOT; colour stays read-only. */
     updateBot: (
       name: string,
-      patch: { teamId?: number; ally?: number },
+      patch: { teamId?: number; ally?: number; side?: number },
     ) => void;
     /**
      * Change an existing bot's AI (host/owner), keeping its seat. The lobby
@@ -355,7 +355,7 @@ export interface BattleRoomView {
   addableAisReady: boolean;
   /** Add an AI bot on the next free team/ally (host only). Lua AIs are addable too:
    *  ADDBOT carries the shortName and the host scripts each as an `[AI]` block. */
-  addBot: (aiShortName: string) => void;
+  addBot: (aiShortName: string, side?: number) => void;
   leave: () => Promise<void>;
   autohostSend: (command: string) => Promise<void>;
   /**
@@ -907,10 +907,11 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
         if (activeKey)
           mpRemoveBot({ serverKey: activeKey, name }).then(clearErr, setErr);
       },
-      // Change a bot we own/host: team or ally. UPDATEBOT carries the bot's whole
+      // Change a bot we own/host: team, ally or faction. UPDATEBOT carries the bot's whole
       // battle status, so we resend the unchanged fields from its current status
       // (colour stays read-only for bots — no second drag-flood surface).
-      updateBot: (name: string, patch: { teamId?: number; ally?: number }) => {
+      updateBot: (name: string, patch: { teamId?: number; ally?: number; side?: number },
+      ) => {
         if (!activeKey || !battle) return;
         const bot = battle.bots[name];
         if (!bot) return;
@@ -924,7 +925,7 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
           mode: bs.mode,
           handicap: bs.handicap,
           sync: bs.sync,
-          side: bs.side,
+          side: patch.side ?? bs.side,
           color: bot.teamColor,
         }).then(clearErr, setErr);
       },
@@ -993,7 +994,7 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
   // Add a native AI bot on the first free team/ally, with a fresh colour and a name
   // unique within the battle. We're a player (mode) and marked synced.
   const addBot = useCallback(
-    (aiShortName: string) => {
+    (aiShortName: string, side = 0) => {
       if (!activeKey || !battle) return;
       const usedTeams = new Set<number>();
       const usedAllies = new Set<number>();
@@ -1028,7 +1029,7 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
         mode: true,
         handicap: 0,
         sync: 1,
-        side: 0,
+        side,
         // Avoid colours already in the battle (no self to exclude for a bot). hex
         // core -> lobby 0xBBGGRR int only.
         color: hexToColorInt(
