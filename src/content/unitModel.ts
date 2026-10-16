@@ -487,3 +487,11 @@ export function countPieces(piece: UnitModelPiece): number {
   for (const child of piece.children) total += countPieces(child);
   return total;
 }
+
+/** Vertices across the whole piece tree. */
+export function countVertices(piece: UnitModelPiece): number {
+  let total = 0;
+  for (const group of piece.groups) total += group.positions.length / 3;
+  for (const child of piece.children) total += countVertices(child);
+  return total;
+}

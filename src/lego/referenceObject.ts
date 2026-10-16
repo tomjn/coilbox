@@ -39,6 +39,7 @@ import * as THREE from "three";
 import type { UnitModelResult } from "../content/bindings";
 import { buildModel } from "../content/unitModel";
 import model from "./reference/armsolar.json";
+import type { ModelCounts } from "./s3oBuild";
 
 /** Sky blue, distinct from every colourway in the bundled parts pack. */
 const REFERENCE_COLOUR = 0x0ea5e9;
@@ -53,6 +54,13 @@ export const REFERENCE_FOOTPRINT_STEPS = model.footprintSteps;
 /** How wide the model itself is, in elmos, measured off the geometry rather
  *  than declared, so nothing can drift out of step with the asset. */
 export const REFERENCE_WIDTH_ELMOS = widthElmos();
+
+/** The solar collector is one mesh, so it counts as one piece. */
+export const REFERENCE_COUNTS: ModelCounts = {
+  pieces: 1,
+  triangles: model.indices.length / 3,
+  vertices: model.positions.length / 3,
+};
 
 function widthElmos(): number {
   let min = Number.POSITIVE_INFINITY;

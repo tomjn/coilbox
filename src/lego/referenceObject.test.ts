@@ -6,6 +6,7 @@ import {
   buildGameReferenceUnit,
   buildReferenceUnit,
   disposeReferenceUnit,
+  REFERENCE_COUNTS,
   REFERENCE_FOOTPRINT_STEPS,
   REFERENCE_WIDTH_ELMOS,
 } from "./referenceObject";
@@ -178,5 +179,15 @@ describe("disposeReferenceUnit", () => {
     disposeReferenceUnit(group);
 
     for (const spy of spies) expect(spy).toHaveBeenCalled();
+  });
+});
+
+describe("REFERENCE_COUNTS", () => {
+  it("counts the solar collector's mesh as one piece", () => {
+    expect(REFERENCE_COUNTS).toEqual({
+      pieces: 1,
+      triangles: 370,
+      vertices: model.positions.length / 3,
+    });
   });
 });

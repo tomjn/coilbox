@@ -187,6 +187,32 @@ export function sitOnGround(
   };
 }
 
+/** What a unit costs the engine to load: pieces, triangles and vertices. */
+export interface ModelCounts {
+  pieces: number;
+  triangles: number;
+  vertices: number;
+}
+
+/**
+ * The counts of the model the unit exports, off the bake rather than the
+ * document: a baked piece's `indices` over three is the triangle count the
+ * engine loads. A piece with no geometry is still a piece.
+ */
+export function bakedCounts(
+  project: LegoProject,
+  pack: LoadedPack,
+  raw: RawGeometry | null,
+): ModelCounts {
+  const counts: ModelCounts = { pieces: 0, triangles: 0, vertices: 0 };
+  for (const piece of bakedPieces(project, pack, raw).pieces.values()) {
+    counts.pieces += 1;
+    counts.triangles += piece.indices.length / 3;
+    counts.vertices += piece.vertices.length;
+  }
+  return counts;
+}
+
 export function buildS3o(
   project: LegoProject,
   pack: LoadedPack,
