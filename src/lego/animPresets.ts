@@ -3,8 +3,9 @@
  *
  * A preset is pure: `track` returns a transform delta from a piece's rest pose
  * at a given moment, and knows nothing about three, the document or the
- * viewport. Playback resets each piece to rest and adds the delta, so stopping
- * always restores exactly what was built and nothing is written to the project.
+ * viewport. The preview does not play it. It runs the Lua the preset writes,
+ * and `track` is what `presetParity.test.ts` holds that Lua to, and what
+ * `cycleThread` samples to write the looping presets.
  *
  * Roles are a fixed vocabulary rather than free text. A preset can then say
  * what it needs, and the panel can say what is missing.
@@ -141,10 +142,14 @@ export interface AnimPreset {
   description: string;
   /** Roles that must be filled, with how many pieces each needs at least. */
   requires: { role: string; count: number }[];
-  /** Every role this preset may move, so playback knows what to reset. */
+  /** Every role this preset may move. */
   animates: string[];
   params: PresetParam[];
-  /** Null when the preset does not move that role. */
+  /**
+   * Where the preset puts a piece at time `t`, null when it does not move that
+   * role. Not played by the preview: it is the specification the parity test
+   * compares the preset's Lua against.
+   */
   track(
     t: number,
     params: Record<string, number>,

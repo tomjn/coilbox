@@ -4,7 +4,6 @@ import type { LoadedPack } from "../../pack";
 import type { RawGeometry } from "../../rawGeometry";
 import { clampFrame, frameAt, type ScriptTimeline } from "../../scriptPlayback";
 import {
-  applyAnimation,
   applyTimeline,
   applyTimelineFrame,
   restoreFromPlayback,
@@ -37,8 +36,8 @@ export interface ScriptFrameSteppingDeps {
 }
 
 /**
- * Run the applied presets or the unit's own script while playing, and paint a
- * paused run's scrubbed or stepped frame.
+ * Play the unit's script run while playing, and paint a paused run's scrubbed
+ * or stepped frame.
  *
  * The two stay together because both are "script frame stepping": one drives
  * the running clock, the other paints the one frame a paused run is held on.
@@ -125,10 +124,8 @@ export function useScriptFrameStepping(
           );
           onScriptFrameRef.current?.(frameAt(timeline, elapsed));
         } else {
-          elapsed += dt;
-          applyAnimation(state, projectRef.current, elapsed);
-          // The presets are not a scenario, so there is no track and nothing
-          // for a stand-in to be about.
+          // No run on screen yet, or the last one failed. The unit holds its
+          // built pose, and there is no track for a stand-in to be about.
           state.standIn.visible = false;
           state.effects.object.visible = false;
         }
