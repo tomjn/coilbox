@@ -8,7 +8,7 @@ import { isScratchArchive, SCRATCH_FOLDER } from "@/lib/generatedGames";
 import type { PlayTarget } from "@/play/config";
 
 import { exportTextureName, unitAtlas } from "./atlas";
-import { legoExport, legoScratchGame } from "./bindings";
+import { legoExport, legoScratchGame, type ScratchSandbox } from "./bindings";
 import { unitScript } from "./luaScript";
 import type { LegoProject } from "./model";
 import type { LoadedPack } from "./pack";
@@ -30,6 +30,8 @@ export interface ScratchGameArgs {
   project: LegoProject;
   pack: LoadedPack;
   raw: RawGeometry | null;
+  /** The sandbox's files, for "Play with this unit". Absent for a plain test. */
+  sandbox?: ScratchSandbox;
   /** Told when the write is done and the rescan starts. */
   onScanning?: () => void;
   /** Told the scratch game's folder as soon as it exists. */
@@ -47,6 +49,7 @@ export async function writeScratchGame({
   project,
   pack,
   raw,
+  sandbox,
   onScanning,
   onWritten,
 }: ScratchGameArgs): Promise<{ dir: string; name: string }> {
@@ -69,6 +72,7 @@ export async function writeScratchGame({
     modinfo: buildModInfo(baseGame),
     sidedata: buildSideData(project.unitName),
     gadget: buildStartUnitGadget(project.unitName),
+    ...(sandbox ? { sandbox } : {}),
   });
   onWritten?.(dir);
   await legoExport({
