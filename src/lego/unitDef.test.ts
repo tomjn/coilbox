@@ -63,6 +63,28 @@ function project(name: string, unitName?: string) {
  * table rather than two that have to be kept in step.
  */
 describe("legoUnitDef", () => {
+  // Splinter Faction's alldefs_post.lua reads these three on every unit and
+  // the engine quits if any is missing (issue #4137).
+  it("writes the fields Splinter Faction's post-processing reads", () => {
+    const def = legoUnitDef(
+      project("Sky Fortress", "skyfort"),
+      bounds({ x: 32, z: 48 }),
+    );
+    expect(def.unitname).toBe("skyfort");
+    expect(def.sightdistance).toBe(0);
+    expect(def.customparams).toEqual({});
+  });
+
+  it("writes customparams as an empty Lua table in the file", () => {
+    const text = buildUnitDef(
+      project("Sky Fortress", "skyfort"),
+      bounds({ x: 32, z: 48 }),
+    );
+    expect(text).toContain('unitname = "skyfort",');
+    expect(text).toContain("sightdistance = 0,");
+    expect(text).toContain("customparams = {},");
+  });
+
   it("keys the definition the way the engine reads one: lower case", () => {
     const def = legoUnitDef(
       project("Sky Fortress", "skyfort"),
