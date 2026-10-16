@@ -284,7 +284,21 @@ export function groundById(id: string): GroundSurface {
 export const TERRAIN_ELMOS = GROUND_ELMOS * 2;
 
 /**
+ * How many times larger than its default the terrain is drawn so that it is
+ * solid out to `reachElmos` from the origin, which is where a unit driving
+ * away from it still needs ground under it. 1 until the reach passes the
+ * default solid radius, so a unit that goes nowhere gets the ground it always
+ * had. The texture and its fade scale with it, which keeps the fade the same
+ * shape and the texture a single shot.
+ */
+export function terrainScale(reachElmos: number): number {
+  return Math.max(1, reachElmos / (GROUND_ELMOS / 2));
+}
+
+/**
  * How opaque the terrain is that far from the origin.
+ *
+ * `scale` is `terrainScale`'s answer for a terrain drawn larger than its default.
  *
  * The terrain is a finite plane, so it has an edge, and an edge in view reads as
  * a slab floating in space. Rather than fog (which would tint the unit as the
@@ -293,9 +307,9 @@ export const TERRAIN_ELMOS = GROUND_ELMOS * 2;
  * reads as distance haze. Against the plain backdrop it reads as the ground
  * going dark.
  */
-export function terrainAlpha(elmosFromCentre: number): number {
-  const solid = GROUND_ELMOS / 2;
-  const rim = TERRAIN_ELMOS / 2;
+export function terrainAlpha(elmosFromCentre: number, scale = 1): number {
+  const solid = (GROUND_ELMOS / 2) * scale;
+  const rim = (TERRAIN_ELMOS / 2) * scale;
   if (elmosFromCentre <= solid) return 1;
   if (elmosFromCentre >= rim) return 0;
   const t = (elmosFromCentre - solid) / (rim - solid);
@@ -358,7 +372,7 @@ export function skyTexture(backdrop: Backdrop): THREE.Texture | null {
  * The solid ground, in its own mesh: never selectable, never exported, and
  * drawn before everything else so the grid and the plates sit on top of it.
  */
-export function buildTerrain(): THREE.Mesh {
+export function buildTerrain(reachElmos = 0): THREE.Mesh {
   const geometry = new THREE.PlaneGeometry(TERRAIN_ELMOS, TERRAIN_ELMOS);
   geometry.rotateX(-Math.PI / 2);
   geometry.translate(0, TERRAIN_Y, 0);
@@ -371,7 +385,15 @@ export function buildTerrain(): THREE.Mesh {
   const mesh = new THREE.Mesh(geometry, material);
   mesh.renderOrder = -1;
   mesh.raycast = () => {};
+  reachTerrain(mesh, reachElmos);
   return mesh;
+}
+
+/** Stretch a flat terrain or sea so it is solid out to `reachElmos`. It is a
+ *  plane at one height, so scaling it sideways is all it takes. */
+export function reachTerrain(mesh: THREE.Mesh, reachElmos: number): void {
+  const scale = terrainScale(reachElmos);
+  mesh.scale.set(scale, 1, scale);
 }
 
 /**
@@ -448,12 +470,15 @@ const SEGMENTS_PER_BUMP = 16;
  * a foot that reaches into a hill disappears into it, which is the point of
  * standing a unit on one.
  */
-export function buildShapedTerrain(shape: GroundShape): THREE.Mesh {
+export function buildShapedTerrain(
+  shape: GroundShape,
+  reachElmos = 0,
+): THREE.Mesh {
   const material = new THREE.MeshLambertMaterial({
     map: terrainTexture(),
     transparent: true,
   });
-  const mesh = new THREE.Mesh(shapedGeometry(shape), material);
+  const mesh = new THREE.Mesh(shapedGeometry(shape, reachElmos), material);
   mesh.renderOrder = -1;
   mesh.raycast = () => {};
   return mesh;
@@ -461,23 +486,28 @@ export function buildShapedTerrain(shape: GroundShape): THREE.Mesh {
 
 /** Swap the shaped ground's surface for another shape's, keeping its
  *  texture, which is the expensive part. */
-export function reshapeTerrain(mesh: THREE.Mesh, shape: GroundShape): void {
+export function reshapeTerrain(
+  mesh: THREE.Mesh,
+  shape: GroundShape,
+  reachElmos = 0,
+): void {
   mesh.geometry.dispose();
-  mesh.geometry = shapedGeometry(shape);
+  mesh.geometry = shapedGeometry(shape, reachElmos);
 }
 
-function shapedGeometry(shape: GroundShape): THREE.PlaneGeometry {
+/** The surface is built at its drawn size rather than scaled, because its
+ *  heights are read off `groundHeight` at the place each point really is. */
+function shapedGeometry(
+  shape: GroundShape,
+  reachElmos: number,
+): THREE.PlaneGeometry {
+  const size = TERRAIN_ELMOS * terrainScale(reachElmos);
   // A slope is flat, so the plane's own two triangles are already exact.
   const segments =
     shape.kind === "slope"
       ? 1
-      : Math.ceil((TERRAIN_ELMOS / shape.width) * SEGMENTS_PER_BUMP);
-  const geometry = new THREE.PlaneGeometry(
-    TERRAIN_ELMOS,
-    TERRAIN_ELMOS,
-    segments,
-    segments,
-  );
+      : Math.ceil((size / shape.width) * SEGMENTS_PER_BUMP);
+  const geometry = new THREE.PlaneGeometry(size, size, segments, segments);
   geometry.rotateX(-Math.PI / 2);
   const position = geometry.getAttribute("position");
   for (let i = 0; i < position.count; i++) {
@@ -515,7 +545,7 @@ const WATER_PIXELS = 256;
  * the part of a hull below the surface show through tinted, while the part
  * above it hides the water behind it.
  */
-export function buildWater(): THREE.Mesh {
+export function buildWater(reachElmos = 0): THREE.Mesh {
   const geometry = new THREE.PlaneGeometry(TERRAIN_ELMOS, TERRAIN_ELMOS);
   geometry.rotateX(-Math.PI / 2);
   geometry.translate(0, TERRAIN_Y, 0);
@@ -528,6 +558,7 @@ export function buildWater(): THREE.Mesh {
   const mesh = new THREE.Mesh(geometry, material);
   mesh.renderOrder = -1;
   mesh.raycast = () => {};
+  reachTerrain(mesh, reachElmos);
   return mesh;
 }
 

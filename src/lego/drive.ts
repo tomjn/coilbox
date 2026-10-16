@@ -167,6 +167,19 @@ export function pathPoints(
   });
 }
 
+/**
+ * How far from the origin a drive takes the base of the unit, in elmos. The
+ * frames are included as well as the waypoints, because a unit swings wide of
+ * a bend and the ground has to be there under that too.
+ */
+export function driveReach(path: Vec2[], frames: DriveFrame[]): number {
+  let reach = 0;
+  for (const [x, z] of path) reach = Math.max(reach, Math.hypot(x, z));
+  for (const { pos } of frames)
+    reach = Math.max(reach, Math.hypot(pos[0], pos[2]));
+  return reach;
+}
+
 /** The unit on one frame of a drive. */
 export interface DriveFrame {
   /** Its base, in elmos, on the ground. */

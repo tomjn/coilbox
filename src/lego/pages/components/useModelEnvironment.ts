@@ -25,6 +25,8 @@ export interface ModelEnvironmentDeps {
   /** What `groundShape` made of the choice, null for a flat ground. Held by
    *  the caller so it is the same object for as long as nothing changes. */
   shape: GroundShape | null;
+  /** How far from the origin a drive takes the unit, in elmos, or 0. */
+  driveReach: number;
   /** Which way is up for the unit on that ground, from `unitUp`, or null. */
   up: [number, number, number] | null;
   /** Whether the unit is playing or showing a script run, which is when it
@@ -52,6 +54,7 @@ export function useModelEnvironment(
     backdrop,
     ground,
     shape,
+    driveReach,
     up,
     previewing,
   }: ModelEnvironmentDeps,
@@ -116,9 +119,9 @@ export function useModelEnvironment(
   useEffect(() => {
     const state = sceneRef.current;
     if (!state) return;
-    applyGround(state, ground, shape);
+    applyGround(state, ground, shape, driveReach);
     state.render();
-  }, [sceneRef, ground, shape]);
+  }, [sceneRef, ground, shape, driveReach]);
 
   // The unit turns to the ground only while it is being previewed. Building
   // happens upright, because every edit, snap and plate is measured from
