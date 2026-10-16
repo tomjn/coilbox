@@ -480,7 +480,8 @@ pub struct LobbyState {
     /// The battle whose running match we were in the room for when it started,
     /// or `None`. Somebody who was there gets the engine launched for them and a
     /// way back in if it exits. Somebody who walked into a running room does not.
-    /// Only a TASServer connection sets it.
+    /// A TASServer connection sets it when the host goes in game, and a Zero-K
+    /// one when the server sends us to the match with `ConnectSpring`.
     pub witnessed_start: Option<u32>,
     /// Whether the server has finished replaying its state after login. Until
     /// then a user's in-game bit is news about the past, not a match starting.

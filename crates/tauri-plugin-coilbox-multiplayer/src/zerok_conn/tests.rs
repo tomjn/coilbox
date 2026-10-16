@@ -974,3 +974,64 @@ async fn the_two_refusal_codes_are_not_confused_for_one_another() {
         Some("name already exists")
     );
 }
+
+/// The match start, through the whole task. The server's `ConnectSpring` is
+/// what says where the match is, and nothing asked for it, so it has to fill
+/// the slot the launch reads and tell the frontend to launch on its own.
+#[tokio::test]
+async fn a_connect_spring_is_where_the_launch_reads_the_match_from() {
+    let port = greet_accept_and_send(vec![
+        r#"ConnectSpring {"Engine":"105.1.1-2590","Game":"Zero-K v1.12.6.0","Ip":"203.0.113.7","Map":"Comet Catcher Remake 1.8","Port":8452,"ScriptPassword":"1873462391","Mode":5,"IsSpectator":false}"#.into(),
+    ])
+    .await;
+    let client = Client::connect(port, "someone").await;
+    client.wait_for("battleStarting").await;
+
+    let registry = client.registry.lock().unwrap_or_else(|e| e.into_inner());
+    let started = registry[&client.key]
+        .started
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone()
+        .expect("the match is held for the launch");
+    assert_eq!(started["isHost"], false);
+    assert_eq!(started["hostIp"], "203.0.113.7");
+    assert_eq!(started["hostPort"], 8452);
+    assert_eq!(started["myPasswd"], "1873462391");
+    // The name the server logged us in as.
+    assert_eq!(started["myPlayerName"], "someone");
+}
+
+/// The way back into a running match, and the request the rejoin offer will
+/// send too: the battle, as one line.
+#[tokio::test]
+async fn asking_where_a_match_is_goes_out_as_one_line() {
+    let (port, heard) = greet_and_answer(None).await;
+    let client = Client::connect(port, "someone").await;
+    first_line(&heard).await;
+
+    {
+        let registry = client.registry.lock().unwrap_or_else(|e| e.into_inner());
+        registry[&client.key]
+            .tx
+            .send(Outbound::Zerok(ZerokAction::RequestConnectSpring {
+                battle_id: 42,
+            }))
+            .expect("the connection takes it");
+    }
+
+    let deadline = std::time::Instant::now() + PATIENCE;
+    while std::time::Instant::now() < deadline {
+        let sent = heard
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(1)
+            .cloned();
+        if let Some(sent) = sent {
+            assert_eq!(sent, r#"RequestConnectSpring {"BattleID":42}"#);
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(2)).await;
+    }
+    panic!("the request never went out");
+}
