@@ -22,6 +22,7 @@ import { unitScript } from "../../luaScript";
 import { type LegoProject, newProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import type { ScriptOutput, ScriptTimeline } from "../../scriptPlayback";
+import { soloProject } from "../../soloPreset";
 import { AnimationPanel } from "./AnimationPanel";
 
 const runLua = vi.fn();
@@ -805,5 +806,176 @@ describe("a unit on the presets, edited while it plays", () => {
 
     expect(onPlayingChange).toHaveBeenLastCalledWith(false);
     expect(runLua).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("playing one preset on its own", () => {
+  const piece = {
+    id: "p0",
+    name: "base",
+    parentId: null,
+    partId: null,
+    position: [0, 0, 0] as [number, number, number],
+    rotation: [0, 0, 0] as [number, number, number],
+    scale: [1, 1, 1] as [number, number, number],
+    role: "base" as const,
+  };
+  const two = (sway = {}) =>
+    project({
+      pieces: [piece],
+      animations: [
+        { presetId: "idle.sway", params: sway },
+        { presetId: "hover.bob", params: {} },
+      ],
+    });
+  const solo = (value: LegoProject) => soloProject(value, "idle.sway");
+  const props = (
+    value: LegoProject,
+    over: Partial<React.ComponentProps<typeof AnimationPanel>> = {},
+  ) => (
+    <AnimationPanel
+      project={value}
+      playing={false}
+      onPlayingChange={vi.fn()}
+      onChange={vi.fn()}
+      onShowScript={vi.fn()}
+      onBuilderChange={vi.fn()}
+      onScriptTimeline={vi.fn()}
+      onScriptRun={vi.fn()}
+      scriptPaused={false}
+      onScriptPausedChange={vi.fn()}
+      scriptFrame={0}
+      onScriptFrameChange={vi.fn()}
+      pack={pack()}
+      raw={null}
+      onStandIn={vi.fn()}
+      {...over}
+    />
+  );
+  const soloButton = () =>
+    screen.getByRole("button", { name: "Preview Idle sway on its own" });
+
+  it("offers it on an applied preset's row and not on one that is not applied", () => {
+    show(two());
+
+    expect(soloButton()).toBeTruthy();
+    expect(
+      screen.queryByRole("button", {
+        name: "Preview Wheels turning on its own",
+      }),
+    ).toBeNull();
+  });
+
+  it("runs the script of that preset alone, in the scenario that shows it", async () => {
+    const value = two();
+    const onChange = vi.fn();
+    show(value, { onChange });
+    fireEvent.click(soloButton());
+
+    await waitFor(() => expect(runLua).toHaveBeenCalled());
+    const sent = runLua.mock.calls[0][0] as {
+      script: string;
+      events: { callin?: string }[];
+    };
+    expect(sent.script).toBe(unitScript(solo(value)));
+    expect(sent.script).not.toBe(unitScript(value));
+    expect(sent.events.map((event) => event.callin)).toContain("StopMoving");
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("moves the scenario picker to the one it ran", async () => {
+    show(two());
+    fireEvent.click(soloButton());
+    await waitFor(() => expect(runLua).toHaveBeenCalled());
+
+    expect(
+      screen.getByRole("combobox", { name: "What happens to the unit" })
+        .textContent,
+    ).toContain("Starting and stopping");
+  });
+
+  it("is what the row shows as playing, and the main button then plays everything", async () => {
+    const value = two();
+    const view = show(value);
+    fireEvent.click(soloButton());
+    await waitFor(() => expect(runLua).toHaveBeenCalledTimes(1));
+    view.rerender(props(value, { playing: true }));
+
+    expect(soloButton().getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Play all" }));
+
+    await waitFor(() => expect(runLua).toHaveBeenCalledTimes(2));
+    expect(runLua.mock.calls[1][0]).toMatchObject({
+      script: unitScript(value),
+    });
+    expect(soloButton().getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("gives the nano row its one line", () => {
+    show(
+      project({
+        pieces: [{ ...piece, role: "buildarm.nano" as const }],
+        animations: [{ presetId: "build.nano", params: {} }],
+      }),
+    );
+
+    expect(screen.getByText(/Moves nothing/)).toBeTruthy();
+  });
+
+  describe("edited while it plays", () => {
+    beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
+    afterEach(() => vi.useRealTimers());
+
+    async function soloing(value: LegoProject) {
+      const view = show(value);
+      fireEvent.click(soloButton());
+      await vi.waitFor(() => expect(runLua).toHaveBeenCalledTimes(1));
+      view.rerender(props(value, { playing: true }));
+      return (next: LegoProject) =>
+        view.rerender(props(next, { playing: true }));
+    }
+
+    it("runs the changed script of the soloed preset, still alone", async () => {
+      const again = await soloing(two());
+      const next = two({ turn: 20 });
+      again(next);
+
+      await vi.advanceTimersByTimeAsync(400);
+      expect(runLua).toHaveBeenCalledTimes(2);
+      expect(runLua.mock.calls[1][0]).toMatchObject({
+        script: unitScript(solo(next)),
+      });
+    });
+
+    it("does not run again for an edit to a preset that is not playing", async () => {
+      const again = await soloing(two());
+      again(
+        project({
+          pieces: [piece],
+          animations: [
+            { presetId: "idle.sway", params: {} },
+            { presetId: "hover.bob", params: { height: 0.5 } },
+          ],
+        }),
+      );
+
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(runLua).toHaveBeenCalledTimes(1);
+    });
+
+    it("plays everything again once the soloed preset is removed", async () => {
+      const again = await soloing(two());
+      const next = project({
+        pieces: [piece],
+        animations: [{ presetId: "hover.bob", params: {} }],
+      });
+      again(next);
+
+      await vi.advanceTimersByTimeAsync(400);
+      expect(runLua).toHaveBeenCalledTimes(2);
+      expect(runLua.mock.calls[1][0]).toMatchObject({
+        script: unitScript(next),
+      });
+    });
   });
 });
