@@ -12,6 +12,7 @@ import type { LegoCollisionVolume, LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import type { RawGeometry } from "../../rawGeometry";
 import { bakedPieces, unitBounds } from "../../s3oBuild";
+import { followPieces } from "./overlayFollow";
 import type { SceneState } from "./sceneState";
 
 /**
@@ -129,11 +130,15 @@ export function showPieceCollisionVolumes(
     // box drawn after it.
     lines.renderOrder = edited ? 5 : 4;
     lines.raycast = () => {};
+    lines.userData.origin = new THREE.Vector3(...origin);
     group.add(lines);
     state.pieceCollisionBoxes.set(pieceId, lines);
   }
   state.pieceCollision = group;
   state.overlay.add(group);
+  // Boxes made while a bake is up, a paused run's frame, go where it holds
+  // their pieces.
+  if (state.rest.size > 0) followPieces(state);
 }
 
 /** Free the per-piece boxes. Each carries its own geometry, and they share the

@@ -376,6 +376,12 @@ describe("placeStandIn", () => {
     const arm = new THREE.Group();
     base.add(arm);
     return {
+      root: new THREE.Group(),
+      selectedGroups: [],
+      selectOutlines: [],
+      selectOverlays: [],
+      hoveredId: null,
+      pieceCollisionBoxes: new Map(),
       standIn: new THREE.Group(),
       standInRadius: 10,
       rest: new Map([
