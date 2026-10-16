@@ -1,9 +1,4 @@
 import * as THREE from "three";
-import {
-  type AnimPreset,
-  ENGINE_ROTATION_ORDER,
-  presetById,
-} from "../../animPresets";
 import type { LegoProject } from "../../model";
 import {
   frameAt,
@@ -11,61 +6,7 @@ import {
   poseAt,
   type ScriptTimeline,
 } from "../../scriptPlayback";
-import type { Vec3 } from "../../snapping";
 import type { SceneState } from "./sceneState";
-
-/**
- * Pose every animated piece for one moment in time.
- *
- * Each piece sits at its baked offset and takes the sum of every applied
- * preset's delta as a rotation about its own origin, so two presets touching
- * the same piece add up rather than one winning.
- *
- * The summed angles compose in the engine's order for as long as playback owns
- * the group, and `restoreFromPlayback` puts it back.
- */
-export function applyAnimation(
-  state: SceneState,
-  project: LegoProject,
-  t: number,
-) {
-  const applied = (project.animations ?? [])
-    .map((entry) => ({
-      preset: presetById(entry.presetId),
-      params: entry.params,
-    }))
-    .filter(
-      (
-        entry,
-      ): entry is { preset: AnimPreset; params: Record<string, number> } =>
-        entry.preset !== undefined,
-    );
-  if (applied.length === 0) return;
-
-  for (const piece of project.pieces) {
-    if (!piece.role) continue;
-    const group = state.groups.get(piece.id);
-    const offset = state.rest.get(piece.id);
-    if (!group || !offset) continue;
-
-    // From the baked pose, not the document's: the geometry already carries
-    // the piece's own rotation and scale, so a delta is a plain turn about
-    // its origin, which is the only thing the engine does.
-    const position: Vec3 = [...offset];
-    const rotation: Vec3 = [0, 0, 0];
-    for (const { preset, params } of applied) {
-      const delta = preset.track(t, params, piece.role);
-      if (!delta) continue;
-      for (let axis = 0; axis < 3; axis++) {
-        position[axis] += delta.position?.[axis] ?? 0;
-        rotation[axis] += delta.rotation?.[axis] ?? 0;
-      }
-    }
-    group.position.set(...position);
-    group.rotation.order = ENGINE_ROTATION_ORDER;
-    group.rotation.set(...rotation);
-  }
-}
 
 /**
  * Pose every piece the way the unit's own script put it at one moment.
