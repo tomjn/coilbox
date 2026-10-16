@@ -246,7 +246,7 @@ export function MemberRow({
         flashIngame && "ingame-flash",
       )}
     >
-      <TableCell className="px-3 py-0.5">
+      <TableCell className="px-3 py-1">
         <div className="flex items-center justify-center gap-1.5">
           <ReadyIcon row={row} />
           {/* Humans only. Sync is whether a player's client has the map and the
@@ -263,7 +263,7 @@ export function MemberRow({
         </div>
       </TableCell>
 
-      <TableCell className="px-3 py-0.5">
+      <TableCell className="px-3 py-1">
         <div className="flex items-center gap-2.5">
           {sharedWith ? (
             // A file-explorer-style branch in the team (leader's) colour,
@@ -293,12 +293,17 @@ export function MemberRow({
               style={{ background: row.colorHex }}
             />
           )}
-          <div className="min-w-0 leading-tight">
-            {/* The AI picker sits beside the name while the row is wide enough
-                for both, and wraps under it when it is not. A bot's name is a
-                handle rather than a sentence, so the pair reads as one thing. */}
-            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-              <div className="flex items-center gap-1 truncate">
+          <div className="min-w-0 flex-1 leading-tight">
+            {/* A bot whose AI can be changed gets a name area of fixed width,
+                so its picker starts at the same place on every row and fills
+                the rest of the cell. */}
+            <div className="flex min-w-0 items-center gap-2">
+              <div
+                className={cn(
+                  "flex items-center gap-1 truncate",
+                  canChangeAi && "w-32 shrink-0",
+                )}
+              >
                 {row.kind === "bot" && (
                   <BotIcon className="size-3.5 text-muted-foreground" />
                 )}
@@ -334,7 +339,7 @@ export function MemberRow({
                   onValueChange={(v) => control?.onChangeAi?.(v)}
                   options={aiOptions ?? []}
                   size="sm"
-                  className={cn(SELECT_SIZE, "w-auto min-w-36")}
+                  className={cn(SELECT_SIZE, "min-w-0 flex-1")}
                   placeholder={row.aiDll ?? "Select an AI"}
                 />
               )}
@@ -353,11 +358,11 @@ export function MemberRow({
           than trailing the name, so they line up down the table instead of
           starting at a different place on every row. Empty when a row has
           nothing to show. */}
-      <TableCell className="px-2 py-0.5 text-center">
+      <TableCell className="px-2 py-1 text-center">
         {row.rank != null && <RankBadge rank={row.rank} />}
       </TableCell>
 
-      <TableCell className="px-2 py-0.5 text-center">
+      <TableCell className="px-2 py-1 text-center">
         {onSetNote && (
           <NoteButton
             name={row.name}
@@ -369,7 +374,7 @@ export function MemberRow({
         )}
       </TableCell>
 
-      <TableCell className="px-2 py-0.5 text-center">
+      <TableCell className="px-2 py-1 text-center">
         {row.kind === "human" && onSetBonus && (
           <BonusButton
             name={row.name}
@@ -380,7 +385,7 @@ export function MemberRow({
       </TableCell>
 
       {showFaction && (
-        <TableCell className="px-2 py-0.5">
+        <TableCell className="px-2 py-1">
           {row.spectator ? (
             <span className="text-xs text-muted-foreground">–</span>
           ) : sharedWith ? (
@@ -420,7 +425,7 @@ export function MemberRow({
       )}
 
       {showTeam && (
-        <TableCell className="px-2 py-0.5">
+        <TableCell className="px-2 py-1">
           {row.spectator ? (
             <span className="text-xs text-muted-foreground">–</span>
           ) : canEditTeam ? (
@@ -452,7 +457,7 @@ export function MemberRow({
         </TableCell>
       )}
 
-      <TableCell className="px-2 py-0.5">
+      <TableCell className="px-2 py-1">
         {row.spectator ? (
           <span className="text-xs text-muted-foreground">–</span>
         ) : sharedWith ? null : canEditAlly ? (
@@ -469,7 +474,7 @@ export function MemberRow({
       </TableCell>
 
       {showActions && (
-        <TableCell className="px-2 py-0.5 text-right">
+        <TableCell className="px-2 py-1 text-right">
           <MemberActionsMenu
             row={row}
             control={control ?? null}

@@ -88,6 +88,7 @@ function renderTable(
     onSetBonus?: (name: string, value: number) => void;
     canAddBot?: boolean;
     botsRefused?: string | null;
+    addableAis?: { shortName: string; kind: "native" | "lua" }[];
   },
 ) {
   return render(
@@ -293,8 +294,34 @@ describe("compact rows (#4187)", () => {
     const cells = container.querySelectorAll("tbody td");
     expect(cells.length).toBeGreaterThan(0);
     for (const cell of cells) {
-      expect(cell.className).toContain("py-0.5");
+      expect(cell.className).toContain("py-1");
+      expect(cell.className).not.toContain("py-0.5");
       expect(cell.className).not.toContain("py-2");
+    }
+  });
+
+  it("gives every bot's AI picker the same width and a fixed-width name area", () => {
+    renderTable(
+      [
+        row({ name: "me", self: true, host: true }),
+        row({ name: "BARb", kind: "bot", owner: "me", aiDll: "Other" }),
+        row({ name: "BARb12", kind: "bot", owner: "me", aiDll: "Other" }),
+      ],
+      { addableAis: [{ shortName: "Other", kind: "native" }] },
+    );
+    for (const name of ["BARb", "BARb12"]) {
+      const nameArea = screen.getByText(name).parentElement;
+      expect(nameArea?.className).toContain("w-32");
+      expect(nameArea?.className).toContain("shrink-0");
+    }
+    const pickers = screen
+      .getAllByRole("combobox")
+      .filter((c) => c.className.includes("flex-1"));
+    expect(pickers).toHaveLength(2);
+    for (const picker of pickers) {
+      expect(picker.className).toContain("min-w-0");
+      expect(picker.className).not.toContain("w-auto");
+      expect(picker.className).toContain("data-[size=sm]:h-6");
     }
   });
 
