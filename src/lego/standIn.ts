@@ -13,6 +13,7 @@
  */
 
 import * as THREE from "three";
+import { type GroundShape, groundHeight } from "./environment";
 import type { UnitBounds } from "./s3oBuild";
 import {
   type ScriptOutput,
@@ -66,6 +67,21 @@ export function standInRadius(bounds: UnitBounds, size?: number): number {
   return Math.min(Math.max(across, MIN_RADIUS), MAX_RADIUS);
 }
 
+/**
+ * `at` stood on the ground: the same point with the ground's height at its
+ * `x` and `z` added to `y`. Flat ground, which is no shape, adds nothing.
+ *
+ * What puts anything on the ground at its own position, as the engine stands
+ * a unit on the terrain, so a unit that moves along a path can use it too.
+ */
+export function onGround(
+  shape: GroundShape | null | undefined,
+  at: Vec3,
+): Vec3 {
+  if (!shape) return at;
+  return [at[0], at[1] + groundHeight(shape, at[0], at[2]), at[2]];
+}
+
 /** Where the stand-in is on one frame, in elmos, and which way it faces. */
 export interface StandInPose {
   /** Unit-local, in elmos. Measured from where the stand-in was last let go
@@ -77,7 +93,9 @@ export interface StandInPose {
 }
 
 /**
- * Where a track puts the stand-in on one frame.
+ * Where a track puts the stand-in on one frame, standing on `ground` at its
+ * own position. A key's `y` is how far above the ground it stands, so 0 is
+ * on it.
  *
  * Keys interpolate linearly. A frame outside the track holds the nearest key
  * rather than extrapolating past it, because a scenario that stops asking for
@@ -85,6 +103,16 @@ export interface StandInPose {
  * end of a preview would be a bug that looks like a feature.
  */
 export function standInAt(
+  track: StandInTrack,
+  frame: number,
+  radius: number,
+  ground?: GroundShape | null,
+): StandInPose | null {
+  const pose = trackPoseAt(track, frame, radius);
+  return pose && { ...pose, pos: onGround(ground, pose.pos) };
+}
+
+function trackPoseAt(
   track: StandInTrack,
   frame: number,
   radius: number,
@@ -249,14 +277,24 @@ export function standInAfterRelease(
   frame: number,
   release: { frame: number; at: Vec3 },
   radius: number,
+  ground?: GroundShape | null,
 ): { pos: Vec3; heading: number } {
   const place = (key: StandInKey): Vec3 => {
     const from = key.fromRelease ? release.at : [0, 0, 0];
-    return [
+    const at: Vec3 = [
       from[0] + key.pos[0] * radius,
       from[1] + key.pos[1] * radius,
       from[2] + key.pos[2] * radius,
     ];
+    if (!ground) return at;
+    // From the origin a key's `y` is above the ground there. From the release
+    // point it is above wherever the stand-in was let go, so the height it
+    // had over the ground is kept as it moves on.
+    const above = key.fromRelease
+      ? groundHeight(ground, at[0], at[2]) -
+        groundHeight(ground, release.at[0], release.at[2])
+      : groundHeight(ground, at[0], at[2]);
+    return [at[0], at[1] + above, at[2]];
   };
   let from = { frame: release.frame, pos: release.at, heading: 0 };
   for (const key of track.keys) {

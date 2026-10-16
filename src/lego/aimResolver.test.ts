@@ -16,6 +16,7 @@ import {
 import {
   type Scenario,
   type ScriptEvent,
+  type ScriptGround,
   STAND_IN_UNIT_ID,
   type StandInTrack,
 } from "./scriptPlayback";
@@ -573,5 +574,73 @@ describe("aimsOf", () => {
     expect(aims.map((aim) => aim.frame)).toEqual([15, 30]);
     expect(aims[0].dir[2]).toBeCloseTo(1);
     expect(aims[1].dir[0]).toBeCloseTo(1);
+  });
+});
+
+describe("a stand-in on a slope", () => {
+  const SLOPE: ScriptGround = {
+    shape: { kind: "slope", degrees: 45 },
+    up: null,
+  };
+  const AHEAD: StandInTrack = { keys: [{ frame: 0, pos: [0, 0, 2] }] };
+
+  it("is told the height of the ground it stands on", () => {
+    const world = worldAt(AHEAD, 0, { ...CTX, ground: SLOPE });
+    // Two radii of 10 ahead, on a 45 degree slope.
+    expect(world.standIn?.pos?.[1]).toBeCloseTo(20);
+  });
+
+  it("is told height 0 on flat ground", () => {
+    expect(worldAt(AHEAD, 0, CTX).standIn?.pos?.[1]).toBe(0);
+  });
+
+  it("is aimed at where it stands on the ground, not at height 0", () => {
+    const scenario: Scenario = {
+      id: "t",
+      label: "t",
+      description: "t",
+      events: [
+        {
+          frame: 0,
+          callin: "AimWeapon1",
+          aimAtStandIn: { from: "AimFromWeapon" },
+        },
+      ],
+      standIn: AHEAD,
+    };
+    const context = (ground: ScriptGround | null): AimContext => ({
+      radius: 10,
+      mid: ORIGIN,
+      pieceRest: new Map([["flare", ORIGIN]]),
+      probed: () => "flare",
+      ground: ground?.shape ?? null,
+    });
+    const pitchOn = (ground: ScriptGround | null) =>
+      resolveScenario(scenario, context(ground)).events[0].args?.[1] ?? 0;
+
+    // The middle is 20 ahead and 5.5 above its base, on ground 20 high.
+    const mid = 0.55 * 10;
+    expect(pitchOn(null)).toBeCloseTo(Math.atan2(mid, 20));
+    expect(pitchOn(SLOPE)).toBeCloseTo(Math.atan2(20 + mid, 20));
+  });
+
+  it("is put down at the height of the ground", () => {
+    const putting: Scenario = {
+      id: "t",
+      label: "t",
+      description: "t",
+      events: [
+        { frame: 5, callin: "TransportDrop", dropAtStandIn: { frame: 0 } },
+      ],
+      standIn: AHEAD,
+    };
+    const { events } = resolveScenario(putting, {
+      radius: 10,
+      mid: ORIGIN,
+      pieceRest: new Map(),
+      probed: () => null,
+      ground: SLOPE.shape,
+    });
+    expect(events[0].args?.[3]).toBeCloseTo(20);
   });
 });

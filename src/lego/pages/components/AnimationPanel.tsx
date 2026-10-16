@@ -610,6 +610,7 @@ export function AnimationPanel({
           mid: aimPoint(project, bounds),
           pieceRest: rest,
           probed: (callin) => named.get(callin) ?? null,
+          ground: scriptGround.current?.shape ?? null,
         },
       );
 

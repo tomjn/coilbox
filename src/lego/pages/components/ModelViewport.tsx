@@ -886,6 +886,7 @@ export function ModelViewport({
         hoveredId: null,
         grid,
         groundSteps: groundSteps(0),
+        groundShape: null,
         axes,
         reference,
         disposeReference: () => disposeReferenceUnit(reference),

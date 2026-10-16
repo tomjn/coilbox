@@ -23,6 +23,7 @@
  * double the latency of every scrub.
  */
 
+import type { GroundShape } from "./environment";
 import {
   type Scenario,
   type ScriptEvent,
@@ -51,6 +52,9 @@ export interface AimContext {
   pieceRest: Map<string, Vec3>;
   /** The first piece a probe named for a call-in, or null for none. */
   probed: (callin: string) => string | null;
+  /** The shape of the ground the stand-in stands on, absent or null for flat
+   *  ground at 0. */
+  ground?: GroundShape | null;
 }
 
 export interface ResolvedScenario {
@@ -64,14 +68,16 @@ export interface ResolvedScenario {
  *
  * Its middle rather than its base, because that is what a weapon aims at: the
  * engine fires at a unit's `aimPos`, which sits inside the unit rather than on
- * the ground under it.
+ * the ground under it. That ground is `ground`, which the stand-in stands on at
+ * its own position.
  */
 export function standInMid(
   track: StandInTrack,
   frame: number,
   radius: number,
+  ground?: GroundShape | null,
 ): Vec3 | null {
-  const pose = standInAt(track, frame, radius);
+  const pose = standInAt(track, frame, radius, ground);
   if (!pose) return null;
   return [pose.pos[0], pose.pos[1] + STAND_IN_MID_Y * radius, pose.pos[2]];
 }
@@ -139,13 +145,16 @@ export function resolveScenario(
   const track = scenario.standIn;
 
   const events = scenario.events.map((event) => {
-    if (event.dropAtStandIn) return putDown(event, track, ctx.radius, notes);
+    if (event.dropAtStandIn)
+      return putDown(event, track, ctx.radius, ctx.ground, notes);
 
     const marker = event.aimAtStandIn;
     if (!marker) return event;
     const { aimAtStandIn: _marker, ...rest } = event;
 
-    const target = track ? standInMid(track, event.frame, ctx.radius) : null;
+    const target = track
+      ? standInMid(track, event.frame, ctx.radius, ctx.ground)
+      : null;
     if (!target) {
       notes.push(
         `${event.callin} aims at a stand-in, and this scenario places no stand-in on frame ${event.frame}. It is aimed straight ahead instead.`,
@@ -186,10 +195,12 @@ function putDown(
   event: ScriptEvent,
   track: StandInTrack | undefined,
   radius: number,
+  ground: GroundShape | null | undefined,
   notes: string[],
 ): ScriptEvent {
   const { dropAtStandIn: marker, ...rest } = event;
-  const pose = track && marker ? standInAt(track, marker.frame, radius) : null;
+  const pose =
+    track && marker ? standInAt(track, marker.frame, radius, ground) : null;
   if (!pose) {
     notes.push(
       `${event.callin} puts the stand-in down where it stood on frame ${marker?.frame}, and this scenario places no stand-in then. It is put down at the unit's origin instead.`,
@@ -264,7 +275,7 @@ export function worldAt(
       : null;
   if (riding) return { standIn: { ...base, pos: riding }, self: ctx.self };
 
-  const pose = standInAt(track, frame, ctx.radius);
+  const pose = standInAt(track, frame, ctx.radius, ctx.ground?.shape);
   if (!pose) return { standIn: { ...base, pos: null }, self: ctx.self };
   return { standIn: { ...base, pos: pose.pos }, self: ctx.self };
 }

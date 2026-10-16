@@ -21,6 +21,7 @@ import { getPartGeometry, type LoadedPack } from "../../pack";
 import { seatPieceMesh } from "../../pivot";
 import { getFixedPieceGeometry, type RawGeometry } from "../../rawGeometry";
 import type { Vec3 } from "../../snapping";
+import { onGround } from "../../standIn";
 import type { CollisionFaceDrag } from "./collisionHandles";
 import type { EffectsLayer } from "./effectsLayer";
 
@@ -145,6 +146,9 @@ export interface SceneState {
   terrain: THREE.Mesh | null;
   /** The sea, kept the same way. */
   water: THREE.Mesh | null;
+  /** The shape of the ground drawn now, or null for a flat one. What the
+   *  stand-in and the reference figure stand on. */
+  groundShape: GroundShape | null;
   /** A slope or uneven ground, kept the same way and reshaped in place, so a
    *  new angle does not paint the mottle again. */
   shaped: THREE.Mesh | null;
@@ -242,6 +246,15 @@ export function applyBackdrop(state: SceneState, id: BackdropId) {
   if (texture) state.sky = { id, texture };
 }
 
+/** Stand the reference figure on the ground at the place it is parked, which
+ *  is level on flat ground and on a slope, and higher or lower on bumps. */
+export function standReferenceOnGround(
+  state: Pick<SceneState, "reference" | "groundShape">,
+) {
+  const { position } = state.reference;
+  position.y = onGround(state.groundShape, [position.x, 0, position.z])[1];
+}
+
 /** Put the solid ground, the sea or a shaped ground under the markings, or
  *  take them all away again. `shape` is what `groundShape` made of the
  *  choice, and null for the flat ones. */
@@ -250,6 +263,8 @@ export function applyGround(
   id: GroundId,
   shape: GroundShape | null,
 ) {
+  state.groundShape = shape;
+  standReferenceOnGround(state);
   state.terrain?.removeFromParent();
   state.water?.removeFromParent();
   state.shaped?.removeFromParent();
