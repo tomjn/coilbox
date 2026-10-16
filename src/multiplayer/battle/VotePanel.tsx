@@ -47,11 +47,16 @@ export function VotePanel({
       aria-label="Autohost vote"
       className="border-b border-primary/30 bg-primary/5 px-4 py-3"
     >
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <div className="flex min-w-0 items-center gap-2">
+      <div className="flex items-center gap-4">
+        <div className="flex min-w-0 flex-1 basis-0 items-center gap-2">
           <VoteIcon className="size-4 shrink-0 text-primary" />
-          <span className="text-sm font-semibold">Vote</span>
-          <span className="truncate text-sm text-muted-foreground">
+          <span className="shrink-0 text-sm font-semibold">Vote</span>
+          <span
+            className="truncate text-sm text-muted-foreground"
+            title={
+              vote.caller ? `${vote.subject} · by ${vote.caller}` : vote.subject
+            }
+          >
             {vote.subject}
             {vote.caller && (
               <span className="text-muted-foreground"> · by {vote.caller}</span>
@@ -63,10 +68,8 @@ export function VotePanel({
             {secondsLeft}s left
           </span>
         )}
-      </div>
 
-      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="flex min-w-[10rem] flex-1 items-center gap-2">
+        <div className="flex min-w-[8rem] flex-1 basis-0 items-center gap-2">
           <div
             className="h-1.5 flex-1 overflow-hidden rounded-full bg-destructive/25"
             aria-hidden
