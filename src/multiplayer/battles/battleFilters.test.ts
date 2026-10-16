@@ -4,6 +4,7 @@ import {
   type BattleFilters,
   battleRowAction,
   filterSortBattles,
+  groupBattles,
   occupancy,
 } from "./battleFilters";
 
@@ -192,5 +193,61 @@ describe("filterSortBattles", () => {
         (b) => b.id,
       ),
     ).toEqual([2, 3, 1]);
+  });
+});
+
+describe("groupBattles", () => {
+  const ids = (bs: Battle[]) => bs.map((b) => b.id);
+
+  it("puts every locked battle in locked, waiting or running, passworded or not", () => {
+    const g = groupBattles(
+      [
+        mk({ id: 1, locked: true }),
+        mk({ id: 2, locked: true, passworded: true }),
+        mk({ id: 3, locked: true }),
+      ],
+      null,
+      new Set([3]),
+    );
+    expect(ids(g.locked)).toEqual([1, 2, 3]);
+    expect(g.open).toEqual([]);
+    expect(g.passworded).toEqual([]);
+    expect(g.running).toEqual([]);
+  });
+
+  it("sorts the unlocked battles by state, running before passworded", () => {
+    const g = groupBattles(
+      [
+        mk({ id: 1 }),
+        mk({ id: 2, passworded: true }),
+        mk({ id: 3, passworded: true }),
+        mk({ id: 4 }),
+      ],
+      null,
+      new Set([3, 4]),
+    );
+    expect(ids(g.open)).toEqual([1]);
+    expect(ids(g.passworded)).toEqual([2]);
+    expect(ids(g.running)).toEqual([3, 4]);
+    expect(g.locked).toEqual([]);
+  });
+
+  it("leaves out the battle you are in, even when it is locked", () => {
+    const g = groupBattles(
+      [mk({ id: 1, locked: true }), mk({ id: 2, locked: true })],
+      1,
+      new Set(),
+    );
+    expect(ids(g.locked)).toEqual([2]);
+  });
+
+  it("keeps the hide locked filter removing locked battles entirely", () => {
+    const filtered = filterSortBattles(
+      [mk({ id: 1, locked: true }), mk({ id: 2 })],
+      { ...base, hideLockedPassworded: true },
+    );
+    const g = groupBattles(filtered, null, new Set());
+    expect(g.locked).toEqual([]);
+    expect(ids(g.open)).toEqual([2]);
   });
 });

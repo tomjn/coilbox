@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { LobbyProtocol } from "../../lobby-servers/config";
 import type { Battle } from "../bindings";
 import { BattleRow } from "./BattleRow";
+import { type BattleGroupKey, groupBattles } from "./battleFilters";
 
 const NO_FRIENDS: ReadonlyMap<number, string> = new Map();
 
@@ -21,9 +22,9 @@ type RowProps = {
 
 /**
  * The scrollable battle list, grouped by state: the battle you're in (if any) is
- * pinned on top so Leave is always reachable, then an "Open" group and an "In
- * progress" group (open first). Each group has a collapsible header with a count;
- * empty groups are omitted. `totalCount` is the unfiltered battle count so the
+ * pinned on top so Leave is always reachable, then "Open", "Passworded", "In
+ * progress" and "Locked" groups (see `groupBattles`). Each group has a collapsible
+ * header with a count; empty groups are omitted. `totalCount` is the unfiltered battle count so the
  * empty state can distinguish "no battles at all" from "filtered everything out".
  */
 export function BattleList({
@@ -77,12 +78,14 @@ export function BattleList({
   /** The protocol of this connection's saved server entry (issue #3524). */
   protocol?: LobbyProtocol;
 }) {
-  // Passworded and running battles are both things you cannot simply drop into,
-  // so they start collapsed and keep the joinable list short.
-  const [collapsed, setCollapsed] = useState({
+  // Running matches can be watched, so they start expanded. Passworded battles
+  // are ones you cannot simply drop into, and locked ones nobody can enter, so
+  // both start collapsed and keep the joinable list short.
+  const [collapsed, setCollapsed] = useState<Record<BattleGroupKey, boolean>>({
     open: false,
     passworded: true,
-    running: true,
+    running: false,
+    locked: true,
   });
   // Rebuilding this object every render would defeat `BattleRow`'s memo, since
   // it spreads into every row's props.
@@ -113,24 +116,25 @@ export function BattleList({
     ],
   );
 
-  // Running wins over passworded: whether a battle has started is the first thing
-  // that decides what you can do with it.
+  const { open, passworded, running, locked } = groupBattles(
+    battles,
+    joinedId,
+    inProgressIds,
+  );
   const rest = battles.filter((b) => b.id !== joinedId);
-  const running = rest.filter((b) => inProgressIds.has(b.id));
-  const waiting = rest.filter((b) => !inProgressIds.has(b.id));
-  const open = waiting.filter((b) => !b.passworded);
-  const passworded = waiting.filter((b) => b.passworded);
 
-  const focusGroup =
+  const focusGroup: BattleGroupKey | null =
     focusId === undefined
       ? null
-      : running.some((b) => b.id === focusId)
-        ? "running"
-        : passworded.some((b) => b.id === focusId)
-          ? "passworded"
-          : open.some((b) => b.id === focusId)
-            ? "open"
-            : null;
+      : locked.some((b) => b.id === focusId)
+        ? "locked"
+        : running.some((b) => b.id === focusId)
+          ? "running"
+          : passworded.some((b) => b.id === focusId)
+            ? "passworded"
+            : open.some((b) => b.id === focusId)
+              ? "open"
+              : null;
   useEffect(() => {
     if (focusGroup) setCollapsed((c) => ({ ...c, [focusGroup]: false }));
   }, [focusGroup]);
@@ -170,6 +174,7 @@ export function BattleList({
         rowProps={rowProps}
         friendsHere={friendsHere}
         focusId={focusId}
+        inProgressIds={inProgressIds}
       />
       <BattleGroup
         label="Passworded"
@@ -181,6 +186,7 @@ export function BattleList({
         rowProps={rowProps}
         friendsHere={friendsHere}
         focusId={focusId}
+        inProgressIds={inProgressIds}
       />
       <BattleGroup
         label="In progress"
@@ -190,7 +196,17 @@ export function BattleList({
         rowProps={rowProps}
         friendsHere={friendsHere}
         focusId={focusId}
-        inProgress
+        inProgressIds={inProgressIds}
+      />
+      <BattleGroup
+        label="Locked"
+        battles={locked}
+        collapsed={collapsed.locked}
+        onToggle={() => setCollapsed((c) => ({ ...c, locked: !c.locked }))}
+        rowProps={rowProps}
+        friendsHere={friendsHere}
+        focusId={focusId}
+        inProgressIds={inProgressIds}
       />
     </div>
   );
@@ -205,7 +221,7 @@ function BattleGroup({
   rowProps,
   friendsHere,
   focusId,
-  inProgress = false,
+  inProgressIds,
 }: {
   label: string;
   battles: Battle[];
@@ -214,9 +230,9 @@ function BattleGroup({
   rowProps: RowProps;
   friendsHere: ReadonlyMap<number, string>;
   focusId?: number;
-  /** Every battle in this group is running (host in-game); rows offer "Watch
-   * live" (spectator join) instead of "Join". */
-  inProgress?: boolean;
+  /** Rows of a running battle (host in-game) offer "Watch live" (spectator
+   * join) instead of "Join". The Locked group mixes running and waiting rows. */
+  inProgressIds: Set<number>;
 }) {
   if (battles.length === 0) return null;
   return (
@@ -243,7 +259,7 @@ function BattleGroup({
               key={b.id}
               battle={b}
               joined={false}
-              inProgress={inProgress}
+              inProgress={inProgressIds.has(b.id)}
               friendsHere={friendsHere.get(b.id)}
               focused={b.id === focusId}
               {...rowProps}
