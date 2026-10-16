@@ -1422,6 +1422,7 @@ export function ModelViewport({
               onGround={setGround}
             />
             <ReferencePicker
+              unit={{ project, pack, raw }}
               show={showReference}
               onShowChange={setShowReference}
               onReference={(choice) => {
