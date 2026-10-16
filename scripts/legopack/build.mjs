@@ -16,11 +16,10 @@
  */
 
 import { createHash } from "node:crypto";
-import { readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { withTeamColourMask } from "./atlas.mjs";
 import { COLOURWAYS, categorise } from "./categorise.mjs";
 import { buildMesh } from "./mesh.mjs";
 import { readObj } from "./obj.mjs";
@@ -100,13 +99,11 @@ function main() {
     atlas,
     categories: COLOURWAYS,
   });
-  // The engine reads the atlas's alpha as the team colour mask, so an atlas
-  // with none gets an alpha of 0 rather than going across as it is (#4164).
-  const shipped = withTeamColourMask(atlasBytes);
-  writeFileSync(join(outDir, "atlas.png"), shipped.bytes);
+  // The atlas already is a PNG, so it goes across untouched.
+  copyFileSync(args.atlas, join(outDir, "atlas.png"));
   writeFileSync(join(outDir, "LICENCE.txt"), `${LICENCE}\n`);
 
-  report(stats, written, meta, audit, shipped);
+  report(stats, written, meta, audit, atlasBytes.length);
 }
 
 function buildParts(source, quiet) {
@@ -199,7 +196,7 @@ function auditParts(parts) {
  * Nothing is silently dropped, so anything that did not make it into the pack
  * is named here rather than left for someone to notice later.
  */
-function report(stats, written, meta, audit, atlas) {
+function report(stats, written, meta, audit, atlasBytes) {
   log("");
   log(`objects read            ${stats.objects}`);
   log(`  no geometry           ${stats.empty}`);
@@ -234,9 +231,7 @@ function report(stats, written, meta, audit, atlas) {
   log(
     `parts.bin               ${mb(written.blobBytes)} raw, ${mb(written.gzippedBytes)} gzipped`,
   );
-  log(
-    `atlas.png               ${mb(atlas.bytes.length)}${atlas.addedAlpha ? "  (alpha of 0 added: no team colour)" : "  (its own alpha kept as the team colour mask)"}`,
-  );
+  log(`atlas.png               ${mb(atlasBytes)}`);
   log(`pack.json               ${mb(written.manifestBytes)}`);
   log("");
 
