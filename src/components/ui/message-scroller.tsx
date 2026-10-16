@@ -1,7 +1,12 @@
 import { Button } from "@picoframe/frame";
-import { MessageScroller as MessageScrollerPrimitive } from "@shadcn/react/message-scroller";
+import {
+  MessageScroller as MessageScrollerPrimitive,
+  useMessageScroller,
+  useMessageScrollerScrollable,
+  useMessageScrollerVisibility,
+} from "@shadcn/react/message-scroller";
 import { ArrowDownIcon } from "lucide-react";
-import type * as React from "react";
+import * as React from "react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -9,12 +14,35 @@ import { cn } from "@/lib/utils";
  * / Radix). Vendored from the shadcn registry and adapted to coilbox: `Button`
  * comes from `@picoframe/frame` and the scroll-to-latest button uses picoframe's
  * `icon` size (the registry default `icon-sm` isn't in picoframe's size union).
+ * The registry's `scroll-fade`, `scrollbar-*` and `content-visibility` classes
+ * and the `gap-8` on the content are not taken: coilbox has no such utilities
+ * and spaces chat rows itself.
  */
+
+/** `scrollEdgeThreshold` default in `@shadcn/react` 0.3.1. */
+const DEFAULT_SCROLL_EDGE_THRESHOLD = 8;
+
+const FollowContext = React.createContext({
+  autoScroll: false,
+  scrollEdgeThreshold: DEFAULT_SCROLL_EDGE_THRESHOLD,
+});
 
 function MessageScrollerProvider(
   props: React.ComponentProps<typeof MessageScrollerPrimitive.Provider>,
 ) {
-  return <MessageScrollerPrimitive.Provider {...props} />;
+  const { autoScroll = false, scrollEdgeThreshold } = props;
+  const follow = React.useMemo(
+    () => ({
+      autoScroll,
+      scrollEdgeThreshold: scrollEdgeThreshold ?? DEFAULT_SCROLL_EDGE_THRESHOLD,
+    }),
+    [autoScroll, scrollEdgeThreshold],
+  );
+  return (
+    <FollowContext.Provider value={follow}>
+      <MessageScrollerPrimitive.Provider {...props} />
+    </FollowContext.Provider>
+  );
 }
 
 function MessageScroller({
@@ -33,15 +61,93 @@ function MessageScroller({
   );
 }
 
+/**
+ * Workaround for shadcn-ui/ui#11224, fixed upstream by the unreleased
+ * shadcn-ui/ui#11223.
+ *
+ * `@shadcn/react` stops following new messages on every wheel or touchmove, and
+ * only starts again from a `scroll` event. A gesture that moves nothing (wheel
+ * momentum after the view hits the bottom, a sideways pan, a wheel used by a
+ * scrollable inside a message) fires no `scroll` event, so following stays off
+ * while the view sits at the bottom.
+ *
+ * The library calls its handler from its own `onWheel` and `onTouchMove`, which
+ * the wrapper cannot reach, so this listens in the capture phase, records
+ * whether the view was at the bottom, and on the next frame calls the public
+ * `scrollToEnd` if the gesture did not scroll the view up. A real scroll-away
+ * delivers its `scroll` event before that frame, so it is left alone.
+ *
+ * Remove once a released `@shadcn/react` contains the fix for #11224, and
+ * confirm the "keeps following" tests in message-scroller.dom.test.tsx still
+ * pass without it.
+ */
+function useKeepFollowingAfterGestures(
+  viewportRef: React.RefObject<HTMLDivElement | null>,
+) {
+  const { autoScroll, scrollEdgeThreshold } = React.useContext(FollowContext);
+  const { scrollToEnd } = useMessageScroller();
+
+  React.useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!autoScroll || !viewport) return;
+
+    let frame: number | null = null;
+    let startTop = 0;
+
+    const check = () => {
+      frame = null;
+      // Scrolled up since the gesture began: the reader meant to leave.
+      if (viewport.scrollTop < startTop - 0.5) return;
+      scrollToEnd({ behavior: "auto" });
+    };
+
+    const onGesture = () => {
+      // A second gesture before the frame keeps the first one's start point.
+      if (frame !== null) return;
+      const distance =
+        viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop;
+      if (distance > scrollEdgeThreshold) return;
+      startTop = viewport.scrollTop;
+      frame = window.requestAnimationFrame(check);
+    };
+
+    viewport.addEventListener("wheel", onGesture, {
+      capture: true,
+      passive: true,
+    });
+    viewport.addEventListener("touchmove", onGesture, {
+      capture: true,
+      passive: true,
+    });
+    return () => {
+      viewport.removeEventListener("wheel", onGesture, { capture: true });
+      viewport.removeEventListener("touchmove", onGesture, { capture: true });
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
+  }, [autoScroll, scrollEdgeThreshold, scrollToEnd, viewportRef]);
+}
+
 function MessageScrollerViewport({
   className,
+  ref,
   ...props
 }: React.ComponentProps<typeof MessageScrollerPrimitive.Viewport>) {
+  const viewportRef = React.useRef<HTMLDivElement | null>(null);
+  const setRef = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      viewportRef.current = node;
+      if (typeof ref === "function") ref(node);
+      else if (ref) ref.current = node;
+    },
+    [ref],
+  );
+  useKeepFollowingAfterGestures(viewportRef);
   return (
     <MessageScrollerPrimitive.Viewport
+      ref={setRef}
       data-slot="message-scroller-viewport"
       className={cn(
-        "size-full min-h-0 min-w-0 overflow-y-auto overscroll-contain",
+        "size-full min-h-0 min-w-0 overflow-y-auto overscroll-contain data-pending-scroll:invisible",
         className,
       )}
       {...props}
@@ -120,4 +226,7 @@ export {
   MessageScrollerItem,
   MessageScrollerProvider,
   MessageScrollerViewport,
+  useMessageScroller,
+  useMessageScrollerScrollable,
+  useMessageScrollerVisibility,
 };
