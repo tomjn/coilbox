@@ -106,14 +106,21 @@ impl Autohost {
             .map_err(|e| format!("could not send {command} to the game: {e}"))
     }
 
-    /// Turn cheats on and reload every gadget, then wait up to `wait` for a
-    /// Lua message starting with `confirm`, which the sandbox's gadget sends
-    /// once it has loaded again. Answers how long the reload took.
+    /// Send `/luarules <message>`, which reaches every synced gadget's
+    /// `GotChatMsg`, and wait up to `wait` for a Lua message starting with
+    /// `reply`. Answers that message and how long it took to come.
     ///
-    /// Cheats go on here rather than at launch, because `/luarules reload`
-    /// refuses without them and they are the reload's to need. A message that
-    /// arrived before the commands went out does not count.
-    pub fn reload_lua_rules(&self, confirm: &str, wait: Duration) -> Result<Duration, String> {
+    /// A plain `/luarules` message needs no cheats, unlike `/luarules reload`.
+    /// A message that arrived before this one went out does not count.
+    pub fn ask_lua_rules(
+        &self,
+        message: &str,
+        reply: &str,
+        wait: Duration,
+    ) -> Result<(String, Duration), String> {
+        if message.is_empty() || message.contains(['\n', '\r', '\0']) {
+            return Err(format!("not a LuaRules message: {message:?}"));
+        }
         let mut state = self.state.lock().unwrap();
         let Some(engine) = state.engine else {
             return Err("The game has not connected to coilbox.".into());
@@ -123,17 +130,16 @@ impl Autohost {
         }
         state.lua.clear();
         let started = Instant::now();
-        self.send(engine, "/cheat 1")?;
-        self.send(engine, "/luarules reload")?;
+        self.send(engine, &format!("/luarules {message}"))?;
         let deadline = started + wait;
         loop {
-            if state.lua.iter().any(|m| m.starts_with(confirm)) {
-                return Ok(started.elapsed());
+            if let Some(answer) = state.lua.iter().find(|m| m.starts_with(reply)) {
+                return Ok((answer.clone(), started.elapsed()));
             }
             let now = Instant::now();
             if now >= deadline || self.closed.load(Ordering::SeqCst) {
                 return Err(format!(
-                    "The game did not say it had reloaded within {} seconds. Its infolog says why.",
+                    "The game did not answer within {} seconds. Its infolog says why.",
                     wait.as_secs()
                 ));
             }
@@ -186,7 +192,8 @@ mod tests {
 
     use super::*;
 
-    const LOADED: &str = "coilbox_sandbox:loaded";
+    const ASK: &str = "coilbox_sandbox reload_scripts";
+    const REPLY: &str = "coilbox_sandbox:";
 
     struct Engine(UdpSocket);
 
@@ -236,42 +243,43 @@ mod tests {
     }
 
     #[test]
-    fn a_reload_turns_cheats_on_then_reloads_and_waits_for_the_gadget() {
+    fn a_message_goes_to_lua_rules_and_the_reply_comes_back() {
         let host = Autohost::bind().expect("bind");
         let engine = Engine::connect(&host);
         engine.started_playing();
         until_playing(&host);
 
         let answering = std::thread::spawn(move || {
-            let heard = [engine.heard(), engine.heard()];
+            let heard = engine.heard();
             engine.lua("someone else's message");
-            engine.lua(&format!("{LOADED}:2"));
+            engine.lua("coilbox_sandbox:loaded");
             heard
         });
-        let took = host
-            .reload_lua_rules(LOADED, Duration::from_secs(5))
-            .expect("confirmed");
+        let (answer, took) = host
+            .ask_lua_rules(ASK, REPLY, Duration::from_secs(5))
+            .expect("answered");
 
         assert_eq!(
             answering.join().unwrap(),
-            ["/cheat 1".to_string(), "/luarules reload".to_string()]
+            "/luarules coilbox_sandbox reload_scripts"
         );
+        assert_eq!(answer, "coilbox_sandbox:loaded");
         assert!(took < Duration::from_secs(5));
         host.close();
     }
 
     #[test]
-    fn a_reload_before_the_engine_has_connected_is_refused() {
+    fn a_message_before_the_engine_has_connected_is_refused() {
         let host = Autohost::bind().expect("bind");
         let err = host
-            .reload_lua_rules(LOADED, Duration::from_secs(1))
+            .ask_lua_rules(ASK, REPLY, Duration::from_secs(1))
             .expect_err("refused");
         assert!(err.contains("not connected"), "{err}");
         host.close();
     }
 
     #[test]
-    fn a_reload_before_the_game_has_started_is_refused() {
+    fn a_message_before_the_game_has_started_is_refused() {
         let host = Autohost::bind().expect("bind");
         let engine = Engine::connect(&host);
         engine.say(&[SERVER_STARTED]);
@@ -283,20 +291,34 @@ mod tests {
                 .unwrap();
         }
         let err = host
-            .reload_lua_rules(LOADED, Duration::from_secs(1))
+            .ask_lua_rules(ASK, REPLY, Duration::from_secs(1))
             .expect_err("refused");
         assert!(err.contains("not started"), "{err}");
         host.close();
     }
 
-    /// A gadget that loaded before this reload, or a reload that never
-    /// finished, must not read as this one having worked.
+    /// One message, one line of chat. A line break would be a second command
+    /// in the engine's console, and that is not what was asked for.
     #[test]
-    fn only_a_confirmation_after_the_commands_counts() {
+    fn a_message_that_is_not_one_line_is_refused() {
+        let host = Autohost::bind().expect("bind");
+        for bad in ["", "reload\n/quitforce"] {
+            let err = host
+                .ask_lua_rules(bad, REPLY, Duration::from_secs(1))
+                .expect_err("refused");
+            assert!(err.contains("not a LuaRules message"), "{err}");
+        }
+        host.close();
+    }
+
+    /// A reply that came before this message went out, or no reply at all,
+    /// must not read as this one having been answered.
+    #[test]
+    fn only_a_reply_after_the_message_counts() {
         let host = Autohost::bind().expect("bind");
         let engine = Engine::connect(&host);
         engine.started_playing();
-        engine.lua(&format!("{LOADED}:1"));
+        engine.lua("coilbox_sandbox:loaded");
         {
             let state = host.state.lock().unwrap();
             let _ = host
@@ -307,10 +329,10 @@ mod tests {
         until_playing(&host);
 
         let err = host
-            .reload_lua_rules(LOADED, Duration::from_millis(300))
-            .expect_err("nothing confirmed this reload");
-        assert!(err.contains("did not say it had reloaded"), "{err}");
-        assert_eq!(engine.heard(), "/cheat 1");
+            .ask_lua_rules(ASK, REPLY, Duration::from_millis(300))
+            .expect_err("nothing answered this message");
+        assert!(err.contains("did not answer"), "{err}");
+        assert_eq!(engine.heard(), "/luarules coilbox_sandbox reload_scripts");
         host.close();
     }
 

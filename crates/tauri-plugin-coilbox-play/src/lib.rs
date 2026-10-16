@@ -269,7 +269,7 @@ fn launch_result<E: std::fmt::Display>(
 /// game while one is already running.
 ///
 /// `autohost` opens coilbox's end of the engine's autohost interface for this
-/// run, so [`play_reload_lua_rules`] can reach the game while it runs. Only the
+/// run, so [`play_ask_lua_rules`] can reach the game while it runs. Only the
 /// unit builder's sandbox asks for it (issue #3346).
 // Each argument is one field of the IPC payload, so grouping them would only
 // move the width into a struct the frontend then has to nest.
@@ -351,22 +351,27 @@ fn open_autohost<R: Runtime>(
     Ok(dir)
 }
 
-/// How long [`play_reload_lua_rules`] waits for the game to say it reloaded.
-const RELOAD_WAIT: Duration = Duration::from_secs(10);
-
-/// `play_reload_lua_rules` — turn cheats on in the game `run_id` is running,
-/// reload every gadget with `/luarules reload`, and wait for a Lua message
-/// starting with `confirm`. Answers how long it took, in seconds.
+/// How long [`play_ask_lua_rules`] waits for the game to answer.
 ///
-/// Every live unit gets its Lua unit script read again, which is the point,
-/// and every gadget starts again from nothing, which is the cost
-/// (`docs/developers/engine-reload.md`). The run has to have been launched
-/// with `autohost`.
+/// The sandbox's reload of the unit script framework answered in 16 to 23 ms
+/// on Splinter Faction 0.1.89 (issue #3346). The slowest reload measured is
+/// the 1.0 s a `/luarules reload` of all 109 of that game's gadgets took
+/// (`docs/developers/engine-reload.md`), which bounds reloading one of them.
+/// Ten times that is a chosen margin for a slower machine, not a measurement.
+const ASK_WAIT: Duration = Duration::from_secs(10);
+
+/// `play_ask_lua_rules` — send `/luarules <message>` to the game `run_id` is
+/// running, and wait for a Lua message from it starting with `reply`. Answers
+/// that message, and how long it took in seconds.
+///
+/// The unit builder's sandbox uses it to have its gadget reload the unit's
+/// script (issue #3346). The run has to have been launched with `autohost`.
 #[tauri::command]
-async fn play_reload_lua_rules(
+async fn play_ask_lua_rules(
     hosts: State<'_, AutohostRegistry>,
     run_id: String,
-    confirm: String,
+    message: String,
+    reply: String,
 ) -> Result<CliResult, ()> {
     let Some(host) = hosts.lock().unwrap().get(&run_id).cloned() else {
         return Ok(CliResult::err(
@@ -374,13 +379,16 @@ async fn play_reload_lua_rules(
         ));
     };
     let result = tauri::async_runtime::spawn_blocking(move || {
-        host.reload_lua_rules(&confirm, RELOAD_WAIT)
+        host.ask_lua_rules(&message, &reply, ASK_WAIT)
     })
     .await;
     Ok(match result {
-        Ok(Ok(took)) => CliResult::ok(json!({ "seconds": took.as_secs_f64() })),
+        Ok(Ok((answer, took))) => CliResult::ok(json!({
+            "answer": answer,
+            "seconds": took.as_secs_f64(),
+        })),
         Ok(Err(e)) => CliResult::err(e),
-        Err(e) => CliResult::err(format!("reload task failed: {e}")),
+        Err(e) => CliResult::err(format!("LuaRules task failed: {e}")),
     })
 }
 
@@ -615,7 +623,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             play_launch_replay,
             play_launch_save,
             play_cancel,
-            play_reload_lua_rules,
+            play_ask_lua_rules,
             play_focus,
             play_infolog,
             play_system_info
