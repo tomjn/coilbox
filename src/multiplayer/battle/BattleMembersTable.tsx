@@ -358,8 +358,10 @@ export function BattleMembersTable({
     // This card is the part of the room that gives way. It takes the height its
     // rows need, shrinks when the chat would otherwise drop below its minimum,
     // and scrolls inside that, spectators and the Add AI row included. The
-    // `min-h-24` floor is the header plus two rows, so it never collapses.
-    <div className="min-h-24 overflow-auto rounded-lg border border-border/50 bg-card">
+    // `min-h-24` floor is the header plus two rows, so it never collapses. The table component's own `overflow-x-auto` wrapper
+    // is switched off, because it made itself the sticky header's scroll
+    // container while never scrolling, so the header never pinned.
+    <div className="min-h-24 overflow-auto rounded-lg border border-border/50 bg-card [&_[data-slot=table-container]]:overflow-visible">
       <Table className="border-collapse">
         <TableHeader className="sticky top-0 z-10 bg-card">
           <TooltipProvider>
