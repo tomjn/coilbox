@@ -1,11 +1,13 @@
 import * as THREE from "three";
 import { describe, expect, it, vi } from "vitest";
 import { GROUND_ELMOS } from "./buildPlate";
+import { type DriveMotion, driveAlong, driveReach, pathPoints } from "./drive";
 import {
   BACKDROPS,
   backdropById,
   buildShapedTerrain,
   buildTerrain,
+  buildWater,
   DEFAULT_GROUND,
   disposeTerrain,
   footprintWidth,
@@ -18,9 +20,11 @@ import {
   skyTexture,
   TERRAIN_ELMOS,
   terrainAlpha,
+  terrainScale,
   unitUp,
   validGroundDegrees,
 } from "./environment";
+import { PREVIEW_FRAMES } from "./scriptPlayback";
 
 describe("the options", () => {
   it("opens on the view the builder has always had", () => {
@@ -261,5 +265,64 @@ describe("buildShapedTerrain", () => {
     mesh.raycast(new THREE.Raycaster(), hits);
     expect(hits).toEqual([]);
     expect(mesh.renderOrder).toBeLessThan(0);
+  });
+});
+
+// Issue #4158: a unit driving away from the origin left the drawn ground.
+describe("ground under a drive", () => {
+  /** 60 elmos a second, the speed the issue saw a unit leave the ground at. */
+  const MOTION: DriveMotion = { speed: 2, turnRate: 600 };
+  const shapes: Parameters<typeof buildShapedTerrain>[0][] = [
+    { kind: "slope", degrees: 10 },
+    { kind: "uneven", degrees: 10, width: 48 },
+  ];
+
+  for (const name of ["straight", "bend", "circle"] as const) {
+    const points = pathPoints(name, MOTION, []);
+    const run = driveAlong(points, MOTION, {
+      start: 15,
+      frames: PREVIEW_FRAMES,
+      ground: null,
+      tilts: false,
+      minScriptChangeHeading: 1,
+    });
+    const reach = driveReach(points, run.frames);
+    const scale = terrainScale(reach);
+
+    /** Every frame is over solid ground inside the mesh's own extent. */
+    function covers(mesh: THREE.Mesh) {
+      mesh.updateMatrixWorld();
+      const box = new THREE.Box3().setFromObject(mesh);
+      for (const { pos } of run.frames) {
+        expect(pos[0]).toBeGreaterThanOrEqual(box.min.x);
+        expect(pos[0]).toBeLessThanOrEqual(box.max.x);
+        expect(pos[2]).toBeGreaterThanOrEqual(box.min.z);
+        expect(pos[2]).toBeLessThanOrEqual(box.max.z);
+        expect(terrainAlpha(Math.hypot(pos[0], pos[2]), scale)).toBe(1);
+      }
+    }
+
+    it(`keeps the flat terrain under the ${name} path`, () => {
+      covers(buildTerrain(reach));
+    });
+
+    it(`keeps the sea under the ${name} path`, () => {
+      covers(buildWater(reach));
+    });
+
+    for (const shape of shapes) {
+      it(`keeps ${shape.kind} ground under the ${name} path`, () => {
+        covers(buildShapedTerrain(shape, reach));
+        const mesh = buildShapedTerrain(shape);
+        reshapeTerrain(mesh, shape, reach);
+        covers(mesh);
+      });
+    }
+  }
+
+  it("draws the default ground when nothing drives", () => {
+    const box = new THREE.Box3().setFromObject(buildTerrain(0));
+    expect(box.max.x - box.min.x).toBeCloseTo(TERRAIN_ELMOS, 5);
+    expect(terrainScale(GROUND_ELMOS / 2)).toBe(1);
   });
 });

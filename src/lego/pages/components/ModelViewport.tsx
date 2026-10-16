@@ -65,6 +65,7 @@ import {
   groundSteps,
   REFERENCE_PARK_X,
 } from "../../buildPlate";
+import { driveReach as driveReachOf } from "../../drive";
 import {
   type BackdropId,
   disposeTerrain,
@@ -1163,6 +1164,15 @@ export function ModelViewport({
 
   useGizmoMode(sceneRef, mode, editingVolume, showAimPoint, uniformScale);
 
+  const drivePathPoints = standIn.drive?.path ?? null;
+  const driveFrames = standIn.drive?.frames;
+  const driveReach = useMemo(
+    () =>
+      drivePathPoints && driveFrames
+        ? driveReachOf(drivePathPoints, driveFrames)
+        : 0,
+    [drivePathPoints, driveFrames],
+  );
   useModelEnvironment(sceneRef, {
     showGrid,
     showReference,
@@ -1170,6 +1180,7 @@ export function ModelViewport({
     backdrop,
     ground: ground.choice.id,
     shape: ground.shape,
+    driveReach,
     up: ground.up,
     previewing: playing || scriptTimeline !== null,
   });
@@ -1177,7 +1188,6 @@ export function ModelViewport({
   useStandInSize(sceneRef, project, pack, raw, standIn.track?.size);
   // The path a drive follows, on whatever ground the view draws.
   // Dots only on points the game maker put down.
-  const drivePathPoints = standIn.drive?.path ?? null;
   const ownPath = standIn.drive?.onPick !== undefined;
   useEffect(() => {
     const state = sceneRef.current;

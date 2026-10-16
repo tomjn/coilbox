@@ -12,6 +12,7 @@ import {
   buildWater,
   type GroundId,
   type GroundShape,
+  reachTerrain,
   reshapeTerrain,
   skyTexture,
 } from "../../environment";
@@ -290,28 +291,53 @@ export function standReferenceOnGround(
 
 /** Put the solid ground, the sea or a shaped ground under the markings, or
  *  take them all away again. `shape` is what `groundShape` made of the
- *  choice, and null for the flat ones. */
+ *  choice, and null for the flat ones. `driveReach` is how far from the origin
+ *  a drive takes the unit's base, or 0 when none does: the ground is made solid
+ *  that far out, and then as far again as the unit itself reaches from its
+ *  base, so no part of it is over nothing. */
 export function applyGround(
-  state: SceneState,
+  state: Pick<
+    SceneState,
+    | "root"
+    | "scene"
+    | "reference"
+    | "groundShape"
+    | "terrain"
+    | "water"
+    | "shaped"
+  >,
   id: GroundId,
   shape: GroundShape | null,
+  driveReach = 0,
 ) {
   state.groundShape = shape;
   standReferenceOnGround(state);
+  const reach = driveReach > 0 ? driveReach + unitRadius(state.root) : 0;
   state.terrain?.removeFromParent();
   state.water?.removeFromParent();
   state.shaped?.removeFromParent();
   if (shape) {
-    if (state.shaped) reshapeTerrain(state.shaped, shape);
-    else state.shaped = buildShapedTerrain(shape);
+    if (state.shaped) reshapeTerrain(state.shaped, shape, reach);
+    else state.shaped = buildShapedTerrain(shape, reach);
     state.scene.add(state.shaped);
   } else if (id === "terrain") {
     state.terrain ??= buildTerrain();
+    reachTerrain(state.terrain, reach);
     state.scene.add(state.terrain);
   } else if (id === "water") {
     state.water ??= buildWater();
+    reachTerrain(state.water, reach);
     state.scene.add(state.water);
   }
+}
+
+/** How far the unit reaches from its base sideways, whichever way it turns:
+ *  half the diagonal of its footprint. */
+function unitRadius(root: THREE.Object3D): number {
+  const size = new THREE.Box3()
+    .setFromObject(root)
+    .getSize(new THREE.Vector3());
+  return Math.hypot(size.x, size.z) / 2;
 }
 
 /**
