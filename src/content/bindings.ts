@@ -2858,6 +2858,12 @@ export interface UnitDefsResult {
    */
   armorDefs: Record<string, unknown>;
   /**
+   * The game's movement classes, from `gamedata/movedefs.lua`, each as the
+   * table the game wrote, in the order the engine numbers them (issue #3255).
+   * `moveDefsOf` in `src/workshop/moveClasses.ts` reads them.
+   */
+  moveDefs: unknown[];
+  /**
    * The units the game's own def loader could not read, in its own words. The
    * loader runs each unit file separately and logs the ones that raise, so a
    * broken unit costs that unit and not the scan. Without this the unit would

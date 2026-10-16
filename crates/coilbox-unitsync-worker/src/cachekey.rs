@@ -69,8 +69,11 @@ use std::path::{Path, PathBuf};
 /// all rather than as a field that was never asked for. v23: the unit dataset's
 /// stats now carry what a unit makes, stores, senses and whether it builds
 /// (#3848), and a blob cached under v22 has none of those keys, which a
-/// classifier would read as a game whose units make nothing.
-pub const INFO_CACHE_VERSION: u32 = 23;
+/// classifier would read as a game whose units make nothing. v24: the unit-defs
+/// read now carries the game's movement classes from `gamedata/movedefs.lua`
+/// (#3255), and a blob cached under v23 has none, which reads as a game that
+/// declares no classes rather than as a field that was never asked for.
+pub const INFO_CACHE_VERSION: u32 = 24;
 
 /// Salts the unit model cache's keys and file names. Bump when the way a model
 /// is flattened or a texture is transcoded changes, so every entry is read again.

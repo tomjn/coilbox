@@ -102,6 +102,7 @@ export function useUnitDefs(
           ...res,
           units,
           armorDefs: res.armorDefs ?? {},
+          moveDefs: Array.isArray(res.moveDefs) ? res.moveDefs : [],
           unitErrors: res.unitErrors ?? [],
           errors: res.errors ?? [],
         });
