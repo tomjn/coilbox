@@ -983,17 +983,22 @@ fn find_engine(snap: &ContentState, path: &str) -> Option<(usize, usize)> {
     None
 }
 
+/// The snapshot as the engine list shows it, refreshed against disk with a
+/// portable install's own root seeded. An engine added since the last rescan is
+/// listed, so it must be verifiable too.
+fn live_snapshot(store: &StoreFile) -> ContentState {
+    let mut state = refresh_against_disk(store.snapshot.clone().unwrap_or_default());
+    state.roots = ensure_portable_seed(state.roots);
+    state
+}
+
 /// Run one tracked engine to read its version, and record the answer against the
 /// binary that gave it. Blocking. The engine must be tracked in the snapshot and
 /// its executable must live within its content root, or it is not run.
 fn verify_engine(sp: &Path, path: &str) -> Result<Engine, String> {
     let store = load_store(sp)?;
-    let snap = store
-        .snapshot
-        .as_ref()
-        .ok_or("no scan yet — run a rescan first")?;
-    let (ri, ei) =
-        find_engine(snap, path).ok_or("engine not found in tracked roots — rescan first")?;
+    let snap = &live_snapshot(&store);
+    let (ri, ei) = find_engine(snap, path).ok_or("engine not found in tracked roots")?;
 
     // Security: the executable must be inside its content root.
     let root_canon = canonical(Path::new(&snap.roots[ri].path));
@@ -1009,19 +1014,14 @@ fn verify_engine(sp: &Path, path: &str) -> Result<Engine, String> {
     // The store is read again under the lock. The run above took long enough
     // for another verification to have saved its own answer.
     let _held = VERIFY_STORE.lock().unwrap_or_else(|e| e.into_inner());
-    let mut store = load_store(sp)?;
-    let snap = store
-        .snapshot
-        .as_mut()
-        .ok_or("no scan yet — run a rescan first")?;
-    let (ri, ei) =
-        find_engine(snap, path).ok_or("engine not found in tracked roots — rescan first")?;
-    let e = &mut snap.roots[ri].engines[ei];
+    let store = load_store(sp)?;
+    let mut snapshot = live_snapshot(&store);
+    let (ri, ei) = find_engine(&snapshot, path).ok_or("engine not found in tracked roots")?;
+    let e = &mut snapshot.roots[ri].engines[ei];
     e.sync_version = Some(version);
     e.verified_at = Some(now_ms());
     e.verified_binary = binary;
     let engine = e.clone();
-    let mut snapshot = snap.clone();
     persist(sp, store, &mut snapshot)?;
     Ok(engine)
 }
@@ -1376,6 +1376,46 @@ mod tests {
             engines: Vec::new(),
             last_scanned_at: Some(0),
         }
+    }
+
+    /// An engine folder added after the last rescan is listed, so Verify must
+    /// find it too rather than asking for a rescan.
+    #[cfg(unix)]
+    #[test]
+    fn verify_engine_finds_an_engine_added_since_the_last_scan() {
+        use std::os::unix::fs::PermissionsExt;
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("data");
+        std::fs::create_dir_all(root.join("games")).unwrap();
+        let sp = tmp.path().join("state.json");
+        let store = StoreFile {
+            schema_version: SCHEMA_VERSION,
+            user_roots: Vec::new(),
+            snapshot: Some(ContentState {
+                schema_version: SCHEMA_VERSION,
+                roots: vec![stale_root(&display_path(&root), RootSource::Manual, false)],
+                last_scan_at: Some(0),
+            }),
+        };
+        save_store(&sp, &store).unwrap();
+
+        let dir = root.join("engine").join("2026.07.01");
+        std::fs::create_dir_all(&dir).unwrap();
+        let exe = dir.join("spring");
+        std::fs::write(&exe, "#!/bin/sh\necho 2026.07.01-71-gd0901ec\n").unwrap();
+        std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let engine = verify_engine(&sp, &display_path(&exe)).unwrap();
+        assert_eq!(
+            engine.sync_version.as_deref(),
+            Some("2026.07.01-71-gd0901ec")
+        );
+        let saved = all_engines(&load_store(&sp).unwrap().snapshot.unwrap());
+        assert_eq!(saved.len(), 1);
+        assert_eq!(
+            saved[0].sync_version.as_deref(),
+            Some("2026.07.01-71-gd0901ec")
+        );
     }
 
     #[test]
