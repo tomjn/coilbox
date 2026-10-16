@@ -563,6 +563,102 @@ fn a_piece_given_as_a_number_is_the_one_the_script_declares_there() {
     }
 }
 
+/// Every call-in that answers with a piece, `attach-unit` and `get PIECE_Y`,
+/// each handed a number worked out from a variable. COB counts that number
+/// along the script's own `piece` line (`CobInstance.cpp:142-195`), and a Lua
+/// script's pieces are the model's (`LuaUnitScript.cpp:264-277`), which holds
+/// them in another order here.
+#[test]
+fn every_piece_worked_out_from_a_number_counts_the_script_s_own_pieces() {
+    // gunPiece starts at 0, so each number below names one declared piece.
+    let source = "piece flare, barrel, pad1, pad2, nano, base, turret;\n\nstatic-var gunPiece;\n\nCreate()\n{\n\tif (get PIECE_Y(gunPiece + 3) == [7]) { move base to y-axis [1] now; }\n}\n\nQueryWeapon1(p) { p = gunPiece; }\nAimFromWeapon1(p) { p = gunPiece + 1; }\nQueryNanoPiece(p) { p = 4; }\nQueryBuildInfo(p) { p = gunPiece + 5; }\nQueryTransport(p) { p = gunPiece + 6; }\nQueryLandingPad(a, b) { a = gunPiece + 2; b = gunPiece + 3; }\nTransportPickup(unitid) { attach-unit unitid to gunPiece + 3; }\n";
+    let model: Vec<String> = ["base", "turret", "barrel", "flare", "pad1", "pad2", "nano"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    // pad2 sits 7 elmos up and nothing else is off the ground.
+    let rest: Vec<coilbox_springlua::unitscript::Rest> = model
+        .iter()
+        .map(|name| coilbox_springlua::unitscript::Rest {
+            parent: (name != "base").then_some(0),
+            position: if name == "pad2" {
+                [0.0, 7.0, 0.0]
+            } else {
+                [0.0; 3]
+            },
+        })
+        .collect();
+    let unit = Unit {
+        rest: &rest,
+        ..Unit::new(&model)
+    };
+    for prune in [false, true] {
+        let lua = convert(
+            source,
+            &Options {
+                name: "scripts/order.bos",
+                includes: &HashMap::new(),
+                pieces: Some(&model),
+                linear_scale: MODERN_LINEAR,
+                precedence: Precedence::Modern,
+                prune,
+            },
+        )
+        .unwrap()
+        .lua;
+
+        let asked = [
+            ("QueryWeapon1", "flare"),
+            ("AimFromWeapon1", "barrel"),
+            ("QueryNanoPiece", "nano"),
+            ("QueryBuildInfo", "base"),
+            ("QueryTransport", "turret"),
+        ];
+        let callins: Vec<String> = asked.iter().map(|(c, _)| c.to_string()).collect();
+        let probes = coilbox_springlua::unitscript::probe(&lua, "order.lua", &unit, &callins);
+        assert_eq!(probes.error, None, "{lua}");
+        for (callin, piece) in asked {
+            let probe = probes.probes.iter().find(|p| p.callin == callin).unwrap();
+            assert_eq!(probe.note, None, "prune {prune}: {callin}\n{lua}");
+            assert_eq!(
+                probe.pieces.first().map(String::as_str),
+                Some(piece),
+                "prune {prune}: {callin}\n{lua}"
+            );
+        }
+        // The probe reads one piece, and QueryLandingPads answers with a list.
+        assert!(
+            lua.contains("return {PIECES[a + 1], PIECES[b + 1]}"),
+            "prune {prune}\n{lua}"
+        );
+
+        let timeline = run(
+            &lua,
+            "order.lua",
+            &unit,
+            &[event(0, "Create", &[]), event(2, "TransportPickup", &[9.0])],
+            5,
+            &HashMap::new(),
+        );
+        assert_eq!(timeline.error, None, "{lua}");
+        let attached: Vec<Option<String>> = timeline
+            .events
+            .iter()
+            .filter_map(|e| match e {
+                coilbox_unitpose::ScriptOutput::Attach { piece, .. } => Some(piece.clone()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(attached, [Some("pad2".to_string())], "prune {prune}\n{lua}");
+        // base moved up, so PIECE_Y read pad2 rather than the model's fourth piece.
+        let base_y = timeline.frames[1][1];
+        assert!(
+            (base_y - 1.0).abs() < 1e-6,
+            "prune {prune}: {base_y}\n{lua}"
+        );
+    }
+}
+
 /// The engine draws a muzzle flame for `show` inside a fire function and
 /// leaves the piece hidden (`CobThread.cpp:715-728`). Anywhere else, `show`
 /// unhides.

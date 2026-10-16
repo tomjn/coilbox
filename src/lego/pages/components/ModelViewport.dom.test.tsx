@@ -832,6 +832,49 @@ describe("placeStandIn", () => {
       expect(center[0]).toBeGreaterThan(0);
     });
 
+    /** Shaped like Corack's left nano gun (#4185): an empty piece at the end
+     *  of a chain, under a parent that has turned a quarter turn about y. */
+    it("sprays from an empty piece several levels deep, through its turned parent", () => {
+      const state = sprayScene();
+      const chain = ["lnanocase", "lnanogun", "lnanospray"];
+      let carrier = state.groups.get("base") as THREE.Group;
+      for (const name of chain) {
+        const group = new THREE.Group();
+        carrier.add(group);
+        state.groups.set(name, group);
+        carrier = group;
+      }
+      state.rest.set("lnanocase", [0, 4, 0]);
+      state.rest.set("lnanogun", [3, 0, 0]);
+      state.rest.set("lnanospray", [9.25, 0, 0]);
+      const nested = project(
+        piece("lnanocase", "base"),
+        piece("lnanogun", "lnanocase"),
+        piece("lnanospray", "lnanogun"),
+      );
+      const timeline: ScriptTimeline = {
+        ...run(40, () => 0, [{ frame: 5, kind: "nano", piece: "lnanospray" }]),
+        pieces: ["base", ...chain],
+        // lnanocase turned a quarter turn about y on every frame, nothing else.
+        frames: Array.from({ length: 40 }, () => [
+          ...[0, 0, 0, 0, 0, 0],
+          ...[0, 0, 0, 0, Math.PI / 2, 0],
+          ...[0, 0, 0, 0, 0, 0],
+          ...[0, 0, 0, 0, 0, 0],
+        ]),
+      };
+      placeEffects(state, nested, beside, true, timeline, 6, noVertices);
+
+      // A quarter turn about y takes the 12.25 elmos along x to -z.
+      expect(geometry(state).instanceCount).toBeGreaterThan(0);
+      const center = geometry(state).getAttribute("center").array;
+      for (let i = 0; i < geometry(state).instanceCount; i++) {
+        expectNear(center[i * 3], 0, NOZZLE_TRAVEL_BOUND);
+        expectNear(center[i * 3 + 1], 4, NOZZLE_TRAVEL_BOUND);
+        expectNear(center[i * 3 + 2], -12.25, NOZZLE_TRAVEL_BOUND);
+      }
+    });
+
     it("leaves the scene posed on the frame it was asked for", () => {
       const state = sprayScene();
       const timeline = run(40, (frame) => frame, [
