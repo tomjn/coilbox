@@ -11,6 +11,8 @@
  * as timing: what the user picked from is the thing that has to make sense.
  */
 
+import type { GroundShape } from "./environment";
+
 /** A call-in to fire, and when. Frames are counted from the start of the run. */
 export interface ScriptEvent {
   frame: number;
@@ -89,6 +91,16 @@ export interface ScriptWorld {
     height: number;
   } | null;
   self: { radius: number; height: number };
+  /** The ground the viewport draws, absent for flat ground at 0. Mirrors
+   *  `Ground` in `crates/coilbox-unitpose/src/ground.rs`. */
+  ground?: ScriptGround;
+}
+
+/** A shaped ground, and which way is up for the unit standing on it. */
+export interface ScriptGround {
+  shape: GroundShape;
+  /** Null for a unit that stays upright. */
+  up: [number, number, number] | null;
 }
 
 /**

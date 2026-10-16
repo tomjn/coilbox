@@ -26,6 +26,7 @@
 import {
   type Scenario,
   type ScriptEvent,
+  type ScriptGround,
   type ScriptWorld,
   STAND_IN_UNIT_ID,
   type StandInAttach,
@@ -207,6 +208,9 @@ export interface WorldContext {
   /** Where the piece a call-in names rests, or null when the script names
    *  none or cannot be asked. */
   attachPiece: (from: StandInAttach["from"]) => Vec3 | null;
+  /** The ground the viewport draws, absent or null for flat ground. The same
+   *  on every frame, because nothing in a run moves the ground. */
+  ground?: ScriptGround | null;
 }
 
 /**
@@ -274,7 +278,10 @@ export function withWorld(
   const buildStart = events.find((e) => e.engine === "factory-build")?.frame;
   return events.map((event) => ({
     ...event,
-    world: worldAt(track, event.frame, ctx, buildStart),
+    world: {
+      ...worldAt(track, event.frame, ctx, buildStart),
+      ...(ctx.ground ? { ground: ctx.ground } : {}),
+    },
   }));
 }
 
