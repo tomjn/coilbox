@@ -131,23 +131,21 @@ describe("the main button once a match is running", () => {
     expect(onJoinMatch).toHaveBeenCalledTimes(1);
   });
 
-  it("asks before watching a match that is well under way", () => {
+  it("lets a match that has run over ten minutes be watched with one click", () => {
     const { onJoinMatch } = drawHeader({
       action: "watch",
       runningSince: NOW - 12 * MINUTE,
     });
     fireEvent.click(screen.getByRole("button", { name: "Watch" }));
-    expect(onJoinMatch).not.toHaveBeenCalled();
-    expect(screen.getByText(/This match started 12m ago\./)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Watch anyway" }));
     expect(onJoinMatch).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: "Watch anyway" })).toBeNull();
   });
 
-  it("asks before watching a match nobody can put a start time on", () => {
+  it("lets a match nobody can put a start time on be watched with one click", () => {
     const { onJoinMatch } = drawHeader({ action: "watch", runningSince: null });
     fireEvent.click(screen.getByRole("button", { name: "Watch" }));
-    expect(onJoinMatch).not.toHaveBeenCalled();
-    expect(screen.getByText(/already running when you connected/)).toBeTruthy();
+    expect(onJoinMatch).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: "Watch anyway" })).toBeNull();
   });
 
   it("offers no way in to somebody who cannot run the match", () => {

@@ -30,7 +30,7 @@ import { serverAddressFromKey } from "../store";
 import type { SyncState } from "./config";
 import { linkifyTitle } from "./linkifyTitle";
 import type { MatchAction } from "./matchAction";
-import { lateWatchWarning, startedAgo, useNow } from "./runningMatch";
+import { startedAgo, useNow } from "./runningMatch";
 import { SyncStatusPill } from "./SyncStatusPill";
 import { startAnywayWarning } from "./startBlockers";
 import { startButtonLabel } from "./startButtonLabel";
@@ -176,13 +176,8 @@ export function BattleRoomHeader({
   const matchRunning = action !== "start" || battle.inProgress;
   const now = useNow(matchRunning);
   // The one thing worth asking before the click goes ahead: leaving somebody
-  // behind at a start, or a long wait in front of a late watch.
-  const warning =
-    action === "start"
-      ? startWarning
-      : action === "watch"
-        ? lateWatchWarning(battle.runningSince, now)
-        : null;
+  // behind at a start.
+  const warning = action === "start" ? startWarning : null;
   const go = action === "start" ? onStart : onJoinMatch;
   const mainDisabled =
     action === "ingame" || !!blockReason || (action === "start" && !allReady);
@@ -190,7 +185,7 @@ export function BattleRoomHeader({
     if (blockReason) return blockReason;
     if (action === "ingame") return "The match is already running";
     if (action === "rejoin") return "Return to the running match";
-    if (action === "watch") return warning ?? "Join the running match to watch";
+    if (action === "watch") return "Join the running match to watch";
     if (!allReady) return "All players must be ready first";
     return (
       warning ??
