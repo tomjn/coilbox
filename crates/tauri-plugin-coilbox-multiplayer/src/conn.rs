@@ -42,6 +42,9 @@ pub(crate) fn now_ms() -> u64 {
 /// is a keepalive, not latency measurement; a coarse interval is plenty.
 const PING_INTERVAL: Duration = Duration::from_secs(30);
 
+/// Why a connection ended when the server closed it before sending one line.
+pub(crate) const SILENT_CLOSE: &str = "the server closed the connection before sending anything";
+
 /// A queued outbound action for the connection task. `Line` is a raw wire line;
 /// `SayPrivate` is recorded into DM state + persisted + emitted as a delta by the
 /// task before the wire line is sent, keeping the task the single state writer;
@@ -497,6 +500,11 @@ async fn run_loop(stream: Box<dyn AsyncReadWrite>, login_cfg: LoginConfig, ctx: 
     // kind of line, so a stale announcement from earlier in the session is
     // never mistaken for why a later, unrelated drop happened.
     let mut last_server_msg: Option<String> = None;
+    // Whether the server has sent a single line. A close before the greeting is
+    // a server that accepted the socket and then would not talk, which BAR's
+    // 8201 port did after its TLS handshake, and with no line there is no other
+    // way for the drop to say so.
+    let mut heard_anything = false;
 
     // Moderator and admin commands, one on the wire at a time.
     let mut admin = AdminQueue::default();
@@ -511,6 +519,7 @@ async fn run_loop(stream: Box<dyn AsyncReadWrite>, login_cfg: LoginConfig, ctx: 
         tokio::select! {
             item = framed.next() => match item {
                 Some(Ok(line)) => {
+                    heard_anything = true;
                     console(&sink, "in", &line);
                     let msg = parse_line(&line);
                     last_server_msg = match &msg {
@@ -776,6 +785,7 @@ async fn run_loop(stream: Box<dyn AsyncReadWrite>, login_cfg: LoginConfig, ctx: 
                 // A clean EOF carries no reason of its own, but the last thing
                 // the server said may be one: a room's `stop` (and a future
                 // kick) says why in a `SERVERMSG` right before it closes.
+                None if !heard_anything => break 'conn Some(SILENT_CLOSE.to_string()),
                 None => break 'conn last_server_msg.clone(),
             },
             Some(out) = rx.recv() => match out {
@@ -1590,6 +1600,81 @@ mod tests {
             );
             tokio::time::sleep(Duration::from_millis(5)).await;
         }
+    }
+
+    /// Connect to a server that runs `serve` on the one socket it accepts, and
+    /// record what the frontend is sent until the connection ends.
+    async fn drop_from(
+        serve: impl FnOnce(
+                tokio::net::TcpStream,
+            ) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
+            + Send
+            + 'static,
+    ) -> Arc<Mutex<Vec<String>>> {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind");
+        let addr = listener.local_addr().expect("addr");
+        tokio::spawn(async move {
+            let (sock, _) = listener.accept().await.expect("accept");
+            serve(sock).await;
+        });
+        let stream = tokio::net::TcpStream::connect(addr).await.expect("connect");
+        let (seen, events) = recording_channel();
+        let key = format!("alice@{addr}");
+        let logs = crate::dmlog::ScratchLogs::new();
+        spawn_connection(
+            Registry::default(),
+            key.clone(),
+            Box::new(stream),
+            LoginConfig {
+                username: "alice".to_string(),
+                password_hash: password_hash("hunter2"),
+                local_ip: "127.0.0.1".to_string(),
+                agent: "Coilbox test".to_string(),
+                client_id: "1".to_string(),
+                compat_flags: vec!["u".to_string()],
+                use_stls: false,
+                mode: LoginMode::Login,
+            },
+            events,
+            logs.dms(&key),
+            logs.channels(&key),
+        );
+        wait_until_heard(&seen, "\"disconnected\"").await;
+        seen
+    }
+
+    /// The disconnect event the frontend was sent.
+    fn disconnected(seen: &Arc<Mutex<Vec<String>>>) -> serde_json::Value {
+        lock_or_recover(seen)
+            .iter()
+            .filter_map(|s| serde_json::from_str::<serde_json::Value>(s).ok())
+            .find(|v| v["kind"] == "disconnected")
+            .expect("a disconnected event")
+    }
+
+    /// BAR's 8201 port completed its TLS handshake and then closed the socket
+    /// without a line, which reached the player as a bare "Disconnected" and an
+    /// empty console. A close before the greeting has to say what happened.
+    #[tokio::test]
+    async fn a_server_that_closes_before_saying_anything_is_named_as_the_reason() {
+        let seen = drop_from(|sock| Box::pin(async move { drop(sock) })).await;
+        assert_eq!(disconnected(&seen)["reason"], SILENT_CLOSE);
+    }
+
+    /// A server that has spoken and then closes is not silent, so it keeps the
+    /// reason it always had, which is none unless its last line was a SERVERMSG.
+    #[tokio::test]
+    async fn a_server_that_greets_and_then_closes_is_not_called_silent() {
+        let seen = drop_from(|sock| {
+            Box::pin(async move {
+                let mut framed = Framed::new(sock, LinesCodec::new());
+                let _ = framed.send("TASSERVER 0.38 * 8201 0".to_string()).await;
+            })
+        })
+        .await;
+        assert_eq!(disconnected(&seen)["reason"], serde_json::Value::Null);
     }
 
     /// An agent that takes requests and never answers them, which is what the
