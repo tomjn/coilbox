@@ -8,6 +8,7 @@
 //!   - `compounds/<id>.json` reusable sub-assemblies, saved out of a unit
 //!   - `thumbs/<id>.png` overview thumbnails, served by the `lego` root of the
 //!     `coilbox://` scheme
+//!   - `pictures/<id>.png` the build picture an export writes to `unitpics/`
 //!   - `geometry/<id>.bin.gz` the meshes of a unit imported from somebody
 //!     else's `.s3o`, served by the `legogeom` root. Too big for the document:
 //!     see [`import`], and [`geometry`] for the ones nobody kept
@@ -157,6 +158,7 @@ async fn lego_delete<R: Runtime>(app: AppHandle<R>, kind: String, id: String) ->
     if kind == "project" {
         if let Ok(base) = lego_dir(&app) {
             let _ = std::fs::remove_file(base.join("thumbs").join(format!("{id}.png")));
+            let _ = std::fs::remove_file(base.join("pictures").join(format!("{id}.png")));
             let _ = std::fs::remove_dir_all(base.join("out").join(&id));
             // Imported geometry belongs to one unit, so it goes with it. The
             // textures do not: they are shared, and `lego_texture_prune` is
@@ -730,6 +732,7 @@ fn export_paths(root: &Path, unit_name: &str) -> Vec<PathBuf> {
             .join("coilbox")
             .join(format!("{unit_name}_collision.lua")),
         root.join("units").join(format!("{unit_name}.lua")),
+        root.join("unitpics").join(format!("{unit_name}.png")),
         root.join("blender").join(format!("{unit_name}.glb")),
         root.join("blender").join(format!("{unit_name}.obj")),
         root.join("blender").join(format!("{unit_name}.mtl")),
@@ -2320,6 +2323,198 @@ fn sort_stale_files(
     Ok(sorted)
 }
 
+/// What placing a build picture did.
+#[derive(Debug, PartialEq)]
+enum PicturePlacement {
+    Written(PathBuf),
+    /// A file was there that the builder did not write, so it was left alone.
+    Kept(PathBuf),
+}
+
+/// Write `unitpics/<unit>.png`, unless the file there is not the builder's.
+///
+/// The engine looks for that name when a definition sets no `buildpic`
+/// (`CUnitDrawerData::SetUnitDefImage`), and a game maker may paint a better
+/// one. So a file already there is replaced only when it hashes to `known`, the
+/// digest the receipt recorded when the builder last wrote it. With no digest, or
+/// a different one, the picture is theirs.
+fn place_picture(
+    root: &Path,
+    unit_name: &str,
+    bytes: &[u8],
+    known: Option<&str>,
+) -> Result<PicturePlacement, String> {
+    let folder = root.join("unitpics");
+    let target = folder.join(format!("{unit_name}.png"));
+    if target.exists() {
+        let ours = match (known, std::fs::read(&target)) {
+            (Some(known), Ok(on_disk)) => hex_digest(&on_disk) == known,
+            _ => false,
+        };
+        if !ours {
+            return Ok(PicturePlacement::Kept(target));
+        }
+    }
+    std::fs::create_dir_all(&folder)
+        .map_err(|e| format!("could not create {}: {e}", folder.display()))?;
+    std::fs::write(&target, bytes)
+        .map_err(|e| format!("could not write {}: {e}", target.display()))?;
+    Ok(PicturePlacement::Written(target))
+}
+
+/// `lego_picture_save` stores the build picture the game maker took, beside the
+/// thumbnails, until an export writes it into a game.
+#[tauri::command]
+async fn lego_picture_save<R: Runtime>(app: AppHandle<R>, id: String, png: Vec<u8>) -> CliResult {
+    if !valid_id(&id) {
+        return CliResult::err(format!("invalid id: {id}"));
+    }
+    if !png.starts_with(PNG_MAGIC) {
+        return CliResult::err("build picture is not a PNG".to_string());
+    }
+    let dir = match lego_dir(&app) {
+        Ok(d) => d.join("pictures"),
+        Err(e) => return CliResult::err(e),
+    };
+    if let Err(e) = std::fs::create_dir_all(&dir) {
+        return CliResult::err(format!("could not create the build picture folder: {e}"));
+    }
+    match std::fs::write(dir.join(format!("{id}.png")), png) {
+        Ok(()) => CliResult::ok(json!({})),
+        Err(e) => CliResult::err(format!("could not save the build picture: {e}")),
+    }
+}
+
+/// `lego_export_picture` writes the stored build picture into a game folder
+/// under the write once rule in [`place_picture`].
+///
+/// `written` is the digest the receipt holds for that path, if any.
+#[tauri::command]
+async fn lego_export_picture<R: Runtime>(
+    app: AppHandle<R>,
+    dir: String,
+    unit_name: String,
+    id: String,
+    written: Option<String>,
+) -> CliResult {
+    if !valid_unit_name(&unit_name) {
+        return CliResult::err(format!(
+            "invalid unit name: {unit_name}. Lower case letters, digits and underscores only."
+        ));
+    }
+    if !valid_id(&id) {
+        return CliResult::err(format!("invalid id: {id}"));
+    }
+    let root = PathBuf::from(&dir);
+    if !root.is_absolute() || !root.is_dir() {
+        return CliResult::err(format!("not a folder: {dir}"));
+    }
+    let source = match lego_dir(&app) {
+        Ok(d) => d.join("pictures").join(format!("{id}.png")),
+        Err(e) => return CliResult::err(e),
+    };
+    let bytes = match std::fs::read(&source) {
+        Ok(bytes) => bytes,
+        Err(e) => return CliResult::err(format!("could not read the build picture: {e}")),
+    };
+    match place_picture(&root, &unit_name, &bytes, written.as_deref()) {
+        Ok(PicturePlacement::Written(path)) => CliResult::ok(json!({
+            "path": path.to_string_lossy(),
+            "kept": false,
+            "owned": [owned_file(&path, &bytes)],
+        })),
+        Ok(PicturePlacement::Kept(path)) => CliResult::ok(json!({
+            "path": path.to_string_lossy(),
+            "kept": true,
+            "owned": [],
+        })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// What a game's `unitpics` folder already holds.
+struct PictureSurvey {
+    /// Width, height and count for each size of PNG, most common first.
+    png_sizes: Vec<(u32, u32, usize)>,
+    /// Extension and count for every other file, such as `dds`.
+    other_formats: Vec<(String, usize)>,
+}
+
+/// Count the pictures in `<root>/unitpics` by size and format, so the builder
+/// can say when a game's pictures are not the kind it writes. A PNG's size is
+/// read off its header without decoding it.
+fn survey_unitpics(root: &Path) -> PictureSurvey {
+    let mut sizes: HashMap<(u32, u32), usize> = HashMap::new();
+    let mut formats: HashMap<String, usize> = HashMap::new();
+    if let Ok(entries) = std::fs::read_dir(root.join("unitpics")) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let extension = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_ascii_lowercase();
+            if extension == "png" {
+                if let Some(size) = png_size(&path) {
+                    *sizes.entry(size).or_default() += 1;
+                }
+            } else if !extension.is_empty() {
+                *formats.entry(extension).or_default() += 1;
+            }
+        }
+    }
+    let mut png_sizes: Vec<(u32, u32, usize)> =
+        sizes.into_iter().map(|((w, h), n)| (w, h, n)).collect();
+    png_sizes.sort_by(|a, b| b.2.cmp(&a.2).then(a.0.cmp(&b.0)).then(a.1.cmp(&b.1)));
+    let mut other_formats: Vec<(String, usize)> = formats.into_iter().collect();
+    other_formats.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+    PictureSurvey {
+        png_sizes,
+        other_formats,
+    }
+}
+
+/// The width and height in a PNG's header, or `None` if it is not one.
+fn png_size(path: &Path) -> Option<(u32, u32)> {
+    use std::io::Read;
+    let mut header = [0u8; 24];
+    std::fs::File::open(path)
+        .ok()?
+        .read_exact(&mut header)
+        .ok()?;
+    if !header.starts_with(PNG_MAGIC) {
+        return None;
+    }
+    let width = u32::from_be_bytes(header[16..20].try_into().ok()?);
+    let height = u32::from_be_bytes(header[20..24].try_into().ok()?);
+    Some((width, height))
+}
+
+/// `lego_picture_survey` reports what a game's `unitpics` folder holds.
+#[tauri::command]
+async fn lego_picture_survey(dir: String) -> CliResult {
+    let root = PathBuf::from(&dir);
+    if !root.is_absolute() || !root.is_dir() {
+        return CliResult::err(format!("not a folder: {dir}"));
+    }
+    let survey = survey_unitpics(&root);
+    CliResult::ok(json!({
+        "pngSizes": survey
+            .png_sizes
+            .iter()
+            .map(|(width, height, count)| json!({ "width": width, "height": height, "count": count }))
+            .collect::<Vec<_>>(),
+        "otherFormats": survey
+            .other_formats
+            .iter()
+            .map(|(extension, count)| json!({ "extension": extension, "count": count }))
+            .collect::<Vec<_>>(),
+    }))
+}
+
 /// A texture to decode into a Blender export's folder.
 ///
 /// The role is what says whether the alpha channel survives, which is not a
@@ -2691,6 +2886,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_export_glb,
             lego_export_obj,
             lego_export_stale,
+            lego_picture_save,
+            lego_export_picture,
+            lego_picture_survey,
             lego_scratch_game,
             lego_run_script,
             lego_probe_script
@@ -3358,19 +3556,20 @@ mod tests {
     }
 
     #[test]
-    fn a_rename_leaves_seven_files_behind_and_the_digests_find_them() {
+    fn a_rename_leaves_eight_files_behind_and_the_digests_find_them() {
         let dir = tempfile::tempdir().expect("tempdir");
         let digests = exported_unit(dir.path(), "skyfort");
 
         let dry = sort_stale_files(dir.path(), "skyfort", &digests, true).expect("dry run");
-        assert_eq!(dry.ours.len(), 7);
+        assert_eq!(dry.ours.len(), 8);
         assert!(dry.kept.is_empty());
         assert!(dry.missing.is_empty());
         // A dry run removes none of them.
         assert!(dir.path().join("units/skyfort.lua").is_file());
 
         let done = sort_stale_files(dir.path(), "skyfort", &digests, false).expect("removal");
-        assert_eq!(done.ours.len(), 7);
+        assert_eq!(done.ours.len(), 8);
+        assert!(!dir.path().join("unitpics/skyfort.png").exists());
         assert!(!dir.path().join("units/skyfort.lua").exists());
         assert!(!dir.path().join("objects3d/skyfort.s3o").exists());
         assert!(!dir
@@ -3392,7 +3591,7 @@ mod tests {
 
         let sorted = sort_stale_files(dir.path(), "skyfort", &digests, false).expect("removal");
         assert_eq!(sorted.kept, vec![edited.to_string_lossy().to_string()]);
-        assert_eq!(sorted.ours.len(), 6);
+        assert_eq!(sorted.ours.len(), 7);
         assert!(edited.is_file());
     }
 
@@ -3405,7 +3604,7 @@ mod tests {
 
         let sorted = sort_stale_files(dir.path(), "skyfort", &[], false).expect("removal");
         assert!(sorted.ours.is_empty());
-        assert_eq!(sorted.kept.len(), 7);
+        assert_eq!(sorted.kept.len(), 8);
         assert!(dir.path().join("units/skyfort.lua").is_file());
     }
 
@@ -3413,7 +3612,7 @@ mod tests {
     fn a_name_that_left_nothing_behind_is_all_missing() {
         let dir = tempfile::tempdir().expect("tempdir");
         let sorted = sort_stale_files(dir.path(), "skyfort", &[], false).expect("removal");
-        assert_eq!(sorted.missing.len(), 7);
+        assert_eq!(sorted.missing.len(), 8);
         assert!(sorted.ours.is_empty());
         assert!(sorted.kept.is_empty());
     }
@@ -3573,5 +3772,101 @@ mod tests {
     fn bitmap_png_names_the_file_when_it_is_missing() {
         let err = bitmap_png("/no/such/flame.tga").unwrap_err();
         assert!(err.contains("flame.tga"), "got: {err}");
+    }
+
+    fn png_of(width: u32, height: u32) -> Vec<u8> {
+        let img = image::RgbaImage::from_pixel(width, height, image::Rgba([1, 2, 3, 255]));
+        coilbox_texture::encode_png(&img).expect("encode")
+    }
+
+    #[test]
+    fn a_build_picture_is_written_where_the_engine_looks_for_it() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let bytes = png_of(4, 4);
+        let outcome = place_picture(dir.path(), "skyfort", &bytes, None).expect("place");
+        let target = dir.path().join("unitpics/skyfort.png");
+        assert_eq!(outcome, PicturePlacement::Written(target.clone()));
+        assert_eq!(std::fs::read(target).expect("read"), bytes);
+    }
+
+    #[test]
+    fn a_build_picture_the_builder_wrote_is_replaced_on_the_next_export() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let first = png_of(4, 4);
+        place_picture(dir.path(), "skyfort", &first, None).expect("first");
+        let second = png_of(8, 8);
+        let outcome = place_picture(
+            dir.path(),
+            "skyfort",
+            &second,
+            Some(hex_digest(&first).as_str()),
+        )
+        .expect("second");
+        assert!(matches!(outcome, PicturePlacement::Written(_)));
+        assert_eq!(
+            std::fs::read(dir.path().join("unitpics/skyfort.png")).expect("read"),
+            second
+        );
+    }
+
+    /// The write once rule: a painted picture hashes to something other than the
+    /// digest the builder recorded, so it is the game maker's and stays.
+    #[test]
+    fn a_build_picture_someone_replaced_is_left_alone() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let ours = png_of(4, 4);
+        place_picture(dir.path(), "skyfort", &ours, None).expect("first");
+        let target = dir.path().join("unitpics/skyfort.png");
+        let painted = png_of(64, 64);
+        std::fs::write(&target, &painted).expect("paint");
+
+        let outcome = place_picture(
+            dir.path(),
+            "skyfort",
+            &png_of(8, 8),
+            Some(hex_digest(&ours).as_str()),
+        )
+        .expect("second");
+
+        assert_eq!(outcome, PicturePlacement::Kept(target.clone()));
+        assert_eq!(std::fs::read(target).expect("read"), painted);
+    }
+
+    #[test]
+    fn a_build_picture_the_builder_never_wrote_is_left_alone() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let target = dir.path().join("unitpics/skyfort.png");
+        std::fs::create_dir_all(target.parent().expect("parent")).expect("mkdir");
+        let theirs = png_of(64, 64);
+        std::fs::write(&target, &theirs).expect("write");
+
+        let outcome = place_picture(dir.path(), "skyfort", &png_of(8, 8), None).expect("place");
+
+        assert_eq!(outcome, PicturePlacement::Kept(target.clone()));
+        assert_eq!(std::fs::read(target).expect("read"), theirs);
+    }
+
+    #[test]
+    fn survey_reports_the_size_most_pictures_have_and_the_formats_present() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let pics = dir.path().join("unitpics");
+        std::fs::create_dir_all(&pics).expect("mkdir");
+        std::fs::write(pics.join("a.png"), png_of(64, 48)).expect("a");
+        std::fs::write(pics.join("b.png"), png_of(64, 48)).expect("b");
+        std::fs::write(pics.join("c.png"), png_of(32, 32)).expect("c");
+        std::fs::write(pics.join("d.dds"), b"dds").expect("d");
+
+        let survey = survey_unitpics(dir.path());
+
+        assert_eq!(survey.png_sizes, vec![(64, 48, 2), (32, 32, 1)]);
+        assert_eq!(survey.other_formats, vec![("dds".to_string(), 1)]);
+    }
+
+    #[test]
+    fn survey_of_a_game_with_no_pictures_is_empty() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let survey = survey_unitpics(dir.path());
+        assert!(survey.png_sizes.is_empty());
+        assert!(survey.other_formats.is_empty());
     }
 }
