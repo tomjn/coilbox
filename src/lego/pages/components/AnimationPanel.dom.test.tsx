@@ -282,7 +282,22 @@ describe("a unit on the presets, once played", () => {
       screen.getByRole("combobox", { name: "What happens to the unit" }),
     ).toBeTruthy();
     expect(screen.getByText("Idle sway")).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Script/ })).toBeTruthy();
+  });
+
+  it("leaves the script to the bottom drawer, and lets the player row wrap", () => {
+    const { container } = show(withPreset());
+
+    expect(screen.queryByRole("button", { name: /Script/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Edit/ })).toBeNull();
+    const row = screen.getByRole("button", { name: /Play/ }).parentElement;
+    expect(row?.className).toContain("flex-wrap");
+    expect(container.querySelector(".ml-auto")).toBeNull();
+  });
+
+  it("does not offer Edit for a unit that owns its script", () => {
+    show(project({ script: "-- one" }));
+
+    expect(screen.queryByRole("button", { name: /Edit/ })).toBeNull();
   });
 
   it("does not offer to edit a script it has not been given", () => {
