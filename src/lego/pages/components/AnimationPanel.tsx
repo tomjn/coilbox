@@ -71,6 +71,7 @@ import type { LoadedPack } from "../../pack";
 import { pieceRest } from "../../pieceRest";
 import type { RawGeometry } from "../../rawGeometry";
 import { pieceWorldRest, unitBounds, unitSize } from "../../s3oBuild";
+import { scenarioMark } from "../../scenarioMarks";
 import { isMarked } from "../../scriptMarks";
 import {
   at,
@@ -341,6 +342,18 @@ export function AnimationPanel({
   const compiled = owned ? undefined : project.compiledScript;
   /** Whether this unit animates from a script of its own rather than presets. */
   const playsOwnScript = owned || compiled !== undefined;
+  // Only the generated script is read for marks. An owned or compiled one is
+  // the user's, and its call-ins are not something presets can be blamed for.
+  const marks = useMemo(() => {
+    const result = new Map<string, string>();
+    if (playsOwnScript) return result;
+    const script = unitScript(project);
+    for (const option of SCENARIOS) {
+      const reason = scenarioMark(option, script);
+      if (reason) result.set(option.id, reason);
+    }
+    return result;
+  }, [project, playsOwnScript]);
 
   const stop = useCallback(() => {
     onPlayingChange(false);
@@ -901,7 +914,17 @@ export function AnimationPanel({
             </SelectTrigger>
             <SelectContent>
               {SCENARIOS.map((option) => (
-                <SelectItem key={option.id} value={option.id}>
+                <SelectItem
+                  key={option.id}
+                  value={option.id}
+                  trailing={
+                    marks.has(option.id) ? (
+                      <span className="text-xs text-muted-foreground">
+                        Nothing to do
+                      </span>
+                    ) : undefined
+                  }
+                >
                   {option.label}
                 </SelectItem>
               ))}
@@ -947,9 +970,16 @@ export function AnimationPanel({
               ) : null}
             </>
           ) : (
-            <p className="text-xs text-muted-foreground">
-              {scenario?.description}
-            </p>
+            <>
+              <p className="text-xs text-muted-foreground">
+                {scenario?.description}
+              </p>
+              {marks.has(scenarioId) ? (
+                <p className="text-xs text-muted-foreground">
+                  {marks.get(scenarioId)}
+                </p>
+              ) : null}
+            </>
           )}
         </div>
 
