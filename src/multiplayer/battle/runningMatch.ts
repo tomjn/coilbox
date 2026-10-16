@@ -17,30 +17,6 @@ export function startedAgo(since: number | null, now: number): string {
   return ago ? `Started ${ago}` : "In progress";
 }
 
-/** How far into a match watching stops being a short wait. */
-const LATE_WATCH_MS = 10 * 60_000;
-
-/**
- * What to tell somebody about to watch a match that is well under way, or null
- * when there is nothing to warn about.
- *
- * An engine that joins late plays the whole match through to catch up. How long
- * that takes depends on the machine, the player count and what happened in the
- * game, so this warns and never refuses.
- */
-export function lateWatchWarning(
-  since: number | null,
-  now: number,
-): string | null {
-  const catchUp =
-    "The engine has to play through all of it to catch up before you see the live game.";
-  if (since === null) {
-    return `This match was already running when you connected, so coilbox does not know how long it has been going. ${catchUp}`;
-  }
-  if (now - since < LATE_WATCH_MS) return null;
-  return `This match started ${agoFrom(since, now)}. ${catchUp}`;
-}
-
 function agoFrom(since: number, now: number): string | null {
   return relativeTime(new Date(since).toISOString(), now);
 }
