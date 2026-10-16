@@ -76,18 +76,36 @@ export function springTexture(url: string): THREE.Texture {
       : new THREE.TextureLoader().load(url, textureArrived, undefined, gaveUp);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 4;
-  // The engine flips every texture to OpenGL's bottom-up order on load,
-  // including a DDS. three does that for anything it decodes itself, but a
-  // compressed texture is uploaded block by block and cannot be flipped, so the
-  // sampling is turned upside down instead.
-  if (ext === "dds") {
-    texture.flipY = false;
+  // three flips a picture it decodes itself so that v = 0 is the bottom row,
+  // which is the wrong way up for everything but a DDS. A compressed DDS cannot
+  // be flipped on upload at all, so its sampling is turned upside down instead.
+  texture.flipY = false;
+  if (!vZeroAtTop(clean)) {
     texture.wrapT = THREE.RepeatWrapping;
     texture.repeat.set(1, -1);
     texture.offset.set(0, 1);
   }
   textures.set(url, texture);
   return texture;
+}
+
+/**
+ * Whether the engine samples a unit texture with v = 0 at the top row of the
+ * picture, judged by its file name.
+ *
+ * True for everything but a `.dds`. The engine passes an `.s3o`'s UVs straight
+ * to the shader (`rts/Rendering/Models/S3OParser.cpp` line 149) and loads every
+ * other format with its top row first: `CBitmap::Load` sets
+ * `IL_ORIGIN_UPPER_LEFT` in `rts/Rendering/Textures/Bitmap.cpp` line 1308. A
+ * `.dds` goes through nv_dds instead, which flips it on load (`flipDDS`, lines
+ * 1235 and 1252), so its v = 0 is the bottom row.
+ *
+ * Seen in a windowed engine for #4174. Splinter Faction's droppod, painted with
+ * a PNG, showed the mirror image of what the builder drew on every face.
+ */
+export function vZeroAtTop(file: string): boolean {
+  const name = file.split(/[?#]/)[0];
+  return name.slice(name.lastIndexOf(".") + 1).toLowerCase() !== "dds";
 }
 
 /**
