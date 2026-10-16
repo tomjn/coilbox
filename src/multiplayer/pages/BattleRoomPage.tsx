@@ -1,4 +1,4 @@
-import { Button, NavGate } from "@picoframe/frame";
+import { Button, cn, NavGate } from "@picoframe/frame";
 import { Bookmark, Gamepad2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
@@ -41,6 +41,7 @@ import { GameTypePresetsControls } from "../battle/GameTypePresetsControls";
 import { MissingContentCard } from "../battle/MissingContentCard";
 import { launchesOnItsOwn, matchAction } from "../battle/matchAction";
 import { matchStartAction } from "../battle/matchStart";
+import { RoomSplitHandle, useRoomSplit } from "../battle/RoomSplit";
 import { StartPosOptions } from "../battle/StartPosOptions";
 import { unsyncedPlayers } from "../battle/startBlockers";
 import { battleToSkirmishDraft } from "../battle/toSkirmish";
@@ -72,6 +73,7 @@ import { useNameMark } from "../useNameMark";
  */
 function BattleRoomPage() {
   const room = useBattleRoom(useBattleRoomKey());
+  const split = useRoomSplit();
   const { disconnect, connections } = useMultiplayer();
   const servers = useProtocolServers();
   // The room's own connection, which is the one a battle in our own LAN room
@@ -563,38 +565,52 @@ function BattleRoomPage() {
       )}
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
-          <BattleMembersTable
-            serverKey={room.serverKey}
-            markFor={markFor}
-            rows={room.rows}
-            sides={room.sides}
-            factionLogos={factionLogos}
-            maxSlots={battle.maxPlayers}
-            startPosType={room.startPosType}
-            selfHost={room.selfHost}
-            serverAssignsSeat={room.serverAssignsSeat}
-            canKick={room.canKick}
-            canBoss={room.canBoss}
-            canAddBot={room.canAddBot}
-            botsRefused={room.botsRefused}
-            canSetBotAlly={room.canSetBotAlly}
-            hostControls={room.hostControls}
-            addableAis={room.addableAis}
-            addableAisReady={room.addableAisReady}
-            aiConfig={aiConfig}
-            noteFor={(row) => getNote(row.userId, row.name)}
-            onSetNote={(row, text) => setNote(row.userId, row.name, text)}
-            statsSummaryFor={(row) => relationSummary(relationFor(row.name))}
-            // Only an autohost battle has anything to send this to: there is
-            // no founder-direct equivalent of SPADS's `!force ... bonus`.
-            onSetBonus={!room.selfHost ? room.setBonus : undefined}
-            onAddBot={room.addBot}
-            onSide={room.setSide}
-            onTeam={room.setTeam}
-            onAlly={room.setAlly}
-            onColor={room.setColor}
-          />
+        <div
+          ref={split.columnRef}
+          className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-4"
+        >
+          <div
+            ref={split.tableRef}
+            id={split.tableId}
+            style={split.tableStyle}
+            className={cn(
+              "flex min-h-24 flex-col [&>*]:grow",
+              split.tableClass,
+            )}
+          >
+            <BattleMembersTable
+              serverKey={room.serverKey}
+              markFor={markFor}
+              rows={room.rows}
+              sides={room.sides}
+              factionLogos={factionLogos}
+              maxSlots={battle.maxPlayers}
+              startPosType={room.startPosType}
+              selfHost={room.selfHost}
+              serverAssignsSeat={room.serverAssignsSeat}
+              canKick={room.canKick}
+              canBoss={room.canBoss}
+              canAddBot={room.canAddBot}
+              botsRefused={room.botsRefused}
+              canSetBotAlly={room.canSetBotAlly}
+              hostControls={room.hostControls}
+              addableAis={room.addableAis}
+              addableAisReady={room.addableAisReady}
+              aiConfig={aiConfig}
+              noteFor={(row) => getNote(row.userId, row.name)}
+              onSetNote={(row, text) => setNote(row.userId, row.name, text)}
+              statsSummaryFor={(row) => relationSummary(relationFor(row.name))}
+              // Only an autohost battle has anything to send this to: there is
+              // no founder-direct equivalent of SPADS's `!force ... bonus`.
+              onSetBonus={!room.selfHost ? room.setBonus : undefined}
+              onAddBot={room.addBot}
+              onSide={room.setSide}
+              onTeam={room.setTeam}
+              onAlly={room.setAlly}
+              onColor={room.setColor}
+            />
+          </div>
+          <RoomSplitHandle {...split.handle} />
           <BattleChatCard
             serverKey={room.serverKey}
             markFor={markFor}
