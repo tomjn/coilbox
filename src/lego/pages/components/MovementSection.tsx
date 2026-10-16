@@ -1,6 +1,6 @@
 /**
- * The unit's movement class, speed and turn rate, picked from the game it is
- * tested against (issue #3255). See `movement.ts` for how the classes are
+ * The unit's movement class, speed and turn rate, picked from the game the unit
+ * belongs to (issues #3255, #4172). See `movement.ts` for how the classes are
  * narrowed and where the numbers come from.
  */
 
@@ -15,6 +15,7 @@ import {
   movementKinds,
   movementState,
   suggestMotion,
+  unitGame,
 } from "../../movement";
 import type { UnitBounds } from "../../s3oBuild";
 import { footprintSteps } from "../../unitDef";
@@ -30,7 +31,13 @@ interface Props {
 }
 
 export function MovementSection({ project, bounds, onMovementChange }: Props) {
-  const { target, targetLoading, scan, game } = useTestGame();
+  // The Test drawer's game is only read here for the engine and the scan. The
+  // classes come from the unit's own game, never from the drawer's pick.
+  const { target, targetLoading, scan } = useTestGame();
+  const own = unitGame(project);
+  const game = own
+    ? scan.data?.games.find((g) => g.primaryArchive.name === own.archive)
+    : undefined;
   const { defs, defsFor, status, error } = useUnitDefs(
     target?.enginePath,
     target?.dataDir,
@@ -48,13 +55,14 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
       ? { units: defs.units, moveDefs: defs.moveDefs }
       : null;
 
-  const noGame =
-    !targetLoading && !target
+  const noGame = !own
+    ? "This unit has no game, so there are no movement classes to offer."
+    : !targetLoading && !target
       ? "No engine is installed, so there is no game to read classes from."
       : scan.error
         ? `The content scan failed: ${scan.error}`
         : scan.data
-          ? "No game is installed, so there is no game to read classes from."
+          ? `${own.name} is not installed, so there are no movement classes to read.`
           : "Reading games";
   const state = movementState({
     gameName: game?.name ?? null,
@@ -158,6 +166,11 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
           ariaLabel="Movement class"
           size="sm"
         />
+      ) : null}
+      {stored && !own ? (
+        <p className="text-xs text-destructive">
+          {stored} is not from this unit's game, because it has none.
+        </p>
       ) : null}
       {missing && game ? (
         <p className="text-xs text-destructive">

@@ -22,13 +22,28 @@ const GAME = {
   name: "Splinter Faction 0.1.89",
   primaryArchive: { name: "SplinterFaction_0.1.89.sdz" },
 };
+const OTHER_GAME = {
+  name: "Metal Factions",
+  primaryArchive: { name: "MetalFactions.sdz" },
+};
+
+/** A unit imported from Splinter Faction, so it belongs to that game. */
+const IMPORTED = {
+  source: "objects3d/a.s3o",
+  game: {
+    name: GAME.name,
+    archive: GAME.primaryArchive.name,
+    member: "objects3d/a.s3o",
+  },
+} as LegoProject["imported"];
 
 function haveGame() {
   testGame.mockReturnValue({
     target: { enginePath: "/e", dataDir: "/d" },
     targetLoading: false,
-    scan: { data: { games: [GAME] } },
-    game: GAME,
+    scan: { data: { games: [GAME, OTHER_GAME] } },
+    // The Test drawer's pick. A unit's movement must not follow it.
+    game: OTHER_GAME,
   });
 }
 
@@ -63,6 +78,7 @@ function project(role: string, over: Partial<LegoProject> = {}): LegoProject {
   return {
     ...base,
     pieces: [{ ...base.pieces[0], role }],
+    imported: IMPORTED,
     ...over,
   };
 }
@@ -85,6 +101,104 @@ afterEach(() => {
 });
 
 describe("MovementSection", () => {
+  it("offers nothing to a unit with no game, whatever the Test drawer picked", () => {
+    render(
+      <MovementSection
+        project={project("wheel", { imported: undefined })}
+        bounds={BOUNDS}
+        onMovementChange={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByText(
+        "This unit has no game, so there are no movement classes to offer.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(screen.queryByText(/Metal Factions/)).toBeNull();
+  });
+
+  it("does not take the folder a unit was exported into as its game", () => {
+    render(
+      <MovementSection
+        project={project("wheel", {
+          imported: undefined,
+          exported: {
+            dir: "/games/SplinterFaction.sdd",
+            at: "2026-10-16T00:00:00Z",
+            unitName: "rover",
+            def: {},
+          },
+        })}
+        bounds={BOUNDS}
+        onMovementChange={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByText(
+        "This unit has no game, so there are no movement classes to offer.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByRole("combobox")).toBeNull();
+  });
+
+  it("reads the unit's imported game, not the Test drawer's", () => {
+    render(
+      <MovementSection
+        project={project("wheel")}
+        bounds={BOUNDS}
+        onMovementChange={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByText(
+        "Splinter Faction 0.1.89's vehicle classes, from its movedefs.lua",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("says a game that is not installed cannot be read", () => {
+    testGame.mockReturnValue({
+      target: { enginePath: "/e", dataDir: "/d" },
+      targetLoading: false,
+      scan: { data: { games: [OTHER_GAME] } },
+      game: OTHER_GAME,
+    });
+    render(
+      <MovementSection
+        project={project("wheel")}
+        bounds={BOUNDS}
+        onMovementChange={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByText(
+        "Splinter Faction 0.1.89 is not installed, so there are no movement classes to read.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("keeps a stored class on a unit with no game and says it is not from one", () => {
+    const onMovementChange = vi.fn();
+    render(
+      <MovementSection
+        project={project("wheel", {
+          imported: undefined,
+          movement: { moveClass: "TANK9", speed: 50 },
+        })}
+        bounds={BOUNDS}
+        onMovementChange={onMovementChange}
+      />,
+    );
+    expect(
+      screen.getByText(
+        "TANK9 is not from this unit's game, because it has none.",
+      ),
+    ).toBeTruthy();
+    expect(onMovementChange).not.toHaveBeenCalled();
+    expect(screen.getByRole("combobox", { name: "Movement class" })).toBeTruthy();
+  });
+
   it("says when there is no game to read classes from", () => {
     testGame.mockReturnValue({
       target: { enginePath: "/e", dataDir: "/d" },
@@ -107,7 +221,7 @@ describe("MovementSection", () => {
     );
     expect(
       screen.getByText(
-        "No game is installed, so there is no game to read classes from.",
+        "Splinter Faction 0.1.89 is not installed, so there are no movement classes to read.",
       ),
     ).toBeTruthy();
     expect(screen.queryByRole("combobox")).toBeNull();
