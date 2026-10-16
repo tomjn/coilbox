@@ -9,7 +9,12 @@ import {
 } from "../../referenceObject";
 import { applySceneScale } from "./cameraFraming";
 import type { GameReferenceChoice } from "./ReferencePicker";
-import { applyBackdrop, applyGround, type SceneState } from "./sceneState";
+import {
+  applyBackdrop,
+  applyGround,
+  type SceneState,
+  standReferenceOnGround,
+} from "./sceneState";
 
 export interface ModelEnvironmentDeps {
   showGrid: boolean;
@@ -95,6 +100,7 @@ export function useModelEnvironment(
     }
 
     state.reference.visible = showReferenceRef.current;
+    standReferenceOnGround(state);
     state.scene.add(state.reference);
     applySceneScale(state);
     state.render();
