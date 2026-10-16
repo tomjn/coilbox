@@ -91,6 +91,9 @@ mod zerok_conn;
 /// What a Zero-K game did to everybody's rating, which is the one post-match
 /// report any protocol coilbox speaks sends at all.
 mod zerok_debriefing;
+/// Where a Zero-K match is, which the server sends rather than putting on the
+/// battle, and the request that asks it to.
+mod zerok_launch;
 /// The Zero-K battle room we are in, held as that protocol describes it and
 /// projected into the same room the other two fill.
 mod zerok_room;
@@ -2639,6 +2642,31 @@ fn mp_zerok_open_battle(
     .unwrap_or_else(|| CliResult::err("this server does not open battles for its players"))
 }
 
+/// `mp_zerok_request_connect_spring`, Zero-K only: ask the server where the
+/// running match in battle `battle_id` is.
+///
+/// The answer is a `ConnectSpring`, which the connection reads like the one sent
+/// at a match's start and which the battle room launches. So this is the way
+/// back into a match whose engine exited, and the way in to watch one.
+#[tauri::command]
+fn mp_zerok_request_connect_spring(
+    registry: State<'_, Registry>,
+    server_key: String,
+    battle_id: u32,
+) -> CliResult {
+    // Zero-K's battle ids are a C# `int` counting up from 1, so one that does not
+    // fit was never one of its battles.
+    let Ok(battle_id) = i32::try_from(battle_id) else {
+        return CliResult::err(format!("{battle_id} is not a Zero-K battle"));
+    };
+    zerok_action(
+        registry.inner(),
+        &server_key,
+        zerok_conn::ZerokAction::RequestConnectSpring { battle_id },
+    )
+    .unwrap_or_else(|| CliResult::err("this server does not send where its matches are"))
+}
+
 /// `mp_start_battle`: ask for the match to begin.
 #[tauri::command]
 fn mp_start_battle(registry: State<'_, Registry>, server_key: String) -> CliResult {
@@ -3568,12 +3596,13 @@ fn host_config_answer(
 /// A Tachyon battle is not built from the lobby at all. The server picks an
 /// autohost and tells each player where to connect in a `battle/start` request,
 /// so the config the connection built from that request is the only one there
-/// is, and until one arrives there is nothing to launch.
+/// is, and until one arrives there is nothing to launch. A Zero-K battle is the
+/// same, with `ConnectSpring` in place of `battle/start`.
 #[tauri::command]
 fn mp_build_battle_config(registry: State<'_, Registry>, server_key: String) -> CliResult {
     let map = lock_or_recover(&registry);
     match map.get(&server_key) {
-        Some(conn) if lock_or_recover(&conn.tachyon).is_some() => {
+        Some(conn) if matches!(conn.protocol, ConnProtocol::Tachyon | ConnProtocol::Zerok) => {
             match lock_or_recover(&conn.started).clone() {
                 // Nothing needs opening through a router: the address is the
                 // server's own autohost.
@@ -3724,6 +3753,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_set_battle_status,
             mp_open_battle,
             mp_zerok_open_battle,
+            mp_zerok_request_connect_spring,
             tachyon_room::mp_create_lobby,
             mp_start_battle,
             mp_update_battle_info,

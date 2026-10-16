@@ -45,7 +45,8 @@ use crate::dmlog::DmLog;
 use crate::tls::ConnectError;
 use crate::turn::TurnAnswer;
 use crate::{
-    lock_or_recover, zerok_battles, zerok_chat, zerok_debriefing, zerok_room, zerok_users,
+    lock_or_recover, zerok_battles, zerok_chat, zerok_debriefing, zerok_launch, zerok_room,
+    zerok_users,
 };
 
 /// How long the socket may be idle before the kernel starts probing, and how far
@@ -146,6 +147,7 @@ pub fn spawn_connection(
     // The sending half goes to the task and nowhere else, so it is dropped when
     // the connection ends and everything waiting on the phase is woken.
     let (phase_tx, phase) = watch::channel(LoginPhase::AwaitGreeting);
+    let started = StartedBattle::default();
 
     tokio::spawn(run_loop(
         stream,
@@ -157,6 +159,7 @@ pub fn spawn_connection(
             rx,
             state: state.clone(),
             phase_slot: phase_tx,
+            started: started.clone(),
             dm_log,
         },
     ));
@@ -174,10 +177,11 @@ pub fn spawn_connection(
             // Zero-K's terms are agreed on its website, so there is no agreement
             // handshake on the connection to park on.
             agreement: Arc::new(Mutex::new(None)),
-            // Neither of these belongs to a Zero-K connection. There is no
-            // Tachyon client, and a battle carries the host's address itself.
+            // There is no Tachyon client on a Zero-K connection.
             tachyon: TachyonHandle::default(),
-            started: StartedBattle::default(),
+            // Where the server last sent us to play, from its `ConnectSpring`.
+            // Zero-K hosts every match itself, so the battle has no address on it.
+            started,
             // Zero-K hosts its own battles on its own servers, so there is no
             // relay credential to ask it for and nothing ever fills this.
             turn: watch::channel(TurnAnswer::Unasked).1,
@@ -201,6 +205,8 @@ struct ZerokConnContext {
     rx: mpsc::UnboundedReceiver<Outbound>,
     state: Arc<Mutex<LobbyState>>,
     phase_slot: watch::Sender<LoginPhase>,
+    /// Filled from each `ConnectSpring`, read by `mp_build_battle_config`.
+    started: StartedBattle,
     dm_log: DmLog,
 }
 
@@ -218,6 +224,7 @@ async fn run_loop(stream: TcpStream, login: ZerokLogin, ctx: ZerokConnContext) {
         mut rx,
         state,
         phase_slot,
+        started,
         dm_log,
     } = ctx;
 
@@ -353,8 +360,10 @@ async fn run_loop(stream: TcpStream, login: ZerokLogin, ctx: ZerokConnContext) {
                     // folded after the login arms so a `LoggedIn` reaches the
                     // frontend before anything that assumes we are.
                     let now = now_ms();
-                    let (deltas, replies) = {
+                    let (deltas, replies, launch, left_room) = {
                         let mut held = lock_or_recover(&state);
+                        let was_in_room = held.current_battle.is_some();
+                        let launch = zerok_launch::reduce(&mut held, &message);
                         let mut deltas = zerok_users::reduce(&mut held, &message);
                         deltas.extend(zerok_battles::reduce(&mut held, &message));
                         deltas.extend(zerok_debriefing::reduce(&mut held, &message));
@@ -375,7 +384,8 @@ async fn run_loop(stream: TcpStream, login: ZerokLogin, ctx: ZerokConnContext) {
                             )
                             .flatten()
                             .collect();
-                        (deltas, replies)
+                        let left_room = was_in_room && held.current_battle.is_none();
+                        (deltas, replies, launch, left_room)
                     };
                     for delta in deltas {
                         // A conversation outlives the connection, so a message
@@ -396,6 +406,27 @@ async fn run_loop(stream: TcpStream, login: ZerokLogin, ctx: ZerokConnContext) {
                         emit(&sink, LobbyEvent::Delta { delta });
                     }
                     outbound.extend(replies);
+                    // The room we were in has gone, so where its match was is
+                    // no longer somewhere to launch.
+                    if left_room {
+                        lock_or_recover(&started).take();
+                    }
+                    // The server has said where a match is. After the deltas, so
+                    // the room the frontend launches from is the one this
+                    // message left.
+                    if let Some(launch) = launch {
+                        for delta in launch.deltas {
+                            emit(&sink, LobbyEvent::Delta { delta });
+                        }
+                        for note in launch.notes {
+                            emit(&sink, LobbyEvent::Console {
+                                direction: "in".into(),
+                                line: note,
+                            });
+                        }
+                        *lock_or_recover(&started) = Some(launch.config);
+                        emit(&sink, LobbyEvent::BattleStarting);
+                    }
                     if matches!(message, ZerokMessage::FriendList(_)) {
                         let held = lock_or_recover(&state);
                         for action in held_joins.take().into_iter().flatten() {
@@ -474,6 +505,9 @@ pub enum ZerokAction {
     /// Something a chat surface asks: a line to say, a channel to join or
     /// leave, or a relation to set.
     Chat(zerok_chat::ChatAction),
+    /// Ask where a running match is. The server answers with a
+    /// `ConnectSpring`, which launches like any other.
+    RequestConnectSpring { battle_id: i32 },
 }
 
 /// The wire lines for an action, in the order they go out.
@@ -491,6 +525,9 @@ fn build(state: &LobbyState, action: &ZerokAction) -> Result<Vec<String>, serde_
         }
         ZerokAction::Room(action) => zerok_room::build(state, action),
         ZerokAction::Chat(action) => zerok_chat::build(state, action),
+        ZerokAction::RequestConnectSpring { battle_id } => {
+            Ok(vec![line::to_line(&zerok_launch::request(*battle_id))?])
+        }
     }
 }
 

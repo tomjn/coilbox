@@ -26,6 +26,8 @@ const wire = vi.hoisted(() => ({
   /** Keys whose battle Rust says goes through the relay. */
   relayedOn: new Set<string>(),
   launches: [] as { relayed: boolean }[],
+  /** Battles a Zero-K connection was asked where the match is, as key and id. */
+  askedForMatch: [] as { serverKey: string; battleId: number }[],
   /** What the scan hook's `runWithReason` resolves, for the rescan tests. */
   scanOutcome: { data: null, error: null } as {
     data: { games: { name: string }[]; maps: { name: string }[] } | null;
@@ -92,6 +94,13 @@ vi.mock("./bindings", () => ({
     };
   },
   mpTachyonSignedIn: async () => ({ signedIn: true }),
+  mpZerokRequestConnectSpring: async (args: {
+    serverKey: string;
+    battleId: number;
+  }) => {
+    wire.askedForMatch.push(args);
+    return { sent: true };
+  },
 }));
 
 // The battle room reads local content and the preferred engine. None of it is
@@ -154,6 +163,7 @@ import { MultiplayerProvider, useMultiplayer } from "./store";
 
 const KEY_A = "AF@server4.beyondallreason.info:8201";
 const KEY_B = "Zeta@lobby.recoilengine.org:8200";
+const KEY_ZK = "Kay@zero-k.info:8200";
 
 function battle(id: number, title: string, host = "Host"): Battle {
   return {
@@ -358,6 +368,31 @@ describe("the battle room with two connections", () => {
     await openRoom(`/battle?server=${encodeURIComponent(KEY_B)}`);
     expect(room.hostIngame).toBe(true);
     expect(room.presentAtStart).toBe(false);
+  });
+
+  // Zero-K has no host whose in-game bit says a match is running, and the
+  // server has to be asked where one is (issue #1973).
+  it("reads a Zero-K room's match off the battle and asks the server for it", async () => {
+    wire.activeKeys = [KEY_A, KEY_ZK];
+    wire.askedForMatch.length = 0;
+    const running = {
+      ...battle(9, "Zero-K room", "Founder"),
+      inProgress: true,
+    };
+    wire.states.set(KEY_ZK, lobbyState("Kay", [running], 9));
+    await openRoom(`/battle?server=${encodeURIComponent(KEY_ZK)}`);
+    expect(room.hostIngame).toBe(true);
+    expect(room.serverSendsMatch).toBe(true);
+    await act(async () => {
+      await room.askForMatch?.();
+    });
+    expect(wire.askedForMatch).toEqual([{ serverKey: KEY_ZK, battleId: 9 }]);
+  });
+
+  it("joins a TASServer match with a launch of its own", async () => {
+    await openRoom(`/battle?server=${encodeURIComponent(KEY_B)}`);
+    expect(room.serverSendsMatch).toBe(false);
+    expect(room.askForMatch).toBeNull();
   });
 
   it("leaves the battle on its own connection", async () => {

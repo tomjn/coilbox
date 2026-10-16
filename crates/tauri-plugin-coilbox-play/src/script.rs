@@ -163,7 +163,10 @@ pub struct AllyTeam {
 }
 
 /// Render a `BattleConfig` into the engine's `[GAME]{ ... }` start-script text.
-pub fn generate_script(cfg: &BattleConfig) -> String {
+///
+/// Refuses a client script holding a value that would change what the script
+/// says. See [`generate_client_script`].
+pub fn generate_script(cfg: &BattleConfig) -> Result<String, String> {
     // A client joining a remote lobby battle needs only a minimal script pointing
     // at the host; the host relays the full game/team/player state. (See skylobby
     // `script-data-client`.)
@@ -304,27 +307,92 @@ pub fn generate_script(cfg: &BattleConfig) -> String {
     }
 
     s.push_str("}\n");
-    s
+    Ok(s)
 }
 
 /// Minimal `[GAME]` block for a client joining a remote host: it identifies the
 /// player and where to connect; the host supplies teams/players/AIs over the wire.
-fn generate_client_script(cfg: &BattleConfig) -> String {
+///
+/// Every value in it came from a lobby server, so each one is checked before it
+/// is written, and a value that fails is refused rather than escaped. A script
+/// quietly rewritten into something else is worse than a launch that did not
+/// happen. See [`value_refusal`] for what is refused and why.
+fn generate_client_script(cfg: &BattleConfig) -> Result<String, String> {
+    let ip = cfg
+        .host_ip
+        .as_deref()
+        .ok_or("Coilbox did not start the game: the server did not say where the match is.")?;
+    let port = cfg.host_port.ok_or(
+        "Coilbox did not start the game: the server did not say which port the match is on.",
+    )?;
+    if let Some(refused) = host_refusal(ip) {
+        return Err(refused);
+    }
+    if let Some(refused) = value_refusal("player name", &cfg.my_player_name) {
+        return Err(refused);
+    }
+    if let Some(refused) = cfg
+        .my_passwd
+        .as_deref()
+        .and_then(|pw| value_refusal("script password", pw))
+    {
+        return Err(refused);
+    }
+
     let mut s = String::new();
     s.push_str("[GAME]\n{\n");
     kv(&mut s, 1, "IsHost", "0");
     kv(&mut s, 1, "MyPlayerName", &cfg.my_player_name);
-    if let Some(ip) = &cfg.host_ip {
-        kv(&mut s, 1, "HostIP", ip);
-    }
-    if let Some(port) = cfg.host_port {
-        kv(&mut s, 1, "HostPort", &port.to_string());
-    }
+    kv(&mut s, 1, "HostIP", ip);
+    kv(&mut s, 1, "HostPort", &port.to_string());
     if let Some(pw) = &cfg.my_passwd {
         kv(&mut s, 1, "MyPasswd", pw);
     }
     s.push_str("}\n");
-    s
+    Ok(s)
+}
+
+/// Why `value` cannot be written as a script value, or `None` when it can.
+///
+/// The engine reads a value as everything from the `=` to the next `;` or line
+/// break (`cont/base/springcontent/gamedata/parse_tdf.lua`, `ParseValue`). Either
+/// of those inside a name or a password ends the value early, and whatever
+/// follows is read as keys of its own. A value that opens with `"` is read as a
+/// quoted string and loses its quotes, and spaces in front of a value are
+/// skipped, so those would change the value without breaking anything visible.
+///
+/// Brackets, braces and `=` are left alone. Inside a value the parser treats
+/// them as ordinary text, and Zero-K names may contain `[` and `]` for a clan
+/// tag (`Utils.ValidLobbyNameCharacter` in Zero-K-Infrastructure).
+fn value_refusal(what: &str, value: &str) -> Option<String> {
+    let reason = if value.is_empty() {
+        "is empty"
+    } else if value.contains(';') {
+        "contains a semicolon"
+    } else if value.chars().any(char::is_control) {
+        "contains a line break or another control character"
+    } else if value.starts_with(char::is_whitespace) || value.ends_with(char::is_whitespace) {
+        "starts or ends with a space"
+    } else if value.starts_with('"') {
+        "starts with a quote mark"
+    } else {
+        return None;
+    };
+    Some(format!(
+        "Coilbox did not start the game: the {what} {reason}."
+    ))
+}
+
+/// The same check for the host's address, which is narrower still. An address
+/// is an IP or a host name, so anything beyond letters, digits, `.`, `:` and
+/// `-` is not one.
+fn host_refusal(ip: &str) -> Option<String> {
+    if let Some(refused) = value_refusal("host address", ip) {
+        return Some(refused);
+    }
+    let address = |c: char| c.is_ascii_alphanumeric() || matches!(c, '.' | ':' | '-');
+    (!ip.chars().all(address))
+        .then(|| "Coilbox did not start the game: the host address is not an address.".into())
 }
 
 /// Write one `Key=Value;` line at `indent` tab stops.
@@ -408,7 +476,7 @@ mod tests {
 
     #[test]
     fn counts_match_vec_lengths() {
-        let s = generate_script(&sample());
+        let s = generate_script(&sample()).unwrap();
         assert!(s.contains("NumPlayers=1;"));
         assert!(s.contains("NumTeams=2;"));
         assert!(s.contains("NumAllyTeams=2;"));
@@ -417,13 +485,13 @@ mod tests {
 
     #[test]
     fn braces_are_balanced() {
-        let s = generate_script(&sample());
+        let s = generate_script(&sample()).unwrap();
         assert_eq!(s.matches('{').count(), s.matches('}').count());
     }
 
     #[test]
     fn native_ai_renders_ai_block_and_no_lua_ai() {
-        let s = generate_script(&sample());
+        let s = generate_script(&sample()).unwrap();
         assert!(s.contains("[AI0]"));
         assert!(s.contains("ShortName=BARb;"));
         assert!(s.contains("Host=0;"));
@@ -438,7 +506,7 @@ mod tests {
         let mut cfg = sample();
         cfg.ais[0].short_name = "Scavengers".into();
         cfg.ais[0].version = Some("<game>".into());
-        let s = generate_script(&cfg);
+        let s = generate_script(&cfg).unwrap();
         assert!(s.contains("[AI0]"));
         assert!(s.contains("ShortName=Scavengers;"));
         assert!(s.contains("Version=<game>;"));
@@ -449,7 +517,7 @@ mod tests {
         let mut cfg = sample();
         cfg.players[0].spectator = true;
         cfg.players[0].team = None;
-        let s = generate_script(&cfg);
+        let s = generate_script(&cfg).unwrap();
         // The single PLAYER block is a spectator, so no Team= should appear inside it.
         let player_block = s
             .split("[PLAYER0]")
@@ -464,7 +532,7 @@ mod tests {
 
     #[test]
     fn rgb_color_is_space_separated_floats() {
-        let s = generate_script(&sample());
+        let s = generate_script(&sample()).unwrap();
         assert!(s.contains("RgbColor=0.9 0.1 0.1;"));
         assert!(s.contains("RgbColor=0.1 0.4 1;"));
     }
@@ -473,7 +541,7 @@ mod tests {
     fn mod_options_emitted_when_present() {
         let mut cfg = sample();
         cfg.mod_options.insert("startmetal".into(), "1000".into());
-        let s = generate_script(&cfg);
+        let s = generate_script(&cfg).unwrap();
         assert!(s.contains("[MODOPTIONS]"));
         assert!(s.contains("startmetal=1000;"));
     }
@@ -484,7 +552,7 @@ mod tests {
         cfg.ais[0]
             .options
             .insert("difficultyLevel".into(), "1".into());
-        let s = generate_script(&cfg);
+        let s = generate_script(&cfg).unwrap();
         assert!(s.contains("[OPTIONS]"));
         assert!(s.contains("difficultyLevel=1;"));
     }
@@ -496,7 +564,7 @@ mod tests {
         cfg.host_ip = Some("192.0.2.10".into());
         cfg.host_port = Some(8452);
         cfg.my_passwd = Some("s3cret".into());
-        let s = generate_script(&cfg);
+        let s = generate_script(&cfg).unwrap();
         assert!(s.contains("IsHost=0;"));
         assert!(s.contains("MyPlayerName=You;"));
         assert!(s.contains("HostIP=192.0.2.10;"));
@@ -507,11 +575,122 @@ mod tests {
         assert!(!s.contains("NumPlayers="));
     }
 
+    /// A client script as a joiner gets it: somebody else's game, named by a
+    /// lobby server.
+    fn client() -> BattleConfig {
+        BattleConfig {
+            my_player_name: "[teh]Someone".into(),
+            is_host: false,
+            host_ip: Some("192.0.2.10".into()),
+            host_port: Some(8452),
+            my_passwd: Some("dGhlIHBhc3N3b3Jk+/=".into()),
+            ..Default::default()
+        }
+    }
+
+    /// The keys of a script, top level only, in order.
+    fn keys(script: &str) -> Vec<String> {
+        script
+            .lines()
+            .filter_map(|line| line.trim().split_once('='))
+            .map(|(key, _)| key.to_owned())
+            .collect()
+    }
+
+    /// Everything a Zero-K server can send in a real `ConnectSpring` goes
+    /// through untouched, the clan tag's brackets and a password's `=` included.
+    #[test]
+    fn a_real_join_is_written_as_it_came() {
+        let s = generate_script(&client()).unwrap();
+        assert!(s.contains("MyPlayerName=[teh]Someone;"));
+        assert!(s.contains("MyPasswd=dGhlIHBhc3N3b3Jk+/=;"));
+        assert_eq!(
+            keys(&s),
+            ["IsHost", "MyPlayerName", "HostIP", "HostPort", "MyPasswd"]
+        );
+    }
+
+    /// Each value that could end its own line early, or be read as something
+    /// other than what it is, stops the launch rather than reaching the file.
+    #[test]
+    fn a_value_that_would_forge_the_script_is_refused() {
+        let forged = [
+            "x;IsHost=1",
+            "x\nIsHost=1;",
+            "x\rIsHost=1;",
+            "x\0",
+            "x\t",
+            " x",
+            "x ",
+            "\"x\"",
+            "",
+        ];
+        for value in forged {
+            let mut cfg = client();
+            cfg.my_player_name = value.into();
+            assert!(
+                generate_script(&cfg).is_err(),
+                "a player name of {value:?} was written"
+            );
+            let mut cfg = client();
+            cfg.my_passwd = Some(value.into());
+            assert!(
+                generate_script(&cfg).is_err(),
+                "a script password of {value:?} was written"
+            );
+            let mut cfg = client();
+            cfg.host_ip = Some(value.into());
+            assert!(
+                generate_script(&cfg).is_err(),
+                "a host address of {value:?} was written"
+            );
+        }
+    }
+
+    /// The refusal says which value it was, so the player is not left guessing.
+    #[test]
+    fn a_refusal_names_the_value() {
+        let mut cfg = client();
+        cfg.my_passwd = Some("a;b".into());
+        assert_eq!(
+            generate_script(&cfg).unwrap_err(),
+            "Coilbox did not start the game: the script password contains a semicolon."
+        );
+    }
+
+    /// An address is letters, digits and the separators of an IP or a host
+    /// name. Brackets and braces are fine in a name and not in an address.
+    #[test]
+    fn a_host_address_takes_only_address_characters() {
+        for good in ["192.0.2.10", "2001:db8::1", "zero-k.info"] {
+            let mut cfg = client();
+            cfg.host_ip = Some(good.into());
+            assert!(generate_script(&cfg).is_ok(), "{good} was refused");
+        }
+        for bad in ["[2001:db8::1]", "host}", "a=b", "host/path"] {
+            let mut cfg = client();
+            cfg.host_ip = Some(bad.into());
+            assert!(generate_script(&cfg).is_err(), "{bad} was written");
+        }
+    }
+
+    /// A client script that does not say where to connect starts an engine that
+    /// waits forever, so it is not written at all.
+    #[test]
+    fn a_client_script_without_an_address_or_port_is_refused() {
+        let mut cfg = client();
+        cfg.host_ip = None;
+        assert!(generate_script(&cfg).is_err());
+        let mut cfg = client();
+        cfg.host_port = None;
+        assert!(generate_script(&cfg).is_err());
+    }
+
     #[test]
     fn networked_host_emits_hostport() {
         let mut cfg = sample();
         cfg.host_port = Some(8452);
-        let s = generate_script(&cfg);
+        let s = generate_script(&cfg).unwrap();
         assert!(s.contains("IsHost=1;"));
         assert!(s.contains("HostIP=0.0.0.0;"));
         assert!(s.contains("HostPort=8452;"));
@@ -529,7 +708,7 @@ mod tests {
         cfg.host_ip = Some("127.0.0.1".into());
         cfg.host_port = Some(8452);
         cfg.host_loopback_reason = Some("This battle is relayed, so loopback is right.".into());
-        let s = generate_script(&cfg);
+        let s = generate_script(&cfg).unwrap();
 
         let note = s
             .lines()
@@ -564,7 +743,7 @@ mod tests {
         let mut cfg = sample();
         cfg.host_port = Some(8452);
         cfg.host_loopback_reason = Some("first line\nHostPort=1;".into());
-        let s = generate_script(&cfg);
+        let s = generate_script(&cfg).unwrap();
         assert!(s.contains("// first line HostPort=1;"));
         let ports: Vec<&str> = s
             .lines()
@@ -584,13 +763,13 @@ mod tests {
     fn a_host_with_nothing_to_explain_adds_no_comment() {
         let mut cfg = sample();
         cfg.host_port = Some(8452);
-        assert!(!generate_script(&cfg).contains("//"));
+        assert!(!generate_script(&cfg).unwrap().contains("//"));
     }
 
     #[test]
     fn singleplayer_host_unchanged_without_port() {
         // Default is_host=true, no host_port -> identical to the legacy skirmish path.
-        let s = generate_script(&sample());
+        let s = generate_script(&sample()).unwrap();
         assert!(s.contains("IsHost=1;"));
         assert!(!s.contains("HostPort="));
         assert!(!s.contains("HostIP="));
@@ -601,7 +780,7 @@ mod tests {
         let mut cfg = sample();
         cfg.start_pos_type = 2;
         cfg.ally_teams[0].start_rect = Some([0.0, 0.0, 1.0, 0.3]);
-        let s = generate_script(&cfg);
+        let s = generate_script(&cfg).unwrap();
         assert!(s.contains("StartRectRight=0.3;"));
         assert!(s.contains("StartPosType=2;"));
     }
@@ -611,7 +790,7 @@ mod tests {
         let mut cfg = sample();
         cfg.restricted_units.insert("armcom".into(), 1);
         cfg.restricted_units.insert("armflash".into(), 0);
-        let s = generate_script(&cfg);
+        let s = generate_script(&cfg).unwrap();
         assert!(s.contains("[RESTRICT]"));
         assert!(s.contains("NumRestrictions=2;"));
         // BTreeMap orders by key, so armcom (Unit0) sorts before armflash (Unit1).
@@ -623,7 +802,7 @@ mod tests {
 
     #[test]
     fn restrict_section_omitted_when_empty() {
-        let s = generate_script(&sample());
+        let s = generate_script(&sample()).unwrap();
         assert!(!s.contains("[RESTRICT]"));
         assert!(!s.contains("NumRestrictions"));
     }

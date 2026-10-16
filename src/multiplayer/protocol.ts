@@ -144,6 +144,18 @@ export function founderRunsTheGame(protocol: LobbyProtocol): boolean {
 }
 
 /**
+ * Whether the server tells each player where a match is, rather than the
+ * battle carrying the host's address.
+ *
+ * True on Tachyon, whose `battle/start` names the autohost, and on Zero-K,
+ * whose `ConnectSpring` names the server's own. The room launches off that
+ * message on both, so the host going in game is not a reason to launch there.
+ */
+export function serverSendsTheMatch(protocol: LobbyProtocol): boolean {
+  return protocol !== "tasserver";
+}
+
+/**
  * Whether this connection has a client-wide away/ingame status to publish.
  *
  * Separate from `syncsOnReady` because Zero-K parts company with it here: the

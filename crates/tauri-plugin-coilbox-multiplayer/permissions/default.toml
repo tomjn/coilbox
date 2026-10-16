@@ -60,6 +60,7 @@ permissions = [
   "allow-mp-set-battle-status",
   "allow-mp-open-battle",
   "allow-mp-zerok-open-battle",
+  "allow-mp-zerok-request-connect-spring",
   "allow-mp-create-lobby",
   "allow-mp-start-battle",
   "allow-mp-update-battle-info",

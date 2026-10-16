@@ -122,6 +122,11 @@ fn put(state: &mut LobbyState, header: &BattleHeader) -> Vec<Delta> {
             // member, so the match ending is the only thing that says the start
             // time no longer applies.
             battle.running_since = None;
+            // The match we were sent to is over, so there is nothing left to
+            // rejoin. The next one is a match we have not been sent to yet.
+            if state.witnessed_start == Some(id) {
+                state.witnessed_start = None;
+            }
         }
     }
 
@@ -398,6 +403,32 @@ mod tests {
             r#"BattleUpdate {"Header":{"BattleID":42,"IsRunning":false}}"#,
         );
         assert_eq!(state.battles[&42].running_since, None);
+    }
+
+    /// Once the match we were sent to has ended there is nothing to rejoin, and
+    /// the room's next match is one we have not been sent to.
+    #[test]
+    fn a_match_that_ends_is_no_longer_one_we_were_at() {
+        let mut state = LobbyState::new();
+        feed(
+            &mut state,
+            r#"BattleAdded {"Header":{"BattleID":42,"IsRunning":true}}"#,
+        );
+        feed(
+            &mut state,
+            r#"BattleAdded {"Header":{"BattleID":43,"IsRunning":true}}"#,
+        );
+        state.witnessed_start = Some(42);
+        feed(
+            &mut state,
+            r#"BattleUpdate {"Header":{"BattleID":43,"IsRunning":false}}"#,
+        );
+        assert_eq!(state.witnessed_start, Some(42), "another room's end");
+        feed(
+            &mut state,
+            r#"BattleUpdate {"Header":{"BattleID":42,"IsRunning":false}}"#,
+        );
+        assert_eq!(state.witnessed_start, None);
     }
 
     #[test]

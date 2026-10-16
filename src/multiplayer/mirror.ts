@@ -52,8 +52,8 @@ export interface LobbyMirror {
   serverMessages: string[];
   serverMessageCount: number;
   /**
-   * Monotonic count of `battleStarting` events: a Tachyon server telling us
-   * where the match is. There is no state behind it, because the connection has
+   * Monotonic count of `battleStarting` events: a Tachyon or Zero-K server
+   * telling us where the match is. There is no state behind it, because the connection has
    * already promised the server we will be there, so the room watches this
    * advance and launches.
    */
