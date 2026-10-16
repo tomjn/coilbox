@@ -89,10 +89,17 @@ if gadgetHandler:IsSyncedCode() then
 			return
 		end
 		-- A Lua unit script that fails to load leaves the unit running with
-		-- no script at all, which is otherwise silent from here on.
+		-- no script at all, which is otherwise silent from here on. A game that
+		-- never turned the framework on has no way to ask, and says so rather
+		-- than losing the line below (issue #4139).
 		local scriptName = def.scriptName or ""
-		if scriptName:lower():match("%.lua$") and not Spring.UnitScript.GetScriptEnv(unitID) then
-			fail("the unit script did not load: " .. scriptName)
+		if scriptName:lower():match("%.lua$") then
+			local getScriptEnv = Spring.UnitScript and Spring.UnitScript.GetScriptEnv
+			if not getScriptEnv then
+				fail("the game does not run Lua unit scripts: " .. scriptName)
+			elseif not getScriptEnv(unitID) then
+				fail("the unit script did not load: " .. scriptName)
+			end
 		end
 		local pieces = Spring.GetUnitPieceList(unitID) or {}
 		Spring.Log(LOG_SECTION, "notice", "spawned " .. UNIT_NAME .. " with " .. #pieces .. " pieces")
