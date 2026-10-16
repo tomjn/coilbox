@@ -23,10 +23,21 @@ export const KEY_STEP = 24;
 
 /**
  * The tallest the table goes in a column with `available` pixels of content
- * height, leaving the chat its `chatMin`. Never below the table's minimum.
+ * height, leaving the chat its `chatMin`, and no taller than its own `content`
+ * (header, rows, spectators and the Add AI row). A `content` of 0 means it has
+ * not been measured, so only the column limits it. Never below the table's
+ * minimum.
  */
-export function maxHeight(available: number, chatMin: number): number {
-  return Math.max(TABLE_MIN, Math.floor(available - GAP - chatMin));
+export function maxHeight(
+  available: number,
+  chatMin: number,
+  content = 0,
+): number {
+  const space = Math.floor(available - GAP - chatMin);
+  return Math.max(
+    TABLE_MIN,
+    content > 0 ? Math.min(space, Math.ceil(content)) : space,
+  );
 }
 
 /**
@@ -39,10 +50,13 @@ export function clampHeight(
   height: number,
   available: number,
   chatMin: number,
+  content = 0,
 ): number {
   if (!Number.isFinite(height)) return TABLE_MIN;
   const floor = Math.max(height, TABLE_MIN);
-  return available > 0 ? Math.min(floor, maxHeight(available, chatMin)) : floor;
+  return available > 0
+    ? Math.min(floor, maxHeight(available, chatMin, content))
+    : floor;
 }
 
 /**
@@ -56,16 +70,17 @@ export function stepHeight(
   key: string,
   available: number,
   chatMin: number,
+  content = 0,
 ): number | null {
   switch (key) {
     case "ArrowUp":
-      return clampHeight(height - KEY_STEP, available, chatMin);
+      return clampHeight(height - KEY_STEP, available, chatMin, content);
     case "ArrowDown":
-      return clampHeight(height + KEY_STEP, available, chatMin);
+      return clampHeight(height + KEY_STEP, available, chatMin, content);
     case "Home":
       return TABLE_MIN;
     case "End":
-      return maxHeight(available, chatMin);
+      return maxHeight(available, chatMin, content);
     default:
       return null;
   }

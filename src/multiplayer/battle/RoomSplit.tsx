@@ -38,11 +38,30 @@ interface Measures {
   drawn: number;
   /** The chat's minimum height in pixels. */
   chatMin: number;
+  /** Height the table's contents need: the card's border and everything in it. 0 until measured. */
+  content: number;
 }
 
 function px(value: string): number {
   const n = Number.parseFloat(value);
   return Number.isFinite(n) ? n : 0;
+}
+
+/**
+ * The height the table's contents need. The card inside the table is a plain
+ * stack of blocks, so this is their heights plus the card's border. Summed
+ * rather than read from `scrollHeight`, which never goes below the card's own
+ * height and so could not show contents shorter than the split.
+ */
+function contentHeight(table: HTMLElement): number {
+  const card = table.firstElementChild;
+  if (!card) return 0;
+  const style = getComputedStyle(card);
+  let total = px(style.borderTopWidth) + px(style.borderBottomWidth);
+  for (const child of card.children) {
+    total += child.getBoundingClientRect().height;
+  }
+  return total;
 }
 
 /** Measure the column, the table and the chat's floor, kept current as the column resizes. */
@@ -54,6 +73,7 @@ function useMeasures(
     available: 0,
     drawn: 0,
     chatMin: CHAT_MIN_FALLBACK,
+    content: 0,
   });
   useEffect(() => {
     if (!column || !table) return;
@@ -66,11 +86,13 @@ function useMeasures(
           column.clientHeight - px(style.paddingTop) - px(style.paddingBottom),
         drawn: table.offsetHeight,
         chatMin: chatMin > 0 ? chatMin : CHAT_MIN_FALLBACK,
+        content: contentHeight(table),
       };
       setMeasures((was) =>
         was.available === next.available &&
         was.drawn === next.drawn &&
-        was.chatMin === next.chatMin
+        was.chatMin === next.chatMin &&
+        was.content === next.content
           ? was
           : next,
       );
@@ -78,8 +100,23 @@ function useMeasures(
     const observer = new ResizeObserver(measure);
     observer.observe(column);
     observer.observe(table);
+    // The card's own height follows the split, so its contents are watched
+    // instead. The spectator row comes and goes, so watch for new children too.
+    const card = table.firstElementChild;
+    const watchContents = () => {
+      for (const child of card?.children ?? []) observer.observe(child);
+    };
+    const mutations = new MutationObserver(() => {
+      watchContents();
+      measure();
+    });
+    if (card) mutations.observe(card, { childList: true });
+    watchContents();
     measure();
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      mutations.disconnect();
+    };
   }, [column, table]);
   return measures;
 }
@@ -91,7 +128,7 @@ export function useRoomSplit() {
   // until the battle exists, so the column mounts after this hook first runs.
   const [column, setColumn] = useState<HTMLElement | null>(null);
   const [table, setTable] = useState<HTMLElement | null>(null);
-  const { available, drawn, chatMin } = useMeasures(column, table);
+  const { available, drawn, chatMin, content } = useMeasures(column, table);
   const tableId = useId();
 
   // The stored height is clamped each time it is drawn and never rewritten for
@@ -99,7 +136,7 @@ export function useRoomSplit() {
   // drag in progress is held here and only stored when it ends.
   const chosen = dragging ?? stored;
   const height =
-    chosen === null ? null : clampHeight(chosen, available, chatMin);
+    chosen === null ? null : clampHeight(chosen, available, chatMin, content);
 
   const onChange = useCallback(
     (next: number | null, final: boolean) => {
@@ -121,9 +158,10 @@ export function useRoomSplit() {
     tableClass: height === null ? "" : "flex-none",
     handle: {
       // What a screen reader reads when nothing is stored: the height drawn now.
-      height: height ?? clampHeight(drawn, available, chatMin),
+      height: height ?? clampHeight(drawn, available, chatMin, content),
       available,
       chatMin,
+      content,
       controls: tableId,
       onChange,
     },
@@ -136,6 +174,8 @@ interface HandleProps {
   /** The column's content height. 0 until measured. */
   available: number;
   chatMin: number;
+  /** Height the table's contents need. 0 until measured. */
+  content: number;
   /** The id of the table this resizes, for `aria-controls`. */
   controls: string;
   /**
@@ -150,6 +190,7 @@ export function RoomSplitHandle({
   height,
   available,
   chatMin,
+  content,
   controls,
   onChange,
 }: HandleProps) {
@@ -170,7 +211,9 @@ export function RoomSplitHandle({
         aria-controls={controls}
         aria-valuenow={height}
         aria-valuemin={TABLE_MIN}
-        aria-valuemax={available > 0 ? maxHeight(available, chatMin) : height}
+        aria-valuemax={
+          available > 0 ? maxHeight(available, chatMin, content) : height
+        }
         tabIndex={0}
         className="group absolute inset-x-0 -top-1.5 z-10 flex h-3 cursor-row-resize items-center focus-visible:outline-none"
         onPointerDown={(event) => {
@@ -185,6 +228,7 @@ export function RoomSplitHandle({
             start.current.height + (event.clientY - start.current.y),
             available,
             chatMin,
+            content,
           );
           onChange(latest.current, false);
         }}
@@ -201,7 +245,13 @@ export function RoomSplitHandle({
         }}
         onDoubleClick={() => onChange(null, true)}
         onKeyDown={(event) => {
-          const next = stepHeight(height, event.key, available, chatMin);
+          const next = stepHeight(
+            height,
+            event.key,
+            available,
+            chatMin,
+            content,
+          );
           if (next === null) return;
           event.preventDefault();
           onChange(next, true);

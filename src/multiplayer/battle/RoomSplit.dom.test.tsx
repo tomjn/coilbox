@@ -9,7 +9,13 @@
  * computes is `clampHeight`, which has its own tests.
  */
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ROOM_SPLIT_KEY, RoomSplitHandle, useRoomSplit } from "./RoomSplit";
 import {
@@ -44,18 +50,35 @@ vi.mock("@picoframe/frame", async (importOriginal) => {
 const COLUMN = 1000;
 const DRAWN = 300;
 
-function Room() {
+/**
+ * `contents` gives the table a card holding one block of that height, which is
+ * what the real table's contents measure. Without it the table is empty and the
+ * contents are unmeasured.
+ */
+function Room({ contents }: { contents?: number }) {
   const split = useRoomSplit();
   return (
     <div ref={split.columnRef} data-testid="column">
-      <div ref={split.tableRef} style={split.tableStyle} data-testid="table" />
+      <div ref={split.tableRef} style={split.tableStyle} data-testid="table">
+        {contents !== undefined && (
+          <div data-testid="card">
+            <div data-height={contents} />
+          </div>
+        )}
+      </div>
       <RoomSplitHandle {...split.handle} />
       <div />
     </div>
   );
 }
 
-function mount() {
+function mount(contents?: number) {
+  Object.defineProperty(HTMLElement.prototype, "getBoundingClientRect", {
+    configurable: true,
+    value() {
+      return { height: Number(this.getAttribute("data-height") ?? 0) };
+    },
+  });
   Object.defineProperty(HTMLElement.prototype, "clientHeight", {
     configurable: true,
     get: () => COLUMN,
@@ -64,7 +87,7 @@ function mount() {
     configurable: true,
     get: () => DRAWN,
   });
-  return render(<Room />);
+  return render(<Room contents={contents} />);
 }
 
 function handle() {
@@ -143,4 +166,34 @@ it("goes back to the default on a double-click", () => {
   fireEvent.doubleClick(handle());
   expect(screen.getByTestId("table").style.height).toBe("");
   expect(store.values.get(ROOM_SPLIT_KEY)).toBeNull();
+});
+
+it("stops the handle at the contents' height", () => {
+  store.values.set(ROOM_SPLIT_KEY, 200);
+  mount(260);
+  expect(handle().getAttribute("aria-valuemax")).toBe("260");
+  fireEvent.keyDown(handle(), { key: "End" });
+  expect(value()).toBe(260);
+  fireEvent.keyDown(handle(), { key: "ArrowDown" });
+  expect(value()).toBe(260);
+  expect(store.values.get(ROOM_SPLIT_KEY)).toBe(260);
+});
+
+it("draws a stored height taller than the contents at the contents' height without rewriting it", () => {
+  store.values.set(ROOM_SPLIT_KEY, 700);
+  mount(260);
+  expect(screen.getByTestId("table").style.height).toBe("260px");
+  expect(value()).toBe(260);
+  expect(store.values.get(ROOM_SPLIT_KEY)).toBe(700);
+});
+
+it("follows the contents as they grow", async () => {
+  store.values.set(ROOM_SPLIT_KEY, 700);
+  mount(260);
+  const block = screen.getByTestId("card").firstElementChild as HTMLElement;
+  block.setAttribute("data-height", "340");
+  // A new child is what a joining spectator adds, and is what triggers a measure here.
+  screen.getByTestId("card").appendChild(document.createElement("div"));
+  await waitFor(() => expect(value()).toBe(340));
+  expect(handle().getAttribute("aria-valuemax")).toBe("340");
 });

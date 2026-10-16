@@ -21,6 +21,28 @@ describe("maxHeight", () => {
   });
 });
 
+describe("maxHeight with a content height", () => {
+  it("stops at the contents when they are shorter than the column allows", () => {
+    expect(maxHeight(TALL, CHAT, 200)).toBe(200);
+  });
+
+  it("rounds a fractional content height up so the card does not scroll", () => {
+    expect(maxHeight(TALL, CHAT, 200.2)).toBe(201);
+  });
+
+  it("stops at the column when the contents are taller", () => {
+    expect(maxHeight(TALL, CHAT, 5000)).toBe(TALL - GAP - CHAT);
+  });
+
+  it("never drops below the table minimum for short contents", () => {
+    expect(maxHeight(TALL, CHAT, 40)).toBe(TABLE_MIN);
+  });
+
+  it("ignores contents that have not been measured", () => {
+    expect(maxHeight(TALL, CHAT, 0)).toBe(TALL - GAP - CHAT);
+  });
+});
+
 describe("clampHeight", () => {
   it("raises a height below the minimum", () => {
     expect(clampHeight(10, TALL, CHAT)).toBe(TABLE_MIN);
@@ -46,6 +68,14 @@ describe("clampHeight", () => {
   it("gives the minimum for a value that is not a number", () => {
     expect(clampHeight(Number.NaN, TALL, CHAT)).toBe(TABLE_MIN);
   });
+
+  it("lowers a height taller than the contents", () => {
+    expect(clampHeight(600, TALL, CHAT, 250)).toBe(250);
+  });
+
+  it("leaves a height inside the contents alone", () => {
+    expect(clampHeight(200, TALL, CHAT, 250)).toBe(200);
+  });
 });
 
 describe("stepHeight", () => {
@@ -61,6 +91,11 @@ describe("stepHeight", () => {
   it("stops at the maximum", () => {
     const max = maxHeight(TALL, CHAT);
     expect(stepHeight(max - 5, "ArrowDown", TALL, CHAT)).toBe(max);
+  });
+
+  it("stops at the contents going down and on End", () => {
+    expect(stepHeight(240, "ArrowDown", TALL, CHAT, 250)).toBe(250);
+    expect(stepHeight(100, "End", TALL, CHAT, 250)).toBe(250);
   });
 
   it("jumps to either end on Home and End", () => {
