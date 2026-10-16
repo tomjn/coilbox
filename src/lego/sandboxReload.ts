@@ -87,10 +87,7 @@ export function afterScriptReload(
 ): LoadedSandbox {
   const files = { ...loaded.files };
   for (const file of written.files) {
-    if (
-      file.path in files &&
-      kindOf(written.dir, file.path) === "script"
-    ) {
+    if (file.path in files && kindOf(written.dir, file.path) === "script") {
       files[file.path] = file.sha256;
     }
   }

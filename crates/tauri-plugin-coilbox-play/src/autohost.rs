@@ -158,8 +158,7 @@ pub fn settings_dir(app_data: &Path) -> PathBuf {
 
 /// Write the settings file that points the engine at `port`.
 pub fn write_settings(dir: &Path, port: u16) -> Result<(), String> {
-    std::fs::create_dir_all(dir)
-        .map_err(|e| format!("could not create {}: {e}", dir.display()))?;
+    std::fs::create_dir_all(dir).map_err(|e| format!("could not create {}: {e}", dir.display()))?;
     let file = dir.join("springsettings.cfg");
     std::fs::write(
         &file,

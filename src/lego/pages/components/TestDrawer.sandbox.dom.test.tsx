@@ -261,7 +261,9 @@ describe("TestDrawer's Reload in the sandbox (issue #3346)", () => {
     fireEvent.click(
       screen.getByRole("button", { name: /Play with this unit/ }),
     );
-    await waitFor(() => expect(reloadButton()).not.toHaveProperty("disabled", true));
+    await waitFor(() =>
+      expect(reloadButton()).not.toHaveProperty("disabled", true),
+    );
   }
 
   it("is there but cannot be pressed with no sandbox running", () => {

@@ -36,6 +36,7 @@ import {
   SCRATCH_FOLDER,
   withoutGeneratedGames,
 } from "../../../lib/generatedGames";
+import { playAskLuaRules } from "../../../play/bindings";
 import {
   gameOptionSchema,
   initialParticipants,
@@ -43,7 +44,6 @@ import {
   toBattleConfig,
   usePreferredTarget,
 } from "../../../play/config";
-import { playAskLuaRules } from "../../../play/bindings";
 import { usePlay } from "../../../play/PlayProvider";
 import { GamePickerButton } from "../../../play/pages/components/GamePickerButton";
 import { GamePickerPanel } from "../../../play/pages/components/GamePickerPanel";

@@ -58,7 +58,10 @@ describe("sandboxChanges", () => {
   // unit that is neither one thing nor the other.
   it("holds the script back when the model changed too", () => {
     expect(
-      sandboxChanges(launched, written({ model: "model-2", script: "script-2" })),
+      sandboxChanges(
+        launched,
+        written({ model: "model-2", script: "script-2" }),
+      ),
     ).toEqual({ reload: false, relaunch: ["model"] });
   });
 
