@@ -218,54 +218,127 @@ export function resolveScenario(
   const notes: string[] = [];
   const track = scenario.standIn;
 
-  const events = scenario.events.map((event) => {
+  let series = false;
+  const events = scenario.events.flatMap((event): ScriptEvent[] => {
     if (event.dropAtStandIn)
-      return putDown(event, track, ctx.radius, ctx.ground, notes);
+      return [putDown(event, track, ctx.radius, ctx.ground, notes)];
 
     const marker = event.aimAtStandIn;
-    if (!marker) return event;
+    if (!marker) return [event];
     const { aimAtStandIn: _marker, ...rest } = event;
 
     const target = track
       ? standInMid(track, event.frame, ctx.radius, ctx.ground)
       : null;
-    if (!target) {
+    if (!track || !target) {
       notes.push(
         `${event.callin} aims at a stand-in, and this scenario places no stand-in on frame ${event.frame}. It is aimed straight ahead instead.`,
       );
-      return { ...rest, args: [0, 0] };
+      return [{ ...rest, args: [0, 0] }];
     }
 
-    if (marker.from === "midPos") {
-      const { heading, pitch } = startBuildingAngles(ctx.mid, target, ctx.up);
-      return { ...rest, args: [heading, pitch] };
+    const angles = anglesFor(event, marker.from, ctx, notes);
+    if (marker.until === undefined) {
+      const { heading, pitch } = angles(target);
+      return [{ ...rest, args: [heading, pitch] }];
     }
-
-    // `AimFromWeapon<n>` rather than `AimFromWeapon`: the marker names the
-    // engine's concept, and the probe was asked for the weapon this event's
-    // own `AimWeapon<n>` drives, `expandForWeapons` having already given each
-    // weapon its own copy of the event.
-    const callin = `AimFromWeapon${weaponNumberOf(event.callin)}`;
-    const piece = ctx.probed(callin);
-    const from = piece ? ctx.pieceRest.get(piece) : undefined;
-    if (!from) {
-      notes.push(
-        `This script names no ${callin} piece, so the aim is measured from the unit's origin rather than from where its weapon sits.`,
-      );
-    }
-    const { heading, pitch } = aimWeaponAngles(
-      from ?? [0, 0, 0],
-      target,
-      ctx.up,
-    );
-    return { ...rest, args: [heading, pitch] };
+    series = true;
+    return keptAiming(rest, marker.until, track, ctx, angles);
   });
 
   // A re-aim can fire many times in one scenario, and each miss produces the
   // same wording. Dedupe so the panel shows each distinct note once rather
   // than one row per event, which also keeps AnimationPanel's `key={note}`
   // list free of duplicate keys.
-  return { events, notes: [...new Set(notes)] };
+  return {
+    // Only a series is out of order. Every other scenario keeps the order it
+    // was written in, which for two events on one frame is the order they
+    // fire in.
+    events: series ? events.sort(byFrameAimFirst) : events,
+    notes: [...new Set(notes)],
+  };
+}
+
+/** Frame order, with an aim landing before a fire on the same frame, since a
+ *  script fires after it has turned to face the target rather than before. */
+function byFrameAimFirst(a: ScriptEvent, b: ScriptEvent): number {
+  return a.frame - b.frame || Number(!a.callin) - Number(!b.callin);
+}
+
+type Angles = (target: Vec3) => { heading: number; pitch: number };
+
+/** The formula an aiming event's call-in is handed its angles by. */
+function anglesFor(
+  event: ScriptEvent,
+  from: "AimFromWeapon" | "midPos",
+  ctx: AimContext,
+  notes: string[],
+): Angles {
+  if (from === "midPos")
+    return (target) => startBuildingAngles(ctx.mid, target, ctx.up);
+
+  // `AimFromWeapon<n>` rather than `AimFromWeapon`: the marker names the
+  // engine's concept, and the probe was asked for the weapon this event's
+  // own `AimWeapon<n>` drives, `expandForWeapons` having already given each
+  // weapon its own copy of the event.
+  const callin = `AimFromWeapon${weaponNumberOf(event.callin)}`;
+  const piece = ctx.probed(callin);
+  const at = piece ? ctx.pieceRest.get(piece) : undefined;
+  if (!at) {
+    notes.push(
+      `This script names no ${callin} piece, so the aim is measured from the unit's origin rather than from where its weapon sits.`,
+    );
+  }
+  return (target) => aimWeaponAngles(at ?? [0, 0, 0], target, ctx.up);
+}
+
+/**
+ * How often the engine calls a weapon's aiming script while it keeps a target.
+ * `CWeapon::UpdateAim` calls `CallAimingScript` on every frame it has one
+ * (`Weapon.cpp:352-357`), and `CanCallAimingScript` lets the call through once
+ * `reaimTime` frames have passed since the last (`Weapon.cpp:380`).
+ * `reaimTime` is `GAME_SPEED >> 1`, 15 frames, for every weapon type
+ * (`Weapon.cpp:137`). Only Lua changes it, through `SetUnitWeaponState`.
+ */
+const REAIM_INTERVAL_FRAMES = 15;
+
+/**
+ * It also lets the call through as soon as the wanted direction is 20 degrees
+ * or more from the one last asked for: `maxAimOffset` is a fixed
+ * `cos(20 degrees)`, and `maxFireAngle` is the weapon's `firetolerance`, which
+ * defaults to 3640, also 20 degrees (`Weapon.cpp:376-383`, `WeaponDef.cpp:113`).
+ * The preview reads no weapon definition, so it has the default.
+ */
+const REAIM_TURN_COS = Math.cos((20 * Math.PI) / 180);
+
+/** An aiming call-in on every frame from `event`'s to `until` that the
+ *  engine would call it, for a weapon that keeps the stand-in as its target. */
+function keptAiming(
+  event: ScriptEvent,
+  until: number,
+  track: StandInTrack,
+  ctx: AimContext,
+  angles: Angles,
+): ScriptEvent[] {
+  const aims: ScriptEvent[] = [];
+  let last: { frame: number; dir: Vec3 } | null = null;
+  for (let frame = event.frame; frame <= until; frame++) {
+    const target = standInMid(track, frame, ctx.radius, ctx.ground);
+    if (!target) continue;
+    const { heading, pitch } = angles(target);
+    // In the unit's own frame rather than the world's, which is the same
+    // turn applied to both, so the angle between them is the same.
+    const dir = aimDirection(heading, pitch);
+    if (
+      last &&
+      frame < last.frame + REAIM_INTERVAL_FRAMES &&
+      dot(dir, last.dir) > REAIM_TURN_COS
+    )
+      continue;
+    aims.push({ ...event, frame, args: [heading, pitch] });
+    last = { frame, dir };
+  }
+  return aims;
 }
 
 /** `TransportDrop`'s Lua arguments for a `dropAtStandIn` marker. */

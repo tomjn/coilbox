@@ -40,6 +40,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { animCobProbe, animCobRun } from "../../../animation/bindings";
+import { OptionSelect } from "../../../components/OptionSelect";
 import { useReduceMotion } from "../../../general/display";
 import { aimPoint } from "../../aimPoint";
 import {
@@ -97,6 +98,15 @@ import {
   soloScenario,
 } from "../../soloPreset";
 import { standInRadius, trackBesideUnit } from "../../standIn";
+import {
+  anchorFor,
+  DEFAULT_TARGET,
+  TARGET_PATHS,
+  type TargetMotion,
+  type TargetPath,
+  type TargetScale,
+  targetTrack,
+} from "../../targetMotion";
 import { isBuilder } from "../../unitDef";
 import { controlFor } from "../../unitValueControls";
 import { ScrubberMarks } from "./ScrubberMarks";
@@ -278,6 +288,10 @@ interface Props {
     nano?: NanoStyle | null;
     aims?: Aim[];
     motion?: UnitMotion | null;
+    /** Where the game maker let the stand-in go after dragging it, unit-local
+     *  x and z in elmos, and the frame they let it go on. Only for a
+     *  scenario whose target can be moved. */
+    onDrag?: (at: [number, number], frame: number) => void;
   }) => void;
   /** What the unit's game lacks for effects to draw its own bitmaps, or null
    *  when it has everything they need. Shown only for a scenario that fires
@@ -343,6 +357,14 @@ export function AnimationPanel({
    *  reported as their default. Never saved to the project: this is a way to
    *  poke at a script's preview, not a decision about the unit. */
   const [values, setValues] = useState<Record<number, number>>({});
+  /** How the firing scenario's target moves. A way to poke at the preview,
+   *  like `values`, and never saved. Read by every run through the ref, since
+   *  a drag in the viewport changes it from a callback the panel handed out
+   *  on an earlier run. */
+  const [target, setTarget] = useState<TargetMotion>(DEFAULT_TARGET);
+  const targetRef = useRef(target);
+  const targetDebounce = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(targetDebounce.current), []);
   /** The function chosen for the "Call a function" scenario, and the text of
    *  its arguments, kept apart from `values` because neither is a unit value. */
   const [callFunction, setCallFunction] = useState("");
@@ -592,9 +614,18 @@ export function AnimationPanel({
 
       const rest = pieceWorldRest(project, pack, raw);
       const radius = standInRadius(bounds, scenario.standIn?.size);
-      const track = scenario.standIn
-        ? trackBesideUnit(scenario.standIn, bounds, radius)
-        : null;
+      // A target that moves goes as fast as the script is told its unit does,
+      // times the game maker's choice, and no nearer than touching the unit.
+      const scale: TargetScale = {
+        radius,
+        unitSpeed: (withValues[CURRENT_SPEED] ?? COB_SCALE) / COB_SCALE,
+        nearest: (Math.max(bounds.sizeX, bounds.sizeZ) / 2 + radius) / radius,
+      };
+      const track = scenario.movingTarget
+        ? targetTrack(targetRef.current, scale)
+        : scenario.standIn
+          ? trackBesideUnit(scenario.standIn, bounds, radius)
+          : null;
       const { events, notes } = resolveScenario(
         {
           ...scenario,
@@ -622,6 +653,23 @@ export function AnimationPanel({
         nano: scenario.nano ?? null,
         aims: aimsOf(events),
         motion: motionOf(events, withValues),
+        ...(scenario.movingTarget
+          ? {
+              onDrag: (at: [number, number], frame: number) =>
+                retargetRef.current(
+                  {
+                    ...targetRef.current,
+                    anchor: anchorFor(
+                      targetRef.current,
+                      [at[0] / radius, at[1] / radius],
+                      frame,
+                      scale,
+                    ),
+                  },
+                  frame,
+                ),
+            }
+          : {}),
       });
       const scene = withWorld(events, track, {
         radius,
@@ -730,9 +778,9 @@ export function AnimationPanel({
   // callbacks are rebuilt on every render.
   const stopRef = useRef(stop);
   stopRef.current = stop;
-  const rerunRef = useRef<() => void>(() => {});
-  rerunRef.current = () => {
-    const resume = { paused: scriptPaused, frame: scriptFrame };
+  const rerunRef = useRef<(frame?: number) => void>(() => {});
+  rerunRef.current = (frame = scriptFrame) => {
+    const resume = { paused: scriptPaused, frame };
     if (isCallMode) fireCall(callFunction, callArgsText, values, resume);
     else void start(scenarioId, values, resume);
   };
@@ -759,6 +807,31 @@ export function AnimationPanel({
     rerunTimer.current = setTimeout(() => rerunRef.current(), SETTLE_MS);
   }, [currentScript, playsOwnScript, applied.length]);
   useEffect(() => () => clearTimeout(rerunTimer.current), []);
+
+  /**
+   * A new motion for the target, run straight away when something is on
+   * screen for it to replace. A drag says which frame it let go on, so the
+   * run picks up there with the target where it was put.
+   */
+  const retargetRef = useRef<(next: TargetMotion, frame?: number) => void>(
+    () => {},
+  );
+  retargetRef.current = (next, frame) => {
+    targetRef.current = next;
+    setTarget(next);
+    clearTimeout(targetDebounce.current);
+    if (hasRunRef.current) rerunRef.current(frame);
+  };
+  /** The speed slider moves in a burst, so it waits for the burst to settle
+   *  the way the call arguments do. */
+  function changeTargetSpeed(speed: number) {
+    const next = { ...targetRef.current, speed };
+    targetRef.current = next;
+    setTarget(next);
+    clearTimeout(targetDebounce.current);
+    if (!hasRunRef.current) return;
+    targetDebounce.current = setTimeout(() => rerunRef.current(), SETTLE_MS);
+  }
 
   // A run on screen was told about the ground it ran on, so a different ground
   // runs it again, the way an edited preset does, rather than leave a script
@@ -1081,6 +1154,38 @@ export function AnimationPanel({
                 <p className="text-xs text-muted-foreground">
                   {marks.get(scenarioId)}
                 </p>
+              ) : null}
+              {scenario?.movingTarget ? (
+                <div className="flex flex-col gap-1.5">
+                  <OptionSelect
+                    size="sm"
+                    ariaLabel="How the target moves"
+                    value={target.path}
+                    options={TARGET_PATHS}
+                    onValueChange={(path) =>
+                      retargetRef.current({
+                        ...targetRef.current,
+                        path: path as TargetPath,
+                      })
+                    }
+                  />
+                  <div className="flex items-center justify-between text-xs">
+                    <span>Target speed</span>
+                    <span className="text-muted-foreground">
+                      {target.speed === 0
+                        ? "Still"
+                        : `${target.speed}× the unit's`}
+                    </span>
+                  </div>
+                  <Slider
+                    min={0}
+                    max={4}
+                    step={0.25}
+                    value={[target.speed]}
+                    onValueChange={([next]) => changeTargetSpeed(next)}
+                    aria-label="Target speed"
+                  />
+                </div>
               ) : null}
             </>
           )}

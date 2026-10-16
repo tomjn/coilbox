@@ -10,6 +10,7 @@ import {
 import { pieceIdOf } from "./gizmoCommit";
 import type { SceneState } from "./sceneState";
 import { setHoveredAndNotify } from "./selectionAndHoverOutlines";
+import { grabStandIn, letGoOfStandIn, moveStandIn } from "./standInDrag";
 
 /**
  * Wire up the canvas's own pointer handling: sizing a collision face,
@@ -70,6 +71,33 @@ export function attachPointerHandlers(state: SceneState): () => void {
   renderer.domElement.addEventListener("pointerup", onFaceUp);
   renderer.domElement.addEventListener("pointercancel", onFaceUp);
 
+  // Dragging the stand-in a scenario aims at, the same way: the orbit is
+  // switched off once the press is known to be on it.
+  const onStandInDown = (event: PointerEvent) => {
+    if (event.button !== 0) return;
+    aimAt(event);
+    if (!grabStandIn(state, raycaster)) return;
+    state.dragging = true;
+    setHoveredAndNotify(state, null);
+    renderer.domElement.setPointerCapture(event.pointerId);
+  };
+  const onStandInMove = (event: PointerEvent) => {
+    if (!state.standInDrag) return;
+    aimAt(event);
+    moveStandIn(state, raycaster);
+  };
+  const onStandInUp = (event: PointerEvent) => {
+    if (!state.standInDrag) return;
+    letGoOfStandIn(state);
+    state.dragging = false;
+    if (renderer.domElement.hasPointerCapture(event.pointerId))
+      renderer.domElement.releasePointerCapture(event.pointerId);
+  };
+  renderer.domElement.addEventListener("pointerdown", onStandInDown);
+  renderer.domElement.addEventListener("pointermove", onStandInMove);
+  renderer.domElement.addEventListener("pointerup", onStandInUp);
+  renderer.domElement.addEventListener("pointercancel", onStandInUp);
+
   // Selection happens on release, not on press, and only when the pointer
   // barely moved. Selecting on press meant a click that missed a gizmo handle
   // by a pixel cleared the selection and detached the gizmo before the drag
@@ -86,7 +114,8 @@ export function attachPointerHandlers(state: SceneState): () => void {
     pressedOnGizmo =
       state.gizmo.dragging ||
       state.gizmo.axis !== null ||
-      state.collisionDrag !== null;
+      state.collisionDrag !== null ||
+      state.standInDrag !== null;
   };
   const onPointerUp = (event: PointerEvent) => {
     const from = pressedAt;
@@ -169,6 +198,10 @@ export function attachPointerHandlers(state: SceneState): () => void {
     renderer.domElement.removeEventListener("pointermove", onFaceMove);
     renderer.domElement.removeEventListener("pointerup", onFaceUp);
     renderer.domElement.removeEventListener("pointercancel", onFaceUp);
+    renderer.domElement.removeEventListener("pointerdown", onStandInDown);
+    renderer.domElement.removeEventListener("pointermove", onStandInMove);
+    renderer.domElement.removeEventListener("pointerup", onStandInUp);
+    renderer.domElement.removeEventListener("pointercancel", onStandInUp);
     renderer.domElement.removeEventListener("pointerdown", onPointerDown);
     renderer.domElement.removeEventListener("pointerup", onPointerUp);
     renderer.domElement.removeEventListener("pointermove", onPointerMove);

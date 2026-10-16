@@ -34,8 +34,11 @@ export interface ScriptEvent {
    * `AimFromWeapon` measures from the piece that call-in names
    * (`rts/Sim/Weapons/Weapon.cpp:410-424`), `midPos` from the unit's mid
    * (`rts/Sim/Units/UnitTypes/Builder.cpp:942-955`).
+   *
+   * `until` makes it a weapon that keeps its target: the resolver aims again
+   * on every frame up to `until` that the engine would, rather than once.
    */
-  aimAtStandIn?: { from: "AimFromWeapon" | "midPos" };
+  aimAtStandIn?: { from: "AimFromWeapon" | "midPos"; until?: number };
   /**
    * Put the stand-in down where the track had it on `frame`, rather than at
    * literal coordinates. `resolveScenario` replaces the marker with
@@ -278,6 +281,9 @@ export interface Scenario {
   standIn?: StandInTrack;
   /** How this scenario's unit sprays nano, when it does. */
   nano?: NanoStyle;
+  /** The stand-in is a target the game maker sets moving, so its track comes
+   *  from `targetMotion.ts` rather than from `standIn`. */
+  movingTarget?: boolean;
 }
 
 /** Seconds to frames, for writing a scenario in the units it reads in.
@@ -367,34 +373,6 @@ function fireVolley(startS: number, endS: number): ScriptEvent[] {
     engine: "fire" as const,
     args: [1],
   }));
-}
-
-/** How often the engine calls a weapon's aiming script again while it still
- *  has a target: `CWeapon::UpdateAim` calls `CallAimingScript` whenever
- *  `HaveTarget()` (`Weapon.cpp:352-357`), which fires only once
- *  `gs->frameNum >= lastAimedFrame + reaimTime` (`Weapon.cpp:380`), and
- *  `reaimTime` defaults to `GAME_SPEED >> 1`, 15 frames at the engine's 30 fps
- *  (`Weapon.cpp:137`). A script that only turns the arm from `AimWeapon`
- *  stands it down again after a fixed delay, so without this the arm goes
- *  back to its rest pose well before a volley ends. */
-const REAIM_INTERVAL_FRAMES = 15;
-
-/** `AimWeapon1` re-aimed at the stand-in every `REAIM_INTERVAL_FRAMES`, from
- *  `startS` up to and including `endFrame`. */
-function reaimVolley(startS: number, endFrame: number): ScriptEvent[] {
-  const events: ScriptEvent[] = [];
-  for (
-    let frame = at(startS);
-    frame <= endFrame;
-    frame += REAIM_INTERVAL_FRAMES
-  ) {
-    events.push({
-      frame,
-      callin: "AimWeapon1",
-      aimAtStandIn: { from: "AimFromWeapon" },
-    });
-  }
-  return events;
 }
 
 /** Aim and fire events merged into one series, sorted by frame, with an aim
@@ -564,43 +542,29 @@ export const SCENARIOS: Scenario[] = [
     id: "firing",
     label: "Aiming and firing",
     description:
-      "Aims one way and fires a volley, then aims the other way and fires again.",
+      "Aims at a target that keeps moving and fires two volleys at it.",
+    movingTarget: true,
     events: [
       ...CREATED,
       // Aimed at the stand-in rather than at two numbers, and measured from
       // the piece `AimFromWeapon1` names, as the engine measures it
-      // (`rts/Sim/Weapons/Weapon.cpp:241-244,286-304,410-424`). Re-aimed every
-      // `REAIM_INTERVAL_FRAMES` for as long as the preview runs, one
-      // continuous series rather than one per volley, since the engine keeps
-      // calling a weapon's aiming script every `reaimTime` frames for as long
-      // as it has a target, whether or not the target is moving
-      // (`Weapon.cpp:352-357,380`). Without this the arm follows the stand-in
-      // between volleys too, not only while it fires.
-      //
-      // The stand-in holds its first spot until at(4), so the first volley
-      // fires while aim is settled rather than mid-turn. It holds its second
-      // spot from at(6) to at(10) the same way, and the continuous re-aim is
-      // what turns the arm to follow it there.
-      ...aimedFire(reaimVolley(0.5, PREVIEW_FRAMES - 1), [
-        ...fireVolley(1, 4),
-        ...fireVolley(7, 10),
-      ]),
+      // (`rts/Sim/Weapons/Weapon.cpp:241-244,286-304,410-424`). Kept aimed for
+      // as long as the preview runs, since the engine keeps calling a
+      // weapon's aiming script for as long as it has a target
+      // (`Weapon.cpp:352-357`). Which frames it calls on depends on how fast
+      // the target turns away from the last aim, so `resolveScenario` works
+      // them out once the track is known.
+      ...aimedFire(
+        [
+          {
+            frame: at(0.5),
+            callin: "AimWeapon1",
+            aimAtStandIn: { from: "AimFromWeapon", until: PREVIEW_FRAMES - 1 },
+          },
+        ],
+        [...fireVolley(1, 4), ...fireVolley(7, 10)],
+      ),
     ],
-    // Both spots are on the ground and well out in front, set by eye with the
-    // user. The pitch still differs a little between the two because each is
-    // measured from the weapon's own piece.
-    //
-    // Back where it started by the end, so the turret tracks it round rather
-    // than the stand-in jumping across the scene when the preview loops.
-    standIn: {
-      keys: [
-        { frame: 0, pos: [4, 0, 10] },
-        { frame: at(4), pos: [4, 0, 10] },
-        { frame: at(6), pos: [-4, 0, 10] },
-        { frame: at(10), pos: [-4, 0, 10] },
-        { frame: at(PREVIEW_SECONDS), pos: [4, 0, 10] },
-      ],
-    },
   },
   {
     id: "transport-pickup",

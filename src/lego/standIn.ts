@@ -343,7 +343,7 @@ export function standInHeight(radius: number): number {
 
 /** How far past the radius the nose reaches, in multiples of the radius. What
  *  makes a shape seen from behind different from one seen in front. */
-const NOSE_REACH = 1.35;
+export const NOSE_REACH = 1.35;
 
 /** The panel texture's own size in pixels, and how many elmos one tile covers.
  *  Small and plain on purpose: flat shading is what makes the facets readable,
