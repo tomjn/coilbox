@@ -130,8 +130,8 @@ describe("buildObj", () => {
       ]),
       // x, y, z, nx, ny, nz, u, v
       vertices: new Float32Array([
-        0, 0, 0, 1, 0, 0, 0, 0, 0, 2, 0, 1, 0, 0, 0.5, 0, 0, 0, 2, 1, 0, 0,
-        0.5, 0.25,
+        0, 0, 0, 1, 0, 0, 0, 0, 0, 2, 0, 1, 0, 0, 0.5, 0, 0, 0, 2, 1, 0, 0, 0.5,
+        0.25,
       ]),
       indices: new Uint32Array([0, 1, 2]),
     };
@@ -144,8 +144,8 @@ describe("buildObj", () => {
     }
 
     const vts = (doc: LegoProject) =>
-      (buildObj(doc, pack(), raw, OPTIONS)?.obj.split("\n") ?? []).filter(
-        (l) => l.startsWith("vt "),
+      (buildObj(doc, pack(), raw, OPTIONS)?.obj.split("\n") ?? []).filter((l) =>
+        l.startsWith("vt "),
       );
 
     // The engine reads v = 0 as the top of a PNG and an .obj reads it as the
