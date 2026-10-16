@@ -5,18 +5,16 @@
  * on the map, not a full customisation surface. Its job is to unblock the
  * engine load test, not to replace hand-tuning a unit afterwards.
  *
- * Written as a static structure. A movement class names an entry in the game's
- * own move definitions, and the builder is a game-independent tool: the same
- * project exports into Balanced Annihilation and into a scratch game, which
- * declare different classes under different names. A unit with `canMove` set
- * but no matching `movementClass` is rejected outright at load, so guessing a
- * name would lose the whole point of this file (something to spawn). Nothing
+ * Written as a static structure unless the game maker has picked a movement
+ * class. A movement class names an entry in the game's own move definitions,
+ * and a unit with `canMove` set but no matching `movementClass` is rejected
+ * outright at load, so the class is only ever one the game declared, picked in
+ * the builder from the game's own list (`movement.ts`, issue #3255). Nothing
  * has to build the unit either, because the scratch game makes it the side's
  * start unit, so a static unit is still one you meet in a match.
  *
- * Picking a class is therefore the workshop's job rather than this one's, once
- * the unit is against a game whose classes can be read (issue #2651). What this
- * file writes is the starting point that always loads, and
+ * What this file writes with no class picked is the starting point that always
+ * loads, and
  * {@link legoUnitDef} is the same table the workshop takes as a clone, so the
  * file in `units/` and the unit on the workshop's page are one definition
  * rather than two that have to be kept in step.
@@ -37,6 +35,7 @@
 import type { TextHome } from "@/workshop/unitText";
 import { effectiveCollisionVolume } from "./collisionVolume";
 import { DEFAULT_BUILDER, type LegoProject } from "./model";
+import { movesInGame } from "./movement";
 import type { UnitBounds } from "./s3oBuild";
 
 /**
@@ -96,6 +95,34 @@ const DEFAULT_MAX_SLOPE = 20;
  */
 const DEFAULT_BUILD_TIME = 100;
 const DEFAULT_BUILD_COST_METAL = DEFAULT_BUILD_TIME;
+
+/**
+ * The keys that say whether and how the unit moves.
+ *
+ * A unit that moves leaves `maxslope` out. For a unit that can move, the engine
+ * checks the slope under it against its move class's own `maxSlope`
+ * (`MoveDefHandler.cpp:233`), not the unit's: `CGameHelper::CheckTerrainConstraints`
+ * reads `unitDef->maxHeightDif` only when `IsImmobileUnit()`
+ * (`GameHelper.cpp:1633`), and `GetBuildHeight` skips it for a mobile unit
+ * (`GameHelper.cpp:1196`). So the building's 20 would be a number with no effect.
+ *
+ * `turnrate` is written only when there is one, since the engine's default of 0
+ * is a unit that cannot turn and is better left visibly unset than written.
+ */
+function movementFields(project: LegoProject): Record<string, unknown> {
+  const movement = project.movement;
+  if (!movesInGame(movement)) {
+    return { canmove: false, maxslope: DEFAULT_MAX_SLOPE };
+  }
+  return {
+    canmove: true,
+    movementclass: movement.moveClass,
+    speed: movement.speed,
+    ...(typeof movement.turnRate === "number"
+      ? { turnrate: movement.turnRate }
+      : {}),
+  };
+}
 
 /** Escapes for characters that cannot appear raw in a quoted Lua string. */
 const LUA_STRING_ESCAPES: Record<string, string> = {
@@ -221,8 +248,7 @@ export function legoUnitDef(
     // other in the engine and neither should here.
     ...(project.pieceSelection ? { usepieceselectionvolumes: true } : {}),
     maxdamage: DEFAULT_MAX_DAMAGE,
-    canmove: false,
-    maxslope: DEFAULT_MAX_SLOPE,
+    ...movementFields(project),
     // Written together or not at all. `UnitDef::IsBuilderUnit` is `builder &&
     // buildSpeed > 0 && buildDistance > 0`, and `builder` is `&=`'d against
     // that a line later, so `builder = true` on its own clears itself against

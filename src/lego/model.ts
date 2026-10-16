@@ -189,6 +189,25 @@ export const DEFAULT_BUILDER: Required<LegoBuilder> = {
   canAssist: true,
 };
 
+/**
+ * How the unit moves, once the game maker has picked one of the game's movement
+ * classes for it (issue #3255). Absent means it does not move. See `movement.ts`.
+ */
+export interface LegoMovement {
+  /** A class out of the game's `gamedata/movedefs.lua`, as the game spells it. */
+  moveClass: string;
+  /** Written as `speed`, in elmos a second. Absent until somebody or the game
+   *  gives it one, and the unit stays static to the engine until then. */
+  speed?: number;
+  /** Written as `turnRate`, in the engine's angular units a second. */
+  turnRate?: number;
+  /** Where `speed` came from, when the game suggested it. Gone once it is set
+   *  by hand. */
+  speedFrom?: string;
+  /** Where `turnRate` came from, the same way. */
+  turnRateFrom?: string;
+}
+
 export interface LegoImported {
   /**
    * The `.s3o` this came from, for saying where the unit came from.
@@ -372,6 +391,8 @@ export interface LegoProject {
    * modelled and nothing driving it is not a thing anybody wants.
    */
   builder?: LegoBuilder;
+  /** The movement class, speed and turn rate, when the unit moves. */
+  movement?: LegoMovement;
   unitDef?: Record<string, string | number | boolean>;
   notes?: string;
   /** Canned animations applied to this unit, from `animPresets.ts`. */
@@ -868,6 +889,7 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
   const mid = parseVec3(d.mid);
   const collisionVolume = parseCollisionVolume(d.collisionVolume);
   const builder = parseBuilder(d.builder);
+  const movement = parseMovement(d.movement);
   const project: LegoProject = {
     schemaVersion: LEGO_SCHEMA_VERSION,
     id: d.id,
@@ -894,6 +916,7 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
     ...(d.pieceCollision === true ? { pieceCollision: true } : {}),
     ...(d.pieceSelection === true ? { pieceSelection: true } : {}),
     ...(builder ? { builder } : {}),
+    ...(movement ? { movement } : {}),
     ...(typeof d.unitDef === "object" && d.unitDef !== null
       ? { unitDef: d.unitDef as Record<string, string | number | boolean> }
       : {}),
@@ -1172,6 +1195,22 @@ function parseBuilder(value: unknown): LegoBuilder | null {
     ...(typeof v.canAssist === "boolean" ? { canAssist: v.canAssist } : {}),
   };
   return Object.keys(builder).length > 0 ? builder : null;
+}
+
+function parseMovement(value: unknown): LegoMovement | null {
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  if (typeof v.moveClass !== "string" || v.moveClass.trim() === "") return null;
+  const number = (x: unknown) => typeof x === "number" && Number.isFinite(x);
+  return {
+    moveClass: v.moveClass,
+    ...(number(v.speed) ? { speed: v.speed as number } : {}),
+    ...(number(v.turnRate) ? { turnRate: v.turnRate as number } : {}),
+    ...(typeof v.speedFrom === "string" ? { speedFrom: v.speedFrom } : {}),
+    ...(typeof v.turnRateFrom === "string"
+      ? { turnRateFrom: v.turnRateFrom }
+      : {}),
+  };
 }
 
 /**

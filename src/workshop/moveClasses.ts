@@ -113,6 +113,107 @@ export function moveClassOf(def: Record<string, unknown> | undefined): string {
 }
 
 /**
+ * The engine's four kinds of ground movement, in the order of
+ * `MoveDef::SpeedModClass` in RecoilEngine's `rts/Sim/MoveTypes/MoveDefHandler.h`
+ * (Tank 0, KBot 1, Hover 2, Ship 3). A tank is any wheeled or tracked vehicle
+ * and a kbot is a walker.
+ */
+export type MoveKind = "tank" | "kbot" | "hover" | "ship";
+
+const SPEED_MOD_CLASSES: MoveKind[] = ["tank", "kbot", "hover", "ship"];
+
+/** One class out of the game's `gamedata/movedefs.lua`. */
+export interface GameMoveClass {
+  /** The name, as the game spells it. The engine matches it case blind. */
+  name: string;
+  kind: MoveKind;
+  /** `footprintx`, the width of ground the class paths with, in steps. */
+  footprint: number;
+}
+
+/**
+ * The kind of one move definition, by the engine's own rule.
+ *
+ * `ParseSpeedModClass` in `rts/Sim/MoveTypes/MoveDefHandler.cpp` takes a
+ * `speedModClass` when the definition has one, clamped into the four kinds.
+ * Otherwise it looks for "boat" or "ship", then "hover", then "tank" in the
+ * name, which the engine has lowercased by then, and anything else walks. So
+ * Splinter Faction's `WALKERTANK3` is a tank to the engine, whatever its name
+ * says.
+ */
+export function moveDefKind(def: Record<string, unknown>): MoveKind {
+  const raw = field(def, "speedmodclass");
+  const number = typeof raw === "string" ? Number(raw.trim()) : raw;
+  if (typeof number === "number" && Number.isFinite(number)) {
+    const index = Math.trunc(number);
+    if (index !== -1) {
+      return SPEED_MOD_CLASSES[Math.min(3, Math.max(0, index))];
+    }
+  }
+  const name = String(field(def, "name") ?? "").toLowerCase();
+  if (name.includes("boat") || name.includes("ship")) return "ship";
+  if (name.includes("hover")) return "hover";
+  if (name.includes("tank")) return "tank";
+  return "kbot";
+}
+
+/**
+ * The classes a game declares, from the `moveDefs` list the unit-defs read
+ * carries. A definition with no name is left out, because no unit can name it.
+ * `footprintx` defaults to 1 the way `MoveDef`'s constructor reads it.
+ */
+export function moveDefsOf(moveDefs: unknown[]): GameMoveClass[] {
+  const out: GameMoveClass[] = [];
+  for (const entry of moveDefs) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const def = entry as Record<string, unknown>;
+    const name = field(def, "name");
+    if (typeof name !== "string" || name.trim() === "") continue;
+    const footprint = Number(field(def, "footprintx"));
+    out.push({
+      name: name.trim(),
+      kind: moveDefKind(def),
+      footprint: Number.isFinite(footprint) ? Math.max(1, footprint) : 1,
+    });
+  }
+  return out;
+}
+
+/**
+ * A unit's top speed in elmos a second, the way `UnitDef.cpp` reads it: `speed`,
+ * or else the older `maxVelocity`, which is in elmos a frame at 30 frames a
+ * second.
+ */
+export function unitSpeedOf(def: Record<string, unknown> | undefined): number {
+  const speed = Number(field(def, "speed"));
+  if (Number.isFinite(speed)) return speed;
+  const legacy = Number(field(def, "maxvelocity"));
+  return Number.isFinite(legacy) ? Math.abs(legacy) * 30 : 0;
+}
+
+/**
+ * Whether the engine gives this unit a move class at all:
+ * `UnitDef::RequireMoveDef` is `canmove && speed > 0 && !canfly`.
+ */
+export function requiresMoveDef(
+  def: Record<string, unknown> | undefined,
+): boolean {
+  return (
+    flag(field(def, "canmove")) &&
+    unitSpeedOf(def) > 0 &&
+    !flag(field(def, "canfly"))
+  );
+}
+
+/** A def's `turnrate`, or nothing when it states none. */
+export function unitTurnRateOf(
+  def: Record<string, unknown> | undefined,
+): number | undefined {
+  const value = Number(field(def, "turnrate"));
+  return Number.isFinite(value) ? value : undefined;
+}
+
+/**
  * Every movement class the game's units name, commonest first and then
  * alphabetically.
  *
