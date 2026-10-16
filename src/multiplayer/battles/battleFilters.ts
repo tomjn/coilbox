@@ -68,6 +68,36 @@ export function battleRowAction(
   return { kind: "join", label: "Join", disabled: !opts.canJoin || full };
 }
 
+export type BattleGroupKey = "open" | "passworded" | "running" | "locked";
+
+/**
+ * Split a battle list into the groups the lobby shows, keeping the input order.
+ * The battle you are in is left out, since it is pinned above the groups even when
+ * locked. Locked battles, waiting or running, go in `locked` alone, because nobody
+ * can enter them. Of the rest, running wins over passworded: whether a battle has
+ * started is the first thing that decides what you can do with it.
+ */
+export function groupBattles(
+  battles: Battle[],
+  joinedId: number | null,
+  inProgressIds: ReadonlySet<number>,
+): Record<BattleGroupKey, Battle[]> {
+  const groups: Record<BattleGroupKey, Battle[]> = {
+    open: [],
+    passworded: [],
+    running: [],
+    locked: [],
+  };
+  for (const b of battles) {
+    if (b.id === joinedId) continue;
+    if (b.locked) groups.locked.push(b);
+    else if (inProgressIds.has(b.id)) groups.running.push(b);
+    else if (b.passworded) groups.passworded.push(b);
+    else groups.open.push(b);
+  }
+  return groups;
+}
+
 function compareBy(key: BattleSortKey, a: Battle, b: Battle): number {
   switch (key) {
     case "players":
