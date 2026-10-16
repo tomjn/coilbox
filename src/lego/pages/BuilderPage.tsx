@@ -52,6 +52,13 @@ import { legoTexturePrune } from "../bindings";
 import { parseClipboardPiece, serializeClipboardPiece } from "../clipboard";
 import { reanchorCollisionVolume } from "../collisionVolume";
 import { selectionAsCompound } from "../compounds";
+import {
+  DEFAULT_GROUND,
+  footprintWidth,
+  type GroundChoice,
+  groundShape,
+  unitUp,
+} from "../environment";
 import { usePartFilter } from "../filter";
 import {
   applyGroupTransform,
@@ -232,6 +239,11 @@ function Builder({ id }: { id: string | undefined }) {
    */
   const [scriptPaused, setScriptPaused] = useState(false);
   const [scriptFrame, setScriptFrame] = useState(0);
+  /** What the unit stands on in the viewport. Held here rather than in the
+   *  viewport because the script preview is told about the same ground. A
+   *  view setting for the session, never saved with the unit. */
+  const [groundChoice, setGroundChoice] =
+    useState<GroundChoice>(DEFAULT_GROUND);
   /** A preference, not part of the unit, so it lives with the session. */
   const [uniformScale, setUniformScale] = useState(true);
   /** What the next "Recalculate normals" click uses, for an imported unit.
@@ -743,6 +755,42 @@ function Builder({ id }: { id: string | undefined }) {
       sitOnGround(draft, pack, raw) !== draft,
     [draft, pack, raw],
   );
+  // Only measured for uneven ground that follows the unit's footprint, since
+  // measuring bakes every piece and nothing else here needs it.
+  const groundFootprint = useMemo(
+    () =>
+      draft !== null &&
+      pack !== null &&
+      groundChoice.id === "uneven" &&
+      groundChoice.width === null
+        ? footprintWidth(unitBounds(draft, pack, raw))
+        : 0,
+    [draft, pack, raw, groundChoice.id, groundChoice.width],
+  );
+  // Kept apart from the upright switch, so flipping it does not lay the
+  // ground again.
+  const {
+    id: groundId,
+    degrees: groundDegrees,
+    width: groundWidth,
+  } = groundChoice;
+  const groundSurface = useMemo(
+    () =>
+      groundShape(
+        { id: groundId, degrees: groundDegrees, width: groundWidth },
+        groundFootprint,
+      ),
+    [groundId, groundDegrees, groundWidth, groundFootprint],
+  );
+  const ground = useMemo(
+    () => ({
+      choice: groundChoice,
+      onChange: setGroundChoice,
+      shape: groundSurface,
+      up: unitUp(groundSurface, groundChoice.upright),
+    }),
+    [groundChoice, groundSurface],
+  );
   // The piece the viewport puts its collision handles on: whichever is
   // selected while the collision panel is open. Selecting a piece is the whole
   // gesture, rather than a switch on top of it, because picking the thing you
@@ -902,6 +950,7 @@ function Builder({ id }: { id: string | undefined }) {
               )}
             >
               <ModelViewport
+                ground={ground}
                 chrome={
                   <>
                     <div className="pointer-events-none flex items-start justify-between gap-3">
@@ -1490,6 +1539,7 @@ function Builder({ id }: { id: string | undefined }) {
                   pack={loaded}
                   raw={raw}
                   onStandIn={setStandIn}
+                  ground={ground}
                   scriptPaused={scriptPaused}
                   onScriptPausedChange={setScriptPaused}
                   scriptFrame={scriptFrame}

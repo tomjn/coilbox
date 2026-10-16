@@ -6,9 +6,12 @@ import { unitAtlas } from "../../atlas";
 import {
   type BackdropId,
   backdropById,
+  buildShapedTerrain,
   buildTerrain,
   buildWater,
   type GroundId,
+  type GroundShape,
+  reshapeTerrain,
   skyTexture,
 } from "../../environment";
 import { importedMaterial, partMaterial } from "../../geometry";
@@ -142,6 +145,9 @@ export interface SceneState {
   terrain: THREE.Mesh | null;
   /** The sea, kept the same way. */
   water: THREE.Mesh | null;
+  /** A slope or uneven ground, kept the same way and reshaped in place, so a
+   *  new angle does not paint the mottle again. */
+  shaped: THREE.Mesh | null;
   /** Piece id to the group holding it, so selection and edits can find it. */
   groups: Map<string, THREE.Group>;
   /** Geometry built for playback, which this owns and must free. The shared
@@ -236,12 +242,22 @@ export function applyBackdrop(state: SceneState, id: BackdropId) {
   if (texture) state.sky = { id, texture };
 }
 
-/** Put the solid ground or the sea under the markings, or take both away
- *  again. */
-export function applyGround(state: SceneState, id: GroundId) {
+/** Put the solid ground, the sea or a shaped ground under the markings, or
+ *  take them all away again. `shape` is what `groundShape` made of the
+ *  choice, and null for the flat ones. */
+export function applyGround(
+  state: SceneState,
+  id: GroundId,
+  shape: GroundShape | null,
+) {
   state.terrain?.removeFromParent();
   state.water?.removeFromParent();
-  if (id === "terrain") {
+  state.shaped?.removeFromParent();
+  if (shape) {
+    if (state.shaped) reshapeTerrain(state.shaped, shape);
+    else state.shaped = buildShapedTerrain(shape);
+    state.scene.add(state.shaped);
+  } else if (id === "terrain") {
     state.terrain ??= buildTerrain();
     state.scene.add(state.terrain);
   } else if (id === "water") {

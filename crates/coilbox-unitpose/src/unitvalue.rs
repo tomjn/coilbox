@@ -306,7 +306,8 @@ pub fn who(id: i64, world: &crate::World) -> Who<'_> {
 /// Where a unit is and how big, answered off the scene the event carried.
 ///
 /// `rts/Sim/Units/Scripts/UnitScript.cpp:1060-1105`. The unit itself stands at
-/// the origin, and the ground is flat at 0, which is what the viewport draws.
+/// the origin, and the ground is whatever [`crate::World::ground`] says the
+/// viewport draws, which is flat at 0 unless it says otherwise.
 /// `carried` is where the stand-in is once a script has held it
 /// ([`crate::Passenger::at`]), which the scene no longer decides.
 /// `None` for an id this does not cover, and for one it cannot answer without
@@ -328,8 +329,15 @@ pub fn world(
     if !matches!(id, UNIT_XZ | UNIT_Y | UNIT_HEIGHT | GROUND_HEIGHT | MAX_ID) {
         return None;
     }
+    // `CGround::GetHeightAboveWater` in the engine, which reads the sea's
+    // surface wherever the ground is under it. The preview's slopes dip below
+    // 0 behind the unit with no sea drawn there, so this answers the ground
+    // the viewport shows rather than a sea it does not.
     if id == GROUND_HEIGHT {
-        return Some(plain(0));
+        let ground = world.and_then(|world| world.ground);
+        let (x, z) = unpack_xz(p1);
+        let height = ground.map_or(0.0, |ground| ground.height(f64::from(x), f64::from(z)));
+        return Some(plain((height * f64::from(COBSCALE)) as i32));
     }
     // The engine answers the size of its unit table less one
     // (`UnitScript.cpp:1123`), and a script loops from nothing up to it asking
@@ -613,6 +621,7 @@ mod tests {
 
     fn scene(pos: Option<[f64; 3]>) -> crate::World {
         crate::World {
+            ground: None,
             stand_in: Some(crate::StandIn {
                 id: 2,
                 pos,
@@ -732,6 +741,28 @@ mod tests {
     #[test]
     fn the_ground_is_flat_at_zero_everywhere() {
         assert_eq!(value(GROUND_HEIGHT, pack_xz(100.0, -50.0), None), Some(0));
+        assert_eq!(
+            value(GROUND_HEIGHT, pack_xz(100.0, -50.0), Some(&scene(None))),
+            Some(0)
+        );
+    }
+
+    /// The viewport's slope rises ahead of the unit, so a script asking 20
+    /// elmos ahead on a 45 degree one is told 20, and 20 behind is told -20.
+    /// Below 0 is ground, not sea: the slope has no water drawn on it.
+    #[test]
+    fn the_ground_is_the_shape_the_viewport_draws() {
+        let mut w = scene(None);
+        w.ground = Some(crate::Ground {
+            shape: crate::ground::Shape::Slope { degrees: 45.0 },
+            up: None,
+        });
+        let ahead = value(GROUND_HEIGHT, pack_xz(7.0, 20.0), Some(&w)).unwrap();
+        assert!((ahead - 20 * 65536).abs() <= 1, "{ahead}");
+        let behind = value(GROUND_HEIGHT, pack_xz(7.0, -20.0), Some(&w)).unwrap();
+        assert!((behind + 20 * 65536).abs() <= 1, "{behind}");
+        // The unit itself still stands at the origin, which is on the slope.
+        assert_eq!(value(UNIT_Y, 0, Some(&w)), Some(0));
     }
 
     /// No world at all is every caller outside the panel. What needs no facts

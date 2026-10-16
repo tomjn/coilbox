@@ -61,6 +61,7 @@ import {
 } from "../../animPresets";
 import { legoProbeScript, legoRunScript } from "../../bindings";
 import { type UnitMotion, unitMotion } from "../../effects";
+import type { GroundShape } from "../../environment";
 import { unitScript } from "../../luaScript";
 import {
   DEFAULT_BUILDER,
@@ -85,6 +86,7 @@ import {
   SCENARIOS,
   type Scenario,
   type ScriptEvent,
+  type ScriptGround,
   type ScriptTimeline,
   type StandInTrack,
   scenarioById,
@@ -281,6 +283,12 @@ interface Props {
    *  when it has everything they need. Shown only for a scenario that fires
    *  something drawn with a bitmap. */
   effectsNote?: string | null;
+  /** The ground the viewport stands the unit on, which a script asking where
+   *  the ground is gets told about. Absent or a null shape is flat. */
+  ground?: {
+    shape: GroundShape | null;
+    up: [number, number, number] | null;
+  };
 }
 
 export function AnimationPanel({
@@ -300,6 +308,7 @@ export function AnimationPanel({
   raw,
   onStandIn,
   effectsNote,
+  ground,
 }: Props) {
   const reduceMotion = useReduceMotion();
   const [scenarioId, setScenarioId] = useState(SCENARIOS[0].id);
@@ -323,6 +332,13 @@ export function AnimationPanel({
     () => unitSize(project, pack, raw),
     [project, pack, raw],
   );
+  // Read by every run rather than captured, so the run callbacks are not
+  // rebuilt for it, and keyed by value for the rerun below.
+  const scriptGround = useRef<ScriptGround | null>(null);
+  scriptGround.current = ground?.shape
+    ? { shape: ground.shape, up: ground.up }
+    : null;
+  const groundKey = JSON.stringify(scriptGround.current);
   /** Unit values the panel has changed away from what the last run's `asked`
    *  reported as their default. Never saved to the project: this is a way to
    *  poke at a script's preview, not a decision about the unit. */
@@ -429,6 +445,7 @@ export function AnimationPanel({
               radius: 0,
               self: size,
               attachPiece: () => null,
+              ground: scriptGround.current,
             });
         const pieces = project.pieces.map((piece) => piece.name);
         // Two runtimes, one timeline. The compiled one runs the bytecode the
@@ -611,6 +628,7 @@ export function AnimationPanel({
           const piece = named.get(from);
           return piece ? (rest.get(piece) ?? null) : null;
         },
+        ground: scriptGround.current,
       });
       return runEvents(scene, withValues, resume);
     },
@@ -739,6 +757,18 @@ export function AnimationPanel({
     rerunTimer.current = setTimeout(() => rerunRef.current(), SETTLE_MS);
   }, [currentScript, playsOwnScript, applied.length]);
   useEffect(() => () => clearTimeout(rerunTimer.current), []);
+
+  // A run on screen was told about the ground it ran on, so a different ground
+  // runs it again, the way an edited preset does, rather than leave a script
+  // that read the ground answering for one the viewport no longer draws.
+  const lastGround = useRef(groundKey);
+  useEffect(() => {
+    if (lastGround.current === groundKey) return;
+    lastGround.current = groundKey;
+    if (!hasRunRef.current) return;
+    clearTimeout(rerunTimer.current);
+    rerunTimer.current = setTimeout(() => rerunRef.current(), SETTLE_MS);
+  }, [groundKey]);
 
   /** Play one applied preset alone, in the scenario that shows it off. */
   function playSolo(presetId: string) {

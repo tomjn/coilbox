@@ -1656,11 +1656,15 @@ impl Run {
         }
         // Where a piece is, which the model knows once somebody has said where
         // its pieces sit. The unit stands at the origin facing forwards, so a
-        // piece's place in the unit is also its place in the world, which is
-        // what the engine answers with.
+        // piece's place in the unit is also its place in the world once the
+        // unit has turned to the ground it stands on, which is what the engine
+        // answers with.
         if id == PIECE_XZ || id == PIECE_Y {
+            let ground = self.world.as_ref().and_then(|world| world.ground);
             // Counted from 0, as every other piece a `.cob` names is.
-            let at = model_piece(&self.program, p1).and_then(|at| self.model.piece_position(at));
+            let at = model_piece(&self.program, p1)
+                .and_then(|at| self.model.piece_position(at))
+                .map(|at| ground.map_or(at, |ground| ground.place(at)));
             let Some(at) = at else {
                 self.model.note(
                     "This script asks where one of its pieces is, and the preview was not told where this unit's pieces sit.".to_string(),

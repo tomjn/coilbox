@@ -4,13 +4,22 @@ import { GROUND_ELMOS } from "./buildPlate";
 import {
   BACKDROPS,
   backdropById,
+  buildShapedTerrain,
   buildTerrain,
+  DEFAULT_GROUND,
   disposeTerrain,
+  footprintWidth,
   GROUND_SURFACES,
   groundById,
+  groundHeight,
+  groundNormal,
+  groundShape,
+  reshapeTerrain,
   skyTexture,
   TERRAIN_ELMOS,
   terrainAlpha,
+  unitUp,
+  validGroundDegrees,
 } from "./environment";
 
 describe("the options", () => {
@@ -105,5 +114,152 @@ describe("buildTerrain", () => {
 
     expect(geometry).toHaveBeenCalled();
     expect(material).toHaveBeenCalled();
+  });
+});
+
+// The same numbers `crates/coilbox-unitpose/src/ground.rs` checks, so the
+// ground a script is told about is the ground drawn.
+describe("groundHeight", () => {
+  it("rises ahead of the unit on a slope", () => {
+    const slope = { kind: "slope", degrees: 45 } as const;
+    expect(groundHeight(slope, 0, 0)).toBeCloseTo(0, 9);
+    expect(groundHeight(slope, 30, 10)).toBeCloseTo(10, 9);
+    expect(groundHeight(slope, 0, -20)).toBeCloseTo(-20, 9);
+  });
+
+  it("is level with the unit at the origin on uneven ground", () => {
+    const uneven = { kind: "uneven", degrees: 45, width: 64 } as const;
+    const top = 64 / (2 * Math.PI);
+    expect(groundHeight(uneven, 0, 0)).toBeCloseTo(0, 9);
+    expect(groundHeight(uneven, 16, 0)).toBeCloseTo(top, 9);
+    expect(groundHeight(uneven, -16, 0)).toBeCloseTo(-top, 9);
+    expect(groundHeight(uneven, 16, 32)).toBeCloseTo(-top, 9);
+  });
+});
+
+describe("groundNormal", () => {
+  it("leans back down a slope", () => {
+    const [x, y, z] = groundNormal({ kind: "slope", degrees: 30 }, 5, 5);
+    expect(x).toBeCloseTo(0, 9);
+    expect(y).toBeCloseTo(Math.cos(Math.PI / 6), 9);
+    expect(z).toBeCloseTo(-Math.sin(Math.PI / 6), 9);
+  });
+
+  it("is as steep as asked under the unit on uneven ground", () => {
+    const [x, y, z] = groundNormal(
+      { kind: "uneven", degrees: 30, width: 32 },
+      0,
+      0,
+    );
+    expect(x).toBeCloseTo(-Math.sin(Math.PI / 6), 9);
+    expect(y).toBeCloseTo(Math.cos(Math.PI / 6), 9);
+    expect(z).toBeCloseTo(0, 9);
+  });
+
+  it("is straight up on top of a bump", () => {
+    const normal = groundNormal(
+      { kind: "uneven", degrees: 30, width: 32 },
+      8,
+      0,
+    );
+    expect(normal[0]).toBeCloseTo(0, 9);
+    expect(normal[1]).toBeCloseTo(1, 9);
+  });
+});
+
+describe("unitUp", () => {
+  const slope = { kind: "slope", degrees: 30 } as const;
+
+  it("turns a unit that is not upright to the ground under it", () => {
+    expect(unitUp(slope, false)).toEqual(groundNormal(slope, 0, 0));
+  });
+
+  it("leaves an upright unit, and any unit on flat ground, alone", () => {
+    expect(unitUp(slope, true)).toBe(null);
+    expect(unitUp(null, false)).toBe(null);
+  });
+});
+
+describe("groundShape", () => {
+  it("is flat for the grounds with no height in them", () => {
+    for (const id of ["grid", "terrain", "water"] as const)
+      expect(groundShape({ ...DEFAULT_GROUND, id }, 32)).toBe(null);
+  });
+
+  it("sizes uneven ground to the unit until a width is chosen", () => {
+    const choice = { ...DEFAULT_GROUND, id: "uneven" as const, degrees: 10 };
+    expect(groundShape(choice, 48)).toEqual({
+      kind: "uneven",
+      degrees: 10,
+      width: 48,
+    });
+    expect(groundShape({ ...choice, width: 80 }, 48)).toEqual({
+      kind: "uneven",
+      degrees: 10,
+      width: 80,
+    });
+  });
+
+  it("opens on flat ground", () => {
+    expect(DEFAULT_GROUND.id).toBe("grid");
+  });
+});
+
+describe("footprintWidth", () => {
+  it("is the larger side of the unit's footprint, in elmos", () => {
+    const bounds = {
+      mid: [0, 0, 0] as [number, number, number],
+      sizeX: 20,
+      sizeY: 5,
+      sizeZ: 40,
+    };
+    expect(footprintWidth(bounds)).toBe(48);
+  });
+});
+
+describe("validGroundDegrees", () => {
+  it("takes level up to just short of a wall", () => {
+    expect(validGroundDegrees(0)).toBe(true);
+    expect(validGroundDegrees(89.9)).toBe(true);
+    expect(validGroundDegrees(90)).toBe(false);
+    expect(validGroundDegrees(-1)).toBe(false);
+    expect(validGroundDegrees(Number.NaN)).toBe(false);
+  });
+});
+
+describe("buildShapedTerrain", () => {
+  function heightsMatch(
+    mesh: THREE.Mesh,
+    shape: Parameters<typeof groundHeight>[0],
+  ) {
+    const position = mesh.geometry.getAttribute("position");
+    for (let i = 0; i < position.count; i++) {
+      expect(position.getY(i)).toBeCloseTo(
+        groundHeight(shape, position.getX(i), position.getZ(i)),
+        1,
+      );
+    }
+  }
+
+  it("draws the height a script is told about", () => {
+    const shape = { kind: "uneven", degrees: 20, width: 64 } as const;
+    heightsMatch(buildShapedTerrain(shape), shape);
+  });
+
+  it("takes a new shape without a new texture", () => {
+    const mesh = buildShapedTerrain({ kind: "slope", degrees: 10 });
+    const material = mesh.material;
+    const shape = { kind: "slope", degrees: 40 } as const;
+    reshapeTerrain(mesh, shape);
+    expect(mesh.material).toBe(material);
+    heightsMatch(mesh, shape);
+  });
+
+  it("is never in the way of a click", () => {
+    const mesh = buildShapedTerrain({ kind: "slope", degrees: 10 });
+    const hits: THREE.Intersection[] = [];
+    mesh.raycast(new THREE.Raycaster(), hits);
+    expect(hits).toEqual([]);
+    expect(mesh.renderOrder).toBeLessThan(0);
   });
 });

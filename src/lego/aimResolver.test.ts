@@ -523,6 +523,30 @@ describe("withWorld", () => {
     expect(events[0].world?.standIn).toBeNull();
     expect(events[3].world?.standIn?.pos).toEqual([0, 20, -5]);
   });
+
+  it("tells every event the ground the viewport draws, and nothing on flat ground", () => {
+    const ground = {
+      shape: { kind: "slope", degrees: 20 } as const,
+      up: [0, 0.94, -0.34] as [number, number, number],
+    };
+    const shaped = withWorld(
+      [
+        { frame: 0, callin: "Create" },
+        { frame: 30, callin: "Activate" },
+      ],
+      null,
+      { ...CTX, ground },
+    );
+    expect(shaped.map((event) => event.world?.ground)).toEqual([
+      ground,
+      ground,
+    ]);
+    const flat = withWorld([{ frame: 0, callin: "Create" }], null, {
+      ...CTX,
+      ground: null,
+    });
+    expect(flat[0].world).not.toHaveProperty("ground");
+  });
 });
 
 describe("aimDirection", () => {

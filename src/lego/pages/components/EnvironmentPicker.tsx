@@ -11,8 +11,10 @@
  * See `environment.ts`.
  */
 
-import { Button } from "@picoframe/frame";
+import { Button, Input } from "@picoframe/frame";
 import { Mountain } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CheckField, Field as LabelledField } from "@/components/Field";
 import {
   Popover,
   PopoverContent,
@@ -24,8 +26,12 @@ import {
   type BackdropId,
   backdropById,
   GROUND_SURFACES,
+  type GroundChoice,
   type GroundId,
+  type GroundShape,
   groundById,
+  MIN_BUMP_WIDTH,
+  validGroundDegrees,
 } from "../../environment";
 
 const ITEM_CLASS =
@@ -36,11 +42,14 @@ export function EnvironmentPicker({
   onBackdrop,
   ground,
   onGround,
+  shape,
 }: {
   backdrop: BackdropId;
   onBackdrop: (id: BackdropId) => void;
-  ground: GroundId;
-  onGround: (id: GroundId) => void;
+  ground: GroundChoice;
+  onGround: (choice: GroundChoice) => void;
+  /** What the choice draws, null for a flat ground. */
+  shape: GroundShape | null;
 }) {
   return (
     <Popover>
@@ -74,12 +83,14 @@ export function EnvironmentPicker({
           </ToggleGroup>
         </Field>
 
-        <Field label="Ground" hint={groundById(ground).hint}>
+        <Field label="Ground" hint={groundById(ground.id).hint}>
           <ToggleGroup
             type="single"
-            value={ground}
-            onValueChange={(value) => value && onGround(value as GroundId)}
-            className="justify-start gap-2"
+            value={ground.id}
+            onValueChange={(value) =>
+              value && onGround({ ...ground, id: value as GroundId })
+            }
+            className="flex-wrap justify-start gap-2"
           >
             {GROUND_SURFACES.map((option) => (
               <ToggleGroupItem
@@ -93,11 +104,93 @@ export function EnvironmentPicker({
           </ToggleGroup>
         </Field>
 
+        {shape && (
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <NumberField
+                label="Angle (°)"
+                value={ground.degrees}
+                valid={validGroundDegrees}
+                onCommit={(degrees) =>
+                  degrees !== null && onGround({ ...ground, degrees })
+                }
+              />
+              {shape.kind === "uneven" && (
+                <NumberField
+                  label="Width (elmos)"
+                  value={ground.width}
+                  placeholder={String(shape.width)}
+                  valid={(width) =>
+                    Number.isFinite(width) && width >= MIN_BUMP_WIDTH
+                  }
+                  onCommit={(width) => onGround({ ...ground, width })}
+                />
+              )}
+            </div>
+            <CheckField
+              label="Upright"
+              checked={ground.upright}
+              onChange={(upright) => onGround({ ...ground, upright })}
+            />
+          </div>
+        )}
+
         <p className="text-xs text-muted-foreground">
           A view setting. Neither one is saved with the unit or exported.
         </p>
       </PopoverContent>
     </Popover>
+  );
+}
+
+/**
+ * A number typed in, committed only once it is one the ground can take. Held
+ * as text while it is typed, so a half-typed number is not thrown back.
+ * Emptying it commits null, which for the bump width means following the
+ * unit's footprint again.
+ */
+function NumberField({
+  label,
+  value,
+  placeholder,
+  valid,
+  onCommit,
+}: {
+  label: string;
+  value: number | null;
+  placeholder?: string;
+  valid: (value: number) => boolean;
+  onCommit: (value: number | null) => void;
+}) {
+  const [text, setText] = useState(value === null ? "" : String(value));
+  useEffect(() => {
+    setText((current) =>
+      (current === "" ? null : Number(current)) === value
+        ? current
+        : value === null
+          ? ""
+          : String(value),
+    );
+  }, [value]);
+  const parsed = text.trim() === "" ? null : Number(text);
+  const ok = parsed === null || valid(parsed);
+  return (
+    <LabelledField label={label} className="min-w-0 flex-1 text-xs">
+      <Input
+        type="number"
+        inputMode="decimal"
+        value={text}
+        placeholder={placeholder}
+        aria-invalid={!ok}
+        className="h-7 text-xs"
+        onChange={(event) => {
+          const next = event.target.value;
+          setText(next);
+          const number = next.trim() === "" ? null : Number(next);
+          if (number === null || valid(number)) onCommit(number);
+        }}
+      />
+    </LabelledField>
   );
 }
 

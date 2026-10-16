@@ -2121,6 +2121,58 @@ mod world {
     /// (`LuaUnitScript.cpp:1262-1286`), so it counts from 0 where every other
     /// piece a Lua script names counts from 1. bos2lua writes `turret - 1` for
     /// exactly this reason.
+    /// A unit turned to stand on a slope carries its pieces round with it, and
+    /// the engine answers where a piece is in the world
+    /// (`GetObjectSpacePos`, `UnitScript.cpp:1023-1040`).
+    #[test]
+    fn answers_where_a_piece_is_once_the_unit_tilts() {
+        let rest = [
+            Rest {
+                parent: None,
+                position: [0.0, 0.0, 0.0],
+            },
+            Rest {
+                parent: Some(0),
+                position: [0.0, 0.0, 10.0],
+            },
+            Rest::default(),
+            Rest::default(),
+        ];
+        let pieces = pieces();
+        let angle = 30f64.to_radians();
+        let mut events = create();
+        events[0].world = Some(coilbox_unitpose::World {
+            ground: Some(coilbox_unitpose::Ground {
+                shape: coilbox_unitpose::ground::Shape::Slope { degrees: 30.0 },
+                up: Some([0.0, angle.cos(), -angle.sin()]),
+            }),
+            stand_in: None,
+            own: coilbox_unitpose::Size::default(),
+        });
+        let timeline = run(
+            r#"
+            local turret = piece("turret")
+            local barrel = piece("barrel")
+            function script.Create()
+                local y = GetUnitValue(COB.PIECE_Y, turret - 1)
+                Move(barrel, y_axis, y / 65536)
+            end
+            "#,
+            "test.lua",
+            &Unit {
+                rest: &rest,
+                ..Unit::new(&pieces)
+            },
+            &events,
+            3,
+            &HashMap::new(),
+        );
+
+        assert_eq!(timeline.error, None);
+        // Ten elmos ahead of the origin, on a slope that rises at 30 degrees.
+        assert!((pose(&timeline, 0, "barrel")[1] - 5.0).abs() < 1e-4);
+    }
+
     #[test]
     fn answers_where_a_piece_is_counting_from_zero() {
         let rest = [
@@ -2258,6 +2310,7 @@ mod world {
 
     fn scene(pos: Option<[f64; 3]>) -> coilbox_unitpose::World {
         coilbox_unitpose::World {
+            ground: None,
             stand_in: Some(coilbox_unitpose::StandIn {
                 id: 2,
                 pos,
@@ -2567,6 +2620,7 @@ mod announcements {
 
     fn scene() -> coilbox_unitpose::World {
         coilbox_unitpose::World {
+            ground: None,
             stand_in: Some(coilbox_unitpose::StandIn {
                 id: 2,
                 pos: Some([30.0, 0.0, 40.0]),
@@ -2832,6 +2886,7 @@ mod engine_attach {
 
     fn scene() -> coilbox_unitpose::World {
         coilbox_unitpose::World {
+            ground: None,
             stand_in: Some(coilbox_unitpose::StandIn {
                 id: 2,
                 pos: Some([30.0, 0.0, 40.0]),
@@ -3349,6 +3404,7 @@ mod engine_factory {
 
     fn scene(pos: Option<[f64; 3]>) -> coilbox_unitpose::World {
         coilbox_unitpose::World {
+            ground: None,
             stand_in: Some(coilbox_unitpose::StandIn {
                 id: 2,
                 pos,
