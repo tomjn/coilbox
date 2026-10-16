@@ -622,3 +622,188 @@ describe("a scenario that moves the unit", () => {
     );
   });
 });
+
+describe("a unit on the presets, edited while it plays", () => {
+  const piece = {
+    id: "p0",
+    name: "base",
+    parentId: null,
+    partId: null,
+    position: [0, 0, 0] as [number, number, number],
+    rotation: [0, 0, 0] as [number, number, number],
+    scale: [1, 1, 1] as [number, number, number],
+    role: "base" as const,
+  };
+  const idle = (params = {}) =>
+    project({
+      pieces: [piece],
+      animations: [{ presetId: "idle.sway", params }],
+    });
+  const frames = (n: number) =>
+    Array.from({ length: n }, () => [0]) as ScriptTimeline["frames"];
+
+  beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
+  afterEach(() => vi.useRealTimers());
+
+  /** Plays the unit and waits for the run to land, then rerenders with `next`. */
+  async function played(
+    first: LegoProject,
+    props: Partial<React.ComponentProps<typeof AnimationPanel>> = {},
+  ) {
+    const view = show(first, { ...props, playing: false });
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+    await vi.waitFor(() => expect(runLua).toHaveBeenCalledTimes(1));
+    const again = (next: LegoProject, over = {}) =>
+      view.rerender(
+        <AnimationPanel
+          project={next}
+          playing={true}
+          onPlayingChange={vi.fn()}
+          onChange={vi.fn()}
+          onShowScript={vi.fn()}
+          onBuilderChange={vi.fn()}
+          onScriptTimeline={vi.fn()}
+          onScriptRun={vi.fn()}
+          scriptPaused={false}
+          onScriptPausedChange={vi.fn()}
+          scriptFrame={0}
+          onScriptFrameChange={vi.fn()}
+          pack={pack()}
+          raw={null}
+          onStandIn={vi.fn()}
+          {...props}
+          {...over}
+        />,
+      );
+    return again;
+  }
+
+  it("runs the new script once the edits settle, and not before", async () => {
+    const again = await played(idle(), { playing: true });
+    const next = idle({ turn: 20 });
+    expect(unitScript(next)).not.toBe(unitScript(idle()));
+    again(next);
+
+    await vi.advanceTimersByTimeAsync(399);
+    expect(runLua).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(runLua).toHaveBeenCalledTimes(2);
+    expect(runLua.mock.calls[1][0]).toMatchObject({ script: unitScript(next) });
+  });
+
+  it("runs once for a drag of many changes", async () => {
+    const again = await played(idle(), { playing: true });
+    for (const amplitude of [20, 21, 22]) {
+      again(idle({ turn: amplitude }));
+      await vi.advanceTimersByTimeAsync(100);
+    }
+    await vi.advanceTimersByTimeAsync(400);
+    expect(runLua).toHaveBeenCalledTimes(2);
+  });
+
+  it("does nothing for an edit that leaves the script as it was", async () => {
+    const value = idle();
+    const again = await played(value, { playing: true });
+    again({ ...value, name: "renamed" });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(runLua).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not run anything if nothing has been played", async () => {
+    const view = show(idle());
+    view.rerender(
+      <AnimationPanel
+        project={idle({ turn: 20 })}
+        playing={false}
+        onPlayingChange={vi.fn()}
+        onChange={vi.fn()}
+        onShowScript={vi.fn()}
+        onBuilderChange={vi.fn()}
+        onScriptTimeline={vi.fn()}
+        onScriptRun={vi.fn()}
+        scriptPaused={false}
+        onScriptPausedChange={vi.fn()}
+        scriptFrame={0}
+        onScriptFrameChange={vi.fn()}
+        pack={pack()}
+        raw={null}
+        onStandIn={vi.fn()}
+      />,
+    );
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(runLua).not.toHaveBeenCalled();
+  });
+
+  it("keeps the pause and the frame when the new run reaches that far", async () => {
+    runLua.mockResolvedValue(timeline({ frames: frames(10) }));
+    const onScriptPausedChange = vi.fn();
+    const onScriptFrameChange = vi.fn();
+    const again = await played(idle(), { playing: true });
+    again(idle({ turn: 20 }), {
+      scriptPaused: true,
+      scriptFrame: 6,
+      onScriptPausedChange,
+      onScriptFrameChange,
+    });
+    await vi.advanceTimersByTimeAsync(400);
+    await vi.waitFor(() => expect(runLua).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() =>
+      expect(onScriptFrameChange).toHaveBeenLastCalledWith(6),
+    );
+    expect(onScriptPausedChange).toHaveBeenLastCalledWith(true);
+  });
+
+  it("goes back to the start when the new run is shorter than the frame", async () => {
+    runLua.mockResolvedValue(timeline({ frames: frames(3) }));
+    const onScriptFrameChange = vi.fn();
+    const again = await played(idle(), { playing: true });
+    again(idle({ turn: 20 }), { scriptFrame: 6, onScriptFrameChange });
+    await vi.advanceTimersByTimeAsync(400);
+    await vi.waitFor(() => expect(runLua).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() =>
+      expect(onScriptFrameChange).toHaveBeenLastCalledWith(0),
+    );
+  });
+
+  it("reads Running while the new run is in flight, with the old poses kept", async () => {
+    const onScriptTimeline = vi.fn();
+    const again = await played(idle(), { playing: true, onScriptTimeline });
+    onScriptTimeline.mockClear();
+    let finish: (value: ScriptTimeline) => void = () => {};
+    runLua.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    again(idle({ turn: 20 }), { onScriptTimeline });
+    await vi.advanceTimersByTimeAsync(400);
+
+    const button = await screen.findByRole("button", { name: /Running/ });
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    expect(onScriptTimeline).not.toHaveBeenCalled();
+    finish(timeline());
+    await vi.waitFor(() => expect(onScriptTimeline).toHaveBeenCalled());
+  });
+
+  it("explains a generated script that will not run, and offers the Script tab", async () => {
+    const onShowScript = vi.fn();
+    const again = await played(idle(), { playing: true, onShowScript });
+    runLua.mockRejectedValue(new Error("load failed"));
+    again(idle({ turn: 20 }), { onShowScript });
+    await vi.advanceTimersByTimeAsync(400);
+
+    expect(await screen.findByText(/load failed/)).toBeTruthy();
+    expect(screen.getByText(/from the presets and the roles/)).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole("button", { name: /Open the Script tab/ }),
+    );
+    expect(onShowScript).toHaveBeenCalled();
+  });
+
+  it("still stops when the unit owns its script", async () => {
+    const onPlayingChange = vi.fn();
+    const owned = project({ pieces: [piece], script: "-- one" });
+    const again = await played(owned, { playing: true, onPlayingChange });
+    again({ ...owned, script: "-- two" }, { onPlayingChange });
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(onPlayingChange).toHaveBeenLastCalledWith(false);
+    expect(runLua).toHaveBeenCalledTimes(1);
+  });
+});
