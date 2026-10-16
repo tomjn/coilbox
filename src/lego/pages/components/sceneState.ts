@@ -85,6 +85,20 @@ export interface SceneState {
   /** How big it was built, in elmos, so a track's radius multiples are read
    *  against the shape actually in the scene. */
   standInRadius: number;
+  /** The height of the level the stand-in is being dragged across, while the
+   *  game maker drags it, and null the rest of the time. Playback leaves a
+   *  stand-in being dragged where the pointer put it. */
+  standInDrag: { y: number } | null;
+  /** Whether a stand-in let go after a drag is still waiting for the track
+   *  that puts it there, so playback leaves it where it was put in the
+   *  meantime rather than snapping it back to the old track. */
+  standInHeld: boolean;
+  /** Told where a dragged stand-in was let go, unit-local x and z in elmos.
+   *  Unset while the running scenario has no target to move, which is what
+   *  stops a drag starting at all. */
+  onStandInDragRef: {
+    current: ((at: [number, number]) => void) | undefined;
+  };
   /** The dots a script's effects are drawn with. A view aid, never exported. */
   effects: EffectsLayer;
   /** The collision volume's wireframe, while it is being shown. Rebuilt on

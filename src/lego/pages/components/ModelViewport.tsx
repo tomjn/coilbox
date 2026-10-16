@@ -647,6 +647,15 @@ export function ModelViewport({
   onPieceVolumeChangeRef.current = onPieceCollisionVolumeChange;
   const onAimChangeRef = useRef(onAimChange);
   onAimChangeRef.current = onAimChange;
+  // The frame comes from the ref when the stand-in is let go rather than when
+  // the scenario started, since the run has played on since then.
+  const onStandInDragRef = useRef<((at: [number, number]) => void) | undefined>(
+    undefined,
+  );
+  const onDrag = standIn.onDrag;
+  onStandInDragRef.current = onDrag
+    ? (at) => onDrag(at, scriptFrameRef.current)
+    : undefined;
 
   // Built once. Everything after this mutates the scene rather than remaking it.
   useCanvas3D(
@@ -893,6 +902,9 @@ export function ModelViewport({
         standIn: standInGroup,
         disposeStandIn: () => disposeStandIn(standInGroup),
         standInRadius: radius,
+        standInDrag: null,
+        standInHeld: false,
+        onStandInDragRef,
         effects,
         collision: null,
         collisionMaterial,
@@ -1133,6 +1145,12 @@ export function ModelViewport({
   });
 
   useStandInSize(sceneRef, project, pack, raw, standIn.track?.size);
+  // A stand-in let go after a drag waits where it was put for the track that
+  // puts it there, which is the next placement the panel sends.
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (state && standIn) state.standInHeld = false;
+  }, [standIn]);
   useEffectsAtlas(sceneRef, effectsAtlas, reduceMotion);
 
   // The toggle only ever hides the stand-in mesh itself: the track and nano

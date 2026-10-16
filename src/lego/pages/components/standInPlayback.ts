@@ -49,6 +49,10 @@ export interface StandInPlacement {
   /** When the running scenario's unit moves and how fast, which carries the
    *  particles it leaves behind back past it. */
   motion?: UnitMotion | null;
+  /** Where the game maker let the stand-in go after dragging it, unit-local x
+   *  and z in elmos, and the frame they let it go on. Absent for a scenario
+   *  whose stand-in cannot be moved. */
+  onDrag?: (at: [number, number], frame: number) => void;
 }
 
 const AT = new THREE.Vector3();
@@ -78,6 +82,12 @@ export function placeStandIn(
 ): void {
   if (!show || !track) {
     state.standIn.visible = false;
+    return;
+  }
+  // Under the pointer, then where it was let go until the track that puts it
+  // there arrives.
+  if (state.standInDrag || state.standInHeld) {
+    state.standIn.visible = true;
     return;
   }
 
