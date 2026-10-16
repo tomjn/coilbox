@@ -332,10 +332,11 @@ A map with no start positions has nowhere to put the targets, and the drawer say
 **Reload in the sandbox** puts your latest change into the sandbox that is already running, so you keep the map, the targets and the time you spent getting there. It works while a game started with Play with this unit is running.
 
 - A changed script reloads. Every copy of your unit in the game, yours and the targets, starts running the new script straight away. Nothing has to be respawned.
-- A changed unit definition, model or texture needs a relaunch. The drawer says which one changed and offers **Relaunch**, which closes the game and starts a new sandbox.
+- A texture that changed but kept its file name reloads, and every copy of your unit shows it straight away. A texture under a file name the game did not start with needs a relaunch.
+- A changed unit definition or model needs a relaunch. The drawer says which one changed and offers **Relaunch**, which closes the game and starts a new sandbox.
 - Renaming the unit needs a relaunch too. A running game only sees files that were there when it started.
 
-When the model changed as well, the script waits for the relaunch, because a new script on the old model can move pieces the model does not have.
+When the model changed as well, the script and the texture wait for the relaunch, because a new script on the old model can move pieces the model does not have.
 
 Coilbox reaches the running game through the engine's autohost interface, and the sandbox gadget reloads only the game's unit script framework. Reloading every gadget would restart the game's own as well, and Splinter Faction's then kills the targets' team because it has no commander. [What the engine reloads in a running game](engine-reload.md) has the detail.
 
