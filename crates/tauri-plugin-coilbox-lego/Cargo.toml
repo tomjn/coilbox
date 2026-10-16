@@ -60,6 +60,10 @@ coilbox-texture = { path = "../coilbox-texture" }
 # it in the binary chunk. Already in the lock file: `coilbox-texture` uses the
 # same crate to write one.
 base64 = { workspace = true }
+# "Play with this unit" puts the mission runtime into the scratch game with the
+# scenario plugin's own installer, the one the workshop's test uses, so there is
+# one copy of the rules for which files make up the runtime (issue #3341).
+tauri-plugin-coilbox-scenario = { path = "../tauri-plugin-coilbox-scenario" }
 
 [dev-dependencies]
 tempfile = { workspace = true }
