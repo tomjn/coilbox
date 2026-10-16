@@ -71,7 +71,7 @@ export function BonusButton({
             hasBonus ? `${confirmed}% resource bonus` : "Set a resource bonus"
           }
           className={cn(
-            "inline-flex h-7 shrink-0 items-center gap-0.5 rounded px-1 text-muted-foreground hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-50",
+            "inline-flex h-6 min-w-6 shrink-0 items-center justify-center gap-0.5 rounded px-1 text-muted-foreground hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-50",
             hasBonus && "text-amber-600 dark:text-amber-400",
           )}
         >

@@ -23,6 +23,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { DaysField } from "../DaysField";
 import * as mod from "../moderation";
 import { NoteForm } from "../NoteButton";
@@ -74,6 +75,8 @@ interface MemberActionsMenuProps {
   /** Entries of the caller's own, such as a battle host's, drawn under the
    * personal ones. Handed `close` so an entry can shut the menu. */
   extra?: (close: () => void) => ReactNode;
+  /** Classes for the trigger button, to size it for a denser list. */
+  triggerClassName?: string;
 }
 
 /** The forms that need extra input before firing. */
@@ -161,6 +164,7 @@ export function MemberActionsMenu({
   follow,
   friend,
   extra,
+  triggerClassName,
 }: MemberActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormKind | null>(null);
@@ -223,7 +227,10 @@ export function MemberActionsMenu({
               : `Actions for ${nick}`
           }
           title={hasNote ? note?.text : undefined}
-          className="relative inline-flex size-8 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+          className={cn(
+            "relative inline-flex size-8 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground",
+            triggerClassName,
+          )}
         >
           <MoreVertical className="size-4" />
           {hasNote && (

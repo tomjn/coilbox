@@ -19,6 +19,7 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BattleMembersTable } from "./BattleMembersTable";
 import type { MemberRow as Row } from "./config";
+import { CONTROL_SIZE, SELECT_SIZE } from "./MemberRow";
 
 vi.mock("../store", () => ({
   useConnection: () => null,
@@ -84,6 +85,7 @@ function renderTable(
     noteFor?: (row: Row) => string;
     onSetNote?: (row: Row, text: string) => void;
     statsSummaryFor?: (row: Row) => string | null;
+    onSetBonus?: (name: string, value: number) => void;
   },
 ) {
   return render(
@@ -270,5 +272,64 @@ describe("ringing a member from their row", () => {
     expect(rings).toHaveLength(1);
     fireEvent.click(rings[0]);
     expect(noopHostControls.ring).toHaveBeenCalledWith("bob");
+  });
+});
+
+describe("compact rows (#4187)", () => {
+  const rows = [
+    row({ name: "me", self: true, host: true }),
+    row({ name: "alice" }),
+  ];
+  const setup = () =>
+    renderTable(rows, {
+      onSetNote: vi.fn(),
+      onSetBonus: vi.fn(),
+    });
+
+  it("trims the vertical padding of every body cell", () => {
+    const { container } = setup();
+    const cells = container.querySelectorAll("tbody td");
+    expect(cells.length).toBeGreaterThan(0);
+    for (const cell of cells) {
+      expect(cell.className).toContain("py-0.5");
+      expect(cell.className).not.toContain("py-2");
+    }
+  });
+
+  it("keeps the 24px target size on the note, bonus and menu buttons", () => {
+    setup();
+    const buttons = [
+      ...screen.getAllByRole("button", { name: /^(Add|Edit) note for/ }),
+      ...screen.getAllByRole("button", {
+        name: /^(Set|Edit) .*resource bonus/,
+      }),
+      ...screen.getAllByRole("button", { name: /^Actions for/ }),
+    ];
+    // Both humans have a note and bonus button; only alice has a menu button.
+    expect(buttons.length).toBeGreaterThanOrEqual(4);
+    for (const button of buttons) {
+      const classes = button.className.split(/\s+/);
+      expect(classes.some((c) => c === CONTROL_SIZE || c === "h-6")).toBe(true);
+      expect(classes).not.toContain("size-8");
+      expect(classes).not.toContain("size-7");
+      expect(classes).not.toContain("h-7");
+    }
+  });
+
+  it("keeps the ally select at 24px and the colour swatch at 24px", () => {
+    setup();
+    expect(SELECT_SIZE).toContain("data-[size=sm]:h-6");
+    const ally = screen.getAllByRole("combobox")[0];
+    expect(ally.className).toContain("data-[size=sm]:h-6");
+    expect(ally.className).not.toContain("data-[size=sm]:h-8");
+    const swatch = screen.getByLabelText("me colour");
+    expect(swatch.className).toContain("size-6");
+  });
+
+  it("puts the host subtitle on the name line", () => {
+    setup();
+    const subtitle = screen.getByText("Host");
+    const name = screen.getByText("me");
+    expect(subtitle.parentElement).toBe(name.parentElement);
   });
 });

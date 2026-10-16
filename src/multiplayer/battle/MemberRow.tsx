@@ -54,6 +54,19 @@ export interface MemberControls {
   onUnboss?: () => void;
 }
 
+/**
+ * Size of every button in a row: the 24 by 24 pixel minimum target size of
+ * WCAG 2.2 (success criterion 2.5.8), so a row can be compact without a control
+ * shrinking below it.
+ */
+export const CONTROL_SIZE = "size-6";
+
+/**
+ * Trigger classes for a select in a row. The sm select is `h-8` through a
+ * `data-[size=sm]` variant, which only a class on the same variant replaces.
+ */
+export const SELECT_SIZE = "py-0 data-[size=sm]:h-6";
+
 /** Ready state as a round check/cross; spectators show an eye (always "ready"). */
 function ReadyIcon({ row }: { row: Row }) {
   if (row.spectator) {
@@ -228,7 +241,7 @@ export function MemberRow({
         flashIngame && "ingame-flash",
       )}
     >
-      <TableCell className="px-3 py-2">
+      <TableCell className="px-3 py-0.5">
         <div className="flex items-center justify-center gap-1.5">
           <ReadyIcon row={row} />
           {/* Humans only. Sync is whether a player's client has the map and the
@@ -245,7 +258,7 @@ export function MemberRow({
         </div>
       </TableCell>
 
-      <TableCell className="px-3 py-2">
+      <TableCell className="px-3 py-0.5">
         <div className="flex items-center gap-2.5">
           {sharedWith ? (
             // A file-explorer-style branch in the team (leader's) colour,
@@ -300,6 +313,11 @@ export function MemberRow({
                 </span>
                 {mark && <NameMarkIcon mark={mark} />}
                 <RatingBadge rating={row.rating} />
+                {!canChangeAi && !aiInvalid && subtitle && (
+                  <span className="text-[11px] font-normal text-muted-foreground">
+                    {subtitle}
+                  </span>
+                )}
               </div>
               {canChangeAi && (
                 <OptionSelect
@@ -311,7 +329,7 @@ export function MemberRow({
                   onValueChange={(v) => control?.onChangeAi?.(v)}
                   options={aiOptions ?? []}
                   size="sm"
-                  className="h-7 w-auto min-w-36"
+                  className={cn(SELECT_SIZE, "w-auto min-w-36")}
                   placeholder={row.aiDll ?? "Select an AI"}
                 />
               )}
@@ -322,11 +340,6 @@ export function MemberRow({
                 {row.aiDll} isn't available in this game
               </span>
             )}
-            {!canChangeAi && !aiInvalid && subtitle && (
-              <span className="text-[11px] text-muted-foreground">
-                {subtitle}
-              </span>
-            )}
           </div>
         </div>
       </TableCell>
@@ -335,22 +348,23 @@ export function MemberRow({
           than trailing the name, so they line up down the table instead of
           starting at a different place on every row. Empty when a row has
           nothing to show. */}
-      <TableCell className="px-2 py-2 text-center">
+      <TableCell className="px-2 py-0.5 text-center">
         {row.rank != null && <RankBadge rank={row.rank} />}
       </TableCell>
 
-      <TableCell className="px-2 py-2 text-center">
+      <TableCell className="px-2 py-0.5 text-center">
         {onSetNote && (
           <NoteButton
             name={row.name}
             note={note ?? ""}
             onSave={onSetNote}
             statsSummary={statsSummary}
+            className={CONTROL_SIZE}
           />
         )}
       </TableCell>
 
-      <TableCell className="px-2 py-2 text-center">
+      <TableCell className="px-2 py-0.5 text-center">
         {row.kind === "human" && onSetBonus && (
           <BonusButton
             name={row.name}
@@ -361,7 +375,7 @@ export function MemberRow({
       </TableCell>
 
       {showFaction && (
-        <TableCell className="px-2 py-2">
+        <TableCell className="px-2 py-0.5">
           {row.spectator ? (
             <span className="text-xs text-muted-foreground">–</span>
           ) : sharedWith ? (
@@ -381,7 +395,7 @@ export function MemberRow({
               size="sm"
               // Matches the skirmish roster: room for a faction name beside its
               // emblem, which costs the trigger 24px before any text.
-              className="w-auto min-w-28"
+              className={cn(SELECT_SIZE, "w-auto min-w-28")}
               disabled={sideOptions.length === 0}
               options={sideOptions}
               onValueChange={(v) => onSide(Number(v))}
@@ -401,7 +415,7 @@ export function MemberRow({
       )}
 
       {showTeam && (
-        <TableCell className="px-2 py-2">
+        <TableCell className="px-2 py-0.5">
           {row.spectator ? (
             <span className="text-xs text-muted-foreground">–</span>
           ) : canEditTeam ? (
@@ -409,7 +423,7 @@ export function MemberRow({
               value={String(row.teamId)}
               onValueChange={(v) => setTeam(Number(v))}
             >
-              <SelectTrigger size="sm" className="w-16">
+              <SelectTrigger size="sm" className={cn(SELECT_SIZE, "w-16")}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -426,21 +440,21 @@ export function MemberRow({
               </SelectContent>
             </Select>
           ) : (
-            <span className="inline-flex h-8 min-w-8 items-center justify-center rounded border border-border/60 bg-muted/40 px-2 text-xs">
+            <span className="inline-flex h-6 min-w-6 items-center justify-center rounded border border-border/60 bg-muted/40 px-2 text-xs">
               {row.teamId + 1}
             </span>
           )}
         </TableCell>
       )}
 
-      <TableCell className="px-2 py-2">
+      <TableCell className="px-2 py-0.5">
         {row.spectator ? (
           <span className="text-xs text-muted-foreground">–</span>
         ) : sharedWith ? null : canEditAlly ? (
           <OptionSelect
             value={String(row.ally)}
             size="sm"
-            className="w-24"
+            className={cn(SELECT_SIZE, "w-24")}
             options={allyOptions}
             onValueChange={(v) => setAlly(Number(v))}
           />
@@ -450,11 +464,12 @@ export function MemberRow({
       </TableCell>
 
       {showActions && (
-        <TableCell className="px-2 py-2 text-right">
+        <TableCell className="px-2 py-0.5 text-right">
           <MemberActionsMenu
             row={row}
             control={control ?? null}
             personal={personal}
+            triggerClassName={CONTROL_SIZE}
           />
         </TableCell>
       )}
@@ -474,10 +489,13 @@ export function MemberActionsMenu({
   row,
   control,
   personal,
+  triggerClassName,
 }: {
   row: Row;
   control: MemberControls | null;
   personal?: PlayerActions | null;
+  /** Classes for the menu's trigger button. */
+  triggerClassName?: string;
 }) {
   if (!control && !personal) return null;
   const canSpectate =
@@ -485,6 +503,7 @@ export function MemberActionsMenu({
   return (
     <PlayerMenu
       nick={row.name}
+      triggerClassName={triggerClassName}
       {...personal}
       extra={
         control
