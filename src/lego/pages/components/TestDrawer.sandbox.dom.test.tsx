@@ -59,13 +59,22 @@ vi.mock("../../../play/config", () => ({
 }));
 
 const launch = vi.fn();
+const cancel = vi.fn();
+const play = { running: false };
 vi.mock("../../../play/PlayProvider", () => ({
-  usePlay: () => ({ running: false, launch }),
+  usePlay: () => ({ running: play.running, launch, cancel }),
+}));
+
+const playAskLuaRules = vi.fn();
+vi.mock("../../../play/bindings", () => ({
+  playAskLuaRules: (args: unknown) => playAskLuaRules(args),
 }));
 
 const writeScratchGame = vi.fn();
+const writeScratchUnit = vi.fn();
 vi.mock("../../writeScratchGame", () => ({
   writeScratchGame: (args: unknown) => writeScratchGame(args),
+  writeScratchUnit: (args: unknown) => writeScratchUnit(args),
 }));
 
 const SANDBOX = {
@@ -77,7 +86,8 @@ const SANDBOX = {
 };
 const PARTICIPANTS = [{ id: "player" }, { id: "targets" }];
 const prepareSandbox = vi.fn();
-vi.mock("../../sandbox", () => ({
+vi.mock("../../sandbox", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   prepareSandbox: (args: unknown) => prepareSandbox(args),
   sandboxModOptions: () => ({ coilbox_mission: "coilbox-lego-sandbox" }),
 }));
@@ -113,9 +123,31 @@ function open() {
   );
 }
 
+const DIR = "/data/games/coilbox-lego-test.sdd";
+
+/** The unit as an export writes it, with any file's digest changed. */
+function unitFiles(changed: { script?: boolean; model?: boolean } = {}) {
+  return {
+    dir: DIR,
+    textures: "atlas",
+    files: [
+      {
+        path: `${DIR}/objects3d/probe_unit.s3o`,
+        sha256: changed.model ? "m2" : "m1",
+      },
+      {
+        path: `${DIR}/scripts/probe_unit.lua`,
+        sha256: changed.script ? "s2" : "s1",
+      },
+      { path: `${DIR}/units/probe_unit.lua`, sha256: "d1" },
+    ],
+  };
+}
+
 beforeEach(() => {
+  play.running = false;
   writeScratchGame.mockResolvedValue({
-    dir: "/data/games/coilbox-lego-test.sdd",
+    ...unitFiles(),
     name: "Coilbox unit test scratch",
   });
   prepareSandbox.mockResolvedValue({
@@ -165,6 +197,8 @@ describe("TestDrawer's Play with this unit", () => {
       config: { battle: true },
       executable: "/engine/spring",
       dataDir: "/data",
+      autohost: true,
+      onEngineStarted: expect.any(Function),
     });
   });
 
@@ -180,6 +214,11 @@ describe("TestDrawer's Play with this unit", () => {
     expect(toBattleConfig).toHaveBeenCalledWith(
       expect.objectContaining({ modOptions: {}, startPosType: 1 }),
     );
+    expect(launch).toHaveBeenCalledWith("skirmish", {
+      config: { battle: true },
+      executable: "/engine/spring",
+      dataDir: "/data",
+    });
   });
 
   it("says why when the sandbox cannot be set up, and launches nothing", async () => {
@@ -196,5 +235,134 @@ describe("TestDrawer's Play with this unit", () => {
     expect(await screen.findByText(/nowhere to put the targets/)).toBeTruthy();
     expect(writeScratchGame).not.toHaveBeenCalled();
     expect(launch).not.toHaveBeenCalled();
+  });
+});
+
+describe("TestDrawer's Reload in the sandbox (issue #3346)", () => {
+  const reloadButton = () =>
+    screen.getByRole("button", { name: /Reload in the sandbox/ });
+
+  /**
+   * Press Play with this unit and leave the game running: the launch only
+   * settles when `cancel` is called, the way a real one settles on exit.
+   */
+  async function sandboxRunning() {
+    launch.mockImplementation(
+      (_kind: string, opts: { onEngineStarted?: (id: string) => void }) =>
+        new Promise((settle) => {
+          play.running = true;
+          opts.onEngineStarted?.("run-1");
+          cancel.mockImplementation(() =>
+            settle({ exitCode: null, signal: null }),
+          );
+        }),
+    );
+    open();
+    fireEvent.click(
+      screen.getByRole("button", { name: /Play with this unit/ }),
+    );
+    await waitFor(() =>
+      expect(reloadButton()).not.toHaveProperty("disabled", true),
+    );
+  }
+
+  it("is there but cannot be pressed with no sandbox running", () => {
+    open();
+    expect(reloadButton()).toHaveProperty("disabled", true);
+  });
+
+  it("is not for a game the plain Launch started", async () => {
+    launch.mockImplementation(() => {
+      play.running = true;
+      return new Promise(() => {});
+    });
+    open();
+    fireEvent.click(screen.getByRole("button", { name: /^Launch$/ }));
+    await waitFor(() => expect(launch).toHaveBeenCalled());
+    expect(reloadButton()).toHaveProperty("disabled", true);
+  });
+
+  it("reloads a changed script in the running game and says so", async () => {
+    await sandboxRunning();
+    writeScratchUnit.mockResolvedValue(unitFiles({ script: true }));
+    playAskLuaRules.mockResolvedValue({
+      answer: "coilbox_sandbox:loaded",
+      seconds: 0.02,
+    });
+
+    fireEvent.click(reloadButton());
+
+    expect(
+      await screen.findByText(
+        "Reloaded the script. Every probe_unit in the game runs it now.",
+      ),
+    ).toBeTruthy();
+    expect(writeScratchUnit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        baseGame: "SplinterFaction 0.1.89",
+        sandbox: SANDBOX,
+      }),
+    );
+    expect(playAskLuaRules).toHaveBeenCalledWith({
+      runId: "run-1",
+      message: "coilbox_sandbox reload_scripts",
+      reply: "coilbox_sandbox:",
+    });
+    expect(screen.queryByRole("button", { name: /^Relaunch$/ })).toBeNull();
+  });
+
+  it("does not reload the same script twice", async () => {
+    await sandboxRunning();
+    writeScratchUnit.mockResolvedValue(unitFiles({ script: true }));
+    playAskLuaRules.mockResolvedValue({
+      answer: "coilbox_sandbox:loaded",
+      seconds: 0.02,
+    });
+    fireEvent.click(reloadButton());
+    await screen.findByText(/Reloaded the script/);
+
+    fireEvent.click(reloadButton());
+
+    expect(
+      await screen.findByText("Nothing has changed since the game started."),
+    ).toBeTruthy();
+    expect(playAskLuaRules).toHaveBeenCalledTimes(1);
+  });
+
+  it("says a changed model needs a relaunch, and relaunches", async () => {
+    await sandboxRunning();
+    writeScratchUnit.mockResolvedValue(
+      unitFiles({ model: true, script: true }),
+    );
+
+    fireEvent.click(reloadButton());
+
+    expect(
+      await screen.findByText(
+        "The model changed. The engine cannot reload a model in a running game, so relaunch to see it.",
+      ),
+    ).toBeTruthy();
+    expect(playAskLuaRules).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Relaunch$/ }));
+
+    await waitFor(() => expect(launch).toHaveBeenCalledTimes(2));
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(prepareSandbox).toHaveBeenCalledTimes(2);
+  });
+
+  it("says why when the game could not reload the script", async () => {
+    await sandboxRunning();
+    writeScratchUnit.mockResolvedValue(unitFiles({ script: true }));
+    playAskLuaRules.mockResolvedValue({
+      answer: "coilbox_sandbox:failed:This game runs no Lua unit scripts.",
+      seconds: 0.01,
+    });
+
+    fireEvent.click(reloadButton());
+
+    expect(
+      await screen.findByText("This game runs no Lua unit scripts."),
+    ).toBeTruthy();
   });
 });

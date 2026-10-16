@@ -168,6 +168,11 @@ export const playLaunch = defineCommand<
     executable: string;
     dataDir: string;
     runId: string;
+    /**
+     * Open coilbox's end of the engine's autohost interface for this run, so
+     * `playAskLuaRules` can reach the game while it runs (issue #3346).
+     */
+    autohost?: boolean;
     onEvent: Channel<LaunchEvent>;
   },
   LaunchOutcome
@@ -204,6 +209,16 @@ export const playLaunchSave = defineCommand<
   },
   LaunchOutcome
 >("coilbox-play", "play_launch_save");
+
+/**
+ * Send `/luarules <message>` to a game launched with `autohost`, and wait for a
+ * Lua message from it starting with `reply` (issue #3346). Rejects when the
+ * game has not started, or does not answer in time.
+ */
+export const playAskLuaRules = defineCommand<
+  { runId: string; message: string; reply: string },
+  { answer: string; seconds: number }
+>("coilbox-play", "play_ask_lua_rules");
 
 /** Kill an in-flight game by run id. */
 export const playCancel = defineCommand<

@@ -7,6 +7,7 @@
 //! this plugin adds is a byte-correct start script and a reliable "game finished"
 //! signal — the `play_launch` command simply resolves when the process exits.
 
+mod autohost;
 mod focus;
 mod infolog;
 mod launch;
@@ -33,6 +34,10 @@ use tauri::{
 /// can kill one and the launch poll-loop can detect cancellation. A run removes
 /// its own entry when the engine exits.
 type RunRegistry = Arc<Mutex<HashMap<String, Child>>>;
+
+/// The autohost connection of each run launched with one, keyed by run id like
+/// [`RunRegistry`]. A run removes its own entry when the engine exits.
+type AutohostRegistry = Arc<Mutex<HashMap<String, Arc<autohost::Autohost>>>>;
 
 /// The process id of the engine a run is still running, or `None` when it is
 /// not running one.
@@ -171,11 +176,29 @@ fn launch_blocking(
     reg: RunRegistry,
     on_event: Channel<LaunchEvent>,
 ) -> Result<Option<ExitOutcome>, String> {
+    launch_blocking_with(bin, args, data_dir, None, run_id, reg, on_event)
+}
+
+/// [`launch_blocking`], with `extra_datadir` added after every content folder.
+/// The autohost's settings file is the one thing that goes there.
+fn launch_blocking_with(
+    bin: PathBuf,
+    args: Vec<String>,
+    data_dir: String,
+    extra_datadir: Option<PathBuf>,
+    run_id: String,
+    reg: RunRegistry,
+    on_event: Channel<LaunchEvent>,
+) -> Result<Option<ExitOutcome>, String> {
+    // Every content folder, so the engine finds a game the scan found in a
+    // folder other than its own.
+    let mut datadir = coilbox_proc::spring_datadir(&data_dir);
+    if let Some(extra) = &extra_datadir {
+        datadir = autohost::with_extra_datadir(&datadir, extra)?;
+    }
     let mut cmd = coilbox_proc::command(&bin);
     cmd.args(&args)
-        // Every content folder, so the engine finds a game the scan found in a
-        // folder other than its own.
-        .env("SPRING_DATADIR", coilbox_proc::spring_datadir(&data_dir))
+        .env("SPRING_DATADIR", datadir)
         // The engine writes its own infolog file; detach its stdio so we don't
         // hold pipes open or pop a console.
         .stdout(Stdio::null())
@@ -244,14 +267,23 @@ fn launch_result<E: std::fmt::Display>(
 /// `play_launch` — write the start script and launch the engine, resolving when
 /// the engine process exits (the UI's unfreeze signal). Refuses to start a second
 /// game while one is already running.
+///
+/// `autohost` opens coilbox's end of the engine's autohost interface for this
+/// run, so [`play_ask_lua_rules`] can reach the game while it runs. Only the
+/// unit builder's sandbox asks for it (issue #3346).
+// Each argument is one field of the IPC payload, so grouping them would only
+// move the width into a struct the frontend then has to nest.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 async fn play_launch<R: Runtime>(
     app: AppHandle<R>,
     reg: State<'_, RunRegistry>,
+    hosts: State<'_, AutohostRegistry>,
     config: BattleConfig,
     executable: String,
     data_dir: String,
     run_id: String,
+    autohost: Option<bool>,
     on_event: Channel<LaunchEvent>,
 ) -> Result<CliResult, ()> {
     let bin = PathBuf::from(&executable);
@@ -278,14 +310,86 @@ async fn play_launch<R: Runtime>(
         return Ok(CliResult::err(format!("could not write script.txt: {e}")));
     }
 
+    let extra_datadir = if autohost == Some(true) {
+        match open_autohost(&app, &hosts, &run_id) {
+            Ok(dir) => Some(dir),
+            Err(e) => return Ok(CliResult::err(e)),
+        }
+    } else {
+        None
+    };
+
     let args = build_engine_args(&path.to_string_lossy(), None);
     let reg = reg.inner().clone();
+    let id = run_id.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        launch_blocking(bin, args, data_dir, run_id, reg, on_event)
+        launch_blocking_with(bin, args, data_dir, extra_datadir, run_id, reg, on_event)
     })
     .await;
+    if let Some(host) = hosts.lock().unwrap().remove(&id) {
+        host.close();
+    }
 
     Ok(launch_result(result))
+}
+
+/// Bind the autohost socket for `run_id` and write the settings file that
+/// points the engine at it. Answers the folder to add to `SPRING_DATADIR`.
+fn open_autohost<R: Runtime>(
+    app: &AppHandle<R>,
+    hosts: &AutohostRegistry,
+    run_id: &str,
+) -> Result<PathBuf, String> {
+    let host = autohost::Autohost::bind()
+        .map_err(|e| format!("could not open a port for the game to talk to: {e}"))?;
+    let dir = autohost::settings_dir(&coilbox_portable::data_dir(app)?);
+    if let Err(e) = autohost::write_settings(&dir, host.port()) {
+        host.close();
+        return Err(e);
+    }
+    hosts.lock().unwrap().insert(run_id.to_string(), host);
+    Ok(dir)
+}
+
+/// How long [`play_ask_lua_rules`] waits for the game to answer.
+///
+/// The sandbox's reload of the unit script framework answered in 16 to 23 ms
+/// on Splinter Faction 0.1.89 (issue #3346). The slowest reload measured is
+/// the 1.0 s a `/luarules reload` of all 109 of that game's gadgets took
+/// (`docs/developers/engine-reload.md`), which bounds reloading one of them.
+/// Ten times that is a chosen margin for a slower machine, not a measurement.
+const ASK_WAIT: Duration = Duration::from_secs(10);
+
+/// `play_ask_lua_rules` — send `/luarules <message>` to the game `run_id` is
+/// running, and wait for a Lua message from it starting with `reply`. Answers
+/// that message, and how long it took in seconds.
+///
+/// The unit builder's sandbox uses it to have its gadget reload the unit's
+/// script (issue #3346). The run has to have been launched with `autohost`.
+#[tauri::command]
+async fn play_ask_lua_rules(
+    hosts: State<'_, AutohostRegistry>,
+    run_id: String,
+    message: String,
+    reply: String,
+) -> Result<CliResult, ()> {
+    let Some(host) = hosts.lock().unwrap().get(&run_id).cloned() else {
+        return Ok(CliResult::err(
+            "That game was not launched with a way to reach it.",
+        ));
+    };
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        host.ask_lua_rules(&message, &reply, ASK_WAIT)
+    })
+    .await;
+    Ok(match result {
+        Ok(Ok((answer, took))) => CliResult::ok(json!({
+            "answer": answer,
+            "seconds": took.as_secs_f64(),
+        })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("LuaRules task failed: {e}")),
+    })
 }
 
 /// `play_launch_replay` — launch the engine to play back a demo (`.sdfz`). Unlike
@@ -507,6 +611,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-play")
         .setup(|app, _api| {
             app.manage(RunRegistry::default());
+            app.manage(AutohostRegistry::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -518,6 +623,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             play_launch_replay,
             play_launch_save,
             play_cancel,
+            play_ask_lua_rules,
             play_focus,
             play_infolog,
             play_system_info

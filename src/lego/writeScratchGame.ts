@@ -10,7 +10,7 @@ import type { PlayTarget } from "@/play/config";
 import { exportTextureName, unitAtlas } from "./atlas";
 import { legoExport, legoScratchGame, type ScratchSandbox } from "./bindings";
 import { unitScript } from "./luaScript";
-import type { LegoProject } from "./model";
+import type { ExportedFile, LegoProject } from "./model";
 import type { LoadedPack } from "./pack";
 import { buildPieceCollisionScript } from "./pieceCollisionScript";
 import type { RawGeometry } from "./rawGeometry";
@@ -38,21 +38,60 @@ export interface ScratchGameArgs {
   onWritten?: (dir: string) => void;
 }
 
+/** What writing the unit into the scratch game put on disk. */
+export interface WrittenScratchUnit {
+  dir: string;
+  /** Every file the unit was written as, with the digest of what was written. */
+  files: ExportedFile[];
+  /**
+   * Which textures it was given, as one string. A texture is copied rather
+   * than generated, so there is no digest of it, and this is what tells one
+   * texture from another.
+   */
+  textures: string;
+}
+
 /**
  * Write the scratch game and the unit into it, then rescan. Answers the name a
  * start script has to ask for the scratch game by. Throws with a reason a
  * person can act on.
  */
-export async function writeScratchGame({
+export async function writeScratchGame(
+  args: ScratchGameArgs,
+): Promise<WrittenScratchUnit & { name: string }> {
+  const written = await writeScratchUnit(args);
+
+  // The engine takes its game list from the same archive cache unitsync
+  // writes, so a forced rescan both registers the scratch game and tells us
+  // the name a start script has to ask for.
+  args.onScanning?.();
+  const { target, baseGame } = args;
+  const rescanned = await primeScan(target.enginePath, target.dataDir, true);
+  const scratch = rescanned.games.find((g) =>
+    isScratchArchive(g.primaryArchive.name),
+  );
+  if (!scratch) {
+    throw new Error(
+      `The engine did not pick up ${SCRATCH_FOLDER}. Check that ${baseGame} is still installed.`,
+    );
+  }
+  return { ...written, name: scratch.name };
+}
+
+/**
+ * Write the scratch game and the unit into it, with no rescan. A game already
+ * running from the scratch game reads the files again from here, which is what
+ * the sandbox's reload needs (issue #3346).
+ */
+export async function writeScratchUnit({
   target,
   baseGame,
   project,
   pack,
   raw,
   sandbox,
-  onScanning,
   onWritten,
-}: ScratchGameArgs): Promise<{ dir: string; name: string }> {
+}: ScratchGameArgs): Promise<WrittenScratchUnit> {
   // An imported unit draws with its own two textures out of the store. A
   // built one samples one atlas, and only its own: an s3o names one texture.
   // A unit whose atlas is not installed still tests, untextured, rather than
@@ -75,20 +114,21 @@ export async function writeScratchGame({
     ...(sandbox ? { sandbox } : {}),
   });
   onWritten?.(dir);
-  await legoExport({
+  const textures = {
+    atlas:
+      !imported && atlas.installed
+        ? {
+            name: atlas.texture,
+            pack: atlas.installed.folder,
+            writeAs: written,
+          }
+        : null,
+    stored: imported?.place ?? [],
+  };
+  const { owned } = await legoExport({
     dir,
     unitName: project.unitName,
-    textures: {
-      atlas:
-        !imported && atlas.installed
-          ? {
-              name: atlas.texture,
-              pack: atlas.installed.folder,
-              writeAs: written,
-            }
-          : null,
-      stored: imported?.place ?? [],
-    },
+    textures,
     // The scratch game always rewrites regardless (see `is_scratch_dir`),
     // so this has no effect here: the drawer's own checkbox is the only
     // thing that reads it for a real export.
@@ -108,18 +148,5 @@ export async function writeScratchGame({
     model,
   });
 
-  // The engine takes its game list from the same archive cache unitsync
-  // writes, so a forced rescan both registers the scratch game and tells us
-  // the name a start script has to ask for.
-  onScanning?.();
-  const rescanned = await primeScan(target.enginePath, target.dataDir, true);
-  const scratch = rescanned.games.find((g) =>
-    isScratchArchive(g.primaryArchive.name),
-  );
-  if (!scratch) {
-    throw new Error(
-      `The engine did not pick up ${SCRATCH_FOLDER}. Check that ${baseGame} is still installed.`,
-    );
-  }
-  return { dir, name: scratch.name };
+  return { dir, files: owned, textures: JSON.stringify(textures) };
 }

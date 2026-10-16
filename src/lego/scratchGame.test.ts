@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -5,7 +6,39 @@ import {
   buildSideData,
   buildStartUnitGadget,
   SCRATCH_SIDE,
+  SPAWN_FRAME,
 } from "./scratchGame";
+
+/**
+ * Load the start unit gadget on `loadFrame`, play `frames`, and print each unit
+ * it created. Team 0 has none of the unit, so it gets one whenever the gadget
+ * decides to spawn.
+ */
+function runStartUnitGadget(loadFrame: number, frames: number[]) {
+  const harness = `
+gadget = {}
+gadgetHandler = { IsSyncedCode = function() return true end }
+UnitDefNames = { cakebot_test = { id = 3 } }
+Spring = {
+  GetGameFrame = function() return ${loadFrame} end,
+  GetGaiaTeamID = function() return 9 end,
+  GetTeamList = function() return { 0 } end,
+  GetTeamUnitDefCount = function() return 0 end,
+  GetTeamStartPosition = function() return 1, 2, 3 end,
+  CreateUnit = function(d, x, y, z, f, t) print("create " .. d .. " " .. t) end,
+  Echo = print,
+}
+assert(loadstring(io.read("*a")))()
+for _, f in ipairs({ ${frames.join(", ")} }) do gadget:GameFrame(f) end
+`;
+  const run = spawnSync("luajit", ["-e", harness], {
+    input: buildStartUnitGadget("cakebot_test"),
+  });
+  return {
+    stderr: run.stderr?.toString() ?? "",
+    lines: (run.stdout?.toString() ?? "").trim().split("\n"),
+  };
+}
 
 describe("buildModInfo", () => {
   it("declares itself a launchable game", () => {
@@ -91,6 +124,21 @@ describe("buildStartUnitGadget", () => {
     expect(buildStartUnitGadget("cakebot_test")).toContain(
       "Spring.GetTeamUnitDefCount(teamID, def.id) == 0",
     );
+  });
+
+  it("spawns once, on its frame", () => {
+    const run = runStartUnitGadget(0, [1, SPAWN_FRAME, SPAWN_FRAME + 1]);
+    expect(run.stderr).toBe("");
+    expect(run.lines).toEqual(["create 3 0"]);
+  });
+
+  // Issue #3346. `/luarules reload` loads it again into a running game, which
+  // is long past its frame, and a team that has lost the unit since would be
+  // handed a new one.
+  it("spawns nothing when a reload loads it after its frame", () => {
+    const run = runStartUnitGadget(SPAWN_FRAME + 600, [SPAWN_FRAME + 601]);
+    expect(run.stderr).toBe("");
+    expect(run.lines).toEqual([""]);
   });
 
   it("skips gaia, which is the map's own team and starts with nothing", () => {

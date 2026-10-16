@@ -126,6 +126,23 @@ engine.env:GameFrame(1)
 check("the start window closes once the game is running",
 	engine.units[engine.spawn("armcom", 1)].alive == true)
 
+-- Issue #3346. `/luarules reload` loads the runtime again into a game that is
+-- already running, long past the frame that closes the start window. Opening it
+-- again there would never close it, and the sandbox's replacement for a target
+-- that died, created with no builder on a team the mission spawns for, would be
+-- undone the moment it appeared.
+engine = load({ coilbox_mission = "demo" }, missionFiles(MISSION), {
+	startPositions = OPTIONS.startPositions,
+	ground = OPTIONS.ground,
+	frame = 900,
+})
+engine.env:Initialize()
+check("a runtime reloaded into a running game leaves a new unit alone",
+	engine.units[engine.spawn("armcom", 1)].alive == true)
+engine.env:GameFrame(901)
+check("and does not set the bank back to the scenario's",
+	engine.resources[0] == nil)
+
 -- Issue #884. Undoing a start only reaches as far as the window, and Splinter
 -- Faction spawns 1800 frames past it, so what a game is actually asked to do is
 -- not spawn. The question it asks holds for the whole mission, because it is the

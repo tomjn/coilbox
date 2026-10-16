@@ -149,6 +149,9 @@ end
 -- `options.allowTransfer(unitID, newTeam, given)` is the game's own
 -- `AllowUnitTransfer`, and a test that says nothing about it has a game that
 -- allows every transfer.
+--
+-- `options.frame` is the game frame the gadget loads on. 0 unless a test says
+-- otherwise, and more only for a runtime reloaded into a running game.
 function M.newEngine(modOptions, files, options)
 	options = options or {}
 
@@ -407,6 +410,9 @@ function M.newEngine(modOptions, files, options)
 		Spring = {
 			GetModOptions = function()
 				return modOptions
+			end,
+			GetGameFrame = function()
+				return options.frame or 0
 			end,
 			Log = function(_, level, message)
 				table.insert(engine.logs, level .. ": " .. message)

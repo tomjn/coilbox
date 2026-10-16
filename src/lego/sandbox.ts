@@ -56,6 +56,22 @@ import { luaString } from "./unitDef";
  */
 export const SANDBOX_MISSION_ID = "coilbox-lego-sandbox";
 
+/**
+ * What coilbox sends the sandbox gadget, as `/luarules <this>`, to have it
+ * reload the unit's script in the running game (issue #3346).
+ */
+export const SANDBOX_RELOAD_MESSAGE = "coilbox_sandbox reload_scripts";
+
+/**
+ * How every answer from the sandbox gadget starts. Coilbox hears them through
+ * the engine's autohost interface. `failed:<why>` follows it when the reload
+ * did not happen.
+ */
+export const SANDBOX_REPLY = "coilbox_sandbox:";
+
+/** The answer when the reload worked. */
+export const SANDBOX_LOADED_REPLY = `${SANDBOX_REPLY}loaded`;
+
 /** The player's participant id in the scenario. */
 export const SANDBOX_PLAYER = "player";
 
@@ -217,7 +233,8 @@ export function buildDownloadMenu(
 /**
  * The scratch game's sandbox gadget. It does nothing unless the start script
  * names the sandbox mission, so a plain Test in game or load check on the same
- * scratch game is unaffected.
+ * scratch game is unaffected. It also reloads the unit's script when coilbox
+ * sends `SANDBOX_RELOAD_MESSAGE`, and answers through the autohost.
  *
  * Which team the targets are on is not passed in: it is every team other than
  * Gaia that no player is playing, which is how the runtime itself tells a
@@ -235,15 +252,25 @@ export function buildSandboxGadget(builder: string | null): string {
     '    author = "coilbox",',
     "    layer = 1001,",
     "    enabled = true,",
+    "    -- The real handler, for reloading the unit script framework.",
+    "    handler = true,",
     "  }",
-    "end",
-    "",
-    "if not gadgetHandler:IsSyncedCode() then",
-    "  return false",
     "end",
     "",
     `if (Spring.GetModOptions() or {})[${luaString(MISSION_MODOPTION)}] ~= ${luaString(SANDBOX_MISSION_ID)} then`,
     "  return false",
+    "end",
+    "",
+    "if not gadgetHandler:IsSyncedCode() then",
+    "  -- Only an unsynced handle can send a Lua message, and coilbox reads them.",
+    "  function gadget:RecvFromSynced(name, answer)",
+    '    if name ~= "coilbox_sandbox" then',
+    "      return false",
+    "    end",
+    "    Spring.SendLuaRulesMsg(answer)",
+    "    return true",
+    "  end",
+    "  return",
     "end",
     "",
     `local BUILDER = ${builder ? luaString(builder) : "nil"}`,
@@ -277,6 +304,31 @@ export function buildSandboxGadget(builder: string | null): string {
     "  elseif unitDefID == builderDefID and not builderID then",
     "    Spring.GiveOrderToUnit(unitID, CMD.FIRE_STATE, { HOLD }, 0)",
     "  end",
+    "end",
+    "",
+    "-- Load the unit script framework again from disk, which gives every live",
+    "-- unit its script again. Only that gadget: reloading them all restarts the",
+    "-- game's own too, and Splinter Faction's then kills a team with no",
+    "-- commander, which is what the targets are.",
+    "local function reloadScripts()",
+    "  for name, known in pairs(gadgetHandler.knownGadgets) do",
+    '    if known.basename == "unit_script.lua" and known.active then',
+    "      gadgetHandler:DisableGadget(name)",
+    "      if gadgetHandler:EnableGadget(name) then",
+    '        return "loaded"',
+    "      end",
+    '      return "failed:" .. name .. " did not load again."',
+    "    end",
+    "  end",
+    '  return "failed:This game runs no Lua unit scripts."',
+    "end",
+    "",
+    "function gadget:GotChatMsg(msg)",
+    `  if msg ~= ${luaString(SANDBOX_RELOAD_MESSAGE)} then`,
+    "    return false",
+    "  end",
+    `  SendToUnsynced("coilbox_sandbox", ${luaString(SANDBOX_REPLY)} .. reloadScripts())`,
+    "  return true",
     "end",
     "",
     "function gadget:UnitDestroyed(unitID, unitDefID, teamID)",

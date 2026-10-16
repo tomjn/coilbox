@@ -593,8 +593,10 @@ if gadgetHandler:IsSyncedCode() then
 		end
 
 		-- Open from here rather than from GameStart, so a game that spawns in
-		-- GamePreload is covered too.
-		suppressing = true
+		-- GamePreload is covered too. Not for a runtime `/luarules reload` loads
+		-- into a game already past the window: nothing would close it again, and
+		-- every unit created with no builder would be undone (issue #3346).
+		suppressing = Spring.GetGameFrame() < START_FRAME
 
 		-- The trigger engine knows nothing about any condition or action until
 		-- one is registered on it. Every module that implements some registers
