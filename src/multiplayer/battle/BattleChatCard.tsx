@@ -204,11 +204,13 @@ export function BattleChatCard({
     );
   }
 
-  // `grid` + `min-h-0 flex-1` stretches the embedded pane to fill the remaining
-  // column height so the chat is anchored to the bottom and scrolls internally
-  // (the page itself never scrolls).
+  // `grid` + `flex-1` stretches the embedded pane to fill the remaining column
+  // height so the chat is anchored to the bottom and scrolls internally. The
+  // `min-h-[22rem]` floor keeps a few messages and the composer on screen in a
+  // crowded room: the members table gives way first, and below that the
+  // column scrolls.
   return (
-    <div className="grid min-h-0 flex-1">
+    <div className="grid min-h-[22rem] flex-1">
       <ChatPane
         variant="embedded"
         title="Battle chat"
