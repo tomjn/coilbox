@@ -726,6 +726,11 @@ export function ModelViewport({
       effects.object.visible = false;
       scene.add(effects.object);
 
+      // Where the collision volume, the piece boxes, their handles and the aim
+      // point live, so a preview that drives or tilts the unit carries them.
+      const overlay = new THREE.Group();
+      scene.add(overlay);
+
       // The collision volume's wireframe. Drawn over everything rather than
       // depth-tested, because a volume set smaller than the unit sits inside
       // the geometry and would otherwise be invisible exactly when its size is
@@ -755,7 +760,7 @@ export function ModelViewport({
         side: THREE.DoubleSide,
       });
       const collisionHandles = buildCollisionHandles(collisionHandleMaterial);
-      scene.add(collisionHandles);
+      overlay.add(collisionHandles);
 
       // The same plates go on a piece's box, in that box's own colour, so the
       // handles say which of the two shapes they are about to size.
@@ -808,7 +813,7 @@ export function ModelViewport({
       const aimMark = points([0, 0, 0], null, aimMaterial);
       aimMark.renderOrder = 5;
       aimMark.visible = false;
-      scene.add(aimMark);
+      overlay.add(aimMark);
 
       const root = new THREE.Group();
       scene.add(root);
@@ -902,6 +907,7 @@ export function ModelViewport({
         controls,
         gizmo,
         root,
+        overlay,
         groupPivot,
         groupPivotAt: [0, 0, 0],
         groupIds: [],

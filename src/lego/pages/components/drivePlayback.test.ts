@@ -9,6 +9,7 @@ import {
   poseRoot,
   restoreFromDrive,
   setDrive,
+  syncOverlay,
 } from "./drivePlayback";
 import type { SceneState } from "./sceneState";
 
@@ -17,6 +18,7 @@ function scene(frames: DriveFrame[] | null) {
   camera.position.set(0, 50, -100);
   return {
     root: new THREE.Group(),
+    overlay: new THREE.Group(),
     drive: frames,
     restTilt: new THREE.Quaternion(),
     follow: true,
@@ -83,6 +85,35 @@ describe("poseRoot", () => {
     // With nothing driving it, posing a frame leaves it alone.
     poseRoot(state, 0);
     expect(state.root.position.toArray()).toEqual([0, 0, 0]);
+  });
+});
+
+describe("the overlays", () => {
+  /** The collision volume, the piece boxes and the aim point sit in the
+   *  overlay group, so it has to end up wherever the unit does. */
+  it("move and turn with the unit while a drive plays, and reset on stop", () => {
+    const angle = (30 * Math.PI) / 180;
+    const state = scene([
+      frame({
+        pos: [100, 5, 50],
+        heading: 16384,
+        up: [0, Math.cos(angle), -Math.sin(angle)],
+      }),
+    ]);
+    poseRoot(state, 0);
+    expect(state.overlay.position.toArray()).toEqual([100, 5, 50]);
+    expect(state.overlay.quaternion.equals(state.root.quaternion)).toBe(true);
+    restoreFromDrive(state);
+    expect(state.overlay.position.toArray()).toEqual([0, 0, 0]);
+    expect(state.overlay.quaternion.equals(state.restTilt)).toBe(true);
+  });
+
+  it("follow the slope tilt of a preview with no drive", () => {
+    const state = scene(null);
+    state.restTilt.setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.3);
+    state.root.quaternion.copy(state.restTilt);
+    syncOverlay(state);
+    expect(state.overlay.quaternion.equals(state.restTilt)).toBe(true);
   });
 });
 
