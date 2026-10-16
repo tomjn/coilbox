@@ -1166,6 +1166,12 @@ export const mpChatLogOpen = defineCommand<
   { messages: ChatMsg[] }
 >("coilbox-multiplayer", "mp_chat_log_open");
 
+/** Move a login's DM and channel logs to a new server key. Never overwrites. */
+export const mpMoveChatLogs = defineCommand<
+  { oldKey: string; newKey: string },
+  { moved: number }
+>("coilbox-multiplayer", "mp_move_chat_logs");
+
 /** Raw escape hatch: send an arbitrary wire line. */
 export const mpSend = defineCommand<
   { serverKey: string; line: string },

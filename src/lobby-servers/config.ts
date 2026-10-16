@@ -127,11 +127,12 @@ export function canonicalServerId(id: string): string {
 
 /**
  * The well-known public lobby servers, taken from SkyLobby's `default-servers`
- * (graal/clj/skylobby/util.clj). Read-only, and users add logins against these. Only
- * BAR's SSL endpoint (8201) is offered, not its plaintext 8200 one. It is the same
- * teiserver either way, so the plain port buys nothing and sends the password in the
- * clear. BAR's Tachyon endpoint is a separate entry, because the same server runs
- * both protocols and TASServer has no announced sunset.
+ * (graal/clj/skylobby/util.clj). Read-only, and users add logins against these. BAR
+ * is offered on 8200 with the in-band `STLS` upgrade, never in plaintext. Its 8201
+ * port completes a TLS handshake and then sends nothing, not even the greeting, as
+ * of October 2026, so a login there hung until coilbox gave up. BAR's Tachyon
+ * endpoint is a separate entry, because the same server runs both protocols and
+ * TASServer has no announced sunset.
  */
 export const BUILTIN_SERVERS: LobbyServer[] = [
   {
@@ -165,11 +166,8 @@ export const BUILTIN_SERVERS: LobbyServer[] = [
     id: "bar-ssl",
     name: "Beyond All Reason",
     host: "server4.beyondallreason.info",
-    port: 8201,
+    port: 8200,
     tls: true,
-    // teiserver's SSL port is TLS from the first byte, unlike uberserver's in-band
-    // STLS upgrade on 8200.
-    tlsStyle: "direct",
     allowSelfSigned: false,
   },
   {

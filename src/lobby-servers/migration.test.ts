@@ -14,6 +14,7 @@ vi.mock("@picoframe/plugin-sdk", () => ({
 import type { LobbyAccount } from "./config";
 import {
   type LegacyLobbyServer,
+  planBarPortMove,
   planBarTlsRemap,
   planMigration,
 } from "./migration";
@@ -48,8 +49,8 @@ describe("planMigration", () => {
       },
       ids(),
     );
-    // 8200 was BAR's plaintext built-in, which is retired, so the row lands on the
-    // SSL entry rather than becoming a custom server that still could not host.
+    // 8200 is where the BAR built-in now lives, upgraded with STLS, so the row
+    // lands on it rather than becoming a custom server.
     expect(plan.customServers).toEqual([]);
     expect(plan.accounts).toEqual([
       { id: "acc-1", serverId: "bar-ssl", username: "alice" },
@@ -93,7 +94,7 @@ describe("planMigration", () => {
     expect(plan.reKey).toEqual([]);
   });
 
-  it("matches BAR SSL by port 8201", () => {
+  it("moves a row on BAR's old 8201 port onto the built-in", () => {
     const plan = planMigration(
       {
         servers: [
@@ -209,5 +210,39 @@ describe("planBarTlsRemap", () => {
     const plan = planBarTlsRemap([acc({}), kept], null);
     expect(plan.accounts).toEqual([kept]);
     expect(plan.reKey).toEqual([]);
+  });
+});
+
+describe("planBarPortMove", () => {
+  const acct = (p: Partial<LobbyAccount>): LobbyAccount => ({
+    id: "a",
+    serverId: "bar-ssl",
+    username: "AF_",
+    ...p,
+  });
+
+  it("moves each BAR login's server key from 8201 to 8200", () => {
+    expect(
+      planBarPortMove([acct({}), acct({ id: "b", username: "bob" })]),
+    ).toEqual([
+      {
+        oldKey: "AF_@server4.beyondallreason.info:8201",
+        newKey: "AF_@server4.beyondallreason.info:8200",
+      },
+      {
+        oldKey: "bob@server4.beyondallreason.info:8201",
+        newKey: "bob@server4.beyondallreason.info:8200",
+      },
+    ]);
+  });
+
+  it("leaves logins on other servers, and nameless ones, alone", () => {
+    expect(
+      planBarPortMove([
+        acct({ serverId: "techa" }),
+        acct({ serverId: "bar-tachyon" }),
+        acct({ username: "" }),
+      ]),
+    ).toEqual([]);
   });
 });

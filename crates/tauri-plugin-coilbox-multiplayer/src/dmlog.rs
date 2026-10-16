@@ -182,6 +182,43 @@ pub(crate) fn mp_chat_log_open<R: Runtime>(
     CliResult::ok(json!({ "messages": log.thread(&name) }))
 }
 
+/// Move `old_key`'s log in `dir` to `new_key`, for a login whose server key
+/// changed. Never overwrites: when `new_key` already has a log, both stay where
+/// they are, the rule `moveKeyedEntry` in `serverKeyData.ts` follows for
+/// settings. Returns whether a file moved.
+pub fn move_log(dir: &Path, old_key: &str, new_key: &str) -> std::io::Result<bool> {
+    let from = dir.join(format!("{}.jsonl", sanitize_key(old_key)));
+    let to = dir.join(format!("{}.jsonl", sanitize_key(new_key)));
+    if from == to || !from.exists() || to.exists() {
+        return Ok(false);
+    }
+    fs::rename(&from, &to)?;
+    Ok(true)
+}
+
+/// `mp_move_chat_logs`: move a login's DM and channel logs from one server key
+/// to another, the files `useMoveServerKeyData` cannot reach.
+#[tauri::command]
+pub(crate) fn mp_move_chat_logs<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    old_key: String,
+    new_key: String,
+) -> CliResult {
+    let (dm_dir, chan_dir) = match crate::log_dirs(&app) {
+        Ok(d) => d,
+        Err(e) => return CliResult::err(e),
+    };
+    let mut moved = 0;
+    for dir in [&dm_dir, &chan_dir] {
+        match move_log(dir, &old_key, &new_key) {
+            Ok(true) => moved += 1,
+            Ok(false) => {}
+            Err(e) => return CliResult::err(format!("could not move a chat log: {e}")),
+        }
+    }
+    CliResult::ok(json!({ "moved": moved }))
+}
+
 /// Somewhere for a test to keep conversation logs that is not the developer's own
 /// store, and that no other run can reach.
 ///
@@ -240,6 +277,33 @@ mod tests {
             at,
             id: None,
         }
+    }
+
+    #[test]
+    fn move_log_carries_history_to_the_new_key() {
+        let dir = tempfile::tempdir().expect("a scratch directory");
+        DmLog::new(dir.path(), "me@host:8201").append("bob", &msg("bob", "hi", 1));
+
+        assert!(move_log(dir.path(), "me@host:8201", "me@host:8200").expect("move"));
+        assert_eq!(DmLog::new(dir.path(), "me@host:8200").load()["bob"][0].text, "hi");
+        assert!(DmLog::new(dir.path(), "me@host:8201").load().is_empty());
+    }
+
+    #[test]
+    fn move_log_never_overwrites_a_log_already_at_the_new_key() {
+        let dir = tempfile::tempdir().expect("a scratch directory");
+        DmLog::new(dir.path(), "me@host:8201").append("bob", &msg("bob", "old", 1));
+        DmLog::new(dir.path(), "me@host:8200").append("bob", &msg("bob", "new", 2));
+
+        assert!(!move_log(dir.path(), "me@host:8201", "me@host:8200").expect("move"));
+        assert_eq!(DmLog::new(dir.path(), "me@host:8200").load()["bob"][0].text, "new");
+        assert_eq!(DmLog::new(dir.path(), "me@host:8201").load()["bob"][0].text, "old");
+    }
+
+    #[test]
+    fn move_log_with_nothing_to_move_does_nothing() {
+        let dir = tempfile::tempdir().expect("a scratch directory");
+        assert!(!move_log(dir.path(), "me@host:8201", "me@host:8200").expect("move"));
     }
 
     #[test]

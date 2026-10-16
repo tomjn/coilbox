@@ -3787,6 +3787,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_watch_engine,
             dmlog::mp_chat_logs,
             dmlog::mp_chat_log_open,
+            dmlog::mp_move_chat_logs,
             tachyon_auth::mp_tachyon_sign_in,
             tachyon_auth::mp_tachyon_sign_out,
             tachyon_auth::mp_tachyon_signed_in,

@@ -69,7 +69,7 @@ describe("allServers", () => {
 
 describe("resolveServer", () => {
   it("finds a built-in by id", () => {
-    expect(resolveServer("bar-ssl", [])?.port).toBe(8201);
+    expect(resolveServer("bar-ssl", [])?.port).toBe(8200);
   });
   it("finds a custom server by id", () => {
     expect(resolveServer("custom-1", [custom])?.host).toBe("192.168.1.10");
@@ -92,9 +92,9 @@ describe("tlsModeFor", () => {
     expect(tlsModeFor(custom)).toBe("none");
   });
 
-  it("keeps teiserver's SSL port on direct TLS", () => {
+  it("upgrades BAR in-band, since its 8201 port never sends the greeting", () => {
     const bar = BUILTIN_SERVERS.find((s) => s.id === "bar-ssl");
-    expect(tlsModeFor(bar as LobbyServer)).toBe("direct");
+    expect(tlsModeFor(bar as LobbyServer)).toBe("stls");
   });
 });
 
@@ -297,7 +297,7 @@ describe("a profile naming BAR's retired plaintext entry", () => {
 
   it("resolves the official server onto the SSL entry", () => {
     const { official } = resolveProfileServerRules({ official: "bar" });
-    expect(official).toMatchObject({ id: "bar-ssl", port: 8201, tls: true });
+    expect(official).toMatchObject({ id: "bar-ssl", port: 8200, tls: true });
   });
 
   it("leaves a current id alone and still ignores an unknown one", () => {

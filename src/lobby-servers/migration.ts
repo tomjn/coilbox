@@ -12,12 +12,12 @@ const BAR_TLS_ID = "bar-ssl";
 
 /**
  * Endpoints that were built-ins once and are not offered any more, mapped to the
- * entry that replaced them. BAR's plaintext 8200 is here because the same server
- * answers on 8201 with TLS, so a row pointing at the plain port is moved across
- * rather than kept as a custom server that sends its password in the clear.
+ * entry that replaced them. BAR's 8201 is here because the built-in moved to 8200
+ * with `STLS` once 8201 stopped answering, so a row pointing at it is moved across
+ * rather than kept as a custom server that never connects.
  */
 const RETIRED_ENDPOINTS: { host: string; port: number; id: string }[] = [
-  { host: "server4.beyondallreason.info", port: 8200, id: BAR_TLS_ID },
+  { host: "server4.beyondallreason.info", port: 8201, id: BAR_TLS_ID },
 ];
 
 /** The old conflated server+username row, stored under `lobbyServers.directory`. */
@@ -165,4 +165,32 @@ export function planBarTlsRemap(
     reKey,
     changed: true,
   };
+}
+
+/** BAR's host, and the TLS port its built-in used before moving to 8200. */
+const BAR_HOST = "server4.beyondallreason.info";
+const BAR_OLD_PORT = 8201;
+
+/** One login's server key before and after the BAR built-in changed port. */
+export interface ServerKeyMove {
+  oldKey: string;
+  newKey: string;
+}
+
+/**
+ * The server key moves for every login on the BAR built-in, now that it is on
+ * 8200 rather than 8201. Pure. A server key is `username@host:port`, so the port
+ * change orphans each login's auto-join channels, favourites, ignores, notes and
+ * chat logs unless they are moved. The keychain entry is keyed by server id and
+ * needs nothing.
+ */
+export function planBarPortMove(accounts: LobbyAccount[]): ServerKeyMove[] {
+  const newPort = BUILTIN_SERVERS.find((b) => b.id === BAR_TLS_ID)?.port;
+  if (newPort == null || newPort === BAR_OLD_PORT) return [];
+  return accounts
+    .filter((a) => a.serverId === BAR_TLS_ID && a.username !== "")
+    .map((a) => ({
+      oldKey: `${a.username}@${BAR_HOST}:${BAR_OLD_PORT}`,
+      newKey: `${a.username}@${BAR_HOST}:${newPort}`,
+    }));
 }

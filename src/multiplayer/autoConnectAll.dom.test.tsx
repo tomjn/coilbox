@@ -140,7 +140,7 @@ import { MultiplayerProvider, useConnection, useMultiplayer } from "./store";
 
 // Two built-in TASServer entries, distinct hosts, so a connect to one never
 // blocks the other under the one-connection-per-host rule.
-const KEY_A = "AF@server4.beyondallreason.info:8201"; // bar-ssl
+const KEY_A = "AF@server4.beyondallreason.info:8200"; // bar-ssl
 const KEY_B = "Zeta@lobby.recoilengine.org:8200"; // recoil-official
 // The Tachyon sibling of bar-ssl's host, a separate account entirely.
 const TACHYON_KEY = "Nova@server4.beyondallreason.info:443"; // bar-tachyon
