@@ -9,7 +9,7 @@ The builder is a modding tool, so it is hidden until you turn on **Advanced mode
 Two things to know before you spend an evening on this:
 
 - A unit you export arrives in the game unbuildable, and static unless you picked a movement class for it in the Animation panel. Putting it on a builder's menu happens in the workshop afterwards. See [making the game use the unit](#making-the-game-use-the-unit).
-- An exported unit has been loaded in a headless engine, which proves its pieces, its size and its script are right. Nobody has yet seen one drawn, so nothing has confirmed it looks right. See [the engine load checklist](#the-engine-load-checklist).
+- An exported unit has the right shape in the engine, but not the right texture yet. The engine draws the whole unit in the player's colour, and each face samples the wrong part of the atlas. See [the engine load checklist](#the-engine-load-checklist).
 
 ## Build a unit
 
@@ -370,11 +370,11 @@ One thing this does not yet do is save. Workshop edits live on the page for as l
 
 ## The engine load checklist
 
-**Result: three of five proved, two still outstanding.** The check is: export a unit into a `.sdd` working copy or use **Test in game**, get it onto a map with `/cheat` and `/give`, and confirm all five of:
+**Result: four of five proved, one failed.** The check is: export a unit into a `.sdd` working copy or use **Test in game**, get it onto a map with `/cheat` and `/give`, and confirm all five of:
 
-1. The model renders at all. **Outstanding.**
+1. The model renders at all. **Proved.**
 2. Its orientation and handedness are right, so it faces the way it did in the builder and is not mirrored. **Proved.**
-3. Textures land on the right geometry. **Outstanding.**
+3. Textures land on the right geometry. **Failed**, in two ways: [issue #4164](https://github.com/tomjn/coilbox/issues/4164) and [issue #4165](https://github.com/tomjn/coilbox/issues/4165).
 4. The selection volume is sane, so clicking the unit selects it and the volume is neither a speck nor the size of the map. **Proved.**
 5. The infolog has no Lua error from the unit script. **Proved.**
 
@@ -385,7 +385,17 @@ Three of them no longer need a machine that can draw. `spring-headless` runs a f
 - **The selection volume.** `Spring.GetUnitRadius` and `GetUnitHeight` return the s3o header values exactly, and the engine's default collision volume is the smallest sphere containing the geometry. Sane, but a sphere is a generous click target for a long unit, so an export now writes a volume of its own: see [The collision volume](#the-collision-volume).
 - **The infolog.** Nothing in it names the unit, its model or its script. `Spring.UnitScript.GetScriptEnv` returns an environment carrying exactly the call-ins the generated script declares, so the script loaded and bound rather than merely failing quietly.
 
-The two still outstanding both need pixels. Nobody has seen the unit drawn, and nothing has checked which part of the atlas each triangle samples. [Issue #563](https://github.com/tomjn/coilbox/issues/563) is the cheaper of the two to settle, because Blender needs no engine.
+The other two need pixels, so [issue #3316](https://github.com/tomjn/coilbox/issues/3316) ran a windowed `spring` on Splinter Faction 0.1.89. Its probe unit has three parts and is asymmetric on every axis: a hull from the red column of the atlas, a tower from the white and blue-grey column on the model's `+x` side at the back, and a turned cube from the stone column hung off the hull at the front on `-x`. The builder's own functions made it, from `newProject` through `buildS3o` to the plugin's `ExportModel` and `coilbox_s3o::write`, into the same scratch game **Test in game** writes. A gadget gave it with `/cheat` and `/give`, put the camera at three fixed points in the unit's model space, and took a screenshot with `screenshot png` from each. A throwaway page drew the builder's own scene, `syncScene` with `partMaterial`, from the same points.
+
+![The probe unit from behind and to its right. 1: the builder viewport. 2: the engine with the unit as exported, plain white. 3: the engine with the atlas's alpha set to 0. 4: the builder with v flipped, which matches 3.](/screenshots/unit-builder-engine-textures.jpg)
+
+- **The model renders.** All three pieces drew, in the places and at the sizes the builder shows, from all three points. The engine named the pieces `base, hull, nose, tower`. `bun run lego:reads3o` on the same file found the hierarchy and offsets as built, no triangle wound against its normal, and u from 0.1199 to 0.9990 and v from 0.3690 to 0.8866.
+- **The texture fails twice.** The engine draws the whole unit in team colour, which was white here (panel 2). The pack's `atlas.png` has no alpha channel, and the engine reads a missing alpha as 1, which is all team colour: [issue #4164](https://github.com/tomjn/coilbox/issues/4164). With the alpha set to 0 the texture shows (panel 3), but every face samples the vertically mirrored part of its column. The builder with v flipped matches the engine from all three points (panel 4). The pack's UVs count v from the bottom of the image, as an `.obj` does, and the engine counts it from the top: [issue #4165](https://github.com/tomjn/coilbox/issues/4165). u is right, so every piece stays in its own colour.
+- **The texture name.** The engine finds the `coilbox_`-prefixed atlas in `unittextures/` by the name in the `.s3o` header. `UnitDefs[id].model.textures.tex1` read `coilbox_atlas.png`, the infolog has no "could not load primary texture" warning, and replacing only that file changed what the engine drew.
+
+The Blender check from [issue #563](https://github.com/tomjn/coilbox/issues/563) is still open. That issue was closed with no comment and no result, and Blender was not installed on the machine #3316 ran on. [Issue #4166](https://github.com/tomjn/coilbox/issues/4166) asks for it again.
+
+Two things about the windowed run itself. A fresh write directory makes Splinter Faction's `gui_initial_settings` widget apply its settings and reload the engine, and the one windowed reload tried here aborted in AppKit before the game started. A write directory whose `springsettings.cfg` already has `SFInitialSettingsVersion` set runs straight through. The window was on screen for every shot, so whether `screenshot` works from a hidden window is still unchecked.
 
 The same run found the footprint was wrong: it was derived from the collision radius, so a unit longer than it is wide claimed far more ground than it stood on. Fixed in [issue #679](https://github.com/tomjn/coilbox/issues/679): the footprint now measures x and z off the model's own bounding box, each axis rounded up to its own step. Reverified headless on an asymmetric probe (48 by 6 elmos): the exported definition wrote `footprintx=3 footprintz=1`, and `UnitDefs[id].xsize/zsize` in a running engine read back `6` and `2`, a rectangle rather than the square the old code would have claimed.
 
