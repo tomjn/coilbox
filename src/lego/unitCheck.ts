@@ -49,3 +49,12 @@ export function describeOtherErrors(report: UnitCheckReport): string | null {
   if (report.otherErrors === 0) return null;
   return `${plural(report.otherErrors, "other error", "other errors")} in the log ${report.otherErrors === 1 ? "is" : "are"} not about this unit.`;
 }
+
+/**
+ * How far the unit drove when the check ordered it to move, or null for a unit
+ * the engine gave no move class (issue #3255).
+ */
+export function describeMove(report: UnitCheckReport): string | null {
+  if (report.movedElmos === null || report.moveClass === null) return null;
+  return `Moved ${plural(report.movedElmos, "elmo", "elmos")} on ${report.moveClass} when ordered to.`;
+}

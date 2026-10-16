@@ -8,7 +8,11 @@ import { FileText } from "lucide-react";
 
 import type { UnitCheckEntry, UnitCheckReport } from "@/content/bindings";
 
-import { describeCheck, describeOtherErrors } from "../../unitCheck";
+import {
+  describeCheck,
+  describeMove,
+  describeOtherErrors,
+} from "../../unitCheck";
 import { ShowMe } from "./ShowMe";
 
 interface Props {
@@ -56,6 +60,7 @@ function Entries({
 
 export function UnitCheckResult({ report, unitName }: Props) {
   const others = describeOtherErrors(report);
+  const moved = describeMove(report);
   return (
     <div className="flex flex-col gap-3 text-xs" data-testid="unit-check">
       <p
@@ -67,6 +72,7 @@ export function UnitCheckResult({ report, unitName }: Props) {
       >
         {describeCheck(report, unitName)}
       </p>
+      {moved ? <p>{moved}</p> : null}
       <Entries title="Why" entries={report.fatal} tone="error" />
       <Entries title="Errors" entries={report.problems} tone="error" />
       <Entries title="Warnings" entries={report.warnings} tone="warning" />

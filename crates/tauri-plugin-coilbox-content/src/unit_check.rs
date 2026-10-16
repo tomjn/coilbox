@@ -104,6 +104,11 @@ pub struct UnitCheckReport {
     pub spawned_pieces: Option<u32>,
     /// The frame the check finished on. Absent when it never did.
     pub done_frame: Option<i32>,
+    /// How far the unit got when ordered to move, in whole elmos. Absent for a
+    /// unit the engine gave no move class, which is not ordered anywhere.
+    pub moved_elmos: Option<u32>,
+    /// The move class the engine gave the unit, as the engine names it.
+    pub move_class: Option<String>,
     pub problems: Vec<log::Entry>,
     pub warnings: Vec<log::Entry>,
     pub fatal: Vec<log::Entry>,
@@ -276,6 +281,8 @@ pub fn run_check(
         outcome,
         spawned_pieces: read.spawned_pieces,
         done_frame: read.done_frame,
+        moved_elmos: read.moved.as_ref().map(|(elmos, _)| *elmos),
+        move_class: read.moved.map(|(_, class)| class),
         problems: read.problems,
         warnings: read.warnings,
         fatal: read.fatal,

@@ -1448,6 +1448,11 @@ export interface UnitCheckReport {
   outcome: "loaded" | "problems" | "gameDidNotLoad" | "unfinished";
   spawnedPieces: number | null;
   doneFrame: number | null;
+  /** How far the unit got when ordered to move, in whole elmos. Null for a
+   *  unit the engine gave no move class (issue #3255). */
+  movedElmos: number | null;
+  /** The move class the engine gave the unit, as the engine names it. */
+  moveClass: string | null;
   problems: UnitCheckEntry[];
   warnings: UnitCheckEntry[];
   fatal: UnitCheckEntry[];

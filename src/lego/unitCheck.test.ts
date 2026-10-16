@@ -2,13 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import type { UnitCheckReport } from "@/content/bindings";
 
-import { describeCheck, describeOtherErrors } from "./unitCheck";
+import { describeCheck, describeMove, describeOtherErrors } from "./unitCheck";
 
 function unfinished(exit: Partial<UnitCheckReport["exit"]>): UnitCheckReport {
   return {
     outcome: "unfinished",
     spawnedPieces: 5,
     doneFrame: null,
+    movedElmos: null,
+    moveClass: null,
     problems: [],
     warnings: [],
     fatal: [],
@@ -57,5 +59,21 @@ describe("describeOtherErrors", () => {
     expect(describeOtherErrors({ ...unfinished({}), otherErrors: 1 })).toBe(
       "1 other error in the log is not about this unit.",
     );
+  });
+});
+
+describe("describeMove", () => {
+  it("says nothing for a unit with no move class", () => {
+    expect(describeMove(unfinished({}))).toBeNull();
+  });
+
+  it("says how far it drove and on which class", () => {
+    expect(
+      describeMove({
+        ...unfinished({}),
+        movedElmos: 212,
+        moveClass: "wheeledtank2",
+      }),
+    ).toBe("Moved 212 elmos on wheeledtank2 when ordered to.");
   });
 });

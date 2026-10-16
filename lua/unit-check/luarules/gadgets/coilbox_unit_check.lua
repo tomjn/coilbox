@@ -8,7 +8,8 @@
 --
 -- Everything it says goes to the log under its own section, which is what
 -- coilbox reads back: `spawned <unit> with <n> pieces`, `done at frame <n>`, and
--- an error for each thing it found wrong.
+-- an error for each thing it found wrong. A unit the engine gave a move class
+-- is also ordered to move, and `moved <n> elmos on <class>` says how far it got.
 
 -- Where coilbox puts the request, inside the generated game.
 local REQUEST_FILE = "luarules/configs/coilbox_unit_check_request.lua"
@@ -42,6 +43,8 @@ if gadgetHandler:IsSyncedCode() then
 	local LAST_FRAME = request.spawnFrame + request.frames
 
 	local unitID
+	-- Where a unit that moves started, and the class the engine gave it.
+	local startX, startZ, moveClass
 
 	local function fail(text)
 		Spring.Log(LOG_SECTION, "error", text)
@@ -103,6 +106,24 @@ if gadgetHandler:IsSyncedCode() then
 		end
 		local pieces = Spring.GetUnitPieceList(unitID) or {}
 		Spring.Log(LOG_SECTION, "notice", "spawned " .. UNIT_NAME .. " with " .. #pieces .. " pieces")
+		-- `moveDef.name` is set only for a unit the engine resolved a class for
+		-- (LuaUnitDefs.cpp, MoveDefTable). Sent towards the map's corner, which
+		-- is far enough that it is still driving when the check ends.
+		if def.canMove and def.moveDef and def.moveDef.name then
+			moveClass = def.moveDef.name
+			startX, _, startZ = Spring.GetUnitPosition(unitID)
+			Spring.GiveOrderToUnit(unitID, CMD.MOVE, { 0, Spring.GetGroundHeight(0, 0), 0 }, 0)
+		end
+	end
+
+	local function reportMove()
+		local x, _, z = Spring.GetUnitPosition(unitID)
+		if not x then return end
+		local moved = math.floor(math.sqrt((x - startX) ^ 2 + (z - startZ) ^ 2) + 0.5)
+		Spring.Log(LOG_SECTION, "notice", "moved " .. moved .. " elmos on " .. moveClass)
+		if moved == 0 then
+			fail(UNIT_NAME .. " was ordered to move and did not")
+		end
 	end
 
 	function gadget:GameFrame(frame)
@@ -111,6 +132,8 @@ if gadgetHandler:IsSyncedCode() then
 		elseif frame == LAST_FRAME and unitID then
 			if Spring.GetUnitIsDead(unitID) ~= false then
 				fail(UNIT_NAME .. " died before frame " .. frame)
+			elseif moveClass then
+				reportMove()
 			end
 			finish(frame)
 		end

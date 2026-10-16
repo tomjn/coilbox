@@ -60,6 +60,9 @@ pub struct CheckLog {
     pub spawned_pieces: Option<u32>,
     /// The frame the gadget finished its plan on. Absent when it never did.
     pub done_frame: Option<i32>,
+    /// How far the unit got when ordered to move, in whole elmos, and the move
+    /// class the engine gave it. Absent for a unit with no class.
+    pub moved: Option<(u32, String)>,
     /// Errors about the unit, the check gadget's own included.
     pub problems: Vec<Entry>,
     /// Warnings about the unit.
@@ -91,6 +94,11 @@ pub fn read(output: &str, unit: &str) -> CheckLog {
                     log.spawned_pieces = pieces.parse().ok();
                 } else if let Some(frame) = said.strip_prefix("done at frame ") {
                     log.done_frame = frame.parse().ok();
+                } else if let Some((elmos, class)) = said
+                    .strip_prefix("moved ")
+                    .and_then(|rest| rest.split_once(" elmos on "))
+                {
+                    log.moved = elmos.parse().ok().map(|n| (n, class.to_string()));
                 }
             }
             _ => {}
@@ -207,6 +215,19 @@ mod tests {
 
     fn log(lines: &[&str]) -> String {
         lines.join("\n") + "\n"
+    }
+
+    #[test]
+    fn a_unit_that_moved_says_how_far_and_on_which_class() {
+        let read = read(
+            &log(&[
+                SPAWNED,
+                "[t=00:00:10.594594][f=0000480] [coilbox-unit-check] moved 212 elmos on wheeledtank2",
+                DONE,
+            ]),
+            "probe_unit",
+        );
+        assert_eq!(read.moved, Some((212, "wheeledtank2".to_string())));
     }
 
     #[test]
