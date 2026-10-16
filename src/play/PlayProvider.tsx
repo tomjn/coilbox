@@ -74,6 +74,8 @@ interface LaunchOpts {
    * recorded hosting route outlives the battle it describes.
    */
   relayed?: boolean;
+  /** Open the engine's autohost interface for this run (issue #3346). */
+  autohost?: boolean;
 }
 
 interface ReplayOpts {
