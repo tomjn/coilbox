@@ -1016,7 +1016,7 @@ export function AnimationPanel({
     const stopped = timeline?.error ?? null;
 
     const header = (
-      <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-border px-3 py-2">
         <Button
           size="sm"
           variant={playing && !scriptPaused ? "default" : "outline"}
@@ -1057,32 +1057,13 @@ export function AnimationPanel({
             <Square size={14} />
           </Button>
         ) : null}
-        <span className="text-xs text-muted-foreground">
+        <span className="min-w-32 flex-1 text-xs text-muted-foreground">
           {reduceMotion
             ? "Playback is off while your system asks for reduced motion."
             : !playsOwnScript && applied.length === 0
               ? "Apply one below."
               : `${PREVIEW_SECONDS} seconds, looped`}
         </span>
-        {owned ? (
-          <Button size="sm" className="ml-auto" onClick={onShowScript}>
-            <FileCode size={14} /> Edit
-          </Button>
-        ) : null}
-        {/* Labelled rather than an icon on its own. This is the only way to
-              read the generated script, and as a bare glyph in the corner it
-              was missed by people who went looking for exactly that. */}
-        {playsOwnScript ? null : (
-          <Button
-            size="sm"
-            variant="outline"
-            className="ml-auto"
-            onClick={onShowScript}
-            title="The animation script these presets generate"
-          >
-            <FileCode size={14} /> Script
-          </Button>
-        )}
       </div>
     );
 
