@@ -211,6 +211,20 @@ const BUILDER_FIELDS: {
   },
 ];
 
+/**
+ * How long a change to the call arguments, or to the generated script, has to
+ * sit still before the panel runs it. One number for both: typing an argument
+ * and dragging a preset slider are the same kind of burst of edits, and 400 is
+ * the wait the arguments field already used.
+ */
+const SETTLE_MS = 400;
+
+/** Where a run that replaces a playing one picks up from. */
+interface Resume {
+  paused: boolean;
+  frame: number;
+}
+
 interface Props {
   project: LegoProject;
   playing: boolean;
@@ -314,6 +328,9 @@ export function AnimationPanel({
   const [callArgsError, setCallArgsError] = useState<string | null>(null);
   const argsDebounce = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(argsDebounce.current), []);
+  /** Which run is the latest, so a slow one that a newer run has overtaken
+   *  does not put its poses back over the newer run's. */
+  const latestRun = useRef(0);
   const isCallMode = scenarioId === CALL_FUNCTION;
   const applied = project.animations ?? [];
   const counts = countRoles(project.pieces);
@@ -353,7 +370,12 @@ export function AnimationPanel({
    * a different `events` list over the same run.
    */
   const runEvents = useCallback(
-    async (events: ScriptEvent[], withValues: Record<number, number>) => {
+    async (
+      events: ScriptEvent[],
+      withValues: Record<number, number>,
+      resume?: Resume,
+    ) => {
+      const thisRun = ++latestRun.current;
       setRunning(true);
       setFailure(null);
       try {
@@ -399,6 +421,7 @@ export function AnimationPanel({
               rest: pieceRest(project),
               values: withValues,
             });
+        if (thisRun !== latestRun.current) return;
         setTimeline(result);
         // A run that produced nothing has only its reason to show. One that
         // failed part way through is still worth watching up to that point.
@@ -407,16 +430,20 @@ export function AnimationPanel({
         // before its first frame is exactly the run its own error matters for.
         onScriptRun(result);
         onPlayingChange(result.frames.length > 0);
-        onScriptPausedChange(false);
-        onScriptFrameChange(0);
+        // A run that replaces a playing one holds the pause and the frame, as
+        // far as the new run reaches.
+        const keep = resume && resume.frame < result.frames.length;
+        onScriptPausedChange(keep ? resume.paused : false);
+        onScriptFrameChange(keep ? resume.frame : 0);
       } catch (error) {
+        if (thisRun !== latestRun.current) return;
         setTimeline(null);
         onScriptTimeline(null);
         onScriptRun(null);
         onPlayingChange(false);
         setFailure(error instanceof Error ? error.message : String(error));
       } finally {
-        setRunning(false);
+        if (thisRun === latestRun.current) setRunning(false);
       }
     },
     [
@@ -440,7 +467,11 @@ export function AnimationPanel({
    * most of them want neither and a probe is a second trip into the runtime.
    */
   const start = useCallback(
-    async (scenarioId: string, withValues: Record<number, number> = values) => {
+    async (
+      scenarioId: string,
+      withValues: Record<number, number> = values,
+      resume?: Resume,
+    ) => {
       const scenario = scenarioById(scenarioId);
       if (!scenario) return;
 
@@ -450,7 +481,7 @@ export function AnimationPanel({
           ...NO_STAND_IN,
           motion: motionOf(scenario.events, withValues),
         });
-        return runEvents(scenario.events, withValues);
+        return runEvents(scenario.events, withValues, resume);
       }
 
       const pieces = project.pieces.map((piece) => piece.name);
@@ -539,7 +570,7 @@ export function AnimationPanel({
           return piece ? (rest.get(piece) ?? null) : null;
         },
       });
-      return runEvents(scene, withValues);
+      return runEvents(scene, withValues, resume);
     },
     [runEvents, values, project, compiled, bounds, pack, raw, size, onStandIn],
   );
@@ -552,6 +583,7 @@ export function AnimationPanel({
       name: string,
       argsText: string,
       withValues: Record<number, number> = values,
+      resume?: Resume,
     ) => {
       if (!name) return;
       const args = parseArgList(argsText);
@@ -565,6 +597,7 @@ export function AnimationPanel({
       void runEvents(
         [...CREATED, { frame: at(0.5), callin: name, args }],
         withValues,
+        resume,
       );
     },
     [runEvents, values],
@@ -600,7 +633,7 @@ export function AnimationPanel({
       clearTimeout(argsDebounce.current);
       argsDebounce.current = setTimeout(
         () => fireCall(callFunction, text),
-        400,
+        SETTLE_MS,
       );
     },
     [fireCall, callFunction],
@@ -617,18 +650,39 @@ export function AnimationPanel({
   );
 
   // A script edited while it is playing leaves the poses on screen describing
-  // the script before the edit, so playback stops rather than lying about it.
-  // Held in a ref because the callbacks are rebuilt on every render.
+  // the script before the edit. A script the game maker owns stops playback
+  // rather than lie about it. A preset unit's script is generated, so editing
+  // its presets, a slider or a piece's role changes it too, and there the
+  // panel runs the new script once the edits settle. Held in refs because the
+  // callbacks are rebuilt on every render.
   const stopRef = useRef(stop);
   stopRef.current = stop;
-  // A preset unit's script is generated, so editing its presets changes it too.
+  const rerunRef = useRef<() => void>(() => {});
+  rerunRef.current = () => {
+    const resume = { paused: scriptPaused, frame: scriptFrame };
+    if (isCallMode) fireCall(callFunction, callArgsText, values, resume);
+    else void start(scenarioId, values, resume);
+  };
+  // Whether there is a run on screen, or a failure, for a change to replace.
+  const hasRun = timeline !== null || failure !== null || playing;
+  const hasRunRef = useRef(hasRun);
+  hasRunRef.current = hasRun;
   const currentScript = useMemo(() => unitScript(project), [project]);
   const lastScript = useRef(currentScript);
+  const rerunTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => {
     if (lastScript.current === currentScript) return;
     lastScript.current = currentScript;
-    stopRef.current();
-  }, [currentScript]);
+    if (playsOwnScript || applied.length === 0) {
+      clearTimeout(rerunTimer.current);
+      stopRef.current();
+      return;
+    }
+    if (!hasRunRef.current) return;
+    clearTimeout(rerunTimer.current);
+    rerunTimer.current = setTimeout(() => rerunRef.current(), SETTLE_MS);
+  }, [currentScript, playsOwnScript, applied.length]);
+  useEffect(() => () => clearTimeout(rerunTimer.current), []);
 
   function apply(presetId: string) {
     onChange([...applied, { presetId, params: {} }]);
@@ -672,13 +726,13 @@ export function AnimationPanel({
           }
         >
           {playing && !scriptPaused ? <Pause size={14} /> : <Play size={14} />}
-          {!playing
-            ? running
-              ? "Running"
-              : "Play"
-            : scriptPaused
-              ? "Resume"
-              : "Pause"}
+          {running
+            ? "Running"
+            : !playing
+              ? "Play"
+              : scriptPaused
+                ? "Resume"
+                : "Pause"}
         </Button>
         {playing ? (
           <Button
@@ -778,9 +832,29 @@ export function AnimationPanel({
     const problems = (
       <>
         {failure ? (
-          <p className="text-xs text-destructive">
-            The script could not be run: {failure}
-          </p>
+          <div className="flex flex-col gap-1 text-xs text-destructive">
+            {playsOwnScript ? (
+              <p>The script could not be run: {failure}</p>
+            ) : (
+              <>
+                <p>The animation could not be run: {failure}</p>
+                <p>
+                  coilbox writes this script from the presets and the roles on
+                  your pieces, so it should always run. Check the presets you
+                  have applied and the roles you have given, and if they look
+                  right, report this as a bug in coilbox.
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="self-start"
+                  onClick={onShowScript}
+                >
+                  <FileCode size={14} /> Open the Script tab
+                </Button>
+              </>
+            )}
+          </div>
         ) : null}
 
         {stopped ? (
