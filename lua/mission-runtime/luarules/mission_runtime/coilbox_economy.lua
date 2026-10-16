@@ -33,6 +33,16 @@ local STORE = { metal = "ms", energy = "es" }
 -- way twice. `pairs` over a two-key table is not ordered.
 local KINDS = { "metal", "energy" }
 
+--- Where what a team is paid is kept for a runtime that `/luarules reload` loads
+-- again into a running mission (issue #4147). A game rules param, which the
+-- engine holds across the reload; the bank itself and what a team can hold are
+-- the engine's own and need no copy.
+M.INCOME_PREFIX = "coilbox_mission_income_"
+
+local function incomeParam(team, kind)
+	return M.INCOME_PREFIX .. team .. "_" .. kind
+end
+
 --- Register the economy actions on a trigger engine.
 --
 -- @param engine the trigger engine
@@ -52,6 +62,15 @@ function M.register(engine, state)
 			metal = tonumber(team.metalIncome) or 0,
 			energy = tonumber(team.energyIncome) or 0,
 		}
+		-- What a `set_income` changed it to, if one did, over what the scenario said.
+		if state.resumed then
+			for _, kind in ipairs(KINDS) do
+				local kept = Spring.GetGameRulesParam(incomeParam(team.team, kind))
+				if type(kept) == "number" then
+					income[team.team][kind] = kept
+				end
+			end
+		end
 	end
 
 	local gameSpeed = tonumber(engine.ctx and engine.ctx.gameSpeed) or 30
@@ -139,6 +158,7 @@ function M.register(engine, state)
 		for _, kind in ipairs(KINDS) do
 			if amounts[kind] ~= nil then
 				income[team][kind] = amount(amounts[kind])
+				Spring.SetGameRulesParam(incomeParam(team, kind), income[team][kind])
 			end
 		end
 	end

@@ -28,6 +28,9 @@
 
 local M = {}
 
+-- What an unlock is called once kept, followed by the engine team and the def id.
+M.UNLOCK_PREFIX = "coilbox_mission_unlocked_"
+
 -- How often the greyed icons are put back, in frames.
 --
 -- Nothing arbitrates between this module and a game's own build gating, and both
@@ -94,6 +97,13 @@ function M.register(engine, state)
 	-- Engine team -> def id -> true, for the defs `unlock_unit` has freed.
 	local unlocked = {}
 
+	--- Where an unlock is kept for a runtime that `/luarules reload` loads again into
+	-- a running mission (issue #4147). A game rules param, which the engine holds
+	-- across the reload; the player's reward would otherwise be taken back by it.
+	local function unlockParam(team, defID)
+		return M.UNLOCK_PREFIX .. team .. "_" .. defID
+	end
+
 	-- The def ids that have a build menu at all, worked out once. Reading
 	-- UnitDefs[id].buildOptions builds a fresh table every time it is asked, so
 	-- asking per unit created would allocate one per unit for an answer that never
@@ -108,6 +118,17 @@ function M.register(engine, state)
 	end
 
 	local handle = {}
+
+	if state.resumed and buildable then
+		for team in pairs(missionTeam) do
+			for id in pairs(UnitDefs) do
+				if type(id) == "number" and Spring.GetGameRulesParam(unlockParam(team, id)) == 1 then
+					unlocked[team] = unlocked[team] or {}
+					unlocked[team][id] = true
+				end
+			end
+		end
+	end
 
 	--- Whether the scenario's own list forbids this def to this team, before any
 	-- unlock. A team the mission does not declare is never restricted.
@@ -244,6 +265,7 @@ function M.register(engine, state)
 
 		unlocked[team] = unlocked[team] or {}
 		unlocked[team][def.id] = true
+		Spring.SetGameRulesParam(unlockParam(team, def.id), 1)
 		-- The reward is not the def alone, it is the def and the icon for it. A
 		-- team that has just been handed something it could not build before has
 		-- to be able to see that, so every builder it owns is repainted here.

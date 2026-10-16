@@ -35,6 +35,15 @@ local VALUE = {
 	failed = M.FAILED,
 }
 
+-- And back, for a runtime that `/luarules reload` loaded again into a running
+-- mission and has the mirror as the only record of how each objective stands
+-- (issue #4147).
+local STATUS = {
+	[M.ACTIVE] = "active",
+	[M.COMPLETE] = "complete",
+	[M.FAILED] = "failed",
+}
+
 --- Register the objective actions on a trigger engine.
 --
 -- @param engine the trigger engine
@@ -93,8 +102,9 @@ function M.register(engine, state)
 	-- being active, so a reader needs the state to know not to draw it.
 	for _, objective in ipairs((state.mission or {}).objectives or {}) do
 		declared[objective.id] = objective
-		status[objective.id] = "active"
-		Spring.SetGameRulesParam(M.RULES_PREFIX .. objective.id, M.ACTIVE)
+		local kept = state.resumed and Spring.GetGameRulesParam(M.RULES_PREFIX .. objective.id)
+		status[objective.id] = STATUS[kept] or "active"
+		Spring.SetGameRulesParam(M.RULES_PREFIX .. objective.id, VALUE[status[objective.id]])
 	end
 
 	engine:addAction("complete_objective", function(params)

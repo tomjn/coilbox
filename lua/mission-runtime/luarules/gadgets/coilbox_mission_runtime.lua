@@ -269,6 +269,22 @@ local DIALOGUE_GLOBAL = "CoilboxMissionDialogue"
 -- that is. 0 means the actor is not on the map.
 local ACTOR_RULES_PREFIX = "coilbox_mission_actor_"
 
+-- Where a trigger's state is kept, so a runtime loaded again by `/luarules reload`
+-- knows which ones had fired. Game rules params, because the engine holds them
+-- across the reload and every other part of the runtime's state that a panel or
+-- a debrief reads is already kept there (issue #4147). The first is whether the
+-- trigger is armed, 1 or 0, and the second the frame it may next fire on.
+local TRIGGER_RULES_PREFIX = "coilbox_mission_trigger_"
+local TRIGGER_READY_PREFIX = "coilbox_mission_trigger_ready_"
+
+-- What a reload cannot give back, said once in the log. Each of these is a list
+-- or a clock the runtime holds in its own variables and the engine holds no copy
+-- of, so there is nothing to read it back from.
+local NOT_KEPT = "which units are in a group and what a group was ordered to do, "
+	.. "which reveals are lit, how long a zone has been held, how many units a team has "
+	.. "built or captured since the mission began, what a player has selected or ordered, "
+	.. "and which held lines of dialogue are on screen"
+
 -- The rest of the runtime reads the mission through GG, in both halves. Both
 -- compute the team plan, because it is derived from the mission and deriving it
 -- twice is cheaper than a channel between the halves.
@@ -304,6 +320,10 @@ local function publish()
 
 	GG.CoilboxMission = {
 		id = MISSION_ID,
+		-- True when this runtime was loaded into a game that was already running,
+		-- which only `/luarules reload` does. The modules read it to take their
+		-- state back from where they kept it instead of starting from the scenario.
+		resumed = Spring.GetGameFrame() >= 1,
 		mission = MISSION,
 		runtime = RUNTIME,
 		-- What the mission is being played at, and the question everything the
@@ -372,6 +392,9 @@ if gadgetHandler:IsSyncedCode() then
 
 	local teams = {}
 	local units = {}
+	-- Actors a reload found still on the map. The unsynced half starts again with
+	-- the gadget but loads after this half does, so it is told on the first frame.
+	local tell
 	-- Whether the scenario places a given engine team's opening units itself. The
 	-- published one, so a game asking the contract question and the undo below are
 	-- reading the same answer.
@@ -582,6 +605,41 @@ if gadgetHandler:IsSyncedCode() then
 		end
 	end
 
+	--- Take back the unit an actor was, in a runtime loaded again into a running
+	-- game.
+	--
+	-- Every actor's unit is in a game rules param, which the engine kept. It is
+	-- trusted only as far as it can be checked: the unit has to be alive and be
+	-- the def the actor is, because the engine reuses a unit id once the unit is
+	-- gone. An actor that died before the reload has 0 there and is dead still.
+	local function recover(id, record)
+		local unitID = Spring.GetGameRulesParam(ACTOR_RULES_PREFIX .. id)
+		if type(unitID) ~= "number" or unitID <= 0 then
+			return false
+		end
+
+		local defID = Spring.ValidUnitID(unitID) and not Spring.GetUnitIsDead(unitID)
+			and Spring.GetUnitDefID(unitID)
+		local def = defID and UnitDefs[defID]
+		local wanted = record.unitDef or record.def
+		if not def or def.name ~= wanted then
+			log("warning", string.format(
+				"actor %s could not be kept across the reload: unit %d is %s now, not %s",
+				id, unitID, def and def.name or "gone", tostring(wanted)))
+			return false
+		end
+
+		units[id] = unitID
+		actorOfUnit[unitID] = id
+		-- Invulnerability is the runtime's own table and is not on the unit.
+		if record.state and record.state.invulnerable then
+			invulnerable[unitID] = true
+		end
+		tell = tell or {}
+		tell[#tell + 1] = { id, unitID }
+		return true
+	end
+
 	function gadget:Initialize()
 		local published, problems = publish()
 		teams = published.teams
@@ -605,6 +663,23 @@ if gadgetHandler:IsSyncedCode() then
 		triggers = TRIGGERS.new(MISSION, {
 			state = published,
 			gameSpeed = Game.gameSpeed,
+			-- Which triggers have fired and which have been switched on or off is
+			-- the one piece of mission progress nothing else already mirrors, so it
+			-- is written here whenever it changes and read back by a reloaded runtime.
+			save = function(id, enabled, readyFrame)
+				Spring.SetGameRulesParam(TRIGGER_RULES_PREFIX .. id, enabled and 1 or 0)
+				Spring.SetGameRulesParam(TRIGGER_READY_PREFIX .. id, readyFrame)
+			end,
+			restore = published.resumed and function(id)
+				local enabled = Spring.GetGameRulesParam(TRIGGER_RULES_PREFIX .. id)
+				if enabled == nil then
+					return nil
+				end
+				return {
+					enabled = enabled == 1,
+					readyFrame = Spring.GetGameRulesParam(TRIGGER_READY_PREFIX .. id),
+				}
+			end or nil,
 			-- A trigger the difficulty leaves out is never armed and cannot be
 			-- armed, which is decided here, before the first frame, because the
 			-- level cannot change while the mission runs.
@@ -663,6 +738,12 @@ if gadgetHandler:IsSyncedCode() then
 					SendToUnsynced(HIDDEN_MESSAGE, unitID)
 				end
 				return unitID
+			end,
+			-- An anchor a reload found still standing, which was made invulnerable
+			-- by a table the reload emptied. Its engine-side hiding survives on
+			-- the unit, so only the table is put back.
+			keep = function(unitID)
+				invulnerable[unitID] = true
 			end,
 		})
 		published.gameOver = gameOver
@@ -767,11 +848,25 @@ if gadgetHandler:IsSyncedCode() then
 		-- Before the first frame, so a panel reading which unit an actor is finds
 		-- "not on the map" rather than nothing at all. Named prefab buildings
 		-- too, because they answer to the same table and the same param.
-		for id in pairs(published.actors) do
-			Spring.SetGameRulesParam(ACTOR_RULES_PREFIX .. id, 0)
+		--
+		-- Not for a runtime `/luarules reload` loads into a game that is running:
+		-- the param is the only record of which unit an actor is, so zeroing it
+		-- would tell every panel and trigger that a living actor was dead (issue
+		-- #4147). It is read back instead, and zeroed only where the unit is gone.
+		for _, records in ipairs({ published.actors, published.buildings }) do
+			for id, record in pairs(records) do
+				if not (published.resumed and recover(id, record)) then
+					Spring.SetGameRulesParam(ACTOR_RULES_PREFIX .. id, 0)
+				end
+			end
 		end
-		for id in pairs(published.buildings) do
-			Spring.SetGameRulesParam(ACTOR_RULES_PREFIX .. id, 0)
+
+		if published.resumed then
+			log("warning", string.format(
+				"mission %s was reloaded into a running game at frame %d. Kept: actors, "
+					.. "invulnerable units, anchors, variables, objectives, which triggers have fired, "
+					.. "what teams are paid and what has been unlocked. Not kept: %s",
+				MISSION_ID, Spring.GetGameFrame(), NOT_KEPT))
 		end
 
 		log("notice", string.format(
@@ -786,6 +881,14 @@ if gadgetHandler:IsSyncedCode() then
 	function gadget:GameFrame(frame)
 		if frame < START_FRAME then
 			return
+		end
+		-- The unsynced half only exists once the gadgets have all loaded, so what a
+		-- reload recovered is said here, on the first frame to run.
+		if tell then
+			for _, entry in ipairs(tell) do
+				SendToUnsynced(ACTOR_MESSAGE, entry[1], entry[2])
+			end
+			tell = nil
 		end
 		if frame == START_FRAME then
 			applyResources()
