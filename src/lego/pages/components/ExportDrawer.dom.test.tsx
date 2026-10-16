@@ -26,8 +26,15 @@ import { ExportDrawer } from "./ExportDrawer";
 const legoGameLanguage = vi.fn();
 const legoExport = vi.fn();
 const legoExportPicture = vi.fn();
+const legoAtlasPng = vi.fn();
+const exportGlb = vi.fn();
+
+vi.mock("../../exportGlb", () => ({
+  exportGlb: (...args: unknown[]) => exportGlb(...args),
+}));
 
 vi.mock("../../bindings", () => ({
+  legoAtlasPng: (args: unknown) => legoAtlasPng(args),
   legoExport: (args: unknown) => legoExport(args),
   legoExportGlb: vi.fn(),
   legoExportObj: vi.fn(),
@@ -103,6 +110,8 @@ beforeEach(() => {
   legoGameLanguage.mockReset();
   legoExport.mockReset();
   legoExportPicture.mockReset();
+  legoAtlasPng.mockReset();
+  exportGlb.mockReset();
 });
 
 afterEach(() => {
@@ -319,5 +328,36 @@ describe("the build picture", () => {
       expect(screen.getByText(/build picture is not: disk full/)).toBeTruthy(),
     );
     expect(screen.getByText("/game/scripts/skyfort.lua")).toBeTruthy();
+  });
+});
+
+/**
+ * The bundled atlas has no alpha channel, which the `.glb` bake reads as full
+ * team colour, so a unit built from parts was written entirely in team colour
+ * (#4173). The atlas has to come from the same Rust rule the `.s3o` export
+ * writes it by, not straight from its file.
+ */
+describe("the .glb of a unit built from parts", () => {
+  it("bakes the atlas as the engine rule reads it, not as the file stands", async () => {
+    legoGameLanguage.mockResolvedValue({ texts: {} });
+    legoExport.mockResolvedValue(exportResult());
+    legoAtlasPng.mockResolvedValue({ dataUrl: "data:image/png;base64,ENGINE" });
+    exportGlb.mockResolvedValue(null);
+    show({ ...project, exportGlb: true });
+    await waitFor(() =>
+      expect(screen.getByText(/goes into the definition/)).toBeTruthy(),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Export" }));
+
+    await waitFor(() => expect(exportGlb).toHaveBeenCalled());
+    expect(legoAtlasPng).toHaveBeenCalledWith({
+      atlas: {
+        name: "atlas.png",
+        pack: undefined,
+        writeAs: "coilbox_atlas.png",
+      },
+    });
+    expect(exportGlb.mock.calls[0][3]).toBe("data:image/png;base64,ENGINE");
   });
 });

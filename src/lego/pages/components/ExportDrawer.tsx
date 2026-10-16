@@ -40,10 +40,11 @@ import {
   languageUnitsFile,
   type TextHome,
 } from "@/workshop/unitText";
-import { atlasUrl, exportTextureName, unitAtlas } from "../../atlas";
+import { exportTextureName, unitAtlas } from "../../atlas";
 import {
   type BlenderTextureRef,
   type BlenderTextureWritten,
+  legoAtlasPng,
   legoExport,
   legoExportGlb,
   legoExportObj,
@@ -379,7 +380,13 @@ export function ExportDrawer({
         ? (await decodedTexture(blender.colour)).dataUrl
         : null;
     }
-    return installed ? atlasUrl(installed) : null;
+    if (!installed) return null;
+    // Through Rust rather than the asset URL: the atlas has no alpha channel,
+    // which the bake reads as all team colour (#4173).
+    const { dataUrl } = await legoAtlasPng({
+      atlas: { name: atlas, pack: installed.folder, writeAs: atlasFile },
+    });
+    return dataUrl;
   }
 
   async function saveGlb() {

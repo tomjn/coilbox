@@ -633,6 +633,16 @@ export const legoTexturePng = defineCommand<
 >("coilbox-lego", "lego_texture_png");
 
 /**
+ * A parts atlas as a PNG `data:` URL, with the alpha the engine reads: an atlas
+ * with no alpha channel comes back with an alpha of 0, and one with its own
+ * alpha comes back as it is. The `.glb` export bakes team colour in by it.
+ */
+export const legoAtlasPng = defineCommand<
+  { atlas: { name: string; pack: string | null; writeAs: string } },
+  { dataUrl: string }
+>("coilbox-lego", "lego_atlas_png");
+
+/**
  * One particle bitmap already extracted to a path on disk, decoded with its
  * alpha kept as a PNG `data:` URL.
  */
