@@ -38,12 +38,14 @@ import {
   mpUnboss,
   mpUpdateBattleInfo,
   mpUpdateBot,
+  mpZerokRequestConnectSpring,
 } from "../bindings";
 import {
   carriesBotAlly,
   founderRunsTheGame,
   protocolForKey,
   seatIsServerAssigned,
+  serverSendsTheMatch,
   startPositionsUnavailable,
   unitRestrictionsUnavailable,
 } from "../protocol";
@@ -227,17 +229,28 @@ export interface BattleRoomView {
    * dead button. Clears on the next successful action.
    */
   actionError: string | null;
-  /** Whether the battle host (autohost) is in-game — i.e. the match has started. */
+  /** Whether the battle host (autohost) is in-game — i.e. the match has started.
+   * On Zero-K, which has no host whose in-game bit could say so, whether the
+   * battle says its match is running. */
   hostIngame: boolean;
   /** Whether we were in this room when the running match started, which is
    * what makes us a participant in it rather than somebody who walked in on it. */
   presentAtStart: boolean;
   /**
-   * Bumped each time a Tachyon server tells us where the match is. That is the
-   * launch signal on a Tachyon lobby, which has no host to go in-game: the
-   * server picks an autohost and sends every player its address.
+   * Bumped each time a Tachyon or Zero-K server tells us where the match is.
+   * That is the launch signal on both, which have no host to go in-game: the
+   * server runs the match and sends every player its address.
    */
   battleStartSeq: number;
+  /** Whether the server sends every player where the match is, so the room
+   * launches off `battleStartSeq` rather than off the host going in game. */
+  serverSendsMatch: boolean;
+  /**
+   * Ask the server where the running match is, on a connection that has to be
+   * asked. Zero-K's answer advances `battleStartSeq`, which launches. Null
+   * everywhere else, where getting in is a launch of our own.
+   */
+  askForMatch: (() => Promise<void>) | null;
   /**
    * The live vote in this battle, or null. Drives the one-click vote panel.
    * Scraped out of the autohost's chat lines on a TASServer connection, so it is
@@ -640,7 +653,11 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
   // participant (human or bot) with every non-spectator human ready — so an
   // all-bot match with the host spectating still starts (the autohost/engine
   // enforces its own rules).
-  const hostIngame = !!battle && !!state?.users[battle.host]?.status.ingame;
+  const hostIngame =
+    !!battle &&
+    (protocol === "zerok"
+      ? battle.inProgress
+      : !!state?.users[battle.host]?.status.ingame);
   const presentAtStart = !!battle && state?.witnessedStart === battle.id;
   const allReady = battleStartable(rows);
   const startPosType = battle ? startPosTypeOf(battle) : 0;
@@ -1055,6 +1072,18 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     await mpStartBattle({ serverKey: activeKey }).then(clearErr, setErr);
   }, [activeKey, clearErr, setErr]);
 
+  // Zero-K's way into a running match: the server answers with where it is,
+  // and that answer is what launches.
+  const battleId = battle?.id ?? null;
+  const requestMatch = useCallback(async () => {
+    if (!activeKey || battleId == null) return;
+    await mpZerokRequestConnectSpring({ serverKey: activeKey, battleId }).then(
+      clearErr,
+      setErr,
+    );
+  }, [activeKey, battleId, clearErr, setErr]);
+  const askForMatch = protocol === "zerok" ? requestMatch : null;
+
   // Vote in the open vote. The fork between `lobby/voteSubmit` and an `!vote`
   // chat line to the autohost is the Rust side's, because only it knows which
   // vote the lobby is holding.
@@ -1407,6 +1436,8 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     hostIngame,
     presentAtStart,
     battleStartSeq: mirror.battleStartSeq,
+    serverSendsMatch: serverSendsTheMatch(protocol),
+    askForMatch,
     currentVote,
     castVote,
     allReady,

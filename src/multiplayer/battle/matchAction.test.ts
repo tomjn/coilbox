@@ -56,6 +56,7 @@ function auto(p: Partial<AutoLaunchState> = {}): AutoLaunchState {
     presentAtStart: true,
     launched: false,
     canRun: true,
+    serverSendsMatch: false,
     ...p,
   };
 }
@@ -83,5 +84,11 @@ describe("launchesOnItsOwn", () => {
 
   it("waits for a map or game we do not have yet", () => {
     expect(launchesOnItsOwn(auto({ canRun: false }))).toBe(false);
+  });
+
+  // Zero-K's match running and its ConnectSpring both arrive, and only the
+  // second says where the match is. Launching off both starts two engines.
+  it("leaves the launch to the server's message where the server sends one", () => {
+    expect(launchesOnItsOwn(auto({ serverSendsMatch: true }))).toBe(false);
   });
 });

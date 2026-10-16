@@ -43,6 +43,9 @@ export interface AutoLaunchState {
   launched: boolean;
   /** The map and game are installed and an engine is selected. */
   canRun: boolean;
+  /** The server sends every player where the match is, and the room launches
+   * off that message instead. */
+  serverSendsMatch: boolean;
 }
 
 /**
@@ -54,6 +57,6 @@ export interface AutoLaunchState {
  * match, so nothing starts for them either.
  */
 export function launchesOnItsOwn(s: AutoLaunchState): boolean {
-  if (s.selfHost || !s.hostIngame) return false;
+  if (s.selfHost || s.serverSendsMatch || !s.hostIngame) return false;
   return s.presentAtStart && !s.launched && s.canRun;
 }

@@ -26,6 +26,7 @@ import {
   publishesStatus,
   relayHostingAvailable,
   seatIsServerAssigned,
+  serverSendsTheMatch,
   startPositionsUnavailable,
   syncsOnReady,
   unitRestrictionsUnavailable,
@@ -442,6 +443,17 @@ describe("founderRunsTheGame", () => {
   it("is false on Zero-K, where founding a room runs nothing here", () => {
     expect(founderRunsTheGame("zerok")).toBe(false);
     expect(founderRunsTheGame("tachyon")).toBe(false);
+  });
+});
+
+describe("serverSendsTheMatch", () => {
+  it("is false on TASServer, where the battle carries the host's address", () => {
+    expect(serverSendsTheMatch("tasserver")).toBe(false);
+  });
+
+  it("is true where the server sends battle/start or ConnectSpring", () => {
+    expect(serverSendsTheMatch("tachyon")).toBe(true);
+    expect(serverSendsTheMatch("zerok")).toBe(true);
   });
 });
 

@@ -1446,6 +1446,18 @@ export const mpZerokOpenBattle = defineCommand<
 >("coilbox-multiplayer", "mp_zerok_open_battle");
 
 /**
+ * Zero-K only: ask the server where the running match in a battle is.
+ *
+ * The answer is a `ConnectSpring`, which advances `battleStartSeq` like the one
+ * sent at a match's start, so the battle room launches it the same way. This is
+ * the way back into a match whose engine exited, and the way in to watch one.
+ */
+export const mpZerokRequestConnectSpring = defineCommand<
+  { serverKey: string; battleId: number },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_zerok_request_connect_spring");
+
+/**
  * Tachyon only: create a lobby, which is a room the server owns and puts us in
  * as its first player. It is not hosting. Nothing runs on this machine until a
  * member starts the match and the server hands out an autohost's address, so

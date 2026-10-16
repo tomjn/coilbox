@@ -340,15 +340,24 @@ function BattleRoomPage() {
       presentAtStart: room.presentAtStart,
       launched: launchedRef.current,
       canRun,
+      serverSendsMatch: room.serverSendsMatch,
     });
     if (!go) return;
     launchedRef.current = true;
     void runLaunch();
-  }, [room.selfHost, room.hostIngame, room.presentAtStart, canRun, runLaunch]);
+  }, [
+    room.selfHost,
+    room.hostIngame,
+    room.presentAtStart,
+    room.serverSendsMatch,
+    canRun,
+    runLaunch,
+  ]);
 
   // A Tachyon lobby has no host to go in-game. The server picks an autohost and
   // sends every player its address, which the connection answers and reports by
-  // advancing `battleStartSeq`, so that is the launch signal here.
+  // advancing `battleStartSeq`, so that is the launch signal here. Zero-K's
+  // `ConnectSpring` advances it the same way.
   //
   // Missing content holds the launch rather than dropping it: `canRun` is a
   // dependency, so a map or game that arrives later starts the engine then. The
@@ -480,7 +489,9 @@ function BattleRoomPage() {
         onToggleSpectate={room.setSpectator}
         onLeave={onLeave}
         onStart={onStart}
-        onJoinMatch={runLaunch}
+        // Zero-K has to be asked where a running match is, and its answer
+        // launches through `battleStartSeq` above.
+        onJoinMatch={room.askForMatch ?? runLaunch}
         selfHost={room.selfHost}
         canStartDirectly={room.isFounder || room.iAmBoss}
         closesRoom={endsTheRoom}
