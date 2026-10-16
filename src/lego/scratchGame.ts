@@ -41,7 +41,7 @@ export const SCRATCH_SIDE = "Coilbox";
  * already done so, so the count in the gadget below sees it and does not add a
  * second copy.
  */
-const SPAWN_FRAME = 30;
+export const SPAWN_FRAME = 30;
 
 /**
  * The scratch archive's `modinfo.lua`.

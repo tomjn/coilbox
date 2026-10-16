@@ -1430,6 +1430,65 @@ export const contentAnalysisEngineOutput = defineCommand<
   { lines: string[] | null }
 >("coilbox-content", "content_analysis_engine_output");
 
+/** One thing the engine said in a unit check, as many times as it said it. */
+export interface UnitCheckEntry {
+  /** The message without its time and frame stamps, stack trace included. */
+  text: string;
+  count: number;
+}
+
+/** What a unit check found (issue #3319). */
+export interface UnitCheckReport {
+  /**
+   * `loaded`: it spawned and ran with no error about it. `problems`: it ran,
+   * and the engine or the check found errors about it. `gameDidNotLoad`: the
+   * engine stopped before the match began, and `fatal` says why.
+   * `unfinished`: the engine stopped part way, and `exit` says how.
+   */
+  outcome: "loaded" | "problems" | "gameDidNotLoad" | "unfinished";
+  spawnedPieces: number | null;
+  doneFrame: number | null;
+  problems: UnitCheckEntry[];
+  warnings: UnitCheckEntry[];
+  fatal: UnitCheckEntry[];
+  /** Errors in the log about anything other than the unit. */
+  otherErrors: number;
+  exit: {
+    code: number | null;
+    signal: number | null;
+    timedOut: boolean;
+    cancelled: boolean;
+    wallSeconds: number;
+  };
+  /** The engine's whole output, kept until the next check. */
+  logPath: string;
+}
+
+/**
+ * Run the unit builder's scratch game in a headless engine, spawn the unit and
+ * report what the engine made of it. `game` is the scratch game's name and
+ * `map` the map's, as unitsync reports them. Rejects in words when the engine
+ * has no headless binary or no base content, or a check is already running.
+ */
+export const contentUnitCheck = defineCommand<
+  {
+    enginePath: string;
+    dataDir: string;
+    game: string;
+    map: string;
+    unitName: string;
+    spawnFrame: number;
+    frames: number;
+  },
+  { report: UnitCheckReport }
+>("coilbox-content", "content_unit_check");
+
+/** Stop the running unit check and wait for its engine to be gone. */
+export const contentUnitCheckCancel = defineCommand<
+  undefined,
+  { cancelled: boolean }
+>("coilbox-content", "content_unit_check_cancel");
+
 /** Forget a match's last failed run, once it has been read. */
 export const contentAnalysisDismiss = defineCommand<
   { gameId: string },

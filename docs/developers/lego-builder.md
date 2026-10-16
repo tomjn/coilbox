@@ -297,6 +297,16 @@ Cheats have to be on before `/give` does anything. Spawning is left to you: `/gi
 
 You need an engine, at least one game and at least one map installed. The drawer says which of those is missing rather than failing at launch.
 
+### Check it loads
+
+**Check it loads**, under Launch in the same drawer, plays the same scratch game with no window. It spawns the unit, runs it for 15 seconds of game time, the same stretch the animation preview plays, and lists what the engine said about it: a script that threw or did not compile, a piece the script names and the model lacks, a model file that is missing, a definition that did not parse, and a texture the model names that is not there. When the game itself fails to start with the unit in it, the drawer shows the engine's reason.
+
+It proves the unit loads and runs. It does not show how it looks.
+
+Most errors in a headless log are not about your unit. A healthy Splinter Faction run logs 53, from widgets that need a screen and the game's own definitions, so the drawer counts those and leaves them in the log rather than listing them. **Show me the engine log** opens the whole thing.
+
+The check needs `spring-headless` and the engine's base content, and the drawer says which is missing. It runs in a folder of its own under coilbox's cache, so nothing is written to your engine or your settings. The first check takes longer than the rest: on a Mac it took 42 seconds and then 11, because the engine scans every archive once and Splinter Faction builds files of its own on a first run.
+
 ## Making the game use the unit
 
 Straight out of export, a unit cannot be played normally. Its definition sets `canmove = false`, and nothing lists it in any unit's `buildoptions`, so nothing can build it and it cannot move. `/cheat` and `/give` is the only way to get one onto a map.

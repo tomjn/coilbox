@@ -33,6 +33,7 @@ mod stats;
 mod stats_watcher;
 mod steam;
 mod storage;
+mod unit_check;
 mod widget;
 
 use model::{
@@ -1167,6 +1168,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             demo::analysis::queue::content_analysis_cancel,
             demo::analysis::queue::content_analysis_engine_output,
             demo::analysis::queue::content_analysis_dismiss,
+            unit_check::content_unit_check,
+            unit_check::content_unit_check_cancel,
             demo::analysis::store::content_replay_analyses,
             demo::analysis::store::content_replay_analysis,
             demo::analysis::store::content_replay_analysis_events,
@@ -1229,6 +1232,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             }
             // Without its folders there is no queue, and the commands say so.
             let _ = demo::analysis::queue::manage(app.app_handle());
+            let _ = unit_check::manage(app.app_handle());
             Ok(())
         })
         // Stop the replay watcher (#462) cleanly when the app is shutting
@@ -1240,6 +1244,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
                 // A replay analysis is a headless engine at full speed, and
                 // nothing else would stop it once coilbox has gone.
                 demo::analysis::queue::shutdown(app);
+                unit_check::shutdown(app);
             }
         })
         .build()

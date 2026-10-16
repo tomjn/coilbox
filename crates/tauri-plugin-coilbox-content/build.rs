@@ -35,6 +35,8 @@ const COMMANDS: &[&str] = &[
     "content_analysis_cancel",
     "content_analysis_engine_output",
     "content_analysis_dismiss",
+    "content_unit_check",
+    "content_unit_check_cancel",
     "content_replay_analyses",
     "content_replay_analysis",
     "content_replay_analysis_events",

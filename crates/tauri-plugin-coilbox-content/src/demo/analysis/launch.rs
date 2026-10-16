@@ -357,14 +357,14 @@ pub fn run_headless(launch: &Launch, control: &RunControl) -> Result<EngineExit,
 }
 
 #[cfg(all(test, unix))]
-pub(super) mod tests {
+pub(crate) mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
 
     /// A shell script standing in for `spring-headless`. CI has no engine, and
     /// what is under test here is what this launch does around one: the
     /// arguments, the environment, the captured output, the limit and the kill.
-    pub(in super::super) fn fake_engine(dir: &Path, body: &str) -> PathBuf {
+    pub(crate) fn fake_engine(dir: &Path, body: &str) -> PathBuf {
         let engine_dir = dir.join("engine");
         std::fs::create_dir_all(&engine_dir).unwrap();
         let bin = engine_dir.join("spring-headless");

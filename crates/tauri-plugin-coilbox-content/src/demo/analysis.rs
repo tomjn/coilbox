@@ -316,7 +316,7 @@ fn tail_progress(events: &Path, len: u64) -> Option<Option<i32>> {
 /// machine or a large game, so this is several times that sum. Too short kills
 /// a run that was going to finish. Too long only delays giving up on an engine
 /// that has hung, which a person can cancel in the meantime.
-const START_UP_ALLOWANCE: Duration = Duration::from_secs(300);
+pub(crate) const START_UP_ALLOWANCE: Duration = Duration::from_secs(300);
 
 /// How long a run of a match may take before it is killed.
 ///
