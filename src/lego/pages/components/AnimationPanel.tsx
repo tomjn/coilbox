@@ -611,6 +611,7 @@ export function AnimationPanel({
           pieceRest: rest,
           probed: (callin) => named.get(callin) ?? null,
           ground: scriptGround.current?.shape ?? null,
+          up: scriptGround.current?.up ?? null,
         },
       );
 

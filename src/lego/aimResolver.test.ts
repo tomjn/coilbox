@@ -13,6 +13,7 @@ import {
   withWorld,
   worldAt,
 } from "./aimResolver";
+import { type GroundShape, unitUp } from "./environment";
 import {
   type Scenario,
   type ScriptEvent,
@@ -642,5 +643,126 @@ describe("a stand-in on a slope", () => {
       ground: SLOPE.shape,
     });
     expect(events[0].args?.[3]).toBeCloseTo(20);
+  });
+});
+
+describe("aiming from a unit tilted on a slope", () => {
+  const DEGREES = 30;
+  const tilt = (DEGREES * Math.PI) / 180;
+  const slope: GroundShape = { kind: "slope", degrees: DEGREES };
+  /** What `unitUp` hands the resolver for a unit on the slope. */
+  const up = unitUp(slope, false);
+  /**
+   * The unit's axes at heading zero, tilted to the slope: the model's own
+   * turned about x by the slope angle, written out here rather than taken from
+   * the code under test (`CSolidObject::UpdateDirVectors`,
+   * `rts/Sim/Objects/SolidObject.cpp:435-450`).
+   */
+  const updir: [number, number, number] = [0, Math.cos(tilt), -Math.sin(tilt)];
+  const frontdir: [number, number, number] = [
+    0,
+    Math.sin(tilt),
+    Math.cos(tilt),
+  ];
+  const rightdir: [number, number, number] = [-1, 0, 0];
+  const dot = (a: number[], b: number[]) =>
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+
+  const AHEAD: StandInTrack = { keys: [{ frame: 0, pos: [0, 0, 2] }] };
+  const aim = (op: Partial<ScriptEvent>): Scenario => ({
+    id: "t",
+    label: "t",
+    description: "t",
+    events: [{ frame: 0, ...op }],
+    standIn: AHEAD,
+  });
+  const context = (overrides: Partial<AimContext>): AimContext => ({
+    radius: 10,
+    mid: ORIGIN,
+    pieceRest: new Map([["flare", ORIGIN]]),
+    probed: () => "flare",
+    ground: slope,
+    ...overrides,
+  });
+
+  it("unitUp is the slope's normal, so the test tilts by the slope angle", () => {
+    expect(up?.[1]).toBeCloseTo(updir[1]);
+    expect(up?.[2]).toBeCloseTo(updir[2]);
+  });
+
+  /** `Weapon.cpp:410-424` with the tilted axes. */
+  it("hands AimWeapon the angles against the tilted axes", () => {
+    const { events } = resolveScenario(
+      aim({ callin: "AimWeapon1", aimAtStandIn: { from: "AimFromWeapon" } }),
+      context({ up }),
+    );
+    // Two radii ahead along the ground, and the stand-in's middle above that.
+    const rise = 20 * Math.tan(tilt) + 0.55 * 10;
+    const length = Math.hypot(20, rise);
+    const dir = [0, rise / length, 20 / length];
+    const [heading, pitch] = events[0].args ?? [];
+    expect(heading).toBeCloseTo(
+      -Math.atan2(dot(dir, rightdir), dot(dir, frontdir)),
+    );
+    expect(pitch).toBeCloseTo(Math.asin(dot(dir, updir)));
+    // Not the level answer, or the test would pass without the fix.
+    const level = resolveScenario(
+      aim({ callin: "AimWeapon1", aimAtStandIn: { from: "AimFromWeapon" } }),
+      context({ up: null }),
+    ).events[0].args;
+    expect(pitch).not.toBeCloseTo(level?.[1] ?? 0);
+  });
+
+  it("measures from where the tilted unit's weapon piece is", () => {
+    const piece: [number, number, number] = [0, 10, 0];
+    const { events } = resolveScenario(
+      aim({ callin: "AimWeapon1", aimAtStandIn: { from: "AimFromWeapon" } }),
+      context({ up, pieceRest: new Map([["flare", piece]]) }),
+    );
+    // The piece's world position: its rest position turned with the unit.
+    const from = [
+      piece[0] * 0 + piece[1] * updir[0],
+      piece[1] * updir[1],
+      piece[1] * updir[2],
+    ];
+    const to = [0, 20 * Math.tan(tilt) + 0.55 * 10, 20];
+    const delta = to.map((v, i) => v - from[i]);
+    const length = Math.hypot(...delta);
+    const dir = delta.map((v) => v / length);
+    expect(events[0].args?.[1]).toBeCloseTo(Math.asin(dot(dir, updir)));
+  });
+
+  /** `Builder.cpp:942-955`: the pitch is against `updir`, the heading is the
+   *  world's, and the `asin(frontdir·updir)` term is zero for orthogonal axes. */
+  it("hands StartBuilding a pitch against the tilted up", () => {
+    const { events } = resolveScenario(
+      aim({ callin: "StartBuilding", aimAtStandIn: { from: "midPos" } }),
+      context({ up }),
+    );
+    const rise = 20 * Math.tan(tilt) + 0.55 * 10;
+    const length = Math.hypot(20, rise);
+    const dir = [0, rise / length, 20 / length];
+    expect(events[0].args?.[0]).toBeCloseTo(Math.atan2(dir[0], dir[2]));
+    expect(events[0].args?.[1]).toBeCloseTo(
+      Math.asin(dot(dir, updir)) - Math.asin(dot(frontdir, updir)),
+    );
+  });
+
+  it("leaves an upright unit on the level basis", () => {
+    const upright = unitUp(slope, true);
+    expect(upright).toBeNull();
+    const args = (up: AimContext["up"], callin: string, from: string) =>
+      resolveScenario(
+        aim({ callin, aimAtStandIn: { from } as never }),
+        context({ up }),
+      ).events[0].args;
+    const target = [0, 20 * Math.tan(tilt) + 0.55 * 10, 20];
+    const length = Math.hypot(...target);
+    expect(args(upright, "AimWeapon1", "AimFromWeapon")?.[1]).toBeCloseTo(
+      Math.asin(target[1] / length),
+    );
+    expect(args(upright, "StartBuilding", "midPos")?.[1]).toBeCloseTo(
+      Math.asin(target[1] / length),
+    );
   });
 });
