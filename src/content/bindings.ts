@@ -4113,6 +4113,47 @@ export const unitsyncArchiveFile = defineCommand<
   ArchiveFileResult
 >("coilbox-unitsync", "unitsync_archive_file");
 
+/** One of the start boxes a Zero-K map or game file declares. */
+export interface StartBoxTeam {
+  /** The box's id, counted from 0. Zero-K deals boxes out to ally teams at
+   * random unless shuffling is off, so this is not an ally team. */
+  id: number;
+  nameLong?: string | null;
+  nameShort?: string | null;
+  /** Suggested start positions, `[x, z]` in world units. */
+  startPoints: [number, number][];
+  /** Polygons, each a list of `[x, z]` corners in world units. */
+  boxes: [number, number][][];
+}
+
+export interface StartBoxConfig {
+  /** Which archive the file came from. */
+  source: "game" | "map";
+  file: string;
+  teams: StartBoxTeam[];
+}
+
+/**
+ * The start boxes Zero-K uses on a map, from the game's
+ * `LuaRules/Configs/StartBoxes/<map>.lua` or else the map's
+ * `mapconfig/map_startboxes.lua` (issue #4194). `config` is null when there is
+ * neither, or when the file failed to evaluate, which `error` then explains.
+ */
+export const contentStartBoxes = defineCommand<
+  {
+    enginePath: string;
+    dataDir: string;
+    gameArchive: string;
+    mapName: string;
+    /** The map's size in world units, for the file's `Game.mapSizeX`. */
+    mapSizeX: number;
+    mapSizeZ: number;
+    /** Ally teams with somebody on them, for the file's `GetTeamCount()`. */
+    teamCount: number;
+  },
+  { config: StartBoxConfig | null; error?: string }
+>("coilbox-content", "content_start_boxes");
+
 export interface GameHeadersResult {
   /** Header art per game. Both fields are absent when the game has no usable
    * art. `file` is the cache file name, served over `coilbox://unitsyncheader/`,

@@ -1,4 +1,4 @@
-import type { MapItem } from "@/content/bindings";
+import type { GameItem, MapItem } from "@/content/bindings";
 import {
   useUnitsyncMapMeta,
   useUnitsyncMinimap,
@@ -17,6 +17,9 @@ import {
 import type { StartRect } from "@/startbox/geometry";
 import { StartBoxEditor } from "@/startbox/StartBoxEditor";
 import { StartBoxOverlay } from "@/startbox/StartBoxOverlay";
+import { StartPolygonOverlay } from "@/startbox/StartPolygonOverlay";
+import { useZerokStartBoxes } from "@/startbox/useZerokStartBoxes";
+import { areasFromConfig, mapExtent } from "@/startbox/zerok";
 import type { Battle } from "../bindings";
 import type { MemberRow } from "./config";
 import { MissingMapBox } from "./MissingMapBox";
@@ -36,6 +39,7 @@ export function BattleMapCard({
   rows,
   enginePath,
   dataDir,
+  game,
   maps,
   mapsLoading,
   localMap,
@@ -54,6 +58,9 @@ export function BattleMapCard({
   rows: MemberRow[];
   enginePath: string | undefined;
   dataDir: string | undefined;
+  /** The battle's game as installed here, which says whether the game reads
+   *  its start boxes from a file rather than the lobby. */
+  game: GameItem | undefined;
   maps: MapItem[];
   /** The map list is still being scanned, so no maps are available yet. */
   mapsLoading: boolean;
@@ -151,6 +158,21 @@ export function BattleMapCard({
   // than the scan, so fold in whichever has landed for this map.
   const [displayMap] = mergeMapTiers([bare], thumbs, meta);
 
+  // Zero-K takes its boxes from the game or the map when either defines them,
+  // and then ignores the lobby's, so those are what the preview shows and
+  // nobody is offered the editor (issue #4194).
+  const extent = mapExtent(displayMap);
+  const { config: fileBoxes } = useZerokStartBoxes({
+    enginePath,
+    dataDir,
+    game,
+    mapName: mapMissing ? undefined : battle.map,
+    extent,
+    teamCount: new Set(players.map((r) => r.ally)).size,
+  });
+  const fileAreas = fileBoxes ? areasFromConfig(fileBoxes) : null;
+  const editBoxes = canEditBoxes && !fileAreas;
+
   return (
     <div className="space-y-2">
       <MapCard
@@ -159,7 +181,7 @@ export function BattleMapCard({
         mapsLoading={mapsLoading}
         thumbs={thumbs}
         minimapUrl={minimap.url}
-        startPositions={startPositions}
+        startPositions={fileAreas ? [] : startPositions}
         minimapLoading={minimap.loading}
         markerColors={markerColors}
         // Wind and tidal come off the local render for an installed map, and
@@ -180,7 +202,7 @@ export function BattleMapCard({
               : "Change map"
             : "Suggest map"
         }
-        overlayInteractive={canEditBoxes}
+        overlayInteractive={editBoxes}
         overlay={
           <>
             {overlayUrl && (
@@ -188,7 +210,9 @@ export function BattleMapCard({
               // drag surface and the picker button are unaffected.
               <MapOverlayImage src={overlayUrl} />
             )}
-            {canEditBoxes ? (
+            {fileAreas ? (
+              <StartPolygonOverlay areas={fileAreas} extent={extent} />
+            ) : editBoxes ? (
               <StartBoxEditor
                 rects={battle.startRects}
                 activeAlly={activeAlly}

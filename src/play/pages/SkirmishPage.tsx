@@ -69,7 +69,10 @@ import {
 } from "@/startbox/StartBoxControls";
 import { StartBoxEditor } from "@/startbox/StartBoxEditor";
 import { StartBoxOverlay } from "@/startbox/StartBoxOverlay";
+import { StartPolygonOverlay } from "@/startbox/StartPolygonOverlay";
 import { StartPosCard } from "@/startbox/StartPosCard";
+import { useZerokStartBoxes } from "@/startbox/useZerokStartBoxes";
+import { areasFromConfig, mapExtent } from "@/startbox/zerok";
 import { useBrandingEntry } from "../../content/branding";
 import { loadReplays } from "../../content/replayList";
 import { useReplayUserState } from "../../content/replayUserState";
@@ -488,6 +491,19 @@ export default function SkirmishPage() {
   // the start-position dropdown, exactly as the battle room shares it.
   const boxAllies = useStartBoxAllies(alliesInPlay, startRects);
   const boxMode = isBoxMode(startPosType);
+  // Zero-K takes its boxes from the game or the map when either defines them,
+  // and then ignores drawn ones, so those are shown in place of the editor
+  // (issue #4194).
+  const mapSize = mapExtent(selectedMap);
+  const { config: fileBoxes } = useZerokStartBoxes({
+    enginePath,
+    dataDir,
+    game: selectedGame,
+    mapName: selectedMap?.name,
+    extent: mapSize,
+    teamCount: alliesInPlay.size,
+  });
+  const fileAreas = boxMode && fileBoxes ? areasFromConfig(fileBoxes) : null;
 
   const setStartBox = useCallback((ally: number, rect: StartRect) => {
     setStartRects((r) => ({ ...r, [String(ally)]: rect }));
@@ -1267,13 +1283,16 @@ export default function SkirmishPage() {
             onSelectMap={setMapName}
             disabled={running}
             dimBase={!!overlay.overlayUrl}
-            overlayInteractive={boxMode && !running}
+            overlayInteractive={boxMode && !running && !fileAreas}
             overlay={
               <>
                 {overlay.overlayUrl && (
                   <MapOverlayImage src={overlay.overlayUrl} />
                 )}
-                {boxMode &&
+                {fileAreas ? (
+                  <StartPolygonOverlay areas={fileAreas} extent={mapSize} />
+                ) : (
+                  boxMode &&
                   (running ? (
                     <StartBoxOverlay rects={startRects} />
                   ) : (
@@ -1283,7 +1302,8 @@ export default function SkirmishPage() {
                       onCommit={setStartBox}
                       onClear={clearStartBox}
                     />
-                  ))}
+                  ))
+                )}
               </>
             }
           />
@@ -1296,11 +1316,11 @@ export default function SkirmishPage() {
             disabled={running}
             note={startPosNote({
               startPosType,
-              hasBoxes: Object.keys(startRects).length > 0,
+              hasBoxes: Object.keys(startRects).length > 0 || !!fileAreas,
               canEditBoxes: !running,
             })}
           >
-            {boxMode && !running && (
+            {boxMode && !running && !fileAreas && (
               <StartBoxControls
                 mapName={mapName}
                 rects={startRects}
