@@ -464,12 +464,13 @@ export function MemberRow({
           <OptionSelect
             value={String(row.ally)}
             size="sm"
-            className={cn(SELECT_SIZE, "w-24")}
+            className={cn(SELECT_SIZE, "w-16")}
+            ariaLabel={`${row.name} ally`}
             options={allyOptions}
             onValueChange={(v) => setAlly(Number(v))}
           />
         ) : (
-          <span className="text-sm">Ally {allyLetter(row.ally)}</span>
+          <span className="text-sm">{allyLetter(row.ally)}</span>
         )}
       </TableCell>
 
