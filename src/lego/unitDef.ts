@@ -87,6 +87,16 @@ const DEFAULT_MAX_DAMAGE = 1000;
  */
 const DEFAULT_MAX_SLOPE = 20;
 
+/**
+ * A stand-in build time and cost, easy to find and retune by hand until the
+ * cost comes from the unit's parts (issue #3280). The time is the engine's own
+ * default (`UnitDef.cpp:345`). The metal is the same number because Splinter
+ * Faction derives a build time of metal plus energy over ten, and with no
+ * energy that lands on the engine default.
+ */
+const DEFAULT_BUILD_TIME = 100;
+const DEFAULT_BUILD_COST_METAL = DEFAULT_BUILD_TIME;
+
 /** Escapes for characters that cannot appear raw in a quoted Lua string. */
 const LUA_STRING_ESCAPES: Record<string, string> = {
   "\\": "\\\\",
@@ -187,7 +197,14 @@ export function legoUnitDef(
     // is read as a table, so it has to exist.
     unitname: project.unitName,
     sightdistance: 0,
-    customparams: {},
+    // `unitdefbuildtime` is Splinter Faction's opt-out from its cost block,
+    // which otherwise prices any unit with no `factionname` at 518181518
+    // metal and energy so that a builder never finishes it (issue #4143). The
+    // game reads only whether it is set. Other games ignore the table.
+    customparams: { unitdefbuildtime: DEFAULT_BUILD_TIME },
+    buildtime: DEFAULT_BUILD_TIME,
+    buildcostmetal: DEFAULT_BUILD_COST_METAL,
+    buildcostenergy: 0,
     objectname: project.unitName,
     script: `${project.unitName}.lua`,
     footprintx: footprintSteps(bounds.sizeX),
@@ -235,12 +252,23 @@ export function unitWords(project: LegoProject): {
   };
 }
 
+/** A table key as Lua source: bare when it is an identifier, quoted when not. */
+function luaKey(key: string): string {
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(key) ? key : `[${luaString(key)}]`;
+}
+
 /**
- * One field's value as Lua source. The three scalar types, and an empty table
- * for a field the game reads as a table but nothing fills in yet.
+ * One field's value as Lua source. The three scalar types, and a table whose
+ * entries are written the same way, so `{}` for a field the game reads as a
+ * table but nothing fills in.
  */
-function luaValue(value: unknown): string {
-  if (typeof value === "object" && value !== null) return "{}";
+export function luaValue(value: unknown): string {
+  if (typeof value === "object" && value !== null) {
+    const entries = Object.entries(value).map(
+      ([key, entry]) => `${luaKey(key)} = ${luaValue(entry)}`,
+    );
+    return entries.length === 0 ? "{}" : `{ ${entries.join(", ")} }`;
+  }
   if (typeof value === "boolean") return value ? "true" : "false";
   if (typeof value === "number") return String(value);
   return luaString(String(value));

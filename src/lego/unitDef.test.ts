@@ -7,6 +7,7 @@ import {
   buildUnitDef as buildUnitDefWithHome,
   legoUnitDef as legoUnitDefWithHome,
   luaString,
+  luaValue,
   unitWords,
 } from "./unitDef";
 
@@ -72,7 +73,21 @@ describe("legoUnitDef", () => {
     );
     expect(def.unitname).toBe("skyfort");
     expect(def.sightdistance).toBe(0);
-    expect(def.customparams).toEqual({});
+    expect(def.customparams).toBeTypeOf("object");
+  });
+
+  // Splinter Faction prices any unit without `customparams.unitdefbuildtime`
+  // or a faction at 518181518 metal (issue #4143). With the opt-out it derives
+  // its build time from the unit's own cost, which must therefore be there.
+  it("opts out of Splinter Faction's catch-all cost and states its own", () => {
+    const def = legoUnitDef(
+      project("Sky Fortress", "skyfort"),
+      bounds({ x: 32, z: 48 }),
+    );
+    expect(def.customparams).toEqual({ unitdefbuildtime: 100 });
+    expect(def.buildtime).toBe(100);
+    expect(def.buildcostmetal).toBe(100);
+    expect(def.buildcostenergy).toBe(0);
   });
 
   // The engine reads `maxSlope` for where a unit that cannot move may be
@@ -86,14 +101,14 @@ describe("legoUnitDef", () => {
     expect(buildUnitDef(p, b)).toContain("maxslope = 20,");
   });
 
-  it("writes customparams as an empty Lua table in the file", () => {
+  it("writes customparams as a Lua table with its keys in the file", () => {
     const text = buildUnitDef(
       project("Sky Fortress", "skyfort"),
       bounds({ x: 32, z: 48 }),
     );
     expect(text).toContain('unitname = "skyfort",');
     expect(text).toContain("sightdistance = 0,");
-    expect(text).toContain("customparams = {},");
+    expect(text).toContain("customparams = { unitdefbuildtime = 100 },");
   });
 
   it("keys the definition the way the engine reads one: lower case", () => {
@@ -197,6 +212,22 @@ describe("legoUnitDef", () => {
     expect(lua).not.toContain("    name =");
     expect(lua).not.toContain("    description =");
     expect(lua).toContain('    objectname = "skyfort"');
+  });
+});
+
+describe("luaValue", () => {
+  it("writes an empty object as an empty table", () => {
+    expect(luaValue({})).toBe("{}");
+  });
+
+  it("writes string and number entries, quoting a key that is not an identifier", () => {
+    expect(luaValue({ a: 1, b_2: "x", "needs quoting": true, "1st": 2 })).toBe(
+      '{ a = 1, b_2 = "x", ["needs quoting"] = true, ["1st"] = 2 }',
+    );
+  });
+
+  it("writes a nested table", () => {
+    expect(luaValue({ outer: { inner: 3 } })).toBe("{ outer = { inner = 3 } }");
   });
 });
 
