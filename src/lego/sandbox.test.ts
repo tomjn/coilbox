@@ -12,6 +12,8 @@ import {
   SANDBOX_RELOAD_MESSAGE,
   SANDBOX_REPLY,
   SANDBOX_TARGETS,
+  SANDBOX_TEXTURES_MESSAGE,
+  SANDBOX_TEXTURES_REPLY,
   sandboxModOptions,
   sandboxParticipants,
   TARGET_COUNT,
@@ -163,6 +165,7 @@ Spring = {
   GetModOptions = function() return { coilbox_mission = ${JSON.stringify(modMission)} } end,
   GetGaiaTeamID = function() return 2 end,
   SendLuaRulesMsg = function(m) log("message " .. m) end,
+  SendCommands = function(c) log("command " .. c) end,
   GetPlayerList = function() return { 0 } end,
   GetPlayerInfo = function() return "you", true, false, 0 end,
   GiveOrderToUnit = function(u, cmd, p) log("order " .. u .. " " .. cmd .. " " .. p[1]) end,
@@ -296,6 +299,36 @@ describe("buildSandboxGadget", () => {
     expect(run.stderr).toBe("");
     expect(run.lines).toEqual([
       "message coilbox_sandbox:loaded",
+      "handled true",
+    ]);
+  });
+
+  // Issue #4146. The command is unsynced, and one from the autohost is never
+  // run, so the gadget's unsynced half sends it.
+  it("hands a texture reload to its unsynced half when coilbox asks", () => {
+    const run = runGadget(
+      gadget,
+      SANDBOX_MISSION_ID,
+      `log("handled " .. tostring(gadget:GotChatMsg(${JSON.stringify(SANDBOX_TEXTURES_MESSAGE)}, 255)))`,
+    );
+    expect(run.stderr).toBe("");
+    expect(run.lines).toEqual([
+      "to unsynced coilbox_sandbox_textures",
+      "handled true",
+    ]);
+  });
+
+  it("reloads the textures from its unsynced half, then says so", () => {
+    const run = runGadget(
+      gadget,
+      SANDBOX_MISSION_ID,
+      `log("handled " .. tostring(gadget:RecvFromSynced("coilbox_sandbox_textures")))`,
+      { synced: false },
+    );
+    expect(run.stderr).toBe("");
+    expect(run.lines).toEqual([
+      "command reloadtextures s3o",
+      `message ${SANDBOX_TEXTURES_REPLY}`,
       "handled true",
     ]);
   });
