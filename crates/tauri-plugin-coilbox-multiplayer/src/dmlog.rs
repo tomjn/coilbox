@@ -285,7 +285,10 @@ mod tests {
         DmLog::new(dir.path(), "me@host:8201").append("bob", &msg("bob", "hi", 1));
 
         assert!(move_log(dir.path(), "me@host:8201", "me@host:8200").expect("move"));
-        assert_eq!(DmLog::new(dir.path(), "me@host:8200").load()["bob"][0].text, "hi");
+        assert_eq!(
+            DmLog::new(dir.path(), "me@host:8200").load()["bob"][0].text,
+            "hi"
+        );
         assert!(DmLog::new(dir.path(), "me@host:8201").load().is_empty());
     }
 
@@ -296,8 +299,14 @@ mod tests {
         DmLog::new(dir.path(), "me@host:8200").append("bob", &msg("bob", "new", 2));
 
         assert!(!move_log(dir.path(), "me@host:8201", "me@host:8200").expect("move"));
-        assert_eq!(DmLog::new(dir.path(), "me@host:8200").load()["bob"][0].text, "new");
-        assert_eq!(DmLog::new(dir.path(), "me@host:8201").load()["bob"][0].text, "old");
+        assert_eq!(
+            DmLog::new(dir.path(), "me@host:8200").load()["bob"][0].text,
+            "new"
+        );
+        assert_eq!(
+            DmLog::new(dir.path(), "me@host:8201").load()["bob"][0].text,
+            "old"
+        );
     }
 
     #[test]
