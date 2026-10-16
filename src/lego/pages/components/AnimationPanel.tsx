@@ -61,6 +61,15 @@ import {
   unmetRequirements,
 } from "../../animPresets";
 import { legoProbeScript, legoRunScript } from "../../bindings";
+import {
+  DRIVE_PATHS,
+  type DrivePath,
+  type DriveSource,
+  driveAlong,
+  driveMotion,
+  ENGINE_MIN_SCRIPT_CHANGE_HEADING,
+  pathPoints,
+} from "../../drive";
 import { type UnitMotion, unitMotion } from "../../effects";
 import type { GroundShape } from "../../environment";
 import { unitScript } from "../../luaScript";
@@ -112,6 +121,7 @@ import { isBuilder } from "../../unitDef";
 import { controlFor } from "../../unitValueControls";
 import { MovementSection } from "./MovementSection";
 import { ScrubberMarks } from "./ScrubberMarks";
+import type { DrivePlacement } from "./standInPlayback";
 
 /** The scenario Select's own entry for firing an arbitrary function by name,
  *  rather than one of the canned scenarios above it. Not a real scenario id:
@@ -142,6 +152,35 @@ const NO_STAND_IN: {
  *  (`crates/coilbox-unitpose/src/unitvalue.rs`). */
 const CURRENT_SPEED = 29;
 const COB_SCALE = 65536;
+
+/** The unit values a drive answers itself, `MAX_SPEED` and `HEADING` beside
+ *  `CURRENT_SPEED` (`rts/Sim/Units/Scripts/CobDefines.h`). A control for one
+ *  would change nothing while the unit drives, so none is offered. */
+const DRIVEN_VALUES = new Set([CURRENT_SPEED, 75, 82]);
+
+/** When `ChangeHeading` reaches the script: never, which is the engine's own
+ *  `minScriptChangeHeading`, or on every frame the unit turns, which is a game
+ *  lowering it to 1. */
+const CHANGE_HEADING_OPTIONS = [
+  { value: "engine", label: "ChangeHeading never sent (engine default)" },
+  { value: "every", label: "ChangeHeading sent on every turning frame" },
+];
+
+/** Where a drive's speed and turn rate came from, in words. */
+function driveSourceText({ motion, speed, turnRate }: DriveSource): string {
+  const speedFrom = {
+    movement: "from Movement",
+    definition: "from the game's definition",
+    preview: "the preview's own",
+  }[speed];
+  const turnFrom =
+    turnRate === "none"
+      ? "none set, so the engine's least"
+      : turnRate === "movement"
+        ? "from Movement"
+        : "from the game's definition";
+  return `Speed ${Math.round(motion.speed * 30 * 10) / 10} elmos/s, ${speedFrom}. Turn rate ${Math.round(motion.turnRate * 10) / 10}, ${turnFrom}.`;
+}
 
 /** How fast a scenario's unit moves and when, from the speed the script is
  *  told it moves at. */
@@ -297,6 +336,8 @@ interface Props {
      *  x and z in elmos, and the frame they let it go on. Only for a
      *  scenario whose target can be moved. */
     onDrag?: (at: [number, number], frame: number) => void;
+    /** The unit's own drive, for the scenario that drives it. */
+    drive?: DrivePlacement | null;
   }) => void;
   /** What the unit's game lacks for effects to draw its own bitmaps, or null
    *  when it has everything they need. Shown only for a scenario that fires
@@ -371,6 +412,15 @@ export function AnimationPanel({
   const targetRef = useRef(target);
   const targetDebounce = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(targetDebounce.current), []);
+  /** The path the driving scenario follows, the points of the game maker's
+   *  own, and whether a turn is sent as `ChangeHeading`. Preview pokes, never
+   *  saved, and read through the ref for the reason `target` is. */
+  const [drive, setDrive] = useState<{
+    path: DrivePath;
+    own: [number, number][];
+    everyTurn: boolean;
+  }>({ path: "straight", own: [], everyTurn: false });
+  const driveRef = useRef(drive);
   /** The function chosen for the "Call a function" scenario, and the text of
    *  its arguments, kept apart from `values` because neither is a unit value. */
   const [callFunction, setCallFunction] = useState("");
@@ -561,6 +611,59 @@ export function AnimationPanel({
     ) => {
       const scenario = scenarioById(scenarioId);
       if (!scenario) return;
+
+      if (scenario.drive) {
+        setStandInNotes([]);
+        const source = driveMotion(project);
+        const settings = driveRef.current;
+        const points = pathPoints(settings.path, source.motion, settings.own);
+        const ground = scriptGround.current;
+        const run = driveAlong(points, source.motion, {
+          start: at(0.5),
+          frames: PREVIEW_FRAMES,
+          ground: ground?.shape ?? null,
+          // A ground with no up is a unit that stays upright on it.
+          tilts: ground !== null && ground.up !== null,
+          minScriptChangeHeading: settings.everyTurn
+            ? 1
+            : ENGINE_MIN_SCRIPT_CHANGE_HEADING,
+        });
+        // A compiled script is never sent `ChangeHeading`: the engine's
+        // `CCobInstance::ChangeHeading` does nothing (`CobInstance.h:171`).
+        const moving = compiled
+          ? run.events.filter((event) => event.callin !== "ChangeHeading")
+          : run.events;
+        // One event a frame that only says where the unit is, because what
+        // a script reads about its heading and speed changes every frame.
+        const poses: ScriptEvent[] = run.frames.map((_, frame) => ({
+          frame,
+          ambient: true,
+        }));
+        const events = [...CREATED, ...moving, ...poses].sort(
+          (a, b) => a.frame - b.frame,
+        );
+        onStandIn({
+          ...NO_STAND_IN,
+          // The unit really moves, so what it leaves behind stays put on its
+          // own rather than being carried back past it.
+          motion: null,
+          drive: {
+            frames: run.frames,
+            path: points,
+            ...(settings.path === "own"
+              ? { onPick: (point: [number, number]) => pickRef.current(point) }
+              : {}),
+          },
+        });
+        const scene = withWorld(events, null, {
+          radius: 0,
+          self: size,
+          attachPiece: () => null,
+          ground,
+          drive: { frames: run.frames, maxSpeed: source.motion.speed },
+        });
+        return runEvents(scene, withValues, resume);
+      }
 
       if (!scenario.standIn && !scenario.events.some((e) => e.aimAtStandIn)) {
         setStandInNotes([]);
@@ -828,6 +931,21 @@ export function AnimationPanel({
     clearTimeout(targetDebounce.current);
     if (hasRunRef.current) rerunRef.current(frame);
   };
+  /** A new path or setting for the drive, run from the start, because a
+   *  different path is a different drive rather than the same one later. */
+  function changeDrive(next: typeof drive) {
+    driveRef.current = next;
+    setDrive(next);
+    if (hasRunRef.current) rerunRef.current(0);
+  }
+  /** A click on the ground while the game maker makes their own path. */
+  const pickRef = useRef<(point: [number, number]) => void>(() => {});
+  pickRef.current = (point) =>
+    changeDrive({
+      ...driveRef.current,
+      own: [...driveRef.current.own, point],
+    });
+
   /** The speed slider moves in a burst, so it waits for the burst to settle
    *  the way the call arguments do. */
   function changeTargetSpeed(speed: number) {
@@ -1193,6 +1311,60 @@ export function AnimationPanel({
                   />
                 </div>
               ) : null}
+              {scenario?.drive ? (
+                <div className="flex flex-col gap-1.5">
+                  <OptionSelect
+                    size="sm"
+                    ariaLabel="Path to drive"
+                    value={drive.path}
+                    options={DRIVE_PATHS}
+                    onValueChange={(path) =>
+                      changeDrive({
+                        ...driveRef.current,
+                        path: path as DrivePath,
+                      })
+                    }
+                  />
+                  {drive.path === "own" ? (
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>
+                        {drive.own.length === 0
+                          ? "Click the ground to add points."
+                          : `${drive.own.length} ${drive.own.length === 1 ? "point" : "points"}`}
+                      </span>
+                      {drive.own.length > 0 ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-5 px-1.5 text-xs"
+                          onClick={() =>
+                            changeDrive({ ...driveRef.current, own: [] })
+                          }
+                        >
+                          Clear
+                        </Button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  <p className="text-xs text-muted-foreground">
+                    {driveSourceText(driveMotion(project))}
+                  </p>
+                  {compiled ? null : (
+                    <OptionSelect
+                      size="sm"
+                      ariaLabel="When ChangeHeading is sent"
+                      value={drive.everyTurn ? "every" : "engine"}
+                      options={CHANGE_HEADING_OPTIONS}
+                      onValueChange={(value) =>
+                        changeDrive({
+                          ...driveRef.current,
+                          everyTurn: value === "every",
+                        })
+                      }
+                    />
+                  )}
+                </div>
+              ) : null}
             </>
           )}
         </div>
@@ -1204,94 +1376,98 @@ export function AnimationPanel({
               What the script reads about its unit. Change one and the preview
               runs again with it.
             </p>
-            {timeline.asked.map((asked) => {
-              const control = controlFor(asked.id, asked.name);
-              const changed = values[asked.id] !== undefined;
-              const raw = values[asked.id] ?? asked.default ?? 0;
-              return (
-                <div key={asked.id} className="flex flex-col gap-1">
-                  <div className="flex items-center justify-between text-xs">
-                    <span>{control.label}</span>
-                    <div className="flex items-center gap-2">
-                      {control.kind === "slider" ? (
-                        <span className="text-muted-foreground">
-                          {control.toDisplay(raw)}
-                          {control.suffix}
-                        </span>
-                      ) : null}
-                      {changed ? (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-5 px-1.5 text-xs"
-                          onClick={() => changeValue(asked.id, undefined)}
-                        >
-                          Reset
-                        </Button>
-                      ) : null}
-                    </div>
-                  </div>
-                  {control.kind === "switch" ? (
-                    <Switch
-                      checked={raw !== 0}
-                      onCheckedChange={(on) =>
-                        changeValue(asked.id, on ? 1 : 0)
-                      }
-                      aria-label={control.label}
-                    />
-                  ) : null}
-                  {control.kind === "slider" ? (
-                    <Slider
-                      min={control.min}
-                      max={control.max}
-                      step={control.step}
-                      value={[control.toDisplay(raw)]}
-                      onValueChange={([next]) =>
-                        changeValue(asked.id, control.toRaw(next))
-                      }
-                      aria-label={control.label}
-                    />
-                  ) : null}
-                  {control.kind === "select" ? (
-                    <Select
-                      value={String(raw)}
-                      onValueChange={(next) =>
-                        changeValue(asked.id, Number(next))
-                      }
-                    >
-                      <SelectTrigger
-                        size="sm"
-                        className="w-full"
-                        aria-label={control.label}
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {control.options.map((option) => (
-                          <SelectItem
-                            key={option.value}
-                            value={String(option.value)}
+            {timeline.asked
+              .filter(
+                (asked) => !(scenario?.drive && DRIVEN_VALUES.has(asked.id)),
+              )
+              .map((asked) => {
+                const control = controlFor(asked.id, asked.name);
+                const changed = values[asked.id] !== undefined;
+                const raw = values[asked.id] ?? asked.default ?? 0;
+                return (
+                  <div key={asked.id} className="flex flex-col gap-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span>{control.label}</span>
+                      <div className="flex items-center gap-2">
+                        {control.kind === "slider" ? (
+                          <span className="text-muted-foreground">
+                            {control.toDisplay(raw)}
+                            {control.suffix}
+                          </span>
+                        ) : null}
+                        {changed ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-5 px-1.5 text-xs"
+                            onClick={() => changeValue(asked.id, undefined)}
                           >
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : null}
-                  {control.kind === "number" ? (
-                    <Input
-                      type="number"
-                      value={raw}
-                      aria-label={control.label}
-                      onChange={(e) => {
-                        const next = Number(e.target.value);
-                        if (!Number.isNaN(next)) changeValue(asked.id, next);
-                      }}
-                    />
-                  ) : null}
-                </div>
-              );
-            })}
+                            Reset
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+                    {control.kind === "switch" ? (
+                      <Switch
+                        checked={raw !== 0}
+                        onCheckedChange={(on) =>
+                          changeValue(asked.id, on ? 1 : 0)
+                        }
+                        aria-label={control.label}
+                      />
+                    ) : null}
+                    {control.kind === "slider" ? (
+                      <Slider
+                        min={control.min}
+                        max={control.max}
+                        step={control.step}
+                        value={[control.toDisplay(raw)]}
+                        onValueChange={([next]) =>
+                          changeValue(asked.id, control.toRaw(next))
+                        }
+                        aria-label={control.label}
+                      />
+                    ) : null}
+                    {control.kind === "select" ? (
+                      <Select
+                        value={String(raw)}
+                        onValueChange={(next) =>
+                          changeValue(asked.id, Number(next))
+                        }
+                      >
+                        <SelectTrigger
+                          size="sm"
+                          className="w-full"
+                          aria-label={control.label}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {control.options.map((option) => (
+                            <SelectItem
+                              key={option.value}
+                              value={String(option.value)}
+                            >
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : null}
+                    {control.kind === "number" ? (
+                      <Input
+                        type="number"
+                        value={raw}
+                        aria-label={control.label}
+                        onChange={(e) => {
+                          const next = Number(e.target.value);
+                          if (!Number.isNaN(next)) changeValue(asked.id, next);
+                        }}
+                      />
+                    ) : null}
+                  </div>
+                );
+              })}
           </div>
         ) : null}
 
