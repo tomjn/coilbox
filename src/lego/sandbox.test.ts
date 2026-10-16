@@ -6,8 +6,10 @@ import {
   buildDownloadMenu,
   buildSandboxGadget,
   buildSandboxScenario,
-  SANDBOX_LOADED_MESSAGE,
+  SANDBOX_LOADED_REPLY,
   SANDBOX_MISSION_ID,
+  SANDBOX_RELOAD_MESSAGE,
+  SANDBOX_REPLY,
   SANDBOX_PLAYER,
   SANDBOX_TARGETS,
   sandboxModOptions,
@@ -144,7 +146,10 @@ function runGadget(
   gadget: string,
   modMission: string,
   script: string,
-  { synced = true, frame = 0 } = {},
+  {
+    synced = true,
+    framework = "loads",
+  }: { synced?: boolean; framework?: "loads" | "fails" | "missing" } = {},
 ) {
   const harness = `
 local calls = {}
@@ -157,7 +162,6 @@ local dead = {}
 Spring = {
   GetModOptions = function() return { coilbox_mission = ${JSON.stringify(modMission)} } end,
   GetGaiaTeamID = function() return 2 end,
-  GetGameFrame = function() return ${frame} end,
   SendLuaRulesMsg = function(m) log("message " .. m) end,
   GetPlayerList = function() return { 0 } end,
   GetPlayerInfo = function() return "you", true, false, 0 end,
@@ -171,6 +175,18 @@ Spring = {
 local chunk = assert(loadstring(io.read("*a")))
 local result = chunk()
 if result == false then print("off") return end
+-- What a gadget asking for \`handler = true\` holds once it has loaded.
+local framework = ${JSON.stringify(framework)}
+gadgetHandler = {
+  knownGadgets = {
+    ["Some other gadget"] = { basename = "other.lua", active = true },
+    ["Lua unit script framework"] = framework ~= "missing"
+      and { basename = "unit_script.lua", active = true } or nil,
+  },
+  DisableGadget = function(_, name) log("disable " .. name) return true end,
+  EnableGadget = function(_, name) log("enable " .. name) return framework == "loads" end,
+}
+SendToUnsynced = function(...) log("to unsynced " .. table.concat({ ... }, " ")) end
 ${script}
 for _, c in ipairs(calls) do print(c) end
 `;
@@ -223,27 +239,69 @@ describe("buildSandboxGadget", () => {
     expect(run.lines).toEqual(["off"]);
   });
 
-  // Issue #3346. `/luarules reload` gives no sign it has finished, so the
-  // gadget says so itself, and coilbox hears it through the autohost.
-  it("says it has loaded when a reload brings it back into a running game", () => {
-    const run = runGadget(gadget, SANDBOX_MISSION_ID, "gadget:Initialize()", {
-      synced: false,
-      frame: 900,
-    });
+  // Issue #3346. Reloading every gadget restarts the game's own as well, and
+  // Splinter Faction's kills a team with no commander when it starts again
+  // mid-game, which the targets are. So the sandbox reloads the one gadget that
+  // holds the unit scripts.
+  const ask = (script: string) =>
+    `log("handled " .. tostring(gadget:GotChatMsg(${JSON.stringify(SANDBOX_RELOAD_MESSAGE)}, 255)))${script}`;
+
+  it("reloads the unit script framework alone when coilbox asks, and says so", () => {
+    const run = runGadget(gadget, SANDBOX_MISSION_ID, ask(""));
     expect(run.stderr).toBe("");
-    expect(run.lines).toEqual([`message ${SANDBOX_LOADED_MESSAGE}`]);
+    expect(run.lines).toEqual([
+      "disable Lua unit script framework",
+      "enable Lua unit script framework",
+      `to unsynced coilbox_sandbox ${SANDBOX_LOADED_REPLY}`,
+      "handled true",
+    ]);
   });
 
-  it("says nothing when the game first loads it", () => {
-    const run = runGadget(gadget, SANDBOX_MISSION_ID, "gadget:Initialize()", {
-      synced: false,
+  it("says so when the framework does not load again", () => {
+    const run = runGadget(gadget, SANDBOX_MISSION_ID, ask(""), {
+      framework: "fails",
     });
     expect(run.stderr).toBe("");
-    expect(run.lines).toEqual([""]);
+    expect(run.lines[2]).toMatch(
+      new RegExp(`^to unsynced coilbox_sandbox ${SANDBOX_REPLY}failed:`),
+    );
+  });
+
+  it("says so when the game runs no Lua unit scripts", () => {
+    const run = runGadget(gadget, SANDBOX_MISSION_ID, ask(""), {
+      framework: "missing",
+    });
+    expect(run.lines[0]).toMatch(
+      new RegExp(`^to unsynced coilbox_sandbox ${SANDBOX_REPLY}failed:`),
+    );
+  });
+
+  it("leaves every other chat message to the gadgets it is for", () => {
+    const run = runGadget(
+      gadget,
+      SANDBOX_MISSION_ID,
+      `log("handled " .. tostring(gadget:GotChatMsg("reload_scripts", 0)))`,
+    );
+    expect(run.lines).toEqual(["handled false"]);
+  });
+
+  it("passes the answer to coilbox from its unsynced half", () => {
+    const run = runGadget(
+      gadget,
+      SANDBOX_MISSION_ID,
+      `gadget:RecvFromSynced("someone_else", "x")
+       log("handled " .. tostring(gadget:RecvFromSynced("coilbox_sandbox", "coilbox_sandbox:loaded")))`,
+      { synced: false },
+    );
+    expect(run.stderr).toBe("");
+    expect(run.lines).toEqual([
+      "message coilbox_sandbox:loaded",
+      "handled true",
+    ]);
   });
 
   it("switches its unsynced half off in a game that is not the sandbox", () => {
-    const run = runGadget(gadget, "", "", { synced: false, frame: 900 });
+    const run = runGadget(gadget, "", "", { synced: false });
     expect(run.lines).toEqual(["off"]);
   });
 
