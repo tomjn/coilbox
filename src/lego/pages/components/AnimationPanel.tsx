@@ -89,6 +89,11 @@ import {
   type StandInTrack,
   scenarioById,
 } from "../../scriptPlayback";
+import {
+  SOLO_MOVES_NOTHING,
+  soloProject,
+  soloScenario,
+} from "../../soloPreset";
 import { standInRadius, trackBesideUnit } from "../../standIn";
 import { isBuilder } from "../../unitDef";
 import { controlFor } from "../../unitValueControls";
@@ -344,6 +349,27 @@ export function AnimationPanel({
   const playsOwnScript = owned || compiled !== undefined;
   // Only the generated script is read for marks. An owned or compiled one is
   // the user's, and its call-ins are not something presets can be blamed for.
+  /**
+   * The applied preset playing alone, or null when everything is. A preview
+   * only: the project is never edited, and a run narrows a copy of it. Held in
+   * a ref as well, because a run starts in the same tick that chooses it, and
+   * a ref is the one place that answer is already settled.
+   */
+  const [soloId, setSoloId] = useState<string | null>(null);
+  const solo =
+    !playsOwnScript && soloId && applied.some((a) => a.presetId === soloId)
+      ? soloId
+      : null;
+  const soloRef = useRef<string | null>(solo);
+  soloRef.current = solo;
+  /** The script a run plays now: the soloed preset's alone, or all of them. */
+  const scriptNow = useCallback(
+    () =>
+      unitScript(
+        soloRef.current ? soloProject(project, soloRef.current) : project,
+      ),
+    [project],
+  );
   const marks = useMemo(() => {
     const result = new Map<string, string>();
     if (playsOwnScript) return result;
@@ -356,6 +382,8 @@ export function AnimationPanel({
   }, [project, playsOwnScript]);
 
   const stop = useCallback(() => {
+    soloRef.current = null;
+    setSoloId(null);
     onPlayingChange(false);
     onScriptTimeline(null);
     onScriptRun(null);
@@ -417,7 +445,7 @@ export function AnimationPanel({
           : await legoRunScript({
               // What the unit's script is: its own text, or the one its presets
               // generate, so the preview runs what an export would write.
-              script: unitScript(project),
+              script: scriptNow(),
               unitName: project.unitName,
               pieces,
               events: sent,
@@ -462,6 +490,7 @@ export function AnimationPanel({
     [
       // The whole project, because where its pieces sit is read off it too.
       project,
+      scriptNow,
       compiled,
       size,
       onPlayingChange,
@@ -502,7 +531,7 @@ export function AnimationPanel({
         compiled
           ? animCobProbe({ bytes: compiled.bytes, pieces, callins })
           : legoProbeScript({
-              script: unitScript(project),
+              script: scriptNow(),
               unitName: project.unitName,
               pieces,
               callins,
@@ -585,7 +614,18 @@ export function AnimationPanel({
       });
       return runEvents(scene, withValues, resume);
     },
-    [runEvents, values, project, compiled, bounds, pack, raw, size, onStandIn],
+    [
+      runEvents,
+      scriptNow,
+      values,
+      project,
+      compiled,
+      bounds,
+      pack,
+      raw,
+      size,
+      onStandIn,
+    ],
   );
 
   /** Fire one of the script's own functions, the way `CREATED` then a scenario's
@@ -680,7 +720,10 @@ export function AnimationPanel({
   const hasRun = timeline !== null || failure !== null || playing;
   const hasRunRef = useRef(hasRun);
   hasRunRef.current = hasRun;
-  const currentScript = useMemo(() => unitScript(project), [project]);
+  const currentScript = useMemo(
+    () => unitScript(solo ? soloProject(project, solo) : project),
+    [project, solo],
+  );
   const lastScript = useRef(currentScript);
   const rerunTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => {
@@ -696,6 +739,30 @@ export function AnimationPanel({
     rerunTimer.current = setTimeout(() => rerunRef.current(), SETTLE_MS);
   }, [currentScript, playsOwnScript, applied.length]);
   useEffect(() => () => clearTimeout(rerunTimer.current), []);
+
+  /** Play one applied preset alone, in the scenario that shows it off. */
+  function playSolo(presetId: string) {
+    const scenarioFor = soloScenario(presetId);
+    if (!scenarioFor) return;
+    soloRef.current = presetId;
+    setSoloId(presetId);
+    setScenarioId(scenarioFor);
+    // The script is about to change because of this click, which has started
+    // the run itself, so the rerun on a changed script must not start another.
+    lastScript.current = scriptNow();
+    clearTimeout(rerunTimer.current);
+    void start(scenarioFor);
+  }
+
+  /** Back to every preset together, in the scenario already chosen. */
+  function playAll() {
+    soloRef.current = null;
+    setSoloId(null);
+    lastScript.current = scriptNow();
+    clearTimeout(rerunTimer.current);
+    if (isCallMode) fireCall(callFunction, callArgsText);
+    else void start(scenarioId);
+  }
 
   function apply(presetId: string) {
     onChange([...applied, { presetId, params: {} }]);
@@ -731,21 +798,25 @@ export function AnimationPanel({
             (!playsOwnScript && applied.length === 0)
           }
           onClick={() =>
-            playing
-              ? onScriptPausedChange(!scriptPaused)
-              : isCallMode
-                ? fireCall(callFunction, callArgsText)
-                : void start(scenarioId)
+            solo
+              ? playAll()
+              : playing
+                ? onScriptPausedChange(!scriptPaused)
+                : isCallMode
+                  ? fireCall(callFunction, callArgsText)
+                  : void start(scenarioId)
           }
         >
           {playing && !scriptPaused ? <Pause size={14} /> : <Play size={14} />}
           {running
             ? "Running"
-            : !playing
-              ? "Play"
-              : scriptPaused
-                ? "Resume"
-                : "Pause"}
+            : solo
+              ? "Play all"
+              : !playing
+                ? "Play"
+                : scriptPaused
+                  ? "Resume"
+                  : "Pause"}
         </Button>
         {playing ? (
           <Button
@@ -1231,6 +1302,21 @@ export function AnimationPanel({
                       {preset.description}
                     </p>
                   </div>
+                  {entry && !playsOwnScript ? (
+                    <Button
+                      size="sm"
+                      variant={
+                        solo === preset.id && playing ? "default" : "outline"
+                      }
+                      disabled={reduceMotion || running}
+                      aria-pressed={solo === preset.id && playing}
+                      aria-label={`Preview ${preset.label} on its own`}
+                      title="Play this preset on its own, without changing the unit"
+                      onClick={() => playSolo(preset.id)}
+                    >
+                      <Play size={14} />
+                    </Button>
+                  ) : null}
                   <Button
                     size="sm"
                     variant={entry ? "outline" : "default"}
@@ -1247,6 +1333,12 @@ export function AnimationPanel({
                   <p className="mt-1 text-xs text-muted-foreground">
                     Needs a piece set as{" "}
                     {missing.map((role) => roleLabel(role)).join(", ")}.
+                  </p>
+                ) : null}
+
+                {entry && SOLO_MOVES_NOTHING[preset.id] ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {SOLO_MOVES_NOTHING[preset.id]}
                   </p>
                 ) : null}
 
