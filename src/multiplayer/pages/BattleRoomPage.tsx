@@ -730,31 +730,30 @@ function BattleRoomPage() {
               />
             </>
           )}
-          <StartPosOptions
-            battle={battle}
-            canEdit={room.canEditOptions}
-            // Zero-K carries no start position mode, so the card says so rather
-            // than showing a default nobody chose (issue #1979).
-            unavailable={room.startPositionsUnavailable}
-            sendOption={room.sendOption}
-            note={startPosNote({
-              startPosType: room.startPosType,
-              hasBoxes: Object.keys(battle.startRects).length > 0,
-              canEditBoxes: room.canEditBoxes,
-            })}
-          >
-            {room.canEditBoxes && (
-              <StartBoxControls
-                mapName={battle.map}
-                rects={battle.startRects}
-                allyList={boxAllies.allyList}
-                activeAlly={boxAllies.activeAlly}
-                onPickAlly={boxAllies.pickAlly}
-                onSetBox={room.setStartBox}
-                onClearBox={room.clearStartBox}
-              />
-            )}
-          </StartPosOptions>
+          {!room.startPositionsUnavailable && (
+            <StartPosOptions
+              battle={battle}
+              canEdit={room.canEditOptions}
+              sendOption={room.sendOption}
+              note={startPosNote({
+                startPosType: room.startPosType,
+                hasBoxes: Object.keys(battle.startRects).length > 0,
+                canEditBoxes: room.canEditBoxes,
+              })}
+            >
+              {room.canEditBoxes && (
+                <StartBoxControls
+                  mapName={battle.map}
+                  rects={battle.startRects}
+                  allyList={boxAllies.allyList}
+                  activeAlly={boxAllies.activeAlly}
+                  onPickAlly={boxAllies.pickAlly}
+                  onSetBox={room.setStartBox}
+                  onClearBox={room.clearStartBox}
+                />
+              )}
+            </StartPosOptions>
+          )}
           <BattleOptionsDrawer
             battle={battle}
             modOptionsSchema={room.modOptionsSchema}
