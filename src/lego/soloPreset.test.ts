@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PRESETS } from "./animPresets";
-import { newProject } from "./model";
+import { type LegoProject, newProject } from "./model";
 import { scenarioCallins } from "./scenarioMarks";
 import { scenarioById } from "./scriptPlayback";
 import { SOLO_SCENARIOS, soloProject, soloScenario } from "./soloPreset";
@@ -14,7 +14,10 @@ describe("the scenario for each preset", () => {
 
   it("names a scenario that exists", () => {
     for (const preset of PRESETS) {
-      expect(scenarioById(soloScenario(preset.id) ?? ""), preset.id).toBeTruthy();
+      expect(
+        scenarioById(soloScenario(preset.id) ?? ""),
+        preset.id,
+      ).toBeTruthy();
     }
   });
 
@@ -56,7 +59,7 @@ describe("soloProject", () => {
     packVersion: "1",
     now: "2026-08-22T00:00:00Z",
   });
-  const project = {
+  const project: LegoProject = {
     ...base,
     animations: [
       { presetId: "walk.biped", params: {} },
