@@ -214,6 +214,80 @@ describe("resolveScenario", () => {
     expect(notes).toHaveLength(1);
   });
 
+  describe("a marker that keeps aiming until a frame", () => {
+    const keepAiming = (standIn: StandInTrack): Scenario => ({
+      ...firing,
+      events: [
+        { frame: 0, callin: "Create" },
+        {
+          frame: 10,
+          callin: "AimWeapon1",
+          aimAtStandIn: { from: "AimFromWeapon", until: 100 },
+        },
+        { frame: 40, engine: "fire", args: [1] },
+      ],
+      standIn,
+    });
+    const aimFrames = (events: ScriptEvent[]) =>
+      events.filter((e) => e.callin === "AimWeapon1").map((e) => e.frame);
+
+    /** `reaimTime` is `GAME_SPEED >> 1`, 15 frames (`Weapon.cpp:137`), and
+     *  `CanCallAimingScript` lets an aim through once that long has passed
+     *  since the last (`Weapon.cpp:380`). */
+    it("aims again every 15 frames at a target standing still", () => {
+      const still = keepAiming({ keys: [{ frame: 0, pos: [1, 0, 4] }] });
+      const { events } = resolveScenario(still, context());
+      expect(aimFrames(events)).toEqual([10, 25, 40, 55, 70, 85, 100]);
+    });
+
+    /**
+     * It also lets one through as soon as the wanted direction has turned 20
+     * degrees or more from the last one asked for, whatever the time
+     * (`Weapon.cpp:376-383`, `firetolerance` defaulting to 3640, which is 20
+     * degrees, in `WeaponDef.cpp:113`). A fast target is aimed at more often
+     * than a slow one, which is what makes a slow turret visibly lag.
+     */
+    it("aims sooner when the target turns 20 degrees from the last aim", () => {
+      // Crossing straight past the front, a radius ahead, a radius a frame.
+      const keys = Array.from({ length: 101 }, (_, frame) => ({
+        frame,
+        pos: [(frame - 50) * 0.2, 0, 1] as [number, number, number],
+      }));
+      const { events } = resolveScenario(keepAiming({ keys }), context());
+      const frames = aimFrames(events);
+      const gaps = frames.slice(1).map((frame, i) => frame - frames[i]);
+      expect(frames[0]).toBe(10);
+      expect(Math.min(...gaps)).toBeLessThan(15);
+      expect(Math.max(...gaps)).toBeLessThanOrEqual(15);
+      expect(frames.at(-1)).toBeLessThanOrEqual(100);
+
+      // And each one that came early came because of the turn.
+      const dirs = events
+        .filter((e) => e.callin === "AimWeapon1")
+        .map((e) => aimDirection(e.args?.[0] ?? 0, e.args?.[1] ?? 0));
+      for (let i = 1; i < frames.length; i++) {
+        if (gaps[i - 1] === 15) continue;
+        const dot =
+          dirs[i][0] * dirs[i - 1][0] +
+          dirs[i][1] * dirs[i - 1][1] +
+          dirs[i][2] * dirs[i - 1][2];
+        expect(dot).toBeLessThanOrEqual(Math.cos((20 * Math.PI) / 180));
+      }
+    });
+
+    it("keeps the run in frame order, with an aim before a fire", () => {
+      const still = keepAiming({ keys: [{ frame: 0, pos: [1, 0, 4] }] });
+      const { events } = resolveScenario(still, context());
+      const order = events.map((e) => e.frame);
+      expect(order).toEqual([...order].sort((a, b) => a - b));
+      const at40 = events.filter((e) => e.frame === 40);
+      expect(at40.map((e) => e.callin ?? e.engine)).toEqual([
+        "AimWeapon1",
+        "fire",
+      ]);
+    });
+  });
+
   it("has nothing to aim at in a scenario with no track", () => {
     const { events, notes } = resolveScenario(
       { ...firing, standIn: undefined },

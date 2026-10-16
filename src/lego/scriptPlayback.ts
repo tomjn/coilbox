@@ -34,8 +34,11 @@ export interface ScriptEvent {
    * `AimFromWeapon` measures from the piece that call-in names
    * (`rts/Sim/Weapons/Weapon.cpp:410-424`), `midPos` from the unit's mid
    * (`rts/Sim/Units/UnitTypes/Builder.cpp:942-955`).
+   *
+   * `until` makes it a weapon that keeps its target: the resolver aims again
+   * on every frame up to `until` that the engine would, rather than once.
    */
-  aimAtStandIn?: { from: "AimFromWeapon" | "midPos" };
+  aimAtStandIn?: { from: "AimFromWeapon" | "midPos"; until?: number };
   /**
    * Put the stand-in down where the track had it on `frame`, rather than at
    * literal coordinates. `resolveScenario` replaces the marker with
