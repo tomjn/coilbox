@@ -55,6 +55,10 @@ export interface AimContext {
   /** The shape of the ground the stand-in stands on, absent or null for flat
    *  ground at 0. */
   ground?: GroundShape | null;
+  /** Which way is up for the unit on that ground, from `unitUp`, or absent or
+   *  null for a unit that stands level. The unit tilts only while it plays, and
+   *  an upright unit stays level, so this is null for both. */
+  up?: Vec3 | null;
 }
 
 export interface ResolvedScenario {
@@ -83,24 +87,74 @@ export function standInMid(
 }
 
 /**
+ * The unit's own axes in the world, at heading zero.
+ *
+ * Level, that is the model's own: `frontdir` is `+z`, `updir` is `+y`, and
+ * `rightdir` is `(-1,0,0)` (`rts/Sim/Objects/SolidObject.cpp:440` with
+ * `GetVectorFromHeading(0)` being `(0,0,1)`). On a slope the engine turns all
+ * three by the shortest rotation from `+y` to the ground's normal
+ * (`SolidObject.cpp:442-450`), which is what the viewport does to the unit.
+ * The editor never turns a unit about its up, so the heading stays zero.
+ */
+interface Basis {
+  right: Vec3;
+  up: Vec3;
+  front: Vec3;
+}
+
+function basisOf(up?: Vec3 | null): Basis {
+  if (!up) return { right: [-1, 0, 0], up: [0, 1, 0], front: [0, 0, 1] };
+  // `CQuaternion quat(uDir.z, 0, -uDir.x, 1 + uDir.y)`, normalised: x, y, z, w.
+  const length = Math.hypot(up[2], up[0], 1 + up[1]);
+  const q = [up[2] / length, 0, -up[0] / length, (1 + up[1]) / length];
+  return {
+    right: rotate(q, [-1, 0, 0]),
+    up,
+    front: rotate(q, [0, 0, 1]),
+  };
+}
+
+/** A vector turned by the unit quaternion `q` (x, y, z, w). */
+function rotate(q: number[], v: Vec3): Vec3 {
+  const [qx, qy, qz, qw] = q;
+  // v + 2w(u x v) + 2 u x (u x v), with u the quaternion's xyz.
+  const cx = qy * v[2] - qz * v[1];
+  const cy = qz * v[0] - qx * v[2];
+  const cz = qx * v[1] - qy * v[0];
+  const dx = qy * cz - qz * cy;
+  const dy = qz * cx - qx * cz;
+  const dz = qx * cy - qy * cx;
+  return [
+    v[0] + 2 * (qw * cx + dx),
+    v[1] + 2 * (qw * cy + dy),
+    v[2] + 2 * (qw * cz + dz),
+  ];
+}
+
+function dot(a: Vec3, b: Vec3): number {
+  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
+/**
  * The heading and pitch `AimWeapon` is handed, from a piece to a target.
  *
  * `rts/Sim/Weapons/Weapon.cpp:410-424`, written out rather than reduced so it
- * can be read against the engine line for line. With the unit at heading zero
- * on flat ground its basis is the model's own: `frontdir` is `+z`, `updir` is
- * `+y`, and `rightdir` is `(-1,0,0)` (`rts/Sim/Objects/SolidObject.cpp:440`
- * with `GetVectorFromHeading(0)` being `(0,0,1)`). The editor never has a unit
- * at any other heading or on any other ground.
+ * can be read against the engine line for line. `from` is the piece in unit
+ * space and `to` is in the world, so a tilted unit's piece is turned with it
+ * first. `up` is the unit's up on a slope, absent for a level unit.
  */
 export function aimWeaponAngles(
   from: Vec3,
   to: Vec3,
+  up?: Vec3 | null,
 ): { heading: number; pitch: number } {
-  const dir = normalize([to[0] - from[0], to[1] - from[1], to[2] - from[2]]);
+  const basis = basisOf(up);
+  const at = up ? toWorld(from, basis) : from;
+  const dir = normalize([to[0] - at[0], to[1] - at[1], to[2] - at[2]]);
 
-  const localX = -dir[0]; // dir · rightdir
-  const localY = dir[1]; //  dir · updir
-  const localZ = dir[2]; //  dir · frontdir
+  const localX = dot(dir, basis.right);
+  const localY = dot(dir, basis.up);
+  const localZ = dot(dir, basis.front);
 
   const heading = headingFromVector(localX, localZ);
   return {
@@ -113,20 +167,40 @@ export function aimWeaponAngles(
  * The heading and pitch `StartBuilding` is handed, from the unit's mid to a
  * build position.
  *
- * `rts/Sim/Units/UnitTypes/Builder.cpp:942-955`. Two terms in that line are
- * zero here and are left out rather than written as `- 0`: the unit's own
- * heading, which is zero in the editor, and `asin(frontdir·updir)`, which is
- * zero for a unit on flat ground, which is the only ground the builder draws.
+ * `rts/Sim/Units/UnitTypes/Builder.cpp:942-955`. The unit's own heading is
+ * zero in the editor, so that term is left out rather than written as `- 0`.
+ * The heading is the world's, not the tilted unit's. The pitch is against
+ * `updir`, less `asin(frontdir·updir)`, which is zero for a unit whose axes
+ * are at right angles, as they are on any ground. `mid` is in unit space and
+ * is turned with a tilted unit first.
  */
 export function startBuildingAngles(
   mid: Vec3,
   to: Vec3,
+  up?: Vec3 | null,
 ): { heading: number; pitch: number } {
-  const dir = normalize([to[0] - mid[0], to[1] - mid[1], to[2] - mid[2]]);
+  const basis = basisOf(up);
+  const at = up ? toWorld(mid, basis) : mid;
+  const dir = normalize([to[0] - at[0], to[1] - at[1], to[2] - at[2]]);
+  const p = Math.asin(Math.min(Math.max(dot(dir, basis.up), -1), 1));
+  const pitch = Math.asin(
+    Math.min(Math.max(dot(basis.front, basis.up), -1), 1),
+  );
   return {
     heading: clampRadPi(headingFromVector(dir[0], dir[2])),
-    pitch: Math.asin(Math.min(Math.max(dir[1], -1), 1)),
+    pitch: p - pitch,
   };
+}
+
+/** A point in unit space, where the tilted unit puts it in the world. The unit
+ *  stands at the origin, so this is only the turn. */
+function toWorld(v: Vec3, { right, up, front }: Basis): Vec3 {
+  // The model's x is the unit's left, which is `-rightdir`.
+  return [
+    -v[0] * right[0] + v[1] * up[0] + v[2] * front[0],
+    -v[0] * right[1] + v[1] * up[1] + v[2] * front[1],
+    -v[0] * right[2] + v[1] * up[2] + v[2] * front[2],
+  ];
 }
 
 /**
@@ -163,7 +237,7 @@ export function resolveScenario(
     }
 
     if (marker.from === "midPos") {
-      const { heading, pitch } = startBuildingAngles(ctx.mid, target);
+      const { heading, pitch } = startBuildingAngles(ctx.mid, target, ctx.up);
       return { ...rest, args: [heading, pitch] };
     }
 
@@ -179,7 +253,11 @@ export function resolveScenario(
         `This script names no ${callin} piece, so the aim is measured from the unit's origin rather than from where its weapon sits.`,
       );
     }
-    const { heading, pitch } = aimWeaponAngles(from ?? [0, 0, 0], target);
+    const { heading, pitch } = aimWeaponAngles(
+      from ?? [0, 0, 0],
+      target,
+      ctx.up,
+    );
     return { ...rest, args: [heading, pitch] };
   });
 
