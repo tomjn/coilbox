@@ -98,7 +98,10 @@ function presetsFilling(callins: string[]): string[] {
  * answers it. Never blocks a scenario: seeing the unit stand still is a
  * result.
  */
-export function scenarioMark(scenario: Scenario, script: string): string | null {
+export function scenarioMark(
+  scenario: Scenario,
+  script: string,
+): string | null {
   const callins = scenarioCallins(scenario);
   if (callins.length === 0) return null;
   const answered = answeredCallins(script);
