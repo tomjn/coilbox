@@ -15,6 +15,8 @@
  */
 
 import {
+  climbableDegrees,
+  DEFAULT_MAX_SLOPE,
   type MoveKind,
   moveClassesOf,
   moveClassOf,
@@ -255,4 +257,50 @@ export function movementState(input: {
     return { state: "none-fit", gameName, kinds: input.kinds };
   }
   return { state: "offer", gameName, offer };
+}
+
+/** A slope angle without a trailing zero: 22.5, 15. */
+function degreesText(degrees: number): string {
+  return String(Math.round(degrees * 10) / 10);
+}
+
+/**
+ * One line saying whether the unit can climb a slope of `degrees`, or null when
+ * there is nothing to say (issue #4128).
+ *
+ * A unit with no movement class is static, and its own `maxslope` only limits
+ * where it can be built, so it gets no line about climbing. Otherwise the
+ * class's `maxSlope` is looked up in the game's move definitions and compared
+ * at its engine value, 1.5 times the number written (`climbableDegrees`). A
+ * class that came off the unit table, or is not declared, has no `maxSlope` to
+ * read, and the line says so rather than assuming the kind's default.
+ *
+ * `game` is null while the game is not read, which is also unknown.
+ */
+export function slopeVerdict(
+  movement: LegoMovement | undefined,
+  game: Pick<GameMovementData, "moveDefs"> | null,
+  degrees: number,
+): string | null {
+  const name = movement?.moveClass.trim();
+  if (!name) return null;
+  const target = name.toLowerCase();
+  const move = game
+    ? moveDefsOf(game.moveDefs).find(
+        (entry) => entry.name.toLowerCase() === target,
+      )
+    : undefined;
+  if (!move) {
+    return `Climbing limit unknown: ${name}'s maxSlope is not read from the game.`;
+  }
+  const limit = climbableDegrees(move);
+  if (limit === null) return `${name} is a ship class, which has no maxSlope.`;
+  const written =
+    move.maxSlope === undefined
+      ? `default maxSlope ${DEFAULT_MAX_SLOPE[move.kind]}`
+      : `maxSlope ${move.maxSlope}`;
+  const reach = `climbs up to ${degreesText(limit)}\u00b0 (${written})`;
+  return degrees <= limit + 1e-9
+    ? `${name} can climb this: it ${reach}.`
+    : `${name} cannot climb this: it ${reach}.`;
 }
