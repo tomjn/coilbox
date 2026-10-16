@@ -1745,12 +1745,24 @@ fn install_spring(
         // script waiting to be finished is a script waiting forever otherwise.
         lua.create_function(|_, _: MultiValue| Ok((false, 1.0)))?,
     )?;
+    let state = Rc::clone(sim);
     spring.set(
         "GetUnitVelocity",
         // The fourth is the speed itself, which is the one that matters: a
         // walking script divides its cycle by it, so nothing there is a unit
-        // that never takes a step.
-        lua.create_function(move |_, _: MultiValue| Ok((0.0, 0.0, speed, speed)))?,
+        // that never takes a step. A driven unit moves along its heading at
+        // the drive's speed, in elmos a frame as the engine's `speed` is.
+        lua.create_function(move |_, _: MultiValue| {
+            let drive = state.borrow().world.as_ref().and_then(|world| world.drive);
+            Ok(match drive {
+                Some(drive) => {
+                    let angle = f64::from(drive.heading) * std::f64::consts::PI / 32768.0;
+                    let (sin, cos) = angle.sin_cos();
+                    (drive.speed * sin, 0.0, drive.speed * cos, drive.speed)
+                }
+                None => (0.0, 0.0, speed, speed),
+            })
+        })?,
     )?;
     spring.set(
         "GetUnitIsCloaked",
@@ -1788,10 +1800,10 @@ fn install_spring(
     )?;
 
     // The unit itself stands at the origin, which is where the viewport draws
-    // it. The stand-in is where the scene the latest event brought puts it, and
-    // any other id is a unit that does not exist, which the engine answers with
-    // nothing. Once a script has held the stand-in, it is where the runtime
-    // carried it.
+    // it, unless a drive has moved it. The stand-in is where the scene the
+    // latest event brought puts it, and any other id is a unit that does not
+    // exist, which the engine answers with nothing. Once a script has held the
+    // stand-in, it is where the runtime carried it.
     let state = Rc::clone(sim);
     spring.set(
         "GetUnitPosition",
@@ -1806,7 +1818,10 @@ fn install_spring(
             };
             let awaiting_build = sim.model.awaiting_build;
             Ok(match unitvalue::who(asked, &world) {
-                unitvalue::Who::Own(_) => (Some(0.0), Some(0.0), Some(0.0)),
+                unitvalue::Who::Own(_) => {
+                    let [x, y, z] = world.drive.map_or([0.0; 3], |drive| drive.pos);
+                    (Some(x), Some(y), Some(z))
+                }
                 // The buildee does not exist until the script reaches build
                 // stance, so it answers as for a unit that is not there, the
                 // way `unitvalue::world` already does.
@@ -2704,7 +2719,8 @@ fn install_unit_value(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
             // can be set. A `.cob` asks for its arithmetic this way and a Lua
             // script has `math`, so this is mostly here so that the two
             // runtimes cannot answer the same id differently.
-            if let Some(value) = unitvalue::arithmetic(id, p1, p2) {
+            let heading = unitvalue::heading(state.borrow().world.as_ref());
+            if let Some(value) = unitvalue::arithmetic_facing(id, p1, p2, heading) {
                 return Ok(value);
             }
             if unitvalue::removed_shared(id) {
@@ -2720,15 +2736,15 @@ fn install_unit_value(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
             // Where one of its own pieces is. Counted from 0, unlike every
             // other piece a Lua script names, because the engine hands this
             // argument to `GetUnitVal` untouched (`LuaUnitScript.cpp:1262-1286`).
-            // The unit stands at the origin facing forwards, so a piece's place
-            // in the unit is its place in the world once the unit has turned to
-            // the ground it stands on.
+            // The engine answers with its place in the world, once the unit
+            // has turned, tilted to the ground and moved to wherever a drive
+            // has taken it.
             if id == unitvalue::PIECE_XZ || id == unitvalue::PIECE_Y {
-                let ground = sim.world.as_ref().and_then(|world| world.ground);
+                let world = sim.world.as_ref();
                 let at = usize::try_from(p1)
                     .ok()
                     .and_then(|index| sim.model.piece_position(index))
-                    .map(|at| ground.map_or(at, |ground| ground.place(at)));
+                    .map(|at| world.map_or(at, |world| world.place(at)));
                 let Some(at) = at else {
                     sim.model.note(
                         "This script asks where one of its pieces is, and the preview was not told where this unit's pieces sit.".to_string(),
@@ -2761,6 +2777,11 @@ fn install_unit_value(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
                     sim.model.note(note);
                 }
                 return Ok(answer.value);
+            }
+            // A driven unit's heading and speed are the move type's, whatever
+            // the panel set.
+            if let Some(value) = unitvalue::driven(id, p1, sim.world.as_ref()) {
+                return Ok(value);
             }
             if let Some(value) = sim.values.get(&id) {
                 return Ok(*value);

@@ -97,6 +97,21 @@ export interface ScriptWorld {
   /** The ground the viewport draws, absent for flat ground at 0. Mirrors
    *  `Ground` in `crates/coilbox-unitpose/src/ground.rs`. */
   ground?: ScriptGround;
+  /** Where the unit is and how it moves, for a scenario that drives it.
+   *  Absent leaves it at the origin facing +z. */
+  drive?: ScriptDrive;
+}
+
+/** The unit on one frame of a drive. Mirrors `Drive` in
+ *  `crates/coilbox-unitpose/src/lib.rs`. */
+export interface ScriptDrive {
+  pos: [number, number, number];
+  /** The engine's `heading`, 65536 to a circle. */
+  heading: number;
+  /** Elmos a frame. */
+  speed: number;
+  /** Elmos a frame. */
+  maxSpeed: number;
 }
 
 /** A shaped ground, and which way is up for the unit standing on it. */
@@ -284,6 +299,9 @@ export interface Scenario {
   /** The stand-in is a target the game maker sets moving, so its track comes
    *  from `targetMotion.ts` rather than from `standIn`. */
   movingTarget?: boolean;
+  /** The unit itself drives along a path, so its moving call-ins come from
+   *  `drive.ts` rather than from `events`, which only stand for them. */
+  drive?: boolean;
 }
 
 /** Seconds to frames, for writing a scenario in the units it reads in.
@@ -415,6 +433,21 @@ export const SCENARIOS: Scenario[] = [
       // After `Create` has finished, for the reason the scenario above gives.
       { frame: at(0.5), callin: "StartMoving" },
       { frame: at(PREVIEW_SECONDS / 2), callin: "StopMoving" },
+    ],
+  },
+  {
+    id: "driving",
+    label: "Driving along a path",
+    description:
+      "Drives forwards along a path, slowing for turns, and stops at the end. Ground units only, not aircraft.",
+    drive: true,
+    // What the scenario fires, for the marks on the picker. The real frames
+    // depend on the path and the unit's speed, so `drive.ts` works them out
+    // and the panel fires those instead.
+    events: [
+      ...CREATED,
+      { frame: at(0.5), callin: "StartMoving", args: [0] },
+      { frame: at(PREVIEW_SECONDS - 1), callin: "StopMoving" },
     ],
   },
   {

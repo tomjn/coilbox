@@ -644,6 +644,198 @@ describe("a scenario that moves the unit", () => {
   });
 });
 
+describe("a unit driven along a path", () => {
+  type Sent = {
+    frame: number;
+    callin?: string;
+    args?: number[];
+    world?: {
+      drive?: { pos: number[]; heading: number; speed: number };
+      ground?: { up: number[] | null };
+    };
+  };
+  const lastPlacement = (onStandIn: ReturnType<typeof vi.fn>) =>
+    onStandIn.mock.calls.at(-1)?.[0];
+  const sentTo = (runner: ReturnType<typeof vi.fn>): Sent[] =>
+    runner.mock.calls.at(-1)?.[0].events ?? [];
+  const callins = (events: Sent[]) =>
+    events.filter((e) => e.callin && e.callin !== "setSFXoccupy");
+
+  async function pickDriving() {
+    fireEvent.click(
+      screen.getByRole("combobox", { name: "What happens to the unit" }),
+    );
+    fireEvent.click(await screen.findByText("Driving along a path"));
+  }
+  async function choose(name: string, option: string) {
+    fireEvent.click(screen.getByRole("combobox", { name }));
+    fireEvent.click(await screen.findByText(option));
+  }
+
+  /** A Lua unit that moves at 60 elmos a second and turns 600 a frame. */
+  const driver = () =>
+    project({
+      script: "function script.Create() end",
+      movement: { moveClass: "TANK2", speed: 60, turnRate: 600 },
+    });
+
+  it("drives the unit at the speed Movement gives it, in the engine's order", async () => {
+    const onStandIn = vi.fn();
+    show(driver(), { onStandIn });
+    await pickDriving();
+    expect(screen.getByText(/Ground units only, not aircraft/)).toBeTruthy();
+    expect(
+      screen.getByText(/Speed 60 elmos\/s, from Movement\. Turn rate 600/),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+    await waitFor(() => expect(runLua).toHaveBeenCalled());
+
+    const events = sentTo(runLua);
+    // Every frame of the preview is told where the unit is.
+    expect(new Set(events.map((e) => e.frame)).size).toBe(450);
+    expect(events.every((e) => e.world?.drive)).toBe(true);
+    expect(callins(events).map((e) => e.callin)).toEqual([
+      "Create",
+      "StartMoving",
+      "StopMoving",
+    ]);
+    const start = events.find((e) => e.callin === "StartMoving");
+    expect(start?.args).toEqual([0]);
+    // Two elmos a frame once it is moving, straight ahead.
+    const moving = events.find((e) => e.frame === 100)?.world?.drive;
+    expect(moving?.speed).toBe(2);
+    expect(moving?.heading).toBe(0);
+    expect(moving?.pos[2]).toBeCloseTo(2 * (100 - 15));
+
+    const placement = lastPlacement(onStandIn);
+    expect(placement.drive.frames).toHaveLength(450);
+    expect(placement.drive.path).toEqual([[0, 480]]);
+    expect(placement.motion).toBeNull();
+    expect(placement.drive.onPick).toBeUndefined();
+  });
+
+  it("sends each frame's turn as ChangeHeading once asked to", async () => {
+    show(driver());
+    await pickDriving();
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+    await waitFor(() => expect(runLua).toHaveBeenCalled());
+    await choose("Path to drive", "Turning right");
+    await waitFor(() =>
+      expect(sentTo(runLua).some((e) => e.world?.drive?.heading)).toBe(true),
+    );
+    expect(sentTo(runLua).some((e) => e.callin === "ChangeHeading")).toBe(
+      false,
+    );
+
+    await choose(
+      "When ChangeHeading is sent",
+      "ChangeHeading: every turning frame",
+    );
+    await waitFor(() =>
+      expect(sentTo(runLua).some((e) => e.callin === "ChangeHeading")).toBe(
+        true,
+      ),
+    );
+    const events = sentTo(runLua);
+    const turns = events.filter((e) => e.callin === "ChangeHeading");
+    // A right turn is negative, and the heading the script reads on that
+    // frame already includes it.
+    expect(turns[0].args?.[0]).toBeLessThan(0);
+    const on = (frame: number) =>
+      events.find((e) => e.frame === frame)?.world?.drive?.heading ?? 0;
+    expect(on(turns[0].frame)).toBe(
+      on(turns[0].frame - 1) + (turns[0].args?.[0] ?? 0),
+    );
+  });
+
+  /** `CCobInstance::ChangeHeading` does nothing (`CobInstance.h:171`). */
+  it("never sends a compiled script ChangeHeading", async () => {
+    show(project({ compiledScript: COMPILED }));
+    await pickDriving();
+    expect(
+      screen.queryByRole("combobox", { name: "When ChangeHeading is sent" }),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+    await waitFor(() => expect(runCob).toHaveBeenCalled());
+    await choose("Path to drive", "A circle to the left");
+    await waitFor(() =>
+      expect(sentTo(runCob).some((e) => e.world?.drive?.heading)).toBe(true),
+    );
+    expect(sentTo(runCob).some((e) => e.callin === "ChangeHeading")).toBe(
+      false,
+    );
+  });
+
+  it("drives through the points clicked on the ground", async () => {
+    const onStandIn = vi.fn();
+    show(driver(), { onStandIn });
+    await pickDriving();
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+    await waitFor(() => expect(runLua).toHaveBeenCalled());
+    await choose("Path to drive", "Your own path");
+    await waitFor(() =>
+      expect(lastPlacement(onStandIn)?.drive?.onPick).toBeTruthy(),
+    );
+    expect(screen.getByText("Click the ground to add points.")).toBeTruthy();
+
+    act(() => lastPlacement(onStandIn).drive.onPick([0, 60]));
+    await waitFor(() =>
+      expect(lastPlacement(onStandIn).drive.path).toEqual([[0, 60]]),
+    );
+    act(() => lastPlacement(onStandIn).drive.onPick([40, 60]));
+    await waitFor(() => expect(screen.getByText("2 points")).toBeTruthy());
+    expect(lastPlacement(onStandIn).drive.path).toEqual([
+      [0, 60],
+      [40, 60],
+    ]);
+    expect(callins(sentTo(runLua)).some((e) => e.callin === "StopMoving")).toBe(
+      true,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    await waitFor(() =>
+      expect(lastPlacement(onStandIn).drive.path).toEqual([]),
+    );
+  });
+
+  /** A slope under a unit that tilts: the up each frame is the ground's
+   *  there, not the one at the origin. */
+  it("stands the unit on the ground wherever it has driven to", async () => {
+    show(driver(), {
+      ground: {
+        shape: { kind: "uneven", degrees: 20, width: 64 },
+        up: [0, 1, 0],
+      },
+    });
+    await pickDriving();
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+    await waitFor(() => expect(runLua).toHaveBeenCalled());
+    const ups = new Set(
+      sentTo(runLua).map((e) => JSON.stringify(e.world?.ground?.up)),
+    );
+    expect(ups.size).toBeGreaterThan(10);
+  });
+
+  /** A control for a value the drive answers itself would do nothing. */
+  it("offers no control for the values the drive answers", async () => {
+    runLua.mockResolvedValue(
+      timeline({
+        asked: [
+          { id: 29, name: "CURRENT_SPEED", default: 65536 },
+          { id: 82, name: "HEADING", default: 0 },
+          { id: 4, name: "HEALTH", default: 100 },
+        ],
+      }),
+    );
+    show(driver());
+    await pickDriving();
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+    await waitFor(() => expect(screen.getByText("Unit values")).toBeTruthy());
+    expect(screen.queryByText("Speed")).toBeNull();
+    expect(screen.queryByText("Heading")).toBeNull();
+  });
+});
+
 describe("a target the game maker sets moving", () => {
   /** An empty unit's stand-in is the smallest it goes, `MIN_RADIUS`. */
   const RADIUS = 4.2;

@@ -6,6 +6,7 @@ import {
   poseAt,
   type ScriptTimeline,
 } from "../../scriptPlayback";
+import { poseRoot, restoreFromDrive } from "./drivePlayback";
 import type { SceneState } from "./sceneState";
 
 /**
@@ -33,6 +34,10 @@ export function applyTimeline(
  * Pose every piece at one exact frame, for a paused run being scrubbed or
  * stepped rather than played. `applyTimeline` is the running clock's own way
  * of reaching this: it turns elapsed seconds into a frame and calls through.
+ *
+ * The whole unit goes where a drive has it on the frame too, so anything that
+ * poses a frame to read a piece's place in the world, an effect or a released
+ * stand-in, reads it where the unit is on that frame.
  */
 export function applyTimelineFrame(
   state: SceneState,
@@ -40,6 +45,7 @@ export function applyTimelineFrame(
   timeline: ScriptTimeline,
   frame: number,
 ) {
+  poseRoot(state, frame);
   for (let index = 0; index < timeline.pieces.length; index++) {
     const piece = project.pieces.find(
       (candidate) => candidate.name === timeline.pieces[index],
@@ -68,10 +74,12 @@ export function applyTimelineFrame(
 
 /**
  * Undo what playing a script did to the groups themselves, as opposed to what
- * it put in them: a piece it hid, and the rotation order it borrowed. Rebuilding
- * the scene from the document sets positions and rotations but neither of these.
+ * it put in them: a piece it hid, the rotation order it borrowed, and where a
+ * drive took the whole unit. Rebuilding the scene from the document sets
+ * positions and rotations but none of these.
  */
 export function restoreFromPlayback(state: SceneState) {
+  restoreFromDrive(state);
   for (const group of state.groups.values()) {
     group.rotation.order = "XYZ";
     for (const child of group.children) {

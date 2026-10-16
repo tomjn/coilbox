@@ -101,6 +101,8 @@ Applying one gives you sliders for its own parameters: stride time, thigh swing,
 
 **What happens to the unit**, under **Preview**, picks what the script is put through: moving, starting and stopping, standing still, switched on, building, hit and destroyed, aiming and firing, or being loaded into a transport. A scenario with something to aim at, build or carry puts a stand-in in the scene, a plain shape the script is told about, so an aim has a target you can check it against.
 
+**Driving along a path** moves the whole unit. It drives straight ahead, round a right turn, round a circle, or through points you click on the ground after picking **Your own path**. It goes at the speed and turn rate under **Movement**, or one elmo a frame when the unit has none, and steers the way the engine steers a ground unit: it cuts corners and slows for tight turns. The script is told `StartMoving` when it sets off and `StopMoving` when it arrives, and `HEADING` and `CURRENT_SPEED` follow it on every frame. The engine sends `ChangeHeading` only to a Lua script, and only once a game lowers `minScriptChangeHeading`, so it is off unless you switch it on. The unit reaches full speed at once rather than speeding up, and it never reverses. The camera button in the viewport stops the view following the unit. Aircraft are not covered.
+
 A scenario the unit has nothing to do in is marked **Nothing to do** in the list. The line under the picker names the presets that would give it something, or says presets do not cover it. You can still pick it.
 
 The scrubber under Play steps through the run one frame at a time. Marks under it show the frames where something happened, such as a shot, and clicking one jumps to that frame.

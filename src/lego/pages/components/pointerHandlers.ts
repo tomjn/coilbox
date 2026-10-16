@@ -7,6 +7,7 @@ import {
   highlightHandle,
   moveFaceDrag,
 } from "./collisionHandles";
+import { pickGround } from "./drivePlayback";
 import { pieceIdOf } from "./gizmoCommit";
 import type { SceneState } from "./sceneState";
 import { setHoveredAndNotify } from "./selectionAndHoverOutlines";
@@ -133,6 +134,14 @@ export function attachPointerHandlers(state: SceneState): () => void {
     const hit = raycaster.intersectObject(root, true)[0];
     if (state.placingAnchorRef.current) {
       placeAnchor(state, hit);
+      return;
+    }
+    // A click that misses the unit while the panel takes points for a path
+    // puts one on the ground there. One on the unit still selects.
+    const pick = state.onGroundPickRef.current;
+    if (pick && !hit) {
+      const at = pickGround(state, raycaster);
+      if (at) pick(at);
       return;
     }
     state.onSelectRef.current(

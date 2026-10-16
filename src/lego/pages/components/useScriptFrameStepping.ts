@@ -9,6 +9,7 @@ import {
   restoreFromPlayback,
 } from "./animationPlayback";
 import { disposeBaked, showBaked } from "./bakedPlayback";
+import { followCamera, setDrive } from "./drivePlayback";
 import { bakedVertices, placeEffects } from "./effectsPlayback";
 import { attachGizmo } from "./gizmoCommit";
 import { type SceneState, syncScene } from "./sceneState";
@@ -25,6 +26,8 @@ export interface ScriptFrameSteppingDeps {
   standIn: StandInPlacement;
   /** The viewport's effects toggle. */
   showEffects: boolean;
+  /** Whether the camera follows a driving unit. */
+  follow: boolean;
   packRef: RefObject<LoadedPack>;
   rawRef: RefObject<RawGeometry | null>;
   projectRef: RefObject<LegoProject>;
@@ -53,6 +56,7 @@ export function useScriptFrameStepping(
     scriptFrame,
     standIn,
     showEffects,
+    follow,
     packRef,
     rawRef,
     projectRef,
@@ -69,6 +73,8 @@ export function useScriptFrameStepping(
   standInRef.current = standIn;
   const showEffectsRef = useRef(showEffects);
   showEffectsRef.current = showEffects;
+  const followRef = useRef(follow);
+  followRef.current = follow;
 
   // Playback. The gizmo comes off first: it would be dragging a transform that
   // is overwritten on the next frame. Stopping puts the scene back from the
@@ -105,7 +111,10 @@ export function useScriptFrameStepping(
             wasPaused = false;
           }
           elapsed += dt;
+          setDrive(state, standInRef.current.drive?.frames ?? null);
+          state.follow = followRef.current;
           applyTimeline(state, projectRef.current, timeline, elapsed);
+          followCamera(state);
           placeStandIn(
             state,
             projectRef.current,
@@ -176,7 +185,10 @@ export function useScriptFrameStepping(
     const state = sceneRef.current;
     if (!state || !playing || !scriptPaused || !scriptTimeline) return;
     const frame = clampFrame(scriptTimeline, scriptFrame);
+    setDrive(state, standIn.drive?.frames ?? null);
+    state.follow = follow;
     applyTimelineFrame(state, projectRef.current, scriptTimeline, frame);
+    followCamera(state);
     placeStandIn(state, projectRef.current, standIn, scriptTimeline, frame);
     placeEffects(
       state,
@@ -196,6 +208,7 @@ export function useScriptFrameStepping(
     scriptFrame,
     standIn,
     showEffects,
+    follow,
     projectRef,
     packRef,
     rawRef,

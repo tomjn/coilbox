@@ -32,6 +32,7 @@ import {
   Sparkles,
   Target,
   Trash2,
+  Video,
 } from "lucide-react";
 import type { ReactNode, RefObject } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -110,6 +111,7 @@ import {
 } from "./collisionHandles";
 import { disposePieceCollision } from "./collisionVolumes";
 import { dotMaterial, points } from "./dotsAndPoints";
+import { drawDrivePath } from "./drivePlayback";
 import { EnvironmentPicker } from "./EnvironmentPicker";
 import type { EffectsAtlas } from "./effectsLayer";
 import { buildEffectsLayer } from "./effectsLayer";
@@ -564,6 +566,9 @@ export function ModelViewport({
   // toggle exists for getting it out of the way rather than for opting in.
   const [showStandIn, setShowStandIn] = useState(true);
   const [showEffects, setShowEffects] = useState(true);
+  // On by default: a unit driving off along a path is out of view in a few
+  // seconds otherwise.
+  const [followDrive, setFollowDrive] = useState(true);
   // Each toggle only shows while the run has something for it to hide: a
   // scenario that places a stand-in or carries one, and a script that drew
   // an effect the effects layer draws.
@@ -660,6 +665,12 @@ export function ModelViewport({
   onStandInDragRef.current = onDrag
     ? (at) => onDrag(at, scriptFrameRef.current)
     : undefined;
+  // A click on the ground adds a point to the game maker's own path, while
+  // the drive playing is taking them.
+  const onGroundPickRef = useRef<((at: [number, number]) => void) | undefined>(
+    undefined,
+  );
+  onGroundPickRef.current = standIn.drive?.onPick;
 
   // Built once. Everything after this mutates the scene rather than remaking it.
   useCanvas3D(
@@ -702,6 +713,11 @@ export function ModelViewport({
       const standInGroup = buildStandIn(radius);
       standInGroup.visible = false;
       scene.add(standInGroup);
+
+      // The path a drive follows. Hidden until a drive plays.
+      const drivePath = new THREE.Group();
+      drivePath.visible = false;
+      scene.add(drivePath);
 
       // The dots a script's effects are drawn with. Hidden until a run that
       // emits something plays.
@@ -909,6 +925,13 @@ export function ModelViewport({
         standInDrag: null,
         standInHeld: false,
         onStandInDragRef,
+        drive: null,
+        restTilt: new THREE.Quaternion(),
+        drivePath,
+        follow: true,
+        followAt: null,
+        followOffset: new THREE.Vector3(),
+        onGroundPickRef,
         effects,
         collision: null,
         collisionMaterial,
@@ -1094,6 +1117,7 @@ export function ModelViewport({
           // Not `standInGroup`, for the same reason: the shape is rebuilt when
           // the unit's size changes, so the one in the scene may not be this.
           state.disposeStandIn();
+          drawDrivePath(state, null, null);
           state.effects.dispose();
           state.collision?.geometry.dispose();
           collisionMaterial.dispose();
@@ -1151,6 +1175,16 @@ export function ModelViewport({
   });
 
   useStandInSize(sceneRef, project, pack, raw, standIn.track?.size);
+  // The path a drive follows, on whatever ground the view draws.
+  // Dots only on points the game maker put down.
+  const drivePathPoints = standIn.drive?.path ?? null;
+  const ownPath = standIn.drive?.onPick !== undefined;
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (!state) return;
+    drawDrivePath(state, drivePathPoints, ground.shape, ownPath);
+    state.render();
+  }, [drivePathPoints, ground.shape, ownPath]);
   // A stand-in let go after a drag waits where it was put for the track that
   // puts it there, which is the next placement the panel sends.
   useEffect(() => {
@@ -1176,6 +1210,7 @@ export function ModelViewport({
     scriptFrame,
     standIn: standInPlacement,
     showEffects,
+    follow: followDrive,
     packRef,
     rawRef,
     projectRef,
@@ -1484,6 +1519,15 @@ export function ModelViewport({
                 onChange={setShowStandIn}
                 hideTitle="Hide the stand-in unit"
                 showTitle="Show the stand-in unit, the thing a scenario aims at, builds or carries"
+              />
+            ) : null}
+            {standIn.drive ? (
+              <ViewToggle
+                icon={Video}
+                on={followDrive}
+                onChange={setFollowDrive}
+                hideTitle="Keep the camera still while the unit drives"
+                showTitle="Follow the driving unit with the camera"
               />
             ) : null}
             {hasEffects ? (

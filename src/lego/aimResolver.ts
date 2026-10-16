@@ -23,6 +23,7 @@
  * double the latency of every scrub.
  */
 
+import { type DriveFrame, scriptDrive } from "./drive";
 import type { GroundShape } from "./environment";
 import {
   type Scenario,
@@ -373,6 +374,11 @@ export interface WorldContext {
   /** The ground the viewport draws, absent or null for flat ground. The same
    *  on every frame, because nothing in a run moves the ground. */
   ground?: ScriptGround | null;
+  /** The unit's own path, for a scenario that drives it: where it is on each
+   *  frame and its top speed, in elmos a frame. On a shaped ground its up
+   *  comes from the frame rather than from `ground`, because it changes as
+   *  the unit moves over it. */
+  drive?: { frames: DriveFrame[]; maxSpeed: number } | null;
 }
 
 /**
@@ -438,13 +444,21 @@ export function withWorld(
   ctx: WorldContext,
 ): ScriptEvent[] {
   const buildStart = events.find((e) => e.engine === "factory-build")?.frame;
-  return events.map((event) => ({
-    ...event,
-    world: {
-      ...worldAt(track, event.frame, ctx, buildStart),
-      ...(ctx.ground ? { ground: ctx.ground } : {}),
-    },
-  }));
+  return events.map((event) => {
+    const driven = ctx.drive?.frames[event.frame];
+    const ground =
+      ctx.ground && driven ? { ...ctx.ground, up: driven.up } : ctx.ground;
+    return {
+      ...event,
+      world: {
+        ...worldAt(track, event.frame, ctx, buildStart),
+        ...(ground ? { ground } : {}),
+        ...(ctx.drive && driven
+          ? { drive: scriptDrive(driven, ctx.drive.maxSpeed) }
+          : {}),
+      },
+    };
+  });
 }
 
 /**
