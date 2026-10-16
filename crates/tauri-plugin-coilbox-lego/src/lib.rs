@@ -1776,6 +1776,30 @@ async fn lego_texture_png<R: Runtime>(app: AppHandle<R>, key: String) -> CliResu
     }
 }
 
+/// `lego_atlas_png` hands a parts atlas back as a PNG `data:` URL with the alpha
+/// the engine would read.
+///
+/// The `.glb` export bakes the team colour in by that alpha, and the bundled
+/// atlas has none, which the webview reads as full team colour everywhere
+/// (#4173). Going through [`texture::engine_atlas`] means the `.glb` and the
+/// `.s3o` follow one rule: no alpha channel is an alpha of 0, and an alpha the
+/// atlas has is kept.
+#[tauri::command]
+async fn lego_atlas_png<R: Runtime>(app: AppHandle<R>, atlas: AtlasRef) -> CliResult {
+    let source = match atlas_source(&app, &atlas) {
+        Ok(path) => path,
+        Err(e) => return CliResult::err(e),
+    };
+    let bytes = match std::fs::read(&source) {
+        Ok(bytes) => bytes,
+        Err(e) => return CliResult::err(format!("could not read the texture: {e}")),
+    };
+    match texture::engine_atlas(&bytes) {
+        Ok(png) => CliResult::ok(json!({ "dataUrl": coilbox_texture::png_data_url(&png) })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
 /// `lego_texture_prune` deletes every stored texture that `keep` does not name.
 ///
 /// The store is content addressed, so refreshing an edited texture leaves the
@@ -2932,6 +2956,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_import_dae,
             lego_texture_import,
             lego_texture_png,
+            lego_atlas_png,
             lego_bitmap_png,
             lego_texture_prune,
             lego_texture_compose_colour,
