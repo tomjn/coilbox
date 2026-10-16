@@ -1,21 +1,19 @@
 import { Button } from "@picoframe/frame";
-import { AlertTriangle, ClipboardCopy, ExternalLink, X } from "lucide-react";
+import { AlertTriangle, ClipboardCopy, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useState } from "react";
-import { contentOpenPath } from "@/content/bindings";
 import { buildCrashReport, describeExit } from "@/play/crash";
 import type { CrashTriage } from "@/play/useCrashTriage";
-import { InfologView } from "./InfologView";
+import { EngineLogFile } from "./EngineLogFile";
 
 /**
  * What the engine left behind when it died (issue #379).
  *
  * A crash used to be silent: the window closed, the badge cleared, and nothing
- * said the engine had gone. This says what happened, shows the end of the log
- * with the engine's own error lines picked out, and puts a note on the
- * clipboard for pasting into Discord or a bug report. The note names the log
- * file and carries none of its lines: part of a log passes for the whole of it
- * (issue #4064).
+ * said the engine had gone. This says what happened, points at the log file the
+ * way the Engine log page does, and puts a note on the clipboard for pasting
+ * into Discord or a bug report. Neither the drawer nor the note carries a line
+ * of the log: part of a log passes for the whole of it (issues #4064 and #4167).
  *
  * A right-hand sheet like `DebriefDrawer`, per the repo's preference for drawers
  * over modal dialogs.
@@ -106,12 +104,7 @@ export function CrashDrawer({
             </div>
 
             {log ? (
-              <>
-                <p className="break-all text-xs text-muted-foreground">
-                  From <code>{log.path}</code>
-                </p>
-                <InfologView log={log} className="max-h-[52vh]" />
-              </>
+              <EngineLogFile log={log} />
             ) : (
               <p className="text-sm text-muted-foreground">
                 {stale
@@ -125,17 +118,6 @@ export function CrashDrawer({
                 <ClipboardCopy className="size-4" />
                 {copied ? "Copied" : "Copy details"}
               </Button>
-              {log ? (
-                <Button
-                  variant="outline"
-                  className="gap-1.5"
-                  onClick={() => {
-                    void contentOpenPath({ path: log.path }).catch(() => {});
-                  }}
-                >
-                  <ExternalLink className="size-4" /> Open the log file
-                </Button>
-              ) : null}
             </div>
           </div>
         </DialogPrimitive.Content>

@@ -10,10 +10,6 @@ import { isAbnormal } from "./crash";
  * way `useSkirmishDebrief` sits apart from `debrief.ts`.
  */
 
-/** How many lines the drawer shows. Long enough for a stack trace plus the
- * loading that led to it, short enough to scroll. */
-const TAIL_LINES = 200;
-
 /** What the drawer needs to describe a dead run. */
 export interface CrashContext {
   outcome: LaunchOutcome;
@@ -58,7 +54,8 @@ export function useCrashTriage() {
 
       let log: InfologTail | null = null;
       try {
-        const res = await playInfolog({ dataDir, maxLines: TAIL_LINES });
+        // No lines: the drawer shows the log's path and time, none of its text.
+        const res = await playInfolog({ dataDir, maxLines: 0 });
         log = res.log;
       } catch {
         log = null;

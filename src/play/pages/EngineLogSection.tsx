@@ -1,14 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { getVersion } from "@tauri-apps/api/app";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import {
-  ClipboardCopy,
-  ExternalLink,
-  FolderSearch,
-  RefreshCw,
-} from "lucide-react";
+import { ClipboardCopy, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { contentOpenPath } from "@/content/bindings";
 import {
   type InfologTail,
   playInfolog,
@@ -16,11 +9,7 @@ import {
   type SystemInfo,
 } from "@/play/bindings";
 import { usePreferredTarget } from "@/play/config";
-
-/** A log's timestamp, in the reader's own locale. */
-function when(ms: number): string {
-  return new Date(ms).toLocaleString();
-}
+import { EngineLogFile } from "./components/EngineLogFile";
 
 /** "macos 14.5 (aarch64)", or without the version when the OS would not say. */
 function describeSystem(s: SystemInfo): string {
@@ -105,7 +94,7 @@ export default function EngineLogSection() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
+      <EngineLogFile log={log}>
         <Button
           variant="outline"
           className="gap-1.5"
@@ -114,38 +103,8 @@ export default function EngineLogSection() {
         >
           <RefreshCw className="size-4" /> {loading ? "Reading" : "Reload"}
         </Button>
-        {log ? (
-          <>
-            <Button
-              variant="outline"
-              className="gap-1.5"
-              onClick={() => {
-                void contentOpenPath({ path: log.path }).catch(() => {});
-              }}
-            >
-              <ExternalLink className="size-4" /> Open the log file
-            </Button>
-            <Button
-              variant="outline"
-              className="gap-1.5"
-              onClick={() => {
-                void revealItemInDir(log.path).catch(() => {});
-              }}
-            >
-              <FolderSearch className="size-4" /> Show in folder
-            </Button>
-          </>
-        ) : null}
-      </div>
-
-      {log ? (
-        <p className="break-all text-sm">
-          <code>{log.path}</code>
-          <span className="block text-xs text-muted-foreground">
-            Written {when(log.modifiedMs)}
-          </span>
-        </p>
-      ) : (
+      </EngineLogFile>
+      {log ? null : (
         <p className="text-sm text-muted-foreground">
           {error ?? "Looking for the engine log."}
         </p>

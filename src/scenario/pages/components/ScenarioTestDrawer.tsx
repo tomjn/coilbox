@@ -94,8 +94,8 @@ const BUSY_LABEL: Record<string, string> = {
 /**
  * How much of the engine's log to read back after a run.
  *
- * 500 rather than the crash drawer's 200. A crash puts what killed it at the
- * very end of the file, so a short tail finds it. A refused spawn happens as the
+ * A crash puts what killed it at the very end of the file, so a short tail
+ * finds it. A refused spawn happens as the
  * mission starts and then the whole game is logged on top of it, so the line
  * being looked for is the oldest one that matters rather than the newest. The
  * tail is filtered down to error and warning lines before anything is shown, so
@@ -106,9 +106,8 @@ const TAIL_LINES = 500;
 /**
  * The log's error and warning lines, each in the colour of its own level.
  *
- * The same two tones `InfologView` uses, and not that component, because what is
- * shown here is a filtered list of lines rather than the tail of a file, so
- * there is no truncation to report and no normal lines to grey out.
+ * Only the lines the runtime and the engine flagged, never a slice of the file,
+ * so there is no truncation to report and no normal lines to grey out.
  */
 function LogLines({ lines }: { lines: string[] }) {
   // Classified once per list rather than once per render, and carrying its own
