@@ -126,10 +126,13 @@ function open() {
 const DIR = "/data/games/coilbox-lego-test.sdd";
 
 /** The unit as an export writes it, with any file's digest changed. */
-function unitFiles(changed: { script?: boolean; model?: boolean } = {}) {
+function unitFiles(
+  changed: { script?: boolean; model?: boolean; texture?: boolean } = {},
+) {
   return {
     dir: DIR,
-    textures: "atlas",
+    textures: changed.texture ? "atlas-2" : "atlas",
+    textureFiles: ["coilbox_atlas.png"],
     files: [
       {
         path: `${DIR}/objects3d/probe_unit.s3o`,
@@ -349,6 +352,75 @@ describe("TestDrawer's Reload in the sandbox (issue #3346)", () => {
     await waitFor(() => expect(launch).toHaveBeenCalledTimes(2));
     expect(cancel).toHaveBeenCalledTimes(1);
     expect(prepareSandbox).toHaveBeenCalledTimes(2);
+  });
+
+  // Issue #4146.
+  it("reloads a texture changed under the same name and says so", async () => {
+    await sandboxRunning();
+    writeScratchUnit.mockResolvedValue(unitFiles({ texture: true }));
+    playAskLuaRules.mockResolvedValue({
+      answer: "coilbox_sandbox:textures",
+      seconds: 0.02,
+    });
+
+    fireEvent.click(reloadButton());
+
+    expect(
+      await screen.findByText(
+        "Reloaded the texture. Every probe_unit in the game shows it now.",
+      ),
+    ).toBeTruthy();
+    expect(playAskLuaRules).toHaveBeenCalledWith({
+      runId: "run-1",
+      message: "coilbox_sandbox reload_textures",
+      reply: "coilbox_sandbox:",
+    });
+    expect(screen.queryByRole("button", { name: /^Relaunch$/ })).toBeNull();
+
+    fireEvent.click(reloadButton());
+    expect(
+      await screen.findByText("Nothing has changed since the game started."),
+    ).toBeTruthy();
+    expect(playAskLuaRules).toHaveBeenCalledTimes(1);
+  });
+
+  it("reloads the script and the texture together", async () => {
+    await sandboxRunning();
+    writeScratchUnit.mockResolvedValue(
+      unitFiles({ script: true, texture: true }),
+    );
+    playAskLuaRules.mockImplementation(({ message }: { message: string }) =>
+      Promise.resolve({
+        answer: message.endsWith("reload_textures")
+          ? "coilbox_sandbox:textures"
+          : "coilbox_sandbox:loaded",
+        seconds: 0.02,
+      }),
+    );
+
+    fireEvent.click(reloadButton());
+
+    expect(
+      await screen.findByText(
+        "Reloaded the script. Every probe_unit in the game runs it now. Reloaded the texture. Every probe_unit in the game shows it now.",
+      ),
+    ).toBeTruthy();
+    expect(playAskLuaRules).toHaveBeenCalledTimes(2);
+  });
+
+  it("says why when the game did not reload the texture", async () => {
+    await sandboxRunning();
+    writeScratchUnit.mockResolvedValue(unitFiles({ texture: true }));
+    playAskLuaRules.mockResolvedValue({
+      answer: "coilbox_sandbox:something else",
+      seconds: 0.01,
+    });
+
+    fireEvent.click(reloadButton());
+
+    expect(
+      await screen.findByText("coilbox_sandbox:something else"),
+    ).toBeTruthy();
   });
 
   it("says why when the game could not reload the script", async () => {

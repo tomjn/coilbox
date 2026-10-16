@@ -3,19 +3,24 @@
  * wrote (issue #3346).
  *
  * A running game has read the unit's files once. The sandbox can give its live
- * units the script again, and nothing else: the engine keeps the definition and
- * the model it loaded for the length of the game, and only sees files that
- * were there when it started (`docs/developers/engine-reload.md`). So each
+ * units the script and the textures again, and nothing else: the engine keeps
+ * the definition and the model it loaded for the length of the game, and only
+ * sees files that were there when it started
+ * (`docs/developers/engine-reload.md`). So each
  * export into a running sandbox is compared with what the game has loaded, by
  * the digest of every file written.
  */
 
 import type { WrittenScratchUnit } from "./writeScratchGame";
 
-/** What the running sandbox has loaded: each file's digest by path, and its textures. */
+/**
+ * What the running sandbox has loaded: each file's digest by path, its
+ * textures, and the file names they were written under.
+ */
 export interface LoadedSandbox {
   files: Record<string, string>;
   textures: string;
+  textureFiles: string[];
 }
 
 /** A part of the unit only a relaunch shows, in the order a sentence names them. */
@@ -26,6 +31,8 @@ const ORDER: RelaunchPart[] = ["definition", "model", "texture", "files"];
 export interface SandboxChanges {
   /** The script changed, and reloading it is worth doing. */
   reload: boolean;
+  /** A texture changed under a file name the game has, so reloading shows it. */
+  textures: boolean;
   relaunch: RelaunchPart[];
 }
 
@@ -34,6 +41,7 @@ export function loadedFrom(written: WrittenScratchUnit): LoadedSandbox {
   return {
     files: Object.fromEntries(written.files.map((f) => [f.path, f.sha256])),
     textures: written.textures,
+    textureFiles: written.textureFiles,
   };
 }
 
@@ -73,11 +81,25 @@ export function sandboxChanges(
     else if (kind === "other") parts.add("files");
     else parts.add(kind);
   }
-  if (written.textures !== loaded.textures) parts.add("texture");
   // The script moves the model's pieces and may include a new file, so it
-  // waits for the relaunch that either of those needs.
-  const reload = script && !parts.has("model") && !parts.has("files");
-  return { reload, relaunch: ORDER.filter((part) => parts.has(part)) };
+  // waits for the relaunch that either of those needs. So does a texture,
+  // since the relaunch shows it anyway.
+  const relaunching = parts.has("model") || parts.has("files");
+  const reload = script && !relaunching;
+  // The engine reads a texture again only under a name it already has, from a
+  // file that was there at launch. A texture file is not in `files`, so its
+  // name is checked here.
+  const textureChanged = written.textures !== loaded.textures;
+  const sameFiles = written.textureFiles.every((name) =>
+    loaded.textureFiles.includes(name),
+  );
+  const textures = textureChanged && sameFiles && !relaunching;
+  if (textureChanged && !textures) parts.add("texture");
+  return {
+    reload,
+    textures,
+    relaunch: ORDER.filter((part) => parts.has(part)),
+  };
 }
 
 /** What the game has loaded once its scripts are the ones in `written`. */
@@ -92,6 +114,14 @@ export function afterScriptReload(
     }
   }
   return { ...loaded, files };
+}
+
+/** What the game has loaded once its textures are the ones in `written`. */
+export function afterTextureReload(
+  loaded: LoadedSandbox,
+  written: WrittenScratchUnit,
+): LoadedSandbox {
+  return { ...loaded, textures: written.textures };
 }
 
 const NAME: Record<Exclude<RelaunchPart, "files">, string> = {
@@ -115,13 +145,13 @@ export function relaunchMessage(parts: RelaunchPart[]): string | null {
     const [part] = named;
     sentences.push(
       part === "texture"
-        ? "The texture changed. Coilbox does not reload a texture in a running game yet, so relaunch to see it."
+        ? "The texture is in a file the game did not start with, so relaunch to see it."
         : `The ${NAME[part]} changed. The engine cannot reload a ${NAME[part]} in a running game, so relaunch to see it.`,
     );
   } else if (named.length > 1) {
     const changed = `The ${list(named.map((p) => NAME[p]))} changed.`;
-    // Whether the engine can reload a texture is not known yet (issue #3346),
-    // so a list with one in it says only what to do.
+    // A texture can be reloaded, just not this time, so a list with one in it
+    // says only what to do.
     sentences.push(
       named.includes("texture")
         ? `${changed} Relaunch to see them in the game.`

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   afterScriptReload,
+  afterTextureReload,
   loadedFrom,
   relaunchMessage,
   sandboxChanges,
@@ -11,7 +12,11 @@ const DIR = "/data/games/coilbox-lego-test.sdd";
 
 function written(
   digests: Partial<Record<"model" | "script" | "collision" | "def", string>>,
-  { unit = "probe_unit", textures = "atlas-a" } = {},
+  {
+    unit = "probe_unit",
+    textures = "atlas-a",
+    textureFiles = ["coilbox_atlas.png"],
+  }: { unit?: string; textures?: string; textureFiles?: string[] } = {},
 ): WrittenScratchUnit {
   const paths = {
     model: `${DIR}/objects3d/${unit}.s3o`,
@@ -22,7 +27,7 @@ function written(
   const files = (["model", "script", "collision", "def"] as const).map(
     (kind) => ({ path: paths[kind], sha256: digests[kind] ?? `${kind}-1` }),
   );
-  return { dir: DIR, files, textures };
+  return { dir: DIR, files, textures, textureFiles };
 }
 
 describe("sandboxChanges", () => {
@@ -31,6 +36,7 @@ describe("sandboxChanges", () => {
   it("finds nothing when the unit is as the game started with it", () => {
     expect(sandboxChanges(launched, written({}))).toEqual({
       reload: false,
+      textures: false,
       relaunch: [],
     });
   });
@@ -38,6 +44,7 @@ describe("sandboxChanges", () => {
   it("reloads a changed script, with nothing to relaunch for", () => {
     expect(sandboxChanges(launched, written({ script: "script-2" }))).toEqual({
       reload: true,
+      textures: false,
       relaunch: [],
     });
   });
@@ -51,7 +58,7 @@ describe("sandboxChanges", () => {
   it("needs a relaunch for a changed definition, and still reloads the script", () => {
     expect(
       sandboxChanges(launched, written({ def: "def-2", script: "script-2" })),
-    ).toEqual({ reload: true, relaunch: ["definition"] });
+    ).toEqual({ reload: true, textures: false, relaunch: ["definition"] });
   });
 
   // The script moves the model's pieces, so a new script on the old model is a
@@ -62,20 +69,60 @@ describe("sandboxChanges", () => {
         launched,
         written({ model: "model-2", script: "script-2" }),
       ),
-    ).toEqual({ reload: false, relaunch: ["model"] });
+    ).toEqual({ reload: false, textures: false, relaunch: ["model"] });
   });
 
-  it("needs a relaunch for a different texture", () => {
+  // Issue #4146. `/reloadtextures s3o` reads every texture again from disk,
+  // under the names the game already has.
+  it("reloads a texture changed under the same file name", () => {
     expect(
-      sandboxChanges(launched, written({}, { textures: "atlas-b" })).relaunch,
-    ).toEqual(["texture"]);
+      sandboxChanges(launched, written({}, { textures: "atlas-b" })),
+    ).toEqual({ reload: false, textures: true, relaunch: [] });
+  });
+
+  it("reloads the texture alongside the script, and still asks for the definition", () => {
+    expect(
+      sandboxChanges(
+        launched,
+        written({ def: "def-2", script: "script-2" }, { textures: "atlas-b" }),
+      ),
+    ).toEqual({ reload: true, textures: true, relaunch: ["definition"] });
+  });
+
+  // A running game only sees files that were there when it started.
+  it("needs a relaunch for a texture under a file name the game did not start with", () => {
+    expect(
+      sandboxChanges(
+        launched,
+        written(
+          {},
+          {
+            textures: "atlas-b",
+            textureFiles: ["coilbox_atlas.png", "unit_tex2.png"],
+          },
+        ),
+      ),
+    ).toEqual({ reload: false, textures: false, relaunch: ["texture"] });
+  });
+
+  it("holds the texture back when the model changed too", () => {
+    expect(
+      sandboxChanges(
+        launched,
+        written({ model: "model-2" }, { textures: "atlas-b" }),
+      ),
+    ).toEqual({
+      reload: false,
+      textures: false,
+      relaunch: ["model", "texture"],
+    });
   });
 
   // A running game only sees files that were there when it started.
   it("needs a relaunch for a renamed unit, whose files are all new", () => {
     expect(
       sandboxChanges(launched, written({}, { unit: "probe_two" })),
-    ).toEqual({ reload: false, relaunch: ["files"] });
+    ).toEqual({ reload: false, textures: false, relaunch: ["files"] });
   });
 
   it("names each part once, in a fixed order", () => {
@@ -110,7 +157,22 @@ describe("afterScriptReload", () => {
 
     expect(sandboxChanges(loaded, now)).toEqual({
       reload: false,
+      textures: false,
       relaunch: ["definition"],
+    });
+  });
+});
+
+describe("afterTextureReload", () => {
+  it("takes on the new textures and nothing else", () => {
+    const launched = loadedFrom(written({}));
+    const now = written({ script: "script-2" }, { textures: "atlas-b" });
+    const loaded = afterTextureReload(launched, now);
+
+    expect(sandboxChanges(loaded, now)).toEqual({
+      reload: true,
+      textures: false,
+      relaunch: [],
     });
   });
 });
@@ -132,9 +194,9 @@ describe("relaunchMessage", () => {
     );
   });
 
-  it("does not claim the engine cannot reload a texture", () => {
+  it("says a texture needs a relaunch only for a file the game did not start with", () => {
     expect(relaunchMessage(["texture"])).toBe(
-      "The texture changed. Coilbox does not reload a texture in a running game yet, so relaunch to see it.",
+      "The texture is in a file the game did not start with, so relaunch to see it.",
     );
   });
 

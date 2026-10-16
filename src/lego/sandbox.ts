@@ -72,6 +72,15 @@ export const SANDBOX_REPLY = "coilbox_sandbox:";
 /** The answer when the reload worked. */
 export const SANDBOX_LOADED_REPLY = `${SANDBOX_REPLY}loaded`;
 
+/**
+ * What coilbox sends the sandbox gadget to have it reload every unit texture
+ * from disk in the running game (issue #4146).
+ */
+export const SANDBOX_TEXTURES_MESSAGE = "coilbox_sandbox reload_textures";
+
+/** The answer once the textures have been reloaded. */
+export const SANDBOX_TEXTURES_REPLY = `${SANDBOX_REPLY}textures`;
+
 /** The player's participant id in the scenario. */
 export const SANDBOX_PLAYER = "player";
 
@@ -234,7 +243,8 @@ export function buildDownloadMenu(
  * The scratch game's sandbox gadget. It does nothing unless the start script
  * names the sandbox mission, so a plain Test in game or load check on the same
  * scratch game is unaffected. It also reloads the unit's script when coilbox
- * sends `SANDBOX_RELOAD_MESSAGE`, and answers through the autohost.
+ * sends `SANDBOX_RELOAD_MESSAGE`, and the unit textures when it sends
+ * `SANDBOX_TEXTURES_MESSAGE`, and answers through the autohost.
  *
  * Which team the targets are on is not passed in: it is every team other than
  * Gaia that no player is playing, which is how the runtime itself tells a
@@ -264,6 +274,13 @@ export function buildSandboxGadget(builder: string | null): string {
     "if not gadgetHandler:IsSyncedCode() then",
     "  -- Only an unsynced handle can send a Lua message, and coilbox reads them.",
     "  function gadget:RecvFromSynced(name, answer)",
+    '    if name == "coilbox_sandbox_textures" then',
+    "      -- An unsynced command. The engine does not run one from the autohost,",
+    "      -- so it is sent from here.",
+    '      Spring.SendCommands("reloadtextures s3o")',
+    `      Spring.SendLuaRulesMsg(${luaString(SANDBOX_TEXTURES_REPLY)})`,
+    "      return true",
+    "    end",
     '    if name ~= "coilbox_sandbox" then',
     "      return false",
     "    end",
@@ -324,6 +341,10 @@ export function buildSandboxGadget(builder: string | null): string {
     "end",
     "",
     "function gadget:GotChatMsg(msg)",
+    `  if msg == ${luaString(SANDBOX_TEXTURES_MESSAGE)} then`,
+    '    SendToUnsynced("coilbox_sandbox_textures")',
+    "    return true",
+    "  end",
     `  if msg ~= ${luaString(SANDBOX_RELOAD_MESSAGE)} then`,
     "    return false",
     "  end",

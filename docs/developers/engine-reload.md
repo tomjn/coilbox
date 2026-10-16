@@ -1,8 +1,8 @@
 # What the engine reloads in a running game
 
-When you change a unit while a game is running, the engine picks up a changed Lua unit script and nothing else. A changed unit definition, model or new file needs the game restarted. This page says what each part of a unit does, how to reload what can be reloaded, and what the unit builder's sandbox does with that.
+When you change a unit while a game is running, the engine picks up a changed Lua unit script and a changed texture, and nothing else. A changed unit definition, model or new file needs the game restarted. This page says what each part of a unit does, how to reload what can be reloaded, and what the unit builder's sandbox does with that.
 
-It answers issue #3344. The sandbox is #3341 and its reload button is #3346.
+It answers issue #3344, and #4146 for textures. The sandbox is #3341 and its reload button is #3346.
 
 ## The answer
 
@@ -13,11 +13,11 @@ It answers issue #3344. The sandbox is #3341 and its reload button is #3346.
 | Unit definition, `units/<unit>.lua` | No | Restart | Keep their old values | Engine run and source |
 | Unit definition values, edited from Lua | Partly | `/cheat 1`, `/editdefs 1`, then a synced gadget writes `UnitDefs[id].<key>` | Keep their old values, and only new units get the edit | Engine run and source |
 | Model, `.s3o` | No | Restart | Keep the old model, and so do new units | Engine run and source |
-| Texture | Probably yes, for a file that already existed | `/reloadtextures s3o` | Get the new texture | Source only, not run |
+| Texture, `.s3o` model | Yes, for a file that already existed | `/reloadtextures s3o`, sent from Lua, not from the autohost | Get the new texture, and so do new units | Windowed engine run and source |
 | Any file that did not exist when the game started | No | Restart | Not applicable | Engine run and source |
 | Full restart | Yes | Quit and launch again, or `Spring.Reload(script)` from Lua | All gone, new game | Engine run and source |
 
-All of it was tested on Splinter Faction 0.1.89 with `spring-headless` from engine 2026.07.04-46-g04f42e2, on this Mac. Source lines are from the RecoilEngine checkout at commit `212c369b4c`.
+All of it was tested on Splinter Faction 0.1.89 with `spring-headless` from engine 2026.07.04-46-g04f42e2, on this Mac, apart from textures, which were tested with the windowed `spring` from the same engine. Source lines are from the RecoilEngine checkout at commit `212c369b4c`.
 
 ## Why a new file never appears
 
@@ -126,7 +126,20 @@ The test swapped `objects3d/probe_unit.s3o` for a model with 9 pieces in place o
 
 It only reloads textures it already has, under the same file name. A new texture file is not seen, for the reason in "Why a new file never appears".
 
-This was not run. A headless engine loads no textures, so it needs a test with a window.
+The windowed test in #4146 showed it working. Two live units were drawn with a solid red `probe_tex.png`:
+
+- after the file on disk was swapped for green, both stayed red, so nothing reads the file again by itself
+- after `/reloadtextures s3o` from the autohost, both stayed red, and the infolog has no "Reloading S3O textures" line
+- after the file was swapped for blue and a gadget's unsynced half called `Spring.SendCommands("reloadtextures s3o")`, both turned blue at once
+- a unit spawned after that reload was blue too
+
+So the command works, but only when Lua sends it. The autohost route does not run it, the same as `/quitforce` in "Sending a command to a running engine".
+
+On Splinter Faction 0.1.89 the reload took 1.6 seconds, measured from the "Reloading S3O textures" line to the gadget's next line, and the game frame did not move in that time. It reloads every `.s3o` texture in the game, not only the unit's.
+
+A second run put the sandbox gadget coilbox generates into the probe game and sent `/luarules coilbox_sandbox reload_textures` through the autohost, as the reload button does. Both units turned blue, and the answer `coilbox_sandbox:textures` reached the listener 1.5 seconds after the request went out.
+
+The screenshots and the script that took them are in `docs/reports/4146/`, which is gitignored.
 
 ## A full restart
 
@@ -159,7 +172,7 @@ The server reads one datagram per update (`CGameServer::Update`, `rts/Net/GameSe
 
 `CGameServer::commandBlacklist` does not get in the way. It is the list of commands only the host may send (`GameServer.cpp:1773`). The autohost is the host, and its commands go straight to `PushAction`. A command from the autohost arrives with player number 255, the server's own, which a gadget's chat action sees.
 
-`/quitforce` sent this way did nothing in the test, though the same command from a gadget stopped the engine. It is an unsynced command, and I did not trace why the server's copy of it is not run. Coilbox already stops the engine process itself.
+`/quitforce` sent this way did nothing in the test, though the same command from a gadget stopped the engine. `/reloadtextures s3o` did nothing this way either in #4146, and worked from a gadget. Both are unsynced commands, so an unsynced command from the autohost does not seem to run. I did not trace why the server's copy is not run. Coilbox already stops the engine process itself, and sends the texture reload through the sandbox gadget.
 
 The engine also sends coilbox every server message, such as "Player coilbox finished loading and is now ingame", and every Lua message a player sends (`GAME_LUAMSG`, `GameServer.cpp:1346`). So a gadget could confirm a reload back to coilbox with `Spring.SendLuaRulesMsg`.
 
@@ -197,7 +210,7 @@ For the reload button in #3346, which does this:
 - Commands go through the autohost interface, set up as described in "Sending a command to a running engine". The launch adds `<app data>/play/autohost/` to the end of `SPRING_DATADIR`, holding only a `springsettings.cfg` with the port.
 - A changed script: export, then send `/luarules coilbox_sandbox reload_scripts`. The sandbox gadget reloads the unit script framework alone, as in "Reloading the unit script framework alone", and answers `coilbox_sandbox:loaded` with `Spring.SendLuaRulesMsg`. A full `/luarules reload` is not used, because of "A full reload can end the game".
 - A changed definition, model or a new file: say a relaunch is needed, and offer it in the same place. Do not use `/editdefs` to fake a definition reload, because table values cannot be written, live units do not change, and the game's own processing of the file would have to be repeated.
-- A changed texture: say a relaunch is needed for now. `/reloadtextures s3o` waits on a windowed test.
+- A changed texture under a file name the game started with: send `/luarules coilbox_sandbox reload_textures`. The sandbox gadget hands it to its unsynced half, which calls `Spring.SendCommands("reloadtextures s3o")` and answers `coilbox_sandbox:textures`. A texture under a new file name, or one that changed with the model, needs a relaunch. Texture files are not in the export's digests, so the file names they were written under are compared with the ones the game was launched on.
 - Which parts changed comes from the digest of every file the export wrote, compared with what the game was launched on.
 
 ## How it was tested
@@ -205,5 +218,7 @@ For the reload button in #3346, which does this:
 A throwaway game, `coilbox-reload-probe.sdd`, depended on Splinter Faction 0.1.89 and held one unit, `probe_unit`, plus a probe gadget. A shell script ran `spring-headless` on it and stepped the gadget through each route by rewriting a request file in the game folder. Between steps it swapped the unit's script, definition and model on disk for a second version, and added two new files. The gadget logged the definition, the files the game could see, and each live unit's script version, health, piece count and tooltip.
 
 A second run did the same through a small UDP listener standing in for coilbox's end of the autohost interface.
+
+The texture test in #4146 used the same probe game with a windowed `spring` on Small Supreme Battlefield V3. Its model named a `probe_tex.png` in `unittextures/`, filled with one colour so the model's UVs did not matter. The gadget pointed the camera at the units, hid the interface and took a screenshot after each step with `/screenshot png`.
 
 The scripts and logs are not in the repository. They stay in `docs/reports/3344/`, which is gitignored.
