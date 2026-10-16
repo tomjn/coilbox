@@ -252,6 +252,7 @@ export function buildS3o(
     texture2: textures.texture2 ?? "",
     root: assemble(
       project,
+      raw,
       pieces,
       project.rootPieceId,
       options?.useOriginalNames ?? false,
@@ -259,22 +260,45 @@ export function buildS3o(
   };
 }
 
+/**
+ * A part's UV as the engine samples it.
+ *
+ * The pack keeps the UVs of KaiserJ's `.obj`, where v runs up from the bottom
+ * of the atlas, and the builder draws them that way: three.js flips an image on
+ * upload. The engine does not. It passes an s3o's UVs straight through
+ * (`S3OParser.cpp`) and loads a PNG top row first (`CBitmap::Load`), so v = 0 is
+ * the top of the atlas there, and a part written as it stands samples the
+ * mirror of its own pixels (#4165).
+ *
+ * Only a part is turned round. A mesh imported from a game's model is already
+ * in the engine's convention, and is written as it came.
+ */
+export function engineUv([u, v]: [number, number]): [number, number] {
+  return [u, 1 - v];
+}
+
 function assemble(
   project: LegoProject,
+  raw: RawGeometry | null,
   pieces: Map<string, BakedPiece>,
   pieceId: string,
   useOriginalNames: boolean,
 ): S3oPiece {
   const baked = pieces.get(pieceId) as BakedPiece;
   const piece = pieceById(project, pieceId);
+  // The same test `geometrySource` makes: a piece draws an imported mesh when
+  // the sidecar holds it, and a part otherwise.
+  const fromPack = piece !== undefined && pieceMesh(raw, piece) === null;
   return {
     name: useOriginalNames ? (piece?.originalName ?? baked.name) : baked.name,
     primitiveType: 0,
     offset: baked.offset,
-    vertices: baked.vertices,
+    vertices: fromPack
+      ? baked.vertices.map((vertex) => ({ ...vertex, uv: engineUv(vertex.uv) }))
+      : baked.vertices,
     indices: baked.indices,
     children: childrenOf(project, pieceId).map((child) =>
-      assemble(project, pieces, child.id, useOriginalNames),
+      assemble(project, raw, pieces, child.id, useOriginalNames),
     ),
   };
 }

@@ -97,6 +97,20 @@ describe("buildObj", () => {
     expect(lines).toContain("f 1/1/1 2/2/2 3/3/3");
   });
 
+  it("writes a part's UVs as the pack has them, since obj runs v up from the bottom too (#4165)", () => {
+    // The s3o turns a part's v round for the engine. An .obj shares the
+    // pack's own convention, so its vt lines are the pack's UVs unchanged.
+    const doc = project([{ id: "hull", name: "hull", parentId: "root" }]);
+
+    const lines = buildObj(doc, pack(), null, OPTIONS)?.obj.split("\n") ?? [];
+
+    expect(lines.filter((l) => l.startsWith("vt "))).toEqual([
+      "vt 0.000000 0.000000",
+      "vt 1.000000 0.000000",
+      "vt 0.000000 1.000000",
+    ]);
+  });
+
   it("bakes a piece's offset into its vertices, since obj has no hierarchy", () => {
     const doc = project([
       { id: "arm", name: "arm", parentId: "root", position: [5, 0, 0] },

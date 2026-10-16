@@ -163,6 +163,8 @@ There is no directory in the blob. `pack.json` holds it.
 
 **The atlas's alpha channel is the team colour mask.** The engine draws an s3o's first texture mixed with the player's colour by its alpha: 0 is the atlas's own colour and 255 is all team colour. A PNG with no alpha channel loads as 255 everywhere, which draws the whole unit in team colour. The bundled atlas has an alpha of 0 everywhere, so a unit built from it shows no team colour. An atlas pack is held to the same rule, and one that wants team colour on some parts paints it into its atlas's alpha.
 
+**v runs up from the bottom of the atlas**, as it does in an `.obj` and in the builder. The engine reads an s3o's v from the top of a PNG, so the s3o export writes a part's v as 1 - v. The `.obj` and `.glb` exports keep the pack's v. A mesh imported from a game's own model is already in the engine's convention, and is exported as it came.
+
 **UVs are not clamped to 0 to 1.** Some parts in the bundled pack sample a neighbouring atlas column through negative `u`, so the texture must repeat rather than clamp.
 
 **Vertices are float32 and pre-merged.** Positions, normals and UVs are already rounded, and identical corners share a vertex.
