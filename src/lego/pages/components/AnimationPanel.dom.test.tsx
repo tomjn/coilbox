@@ -729,7 +729,7 @@ describe("a unit driven along a path", () => {
 
     await choose(
       "When ChangeHeading is sent",
-      "ChangeHeading sent on every turning frame",
+      "ChangeHeading: every turning frame",
     );
     await waitFor(() =>
       expect(sentTo(runLua).some((e) => e.callin === "ChangeHeading")).toBe(

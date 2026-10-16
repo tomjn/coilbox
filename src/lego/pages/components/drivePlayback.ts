@@ -108,13 +108,15 @@ export function restoreFromDrive(state: SceneState) {
 
 /**
  * Draw the path a drive follows on the ground, from where the unit starts
- * through every waypoint, with a dot on each waypoint. An empty path draws
- * nothing.
+ * through every waypoint, with a dot on each waypoint when `dots` says so.
+ * A fixed circle has a waypoint every few elmos, which reads as noise rather
+ * than as points somebody put there. An empty path draws nothing.
  */
 export function drawDrivePath(
   state: Pick<SceneState, "drivePath">,
   path: [number, number][] | null,
   ground: GroundShape | null,
+  dots = true,
 ) {
   const group = state.drivePath;
   for (const child of [...group.children]) {
@@ -156,6 +158,9 @@ export function drawDrivePath(
       new THREE.BufferGeometry().setFromPoints(line),
       new THREE.LineBasicMaterial({ color: PATH_COLOUR }),
     ),
+  );
+  if (!dots) return;
+  group.add(
     new THREE.Points(
       new THREE.BufferGeometry().setFromPoints(
         path.map(([x, z]) => lifted(x, z)),

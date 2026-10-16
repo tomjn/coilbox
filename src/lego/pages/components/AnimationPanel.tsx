@@ -162,8 +162,8 @@ const DRIVEN_VALUES = new Set([CURRENT_SPEED, 75, 82]);
  *  `minScriptChangeHeading`, or on every frame the unit turns, which is a game
  *  lowering it to 1. */
 const CHANGE_HEADING_OPTIONS = [
-  { value: "engine", label: "ChangeHeading never sent (engine default)" },
-  { value: "every", label: "ChangeHeading sent on every turning frame" },
+  { value: "engine", label: "ChangeHeading: never (default)" },
+  { value: "every", label: "ChangeHeading: every turning frame" },
 ];
 
 /** Where a drive's speed and turn rate came from, in words. */

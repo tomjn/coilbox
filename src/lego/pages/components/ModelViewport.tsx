@@ -1176,13 +1176,15 @@ export function ModelViewport({
 
   useStandInSize(sceneRef, project, pack, raw, standIn.track?.size);
   // The path a drive follows, on whatever ground the view draws.
+  // Dots only on points the game maker put down.
   const drivePathPoints = standIn.drive?.path ?? null;
+  const ownPath = standIn.drive?.onPick !== undefined;
   useEffect(() => {
     const state = sceneRef.current;
     if (!state) return;
-    drawDrivePath(state, drivePathPoints, ground.shape);
+    drawDrivePath(state, drivePathPoints, ground.shape, ownPath);
     state.render();
-  }, [drivePathPoints, ground.shape]);
+  }, [drivePathPoints, ground.shape, ownPath]);
   // A stand-in let go after a drag waits where it was put for the track that
   // puts it there, which is the next placement the panel sends.
   useEffect(() => {
