@@ -10,10 +10,10 @@
  * only honest way to offer it. Typing a class is guessing at another file's
  * spelling, and the only report you get is a unit that is not in the game.
  *
- * Read off the game's own units rather than out of `gamedata/movedefs.lua`,
- * for two reasons. Nothing in coilbox reads that file, so there is no reader to
- * ask, and the workshop already holds every unit definition in the game, so
- * this costs one pass over a table that is already in memory. It is also the
+ * The workshop's picker reads them off the game's own units rather than out of
+ * `gamedata/movedefs.lua`. The unit-defs read carries that file's classes too
+ * now (`moveDefsOf`, which the unit builder uses, issue #3255), but the unit
+ * table costs one pass over something already in memory. It is also the
  * stronger guarantee of the two: a class some unit in this game already moves
  * on is one the engine has resolved, where a class declared in a file may be
  * declared and unreachable. What it misses is a class no unit uses, which is a
