@@ -15,7 +15,7 @@ import {
   useProtocolServers,
   usernameFromKey,
 } from "../store";
-import { BattleRow } from "./BattleRow";
+import { BATTLE_GRID, BattleRow } from "./BattleRow";
 import { type FriendBattle, friendBattles } from "./friendBattles";
 import { joinBattle } from "./joinBattle";
 import { useOneBattleRule } from "./oneBattle";
@@ -86,7 +86,7 @@ export function FriendBattles({
         <span className="text-muted-foreground">{found.length}</span>
       </button>
       {!collapsed && (
-        <ul className="flex flex-col gap-2 px-4 pb-2">
+        <ul className={`${BATTLE_GRID} px-4 pb-2`}>
           {found.map((entry) => (
             <FriendBattleRow
               key={`${entry.serverKey}:${entry.battle.id}`}

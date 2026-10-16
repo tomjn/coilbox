@@ -2,7 +2,7 @@ import { ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { LobbyProtocol } from "../../lobby-servers/config";
 import type { Battle } from "../bindings";
-import { BattleRow } from "./BattleRow";
+import { BATTLE_GRID, BattleRow } from "./BattleRow";
 import { type BattleGroupKey, groupBattles } from "./battleFilters";
 
 const NO_FRIENDS: ReadonlyMap<number, string> = new Map();
@@ -157,7 +157,7 @@ export function BattleList({
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-auto">
       {joinedBattle && (
-        <ul className="flex flex-col gap-2 p-4 pb-0">
+        <ul className={`${BATTLE_GRID} p-4 pb-0`}>
           <BattleRow
             battle={joinedBattle}
             joined
@@ -253,7 +253,7 @@ function BattleGroup({
         <span className="text-muted-foreground">{battles.length}</span>
       </button>
       {!collapsed && (
-        <ul className="flex flex-col gap-2 px-4 pb-2">
+        <ul className={`${BATTLE_GRID} px-4 pb-2`}>
           {battles.map((b) => (
             <BattleRow
               key={b.id}

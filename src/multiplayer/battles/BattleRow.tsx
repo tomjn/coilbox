@@ -17,6 +17,15 @@ import { battleRowAction, occupancy } from "./battleFilters";
 import { JoinBattlePopover } from "./JoinBattlePopover";
 
 /**
+ * The grid every battle group lays its cards in. Columns come from a minimum
+ * card width, so they grow with the window and every group (including the
+ * pinned battle and the friends section) shares the same column edges. The
+ * `min()` keeps a window narrower than the card from overflowing.
+ */
+export const BATTLE_GRID =
+  "grid grid-cols-[repeat(auto-fill,minmax(min(24rem,100%),1fr))] gap-2";
+
+/**
  * One battle in the list: a minimap thumbnail, title (with a lock glyph when
  * passworded/locked), map · game · host, occupancy and spectators, and a join
  * affordance. When actionable, the title area is itself a button that triggers
@@ -119,24 +128,31 @@ function BattleRowInner({
     else onJoin(battle);
   };
 
+  // Tachyon's lobby list names no founder, so there is no host to name.
+  const subtitle = `${battle.map} · ${battle.modname}${
+    battle.host ? ` · host ${battle.host}` : ""
+  }${connectionLabel ? ` · ${connectionLabel}` : ""}`;
+
+  // Both lines cut off with an ellipsis on a narrow card and carry the full
+  // text as a hover title.
   const details = (
     <div className="min-w-0 flex-1">
-      <p className="flex items-center gap-2 truncate text-sm font-medium">
+      <p className="flex items-center gap-2 text-sm font-medium">
         {restricted && (
           <Lock
             className="size-3.5 shrink-0 text-muted-foreground"
             aria-label={battle.passworded ? "Passworded" : "Locked"}
           />
         )}
-        <span className="truncate transition-colors group-hover/row:text-primary">
+        <span
+          title={battle.title}
+          className="truncate transition-colors group-hover/row:text-primary"
+        >
           {battle.title}
         </span>
       </p>
-      <p className="truncate text-xs text-muted-foreground">
-        {battle.map} · {battle.modname}
-        {/* Tachyon's lobby list names no founder, so there is no host to name. */}
-        {battle.host && ` · host ${battle.host}`}
-        {connectionLabel && ` · ${connectionLabel}`}
+      <p title={subtitle} className="truncate text-xs text-muted-foreground">
+        {subtitle}
       </p>
     </div>
   );
@@ -145,85 +161,89 @@ function BattleRowInner({
     <li
       ref={rowRef}
       aria-current={focused ? "true" : undefined}
-      className={`flex items-center gap-4 rounded-md border p-3 ${
+      className={`flex min-w-0 flex-col gap-3 rounded-md border p-3 ${
         joined || focused ? "border-primary bg-primary/5" : "border-border"
       } ${focused ? "ring-2 ring-primary" : ""}`}
     >
-      <BattleRowMapThumb
-        battle={battle}
-        enginePath={enginePath}
-        dataDir={dataDir}
-      />
-      {disabled ? (
-        <div className="flex min-w-0 flex-1 items-center">{details}</div>
-      ) : (
-        <button
-          type="button"
-          onClick={activate}
-          aria-label={`${action.label} ${battle.title}`}
-          className="group/row flex min-w-0 flex-1 cursor-pointer items-center rounded-md text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          {details}
-        </button>
-      )}
-      {friendsHere && <FriendsBadge names={friendsHere} />}
-      <div className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-        {started !== null && (
-          <span className="mr-2">{startedAgo(started, now)}</span>
-        )}
-        <Users className="size-3.5" aria-hidden />
-        <span>
-          {players}/{battle.maxPlayers}
-        </span>
-        {battle.spectatorCount > 0 && (
-          <span className="ml-1">+{battle.spectatorCount} spec</span>
+      <div className="flex min-w-0 items-center gap-3">
+        <BattleRowMapThumb
+          battle={battle}
+          enginePath={enginePath}
+          dataDir={dataDir}
+        />
+        {disabled ? (
+          <div className="flex min-w-0 flex-1 items-center">{details}</div>
+        ) : (
+          <button
+            type="button"
+            onClick={activate}
+            aria-label={`${action.label} ${battle.title}`}
+            className="group/row flex min-w-0 flex-1 cursor-pointer items-center rounded-md text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {details}
+          </button>
         )}
       </div>
-      {invite && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-8 shrink-0"
-          disabled={!linkable}
-          aria-label={`Copy an invite link for ${battle.title}`}
-          title="Copy invite link"
-          onClick={() => copyDeepLink(invite)}
-        >
-          <LinkIcon className="size-4" />
-        </Button>
-      )}
-      {joined ? (
-        <Button
-          className="h-8 shrink-0 gap-1 px-3"
-          onClick={onLeave}
-          aria-label="Leave battle"
-        >
-          <LogOut className="size-4" />
-          Leave
-        </Button>
-      ) : asks ? (
-        <JoinBattlePopover
-          title={battle.title}
-          disabled={disabled}
-          onSubmit={(key) =>
-            battle.passworded ? onJoin(battle, key) : onJoin(battle)
-          }
-          open={pwOpen}
-          onOpenChange={setPwOpen}
-          needsPassword={battle.passworded}
-          notice={leaves}
-          triggerLabel={battle.passworded ? "Join" : action.label}
-          protocol={protocol}
-        />
-      ) : (
-        <Button
-          className="h-8 shrink-0 px-3"
-          disabled={disabled}
-          onClick={() => onJoin(battle)}
-        >
-          {action.label}
-        </Button>
-      )}
+      <div className="flex flex-wrap items-center gap-2">
+        {friendsHere && <FriendsBadge names={friendsHere} />}
+        <div className="mr-auto flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+          {started !== null && (
+            <span className="mr-2">{startedAgo(started, now)}</span>
+          )}
+          <Users className="size-3.5" aria-hidden />
+          <span>
+            {players}/{battle.maxPlayers}
+          </span>
+          {battle.spectatorCount > 0 && (
+            <span className="ml-1">+{battle.spectatorCount} spec</span>
+          )}
+        </div>
+        {invite && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 shrink-0"
+            disabled={!linkable}
+            aria-label={`Copy an invite link for ${battle.title}`}
+            title="Copy invite link"
+            onClick={() => copyDeepLink(invite)}
+          >
+            <LinkIcon className="size-4" />
+          </Button>
+        )}
+        {joined ? (
+          <Button
+            className="h-8 shrink-0 gap-1 px-3"
+            onClick={onLeave}
+            aria-label="Leave battle"
+          >
+            <LogOut className="size-4" />
+            Leave
+          </Button>
+        ) : asks ? (
+          <JoinBattlePopover
+            title={battle.title}
+            disabled={disabled}
+            onSubmit={(key) =>
+              battle.passworded ? onJoin(battle, key) : onJoin(battle)
+            }
+            open={pwOpen}
+            onOpenChange={setPwOpen}
+            needsPassword={battle.passworded}
+            notice={leaves}
+            triggerLabel={battle.passworded ? "Join" : action.label}
+            protocol={protocol}
+          />
+        ) : (
+          <Button
+            className="h-8 shrink-0 px-3"
+            disabled={disabled}
+            onClick={() => onJoin(battle)}
+          >
+            {action.label}
+          </Button>
+        )}
+      </div>
     </li>
   );
 }
