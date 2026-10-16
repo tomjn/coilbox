@@ -1002,6 +1002,25 @@ async fn a_connect_spring_is_where_the_launch_reads_the_match_from() {
     assert_eq!(started["myPlayerName"], "someone");
 }
 
+/// A dropped player is offered the match on login. The offer reaches the
+/// frontend as an event, and nothing is sent back until the player accepts.
+#[tokio::test]
+async fn a_rejoin_option_reaches_the_frontend_and_launches_nothing() {
+    let port = greet_accept_and_send(vec![r#"RejoinOption {"BattleID":42}"#.into()]).await;
+    let client = Client::connect(port, "someone").await;
+    let event = client.wait_for("rejoinOffered").await;
+    assert_eq!(event["battleId"], 42);
+
+    let registry = client.registry.lock().unwrap_or_else(|e| e.into_inner());
+    assert!(registry[&client.key]
+        .started
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .is_none());
+    drop(registry);
+    assert!(client.event("battleStarting").is_none());
+}
+
 /// The way back into a running match, and the request the rejoin offer will
 /// send too: the battle, as one line.
 #[tokio::test]

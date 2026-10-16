@@ -560,6 +560,12 @@ export type LobbyEvent =
    * `mpBuildBattleConfig`, so a relaunch after our engine exits reads the same one.
    */
   | { kind: "battleStarting" }
+  /**
+   * A Zero-K server says we are still in a running match we left, and offers the
+   * way back (`RejoinOption`). Nothing launches until the player accepts and
+   * `mpZerokRequestConnectSpring` is sent for `battleId`.
+   */
+  | { kind: "rejoinOffered"; battleId: number }
   | { kind: "disconnected"; reason: string | null };
 
 // ---------------------------------------------------------------------------

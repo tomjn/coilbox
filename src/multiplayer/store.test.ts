@@ -284,6 +284,30 @@ describe("mirrorReducer channel-list completion", () => {
   });
 });
 
+describe("mirrorReducer rejoin offer", () => {
+  it("holds the offered battle, as a new object for each offer", () => {
+    const once = mirrorReducer(initialMirror, {
+      type: "event",
+      ev: { kind: "rejoinOffered", battleId: 42 },
+    });
+    expect(once.rejoinOffer).toEqual({ battleId: 42 });
+    const twice = mirrorReducer(once, {
+      type: "event",
+      ev: { kind: "rejoinOffered", battleId: 42 },
+    });
+    expect(twice.rejoinOffer).not.toBe(once.rejoinOffer);
+  });
+
+  it("starts empty and does not launch anything by itself", () => {
+    expect(initialMirror.rejoinOffer).toBeNull();
+    const m = mirrorReducer(initialMirror, {
+      type: "event",
+      ev: { kind: "rejoinOffered", battleId: 42 },
+    });
+    expect(m.battleStartSeq).toBe(0);
+  });
+});
+
 describe("mirrorReducer Tachyon battle start", () => {
   it("starts the counter at zero", () => {
     expect(initialMirror.battleStartSeq).toBe(0);

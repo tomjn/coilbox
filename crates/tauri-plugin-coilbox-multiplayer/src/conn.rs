@@ -312,6 +312,13 @@ pub enum LobbyEvent {
     /// with `mp_build_battle_config` rather than carried here, so a room that
     /// launches again after our engine exits reads the same one.
     BattleStarting,
+    /// A Zero-K server says the player is still in a running match they left,
+    /// and offers the way back (`RejoinOption`). Nothing launches until the
+    /// player accepts and the frontend sends `RequestConnectSpring`.
+    #[serde(rename_all = "camelCase")]
+    RejoinOffered {
+        battle_id: i32,
+    },
     Disconnected {
         reason: Option<String>,
     },

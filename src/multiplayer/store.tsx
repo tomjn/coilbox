@@ -106,6 +106,7 @@ import { triggerIngameCue } from "./ingameCue";
 import { MatchFoundPanel } from "./MatchFoundPanel";
 import { initialMirror, type LobbyMirror, type MirrorAction } from "./mirror";
 import { protocolForKey } from "./protocol";
+import { RejoinOfferPanel } from "./RejoinOfferPanel";
 import { triggerRing } from "./ringEffect";
 import { ServerMessageBoxDialog } from "./ServerMessageBoxDialog";
 import { VerificationCodeDialog } from "./VerificationCodeDialog";
@@ -2470,6 +2471,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       ))}
       <VerificationCodeDialog />
       <MatchFoundPanel />
+      <RejoinOfferPanel />
       <ServerMessageBoxDialog
         text={serverMsgBoxes[0]?.text ?? null}
         serverName={

@@ -427,6 +427,13 @@ async fn run_loop(stream: TcpStream, login: ZerokLogin, ctx: ZerokConnContext) {
                         *lock_or_recover(&started) = Some(launch.config);
                         emit(&sink, LobbyEvent::BattleStarting);
                     }
+                    // Sent on login for a match the account dropped out of. The
+                    // server has already put us back in its room. Whether to go
+                    // back into the match is the player's call, so this only
+                    // tells the frontend.
+                    if let ZerokMessage::RejoinOption(offer) = &message {
+                        emit(&sink, LobbyEvent::RejoinOffered { battle_id: offer.battle_id });
+                    }
                     if matches!(message, ZerokMessage::FriendList(_)) {
                         let held = lock_or_recover(&state);
                         for action in held_joins.take().into_iter().flatten() {
