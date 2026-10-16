@@ -22,7 +22,7 @@
 
 import { Button } from "@picoframe/frame";
 import { SwatchBook } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Label } from "@/components/ui/label";
 import {
@@ -33,6 +33,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import type {
   UnitDatasetEntry,
+  UnitModelPiece,
   UnitModelResult,
 } from "../../../content/bindings";
 import {
@@ -43,9 +44,20 @@ import {
 import { ModelReadFailed } from "../../../content/pages/components/ModelReadFailed";
 import { UnitPickerButton } from "../../../content/pages/components/UnitPicker";
 import { unitLabel } from "../../../content/unitChoices";
-import { countTriangles, missingTextures } from "../../../content/unitModel";
+import {
+  countPieces,
+  countTriangles,
+  countVertices,
+  missingTextures,
+} from "../../../content/unitModel";
 import { withoutGeneratedGames } from "../../../lib/generatedGames";
 import { usePreferredTarget } from "../../../play/config";
+import type { LegoProject } from "../../model";
+import type { LoadedPack } from "../../pack";
+import type { RawGeometry } from "../../rawGeometry";
+import { REFERENCE_COUNTS } from "../../referenceObject";
+import { bakedCounts, type ModelCounts } from "../../s3oBuild";
+import { UnitCounts } from "./UnitCounts";
 
 /** What the viewport needs to stand a unit in the scene, and what to call it. */
 export interface GameReferenceChoice {
@@ -61,11 +73,20 @@ export interface GameReferenceChoice {
  */
 const BUILT_IN = "coilbox:built-in";
 
+/** The unit being built, for the counts shown beside the reference's. */
+export interface UnitSource {
+  project: LegoProject;
+  pack: LoadedPack;
+  raw: RawGeometry | null;
+}
+
 export function ReferencePicker({
+  unit: unitSource,
   show,
   onShowChange,
   onReference,
 }: {
+  unit: UnitSource;
   /** Whether the figure is in the scene at all. */
   show: boolean;
   onShowChange: (on: boolean) => void;
@@ -168,6 +189,25 @@ export function ReferencePicker({
             />
           </Field>
         )}
+
+        <Counts
+          unit={unitSource}
+          reference={
+            model && drawable && unit
+              ? {
+                  counts: {
+                    pieces: countPieces(model.root as UnitModelPiece),
+                    triangles: countTriangles(model.root as UnitModelPiece),
+                    vertices: countVertices(model.root as UnitModelPiece),
+                  },
+                  label: unitLabel(unit),
+                }
+              : {
+                  counts: REFERENCE_COUNTS,
+                  label: "Solar collector (a building)",
+                }
+          }
+        />
 
         <Note
           scanning={scan.loading}
@@ -286,6 +326,31 @@ function Note({
         </Text>
       )}
     </>
+  );
+}
+
+/**
+ * Mounted only while the popover is open, so the bake behind the unit's counts
+ * runs when somebody is looking and is reused until the unit changes.
+ */
+function Counts({
+  unit,
+  reference,
+}: {
+  unit: UnitSource;
+  reference: { counts: ModelCounts; label: string };
+}) {
+  const { project, pack, raw } = unit;
+  const counts = useMemo(
+    () => bakedCounts(project, pack, raw),
+    [project, pack, raw],
+  );
+  return (
+    <UnitCounts
+      unit={counts}
+      reference={reference.counts}
+      referenceLabel={reference.label}
+    />
   );
 }
 

@@ -5,6 +5,7 @@ import { type LegoPiece, type LegoProject, newProject } from "./model";
 import type { LegoPartInfo, LoadedPack } from "./pack";
 import type { RawGeometry } from "./rawGeometry";
 import {
+  bakedCounts,
   buildS3o,
   pieceWorldRest,
   type S3oPiece,
@@ -808,5 +809,24 @@ describe("pieceWorldRest", () => {
     expect(
       pieceWorldRest(project([]), pack(), null).get("nope"),
     ).toBeUndefined();
+  });
+});
+
+describe("bakedCounts", () => {
+  it("counts the root as a piece with no triangles", () => {
+    expect(bakedCounts(project([]), pack(), null)).toEqual({
+      pieces: 1,
+      triangles: 0,
+      vertices: 0,
+    });
+  });
+
+  it("counts each piece, and the triangles and vertices it exports", () => {
+    const counts = bakedCounts(
+      project([{}, { rotation: [0, 90, 0], scale: [2, 2, 2] }]),
+      pack(),
+      null,
+    );
+    expect(counts).toEqual({ pieces: 3, triangles: 2, vertices: 6 });
   });
 });

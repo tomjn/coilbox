@@ -29,8 +29,13 @@ vi.mock("@/lib/springTexture", () => ({
   },
 }));
 
-const { buildModel, missingTextures, modelFormatLabel, prepareTextureAtlas } =
-  await import("./unitModel");
+const {
+  buildModel,
+  countVertices,
+  missingTextures,
+  modelFormatLabel,
+  prepareTextureAtlas,
+} = await import("./unitModel");
 type UnitTextureAtlas = NonNullable<
   Awaited<ReturnType<typeof prepareTextureAtlas>>
 >;
@@ -511,5 +516,30 @@ describe("buildModel materials", () => {
     const built = buildModel(twoColours, undefined, { merge: true });
     expect(meshes(built.object)).toHaveLength(2);
     built.dispose();
+  });
+});
+
+describe("countVertices", () => {
+  it("adds the vertices of every group in every piece", () => {
+    const group = (vertices: number) => ({
+      positions: new Array(vertices * 3).fill(0),
+      normals: [],
+      uvs: [],
+      indices: [],
+    });
+    const root = {
+      name: "base",
+      offset: [0, 0, 0] as [number, number, number],
+      groups: [group(3), group(4)],
+      children: [
+        {
+          name: "turret",
+          offset: [0, 0, 0] as [number, number, number],
+          groups: [group(5)],
+          children: [],
+        },
+      ],
+    };
+    expect(countVertices(root)).toBe(12);
   });
 });
