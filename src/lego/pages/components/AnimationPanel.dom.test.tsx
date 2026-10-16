@@ -208,6 +208,18 @@ describe("a unit whose game compiled its animation", () => {
   });
 });
 
+describe("a unit that owns its script", () => {
+  it("says the presets no longer write it, and where to edit it", () => {
+    show(project({ script: "function script.Create() end\n" }));
+
+    expect(
+      screen.getByText(
+        /presets no longer write it\. Edit it on the Script tab/,
+      ),
+    ).toBeTruthy();
+  });
+});
+
 describe("a unit on the presets", () => {
   it("offers them, and runs no script until played", () => {
     show(project());
