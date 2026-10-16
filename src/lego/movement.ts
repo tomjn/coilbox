@@ -219,6 +219,29 @@ export function declaresMoveClass(
   return names.some((name) => name.toLowerCase() === target);
 }
 
+/** The game a unit belongs to, as far as the project records it. */
+export interface UnitGame {
+  name: string;
+  /** The primary archive's file name, the identity behind the name. */
+  archive: string;
+}
+
+/**
+ * The game a unit belongs to, or null when it belongs to none. This is the one
+ * place the movement picker asks, so #3257 (a unit records its game) replaces
+ * this body and nothing else.
+ *
+ * Until then only an import counts: a model picked from a game's archive is that
+ * game's. `exported.dir` does not. Exporting writes files into a folder, which
+ * says where the unit was put, not which game it is for, and a folder can be a
+ * loose `.sdd` that any unit is dropped into. The Test drawer's game does not
+ * count either, since that is a habit shared by every project.
+ */
+export function unitGame(project: LegoProject): UnitGame | null {
+  const game = project.imported?.game;
+  return game ? { name: game.name, archive: game.archive } : null;
+}
+
 /** What the movement picker can show, given what is known about the game. */
 export type MovementState =
   | { state: "no-game"; reason: string }

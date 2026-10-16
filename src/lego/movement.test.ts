@@ -8,6 +8,7 @@ import {
   offerMoveClasses,
   slopeVerdict,
   suggestMotion,
+  unitGame,
 } from "./movement";
 
 function project(roles: string[]): LegoProject {
@@ -272,5 +273,38 @@ describe("slopeVerdict", () => {
     expect(slopeVerdict({ moveClass: "BOAT2" }, { moveDefs }, 10)).toBe(
       "BOAT2 is a ship class, which has no maxSlope.",
     );
+  });
+});
+
+describe("unitGame", () => {
+  const exported = {
+    dir: "/games/SplinterFaction.sdd",
+    at: "2026-10-16T00:00:00Z",
+    unitName: "rover",
+    def: {},
+    files: [],
+  };
+
+  it("is null for a unit that belongs to no game", () => {
+    expect(unitGame(project(["wheel"]))).toBeNull();
+  });
+
+  it("is the game a unit was imported from", () => {
+    const imported = {
+      source: "x.s3o",
+      game: {
+        name: "Splinter Faction 0.1.89",
+        archive: "SplinterFaction_0.1.89.sdz",
+        member: "objects3d/a.s3o",
+      },
+    } as LegoProject["imported"];
+    expect(unitGame({ ...project(["wheel"]), imported })).toEqual({
+      name: "Splinter Faction 0.1.89",
+      archive: "SplinterFaction_0.1.89.sdz",
+    });
+  });
+
+  it("does not count the folder a unit was exported into", () => {
+    expect(unitGame({ ...project(["wheel"]), exported })).toBeNull();
   });
 });

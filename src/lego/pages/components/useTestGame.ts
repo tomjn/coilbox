@@ -1,7 +1,7 @@
 /**
- * The game a built unit is tested against, which is also the game the builder
- * reads movement classes from (issue #3255). Kept as an app setting by the Test
- * drawer, since a built unit has no game of its own before it is exported.
+ * The game a built unit is tested against. Kept as an app setting by the Test
+ * drawer. It is not the unit's game: movement classes come from `unitGame`
+ * (issue #4172).
  */
 
 import { useSetting } from "@picoframe/frame";
