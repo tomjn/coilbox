@@ -454,11 +454,12 @@ export function ScriptTab({
       {!owned && !compiled && (
         <div className="flex flex-col gap-2 border-t border-border/60 px-3 py-3">
           <p className="text-xs text-muted-foreground">
-            Take this script over and the unit keeps your version of it: you
-            edit it here, and an export writes what you wrote. The animation
-            presets stop applying to this unit at that point. You can hand the
-            script back later, which discards what you wrote and puts the
-            presets back in charge.
+            Take this script over to edit it. The unit then keeps your version,
+            an export writes what you wrote, and the presets stop generating it.
+            You do not need to take it over to see the unit run, because the
+            Animation panel already plays this script. You can hand it back
+            later, which discards your version and puts the presets back in
+            charge.
           </p>
           <Button
             variant="outline"

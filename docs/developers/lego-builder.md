@@ -95,7 +95,19 @@ Then open the **Animation** tab. Each preset says what it does and what it needs
 | Factory build cycle | A door |
 | Nano from the nozzle | A nano emit point |
 
-Applying one gives you sliders for its own parameters: stride time, thigh swing, sweep angle, kick distance and so on. **Play** runs everything applied, in the viewport, over the unit's built pose. Nothing about playback is written to the unit, so stopping restores exactly what you built. Playback stays off if your system asks for reduced motion.
+Applying one gives you sliders for its own parameters: stride time, thigh swing, sweep angle, kick distance and so on.
+
+**Play** runs the script the presets generate, the same Lua an export writes, and shows what it does in the viewport. A mistake in the script shows up here rather than after export. Each run lasts 15 seconds and loops. Change a preset, one of its sliders or a role while a run is on screen, and the new script runs as soon as you stop editing.
+
+**What happens to the unit**, under **Preview**, picks what the script is put through: moving, starting and stopping, standing still, switched on, building, hit and destroyed, aiming and firing, or being loaded into a transport. A scenario with something to aim at, build or carry puts a stand-in in the scene, a plain shape the script is told about, so an aim has a target you can check it against.
+
+A scenario the unit has nothing to do in is marked **Nothing to do** in the list. The line under the picker names the presets that would give it something, or says presets do not cover it. You can still pick it.
+
+The scrubber under Play steps through the run one frame at a time. Marks under it show the frames where something happened, such as a shot, and clicking one jumps to that frame.
+
+With several presets applied, the play button on a preset's own row plays that one alone, in the scenario that shows it off. The main button then reads **Play all** and goes back to all of them.
+
+Nothing about playback is written to the unit, so stopping restores exactly what you built. Playback stays off if your system asks for reduced motion.
 
 Presets are demonstrations of motion, not the motion itself in every case. A turret in a game points where the target is, and the sweep you see in the viewport is what that motion looks like.
 
@@ -117,11 +129,13 @@ Its script sets build stance. That one is written for every unit, builder or not
 
 ### The script behind the presets
 
-**Script** at the top of the Animation panel shows the Lua the presets generate, ready to copy. It declares a local only for the pieces it actually uses, and it is sampled from the same maths the viewport plays, so the two cannot drift apart.
+The **Script** tab, in the strip along the bottom, shows the Lua the presets generate, ready to copy. The **Script** button at the top of the Animation panel opens it. It declares a local only for the pieces it actually uses. It is also the script the preview runs, so what plays in the viewport and what an export writes cannot drift apart.
 
 The engine calls this the unit script, and it is written on export to `scripts/<unit>.lua`. Animation is most of what it does, which is why the builder puts it behind the Animation panel, but the same file is where a game's own `Create`, `Killed` and `AimWeapon` hooks would go. It is loaded by the unit script framework that games ship in `LuaGadgets/Gadgets/unit_script.lua`, which reads the file named by the unit definition's `script` key.
 
-**Take ownership of this script** hands it to you. From then on the drawer is an editor, the text is stored on the unit, and an export writes exactly what you wrote. The presets stop applying at that point, so the Animation panel becomes a player for your script rather than a list of presets.
+**Take ownership of this script** hands it to you, so you can edit it. From then on the Script tab is an editor, the text is stored on the unit, and an export writes exactly what you wrote. The presets stop generating it at that point. The Animation panel drops the preset list and plays your text in the same player.
+
+You do not need to take ownership to see the unit run. The preview already plays the generated script, so ownership is only for changing it by hand.
 
 A unit opened out of a game brings its own script with it. See [Opening a unit from a game](#opening-a-unit-from-a-game).
 
@@ -133,7 +147,7 @@ A model opened out of an installed game arrives as geometry with a modeller's na
 
 Where that script is comes from the unit definition's `script` key, resolved the way the engine's unit script framework resolves it rather than as a path. A game that moved to Lua while keeping the old `.cob` names in its definitions still resolves.
 
-Lua is offered as the unit's own script. Keep it and the unit animates the way it does in its game, and an export writes it back. The presets stop applying while it does, and the script drawer hands it back whenever you want them.
+Lua is offered as the unit's own script. Keep it and the unit animates the way it does in its game, and an export writes it back. The presets stop applying while it does, and the Script tab hands it back whenever you want them.
 
 A `.cob` is compiled, and coilbox writes Lua, so one of those is never taken on. It is disassembled and shown for reading instead, straight from the bytes, so nothing is copied out of the game and the file itself is untouched. The unit opens on the presets.
 

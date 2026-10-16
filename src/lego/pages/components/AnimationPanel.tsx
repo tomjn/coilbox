@@ -1186,8 +1186,8 @@ export function AnimationPanel({
           </p>
         ) : playsOwnScript ? (
           <p className="text-xs text-muted-foreground">
-            The presets wrote this unit's script once and are done with it. This
-            plays the script itself, so what you see is what the file says.
+            This unit has its own script, so the presets no longer write it.
+            Edit it on the Script tab.
           </p>
         ) : null}
       </>

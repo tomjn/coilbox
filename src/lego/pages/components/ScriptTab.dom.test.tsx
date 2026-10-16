@@ -139,17 +139,24 @@ describe("a unit still on the generated script", () => {
     expect(screen.getByText(/Generated from the animations/)).toBeTruthy();
   });
 
-  it("offers to take it over, and says the presets stop applying", () => {
+  it("offers to take it over, and says the presets stop generating it", () => {
     show(unit());
     expect(
       screen.getByRole("button", { name: /Take ownership of this script/ }),
     ).toBeTruthy();
-    expect(screen.getByText(/presets stop applying/)).toBeTruthy();
+    expect(screen.getByText(/presets stop\s+generating it/)).toBeTruthy();
+  });
+
+  it("says the unit runs without taking the script over", () => {
+    show(unit());
+    expect(
+      screen.getByText(/do not need to take it over to see the unit run/),
+    ).toBeTruthy();
   });
 
   it("says the script can be handed back later", () => {
     show(unit());
-    expect(screen.getByText(/hand\s+the script back later/)).toBeTruthy();
+    expect(screen.getByText(/hand it\s+back later/)).toBeTruthy();
   });
 
   it("offers no way back while there is nothing to hand back", () => {
