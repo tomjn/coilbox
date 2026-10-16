@@ -7,10 +7,10 @@
  * https://github.com/tomjn/coilbox/issues/581. What can be undone is coilbox's
  * own bake, because every vertex it wrote was copied from a part.
  *
- * A file is coilbox's when every piece that has geometry carries a part's UVs
- * verbatim. UVs are the one thing the bake never touches: positions go through
- * the piece's rotation and scale and normals through the inverse transpose, but
- * a UV is copied across as it stands. They are also what tells two parts apart,
+ * A file is coilbox's when every piece that has geometry carries a part's UVs.
+ * UVs are the one thing the bake never transforms: positions go through the
+ * piece's rotation and scale and normals through the inverse transpose, but a
+ * UV only has its v turned round for the engine (see `engineUv`). They are also what tells two parts apart,
  * since a colourway family shares its mesh and differs only in where it samples
  * the atlas, and every one of the bundled pack's 373 parts has a UV stream no
  * other part has. Matching on them cannot half-recognise a model: either every
@@ -30,7 +30,7 @@ import * as THREE from "three";
 import { exportTextureName, type LegoAtlas } from "./atlas";
 import { LEGO_SCHEMA_VERSION, type LegoPiece, type LegoProject } from "./model";
 import type { LegoPartInfo, LoadedPack } from "./pack";
-import type { S3oVertex } from "./s3oBuild";
+import { engineUv, type S3oVertex } from "./s3oBuild";
 
 /** x, y, z, nx, ny, nz, u, v, the record the pack and the format share. */
 const FLOATS_PER_VERTEX = 8;
@@ -230,8 +230,8 @@ function flatten(root: S3oReadPiece, newId: () => string): Node[] {
  *
  * Vertex and index counts narrow the search first, and are not evidence on
  * their own: plenty of parts share a mesh. The UV stream is what identifies
- * one, and it has to match to the bit, which it does because the bake copies it
- * and both ends store it as a 32-bit float.
+ * one, and it has to match to the bit, which it does because the export works
+ * it out the same way every time and both ends store it as a 32-bit float.
  */
 function findPart(pack: LoadedPack, piece: S3oReadPiece): LegoPartInfo | null {
   for (const part of pack.parts) {
@@ -242,17 +242,31 @@ function findPart(pack: LoadedPack, piece: S3oReadPiece): LegoPartInfo | null {
   return null;
 }
 
+/**
+ * Whether a piece carries a part's UVs, as an export writes them.
+ *
+ * An export writes a part's v as `engineUv` gives it, and the file holds that
+ * as a 32-bit float, which `Math.fround` is. An export made before #4165 wrote
+ * the pack's v unchanged, and still matches, so a unit exported then can be
+ * recovered and exported again the right way up.
+ */
 function sameUvs(
   pack: LoadedPack,
   part: LegoPartInfo,
   vertices: S3oVertex[],
 ): boolean {
-  for (let i = 0; i < part.vCount; i++) {
-    const at = (part.vFirst + i) * FLOATS_PER_VERTEX;
-    if (pack.vertices[at + 6] !== vertices[i].uv[0]) return false;
-    if (pack.vertices[at + 7] !== vertices[i].uv[1]) return false;
-  }
-  return true;
+  const matches = (written: (u: number, v: number) => [number, number]) => {
+    for (let i = 0; i < part.vCount; i++) {
+      const at = (part.vFirst + i) * FLOATS_PER_VERTEX;
+      const [u, v] = written(pack.vertices[at + 6], pack.vertices[at + 7]);
+      if (u !== vertices[i].uv[0] || v !== vertices[i].uv[1]) return false;
+    }
+    return true;
+  };
+  return (
+    matches((u, v) => engineUv([u, v]).map(Math.fround) as [number, number]) ||
+    matches((u, v) => [u, v])
+  );
 }
 
 /**

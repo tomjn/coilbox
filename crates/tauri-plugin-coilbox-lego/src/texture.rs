@@ -440,6 +440,33 @@ fn stored_png(source: &Path, keep_alpha: bool) -> Result<BlenderPng, String> {
     })
 }
 
+/// A parts atlas as the engine needs it in a game's `unittextures/`.
+///
+/// The engine draws an s3o's first texture mixed with the player's colour by
+/// its alpha, `mix(diffuse.rgb, teamColor.rgb, diffuse.a)` in
+/// `ModelFragProg.glsl`, and loads a PNG with no alpha channel as fully opaque.
+/// KaiserJ's atlas has none, so written as it stands it draws a unit entirely
+/// in team colour (#4164). An atlas with no alpha is written with an alpha of
+/// 0, which is the parts' own colours and no team colour anywhere. One that has
+/// an alpha carries a mask somebody drew, and is written exactly as it is.
+///
+/// The pack keeps its atlas opaque rather than shipping this. The builder's
+/// webview draws the parts from that file, and with an alpha of 0 it drew every
+/// part black.
+pub fn engine_atlas(bytes: &[u8]) -> Result<Vec<u8>, String> {
+    let img = image::load_from_memory(bytes)
+        .map_err(|e| format!("could not read the atlas as an image: {e}"))?;
+    if img.color().has_alpha() {
+        return Ok(bytes.to_vec());
+    }
+    let mut rgba = img.to_rgba8();
+    for pixel in rgba.pixels_mut() {
+        pixel[3] = 0;
+    }
+    coilbox_texture::encode_png(&rgba)
+        .ok_or_else(|| "could not encode the atlas as a PNG".to_string())
+}
+
 /// Delete every texture in the store that no saved unit names.
 ///
 /// The store is content addressed, so editing a texture and refreshing leaves
@@ -479,6 +506,44 @@ mod tests {
             .write_to(&mut out, image::ImageFormat::Png)
             .expect("encode");
         out.into_inner()
+    }
+
+    #[test]
+    fn an_atlas_with_no_alpha_is_written_with_an_alpha_of_0_and_its_colours_kept() {
+        let written = engine_atlas(&png_bytes(2, 1)).expect("atlas");
+
+        let img = image::load_from_memory(&written).expect("decode");
+        assert!(img.color().has_alpha());
+        assert!(img.to_rgba8().pixels().all(|pixel| pixel.0 == [1, 2, 3, 0]));
+    }
+
+    /// A mask somebody drew: the second pixel is all team colour.
+    #[test]
+    fn an_atlas_with_its_own_alpha_is_written_exactly_as_it_is() {
+        let mut img = image::RgbaImage::from_pixel(2, 1, image::Rgba([9, 9, 9, 0]));
+        img.put_pixel(1, 0, image::Rgba([8, 8, 8, 255]));
+        let bytes = coilbox_texture::encode_png(&img).expect("encode");
+
+        assert_eq!(engine_atlas(&bytes).expect("atlas"), bytes);
+    }
+
+    /// The bundled atlas, which the builder draws with and an export writes
+    /// from. It stays opaque: the webview drew every part black when it had an
+    /// alpha of 0. So the alpha the engine needs is added on the way out.
+    #[test]
+    fn the_bundled_atlas_is_opaque_and_its_export_has_no_team_colour() {
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../src-tauri/legoparts/atlas.png");
+        let bytes = std::fs::read(&path).expect("bundled atlas");
+        assert!(!image::load_from_memory(&bytes)
+            .expect("decode")
+            .color()
+            .has_alpha());
+
+        let written =
+            image::load_from_memory(&engine_atlas(&bytes).expect("atlas")).expect("decode");
+        assert!(written.color().has_alpha());
+        assert!(written.to_rgba8().pixels().all(|pixel| pixel[3] == 0));
     }
 
     /// The engine appends `00` to a `.3do` texture name, so a face naming

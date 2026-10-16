@@ -6,6 +6,7 @@ import type { LegoPartInfo, LoadedPack } from "./pack";
 import type { RawGeometry } from "./rawGeometry";
 import {
   bakedCounts,
+  bakedPieces,
   buildS3o,
   pieceWorldRest,
   type S3oPiece,
@@ -444,6 +445,78 @@ describe("buildS3o", () => {
 
     expect(build?.texture1).toBe("probe.png");
     expect(build?.texture2).toBe("probe_glow.png");
+  });
+});
+
+describe("a part's UVs on export (#4165)", () => {
+  // pack()'s triangle carries uv (0, 0), (1, 0) and (0, 1), in the pack's
+  // convention: v from the bottom of the atlas, as the .obj it came from.
+  it("writes v as 1 - v, since the engine reads v from the top of the atlas", () => {
+    const build = buildS3o(
+      project([{ id: "hull", name: "hull" }]),
+      pack(),
+      null,
+      TEXTURES,
+    );
+
+    expect(
+      child(build?.root as S3oPiece, "hull").vertices.map(
+        (vertex) => vertex.uv,
+      ),
+    ).toEqual([
+      [0, 1],
+      [1, 1],
+      [0, 0],
+    ]);
+  });
+
+  it("leaves the bake the viewport draws in the pack's own convention", () => {
+    const doc = project([{ id: "hull", name: "hull" }]);
+
+    const baked = bakedPieces(doc, pack(), null).pieces.get("hull");
+
+    expect(baked?.vertices.map((vertex) => vertex.uv)).toEqual([
+      [0, 0],
+      [1, 0],
+      [0, 1],
+    ]);
+  });
+
+  it("turns a part round after its own UV fix, not instead of it", () => {
+    const doc = project([{ id: "hull", name: "hull", uvFlip: true }]);
+
+    const build = buildS3o(doc, pack(), null, TEXTURES);
+
+    // Flipped by the fix and then by the export, so back where the pack has it.
+    expect(
+      child(build?.root as S3oPiece, "hull").vertices.map(
+        (vertex) => vertex.uv,
+      ),
+    ).toEqual([
+      [0, 0],
+      [1, 0],
+      [0, 1],
+    ]);
+  });
+
+  it("writes an imported mesh's UVs as they came, beside a part that is turned round", () => {
+    // A unit imported from a game's model, with a part added to it. The mesh
+    // is already in the engine's convention, and flipping it would mirror a
+    // game's own unit the moment it was exported again.
+    const doc = project([
+      { id: "hull", name: "hull", partId: null, meshId: "m1" },
+      { id: "fin", name: "fin" },
+    ]);
+
+    const build = buildS3o(doc, pack(), raw(), TEXTURES);
+    const root = build?.root as S3oPiece;
+
+    expect(child(root, "hull").vertices.map((vertex) => vertex.uv)).toEqual([
+      [0, 0],
+      [0.5, 0],
+      [0.5, 0.5],
+    ]);
+    expect(child(root, "fin").vertices[0].uv).toEqual([0, 1]);
   });
 });
 

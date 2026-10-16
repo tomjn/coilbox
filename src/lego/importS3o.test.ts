@@ -347,6 +347,31 @@ describe("recoverProject", () => {
     }
   });
 
+  it("tells two parts apart by their UVs once the export has turned v round (#4165)", () => {
+    const doc = project([
+      { id: "a", name: "a", partId: "red" },
+      { id: "b", name: "b", partId: "blue", position: [3, 0, 0] },
+    ]);
+
+    const back = recover(exported(doc));
+
+    expect(named(back, "a").partId).toBe("red");
+    expect(named(back, "b").partId).toBe("blue");
+  });
+
+  it("still recovers a unit exported before #4165, with v as the pack has it", () => {
+    const model = exported(project([{ id: "a", name: "a", partId: "blue" }]));
+    // What an export wrote then: the pack's UVs, unchanged.
+    model.root.children[0].vertices = model.root.children[0].vertices.map(
+      (vertex, i) => ({
+        ...vertex,
+        uv: [Math.fround(0.75), Math.fround(i / 10)] as [number, number],
+      }),
+    );
+
+    expect(named(recover(model), "a").partId).toBe("blue");
+  });
+
   it("names the pack it was recovered against", () => {
     const back = recover(exported(project([{ id: "a", name: "a" }])));
 

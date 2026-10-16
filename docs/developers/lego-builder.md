@@ -370,11 +370,11 @@ One thing this does not yet do is save. Workshop edits live on the page for as l
 
 ## The engine load checklist
 
-**Result: four of five proved, one failed.** The check is: export a unit into a `.sdd` working copy or use **Test in game**, get it onto a map with `/cheat` and `/give`, and confirm all five of:
+**Result: all five proved.** The check is: export a unit into a `.sdd` working copy or use **Test in game**, get it onto a map with `/cheat` and `/give`, and confirm all five of:
 
 1. The model renders at all. **Proved.**
 2. Its orientation and handedness are right, so it faces the way it did in the builder and is not mirrored. **Proved.**
-3. Textures land on the right geometry. **Failed**, in two ways: [issue #4164](https://github.com/tomjn/coilbox/issues/4164) and [issue #4165](https://github.com/tomjn/coilbox/issues/4165).
+3. Textures land on the right geometry. **Proved**, after fixing [issue #4164](https://github.com/tomjn/coilbox/issues/4164) and [issue #4165](https://github.com/tomjn/coilbox/issues/4165).
 4. The selection volume is sane, so clicking the unit selects it and the volume is neither a speck nor the size of the map. **Proved.**
 5. The infolog has no Lua error from the unit script. **Proved.**
 
@@ -390,8 +390,12 @@ The other two need pixels, so [issue #3316](https://github.com/tomjn/coilbox/iss
 ![The probe unit from behind and to its right. 1: the builder viewport. 2: the engine with the unit as exported, plain white. 3: the engine with the atlas's alpha set to 0. 4: the builder with v flipped, which matches 3.](/screenshots/unit-builder-engine-textures.jpg)
 
 - **The model renders.** All three pieces drew, in the places and at the sizes the builder shows, from all three points. The engine named the pieces `base, hull, nose, tower`. `bun run lego:reads3o` on the same file found the hierarchy and offsets as built, no triangle wound against its normal, and u from 0.1199 to 0.9990 and v from 0.3690 to 0.8866.
-- **The texture fails twice.** The engine draws the whole unit in team colour, which was white here (panel 2). The pack's `atlas.png` has no alpha channel, and the engine reads a missing alpha as 1, which is all team colour: [issue #4164](https://github.com/tomjn/coilbox/issues/4164). With the alpha set to 0 the texture shows (panel 3), but every face samples the vertically mirrored part of its column. The builder with v flipped matches the engine from all three points (panel 4). The pack's UVs count v from the bottom of the image, as an `.obj` does, and the engine counts it from the top: [issue #4165](https://github.com/tomjn/coilbox/issues/4165). u is right, so every piece stays in its own colour.
+- **The texture failed twice at first.** The engine drew the whole unit in team colour, which was white here (panel 2). The pack's `atlas.png` has no alpha channel, and the engine reads a missing alpha as 1, which is all team colour: [issue #4164](https://github.com/tomjn/coilbox/issues/4164). With the alpha set to 0 the texture shows (panel 3), but every face samples the vertically mirrored part of its column. The builder with v flipped matches the engine from all three points (panel 4). The pack's UVs count v from the bottom of the image, as an `.obj` does, and the engine counts it from the top: [issue #4165](https://github.com/tomjn/coilbox/issues/4165). u is right, so every piece stays in its own colour.
 - **The texture name.** The engine finds the `coilbox_`-prefixed atlas in `unittextures/` by the name in the `.s3o` header. `UnitDefs[id].model.textures.tex1` read `coilbox_atlas.png`, the infolog has no "could not load primary texture" warning, and replacing only that file changed what the engine drew.
+- **The texture after the fixes.** An export now writes an atlas with no alpha channel into `unittextures/` with an alpha of 0, and writes a part's v as 1 - v. The bundled atlas itself stays opaque, because the builder draws from it and an alpha of 0 there drew every part black. The same probe, run the same way with the atlas written by the export's own code, draws every face as the builder does from all three points, with no team colour (panel 3 below). The builder's own view of the probe is pixel for pixel what it was before the change.
+- **Lighting is not part of this check.** The engine draws the parts much paler than the builder does, the stone cube nearly white. Which pixels are sampled is right. Why they come out paler is not known yet: [issue #4175](https://github.com/tomjn/coilbox/issues/4175).
+
+![The probe unit from behind and to its right. 1: the builder viewport. 2: the engine before the fixes, plain white. 3: the engine after them, matching 1.](/screenshots/unit-builder-engine-textures-fixed.jpg)
 
 The Blender check from [issue #563](https://github.com/tomjn/coilbox/issues/563) is still open. That issue was closed with no comment and no result, and Blender was not installed on the machine #3316 ran on. [Issue #4166](https://github.com/tomjn/coilbox/issues/4166) asks for it again.
 
