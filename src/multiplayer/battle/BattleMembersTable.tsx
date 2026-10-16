@@ -115,7 +115,7 @@ export function BattleMembersTable({
     removeBot: (name: string) => void;
     updateBot: (
       name: string,
-      patch: { teamId?: number; ally?: number },
+      patch: { teamId?: number; ally?: number; side?: number },
     ) => void;
     changeBotAi: (name: string, aiShortName: string) => void;
   };
@@ -146,7 +146,7 @@ export function BattleMembersTable({
    * equivalent of SPADS's `!force <name> bonus <n>` (see `useBattleRoom`).
    */
   onSetBonus?: (name: string, value: number) => void;
-  onAddBot: (aiShortName: string) => void;
+  onAddBot: (aiShortName: string, side?: number) => void;
   onSide: (side: number) => void;
   onTeam: (teamId: number) => void;
   onAlly: (ally: number) => void;
@@ -161,6 +161,7 @@ export function BattleMembersTable({
   const justWentIngame = useConnection(serverKey)?.justWentIngame ?? NO_NAMES;
   // The AI the host will add next; defaults to the first available.
   const [chosenAi, setChosenAi] = useState("");
+  const [chosenSide, setChosenSide] = useState("0");
   useEffect(() => {
     if (addableAis.length > 0)
       setChosenAi((c) =>
@@ -231,6 +232,11 @@ export function BattleMembersTable({
         onForceAlly: canSetBotAlly
           ? (a) => hostControls.updateBot(row.name, { ally: a })
           : undefined,
+        // The faction rides in the TASServer battle status. Neither Tachyon's
+        // nor Zero-K's bot message carries one.
+        onForceSide: serverAssignsSeat
+          ? undefined
+          : (s) => hostControls.updateBot(row.name, { side: s }),
         onKick: () => hostControls.removeBot(row.name),
         onChangeAi: (ai) => hostControls.changeBotAi(row.name, ai),
       };
@@ -344,10 +350,24 @@ export function BattleMembersTable({
           addableAis.length > 0 ? "Select an AI" : "No AIs installed"
         }
       />
+      {showFaction && !serverAssignsSeat && (
+        <OptionSelect
+          value={chosenSide}
+          ariaLabel="Faction for the new AI"
+          disabled={!canAddBot}
+          onValueChange={setChosenSide}
+          options={sideOptions}
+          size="sm"
+          className="w-auto min-w-28"
+        />
+      )}
       <Button
         className="h-8 px-3"
         disabled={!canAddBot || !chosenAi}
-        onClick={() => chosenAi && onAddBot(chosenAi)}
+        onClick={() =>
+          chosenAi &&
+          onAddBot(chosenAi, showFaction ? Number(chosenSide) : undefined)
+        }
       >
         Add
       </Button>
