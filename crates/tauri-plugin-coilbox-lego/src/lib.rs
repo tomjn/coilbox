@@ -1981,6 +1981,14 @@ fn write_cob_vars(
     Ok((Some(target.to_string_lossy().to_string()), false))
 }
 
+/// Write a pack's atlas into a game with the alpha the engine reads as the team
+/// colour mask (see [`texture::engine_atlas`]).
+fn write_engine_atlas(source: &Path, target: &Path) -> Result<(), String> {
+    let bytes = std::fs::read(source).map_err(|e| format!("could not read the texture: {e}"))?;
+    let written = texture::engine_atlas(&bytes)?;
+    std::fs::write(target, written).map_err(|e| format!("could not write the texture: {e}"))
+}
+
 /// `lego_export` writes a built unit into a game folder.
 ///
 /// The model goes to `objects3d/<unit>.s3o`. The atlas is shared by every unit
@@ -2081,8 +2089,8 @@ async fn lego_export<R: Runtime>(
         };
         if keep_existing(&target, scratch, overwrite_texture) {
             texture_kept = true;
-        } else if let Err(e) = std::fs::copy(&source, &target) {
-            return CliResult::err(format!("could not copy the texture: {e}"));
+        } else if let Err(e) = write_engine_atlas(&source, &target) {
+            return CliResult::err(e);
         } else {
             texture_path = Some(target.to_string_lossy().to_string());
         }
