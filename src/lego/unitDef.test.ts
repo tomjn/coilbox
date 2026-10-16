@@ -75,6 +75,17 @@ describe("legoUnitDef", () => {
     expect(def.customparams).toEqual({});
   });
 
+  // The engine reads `maxSlope` for where a unit that cannot move may be
+  // built, and its default of 0 allows no height difference at all (issue
+  // #4142). 20 is a value BA, Metal Factions and Complete Annihilation all use
+  // on buildings.
+  it("lets a builder place the unit on sloped ground", () => {
+    const p = project("Sky Fortress", "skyfort");
+    const b = bounds({ x: 32, z: 48 });
+    expect(legoUnitDef(p, b).maxslope).toBe(20);
+    expect(buildUnitDef(p, b)).toContain("maxslope = 20,");
+  });
+
   it("writes customparams as an empty Lua table in the file", () => {
     const text = buildUnitDef(
       project("Sky Fortress", "skyfort"),

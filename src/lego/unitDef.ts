@@ -77,6 +77,16 @@ export const ELMOS_PER_FOOTPRINT = 16;
 /** A conservative stand-in health value, easy to find and retune by hand. */
 const DEFAULT_MAX_DAMAGE = 1000;
 
+/**
+ * The steepest ground, in degrees, the unit may be built on. The engine reads
+ * `maxSlope` for a unit that cannot move and defaults it to 0
+ * (`UnitDef.cpp:423`), which allows no height difference across the footprint,
+ * so a builder is refused almost everywhere (issue #4142). 20 is a value the
+ * buildings of Balanced Annihilation (mex, geo), Metal Factions and Complete
+ * Annihilation use, inside the 10 to 60 that Splinter Faction's buildings span.
+ */
+const DEFAULT_MAX_SLOPE = 20;
+
 /** Escapes for characters that cannot appear raw in a quoted Lua string. */
 const LUA_STRING_ESCAPES: Record<string, string> = {
   "\\": "\\\\",
@@ -195,6 +205,7 @@ export function legoUnitDef(
     ...(project.pieceSelection ? { usepieceselectionvolumes: true } : {}),
     maxdamage: DEFAULT_MAX_DAMAGE,
     canmove: false,
+    maxslope: DEFAULT_MAX_SLOPE,
     // Written together or not at all. `UnitDef::IsBuilderUnit` is `builder &&
     // buildSpeed > 0 && buildDistance > 0`, and `builder` is `&=`'d against
     // that a line later, so `builder = true` on its own clears itself against
