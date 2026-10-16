@@ -258,6 +258,10 @@ if not gadgetHandler:IsSyncedCode() then
 			Spring.Quit()
 		elseif message == "coilbox_harness_player_order" then
 			playerOrder(...)
+		elseif message == "coilbox_harness_reload" then
+			-- Cheats were switched on in Initialize. A full reload, the way a game
+			-- maker types it, and it takes this gadget with everything else.
+			Spring.SendCommands("luarules reload")
 		elseif message == "coilbox_harness_select" then
 			-- What a player's click or drag does to the selection. Nothing here
 			-- tells the runtime: its own unsynced half has to notice, and carry
@@ -1364,6 +1368,101 @@ plans.briefing = {
 	},
 }
 
+-- Reload: `/luarules reload` in the middle of a mission (issue #4147).
+--
+-- The reload loads every gadget again from nothing, this probe included, so the
+-- run is two plans. The first lets the mission get going, writes down what the
+-- reload has to leave alone in game rules params (the engine keeps those), and
+-- asks for the reload. The second is the same probe loaded again past the first
+-- frame, and it reads what the runtime says now against what was written down.
+--
+-- The checks are real damage and real units, not the runtime's own tables: an
+-- invulnerable unit is one that survives a hit, whatever the runtime thinks.
+local HARNESS_HERO, HARNESS_ANCHOR = "coilbox_harness_hero", "coilbox_harness_anchor"
+local HARNESS_GRUNT = "coilbox_harness_grunt"
+
+--- Whether a unit is hurt by a hit. The engine reports a death a frame or more
+-- after the damage, so what is read is the health it is left with.
+local function hurt(unitID)
+	local before = Spring.GetUnitHealth(unitID)
+	Spring.AddUnitDamage(unitID, 50)
+	local after = Spring.GetUnitHealth(unitID)
+	return after == nil or after < before
+end
+
+plans.reload = {
+	deadline = 400,
+	steps = {
+		{ frame = 5, run = function()
+			check("the invulnerable actor is on the map and cannot be killed",
+				state().units.hero ~= nil)
+		end },
+		{ frame = 60, run = function()
+			local mission = state()
+			check("the trigger has fired once", not armed("tally"))
+			check("which added to the var and settled the first objective",
+				rules("coilbox_mission_var_counter") == 6 and objectiveIs("first") == COMPLETE,
+				tostring(rules("coilbox_mission_var_counter")) .. "/" .. tostring(objectiveIs("first")))
+			local anchor
+			for _, unitID in ipairs(Spring.GetTeamUnits(0) or {}) do
+				if mission.gameOver.isAnchor(unitID) then
+					anchor = unitID
+				end
+			end
+			check("the human's team has an anchor", anchor ~= nil)
+			Spring.SetGameRulesParam(HARNESS_HERO, mission.units.hero)
+			Spring.SetGameRulesParam(HARNESS_GRUNT, mission.units.grunt)
+			Spring.SetGameRulesParam(HARNESS_ANCHOR, anchor or -1)
+			check("the invulnerable actor survives a hit before the reload", not hurt(mission.units.hero))
+			check("and the anchor does", not hurt(anchor))
+			-- The reload is the next thing that happens.
+			SendToUnsynced("coilbox_harness_reload")
+		end },
+	},
+}
+
+-- The probe loaded again, in the game the first one left. Frames are counted
+-- from the one it loaded on, because the reload lands wherever the game is by
+-- the time the command arrives.
+plans.reloaded = {
+	relative = true,
+	deadline = 100,
+	steps = {
+		{ frame = 10, run = function()
+			local mission = state()
+			local hero, grunt = rules(HARNESS_HERO), rules(HARNESS_GRUNT)
+			local anchor = rules(HARNESS_ANCHOR)
+			check("after the reload an actor is still the unit it was",
+				mission.units.grunt == grunt and rules("coilbox_mission_actor_grunt") == grunt,
+				tostring(mission.units.grunt) .. "/" .. tostring(rules("coilbox_mission_actor_grunt"))
+					.. " wanted " .. tostring(grunt))
+			check("including the invulnerable one",
+				mission.units.hero == hero and rules("coilbox_mission_actor_hero") == hero,
+				tostring(mission.units.hero) .. "/" .. tostring(rules("coilbox_mission_actor_hero"))
+					.. " wanted " .. tostring(hero))
+			check("and the invulnerable actor still survives a hit", not hurt(hero))
+			check("the anchor is still known as one",
+				mission.gameOver.isAnchor(anchor) and mission.gameOver.anchorCount(0) == 1,
+				tostring(mission.gameOver.isAnchor(anchor)) .. "/" .. mission.gameOver.anchorCount(0))
+			check("and still survives a hit", not hurt(anchor))
+			Spring.DestroyUnit(grunt, false, true)
+			check("a var keeps the number it had reached",
+				rules("coilbox_mission_var_counter") == 6, rules("coilbox_mission_var_counter"))
+			check("a settled objective stays settled",
+				objectiveIs("first") == COMPLETE, objectiveIs("first"))
+			check("and one that was open stays open", objectiveIs("second") == ACTIVE)
+			check("a trigger that had fired is still spent", not armed("tally"), tostring(armed("tally")))
+		end },
+		{ frame = 60, run = function()
+			check("and did not fire again", rules("coilbox_mission_var_counter") == 6,
+				rules("coilbox_mission_var_counter"))
+			check("an actor that is killed after the reload is dead to the mission",
+				rules("coilbox_mission_actor_grunt") == 0 and state().units.grunt == nil,
+				tostring(rules("coilbox_mission_actor_grunt")))
+		end },
+	},
+}
+
 -- No mission at all: the modoption gate. The runtime is a file in the game
 -- whatever happens, so what has to be proved is that a normal game never gets a
 -- gadget out of it.
@@ -1381,6 +1480,12 @@ local GATE = {
 --------------------------------------------------------------------------------
 
 local plan = MISSION_ID and plans[MISSION_ID] or (not MISSION_ID and GATE)
+-- Loaded into a game that is already running, which only a reload does: the
+-- plan is the one for after it, counted from this frame.
+local startedAt = Spring.GetGameFrame()
+if MISSION_ID == "reload" and startedAt > 1 then
+	plan = plans.reloaded
+end
 local done = false
 
 function gadget:Initialize()
@@ -1400,8 +1505,9 @@ function gadget:GameFrame(frame)
 		return
 	end
 
+	local offset = plan.relative and startedAt or 0
 	for _, step in ipairs(plan.steps) do
-		if step.frame == frame then
+		if step.frame + offset == frame then
 			-- A check that raises should not take the rest of the run with it: the
 			-- other steps still have something to say, and an engine that never
 			-- quits is a hung harness rather than a failed one.
@@ -1412,7 +1518,7 @@ function gadget:GameFrame(frame)
 		end
 	end
 
-	if frame >= plan.deadline then
+	if frame >= plan.deadline + (plan.relative and startedAt or 0) then
 		done = true
 		say("done")
 		SendToUnsynced("coilbox_harness_done")
