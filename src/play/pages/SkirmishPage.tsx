@@ -72,7 +72,7 @@ import { StartBoxOverlay } from "@/startbox/StartBoxOverlay";
 import { StartPolygonOverlay } from "@/startbox/StartPolygonOverlay";
 import { StartPosCard } from "@/startbox/StartPosCard";
 import { useZerokStartBoxes } from "@/startbox/useZerokStartBoxes";
-import { areasFromConfig, mapExtent } from "@/startbox/zerok";
+import { areasFromConfig, mapExtent, roomShape } from "@/startbox/zerok";
 import { useBrandingEntry } from "../../content/branding";
 import { loadReplays } from "../../content/replayList";
 import { useReplayUserState } from "../../content/replayUserState";
@@ -501,7 +501,11 @@ export default function SkirmishPage() {
     game: selectedGame,
     mapName: selectedMap?.name,
     extent: mapSize,
-    teamCount: alliesInPlay.size,
+    room: roomShape(
+      participants
+        .filter((p) => !(p.kind === "you" && p.spectator))
+        .map((p) => ({ ally: p.allyTeam, bot: p.kind === "ai" })),
+    ),
   });
   const fileAreas = boxMode && fileBoxes ? areasFromConfig(fileBoxes) : null;
 

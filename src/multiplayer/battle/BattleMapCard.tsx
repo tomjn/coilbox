@@ -19,7 +19,7 @@ import { StartBoxEditor } from "@/startbox/StartBoxEditor";
 import { StartBoxOverlay } from "@/startbox/StartBoxOverlay";
 import { StartPolygonOverlay } from "@/startbox/StartPolygonOverlay";
 import { useZerokStartBoxes } from "@/startbox/useZerokStartBoxes";
-import { areasFromConfig, mapExtent } from "@/startbox/zerok";
+import { areasFromConfig, mapExtent, roomShape } from "@/startbox/zerok";
 import type { Battle } from "../bindings";
 import type { MemberRow } from "./config";
 import { MissingMapBox } from "./MissingMapBox";
@@ -168,7 +168,9 @@ export function BattleMapCard({
     game,
     mapName: mapMissing ? undefined : battle.map,
     extent,
-    teamCount: new Set(players.map((r) => r.ally)).size,
+    room: roomShape(
+      players.map((r) => ({ ally: r.ally, bot: r.kind === "bot" })),
+    ),
   });
   const fileAreas = fileBoxes ? areasFromConfig(fileBoxes) : null;
   const editBoxes = canEditBoxes && !fileAreas;

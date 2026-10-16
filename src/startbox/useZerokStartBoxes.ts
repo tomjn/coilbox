@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   contentStartBoxes,
   type GameItem,
+  type RoomAllyTeam,
   type StartBoxConfig,
 } from "@/content/bindings";
 import { shareInFlight } from "@/content/inFlight";
@@ -14,8 +15,8 @@ const pending = new Map<string, Promise<StartBoxConfig | null>>();
 
 /**
  * The start boxes Zero-K will use on `mapName`, or null when the game is not
- * Zero-K, neither file exists or the file failed (issue #4194). `teamCount`
- * is part of the key because a file may answer differently for it.
+ * Zero-K, neither file exists or the file failed (issue #4194). `room`
+ * is part of the key because a file may answer differently for who is in it.
  */
 export function useZerokStartBoxes({
   enginePath,
@@ -23,14 +24,14 @@ export function useZerokStartBoxes({
   game,
   mapName,
   extent,
-  teamCount,
+  room,
 }: {
   enginePath: string | undefined;
   dataDir: string | undefined;
   game: GameItem | null | undefined;
   mapName: string | undefined;
   extent: WorldExtent | null;
-  teamCount: number;
+  room: RoomAllyTeam[];
 }): { config: StartBoxConfig | null; loading: boolean } {
   const gameArchive = readsZerokStartBoxes(game)
     ? game?.primaryArchive.name
@@ -39,17 +40,13 @@ export function useZerokStartBoxes({
   // request.
   const sizeX = extent?.x;
   const sizeZ = extent?.z;
+  // The shape as text, so a new array of the same room is the same request.
+  const roomKey = JSON.stringify(room);
   const key =
     enginePath && dataDir && gameArchive && mapName && sizeX && sizeZ
-      ? [
-          dataDir,
-          enginePath,
-          gameArchive,
-          mapName,
-          sizeX,
-          sizeZ,
-          teamCount,
-        ].join("::")
+      ? [dataDir, enginePath, gameArchive, mapName, sizeX, sizeZ, roomKey].join(
+          "::",
+        )
       : undefined;
   const [answer, setAnswer] = useState<{
     key: string;
@@ -72,7 +69,7 @@ export function useZerokStartBoxes({
         mapName,
         mapSizeX: sizeX,
         mapSizeZ: sizeZ,
-        teamCount,
+        allyTeams: JSON.parse(roomKey) as RoomAllyTeam[],
       }).then((res) => res.config),
     )
       .then((config) => {
@@ -87,7 +84,7 @@ export function useZerokStartBoxes({
     return () => {
       cancelled = true;
     };
-  }, [key, enginePath, dataDir, gameArchive, mapName, sizeX, sizeZ, teamCount]);
+  }, [key, enginePath, dataDir, gameArchive, mapName, sizeX, sizeZ, roomKey]);
 
   const current = !!key && answer?.key === key;
   return {

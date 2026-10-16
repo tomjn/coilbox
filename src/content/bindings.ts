@@ -4126,6 +4126,12 @@ export interface StartBoxTeam {
   boxes: [number, number][][];
 }
 
+/** One ally team with somebody on it: a flag per player, true for a bot. */
+export interface RoomAllyTeam {
+  allyTeam: number;
+  bots: boolean[];
+}
+
 export interface StartBoxConfig {
   /** Which archive the file came from. */
   source: "game" | "map";
@@ -4148,8 +4154,9 @@ export const contentStartBoxes = defineCommand<
     /** The map's size in world units, for the file's `Game.mapSizeX`. */
     mapSizeX: number;
     mapSizeZ: number;
-    /** Ally teams with somebody on them, for the file's `GetTeamCount()`. */
-    teamCount: number;
+    /** Who is in the room, for the file's `GetTeamList`, `GetTeamCount()` and
+     * `Spring.Utilities.Gametype`. */
+    allyTeams: RoomAllyTeam[];
   },
   { config: StartBoxConfig | null; error?: string }
 >("coilbox-content", "content_start_boxes");
