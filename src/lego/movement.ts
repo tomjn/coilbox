@@ -134,8 +134,9 @@ export function suggestMotion(
 ): LegoMovement {
   const target = moveClass.toLowerCase();
   const declared = moveDefsOf(game.moveDefs);
-  const kind = declared.find((entry) => entry.name.toLowerCase() === target)
-    ?.kind;
+  const kind = declared.find(
+    (entry) => entry.name.toLowerCase() === target,
+  )?.kind;
   const pools: { units: Record<string, unknown>[]; label: string }[] = [
     {
       units: unitsOn(game.units, new Set([target])),
@@ -196,6 +197,24 @@ export function movesInGame(
     typeof movement.speed === "number" &&
     movement.speed > 0
   );
+}
+
+/**
+ * Whether the game has a class by this name, matched case blind as
+ * `MoveDefHandler::GetMoveDefByName` matches it. Against the unit table when the
+ * game's move definitions could not be read.
+ */
+export function declaresMoveClass(
+  game: GameMovementData,
+  moveClass: string,
+): boolean {
+  const target = moveClass.toLowerCase();
+  const declared = moveDefsOf(game.moveDefs);
+  const names =
+    declared.length > 0
+      ? declared.map((entry) => entry.name)
+      : moveClassesOf(game.units).map((entry) => entry.name);
+  return names.some((name) => name.toLowerCase() === target);
 }
 
 /** What the movement picker can show, given what is known about the game. */

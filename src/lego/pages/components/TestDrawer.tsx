@@ -28,21 +28,14 @@ import {
   contentUnitCheckCancel,
   type UnitCheckReport,
 } from "../../../content/bindings";
-import {
-  useUnitsyncGameHeaders,
-  useUnitsyncScan,
-} from "../../../content/config";
-import {
-  SCRATCH_FOLDER,
-  withoutGeneratedGames,
-} from "../../../lib/generatedGames";
+import { useUnitsyncGameHeaders } from "../../../content/config";
+import { SCRATCH_FOLDER } from "../../../lib/generatedGames";
 import { playAskLuaRules } from "../../../play/bindings";
 import {
   gameOptionSchema,
   initialParticipants,
   mapOptionSchema,
   toBattleConfig,
-  usePreferredTarget,
 } from "../../../play/config";
 import { usePlay } from "../../../play/PlayProvider";
 import { GamePickerButton } from "../../../play/pages/components/GamePickerButton";
@@ -75,6 +68,7 @@ import {
 } from "../../writeScratchGame";
 import { ShowMe } from "./ShowMe";
 import { UnitCheckResult } from "./UnitCheckResult";
+import { uniqueByName, useTestGame } from "./useTestGame";
 
 interface Props {
   open: boolean;
@@ -125,31 +119,15 @@ const BUSY_LABEL: Record<string, string> = {
   checking: "Running the engine",
 };
 
-/**
- * Two installed archives can carry the same map or game name. A start script
- * names one, so the second is the same choice offered twice.
- */
-function uniqueByName<T extends { name: string }>(items: T[]): T[] {
-  const seen = new Set<string>();
-  return items.filter((item) => {
-    if (seen.has(item.name)) return false;
-    seen.add(item.name);
-    return true;
-  });
-}
-
 export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
-  const { target, loading: targetLoading } = usePreferredTarget();
-  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  const { target, targetLoading, scan, games, game, setGameName } =
+    useTestGame();
   const { headers: gameHeaders } = useUnitsyncGameHeaders(
     target?.enginePath,
     target?.dataDir,
   );
   const { running, launch, cancel } = usePlay();
 
-  // Remembered app-wide rather than on the unit: which game and map you test
-  // against is a habit, not a property of the thing being built.
-  const [gameName, setGameName] = useSetting<string>("lego.testGame", "");
   const [mapName, setMapName] = useSetting<string>("lego.testMap", "");
 
   const [phase, setPhase] = useState<Phase>({ state: "idle" });
@@ -171,12 +149,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
   /** The launch in flight, so a relaunch can wait for it to finish. */
   const playing = useRef<Promise<void> | null>(null);
 
-  // The scratch game is itself a game, so it comes back in every scan. Offering
-  // it as a base would nest it inside itself, and the scenario editor's test
-  // mutator is no better a base than this one is.
-  const games = uniqueByName(withoutGeneratedGames(scan.data?.games ?? []));
   const maps = uniqueByName(scan.data?.maps ?? []);
-  const game = games.find((g) => g.name === gameName) ?? games[0];
   const map = maps.find((m) => m.name === mapName) ?? maps[0];
 
   const busy =

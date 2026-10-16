@@ -1587,6 +1587,11 @@ function Builder({ id }: { id: string | undefined }) {
                   onBuilderChange={(builder) =>
                     edit((project) => ({ ...project, builder }))
                   }
+                  onMovementChange={(movement) =>
+                    edit(({ movement: _old, ...project }) =>
+                      movement ? { ...project, movement } : project,
+                    )
+                  }
                   effectsNote={effectBitmaps.note}
                 />
               ) : (

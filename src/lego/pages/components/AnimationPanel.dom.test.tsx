@@ -59,6 +59,10 @@ vi.mock("../../../general/display", () => ({
   useReduceMotion: () => false,
 }));
 
+// Reads the test game and its unit definitions through unitsync, which a panel
+// rendered on its own has no app for. `MovementSection.dom.test.tsx` covers it.
+vi.mock("./MovementSection", () => ({ MovementSection: () => null }));
+
 function timeline(over: Partial<ScriptTimeline> = {}): ScriptTimeline {
   return {
     fps: 30,
@@ -114,6 +118,7 @@ function show(
       onChange={vi.fn()}
       onShowScript={vi.fn()}
       onBuilderChange={vi.fn()}
+      onMovementChange={vi.fn()}
       onScriptTimeline={vi.fn()}
       onScriptRun={vi.fn()}
       scriptPaused={false}
@@ -794,6 +799,7 @@ describe("a unit on the presets, edited while it plays", () => {
           onChange={vi.fn()}
           onShowScript={vi.fn()}
           onBuilderChange={vi.fn()}
+          onMovementChange={vi.fn()}
           onScriptTimeline={vi.fn()}
           onScriptRun={vi.fn()}
           scriptPaused={false}
@@ -851,6 +857,7 @@ describe("a unit on the presets, edited while it plays", () => {
         onChange={vi.fn()}
         onShowScript={vi.fn()}
         onBuilderChange={vi.fn()}
+        onMovementChange={vi.fn()}
         onScriptTimeline={vi.fn()}
         onScriptRun={vi.fn()}
         scriptPaused={false}
@@ -971,6 +978,7 @@ describe("playing one preset on its own", () => {
       onChange={vi.fn()}
       onShowScript={vi.fn()}
       onBuilderChange={vi.fn()}
+      onMovementChange={vi.fn()}
       onScriptTimeline={vi.fn()}
       onScriptRun={vi.fn()}
       scriptPaused={false}
