@@ -88,7 +88,11 @@ import { unitBounds } from "../../s3oBuild";
 import type { ScriptTimeline } from "../../scriptPlayback";
 import type { Vec3 } from "../../snapping";
 import { buildStandIn, disposeStandIn, standInRadius } from "../../standIn";
-import { captureThumbnail, readyToCapture } from "../../thumbnail";
+import {
+  type Capture,
+  captureThumbnail,
+  readyToCapture,
+} from "../../thumbnail";
 import {
   applySnap,
   clearAnchors,
@@ -341,7 +345,7 @@ interface Props {
    * It answers null while there is no picture to take: an empty unit, or one
    * still waiting on its textures. Ask again later rather than storing that.
    */
-  onReady?: (capture: () => HTMLCanvasElement | null) => void;
+  onReady?: (capture: Capture) => void;
   /** The applied presets, or a unit's own script, playing or scrubbed. */
   scriptPlayback: {
     /** Runs the applied presets. Nothing is written: stopping restores the
@@ -1026,15 +1030,17 @@ export function ModelViewport({
       // A thumbnail is the unit alone, drawn from a fixed camera: see
       // thumbnail.ts. The live view is drawn again straight after, before the
       // browser composites anything, so the capture is never seen.
-      onReadyRef.current?.(() => {
+      onReadyRef.current?.((shot) => {
         // Nothing worth photographing yet: a unit with no pieces in it, or one
         // whose textures have not arrived and would draw black.
         if (!readyToCapture(root)) return null;
-        const thumb = captureThumbnail(renderer, scene, root, [
-          state.hoverOverlay,
-          state.anchors,
-          ...state.selectOverlays,
-        ]);
+        const thumb = captureThumbnail(
+          renderer,
+          scene,
+          root,
+          [state.hoverOverlay, state.anchors, ...state.selectOverlays],
+          shot,
+        );
         render();
         return thumb;
       });

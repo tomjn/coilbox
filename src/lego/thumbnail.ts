@@ -26,7 +26,7 @@ import type { Vec3 } from "./snapping";
 
 /** The square the frame is drawn at, in CSS pixels. The stored file comes off
  *  it and is smaller still: see `saveThumbnail`. */
-const THUMBNAIL_PIXELS = 320;
+export const THUMBNAIL_PIXELS = 320;
 
 /**
  * Where the camera sits, as a direction from the unit: above it, in front of it
@@ -45,23 +45,59 @@ const THUMBNAIL_FOV = 40;
 const MIN_THUMBNAIL_FAR = 500;
 
 /**
+ * How a build picture differs from the overview thumbnail: its own size, a
+ * background behind the unit, and a camera direction.
+ */
+export interface PictureShot {
+  /** Side of the square, in pixels. Drawn at exactly this size whatever the
+   *  screen's pixel ratio is, because the engine reads the file's own pixels. */
+  pixels: number;
+  /** A CSS colour, or null for none, which leaves the pixels transparent. */
+  background: string | null;
+  /** Where the camera sits, as a direction from the unit. */
+  view: Vec3;
+}
+
+/**
+ * What the viewport hands over for taking a picture of the unit. It answers
+ * null while there is nothing to photograph.
+ */
+export type Capture = (shot?: PictureShot) => HTMLCanvasElement | null;
+
+/**
  * Draw `unit` on its own and hand back a canvas holding the pixels.
  *
  * `chrome` is whatever is drawn on the pieces themselves rather than beside
  * them: those hang off the unit, so the sweep over the scene cannot reach them.
+ *
+ * With `shot` it takes a build picture instead of the overview thumbnail.
  */
 export function captureThumbnail(
   renderer: THREE.WebGLRenderer,
   scene: THREE.Scene,
   unit: THREE.Object3D,
   chrome: (THREE.Object3D | null)[],
+  shot?: PictureShot,
 ): HTMLCanvasElement {
   const restore = hideChrome(scene, unit, chrome);
   const size = renderer.getSize(new THREE.Vector2());
+  const ratio = renderer.getPixelRatio();
+  // The largest square the graphics card can draw, so a size asked for that it
+  // cannot draw is the largest it can rather than an empty canvas.
+  const pixels = shot
+    ? Math.min(shot.pixels, renderer.capabilities.maxTextureSize)
+    : THUMBNAIL_PIXELS;
+  if (shot) {
+    renderer.setPixelRatio(1);
+    // `hideChrome` has taken the sky away, so this is the only background.
+    scene.background = shot.background
+      ? new THREE.Color(shot.background)
+      : null;
+  }
   // Square, so the framing is the same whatever shape the panel is. The style
   // is left alone, so the canvas stays the size the page laid it out at.
-  renderer.setSize(THUMBNAIL_PIXELS, THUMBNAIL_PIXELS, false);
-  renderer.render(scene, thumbnailCamera(unit));
+  renderer.setSize(pixels, pixels, false);
+  renderer.render(scene, thumbnailCamera(unit, shot?.view));
 
   const source = renderer.domElement;
   const thumb = document.createElement("canvas");
@@ -69,6 +105,7 @@ export function captureThumbnail(
   thumb.height = source.height;
   thumb.getContext("2d")?.drawImage(source, 0, 0);
 
+  if (shot) renderer.setPixelRatio(ratio);
   renderer.setSize(size.x, size.y, false);
   restore();
   return thumb;
@@ -118,7 +155,10 @@ export function readyToCapture(unit: THREE.Object3D): boolean {
  * A unit with nothing in it yet has no bounds to frame, so the camera keeps the
  * view's own distance and looks at the origin, which is where an empty unit is.
  */
-export function thumbnailCamera(unit: THREE.Object3D): THREE.PerspectiveCamera {
+export function thumbnailCamera(
+  unit: THREE.Object3D,
+  view: Vec3 = THUMBNAIL_VIEW,
+): THREE.PerspectiveCamera {
   const camera = new THREE.PerspectiveCamera(
     THUMBNAIL_FOV,
     1,
@@ -127,7 +167,7 @@ export function thumbnailCamera(unit: THREE.Object3D): THREE.PerspectiveCamera {
   );
   const box = new THREE.Box3().setFromObject(unit);
   if (box.isEmpty()) {
-    camera.position.set(...THUMBNAIL_VIEW);
+    camera.position.set(...view);
     camera.lookAt(0, 0, 0);
     return camera;
   }
@@ -137,7 +177,7 @@ export function thumbnailCamera(unit: THREE.Object3D): THREE.PerspectiveCamera {
       min: [box.min.x, box.min.y, box.min.z],
       max: [box.max.x, box.max.y, box.max.z],
     },
-    THUMBNAIL_VIEW,
+    view,
     THREE.MathUtils.degToRad(THUMBNAIL_FOV),
   );
   camera.position.set(...position);
