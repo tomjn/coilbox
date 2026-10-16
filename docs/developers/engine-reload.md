@@ -8,7 +8,7 @@ It answers issue #3344. The sandbox is #3341 and its reload button is #3346.
 
 | Part of the unit | Reloads in a running game | How | Live units | Evidence |
 |---|---|---|---|---|
-| Lua unit script | Yes | `/cheat 1`, then `/luarules reload` | Get the new script, and `script.Create` runs again | Engine run and source |
+| Lua unit script | Yes | `/cheat 1`, then `/luarules reload`, or reload the unit script framework gadget alone | Get the new script, and `script.Create` runs again | Engine run and source |
 | COB unit script | Yes | `/cheat 1`, then `/reloadcob <unit>` | Get the new script | Source, and an engine run showing it ignores a Lua script |
 | Unit definition, `units/<unit>.lua` | No | Restart | Keep their old values | Engine run and source |
 | Unit definition values, edited from Lua | Partly | `/cheat 1`, `/editdefs 1`, then a synced gadget writes `UnitDefs[id].<key>` | Keep their old values, and only new units get the edit | Engine run and source |
@@ -53,6 +53,27 @@ The reload took 1.0 seconds, from the cheat taking effect to `LuaRules loaded`, 
 The cost is that every gadget in the game starts again from nothing. Splinter Faction reloaded 109 synced gadgets without new errors. But any state a gadget holds in its own variables is lost: an upgrade a team bought, a wave counter, a scenario's progress. A gadget can keep state it needs through a reload in game rules params, which the engine holds. The probe gadget did that to count its own loads.
 
 Splinter Faction does not handle the reload differently from the base game. Its `LuaRules/Gadgets/unit_script.lua` is the base content gadget, included from `springcontent.sdz`.
+
+### A full reload can end the game
+
+Splinter Faction 0.1.89's `game_team_com_ends.lua` kills every ally team that has no commander when it starts again past frame 1. Its own comment says this is for a `/luarules reload`. In the unit builder's sandbox the targets' team has no commander, so a full reload killed all three targets with no attacker and the game ended 193 and 171 frames later in two runs (issue #3346, headless, AcidicQuarry 5.17).
+
+### Reloading the unit script framework alone
+
+The gadget handler can unload and load one gadget again from disk, with `gadgetHandler:DisableGadget(name)` then `gadgetHandler:EnableGadget(name)` (`cont/base/springcontent/LuaGadgets/gadgets.lua`). A gadget can only reach those with `handler = true` in its `GetInfo`, which gives it the real handler rather than the wrapped one. The handler's own `togglegadget` chat action does the same, but only for player 0 with cheats on.
+
+Doing that to the gadget whose file is `unit_script.lua` reloads every Lua unit script, and its `Initialize` calls `UnitCreated` for every unit already alive, as a full reload does. Every other gadget keeps its state. In the #3346 run, on the same game and map:
+
+```
+[f=0000307] Removed:  LuaRules/Gadgets/unit_script.lua
+[f=0000307] Loading:  LuaRules/Gadgets/unit_script.lua
+[f=0000307] probe script v2 create 29170
+[f=0000307] probe script v2 create 1279
+[f=0000307] probe script v2 create 7687
+[f=0000307] probe script v2 create 26007
+```
+
+All four live units ran the new script. The three targets and the builder were all still there at frame 1800, and a target killed after the reload was replaced. Coilbox's request reached the gadget and its answer came back in 16 to 23 ms over three runs. It needs no cheats, because a plain `/luarules <text>` goes to every synced gadget's `GotChatMsg`. A command from the autohost arrives there as player 255.
 
 ### COB scripts
 
@@ -171,12 +192,13 @@ For the sandbox in #3341:
 - Turn cheats on through the autohost once the game has started, so a reload never waits on them.
 - Keep every file name the unit uses the same from one export to the next, and write every file the unit could need before launch. A reload only sees files that existed when the game started.
 
-For the reload button in #3346:
+For the reload button in #3346, which does this:
 
-- Send commands through the autohost interface, set up as described in "Sending a command to a running engine". It is the engine's own route, it would still work after LuaRules fails to load because the server reads it, and it can confirm what happened. The file watching gadget is the fallback if the autohost route turns out to be a problem.
-- A changed script: export, then send `/luarules reload`. Live units get the new script, so there is no need to respawn them. Say that the game's gadgets started again.
+- Commands go through the autohost interface, set up as described in "Sending a command to a running engine". The launch adds `<app data>/play/autohost/` to the end of `SPRING_DATADIR`, holding only a `springsettings.cfg` with the port.
+- A changed script: export, then send `/luarules coilbox_sandbox reload_scripts`. The sandbox gadget reloads the unit script framework alone, as in "Reloading the unit script framework alone", and answers `coilbox_sandbox:loaded` with `Spring.SendLuaRulesMsg`. A full `/luarules reload` is not used, because of "A full reload can end the game".
 - A changed definition, model or a new file: say a relaunch is needed, and offer it in the same place. Do not use `/editdefs` to fake a definition reload, because table values cannot be written, live units do not change, and the game's own processing of the file would have to be repeated.
-- A changed texture: send `/reloadtextures s3o`, once a windowed test has shown it works.
+- A changed texture: say a relaunch is needed for now. `/reloadtextures s3o` waits on a windowed test.
+- Which parts changed comes from the digest of every file the export wrote, compared with what the game was launched on.
 
 ## How it was tested
 

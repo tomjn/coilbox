@@ -325,6 +325,18 @@ Splinter Faction 0.1.89 has not taken the runtime's start guard ([the adoption c
 
 A map with no start positions has nowhere to put the targets, and the drawer says so. The builder can only place your unit where its definition allows. A unit that cannot move has no slope limit unless you give it a `maxslope`, so it can only be built on perfectly flat ground. Splinter Faction 0.1.89 also gives any unit without a `customparams.factionname` a cost of 518,181,518 metal and energy, so its builder starts your unit and never finishes it.
 
+### Reload in the sandbox
+
+**Reload in the sandbox** puts your latest change into the sandbox that is already running, so you keep the map, the targets and the time you spent getting there. It works while a game started with Play with this unit is running.
+
+- A changed script reloads. Every copy of your unit in the game, yours and the targets, starts running the new script straight away. Nothing has to be respawned.
+- A changed unit definition, model or texture needs a relaunch. The drawer says which one changed and offers **Relaunch**, which closes the game and starts a new sandbox.
+- Renaming the unit needs a relaunch too. A running game only sees files that were there when it started.
+
+When the model changed as well, the script waits for the relaunch, because a new script on the old model can move pieces the model does not have.
+
+Coilbox reaches the running game through the engine's autohost interface, and the sandbox gadget reloads only the game's unit script framework. Reloading every gadget would restart the game's own as well, and Splinter Faction's then kills the targets' team because it has no commander. [What the engine reloads in a running game](engine-reload.md) has the detail.
+
 ## Making the game use the unit
 
 Straight out of export, a unit cannot be played normally. Its definition sets `canmove = false`, and nothing lists it in any unit's `buildoptions`, so nothing can build it and it cannot move. `/cheat` and `/give` is the only way to get one onto a map.
