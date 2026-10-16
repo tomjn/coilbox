@@ -6,7 +6,13 @@
  * bot's side, so a server-assigned room keeps it read-only.
  */
 
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BattleMembersTable } from "./BattleMembersTable";
@@ -95,7 +101,6 @@ function setup(opts: { serverAssignsSeat: boolean }) {
       sides={sides as never}
       maxSlots={8}
       selfHost
-      me="Me"
       serverAssignsSeat={opts.serverAssignsSeat}
       canKick
       canBoss

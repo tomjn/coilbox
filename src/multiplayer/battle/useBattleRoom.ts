@@ -910,7 +910,9 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
       // Change a bot we own/host: team, ally or faction. UPDATEBOT carries the bot's whole
       // battle status, so we resend the unchanged fields from its current status
       // (colour stays read-only for bots — no second drag-flood surface).
-      updateBot: (name: string, patch: { teamId?: number; ally?: number; side?: number },
+      updateBot: (
+        name: string,
+        patch: { teamId?: number; ally?: number; side?: number },
       ) => {
         if (!activeKey || !battle) return;
         const bot = battle.bots[name];
