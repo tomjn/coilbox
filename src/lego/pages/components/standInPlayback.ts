@@ -109,6 +109,7 @@ export function placeStandIn(
       frame,
       { frame: passenger.frame, at },
       state.standInRadius,
+      state.groundShape,
     );
     state.standIn.visible = true;
     state.standIn.rotation.set(0, pose.heading, 0);
@@ -162,7 +163,7 @@ function placeLoose(
 
   // Loose, past the attach, or on a build piece the probe never named. Nothing
   // has been let go yet, so every key is measured from the unit's origin.
-  const pose = standInAt(track, frame, state.standInRadius);
+  const pose = standInAt(track, frame, state.standInRadius, state.groundShape);
   if (!pose) {
     state.standIn.visible = false;
     return;

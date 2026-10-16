@@ -1,11 +1,12 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
-
+import type { GroundShape } from "./environment";
 import type { ScriptOutput, StandInTrack } from "./scriptPlayback";
 import {
   attachedAt,
   buildStandIn,
   disposeStandIn,
+  onGround,
   passengerAt,
   standInAfterRelease,
   standInAt,
@@ -471,5 +472,81 @@ describe("standInAfterRelease", () => {
       10,
     );
     expect(pose.pos).toEqual([5, 4, 0]);
+  });
+});
+
+/** 45 degrees, so the ground is as high as it is far ahead. */
+const SLOPE: GroundShape = { kind: "slope", degrees: 45 };
+
+describe("a stand-in on the ground", () => {
+  it("stands on a slope at the height of the ground under it", () => {
+    // Two radii of 8 ahead is 16 elmos, where a 45 degree slope is 16 high.
+    expect(standInAt(track(), 10, 8, SLOPE)?.pos[1]).toBeCloseTo(16);
+  });
+
+  it("sinks behind the unit where the slope dips below zero", () => {
+    const behind: StandInTrack = { keys: [{ frame: 0, pos: [0, 0, -2] }] };
+    expect(standInAt(behind, 0, 8, SLOPE)?.pos[1]).toBeCloseTo(-16);
+  });
+
+  it("keeps a key's own height above the ground", () => {
+    // Key y of 1 radius on top of the 16 of ground.
+    expect(standInAt(track(), 20, 8, SLOPE)?.pos[1]).toBeCloseTo(8 + 16);
+  });
+
+  it("follows the ground as it moves between keys", () => {
+    const walking: StandInTrack = {
+      keys: [
+        { frame: 0, pos: [0, 0, 0] },
+        { frame: 10, pos: [0, 0, 4] },
+      ],
+    };
+    expect(standInAt(walking, 5, 8, SLOPE)?.pos[1]).toBeCloseTo(16);
+  });
+
+  it("stands on uneven ground at that ground's height", () => {
+    const uneven: GroundShape = { kind: "uneven", degrees: 30, width: 32 };
+    const east: StandInTrack = { keys: [{ frame: 0, pos: [1, 0, 0] }] };
+    const pose = standInAt(east, 0, 8, uneven);
+    // A quarter of a width along x is the crest of sin(kx).
+    const k = (2 * Math.PI) / 32;
+    expect(pose?.pos[1]).toBeCloseTo(Math.tan(Math.PI / 6) / k);
+  });
+
+  it("is unchanged on flat ground", () => {
+    expect(standInAt(track(), 15, 8, null)?.pos).toEqual([8, 4, 16]);
+    expect(onGround(null, [1, 2, 3])).toEqual([1, 2, 3]);
+  });
+
+  it("lifts a point to the ground under it", () => {
+    expect(onGround(SLOPE, [5, 1, 10])[1]).toBeCloseTo(11);
+  });
+
+  it("stands a released stand-in's origin keys on the ground", () => {
+    const keyed: StandInTrack = { keys: [{ frame: 50, pos: [0, 0, 2] }] };
+    const pos = standInAfterRelease(
+      keyed,
+      50,
+      { frame: 40, at: [0, 5, 0] },
+      8,
+      SLOPE,
+    ).pos;
+    expect(pos[1]).toBeCloseTo(16);
+  });
+
+  it("keeps a release-relative key's height over the ground", () => {
+    const keyed: StandInTrack = {
+      keys: [{ frame: 50, pos: [0, 0, 2], fromRelease: true }],
+    };
+    // Let go 5 above flat ground at the origin, then moved 16 ahead onto
+    // ground that is 16 higher: still 5 above it.
+    const pos = standInAfterRelease(
+      keyed,
+      50,
+      { frame: 40, at: [0, 5, 0] },
+      8,
+      SLOPE,
+    ).pos;
+    expect(pos[1]).toBeCloseTo(5 + 16);
   });
 });
