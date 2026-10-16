@@ -26,7 +26,7 @@ import { InviteLinkHost } from "./InviteLinkHost";
 import { inviteLinkFrom } from "./inviteOffer";
 import { offerInvite, resetInviteStore } from "./inviteStore";
 
-const BAR = "server4.beyondallreason.info:8201";
+const BAR = "server4.beyondallreason.info:8200";
 const ALICE_KEY = `alice@${BAR}`;
 const ZK = "zero-k.info:8200";
 const ZK_KEY = `zed@${ZK}`;
@@ -362,7 +362,7 @@ describe("an invite link to a server coilbox does not know", () => {
   // Threat 3.
   it("offers no saved login to a known host on another port", () => {
     draw();
-    open("server4.beyondallreason.info:8200");
+    open("server4.beyondallreason.info:8201");
     expect(screen.queryByRole("button", { name: /alice/ })).toBeNull();
     expect(screen.getByText(/does not know this server/)).toBeTruthy();
   });

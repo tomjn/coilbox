@@ -531,7 +531,11 @@ function useAccountConnection(
   const onlineCount = connected
     ? Object.keys(conn?.mirror.state?.users ?? {}).length
     : 0;
-  return { connected, onlineCount };
+  // A login that dropped keeps its entry, and its console holds the last
+  // thing the server said, so the console stays reachable until it is
+  // dismissed or logged out.
+  const hasConsole = conn != null;
+  return { connected, onlineCount, hasConsole };
 }
 
 /**
@@ -942,8 +946,11 @@ function AccountForm({
   // keychain. A user opened this drawer, so the (macOS) prompt is expected.
   const [saved, setSaved] = useState<boolean | undefined>(a.hasSecret);
   const server = servers.find((s) => s.id === a.serverId);
-  const { connected, onlineCount } = useAccountConnection(a, server);
-  // The button below only shows while `connected`, which needs `server`
+  const { connected, onlineCount, hasConsole } = useAccountConnection(
+    a,
+    server,
+  );
+  // The button below only shows while `hasConsole`, which needs `server`
   // resolved (see `useAccountConnection`), so this is non-null whenever it
   // is clickable.
   const accountKey = server ? serverKeyFor(server, a.username) : null;
@@ -1050,14 +1057,17 @@ function AccountForm({
   return (
     <>
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
-        {connected && (
+        {hasConsole && (
           <div className="flex items-center gap-2">
             <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
               <span
-                className="size-2 rounded-full bg-emerald-500"
+                className={cn(
+                  "size-2 rounded-full",
+                  connected ? "bg-emerald-500" : "bg-destructive",
+                )}
                 aria-hidden
               />
-              Connected · {onlineCount} online
+              {connected ? `Connected · ${onlineCount} online` : "Disconnected"}
             </span>
             <Button
               variant="outline"

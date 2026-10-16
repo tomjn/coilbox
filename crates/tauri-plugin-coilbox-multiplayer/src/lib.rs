@@ -417,7 +417,9 @@ async fn open_and_spawn<R: Runtime>(
         // The server records this as the client's advertised local address; a
         // wildcard is accepted and avoids leaking a real LAN IP.
         local_ip: "*".into(),
-        agent: format!("Coilbox {}", env!("CARGO_PKG_VERSION")),
+        // The running app's version, as `open_zerok` does: `CARGO_PKG_VERSION`
+        // stays the 0.0.0 placeholder in source, so every client said 0.0.0.
+        agent: format!("Coilbox {}", app.package_info().version),
         client_id,
         compat_flags,
         // TLS was already upgraded up-front in `connect_stream`, so the login
@@ -3787,6 +3789,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_watch_engine,
             dmlog::mp_chat_logs,
             dmlog::mp_chat_log_open,
+            dmlog::mp_move_chat_logs,
             tachyon_auth::mp_tachyon_sign_in,
             tachyon_auth::mp_tachyon_sign_out,
             tachyon_auth::mp_tachyon_signed_in,

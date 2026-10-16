@@ -1,5 +1,7 @@
 import { useSetting } from "@picoframe/frame";
 import { type ReactNode, useEffect, useRef } from "react";
+import { mpMoveChatLogs } from "../multiplayer/bindings";
+import { useMoveServerKeyData } from "../multiplayer/serverKeyData";
 import {
   lsDeleteCredential,
   lsGetCredential,
@@ -8,6 +10,7 @@ import {
 import { useCustomServers, useLastLogin, useLobbyAccounts } from "./config";
 import {
   type LegacyLobbyServerDir,
+  planBarPortMove,
   planBarTlsRemap,
   planMigration,
 } from "./migration";
@@ -19,6 +22,7 @@ import {
 export function LobbyServersProvider({ children }: { children: ReactNode }) {
   useLobbyServersMigration();
   useBarTlsMigration();
+  useBarPortMigration();
   return <>{children}</>;
 }
 
@@ -114,6 +118,52 @@ function useBarTlsMigration() {
     lastLogin,
     setAccounts,
     setLastLogin,
+    setMigrated,
+  ]);
+}
+
+/**
+ * Move each BAR login's server-keyed data from the old 8201 key to the 8200 one
+ * the built-in now uses, once, guarded by `lobbyServers.migratedBarPort`. Waits
+ * for both migrations above, since either can add `bar-ssl` logins, and this
+ * reads the accounts as they are on the render it runs in.
+ */
+function useBarPortMigration() {
+  const [migrated, setMigrated] = useSetting(
+    "lobbyServers.migratedBarPort",
+    false,
+  );
+  const [v2Migrated] = useSetting("lobbyServers.migratedV2", false);
+  const [tlsMigrated] = useSetting("lobbyServers.migratedBarTls", false);
+  const [accountsCfg] = useLobbyAccounts();
+  const moveServerKeyData = useMoveServerKeyData();
+  const ranRef = useRef(false);
+
+  useEffect(() => {
+    if (migrated || !v2Migrated || !tlsMigrated || ranRef.current) return;
+    ranRef.current = true;
+
+    const moves = planBarPortMove(accountsCfg.accounts);
+    for (const { oldKey, newKey } of moves) moveServerKeyData(oldKey, newKey);
+
+    (async () => {
+      // Best-effort, as above: a failed move leaves that login's chat history
+      // under the old key, where the log viewer still lists it.
+      for (const { oldKey, newKey } of moves) {
+        try {
+          await mpMoveChatLogs({ oldKey, newKey });
+        } catch (e) {
+          console.warn("bar port move: chat log move failed", oldKey, e);
+        }
+      }
+      setMigrated(true);
+    })();
+  }, [
+    migrated,
+    v2Migrated,
+    tlsMigrated,
+    accountsCfg,
+    moveServerKeyData,
     setMigrated,
   ]);
 }

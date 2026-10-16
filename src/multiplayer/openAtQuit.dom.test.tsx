@@ -117,7 +117,7 @@ import { MultiplayerProvider, useMultiplayer } from "./store";
 
 const BAR = BUILTIN_SERVERS.find((s) => s.id === "bar-ssl");
 if (!BAR) throw new Error("no bar-ssl in BUILTIN_SERVERS");
-const KEY = "AF@server4.beyondallreason.info:8201";
+const KEY = "AF@server4.beyondallreason.info:8200";
 
 let store: ReturnType<typeof useMultiplayer>;
 

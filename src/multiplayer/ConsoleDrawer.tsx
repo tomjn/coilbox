@@ -71,12 +71,21 @@ export function ConsoleDrawer({
   useEffect(() => {
     if (open) setManualPick(null);
   }, [open]);
+  // A login that dropped still has its entry, and its console is the only
+  // record of what the server said before it closed, so the drawer still
+  // shows it when that login's row opened it.
+  const pickable =
+    openedFor && openedFor in connections && !liveKeys.includes(openedFor)
+      ? [...liveKeys, openedFor]
+      : liveKeys;
   const pickedKey =
-    (manualPick && liveKeys.includes(manualPick) ? manualPick : null) ??
-    (openedFor && liveKeys.includes(openedFor) ? openedFor : null) ??
-    liveKeys[0] ??
+    (manualPick && pickable.includes(manualPick) ? manualPick : null) ??
+    (openedFor && pickable.includes(openedFor) ? openedFor : null) ??
+    pickable[0] ??
     null;
   const picked = useConnection(pickedKey);
+  // Only a live connection has a socket to write to.
+  const sendKey = picked?.live ? pickedKey : null;
   const lines = picked?.mirror.consoleLines ?? [];
   const protocol = protocolForKey(pickedKey, servers);
   const [command, setCommand] = useState("");
@@ -84,9 +93,9 @@ export function ConsoleDrawer({
   function send(e: React.FormEvent) {
     e.preventDefault();
     const line = command.trim();
-    if (!line || !pickedKey) return;
+    if (!line || !sendKey) return;
     // The sent line and any reply surface in `consoleLines` via the protocol layer.
-    mpSend({ serverKey: pickedKey, line }).catch(() => {});
+    mpSend({ serverKey: sendKey, line }).catch(() => {});
     setCommand("");
   }
 
@@ -108,11 +117,11 @@ export function ConsoleDrawer({
       >
         <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
           <h2 className="shrink-0 text-sm font-semibold">Protocol console</h2>
-          {liveKeys.length > 1 && (
+          {pickable.length > 1 && (
             <div className="min-w-0 flex-1">
               <AccountPicker
-                keys={liveKeys}
-                value={pickedKey ?? liveKeys[0]}
+                keys={pickable}
+                value={pickedKey ?? pickable[0]}
                 onChange={setManualPick}
               />
             </div>
@@ -133,18 +142,18 @@ export function ConsoleDrawer({
               value={command}
               onChange={(e) => setCommand(e.target.value)}
               placeholder={
-                pickedKey ? "Send a raw command…" : "Connect to send commands"
+                sendKey ? "Send a raw command…" : "Connect to send commands"
               }
-              disabled={!pickedKey}
+              disabled={!sendKey}
               className="font-mono text-xs"
               {...identifierFieldProps}
             />
-            <Button type="submit" disabled={!pickedKey || !command.trim()}>
+            <Button type="submit" disabled={!sendKey || !command.trim()}>
               Send
             </Button>
           </form>
         ) : (
-          <TachyonSendBox serverKey={pickedKey} />
+          <TachyonSendBox serverKey={sendKey} />
         )}
       </aside>
     </>,

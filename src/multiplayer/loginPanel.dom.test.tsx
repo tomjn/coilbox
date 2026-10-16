@@ -24,7 +24,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConnectionState } from "./connections";
 import LobbyStatusButton, { LoginPanel } from "./LobbyStatusButton";
 
-const ALICE_KEY = "alice@server4.beyondallreason.info:8201";
+const ALICE_KEY = "alice@server4.beyondallreason.info:8200";
 const CAROL_KEY = "carol@lobby.techa-rts.com:8200";
 
 const calls: string[] = [];

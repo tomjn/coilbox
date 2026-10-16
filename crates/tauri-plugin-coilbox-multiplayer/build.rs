@@ -94,6 +94,7 @@ const COMMANDS: &[&str] = &[
     "mp_watch_engine",
     "mp_chat_logs",
     "mp_chat_log_open",
+    "mp_move_chat_logs",
     "mp_tachyon_sign_in",
     "mp_tachyon_sign_out",
     "mp_tachyon_signed_in",
