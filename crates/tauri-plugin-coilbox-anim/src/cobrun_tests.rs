@@ -665,6 +665,7 @@ mod what_it_says_about_itself {
     fn scene(pos: Option<[f64; 3]>) -> coilbox_unitpose::World {
         coilbox_unitpose::World {
             ground: None,
+            drive: None,
             stand_in: Some(coilbox_unitpose::StandIn {
                 id: 2,
                 pos,
@@ -1014,6 +1015,7 @@ mod what_it_says_about_itself {
         let angle = 30f64.to_radians();
         let mut events = created();
         events[0].world = Some(coilbox_unitpose::World {
+            drive: None,
             ground: Some(coilbox_unitpose::Ground {
                 shape: coilbox_unitpose::ground::Shape::Slope { degrees: 30.0 },
                 up: Some([0.0, angle.cos(), -angle.sin()]),
@@ -1105,6 +1107,7 @@ mod announcements {
     fn scene() -> coilbox_unitpose::World {
         coilbox_unitpose::World {
             ground: None,
+            drive: None,
             stand_in: Some(coilbox_unitpose::StandIn {
                 id: 2,
                 pos: Some([30.0, 0.0, 40.0]),
@@ -1289,6 +1292,7 @@ mod engine_attach {
     fn scene(height: f64) -> coilbox_unitpose::World {
         coilbox_unitpose::World {
             ground: None,
+            drive: None,
             stand_in: Some(coilbox_unitpose::StandIn {
                 id: 2,
                 pos: Some([30.0, 0.0, 40.0]),
@@ -1817,6 +1821,7 @@ mod engine_factory {
         let mut start = action(0, EngineAction::FactoryBuild);
         start.world = Some(coilbox_unitpose::World {
             ground: None,
+            drive: None,
             stand_in: Some(coilbox_unitpose::StandIn {
                 id: 2,
                 pos: Some([0.0, 0.0, 40.0]),
@@ -1885,6 +1890,7 @@ mod engine_factory {
     fn scene(pos: Option<[f64; 3]>) -> coilbox_unitpose::World {
         coilbox_unitpose::World {
             ground: None,
+            drive: None,
             stand_in: Some(coilbox_unitpose::StandIn {
                 id: 2,
                 pos,
@@ -2280,6 +2286,7 @@ mod total_annihilation {
     fn scene() -> coilbox_unitpose::World {
         coilbox_unitpose::World {
             ground: None,
+            drive: None,
             stand_in: Some(coilbox_unitpose::StandIn {
                 id: 2,
                 pos: Some([30.0, 0.0, 40.0]),
@@ -2373,5 +2380,74 @@ mod total_annihilation {
         words.extend([op("PIECE_OP_09"), 1, op("PIECE_OP_0A"), 1]);
         words.extend(move_base());
         assert!(close(pose(&pickup(words), 0, "base")[2], 1.0));
+    }
+}
+
+mod drive {
+    use super::*;
+
+    /// One world-only event per frame, which is how the panel drives a unit.
+    fn driven(frames: u32) -> Vec<ScriptEvent> {
+        let mut events = created();
+        for frame in 0..frames {
+            events.push(ScriptEvent {
+                frame,
+                callin: String::new(),
+                args: Vec::new(),
+                ambient: true,
+                world: Some(coilbox_unitpose::World {
+                    ground: None,
+                    drive: Some(coilbox_unitpose::Drive {
+                        pos: [f64::from(frame) * 3.0, 0.0, 10.0],
+                        heading: -8192,
+                        speed: 0.5 * f64::from(frame),
+                        max_speed: 2.0,
+                    }),
+                    stand_in: None,
+                    own: coilbox_unitpose::Size::default(),
+                }),
+                engine: None,
+            });
+        }
+        events
+    }
+
+    /// `get <id>(0, 0, 0, 0)`, then move a piece along y by the answer.
+    fn read_into(id: u32, piece: u32) -> Vec<u32> {
+        let mut code = push(id);
+        for _ in 0..4 {
+            code.extend(push(0));
+        }
+        code.push(op("GET"));
+        code.extend([op("MOVE_NOW"), piece, 1]);
+        code
+    }
+
+    /// A `.cob` reads a driven unit's heading and speed as the engine answers
+    /// them (`UnitScript.cpp:1117-1118,1175-1177`), on the frame it reads.
+    #[test]
+    fn a_driven_unit_reads_its_heading_and_speed() {
+        // Sleep four frames, waking on frame 5, then read both.
+        let mut code = push(132); // 132ms
+        code.push(op("SLEEP"));
+        code.extend(read_into(82, 1)); // HEADING into the turret
+        code.extend(read_into(29, 2)); // CURRENT_SPEED into the barrel
+        code.push(op("RETURN"));
+
+        let timeline = run(
+            &create_only(code),
+            &model_pieces(),
+            &driven(8),
+            8,
+            &[],
+            &HashMap::new(),
+        );
+
+        assert_eq!(timeline.error, None);
+        assert!(timeline.warnings.is_empty(), "{:?}", timeline.warnings);
+        // -8192 in 65536ths of an elmo.
+        assert!(close(pose(&timeline, 6, "turret")[1], -0.125));
+        // Two and a half elmos a frame, the drive's speed on frame 5.
+        assert!(close(pose(&timeline, 6, "barrel")[1], 2.5));
     }
 }

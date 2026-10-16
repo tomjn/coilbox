@@ -1642,7 +1642,8 @@ impl Run {
         if (LUA0..=LUA9).contains(&id) {
             return self.threads[i].lua[(id - LUA0) as usize];
         }
-        if let Some(value) = unitvalue::arithmetic(id, p1, p2) {
+        let heading = unitvalue::heading(self.world.as_ref());
+        if let Some(value) = unitvalue::arithmetic_facing(id, p1, p2, heading) {
             return value;
         }
         if unitvalue::removed_shared(id) {
@@ -1655,16 +1656,15 @@ impl Run {
             return self.frame as i32;
         }
         // Where a piece is, which the model knows once somebody has said where
-        // its pieces sit. The unit stands at the origin facing forwards, so a
-        // piece's place in the unit is also its place in the world once the
-        // unit has turned to the ground it stands on, which is what the engine
-        // answers with.
+        // its pieces sit. The engine answers with its place in the world, once
+        // the unit has turned, tilted to the ground and moved to wherever a
+        // drive has taken it.
         if id == PIECE_XZ || id == PIECE_Y {
-            let ground = self.world.as_ref().and_then(|world| world.ground);
+            let world = self.world.as_ref();
             // Counted from 0, as every other piece a `.cob` names is.
             let at = model_piece(&self.program, p1)
                 .and_then(|at| self.model.piece_position(at))
-                .map(|at| ground.map_or(at, |ground| ground.place(at)));
+                .map(|at| world.map_or(at, |world| world.place(at)));
             let Some(at) = at else {
                 self.model.note(
                     "This script asks where one of its pieces is, and the preview was not told where this unit's pieces sit.".to_string(),
@@ -1698,6 +1698,11 @@ impl Run {
                 self.model.note(note);
             }
             return answer.value;
+        }
+        // A driven unit's heading and speed are the move type's, whatever the
+        // panel set.
+        if let Some(value) = unitvalue::driven(id, p1, self.world.as_ref()) {
+            return value;
         }
         if let Some(value) = self.set_values.get(&id) {
             return *value;

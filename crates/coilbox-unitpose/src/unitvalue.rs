@@ -136,9 +136,15 @@ const TAANG2RAD: f32 = std::f32::consts::PI / 32768.0;
 ///
 /// `XZ_ATAN` and `XZ_HYPOT` are here too. They take a map position packed into
 /// one number, which looks like a question about the world, but the only thing
-/// either reads from outside the arguments is the unit's own heading, and that
-/// is 0 in the editor.
+/// either reads from outside the arguments is the unit's own heading, which is
+/// 0 here. [`arithmetic_facing`] is the same for a unit that has turned.
 pub fn arithmetic(id: i32, p1: i32, p2: i32) -> Option<i32> {
+    arithmetic_facing(id, p1, p2, 0)
+}
+
+/// [`arithmetic`] for a unit at `heading`, in the engine's 65536ths of a
+/// circle, which only `XZ_ATAN` reads (`UnitScript.cpp:1094-1095`).
+pub fn arithmetic_facing(id: i32, p1: i32, p2: i32, heading: i32) -> Option<i32> {
     let sane = |value: f32| Some(if value.is_finite() { value as i32 } else { 0 });
     match id {
         // On a pair of fixed-point numbers, answering in the same.
@@ -155,11 +161,10 @@ pub fn arithmetic(id: i32, p1: i32, p2: i32) -> Option<i32> {
         KTAN => sane(1024.0 * (TAANG2RAD * p1 as f32).tan()),
         // Nothing for a negative, and it says so the same way.
         SQRT => sane((p1 as f32).sqrt()),
-        // A packed pair, from a unit at heading 0, which is the only heading
-        // the editor has.
+        // A packed pair, less the unit's own heading.
         XZ_ATAN => {
             let (x, z) = unpack_xz(p1);
-            sane(RAD2TAANG * x.atan2(z) + 32768.0)
+            sane(RAD2TAANG * x.atan2(z) + 32768.0 - heading as f32)
         }
         XZ_HYPOT => {
             let (x, z) = unpack_xz(p1);
@@ -252,15 +257,42 @@ pub fn known(id: i32) -> Option<i32> {
         CURRENT_SPEED | MAX_SPEED => Some(65536),
         // The one unit the preview has.
         MY_ID => Some(UNIT_ID),
-        // Facing the way it was made facing. The preview never turns the unit
-        // as a whole, and 202 of Beyond All Reason's compiled scripts ask,
-        // mostly to work out where a weapon is pointing relative to the hull.
+        // Facing the way it was made facing, unless a drive has turned it,
+        // which [`driven`] answers first. 202 of Beyond All Reason's compiled
+        // scripts ask, mostly to work out where a weapon is pointing relative
+        // to the hull.
         HEADING => Some(0),
         // Standing on land, which is what every scenario tells the unit it is
         // standing on and what the ground plane under it in the viewport shows.
         IN_WATER => Some(0),
         _ => None,
     }
+}
+
+/// What a unit being driven along a path answers about its own motion, ahead
+/// of anything the panel set, because the engine works these out from the move
+/// type rather than letting a script or a player decide them.
+///
+/// `HEADING` is the unit's own heading when it asks about itself
+/// (`UnitScript.cpp:1175-1177`), `CURRENT_SPEED` its `speed.w` and `MAX_SPEED`
+/// the move type's top speed, both in 65536ths of an elmo a frame
+/// (`UnitScript.cpp:1117-1118,1148-1149`). `None` when nothing drives the unit,
+/// which leaves [`known`] to answer as it always has.
+pub fn driven(id: i32, p1: i32, world: Option<&crate::World>) -> Option<i32> {
+    let drive = world?.drive?;
+    match id {
+        HEADING if p1 <= 0 || p1 == UNIT_ID => Some(drive.heading),
+        CURRENT_SPEED => Some((drive.speed * f64::from(COBSCALE)) as i32),
+        MAX_SPEED => Some((drive.max_speed * f64::from(COBSCALE)) as i32),
+        _ => None,
+    }
+}
+
+/// The heading the unit faces on this frame, 0 unless it is being driven.
+pub fn heading(world: Option<&crate::World>) -> i32 {
+    world
+        .and_then(|world| world.drive)
+        .map_or(0, |drive| drive.heading)
 }
 
 /// Ids that ask where a unit is or how big it is, from `CobDefines.h`.
@@ -306,8 +338,9 @@ pub fn who(id: i64, world: &crate::World) -> Who<'_> {
 /// Where a unit is and how big, answered off the scene the event carried.
 ///
 /// `rts/Sim/Units/Scripts/UnitScript.cpp:1060-1105`. The unit itself stands at
-/// the origin, and the ground is whatever [`crate::World::ground`] says the
-/// viewport draws, which is flat at 0 unless it says otherwise.
+/// the origin unless [`crate::World::drive`] has moved it, and the ground is
+/// whatever [`crate::World::ground`] says the viewport draws, which is flat at
+/// 0 unless it says otherwise.
 /// `carried` is where the stand-in is once a script has held it
 /// ([`crate::Passenger::at`]), which the scene no longer decides.
 /// `None` for an id this does not cover, and for one it cannot answer without
@@ -347,9 +380,16 @@ pub fn world(
         let stand_in = world.and_then(|world| world.stand_in.as_ref());
         return Some(plain(stand_in.map_or(UNIT_ID, |s| s.id.max(UNIT_ID))));
     }
+    // At the origin, unless a drive has moved it (`UnitScript.cpp:1060-1081`).
     let asks_itself = p1 <= 0 || p1 == UNIT_ID;
     if asks_itself && id != UNIT_HEIGHT {
-        return Some(plain(0));
+        let pos = world
+            .and_then(|world| world.drive)
+            .map_or([0.0; 3], |drive| drive.pos);
+        return Some(plain(match id {
+            UNIT_XZ => pack_xz(pos[0], pos[2]),
+            _ => (pos[1] * f64::from(COBSCALE)) as i32,
+        }));
     }
     let world = world?;
     let stand_in = match who(i64::from(p1), world) {
@@ -622,6 +662,7 @@ mod tests {
     fn scene(pos: Option<[f64; 3]>) -> crate::World {
         crate::World {
             ground: None,
+            drive: None,
             stand_in: Some(crate::StandIn {
                 id: 2,
                 pos,
@@ -900,6 +941,66 @@ mod tests {
             Some(1)
         );
         assert!(relation(HEALTH, 2, Some(&scene(None)), &model, 0).is_none());
+    }
+
+    fn driving(pos: [f64; 3], heading: i32, speed: f64) -> crate::World {
+        crate::World {
+            drive: Some(crate::Drive {
+                pos,
+                heading,
+                speed,
+                max_speed: 2.0,
+            }),
+            ..scene(None)
+        }
+    }
+
+    /// A driven unit answers its own heading and speed as the engine holds
+    /// them: the heading in 65536ths of a circle, the speeds in 65536ths of an
+    /// elmo a frame (`UnitScript.cpp:1117-1118,1148-1149,1175-1177`).
+    #[test]
+    fn a_driven_unit_answers_its_heading_and_speed() {
+        let w = driving([0.0, 0.0, 0.0], -8192, 1.5);
+        for asker in [0, -1, UNIT_ID] {
+            assert_eq!(driven(HEADING, asker, Some(&w)), Some(-8192));
+        }
+        assert_eq!(driven(CURRENT_SPEED, 0, Some(&w)), Some(98304));
+        assert_eq!(driven(MAX_SPEED, 0, Some(&w)), Some(2 * 65536));
+        // Another unit's heading is not the driven unit's.
+        assert_eq!(driven(HEADING, 2, Some(&w)), None);
+        assert_eq!(driven(HEALTH, 0, Some(&w)), None);
+    }
+
+    /// Nothing driving it leaves the answers to `known`, which is what every
+    /// scenario but the drive has always had.
+    #[test]
+    fn an_undriven_unit_leaves_its_motion_to_the_defaults() {
+        assert_eq!(driven(HEADING, 0, Some(&scene(None))), None);
+        assert_eq!(driven(CURRENT_SPEED, 0, None), None);
+        assert_eq!(known(HEADING), Some(0));
+    }
+
+    /// `UnitScript.cpp:1060-1081`: where a driven unit is, not the origin.
+    #[test]
+    fn a_driven_unit_is_where_the_drive_has_taken_it() {
+        let w = driving([30.0, 4.0, -60.0], 0, 1.0);
+        assert_eq!(value(UNIT_XZ, 0, Some(&w)), Some(pack_xz(30.0, -60.0)));
+        assert_eq!(value(UNIT_Y, UNIT_ID, Some(&w)), Some(4 * 65536));
+        assert_eq!(heading(Some(&w)), 0);
+    }
+
+    /// `XZ_ATAN` takes the unit's own heading off (`UnitScript.cpp:1094-1095`),
+    /// so a unit turned a quarter left sees a point to its left as dead ahead.
+    #[test]
+    fn heads_towards_a_packed_pair_from_a_turned_unit() {
+        assert_eq!(
+            arithmetic_facing(XZ_ATAN, pack_xz(1.0, 0.0), 0, 16384),
+            Some(32768)
+        );
+        assert_eq!(
+            arithmetic_facing(XZ_ATAN, pack_xz(1.0, 0.0), 0, 0),
+            arithmetic(XZ_ATAN, pack_xz(1.0, 0.0), 0)
+        );
     }
 
     #[test]

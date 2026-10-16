@@ -156,6 +156,50 @@ pub struct World {
     /// The ground the viewport draws under it, or none for flat ground at 0.
     #[serde(default)]
     pub ground: Option<Ground>,
+    /// Where the unit is and how it is moving, for a scenario that drives it
+    /// along a path. None leaves it standing at the origin facing +z.
+    #[serde(default)]
+    pub drive: Option<Drive>,
+}
+
+/// The unit on one frame of a drive, as the engine holds it.
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Drive {
+    /// Where its base is, in elmos.
+    pub pos: [f64; 3],
+    /// The engine's `heading`: 65536 to a circle, 0 facing +z, and positive
+    /// turning towards +x, which is the unit's left (`GetHeadingFromVector`).
+    pub heading: i32,
+    /// Elmos a frame, which is what the engine's `speed.w` is in.
+    pub speed: f64,
+    /// Elmos a frame, the move type's `maxSpeed`.
+    pub max_speed: f64,
+}
+
+impl World {
+    /// Where a point in the unit's own space is in the world: turned by the
+    /// heading, then by the ground, then moved to where the unit is.
+    ///
+    /// The engine's order. `UpdateDirVectors` turns the axes about straight up
+    /// by the heading first, then by the shortest rotation from straight up to
+    /// the ground's normal (`SolidObject.cpp:435-451`), and `GetObjectSpacePos`
+    /// adds the unit's position (`SolidObject.h:233`).
+    pub fn place(&self, at: [f64; 3]) -> [f64; 3] {
+        let turned = match self.drive {
+            Some(drive) => {
+                let angle = f64::from(drive.heading) * std::f64::consts::PI / 32768.0;
+                let (sin, cos) = angle.sin_cos();
+                // The model's x is the unit's left, which is `-rightdir`, and
+                // `rightdir` is `(-cos, 0, sin)` at this heading.
+                [at[0] * cos + at[2] * sin, at[1], -at[0] * sin + at[2] * cos]
+            }
+            None => at,
+        };
+        let tilted = self.ground.map_or(turned, |ground| ground.place(turned));
+        let pos = self.drive.map_or([0.0; 3], |drive| drive.pos);
+        [tilted[0] + pos[0], tilted[1] + pos[1], tilted[2] + pos[2]]
+    }
 }
 
 /// The stand-in, in elmos, in the unit's own space, which is world space
@@ -949,6 +993,7 @@ mod tests {
     fn scene(pos: [f64; 3]) -> World {
         World {
             ground: None,
+            drive: None,
             stand_in: Some(StandIn {
                 id: 2,
                 pos: Some(pos),
@@ -960,6 +1005,59 @@ mod tests {
                 height: 12.0,
             },
         }
+    }
+
+    fn close3(a: [f64; 3], b: [f64; 3]) -> bool {
+        a.iter().zip(b).all(|(a, b)| (a - b).abs() < 1e-9)
+    }
+
+    /// A driven unit carries its pieces round and along with it: a point ahead
+    /// of a unit turned a quarter left is to the world's +x, then moved to
+    /// where the unit is.
+    #[test]
+    fn a_driven_unit_places_its_pieces_turned_and_moved() {
+        let mut world = scene([0.0; 3]);
+        world.drive = Some(Drive {
+            pos: [100.0, 0.0, 50.0],
+            heading: 16384,
+            speed: 1.0,
+            max_speed: 1.0,
+        });
+        assert!(close3(world.place([0.0, 2.0, 10.0]), [110.0, 2.0, 50.0]));
+        // The model's +x is the unit's left, which has turned to face -z.
+        assert!(close3(world.place([10.0, 0.0, 0.0]), [100.0, 0.0, 40.0]));
+    }
+
+    /// Turned first, then tilted, as `UpdateDirVectors` does it: on a slope
+    /// rising towards +z, a unit turned to face +x has its nose level and its
+    /// top leaning downhill.
+    #[test]
+    fn a_driven_unit_turns_before_it_tilts() {
+        let angle = 30f64.to_radians();
+        let mut world = scene([0.0; 3]);
+        world.ground = Some(Ground {
+            shape: ground::Shape::Slope { degrees: 30.0 },
+            up: Some([0.0, angle.cos(), -angle.sin()]),
+        });
+        world.drive = Some(Drive {
+            pos: [0.0; 3],
+            heading: 16384,
+            speed: 1.0,
+            max_speed: 1.0,
+        });
+        // The nose points along +x, across the slope, so it stays level.
+        assert!(close3(world.place([0.0, 0.0, 10.0]), [10.0, 0.0, 0.0]));
+        let top = world.place([0.0, 10.0, 0.0]);
+        assert!(close3(top, [0.0, 10.0 * angle.cos(), -10.0 * angle.sin()]));
+    }
+
+    /// No drive is the unit at the origin, as before, turned only by the ground.
+    #[test]
+    fn an_undriven_unit_places_its_pieces_where_it_stands() {
+        assert!(close3(
+            scene([0.0; 3]).place([1.0, 2.0, 3.0]),
+            [1.0, 2.0, 3.0]
+        ));
     }
 
     /// `CUnit::AttachUnit` records the piece and nothing else. The passenger

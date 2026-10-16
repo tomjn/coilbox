@@ -2142,6 +2142,7 @@ mod world {
         let angle = 30f64.to_radians();
         let mut events = create();
         events[0].world = Some(coilbox_unitpose::World {
+            drive: None,
             ground: Some(coilbox_unitpose::Ground {
                 shape: coilbox_unitpose::ground::Shape::Slope { degrees: 30.0 },
                 up: Some([0.0, angle.cos(), -angle.sin()]),
@@ -2311,6 +2312,7 @@ mod world {
     fn scene(pos: Option<[f64; 3]>) -> coilbox_unitpose::World {
         coilbox_unitpose::World {
             ground: None,
+            drive: None,
             stand_in: Some(coilbox_unitpose::StandIn {
                 id: 2,
                 pos,
@@ -2621,6 +2623,7 @@ mod announcements {
     fn scene() -> coilbox_unitpose::World {
         coilbox_unitpose::World {
             ground: None,
+            drive: None,
             stand_in: Some(coilbox_unitpose::StandIn {
                 id: 2,
                 pos: Some([30.0, 0.0, 40.0]),
@@ -2887,6 +2890,7 @@ mod engine_attach {
     fn scene() -> coilbox_unitpose::World {
         coilbox_unitpose::World {
             ground: None,
+            drive: None,
             stand_in: Some(coilbox_unitpose::StandIn {
                 id: 2,
                 pos: Some([30.0, 0.0, 40.0]),
@@ -3405,6 +3409,7 @@ mod engine_factory {
     fn scene(pos: Option<[f64; 3]>) -> coilbox_unitpose::World {
         coilbox_unitpose::World {
             ground: None,
+            drive: None,
             stand_in: Some(coilbox_unitpose::StandIn {
                 id: 2,
                 pos,
@@ -3723,5 +3728,149 @@ mod engine_fire {
             weapon: 2,
             piece: Some("barrel".into())
         }));
+    }
+}
+
+mod drive {
+    use super::*;
+
+    /// One event per frame that only says where the unit is, which is how the
+    /// panel drives a unit: the runtime keeps the last scene it was handed.
+    fn driven(frames: u32, at: impl Fn(u32) -> coilbox_unitpose::Drive) -> Vec<ScriptEvent> {
+        let mut events = create();
+        for frame in 0..frames {
+            events.push(ScriptEvent {
+                frame,
+                callin: String::new(),
+                args: Vec::new(),
+                ambient: true,
+                world: Some(coilbox_unitpose::World {
+                    ground: None,
+                    drive: Some(at(frame)),
+                    stand_in: None,
+                    own: coilbox_unitpose::Size::default(),
+                }),
+                engine: None,
+            });
+        }
+        events
+    }
+
+    fn drive(frame: u32) -> coilbox_unitpose::Drive {
+        coilbox_unitpose::Drive {
+            pos: [f64::from(frame) * 3.0, 0.0, 10.0],
+            heading: -100 * frame as i32,
+            speed: 0.5 * f64::from(frame),
+            max_speed: 2.0,
+        }
+    }
+
+    /// `HEADING`, `CURRENT_SPEED` and `MAX_SPEED` follow the drive frame by
+    /// frame, in the engine's units (`UnitScript.cpp:1117-1118,1148-1149,
+    /// 1175-1177`), and a world-only event raises no note.
+    #[test]
+    fn a_driven_unit_reads_its_heading_and_speed_each_frame() {
+        let timeline = run(
+            r#"
+            local turret = piece("turret")
+            local barrel = piece("barrel")
+            local flare = piece("flare")
+            function script.Create()
+                StartThread(function()
+                    while true do
+                        Move(turret, x_axis, GetUnitValue(COB.HEADING))
+                        Move(barrel, x_axis, GetUnitValue(COB.CURRENT_SPEED) / 65536)
+                        Move(flare, x_axis, GetUnitValue(COB.MAX_SPEED) / 65536)
+                        Sleep(1)
+                    end
+                end)
+            end
+            "#,
+            "test.lua",
+            &Unit::new(&pieces()),
+            &driven(6, drive),
+            6,
+            &HashMap::new(),
+        );
+
+        assert_eq!(timeline.error, None);
+        assert!(timeline.warnings.is_empty(), "{:?}", timeline.warnings);
+        assert_eq!(pose(&timeline, 4, "turret")[0], -400.0);
+        assert!((pose(&timeline, 4, "barrel")[0] - 2.0).abs() < 1e-4);
+        assert!((pose(&timeline, 4, "flare")[0] - 2.0).abs() < 1e-4);
+    }
+
+    /// Where the unit is and how fast it goes, through the Lua calls a unit
+    /// script asks with rather than `GetUnitValue`.
+    #[test]
+    fn a_driven_unit_is_where_the_drive_has_taken_it() {
+        let timeline = run(
+            r#"
+            local turret = piece("turret")
+            local barrel = piece("barrel")
+            function script.Create()
+                StartThread(function()
+                    while true do
+                        local x, _, z = Spring.GetUnitPosition(unitID)
+                        Move(turret, x_axis, x)
+                        Move(turret, z_axis, z)
+                        local vx, _, vz, speed = Spring.GetUnitVelocity(unitID)
+                        Move(barrel, x_axis, vx)
+                        Move(barrel, z_axis, vz)
+                        Move(barrel, y_axis, speed)
+                        Sleep(1)
+                    end
+                end)
+            end
+            "#,
+            "test.lua",
+            &Unit::new(&pieces()),
+            &driven(4, |frame| coilbox_unitpose::Drive {
+                // A quarter turn left faces +x.
+                heading: 16384,
+                ..drive(frame)
+            }),
+            4,
+            &HashMap::new(),
+        );
+
+        assert_eq!(timeline.error, None);
+        let turret = pose(&timeline, 2, "turret");
+        assert!((turret[0] - 6.0).abs() < 1e-4 && (turret[2] - 10.0).abs() < 1e-4);
+        let barrel = pose(&timeline, 2, "barrel");
+        assert!((barrel[0] - 1.0).abs() < 1e-4, "{barrel:?}");
+        assert!(barrel[2].abs() < 1e-4, "{barrel:?}");
+        assert!((barrel[1] - 1.0).abs() < 1e-4, "{barrel:?}");
+    }
+
+    /// `ChangeHeading` gets the raw delta in the engine's 65536ths of a circle,
+    /// as a number (`LuaUnitScript.cpp:1008`), not radians.
+    #[test]
+    fn change_heading_is_handed_the_raw_delta() {
+        let mut events = create();
+        events.push(ScriptEvent {
+            frame: 1,
+            callin: "ChangeHeading".to_string(),
+            args: vec![-182.0],
+            ambient: false,
+            world: None,
+            engine: None,
+        });
+        let timeline = run(
+            r#"
+            local turret = piece("turret")
+            function script.ChangeHeading(delta)
+                Move(turret, x_axis, delta)
+            end
+            "#,
+            "test.lua",
+            &Unit::new(&pieces()),
+            &events,
+            3,
+            &HashMap::new(),
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(pose(&timeline, 2, "turret")[0], -182.0);
     }
 }
