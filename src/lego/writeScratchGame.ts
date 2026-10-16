@@ -50,6 +50,8 @@ export interface WrittenScratchUnit {
    * texture from another.
    */
   textures: string;
+  /** The file names the textures were written under, in `unittextures/`. */
+  textureFiles: string[];
 }
 
 /**
@@ -150,5 +152,14 @@ export async function writeScratchUnit({
     model,
   });
 
-  return { dir, files: owned, textures: JSON.stringify(textures) };
+  const textureFiles = [
+    ...(textures.atlas ? [textures.atlas.writeAs] : []),
+    ...textures.stored.map((stored) => stored.writeAs),
+  ];
+  return {
+    dir,
+    files: owned,
+    textures: JSON.stringify(textures),
+    textureFiles,
+  };
 }

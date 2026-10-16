@@ -50,10 +50,13 @@ import {
   SANDBOX_LOADED_REPLY,
   SANDBOX_RELOAD_MESSAGE,
   SANDBOX_REPLY,
+  SANDBOX_TEXTURES_MESSAGE,
+  SANDBOX_TEXTURES_REPLY,
   sandboxModOptions,
 } from "../../sandbox";
 import {
   afterScriptReload,
+  afterTextureReload,
   type LoadedSandbox,
   loadedFrom,
   relaunchMessage,
@@ -307,7 +310,8 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
 
   /**
    * Export the unit into the running sandbox and reload what the engine can,
-   * which is the script. Says what needs a relaunch for the rest.
+   * which is the script and the textures. Says what needs a relaunch for the
+   * rest.
    */
   async function reloadSandbox() {
     const run = sandboxRun;
@@ -344,6 +348,28 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
         );
         said.push(
           `Reloaded the script. Every ${project.unitName} in the game runs it now.`,
+        );
+      }
+      if (changes.textures) {
+        const { answer } = await playAskLuaRules({
+          runId: run.runId,
+          message: SANDBOX_TEXTURES_MESSAGE,
+          reply: SANDBOX_REPLY,
+        });
+        if (answer !== SANDBOX_TEXTURES_REPLY) {
+          throw new Error(
+            answer.startsWith(FAILED) ? answer.slice(FAILED.length) : answer,
+          );
+        }
+        setSandboxRun(
+          (current) =>
+            current && {
+              ...current,
+              loaded: afterTextureReload(current.loaded, written),
+            },
+        );
+        said.push(
+          `Reloaded the texture. Every ${project.unitName} in the game shows it now.`,
         );
       }
       const relaunch = relaunchMessage(changes.relaunch);
