@@ -20,7 +20,7 @@
 # that the whole thing loads at all.
 #
 # Usage: scripts/mission-headless.sh [mission ...]
-# Default: gate, ambush, garrison, siege, outbreak, drill, briefing.
+# Default: gate, ambush, garrison, siege, outbreak, drill, briefing, reload.
 #
 # outbreak is the difficulty fixture. It is run at whatever
 # COILBOX_HARNESS_DIFFICULTY says, which is nothing by default, so the default
@@ -78,7 +78,7 @@ MAP_ARCHIVE="${COILBOX_HARNESS_MAP:-}"
 [ -n "$MAP_ARCHIVE" ] || MAP_ARCHIVE="$(pick "$DATA_DIR/maps" '\.sd[7z]$' 'map')"
 
 MISSIONS=("$@")
-[ ${#MISSIONS[@]} -gt 0 ] || MISSIONS=(gate ambush garrison siege outbreak drill briefing)
+[ ${#MISSIONS[@]} -gt 0 ] || MISSIONS=(gate ambush garrison siege outbreak drill briefing reload)
 
 DIFFICULTY="${COILBOX_HARNESS_DIFFICULTY:-}"
 
@@ -162,6 +162,12 @@ read -r RUNTIME_VERSION RUNTIME_FILES <<<"$RUNTIME_INSTALL"
 mkdir -p "$GAME/luarules/gadgets"
 cp "$HEADLESS/probe.lua" "$GAME/luarules/gadgets/zzz_coilbox_harness_probe.lua"
 for mission in "$FIXTURES"/*/; do
+  id="$(basename "$mission")"
+  mkdir -p "$GAME/missions/$id"
+  cp "$mission/mission.lua" "$GAME/missions/$id/mission.lua"
+done
+# Missions written by hand for the harness alone, which no scenario compiles to.
+for mission in "$HEADLESS"/missions/*/; do
   id="$(basename "$mission")"
   mkdir -p "$GAME/missions/$id"
   cp "$mission/mission.lua" "$GAME/missions/$id/mission.lua"

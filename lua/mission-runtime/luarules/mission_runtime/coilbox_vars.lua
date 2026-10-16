@@ -17,6 +17,12 @@
 -- synced Lua can read is no use to an objectives panel, a debrief or a debug
 -- view. Reading the mirror needs no line of sight and no channel: the engine
 -- answers Spring.GetGameRulesParam for every handle, LuaUI included.
+--
+-- The mirror is also what survives `/luarules reload`, which loads the runtime
+-- again into a running game and so forgets every value it held (issue #4147). A
+-- reloaded runtime takes its numbers back from it instead of starting from the
+-- scenario's. The engine keeps a param as a float, so a number with more
+-- precision than that comes back rounded to it.
 
 local M = {}
 
@@ -113,7 +119,12 @@ function M.register(engine, state)
 
 	for name, initial in pairs((state.mission or {}).vars or {}) do
 		declared[name] = true
-		vars.set(name, tonumber(initial) or 0)
+		local kept = state.resumed and Spring.GetGameRulesParam(M.RULES_PREFIX .. name)
+		if type(kept) == "number" then
+			values[name] = kept
+		else
+			vars.set(name, tonumber(initial) or 0)
+		end
 	end
 
 	-- Polled, not event-driven. A var changes only when an action changes it, so

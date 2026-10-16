@@ -41,6 +41,11 @@ M.OVER_PARAM = "coilbox_mission_over"
 M.WINNERS_PARAM = "coilbox_mission_winners"
 M.WINNER_PREFIX = "coilbox_mission_winner_"
 
+-- Which unit is a team's anchor, kept in a game rules param so a runtime that
+-- `/luarules reload` loads again into a running mission can find its anchors
+-- (issue #4147). Nothing else tells an anchor from another unit of the same def.
+M.ANCHOR_PREFIX = "coilbox_mission_anchor_"
+
 -- Where an anchor stands. The engine clamps a creation into the map, so this is
 -- the corner: the furthest a fixed point can be from anything a mission is
 -- about. It is still a place a zone could cover, which is why the runtime's own
@@ -319,6 +324,7 @@ function M.register(engine, state, hooks)
 			if unitID then
 				neuter(unitID)
 				anchors[unitID] = { team = team.team, defID = def.id }
+				Spring.SetGameRulesParam(M.ANCHOR_PREFIX .. team.team, unitID)
 				placed = placed + 1
 			end
 		end
@@ -357,6 +363,8 @@ function M.register(engine, state, hooks)
 		end
 		local team = anchors[unitID].team
 		anchors[unitID] = nil
+		-- Said here once, so a reload has no anchor to go looking for and say it again.
+		Spring.SetGameRulesParam(M.ANCHOR_PREFIX .. team, nil)
 		engine:log("warning", string.format(
 			"the mission anchor for team %s was destroyed", tostring(team)))
 	end
@@ -398,9 +406,44 @@ function M.register(engine, state, hooks)
 			tostring(team), anchorState(team)))
 	end
 
+	--- Take back what a runtime loaded again into a running mission had forgotten:
+	-- whether the mission had ended, and which units were its anchors.
+	--
+	-- An anchor is trusted only as far as it can be checked. The engine reuses a
+	-- unit id once the unit is gone, so the unit has to be alive and on the team the
+	-- anchor was for. One that is not is said and not replaced: it was lost before
+	-- the reload, and a team the anchor no longer holds open is the situation
+	-- `handle.teamDied` already reports.
+	local function resume()
+		over = Spring.GetGameRulesParam(M.OVER_PARAM) == 1
+
+		for _, team in ipairs(state.teams or {}) do
+			local unitID = Spring.GetGameRulesParam(M.ANCHOR_PREFIX .. team.team)
+			if type(unitID) == "number" then
+				local defID = Spring.ValidUnitID(unitID) and not Spring.GetUnitIsDead(unitID)
+					and Spring.GetUnitTeam(unitID) == team.team and Spring.GetUnitDefID(unitID)
+				if defID then
+					anchors[unitID] = { team = team.team, defID = defID }
+					held[team.team] = true
+					anchorDef = UnitDefs[defID].name
+					if hooks.keep then
+						hooks.keep(unitID)
+					end
+				else
+					engine:log("warning", string.format(
+						"the anchor for team %s was gone when the runtime was reloaded", tostring(team.team)))
+				end
+			end
+		end
+	end
+
 	-- Before the first frame, so a panel reading the outcome finds "not yet"
 	-- rather than nothing at all, the way it finds every objective already there.
-	Spring.SetGameRulesParam(M.OVER_PARAM, 0)
+	if state.resumed then
+		resume()
+	else
+		Spring.SetGameRulesParam(M.OVER_PARAM, 0)
+	end
 
 	engine:addAction("victory", function(params)
 		handle.victory(params.team)

@@ -133,6 +133,18 @@ function Engine:setEnabled(id, enabled)
 		record.readyFrame = self.frameNumber
 		record.armedAt = self:stamp()
 	end
+	self:save(record)
+end
+
+--- Hand the host a trigger's state to keep, whenever it changes.
+--
+-- The engine knows nothing about where it goes. A host that keeps it somewhere a
+-- reload does not clear gives `ctx.restore` the same place to read it back from
+-- (issue #4147), and a host that does neither is not asked to do anything.
+function Engine:save(record)
+	if self.ctx.save then
+		self.ctx.save(record.id, record.enabled, record.readyFrame)
+	end
 end
 
 function Engine:isEnabled(id)
@@ -223,6 +235,14 @@ function M.new(mission, ctx)
 			-- the player does from the first frame.
 			armedAt = 0,
 		}
+		-- A runtime loaded again into a running game has the host's word for which
+		-- triggers had been switched on or off and how long a repeating one had to
+		-- wait. A trigger the difficulty left out stays out whatever was kept.
+		local kept = not excluded and self.ctx.restore and self.ctx.restore(trigger.id)
+		if kept then
+			record.enabled = kept.enabled
+			record.readyFrame = tonumber(kept.readyFrame) or record.readyFrame
+		end
 		self.triggers[#self.triggers + 1] = record
 		self.byId[record.id] = record
 	end
@@ -372,6 +392,7 @@ function Engine:fire(record)
 	else
 		record.enabled = false
 	end
+	self:save(record)
 
 	for _, action in ipairs(record.def.actions or {}) do
 		self:act(action)

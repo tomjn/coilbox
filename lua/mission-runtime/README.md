@@ -480,6 +480,30 @@ GG.CoilboxMission.gameOver.victory("player")
 GG.CoilboxMission.gameOver.defeat("player")
 ```
 
+## Reloading in a running game
+
+`/cheat 1` then `/luarules reload` loads every gadget again from nothing, in the middle of a mission. The engine keeps units, team resources and game rules params, and nothing the gadget held in its own variables ([what the engine reloads](../../docs/developers/engine-reload.md)). The runtime knows it has been loaded into a running game when `Spring.GetGameFrame()` is 1 or more, publishes that as `GG.CoilboxMission.resumed`, and takes its state back from the engine instead of starting from the scenario ([issue #4147](https://github.com/tomjn/coilbox/issues/4147)).
+
+What it keeps, and where it comes from:
+
+| State | Kept in |
+|---|---|
+| Which unit each actor is | the `coilbox_mission_actor_<id>` param, checked against the unit's def and that it is alive |
+| Which actors are invulnerable | the scenario's `state.invulnerable`, applied to the actors found again |
+| Which units are anchors | a `coilbox_mission_anchor_<team>` param |
+| Variables | the `coilbox_mission_var_<name>` mirror, which the engine holds as a float |
+| Objectives | the `coilbox_mission_objective_<id>` mirror |
+| Which triggers are armed and when a repeating one may fire next | `coilbox_mission_trigger_<id>` and `coilbox_mission_trigger_ready_<id>` |
+| Whether the mission has ended | `coilbox_mission_over` |
+| What a team is paid after a `set_income` | `coilbox_mission_income_<team>_<kind>` |
+| What `unlock_unit` freed | `coilbox_mission_unlocked_<team>_<def id>` |
+
+Params rather than a table in `GG`, because `GG` is cleared by the same reload. They are the cheapest store the engine holds across it, and most of them were already being written for the mission panel.
+
+What it cannot keep is named in the log, as a warning, every time. That is which units are in a group and what a group was ordered to do, which reveals are lit, how long a zone has been held, how many units a team has built or captured, what a player has selected or ordered, and which held lines of dialogue are on screen. The units themselves stay on the map. An actor whose unit is gone, or whose id now belongs to a different kind of unit, is reported by name and left dead.
+
+Splinter Faction's `game_team_com_ends.lua` kills an ally team with no commander when it starts again past frame 1, so a mission team with `noCommander` set loses its units to the game on a full reload whatever the runtime does. The headless run uses Balanced Annihilation for that reason.
+
 ## Conventions
 
 - Everything vendored is named `coilbox_*` so a game maintainer can see at a glance which files came from here.
@@ -531,6 +555,8 @@ What it has settled:
 - A pause and the dismissals that end it. The briefing mission pauses on frame 30 and holds two lines. The engine's own log names the frame of the pause and of the unpause, and the harness passes only when they are the same frame. In between, two dismissals crossed the server and three triggers fired, one of them polled. On a machine with no LuaUI the runtime's unsynced half sends both dismissals, which is its fallback for a player with no panel. With LuaUI the probe sends them in place of the widget's click. Not covered: the click itself, the "Click to continue" line being drawn, two players, a spectator and a replay.
 - The two conditions that read the player, on one client. The drill mission's probe selects a unit with `Spring.SelectUnitArray` and gives orders from unsynced code, which is the path a click takes. The selection reaches the synced half through the runtime's own `Update` and `RecvLuaMsg`, a player's order arrives at `UnitCommand` and completes `command_given`, and an order synced Lua gave does not. Two players at once, a spectator and a replay are not in that run.
 - The widget, as far as a run with no screen can take it. A real game's own widget handler finds `coilbox_mission_ui.lua` in the vendored `luaui/widgets/`, and it initialises: the panel model and the compiled mission both come out of the archive, and it registers `CoilboxMissionDialogue`. `Script.LuaUI` is how the probe reads that, because the global a widget registers is the one thing about it a gadget can see, and it is what the runtime's own dialogue call reaches. The widget is still registered when the mission ends, having run every frame in between: the panels' text goes through `gl.Text` for real, the backdrops stay off because a headless engine answers `gl.GetVBO` with nothing and the widget carries on without them, and a widget that raised in any callin would have been thrown out with its global. A game with no mission is left with no widget, because the widget takes itself back off.
+
+- A full `/luarules reload` in the middle of a mission. The `reload` mission is written by hand in `tests/headless/missions/` rather than compiled, because no scenario is it: an invulnerable actor, an ordinary one, a var, two objectives and a trigger that fires once. The probe records what the engine holds, sends `luarules reload`, and the probe the reload loads checks the same things with real damage and real units: the actors are still the units they were, the invulnerable actor and the anchor still survive a hit, the var, the objective and the spent trigger are where they were. Before the fix 8 of those 17 checks failed.
 
 What it has caught:
 

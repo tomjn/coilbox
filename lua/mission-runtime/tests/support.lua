@@ -152,6 +152,11 @@ end
 --
 -- `options.frame` is the game frame the gadget loads on. 0 unless a test says
 -- otherwise, and more only for a runtime reloaded into a running game.
+--
+-- `options.survivors` is the engine a reload is reloading: its units, banks, game
+-- rules params and unit defs carry over to the new one, which is everything the
+-- engine holds across `/luarules reload`. What the gadget held in its own
+-- variables does not, because the new engine is a new Lua state.
 function M.newEngine(modOptions, files, options)
 	options = options or {}
 
@@ -219,6 +224,30 @@ function M.newEngine(modOptions, files, options)
 		-- Every console command sent through Spring.SendCommands.
 		commands = {},
 	}
+
+	local previous = options.survivors
+	if previous then
+		-- Copied, so what one reload does to the world is not there for the next
+		-- test's reload to find. A unit's table is one level deep and a bank's is
+		-- two numbers.
+		for _, key in ipairs({ "units", "resources", "income", "rulesParams", "noSelect" }) do
+			engine[key] = {}
+			for name, value in pairs(previous[key]) do
+				if type(value) == "table" then
+					local copy = {}
+					for field, kept in pairs(value) do
+						copy[field] = kept
+					end
+					value = copy
+				end
+				engine[key][name] = value
+			end
+		end
+		for index, unitID in ipairs(previous.order) do
+			engine.order[index] = unitID
+		end
+		engine.nextUnitID, engine.nextDefID = previous.nextUnitID, previous.nextDefID
+	end
 
 	--- Engine team -> ally team. A team nothing says otherwise about is in an ally
 	-- team of its own number, which is what a mission of one participant a side
@@ -526,6 +555,17 @@ function M.newEngine(modOptions, files, options)
 				local unit = engine.units[unitID]
 				return unit and unit.team
 			end,
+			-- Whether the id names a unit the engine still has, and whether that
+			-- unit is on its way out. The stub drops a unit the moment it is killed,
+			-- which is stricter than the engine, so a dead unit is neither here.
+			ValidUnitID = function(unitID)
+				local unit = engine.units[unitID]
+				return unit ~= nil and unit.alive
+			end,
+			GetUnitIsDead = function(unitID)
+				local unit = engine.units[unitID]
+				return unit == nil or not unit.alive
+			end,
 			-- Two teams in one ally team are allied, and so is a team with itself.
 			-- `options.allyTeams` is what decides, the way it does everywhere else
 			-- here.
@@ -755,8 +795,8 @@ function M.newEngine(modOptions, files, options)
 			MOVESTATE_ROAM = 2,
 		},
 		-- Filled in as defs are used, so a test names units and never ids.
-		UnitDefs = {},
-		UnitDefNames = {},
+		UnitDefs = previous and previous.env.UnitDefs or {},
+		UnitDefNames = previous and previous.env.UnitDefNames or {},
 		VFS = {
 			ZIP = 1,
 			FileExists = function(path)
