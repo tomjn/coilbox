@@ -3,22 +3,32 @@
 /**
  * What the player sees after the engine dies (issue #379).
  *
- * The log lines below were copied out of a real `~/.config/spring/infolog.txt`,
- * so the highlighting is tested against what the engine writes rather than what
- * its formatter's source suggests it should.
+ * The drawer points at the real `infolog.txt` and shows none of it, as the
+ * Engine log page does. A slice of the file reads as the whole of it, and the
+ * start, where the engine records the system and the GPU, is the part a slice
+ * leaves out (issue #4167).
  */
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { InfologTail } from "@/play/bindings";
 import type { CrashTriage } from "@/play/useCrashTriage";
 import { CrashDrawer } from "./CrashDrawer";
 
-// The drawer's buttons reach the plugin. Neither is pressed here, so the mock
-// only has to stop the import resolving a real Tauri command.
-vi.mock("@/content/bindings", () => ({ contentOpenPath: vi.fn() }));
+const m = vi.hoisted(() => ({
+  contentOpenPath: vi.fn(async (_a: { path: string }) => {}),
+  revealItemInDir: vi.fn(async (_p: string) => {}),
+}));
 
-afterEach(cleanup);
+vi.mock("@/content/bindings", () => ({ contentOpenPath: m.contentOpenPath }));
+vi.mock("@tauri-apps/plugin-opener", () => ({
+  revealItemInDir: m.revealItemInDir,
+}));
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 const LINES = [
   '[t=00:00:03.486366] [Font] [InitFontconfig] Using Fontconfig cache dir "/opt/homebrew/var/cache/fontconfig"',
@@ -44,13 +54,6 @@ const triage = (over: Partial<CrashTriage> = {}): CrashTriage => ({
   ...over,
 });
 
-/** The line elements, in order, tagged with how the drawer classified them. */
-function lineKinds(): string[] {
-  return Array.from(document.querySelectorAll("[data-line-kind]")).map(
-    (el) => el.getAttribute("data-line-kind") ?? "",
-  );
-}
-
 describe("CrashDrawer", () => {
   it("says how the engine died", () => {
     render(<CrashDrawer open onOpenChange={() => {}} triage={triage()} />);
@@ -63,14 +66,43 @@ describe("CrashDrawer", () => {
     expect(screen.getByText("Beyond All Reason test-1234")).toBeTruthy();
   });
 
-  it("marks the error and warning lines and leaves the rest alone", () => {
+  it("shows the path to the log file and when it was written", () => {
     render(<CrashDrawer open onOpenChange={() => {}} triage={triage()} />);
-    expect(lineKinds()).toEqual(["normal", "warning", "error"]);
+    expect(screen.getByText(log.path)).toBeTruthy();
+    expect(screen.getByText(/Written /)).toBeTruthy();
   });
 
-  it("says how much of the log it is showing", () => {
+  it("shows no line of the log, which would pass for the whole file", () => {
     render(<CrashDrawer open onOpenChange={() => {}} triage={triage()} />);
-    expect(screen.getByText(/last 3 of 1091 lines/)).toBeTruthy();
+    expect(screen.queryByText(/UsePBO/)).toBeNull();
+    expect(screen.queryByText(/Fontconfig/)).toBeNull();
+    expect(screen.queryByText(/showing the last/i)).toBeNull();
+  });
+
+  it("opens the log file", () => {
+    render(<CrashDrawer open onOpenChange={() => {}} triage={triage()} />);
+    fireEvent.click(screen.getByRole("button", { name: /open the log file/i }));
+    expect(m.contentOpenPath).toHaveBeenCalledWith({ path: log.path });
+  });
+
+  it("shows the log file in its folder", () => {
+    render(<CrashDrawer open onOpenChange={() => {}} triage={triage()} />);
+    fireEvent.click(screen.getByRole("button", { name: /show in folder/i }));
+    expect(m.revealItemInDir).toHaveBeenCalledWith(log.path);
+  });
+
+  it("copies the crash details and the log path, and no log line", () => {
+    const writeText = vi.fn(async (_t: string) => {});
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    render(<CrashDrawer open onOpenChange={() => {}} triage={triage()} />);
+    fireEvent.click(screen.getByRole("button", { name: /copy details/i }));
+    const text = writeText.mock.calls[0][0];
+    expect(text).toContain("Comet Catcher Remake");
+    expect(text).toContain(log.path);
+    expect(text).not.toContain("UsePBO");
   });
 
   it("shows no log at all when the newest one predates the run", () => {
@@ -83,7 +115,7 @@ describe("CrashDrawer", () => {
     );
     // A log from an earlier session reads as evidence, so it is withheld rather
     // than shown with a caveat.
-    expect(lineKinds()).toEqual([]);
+    expect(screen.queryByText(log.path)).toBeNull();
     expect(screen.getByText(/wrote no log for this run/)).toBeTruthy();
   });
 
@@ -103,6 +135,7 @@ describe("CrashDrawer", () => {
       <CrashDrawer open onOpenChange={() => {}} triage={triage()} />,
     );
     expect(screen.getByText("Open the log file")).toBeTruthy();
+    expect(screen.getByText("Show in folder")).toBeTruthy();
     unmount();
 
     render(
@@ -113,6 +146,7 @@ describe("CrashDrawer", () => {
       />,
     );
     expect(screen.queryByText("Open the log file")).toBeNull();
+    expect(screen.queryByText("Show in folder")).toBeNull();
   });
 
   it("reports a nonzero exit with its code", () => {
