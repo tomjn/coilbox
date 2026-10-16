@@ -327,3 +327,12 @@ describe("BattleChatCard: !balance/!lock host suggestions", () => {
     expect(screen.getByText("!fixcolors")).toBeTruthy();
   });
 });
+
+describe("BattleChatCard: minimum height (#4186)", () => {
+  it("keeps a minimum height and grows to fill the column", () => {
+    renderCard(false);
+    const wrapper = document.querySelector("section")?.parentElement;
+    expect(wrapper?.className).toContain("min-h-[22rem]");
+    expect(wrapper?.className).toContain("flex-1");
+  });
+});
