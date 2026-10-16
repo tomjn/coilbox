@@ -13,13 +13,15 @@ import { Button, useSetting } from "@picoframe/frame";
 import {
   Crosshair,
   FolderOpen,
+  RefreshCw,
   Rocket,
+  RotateCcw,
   ScanSearch,
   Square,
   X,
 } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
 import {
   contentUnitCheck,
@@ -41,6 +43,7 @@ import {
   toBattleConfig,
   usePreferredTarget,
 } from "../../../play/config";
+import { playAskLuaRules } from "../../../play/bindings";
 import { usePlay } from "../../../play/PlayProvider";
 import { GamePickerButton } from "../../../play/pages/components/GamePickerButton";
 import { GamePickerPanel } from "../../../play/pages/components/GamePickerPanel";
@@ -49,10 +52,27 @@ import type { ScratchSandbox } from "../../bindings";
 import type { LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import type { RawGeometry } from "../../rawGeometry";
-import { prepareSandbox, sandboxModOptions } from "../../sandbox";
+import {
+  prepareSandbox,
+  SANDBOX_LOADED_REPLY,
+  SANDBOX_RELOAD_MESSAGE,
+  SANDBOX_REPLY,
+  sandboxModOptions,
+} from "../../sandbox";
+import {
+  afterScriptReload,
+  type LoadedSandbox,
+  loadedFrom,
+  relaunchMessage,
+  sandboxChanges,
+} from "../../sandboxReload";
 import { SCRATCH_SIDE } from "../../scratchGame";
 import { CHECK_FRAMES, CHECK_SPAWN_FRAME } from "../../unitCheck";
-import { writeScratchGame } from "../../writeScratchGame";
+import {
+  type WrittenScratchUnit,
+  writeScratchGame,
+  writeScratchUnit,
+} from "../../writeScratchGame";
 import { ShowMe } from "./ShowMe";
 import { UnitCheckResult } from "./UnitCheckResult";
 
@@ -79,6 +99,24 @@ type Phase =
   | { state: "checking" }
   | { state: "done" }
   | { state: "failed"; message: string };
+
+/** The sandbox this drawer launched, while it runs (issue #3346). */
+interface SandboxRun {
+  /** Null until the engine process exists. */
+  runId: string | null;
+  baseGame: string;
+  sandbox: ScratchSandbox;
+  loaded: LoadedSandbox;
+}
+
+type Reload =
+  | { state: "idle" }
+  | { state: "reloading" }
+  | { state: "done"; message: string; relaunch: boolean }
+  | { state: "failed"; message: string };
+
+/** What the sandbox gadget puts before its reason when a reload did not happen. */
+const FAILED = `${SANDBOX_REPLY}failed:`;
 
 const BUSY_LABEL: Record<string, string> = {
   writing: "Writing the scratch game",
@@ -107,7 +145,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
     target?.enginePath,
     target?.dataDir,
   );
-  const { running, launch } = usePlay();
+  const { running, launch, cancel } = usePlay();
 
   // Remembered app-wide rather than on the unit: which game and map you test
   // against is a habit, not a property of the thing being built.
@@ -128,6 +166,10 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
   const [check, setCheck] = useState<UnitCheckReport | null>(null);
   /** Which action the busy phases belong to. */
   const [action, setAction] = useState<Action>("launch");
+  const [sandboxRun, setSandboxRun] = useState<SandboxRun | null>(null);
+  const [reload, setReload] = useState<Reload>({ state: "idle" });
+  /** The launch in flight, so a relaunch can wait for it to finish. */
+  const playing = useRef<Promise<void> | null>(null);
 
   // The scratch game is itself a game, so it comes back in every scan. Offering
   // it as a base would nest it inside itself, and the scenario editor's test
@@ -158,10 +200,12 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
 
   const waiting = targetLoading || (!!target && !scan.data && scan.loading);
 
-  async function scratchGame(sandbox?: ScratchSandbox): Promise<string | null> {
+  async function scratchGame(
+    sandbox?: ScratchSandbox,
+  ): Promise<(WrittenScratchUnit & { name: string }) | null> {
     if (!target || !game) return null;
     setPhase({ state: "writing" });
-    const { name } = await writeScratchGame({
+    return writeScratchGame({
       target,
       baseGame: game.name,
       project,
@@ -171,11 +215,16 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
       onWritten: setScratchDir,
       onScanning: () => setPhase({ state: "scanning" }),
     });
-    return name;
   }
 
   /** Write the scratch game, launch it, and say how the engine exited. */
-  async function play(
+  function play(...args: Parameters<typeof launchAndWait>) {
+    const run = launchAndWait(...args);
+    playing.current = run;
+    return run;
+  }
+
+  async function launchAndWait(
     next: Action,
     setup: () => Promise<{
       sandbox?: ScratchSandbox;
@@ -190,11 +239,32 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
     try {
       setPhase({ state: "writing" });
       const { sandbox, participants, startPosType, modOptions } = await setup();
-      const scratchName = await scratchGame(sandbox);
-      if (!scratchName) return;
+      const written = await scratchGame(sandbox);
+      if (!written) return;
+      const scratchName = written.name;
 
       setPhase({ state: "playing" });
+      setReload({ state: "idle" });
+      // A sandbox can be reached while it runs, so its script can be reloaded
+      // (issue #3346). Recorded before the launch, with the run id to follow
+      // once the engine exists.
+      const reachable = sandbox
+        ? {
+            autohost: true,
+            onEngineStarted: (runId: string) =>
+              setSandboxRun((run) => run && { ...run, runId }),
+          }
+        : {};
+      if (sandbox) {
+        setSandboxRun({
+          runId: null,
+          baseGame: game.name,
+          sandbox,
+          loaded: loadedFrom(written),
+        });
+      }
       const result = await launch("skirmish", {
+        ...reachable,
         config: toBattleConfig({
           participants,
           mapName: map.name,
@@ -225,6 +295,10 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
         state: "failed",
         message: error instanceof Error ? error.message : String(error),
       });
+    } finally {
+      // What a reload said was about the game that has now closed.
+      setSandboxRun(null);
+      setReload({ state: "idle" });
     }
   }
 
@@ -258,13 +332,80 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
     });
   }
 
+  /**
+   * Export the unit into the running sandbox and reload what the engine can,
+   * which is the script. Says what needs a relaunch for the rest.
+   */
+  async function reloadSandbox() {
+    const run = sandboxRun;
+    if (!run?.runId || !target) return;
+    setReload({ state: "reloading" });
+    try {
+      const written = await writeScratchUnit({
+        target,
+        baseGame: run.baseGame,
+        project,
+        pack,
+        raw,
+        sandbox: run.sandbox,
+      });
+      const changes = sandboxChanges(run.loaded, written);
+      const said: string[] = [];
+      if (changes.reload) {
+        const { answer } = await playAskLuaRules({
+          runId: run.runId,
+          message: SANDBOX_RELOAD_MESSAGE,
+          reply: SANDBOX_REPLY,
+        });
+        if (answer !== SANDBOX_LOADED_REPLY) {
+          throw new Error(
+            answer.startsWith(FAILED) ? answer.slice(FAILED.length) : answer,
+          );
+        }
+        setSandboxRun(
+          (current) =>
+            current && {
+              ...current,
+              loaded: afterScriptReload(current.loaded, written),
+            },
+        );
+        said.push(
+          `Reloaded the script. Every ${project.unitName} in the game runs it now.`,
+        );
+      }
+      const relaunch = relaunchMessage(changes.relaunch);
+      if (relaunch) said.push(relaunch);
+      if (said.length === 0) {
+        said.push("Nothing has changed since the game started.");
+      }
+      setReload({
+        state: "done",
+        message: said.join(" "),
+        relaunch: changes.relaunch.length > 0,
+      });
+    } catch (error) {
+      setReload({
+        state: "failed",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /** Close the running sandbox and play a new one with the unit as it is now. */
+  async function relaunchSandbox() {
+    cancel();
+    await playing.current;
+    await playSandbox();
+  }
+
   async function checkLoads() {
     if (!target || !game || !map) return;
     setCheck(null);
     setAction("check");
     try {
-      const scratchName = await scratchGame();
-      if (!scratchName) return;
+      const written = await scratchGame();
+      if (!written) return;
+      const scratchName = written.name;
 
       setPhase({ state: "checking" });
       const { report } = await contentUnitCheck({
@@ -390,6 +531,38 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
                     ? BUSY_LABEL[phase.state]
                     : "Play with this unit"}
                 </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => void reloadSandbox()}
+                  disabled={
+                    !running ||
+                    !sandboxRun?.runId ||
+                    reload.state === "reloading"
+                  }
+                >
+                  <RefreshCw className="size-4" />
+                  {reload.state === "reloading"
+                    ? "Reloading"
+                    : "Reload in the sandbox"}
+                </Button>
+                {reload.state === "done" ? (
+                  <div className="flex flex-col gap-2 text-xs text-muted-foreground">
+                    <p>{reload.message}</p>
+                    {reload.relaunch ? (
+                      <Button
+                        variant="outline"
+                        onClick={() => void relaunchSandbox()}
+                        disabled={!sandboxRun?.runId}
+                      >
+                        <RotateCcw className="size-4" />
+                        Relaunch
+                      </Button>
+                    ) : null}
+                  </div>
+                ) : null}
+                {reload.state === "failed" ? (
+                  <p className="text-xs text-destructive">{reload.message}</p>
+                ) : null}
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
