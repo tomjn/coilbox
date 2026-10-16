@@ -1,4 +1,8 @@
-import type { GameItem, StartBoxConfig } from "@/content/bindings";
+import type {
+  GameItem,
+  RoomAllyTeam,
+  StartBoxConfig,
+} from "@/content/bindings";
 import type { StartArea, WorldExtent } from "./polygon";
 
 /**
@@ -18,6 +22,23 @@ export function readsZerokStartBoxes(
  * owner the lobby does not know.
  */
 export const ZEROK_AREA_COLOR = "#f5f5f5";
+
+/**
+ * The players in a room grouped by ally team, in ally order, for the
+ * evaluation of a start box file (issue #4214). Spectators are left out by the
+ * caller.
+ */
+export function roomShape(
+  players: { ally: number; bot: boolean }[],
+): RoomAllyTeam[] {
+  const byAlly = new Map<number, boolean[]>();
+  for (const { ally, bot } of players) {
+    byAlly.set(ally, [...(byAlly.get(ally) ?? []), bot]);
+  }
+  return [...byAlly]
+    .sort(([a], [b]) => a - b)
+    .map(([allyTeam, bots]) => ({ allyTeam, bots }));
+}
 
 /** A file's boxes as the areas `StartPolygonOverlay` draws. */
 export function areasFromConfig(config: StartBoxConfig): StartArea[] {

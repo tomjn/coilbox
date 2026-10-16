@@ -59,13 +59,154 @@ struct Evaluated {
     teams: Vec<StartBoxTeam>,
 }
 
+/// Who is in the room, for the files that ask. `ally_team` is the ally team's
+/// number and `bots` has one entry per player on it, true for a bot. A human
+/// is a player and a bot is a team with no player, as the engine has them.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoomAllyTeam {
+    pub ally_team: u32,
+    pub bots: Vec<bool>,
+}
+
+/// The Spring calls Zero-K's start box files make about the room, answered
+/// from `__ROOM__`: `GetTeamList`, `GetAllyTeamList`, `GetGaiaTeamID`,
+/// `GetTeamInfo`, `GetPlayerList`, `GetPlayerInfo`, `GetTeamCount` and
+/// `Spring.Utilities.Gametype`, plus `ConcatArrays`.
+///
+/// Teams are numbered from 0 through the ally teams in order, and Gaia is the
+/// last team on an ally team of its own, as in a Zero-K match. Nobody is a
+/// spectator and no AI is a chicken AI, so `isChickens` is always false.
+/// `GetGameRulesParam` answers nil. `math.random` is replaced by a function
+/// that always answers the bottom of its range, so a file that picks a layout
+/// at random shows the same one every time.
+const PRELUDE: &str = r#"
+local room = __ROOM__
+
+local teamsOfAlly, allyList, allTeams, allyOfTeam, botTeam, playerOfTeam = {}, {}, {}, {}, {}, {}
+local humanAllies, humanTeams = {}, 0
+local sizes = {}
+local nextTeam, nextPlayer, lastAlly = 0, 0, -1
+for _, ally in ipairs(room) do
+  local teams = {}
+  local hasHuman = false
+  for _, isBot in ipairs(ally.bots) do
+    teams[#teams + 1] = nextTeam
+    allTeams[#allTeams + 1] = nextTeam
+    allyOfTeam[nextTeam] = ally.ally
+    botTeam[nextTeam] = isBot
+    if not isBot then
+      playerOfTeam[nextTeam] = nextPlayer
+      nextPlayer = nextPlayer + 1
+      hasHuman = true
+      humanTeams = humanTeams + 1
+    end
+    nextTeam = nextTeam + 1
+  end
+  teamsOfAlly[ally.ally] = teams
+  allyList[#allyList + 1] = ally.ally
+  sizes[#sizes + 1] = #teams
+  if hasHuman then humanAllies[#humanAllies + 1] = ally.ally end
+  lastAlly = ally.ally
+end
+local humans = nextPlayer
+local gaiaTeam, gaiaAlly = nextTeam, lastAlly + 1
+allTeams[#allTeams + 1] = gaiaTeam
+allyOfTeam[gaiaTeam] = gaiaAlly
+botTeam[gaiaTeam] = true
+teamsOfAlly[gaiaAlly] = { gaiaTeam }
+allyList[#allyList + 1] = gaiaAlly
+
+local function copy(list)
+  local out = {}
+  for i, v in ipairs(list) do out[i] = v end
+  return out
+end
+
+function Spring.GetTeamList(ally)
+  if ally == nil then return copy(allTeams) end
+  return copy(teamsOfAlly[ally] or {})
+end
+function Spring.GetAllyTeamList() return copy(allyList) end
+function Spring.GetGaiaTeamID() return gaiaTeam end
+function Spring.GetTeamLuaAI() return "" end
+function Spring.GetModOptions() return {} end
+function Spring.GetGameRulesParam() return nil end
+function Spring.GetTeamInfo(team)
+  if allyOfTeam[team] == nil then return nil end
+  local leader = playerOfTeam[team] or -1
+  return team, leader, false, botTeam[team], "", allyOfTeam[team]
+end
+function Spring.GetPlayerList(team)
+  local out = {}
+  for _, t in ipairs(allTeams) do
+    if playerOfTeam[t] and (team == nil or team == t) then out[#out + 1] = playerOfTeam[t] end
+  end
+  return out
+end
+function Spring.GetPlayerInfo(player)
+  for team, id in pairs(playerOfTeam) do
+    if id == player then
+      return "Player " .. id, true, false, team, allyOfTeam[team], 0, 0, ""
+    end
+  end
+  return nil
+end
+
+math.random = function(low, high)
+  if low == nil then return 0 end
+  if high == nil then return 1 end
+  return low
+end
+math.randomseed = function() end
+
+Spring.Utilities = Spring.Utilities or {}
+function Spring.Utilities.ConcatArrays(...)
+  local out = {}
+  for _, array in ipairs({ ... }) do
+    for _, item in ipairs(array) do out[#out + 1] = item end
+  end
+  return out
+end
+
+local shape = {}
+if #sizes == 2 then
+  shape.duel = sizes[1] == 1 and sizes[2] == 1
+  shape.teams = not shape.duel
+  shape.small = shape.teams and sizes[1] <= 4 and sizes[2] <= 4
+  shape.big = shape.teams and not shape.small
+end
+local soloTeams = true
+for _, size in ipairs(sizes) do
+  if size > 1 then soloTeams = false end
+end
+
+function Spring.Utilities.GetTeamCount() return #sizes end
+GetTeamCount = Spring.Utilities.GetTeamCount
+
+local function answer(value) return function() return value == true end end
+Spring.Utilities.Gametype = {
+  is1v1 = answer(shape.duel),
+  isTeams = answer(shape.teams),
+  isSmallTeams = answer(shape.small),
+  isBigTeams = answer(shape.big),
+  isFFA = answer(#sizes > 2),
+  isTeamFFA = answer(#sizes > 2 and not soloTeams),
+  isSandbox = answer(#sizes < 2),
+  isCoop = answer(#humanAllies == 1),
+  isSoloTeams = answer(soloTeams),
+  isFullCommshare = answer(humanTeams == 1),
+  IsSinglePlayer = answer(humans <= 1),
+  isChickens = answer(false),
+  isPlanetWars = answer(false),
+}
+"#;
+
 /// Runs the file at `__PATH__` and rewrites what it returned as a sequence of
 /// boxes in id order, shifting a file that counts from 1 down to 0 as
 /// `ParseBoxes` does. Keys are lower case because `eval_to` lowers them.
 const WRAPPER: &str = r#"
-function GetTeamCount() return __TEAMS__ end
-Spring.Utilities = Spring.Utilities or {}
-Spring.Utilities.GetTeamCount = GetTeamCount
+__PRELUDE__
 
 local config = VFS.Include(__PATH__)
 if type(config) ~= "table" then
@@ -119,7 +260,7 @@ return { teams = out }
 pub fn find(
     mut read: impl FnMut(Source, &str) -> Result<Option<String>, String>,
     game: &GameConstants,
-    team_count: u32,
+    room: &[RoomAllyTeam],
 ) -> Result<Option<StartBoxConfig>, String> {
     let game_file = format!("{GAME_DIR}{}.lua", game.map_name);
     let (source, file, text) = if let Some(text) = read(Source::Game, &game_file)? {
@@ -130,7 +271,7 @@ pub fn find(
         return Ok(None);
     };
     let files = gather(&mut |path| read(source, path), &file, text)?;
-    let teams = evaluate(files, &file, game, team_count).map_err(|e| format!("{file}: {e}"))?;
+    let teams = evaluate(files, &file, game, room).map_err(|e| format!("{file}: {e}"))?;
     Ok(Some(StartBoxConfig {
         source,
         file,
@@ -143,7 +284,7 @@ pub fn evaluate(
     files: BTreeMap<String, String>,
     file: &str,
     game: &GameConstants,
-    team_count: u32,
+    room: &[RoomAllyTeam],
 ) -> Result<Vec<StartBoxTeam>, String> {
     // A root nothing is ever written to, so every read is one of `files`.
     let nanos = SystemTime::now()
@@ -164,10 +305,30 @@ pub fn evaluate(
         format!("\"{MAP_FILE}\"")
     };
     let src = WRAPPER
-        .replace("__TEAMS__", &team_count.to_string())
+        .replace("__PRELUDE__", PRELUDE)
+        .replace("__ROOM__", &room_literal(room))
         .replace("__PATH__", &path);
     let out: Evaluated = lua.eval_to(&src, "startboxes").map_err(|e| e.to_string())?;
     Ok(out.teams)
+}
+
+/// `room` as a Lua table, ally teams in number order with the empty ones left
+/// out and one entry merged from any repeats. Built from numbers and booleans
+/// only, so nothing the caller sends can be code.
+fn room_literal(room: &[RoomAllyTeam]) -> String {
+    let mut allies: BTreeMap<u32, Vec<bool>> = BTreeMap::new();
+    for ally in room {
+        allies.entry(ally.ally_team).or_default().extend(&ally.bots);
+    }
+    let entries: Vec<String> = allies
+        .into_iter()
+        .filter(|(_, bots)| !bots.is_empty())
+        .map(|(ally, bots)| {
+            let bots: Vec<String> = bots.iter().map(bool::to_string).collect();
+            format!("{{ ally = {ally}, bots = {{ {} }} }}", bots.join(", "))
+        })
+        .collect();
+    format!("{{ {} }}", entries.join(", "))
 }
 
 /// `first` and every file it pulls in through `VFS.Include` with a literal
@@ -221,8 +382,8 @@ fn included_names(text: &str) -> Vec<String> {
 
 /// `content_start_boxes`: the start boxes Zero-K uses on `mapName`, read from
 /// `gameArchive` and the map (issue #4194). `mapSizeX` and `mapSizeZ` are the
-/// map's size in world units and `teamCount` the number of ally teams with
-/// somebody on them, which is what Zero-K's `GetTeamCount` answers.
+/// map's size in world units and `allyTeams` who is in the room, which the
+/// files read through `GetTeamList`, `GetTeamCount` and `Gametype`.
 ///
 /// Answers `{ config }`, where `config` is null when neither file exists or
 /// the file failed. A failure is logged and its reason returned as `error`.
@@ -235,7 +396,7 @@ pub(crate) async fn content_start_boxes(
     map_name: String,
     map_size_x: f64,
     map_size_z: f64,
-    team_count: u32,
+    ally_teams: Vec<RoomAllyTeam>,
 ) -> CliResult {
     let game = GameConstants {
         map_name: map_name.clone(),
@@ -258,7 +419,7 @@ pub(crate) async fn content_start_boxes(
                 )
             },
             &game,
-            team_count,
+            &ally_teams,
         )
     })
     .await
@@ -282,6 +443,22 @@ mod tests {
             map_size_x: x,
             map_size_z: z,
         }
+    }
+
+    /// Ally teams numbered from 0, each a list of players, true for a bot.
+    fn room(allies: &[&[bool]]) -> Vec<RoomAllyTeam> {
+        allies
+            .iter()
+            .enumerate()
+            .map(|(i, bots)| RoomAllyTeam {
+                ally_team: i as u32,
+                bots: bots.to_vec(),
+            })
+            .collect()
+    }
+
+    fn duel() -> Vec<RoomAllyTeam> {
+        room(&[&[false], &[false]])
     }
 
     /// A reader over two in-memory archives, recording what was asked for.
@@ -330,7 +507,7 @@ return {
         let config = find(
             archives(&[], &[(MAP_FILE, MAP_SIDE)], &mut asked),
             &game("Sailaway 2", 10240.0, 10240.0),
-            2,
+            &duel(),
         )
         .unwrap()
         .expect("boxes");
@@ -377,7 +554,7 @@ return layout, { 2 }
                 &mut asked,
             ),
             &game("Mirror 1", 7168.0, 2048.0),
-            2,
+            &duel(),
         )
         .unwrap()
         .expect("boxes");
@@ -405,15 +582,16 @@ return ret
     #[test]
     fn get_team_count_answers_the_rooms_team_count() {
         for (teams, boxes) in [(2, 2), (3, 3), (4, 4)] {
+            let teams = room(&vec![&[false][..]; teams]);
             let mut asked = Vec::new();
             let config = find(
                 archives(&[], &[(MAP_FILE, BY_TEAM_COUNT)], &mut asked),
                 &game("Count", 4096.0, 4096.0),
-                teams,
+                &teams,
             )
             .unwrap()
             .expect("boxes");
-            assert_eq!(config.teams.len(), boxes, "with {teams} teams");
+            assert_eq!(config.teams.len(), boxes, "with {} teams", teams.len());
         }
     }
 
@@ -427,7 +605,7 @@ return ret
                 &mut asked,
             ),
             &game("Sailaway 2", 7168.0, 2048.0),
-            2,
+            &duel(),
         )
         .unwrap()
         .expect("boxes");
@@ -445,7 +623,7 @@ return ret
         let config = find(
             archives(&[], &[(MAP_FILE, MAP_SIDE)], &mut asked),
             &game("Sailaway 2", 10240.0, 10240.0),
-            2,
+            &duel(),
         )
         .unwrap()
         .expect("boxes");
@@ -465,7 +643,12 @@ return ret
     #[test]
     fn no_file_is_no_boxes() {
         let mut asked = Vec::new();
-        let config = find(archives(&[], &[], &mut asked), &game("Plain", 1.0, 1.0), 2).unwrap();
+        let config = find(
+            archives(&[], &[], &mut asked),
+            &game("Plain", 1.0, 1.0),
+            &duel(),
+        )
+        .unwrap();
         assert_eq!(config, None);
     }
 
@@ -476,7 +659,7 @@ return ret
         let err = find(
             archives(&[], &[(MAP_FILE, broken)], &mut asked),
             &game("Broken", 1.0, 1.0),
-            2,
+            &duel(),
         )
         .unwrap_err();
         assert!(err.starts_with(MAP_FILE), "{err}");
@@ -486,7 +669,7 @@ return ret
         let err = find(
             archives(&[], &[(MAP_FILE, not_a_point)], &mut asked),
             &game("Broken", 1.0, 1.0),
-            2,
+            &duel(),
         )
         .unwrap_err();
         assert!(err.contains("not a pair of numbers"), "{err}");
@@ -510,7 +693,7 @@ return ret
                 &mut asked,
             ),
             &game("Mirror 1.1", 7168.0, 2048.0),
-            2,
+            &duel(),
         )
         .unwrap()
         .expect("boxes");
@@ -522,6 +705,140 @@ return ret
     fn included_names_reads_both_quotes_and_no_parentheses() {
         let text = r#"local a = VFS.Include("a.lua") local b = VFS.Include ( 'b.lua', nil, VFS.GAME ) local c = VFS.Include "c.lua" local d = VFS.Include(name)"#;
         assert_eq!(included_names(text), vec!["a.lua", "b.lua", "c.lua"]);
+    }
+
+    /// Which `Gametype` answers are true, by name, for a room.
+    fn gametype(room: &[RoomAllyTeam]) -> Vec<String> {
+        let names = [
+            "is1v1",
+            "isTeams",
+            "isSmallTeams",
+            "isBigTeams",
+            "isFFA",
+            "isTeamFFA",
+            "isSandbox",
+            "isCoop",
+            "isSoloTeams",
+            "isFullCommshare",
+            "IsSinglePlayer",
+            "isChickens",
+        ];
+        let probe: String = names
+            .iter()
+            .map(|n| format!("if Spring.Utilities.Gametype.{n}() then t[#t + 1] = \"{n}\" end\n"))
+            .collect();
+        let file = format!(
+            "local t = {{}}\n{probe}return {{ {{ nameLong = table.concat(t, \",\"), boxes = {{}}, startpoints = {{}} }} }}"
+        );
+        let mut asked = Vec::new();
+        let config = find(
+            archives(&[], &[(MAP_FILE, &file)], &mut asked),
+            &game("Shape", 1.0, 1.0),
+            room,
+        )
+        .unwrap()
+        .expect("boxes");
+        let joined = config.teams[0].name_long.clone().unwrap_or_default();
+        joined
+            .split(',')
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+            .collect()
+    }
+
+    #[test]
+    fn gametype_follows_the_rooms_shape() {
+        let h = false;
+        let b = true;
+        assert_eq!(
+            gametype(&room(&[&[h], &[b]])),
+            [
+                "is1v1",
+                "isCoop",
+                "isSoloTeams",
+                "isFullCommshare",
+                "IsSinglePlayer"
+            ]
+        );
+        assert_eq!(
+            gametype(&room(&[&[h, h, h, h], &[h, h, h, h]])),
+            ["isTeams", "isSmallTeams"]
+        );
+        assert_eq!(
+            gametype(&room(&[&[h, h, h, h, h], &[h]])),
+            ["isTeams", "isBigTeams"]
+        );
+        assert_eq!(
+            gametype(&room(&[&[h], &[h], &[h]])),
+            ["isFFA", "isSoloTeams"]
+        );
+        assert_eq!(
+            gametype(&room(&[&[h, h], &[h], &[h]])),
+            ["isFFA", "isTeamFFA"]
+        );
+        assert_eq!(
+            gametype(&room(&[&[h, b, b]])),
+            ["isSandbox", "isCoop", "isFullCommshare", "IsSinglePlayer"]
+        );
+    }
+
+    /// The calls a file makes about who is in the room: the Gaia team counts
+    /// in the whole list and in no ally team, and bots are teams with no player.
+    #[test]
+    fn spring_answers_about_teams_and_players() {
+        let file = r#"
+local gaia = Spring.GetGaiaTeamID()
+local n = #Spring.GetTeamList()
+local first, second = #Spring.GetTeamList(0), #Spring.GetTeamList(1)
+local _, leader, _, isAI, _, ally = Spring.GetTeamInfo(2)
+local name, active, spectator, team, allyTeam = Spring.GetPlayerInfo(1)
+local joined = Spring.Utilities.ConcatArrays({ 1, 2 }, {}, { 3 })
+local bad = #Spring.GetTeamList(7) ~= 0 or Spring.GetGameRulesParam("x") ~= nil
+	or math.random() ~= 0 or math.random(2, 4) ~= 2
+return { {
+	nameLong = table.concat({ gaia, n, first, second, leader, tostring(isAI), ally,
+		#Spring.GetPlayerList(), team, allyTeam, tostring(spectator), #joined, tostring(bad) }, ","),
+	boxes = {}, startpoints = {},
+} }
+"#;
+        let mut asked = Vec::new();
+        let config = find(
+            archives(&[], &[(MAP_FILE, file)], &mut asked),
+            &game("Calls", 1.0, 1.0),
+            &room(&[&[false, false], &[true, false]]),
+        )
+        .unwrap()
+        .expect("boxes");
+        assert_eq!(
+            config.teams[0].name_long.as_deref(),
+            Some("4,5,2,2,-1,true,1,3,1,0,false,3,false")
+        );
+    }
+
+    #[test]
+    fn a_room_is_merged_by_ally_team_and_drops_empty_ones() {
+        let allies = vec![
+            RoomAllyTeam {
+                ally_team: 3,
+                bots: vec![false],
+            },
+            RoomAllyTeam {
+                ally_team: 1,
+                bots: vec![],
+            },
+            RoomAllyTeam {
+                ally_team: 3,
+                bots: vec![true],
+            },
+            RoomAllyTeam {
+                ally_team: 0,
+                bots: vec![false],
+            },
+        ];
+        assert_eq!(
+            room_literal(&allies),
+            "{ { ally = 0, bots = { false } }, { ally = 3, bots = { false, true } } }"
+        );
     }
 
     /// Every file under `COILBOX_STARTBOX_SWEEP`, evaluated the way the app
@@ -538,49 +855,60 @@ return ret
             .filter(|p| p.extension().is_some_and(|e| e == "lua"))
             .collect();
         entries.sort();
-        let (mut good, mut bad) = (0, 0);
-        for path in entries {
-            let name = path.file_stem().unwrap().to_string_lossy().into_owned();
-            let siblings: Vec<(String, String)> = std::fs::read_dir(&dir)
-                .unwrap()
-                .flatten()
-                .filter_map(|e| {
-                    let file = e.file_name().to_string_lossy().into_owned();
-                    let text = std::fs::read_to_string(e.path()).ok()?;
-                    Some((format!("{GAME_DIR}{file}"), text))
-                })
-                .collect();
-            let result = find(
-                |_, wanted| {
-                    Ok(siblings
-                        .iter()
-                        .find(|(p, _)| p.eq_ignore_ascii_case(wanted))
-                        .map(|(_, t)| t.clone()))
-                },
-                &game(&name, 8192.0, 8192.0),
-                2,
-            );
-            match result {
-                Ok(Some(config)) => {
-                    good += 1;
-                    let corners: usize = config
-                        .teams
-                        .iter()
-                        .flat_map(|t| &t.boxes)
-                        .map(Vec::len)
-                        .sum();
-                    println!(
-                        "ok   {name}: {} boxes, {corners} corners",
-                        config.teams.len()
-                    );
-                }
-                Ok(None) => println!("none {name}"),
-                Err(e) => {
-                    bad += 1;
-                    println!("FAIL {name}: {e}");
+        // A duel, small and big teams, a free for all and a room of one team,
+        // since a file can take a different path through each.
+        let rooms = [
+            ("1v1", duel()),
+            ("4v4", room(&[&[false; 4], &[false; 4]])),
+            ("8v8", room(&[&[false; 8], &[false; 8]])),
+            ("ffa", room(&[&[false], &[false], &[false], &[false]])),
+            ("one team", room(&[&[false, true]])),
+        ];
+        for (label, shape) in rooms {
+            let (mut good, mut bad) = (0, 0);
+            for path in &entries {
+                let name = path.file_stem().unwrap().to_string_lossy().into_owned();
+                let siblings: Vec<(String, String)> = std::fs::read_dir(&dir)
+                    .unwrap()
+                    .flatten()
+                    .filter_map(|e| {
+                        let file = e.file_name().to_string_lossy().into_owned();
+                        let text = std::fs::read_to_string(e.path()).ok()?;
+                        Some((format!("{GAME_DIR}{file}"), text))
+                    })
+                    .collect();
+                let result = find(
+                    |_, wanted| {
+                        Ok(siblings
+                            .iter()
+                            .find(|(p, _)| p.eq_ignore_ascii_case(wanted))
+                            .map(|(_, t)| t.clone()))
+                    },
+                    &game(&name, 8192.0, 8192.0),
+                    &shape,
+                );
+                match result {
+                    Ok(Some(config)) => {
+                        good += 1;
+                        let corners: usize = config
+                            .teams
+                            .iter()
+                            .flat_map(|t| &t.boxes)
+                            .map(Vec::len)
+                            .sum();
+                        println!(
+                            "ok   {name}: {} boxes, {corners} corners",
+                            config.teams.len()
+                        );
+                    }
+                    Ok(None) => println!("none {name}"),
+                    Err(e) => {
+                        bad += 1;
+                        println!("FAIL {name}: {e}");
+                    }
                 }
             }
+            println!("{label}: {good} evaluated, {bad} failed");
         }
-        println!("{good} evaluated, {bad} failed");
     }
 }

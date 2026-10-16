@@ -3,6 +3,7 @@ import {
   areasFromConfig,
   mapExtent,
   readsZerokStartBoxes,
+  roomShape,
   ZEROK_AREA_COLOR,
 } from "./zerok";
 
@@ -13,6 +14,22 @@ describe("readsZerokStartBoxes", () => {
     expect(readsZerokStartBoxes({ info: { shortname: "SF" } })).toBe(false);
     expect(readsZerokStartBoxes({ info: {} })).toBe(false);
     expect(readsZerokStartBoxes(undefined)).toBe(false);
+  });
+});
+
+describe("roomShape", () => {
+  it("groups players by ally team in ally order, with a flag for bots", () => {
+    expect(
+      roomShape([
+        { ally: 1, bot: true },
+        { ally: 0, bot: false },
+        { ally: 1, bot: false },
+      ]),
+    ).toEqual([
+      { allyTeam: 0, bots: [false] },
+      { allyTeam: 1, bots: [true, false] },
+    ]);
+    expect(roomShape([])).toEqual([]);
   });
 });
 
