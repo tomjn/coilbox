@@ -2,6 +2,7 @@ import * as THREE from "three";
 
 import { isEffectivelyHidden, type LegoProject } from "../../model";
 import { ORIGIN_COLOUR } from "./ModelViewport";
+import { hideOverlay, showOverlay } from "./overlayFollow";
 import type { SceneState } from "./sceneState";
 
 /**
@@ -25,36 +26,6 @@ export function overlayMaterial(
     polygonOffsetFactor: -1,
     polygonOffsetUnits: -1,
   });
-}
-
-/**
- * Sit a wash mesh over a piece's own faces, not its bounding box, by pointing
- * it at the same geometry as the piece's mesh and copying that mesh's local
- * transform. The geometry is a borrowed reference: it belongs to the pack's
- * shared cache or, while playing, to the bake, and this mesh must never
- * dispose it.
- *
- * A piece with no part (an empty hierarchy node) has no mesh to trace, so
- * there is nothing to wash and the overlay is hidden instead.
- */
-function showOverlay(overlay: THREE.Mesh, group: THREE.Group) {
-  const mesh = group.children.find((child) => child instanceof THREE.Mesh) as
-    | THREE.Mesh
-    | undefined;
-  if (!mesh) {
-    hideOverlay(overlay);
-    return;
-  }
-  overlay.geometry = mesh.geometry;
-  overlay.position.copy(mesh.position);
-  overlay.rotation.copy(mesh.rotation);
-  overlay.scale.copy(mesh.scale);
-  group.add(overlay);
-  overlay.visible = true;
-}
-
-function hideOverlay(overlay: THREE.Mesh) {
-  overlay.visible = false;
 }
 
 /**

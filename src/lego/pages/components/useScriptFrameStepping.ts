@@ -12,6 +12,7 @@ import { disposeBaked, showBaked } from "./bakedPlayback";
 import { followCamera, setDrive } from "./drivePlayback";
 import { bakedVertices, placeEffects } from "./effectsPlayback";
 import { attachGizmo } from "./gizmoCommit";
+import { refreshSelection } from "./overlayFollow";
 import { type SceneState, syncScene } from "./sceneState";
 import { placeStandIn, type StandInPlacement } from "./standInPlayback";
 
@@ -155,6 +156,7 @@ export function useScriptFrameStepping(
       current.effects.object.visible = false;
       disposeBaked(current);
       syncScene(current, packRef.current, rawRef.current, projectRef.current);
+      refreshSelection(current);
       attachGizmo(
         current,
         projectRef.current,

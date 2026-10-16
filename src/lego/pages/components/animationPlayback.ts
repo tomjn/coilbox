@@ -7,6 +7,7 @@ import {
   type ScriptTimeline,
 } from "../../scriptPlayback";
 import { poseRoot, restoreFromDrive } from "./drivePlayback";
+import { followPieces, releasePieces } from "./overlayFollow";
 import type { SceneState } from "./sceneState";
 
 /**
@@ -70,16 +71,18 @@ export function applyTimelineFrame(
     const mesh = group.children.find((child) => child instanceof THREE.Mesh);
     if (mesh) mesh.visible = !hiddenAt(timeline, frame, index);
   }
+  followPieces(state);
 }
 
 /**
  * Undo what playing a script did to the groups themselves, as opposed to what
  * it put in them: a piece it hid, the rotation order it borrowed, and where a
- * drive took the whole unit. Rebuilding the scene from the document sets
+ * drive took the whole unit, and the piece boxes carried along with the pieces. Rebuilding the scene from the document sets
  * positions and rotations but none of these.
  */
 export function restoreFromPlayback(state: SceneState) {
   restoreFromDrive(state);
+  releasePieces(state);
   for (const group of state.groups.values()) {
     group.rotation.order = "XYZ";
     for (const child of group.children) {
