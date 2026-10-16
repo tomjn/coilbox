@@ -20,7 +20,8 @@ use script::{generate_script, BattleConfig};
 use serde::Serialize;
 use serde_json::json;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::process::{Child, ExitStatus, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -123,11 +124,39 @@ fn script_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     Ok(dir.join("script.txt"))
 }
 
+/// Write the start script so that only this user can read it.
+///
+/// A script for joining somebody else's game carries the password the host lets
+/// this player in with, in plain text. The folder is already this user's own app
+/// data, and on Unix the file is also kept from every other account on the
+/// machine. The mode given to `open` only applies to a file it creates, so it is
+/// set again on the open file, which narrows a script an earlier version left
+/// readable before anything new is written into it.
+fn write_private(path: &Path, text: &str) -> std::io::Result<()> {
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file = options.open(path)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
+    }
+    file.write_all(text.as_bytes())
+}
+
 /// `play_generate_script` — render a `BattleConfig` to start-script text without
 /// launching anything (used by tests and to write the file before launch).
 #[tauri::command]
 async fn play_generate_script(config: BattleConfig) -> CliResult {
-    CliResult::ok(json!({ "script": generate_script(&config) }))
+    match generate_script(&config) {
+        Ok(script) => CliResult::ok(json!({ "script": script })),
+        Err(e) => CliResult::err(e),
+    }
 }
 
 /// `play_export_script` — render a `BattleConfig` and write it to a caller-chosen
@@ -135,7 +164,11 @@ async fn play_generate_script(config: BattleConfig) -> CliResult {
 /// plugin, so the write happens here.
 #[tauri::command]
 async fn play_export_script(config: BattleConfig, dest: String) -> CliResult {
-    match std::fs::write(&dest, generate_script(&config)) {
+    let script = match generate_script(&config) {
+        Ok(script) => script,
+        Err(e) => return CliResult::err(e),
+    };
+    match std::fs::write(&dest, script) {
         Ok(()) => CliResult::ok(json!({ "dest": dest })),
         Err(e) => CliResult::err(format!("could not write start script: {e}")),
     }
@@ -306,7 +339,11 @@ async fn play_launch<R: Runtime>(
             return Ok(CliResult::err(format!("could not create script dir: {e}")));
         }
     }
-    if let Err(e) = std::fs::write(&path, generate_script(&config)) {
+    let script = match generate_script(&config) {
+        Ok(script) => script,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    if let Err(e) = write_private(&path, &script) {
         return Ok(CliResult::err(format!("could not write script.txt: {e}")));
     }
 
@@ -844,5 +881,28 @@ mod tests {
             .error
             .unwrap()
             .contains("engine executable not found"));
+    }
+
+    /// The script carries a joiner's script password, so nobody but this user
+    /// may read it. That includes a script an earlier version left behind with
+    /// the default mode, which `open` alone would keep.
+    #[cfg(unix)]
+    #[test]
+    fn the_script_is_readable_by_this_user_alone() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = std::env::temp_dir().join(format!("coilbox-play-script-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("script.txt");
+        std::fs::write(&path, "left by an earlier version").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+
+        write_private(&path, "[GAME]\n{\n}\n").unwrap();
+
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+        let text = std::fs::read_to_string(&path).unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(mode, 0o600);
+        assert_eq!(text, "[GAME]\n{\n}\n");
     }
 }
