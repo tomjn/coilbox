@@ -175,11 +175,23 @@ It writes, if you leave the boxes ticked:
 - `scripts/<unit>.lua`, the unit script the animations generate.
 - The pack's atlas into `unittextures/`. Every unit built from a pack names the same texture, so this only needs doing once per game rather than once per unit.
 
+- `unitpics/<unit>.png`, the build picture, but only once you have taken one with **Build picture**. See [The build picture](#the-build-picture).
+
 It can also write a `.glb`, or an `.obj` with its `.mtl` and a copy of the atlas beside them. Neither is read by the engine. Both go into a `blender` folder alongside the game's own, for taking the unit into Blender to check it against the `.s3o` or finish it by hand.
 
 **The script, the unit definition and the texture are all written once and then left alone.** If any is already there, export keeps yours and says so. The script and the unit definition are meant to be edited: the unit definition coilbox writes is the minimum the engine needs to accept the unit, and adding weapons, cost, a build picture or a movement class is a hand edit that has to survive re-exporting the model. Only the model is overwritten every time, because it is the one file the builder alone owns.
 
 The one exception is coilbox's own scratch game, below, which is a throwaway and is always rewritten in full.
+
+### The build picture
+
+A game's build menu shows a small picture of each unit. With no `buildpic` in the definition the engine looks for `unitpics/<unit>.dds`, then `.png`, `.pcx` and `.bmp`, and draws a blue square if it finds none. So the builder writes `unitpics/<unit>.png` and adds no key.
+
+**Build picture** in the toolbar opens a drawer with a preview of the frame, a camera angle, a transparent or coloured background and a size in pixels. The size starts at 320, the size of the overview thumbnail. **Take picture** stores it on the unit, and every export after that writes it.
+
+The picture is write once, like the script. If `unitpics/<unit>.png` is there already and coilbox did not write it, or you replaced it with a painted one, export leaves it and says so. Coilbox tells the two apart by the digest it recorded when it last wrote the file.
+
+Export never takes a new picture on its own. When the unit changes after the picture was taken, the toolbar button shows a dot and the drawer offers **Update picture**. The drawer also reads the game's `unitpics` folder and says when most of its pictures are another size, or another format.
 
 ### Where the unit's name goes
 

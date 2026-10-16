@@ -8,7 +8,13 @@
 
 import { legoThumbUrl } from "../lib/assetUrl";
 import { createDocumentStore } from "../lib/documentStore";
-import { legoDelete, legoList, legoSave, legoThumbSave } from "./bindings";
+import {
+  legoDelete,
+  legoList,
+  legoPictureSave,
+  legoSave,
+  legoThumbSave,
+} from "./bindings";
 import { type LegoProject, orderedPieces, parseLegoProjectJson } from "./model";
 
 interface LegoStore {
@@ -130,6 +136,24 @@ export async function saveThumbnail(
   if (!blob) return;
   const bytes = new Uint8Array(await blob.arrayBuffer());
   await legoThumbSave({ id, png: Array.from(bytes) });
+}
+
+/**
+ * Store the build picture an export writes into a game (issue #3347).
+ *
+ * Unlike the thumbnail this is not scaled: the canvas is already the size the
+ * game maker asked for, and the file is the canvas as it is.
+ */
+export async function savePicture(
+  id: string,
+  picture: HTMLCanvasElement,
+): Promise<void> {
+  const blob = await new Promise<Blob | null>((resolve) =>
+    picture.toBlob(resolve, "image/png"),
+  );
+  if (!blob) throw new Error("The picture could not be encoded as a PNG.");
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  await legoPictureSave({ id, png: Array.from(bytes) });
 }
 
 /**

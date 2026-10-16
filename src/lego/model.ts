@@ -442,6 +442,12 @@ export interface LegoProject {
   /** What the last export actually put in a game folder (issue #2651). */
   exported?: LegoExport;
   /**
+   * The build picture last taken, which an export writes to
+   * `unitpics/<unit>.png` (issue #3347). The picture's bytes are stored beside
+   * the thumbnail; this is what it was taken with and when.
+   */
+  picture?: BuildPicture;
+  /**
    * Names this project has exported under in the same folder and no longer
    * uses, whose files are still sitting in the game (issue #2680).
    *
@@ -449,6 +455,40 @@ export interface LegoProject {
    * gone, so an empty list means the rename left nothing behind.
    */
   staleExports?: StaleExport[];
+}
+
+/** The camera directions the build picture can be taken from. */
+export const PICTURE_VIEW_IDS = ["right", "left", "front", "side"] as const;
+export type PictureViewId = (typeof PICTURE_VIEW_IDS)[number];
+
+/** How a build picture was taken (issue #3347). */
+export interface BuildPicture {
+  /** Side of the square, in pixels. */
+  size: number;
+  /** A CSS colour, or null for a transparent picture. */
+  background: string | null;
+  view: PictureViewId;
+  /** When it was taken, ISO. */
+  takenAt: string;
+  /** What the unit looked like then: see `pictureFingerprint`. */
+  fingerprint: string;
+}
+
+function parseBuildPicture(raw: unknown): BuildPicture | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const p = raw as Record<string, unknown>;
+  if (typeof p.size !== "number" || !Number.isInteger(p.size) || p.size < 1)
+    return null;
+  if (typeof p.fingerprint !== "string") return null;
+  const view = PICTURE_VIEW_IDS.find((id) => id === p.view);
+  if (!view) return null;
+  return {
+    size: p.size,
+    background: typeof p.background === "string" ? p.background : null,
+    view,
+    takenAt: typeof p.takenAt === "string" ? p.takenAt : "",
+    fingerprint: p.fingerprint,
+  };
 }
 
 /**
@@ -882,6 +922,10 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
     ...(() => {
       const exported = parseExport(d.exported);
       return exported ? { exported } : {};
+    })(),
+    ...(() => {
+      const picture = parseBuildPicture(d.picture);
+      return picture ? { picture } : {};
     })(),
     ...(() => {
       const stale = parseStaleExports(d.staleExports);

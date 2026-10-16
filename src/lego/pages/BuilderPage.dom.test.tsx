@@ -75,8 +75,9 @@ vi.mock("../useRawGeometry", () => ({
   }),
 }));
 
+// Draws its `chrome`, which is the toolbar over the view.
 vi.mock("./components/ModelViewport", () => ({
-  ModelViewport: () => null,
+  ModelViewport: ({ chrome }: { chrome?: React.ReactNode }) => chrome,
 }));
 
 // Reads the app's own settings store for its target engine, which nothing
@@ -124,6 +125,7 @@ function session(project: LegoProject): LegoDocumentSession {
     insert: () => [],
     duplicate: () => [],
     onCapture: vi.fn(),
+    capture: vi.fn(() => null),
   };
 }
 
@@ -193,6 +195,36 @@ describe("while the unit is still opening", () => {
 
     expect(
       await screen.findByText("This unit could not be opened."),
+    ).toBeTruthy();
+  });
+});
+
+describe("the build picture action", () => {
+  it("is in the toolbar and opens the build picture drawer", async () => {
+    show(unit());
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Build picture" }),
+    );
+    expect(
+      await screen.findByRole("dialog", { name: "Build picture" }),
+    ).toBeTruthy();
+  });
+
+  it("marks the toolbar button when the unit has changed since the picture", async () => {
+    show(
+      unit({
+        picture: {
+          size: 320,
+          background: null,
+          view: "right",
+          takenAt: "2026-10-16T00:00:00Z",
+          fingerprint: "an older unit",
+        },
+      }),
+    );
+    await screen.findByRole("button", { name: "Build picture" });
+    expect(
+      document.querySelector("button[aria-label='Build picture'] span"),
     ).toBeTruthy();
   });
 });

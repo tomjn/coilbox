@@ -25,11 +25,13 @@ import { ExportDrawer } from "./ExportDrawer";
 
 const legoGameLanguage = vi.fn();
 const legoExport = vi.fn();
+const legoExportPicture = vi.fn();
 
 vi.mock("../../bindings", () => ({
   legoExport: (args: unknown) => legoExport(args),
   legoExportGlb: vi.fn(),
   legoExportObj: vi.fn(),
+  legoExportPicture: (args: unknown) => legoExportPicture(args),
   legoExportStale: vi.fn().mockResolvedValue({
     ours: [],
     kept: [],
@@ -83,15 +85,15 @@ const pack = {
   },
 } as unknown as LoadedPack;
 
-function show() {
+function show(shown = project, onRemember = vi.fn()) {
   return render(
     <ExportDrawer
       open
       onOpenChange={vi.fn()}
-      project={project}
+      project={shown}
       pack={pack}
       raw={null}
-      onRemember={vi.fn()}
+      onRemember={onRemember}
       onStale={vi.fn()}
     />,
   );
@@ -100,6 +102,7 @@ function show() {
 beforeEach(() => {
   legoGameLanguage.mockReset();
   legoExport.mockReset();
+  legoExportPicture.mockReset();
 });
 
 afterEach(() => {
@@ -215,5 +218,106 @@ describe("the shared values polyfill", () => {
       expect(screen.getByText("/game/scripts/skyfort.lua")).toBeTruthy(),
     );
     expect(screen.queryByText(/VFS\.Include/)).toBeNull();
+  });
+});
+
+/**
+ * The build picture is write once (issue #3347). The drawer sends the digest the
+ * receipt holds for the picture's path, so the file on disk is replaced only if
+ * the builder wrote it, and says so when it was left alone.
+ */
+describe("the build picture", () => {
+  const withPicture = {
+    ...project,
+    picture: {
+      size: 320,
+      background: null,
+      view: "right" as const,
+      takenAt: "2026-10-16T00:00:00Z",
+      fingerprint: "f",
+    },
+    exported: {
+      dir: "/games/some.sdd",
+      at: "",
+      unitName: "skyfort",
+      def: {},
+      files: [
+        {
+          path: "/games/some.sdd/unitpics/skyfort.png",
+          sha256: "last-written",
+        },
+      ],
+    },
+  };
+
+  async function exportIt(shown: typeof withPicture, onRemember = vi.fn()) {
+    legoGameLanguage.mockResolvedValue({ texts: {} });
+    legoExport.mockResolvedValue(exportResult());
+    show(shown, onRemember);
+    await waitFor(() =>
+      expect(screen.getByText(/goes into the definition/)).toBeTruthy(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Export" }));
+  }
+
+  it("sends the digest the builder last wrote and reports the new file", async () => {
+    legoExportPicture.mockResolvedValue({
+      path: "/games/some.sdd/unitpics/skyfort.png",
+      kept: false,
+      owned: [{ path: "/games/some.sdd/unitpics/skyfort.png", sha256: "new" }],
+    });
+    const onRemember = vi.fn();
+    await exportIt(withPicture, onRemember);
+    await waitFor(() =>
+      expect(
+        screen.getByText("/games/some.sdd/unitpics/skyfort.png"),
+      ).toBeTruthy(),
+    );
+    expect(legoExportPicture).toHaveBeenCalledWith({
+      dir: "/games/some.sdd",
+      unitName: "skyfort",
+      id: "p",
+      written: "last-written",
+    });
+    const remembered = onRemember.mock.calls[0][0];
+    expect(remembered.exported.files).toEqual([
+      { path: "/games/some.sdd/unitpics/skyfort.png", sha256: "new" },
+    ]);
+  });
+
+  it("says so when a picture the builder did not write was left alone", async () => {
+    legoExportPicture.mockResolvedValue({
+      path: "/games/some.sdd/unitpics/skyfort.png",
+      kept: true,
+      owned: [],
+    });
+    const onRemember = vi.fn();
+    await exportIt(withPicture, onRemember);
+    await waitFor(() =>
+      expect(
+        screen.getByText(/did not write, and has been left alone/),
+      ).toBeTruthy(),
+    );
+    // Kept, so the receipt still holds the digest of the last one coilbox wrote.
+    expect(onRemember.mock.calls[0][0].exported.files).toEqual([
+      { path: "/games/some.sdd/unitpics/skyfort.png", sha256: "last-written" },
+    ]);
+  });
+
+  it("writes no picture when none has been taken", async () => {
+    await exportIt(project as typeof withPicture);
+    await waitFor(() =>
+      expect(screen.getByText("/game/scripts/skyfort.lua")).toBeTruthy(),
+    );
+    expect(legoExportPicture).not.toHaveBeenCalled();
+  });
+
+  it("still reports the export when the picture could not be written", async () => {
+    legoExportPicture.mockRejectedValue(new Error("disk full"));
+    await exportIt(withPicture);
+    await waitFor(() =>
+      expect(screen.getByText(/build picture is not: disk full/)).toBeTruthy(),
+    );
+    expect(screen.getByText("/game/scripts/skyfort.lua")).toBeTruthy();
   });
 });

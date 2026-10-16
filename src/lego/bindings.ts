@@ -170,6 +170,40 @@ export const legoExport = defineCommand<
 >("coilbox-lego", "lego_export");
 
 /**
+ * Store the build picture a game maker took, until an export writes it into a
+ * game (issue #3347). The caller renders and encodes it.
+ */
+export const legoPictureSave = defineCommand<
+  { id: string; png: number[] },
+  Record<string, never>
+>("coilbox-lego", "lego_picture_save");
+
+/**
+ * Write the stored build picture to `unitpics/<unit>.png` in a game folder.
+ *
+ * `written` is the digest the receipt holds for that path. A file already there
+ * is replaced only if it hashes to it: otherwise it is the game maker's, and
+ * `kept` comes back true.
+ */
+export const legoExportPicture = defineCommand<
+  { dir: string; unitName: string; id: string; written: string | null },
+  { path: string; kept: boolean; owned: ExportedFile[] }
+>("coilbox-lego", "lego_export_picture");
+
+/** The pictures a game's `unitpics` folder already holds, by size and format. */
+export interface PictureSurvey {
+  /** PNGs by size, the most common first. */
+  pngSizes: { width: number; height: number; count: number }[];
+  /** Every other format present, by extension. */
+  otherFormats: { extension: string; count: number }[];
+}
+
+export const legoPictureSurvey = defineCommand<{ dir: string }, PictureSurvey>(
+  "coilbox-lego",
+  "lego_picture_survey",
+);
+
+/**
  * Read a game folder's own `language/<code>/units.json` files, which is where
  * Beyond All Reason names every one of its units.
  *

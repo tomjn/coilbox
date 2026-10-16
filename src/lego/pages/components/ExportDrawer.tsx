@@ -47,11 +47,13 @@ import {
   legoExport,
   legoExportGlb,
   legoExportObj,
+  legoExportPicture,
   legoExportStale,
   legoGameLanguage,
   legoSaveGlb,
   legoTexturePng,
 } from "../../bindings";
+import { pictureDigest } from "../../buildPicture";
 import { exportGlb } from "../../exportGlb";
 import { buildObj } from "../../exportObj";
 import { digestsOf, forgetStale, recordExport } from "../../exportRecord";
@@ -135,6 +137,12 @@ type Result =
       blenderProblem: string | null;
       /** `language/<code>/coilbox.json`, for a game named out of one. */
       language: string | null;
+      /** `unitpics/<unit>.png`, when the build picture was written. */
+      picture: string | null;
+      /** True when a picture was already there that the builder did not write,
+       *  and it was left alone. */
+      pictureKept: boolean;
+      pictureProblem: string | null;
     }
   | { state: "failed"; message: string };
 
@@ -196,6 +204,7 @@ export function ExportDrawer({
   const [withScript, setWithScript] = useState(project.exportScript !== false);
   const [withGlb, setWithGlb] = useState(project.exportGlb === true);
   const [withObj, setWithObj] = useState(project.exportObj === true);
+  const [withPicture, setWithPicture] = useState(true);
   const [result, setResult] = useState<Result>({ state: "idle" });
   const [glbSave, setGlbSave] = useState<GlbSave>({ state: "idle" });
   const [gameText, setGameText] = useState<GameText>({ state: "unread" });
@@ -466,6 +475,31 @@ export function ExportDrawer({
       // Every file this run put on disk under the unit's name, for the receipt
       // a later rename reads to know what is still its own (issue #2680).
       let owned: ExportedFile[] = exported.owned;
+
+      // The build picture, if one has been taken. Its own step because it is
+      // write once: a picture in the game that the builder did not write is the
+      // game maker's, and the receipt's digest is how that is told. A failure
+      // here is reported and does not undo the export above.
+      let picturePath: string | null = null;
+      let pictureKept = false;
+      let pictureProblem: string | null = null;
+      if (withPicture && project.picture) {
+        try {
+          const placed = await legoExportPicture({
+            dir,
+            unitName: project.unitName,
+            id: project.id,
+            written: pictureDigest(project.exported, dir, project.unitName),
+          });
+          pictureKept = placed.kept;
+          picturePath = placed.kept ? null : placed.path;
+          owned = [...owned, ...placed.owned];
+        } catch (error) {
+          pictureProblem =
+            error instanceof Error ? error.message : String(error);
+        }
+      }
+
       try {
         // The mask is not a colour map, so it goes beside whichever file is
         // written rather than into a material slot that would misdescribe it.
@@ -553,6 +587,9 @@ export function ExportDrawer({
         glb: glbPath,
         obj: objPath,
         mtl: mtlPath,
+        picture: picturePath,
+        pictureKept,
+        pictureProblem,
         // Both Blender files write the mask, into the same folder under the
         // same name, so a run that wrote both reports it once.
         blenderTextures: written.filter(
@@ -961,6 +998,21 @@ export function ExportDrawer({
               </div>
             ) : null}
 
+            {project.picture ? (
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="lego-export-picture"
+                  checked={withPicture}
+                  onCheckedChange={(checked) =>
+                    setWithPicture(checked === true)
+                  }
+                />
+                <Label htmlFor="lego-export-picture">
+                  Also write the build picture
+                </Label>
+              </div>
+            ) : null}
+
             <div className="flex flex-col gap-2 border-t border-border/60 pt-4">
               <Button
                 onClick={() => void runExport()}
@@ -1036,6 +1088,21 @@ export function ExportDrawer({
                 ) : null}
                 {result.language ? (
                   <code className="break-all">{result.language}</code>
+                ) : null}
+                {result.picture ? (
+                  <code className="break-all">{result.picture}</code>
+                ) : null}
+                {result.pictureKept ? (
+                  <p className="text-muted-foreground">
+                    A build picture was already there that coilbox did not
+                    write, and has been left alone.
+                  </p>
+                ) : null}
+                {result.pictureProblem ? (
+                  <p className="text-destructive">
+                    The unit is exported, but the build picture is not:{" "}
+                    {result.pictureProblem}
+                  </p>
                 ) : null}
                 {result.glb ? (
                   <code className="break-all">{result.glb}</code>
