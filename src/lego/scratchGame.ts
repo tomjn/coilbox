@@ -12,13 +12,13 @@
  * game list should not offer it, live in `src/lib/generatedGames.ts` alongside
  * the scenario editor's equivalent.
  *
- * Three files make the unit reachable without cheats. The `modinfo.lua` names
- * the base game to build on. The `gamedata/sidedata.lua` declares one side
+ * Four files make the unit reachable without cheats. The `modinfo.lua` names
+ * the base game to build on. The `gamedata/sidedata.lua` declares a side
  * whose start unit is the built unit, which is how a Spring game says what a
  * player begins with. The gadget spawns it, because the engine does not: a
  * game's own Lua does, and a game whose spawn gadget names its commander
  * outright (Balanced Annihilation does) never reads the side's start unit at
- * all.
+ * all. A fourth file turns Lua unit scripts on where the base game has not.
  */
 
 import { luaString } from "./unitDef";
@@ -30,9 +30,10 @@ const SCRATCH_NAME = "Coilbox unit test";
 const SCRATCH_VERSION = "scratch";
 
 /**
- * The one side the scratch game declares. A game's sides live in a single file,
- * so the scratch archive's copy replaces the base game's rather than adding to
- * it: after this there is one side, and its start unit is the built unit.
+ * The side the scratch game declares first, whose start unit is the built unit.
+ * A game's sides live in a single file, so the scratch archive's copy replaces
+ * the base game's. It lists a base game's sides after this one only when they
+ * are in `sidedata.tdf`, which it can read (see `buildSideData`).
  */
 export const SCRATCH_SIDE = "Coilbox";
 
@@ -77,19 +78,75 @@ export function buildModInfo(baseGame: string): string {
  * A game's sides are a list of `{ name, startunit }`, and `startunit` is the
  * unit a player begins the match with. Balanced Annihilation's own file names
  * `armcom` and `corcom` that way, and unitsync reads the scratch game's copy in
- * its place, so the built unit is what the one side starts with.
+ * its place, so the built unit is what the Coilbox side starts with.
+ *
+ * Replacing the file also drops the sides the base game declared. Metal
+ * Factions declares its in `gamedata/sidedata.tdf`, which the engine reads
+ * through its own `sidedata.lua` and which this file shadows, and its start
+ * gadget looks one of them up by name (issue #4139). So the file reads the
+ * base game's tdf the way the engine's does and lists those sides after its
+ * own, untouched.
  */
 export function buildSideData(unitName: string): string {
   const lines = [
-    "-- The side the scratch game gives you, replacing the base game's own.",
+    "-- The side the scratch game gives you, then the sides the base game",
+    "-- declares in sidedata.tdf, if it does.",
     "-- Rewritten on every test launch. Delete this folder to undo it.",
     "",
-    "return {",
+    "local sides = {",
     "  {",
     `    name = ${luaString(SCRATCH_SIDE)},`,
     `    startunit = ${luaString(unitName)},`,
     "  },",
     "}",
+    "",
+    "local tdf = 'gamedata/sidedata.tdf'",
+    "if VFS.FileExists(tdf) then",
+    "  local parsed = VFS.Include('gamedata/parse_tdf.lua').Parse(tdf)",
+    "  local index = 0",
+    "  while parsed and type(parsed['side' .. index]) == 'table' do",
+    "    local side = parsed['side' .. index]",
+    "    sides[#sides + 1] = { name = side.name, startunit = side.commander }",
+    "    index = index + 1",
+    "  end",
+    "end",
+    "",
+    "return sides",
+  ];
+  return `${lines.join("\n")}\n`;
+}
+
+/**
+ * The scratch archive's gadget that turns the engine's Lua unit script
+ * framework on, for a base game that has not.
+ *
+ * The builder writes a unit's animation as a Lua script, and nothing runs one
+ * unless a gadget includes the framework. Balanced Annihilation and Splinter
+ * Faction each have one that does. Metal Factions has none, because all its
+ * units are COB, so a built unit sat there with no script and the load check
+ * could not ask the framework about it (issue #4139).
+ *
+ * A game that already includes it is left alone, because two copies would each
+ * wrap every Lua unit. It finds that by looking for the include in the game's
+ * other gadgets, which works whatever the file is called and in whatever order
+ * the gadgets load.
+ */
+export function buildUnitScriptGadget(): string {
+  const lines = [
+    "-- Turns the engine's Lua unit scripts on in a game that has not.",
+    "-- Rewritten on every test launch. Delete this folder to undo it.",
+    "",
+    "local FRAMEWORK = 'LuaGadgets/Gadgets/unit_script.lua'",
+    "local OWN_PREFIX = 'luarules/gadgets/coilbox_'",
+    "",
+    "for _, path in ipairs(VFS.DirList('LuaRules/Gadgets/', '*.lua')) do",
+    "  local text = path:lower():find(OWN_PREFIX, 1, true) ~= 1 and VFS.LoadFile(path)",
+    "  if text and text:find(FRAMEWORK, 1, true) then",
+    "    return false",
+    "  end",
+    "end",
+    "",
+    "return VFS.Include(FRAMEWORK, nil, VFS.ZIP_ONLY)",
   ];
   return `${lines.join("\n")}\n`;
 }

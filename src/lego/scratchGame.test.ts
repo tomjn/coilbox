@@ -5,9 +5,75 @@ import {
   buildModInfo,
   buildSideData,
   buildStartUnitGadget,
+  buildUnitScriptGadget,
   SCRATCH_SIDE,
   SPAWN_FRAME,
 } from "./scratchGame";
+
+/** Run generated Lua under luajit and read back what it printed. */
+function runLua(source: string, harness: string) {
+  const run = spawnSync("luajit", ["-e", harness], { input: source });
+  return {
+    stderr: run.stderr?.toString() ?? "",
+    lines: (run.stdout?.toString() ?? "").trim().split("\n"),
+  };
+}
+
+/**
+ * Load the side data the way the engine's side parser does, in a game whose
+ * `gamedata/sidedata.tdf` parses to `tdf` (null for a game with no such file),
+ * and print each side as `name=startunit`.
+ */
+function runSideData(tdf: string | null) {
+  return runLua(
+    buildSideData("cakebot_test"),
+    `
+VFS = {
+  FileExists = function(path) return ${tdf ? "path == 'gamedata/sidedata.tdf'" : "false"} end,
+  Include = function(path)
+    assert(path == "gamedata/parse_tdf.lua", path)
+    return { Parse = function() return ${tdf ?? "nil"} end }
+  end,
+}
+for _, side in ipairs(assert(loadstring(io.read("*a")))()) do
+  print(side.name .. "=" .. side.startunit)
+end
+`,
+  );
+}
+
+/**
+ * Load the unit script gadget in a game whose synced gadget folder holds
+ * `gadgets` (file name to text), and print what the file hands the gadget
+ * handler.
+ */
+function runUnitScriptGadget(gadgets: Record<string, string>) {
+  const files = Object.entries(gadgets)
+    .map(
+      ([name, text]) =>
+        `files["LuaRules/Gadgets/${name}"] = ${JSON.stringify(text)}`,
+    )
+    .join("\n");
+  return runLua(
+    buildUnitScriptGadget(),
+    `
+local files = {}
+${files}
+VFS = {
+  ZIP_ONLY = "zip",
+  DirList = function()
+    local list = {}
+    for path in pairs(files) do list[#list + 1] = path end
+    table.sort(list)
+    return list
+  end,
+  LoadFile = function(path) return files[path] end,
+  Include = function(path, env, mode) return "included " .. path .. " from " .. mode end,
+}
+print(tostring(assert(loadstring(io.read("*a")))()))
+`,
+  );
+}
 
 /**
  * Load the start unit gadget on `loadFrame`, play `frames`, and print each unit
@@ -76,8 +142,32 @@ describe("buildSideData", () => {
 
     expect(lua).toContain(`name = "${SCRATCH_SIDE}"`);
     expect(lua).toContain('startunit = "cakebot_test"');
-    // One side, so the built unit is what the engine's default side starts with.
-    expect(lua.match(/startunit =/g)).toHaveLength(1);
+    // One side when the base game declares none the TDF way, so the built unit
+    // is what the engine's default side starts with.
+    const run = runSideData(null);
+    expect(run.stderr).toBe("");
+    expect(run.lines).toEqual([`${SCRATCH_SIDE}=cakebot_test`]);
+  });
+
+  // Issue #4139. Metal Factions declares its sides in gamedata/sidedata.tdf and
+  // its start gadget looks one up by name, so replacing the list wholesale left
+  // Spring.GetSideData("random") with nothing to return.
+  it("keeps the sides a base game declares in sidedata.tdf, after its own", () => {
+    const run = runSideData(
+      '{ side0 = { name = "Random", commander = "random" }, side1 = { name = "Aven", commander = "aven_commander" }, other = {} }',
+    );
+    expect(run.stderr).toBe("");
+    expect(run.lines).toEqual([
+      `${SCRATCH_SIDE}=cakebot_test`,
+      "Random=random",
+      "Aven=aven_commander",
+    ]);
+  });
+
+  it("is left with its own side when the base game's tdf does not parse", () => {
+    const run = runSideData("nil");
+    expect(run.stderr).toBe("");
+    expect(run.lines).toEqual([`${SCRATCH_SIDE}=cakebot_test`]);
   });
 
   it("spells the key the way a game's own side data does", () => {
@@ -167,5 +257,47 @@ describe("buildStartUnitGadget", () => {
 
     expect(lua.endsWith("\n")).toBe(true);
     expect(lua.endsWith("\n\n")).toBe(false);
+  });
+});
+
+// Issue #4139. A Lua unit script runs only where the game has turned the
+// engine's framework on, and Metal Factions has not (its units are all COB).
+describe("buildUnitScriptGadget", () => {
+  const framework = 'return VFS.Include("LuaGadgets/Gadgets/unit_script.lua")';
+
+  it("turns the framework on in a game that has not", () => {
+    const run = runUnitScriptGadget({
+      "game_start.lua": "-- spawns a commander",
+    });
+    expect(run.stderr).toBe("");
+    expect(run.lines).toEqual([
+      "included LuaGadgets/Gadgets/unit_script.lua from zip",
+    ]);
+  });
+
+  it("leaves a game that has turned it on to its own copy", () => {
+    // Two copies of the framework would each wrap every Lua unit.
+    const run = runUnitScriptGadget({
+      "game_start.lua": "-- spawns a commander",
+      "unit_script.lua": framework,
+    });
+    expect(run.stderr).toBe("");
+    expect(run.lines).toEqual(["false"]);
+  });
+
+  it("finds the framework turned on under any file name", () => {
+    const run = runUnitScriptGadget({ "unit_lua_scripts.lua": framework });
+    expect(run.stderr).toBe("");
+    expect(run.lines).toEqual(["false"]);
+  });
+
+  it("does not take its own file for the game's", () => {
+    const run = runUnitScriptGadget({
+      "coilbox_unit_script.lua": buildUnitScriptGadget(),
+    });
+    expect(run.stderr).toBe("");
+    expect(run.lines).toEqual([
+      "included LuaGadgets/Gadgets/unit_script.lua from zip",
+    ]);
   });
 });

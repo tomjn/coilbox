@@ -20,6 +20,7 @@ import {
   buildModInfo,
   buildSideData,
   buildStartUnitGadget,
+  buildUnitScriptGadget,
 } from "./scratchGame";
 import { buildUnitDef } from "./unitDef";
 
@@ -111,6 +112,7 @@ export async function writeScratchUnit({
     modinfo: buildModInfo(baseGame),
     sidedata: buildSideData(project.unitName),
     gadget: buildStartUnitGadget(project.unitName),
+    unitScriptGadget: buildUnitScriptGadget(),
     ...(sandbox ? { sandbox } : {}),
   });
   onWritten?.(dir);

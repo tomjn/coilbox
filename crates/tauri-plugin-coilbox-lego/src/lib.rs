@@ -2706,6 +2706,7 @@ async fn lego_export_obj<R: Runtime>(
 const SCRATCH_MODINFO: &[&str] = &["modinfo.lua"];
 const SCRATCH_SIDEDATA: &[&str] = &["gamedata", "sidedata.lua"];
 const SCRATCH_GADGET: &[&str] = &["LuaRules", "Gadgets", "coilbox_start_unit.lua"];
+const SCRATCH_UNIT_SCRIPT_GADGET: &[&str] = &["LuaRules", "Gadgets", "coilbox_unit_script.lua"];
 
 /// Write one generated file into the scratch game, creating its folder.
 ///
@@ -2727,13 +2728,14 @@ fn write_scratch_file(dir: &Path, relative: &[&str], contents: &str) -> Result<(
 }
 
 /// Write the scratch game's generated files into `dir`: the `modinfo.lua`, the
-/// side data and the start unit gadget, in that order, and the sandbox's files
+/// side data, the start unit gadget and the unit script gadget, in that order,
+/// and the sandbox's files
 /// before them when there is a sandbox. The sandbox goes first because
 /// installing the runtime removes the start unit gadget (see
 /// [`sandbox::write`]).
 fn write_scratch_game(
     dir: &Path,
-    [modinfo, sidedata, gadget]: [&str; 3],
+    [modinfo, sidedata, gadget, unit_script_gadget]: [&str; 4],
     sandbox: Option<&sandbox::Sandbox>,
     runtime_src: Option<&Path>,
 ) -> Result<(), String> {
@@ -2750,6 +2752,7 @@ fn write_scratch_game(
         (SCRATCH_MODINFO, modinfo),
         (SCRATCH_SIDEDATA, sidedata),
         (SCRATCH_GADGET, gadget),
+        (SCRATCH_UNIT_SCRIPT_GADGET, unit_script_gadget),
     ] {
         write_scratch_file(dir, relative, contents)?;
     }
@@ -2758,14 +2761,18 @@ fn write_scratch_game(
 
 /// `lego_scratch_game` prepares the `.sdd` a unit is tested in.
 ///
-/// It writes the three files the frontend generated into
+/// It writes the four files the frontend generated into
 /// `<data_dir>/games/<folder>`: the `modinfo.lua` naming the base game, the
-/// `gamedata/sidedata.lua` declaring the built unit as the side's start unit,
-/// and the gadget that spawns it. `sandbox` adds what "Play with this unit"
+/// `gamedata/sidedata.lua` declaring the built unit as a side's start unit,
+/// the gadget that spawns it, and the gadget that turns Lua unit scripts on
+/// where the base game has not. `sandbox` adds what "Play with this unit"
 /// needs on top, see [`sandbox`]. The unit itself follows through
 /// `lego_export`, which treats the result as any other game folder. Nothing
 /// else in the content root is touched, so removing that one folder undoes the
 /// lot.
+// Each argument is one generated file in the IPC payload, so grouping them would
+// only move the width into a struct the frontend then has to nest.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 async fn lego_scratch_game<R: Runtime>(
     app: AppHandle<R>,
@@ -2774,6 +2781,7 @@ async fn lego_scratch_game<R: Runtime>(
     modinfo: String,
     sidedata: String,
     gadget: String,
+    unit_script_gadget: String,
     sandbox: Option<sandbox::Sandbox>,
 ) -> CliResult {
     if !valid_scratch_folder(&folder) {
@@ -2797,7 +2805,7 @@ async fn lego_scratch_game<R: Runtime>(
     };
     if let Err(e) = write_scratch_game(
         &dir,
-        [&modinfo, &sidedata, &gadget],
+        [&modinfo, &sidedata, &gadget, &unit_script_gadget],
         sandbox.as_ref(),
         runtime_src.as_deref(),
     ) {
@@ -3677,6 +3685,7 @@ mod tests {
             (SCRATCH_MODINFO, "modinfo"),
             (SCRATCH_SIDEDATA, "sidedata"),
             (SCRATCH_GADGET, "gadget"),
+            (SCRATCH_UNIT_SCRIPT_GADGET, "unit script"),
         ] {
             write_scratch_file(dir.path(), relative, contents).expect("write");
         }
@@ -3685,6 +3694,10 @@ mod tests {
         assert_eq!(read("modinfo.lua"), "modinfo");
         assert_eq!(read("gamedata/sidedata.lua"), "sidedata");
         assert_eq!(read("LuaRules/Gadgets/coilbox_start_unit.lua"), "gadget");
+        assert_eq!(
+            read("LuaRules/Gadgets/coilbox_unit_script.lua"),
+            "unit script"
+        );
     }
 
     /// Installing the runtime removes `coilbox_*` gadgets it did not write, so
@@ -3709,7 +3722,7 @@ mod tests {
             mission: "return {}".into(),
             ship_runtime: true,
         };
-        let files = ["modinfo", "sidedata", "start unit"];
+        let files = ["modinfo", "sidedata", "start unit", "unit script"];
 
         // Twice, so the second launch finds the first one's files in place.
         for _ in 0..2 {
@@ -3720,6 +3733,10 @@ mod tests {
         assert_eq!(
             read("LuaRules/Gadgets/coilbox_start_unit.lua"),
             "start unit"
+        );
+        assert_eq!(
+            read("LuaRules/Gadgets/coilbox_unit_script.lua"),
+            "unit script"
         );
         assert_eq!(read("LuaRules/Gadgets/coilbox_sandbox.lua"), "-- sandbox");
         assert_eq!(
