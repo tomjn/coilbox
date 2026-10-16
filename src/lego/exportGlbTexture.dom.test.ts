@@ -108,7 +108,7 @@ beforeAll(() => {
           }
         },
       } as unknown as CanvasRenderingContext2D;
-    } as typeof HTMLCanvasElement.prototype.getContext,
+    } as unknown as typeof HTMLCanvasElement.prototype.getContext,
   );
 
   vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(function (
