@@ -56,6 +56,13 @@ import { luaString } from "./unitDef";
  */
 export const SANDBOX_MISSION_ID = "coilbox-lego-sandbox";
 
+/**
+ * The Lua message the sandbox gadget sends when `/luarules reload` has loaded it
+ * again into a running game. Coilbox hears it through the engine's autohost
+ * interface, and it is the only sign the reload finished (issue #3346).
+ */
+export const SANDBOX_LOADED_MESSAGE = "coilbox_sandbox:loaded";
+
 /** The player's participant id in the scenario. */
 export const SANDBOX_PLAYER = "player";
 
@@ -238,12 +245,18 @@ export function buildSandboxGadget(builder: string | null): string {
     "  }",
     "end",
     "",
-    "if not gadgetHandler:IsSyncedCode() then",
+    `if (Spring.GetModOptions() or {})[${luaString(MISSION_MODOPTION)}] ~= ${luaString(SANDBOX_MISSION_ID)} then`,
     "  return false",
     "end",
     "",
-    `if (Spring.GetModOptions() or {})[${luaString(MISSION_MODOPTION)}] ~= ${luaString(SANDBOX_MISSION_ID)} then`,
-    "  return false",
+    "if not gadgetHandler:IsSyncedCode() then",
+    "  -- Loaded past frame 0 only by `/luarules reload`, which coilbox waits on.",
+    "  function gadget:Initialize()",
+    "    if Spring.GetGameFrame() > 0 then",
+    `      Spring.SendLuaRulesMsg(${luaString(SANDBOX_LOADED_MESSAGE)})`,
+    "    end",
+    "  end",
+    "  return",
     "end",
     "",
     `local BUILDER = ${builder ? luaString(builder) : "nil"}`,

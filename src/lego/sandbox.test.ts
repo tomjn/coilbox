@@ -6,6 +6,7 @@ import {
   buildDownloadMenu,
   buildSandboxGadget,
   buildSandboxScenario,
+  SANDBOX_LOADED_MESSAGE,
   SANDBOX_MISSION_ID,
   SANDBOX_PLAYER,
   SANDBOX_TARGETS,
@@ -139,18 +140,25 @@ describe("buildDownloadMenu", () => {
  * Runs the gadget against a stub of the slice of the engine it touches, and
  * prints what it asked the engine to do, one call a line.
  */
-function runGadget(gadget: string, modMission: string, script: string) {
+function runGadget(
+  gadget: string,
+  modMission: string,
+  script: string,
+  { synced = true, frame = 0 } = {},
+) {
   const harness = `
 local calls = {}
 local function log(s) calls[#calls + 1] = s end
 gadget = {}
-gadgetHandler = { IsSyncedCode = function() return true end }
+gadgetHandler = { IsSyncedCode = function() return ${synced} end }
 CMD = { FIRE_STATE = 45, MOVE_STATE = 50 }
 UnitDefNames = { fedcommander = { id = 7 } }
 local dead = {}
 Spring = {
   GetModOptions = function() return { coilbox_mission = ${JSON.stringify(modMission)} } end,
   GetGaiaTeamID = function() return 2 end,
+  GetGameFrame = function() return ${frame} end,
+  SendLuaRulesMsg = function(m) log("message " .. m) end,
   GetPlayerList = function() return { 0 } end,
   GetPlayerInfo = function() return "you", true, false, 0 end,
   GiveOrderToUnit = function(u, cmd, p) log("order " .. u .. " " .. cmd .. " " .. p[1]) end,
@@ -212,6 +220,30 @@ describe("buildSandboxGadget", () => {
   it("switches itself off in a game that is not the sandbox", () => {
     const run = runGadget(gadget, "", "");
     expect(run.status).toBe(0);
+    expect(run.lines).toEqual(["off"]);
+  });
+
+  // Issue #3346. `/luarules reload` gives no sign it has finished, so the
+  // gadget says so itself, and coilbox hears it through the autohost.
+  it("says it has loaded when a reload brings it back into a running game", () => {
+    const run = runGadget(gadget, SANDBOX_MISSION_ID, "gadget:Initialize()", {
+      synced: false,
+      frame: 900,
+    });
+    expect(run.stderr).toBe("");
+    expect(run.lines).toEqual([`message ${SANDBOX_LOADED_MESSAGE}`]);
+  });
+
+  it("says nothing when the game first loads it", () => {
+    const run = runGadget(gadget, SANDBOX_MISSION_ID, "gadget:Initialize()", {
+      synced: false,
+    });
+    expect(run.stderr).toBe("");
+    expect(run.lines).toEqual([""]);
+  });
+
+  it("switches its unsynced half off in a game that is not the sandbox", () => {
+    const run = runGadget(gadget, "", "", { synced: false, frame: 900 });
     expect(run.lines).toEqual(["off"]);
   });
 
