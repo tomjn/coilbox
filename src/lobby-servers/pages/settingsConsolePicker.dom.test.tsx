@@ -139,3 +139,25 @@ it("opens the console on a different account's row without carrying over the las
   );
   expect(openedConsoleFor).toHaveBeenLastCalledWith(keyFor("alice"));
 });
+
+it("keeps the console button on a login that dropped, so its last lines can be read", () => {
+  connections[keyFor("bob")] = { ...connectionFor(keyFor("bob")), live: false };
+  render(<LobbyServersSettings />);
+
+  openAccountRow("bob");
+  expect(screen.getByText("Disconnected")).toBeTruthy();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Open protocol console" }),
+  );
+  expect(openedConsoleFor).toHaveBeenLastCalledWith(keyFor("bob"));
+});
+
+it("has no console button for a login with no connection at all", () => {
+  delete connections[keyFor("bob")];
+  render(<LobbyServersSettings />);
+
+  openAccountRow("bob");
+  expect(
+    screen.queryByRole("button", { name: "Open protocol console" }),
+  ).toBeNull();
+});

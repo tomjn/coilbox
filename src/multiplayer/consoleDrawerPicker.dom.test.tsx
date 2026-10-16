@@ -149,6 +149,35 @@ it("stops the raw command input auto-capitalising on macOS (issue #2924)", () =>
   expect(field.getAttribute("autocapitalize")).toBe("off");
 });
 
+it("shows a dropped login's lines when opened for it, with sending off", () => {
+  connections = {
+    [KEY_A]: {
+      ...connectionFor(KEY_A, ["<< TASSERVER 0.38-33-ga5f3b28 * 8201 0"]),
+      live: false,
+    },
+  };
+  render(<ConsoleDrawer open onClose={() => {}} serverKey={KEY_A} />);
+
+  expect(
+    screen.getByText("<< TASSERVER 0.38-33-ga5f3b28 * 8201 0"),
+  ).toBeTruthy();
+  const field = screen.getByPlaceholderText("Connect to send commands");
+  expect((field as HTMLInputElement).disabled).toBe(true);
+});
+
+it("lists a dropped login beside the live one it was opened for", () => {
+  connections = {
+    [KEY_A]: connectionFor(KEY_A, ["line from A"]),
+    [KEY_B]: { ...connectionFor(KEY_B, ["line from B"]), live: false },
+  };
+  activeKey = KEY_A;
+  render(<ConsoleDrawer open onClose={() => {}} serverKey={KEY_B} />);
+
+  expect(screen.getByText("line from B")).toBeTruthy();
+  expect(screen.getByText(`pick ${KEY_A}`)).toBeTruthy();
+  expect(screen.getByText(`pick ${KEY_B}`)).toBeTruthy();
+});
+
 it("re-opens on the given connection rather than remembering the last pick", () => {
   connections = {
     [KEY_A]: connectionFor(KEY_A, ["line from A"]),
