@@ -14,6 +14,7 @@
 import * as THREE from "three";
 
 import type { Aim } from "../../aimResolver";
+import type { DriveFrame } from "../../drive";
 import type { UnitMotion } from "../../effects";
 import type { LegoProject } from "../../model";
 import type {
@@ -47,12 +48,27 @@ export interface StandInPlacement {
    *  `wantedDir` a muzzle flame faces (`Weapon.cpp:509-510`). */
   aims?: Aim[];
   /** When the running scenario's unit moves and how fast, which carries the
-   *  particles it leaves behind back past it. */
+   *  particles it leaves behind back past it. Null for a drive, where the
+   *  unit really moves and leaves them behind itself. */
   motion?: UnitMotion | null;
+  /** The unit's own drive, for a scenario that drives it along a path. */
+  drive?: DrivePlacement | null;
   /** Where the game maker let the stand-in go after dragging it, unit-local x
    *  and z in elmos, and the frame they let it go on. Absent for a scenario
    *  whose stand-in cannot be moved. */
   onDrag?: (at: [number, number], frame: number) => void;
+}
+
+/** A drive, as the viewport plays it. */
+export interface DrivePlacement {
+  /** The unit's pose on each frame of the run. */
+  frames: DriveFrame[];
+  /** The waypoints it drives through, x and z in elmos from where it starts,
+   *  for the view to draw. */
+  path: [number, number][];
+  /** Told where the game maker clicked the ground, x and z in elmos, while
+   *  they are making their own path. Absent for a fixed path. */
+  onPick?: (at: [number, number]) => void;
 }
 
 const AT = new THREE.Vector3();

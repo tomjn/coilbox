@@ -130,13 +130,12 @@ export function useModelEnvironment(
     if (previewing) {
       // The shortest turn from straight up, with the heading left at 0, which
       // is the engine's own (`CSolidObject::UpdateDirVectors`).
-      state.root.quaternion.setFromUnitVectors(
-        UP,
-        new THREE.Vector3(upX, upY, upZ),
-      );
+      state.restTilt.setFromUnitVectors(UP, new THREE.Vector3(upX, upY, upZ));
     } else {
-      state.root.quaternion.identity();
+      state.restTilt.identity();
     }
+    // A drive turns the unit itself, on every frame it poses.
+    if (!state.drive) state.root.quaternion.copy(state.restTilt);
     state.render();
   }, [sceneRef, previewing, upX, upY, upZ]);
 }

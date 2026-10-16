@@ -3,6 +3,7 @@ import type { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import type { TransformControls } from "three/addons/controls/TransformControls.js";
 import type { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import { unitAtlas } from "../../atlas";
+import type { DriveFrame } from "../../drive";
 import {
   type BackdropId,
   backdropById,
@@ -99,6 +100,24 @@ export interface SceneState {
   onStandInDragRef: {
     current: ((at: [number, number]) => void) | undefined;
   };
+  /** The unit's pose on every frame of the drive that is playing, or null
+   *  while nothing drives it and it stands at the origin. */
+  drive: DriveFrame[] | null;
+  /** How the unit stands when nothing drives it: turned to the ground at the
+   *  origin while it is previewed, and level otherwise. */
+  restTilt: THREE.Quaternion;
+  /** The path a drive follows, drawn on the ground. A view aid. */
+  drivePath: THREE.Group;
+  /** Whether the camera follows a driving unit. */
+  follow: boolean;
+  /** Where the camera last followed the unit to, or null while it is not
+   *  following. */
+  followAt: THREE.Vector3 | null;
+  /** How far following has moved the camera, so it can be put back. */
+  followOffset: THREE.Vector3;
+  /** Told where a click on the ground landed, x and z in elmos, while the
+   *  panel takes points for a path. Unset the rest of the time. */
+  onGroundPickRef: { current: ((at: [number, number]) => void) | undefined };
   /** The dots a script's effects are drawn with. A view aid, never exported. */
   effects: EffectsLayer;
   /** The collision volume's wireframe, while it is being shown. Rebuilt on
