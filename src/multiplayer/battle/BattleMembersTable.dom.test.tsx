@@ -86,6 +86,8 @@ function renderTable(
     onSetNote?: (row: Row, text: string) => void;
     statsSummaryFor?: (row: Row) => string | null;
     onSetBonus?: (name: string, value: number) => void;
+    canAddBot?: boolean;
+    botsRefused?: string | null;
   },
 ) {
   return render(
@@ -352,5 +354,32 @@ describe("giving way to the chat (#4186)", () => {
     ]);
     const chips = screen.getByText("Spectating").parentElement;
     expect(card(container)?.contains(chips)).toBe(true);
+  });
+});
+
+describe("Add AI control", () => {
+  it("is disabled, with no notice text, in a room that takes no AIs", () => {
+    renderTable([row({ name: "Me", self: true, host: true })], {
+      canAddBot: false,
+      botsRefused: "This room type takes no AIs.",
+    });
+    const add = screen.getByRole("button", { name: "Add" });
+    expect((add as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByText("This room type takes no AIs.")).toBe(null);
+  });
+
+  it("offers no control when the room is not refusing AIs", () => {
+    renderTable([row({ name: "Me", self: true, host: true })], {
+      canAddBot: false,
+      botsRefused: null,
+    });
+    expect(screen.queryByRole("button", { name: "Add" })).toBe(null);
+  });
+
+  it("shows the control in a room that takes AIs", () => {
+    renderTable([row({ name: "Me", self: true, host: true })], {
+      canAddBot: true,
+    });
+    expect(screen.getByRole("button", { name: "Add" })).toBeTruthy();
   });
 });

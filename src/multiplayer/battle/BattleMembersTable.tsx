@@ -98,8 +98,8 @@ export function BattleMembersTable({
   canBoss: boolean;
   /** When true, the viewer may add a bot (any seated member — see `useBattleRoom`). */
   canAddBot: boolean;
-  /** Why this room takes no AIs, shown in place of the Add AI control so its
-   * absence reads as a rule rather than as a missing feature. */
+  /** Why this room takes no AIs, shown as a tooltip on the disabled Add AI control so
+   * it reads as a rule rather than as a missing feature. */
   botsRefused?: string | null;
   /** Whether a bot's ally team may be set, which Tachyon alone does not carry. */
   canSetBotAlly: boolean;
@@ -331,6 +331,29 @@ export function BattleMembersTable({
     };
   });
 
+  const addAiControls = (
+    <>
+      <OptionSelect
+        value={chosenAi}
+        disabled={!canAddBot}
+        onValueChange={setChosenAi}
+        options={aiOptions}
+        size="sm"
+        className="w-auto min-w-40"
+        placeholder={
+          addableAis.length > 0 ? "Select an AI" : "No AIs installed"
+        }
+      />
+      <Button
+        className="h-8 px-3"
+        disabled={!canAddBot || !chosenAi}
+        onClick={() => chosenAi && onAddBot(chosenAi)}
+      >
+        Add
+      </Button>
+    </>
+  );
+
   return (
     // This card is the part of the room that gives way. It takes the height its
     // rows need, shrinks when the chat would otherwise drop below its minimum,
@@ -519,33 +542,25 @@ export function BattleMembersTable({
         </div>
       )}
 
-      {!canAddBot && botsRefused && (
-        <div className="border-t border-border/40 p-2 text-xs text-muted-foreground">
-          {botsRefused}
-        </div>
-      )}
-      {canAddBot && (
+      {(canAddBot || botsRefused) && (
         <div className="sticky bottom-0 flex items-center gap-2 border-t border-border/40 bg-card p-2">
           <span className="text-xs font-medium text-muted-foreground">
             Add AI
           </span>
-          <OptionSelect
-            value={chosenAi}
-            onValueChange={setChosenAi}
-            options={aiOptions}
-            size="sm"
-            className="w-auto min-w-40"
-            placeholder={
-              addableAis.length > 0 ? "Select an AI" : "No AIs installed"
-            }
-          />
-          <Button
-            className="h-8 px-3"
-            disabled={!chosenAi}
-            onClick={() => chosenAi && onAddBot(chosenAi)}
-          >
-            Add
-          </Button>
+          {canAddBot ? (
+            addAiControls
+          ) : (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex items-center gap-2">
+                    {addAiControls}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>{botsRefused}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
       )}
     </div>
