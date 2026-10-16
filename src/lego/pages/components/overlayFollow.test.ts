@@ -78,6 +78,14 @@ function timeline(move: number, turn = 0): ScriptTimeline {
   } as unknown as ScriptTimeline;
 }
 
+/** The same frame as `timeline`, with the arm hidden or shown. */
+function hidingTimeline(armHidden: boolean): ScriptTimeline {
+  return {
+    ...timeline(5),
+    hidden: [[false, armHidden]],
+  } as unknown as ScriptTimeline;
+}
+
 function worldCentre(box: THREE.Box3Helper | THREE.BoxHelper) {
   return new THREE.Box3().setFromObject(box).getCenter(new THREE.Vector3());
 }
@@ -136,5 +144,20 @@ describe("overlays while a script poses the pieces", () => {
     expect(box.matrixAutoUpdate).toBe(true);
     expect(placed(state, box).x).toBeCloseTo(10);
     expect(worldCentre(selectOutline).x).toBeCloseTo(10);
+  });
+
+  it("hides a piece's collision box on frames where the script hides the piece", () => {
+    const { state, box } = scene();
+    applyTimelineFrame(state, project, hidingTimeline(true), 0);
+    expect(box.visible).toBe(false);
+    applyTimelineFrame(state, project, hidingTimeline(false), 0);
+    expect(box.visible).toBe(true);
+  });
+
+  it("shows a hidden piece's collision box again when playback stops", () => {
+    const { state, box } = scene();
+    applyTimelineFrame(state, project, hidingTimeline(true), 0);
+    restoreFromPlayback(state);
+    expect(box.visible).toBe(true);
   });
 });

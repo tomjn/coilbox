@@ -87,6 +87,11 @@ export function followPieces(state: SceneState) {
     const group = state.groups.get(pieceId);
     const origin = boxOrigin(box);
     if (!group || !origin) continue;
+    // The engine skips a piece the script hides when it tests the volumes
+    // (`IntersectPiecesHelper` checks `GetScriptVisible()`), so its box goes
+    // with it. The piece's mesh carries the flag, as in `applyTimelineFrame`.
+    const mesh = group.children.find((child) => child instanceof THREE.Mesh);
+    box.visible = mesh?.visible ?? true;
     // The piece's move from where the box was built, in the root's space:
     // where it is now, taken back through where it was.
     BACK.makeTranslation(-origin.x, -origin.y, -origin.z);
@@ -104,5 +109,6 @@ export function releasePieces(state: SceneState) {
   for (const box of state.pieceCollisionBoxes.values()) {
     box.matrixAutoUpdate = true;
     box.matrixWorldNeedsUpdate = true;
+    box.visible = true;
   }
 }
