@@ -237,6 +237,13 @@ export interface LegoImported {
   /** The texture name the header gave when the file could not be found. */
   missingTexture?: string;
   missingTexture2?: string;
+  /**
+   * Set on a unit opened from a `.3do` since #4174, whose UVs count the rows of
+   * its sheet from the top, which is how the engine reads the PNG. A `.3do`
+   * opened before then counted them from the bottom, and has its meshes turned
+   * round once when it is read: see `parseLegoProjectData`.
+   */
+  sheetFromTop?: true;
 }
 
 export interface LegoPiece {
@@ -875,16 +882,17 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
   // rejecting the document, would both be worse than silently renaming it,
   // and match parseLegoProjectJson's own contract just above: this project is
   // merely wrong, not unparsable.
-  const pieces: LegoPiece[] = [];
+  const parsed: LegoPiece[] = [];
   const takenNames = new Set<string>();
   for (const raw of d.pieces) {
     const piece = parsePiece(raw);
     if (!piece) return null;
     const name = uniquePieceName(piece.name, takenNames);
     takenNames.add(name);
-    pieces.push(name === piece.name ? piece : { ...piece, name });
+    parsed.push(name === piece.name ? piece : { ...piece, name });
   }
-  if (pieces.length === 0) return null;
+  if (parsed.length === 0) return null;
+  const { imported, pieces } = sheetFromTop(parseImported(d.imported), parsed);
 
   const mid = parseVec3(d.mid);
   const collisionVolume = parseCollisionVolume(d.collisionVolume);
@@ -901,10 +909,7 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
     ...(typeof d.atlas === "string" && d.atlas !== ""
       ? { atlas: d.atlas }
       : {}),
-    ...(() => {
-      const imported = parseImported(d.imported);
-      return imported ? { imported } : {};
-    })(),
+    ...(imported ? { imported } : {}),
     createdAt: typeof d.createdAt === "string" ? d.createdAt : "",
     updatedAt: typeof d.updatedAt === "string" ? d.updatedAt : "",
     rootPieceId: d.rootPieceId,
@@ -1047,6 +1052,33 @@ function parseImported(value: unknown): LegoImported | null {
       ? { missingTexture: v.missingTexture }
       : {}),
     ...(typeof missingTexture2 === "string" ? { missingTexture2 } : {}),
+    ...(v.sheetFromTop === true ? { sheetFromTop: true } : {}),
+  };
+}
+
+/**
+ * A unit opened from a `.3do` before #4174, with every imported mesh turned
+ * round to count its sheet's rows from the top.
+ *
+ * The geometry sidecar holds the UVs the import wrote, which counted the rows
+ * from the bottom. Flipping v is exactly the difference, and the Flip UVs fix
+ * already does it at draw and export time, so the sidecar is left as it is and
+ * each mesh's flag is toggled. Toggled rather than set, so a mesh somebody had
+ * flipped by hand comes out the way they saw it.
+ */
+function sheetFromTop(
+  imported: LegoImported | null,
+  pieces: LegoPiece[],
+): { imported: LegoImported | null; pieces: LegoPiece[] } {
+  if (!imported || imported.sheetFromTop) return { imported, pieces };
+  if (!/\.3do$/i.test(imported.source)) return { imported, pieces };
+  return {
+    imported: { ...imported, sheetFromTop: true },
+    pieces: pieces.map((piece) => {
+      if (!piece.meshId) return piece;
+      const { uvFlip, ...rest } = piece;
+      return uvFlip ? rest : { ...rest, uvFlip: true };
+    }),
   };
 }
 

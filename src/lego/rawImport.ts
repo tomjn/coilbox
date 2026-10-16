@@ -132,6 +132,9 @@ export function projectFromImport(
       result.texture2,
       keepSource,
     ),
+    // What tells a loader this unit's UVs already count the sheet's rows from
+    // the top. See `LegoImported.sheetFromTop`.
+    ...(/\.3do$/i.test(options.source) ? { sheetFromTop: true as const } : {}),
   };
 
   return {

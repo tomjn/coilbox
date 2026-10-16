@@ -68,6 +68,26 @@ function build(overrides: Partial<S3oImport> = {}, unpacked = false) {
 }
 
 describe("projectFromImport", () => {
+  /** What tells a document's loader its UVs need no turning round (#4174). */
+  it("marks a .3do as counting its sheet's rows from the top", () => {
+    let n = 0;
+    const options = {
+      id: "unit-1",
+      name: "armcom",
+      unitName: "armcom",
+      packId: "coilbox-lego",
+      packVersion: "1",
+      now: "2026-10-16T00:00:00.000Z",
+      newId: () => `p${n++}`,
+    };
+    const three = projectFromImport(result(), {
+      ...options,
+      source: "/game/objects3d/armcom.3do",
+    });
+    expect(three.project.imported?.sheetFromTop).toBe(true);
+    expect(build().project.imported?.sheetFromTop).toBeUndefined();
+  });
+
   it("keeps the tree, and names every piece as a script can address it", () => {
     const { project } = build({
       root: piece("Base Plate", null, [
