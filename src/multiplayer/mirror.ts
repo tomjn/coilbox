@@ -58,6 +58,12 @@ export interface LobbyMirror {
    * advance and launches.
    */
   battleStartSeq: number;
+  /**
+   * The match a Zero-K server has offered to put us back in, or null. A fresh
+   * object per offer, so a panel can tell a new offer from one it has already
+   * answered by identity. Cleared with the rest of the mirror on a reconnect.
+   */
+  rejoinOffer: { battleId: number } | null;
 }
 
 const CONSOLE_CAP = 500;
@@ -96,6 +102,7 @@ export const initialMirror: LobbyMirror = {
   serverMessages: [],
   serverMessageCount: 0,
   battleStartSeq: 0,
+  rejoinOffer: null,
 };
 
 export type MirrorAction =
@@ -146,6 +153,8 @@ export function mirrorReducer(
         }
         case "battleStarting":
           return { ...m, battleStartSeq: m.battleStartSeq + 1 };
+        case "rejoinOffered":
+          return { ...m, rejoinOffer: { battleId: ev.battleId } };
         case "disconnected":
           return { ...m, connected: false, error: ev.reason ?? null };
         case "delta": {

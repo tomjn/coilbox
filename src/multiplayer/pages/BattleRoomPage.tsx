@@ -47,6 +47,7 @@ import { battleToSkirmishDraft } from "../battle/toSkirmish";
 import { useBattleLaunch } from "../battle/useBattleLaunch";
 import { useBattleRoom } from "../battle/useBattleRoom";
 import { useBattleRoomKey } from "../battle/useBattleRoomKey";
+import { useRejoinRequest } from "../battle/useRejoinRequest";
 import { VotePanel } from "../battle/VotePanel";
 import { useMpRevealed } from "../navPredicates";
 import { useNoteActions } from "../notes";
@@ -155,6 +156,8 @@ function BattleRoomPage() {
   const location = useLocation();
   const hostDraft = (location.state as { hostDraft?: SkirmishDraft } | null)
     ?.hostDraft;
+
+  useRejoinRequest(room.battle?.id ?? null, room.askForMatch);
 
   // Apply a "Host as battle" seed once, the first time this battle is ready:
   // the draft's own seat, its mod/map options, start-pos type and unit
