@@ -309,6 +309,22 @@ Most errors in a headless log are not about your unit. A healthy Splinter Factio
 
 The check needs `spring-headless` and the engine's base content, and the drawer says which is missing. It runs in a folder of its own under coilbox's cache, so nothing is written to your engine or your settings. The first check takes longer than the rest: on a Mac it took 42 seconds and then 11, because the engine scans every archive once and Splinter Faction builds files of its own on a first run.
 
+### Play with this unit
+
+**Play with this unit**, under Launch, starts a skirmish that is set up for trying the unit out. No cheats are needed.
+
+- Your unit is at your start position, on the map's first start spot.
+- Beside it is the game's own builder, the start unit of the game's first side. Your unit is on its build menu.
+- Three copies of your unit stand 320 elmos away, towards the map's second start spot, on a team nobody plays. They hold fire and hold position. One that dies is replaced where it stood, so the match does not end when you have shot them all.
+- The builder holds fire too, so its own weapons leave the targets to your unit. Change its fire state in game if you want it to fight.
+- You start with a full bank, so the builder can build your unit straight away.
+
+It runs on coilbox's mission runtime, the way the workshop's "Start with this unit on the map" does. The scratch game carries the runtime, a generated mission, a gadget that holds the targets still, and `download/coilbox_sandbox.tdf`, which puts your unit on the builder's menu. The engine reads that file while it loads the game's units, so nothing of the game's is changed or copied. All of it is in the same scratch folder, so deleting the folder still undoes everything.
+
+Splinter Faction 0.1.89 has not taken the runtime's start guard ([the adoption contract](mission-runtime.md)), so a minute into the match it adds a commander to each team as well. The targets' one holds fire like the rest.
+
+A map with no start positions has nowhere to put the targets, and the drawer says so. The builder can only place your unit where its definition allows. A unit that cannot move has no slope limit unless you give it a `maxslope`, so it can only be built on perfectly flat ground. Splinter Faction 0.1.89 also gives any unit without a `customparams.factionname` a cost of 518,181,518 metal and energy, so its builder starts your unit and never finishes it.
+
 ## Making the game use the unit
 
 Straight out of export, a unit cannot be played normally. Its definition sets `canmove = false`, and nothing lists it in any unit's `buildoptions`, so nothing can build it and it cannot move. `/cheat` and `/give` is the only way to get one onto a map.

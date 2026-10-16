@@ -25,6 +25,7 @@ mod assimp;
 mod geometry;
 mod glb;
 mod import;
+mod sandbox;
 mod texture;
 
 use coilbox_3do_convert as atlas3do;
@@ -2725,22 +2726,55 @@ fn write_scratch_file(dir: &Path, relative: &[&str], contents: &str) -> Result<(
         .map_err(|e| format!("could not write {}: {e}", target.display()))
 }
 
+/// Write the scratch game's generated files into `dir`: the `modinfo.lua`, the
+/// side data and the start unit gadget, in that order, and the sandbox's files
+/// before them when there is a sandbox. The sandbox goes first because
+/// installing the runtime removes the start unit gadget (see
+/// [`sandbox::write`]).
+fn write_scratch_game(
+    dir: &Path,
+    [modinfo, sidedata, gadget]: [&str; 3],
+    sandbox: Option<&sandbox::Sandbox>,
+    runtime_src: Option<&Path>,
+) -> Result<(), String> {
+    if let Some(sandbox) = sandbox {
+        sandbox::write(dir, sandbox, runtime_src)?;
+        // Read back through the sandbox the runtime gadget's own `VFS.Include`
+        // uses, so a runtime copy that half succeeded is a refusal here and
+        // not a game that starts with no mission and says nothing.
+        if sandbox.ship_runtime {
+            tauri_plugin_coilbox_scenario::runtime::read_marker(dir)?;
+        }
+    }
+    for (relative, contents) in [
+        (SCRATCH_MODINFO, modinfo),
+        (SCRATCH_SIDEDATA, sidedata),
+        (SCRATCH_GADGET, gadget),
+    ] {
+        write_scratch_file(dir, relative, contents)?;
+    }
+    Ok(())
+}
+
 /// `lego_scratch_game` prepares the `.sdd` a unit is tested in.
 ///
 /// It writes the three files the frontend generated into
 /// `<data_dir>/games/<folder>`: the `modinfo.lua` naming the base game, the
 /// `gamedata/sidedata.lua` declaring the built unit as the side's start unit,
-/// and the gadget that spawns it. The unit itself follows through
+/// and the gadget that spawns it. `sandbox` adds what "Play with this unit"
+/// needs on top, see [`sandbox`]. The unit itself follows through
 /// `lego_export`, which treats the result as any other game folder. Nothing
 /// else in the content root is touched, so removing that one folder undoes the
 /// lot.
 #[tauri::command]
-async fn lego_scratch_game(
+async fn lego_scratch_game<R: Runtime>(
+    app: AppHandle<R>,
     data_dir: String,
     folder: String,
     modinfo: String,
     sidedata: String,
     gadget: String,
+    sandbox: Option<sandbox::Sandbox>,
 ) -> CliResult {
     if !valid_scratch_folder(&folder) {
         return CliResult::err(format!("not a scratch game folder: {folder}"));
@@ -2755,14 +2789,19 @@ async fn lego_scratch_game(
         return CliResult::err(format!("could not create {}: {e}", dir.display()));
     }
 
-    for (relative, contents) in [
-        (SCRATCH_MODINFO, &modinfo),
-        (SCRATCH_SIDEDATA, &sidedata),
-        (SCRATCH_GADGET, &gadget),
-    ] {
-        if let Err(e) = write_scratch_file(&dir, relative, contents) {
-            return CliResult::err(e);
+    let runtime_src = match &sandbox {
+        Some(sandbox) if sandbox.ship_runtime => {
+            tauri_plugin_coilbox_scenario::runtime::runtime_dir(&app)
         }
+        _ => None,
+    };
+    if let Err(e) = write_scratch_game(
+        &dir,
+        [&modinfo, &sidedata, &gadget],
+        sandbox.as_ref(),
+        runtime_src.as_deref(),
+    ) {
+        return CliResult::err(e);
     }
     CliResult::ok(json!({ "dir": dir.to_string_lossy() }))
 }
@@ -3646,6 +3685,48 @@ mod tests {
         assert_eq!(read("modinfo.lua"), "modinfo");
         assert_eq!(read("gamedata/sidedata.lua"), "sidedata");
         assert_eq!(read("LuaRules/Gadgets/coilbox_start_unit.lua"), "gadget");
+    }
+
+    /// Installing the runtime removes `coilbox_*` gadgets it did not write, so
+    /// a sandbox launch must still end up with the start unit gadget and the
+    /// sandbox's own, whatever was in the folder before (issue #3341).
+    #[test]
+    fn a_sandbox_scratch_game_keeps_both_of_its_gadgets() {
+        let src = tempfile::tempdir().expect("tempdir");
+        for (rel, body) in [
+            ("missions/runtime.lua", "return { version = 1 }"),
+            ("luarules/gadgets/coilbox_mission_runtime.lua", "-- runtime"),
+        ] {
+            let path = src.path().join(rel);
+            std::fs::create_dir_all(path.parent().unwrap()).expect("mkdir");
+            std::fs::write(path, body).expect("write");
+        }
+        let dir = tempfile::tempdir().expect("tempdir");
+        let sandbox = sandbox::Sandbox {
+            download: "[MENUENTRY1]".into(),
+            gadget: "-- sandbox".into(),
+            mission_id: "coilbox-lego-sandbox".into(),
+            mission: "return {}".into(),
+            ship_runtime: true,
+        };
+        let files = ["modinfo", "sidedata", "start unit"];
+
+        // Twice, so the second launch finds the first one's files in place.
+        for _ in 0..2 {
+            write_scratch_game(dir.path(), files, Some(&sandbox), Some(src.path())).expect("write");
+        }
+
+        let read = |rel: &str| std::fs::read_to_string(dir.path().join(rel)).expect(rel);
+        assert_eq!(
+            read("LuaRules/Gadgets/coilbox_start_unit.lua"),
+            "start unit"
+        );
+        assert_eq!(read("LuaRules/Gadgets/coilbox_sandbox.lua"), "-- sandbox");
+        assert_eq!(
+            read("LuaRules/Gadgets/coilbox_mission_runtime.lua"),
+            "-- runtime"
+        );
+        assert_eq!(read("modinfo.lua"), "modinfo");
     }
 
     #[test]

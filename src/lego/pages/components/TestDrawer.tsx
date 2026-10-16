@@ -10,7 +10,14 @@
  */
 
 import { Button, useSetting } from "@picoframe/frame";
-import { FolderOpen, Rocket, ScanSearch, Square, X } from "lucide-react";
+import {
+  Crosshair,
+  FolderOpen,
+  Rocket,
+  ScanSearch,
+  Square,
+  X,
+} from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useEffect, useState } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
@@ -37,9 +44,12 @@ import {
 import { usePlay } from "../../../play/PlayProvider";
 import { GamePickerButton } from "../../../play/pages/components/GamePickerButton";
 import { GamePickerPanel } from "../../../play/pages/components/GamePickerPanel";
+import type { Participant } from "../../../play/participants";
+import type { ScratchSandbox } from "../../bindings";
 import type { LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import type { RawGeometry } from "../../rawGeometry";
+import { prepareSandbox, sandboxModOptions } from "../../sandbox";
 import { SCRATCH_SIDE } from "../../scratchGame";
 import { CHECK_FRAMES, CHECK_SPAWN_FRAME } from "../../unitCheck";
 import { writeScratchGame } from "../../writeScratchGame";
@@ -57,6 +67,9 @@ interface Props {
 
 /** Random start position: a test needs a spawn, not a chosen one. */
 const START_POS_RANDOM = 1;
+
+/** The three things the drawer can do, so a busy label lands on the right button. */
+type Action = "launch" | "play" | "check";
 
 type Phase =
   | { state: "idle" }
@@ -113,8 +126,8 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
   const [scratchDir, setScratchDir] = useState<string | null>(null);
   /** The last load check's report, cleared when another run starts. */
   const [check, setCheck] = useState<UnitCheckReport | null>(null);
-  /** Which of the two actions the busy phases belong to. */
-  const [checking, setChecking] = useState(false);
+  /** Which action the busy phases belong to. */
+  const [action, setAction] = useState<Action>("launch");
 
   // The scratch game is itself a game, so it comes back in every scan. Offering
   // it as a base would nest it inside itself, and the scenario editor's test
@@ -145,7 +158,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
 
   const waiting = targetLoading || (!!target && !scan.data && scan.loading);
 
-  async function scratchGame(): Promise<string | null> {
+  async function scratchGame(sandbox?: ScratchSandbox): Promise<string | null> {
     if (!target || !game) return null;
     setPhase({ state: "writing" });
     const { name } = await writeScratchGame({
@@ -154,30 +167,40 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
       project,
       pack,
       raw,
+      sandbox,
       onWritten: setScratchDir,
       onScanning: () => setPhase({ state: "scanning" }),
     });
     return name;
   }
 
-  async function run() {
+  /** Write the scratch game, launch it, and say how the engine exited. */
+  async function play(
+    next: Action,
+    setup: () => Promise<{
+      sandbox?: ScratchSandbox;
+      participants: Participant[];
+      startPosType: number;
+      modOptions: Record<string, string>;
+    }>,
+  ) {
     if (!target || !game || !map) return;
     setCheck(null);
-    setChecking(false);
+    setAction(next);
     try {
-      const scratchName = await scratchGame();
+      setPhase({ state: "writing" });
+      const { sandbox, participants, startPosType, modOptions } = await setup();
+      const scratchName = await scratchGame(sandbox);
       if (!scratchName) return;
 
       setPhase({ state: "playing" });
       const result = await launch("skirmish", {
         config: toBattleConfig({
-          // On the scratch game's own side, so a base game that does read the
-          // side's start unit resolves it rather than seeing an empty side.
-          participants: [{ ...initialParticipants()[0], side: SCRATCH_SIDE }],
+          participants,
           mapName: map.name,
           gameType: scratchName,
-          startPosType: START_POS_RANDOM,
-          modOptions: {},
+          startPosType,
+          modOptions,
           // The scratch game is a mutator over the picked game and declares no
           // options of its own, so the base game's are the ones that apply.
           optionSchema: await gameOptionSchema(
@@ -205,10 +228,40 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
     }
   }
 
+  function run() {
+    return play("launch", async () => ({
+      // On the scratch game's own side, so a base game that does read the
+      // side's start unit resolves it rather than seeing an empty side.
+      participants: [{ ...initialParticipants()[0], side: SCRATCH_SIDE }],
+      startPosType: START_POS_RANDOM,
+      modOptions: {},
+    }));
+  }
+
+  /** "Play with this unit": the sandbox mission (issue #3341). */
+  function playSandbox() {
+    return play("play", async () => {
+      if (!target || !game || !map) throw new Error("Nothing to play on.");
+      const { sandbox, scenario } = await prepareSandbox({
+        enginePath: target.enginePath,
+        dataDir: target.dataDir,
+        game,
+        mapName: map.name,
+        unitName: project.unitName,
+      });
+      return {
+        sandbox,
+        participants: scenario.setup.participants,
+        startPosType: scenario.setup.startPosType,
+        modOptions: sandboxModOptions(),
+      };
+    });
+  }
+
   async function checkLoads() {
     if (!target || !game || !map) return;
     setCheck(null);
-    setChecking(true);
+    setAction("check");
     try {
       const scratchName = await scratchGame();
       if (!scratchName) return;
@@ -323,7 +376,19 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
                   disabled={busy || !!blocker || !game || !map}
                 >
                   <Rocket className="size-4" />
-                  {busy && !checking ? BUSY_LABEL[phase.state] : "Launch"}
+                  {busy && action === "launch"
+                    ? BUSY_LABEL[phase.state]
+                    : "Launch"}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => void playSandbox()}
+                  disabled={busy || !!blocker || !game || !map}
+                >
+                  <Crosshair className="size-4" />
+                  {busy && action === "play"
+                    ? BUSY_LABEL[phase.state]
+                    : "Play with this unit"}
                 </Button>
                 <div className="flex gap-2">
                   <Button
@@ -333,7 +398,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
                     disabled={busy || !!blocker || !game || !map}
                   >
                     <ScanSearch className="size-4" />
-                    {busy && checking
+                    {busy && action === "check"
                       ? BUSY_LABEL[phase.state]
                       : "Check it loads"}
                   </Button>
