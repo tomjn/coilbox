@@ -67,7 +67,8 @@ import {
 import {
   type BackdropId,
   disposeTerrain,
-  type GroundId,
+  type GroundChoice,
+  type GroundShape,
 } from "../../environment";
 import { addStandardLights } from "../../geometry";
 import type { PieceTransform } from "../../groupTransform";
@@ -289,6 +290,18 @@ interface Props {
    * same place.
    */
   chrome?: ReactNode;
+  /**
+   * What the unit stands on. Held by the page rather than here, because the
+   * script preview has to be told the same ground the view draws.
+   */
+  ground: {
+    choice: GroundChoice;
+    onChange: (choice: GroundChoice) => void;
+    /** What `groundShape` made of `choice`, null for a flat ground. */
+    shape: GroundShape | null;
+    /** Which way is up for the unit on it, from `unitUp`, or null. */
+    up: [number, number, number] | null;
+  };
   /** The piece hierarchy, and the raw geometry of a unit imported from
    *  somebody else's model rather than built from parts. */
   document: {
@@ -465,6 +478,7 @@ interface Props {
 
 export function ModelViewport({
   chrome,
+  ground,
   document,
   selection,
   onReady,
@@ -557,7 +571,6 @@ export function ModelViewport({
   // exactly as the two above are. Both open on what the builder has always
   // shown, so nothing about opening a project changes.
   const [backdrop, setBackdrop] = useState<BackdropId>("studio");
-  const [ground, setGround] = useState<GroundId>("grid");
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   // The compass is the button people press when they are lost, so it frames
@@ -902,6 +915,7 @@ export function ModelViewport({
         sky: null,
         terrain: null,
         water: null,
+        shaped: null,
         groups: new Map(),
         baked: [],
         imported: null,
@@ -1054,6 +1068,7 @@ export function ModelViewport({
           state.sky?.texture.dispose();
           if (state.terrain) disposeTerrain(state.terrain);
           if (state.water) disposeTerrain(state.water);
+          if (state.shaped) disposeTerrain(state.shaped);
           // Not `reference`: the figure may have been swapped for a unit read
           // out of an installed game since the scene was built.
           state.disposeReference();
@@ -1110,7 +1125,10 @@ export function ModelViewport({
     showReference,
     gameReference,
     backdrop,
-    ground,
+    ground: ground.choice.id,
+    shape: ground.shape,
+    up: ground.up,
+    previewing: playing || scriptTimeline !== null,
   });
 
   useStandInSize(sceneRef, project, pack, raw, standIn.track?.size);
@@ -1418,8 +1436,9 @@ export function ModelViewport({
             <EnvironmentPicker
               backdrop={backdrop}
               onBackdrop={setBackdrop}
-              ground={ground}
-              onGround={setGround}
+              ground={ground.choice}
+              onGround={ground.onChange}
+              shape={ground.shape}
             />
             <ReferencePicker
               unit={{ project, pack, raw }}
