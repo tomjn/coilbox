@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { buildMesh } from "./mesh.mjs";
 import { readObj } from "./obj.mjs";
 import { newellNormal, tessellate } from "./tessellate.mjs";
-import { SWATCHES, writePack } from "./writePack.mjs";
+import { ROUND_PANELS, SWATCHES, writePack } from "./writePack.mjs";
 
 /**
  * A square in the xz plane facing +y, written the way Wings exports one. The
@@ -216,7 +216,7 @@ describe("buildMesh", () => {
 });
 
 describe("writePack", () => {
-  it("writes the swatches the bundled pack ships (#3327)", () => {
+  it("writes the swatches and round panels the bundled pack ships (#3327, #4398)", () => {
     const outDir = mkdtempSync(join(tmpdir(), "legopack-"));
     try {
       writePack({
@@ -240,6 +240,8 @@ describe("writePack", () => {
       );
       expect(written.swatches).toEqual(SWATCHES);
       expect(bundled.swatches).toEqual(SWATCHES);
+      expect(written.roundPanels).toEqual(ROUND_PANELS);
+      expect(bundled.roundPanels).toEqual(ROUND_PANELS);
     } finally {
       rmSync(outDir, { recursive: true });
     }

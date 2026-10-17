@@ -4,13 +4,16 @@
  */
 
 import type * as THREE from "three";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { parseClipboardPiece, serializeClipboardPiece } from "./clipboard";
 import { duplicatePiece, insertCompound } from "./compounds";
 import { boxConnectors, pieceConnectors, pieceOwnBox } from "./connectors";
 import { buildGlbScene } from "./exportGlb";
 import { buildObj } from "./exportObj";
-import { bundledSwatches } from "./fixtures/bundledSwatches";
+import {
+  bundledRoundPanels,
+  bundledSwatches,
+} from "./fixtures/bundledSwatches";
 import { mirrorCopy } from "./mirror";
 import { type LegoPiece, type LegoProject, newProject } from "./model";
 import { moduleShareCode, readSharedModule } from "./moduleShare";
@@ -20,6 +23,7 @@ import { pivotChoices } from "./pivot";
 import { bakedPieces, buildS3o, pieceBoxes, type S3oPiece } from "./s3oBuild";
 import {
   type LegoShape,
+  setShapeRoundPanels,
   setShapeSwatches,
   shapeBox,
   shapeMesh,
@@ -201,6 +205,85 @@ describe("a shape in the exports (#3327)", () => {
         expect(insideGrey([uv.getX(i), uv.getY(i)])).toBe(true);
       }
     }
+  });
+});
+
+describe("a round panel in the exports (#4398)", () => {
+  beforeAll(() => {
+    setShapeRoundPanels(bundledRoundPanels());
+  });
+  afterAll(() => {
+    setShapeRoundPanels([]);
+  });
+
+  const PANEL = bundledRoundPanels()[2];
+  const onPanel = ([u, v]: [number, number]) =>
+    Math.hypot(u - PANEL.centre[0], v - PANEL.centre[1]) <=
+    PANEL.radius + SLACK;
+  const unit = project([
+    {
+      id: "wheel",
+      shape: {
+        kind: "cylinder",
+        size: [4, 1, 4],
+        swatch: "grey",
+        options: { hub: 1 },
+      },
+    },
+    {
+      id: "ring",
+      shape: {
+        kind: "tube",
+        size: [6, 2, 6],
+        swatch: "grey",
+        options: { hub: 1, inner: 2 },
+      },
+      position: [8, 0, 0],
+    },
+  ]);
+
+  /** Every UV is on the swatch or the panel, and the panel is used. */
+  function check(uvs: [number, number][]) {
+    expect(uvs.filter((uv) => !insideGrey(uv) && !onPanel(uv))).toEqual([]);
+    expect(uvs.some(onPanel)).toBe(true);
+  }
+
+  it("writes the s3o's end UVs inside the panel", () => {
+    const built = buildS3o(unit, pack(), null, { texture1: "atlas.png" });
+    if (!built) throw new Error("no build");
+    const uvs: [number, number][] = [];
+    const walk = (piece: S3oPiece) => {
+      for (const { uv } of piece.vertices) uvs.push([uv[0], 1 - uv[1]]);
+      piece.children.forEach(walk);
+    };
+    walk(built.root);
+    check(uvs);
+  });
+
+  it("writes the .obj's end UVs inside the panel", () => {
+    const built = buildObj(unit, pack(), null, {
+      unitName: "roller",
+      textureName: "atlas.png",
+    });
+    check(
+      (built?.obj.split("\n") ?? [])
+        .filter((line) => line.startsWith("vt "))
+        .map(
+          (line) => line.split(" ").slice(1).map(Number) as [number, number],
+        ),
+    );
+  });
+
+  it("writes the .glb's end UVs inside the panel", () => {
+    const scene = buildGlbScene(unit, pack(), null);
+    const uvs: [number, number][] = [];
+    scene?.traverse((node) => {
+      const mesh = node as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const uv = mesh.geometry.getAttribute("uv");
+      for (let i = 0; i < uv.count; i++) uvs.push([uv.getX(i), uv.getY(i)]);
+    });
+    check(uvs);
   });
 });
 
