@@ -370,6 +370,51 @@ export async function exportWeapons(
   };
 }
 
+/** What the scratch game is given for the unit's weapons. */
+export interface ScratchWeapons extends ExportedWeapons {
+  /** The unit without the game weapons the test game does not have. */
+  project: LegoProject;
+  /** A line for each weapon left out, library and game alike. */
+  leftOut: string[];
+}
+
+/**
+ * The weapons a test game is written with: the export's own slots and files
+ * (`exportWeapons`), after leaving out each game weapon `gameWeapons` does not
+ * hold, so the scratch unit never names a weapon the game cannot find. Null
+ * `gameWeapons` means the game has not been read, and nothing is left out.
+ */
+export async function scratchWeapons(
+  project: LegoProject,
+  projects: readonly ModProject[],
+  gameWeapons: Record<string, Record<string, unknown>> | null,
+  compile: (project: ModProject) => Promise<CompiledMod>,
+): Promise<ScratchWeapons> {
+  const absent: string[] = [];
+  const pieces = project.pieces.map((piece) => {
+    const fires = piece.weapon?.fires;
+    if (
+      !piece.weapon ||
+      !fires ||
+      fires.from !== "game" ||
+      !gameWeapons ||
+      gameWeapons[fires.name.toLowerCase()]
+    ) {
+      return piece;
+    }
+    absent.push(`${fires.name} (not in this game).`);
+    const { fires: _fires, ...weapon } = piece.weapon;
+    return { ...piece, weapon };
+  });
+  const armed = absent.length > 0 ? { ...project, pieces } : project;
+  const exported = await exportWeapons(armed, projects, compile);
+  return {
+    ...exported,
+    project: armed,
+    leftOut: [...absent, ...exported.missing],
+  };
+}
+
 function figure(n: number): string {
   return String(Number(n.toFixed(2)));
 }

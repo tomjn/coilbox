@@ -6,6 +6,8 @@
 import { primeScan } from "@/content/config";
 import { isScratchArchive, SCRATCH_FOLDER } from "@/lib/generatedGames";
 import type { PlayTarget } from "@/play/config";
+import { workshopCompile } from "@/workshop/compile";
+import type { ModProject } from "@/workshop/project";
 
 import { exportTextureName, unitAtlas } from "./atlas";
 import { legoExport, legoScratchGame, type ScratchSandbox } from "./bindings";
@@ -25,6 +27,7 @@ import {
 } from "./scratchGame";
 import { sheetSources } from "./textureSheet";
 import { buildUnitDef, legoUnitDef } from "./unitDef";
+import { scratchWeapons } from "./weaponModule";
 import { worthTotals } from "./worth";
 import { buildWreck } from "./wreck";
 
@@ -35,6 +38,13 @@ export interface ScratchGameArgs {
   project: LegoProject;
   pack: LoadedPack;
   raw: RawGeometry | null;
+  /** The workshop's projects, where a library weapon is read from. */
+  workshopProjects: readonly ModProject[];
+  /**
+   * The test game's weapon table, null until it is read. A game weapon the
+   * unit names that is not in it is left out of the scratch unit.
+   */
+  gameWeapons: Record<string, Record<string, unknown>> | null;
   /** The sandbox's files, for "Play with this unit". Absent for a plain test. */
   sandbox?: ScratchSandbox;
   /** Told when the write is done and the rescan starts. */
@@ -56,6 +66,8 @@ export interface WrittenScratchUnit {
   textures: string;
   /** The file names the textures were written under, in `unittextures/`. */
   textureFiles: string[];
+  /** A line for each weapon the unit names that was left out, and why. */
+  weaponsLeftOut: string[];
 }
 
 /**
@@ -93,12 +105,24 @@ export async function writeScratchGame(
 export async function writeScratchUnit({
   target,
   baseGame,
-  project,
+  project: unit,
   pack,
   raw,
+  workshopProjects,
+  gameWeapons,
   sandbox,
   onWritten,
 }: ScratchGameArgs): Promise<WrittenScratchUnit> {
+  // The same slots and files a real export writes, less the game weapons this
+  // game lacks. The script reads the unit it is numbered from, so it gets the
+  // unit as left out too.
+  const weapons = await scratchWeapons(
+    unit,
+    workshopProjects,
+    gameWeapons,
+    (made) => workshopCompile({ project: made }),
+  );
+  const project = weapons.project;
   // An imported unit draws with its own two textures out of the store. A
   // built one samples one atlas, and only its own: an s3o names one texture.
   // A unit whose atlas is not installed still tests, untextured, rather than
@@ -152,6 +176,7 @@ export async function writeScratchUnit({
     unitBounds(project, pack, raw),
     "def",
     worthTotals(project, pack),
+    weapons.slots,
   );
   const wreck = buildWreck(
     project,
@@ -187,10 +212,12 @@ export async function writeScratchUnit({
       unitBounds(project, pack, raw),
       "def",
       worthTotals(project, pack),
+      weapons.slots,
     ),
     unitDefFields: null,
     text: null,
     model,
+    weapons: weapons.files,
     // So a test match drops the same wreck a real game will (issue #3310).
     ...(wreck
       ? {
@@ -212,5 +239,6 @@ export async function writeScratchUnit({
     files: owned,
     textures: JSON.stringify(textures),
     textureFiles,
+    weaponsLeftOut: weapons.leftOut,
   };
 }

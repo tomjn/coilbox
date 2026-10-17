@@ -13,6 +13,7 @@ import {
   pickWeaponFile,
   pickWeaponParts,
   sameWeapon,
+  scratchWeapons,
   scriptWeapons,
   slotTarget,
   weaponCarriers,
@@ -342,6 +343,66 @@ describe("exportWeapons", () => {
     expect(out.files).toEqual([]);
     expect(out.slots.map((slot) => slot.name)).toEqual(["gun"]);
     expect(out.missing).toEqual(["laser_copy from Lasers: compiler refused."]);
+  });
+});
+
+describe("scratchWeapons", () => {
+  const fires = {
+    from: "library" as const,
+    projectId: "w1",
+    key: "laser_copy",
+  };
+  const compiled: CompiledMod = {
+    chunks: [],
+    notes: [],
+    tweakdefs: null,
+    files: [
+      { path: "weapons/coilbox_rover_laser_copy.lua", contents: "return {}" },
+    ],
+  };
+  const compile = async () => compiled;
+
+  it("keeps a game weapon the test game has, and writes a library weapon with its file", async () => {
+    const armed = unit([
+      { role: "turret", weapon: { fires: { from: "game", name: "Gun" } } },
+      { role: "turret", weapon: { fires } },
+    ]);
+    const out = await scratchWeapons(armed, [workshop()], { gun: {} }, compile);
+    expect(out.slots.map((slot) => slot.name)).toEqual([
+      "gun",
+      "rover_laser_copy",
+    ]);
+    expect(out.files).toEqual([
+      { name: "coilbox_rover_laser_copy.lua", contents: "return {}" },
+    ]);
+    expect(out.leftOut).toEqual([]);
+    expect(out.project).toBe(armed);
+  });
+
+  it("leaves out a game weapon the test game lacks, and says so", async () => {
+    const armed = unit([
+      {
+        role: "turret",
+        weapon: { fires: { from: "game", name: "armcom_laser" } },
+      },
+      { role: "turret", weapon: { fires } },
+    ]);
+    const out = await scratchWeapons(armed, [workshop()], { gun: {} }, compile);
+    expect(out.slots.map((slot) => slot.name)).toEqual(["rover_laser_copy"]);
+    expect(out.leftOut).toEqual(["armcom_laser (not in this game)."]);
+    expect(mountedWeapons(out.project).map((m) => m.fires)).toEqual([fires]);
+  });
+
+  it("leaves nothing out of a game that has not been read", async () => {
+    const armed = unit([
+      {
+        role: "turret",
+        weapon: { fires: { from: "game", name: "armcom_laser" } },
+      },
+    ]);
+    const out = await scratchWeapons(armed, [], null, compile);
+    expect(out.slots.map((slot) => slot.name)).toEqual(["armcom_laser"]);
+    expect(out.leftOut).toEqual([]);
   });
 });
 
