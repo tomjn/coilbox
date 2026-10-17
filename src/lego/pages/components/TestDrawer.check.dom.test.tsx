@@ -42,6 +42,19 @@ vi.mock("../../../content/config", () => ({
   }),
 }));
 
+const unitDefs = vi.hoisted(() => ({
+  defs: null as { weaponDefs: Record<string, unknown> } | null,
+}));
+vi.mock("@/workshop/config", () => ({
+  useUnitDefs: () => ({
+    defs: unitDefs.defs,
+    defsFor: unitDefs.defs ? "splinterfaction_0.1.89.sdz" : null,
+  }),
+}));
+vi.mock("@/workshop/project", () => ({
+  useModProjects: () => ({ projects: [] }),
+}));
+
 vi.mock("../../../play/config", () => ({
   gameOptionSchema: vi.fn(),
   initialParticipants: () => [{}],
@@ -132,6 +145,7 @@ beforeEach(() => {
   writeScratchGame.mockResolvedValue({
     dir: "/data/games/coilbox-lego-test.sdd",
     name: "Coilbox unit test scratch",
+    weaponsLeftOut: [],
   });
 });
 
