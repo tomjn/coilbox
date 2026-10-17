@@ -42,8 +42,18 @@ function elmos(
   min: number,
   max: number,
   fallback: number,
+  handle?: BodyPlanProportion["handle"],
 ): BodyPlanProportion {
-  return { id, label, unit: "elmo", min, max, step: 0.1, fallback };
+  return {
+    id,
+    label,
+    unit: "elmo",
+    min,
+    max,
+    step: 0.1,
+    fallback,
+    ...(handle ? { handle } : {}),
+  };
 }
 
 const BASE: BodyPlanBone = {
@@ -65,9 +75,18 @@ export const TURRET_BUILDING: BodyPlan = {
   label: "Turret building",
   description: "A gun turret on a base that does not move.",
   proportions: [
-    elmos("baseHeight", "Base height", 20, 225, 41),
-    elmos("turretHeight", "Turret height", 0, 45, 13.7),
-    elmos("barrelLength", "Barrel length", 5, 160, 41.1),
+    elmos("baseHeight", "Base height", 20, 225, 41, {
+      bone: "turret",
+      axis: 1,
+    }),
+    elmos("turretHeight", "Turret height", 0, 45, 13.7, {
+      bone: "barrel",
+      axis: 1,
+    }),
+    elmos("barrelLength", "Barrel length", 5, 160, 41.1, {
+      bone: "flare",
+      axis: 2,
+    }),
   ],
   bones({ baseHeight, turretHeight, barrelLength }) {
     return [

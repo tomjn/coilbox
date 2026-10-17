@@ -61,6 +61,7 @@ import { presetById, ROLES, restAngleWarnings } from "../animPresets";
 import { unitAtlas } from "../atlas";
 import { balanceProblem, checkBalance } from "../balance";
 import { legoTexturePrune } from "../bindings";
+import { bodyPlanById } from "../bodyPlans";
 import { addBuildArm, builderKind, pickArmParts } from "../buildArm";
 import { pictureIsStale } from "../buildPicture";
 import {
@@ -160,6 +161,7 @@ import type {
 } from "../scriptPlayback";
 import { dragPiece, freeMoved, type Seat, typedTransform } from "../seat";
 import { isShortcut, shortcutLabel } from "../shortcuts";
+import { applyProportions } from "../skeletonEdit";
 import { swapModule } from "../swapModule";
 import { swapPart } from "../swapPart";
 import { useEditShortcuts } from "../useEditShortcuts";
@@ -187,6 +189,7 @@ import { collisionHandlePieceId } from "./components/PieceCollisionFields";
 import { PieceTree } from "./components/PieceTree";
 import { ProblemErrors } from "./components/ProblemErrors";
 import type { CheckStatus } from "./components/ProblemsButton";
+import { ProportionsPanel } from "./components/ProportionsPanel";
 import type { Placing } from "./components/placeByFace";
 import type { ReferenceUnit } from "./components/ReferencePicker";
 import type {
@@ -240,6 +243,42 @@ function Builder({ id }: { id: string | undefined }) {
   const doc = useLegoDocument(id, pack);
   const { edit, selectedId, selectedIds, select: setSelectedId } = doc;
   const draft = doc.project;
+  // The skeleton's body plan, and the proportion a slider or handle is showing
+  // before it is let go. The preview is not an edit: it only changes what the
+  // viewport and the panel show.
+  const skeletonPlan = draft?.skeleton
+    ? bodyPlanById(draft.skeleton.plan)
+    : undefined;
+  const [proportionPreview, setProportionPreview] = useState<{
+    id: string;
+    value: number;
+  } | null>(null);
+  const shown = useMemo(
+    () =>
+      draft && skeletonPlan && proportionPreview
+        ? applyProportions(
+            draft,
+            skeletonPlan,
+            { [proportionPreview.id]: proportionPreview.value },
+            () => crypto.randomUUID(),
+          ).project
+        : draft,
+    [draft, skeletonPlan, proportionPreview],
+  );
+  // One edit however many bones move, so one undo step.
+  const changeProportions = useCallback(
+    (values: Record<string, number>) => {
+      setProportionPreview(null);
+      if (!skeletonPlan) return;
+      edit(
+        (project) =>
+          applyProportions(project, skeletonPlan, values, () =>
+            crypto.randomUUID(),
+          ).project,
+      );
+    },
+    [edit, skeletonPlan],
+  );
   // The document as it is now, for an edit made after waiting on a file.
   const docRef = useRef(doc);
   docRef.current = doc;
@@ -302,7 +341,7 @@ function Builder({ id }: { id: string | undefined }) {
   const liftedRef = useRef<LegoProject | null>(null);
   const [asideOpen, setAsideOpen] = usePanelOpen("aside");
   const [aside, setAside] = useState<
-    "pieces" | "animation" | "collision" | "aim" | "texture"
+    "pieces" | "animation" | "collision" | "aim" | "texture" | "skeleton"
   >("pieces");
   /** The game unit standing beside the build, which the stats compare with. */
   const [referenceUnit, setReferenceUnit] = useState<ReferenceUnit | null>(
@@ -1884,7 +1923,13 @@ function Builder({ id }: { id: string | undefined }) {
                     <ProblemErrors problems={problems} />
                   </>
                 }
-                document={{ pack, raw, project: draft, balance, overlap }}
+                document={{
+                  pack,
+                  raw,
+                  project: shown ?? draft,
+                  balance,
+                  overlap,
+                }}
                 footprint={{
                   result: footprint,
                   leaveOut: footprintLeaveOut,
@@ -1994,6 +2039,17 @@ function Builder({ id }: { id: string | undefined }) {
                       ),
                     })),
                 }}
+                proportions={
+                  asideOpen && aside === "skeleton" && skeletonPlan
+                    ? {
+                        plan: skeletonPlan,
+                        onDrag: (id, value) =>
+                          setProportionPreview({ id, value }),
+                        onDragEnd: (id, value) =>
+                          changeProportions({ [id]: value }),
+                      }
+                    : undefined
+                }
                 aimPoint={{
                   // The same reasoning, for the marker the aim point panel
                   // is about: opening the panel draws the point it is
@@ -2221,6 +2277,16 @@ function Builder({ id }: { id: string | undefined }) {
                 >
                   Aim
                 </Button>
+                {draft.skeleton ? (
+                  <Button
+                    size="sm"
+                    variant={aside === "skeleton" ? "default" : "outline"}
+                    onClick={() => setAside("skeleton")}
+                    aria-pressed={aside === "skeleton"}
+                  >
+                    Skeleton
+                  </Button>
+                ) : null}
                 {/* Only for a unit imported whole: a parts-pack unit draws
                   with a shared atlas rather than its own two textures, and
                   there is nothing here for it to build. See #2574. */}
@@ -2241,6 +2307,14 @@ function Builder({ id }: { id: string | undefined }) {
                   imported={imported}
                   unitName={draft.unitName}
                   onChange={changeTextures}
+                />
+              ) : aside === "skeleton" && skeletonPlan ? (
+                <ProportionsPanel
+                  project={draft}
+                  plan={skeletonPlan}
+                  onChange={changeProportions}
+                  onPreview={setProportionPreview}
+                  preview={proportionPreview}
                 />
               ) : aside === "aim" ? (
                 <AimPointPanel
