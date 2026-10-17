@@ -65,6 +65,7 @@ function pack(): LoadedPack {
     part("hull", [-1, -0.5, -2], [1, 0.5, 2]),
     part("leg", [-0.25, -1, -0.25], [0.25, 1, 0.25]),
     part("bighull", [-2, -1, -3], [2, 1, 3]),
+    part("post", [-0.25, -1, -0.25], [0.5, 1, 0.25]),
   ];
   return {
     manifest: {} as LoadedPack["manifest"],
@@ -283,6 +284,56 @@ describe("resolveConnections", () => {
     expect(worldPoint(out, "leg", [0.25, 0, 0])).toEqual([1, 0, 0]);
     expect(worldNormal(out, "leg", [1, 0, 0])).toEqual([-1, 0, 0]);
     expect(round(pieceOf(out, "leg").scale)).toEqual([-1, 1, 1]);
+  });
+
+  it("seats a part on the side face of a parent mirrored in x", () => {
+    // The hull's "+x" face is at x = -1 once the hull is mirrored.
+    for (const [connector, to, face, own, theirs] of [
+      ["-x", "+x", -1, [-1, 0, 0], [1, 0, 0]],
+      ["+x", "-x", 1, [1, 0, 0], [-1, 0, 0]],
+    ] as const) {
+      const doc = project([
+        { id: "hull", partId: "hull", scale: [-1, 1, 1] },
+        {
+          id: "leg",
+          parentId: "hull",
+          partId: "post",
+          connection: { connector, to },
+        },
+      ]);
+      const out = resolveConnections(doc, pack()).project;
+      const edge = connector === "-x" ? -0.25 : 0.5;
+      expect(worldPoint(out, "leg", [edge, 0, 0])).toEqual([face, 0, 0]);
+      expect(worldNormal(out, "leg", [...own])).toEqual(
+        negate(worldNormal(out, "hull", [...theirs])),
+      );
+    }
+  });
+
+  it("keeps a side join on a face when its parent is mirrored", () => {
+    const doc = resolveConnections(
+      project([
+        { id: "hull", partId: "hull" },
+        {
+          id: "leg",
+          parentId: "hull",
+          partId: "post",
+          connection: { connector: "-x", to: "+x" },
+        },
+      ]),
+      pack(),
+    ).project;
+    expect(worldPoint(doc, "leg", [-0.25, 0, 0])).toEqual([1, 0, 0]);
+    const mirrored = resolveConnections(
+      {
+        ...doc,
+        pieces: doc.pieces.map((p) =>
+          p.id === "hull" ? { ...p, scale: [-1, 1, 1] as Vec3 } : p,
+        ),
+      },
+      pack(),
+    ).project;
+    expect(worldPoint(mirrored, "leg", [-0.25, 0, 0])).toEqual([-1, 0, 0]);
   });
 
   it("follows the parent when its part changes", () => {

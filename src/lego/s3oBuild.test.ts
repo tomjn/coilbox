@@ -931,11 +931,11 @@ describe("a joined child under a scaled parent (#3292)", () => {
   });
 
   it("moves the child with the parent's scaled connector", () => {
-    const plain = bakedChild([1, 1, 1], true)?.offset ?? [0, 0, 0];
+    // The parent's +x connector is at (1, 0, 0.5), so (2, 0, 2) once scaled. The
+    // child keeps its own size and turns its +x face round onto it, which puts
+    // its connector (1, 0, 0.5) at (-1, 0, -0.5) from its own origin.
     const scaled = bakedChild(SCALE, true)?.offset ?? [0, 0, 0];
-    expect(round(scaled)).toEqual(
-      round(plain.map((n, i) => n * SCALE[i]) as number[]),
-    );
+    expect(round(scaled)).toEqual([3, 0, 2.5]);
   });
 
   it("still stretches a child that is not joined", () => {
