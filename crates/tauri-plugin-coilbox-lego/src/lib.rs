@@ -25,6 +25,7 @@ mod assimp;
 mod geometry;
 mod glb;
 mod import;
+mod reexport;
 mod sandbox;
 mod texture;
 
@@ -2021,15 +2022,18 @@ fn write_engine_atlas(source: &Path, target: &Path) -> Result<(), String> {
 /// which installed pack ships it, since a unit may sample an atlas pack's
 /// texture rather than the base pack's, and `atlas.write_as` is what it is
 /// called once written.
-/// The unit script and the unit definition both land under their own folder,
-/// and all three of the texture, the script and the definition are written once
-/// and then left alone: a re-export never overwrites one that is already there
-/// (see [`keep_existing`]). Only the model and the per-piece collision file are
-/// rewritten every time, because those are the files the builder alone owns.
-/// `overwrite_texture` is the one way round that rule: with it set, a texture
-/// already at that name is replaced rather than kept, for a stale copy the
-/// drawer's ordinary write-once behaviour has no other way to clear. It has no
-/// bearing on the script or the definition, which stay write-once regardless.
+/// The unit script and the unit definition both land under their own folder.
+/// The texture is written once and then left alone (see [`keep_existing`]).
+/// The script and the definition follow the re-export rule in [`reexport`]
+/// (issue #3245): the script is replaced only while it is still the one the
+/// last export wrote, whose digest is `script_written`, and the definition has
+/// the fields the build decides brought up to date, `unit_def_fields`, while
+/// everything changed by hand stays. The model and the per-piece collision file
+/// are rewritten every time, because those are the files the builder alone
+/// owns. `overwrite_texture` is the one way round the texture's rule: with it
+/// set, a texture already at that name is replaced rather than kept, for a
+/// stale copy the drawer's ordinary write-once behaviour has no other way to
+/// clear.
 ///
 /// `text` is the unit's name and description for a game that reads neither from
 /// the definition, and goes to [`coilbox_language_file`]. `None` for a game
@@ -2046,11 +2050,16 @@ async fn lego_export<R: Runtime>(
     textures: Option<ExportTextures>,
     // The export drawer's "replace textures already there" checkbox. Only a
     // texture reads it: the script and the unit definition below keep their
-    // own write-once rule regardless.
+    // own rule regardless.
     overwrite_texture: bool,
     script: Option<String>,
+    // The digest the receipt holds for the script the last export wrote here.
+    script_written: Option<String>,
     piece_collision: Option<String>,
     unit_def: Option<String>,
+    // The fields the build decides, or `None` when nothing records coilbox
+    // writing the definition already in the folder.
+    unit_def_fields: Option<Vec<reexport::DerivedField>>,
     text: Option<UnitText>,
     model: ExportModel,
 ) -> CliResult {
@@ -2164,25 +2173,27 @@ async fn lego_export<R: Runtime>(
         Err(e) => return CliResult::err(e),
     };
 
-    // The unit script is written once and then left alone. It is meant to be
-    // edited by hand, and re-exporting a model after a change to the geometry
-    // must not throw that away. The scratch game is the one exception: it has
-    // no hand edits worth keeping, so it always gets the current script.
+    // The unit script is meant to be edited by hand, and re-exporting after a
+    // change to the build must not throw that away. So it is replaced only
+    // while it is still exactly the script the last export wrote (issue
+    // #3245). The scratch game has no hand edits worth keeping, so it always
+    // gets the current script.
     let mut script_path = None;
     let mut script_kept = false;
     if let Some(script) = script {
-        let scripts = root.join("scripts");
-        if let Err(e) = std::fs::create_dir_all(&scripts) {
-            return CliResult::err(format!("could not create {}: {e}", scripts.display()));
-        }
-        let target = scripts.join(format!("{unit_name}.lua"));
-        if keep_existing(&target, scratch, false) {
-            script_kept = true;
-        } else if let Err(e) = std::fs::write(&target, &script) {
-            return CliResult::err(format!("could not write {}: {e}", target.display()));
-        } else {
-            script_path = Some(target.to_string_lossy().to_string());
-            owned.push(owned_file(&target, script.as_bytes()));
+        match reexport::write_script(
+            &root,
+            &unit_name,
+            scratch,
+            &script,
+            script_written.as_deref(),
+        ) {
+            Ok(reexport::ScriptWrite::Written(target)) => {
+                script_path = Some(target.to_string_lossy().to_string());
+                owned.push(owned_file(&target, script.as_bytes()));
+            }
+            Ok(reexport::ScriptWrite::Kept(_)) => script_kept = true,
+            Err(e) => return CliResult::err(e),
         }
     }
 
@@ -2215,24 +2226,29 @@ async fn lego_export<R: Runtime>(
         owned.push(owned_file(&target, lua.as_bytes()));
     }
 
-    // The unit definition follows the same rule as the script, scratch
-    // exception included: written once and left alone in a real game folder,
-    // always refreshed in coilbox's own scratch game.
+    // The unit definition: written whole the first time and in the scratch
+    // game, and after that brought up to date field by field, keeping every
+    // field somebody changed (issue #3245).
     let mut unit_def_path = None;
-    let mut unit_def_kept = false;
+    let mut unit_def_kept = None;
+    let mut unit_def_changes = Vec::new();
     if let Some(unit_def) = unit_def {
-        let units = root.join("units");
-        if let Err(e) = std::fs::create_dir_all(&units) {
-            return CliResult::err(format!("could not create {}: {e}", units.display()));
-        }
-        let target = units.join(format!("{unit_name}.lua"));
-        if keep_existing(&target, scratch, false) {
-            unit_def_kept = true;
-        } else if let Err(e) = std::fs::write(&target, &unit_def) {
-            return CliResult::err(format!("could not write {}: {e}", target.display()));
-        } else {
-            unit_def_path = Some(target.to_string_lossy().to_string());
-            owned.push(owned_file(&target, unit_def.as_bytes()));
+        match reexport::write_unit_def(
+            &root,
+            &unit_name,
+            scratch,
+            &unit_def,
+            unit_def_fields.as_deref(),
+        ) {
+            Ok(wrote) => {
+                if let Some(text) = &wrote.written {
+                    unit_def_path = Some(wrote.path.to_string_lossy().to_string());
+                    owned.push(owned_file(&wrote.path, text.as_bytes()));
+                }
+                unit_def_kept = wrote.kept;
+                unit_def_changes = wrote.fields;
+            }
+            Err(e) => return CliResult::err(e),
         }
     }
 
@@ -2262,6 +2278,7 @@ async fn lego_export<R: Runtime>(
         "pieceCollision": piece_collision_path,
         "unitDef": unit_def_path,
         "unitDefKept": unit_def_kept,
+        "unitDefFields": unit_def_changes,
         "owned": owned,
     }))
 }
