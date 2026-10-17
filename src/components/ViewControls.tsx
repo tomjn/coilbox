@@ -91,7 +91,9 @@ export function ViewToggle({
   return (
     <Button
       size="icon"
-      variant="outline"
+      // Filled while on, the way the unit builder's move, turn and scale
+      // buttons show the mode they are in.
+      variant={on ? "default" : "outline"}
       onClick={() => onChange(!on)}
       aria-pressed={on}
       title={title}
