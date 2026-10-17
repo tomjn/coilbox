@@ -17,6 +17,7 @@
 
 import type { AppliedPreset, PresetParam } from "./animPresets";
 import { BUILDING, TURRET_BUILDING } from "./buildingPlans";
+import { AIRCRAFT, HOVER, SHIP } from "./hoverAirShipPlans";
 import {
   childrenOf,
   type LegoPiece,
@@ -24,6 +25,7 @@ import {
   newProject,
   uniquePieceName,
 } from "./model";
+import { between, type Joints, mean, rise } from "./planMeasure";
 import { TRACKED, WHEELED } from "./vehiclePlans";
 
 /**
@@ -68,6 +70,17 @@ export interface BodyPlan {
   bones(proportions: Record<string, number>): BodyPlanBone[];
   /** Applied to the unit as they are written here. */
   presets: AppliedPreset[];
+  /**
+   * The proportions a unit's own pieces give, when the plan is fitted to
+   * pieces that already exist (#3261). `joints` holds where each picked bone's
+   * joint is in the unit, and `values` the plan's proportions, of which only
+   * the counts were chosen. A proportion left undefined could not be
+   * measured. A plan without this measures nothing.
+   */
+  measure?(
+    joints: Joints,
+    values: Record<string, number>,
+  ): Record<string, number | undefined>;
   /** The plan this one adds bone groups to (`describedPlan.ts`). It is sized
    *  by that plan's rule, because the groups add no proportion to the size. */
   basedOn?: string;
@@ -204,6 +217,29 @@ function trunk(
   ];
 }
 
+/**
+ * A legged unit's proportions off its joints, as the defaults above were
+ * measured: leg length from each thigh joint to its foot joint, stance between
+ * a pair's two thigh joints, and body height as the torso joint's rise above
+ * the body joint. Each is the mean over the legs or pairs that were picked.
+ */
+function measureLegs(joints: Joints, body: string, pairs: (1 | 2)[]) {
+  const sides = ["l", "r"] as const;
+  return {
+    legLength: mean(
+      pairs.flatMap((pair) =>
+        sides.map((side) =>
+          between(joints, `thigh.${side}${pair}`, `foot.${side}${pair}`),
+        ),
+      ),
+    ),
+    stance: mean(
+      pairs.map((pair) => between(joints, `thigh.l${pair}`, `thigh.r${pair}`)),
+    ),
+    bodyHeight: rise(joints, body, "torso"),
+  };
+}
+
 export const BIPED: BodyPlan = {
   id: "biped",
   label: "Two legs",
@@ -216,6 +252,7 @@ export const BIPED: BodyPlan = {
     ];
   },
   presets: [{ presetId: "walk.biped", params: {} }],
+  measure: (joints) => measureLegs(joints, "hip", [1]),
 };
 
 export const QUADRUPED: BodyPlan = {
@@ -232,6 +269,15 @@ export const QUADRUPED: BodyPlan = {
     ];
   },
   presets: [{ presetId: "walk.quad", params: {} }],
+  // Body length is the gap between a side's front and rear thigh joints.
+  measure: (joints) => ({
+    ...measureLegs(joints, "body", [1, 2]),
+    bodyLength: mean(
+      (["l", "r"] as const).map((side) =>
+        between(joints, `thigh.${side}1`, `thigh.${side}2`),
+      ),
+    ),
+  }),
 };
 
 /** Every plan a unit can start from. */
@@ -242,6 +288,9 @@ export const BODY_PLANS: BodyPlan[] = [
   TRACKED,
   TURRET_BUILDING,
   BUILDING,
+  HOVER,
+  SHIP,
+  AIRCRAFT,
 ];
 
 export function bodyPlanById(id: string): BodyPlan | undefined {

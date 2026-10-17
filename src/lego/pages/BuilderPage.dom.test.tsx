@@ -339,6 +339,31 @@ describe("while the unit is still opening", () => {
   });
 });
 
+describe("the fit a body plan action (#3261)", () => {
+  it("is in the toolbar of a unit from a game, and fits in one edit", async () => {
+    show(unit({ imported: { source: "/tmp/unit.s3o" } }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Fit a body plan" }),
+    );
+    expect(
+      await screen.findByRole("dialog", { name: "Fit a body plan" }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /^Building/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Use suggestions" }));
+    fireEvent.click(screen.getByRole("button", { name: "Fit" }));
+
+    const edit = doc.current.edit as ReturnType<typeof vi.fn>;
+    expect(edit).toHaveBeenCalledTimes(1);
+    const next = edit.mock.calls[0][0](unit());
+    expect(next.skeleton).toEqual({
+      plan: "building",
+      proportions: {},
+      fitted: true,
+    });
+    expect(next.pieces[0]).toMatchObject({ bone: "base", role: "base" });
+  });
+});
+
 describe("the build picture action", () => {
   it("is in the toolbar and opens the build picture drawer", async () => {
     show(unit());

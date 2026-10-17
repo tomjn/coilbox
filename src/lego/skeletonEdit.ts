@@ -82,7 +82,8 @@ const same = (a: Vec3, b: Vec3) => a.every((n, i) => n === b[i]);
  * `projectFromPlan` makes them. Nothing that is not a bone is touched, and a
  * piece keeps its own size and rotation.
  *
- * A unit with no skeleton, or one from another plan, comes back as it was.
+ * A unit with no skeleton, one from another plan, or one fitted to pieces it
+ * already had (#3261), comes back as it was.
  */
 export function applyProportions(
   project: LegoProject,
@@ -91,7 +92,9 @@ export function applyProportions(
   newId: () => string,
 ): { project: LegoProject } {
   const skeleton = project.skeleton;
-  if (!skeleton || skeleton.plan !== plan.id) return { project };
+  if (!skeleton || skeleton.plan !== plan.id || skeleton.fitted) {
+    return { project };
+  }
 
   const before = planProportions(plan, skeleton.proportions);
   const after = planProportions(plan, { ...before, ...given });
@@ -206,7 +209,7 @@ export function proportionHandles(
   plan: BodyPlan,
 ): ProportionHandle[] {
   const skeleton = project.skeleton;
-  if (!skeleton || skeleton.plan !== plan.id) return [];
+  if (!skeleton || skeleton.plan !== plan.id || skeleton.fitted) return [];
   const values = planProportions(plan, skeleton.proportions);
   const places = boneWorldPositions(project);
   const handles: ProportionHandle[] = [];
