@@ -850,6 +850,11 @@ describe("DERIVED_FIELDS", () => {
       expect(DERIVED_FIELDS).toContain(`customparams.${key}`);
   });
 
+  it("names the wreck the export writes beside the unit (#3310)", () => {
+    expect(mobile.corpse).toBe("conbot_dead");
+    expect(DERIVED_FIELDS).toContain("corpse");
+  });
+
   it("lists only fields the builder can write", () => {
     for (const path of DERIVED_FIELDS)
       expect(

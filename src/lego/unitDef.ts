@@ -288,7 +288,23 @@ export function legoUnitDef(
     // `luaScript.ts`.
     ...builderFields(project),
     ...(weapons.length > 0 ? { weapons } : {}),
+    // The wreck the export writes beside the unit, `wreck.ts` (issue #3310).
+    // The engine makes it when the unit dies, looking it up by this name
+    // (`UnitDef.cpp`, `CUnit::PreInit`). Balanced Annihilation's
+    // `featuredefs_post.lua` would prefix a short name with the unit's, and
+    // leaves this one alone because no feature has the longer name.
+    corpse: wreckName(project.unitName),
   };
+}
+
+/**
+ * The name of a unit's wreck. Splinter Faction's own spelling: its
+ * `alldefs_post.lua` defaults `customparams.corpse` to it, which is the wreck
+ * its death gadget drops, and Balanced Annihilation's wrecks end up called the
+ * same once its `featuredefs_post.lua` has prefixed them.
+ */
+export function wreckName(unitName: string): string {
+  return `${unitName}_dead`;
 }
 
 /**
@@ -339,6 +355,7 @@ export const DERIVED_FIELDS: readonly string[] = [
   "builddistance",
   "canassist",
   "weapons",
+  "corpse",
 ];
 
 /** The value at a dotted `path` in a definition, or undefined. */

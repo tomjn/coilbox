@@ -734,11 +734,21 @@ fn export_paths(root: &Path, unit_name: &str) -> Vec<PathBuf> {
             .join("coilbox")
             .join(format!("{unit_name}_collision.lua")),
         root.join("units").join(format!("{unit_name}.lua")),
+        wreck_model_path(root, unit_name),
+        reexport::feature_path(root, unit_name),
         root.join("unitpics").join(format!("{unit_name}.png")),
         root.join("blender").join(format!("{unit_name}.glb")),
         root.join("blender").join(format!("{unit_name}.obj")),
         root.join("blender").join(format!("{unit_name}.mtl")),
     ]
+}
+
+/// Where a unit's wreck model is written (issue #3310). In a `coilbox` folder
+/// so it cannot be the model of a unit whose own name ends in `_dead`.
+fn wreck_model_path(root: &Path, unit_name: &str) -> PathBuf {
+    root.join("objects3d")
+        .join("coilbox")
+        .join(format!("{unit_name}_dead.s3o"))
 }
 
 #[derive(Deserialize)]
@@ -766,6 +776,83 @@ struct ExportModel {
     texture1: String,
     texture2: String,
     root: ExportPiece,
+}
+
+impl ExportModel {
+    /// The model as `.s3o` bytes.
+    fn into_s3o(self) -> Result<Vec<u8>, String> {
+        coilbox_s3o::write(&coilbox_s3o::Model {
+            radius: self.radius,
+            height: self.height,
+            mid: self.mid,
+            texture1: self.texture1,
+            texture2: self.texture2,
+            root: self.root.into(),
+        })
+        .map_err(|e| format!("could not build the model: {e}"))
+    }
+}
+
+/// The wreck a unit leaves (issue #3310): its model, and the feature
+/// definition that names it.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WreckExport {
+    model: ExportModel,
+    feature: String,
+    /// The digest the receipt holds for the feature file the last export
+    /// wrote here.
+    feature_written: Option<String>,
+}
+
+/// What writing the wreck did: the model's path, the feature file's path when
+/// it was written, and whether a changed feature file was left alone.
+struct WreckWrite {
+    model: PathBuf,
+    feature: Option<PathBuf>,
+    feature_kept: bool,
+}
+
+/// Write the wreck's model, rewritten every time like the unit's, and its
+/// feature file, under the script's rule. Adds what it wrote to `owned`.
+fn write_wreck(
+    root: &Path,
+    unit_name: &str,
+    scratch: bool,
+    wreck: WreckExport,
+    owned: &mut Vec<serde_json::Value>,
+) -> Result<WreckWrite, String> {
+    let bytes = wreck.model.into_s3o()?;
+    let model = wreck_model_path(root, unit_name);
+    if let Some(folder) = model.parent() {
+        std::fs::create_dir_all(folder)
+            .map_err(|e| format!("could not create {}: {e}", folder.display()))?;
+    }
+    std::fs::write(&model, &bytes)
+        .map_err(|e| format!("could not write {}: {e}", model.display()))?;
+    owned.push(owned_file(&model, &bytes));
+    let written = reexport::write_feature(
+        root,
+        unit_name,
+        scratch,
+        &wreck.feature,
+        wreck.feature_written.as_deref(),
+    )?;
+    Ok(match written {
+        reexport::ScriptWrite::Written(path) => {
+            owned.push(owned_file(&path, wreck.feature.as_bytes()));
+            WreckWrite {
+                model,
+                feature: Some(path),
+                feature_kept: false,
+            }
+        }
+        reexport::ScriptWrite::Kept(_) => WreckWrite {
+            model,
+            feature: None,
+            feature_kept: true,
+        },
+    })
 }
 
 impl From<ExportPiece> for coilbox_s3o::Piece {
@@ -2122,6 +2209,9 @@ async fn lego_export<R: Runtime>(
     // The library weapons the unit fires (issue #3274). Absent from a caller
     // that writes none.
     weapons: Option<Vec<WeaponFile>>,
+    // The wreck the unit leaves (issue #3310). Absent from a caller that
+    // writes none.
+    wreck: Option<WreckExport>,
 ) -> CliResult {
     if !valid_unit_name(&unit_name) {
         return CliResult::err(format!(
@@ -2139,16 +2229,9 @@ async fn lego_export<R: Runtime>(
         Err(e) => return CliResult::err(e),
     };
 
-    let bytes = match coilbox_s3o::write(&coilbox_s3o::Model {
-        radius: model.radius,
-        height: model.height,
-        mid: model.mid,
-        texture1: model.texture1,
-        texture2: model.texture2,
-        root: model.root.into(),
-    }) {
+    let bytes = match model.into_s3o() {
         Ok(bytes) => bytes,
-        Err(e) => return CliResult::err(format!("could not build the model: {e}")),
+        Err(e) => return CliResult::err(e),
     };
 
     let models = root.join("objects3d");
@@ -2302,6 +2385,14 @@ async fn lego_export<R: Runtime>(
         Err(e) => return CliResult::err(e),
     };
 
+    let wreck = match wreck
+        .map(|wreck| write_wreck(&root, &unit_name, scratch, wreck, &mut owned))
+        .transpose()
+    {
+        Ok(wreck) => wreck,
+        Err(e) => return CliResult::err(e),
+    };
+
     // The unit definition: written whole the first time and in the scratch
     // game, and after that brought up to date field by field, keeping every
     // field somebody changed (issue #3245).
@@ -2356,6 +2447,12 @@ async fn lego_export<R: Runtime>(
         "unitDefKept": unit_def_kept,
         "unitDefFields": unit_def_changes,
         "weapons": weapon_paths,
+        "wreckModel": wreck.as_ref().map(|w| w.model.to_string_lossy().to_string()),
+        "wreckFeature": wreck
+            .as_ref()
+            .and_then(|w| w.feature.as_ref())
+            .map(|path| path.to_string_lossy().to_string()),
+        "wreckFeatureKept": wreck.as_ref().is_some_and(|w| w.feature_kept),
         "owned": owned,
     }))
 }
@@ -3825,20 +3922,28 @@ mod tests {
     }
 
     #[test]
-    fn a_rename_leaves_eight_files_behind_and_the_digests_find_them() {
+    fn a_rename_leaves_ten_files_behind_and_the_digests_find_them() {
         let dir = tempfile::tempdir().expect("tempdir");
         let digests = exported_unit(dir.path(), "skyfort");
 
         let dry = sort_stale_files(dir.path(), "skyfort", &digests, true).expect("dry run");
-        assert_eq!(dry.ours.len(), 8);
+        assert_eq!(dry.ours.len(), 10);
         assert!(dry.kept.is_empty());
         assert!(dry.missing.is_empty());
         // A dry run removes none of them.
         assert!(dir.path().join("units/skyfort.lua").is_file());
 
         let done = sort_stale_files(dir.path(), "skyfort", &digests, false).expect("removal");
-        assert_eq!(done.ours.len(), 8);
+        assert_eq!(done.ours.len(), 10);
         assert!(!dir.path().join("unitpics/skyfort.png").exists());
+        assert!(!dir
+            .path()
+            .join("objects3d/coilbox/skyfort_dead.s3o")
+            .exists());
+        assert!(!dir
+            .path()
+            .join("features/coilbox/skyfort_dead.lua")
+            .exists());
         assert!(!dir.path().join("units/skyfort.lua").exists());
         assert!(!dir.path().join("objects3d/skyfort.s3o").exists());
         assert!(!dir
@@ -3846,6 +3951,66 @@ mod tests {
             .join("scripts/coilbox/skyfort_collision.lua")
             .exists());
         assert!(!dir.path().join("blender/skyfort.mtl").exists());
+    }
+
+    fn wreck(feature: &str, feature_written: Option<String>) -> WreckExport {
+        serde_json::from_value(json!({
+            "model": {
+                "radius": 1.0,
+                "height": 1.0,
+                "mid": [0.0, 0.0, 0.0],
+                "texture1": "atlas.png",
+                "texture2": "",
+                "root": {
+                    "name": "base",
+                    "offset": [0.0, -2.0, 0.0],
+                    "vertices": [],
+                    "indices": [],
+                    "children": [],
+                },
+            },
+            "feature": feature,
+            "featureWritten": feature_written,
+        }))
+        .expect("wreck payload")
+    }
+
+    /// Issue #3310: the wreck's model is the builder's and is rewritten every
+    /// time, and its feature file is kept once somebody has changed it.
+    #[test]
+    fn the_wreck_model_is_rewritten_and_its_feature_kept_once_edited() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let model = dir.path().join("objects3d/coilbox/tank_dead.s3o");
+        let feature = dir.path().join("features/coilbox/tank_dead.lua");
+
+        let mut owned = Vec::new();
+        let first =
+            write_wreck(dir.path(), "tank", false, wreck("one", None), &mut owned).expect("wreck");
+        assert_eq!(first.model, model);
+        assert_eq!(first.feature.as_ref(), Some(&feature));
+        assert!(!first.feature_kept);
+        assert!(model.is_file());
+        assert_eq!(std::fs::read_to_string(&feature).unwrap(), "one");
+        // Both on the receipt, so a rename can clear them.
+        assert_eq!(owned.len(), 2);
+        assert_eq!(owned[1]["sha256"], json!(hex_digest(b"one")));
+
+        std::fs::write(&feature, "metal = 9000").unwrap();
+        std::fs::remove_file(&model).unwrap();
+        let mut owned = Vec::new();
+        let second = write_wreck(
+            dir.path(),
+            "tank",
+            false,
+            wreck("two", Some(hex_digest(b"one"))),
+            &mut owned,
+        )
+        .expect("wreck");
+        assert!(second.feature_kept);
+        assert_eq!(second.feature, None);
+        assert!(model.is_file());
+        assert_eq!(std::fs::read_to_string(&feature).unwrap(), "metal = 9000");
+        assert_eq!(owned.len(), 1);
     }
 
     /// The rule that makes this safe to offer at all: a file whose contents are
@@ -3860,7 +4025,7 @@ mod tests {
 
         let sorted = sort_stale_files(dir.path(), "skyfort", &digests, false).expect("removal");
         assert_eq!(sorted.kept, vec![edited.to_string_lossy().to_string()]);
-        assert_eq!(sorted.ours.len(), 7);
+        assert_eq!(sorted.ours.len(), 9);
         assert!(edited.is_file());
     }
 
@@ -3886,11 +4051,11 @@ mod tests {
         digests.extend([laser_digest, rocket_digest]);
 
         let dry = sort_stale_files(dir.path(), "skyfort", &digests, true).expect("dry run");
-        assert_eq!(dry.ours.len(), 10);
+        assert_eq!(dry.ours.len(), 12);
         assert!(laser.is_file() && rocket.is_file());
 
         let done = sort_stale_files(dir.path(), "skyfort", &digests, false).expect("removal");
-        assert_eq!(done.ours.len(), 10);
+        assert_eq!(done.ours.len(), 12);
         assert!(done.kept.is_empty());
         assert!(!laser.exists() && !rocket.exists());
     }
@@ -3934,7 +4099,7 @@ mod tests {
 
         let sorted = sort_stale_files(dir.path(), "skyfort", &[], false).expect("removal");
         assert!(sorted.ours.is_empty());
-        assert_eq!(sorted.kept.len(), 8);
+        assert_eq!(sorted.kept.len(), 10);
         assert!(dir.path().join("units/skyfort.lua").is_file());
     }
 
@@ -3942,7 +4107,7 @@ mod tests {
     fn a_name_that_left_nothing_behind_is_all_missing() {
         let dir = tempfile::tempdir().expect("tempdir");
         let sorted = sort_stale_files(dir.path(), "skyfort", &[], false).expect("removal");
-        assert_eq!(sorted.missing.len(), 8);
+        assert_eq!(sorted.missing.len(), 10);
         assert!(sorted.ours.is_empty());
         assert!(sorted.kept.is_empty());
     }
