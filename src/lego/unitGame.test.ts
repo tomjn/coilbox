@@ -279,6 +279,29 @@ describe("gameChangeRefusal", () => {
       "Remove the pieces from Splinter Faction 0.1.86 first: base, turret.",
     );
   });
+
+  it("counts a piece lifted onto a unit of parts as one from its game", () => {
+    const sf = gameRecordFor(sf86, installed);
+    const base = project({ game: sf });
+    const unit = {
+      ...base,
+      pieces: [
+        ...base.pieces,
+        {
+          ...base.pieces[0],
+          id: "t",
+          name: "turret",
+          parentId: base.rootPieceId,
+          partId: null,
+          meshId: "m1",
+          lifted: { game: sf, member: "objects3d/a.s3o" },
+        },
+      ],
+    };
+    expect(gameChangeRefusal(unit, gameRecordFor(xta, installed))).toBe(
+      "Remove the pieces from Splinter Faction 0.1.86 first: turret.",
+    );
+  });
 });
 
 describe("liftRefusal", () => {

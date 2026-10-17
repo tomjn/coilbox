@@ -238,6 +238,23 @@ export interface LegoUnitGame extends LegoGameRef {
 }
 
 /**
+ * Where a piece lifted off one of a game's units came from (issue #3262).
+ *
+ * Kept on every piece rather than on the module, so it stays with a piece that
+ * is copied or moved. It is what keeps the piece in units for its own game
+ * (#3268) and off the hub (#3272), so nothing in the builder removes it.
+ */
+export interface LegoLifted {
+  /** The game the piece was read from, recorded as a unit records its game so
+   *  the two compare with `sameGame`. */
+  game: LegoUnitGame;
+  /** The model inside that game's archive, e.g. `objects3d/armcom.s3o`. */
+  member: string;
+  /** The unitdef that names the model. */
+  unit?: string;
+}
+
+/**
  * What a unit that builds is worth, as three unit definition keys.
  *
  * All three go in together, and that is not tidiness. `UnitDef::IsBuilderUnit`
@@ -360,8 +377,9 @@ export interface LegoPiece {
   partId: string | null;
   /**
    * Geometry taken verbatim from an imported model, by its key in the project's
-   * geometry sidecar. Only ever set on a piece of an imported unit, where
-   * `partId` is always null.
+   * geometry sidecar. Set on a piece of an imported unit, or of a piece lifted
+   * into the inventory, whose module has a sidecar of its own. `partId` is
+   * then always null.
    */
   meshId?: string;
   /** Relative to the parent piece. */
@@ -386,6 +404,8 @@ export interface LegoPiece {
   /** Editor only, never affects export. */
   hidden?: boolean;
   customAnchors?: LegoAnchor[];
+  /** Set on a piece lifted off a game's unit. See {@link LegoLifted}. */
+  lifted?: LegoLifted;
   /**
    * Joined to the parent by a connector. Absent means a free piece, placed by
    * its own `position` and `rotation`, which is every piece made before #3273.
@@ -1401,11 +1421,28 @@ function parsePiece(raw: unknown): LegoPiece | null {
       const module = parseModuleRef(p.module);
       return module ? { module } : {};
     })(),
+    ...(() => {
+      const lifted = parseLifted(p.lifted);
+      return lifted ? { lifted } : {};
+    })(),
     ...(typeof p.twin === "string" && p.twin !== "" ? { twin: p.twin } : {}),
     ...(() => {
       const ring = parsePieceRing(p.ring);
       return ring ? { ring } : {};
     })(),
+  };
+}
+
+/** Where a lifted piece came from, or null without a game and a model. */
+function parseLifted(value: unknown): LegoLifted | null {
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  const game = parseUnitGame(v.game);
+  if (!game || typeof v.member !== "string" || v.member === "") return null;
+  return {
+    game,
+    member: v.member,
+    ...(typeof v.unit === "string" && v.unit !== "" ? { unit: v.unit } : {}),
   };
 }
 

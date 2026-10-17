@@ -10,7 +10,6 @@
 
 import type { GameItem } from "@/content/bindings";
 import type { GameModelRow } from "./gameModels";
-import type { S3oReadPiece } from "./importS3o";
 import type { LegoProject } from "./model";
 import { installedGameFor, liftRefusal, unitGame } from "./unitGame";
 
@@ -74,8 +73,18 @@ export interface PieceLine {
   path: string;
 }
 
-/** A model's pieces in tree order, each with how far down it hangs. */
-export function pieceLines(root: S3oReadPiece, path = "0"): PieceLine[] {
+/** A piece and the ones under it, as either model reader gives them. */
+interface PieceNode {
+  name: string;
+  children: readonly PieceNode[];
+}
+
+/**
+ * A model's pieces in tree order, each with how far down it hangs. The read
+ * and the import walk a model the same way, so a path names the same piece in
+ * either tree.
+ */
+export function pieceLines(root: PieceNode, path = "0"): PieceLine[] {
   return [
     { name: root.name, depth: path.split(".").length - 1, path },
     ...root.children.flatMap((child, index) =>

@@ -10,7 +10,7 @@
 
 import * as THREE from "three";
 
-import { type LegoProject, orderedPieces } from "./model";
+import { type LegoPiece, type LegoProject, orderedPieces } from "./model";
 import { seatPieceMesh } from "./pivot";
 
 /**
@@ -23,11 +23,12 @@ import { seatPieceMesh } from "./pivot";
  * units the cell is laid out in.
  *
  * The geometry arrives as a lookup rather than a pack, so this stays clear of
- * the loader and a test can hand it a shape of its own.
+ * the loader and a test can hand it a shape of its own. It is asked with the
+ * piece, because a piece lifted from a game has a mesh rather than a part.
  */
 export function buildCompoundHolder(
   compound: LegoProject,
-  geometryFor: (partId: string) => THREE.BufferGeometry | null,
+  geometryFor: (piece: LegoPiece) => THREE.BufferGeometry | null,
   material: THREE.Material,
   fit: number,
 ): THREE.Group {
@@ -55,7 +56,7 @@ export function buildCompoundHolder(
     parent.add(group);
     groups.set(piece.id, group);
 
-    const geometry = piece.partId ? geometryFor(piece.partId) : null;
+    const geometry = geometryFor(piece);
     if (!geometry) continue;
     const mesh = new THREE.Mesh(geometry, material);
     seatPieceMesh(mesh, piece.pivot);

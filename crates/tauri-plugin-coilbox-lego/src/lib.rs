@@ -140,9 +140,10 @@ async fn lego_save<R: Runtime>(
     }
 }
 
-/// `lego_delete` removes a document, and for a project its thumbnail and export
-/// folder too. Those two are best effort: a project that was never exported or
-/// never saved a thumbnail has neither.
+/// `lego_delete` removes a document and its geometry sidecar, and for a project
+/// its thumbnail and export folder too. Those are best effort: a project that
+/// was never exported or never saved a thumbnail has neither, and only an
+/// imported unit or a lifted piece has a sidecar.
 #[tauri::command]
 async fn lego_delete<R: Runtime>(app: AppHandle<R>, kind: String, id: String) -> CliResult {
     if !valid_id(&id) {
@@ -162,11 +163,14 @@ async fn lego_delete<R: Runtime>(app: AppHandle<R>, kind: String, id: String) ->
             let _ = std::fs::remove_file(base.join("thumbs").join(format!("{id}.png")));
             let _ = std::fs::remove_file(base.join("pictures").join(format!("{id}.png")));
             let _ = std::fs::remove_dir_all(base.join("out").join(&id));
-            // Imported geometry belongs to one unit, so it goes with it. The
-            // textures do not: they are shared, and `lego_texture_prune` is
-            // what clears the ones nothing names any more.
-            let _ = std::fs::remove_file(base.join("geometry").join(format!("{id}.bin.gz")));
         }
+    }
+    // Imported geometry belongs to one unit, or to one piece lifted into the
+    // inventory (#3262), so it goes with it. The textures do not: they are
+    // shared, and `lego_texture_prune` is what clears the ones nothing names
+    // any more.
+    if let Ok(base) = lego_dir(&app) {
+        let _ = std::fs::remove_file(base.join("geometry").join(format!("{id}.bin.gz")));
     }
     CliResult::ok(json!({}))
 }
