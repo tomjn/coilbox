@@ -8,6 +8,7 @@ import {
 } from "./bodyPlans";
 import { BUILDING, TURRET_BUILDING } from "./buildingPlans";
 import type { LegoPiece, LegoProject } from "./model";
+import { framesAgree, worldMatrix } from "./reparent";
 import {
   applyProportions,
   boneWorldPositions,
@@ -212,6 +213,31 @@ describe("applyProportions", () => {
     // The bone sat at its z, so the piece keeps its place in the unit.
     const lost = byBone(hung, "wheel.l3").position;
     expect(part?.position).toEqual([lost[0] + 1, lost[1] + 2, lost[2] + 3]);
+  });
+
+  it("keeps a piece hung on a turned removed bone where and which way it was, under a turned parent", () => {
+    const base = hang(unit(WHEELED, { axles: 3 }), "wheel.l3");
+    const turned: LegoProject = {
+      ...base,
+      pieces: base.pieces.map((p) => {
+        if (p.bone === "body") return { ...p, rotation: [0.3, 0.9, -0.2] };
+        if (p.bone === "wheel.l3") {
+          return { ...p, rotation: [0.5, -1.1, 0.4], scale: [1.5, 1.5, 1.5] };
+        }
+        return p;
+      }),
+    };
+
+    const next = applyProportions(turned, WHEELED, { axles: 2 }, ids()).project;
+
+    const part = next.pieces.find((p) => p.id === "hung-wheel.l3");
+    expect(part?.parentId).toBe(byBone(next, "body").id);
+    expect(
+      framesAgree(
+        worldMatrix(turned, "hung-wheel.l3"),
+        worldMatrix(next, "hung-wheel.l3"),
+      ),
+    ).toBe(true);
   });
 
   it("does nothing to a unit without a skeleton or for another plan", () => {
