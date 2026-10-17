@@ -17,6 +17,7 @@
 
 import type { AppliedPreset, PresetParam } from "./animPresets";
 import { BUILDING, TURRET_BUILDING } from "./buildingPlans";
+import { AIRCRAFT, HOVER, SHIP } from "./hoverAirShipPlans";
 import {
   childrenOf,
   type LegoPiece,
@@ -239,6 +240,9 @@ export const BODY_PLANS: BodyPlan[] = [
   TRACKED,
   TURRET_BUILDING,
   BUILDING,
+  HOVER,
+  SHIP,
+  AIRCRAFT,
 ];
 
 export function bodyPlanById(id: string): BodyPlan | undefined {
