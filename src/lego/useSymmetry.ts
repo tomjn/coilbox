@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { followMirror, mirrorTwin } from "./mirror";
 import type { LegoProject } from "./model";
+import type { LoadedPack } from "./pack";
 
 export interface SymmetrySession {
   /** Whether a piece added now should get a twin. */
@@ -49,8 +50,10 @@ export function useSymmetry(options: {
   project: LegoProject | null;
   selectedIds: string[];
   edit: (change: (project: LegoProject) => LegoProject) => void;
+  /** What a twin's join to a face is measured by. With none, twins are free. */
+  pack?: LoadedPack | null;
 }): SymmetrySession {
-  const { project, selectedIds, edit } = options;
+  const { project, selectedIds, edit, pack = null } = options;
 
   /**
    * A preference for the session rather than something the unit carries, so it
@@ -123,11 +126,16 @@ export function useSymmetry(options: {
       for (const pieceId of pieceIds) {
         const twinId = twins.current.get(pieceId);
         if (twinId) {
-          next = followMirror(next, pieceId, twinId);
+          next = followMirror(next, pieceId, twinId, pack);
           continue;
         }
         if (!awaitingTwin.current.has(pieceId)) continue;
-        const twinned = mirrorTwin(next, pieceId, () => crypto.randomUUID());
+        const twinned = mirrorTwin(
+          next,
+          pieceId,
+          () => crypto.randomUUID(),
+          pack,
+        );
         if (!twinned) continue;
         awaitingTwin.current.delete(pieceId);
         twins.current.set(pieceId, twinned.twinId);

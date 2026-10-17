@@ -21,6 +21,7 @@ import {
   type LegoProject,
   pieceById,
 } from "./model";
+import { MIN_SCREEN_THRESHOLD } from "./snapping";
 
 /**
  * Every piece that could carry all of `pieceIds`, in tree order and with its
@@ -121,6 +122,40 @@ export function localFromWorld(
     new THREE.Vector3().setFromMatrixPosition(world).applyMatrix4(inverse),
   );
   return local;
+}
+
+/**
+ * How close two points have to be to count as the same place.
+ *
+ * The snap's own floor: the tightest a seat ever gets, however far the camera
+ * is pulled back. Two points this builder would already snap together are two
+ * points these answers treat as one.
+ */
+export const SAME_PLACE = MIN_SCREEN_THRESHOLD;
+
+/**
+ * The four points a frame is compared by: its origin and the tip of each axis.
+ *
+ * Comparing where a frame puts these, rather than its sixteen numbers, asks the
+ * question in world units throughout, so one threshold covers position,
+ * rotation and scale at once and a left-handed frame never passes for a
+ * right-handed one.
+ */
+const PROBES = [
+  new THREE.Vector3(0, 0, 0),
+  new THREE.Vector3(1, 0, 0),
+  new THREE.Vector3(0, 1, 0),
+  new THREE.Vector3(0, 0, 1),
+];
+
+/** Whether two frames stand in the same place, the same way round, the same
+ *  size. */
+export function framesAgree(a: THREE.Matrix4, b: THREE.Matrix4): boolean {
+  return PROBES.every(
+    (probe) =>
+      probe.clone().applyMatrix4(a).distanceTo(probe.clone().applyMatrix4(b)) <=
+      SAME_PLACE,
+  );
 }
 
 /**

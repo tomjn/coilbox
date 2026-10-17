@@ -20,27 +20,23 @@
 import * as THREE from "three";
 
 import { insertCompoundAt, subtreeAsCompound } from "./compounds";
-import { freePiece } from "./connectors";
+import { freePiece, joinAt } from "./connectors";
 import {
   descendantIds,
   type LegoPiece,
   type LegoProject,
   pieceById,
 } from "./model";
-import { isJoined, localFromWorld, worldMatrix } from "./reparent";
-import { MIN_SCREEN_THRESHOLD } from "./snapping";
+import type { LoadedPack } from "./pack";
+import {
+  framesAgree,
+  localFromWorld,
+  SAME_PLACE,
+  worldMatrix,
+} from "./reparent";
 
 /** Reflection across x = 0, the plane the unit's centre line runs down. */
 const REFLECT_X = new THREE.Matrix4().makeScale(-1, 1, 1);
-
-/**
- * How close two points have to be to count as the same place.
- *
- * The snap's own floor: the tightest a seat ever gets, however far the camera
- * is pulled back. Two points this builder would already snap together are two
- * points these answers treat as one.
- */
-const SAME_PLACE = MIN_SCREEN_THRESHOLD;
 
 /**
  * The reflection of the unit's own centre line, in the frame the document's
@@ -82,24 +78,49 @@ function asTransform(
  * parentless piece is already broken, and treating it as its own frame is
  * enough to not crash.
  *
- * `keepsJoin` says the target stays joined to its parent, which decides whether
- * the parent's scale is part of its place.
+ * Written for the target as a free piece, which it is until `rejoined` finds
+ * the face its reflection sits on.
  */
 function mirroredTransform(
   project: LegoProject,
   sourceId: string,
   targetId: string,
-  keepsJoin: boolean,
 ): Pick<LegoPiece, "position" | "rotation" | "scale"> {
   const target = pieceById(project, targetId);
   return asTransform(
     localFromWorld(
       project,
       target?.parentId ?? null,
-      reflection(project).multiply(worldMatrix(project, sourceId)),
-      keepsJoin && target !== undefined && isJoined(project, target),
+      mirroredWorld(project, sourceId),
+      false,
     ),
   );
+}
+
+/** Where the mirror image of a piece stands in the unit. */
+function mirroredWorld(project: LegoProject, sourceId: string): THREE.Matrix4 {
+  return reflection(project).multiply(worldMatrix(project, sourceId));
+}
+
+/**
+ * A free piece joined again by its own `connector`, to the face of its parent
+ * that puts it at `world` (issue #3309), or left free when no face does.
+ *
+ * A reflected piece joins by the same connector it did before. Its whole part
+ * is reflected with it, so that connector is now on the side facing the
+ * parent. Only the parent's face changes, and which face that is comes from
+ * where the reflection stands. The twist and the offset along the face come out
+ * reflected too.
+ */
+function rejoined(
+  project: LegoProject,
+  pack: LoadedPack | null,
+  pieceId: string,
+  connector: string | undefined,
+  world: THREE.Matrix4,
+): LegoProject {
+  if (!pack || connector === undefined) return project;
+  return joinAt(project, pack, pieceId, connector, world) ?? project;
 }
 
 /**
@@ -140,17 +161,23 @@ export function mirrorRole(role: string): string {
  * out in place, which is what a mirror does to it. Mirroring twice returns the
  * piece to where it started.
  *
+ * A joined piece is joined again to the face its reflection sits on, by the
+ * same connector, when `pack` is given and the parent has a face there. It is
+ * left free otherwise.
+ *
  * Returns the project untouched when the piece cannot be mirrored.
  */
 export function mirrorPiece(
   project: LegoProject,
   pieceId: string,
+  pack: LoadedPack | null = null,
 ): LegoProject {
   if (!canMirror(project, pieceId)) return project;
-  const transform = mirroredTransform(project, pieceId, pieceId, false);
+  const transform = mirroredTransform(project, pieceId, pieceId);
+  const connector = pieceById(project, pieceId)?.connection?.connector;
 
   const subtree = new Set(descendantIds(project, pieceId));
-  return {
+  const mirrored: LegoProject = {
     ...project,
     pieces: project.pieces.map((current) => {
       if (!subtree.has(current.id)) return current;
@@ -165,14 +192,21 @@ export function mirrorPiece(
               weapon: { ...roled.weapon, heading: -roled.weapon.heading || 0 },
             }
           : roled;
-      // The mirrored piece is placed by the mirror now, not by its join, which
-      // would put it straight back. Joins below it are written against it and
-      // still hold.
+      // The mirrored piece is placed by the mirror, and its old join would put
+      // it straight back, so it is freed and then joined again. Joins below it
+      // are written against it and still hold.
       return current.id === pieceId
         ? { ...freePiece(sided), ...transform }
         : sided;
     }),
   };
+  return rejoined(
+    mirrored,
+    pack,
+    pieceId,
+    connector,
+    mirroredWorld(project, pieceId),
+  );
 }
 
 /**
@@ -186,6 +220,9 @@ export function mirrorPiece(
  * Hangs off the source's own parent unless another is named, which is what
  * symmetry mode does to put a mirrored child under the mirrored parent.
  *
+ * A joined source gives a copy joined by the same connector to the face its
+ * reflection sits on, as `mirrorPiece` does, when `pack` is given.
+ *
  * Answers null when the piece cannot be mirrored, and otherwise the new
  * document with the copy's own piece id.
  */
@@ -194,6 +231,7 @@ export function mirrorCopy(
   pieceId: string,
   newId: () => string,
   parentId?: string,
+  pack: LoadedPack | null = null,
 ): { project: LegoProject; pieceId: string } | null {
   const source = pieceById(project, pieceId);
   if (!source || !canMirror(project, pieceId)) return null;
@@ -202,14 +240,15 @@ export function mirrorCopy(
   const target = parentId ?? ownParent;
   // The copy has to start from where the original stands before it is
   // reflected, which under the original's own parent is simply the original's
-  // transform, and under any other is that same place written against the new
-  // parent instead.
+  // transform and join, and under any other is that same place written against
+  // the new parent instead.
   const at =
     target === ownParent
       ? {
           position: source.position,
           rotation: source.rotation,
           scale: source.scale,
+          ...(source.connection ? { connection: source.connection } : {}),
         }
       : asTransform(
           // The copy goes in free, so the new parent's scale is part of its place.
@@ -231,8 +270,15 @@ export function mirrorCopy(
   // had been dropped back at the hull's origin would not be the other leg.
   const inserted = insertCompoundAt(project, cutting, target, at, newId);
 
+  const mirrored = mirrorPiece(inserted.project, inserted.rootPieceId);
   return {
-    project: mirrorPiece(inserted.project, inserted.rootPieceId),
+    project: rejoined(
+      mirrored,
+      pack,
+      inserted.rootPieceId,
+      source.connection?.connector,
+      mirroredWorld(project, pieceId),
+    ),
     pieceId: inserted.rootPieceId,
   };
 }
@@ -249,31 +295,6 @@ export function onCentreLine(project: LegoProject, pieceId: string): boolean {
     .invert()
     .multiply(worldMatrix(project, pieceId));
   return Math.abs(new THREE.Vector3().applyMatrix4(inRoot).x) <= SAME_PLACE;
-}
-
-/**
- * The four points a frame is compared by: its origin and the tip of each axis.
- *
- * Comparing where a frame puts these, rather than its sixteen numbers, asks the
- * question in world units throughout, so one threshold covers position,
- * rotation and scale at once and a left-handed frame never passes for a
- * right-handed one.
- */
-const PROBES = [
-  new THREE.Vector3(0, 0, 0),
-  new THREE.Vector3(1, 0, 0),
-  new THREE.Vector3(0, 1, 0),
-  new THREE.Vector3(0, 0, 1),
-];
-
-/** Whether two frames stand in the same place, the same way round, the same
- *  size. */
-function framesAgree(a: THREE.Matrix4, b: THREE.Matrix4): boolean {
-  return PROBES.every(
-    (probe) =>
-      probe.clone().applyMatrix4(a).distanceTo(probe.clone().applyMatrix4(b)) <=
-      SAME_PLACE,
-  );
 }
 
 /**
@@ -317,6 +338,9 @@ export function canMirrorTwin(project: LegoProject, pieceId: string): boolean {
  * stands where its parent's own reflection stands, so a piece added to the left
  * thigh is twinned onto the right thigh rather than onto the left one.
  *
+ * A piece joined to a face gives a twin joined to the face that mirrors it,
+ * when `pack` is given (issues #3309 and #4291).
+ *
  * Answers null when the piece should not be twinned, and otherwise the new
  * document and the twin's own piece id, which is what the pair is then followed
  * by.
@@ -325,11 +349,12 @@ export function mirrorTwin(
   project: LegoProject,
   pieceId: string,
   newId: () => string,
+  pack: LoadedPack | null = null,
 ): { project: LegoProject; twinId: string } | null {
   if (!canMirrorTwin(project, pieceId)) return null;
   const source = pieceById(project, pieceId) as LegoPiece;
   const parent = mirrorParent(project, source.parentId ?? project.rootPieceId);
-  const copy = mirrorCopy(project, pieceId, newId, parent);
+  const copy = mirrorCopy(project, pieceId, newId, parent, pack);
   return copy ? { project: copy.project, twinId: copy.pieceId } : null;
 }
 
@@ -341,6 +366,10 @@ export function mirrorTwin(
  * than merely shifted. Everything hanging off the twin comes along, because it
  * is positioned against the twin rather than against the unit.
  *
+ * The twin's join follows its counterpart's. A counterpart joined to a face, or
+ * slid along one, leaves the twin joined to the face that mirrors it, when
+ * `pack` is given. A counterpart that is free leaves the twin free.
+ *
  * Returns the project untouched when either piece has since gone, so a deleted
  * twin quietly stops following instead of resurrecting or throwing.
  */
@@ -348,15 +377,23 @@ export function followMirror(
   project: LegoProject,
   pieceId: string,
   twinId: string,
+  pack: LoadedPack | null = null,
 ): LegoProject {
-  if (!pieceById(project, pieceId) || !pieceById(project, twinId))
-    return project;
+  const partner = pieceById(project, pieceId);
+  if (!partner || !pieceById(project, twinId)) return project;
   if (!canMirror(project, twinId)) return project;
-  const transform = mirroredTransform(project, pieceId, twinId, true);
-  return {
+  const transform = mirroredTransform(project, pieceId, twinId);
+  const followed: LegoProject = {
     ...project,
     pieces: project.pieces.map((piece) =>
-      piece.id === twinId ? { ...piece, ...transform } : piece,
+      piece.id === twinId ? { ...freePiece(piece), ...transform } : piece,
     ),
   };
+  return rejoined(
+    followed,
+    pack,
+    twinId,
+    partner.connection?.connector,
+    mirroredWorld(project, pieceId),
+  );
 }

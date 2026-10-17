@@ -28,7 +28,7 @@ import type {
   LegoProject,
 } from "./model";
 import type { LoadedPack } from "./pack";
-import { isJoined, localFromWorld, worldMatrix } from "./reparent";
+import { framesAgree, isJoined, localFromWorld, worldMatrix } from "./reparent";
 import type { Bounds, Vec3 } from "./snapping";
 
 export interface LegoConnector {
@@ -351,6 +351,123 @@ export function slideJoin(
 
   const placed = at(offset);
   return placed ? { offset, position: placed.position } : null;
+}
+
+/**
+ * The angle about the parent's connector that leaves the piece turned as it is.
+ *
+ * The piece's up direction is carried into the parent's child space, which is
+ * where the join is written, and measured from the parent connector's up.
+ * Nothing in a drag sets a twist, so this is what stops a join resolving to a
+ * quarter turn from where the piece was dropped.
+ */
+export function twistOf(
+  project: LegoProject,
+  pack: LoadedPack,
+  piece: LegoPiece,
+  pieceWorld: THREE.Matrix4,
+  parent: LegoPiece,
+  join: Pick<LegoConnection, "connector" | "to">,
+): number {
+  const own = pieceConnectors(pack, piece).find((c) => c.id === join.connector);
+  const theirs = pieceConnectors(pack, parent).find((c) => c.id === join.to);
+  if (!own || !theirs) return 0;
+
+  // The piece will be joined, so it takes the parent's turn and not its scale.
+  const parentTurn = new THREE.Quaternion();
+  worldMatrix(project, parent.id).decompose(
+    new THREE.Vector3(),
+    parentTurn,
+    new THREE.Vector3(),
+  );
+  const up = new THREE.Vector3(...own.up)
+    .transformDirection(pieceWorld)
+    .applyQuaternion(parentTurn.invert());
+  const facing = new THREE.Vector3(...theirs.facing).normalize();
+  up.addScaledVector(facing, -up.dot(facing)).normalize();
+
+  const from = new THREE.Vector3(...theirs.up).normalize();
+  const twist = Math.atan2(
+    facing.dot(new THREE.Vector3().crossVectors(from, up)),
+    from.dot(up),
+  );
+  return Number.isFinite(twist) ? twist : 0;
+}
+
+/** Below this an offset or a twist is rounding, and is left out of a join. */
+const NONE = 1e-9;
+
+/**
+ * The document with a piece joined by its own `connector` to whichever face of
+ * its parent puts it at `world`, or null when no face does (issue #3309).
+ *
+ * Each of the parent's connectors is tried, with the twist and the offset along
+ * the face that would leave the piece at `world`, and the first whose join puts
+ * it there wins. Mirror and symmetry join a reflected piece this way, so which
+ * face the reflection sits on, and which way a twist or an offset turns round,
+ * is measured rather than worked out for each face.
+ *
+ * `world` is asked for rather than read off the piece, because a free piece
+ * under a parent scaled unevenly cannot always hold a turned place exactly, and
+ * a joined one can.
+ */
+export function joinAt(
+  project: LegoProject,
+  pack: LoadedPack,
+  pieceId: string,
+  connector: string,
+  world: THREE.Matrix4,
+): LegoProject | null {
+  const piece = project.pieces.find((p) => p.id === pieceId);
+  const parent = piece?.parentId
+    ? project.pieces.find((p) => p.id === piece.parentId)
+    : undefined;
+  if (!piece || !parent) return null;
+
+  // A joined piece keeps its own size, so its transform is written that way
+  // before any join is measured from it.
+  const local = transformOf(localFromWorld(project, parent.id, world, true));
+  const withPiece = (next: LegoPiece): LegoProject => ({
+    ...project,
+    pieces: project.pieces.map((p) => (p.id === pieceId ? next : p)),
+  });
+
+  for (const theirs of pieceConnectors(pack, parent)) {
+    const twist = twistOf(project, pack, piece, world, parent, {
+      connector,
+      to: theirs.id,
+    });
+    const twisted: LegoPiece = {
+      ...piece,
+      ...local,
+      connection: {
+        connector,
+        to: theirs.id,
+        ...(Math.abs(twist) > NONE ? { twist } : {}),
+      },
+    };
+    const slid = slideJoin(
+      withPiece(twisted),
+      pack,
+      pieceId,
+      local.position,
+      0,
+    );
+    if (!slid) continue;
+    const offset = slid.offset.map((n) => (Math.abs(n) > NONE ? n : 0)) as [
+      number,
+      number,
+    ];
+    const connection: LegoConnection = {
+      ...(twisted.connection as LegoConnection),
+      ...(offset[0] || offset[1] ? { offset } : {}),
+    };
+    const placed = placeJoin(pack, twisted, parent, connection);
+    if (!placed) continue;
+    const joined = withPiece({ ...twisted, ...placed, connection });
+    if (framesAgree(worldMatrix(joined, pieceId), world)) return joined;
+  }
+  return null;
 }
 
 /** A right-handed frame with `facing` and `up` as its first two columns. */

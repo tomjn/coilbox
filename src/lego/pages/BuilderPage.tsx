@@ -117,7 +117,7 @@ import type {
   ScriptTimeline,
   StandInTrack,
 } from "../scriptPlayback";
-import { dragPiece, freeMoved, type Seat } from "../seat";
+import { dragPiece, freeMoved, type Seat, typedTransform } from "../seat";
 import { isShortcut, shortcutLabel } from "../shortcuts";
 import { swapPart } from "../swapPart";
 import { useEditShortcuts } from "../useEditShortcuts";
@@ -330,7 +330,7 @@ function Builder({ id }: { id: string | undefined }) {
    * as it stays selected. A preference for the session, like the scale lock
    * above, rather than something the unit carries. See `../useSymmetry`.
    */
-  const symmetry = useSymmetry({ project: draft, selectedIds, edit });
+  const symmetry = useSymmetry({ project: draft, selectedIds, edit, pack });
   const { queueTwin, place } = symmetry;
   const filter = usePartFilter(pack);
 
@@ -646,7 +646,8 @@ function Builder({ id }: { id: string | undefined }) {
     //
     // A `seat` (or null for a drag that seated nothing) says this is a drag,
     // which saves the join it ended on and frees a piece it moved off its join.
-    // Typing a number is not a drag and goes through as it always did.
+    // Typing a number is not a drag, but it frees a joined piece it moves or
+    // turns all the same.
     place([pieceId], (project) =>
       seat !== undefined && pack && change.position && change.rotation
         ? dragPiece(
@@ -661,12 +662,7 @@ function Builder({ id }: { id: string | undefined }) {
             seat,
             slide ?? null,
           )
-        : {
-            ...project,
-            pieces: project.pieces.map((piece) =>
-              piece.id === pieceId ? { ...piece, ...change } : piece,
-            ),
-          },
+        : typedTransform(project, pieceId, change),
     );
   }
 
@@ -865,14 +861,20 @@ function Builder({ id }: { id: string | undefined }) {
 
   function mirrorSelection() {
     if (!selectedId) return;
-    edit((project) => mirrorPiece(project, selectedId));
+    edit((project) => mirrorPiece(project, selectedId, pack));
   }
 
   // A copy, because the case this is for is one leg becoming the other and the
   // first leg is meant to stay.
   function mirrorCopyOfSelection() {
     if (!draft || !selectedId) return;
-    const copy = mirrorCopy(draft, selectedId, () => crypto.randomUUID());
+    const copy = mirrorCopy(
+      draft,
+      selectedId,
+      () => crypto.randomUUID(),
+      undefined,
+      pack,
+    );
     if (!copy) return;
     edit(() => copy.project);
     setSelectedId(copy.pieceId);
