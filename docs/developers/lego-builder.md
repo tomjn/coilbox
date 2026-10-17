@@ -473,6 +473,8 @@ Select a bone and click a part in the inventory. The part hangs off the bone and
 
 A bone has no faces, so nothing joins to it. With symmetry on, the twin bone on the other side gets the mirrored part.
 
+To remove a skeleton, open the **Skeleton** tab, press **Remove skeleton** and confirm. Every piece, role and preset stays, the tab and the skeleton in the view go, and it is one undo step.
+
 ### See the skeleton
 
 A unit with a skeleton shows it in the view: a line from each bone to its parent, a dot on each joint and the bone's role beside the dot. The bone button beside the collision button, or `K`, shows and hides it. It is on whenever a unit with a skeleton opens. It draws through the parts, a click passes through it to the part behind, and it is never exported.
