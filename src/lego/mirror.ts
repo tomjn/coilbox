@@ -150,9 +150,17 @@ export function mirrorPiece(
     ...project,
     pieces: project.pieces.map((current) => {
       if (!subtree.has(current.id)) return current;
-      const sided = current.role
+      const roled = current.role
         ? { ...current, role: mirrorRole(current.role) }
         : current;
+      // A weapon's arc points to the other side too (issue #3274).
+      const sided =
+        roled.weapon?.heading !== undefined
+          ? {
+              ...roled,
+              weapon: { ...roled.weapon, heading: -roled.weapon.heading || 0 },
+            }
+          : roled;
       return current.id === pieceId ? { ...sided, ...transform } : sided;
     }),
   };

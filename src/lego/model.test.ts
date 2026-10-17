@@ -361,6 +361,41 @@ describe("parseLegoProjectJson", () => {
     expect(parseLegoProjectJson(JSON.stringify(doc))).toEqual(doc);
   });
 
+  it("round-trips the weapon a turret fires and its arc (#3274)", () => {
+    const doc = project([
+      piece("root", null),
+      {
+        ...piece("a", "root"),
+        role: "turret",
+        weapon: {
+          fires: { from: "library", projectId: "w1", key: "laser_copy" },
+          arc: 180,
+          heading: -90,
+        },
+      },
+      {
+        ...piece("b", "root"),
+        role: "turret",
+        weapon: { fires: { from: "game", name: "armpw_emg" } },
+      },
+      { ...piece("c", "root"), role: "turret", weapon: {} },
+    ]);
+    expect(parseLegoProjectJson(JSON.stringify(doc))).toEqual(doc);
+  });
+
+  it("drops a weapon reference it cannot read but keeps the arc", () => {
+    const doc = project([
+      piece("root", null),
+      {
+        ...piece("a", "root"),
+        weapon: { fires: { from: "game", name: "" }, arc: 90 },
+      } as LegoPiece,
+    ]);
+    expect(parseLegoProjectJson(JSON.stringify(doc))?.pieces[1].weapon).toEqual(
+      { arc: 90 },
+    );
+  });
+
   it("round-trips the export receipt the workshop reads (#2651)", () => {
     const doc = {
       ...project([piece("root", null)]),

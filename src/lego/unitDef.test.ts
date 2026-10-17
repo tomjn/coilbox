@@ -357,6 +357,50 @@ describe("luaValue", () => {
   it("writes a nested table", () => {
     expect(luaValue({ outer: { inner: 3 } })).toBe("{ outer = { inner = 3 } }");
   });
+
+  // The engine reads a `weapons` table by position from 1
+  // (`UnitDef::ParseWeaponsTable`), so a list must not become string keys.
+  it("writes a list by position", () => {
+    expect(luaValue([{ name: "a" }, { name: "b" }])).toBe(
+      '{ { name = "a" }, { name = "b" } }',
+    );
+    expect(luaValue([])).toBe("{}");
+  });
+});
+
+describe("weapons (#3274)", () => {
+  const slots = [
+    { def: "armpw_emg", name: "armpw_emg", maxangledif: 180, maindir: "0 0 1" },
+  ];
+
+  it("writes no weapons table for a unit with no weapon", () => {
+    const def = legoUnitDef(
+      project("Rover", "rover"),
+      bounds({ x: 16, z: 16 }),
+    );
+    expect(def).not.toHaveProperty("weapons");
+  });
+
+  it("writes the slots it is given, in order", () => {
+    const def = legoUnitDefWithHome(
+      project("Rover", "rover"),
+      bounds({ x: 16, z: 16 }),
+      "def",
+      null,
+      slots,
+    );
+    expect(def.weapons).toEqual(slots);
+    const lua = buildUnitDefWithHome(
+      project("Rover", "rover"),
+      bounds({ x: 16, z: 16 }),
+      "def",
+      null,
+      slots,
+    );
+    expect(lua).toContain(
+      '    weapons = { { def = "armpw_emg", name = "armpw_emg", maxangledif = 180, maindir = "0 0 1" } },',
+    );
+  });
 });
 
 describe("luaString", () => {

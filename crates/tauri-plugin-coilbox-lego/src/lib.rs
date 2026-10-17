@@ -1971,6 +1971,63 @@ fn stored_texture_target(dir: &Path, write_as: &str) -> Result<PathBuf, String> 
     Ok(dir.join(write_as))
 }
 
+/// One library weapon's file, as the workshop's compile wrote it (issue
+/// #3274).
+#[derive(Deserialize)]
+struct WeaponFile {
+    name: String,
+    contents: String,
+}
+
+/// Where each weapon file goes, checked before anything is written.
+///
+/// Only `coilbox_<unit>_<key>.lua` under `weapons/`, the name the workshop's
+/// compile gives a library weapon on a unit (`weapon_file_name` in its
+/// `compile.rs`). So an export can only ever write coilbox's own weapon files
+/// for this unit, never one of the game's.
+fn weapon_file_targets(
+    root: &Path,
+    unit_name: &str,
+    files: &[WeaponFile],
+) -> Result<Vec<PathBuf>, String> {
+    let prefix = format!("coilbox_{unit_name}_");
+    files
+        .iter()
+        .map(|file| {
+            let key = file
+                .name
+                .strip_prefix(&prefix)
+                .and_then(|rest| rest.strip_suffix(".lua"));
+            match key {
+                Some(key) if valid_unit_name(key) => Ok(root.join("weapons").join(&file.name)),
+                _ => Err(format!("invalid weapon file name: {}", file.name)),
+            }
+        })
+        .collect()
+}
+
+/// Write the weapon files. Rewritten on every export, like the collision
+/// file, because the weapon is read again from the workshop each time.
+fn write_weapon_files(
+    targets: &[PathBuf],
+    files: &[WeaponFile],
+) -> Result<Vec<(String, serde_json::Value)>, String> {
+    let mut written = Vec::new();
+    for (target, file) in targets.iter().zip(files) {
+        if let Some(folder) = target.parent() {
+            std::fs::create_dir_all(folder)
+                .map_err(|e| format!("could not create {}: {e}", folder.display()))?;
+        }
+        std::fs::write(target, &file.contents)
+            .map_err(|e| format!("could not write {}: {e}", target.display()))?;
+        written.push((
+            target.to_string_lossy().to_string(),
+            owned_file(target, file.contents.as_bytes()),
+        ));
+    }
+    Ok(written)
+}
+
 /// Where an export writes the polyfill for shared COB unit values.
 const COB_VARS: &[&str] = &["lualibs", "cob_vars.lua"];
 
@@ -2053,6 +2110,9 @@ async fn lego_export<R: Runtime>(
     unit_def: Option<String>,
     text: Option<UnitText>,
     model: ExportModel,
+    // The library weapons the unit fires (issue #3274). Absent from a caller
+    // that writes none.
+    weapons: Option<Vec<WeaponFile>>,
 ) -> CliResult {
     if !valid_unit_name(&unit_name) {
         return CliResult::err(format!(
@@ -2064,6 +2124,11 @@ async fn lego_export<R: Runtime>(
         return CliResult::err(format!("not a folder: {dir}"));
     }
     let scratch = is_scratch_dir(&root);
+    let weapons = weapons.unwrap_or_default();
+    let weapon_targets = match weapon_file_targets(&root, &unit_name, &weapons) {
+        Ok(targets) => targets,
+        Err(e) => return CliResult::err(e),
+    };
 
     let bytes = match coilbox_s3o::write(&coilbox_s3o::Model {
         radius: model.radius,
@@ -2215,6 +2280,17 @@ async fn lego_export<R: Runtime>(
         owned.push(owned_file(&target, lua.as_bytes()));
     }
 
+    let weapon_paths = match write_weapon_files(&weapon_targets, &weapons) {
+        Ok(written) => written
+            .into_iter()
+            .map(|(path, file)| {
+                owned.push(file);
+                path
+            })
+            .collect::<Vec<_>>(),
+        Err(e) => return CliResult::err(e),
+    };
+
     // The unit definition follows the same rule as the script, scratch
     // exception included: written once and left alone in a real game folder,
     // always refreshed in coilbox's own scratch game.
@@ -2262,6 +2338,7 @@ async fn lego_export<R: Runtime>(
         "pieceCollision": piece_collision_path,
         "unitDef": unit_def_path,
         "unitDefKept": unit_def_kept,
+        "weapons": weapon_paths,
         "owned": owned,
     }))
 }
@@ -3254,6 +3331,61 @@ mod tests {
         assert_eq!(
             std::fs::read_to_string(&target).expect("read"),
             coilbox_bos2lua::COB_VARS_POLYFILL
+        );
+    }
+
+    fn weapon_file(name: &str, contents: &str) -> WeaponFile {
+        WeaponFile {
+            name: name.to_string(),
+            contents: contents.to_string(),
+        }
+    }
+
+    /// A weapon file goes under `weapons/` only by the name the workshop gives
+    /// a library weapon on this unit, so an export cannot write a game's own.
+    #[test]
+    fn weapon_files_go_only_under_the_units_own_coilbox_names() {
+        let root = Path::new("/game.sdd");
+        let ok = [weapon_file("coilbox_rover_laser_copy.lua", "")];
+        assert_eq!(
+            weapon_file_targets(root, "rover", &ok).expect("valid"),
+            vec![root.join("weapons").join("coilbox_rover_laser_copy.lua")]
+        );
+        for bad in [
+            "armpw_emg.lua",
+            "coilbox_other_laser.lua",
+            "coilbox_rover_.lua",
+            "coilbox_rover_laser.txt",
+            "coilbox_rover_../x.lua",
+            "coilbox_rover_Laser.lua",
+        ] {
+            assert!(
+                weapon_file_targets(root, "rover", &[weapon_file(bad, "")]).is_err(),
+                "accepted {bad}"
+            );
+        }
+    }
+
+    /// Written every export, so a weapon changed in the workshop reaches the
+    /// game, and recorded in the receipt with its digest.
+    #[test]
+    fn weapon_files_are_rewritten_and_owned() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let first = [weapon_file("coilbox_rover_laser.lua", "return { a = 1 }")];
+        let targets = weapon_file_targets(dir.path(), "rover", &first).expect("valid");
+        write_weapon_files(&targets, &first).expect("write");
+        let second = [weapon_file("coilbox_rover_laser.lua", "return { a = 2 }")];
+        let written = write_weapon_files(&targets, &second).expect("write");
+
+        assert_eq!(
+            std::fs::read_to_string(&targets[0]).expect("read"),
+            "return { a = 2 }"
+        );
+        assert_eq!(written.len(), 1);
+        assert_eq!(written[0].0, targets[0].to_string_lossy());
+        assert_eq!(
+            written[0].1,
+            owned_file(&targets[0], "return { a = 2 }".as_bytes())
         );
     }
 

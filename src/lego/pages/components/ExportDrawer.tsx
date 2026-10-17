@@ -33,6 +33,8 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { workshopCompile } from "@/workshop/compile";
+import { useModProjects } from "@/workshop/project";
 import {
   baseLanguage,
   type LanguageTexts,
@@ -74,6 +76,7 @@ import type { RawGeometry } from "../../rawGeometry";
 import { blenderTextures, importedTextures } from "../../rawImport";
 import { bakedPieces, buildS3o, unitBounds } from "../../s3oBuild";
 import { buildUnitDef, legoUnitDef, unitWords } from "../../unitDef";
+import { exportWeapons } from "../../weaponModule";
 import { worthTotals } from "../../worth";
 import { ShowMe } from "./ShowMe";
 
@@ -128,6 +131,12 @@ type Result =
       pieceCollision: string | null;
       unitDef: string | null;
       unitDefKept: boolean;
+      /** The library weapon files written under `weapons/` (issue #3274). */
+      weapons: string[];
+      /** How many weapon slots the definition names. */
+      weaponSlots: number;
+      /** A line for each weapon left out, and why. */
+      weaponsMissing: string[];
       glb: string | null;
       obj: string | null;
       mtl: string | null;
@@ -210,6 +219,8 @@ export function ExportDrawer({
   const [result, setResult] = useState<Result>({ state: "idle" });
   const [glbSave, setGlbSave] = useState<GlbSave>({ state: "idle" });
   const [gameText, setGameText] = useState<GameText>({ state: "unread" });
+  // Where a library weapon is read from on each export (issue #3274).
+  const { projects: workshopProjects } = useModProjects();
 
   // Asked of the folder as soon as there is one, so the drawer can say where
   // this unit's name is going before anybody presses the button rather than
@@ -439,8 +450,13 @@ export function ExportDrawer({
     // loads, and the receipt the workshop turns into a unit (issue #2651).
     const bounds = unitBounds(project, pack, raw);
     const totals = worthTotals(project, pack);
-    const def = legoUnitDef(project, bounds, home, totals);
     try {
+      // Read again from the workshop every time, so the weapon it writes is
+      // the one the workshop holds now (issue #3274).
+      const weapons = await exportWeapons(project, workshopProjects, (made) =>
+        workshopCompile({ project: made }),
+      );
+      const def = legoUnitDef(project, bounds, home, totals, weapons.slots);
       const exported = await legoExport({
         dir,
         unitName: project.unitName,
@@ -465,12 +481,13 @@ export function ExportDrawer({
         // Unlike the atlas and the script, there is no scenario where a
         // built unit should export without one: with no unit definition the
         // engine has nothing to spawn.
-        unitDef: buildUnitDef(project, bounds, home, totals),
+        unitDef: buildUnitDef(project, bounds, home, totals, weapons.slots),
         // Where the name goes for a game that will not read one in the
         // definition. Coilbox's own file beside the game's, never the game's
         // (issue #2683).
         text: writesLanguage ? { language, ...unitWords(project) } : null,
         model,
+        weapons: weapons.files,
       });
 
       // The Blender half, which the engine reads none of. A texture the decoder
@@ -593,6 +610,8 @@ export function ExportDrawer({
       setResult({
         state: "done",
         ...exported,
+        weaponSlots: weapons.slots.length,
+        weaponsMissing: weapons.missing,
         glb: glbPath,
         obj: objPath,
         mtl: mtlPath,
@@ -1093,8 +1112,21 @@ export function ExportDrawer({
                   <p className="text-muted-foreground">
                     The unit definition was already there and has been left
                     alone.
+                    {result.weaponSlots > 0
+                      ? " Its weapons are as that file has them."
+                      : null}
                   </p>
                 ) : null}
+                {result.weapons.map((written) => (
+                  <code key={written} className="break-all">
+                    {written}
+                  </code>
+                ))}
+                {result.weaponsMissing.map((line) => (
+                  <p key={line} className="text-destructive">
+                    Weapon left out: {line}
+                  </p>
+                ))}
                 {result.language ? (
                   <code className="break-all">{result.language}</code>
                 ) : null}
