@@ -323,6 +323,32 @@ export function at(seconds: number): number {
 export const ON_LAND = 4;
 
 /**
+ * What the engine tells a unit standing in deep water, upright.
+ *
+ * `SFX_TERRAINTYPE_WATER_B` (2) in `rts/Sim/Units/Unit.cpp:1908`, chosen at
+ * `Unit.cpp:1925-1927` when the ground is below -5 and the unit is upright.
+ */
+export const ON_WATER = 2;
+
+/** What the preview's ground tells the script it is standing on. */
+export function occupyFor(groundId: string | undefined): number {
+  return groundId === "water" ? ON_WATER : ON_LAND;
+}
+
+/** `events` with the surface the unit is told about set for `groundId`. */
+export function onGround(
+  events: ScriptEvent[],
+  groundId: string | undefined,
+): ScriptEvent[] {
+  const occupy = occupyFor(groundId);
+  return events.map((event) =>
+    event.ambient && event.callin === "setSFXoccupy"
+      ? { ...event, args: [occupy] }
+      : event,
+  );
+}
+
+/**
  * How every scenario starts: the unit exists, and it is standing on land.
  *
  * `Create` because the engine does it and because a script's rest pose is often
@@ -332,8 +358,8 @@ export const ON_LAND = 4;
  * only walks on land or shallow water and stands still on anything else, so
  * without this it never walks at all (#1940).
  *
- * Land rather than water because the viewport draws a unit on a ground plane,
- * and a preview should agree with what it is showing.
+ * Land unless the preview's ground is the sea, because a preview should agree
+ * with what the viewport shows. `onGround` swaps in water for the sea.
  *
  * Exported because anything that drives a script itself needs the same two
  * events for the same reason, not only the scenarios below.

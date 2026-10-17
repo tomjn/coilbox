@@ -72,7 +72,7 @@ import {
   pathPoints,
 } from "../../drive";
 import { type UnitMotion, unitMotion } from "../../effects";
-import type { GroundShape } from "../../environment";
+import type { GroundId, GroundShape } from "../../environment";
 import { presetCopies, unitScript } from "../../luaScript";
 import {
   DEFAULT_BUILDER,
@@ -93,6 +93,7 @@ import {
   clampFrame,
   FIRE_INTERVAL_FRAMES,
   type NanoStyle,
+  onGround,
   PREVIEW_FRAMES,
   PREVIEW_SECONDS,
   playable,
@@ -388,6 +389,7 @@ interface Props {
   /** The ground the viewport stands the unit on, which a script asking where
    *  the ground is gets told about. Absent or a null shape is flat. */
   ground?: {
+    choice?: { id: GroundId };
     shape: GroundShape | null;
     up: [number, number, number] | null;
   };
@@ -445,7 +447,8 @@ export function AnimationPanel({
   scriptGround.current = ground?.shape
     ? { shape: ground.shape, up: ground.up }
     : null;
-  const groundKey = JSON.stringify(scriptGround.current);
+  const groundId = ground?.choice?.id;
+  const groundKey = JSON.stringify([scriptGround.current, groundId]);
   /** Unit values the panel has changed away from what the last run's `asked`
    *  reported as their default. Never saved to the project: this is a way to
    *  poke at a script's preview, not a decision about the unit. */
@@ -563,9 +566,10 @@ export function AnimationPanel({
         // Every run carries the scene. A scenario with a stand-in has already
         // been given it by `start`. Anything else, an idle run or a call to one
         // of the script's own functions, is the unit alone.
-        const sent = events.some((event) => event.world)
-          ? events
-          : withWorld(events, null, {
+        const told = onGround(events, groundId);
+        const sent = told.some((event) => event.world)
+          ? told
+          : withWorld(told, null, {
               radius: 0,
               self: size,
               attachPiece: () => null,
@@ -634,6 +638,7 @@ export function AnimationPanel({
       scriptNow,
       compiled,
       size,
+      groundId,
       onPlayingChange,
       onScriptTimeline,
       onScriptRun,
