@@ -97,7 +97,7 @@
   "categories": [
     {
       "id": "green",
-      "label": "Green"
+      "label": "Team colour"
     },
     {
       "id": "tan",
@@ -12316,7 +12316,7 @@
     },
     {
       "id": "3afef15e1a37",
-      "name": "green block 1x0.5x0.5",
+      "name": "team colour block 1x0.5x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -12365,7 +12365,7 @@
     },
     {
       "id": "17657a95e57e",
-      "name": "green block 1x0.5x0.5",
+      "name": "team colour block 1x0.5x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -12414,7 +12414,7 @@
     },
     {
       "id": "29820a30b67f",
-      "name": "green block 1x1x0.5",
+      "name": "team colour block 1x1x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -12463,7 +12463,7 @@
     },
     {
       "id": "ae4f7ce46ab9",
-      "name": "green beam 5x1x0.5",
+      "name": "team colour beam 5x1x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "beam",
@@ -12512,7 +12512,7 @@
     },
     {
       "id": "3cc1a7af9e0a",
-      "name": "green beam 3x1x0.5",
+      "name": "team colour beam 3x1x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "beam",
@@ -12561,7 +12561,7 @@
     },
     {
       "id": "d9d065b448bc",
-      "name": "green plate 3.5x2x0.5",
+      "name": "team colour plate 3.5x2x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "plate",
@@ -12610,7 +12610,7 @@
     },
     {
       "id": "a7051b37bbdb",
-      "name": "green block 1x1x1",
+      "name": "team colour block 1x1x1",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -12659,7 +12659,7 @@
     },
     {
       "id": "d0ddb8009aac",
-      "name": "green block 2x2x0.5",
+      "name": "team colour block 2x2x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -12708,7 +12708,7 @@
     },
     {
       "id": "1eaf15d2dd14",
-      "name": "green beam 5x0.5x0.5",
+      "name": "team colour beam 5x0.5x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "beam",
@@ -12757,7 +12757,7 @@
     },
     {
       "id": "62bd4b7e4855",
-      "name": "green beam 2x0.5x0.5",
+      "name": "team colour beam 2x0.5x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "beam",
@@ -12806,7 +12806,7 @@
     },
     {
       "id": "67d3aa4e3716",
-      "name": "green block 0.75x0.75x0.25",
+      "name": "team colour block 0.75x0.75x0.25",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -12855,7 +12855,7 @@
     },
     {
       "id": "ef77aa65987c",
-      "name": "green block 0.75x0.75x0.5",
+      "name": "team colour block 0.75x0.75x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -12904,7 +12904,7 @@
     },
     {
       "id": "0360c526005a",
-      "name": "green block 1x1x0.5",
+      "name": "team colour block 1x1x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -12953,7 +12953,7 @@
     },
     {
       "id": "10a059c52c2d",
-      "name": "green block 1.5x1.5x0.5",
+      "name": "team colour block 1.5x1.5x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -13002,7 +13002,7 @@
     },
     {
       "id": "7229df5744ac",
-      "name": "green block 1.25x1.25x0.5",
+      "name": "team colour block 1.25x1.25x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -13051,7 +13051,7 @@
     },
     {
       "id": "b35cf04453d9",
-      "name": "green block 1.25x0.5x0.5",
+      "name": "team colour block 1.25x0.5x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -13100,7 +13100,7 @@
     },
     {
       "id": "3607e381f245",
-      "name": "green block 0.75x0.75x0.25",
+      "name": "team colour block 0.75x0.75x0.25",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -13149,7 +13149,7 @@
     },
     {
       "id": "8d001d9bd3fb",
-      "name": "green block 0.75x0.25x0.25",
+      "name": "team colour block 0.75x0.25x0.25",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -13198,7 +13198,7 @@
     },
     {
       "id": "c84508b74ef0",
-      "name": "green block 1x1x0.5",
+      "name": "team colour block 1x1x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -13247,7 +13247,7 @@
     },
     {
       "id": "b13a7ce11419",
-      "name": "green block 1.75x1.75x1",
+      "name": "team colour block 1.75x1.75x1",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -13296,7 +13296,7 @@
     },
     {
       "id": "d84bd6f5da20",
-      "name": "green block 3x3x1.5",
+      "name": "team colour block 3x3x1.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -13345,7 +13345,7 @@
     },
     {
       "id": "652c65f2097a",
-      "name": "green block 1x1x0.5",
+      "name": "team colour block 1x1x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -13394,7 +13394,7 @@
     },
     {
       "id": "b054611de517",
-      "name": "green beam 3x1x0.5",
+      "name": "team colour beam 3x1x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "beam",
@@ -13443,7 +13443,7 @@
     },
     {
       "id": "f4614336fd56",
-      "name": "green block 1x1x0.5",
+      "name": "team colour block 1x1x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -13492,7 +13492,7 @@
     },
     {
       "id": "72a06a054c75",
-      "name": "green block 2x0.75x0.75",
+      "name": "team colour block 2x0.75x0.75",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -13541,7 +13541,7 @@
     },
     {
       "id": "674c40f64308",
-      "name": "green block 2.5x2x1.5",
+      "name": "team colour block 2.5x2x1.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -13590,7 +13590,7 @@
     },
     {
       "id": "48dc27d75edc",
-      "name": "green block 1.5x1.5x1",
+      "name": "team colour block 1.5x1.5x1",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -13639,7 +13639,7 @@
     },
     {
       "id": "3b30d4cf544b",
-      "name": "green block 1x0.5x0.5",
+      "name": "team colour block 1x0.5x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -13688,7 +13688,7 @@
     },
     {
       "id": "7b9a34900c9b",
-      "name": "green block 2x2x1",
+      "name": "team colour block 2x2x1",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -13737,7 +13737,7 @@
     },
     {
       "id": "dd1431ae410f",
-      "name": "green plate 3.75x3.75x0.5",
+      "name": "team colour plate 3.75x3.75x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "plate",
@@ -13786,7 +13786,7 @@
     },
     {
       "id": "08dbe5567b8a",
-      "name": "green block 1.5x1.5x0.5",
+      "name": "team colour block 1.5x1.5x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -13835,7 +13835,7 @@
     },
     {
       "id": "a9fb62cf11ed",
-      "name": "green block 2x2x1.25",
+      "name": "team colour block 2x2x1.25",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -13884,7 +13884,7 @@
     },
     {
       "id": "1a8e6a97f4b7",
-      "name": "green block 3x3x1.25",
+      "name": "team colour block 3x3x1.25",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -13933,7 +13933,7 @@
     },
     {
       "id": "43011fe83f6e",
-      "name": "green block 1.75x1.25x0.5",
+      "name": "team colour block 1.75x1.25x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -13982,7 +13982,7 @@
     },
     {
       "id": "30cfaf98515e",
-      "name": "green beam 4.5x1.25x0.5",
+      "name": "team colour beam 4.5x1.25x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "beam",
@@ -14031,7 +14031,7 @@
     },
     {
       "id": "0aa490cf97f8",
-      "name": "green plate 4x2.5x0.5",
+      "name": "team colour plate 4x2.5x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "plate",
@@ -14080,7 +14080,7 @@
     },
     {
       "id": "c6a664208f9b",
-      "name": "green plate 3.5x2.5x0.5",
+      "name": "team colour plate 3.5x2.5x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "plate",
@@ -14129,7 +14129,7 @@
     },
     {
       "id": "1fa3841f8622",
-      "name": "green beam 1.5x0.5x0.5",
+      "name": "team colour beam 1.5x0.5x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "beam",
@@ -14178,7 +14178,7 @@
     },
     {
       "id": "6a05eb147042",
-      "name": "green plate 4.5x3.5x0.5",
+      "name": "team colour plate 4.5x3.5x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "plate",
@@ -14227,7 +14227,7 @@
     },
     {
       "id": "278946c4e25a",
-      "name": "green block 2.5x2.5x0.5",
+      "name": "team colour block 2.5x2.5x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -14276,7 +14276,7 @@
     },
     {
       "id": "8ae47196fddf",
-      "name": "green block 1.5x1.5x0.5",
+      "name": "team colour block 1.5x1.5x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -14325,7 +14325,7 @@
     },
     {
       "id": "97e997bc35b0",
-      "name": "green block 0.75x0.75x0.75",
+      "name": "team colour block 0.75x0.75x0.75",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -14374,7 +14374,7 @@
     },
     {
       "id": "3bdf8ed26409",
-      "name": "green block 1x1x1",
+      "name": "team colour block 1x1x1",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -14423,7 +14423,7 @@
     },
     {
       "id": "ebc8494afa48",
-      "name": "green block 2.5x2.5x1",
+      "name": "team colour block 2.5x2.5x1",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -14472,7 +14472,7 @@
     },
     {
       "id": "501f684fd181",
-      "name": "green beam 2x0.5x0.25",
+      "name": "team colour beam 2x0.5x0.25",
       "category": "green",
       "colourway": "green",
       "shape": "beam",
@@ -14521,7 +14521,7 @@
     },
     {
       "id": "e6fa317d90ce",
-      "name": "green beam 1.5x0.5x0.25",
+      "name": "team colour beam 1.5x0.5x0.25",
       "category": "green",
       "colourway": "green",
       "shape": "beam",
@@ -14570,7 +14570,7 @@
     },
     {
       "id": "440bb30ef9d3",
-      "name": "green beam 2x0.5x0.5",
+      "name": "team colour beam 2x0.5x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "beam",
@@ -14619,7 +14619,7 @@
     },
     {
       "id": "eaea77fd71c2",
-      "name": "green block 2.5x2.5x1",
+      "name": "team colour block 2.5x2.5x1",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -14668,7 +14668,7 @@
     },
     {
       "id": "d4550d0dfac3",
-      "name": "green plate 4x3x0.75",
+      "name": "team colour plate 4x3x0.75",
       "category": "green",
       "colourway": "green",
       "shape": "plate",
@@ -14717,7 +14717,7 @@
     },
     {
       "id": "de428641defc",
-      "name": "green block 2x1.5x0.5",
+      "name": "team colour block 2x1.5x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -14766,7 +14766,7 @@
     },
     {
       "id": "4675ab8fdaad",
-      "name": "green block 3.75x3.75x1.5",
+      "name": "team colour block 3.75x3.75x1.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -14815,7 +14815,7 @@
     },
     {
       "id": "ed67c80227c5",
-      "name": "green beam 6x1.5x1",
+      "name": "team colour beam 6x1.5x1",
       "category": "green",
       "colourway": "green",
       "shape": "beam",
@@ -14864,7 +14864,7 @@
     },
     {
       "id": "3080b067846e",
-      "name": "green block 3x1.5x1",
+      "name": "team colour block 3x1.5x1",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -14913,7 +14913,7 @@
     },
     {
       "id": "8b023d89abcb",
-      "name": "green block 2x1x1",
+      "name": "team colour block 2x1x1",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -14962,7 +14962,7 @@
     },
     {
       "id": "3b035ba53dc5",
-      "name": "green beam 2x0.5x0.5",
+      "name": "team colour beam 2x0.5x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "beam",
@@ -15011,7 +15011,7 @@
     },
     {
       "id": "f50567bc825a",
-      "name": "green beam 2x0.5x0.5",
+      "name": "team colour beam 2x0.5x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "beam",
@@ -15060,7 +15060,7 @@
     },
     {
       "id": "b7afb72e8c76",
-      "name": "green plate 6.5x3x0.5",
+      "name": "team colour plate 6.5x3x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "plate",
@@ -15109,7 +15109,7 @@
     },
     {
       "id": "51f3c189364c",
-      "name": "green plate 4x4x0.5",
+      "name": "team colour plate 4x4x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "plate",
@@ -15158,7 +15158,7 @@
     },
     {
       "id": "904bc0b5610e",
-      "name": "green block 2x1x0.5",
+      "name": "team colour block 2x1x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -15207,7 +15207,7 @@
     },
     {
       "id": "0e00f1764dc6",
-      "name": "green block 1.25x1x0.5",
+      "name": "team colour block 1.25x1x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -15256,7 +15256,7 @@
     },
     {
       "id": "3595b4c7b566",
-      "name": "green block 2x1x0.75",
+      "name": "team colour block 2x1x0.75",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -15305,7 +15305,7 @@
     },
     {
       "id": "1025c79ba6a4",
-      "name": "green beam 3x1x1",
+      "name": "team colour beam 3x1x1",
       "category": "green",
       "colourway": "green",
       "shape": "beam",
@@ -15354,7 +15354,7 @@
     },
     {
       "id": "fcd2ec40d47e",
-      "name": "green block 1x1x0.5",
+      "name": "team colour block 1x1x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -15403,7 +15403,7 @@
     },
     {
       "id": "4be7ff101484",
-      "name": "green block 1x1x1",
+      "name": "team colour block 1x1x1",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -15452,7 +15452,7 @@
     },
     {
       "id": "a2169a6c168b",
-      "name": "green block 4x2x2",
+      "name": "team colour block 4x2x2",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -15501,7 +15501,7 @@
     },
     {
       "id": "1fc4ff68d2da",
-      "name": "green block 1x1x1",
+      "name": "team colour block 1x1x1",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -15550,7 +15550,7 @@
     },
     {
       "id": "0e2e4c3557dd",
-      "name": "green block 2x1x0.5",
+      "name": "team colour block 2x1x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -15599,7 +15599,7 @@
     },
     {
       "id": "7a726293d242",
-      "name": "green block 2x1x1",
+      "name": "team colour block 2x1x1",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -15648,7 +15648,7 @@
     },
     {
       "id": "df88c0c65161",
-      "name": "green block 2x2x2",
+      "name": "team colour block 2x2x2",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -15697,7 +15697,7 @@
     },
     {
       "id": "34b2e3057ad3",
-      "name": "green block 2x2x1",
+      "name": "team colour block 2x2x1",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -15746,7 +15746,7 @@
     },
     {
       "id": "887011651600",
-      "name": "green beam 1x0.25x0.25",
+      "name": "team colour beam 1x0.25x0.25",
       "category": "green",
       "colourway": "green",
       "shape": "beam",
@@ -15795,7 +15795,7 @@
     },
     {
       "id": "33720aafb051",
-      "name": "green beam 2x0.75x0.75",
+      "name": "team colour beam 2x0.75x0.75",
       "category": "green",
       "colourway": "green",
       "shape": "beam",
@@ -15844,7 +15844,7 @@
     },
     {
       "id": "600da929391a",
-      "name": "green block 1.5x1x1",
+      "name": "team colour block 1.5x1x1",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -15893,7 +15893,7 @@
     },
     {
       "id": "ff1530dc011c",
-      "name": "green beam 2x0.25x0.25",
+      "name": "team colour beam 2x0.25x0.25",
       "category": "green",
       "colourway": "green",
       "shape": "beam",
@@ -15942,7 +15942,7 @@
     },
     {
       "id": "a2e8f6466e39",
-      "name": "green beam 3x0.5x0.5",
+      "name": "team colour beam 3x0.5x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "beam",
@@ -15991,7 +15991,7 @@
     },
     {
       "id": "bb5643a06d89",
-      "name": "green beam 2x0.25x0.25",
+      "name": "team colour beam 2x0.25x0.25",
       "category": "green",
       "colourway": "green",
       "shape": "beam",
@@ -16040,7 +16040,7 @@
     },
     {
       "id": "ec96c7aa47c5",
-      "name": "green block 1.5x1.5x1.25",
+      "name": "team colour block 1.5x1.5x1.25",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -16089,7 +16089,7 @@
     },
     {
       "id": "25b42045be6c",
-      "name": "green block 2x1.5x1.5",
+      "name": "team colour block 2x1.5x1.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -16138,7 +16138,7 @@
     },
     {
       "id": "39f073aa3d14",
-      "name": "green block 1.5x1.5x0.75",
+      "name": "team colour block 1.5x1.5x0.75",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -16187,7 +16187,7 @@
     },
     {
       "id": "4c693db2780b",
-      "name": "green block 1.75x1.5x1.25",
+      "name": "team colour block 1.75x1.5x1.25",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -16236,7 +16236,7 @@
     },
     {
       "id": "68b3253ad970",
-      "name": "green block 2x1.5x0.5",
+      "name": "team colour block 2x1.5x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -16285,7 +16285,7 @@
     },
     {
       "id": "6b2684ee09a4",
-      "name": "green beam 2x0.5x0.5",
+      "name": "team colour beam 2x0.5x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "beam",
@@ -16334,7 +16334,7 @@
     },
     {
       "id": "3ea78439cb5c",
-      "name": "green block 2x1x1",
+      "name": "team colour block 2x1x1",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -16383,7 +16383,7 @@
     },
     {
       "id": "081993ffec00",
-      "name": "green block 1.75x1x0.5",
+      "name": "team colour block 1.75x1x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -16432,7 +16432,7 @@
     },
     {
       "id": "1d5dc1aa76bb",
-      "name": "green block 1x1x0.5",
+      "name": "team colour block 1x1x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -16481,7 +16481,7 @@
     },
     {
       "id": "f47a878354b5",
-      "name": "green block 1.75x1.25x1.25",
+      "name": "team colour block 1.75x1.25x1.25",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -16530,7 +16530,7 @@
     },
     {
       "id": "3c73fe0b1706",
-      "name": "green block 1.5x1x0.75",
+      "name": "team colour block 1.5x1x0.75",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -16579,7 +16579,7 @@
     },
     {
       "id": "af72604ecad7",
-      "name": "green block 1.5x1.25x1.25",
+      "name": "team colour block 1.5x1.25x1.25",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -16628,7 +16628,7 @@
     },
     {
       "id": "f08cbca0ae38",
-      "name": "green block 3x2x1",
+      "name": "team colour block 3x2x1",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -16677,7 +16677,7 @@
     },
     {
       "id": "5ea78581da1b",
-      "name": "green block 3x1.5x1",
+      "name": "team colour block 3x1.5x1",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -16726,7 +16726,7 @@
     },
     {
       "id": "715943de5aa3",
-      "name": "green block 1.5x1x1",
+      "name": "team colour block 1.5x1x1",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -16775,7 +16775,7 @@
     },
     {
       "id": "65c566e8e1be",
-      "name": "green block 2x1.5x1.25",
+      "name": "team colour block 2x1.5x1.25",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -16824,7 +16824,7 @@
     },
     {
       "id": "c7cfd5aac7ea",
-      "name": "green beam 6x1x0.5",
+      "name": "team colour beam 6x1x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "beam",
@@ -16873,7 +16873,7 @@
     },
     {
       "id": "2194dc7ce158",
-      "name": "green beam 3x1x0.5",
+      "name": "team colour beam 3x1x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "beam",
@@ -16922,7 +16922,7 @@
     },
     {
       "id": "58320bf979f8",
-      "name": "green beam 2.5x0.75x0.75",
+      "name": "team colour beam 2.5x0.75x0.75",
       "category": "green",
       "colourway": "green",
       "shape": "beam",
@@ -16971,7 +16971,7 @@
     },
     {
       "id": "b5601c34240d",
-      "name": "green beam 2.5x0.5x0.5",
+      "name": "team colour beam 2.5x0.5x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "beam",
@@ -17020,7 +17020,7 @@
     },
     {
       "id": "a7d9ccbfb9f0",
-      "name": "green block 2x1x1",
+      "name": "team colour block 2x1x1",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -17069,7 +17069,7 @@
     },
     {
       "id": "d5f9d9322265",
-      "name": "green block 1.5x1x1",
+      "name": "team colour block 1.5x1x1",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -17118,7 +17118,7 @@
     },
     {
       "id": "915b7733a004",
-      "name": "green block 2.25x1.75x1",
+      "name": "team colour block 2.25x1.75x1",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -17167,7 +17167,7 @@
     },
     {
       "id": "36ebc2d57b6c",
-      "name": "green block 1.75x1.25x1",
+      "name": "team colour block 1.75x1.25x1",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -17216,7 +17216,7 @@
     },
     {
       "id": "b47582d48fe2",
-      "name": "green block 2.25x1.5x1.25",
+      "name": "team colour block 2.25x1.5x1.25",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -17265,7 +17265,7 @@
     },
     {
       "id": "1dde047f8ac4",
-      "name": "green block 2.5x2x0.75",
+      "name": "team colour block 2.5x2x0.75",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -17314,7 +17314,7 @@
     },
     {
       "id": "bdeaf6f191ac",
-      "name": "green plate 0.75x0.5x0.25",
+      "name": "team colour plate 0.75x0.5x0.25",
       "category": "green",
       "colourway": "green",
       "shape": "plate",
@@ -17363,7 +17363,7 @@
     },
     {
       "id": "d3e9a268aa8c",
-      "name": "green plate 1.75x1x0.25",
+      "name": "team colour plate 1.75x1x0.25",
       "category": "green",
       "colourway": "green",
       "shape": "plate",
@@ -17412,7 +17412,7 @@
     },
     {
       "id": "27354797a739",
-      "name": "green block 1x1x0.75",
+      "name": "team colour block 1x1x0.75",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -17461,7 +17461,7 @@
     },
     {
       "id": "2352a423f364",
-      "name": "green block 0.75x0.5x0.5",
+      "name": "team colour block 0.75x0.5x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -17510,7 +17510,7 @@
     },
     {
       "id": "465fb6c9f1a7",
-      "name": "green block 2x1.75x0.75",
+      "name": "team colour block 2x1.75x0.75",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -17559,7 +17559,7 @@
     },
     {
       "id": "6d3c3b7558f7",
-      "name": "green block 1x0.75x0.5",
+      "name": "team colour block 1x0.75x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -17608,7 +17608,7 @@
     },
     {
       "id": "a34b8c192407",
-      "name": "green block 1.25x1x0.75",
+      "name": "team colour block 1.25x1x0.75",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -17657,7 +17657,7 @@
     },
     {
       "id": "4106fa8b9dfb",
-      "name": "green plate 3x2.5x0.25",
+      "name": "team colour plate 3x2.5x0.25",
       "category": "green",
       "colourway": "green",
       "shape": "plate",
@@ -17706,7 +17706,7 @@
     },
     {
       "id": "76ba33c87c19",
-      "name": "green plate 1.75x1x0.25",
+      "name": "team colour plate 1.75x1x0.25",
       "category": "green",
       "colourway": "green",
       "shape": "plate",
@@ -17755,7 +17755,7 @@
     },
     {
       "id": "53327e447fb7",
-      "name": "green plate 4.5x3.5x0.25",
+      "name": "team colour plate 4.5x3.5x0.25",
       "category": "green",
       "colourway": "green",
       "shape": "plate",
@@ -17804,7 +17804,7 @@
     },
     {
       "id": "dbf53ec31f2b",
-      "name": "green plate 5.5x3.25x0.25",
+      "name": "team colour plate 5.5x3.25x0.25",
       "category": "green",
       "colourway": "green",
       "shape": "plate",
@@ -17853,7 +17853,7 @@
     },
     {
       "id": "211bd1ae09dd",
-      "name": "green block 2x2x1.25",
+      "name": "team colour block 2x2x1.25",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -17902,7 +17902,7 @@
     },
     {
       "id": "23c99a7f1d44",
-      "name": "green block 3x2x2",
+      "name": "team colour block 3x2x2",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -17951,7 +17951,7 @@
     },
     {
       "id": "97028454e32a",
-      "name": "green block 4x4x1.25",
+      "name": "team colour block 4x4x1.25",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -18000,7 +18000,7 @@
     },
     {
       "id": "729ab042b15f",
-      "name": "green block 1.5x1.5x1.25",
+      "name": "team colour block 1.5x1.5x1.25",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -18049,7 +18049,7 @@
     },
     {
       "id": "f1c15dbf8897",
-      "name": "green beam 6x1.5x1.5",
+      "name": "team colour beam 6x1.5x1.5",
       "category": "green",
       "colourway": "green",
       "shape": "beam",
@@ -18098,7 +18098,7 @@
     },
     {
       "id": "286dc22c9d11",
-      "name": "green beam 3x0.5x0.5",
+      "name": "team colour beam 3x0.5x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "beam",
@@ -18147,7 +18147,7 @@
     },
     {
       "id": "96be26af25c7",
-      "name": "green beam 3x1x1",
+      "name": "team colour beam 3x1x1",
       "category": "green",
       "colourway": "green",
       "shape": "beam",
@@ -18196,7 +18196,7 @@
     },
     {
       "id": "4dcb77cb856c",
-      "name": "green block 2.5x1.5x0.5",
+      "name": "team colour block 2.5x1.5x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -18245,7 +18245,7 @@
     },
     {
       "id": "d5c73f269b69",
-      "name": "green block 1.5x1x0.5",
+      "name": "team colour block 1.5x1x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -18294,7 +18294,7 @@
     },
     {
       "id": "797083513c4b",
-      "name": "green beam 4x0.5x0.5",
+      "name": "team colour beam 4x0.5x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "beam",
@@ -18343,7 +18343,7 @@
     },
     {
       "id": "66300440174f",
-      "name": "green block 1x0.5x0.5",
+      "name": "team colour block 1x0.5x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
