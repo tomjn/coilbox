@@ -5,6 +5,8 @@
  * carries only that preset, so the project itself is never edited.
  */
 
+import { presetById } from "./animPresets";
+import { presetRoles } from "./luaScript";
 import type { LegoProject } from "./model";
 
 /**
@@ -46,15 +48,34 @@ export function soloScenario(presetId: string): string | undefined {
   return SOLO_SCENARIOS[presetId];
 }
 
-/** The project as the solo run sees it: the same unit with one preset applied. */
+/**
+ * The project as the solo run sees it: the same unit with one preset applied.
+ *
+ * With `instance`, only that copy of the module animates. The other copies'
+ * pieces lose the roles the preset uses in the solo copy of the unit, so the
+ * script has nothing to write for them, and the unit itself is untouched.
+ */
 export function soloProject(
   project: LegoProject,
   presetId: string,
+  instance: string | null = null,
 ): LegoProject {
+  const preset = presetById(presetId);
+  const roles = new Set(preset ? presetRoles(preset) : []);
   return {
     ...project,
     animations: (project.animations ?? []).filter(
       (entry) => entry.presetId === presetId,
     ),
+    ...(instance !== null
+      ? {
+          pieces: project.pieces.map((piece) => {
+            if (!piece.role || !roles.has(piece.role)) return piece;
+            if ((piece.module?.instance ?? "") === instance) return piece;
+            const { role: _role, ...rest } = piece;
+            return rest;
+          }),
+        }
+      : {}),
   };
 }
