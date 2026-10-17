@@ -21,6 +21,7 @@ import type { PieceTransform } from "../../groupTransform";
 import type { GuideLine, GuidePlane } from "../../guides";
 import { JoinedGroup } from "../../joinedWorld";
 import type { LegoCollisionVolume, LegoPiece, LegoProject } from "../../model";
+import type { StandardView } from "../../orthoViews";
 import { getPartGeometry, type LoadedPack } from "../../pack";
 import { seatPieceMesh } from "../../pivot";
 import type { FaceTarget } from "../../placePart";
@@ -36,7 +37,17 @@ import type { Placing } from "./placeByFace";
 export interface SceneState {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
-  camera: THREE.PerspectiveCamera;
+  /** The camera in use: one of the two below. Read it afresh each time rather
+   *  than holding it, because a standard view swaps it. */
+  camera: THREE.PerspectiveCamera | THREE.OrthographicCamera;
+  perspectiveCamera: THREE.PerspectiveCamera;
+  orthographicCamera: THREE.OrthographicCamera;
+  /** The standard view the orthographic camera is showing, and the camera
+   *  orientation it was set to, so a turn of the view can be told from a pan
+   *  or a zoom. Null while the perspective camera is in use. */
+  standardView: { id: StandardView; quaternion: THREE.Quaternion } | null;
+  /** Told whenever the view changes, so the buttons can show which is on. */
+  onViewChange: (view: StandardView | null) => void;
   controls: OrbitControls;
   gizmo: TransformControls;
   root: THREE.Group;

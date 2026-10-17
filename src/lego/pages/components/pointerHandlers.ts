@@ -33,7 +33,7 @@ import { grabStandIn, letGoOfStandIn, moveStandIn } from "./standInDrag";
  * those four. See #2544.
  */
 export function attachPointerHandlers(state: SceneState): () => void {
-  const { renderer, camera, root } = state;
+  const { renderer, root } = state;
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
 
@@ -41,7 +41,7 @@ export function attachPointerHandlers(state: SceneState): () => void {
     const rect = renderer.domElement.getBoundingClientRect();
     pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-    raycaster.setFromCamera(pointer, camera);
+    raycaster.setFromCamera(pointer, state.camera);
   };
 
   // Sizing the volume by its faces. Registered before the selection
@@ -142,7 +142,7 @@ export function attachPointerHandlers(state: SceneState): () => void {
     const bounds = renderer.domElement.getBoundingClientRect();
     pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
     pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
-    raycaster.setFromCamera(pointer, camera);
+    raycaster.setFromCamera(pointer, state.camera);
     const hit = raycaster.intersectObject(root, true)[0];
     if (state.measure.active) {
       const at = measureAt(hit);
@@ -190,7 +190,7 @@ export function attachPointerHandlers(state: SceneState): () => void {
     if (!hoverAt || state.dragging) return;
     pointer.x = hoverAt.x;
     pointer.y = hoverAt.y;
-    raycaster.setFromCamera(pointer, camera);
+    raycaster.setFromCamera(pointer, state.camera);
     if (state.measure.active) {
       state.measure.onHover?.(
         measureAt(raycaster.intersectObject(root, true)[0]),

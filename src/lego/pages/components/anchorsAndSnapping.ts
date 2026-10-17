@@ -14,6 +14,7 @@ import {
   nearestSnap,
   pieceAnchors,
   screenPixelsToWorld,
+  screenPixelsToWorldOrtho,
   snapPosition,
   snapRotation,
   type Vec3,
@@ -268,6 +269,29 @@ export function forceUniformScale(state: SceneState) {
 }
 
 /**
+ * How far, in world units, a snap reaches at `at`: `SNAP_PIXELS` on screen. A
+ * perspective camera covers more world per pixel the further `at` is from it.
+ * An orthographic one covers the same everywhere, set by how much it shows.
+ */
+export function snapReach(state: SceneState, at: THREE.Vector3): number {
+  const viewportHeight = state.renderer.getSize(new THREE.Vector2()).y;
+  const { camera } = state;
+  if (camera instanceof THREE.OrthographicCamera) {
+    return screenPixelsToWorldOrtho(
+      (camera.top - camera.bottom) / camera.zoom,
+      viewportHeight,
+      SNAP_PIXELS,
+    );
+  }
+  return screenPixelsToWorld(
+    THREE.MathUtils.degToRad(camera.fov),
+    viewportHeight,
+    camera.position.distanceTo(at),
+    SNAP_PIXELS,
+  );
+}
+
+/**
  * Where a click or the pointer lands when measuring: on the nearest anchor of
  * any piece, else on a guide, else where the ray met the model or the ground.
  * Alt held, as in a drag, places it freely.
@@ -282,13 +306,7 @@ export function measurePoint(state: SceneState, at: Vec3): Vec3 {
   const anchors = project.pieces.flatMap((piece) =>
     worldAnchors(state, pack, piece).map((anchor) => anchor.position),
   );
-  const distance = state.camera.position.distanceTo(new THREE.Vector3(...at));
-  const threshold = screenPixelsToWorld(
-    THREE.MathUtils.degToRad(state.camera.fov),
-    state.renderer.getSize(new THREE.Vector2()).y,
-    distance,
-    SNAP_PIXELS,
-  );
+  const threshold = snapReach(state, new THREE.Vector3(...at));
   return snapMeasurePoint(
     at,
     anchors,
@@ -370,15 +388,9 @@ export function applySnap(state: SceneState) {
   // camera is zoomed in tight or pulled right back. Measured to the dragged
   // piece itself, not the camera's orbit target, so seating a piece far from
   // the pivot does not get a threshold sized for somewhere else in the scene.
-  const distance = state.camera.position.distanceTo(
+  const threshold = snapReach(
+    state,
     group.getWorldPosition(new THREE.Vector3()),
-  );
-  const viewportHeight = state.renderer.getSize(new THREE.Vector2()).y;
-  const threshold = screenPixelsToWorld(
-    THREE.MathUtils.degToRad(state.camera.fov),
-    viewportHeight,
-    distance,
-    SNAP_PIXELS,
   );
 
   paintProximity(state, mine, targetPoints, threshold);
