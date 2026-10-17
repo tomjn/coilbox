@@ -288,6 +288,17 @@ fn spec(
     }))
 }
 
+const WEAPON_STEMS: [&str; 8] = [
+    "QueryWeapon",
+    "AimFromWeapon",
+    "AimWeapon",
+    "FireWeapon",
+    "EndBurst",
+    "Shot",
+    "BlockShot",
+    "TargetWeight",
+];
+
 fn weapon(name: &str) -> Option<(Weapon, u32)> {
     const NUMBERED: [(&str, Weapon); 8] = [
         ("QueryWeapon", Weapon::Query),
@@ -2105,6 +2116,7 @@ impl<'p, 'a> Writer<'p, 'a> {
             }
         }
         self.special_adapters();
+        self.default_piece_callins();
     }
 
     fn define(&mut self, name: &str, file: usize, trailing: &Option<Comment>) {
@@ -2568,6 +2580,78 @@ impl<'p, 'a> Writer<'p, 'a> {
                 "\t-- The engine tells a COB script its longest reload once it is created, and\n\t-- does not tell a Lua one, so this asks.\n\t{call}\nend\n"
             ));
             self.adapters.push(text);
+        }
+        self.worst_refs = self.worst_refs.max(self.refs.len());
+        self.refs = saved;
+    }
+
+    /// The piece call-ins the BOS leaves out, written to answer what the engine
+    /// answers a COB script for them. The engine seeds the answer with 1 and
+    /// returns it when the function is missing (`CobInstance.cpp:411-420,
+    /// 437-446`), where a Lua script answers no piece (`LuaUnitScript.cpp:
+    /// 505-509`). Script piece 1 is the second declared piece, and a script
+    /// that declares only one has no such piece, so the engine sprays and
+    /// fires from nothing and there is nothing to write.
+    fn default_piece_callins(&mut self) {
+        if self.p.declared.len() < 2 {
+            return;
+        }
+        let have = |p: &Program, key: &str| {
+            p.func_order.iter().any(|n| {
+                let info = &p.funcs[n];
+                !p.dropped.contains(n)
+                    && matches!(&info.role, Some(Role::Callin(s)) if s.lua == key)
+            })
+        };
+        let mut missing = Vec::new();
+        if !have(self.p, "script.QueryNanoPiece") {
+            missing.push("QueryNanoPiece".to_string());
+        }
+        let mut weapons = std::collections::BTreeSet::new();
+        for n in &self.p.func_order {
+            if self.p.dropped.contains(n) {
+                continue;
+            }
+            let Some(Role::Callin(s)) = &self.p.funcs[n].role else {
+                continue;
+            };
+            let Some(rest) = s.lua.strip_prefix("script.") else {
+                continue;
+            };
+            let digits = rest.trim_start_matches(|c: char| !c.is_ascii_digit());
+            let stem = &rest[..rest.len() - digits.len()];
+            if let Ok(number) = digits.parse::<u32>() {
+                if WEAPON_STEMS.contains(&stem) {
+                    weapons.insert(number);
+                }
+            }
+        }
+        for n in weapons {
+            for stem in ["QueryWeapon", "AimFromWeapon"] {
+                if !have(self.p, &format!("script.{stem}{n}")) {
+                    missing.push(format!("{stem}{n}"));
+                }
+            }
+        }
+        if missing.is_empty() {
+            return;
+        }
+        // The piece by name where the script keeps it, so a pruned script does
+        // not gain a table of every piece it declared.
+        let (second, model) = self.p.declared[1].clone();
+        let saved = std::mem::take(&mut self.refs);
+        let answer = if self.p.pieces.iter().any(|(b, _, _)| *b == second) {
+            self.piece(&second)
+        } else if let Some(model) = model {
+            format!("piece(\"{model}\")")
+        } else {
+            self.refs = saved;
+            return;
+        };
+        for name in missing {
+            self.adapters.push(format!(
+                "-- The engine answers script piece 1 for a COB script with no {name}.\nfunction script.{name}()\n\treturn {answer}\nend\n"
+            ));
         }
         self.worst_refs = self.worst_refs.max(self.refs.len());
         self.refs = saved;
