@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  facesOppose,
   localAnchors,
   nearestSnap,
   pieceAnchors,
@@ -187,6 +188,69 @@ describe("screenPixelsToWorld", () => {
     expect(Number.isFinite(screenPixelsToWorld(WIDE_FOV, 0, 10, 5))).toBe(true);
     expect(Number.isFinite(screenPixelsToWorld(WIDE_FOV, -50, 10, 5))).toBe(
       true,
+    );
+  });
+});
+
+describe("face connectors", () => {
+  it("names each face the way boxConnectors does and points it out", () => {
+    const faces = localAnchors(UNIT).filter((a) => a.kind === "face");
+
+    expect(faces.map((a) => [a.connector, a.facing])).toEqual([
+      ["-x", [-1, 0, 0]],
+      ["+x", [1, 0, 0]],
+      ["-y", [0, -1, 0]],
+      ["+y", [0, 1, 0]],
+      ["-z", [0, 0, -1]],
+      ["+z", [0, 0, 1]],
+    ]);
+  });
+
+  it("leaves corners and the middle out, since they face nowhere", () => {
+    const others = localAnchors(UNIT).filter((a) => a.kind !== "face");
+
+    expect(others.every((a) => a.connector === undefined)).toBe(true);
+  });
+});
+
+describe("nearestSnap movingIndex", () => {
+  it("says which of the moving anchors won", () => {
+    const snap = nearestSnap(
+      [
+        [0, 0, 0],
+        [5, 0, 0],
+      ],
+      [[5.1, 0, 0]],
+      0.5,
+    );
+
+    expect(snap?.movingIndex).toBe(1);
+    expect(snap?.targetIndex).toBe(0);
+  });
+});
+
+describe("facesOppose", () => {
+  it("is true for faces pointing straight at each other", () => {
+    expect(facesOppose([0, 1, 0], [0, -1, 0])).toBe(true);
+  });
+
+  it("is false for faces pointing the same way", () => {
+    expect(facesOppose([0, 1, 0], [0, 1, 0])).toBe(false);
+  });
+
+  it("is false for faces at right angles", () => {
+    expect(facesOppose([0, 1, 0], [1, 0, 0])).toBe(false);
+  });
+
+  it("allows a facing a hair off exact, as a rotated float is", () => {
+    const tilt = 1e-6;
+    expect(facesOppose([0, 1, 0], [tilt, -1, 0])).toBe(true);
+  });
+
+  it("refuses a facing a few degrees off", () => {
+    const tilt = (5 * Math.PI) / 180;
+    expect(facesOppose([0, 1, 0], [Math.sin(tilt), -Math.cos(tilt), 0])).toBe(
+      false,
     );
   });
 });

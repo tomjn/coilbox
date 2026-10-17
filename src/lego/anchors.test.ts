@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { addAnchor, removeAnchor, updateAnchor } from "./anchors";
 import { subtreeAsCompound } from "./compounds";
-import { type LegoPiece, type LegoProject, newProject } from "./model";
+import {
+  type LegoPiece,
+  type LegoProject,
+  newProject,
+  parseLegoProjectData,
+} from "./model";
 
 function project(): LegoProject {
   const base = newProject({
@@ -33,6 +38,39 @@ function project(): LegoProject {
 function pieceOf(doc: LegoProject, id: string): LegoPiece {
   return doc.pieces.find((piece) => piece.id === id) as LegoPiece;
 }
+
+describe("addAnchor with a facing", () => {
+  it("stores the facing of the face that was clicked", () => {
+    const doc = addAnchor(project(), "nose", [0, 0, 2], "a1", [0, 0, 1]);
+
+    expect(pieceOf(doc, "nose").customAnchors).toEqual([
+      { id: "a1", name: "anchor", position: [0, 0, 2], facing: [0, 0, 1] },
+    ]);
+  });
+
+  it("reads a facing and up back from a saved unit, and none from an old one", () => {
+    const doc = addAnchor(project(), "nose", [0, 0, 2], "a1", [0, 0, 1]);
+    const withUp = updateAnchor(doc, "nose", "a1", { up: [1, 0, 0] });
+    const saved = JSON.parse(JSON.stringify(withUp));
+    saved.pieces[1].customAnchors.push({
+      id: "old",
+      name: "old",
+      position: [0, 0, 1],
+    });
+    const read = parseLegoProjectData(saved);
+
+    expect(read?.pieces[1].customAnchors).toEqual([
+      {
+        id: "a1",
+        name: "anchor",
+        position: [0, 0, 2],
+        facing: [0, 0, 1],
+        up: [1, 0, 0],
+      },
+      { id: "old", name: "old", position: [0, 0, 1] },
+    ]);
+  });
+});
 
 describe("addAnchor", () => {
   it("puts the anchor on the piece, where it was placed", () => {

@@ -42,6 +42,25 @@ export interface Anchor {
    * corner with a cube that meets it. Snapping is about the position alone.
    */
   out?: Vec3;
+  /**
+   * The id of the connector at this anchor (`connectors.ts`), for an anchor
+   * that is one: a face, or a custom anchor. Absent for a corner and the middle,
+   * which have no facing and so are not connectors.
+   */
+  connector?: string;
+  /** Which way the connector points: unit length, in the space the anchor's
+   *  position is in. Present with `connector`. */
+  facing?: Vec3;
+}
+
+/** The id `boxConnectors` gives the face that points along `out`. */
+function faceId(out: Vec3): string {
+  const axis = out.findIndex((n) => n !== 0);
+  return `${out[axis] > 0 ? "+" : "-"}${"xyz"[axis]}`;
+}
+
+function face(position: Vec3, out: Vec3): Anchor {
+  return { position, kind: "face", out, connector: faceId(out), facing: out };
 }
 
 /**
@@ -72,12 +91,12 @@ export function localAnchors(bounds: Bounds): Anchor[] {
   }
 
   anchors.push(
-    { position: [min[0], mid[1], mid[2]], kind: "face", out: [-1, 0, 0] },
-    { position: [max[0], mid[1], mid[2]], kind: "face", out: [1, 0, 0] },
-    { position: [mid[0], min[1], mid[2]], kind: "face", out: [0, -1, 0] },
-    { position: [mid[0], max[1], mid[2]], kind: "face", out: [0, 1, 0] },
-    { position: [mid[0], mid[1], min[2]], kind: "face", out: [0, 0, -1] },
-    { position: [mid[0], mid[1], max[2]], kind: "face", out: [0, 0, 1] },
+    face([min[0], mid[1], mid[2]], [-1, 0, 0]),
+    face([max[0], mid[1], mid[2]], [1, 0, 0]),
+    face([mid[0], min[1], mid[2]], [0, -1, 0]),
+    face([mid[0], max[1], mid[2]], [0, 1, 0]),
+    face([mid[0], mid[1], min[2]], [0, 0, -1]),
+    face([mid[0], mid[1], max[2]], [0, 0, 1]),
     { position: mid, kind: "centre" },
   );
 
@@ -113,6 +132,9 @@ export interface Snap {
   distance: number;
   /** Where the two anchors meet once the delta is applied. */
   at: Vec3;
+  /** Which of the moving piece's anchors won, so a connection knows its own
+   *  side. */
+  movingIndex: number;
   /** Which of the target anchors won, so the caller can say whose it is. */
   targetIndex: number;
 }
@@ -132,7 +154,7 @@ export function nearestSnap(
 ): Snap | null {
   let best: Snap | null = null;
 
-  for (const from of moving) {
+  for (const [movingIndex, from] of moving.entries()) {
     for (const [index, to] of targets.entries()) {
       const dx = to[0] - from[0];
       const dy = to[1] - from[1];
@@ -140,11 +162,30 @@ export function nearestSnap(
       const distance = Math.hypot(dx, dy, dz);
       if (distance > threshold) continue;
       if (best && distance >= best.distance) continue;
-      best = { delta: [dx, dy, dz], distance, at: to, targetIndex: index };
+      best = {
+        delta: [dx, dy, dz],
+        distance,
+        at: to,
+        movingIndex,
+        targetIndex: index,
+      };
     }
   }
 
   return best;
+}
+
+/**
+ * How close to exactly opposite two facings must be to count as pointing at
+ * each other: one minus the cosine of the angle between them, so a facing off
+ * by 0.045 radians (the same slack a stated connector's length gets in
+ * `connectors.ts`) still joins.
+ */
+const OPPOSE_TOLERANCE = 1e-3;
+
+/** Whether two unit facings point at each other, as two faces meeting do. */
+export function facesOppose(a: Vec3, b: Vec3): boolean {
+  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2] <= -(1 - OPPOSE_TOLERANCE);
 }
 
 /** Round each angle to the nearest step, for rotation snapping. */
