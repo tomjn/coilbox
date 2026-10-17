@@ -21,6 +21,8 @@ export const SOLO_SCENARIOS: Record<string, string> = {
   "rudder.follow": "driving",
   // Emits the reverse wake when told the unit backs up, which only a drive says.
   "wake.moving": "driving",
+  // Stows on take off and lowers on landing, which only this scenario sends.
+  "gear.stow": "take-off-landing",
   buildarm: "building",
   "build.aim": "building",
   "build.factory": "building-factory",
