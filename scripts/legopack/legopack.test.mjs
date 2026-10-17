@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { COLOURWAYS, categorise } from "./categorise.mjs";
 import { buildMesh } from "./mesh.mjs";
 import { readObj } from "./obj.mjs";
 import { newellNormal, tessellate } from "./tessellate.mjs";
@@ -212,6 +213,23 @@ describe("buildMesh", () => {
 
   it("returns null for an object with no faces", () => {
     expect(buildMesh({ name: "empty", faces: [] }, readObj(SQUARE))).toBeNull();
+  });
+});
+
+describe("categorise", () => {
+  it("names a part in the first atlas column team colour, under the id green (#4466)", () => {
+    const inFirstColumn = SQUARE.replace(
+      "vt 1 0\nvt 1 1",
+      "vt 0.2 0\nvt 0.2 1",
+    );
+    const source = readObj(inFirstColumn);
+    const mesh = buildMesh(source.objects[0], source);
+    const [meta] = categorise([{ mesh, sourceNames: ["Part1"] }]);
+
+    expect(meta.colourway).toBe("green");
+    expect(meta.category).toBe("green");
+    expect(meta.name).toBe("team colour sheet 2x2x0");
+    expect(COLOURWAYS[0]).toEqual({ id: "green", label: "Team colour" });
   });
 });
 

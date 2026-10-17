@@ -143,7 +143,7 @@ The shape changes its numbers, not its scale, so its texture does not stretch.
 
 A shape has no panel detail. It tiles a small swatch of plain surface from its colourway, mirrored at each edge, at the same texture density as the pack's parts. A bigger shape shows more tiles rather than a stretched one.
 
-On the bundled atlas the green colourway is plain red, the same red the green parts are drawn in. Tan is a grainy concrete, where the mirrored tiles show a repeating pattern. Grey is a flat light grey.
+On the bundled atlas the team colour colourway is plain red, the same red the team colour parts are drawn in. Tan is a grainy concrete, where the mirrored tiles show a repeating pattern. Grey is a flat light grey.
 
 A shape takes the colourway most of the unit's parts and shapes use when it is added, or the pack's first one when the unit has none. It keeps that colourway. The piece panel has no control to change it, and **Change part** is not offered for a shape.
 

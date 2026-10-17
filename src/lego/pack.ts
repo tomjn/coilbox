@@ -921,6 +921,20 @@ export function shapeVariants(
   return pack.parts.filter((part) => part.shapeId === shapeId);
 }
 
+/**
+ * What to call a colourway on screen: the label of the category with its id,
+ * or the id itself when no category has it. The bundled pack's red column has
+ * the id "green" and the label "Team colour" (#4466).
+ */
+export function colourwayLabel(
+  pack: Pick<LoadedPack, "manifest">,
+  colourway: string,
+): string {
+  return (
+    pack.manifest.categories.find((c) => c.id === colourway)?.label ?? colourway
+  );
+}
+
 /** Free every geometry built from a pack. Call when tearing down the last view. */
 export function disposePackGeometry(pack: LoadedPack): void {
   const cache = geometryCache.get(pack);
