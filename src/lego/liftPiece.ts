@@ -21,6 +21,8 @@ import type { GameItem } from "@/content/bindings";
 import type { S3oImport } from "./bindings";
 import { selectionAsCompound } from "./compounds";
 import { pieceLines } from "./gameUnits";
+import type { RoleProposal } from "./inferRoles";
+import { withLiftedRoles } from "./liftRoles";
 import type {
   LegoImported,
   LegoImportedGame,
@@ -33,35 +35,31 @@ import type { RawGeometry } from "./rawGeometry";
 import { projectFromImport } from "./rawImport";
 import { liftRefusal, unitGame } from "./unitGame";
 
-/**
- * The module a lift makes: the piece at `path` in the imported tree and
- * everything under it, or null when the model has no piece there.
- *
- * `id` must be the id the import stored the geometry under.
- */
-export function liftFromImport(
-  result: S3oImport,
-  path: string,
-  options: {
-    id: string;
-    /** The game read, as `gameRecordFor` records it. */
-    game: LegoUnitGame;
-    /** The game, model and unit, as an opened unit records them. */
-    from: LegoImportedGame;
-    source: string;
-    /** Whether the model was unpacked into a temp folder. */
-    unpacked: boolean;
-    packId: string;
-    packVersion: string;
-    now: string;
-    newId: () => string;
-  },
-): LegoProject | null {
-  const index = pieceLines(result.root).findIndex((line) => line.path === path);
-  if (index < 0) return null;
+/** What importing a model needs to know, whether it is lifted from or not. */
+interface ImportOptions {
+  id: string;
+  /** The game, model and unit, as an opened unit records them. */
+  from: LegoImportedGame;
+  source: string;
+  /** Whether the model was unpacked into a temp folder. */
+  unpacked: boolean;
+  packId: string;
+  packVersion: string;
+  now: string;
+  newId: () => string;
+}
 
+/**
+ * The whole model as a unit, the way opening it from the game makes one. A lift
+ * cuts its module out of this, and the game's script is asked about this
+ * unit's pieces, since the script names every piece of the model.
+ */
+export function wholeFromImport(
+  result: S3oImport,
+  options: ImportOptions,
+): LegoProject {
   const unitName = options.from.unit ?? options.from.member;
-  const whole = projectFromImport(result, {
+  return projectFromImport(result, {
     id: options.id,
     source: options.source,
     game: options.from,
@@ -73,6 +71,33 @@ export function liftFromImport(
     now: options.now,
     newId: options.newId,
   }).project;
+}
+
+/**
+ * The module a lift makes: the piece at `path` in the imported tree and
+ * everything under it, or null when the model has no piece there.
+ *
+ * `id` must be the id the import stored the geometry under.
+ *
+ * `roles` are what the game's script said about the model's pieces. Passing
+ * them, even an empty list, gives the lifted pieces their roles and the module
+ * the presets those roles run (#3270). Leaving them out lifts geometry only.
+ */
+export function liftFromImport(
+  result: S3oImport,
+  path: string,
+  options: ImportOptions & {
+    /** The game read, as `gameRecordFor` records it. */
+    game: LegoUnitGame;
+    /** The unit `wholeFromImport` made, when the caller already has one. */
+    whole?: LegoProject;
+    roles?: RoleProposal[];
+  },
+): LegoProject | null {
+  const index = pieceLines(result.root).findIndex((line) => line.path === path);
+  if (index < 0) return null;
+
+  const whole = options.whole ?? wholeFromImport(result, options);
   // The import adds pieces in the same order as `pieceLines` lists them.
   const piece = whole.pieces[index];
   const cut = piece
@@ -90,13 +115,14 @@ export function liftFromImport(
     ...(options.from.unit ? { unit: options.from.unit } : {}),
     ...liftedTextures(whole.imported),
   };
-  return {
+  const module: LegoProject = {
     ...cut,
     name: options.from.unit ? `${options.from.unit} ${piece.name}` : piece.name,
     ...(whole.imported ? { imported: whole.imported } : {}),
     game: options.game,
     pieces: cut.pieces.map((p) => ({ ...p, lifted })),
   };
+  return options.roles ? withLiftedRoles(module, options.roles) : module;
 }
 
 /**
