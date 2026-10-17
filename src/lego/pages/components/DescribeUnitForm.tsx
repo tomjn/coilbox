@@ -97,7 +97,8 @@ export function DescribeUnitForm({ onBack, onStart }: Props) {
           ))}
         </ToggleGroup>
         <p className="text-xs text-muted-foreground">
-          One at most: the script has one weapon.
+          One at most: a plan adds one turret, barrel and flare. Add more once
+          the unit has started.
         </p>
       </Question>
       <Question label="Does it build?">
