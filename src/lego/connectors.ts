@@ -28,6 +28,7 @@ import type {
   LegoProject,
 } from "./model";
 import type { LoadedPack } from "./pack";
+import { isJoined, localFromWorld, worldMatrix } from "./reparent";
 import type { Bounds, Vec3 } from "./snapping";
 
 export interface LegoConnector {
@@ -387,15 +388,59 @@ export function freePiece(piece: LegoPiece): LegoPiece {
   return rest;
 }
 
-/** Take a piece's join away, leaving it where it stands as a free piece. */
+/**
+ * Take a piece's join away, leaving it where it stands as a free piece. A
+ * joined piece does not take its parent's scale, so the free piece's transform
+ * is worked out again to hold the same size and place.
+ */
 export function disconnectPiece(
   project: LegoProject,
   pieceId: string,
 ): LegoProject {
   const piece = project.pieces.find((p) => p.id === pieceId);
   if (!piece?.connection) return project;
+  const local =
+    isJoined(project, piece) && scaledAbove(project, piece)
+      ? localFromWorld(
+          project,
+          piece.parentId,
+          worldMatrix(project, pieceId),
+          false,
+        )
+      : undefined;
   return {
     ...project,
-    pieces: project.pieces.map((p) => (p.id === pieceId ? freePiece(p) : p)),
+    pieces: project.pieces.map((p) =>
+      p.id === pieceId
+        ? { ...freePiece(p), ...(local ? transformOf(local) : {}) }
+        : p,
+    ),
   };
+}
+
+/** A local matrix as the three fields the document stores. */
+function transformOf(
+  local: THREE.Matrix4,
+): Pick<LegoPiece, "position" | "rotation" | "scale"> {
+  const position = new THREE.Vector3();
+  const rotation = new THREE.Quaternion();
+  const scale = new THREE.Vector3();
+  local.decompose(position, rotation, scale);
+  const euler = new THREE.Euler().setFromQuaternion(rotation);
+  return {
+    position: [position.x, position.y, position.z],
+    rotation: [euler.x, euler.y, euler.z],
+    scale: [scale.x, scale.y, scale.z],
+  };
+}
+
+/** Whether the parent's scale is anything but 1, which is when a join matters. */
+function scaledAbove(project: LegoProject, piece: LegoPiece): boolean {
+  const scale = new THREE.Vector3();
+  worldMatrix(project, piece.parentId as string).decompose(
+    new THREE.Vector3(),
+    new THREE.Quaternion(),
+    scale,
+  );
+  return scale.distanceTo(new THREE.Vector3(1, 1, 1)) > 1e-9;
 }

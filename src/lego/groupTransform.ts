@@ -17,7 +17,7 @@
 import * as THREE from "three";
 
 import { descendantIds, type LegoPiece, type LegoProject } from "./model";
-import { worldMatrix } from "./reparent";
+import { isJoined, localFromWorld, worldMatrix } from "./reparent";
 import type { Vec3 } from "./snapping";
 
 /**
@@ -146,12 +146,12 @@ export function groupTransform(
     const piece = pieceIn(project, id);
     if (!piece) continue;
 
-    const parent = piece.parentId
-      ? worldMatrix(project, piece.parentId)
-      : new THREE.Matrix4();
-    const local = parent
-      .invert()
-      .multiply(move.clone().multiply(worldMatrix(project, id)));
+    const local = localFromWorld(
+      project,
+      piece.parentId,
+      move.clone().multiply(worldMatrix(project, id)),
+      isJoined(project, piece),
+    );
 
     const position = new THREE.Vector3();
     const rotation = new THREE.Quaternion();

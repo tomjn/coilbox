@@ -27,7 +27,7 @@ import {
   type LegoProject,
   pieceById,
 } from "./model";
-import { worldMatrix } from "./reparent";
+import { isJoined, localFromWorld, worldMatrix } from "./reparent";
 import { MIN_SCREEN_THRESHOLD } from "./snapping";
 
 /** Reflection across x = 0, the plane the unit's centre line runs down. */
@@ -81,21 +81,24 @@ function asTransform(
  * pieces when one of a pair is following the other. A document with a second
  * parentless piece is already broken, and treating it as its own frame is
  * enough to not crash.
+ *
+ * `keepsJoin` says the target stays joined to its parent, which decides whether
+ * the parent's scale is part of its place.
  */
 function mirroredTransform(
   project: LegoProject,
   sourceId: string,
   targetId: string,
+  keepsJoin: boolean,
 ): Pick<LegoPiece, "position" | "rotation" | "scale"> {
   const target = pieceById(project, targetId);
-  const parent = target?.parentId
-    ? worldMatrix(project, target.parentId)
-    : new THREE.Matrix4();
   return asTransform(
-    parent
-      .invert()
-      .multiply(reflection(project))
-      .multiply(worldMatrix(project, sourceId)),
+    localFromWorld(
+      project,
+      target?.parentId ?? null,
+      reflection(project).multiply(worldMatrix(project, sourceId)),
+      keepsJoin && target !== undefined && isJoined(project, target),
+    ),
   );
 }
 
@@ -144,7 +147,7 @@ export function mirrorPiece(
   pieceId: string,
 ): LegoProject {
   if (!canMirror(project, pieceId)) return project;
-  const transform = mirroredTransform(project, pieceId, pieceId);
+  const transform = mirroredTransform(project, pieceId, pieceId, false);
 
   const subtree = new Set(descendantIds(project, pieceId));
   return {
@@ -209,9 +212,8 @@ export function mirrorCopy(
           scale: source.scale,
         }
       : asTransform(
-          worldMatrix(project, target)
-            .invert()
-            .multiply(worldMatrix(project, pieceId)),
+          // The copy goes in free, so the new parent's scale is part of its place.
+          localFromWorld(project, target, worldMatrix(project, pieceId), false),
         );
 
   // The compound in the middle is never stored, so its id and its timestamp are
@@ -350,7 +352,7 @@ export function followMirror(
   if (!pieceById(project, pieceId) || !pieceById(project, twinId))
     return project;
   if (!canMirror(project, twinId)) return project;
-  const transform = mirroredTransform(project, pieceId, twinId);
+  const transform = mirroredTransform(project, pieceId, twinId, true);
   return {
     ...project,
     pieces: project.pieces.map((piece) =>

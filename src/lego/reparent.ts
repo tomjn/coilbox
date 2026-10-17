@@ -13,6 +13,7 @@
 import * as THREE from "three";
 
 import { freePiece } from "./connectors";
+import { joinedWorld } from "./joinedWorld";
 import {
   childrenOf,
   descendantIds,
@@ -47,32 +48,79 @@ export function parentOptions(
   return options;
 }
 
-/** Where a piece sits in the unit, with every ancestor's transform applied. */
+/**
+ * Whether a piece is drawn and baked as joined to its parent: it has a join
+ * and a parent to be joined to. A joined piece keeps its own size, which
+ * `joinedWorld` decides (#3292).
+ */
+export function isJoined(project: LegoProject, piece: LegoPiece): boolean {
+  return (
+    piece.connection !== undefined &&
+    piece.parentId !== null &&
+    pieceById(project, piece.parentId) !== undefined
+  );
+}
+
+/**
+ * Where a piece sits in the unit, with every ancestor's transform applied. A
+ * joined piece takes its parent's turn and place but not its scale, the same
+ * as the scene and the bake draw it.
+ */
 export function worldMatrix(
   project: LegoProject,
   pieceId: string,
 ): THREE.Matrix4 {
-  const world = new THREE.Matrix4();
-  const local = new THREE.Matrix4();
-  const position = new THREE.Vector3();
-  const rotation = new THREE.Quaternion();
-  const scale = new THREE.Vector3();
-
   // A malformed document can have a parent loop, and this walk is the first
   // thing that would hang on one.
   const seen = new Set<string>();
+  const chain: LegoPiece[] = [];
   let piece = pieceById(project, pieceId);
   while (piece && !seen.has(piece.id)) {
     seen.add(piece.id);
-    local.compose(
-      position.set(...piece.position),
-      rotation.setFromEuler(new THREE.Euler(...piece.rotation)),
-      scale.set(...piece.scale),
-    );
-    world.premultiply(local);
+    chain.push(piece);
     piece = piece.parentId ? pieceById(project, piece.parentId) : undefined;
   }
+
+  let world = new THREE.Matrix4();
+  for (const link of chain.reverse()) {
+    const local = new THREE.Matrix4().compose(
+      new THREE.Vector3(...link.position),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(...link.rotation)),
+      new THREE.Vector3(...link.scale),
+    );
+    world = isJoined(project, link)
+      ? joinedWorld(world, local)
+      : world.multiply(local);
+  }
   return world;
+}
+
+/**
+ * The local matrix that puts a piece at `world` under `parentId`, the inverse
+ * of what `worldMatrix` does for that piece. `joined` says whether the piece
+ * will be joined to the parent, which changes how the parent's scale is read.
+ */
+export function localFromWorld(
+  project: LegoProject,
+  parentId: string | null,
+  world: THREE.Matrix4,
+  joined: boolean,
+): THREE.Matrix4 {
+  const parentWorld = parentId
+    ? worldMatrix(project, parentId)
+    : new THREE.Matrix4();
+  const inverse = parentWorld.clone().invert();
+  if (!joined) return inverse.multiply(world);
+
+  const turn = new THREE.Quaternion();
+  parentWorld.decompose(new THREE.Vector3(), turn, new THREE.Vector3());
+  const local = new THREE.Matrix4()
+    .makeRotationFromQuaternion(turn.invert())
+    .multiply(world);
+  local.setPosition(
+    new THREE.Vector3().setFromMatrixPosition(world).applyMatrix4(inverse),
+  );
+  return local;
 }
 
 /**
@@ -94,17 +142,27 @@ export function canReparent(
   return !descendantIds(project, pieceId).includes(parentId);
 }
 
-/** The piece hangs off `parentId`, in the same place it was before. */
+/**
+ * The piece hangs off `parentId`, in the same place it was before.
+ *
+ * It lands free. `willJoin` is for a caller that joins it straight away: the
+ * new parent's scale is then left out of its transform, as a join leaves it
+ * out of the drawing.
+ */
 export function reparentPiece(
   project: LegoProject,
   pieceId: string,
   parentId: string,
+  willJoin = false,
 ): LegoProject {
   if (!canReparent(project, pieceId, parentId)) return project;
 
-  const local = worldMatrix(project, parentId)
-    .invert()
-    .multiply(worldMatrix(project, pieceId));
+  const local = localFromWorld(
+    project,
+    parentId,
+    worldMatrix(project, pieceId),
+    willJoin,
+  );
 
   const position = new THREE.Vector3();
   const rotation = new THREE.Quaternion();
