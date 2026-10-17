@@ -392,6 +392,14 @@ export interface LegoPiece {
    * then always null.
    */
   meshId?: string;
+  /**
+   * The box round the mesh `meshId` names, in the mesh's own space and before
+   * the pivot, rotation and scale (#3269). A piece with a mesh has no part to
+   * take faces from, so its connectors and pivot choices come from this.
+   * Recorded when a piece is lifted, from the geometry. Absent on a piece that
+   * has not been measured, which then has no connectors.
+   */
+  meshBox?: { min: [number, number, number]; max: [number, number, number] };
   /** Relative to the parent piece. */
   position: [number, number, number];
   /**
@@ -1404,6 +1412,12 @@ function parsePiece(raw: unknown): LegoPiece | null {
     ...(typeof p.meshId === "string" && p.meshId !== ""
       ? { meshId: p.meshId }
       : {}),
+    ...(() => {
+      const box = p.meshBox as { min?: unknown; max?: unknown } | null;
+      const min = parseVec3(box?.min);
+      const max = parseVec3(box?.max);
+      return min && max ? { meshBox: { min, max } } : {};
+    })(),
     position: parseVec3(p.position) ?? [0, 0, 0],
     rotation: parseVec3(p.rotation) ?? [0, 0, 0],
     scale: parseVec3(p.scale) ?? [1, 1, 1],

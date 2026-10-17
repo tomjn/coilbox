@@ -29,6 +29,7 @@ import type {
   LegoTexture,
   LegoUnitGame,
 } from "./model";
+import type { RawGeometry } from "./rawGeometry";
 import { projectFromImport } from "./rawImport";
 import { liftRefusal, unitGame } from "./unitGame";
 
@@ -104,6 +105,28 @@ export function liftFromImport(
  */
 export function holdsLiftedPieces(project: LegoProject): boolean {
   return project.pieces.some((piece) => piece.lifted);
+}
+
+/**
+ * The pieces with a mesh and no box, given the box of that mesh from `raw`
+ * (#3269). A box a piece already has is kept, and a mesh `raw` does not hold
+ * leaves its piece as it is. The same document comes back when nothing changed.
+ *
+ * Pieces are measured here rather than at the lift, because the vertices never
+ * cross the IPC: only the sidecar written by the import has them.
+ */
+export function withMeshBoxes(
+  project: LegoProject,
+  raw: RawGeometry,
+): LegoProject {
+  let changed = false;
+  const pieces = project.pieces.map((piece) => {
+    const mesh = piece.meshId ? raw.byId.get(piece.meshId) : undefined;
+    if (!mesh || piece.meshBox) return piece;
+    changed = true;
+    return { ...piece, meshBox: mesh.bbox };
+  });
+  return changed ? { ...project, pieces } : project;
 }
 
 /** The credit for one lifted piece: "From Beyond All Reason, unit armcom". */

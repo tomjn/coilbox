@@ -105,6 +105,17 @@ describe("liftIntoUnit", () => {
     expect(written().byId.get("mod/m0")?.bbox.min).toEqual([5, 0, 0]);
   });
 
+  it("records the box of each mesh on the module's pieces (#3269)", async () => {
+    files.set("mod", geometry("m0", 5));
+
+    const { module } = await liftIntoUnit("unit", turret());
+
+    expect(module.pieces[0].meshBox).toEqual({
+      min: [5, 0, 0],
+      max: [5, 0, 0],
+    });
+  });
+
   it("keeps what the unit's file already holds", async () => {
     files.set("mod", geometry("m0", 5));
     files.set("unit", geometry("other/m0", 9));

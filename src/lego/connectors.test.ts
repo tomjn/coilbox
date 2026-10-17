@@ -8,6 +8,7 @@ import {
   customConnectors,
   describeJoin,
   disconnectPiece,
+  faceName,
   joinFaceOutlines,
   type LegoConnector,
   pieceConnectors,
@@ -1103,5 +1104,88 @@ describe("slideJoin", () => {
     const doc = hullAndLeg({ position: [0, 1.5, 0] });
 
     expect(slideJoin(doc, pack(), "leg", [1, 1.5, 0], 0.5)).toBeNull();
+  });
+});
+
+describe("pieceConnectors for a mesh piece (#3269)", () => {
+  const mesh = {
+    id: "m",
+    name: "m",
+    parentId: "root",
+    partId: null,
+    meshId: "mod/m0",
+    position: [0, 0, 0],
+    rotation: [0, 0, 0],
+    scale: [1, 1, 1],
+  } as LegoPiece;
+
+  it("are the faces of the mesh's box, where the geometry is", () => {
+    const connectors = pieceConnectors(pack(), {
+      ...mesh,
+      meshBox: { min: [-1, 2, -1], max: [3, 6, 1] },
+    });
+    expect(connectors.map((c) => c.id)).toEqual([
+      "+x",
+      "-x",
+      "+y",
+      "-y",
+      "+z",
+      "-z",
+    ]);
+    expect(connectors.find((c) => c.id === "+x")?.position).toEqual([3, 4, 0]);
+    expect(connectors.find((c) => c.id === "-y")?.position).toEqual([1, 2, 0]);
+  });
+
+  it("are none while the box is unknown", () => {
+    expect(pieceConnectors(pack(), mesh)).toEqual([]);
+  });
+
+  it("give way to the piece's own anchors", () => {
+    const connectors = pieceConnectors(pack(), {
+      ...mesh,
+      meshBox: { min: [-1, 2, -1], max: [3, 6, 1] },
+      customAnchors: [
+        { id: "a", name: "a", position: [0, 6, 0], facing: [0, 1, 0] },
+      ],
+    });
+    expect(connectors.map((c) => c.id)).toEqual(["a"]);
+  });
+
+  it("name the faces of a box, as a pack part's are", () => {
+    const withBox = { ...mesh, meshBox: { min: [-1, 0, -1], max: [1, 2, 1] } };
+    expect(faceName(pack(), withBox as LegoPiece, "+y")).toBe("top");
+  });
+
+  it("join a mesh piece to a hull so its bottom rests on the hull's top", () => {
+    const project = {
+      ...newProject({
+        id: "p",
+        rootPieceId: "root",
+        name: "u",
+        packId: "lego",
+        packVersion: "1",
+        now: "2026-10-17T00:00:00Z",
+      }),
+    };
+    const hull = {
+      ...mesh,
+      id: "hull",
+      meshId: undefined,
+      partId: "hull",
+    } as LegoPiece;
+    const turret = {
+      ...mesh,
+      id: "turret",
+      parentId: "hull",
+      meshBox: { min: [-1, 2, -1], max: [1, 6, 1] },
+      connection: { connector: "-y", to: "+y" },
+    } as LegoPiece;
+    const joined = resolveConnections(
+      { ...project, pieces: [...project.pieces, hull, turret] },
+      pack(),
+    ).project;
+    const placed = joined.pieces.find((p) => p.id === "turret") as LegoPiece;
+    // Its origin sits 2 below its bottom face, which is on the hull's top (0.5).
+    expect(placed.position[1]).toBeCloseTo(0.5 - 2);
   });
 });
