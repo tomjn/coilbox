@@ -7,7 +7,7 @@ import { presetById, ROLES } from "./animPresets";
 import { buildArmModule, pickArmParts } from "./buildArm";
 import { pieceConnectors } from "./connectors";
 import { type LegoProject, newProject, parseLegoProjectJson } from "./model";
-import { STARTER_CATEGORIES } from "./moduleFilter";
+import { STARTER_CATEGORIES, swapCandidates } from "./moduleFilter";
 import { insertModule } from "./moduleMount";
 import { type LegoPackManifest, type LoadedPack, mergePacks } from "./pack";
 import { worldMatrix } from "./reparent";
@@ -17,6 +17,7 @@ import {
   starterModules,
   withStarters,
 } from "./starterModules";
+import { swapModule } from "./swapModule";
 import { buildWeaponModule, pickWeaponParts } from "./weaponModule";
 
 const bundled = JSON.parse(
@@ -306,5 +307,55 @@ describe("ownCopy", () => {
       now: "now",
     });
     expect(copy.name).toBe("Turret copy");
+  });
+});
+
+describe("built in modules as instances", () => {
+  it("records the built in id on every piece of a drop", () => {
+    const dropped = insertModule(
+      hull(),
+      named("Wheel"),
+      "root",
+      newId,
+      pack,
+      undefined,
+      true,
+    );
+    const added = dropped.project.pieces.filter((p) => p.module);
+    expect(added.length).toBeGreaterThan(0);
+    for (const p of added) expect(p.module?.id).toBe("builtin.wheel");
+  });
+
+  it("offers the other built in wheel first when swapping a wheel", () => {
+    const list = withStarters(starters, []);
+    const offered = swapCandidates(list, "builtin.wheel", "Wheel");
+    expect(offered[0]?.id).toBe("builtin.axle");
+    expect(offered.map((m) => m.id)).not.toContain("builtin.wheel");
+  });
+
+  it("records the built in id on the module a swap puts in", () => {
+    const dropped = insertModule(
+      hull(),
+      named("Wheel"),
+      "root",
+      newId,
+      pack,
+      undefined,
+      true,
+    );
+    const wheel = dropped.project.pieces.find((p) => p.role === "wheel");
+    if (!wheel) throw new Error("the wheel did not land");
+    const swapped = swapModule(
+      dropped.project,
+      pack,
+      wheel.id,
+      named("Axle with two wheels"),
+      newId,
+    );
+    if (!swapped) throw new Error("the swap did not happen");
+    const refs = new Set(
+      swapped.project.pieces.flatMap((p) => (p.module ? [p.module.id] : [])),
+    );
+    expect([...refs]).toEqual(["builtin.axle"]);
   });
 });
