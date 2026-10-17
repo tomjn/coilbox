@@ -16,6 +16,7 @@
  */
 
 import type { AppliedPreset, PresetParam } from "./animPresets";
+import { BUILDING, TURRET_BUILDING } from "./buildingPlans";
 import {
   childrenOf,
   type LegoPiece,
@@ -205,8 +206,15 @@ export const QUADRUPED: BodyPlan = {
   presets: [{ presetId: "walk.quad", params: {} }],
 };
 
-/** Every plan a unit can start from. More come with #3251. */
-export const BODY_PLANS: BodyPlan[] = [BIPED, QUADRUPED, WHEELED, TRACKED];
+/** Every plan a unit can start from. */
+export const BODY_PLANS: BodyPlan[] = [
+  BIPED,
+  QUADRUPED,
+  WHEELED,
+  TRACKED,
+  TURRET_BUILDING,
+  BUILDING,
+];
 
 export function bodyPlanById(id: string): BodyPlan | undefined {
   return BODY_PLANS.find((plan) => plan.id === id);

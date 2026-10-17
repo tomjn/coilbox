@@ -285,7 +285,7 @@ A unit opened out of a game brings its own script with it. See [Opening a unit f
 
 A skeleton is the stick figure of a unit: where its joints are, what each one is for and how it moves, before it has any parts. There is no way to start a unit from one in the builder yet. Milestone 63 adds it, and this is how a skeleton is stored.
 
-A skeleton comes from a body plan, such as two legs or wheeled. The plans are part of coilbox, in `src/lego/bodyPlans.ts` and, for wheels and tracks, `src/lego/vehiclePlans.ts`. Each plan has:
+A skeleton comes from a body plan, such as two legs or wheeled. The plans are part of coilbox, in `src/lego/bodyPlans.ts`, `src/lego/vehiclePlans.ts` for wheels and tracks, and `src/lego/buildingPlans.ts` for buildings. Each plan has:
 
 - named proportions, such as leg length and stance width, each with a range and a default, in elmos or, for something the plan repeats such as axles, a whole number
 - bones, worked out from those proportions, each with a name, a parent, a position against its parent, and a role
@@ -311,6 +311,18 @@ Every wheel and road wheel has the Wheel role, and both plans apply **Wheels tur
 There is no role for a track, so a track bone has none. Hang the tread on it. The road wheels turn and the tread does not. A unit script cannot scroll a texture: the calls a Lua unit script has in Recoil move, turn, spin, scale, show, hide and explode pieces, and none of them reads or writes texture coordinates.
 
 Fewer axles or road wheels delete the bones that are no longer needed. `bonesLostWithParts` lists the ones carrying a part or with a piece hung on them, so a change can say so before it deletes anything.
+
+### Buildings
+
+The turret building and the plain building are in `src/lego/buildingPlans.ts`. Neither sets a movement class, so export writes a unit that cannot move. The root bone is the base, on the ground, with the Body role.
+
+The turret building has a turret on the base, a barrel on the turret and a muzzle flare at the end of the barrel, each with the role of the same name. It applies **Turret sweep** and **Recoil on firing**, so the generated script aims the turret and barrel at a target and kicks the barrel back on each shot. Its proportions are the base height, which is the turret's joint above the ground, the turret height, which is the barrel's joint above the turret's, and the barrel length, from the barrel's joint to the flare. The defaults are the median of Splinter Faction's 13 static defences: 41, 13.7 and 41.1.
+
+There is no aim point. A piece with the Aim point role carries a weapon of its own, so a turret and an aim point together are two weapons, and the script would aim a second weapon the unit does not have. The turret is already where the weapon aims from. **Aim point** is not applied for the same reason.
+
+The plain building is the base alone, with no proportions and nothing to animate. No Splinter Faction building has a door piece, so a door is added by hand with the Door role and **Doors**.
+
+Neither plan has a width or a depth, because no bone sits at the edge of the base for them to move. A building's width and depth are its footprint, which comes from the parts hung on it. A building with no parts yet exports with a 1 by 1 footprint.
 
 ## Health, cost and stats
 
