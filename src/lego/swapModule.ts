@@ -36,6 +36,7 @@ import * as THREE from "three";
 import { presetById } from "./animPresets";
 import { insertCompound, type PresetOutcome } from "./compounds";
 import { pieceConnectors, resolveConnections, transformOf } from "./connectors";
+import { liftedModuleRefusal } from "./liftPiece";
 import {
   followMirror,
   mirrorRole,
@@ -240,6 +241,8 @@ function swapOne(
   module: LegoProject,
   newId: () => string,
 ): SwapModuleResult | null {
+  // The caller says why; this is the last gate, so no path can swap one in.
+  if (liftedModuleRefusal(project, module)) return null;
   const chosen = pieceById(project, pieceId);
   const ref = chosen?.module;
   if (!ref) return null;
