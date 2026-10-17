@@ -16,6 +16,7 @@ import type { LoadedPack } from "./pack";
 import { pieceMesh, type RawGeometry } from "./rawGeometry";
 import { importedVZeroAtTop } from "./rawImport";
 import { bakedPieces } from "./s3oBuild";
+import type { SheetUv } from "./textureSheet";
 
 export interface ObjBuild {
   obj: string;
@@ -46,6 +47,9 @@ export function buildObj(
     unitName: string;
     textureName: string | null;
     maskName?: string | null;
+    /** Where each UV goes on a mixed unit's combined sheet (#3260), which is
+     *  a PNG read top row first like any other. */
+    sheet?: SheetUv;
   },
 ): ObjBuild | null {
   if (!pieceById(project, project.rootPieceId)) return null;
@@ -88,6 +92,11 @@ export function buildObj(
         );
       }
       for (const vertex of baked.vertices) {
+        if (options.sheet) {
+          const [u, v] = options.sheet(pieceId, vertex.uv);
+          lines.push(`vt ${fmt(u)} ${fmt(1 - v)}`);
+          continue;
+        }
         const v = turned ? 1 - vertex.uv[1] : vertex.uv[1];
         lines.push(`vt ${fmt(vertex.uv[0])} ${fmt(v)}`);
       }

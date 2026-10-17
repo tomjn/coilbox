@@ -9,7 +9,7 @@ import type { PlayTarget } from "@/play/config";
 
 import { exportTextureName, unitAtlas } from "./atlas";
 import { legoExport, legoScratchGame, type ScratchSandbox } from "./bindings";
-import { textureSheetRefusal } from "./liftPiece";
+import { buildCombinedSheet } from "./combinedSheet";
 import { unitScript } from "./luaScript";
 import type { ExportedFile, LegoProject } from "./model";
 import type { LoadedPack } from "./pack";
@@ -23,6 +23,7 @@ import {
   buildStartUnitGadget,
   buildUnitScriptGadget,
 } from "./scratchGame";
+import { sheetSources } from "./textureSheet";
 import { buildUnitDef, legoUnitDef } from "./unitDef";
 import { worthTotals } from "./worth";
 import { buildWreck } from "./wreck";
@@ -101,16 +102,28 @@ export async function writeScratchUnit({
   // An imported unit draws with its own two textures out of the store. A
   // built one samples one atlas, and only its own: an s3o names one texture.
   // A unit whose atlas is not installed still tests, untextured, rather than
-  // failing on a file that cannot be copied.
-  const heldBack = textureSheetRefusal(project);
-  if (heldBack) throw new Error(heldBack);
+  // failing on a file that cannot be copied. A unit mixing parts with lifted
+  // pieces draws from one sheet made of both (#3260).
+  const mixed = sheetSources(project, pack, raw);
+  if (mixed && "refused" in mixed) throw new Error(mixed.refused);
+  const sheet = mixed
+    ? await buildCombinedSheet(project, pack, raw, mixed.sources)
+    : null;
   const atlas = unitAtlas(project, pack.library.atlases);
   const written = exportTextureName(atlas.texture);
   const imported = project.imported ? importedTextures(project.imported) : null;
-  const model = buildS3o(project, pack, raw, {
-    texture1: imported ? imported.texture1 : written,
-    texture2: imported?.texture2,
-  });
+  const model = sheet
+    ? buildS3o(
+        project,
+        pack,
+        raw,
+        { texture1: sheet.texture1, texture2: sheet.texture2 },
+        { sheet: sheet.uv },
+      )
+    : buildS3o(project, pack, raw, {
+        texture1: imported ? imported.texture1 : written,
+        texture2: imported?.texture2,
+      });
   if (!model) throw new Error("This unit has no root piece.");
 
   const { dir } = await legoScratchGame({
@@ -125,14 +138,14 @@ export async function writeScratchUnit({
   onWritten?.(dir);
   const textures = {
     atlas:
-      !imported && atlas.installed
+      !imported && !sheet && atlas.installed
         ? {
             name: atlas.texture,
             pack: atlas.installed.folder,
             writeAs: written,
           }
         : null,
-    stored: imported?.place ?? [],
+    stored: sheet ? sheet.place : (imported?.place ?? []),
   };
   const def = legoUnitDef(
     project,
@@ -146,6 +159,7 @@ export async function writeScratchUnit({
     raw,
     { texture1: model.texture1, texture2: model.texture2 },
     def,
+    sheet?.uv,
   );
   const { owned } = await legoExport({
     dir,

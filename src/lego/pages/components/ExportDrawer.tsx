@@ -60,6 +60,7 @@ import {
   legoTexturePng,
 } from "../../bindings";
 import { pictureDigest } from "../../buildPicture";
+import { buildCombinedSheet, type CombinedSheet } from "../../combinedSheet";
 import { exportGlb } from "../../exportGlb";
 import { buildObj } from "../../exportObj";
 import {
@@ -68,7 +69,7 @@ import {
   receiptFor,
   recordExport,
 } from "../../exportRecord";
-import { liftCredits, textureSheetRefusal } from "../../liftPiece";
+import { liftCredits } from "../../liftPiece";
 import { unitScript } from "../../luaScript";
 import type {
   ExportedFile,
@@ -91,6 +92,7 @@ import {
   writtenDigest,
 } from "../../reexport";
 import { bakedPieces, buildS3o, unitBounds } from "../../s3oBuild";
+import { sheetSources, sheetTextureNames } from "../../textureSheet";
 import { buildUnitDef, defValue, legoUnitDef, unitWords } from "../../unitDef";
 import { exportWeapons } from "../../weaponModule";
 import { worthTotals } from "../../worth";
@@ -492,9 +494,13 @@ export function ExportDrawer({
   // A unit imported from somebody else's model draws with its own textures out
   // of the store, and none of the atlas below applies to it.
   const imported = project.imported ? importedTextures(project.imported) : null;
-  // A unit of parts holding a lifted piece has two textures and a model can
-  // name one, so nothing is written out until they share a sheet (#3260).
-  const heldBack = textureSheetRefusal(project);
+  // A unit of parts holding a lifted piece draws from more than one picture
+  // and a model names one, so on export they go onto one sheet (#3260). Null
+  // for every other unit, which exports exactly as it did before.
+  const mixed = sheetSources(project, pack, raw);
+  const heldBack = mixed && "refused" in mixed ? mixed.refused : null;
+  const sheetFrom = mixed && "sources" in mixed ? mixed.sources : null;
+  const sheetNames = sheetTextureNames(project.unitName);
   const credits = liftCredits(project);
   // The same two textures again, named as the PNGs a Blender file can carry.
   const blender = project.imported ? blenderTextures(project.imported) : null;
@@ -522,8 +528,11 @@ export function ExportDrawer({
   // What the GLB's material samples: an imported unit's own picture, decoded
   // out of the store, or the atlas a built one shares. Shared by the full
   // export below and by the standalone "Save GLB…" button, which both need
-  // the same answer to the same question.
-  async function glbColourUrl(): Promise<string | null> {
+  // the same answer to the same question. A mixed unit's is its sheet.
+  async function glbColourUrl(
+    sheet: CombinedSheet | null,
+  ): Promise<string | null> {
+    if (sheet) return (await decodedTexture(sheet.blender.colour)).dataUrl;
     if (blender) {
       return blender.colour
         ? (await decodedTexture(blender.colour)).dataUrl
@@ -551,8 +560,11 @@ export function ExportDrawer({
     }
     setGlbSave({ state: "working" });
     try {
-      const colourUrl = await glbColourUrl();
-      const bytes = await exportGlb(project, pack, raw, colourUrl);
+      const sheet = sheetFrom
+        ? await buildCombinedSheet(project, pack, raw, sheetFrom)
+        : null;
+      const colourUrl = await glbColourUrl(sheet);
+      const bytes = await exportGlb(project, pack, raw, colourUrl, sheet?.uv);
       if (!bytes) {
         setGlbSave({
           state: "failed",
@@ -578,12 +590,35 @@ export function ExportDrawer({
       setResult({ state: "failed", message: heldBack });
       return;
     }
+    // A mixed unit's sheet is made first, since the model names it and its
+    // UVs point onto it.
+    let sheet: CombinedSheet | null = null;
+    if (sheetFrom) {
+      setResult({ state: "working" });
+      try {
+        sheet = await buildCombinedSheet(project, pack, raw, sheetFrom);
+      } catch (error) {
+        setResult({
+          state: "failed",
+          message: error instanceof Error ? error.message : String(error),
+        });
+        return;
+      }
+    }
     // The s3o header names the atlas whether or not this export copies it, so a
     // unit exported without the texture still finds one already installed.
-    const model = buildS3o(project, pack, raw, {
-      texture1: imported ? imported.texture1 : atlasFile,
-      texture2: imported?.texture2,
-    });
+    const model = sheet
+      ? buildS3o(
+          project,
+          pack,
+          raw,
+          { texture1: sheet.texture1, texture2: sheet.texture2 },
+          { sheet: sheet.uv },
+        )
+      : buildS3o(project, pack, raw, {
+          texture1: imported ? imported.texture1 : atlasFile,
+          texture2: imported?.texture2,
+        });
     if (!model) {
       setResult({ state: "failed", message: "This unit has no root piece." });
       return;
@@ -613,19 +648,28 @@ export function ExportDrawer({
         raw,
         { texture1: model.texture1, texture2: model.texture2 },
         def,
+        sheet?.uv,
       );
       const exported = await legoExport({
         dir,
         unitName: project.unitName,
-        textures: withTexture
-          ? {
-              atlas:
-                !imported && installed
-                  ? { name: atlas, pack: installed.folder, writeAs: atlasFile }
-                  : null,
-              stored: imported ? imported.place : [],
-            }
-          : null,
+        // A mixed unit's sheet is always written: it is made from this build,
+        // so no game can already have it.
+        textures: sheet
+          ? { atlas: null, stored: sheet.place }
+          : withTexture
+            ? {
+                atlas:
+                  !imported && installed
+                    ? {
+                        name: atlas,
+                        pack: installed.folder,
+                        writeAs: atlasFile,
+                      }
+                    : null,
+                stored: imported ? imported.place : [],
+              }
+            : null,
         overwriteTexture: withOverwriteTexture,
         script: withScript ? unitScript(project) : null,
         // A script still exactly as the last export wrote it has not been
@@ -709,11 +753,20 @@ export function ExportDrawer({
       try {
         // The mask is not a colour map, so it goes beside whichever file is
         // written rather than into a material slot that would misdescribe it.
-        const place = blender?.mask ? [blender.mask] : [];
+        // A mixed unit's two sheets go the way an imported unit's own
+        // textures do.
+        const pictures = sheet ? sheet.blender : blender;
+        const place = pictures?.mask ? [pictures.mask] : [];
 
-        if (withGlb && (blender || installed)) {
-          const colourUrl = await glbColourUrl();
-          const bytes = await exportGlb(project, pack, raw, colourUrl);
+        if (withGlb && (pictures || installed)) {
+          const colourUrl = await glbColourUrl(sheet);
+          const bytes = await exportGlb(
+            project,
+            pack,
+            raw,
+            colourUrl,
+            sheet?.uv,
+          );
           if (bytes) {
             const glbWritten = await legoExportGlb({
               dir,
@@ -727,13 +780,14 @@ export function ExportDrawer({
           }
         }
 
-        if (withObj && (blender || installed)) {
+        if (withObj && (pictures || installed)) {
           const objBuild = buildObj(project, pack, raw, {
             unitName: project.unitName,
-            textureName: blender
-              ? (blender.colour?.writeAs ?? null)
+            textureName: pictures
+              ? (pictures.colour?.writeAs ?? null)
               : atlasFile,
-            maskName: blender?.mask?.writeAs,
+            maskName: pictures?.mask?.writeAs,
+            sheet: sheet?.uv,
           });
           if (objBuild) {
             const objWritten = await legoExportObj({
@@ -742,14 +796,14 @@ export function ExportDrawer({
               obj: objBuild.obj,
               mtl: objBuild.mtl,
               atlas:
-                !blender && installed
+                !pictures && installed
                   ? { name: atlas, pack: installed.folder, writeAs: atlasFile }
                   : null,
               // The colour texture as well this time: an `.mtl` names a file
               // beside it rather than carrying the picture the way a `.glb`
               // does.
-              textures: blender
-                ? [blender.colour, ...place].filter((t) => t !== null)
+              textures: pictures
+                ? [pictures.colour, ...place].filter((t) => t !== null)
                 : [],
             });
             objPath = objWritten.obj;
@@ -956,74 +1010,94 @@ export function ExportDrawer({
               </p>
             </div>
 
-            <div className="flex flex-col gap-2">
-              <span className="text-sm font-medium">
-                {imported ? "Textures" : "Texture"}
-              </span>
-              <div className="flex items-start gap-2">
-                <Checkbox
-                  id="lego-export-texture"
-                  checked={withTexture && (imported ? true : !!installed)}
-                  disabled={!imported && !installed}
-                  onCheckedChange={(checked) =>
-                    setWithTexture(checked === true)
-                  }
-                  className="mt-0.5"
-                />
-                <div>
-                  <Label htmlFor="lego-export-texture">
-                    Also place the {imported ? "textures" : "texture"}
-                  </Label>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {imported ? (
-                      <>
-                        Copies this unit's own{" "}
-                        {imported.place.length === 1 ? "texture" : "textures"}{" "}
-                        into <code>unittextures</code>, under the{" "}
-                        {imported.place.length === 1 ? "name" : "names"} the
-                        model already gives{" "}
-                        {imported.place.length === 1 ? "it" : "them"}. A file
-                        already at that name is left alone unless "Replace
-                        textures already there" below is checked, since it may
-                        be the game's own.
-                      </>
-                    ) : (
-                      <>
-                        Copies the atlas into <code>unittextures</code> as{" "}
-                        <code>{atlasFile}</code>. Every unit sampling this atlas
-                        uses it, so this only needs doing once per game. A file
-                        already at that name is left alone unless "Replace
-                        textures already there" below is checked.
-                      </>
-                    )}
-                  </p>
+            {sheetFrom ? (
+              <div className="flex flex-col gap-2">
+                <span className="text-sm font-medium">Texture sheet</span>
+                <p className="text-xs text-muted-foreground">
+                  This unit mixes parts with pieces lifted from a game, so
+                  export always writes one sheet of their textures,{" "}
+                  <code>{sheetNames.texture1}</code>, and one of their second
+                  textures, <code>{sheetNames.texture2}</code>, to{" "}
+                  <code>unittextures</code>. Both are made again from the build
+                  every time, from:
+                </p>
+                <ul className="text-xs text-muted-foreground">
+                  {sheetFrom.map((source) => (
+                    <li key={source.id}>{source.label}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <span className="text-sm font-medium">
+                  {imported ? "Textures" : "Texture"}
+                </span>
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    id="lego-export-texture"
+                    checked={withTexture && (imported ? true : !!installed)}
+                    disabled={!imported && !installed}
+                    onCheckedChange={(checked) =>
+                      setWithTexture(checked === true)
+                    }
+                    className="mt-0.5"
+                  />
+                  <div>
+                    <Label htmlFor="lego-export-texture">
+                      Also place the {imported ? "textures" : "texture"}
+                    </Label>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {imported ? (
+                        <>
+                          Copies this unit's own{" "}
+                          {imported.place.length === 1 ? "texture" : "textures"}{" "}
+                          into <code>unittextures</code>, under the{" "}
+                          {imported.place.length === 1 ? "name" : "names"} the
+                          model already gives{" "}
+                          {imported.place.length === 1 ? "it" : "them"}. A file
+                          already at that name is left alone unless "Replace
+                          textures already there" below is checked, since it may
+                          be the game's own.
+                        </>
+                      ) : (
+                        <>
+                          Copies the atlas into <code>unittextures</code> as{" "}
+                          <code>{atlasFile}</code>. Every unit sampling this
+                          atlas uses it, so this only needs doing once per game.
+                          A file already at that name is left alone unless
+                          "Replace textures already there" below is checked.
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    id="lego-export-texture-overwrite"
+                    checked={withOverwriteTexture}
+                    disabled={!imported && !installed}
+                    onCheckedChange={(checked) =>
+                      setWithOverwriteTexture(checked === true)
+                    }
+                    className="mt-0.5"
+                  />
+                  <div>
+                    <Label htmlFor="lego-export-texture-overwrite">
+                      Replace {imported ? "textures" : "a texture"} already
+                      there
+                    </Label>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Off by default, so a file the game already has under that
+                      name is left alone, since it may be the game's own. Turn
+                      this on to overwrite it with this export's copy instead.
+                    </p>
+                  </div>
                 </div>
               </div>
+            )}
 
-              <div className="flex items-start gap-2">
-                <Checkbox
-                  id="lego-export-texture-overwrite"
-                  checked={withOverwriteTexture}
-                  disabled={!imported && !installed}
-                  onCheckedChange={(checked) =>
-                    setWithOverwriteTexture(checked === true)
-                  }
-                  className="mt-0.5"
-                />
-                <div>
-                  <Label htmlFor="lego-export-texture-overwrite">
-                    Replace {imported ? "textures" : "a texture"} already there
-                  </Label>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Off by default, so a file the game already has under that
-                    name is left alone, since it may be the game's own. Turn
-                    this on to overwrite it with this export's copy instead.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {imported || installed ? null : (
+            {imported || installed || sheetFrom ? null : (
               <p className="text-xs text-muted-foreground">
                 <code>{atlas}</code> is not installed, so the texture cannot be
                 copied and the Blender files cannot be written. The{" "}
@@ -1062,8 +1136,8 @@ export function ExportDrawer({
             <div className="flex items-start gap-2">
               <Checkbox
                 id="lego-export-glb"
-                checked={withGlb && (blender ? true : !!installed)}
-                disabled={!blender && !installed}
+                checked={withGlb && (blender || sheetFrom ? true : !!installed)}
+                disabled={!blender && !installed && !sheetFrom}
                 onCheckedChange={(checked) => setWithGlb(checked === true)}
                 className="mt-0.5"
               />
@@ -1093,7 +1167,7 @@ export function ExportDrawer({
                   variant="outline"
                   size="sm"
                   disabled={
-                    (!blender && !installed) ||
+                    (!blender && !installed && !sheetFrom) ||
                     glbSave.state === "working" ||
                     heldBack !== null
                   }
@@ -1120,8 +1194,8 @@ export function ExportDrawer({
             <div className="flex items-start gap-2">
               <Checkbox
                 id="lego-export-obj"
-                checked={withObj && (blender ? true : !!installed)}
-                disabled={!blender && !installed}
+                checked={withObj && (blender || sheetFrom ? true : !!installed)}
+                disabled={!blender && !installed && !sheetFrom}
                 onCheckedChange={(checked) => setWithObj(checked === true)}
                 className="mt-0.5"
               />
@@ -1138,7 +1212,11 @@ export function ExportDrawer({
                     <>
                       , with a copy of{" "}
                       <code>
-                        {blender ? blender.colour?.writeAs : atlasFile}
+                        {sheetFrom
+                          ? sheetNames.texture1
+                          : blender
+                            ? blender.colour?.writeAs
+                            : atlasFile}
                       </code>{" "}
                       next to them so the material resolves.
                     </>
