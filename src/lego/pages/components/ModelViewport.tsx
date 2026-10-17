@@ -128,11 +128,7 @@ import {
   pieceIdOf,
 } from "./gizmoCommit";
 import { clearJoinFaces } from "./joinFaceMarks";
-import {
-  clearPlaceGhost,
-  type PlacingPart,
-  showPlaceGhost,
-} from "./placeByFace";
+import { clearPlaceGhost, type Placing, showPlaceGhost } from "./placeByFace";
 import { attachPointerHandlers } from "./pointerHandlers";
 import {
   type GameReferenceChoice,
@@ -472,7 +468,7 @@ interface Props {
   /** Putting a part on a face of the unit: hovering shows it there, and a
    *  click on the face adds it. */
   partPlacement: {
-    placing?: PlacingPart | null;
+    placing?: Placing | null;
     /** The face that was clicked, or null for a click that hit nothing. */
     onPlace?: (target: FaceTarget | null) => void;
   };
@@ -942,6 +938,10 @@ export function ModelViewport({
       placeGhost.raycast = () => {};
       scene.add(placeGhost);
 
+      const placeModuleGhost = new THREE.Group();
+      placeModuleGhost.visible = false;
+      scene.add(placeModuleGhost);
+
       const placeMark = new THREE.Points(
         new THREE.BufferGeometry().setAttribute(
           "position",
@@ -1069,6 +1069,7 @@ export function ModelViewport({
         onPlacePartRef,
         placeTarget: null,
         placeGhost,
+        placeModuleGhost,
         placeMark,
         onTransformRef,
         onTransformManyRef,
@@ -1607,7 +1608,7 @@ export function ModelViewport({
               {placingAnchor
                 ? "Click the model to put an anchor there. Escape to stop"
                 : placingPart
-                  ? `Click a face to place the part. ${shortcutLabel("place-face")} next face, ${shortcutLabel("place-twist")} twist, Escape to stop`
+                  ? `Click a face to place the ${"module" in placingPart ? (placingPart.module.mount ? "module" : "module, which has no mount so joins by its first piece") : "part"}. ${shortcutLabel("place-face")} next face, ${shortcutLabel("place-twist")} twist, Escape to stop`
                   : snapped
                     ? snappedTo
                       ? `Snapped to "${snappedTo}". Hold Alt to place freely`

@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
-
 import { insertCompound, selectionAsCompound } from "./compounds";
+import { pieceConnectors } from "./connectors";
 import {
   type LegoPiece,
   type LegoProject,
@@ -13,6 +13,7 @@ import {
   defaultMount,
   insertModule,
   moduleConnectors,
+  placeModule,
 } from "./moduleMount";
 import type { LegoPartInfo, LoadedPack } from "./pack";
 import { worldMatrix } from "./reparent";
@@ -296,5 +297,124 @@ describe("insertModule", () => {
     const b = at(out.project, second, [0, 0, 0]);
     expect(b[0] - a[0]).toBeCloseTo(3);
     expect(b[1] - a[1]).toBeCloseTo(0);
+  });
+});
+
+describe("placeModule", () => {
+  const none = { cycle: 0, twist: 0 };
+  const mounted = { ...MODULE, mount: { piece: "leg", connector: "-y" } };
+
+  function root(out: ReturnType<typeof insertModule> | null) {
+    return out?.project.pieces.find((p) => p.id === out.rootPieceIds[0]);
+  }
+
+  it("joins the mount to the face that was chosen, not the first free one", () => {
+    const out = placeModule(
+      UNIT,
+      mounted,
+      pack(),
+      { parentId: "hull", to: "+z" },
+      none,
+      counter("n"),
+    );
+    expect(root(out)?.parentId).toBe("hull");
+    expect(root(out)?.connection).toEqual({ connector: "-y", to: "+z" });
+    // The leg's bottom is on the hull's front face and it points out of it.
+    expect(
+      at(out?.project as LegoProject, root(out)?.id as string, [0, -1, 0]),
+    ).toEqual([0, 0, 2]);
+    expect(
+      at(out?.project as LegoProject, root(out)?.id as string, [0, 0, 0]),
+    ).toEqual([0, 0, 3]);
+  });
+
+  it("steps through the connectors of the mount's piece", () => {
+    const own = pieceConnectors(pack(), MODULE.pieces[0]);
+    const from = own.findIndex((c) => c.id === "-y");
+    const out = placeModule(
+      UNIT,
+      mounted,
+      pack(),
+      { parentId: "hull", to: "+y" },
+      { cycle: 1, twist: 0 },
+      counter("n"),
+    );
+    expect(root(out)?.connection?.connector).toBe(
+      own[(from + 1) % own.length].id,
+    );
+  });
+
+  it("turns the module about the joined face", () => {
+    const out = placeModule(
+      UNIT,
+      mounted,
+      pack(),
+      { parentId: "hull", to: "+y" },
+      { cycle: 0, twist: 1 },
+      counter("n"),
+    );
+    expect(root(out)?.connection?.twist).toBeCloseTo(Math.PI / 2);
+  });
+
+  it("seats a mount on a deeper piece on the chosen face without a join", () => {
+    const out = placeModule(
+      UNIT,
+      { ...MODULE, mount: { piece: "pod", connector: "-y" } },
+      pack(),
+      { parentId: "hull", to: "+y" },
+      none,
+      counter("n"),
+    );
+    const pod = out?.project.pieces.find((p) => p.name === "pod");
+    expect(root(out)?.connection).toBeUndefined();
+    expect(
+      at(out?.project as LegoProject, pod?.id as string, [0, -0.5, 0]),
+    ).toEqual([0, 0.5, 0]);
+  });
+
+  it("joins a module with no mount by the face of its first piece that faces back", () => {
+    const top = placeModule(
+      UNIT,
+      MODULE,
+      pack(),
+      { parentId: "hull", to: "+y" },
+      none,
+      counter("n"),
+    );
+    expect(root(top)?.connection).toEqual({ connector: "-y", to: "+y" });
+    const front = placeModule(
+      UNIT,
+      MODULE,
+      pack(),
+      { parentId: "hull", to: "+z" },
+      none,
+      counter("m"),
+    );
+    expect(root(front)?.connection).toEqual({ connector: "-z", to: "+z" });
+  });
+
+  it("treats a mount that no longer resolves as no mount", () => {
+    const stale = { ...MODULE, mount: { piece: "leg", connector: "nope" } };
+    const out = placeModule(
+      UNIT,
+      stale,
+      pack(),
+      { parentId: "hull", to: "+y" },
+      none,
+      counter("n"),
+    );
+    expect(root(out)?.connection).toEqual({ connector: "-y", to: "+y" });
+  });
+
+  it("is null for a missing piece, a missing face or a first piece with no faces", () => {
+    const go = (module: LegoProject, parentId: string, to: string) =>
+      placeModule(UNIT, module, pack(), { parentId, to }, none, counter("n"));
+    expect(go(mounted, "gone", "+y")).toBeNull();
+    expect(go(mounted, "hull", "nope")).toBeNull();
+    const bare: LegoProject = {
+      ...MODULE,
+      pieces: [piece({ id: "leg", parentId: null })],
+    };
+    expect(go(bare, "hull", "+y")).toBeNull();
   });
 });

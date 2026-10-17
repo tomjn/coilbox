@@ -93,7 +93,7 @@ import {
   type StaleExport,
   uniquePieceName,
 } from "../model";
-import { defaultMount, moduleConnectors } from "../moduleMount";
+import { defaultMount, moduleConnectors, placeModule } from "../moduleMount";
 import {
   type LegoPartInfo,
   type LoadedPack,
@@ -142,7 +142,7 @@ import { NoMatches, PartFilters } from "./components/PartFilters";
 import { PartPicker } from "./components/PartPicker";
 import { collisionHandlePieceId } from "./components/PieceCollisionFields";
 import { PieceTree } from "./components/PieceTree";
-import type { PlacingPart } from "./components/placeByFace";
+import type { Placing } from "./components/placeByFace";
 import type { ReferenceUnit } from "./components/ReferencePicker";
 import type { MountOptions } from "./components/SaveCompoundPopover";
 import { SaveModelPopover } from "./components/SaveModelPopover";
@@ -329,7 +329,7 @@ function Builder({ id }: { id: string | undefined }) {
   /** Whether the next click in the viewport drops a snap anchor. */
   const [placingAnchor, setPlacingAnchor] = useState(false);
   /** The part chosen in the strip, waiting for a face to be clicked. */
-  const [placingPart, setPlacingPart] = useState<PlacingPart | null>(null);
+  const [placingPart, setPlacingPart] = useState<Placing | null>(null);
   /**
    * Symmetry mode: a piece added now gets a mirrored twin the first time it is
    * put somewhere off the centre line, and the twin then follows it for as long
@@ -418,7 +418,27 @@ function Builder({ id }: { id: string | undefined }) {
       }
     }
     setPlacingPart((was) =>
-      was?.part.id === part.id ? null : { part, cycle: 0, twist: 0 },
+      was && "part" in was && was.part.id === part.id
+        ? null
+        : { part, cycle: 0, twist: 0 },
+    );
+  }
+
+  /**
+   * Choosing a module starts placing it on a connector. Alt, or a unit with no
+   * part to hover yet, adds it to the selected piece straight away.
+   */
+  function startPlacingModule(module: LegoProject, now: boolean) {
+    setPlacingAnchor(false);
+    if (now || !draft?.pieces.some((piece) => piece.partId)) {
+      addCompound(module);
+      setPlacingPart(null);
+      return;
+    }
+    setPlacingPart((was) =>
+      was && "module" in was && was.module.id === module.id
+        ? null
+        : { module, cycle: 0, twist: 0 },
     );
   }
 
@@ -430,6 +450,24 @@ function Builder({ id }: { id: string | undefined }) {
    */
   function placeOnFace(target: FaceTarget | null) {
     if (!placingPart || !draft || !pack) return;
+    if ("module" in placingPart) {
+      if (!target) return;
+      const { module } = placingPart;
+      const inserted = placeModule(
+        draft,
+        module,
+        pack,
+        target,
+        placingPart,
+        () => crypto.randomUUID(),
+      );
+      if (!inserted) return;
+      edit(() => inserted.project);
+      doc.selectMany(inserted.rootPieceIds);
+      for (const pieceId of inserted.rootPieceIds) queueTwin(pieceId);
+      setPlacingPart(null);
+      return;
+    }
     if (!target) {
       if (draft.pieces.some((piece) => piece.partId)) return;
       addPart(placingPart.part);
@@ -1716,7 +1754,12 @@ function Builder({ id }: { id: string | undefined }) {
                       pack={pack}
                       compounds={compounds}
                       atlas={drawAtlas}
-                      onInsert={addCompound}
+                      onInsert={startPlacingModule}
+                      placingId={
+                        placingPart && "module" in placingPart
+                          ? placingPart.module.id
+                          : undefined
+                      }
                       onDelete={(compoundId) => void deleteCompound(compoundId)}
                       onRename={(compound, name) =>
                         void saveCompound({ ...compound, name })
@@ -1729,7 +1772,11 @@ function Builder({ id }: { id: string | undefined }) {
                       pack={pack}
                       parts={filter.parts}
                       atlas={drawAtlas}
-                      selectedId={placingPart?.part.id}
+                      selectedId={
+                        placingPart && "part" in placingPart
+                          ? placingPart.part.id
+                          : undefined
+                      }
                       onSelect={startPlacing}
                     />
                   )}
