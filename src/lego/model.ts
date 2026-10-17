@@ -400,6 +400,18 @@ export interface LegoPiece {
    * did not come from a module. See `LegoModuleRef`.
    */
   module?: LegoModuleRef;
+  /**
+   * The piece this one is the mirror twin of (#3315). Both pieces of a pair
+   * name each other, so either can lead. Symmetry mode moves the other when one
+   * is placed, across the centre line of the root (x = 0 in its space), which is
+   * implied rather than stored: a later symmetry about the vertical axis adds a
+   * project level field that says which, and a pair with no such field is a
+   * mirror pair. Stored on the pieces, not as a list on the project, so a copy
+   * carries it and the id remap in `compounds.ts` can reach it. Absent on a
+   * piece with no twin, which is every piece of a unit saved before this
+   * existed.
+   */
+  twin?: string;
 }
 
 /**
@@ -960,6 +972,9 @@ export function projectProblems(project: LegoProject): string[] {
         `"${piece.name}" is saved as joined to a parent, but it has none.`,
       );
     }
+    if (piece.twin !== undefined && !byId.has(piece.twin)) {
+      problems.push(`"${piece.name}" has a twin that no longer exists.`);
+    }
   }
   for (const [name, count] of names) {
     if (count > 1) problems.push(`${count} pieces are called "${name}".`);
@@ -1248,6 +1263,7 @@ function parsePiece(raw: unknown): LegoPiece | null {
       const module = parseModuleRef(p.module);
       return module ? { module } : {};
     })(),
+    ...(typeof p.twin === "string" && p.twin !== "" ? { twin: p.twin } : {}),
   };
 }
 

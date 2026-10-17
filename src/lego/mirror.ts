@@ -407,7 +407,83 @@ export function mirrorTwin(
   const source = pieceById(project, pieceId) as LegoPiece;
   const parent = mirrorParent(project, source.parentId ?? project.rootPieceId);
   const copy = mirrorCopy(project, pieceId, newId, parent, pack);
-  return copy ? { project: copy.project, twinId: copy.pieceId } : null;
+  return copy
+    ? {
+        project: pairPieces(copy.project, pieceId, copy.pieceId),
+        twinId: copy.pieceId,
+      }
+    : null;
+}
+
+/**
+ * Record two pieces as each other's twin (#3315). Either was perhaps paired
+ * with another piece before, and that piece is let go rather than left naming a
+ * piece that no longer names it back.
+ */
+export function pairPieces(
+  project: LegoProject,
+  firstId: string,
+  secondId: string,
+): LegoProject {
+  const letGo = new Set<string>();
+  for (const id of [firstId, secondId]) {
+    const old = pieceById(project, id)?.twin;
+    if (old && old !== firstId && old !== secondId) letGo.add(old);
+  }
+  return {
+    ...project,
+    pieces: project.pieces.map((piece) => {
+      if (piece.id === firstId) return { ...piece, twin: secondId };
+      if (piece.id === secondId) return { ...piece, twin: firstId };
+      if (letGo.has(piece.id)) {
+        const { twin: _gone, ...rest } = piece;
+        return rest;
+      }
+      return piece;
+    }),
+  };
+}
+
+/**
+ * Break the pairing a piece is in, leaving both pieces as ordinary pieces where
+ * they stand. Returns the project untouched when the piece has no twin.
+ */
+export function unpairPiece(
+  project: LegoProject,
+  pieceId: string,
+): LegoProject {
+  const twinId = pieceById(project, pieceId)?.twin;
+  if (twinId === undefined) return project;
+  return {
+    ...project,
+    pieces: project.pieces.map((piece) => {
+      if (
+        piece.id !== pieceId &&
+        !(piece.id === twinId && piece.twin === pieceId)
+      )
+        return piece;
+      const { twin: _gone, ...rest } = piece;
+      return rest;
+    }),
+  };
+}
+
+/**
+ * Drop every pairing that names a piece the unit no longer has, so deleting
+ * either piece of a pair leaves the other as an ordinary piece.
+ */
+export function withoutDanglingTwins(project: LegoProject): LegoProject {
+  const present = new Set(project.pieces.map((piece) => piece.id));
+  if (!project.pieces.some((p) => p.twin !== undefined && !present.has(p.twin)))
+    return project;
+  return {
+    ...project,
+    pieces: project.pieces.map((piece) => {
+      if (piece.twin === undefined || present.has(piece.twin)) return piece;
+      const { twin: _gone, ...rest } = piece;
+      return rest;
+    }),
+  };
 }
 
 /**

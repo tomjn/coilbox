@@ -78,7 +78,13 @@ import {
 } from "../groupTransform";
 import { useInventoryView } from "../inventory";
 import { canFixMesh, DEFAULT_SMOOTHING_ANGLE_DEG } from "../meshFix";
-import { canMirror, mirrorCopy, mirrorPiece } from "../mirror";
+import {
+  canMirror,
+  mirrorCopy,
+  mirrorPiece,
+  unpairPiece,
+  withoutDanglingTwins,
+} from "../mirror";
 import {
   descendantIds,
   type LegoCompiledScript,
@@ -351,7 +357,7 @@ function Builder({ id }: { id: string | undefined }) {
    * as it stays selected. A preference for the session, like the scale lock
    * above, rather than something the unit carries. See `../useSymmetry`.
    */
-  const symmetry = useSymmetry({ project: draft, selectedIds, edit, pack });
+  const symmetry = useSymmetry({ project: draft, edit, pack });
   const { queueTwin, place } = symmetry;
   const inventoryView = useInventoryView(pack, compounds);
 
@@ -639,10 +645,12 @@ function Builder({ id }: { id: string | undefined }) {
         .flatMap((pieceId) => descendantIds(draft, pieceId)),
     );
     if (doomed.size === 0) return;
-    edit((project) => ({
-      ...project,
-      pieces: project.pieces.filter((piece) => !doomed.has(piece.id)),
-    }));
+    edit((project) =>
+      withoutDanglingTwins({
+        ...project,
+        pieces: project.pieces.filter((piece) => !doomed.has(piece.id)),
+      }),
+    );
     // The edit above already reseats the selection to the removed pieces'
     // parents, since they are no longer in the resulting project.
   }
@@ -2384,6 +2392,29 @@ function Builder({ id }: { id: string | undefined }) {
                               onShowFreeChange={setShowFreeFaces}
                             />
                           )}
+
+                          {selected.twin && pieceById(draft, selected.twin) ? (
+                            <div className="mt-2 flex items-center gap-2 text-xs">
+                              <span className="text-muted-foreground">
+                                Twin
+                              </span>
+                              <span className="min-w-0 flex-1 truncate">
+                                {pieceById(draft, selected.twin)?.name}
+                              </span>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 px-2 text-xs"
+                                onClick={() =>
+                                  edit((project) =>
+                                    unpairPiece(project, selected.id),
+                                  )
+                                }
+                              >
+                                Break
+                              </Button>
+                            </div>
+                          ) : null}
 
                           {selectedPart ? (
                             <div className="mt-2">

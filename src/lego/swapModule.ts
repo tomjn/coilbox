@@ -27,6 +27,7 @@ import * as THREE from "three";
 import { presetById } from "./animPresets";
 import { insertCompound, type PresetOutcome } from "./compounds";
 import { pieceConnectors, resolveConnections, transformOf } from "./connectors";
+import { withoutDanglingTwins } from "./mirror";
 import { type LegoPiece, type LegoProject, pieceById } from "./model";
 import { placeModule } from "./moduleMount";
 import type { LoadedPack } from "./pack";
@@ -80,10 +81,10 @@ export function swapModule(
     (p) => !oldIds.has(p.id) && p.parentId && oldIds.has(p.parentId),
   );
   const oldRoles = new Set(old.flatMap((p) => (p.role ? [p.role] : [])));
-  const without: LegoProject = {
+  const without: LegoProject = withoutDanglingTwins({
     ...project,
     pieces: project.pieces.filter((p) => !oldIds.has(p.id)),
-  };
+  });
 
   const join = top.connection;
   const quarters = join ? Math.round((join.twist ?? 0) / QUARTER) : 0;
