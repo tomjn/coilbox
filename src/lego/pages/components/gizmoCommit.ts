@@ -6,7 +6,13 @@ import {
   transformRoots,
 } from "../../groupTransform";
 import { isEffectivelyHidden, type LegoProject } from "../../model";
-import { snapRotation, type Vec3 } from "../../snapping";
+import { partUnit } from "../../pack";
+import {
+  moveStep,
+  snapPosition,
+  snapRotation,
+  type Vec3,
+} from "../../snapping";
 import { handleBox } from "./collisionHandles";
 import { type GizmoMode, ROTATION_STEP } from "./ModelViewport";
 import type { SceneState } from "./sceneState";
@@ -118,12 +124,36 @@ export function dragGroup(state: SceneState) {
     pivot.rotation.set(...rotation);
   }
 
-  const changes = groupTransform(state.projectRef.current, state.groupIds, at, {
-    position: [
-      pivot.position.x - at[0],
-      pivot.position.y - at[1],
-      pivot.position.z - at[2],
-    ],
+  const project = state.projectRef.current;
+  let position: Vec3 = [
+    pivot.position.x - at[0],
+    pivot.position.y - at[1],
+    pivot.position.z - at[2],
+  ];
+  // The distance moved steps in part units, not the pivot's own position: the
+  // pivot sits at the middle of the set, which is not on any grid, and the
+  // pieces keep their places relative to each other. The pivot is put back so
+  // the handles show where the set has gone.
+  const step =
+    state.snapping && state.gizmo.getMode() === "translate"
+      ? moveStep(
+          state.groupIds.flatMap(
+            (id) => project.pieces.find((p) => p.id === id) ?? [],
+          ),
+          partUnit(state.packRef.current),
+        )
+      : null;
+  if (step !== null) {
+    position = snapPosition(position, step);
+    pivot.position.set(
+      at[0] + position[0],
+      at[1] + position[1],
+      at[2] + position[2],
+    );
+  }
+
+  const changes = groupTransform(project, state.groupIds, at, {
+    position,
     rotation,
     scale,
   });
@@ -139,7 +169,7 @@ export function dragGroup(state: SceneState) {
 
   // A set seats against nothing: there is no one anchor on it to seat with.
   // Its turn still lands on the same 15 degree steps a single piece's does.
-  state.onSnapChange(rotating && state.snapping);
+  state.onSnapChange(rotating && state.snapping, undefined, step ?? undefined);
 }
 
 /** The scale a drag has put on the pivot, read off the axis that moved. */
