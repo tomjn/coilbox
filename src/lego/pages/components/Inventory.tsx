@@ -150,7 +150,9 @@ export function InventoryFilters({
             aria-label="Search the inventory"
           />
           <span className="ml-auto text-sm text-muted-foreground">
-            {view.parts.length} parts, {view.modules.length} modules
+            {view.parts.length} {view.parts.length === 1 ? "part" : "parts"},{" "}
+            {view.modules.length}{" "}
+            {view.modules.length === 1 ? "module" : "modules"}
           </span>
           {loadButton}
         </div>
