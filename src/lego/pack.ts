@@ -34,7 +34,7 @@ import {
 } from "./connectors";
 import type { LegoProject } from "./model";
 import { type Problem, problem } from "./problems";
-import { isKnownShapeKind } from "./shapes";
+import { isKnownShapeKind, type ShapeSwatch, setShapeSwatches } from "./shapes";
 
 const BLOB_MAGIC = "CBLEGO\0\0";
 const SUPPORTED_SCHEMA = 1;
@@ -101,6 +101,13 @@ export interface LegoPackManifest {
    * `partUnit` for what a pack without one gets.
    */
   unit?: number;
+  /**
+   * The plain rectangles of the atlas a generated shape tiles, one per
+   * colourway (#3326). Optional. Only the base pack's count, because an
+   * extension pack and an atlas pack use its atlas, and a base pack with none
+   * offers no shapes. See `readSwatches`.
+   */
+  swatches?: ShapeSwatch[];
   geometry: {
     file: string;
     encoding: string;
@@ -200,6 +207,63 @@ export const DEFAULT_PART_UNIT = 0.25;
  */
 export function partUnit(pack: Pick<LoadedPack, "manifest">): number {
   return pack.manifest.unit ?? DEFAULT_PART_UNIT;
+}
+
+/**
+ * The swatches a pack lists that a shape can use, and what was wrong with the
+ * rest, as the end of a sentence about the pack. A swatch needs an id no other
+ * swatch has, a rectangle inside the atlas with its minimum below its maximum,
+ * and a positive `tile`.
+ */
+export function readSwatches(value: unknown): {
+  usable: ShapeSwatch[];
+  problem: string | null;
+} {
+  if (value === undefined) return { usable: [], problem: null };
+  if (!Array.isArray(value)) {
+    return {
+      usable: [],
+      problem: 'states "swatches" that are not a list, so it offers no shapes.',
+    };
+  }
+  const usable: ShapeSwatch[] = [];
+  let refused = 0;
+  for (const item of value as unknown[]) {
+    const swatch = item as Partial<ShapeSwatch> | null;
+    const corner = (c: unknown) =>
+      Array.isArray(c) &&
+      c.length === 2 &&
+      c.every((x) => typeof x === "number" && x >= 0 && x <= 1);
+    const min = swatch?.uv?.min;
+    const max = swatch?.uv?.max;
+    if (
+      typeof swatch?.id === "string" &&
+      swatch.id !== "" &&
+      !usable.some((s) => s.id === swatch.id) &&
+      corner(min) &&
+      corner(max) &&
+      min &&
+      max &&
+      min[0] < max[0] &&
+      min[1] < max[1] &&
+      isUnit(swatch.tile)
+    ) {
+      usable.push({
+        id: swatch.id,
+        uv: { min: [min[0], min[1]], max: [max[0], max[1]] },
+        tile: swatch.tile,
+      });
+    } else {
+      refused++;
+    }
+  }
+  return {
+    usable,
+    problem:
+      refused === 0
+        ? null
+        : `states ${refused} ${refused === 1 ? "swatch" : "swatches"} that cannot be used, so shapes cannot take ${refused === 1 ? "it" : "them"}.`,
+  };
 }
 
 function isUnit(value: unknown): value is number {
@@ -337,6 +401,10 @@ export function mergePacks(sources: PackSource[]): MergedPacks {
     );
   }
   const unit = isUnit(baseUnit) ? baseUnit : DEFAULT_PART_UNIT;
+  const swatches = readSwatches(base.manifest.swatches);
+  if (swatches.problem) {
+    problems.push(`"${base.manifest.id}" ${swatches.problem}`);
+  }
   const parts: LegoPartInfo[] = [];
   const byId = new Map<string, LegoPartInfo>();
   const vertexBlocks: Float32Array[] = [];
@@ -412,7 +480,15 @@ export function mergePacks(sources: PackSource[]): MergedPacks {
   }
 
   return {
-    manifest: { ...base.manifest, unit, categories, parts },
+    manifest: {
+      ...base.manifest,
+      unit,
+      categories,
+      parts,
+      ...(base.manifest.swatches === undefined
+        ? {}
+        : { swatches: swatches.usable }),
+    },
     parts,
     byId,
     vertices: concatFloat32(vertexBlocks),
@@ -598,6 +674,7 @@ async function fetchLibrary(): Promise<LoadedPack> {
   }
 
   const merged = mergePacks(sources);
+  setShapeSwatches(merged.manifest.swatches ?? []);
   return {
     manifest: merged.manifest,
     parts: merged.parts,

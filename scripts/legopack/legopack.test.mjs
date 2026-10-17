@@ -1,8 +1,12 @@
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { buildMesh } from "./mesh.mjs";
 import { readObj } from "./obj.mjs";
 import { newellNormal, tessellate } from "./tessellate.mjs";
+import { SWATCHES, writePack } from "./writePack.mjs";
 
 /**
  * A square in the xz plane facing +y, written the way Wings exports one. The
@@ -208,5 +212,36 @@ describe("buildMesh", () => {
 
   it("returns null for an object with no faces", () => {
     expect(buildMesh({ name: "empty", faces: [] }, readObj(SQUARE))).toBeNull();
+  });
+});
+
+describe("writePack", () => {
+  it("writes the swatches the bundled pack ships (#3327)", () => {
+    const outDir = mkdtempSync(join(tmpdir(), "legopack-"));
+    try {
+      writePack({
+        outDir,
+        packId: "probe",
+        version: "1",
+        source: {},
+        licence: "",
+        parts: [],
+        atlas: { width: 2048, height: 2048 },
+        categories: [],
+      });
+      const written = JSON.parse(
+        readFileSync(join(outDir, "pack.json"), "utf8"),
+      );
+      const bundled = JSON.parse(
+        readFileSync(
+          new URL("../../src-tauri/legoparts/pack.json", import.meta.url),
+          "utf8",
+        ),
+      );
+      expect(written.swatches).toEqual(SWATCHES);
+      expect(bundled.swatches).toEqual(SWATCHES);
+    } finally {
+      rmSync(outDir, { recursive: true });
+    }
   });
 });
