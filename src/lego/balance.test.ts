@@ -117,8 +117,9 @@ function project(pieces: (Partial<LegoPiece> & { id: string })[]): LegoProject {
 }
 
 describe("isSupportRole", () => {
-  it("counts feet and wheels and nothing else", () => {
+  it("counts feet, wheels and tracks and nothing else", () => {
     expect(isSupportRole("wheel")).toBe(true);
+    expect(isSupportRole("track")).toBe(true);
     expect(isSupportRole("leg.l1.foot")).toBe(true);
     expect(isSupportRole("leg.r2.foot")).toBe(true);
     expect(isSupportRole("leg.l1.shin")).toBe(false);
@@ -284,6 +285,35 @@ describe("checkBalance", () => {
     expect(result.status).toBe("notApplicable");
     expect(balanceProblem(result)).toBeNull();
     expect(balanceSummary(result)).toMatch(/foot or wheel/);
+  });
+
+  it("balances a tracked unit on its treads when the tread is lowest", () => {
+    // Road wheels 1 above the ground, a tread under each track at y = 0.
+    const doc = project([
+      { id: "lt", role: "track", position: [-4, 0.5, 0], scale: [1, 1, 8] },
+      {
+        id: "ltread",
+        parentId: "lt",
+        position: [0, -0.5, 0],
+        scale: [1, 1, 8],
+      },
+      { id: "lw", parentId: "lt", role: "wheel", position: [0, 1, 0] },
+      { id: "rt", role: "track", position: [4, 0.5, 0] },
+      {
+        id: "rtread",
+        parentId: "rt",
+        position: [0, -0.5, 0],
+        scale: [1, 1, 8],
+      },
+      { id: "rw", parentId: "rt", role: "wheel", position: [0, 1, 0] },
+      { id: "body", position: [-1, 2, -1], scale: [2, 2, 2] },
+    ]);
+
+    const result = checkBalance(doc, pack(), null);
+
+    if (result.status === "notApplicable") throw new Error(result.reason);
+    expect([...result.resting].sort()).toEqual(["lt", "rt"]);
+    expect(result.status).toBe("inside");
   });
 
   it("does not apply, and says how high, when no foot reaches the ground", () => {

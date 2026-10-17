@@ -40,7 +40,7 @@ export function movementKinds(project: LegoProject): MoveKind[] {
   const roles = project.pieces.map((piece) => piece.role ?? "");
   const kinds: MoveKind[] = [];
   if (roles.some((role) => role.startsWith("leg."))) kinds.push("kbot");
-  if (roles.includes("wheel")) kinds.push("tank");
+  if (roles.includes("wheel") || roles.includes("track")) kinds.push("tank");
   return kinds;
 }
 

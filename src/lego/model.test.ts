@@ -500,6 +500,37 @@ describe("parseLegoProjectJson", () => {
     expect(parseLegoProjectJson(JSON.stringify(doc))).toEqual(doc);
   });
 
+  it("gives the track role to a tracked plan's unroled track bones", () => {
+    const doc: LegoProject = {
+      ...project([
+        { ...piece("root", null), bone: "base" },
+        { ...piece("l", "root"), bone: "track.l" },
+        { ...piece("r", "root"), bone: "track.r", role: "base" },
+        { ...piece("w", "l"), bone: "wheel.l1", role: "wheel" },
+      ]),
+      skeleton: { plan: "tracked", proportions: {} },
+    };
+    const parsed = parseLegoProjectJson(JSON.stringify(doc));
+    const role = (bone: string) =>
+      parsed?.pieces.find((p) => p.bone === bone)?.role;
+    expect(role("track.l")).toBe("track");
+    expect(role("track.r")).toBe("base");
+    expect(role("wheel.l1")).toBe("wheel");
+    expect(role("base")).toBeUndefined();
+  });
+
+  it("leaves a track bone of another plan without a role", () => {
+    const doc: LegoProject = {
+      ...project([
+        { ...piece("root", null), bone: "base" },
+        { ...piece("l", "root"), bone: "track.l" },
+      ]),
+      skeleton: { plan: "wheeled", proportions: {} },
+    };
+    const parsed = parseLegoProjectJson(JSON.stringify(doc));
+    expect(parsed?.pieces[1].role).toBeUndefined();
+  });
+
   it("round-trips a skeleton's target (#3254)", () => {
     const doc: LegoProject = {
       ...project([{ ...piece("root", null), bone: "base" }]),
