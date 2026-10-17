@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { BIPED, QUADRUPED } from "./bodyPlans";
 import { TURRET_BUILDING } from "./buildingPlans";
+import { planById } from "./describedPlan";
 import { fitPlan, planBones, suggestPicks } from "./fitPlan";
 import {
   type LegoPiece,
@@ -368,6 +369,47 @@ describe("planBones", () => {
       "wheel.r3",
     );
     expect(planBones(WHEELED, {}).map((b) => b.id)).not.toContain("wheel.l3");
+  });
+});
+
+describe("a described plan (#3263)", () => {
+  it("fits with its gun and build arm, and measures them", () => {
+    const plan = planById("wheeled+gun+build");
+    if (!plan) throw new Error("no plan");
+    const car = unit([
+      piece("hull", "root", [0, 5, 0]),
+      piece("gun", "hull", [0, 3, 0]),
+      piece("sleeve", "gun", [0, 4, 0]),
+      piece("muzzle", "sleeve", [0, 0, 20]),
+      piece("arm", "hull", [0, 0, 0]),
+      piece("nozzle", "arm", [0, 7, 0]),
+    ]);
+    const { project, unmeasured } = fitPlan(
+      car,
+      plan,
+      {},
+      {
+        body: "hull",
+        turret: "gun",
+        barrel: "sleeve",
+        flare: "muzzle",
+        "buildarm.arm": "arm",
+        "buildarm.nozzle": "nozzle",
+      },
+    );
+    expect(project.skeleton?.plan).toBe("wheeled+gun+build");
+    expect(project.skeleton?.proportions).toMatchObject({
+      turretHeight: 4,
+      barrelLength: 20,
+      nanoRise: 7,
+    });
+    expect(unmeasured).toEqual(
+      expect.arrayContaining(["axleSpacing", "trackWidth", "wheelHeight"]),
+    );
+    expect(project.pieces.find((p) => p.id === "gun")?.role).toBe("turret");
+    expect(project.animations?.map((a) => a.presetId)).toEqual(
+      expect.arrayContaining(["turret.track", "recoil"]),
+    );
   });
 });
 

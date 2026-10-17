@@ -152,4 +152,26 @@ describe("FitPlanDrawer", () => {
     expect(row(/^rwheel3/)).toBeTruthy();
     expect(WHEELED.proportions[0]?.id).toBe("axles");
   });
+  it("adds a gun and a build arm as the described plans do (#3263)", () => {
+    const { select, onFit } = show();
+    fireEvent.click(screen.getByRole("button", { name: /Wheels/ }));
+    expect(screen.queryByRole("button", { name: /^Turret/ })).toBeNull();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Gun" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Builds" }));
+    fireEvent.click(row(/^Turret/));
+    select("lthigh");
+    fireEvent.click(screen.getByRole("button", { name: "Fit" }));
+
+    const [plan, , picks] = onFit.mock.calls[0] ?? [];
+    expect(plan.id).toBe("wheeled+gun+build");
+    expect(picks).toEqual({ turret: "lthigh" });
+    expect(row(/^Build nozzle/)).toBeTruthy();
+  });
+
+  it("offers no second gun to a plan that has a turret", () => {
+    show();
+    fireEvent.click(screen.getByRole("button", { name: /^Turret building/ }));
+    expect(screen.queryByRole("checkbox", { name: "Gun" })).toBeNull();
+  });
 });

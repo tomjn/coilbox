@@ -16,9 +16,11 @@ import { Button, Input } from "@picoframe/frame";
 import { X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { CheckField } from "@/components/Field";
 
 import { presetById, roleLabel } from "../../animPresets";
 import { BODY_PLANS, type BodyPlan, type BodyPlanBone } from "../../bodyPlans";
+import { withGroups } from "../../describedPlan";
 import {
   type BonePicks,
   fitPlan,
@@ -67,7 +69,17 @@ export function FitPlanDrawer({
   onOpenChange,
   onFit,
 }: Props) {
-  const [plan, setPlan] = useState<BodyPlan | null>(null);
+  // The plan picked from the list, and the gun and build arm groups the
+  // "Describe it instead" form adds to it (#3263), so a fitted unit can be
+  // any plan a new one can.
+  const [base, setBase] = useState<BodyPlan | null>(null);
+  const [groups, setGroups] = useState({ weapon: false, builds: false });
+  const plan = useMemo(
+    () => (base ? withGroups(base, groups) : null),
+    [base, groups],
+  );
+  const takesGun =
+    !!base && withGroups(base, { weapon: true, builds: false }) !== base;
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [picks, setPicks] = useState<BonePicks>({});
   const [active, setActive] = useState<string | null>(null);
@@ -102,7 +114,8 @@ export function FitPlanDrawer({
   }, [selectedId, active, picks, bones]);
 
   function choose(chosen: BodyPlan) {
-    setPlan(chosen);
+    setBase(chosen);
+    setGroups({ weapon: false, builds: false });
     setCounts({});
     setPicks({});
     setActive(planBones(chosen, {})[0]?.id ?? null);
@@ -181,6 +194,18 @@ export function FitPlanDrawer({
           ) : (
             <>
               <div className="space-y-2 border-b border-border/60 px-5 py-3">
+                {takesGun ? (
+                  <CheckField
+                    label="Gun"
+                    checked={groups.weapon}
+                    onChange={(weapon) => setGroups({ ...groups, weapon })}
+                  />
+                ) : null}
+                <CheckField
+                  label="Builds"
+                  checked={groups.builds}
+                  onChange={(builds) => setGroups({ ...groups, builds })}
+                />
                 {plan.proportions
                   .filter((p) => p.unit === "count")
                   .map((proportion) => (
@@ -216,7 +241,7 @@ export function FitPlanDrawer({
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => setPlan(null)}
+                    onClick={() => setBase(null)}
                   >
                     Change plan
                   </Button>
