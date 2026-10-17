@@ -25,6 +25,10 @@ import {
 } from "./shapes";
 import type { Vec3 } from "./snapping";
 
+/** The order `boxConnectors` lists its faces in, which a shape keeps so a face
+ *  is in the same place in the list whatever the part. */
+const BOX_ORDER = ["+x", "-x", "+y", "-y", "+z", "-z"];
+
 function idOf(axis: number, sign: number): string {
   return `${sign > 0 ? "+" : "-"}${"xyz"[axis]}`;
 }
@@ -80,7 +84,9 @@ function roundConnectors(shape: LegoShape): LegoConnector[] {
       connectors.push(connector(idOf(other, sign), position, facing));
     }
   }
-  return connectors;
+  return connectors.sort(
+    (a, b) => BOX_ORDER.indexOf(a.id) - BOX_ORDER.indexOf(b.id),
+  );
 }
 
 /** The centre of a flat polygon, from the area it covers. */
