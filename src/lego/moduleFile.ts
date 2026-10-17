@@ -14,7 +14,7 @@ import {
   parseClipboardPiece,
   serializeClipboardPiece,
 } from "./clipboard";
-import type { LegoProject } from "./model";
+import { type LegoProject, parseLifted } from "./model";
 import { isBuiltInModule } from "./starterModules";
 
 /** Raised when the file's layout changes in a way an older build cannot read. */
@@ -69,7 +69,32 @@ export function parseModuleFile(
   if (!parsed.ok) {
     return { ok: false, reason: "The module in the file could not be read." };
   }
+  const unplaced = piecesWithoutGame(envelope.project);
+  if (unplaced.length > 0) {
+    return {
+      ok: false,
+      reason: `${unplaced.join(", ")} came from a game, but the file does not say which. A piece from a game only goes in units for that game.`,
+    };
+  }
   return parsed;
+}
+
+/**
+ * Names of the pieces in a file's project that claim to be lifted from a game
+ * but do not record one. Reading such a piece would drop its `lifted` record
+ * and turn it into a piece that goes into any unit.
+ */
+function piecesWithoutGame(project: unknown): string[] {
+  const pieces = (project as { pieces?: unknown } | null)?.pieces;
+  if (!Array.isArray(pieces)) return [];
+  return pieces.flatMap((piece: unknown, index) => {
+    const p = (piece ?? {}) as { name?: unknown; lifted?: unknown };
+    if (p.lifted === undefined || p.lifted === null) return [];
+    if (parseLifted(p.lifted)) return [];
+    return [
+      typeof p.name === "string" && p.name ? p.name : `piece ${index + 1}`,
+    ];
+  });
 }
 
 export type LoadChoice = "replace" | "keep-both";
