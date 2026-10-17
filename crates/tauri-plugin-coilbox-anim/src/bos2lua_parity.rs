@@ -23,8 +23,11 @@ const TOLERANCE: f64 = 0.01;
 const ANGLE_DRIFT: f64 = 0.0005;
 const FRAMES: u32 = 300;
 
-/// Expand and Exterminate scripts whose Lua is right for the engine but which
-/// these two previews play a frame or a cycle apart, each looked at by hand.
+/// Scripts each looked at by hand. Expand and Exterminate's and some of
+/// Balanced Annihilation's have Lua that is right for the engine, which
+/// these two previews play a frame or a cycle apart. The rest of Balanced
+/// Annihilation's ship a `.cob` that was not compiled from the `.bos` beside
+/// it, so no conversion of the `.bos` can match it.
 const KNOWN: &[(&str, &str)] = &[
     (
         "scripts/gdadvhfact2.bos",
@@ -49,6 +52,70 @@ const KNOWN: &[(&str, &str)] = &[
     (
         "scripts/alienpenetrator.bos",
         "a sleeper wakes in the frame StartMoving arrives",
+    ),
+    (
+        "scripts/armah.bos",
+        "a move lasting a whole number of frames ends a frame apart",
+    ),
+    (
+        "scripts/armraz.bos",
+        "a turn lasting a whole number of frames ends a frame apart",
+    ),
+    (
+        "scripts/armarad.bos",
+        "a spin's speed is off by the angle drift, so it stops either side of a half turn and the turn back goes the other way",
+    ),
+    (
+        "scripts/corspec.bos",
+        "a spin's speed is off by the angle drift, so the turn back after it ends a frame apart",
+    ),
+    (
+        "scripts/armasye.bos",
+        "the .cob turns slip in Create and the .bos does not",
+    ),
+    (
+        "scripts/armasyn.bos",
+        "the .cob turns slip in Create and the .bos does not",
+    ),
+    (
+        "scripts/armasyw.bos",
+        "the .cob turns slip in Create and the .bos does not",
+    ),
+    (
+        "scripts/armbrtha.bos",
+        "the .cob's QueryPrimary answers sleeve and the .bos answers flare",
+    ),
+    (
+        "scripts/corint.bos",
+        "the .cob's QueryPrimary answers gun and the .bos answers flare",
+    ),
+    (
+        "scripts/armcom.bos",
+        "the .cob moves lfirept and rbigflash in Create and the .bos does not",
+    ),
+    (
+        "scripts/armdecom.bos",
+        "the .cob moves lfirept and rbigflash in Create and the .bos does not",
+    ),
+    (
+        "scripts/corcom.bos",
+        "the .cob moves mlasflsh and bigflsh in Create and the .bos does not",
+    ),
+    (
+        "scripts/cordecom.bos",
+        "the .cob moves mlasflsh and bigflsh in Create and the .bos does not",
+    ),
+    (
+        "scripts/corack.bos",
+        "the .cob's Killed adds NOHEATCLOUD and never explodes lnanocase or rnanocase",
+    ),
+    (
+        "scripts/corvipe.bos",
+        "the .cob's Killed explodes pieces where the .bos returns before any explode",
+    ),
+    (
+        "scripts/corcrw.bos",
+        "the .cob has no StartMoving or StopMoving and the .bos has both",
     ),
 ];
 
