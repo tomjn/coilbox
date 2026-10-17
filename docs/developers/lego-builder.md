@@ -285,7 +285,7 @@ A unit opened out of a game brings its own script with it. See [Opening a unit f
 
 A skeleton is the stick figure of a unit: where its joints are, what each one is for and how it moves, before it has any parts. There is no way to start a unit from one in the builder yet. Milestone 63 adds it, and this is how a skeleton is stored.
 
-A skeleton comes from a body plan, such as two legs or wheeled. The plans are part of coilbox, in `src/lego/bodyPlans.ts`, `src/lego/vehiclePlans.ts` for wheels and tracks, and `src/lego/buildingPlans.ts` for buildings. Each plan has:
+A skeleton comes from a body plan, such as two legs or wheeled. The plans are part of coilbox, in `src/lego/bodyPlans.ts`, `src/lego/vehiclePlans.ts` for wheels and tracks, `src/lego/buildingPlans.ts` for buildings, and `src/lego/hoverAirShipPlans.ts` for hovercraft, ships and aircraft. Each plan has:
 
 - named proportions, such as leg length and stance width, each with a range and a default, in elmos or, for something the plan repeats such as axles, a whole number
 - bones, worked out from those proportions, each with a name, a parent, a position against its parent, and a role
@@ -324,6 +324,16 @@ The plain building is the base alone, with no proportions and nothing to animate
 
 Neither plan has a width or a depth, because no bone sits at the edge of the base for them to move. A building's width and depth are its footprint, which comes from the parts hung on it. A building with no parts yet exports with a 1 by 1 footprint.
 
+### Hovercraft, ships and aircraft
+
+The hovercraft, ship and aircraft plans are in `src/lego/hoverAirShipPlans.ts`. They use only roles and presets that already exist, so each description says what the plan will not do. Like every plan, none sets a movement class, so export writes a unit that cannot move until one is picked under Movement. See [Hovercraft, aircraft and ships](#hovercraft-aircraft-and-ships) for what each can be given today.
+
+The hovercraft has a root on the ground and a hull at the gap above it, with the Body role. **Hover and bob** bobs and rocks the hull. A deck bone sits on top of the hull, a skirt bone on each side and a wake bone at the stern. None of those has a role: the deck is where a turret goes, and the wake is the piece a script written by hand emits a wake from ([issue #4368](https://github.com/tomjn/coilbox/issues/4368)). It does not lean into turns ([issue #3359](https://github.com/tomjn/coilbox/issues/3359)). Its proportions are the hull length, the hull width, the hull height and the gap under the hull. Splinter Faction has no hover movement class, so the defaults are the median of Beyond All Reason's 20 hovercraft: 40.2 long, 31.1 wide, 14.9 high, 0.1 off the ground. Two of them dip just below the ground, so the gap starts at 0.
+
+The ship is the turret building on a hull. The root is the hull, at the waterline, with the Body role, and a wake bone with no role sits at the stern. It applies **Turret sweep** and **Recoil on firing**. Its proportions are the hull length, the deck height, which is the turret's joint above the hull's, the turret height and the barrel length. The defaults are the median of Splinter Faction's 10 ships: 89.2, 9.3, 5.8 and 14.3, with the gun's three from the 8 that carry a turret. No bone sits at the side of the hull, so the plan has no beam. It does not rock, so add **Hover and bob** with a small bob for a ship on a swell. It leaves no wake ([issue #4368](https://github.com/tomjn/coilbox/issues/4368)) and has no rudder ([issue #4396](https://github.com/tomjn/coilbox/issues/4396)).
+
+The aircraft is a body, the root, with the Body role and a gun: a turret with the barrel's joint on the turret's, and a flare at the end of the barrel. That is how all 7 of Splinter Faction's aircraft with a gun carry it. It applies **Turret sweep** and **Recoil on firing**. Its proportions are how far the gun sits ahead of the body's joint, which is negative for a tail gun, how far above, and the barrel length. The defaults are the median of those 7: 5.1, 1.9 and 5.2. It does not fly once exported ([issue #4370](https://github.com/tomjn/coilbox/issues/4370)), and has no rotors ([issue #3359](https://github.com/tomjn/coilbox/issues/3359)) or landing gear ([issue #4369](https://github.com/tomjn/coilbox/issues/4369)). **Hover and bob** is not applied, because it keeps running after the aircraft lands.
+
 ### Sizing a skeleton
 
 A unit made from a plan is sized to a target: a footprint in steps of 16 elmos (`ELMOS_PER_FOOTPRINT`) and a height in elmos. **New unit** asks for it after a plan is chosen, starting from the plan's own size, and the Skeleton panel can fit it again. The target is stored as `skeleton.target`, and the panel says when the skeleton passes it. The rules are in `src/lego/skeletonSize.ts`, and the size they measure is the box the proportions describe, from joint to joint. The footprint check measures the finished unit.
@@ -334,6 +344,9 @@ A unit made from a plan is sized to a target: a footprint in steps of 16 elmos (
 - Tracks: track width, track length and track height.
 - Turret building: base height and turret height share the height. No joint places the base's width and depth, so the target is the footprint.
 - Building: no proportions, so the target is the whole size. Its default is 9 by 9 steps, the median of Splinter Faction's 23 buildings with no weapon, and 29.1 elmos tall, which is the reference solar collector's height because no building height has been measured.
+- Hovercraft: hull width, hull length, and the gap under the hull and the hull height share the height.
+- Ship: hull length, and deck height and turret height share the height. No joint places the beam, so the width is the target's. Its default is 6 steps, the median of Splinter Faction's ships.
+- Aircraft: no joint places its width, length or height, so the target is the whole size. Its default is 4 by 4 steps and 14.5 elmos tall, the median of Splinter Faction's 17 aircraft.
 
 A value that passes a proportion's range is held to it, so the size read out can differ from the target. Where a height is shared and one part is held, the other takes what is left.
 
@@ -605,6 +618,8 @@ The roles and presets were made for units that walk or roll. To the engine a hov
 
 A unit with no wheels and no legs is offered every movement class its game has, so you can pick a hover or a ship class under Movement. A unit built from parts has no game yet, so it gets no classes at all ([issue #3257](https://github.com/tomjn/coilbox/issues/3257)).
 
+Each of the three has a body plan to start from, built from the roles and presets below. See [Hovercraft, ships and aircraft](#hovercraft-ships-and-aircraft).
+
 A hovercraft:
 
 - Works today. The engine sends it `StartMoving` and `StopMoving` like a tank, so **Driving along a path** steers it as a game would. **Hover and bob** on the Body piece bobs and rocks the hull for the unit's whole life. **Idle sway**, turrets and weapons work as on any unit.
@@ -620,7 +635,7 @@ An aircraft:
 A ship:
 
 - Works today. The engine sends it `StartMoving` and `StopMoving` like a tank, so Driving along a path, Idle sway, turrets and weapons all work. **Hover and bob** with a small bob reads as a ship rolling on the swell. The sea under **Ground** shows how the hull sits in the water.
-- Does not work. There is no wake ([issue #4368](https://github.com/tomjn/coilbox/issues/4368)) and no rudder role. The preview tells the script it is on land even on the sea ([issue #4367](https://github.com/tomjn/coilbox/issues/4367)).
+- Does not work. There is no wake ([issue #4368](https://github.com/tomjn/coilbox/issues/4368)) and no rudder role ([issue #4396](https://github.com/tomjn/coilbox/issues/4396)). The preview tells the script it is on land even on the sea ([issue #4367](https://github.com/tomjn/coilbox/issues/4367)).
 - By hand. A ship floats with the model's origin at sea level unless its definition sets `waterline`, the depth in elmos it sits below the surface. The builder does not write it, so set it in Unit tweaks. A ship class in `movedefs.lua` can override it with `overrideUnitWaterline`. Write a wake by hand, as for a hovercraft.
 
 ### Fit to the game
