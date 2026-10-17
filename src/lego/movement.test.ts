@@ -3,9 +3,11 @@ import { type LegoProject, newProject, parseLegoProjectJson } from "./model";
 import {
   type GameMovementData,
   movementKinds,
+  movementProblems,
   movementState,
   movesInGame,
   offerMoveClasses,
+  scratchMovement,
   slopeVerdict,
   suggestFlight,
   suggestMotion,
@@ -485,5 +487,104 @@ describe("suggestFlight", () => {
     expect(movesInGame({ moveClass: "", flies: "plane" })).toBe(false);
     const saved = { ...project([]), movement: m };
     expect(parseLegoProjectJson(JSON.stringify(saved))?.movement).toEqual(m);
+  });
+});
+
+/**
+ * Cakebot's shape (issue #4472): two legs, a walk cycle, and no game and no
+ * movement of its own.
+ */
+function cakebot(): LegoProject {
+  return {
+    ...project([
+      "leg.l1.thigh",
+      "leg.l1.shin",
+      "leg.l1.foot",
+      "leg.r1.thigh",
+      "leg.r1.shin",
+      "leg.r1.foot",
+    ]),
+    animations: [{ presetId: "walk.biped", params: {} }],
+  };
+}
+
+describe("scratchMovement", () => {
+  it("gives a walker with no movement the test game's walker class", () => {
+    const movement = scratchMovement(
+      cakebot(),
+      SPLINTER,
+      "Splinter Faction",
+      3,
+    );
+    expect(movement?.moveClass).toBe("WALKERTANK3");
+    expect(movement?.speed).toBe(72);
+    expect(movement?.turnRate).toBe(500);
+    expect(movesInGame(movement)).toBe(true);
+  });
+
+  it("reads a walk preset as a walker when no piece has a leg role", () => {
+    const walker = {
+      ...project(["turret"]),
+      animations: [{ presetId: "walk.quad", params: {} }],
+    };
+    expect(
+      scratchMovement(walker, SPLINTER, "Splinter Faction", 3)?.moveClass,
+    ).toBe("WALKERTANK3");
+  });
+
+  it("keeps the movement the game maker picked", () => {
+    const picked = {
+      ...cakebot(),
+      movement: { moveClass: "WHEELEDTANK2", speed: 10 },
+    };
+    expect(scratchMovement(picked, SPLINTER, "Splinter Faction", 3)).toEqual(
+      picked.movement,
+    );
+  });
+
+  it("leaves a unit with nothing that moves static", () => {
+    expect(
+      scratchMovement(project(["turret"]), SPLINTER, "Splinter Faction", 3),
+    ).toBeUndefined();
+  });
+
+  it("leaves it as it is with no game read", () => {
+    expect(
+      scratchMovement(cakebot(), null, "Splinter Faction", 3),
+    ).toBeUndefined();
+  });
+
+  it("guesses nothing when the classes carry no kind", () => {
+    const unread = { ...SPLINTER, moveDefs: [] };
+    expect(
+      scratchMovement(cakebot(), unread, "Splinter Faction", 3),
+    ).toBeUndefined();
+  });
+});
+
+describe("movementProblems", () => {
+  it("warns about legs with no movement, in one line", () => {
+    const problems = movementProblems(cakebot());
+    expect(problems).toHaveLength(1);
+    expect(problems[0].severity).toBe("warning");
+    expect(problems[0].message).toBe(
+      "It has legs but no movement class, so it exports as a building.",
+    );
+  });
+
+  it("names wheels for a vehicle", () => {
+    expect(movementProblems(project(["wheel"]))[0].message).toBe(
+      "It has wheels or tracks but no movement class, so it exports as a building.",
+    );
+  });
+
+  it("says nothing once it moves, or when nothing on it moves", () => {
+    expect(
+      movementProblems({
+        ...cakebot(),
+        movement: { moveClass: "WALKERTANK3", speed: 72 },
+      }),
+    ).toEqual([]);
+    expect(movementProblems(project(["turret"]))).toEqual([]);
   });
 });

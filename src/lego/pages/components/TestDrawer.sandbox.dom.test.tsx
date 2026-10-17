@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 /**
- * The Test drawer's "Play with this unit" (issue #3341). It writes the scratch
+ * The Test drawer's "Launch sandbox with targets" (issue #3341). It writes the scratch
  * game with the sandbox's files in it and launches the sandbox mission, with the
  * scenario's own participants and start positions.
  */
@@ -44,7 +44,11 @@ vi.mock("../../../content/config", () => ({
 
 const toBattleConfig = vi.fn();
 const unitDefs = vi.hoisted(() => ({
-  defs: null as { weaponDefs: Record<string, unknown> } | null,
+  defs: null as {
+    weaponDefs: Record<string, unknown>;
+    units?: Record<string, unknown>;
+    moveDefs?: unknown[];
+  } | null,
 }));
 vi.mock("@/workshop/config", () => ({
   useUnitDefs: () => ({
@@ -182,19 +186,31 @@ afterEach(() => {
 
 describe("TestDrawer's weapons", () => {
   it("hands the scratch game the test game's weapons and names those left out", async () => {
-    unitDefs.defs = { weaponDefs: { gun: {} } };
+    unitDefs.defs = {
+      weaponDefs: { gun: {} },
+      units: { fedbear: { movementclass: "WALKERTANK3" } },
+      moveDefs: [{ name: "WALKERTANK3" }],
+    };
     writeScratchGame.mockResolvedValue({
       ...unitFiles(),
       name: "Coilbox unit test scratch",
       weaponsLeftOut: ["armcom_laser (not in this game)."],
     });
     open();
-    fireEvent.click(screen.getByRole("button", { name: /^Launch$/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Launch with it as start unit$/ }),
+    );
     await waitFor(() => expect(launch).toHaveBeenCalled());
 
     expect(writeScratchGame).toHaveBeenCalledWith(
       expect.objectContaining({
         gameWeapons: { gun: {} },
+        // So a unit with legs and no movement walks on the test game's class
+        // (issue #4472).
+        gameMovement: {
+          units: { fedbear: { movementclass: "WALKERTANK3" } },
+          moveDefs: [{ name: "WALKERTANK3" }],
+        },
         workshopProjects: [],
       }),
     );
@@ -205,11 +221,11 @@ describe("TestDrawer's weapons", () => {
   });
 });
 
-describe("TestDrawer's Play with this unit", () => {
+describe("TestDrawer's sandbox launch", () => {
   it("writes the sandbox into the scratch game and launches its mission", async () => {
     open();
     fireEvent.click(
-      screen.getByRole("button", { name: /Play with this unit/ }),
+      screen.getByRole("button", { name: /^Launch sandbox with targets$/ }),
     );
     await waitFor(() => expect(launch).toHaveBeenCalled());
 
@@ -246,7 +262,9 @@ describe("TestDrawer's Play with this unit", () => {
 
   it("leaves Launch as it was, with no sandbox and no mission", async () => {
     open();
-    fireEvent.click(screen.getByRole("button", { name: /^Launch$/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Launch with it as start unit$/ }),
+    );
     await waitFor(() => expect(launch).toHaveBeenCalled());
 
     expect(prepareSandbox).not.toHaveBeenCalled();
@@ -271,7 +289,7 @@ describe("TestDrawer's Play with this unit", () => {
     );
     open();
     fireEvent.click(
-      screen.getByRole("button", { name: /Play with this unit/ }),
+      screen.getByRole("button", { name: /^Launch sandbox with targets$/ }),
     );
 
     expect(await screen.findByText(/nowhere to put the targets/)).toBeTruthy();
@@ -280,12 +298,14 @@ describe("TestDrawer's Play with this unit", () => {
   });
 });
 
-describe("TestDrawer's Reload in the sandbox (issue #3346)", () => {
+describe("TestDrawer's Reload into the sandbox (issues #3346, #4473)", () => {
   const reloadButton = () =>
-    screen.getByRole("button", { name: /Reload in the sandbox/ });
+    screen.getByRole("button", { name: /^Reload into the sandbox$/ });
+  const reloadShown = () =>
+    screen.queryByRole("button", { name: /Reload into the sandbox/ });
 
   /**
-   * Press Play with this unit and leave the game running: the launch only
+   * Press Launch sandbox with targets and leave the game running: the launch only
    * settles when `cancel` is called, the way a real one settles on exit.
    */
   async function sandboxRunning() {
@@ -301,16 +321,31 @@ describe("TestDrawer's Reload in the sandbox (issue #3346)", () => {
     );
     open();
     fireEvent.click(
-      screen.getByRole("button", { name: /Play with this unit/ }),
+      screen.getByRole("button", { name: /^Launch sandbox with targets$/ }),
     );
     await waitFor(() =>
       expect(reloadButton()).not.toHaveProperty("disabled", true),
     );
   }
 
-  it("is there but cannot be pressed with no sandbox running", () => {
+  it("is not shown with no sandbox running", () => {
     open();
-    expect(reloadButton()).toHaveProperty("disabled", true);
+    expect(reloadShown()).toBeNull();
+  });
+
+  it("waits for the engine, and says so, while the sandbox starts", async () => {
+    launch.mockImplementation(() => {
+      play.running = true;
+      return new Promise(() => {});
+    });
+    open();
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Launch sandbox with targets$/ }),
+    );
+    await waitFor(() => expect(launch).toHaveBeenCalled());
+    expect(
+      screen.getByRole("button", { name: /^Waiting for the engine to start$/ }),
+    ).toHaveProperty("disabled", true);
   });
 
   it("is not for a game the plain Launch started", async () => {
@@ -319,9 +354,11 @@ describe("TestDrawer's Reload in the sandbox (issue #3346)", () => {
       return new Promise(() => {});
     });
     open();
-    fireEvent.click(screen.getByRole("button", { name: /^Launch$/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Launch with it as start unit$/ }),
+    );
     await waitFor(() => expect(launch).toHaveBeenCalled());
-    expect(reloadButton()).toHaveProperty("disabled", true);
+    expect(reloadShown()).toBeNull();
   });
 
   it("reloads a changed script in the running game and says so", async () => {
