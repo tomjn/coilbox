@@ -69,6 +69,9 @@ export interface BodyPlan {
   bones(proportions: Record<string, number>): BodyPlanBone[];
   /** Applied to the unit as they are written here. */
   presets: AppliedPreset[];
+  /** The plan this one adds bone groups to (`describedPlan.ts`). It is sized
+   *  by that plan's rule, because the groups add no proportion to the size. */
+  basedOn?: string;
 }
 
 /*

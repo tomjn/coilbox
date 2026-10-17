@@ -216,6 +216,10 @@ const RULES: Record<string, Rule> = {
   },
 };
 
+function ruleFor(plan: BodyPlan): Rule | undefined {
+  return RULES[plan.basedOn ?? plan.id];
+}
+
 /** Elmos in a footprint, per axis. */
 export function targetElmos(target: SkeletonTarget): Goal {
   return {
@@ -235,7 +239,7 @@ export function skeletonSize(
   proportions: Values,
   target?: SkeletonTarget,
 ): SkeletonSize {
-  const rule = RULES[plan.id];
+  const rule = ruleFor(plan);
   const measured = rule ? rule.measure(planProportions(plan, proportions)) : {};
   const goal = target ? targetElmos(target) : null;
   return {
@@ -255,7 +259,7 @@ export function fitProportions(
   proportions: Values,
   target: SkeletonTarget,
 ): Values {
-  const rule = RULES[plan.id];
+  const rule = ruleFor(plan);
   const current = planProportions(plan, proportions);
   if (!rule) return current;
   return planProportions(plan, {
@@ -269,7 +273,7 @@ export function fitProportions(
  * proportions, or for a building the median footprint of the game's own.
  */
 export function defaultTarget(plan: BodyPlan): SkeletonTarget {
-  const rule = RULES[plan.id];
+  const rule = ruleFor(plan);
   const measured = rule?.measure(planProportions(plan)) ?? {};
   const steps = (elmos: number | undefined, fallback = 1) =>
     elmos === undefined ? fallback : footprintSteps(elmos);

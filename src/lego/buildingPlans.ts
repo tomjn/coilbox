@@ -70,6 +70,26 @@ const BASE: BodyPlanBone = {
  * is straight ahead on +z, the way the engine points a unit and recoil pulls a
  * barrel back.
  */
+export const TURRET_HEIGHT = elmos(
+  "turretHeight",
+  "Turret height",
+  0,
+  45,
+  13.7,
+  {
+    bone: "barrel",
+    axis: 1,
+  },
+);
+export const BARREL_LENGTH = elmos(
+  "barrelLength",
+  "Barrel length",
+  5,
+  160,
+  41.1,
+  { bone: "flare", axis: 2 },
+);
+
 export const TURRET_BUILDING: BodyPlan = {
   id: "turret.building",
   label: "Turret building",
@@ -79,14 +99,8 @@ export const TURRET_BUILDING: BodyPlan = {
       bone: "turret",
       axis: 1,
     }),
-    elmos("turretHeight", "Turret height", 0, 45, 13.7, {
-      bone: "barrel",
-      axis: 1,
-    }),
-    elmos("barrelLength", "Barrel length", 5, 160, 41.1, {
-      bone: "flare",
-      axis: 2,
-    }),
+    TURRET_HEIGHT,
+    BARREL_LENGTH,
   ],
   bones({ baseHeight, turretHeight, barrelLength }) {
     return [
