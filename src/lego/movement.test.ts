@@ -204,6 +204,67 @@ describe("suggestMotion", () => {
   });
 });
 
+describe("suggestMotion acceleration and brake rate", () => {
+  // BA writes `acceleration` and `brakerate` in elmos a frame squared, and the
+  // values are small: 0.026 would be 0 if rounded to a tenth. Splinter Faction
+  // writes `acceleration` and `brakeRate`, and a few older units `maxAcc`.
+  const game: GameMovementData = {
+    moveDefs: [{ name: "TANK2" }, { name: "TANK3" }],
+    units: {
+      a: {
+        canmove: true,
+        movementclass: "TANK2",
+        speed: 60,
+        acceleration: 0.026,
+        brakerate: 0.057,
+      },
+      b: {
+        canmove: true,
+        movementclass: "TANK2",
+        speed: 60,
+        maxacc: 0.096,
+        maxdec: 0.075,
+      },
+      c: {
+        canmove: true,
+        movementclass: "TANK2",
+        speed: 60,
+        acceleration: 0.5,
+      },
+    },
+  };
+
+  it("takes the median of the class's units and says where it came from", () => {
+    const movement = suggestMotion(game, "BA", "TANK2");
+    expect(movement.acceleration).toBe(0.096);
+    expect(movement.accelerationFrom).toBe("Median of 3 BA units on TANK2");
+    // Only two units state a brake rate. The third would brake at its acceleration.
+    expect(movement.brakeRate).toBe(0.066);
+    expect(movement.brakeRateFrom).toBe("Median of 2 BA units on TANK2");
+  });
+
+  it("falls back on the same kind of class", () => {
+    const movement = suggestMotion(game, "BA", "TANK3");
+    expect(movement.acceleration).toBe(0.096);
+    expect(movement.accelerationFrom).toBe(
+      "Median of 3 BA units on vehicle classes",
+    );
+  });
+
+  it("leaves both out when no unit states them", () => {
+    const movement = suggestMotion(
+      {
+        moveDefs: [{ name: "TANK2" }],
+        units: { a: { canmove: true, movementclass: "TANK2", speed: 60 } },
+      },
+      "BA",
+      "TANK2",
+    );
+    expect(movement).not.toHaveProperty("acceleration");
+    expect(movement).not.toHaveProperty("brakeRate");
+  });
+});
+
 describe("a project's movement", () => {
   it("survives a save and a load", () => {
     const saved = {
@@ -212,7 +273,11 @@ describe("a project's movement", () => {
         moveClass: "WHEELEDTANK2",
         speed: 120,
         turnRate: 600,
+        acceleration: 0.5,
+        brakeRate: 1,
         speedFrom: "Median of 3 Splinter Faction units on WHEELEDTANK2",
+        accelerationFrom: "Median of 2 Splinter Faction units on WHEELEDTANK2",
+        brakeRateFrom: "Median of 2 Splinter Faction units on WHEELEDTANK2",
       },
     };
     expect(parseLegoProjectJson(JSON.stringify(saved))?.movement).toEqual(

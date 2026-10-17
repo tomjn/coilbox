@@ -201,11 +201,21 @@ export interface LegoMovement {
   speed?: number;
   /** Written as `turnRate`, in the engine's angular units a second. */
   turnRate?: number;
+  /** Written as `acceleration`, in elmos a frame squared (the unit the engine
+   *  reads it in, and the one BA and Splinter Faction write). */
+  acceleration?: number;
+  /** Written as `brakeRate`, in the same unit. Absent means the engine brakes
+   *  at the acceleration. */
+  brakeRate?: number;
   /** Where `speed` came from, when the game suggested it. Gone once it is set
    *  by hand. */
   speedFrom?: string;
   /** Where `turnRate` came from, the same way. */
   turnRateFrom?: string;
+  /** Where `acceleration` came from, the same way. */
+  accelerationFrom?: string;
+  /** Where `brakeRate` came from, the same way. */
+  brakeRateFrom?: string;
 }
 
 export interface LegoImported {
@@ -1238,9 +1248,19 @@ function parseMovement(value: unknown): LegoMovement | null {
     moveClass: v.moveClass,
     ...(number(v.speed) ? { speed: v.speed as number } : {}),
     ...(number(v.turnRate) ? { turnRate: v.turnRate as number } : {}),
+    ...(number(v.acceleration)
+      ? { acceleration: v.acceleration as number }
+      : {}),
+    ...(number(v.brakeRate) ? { brakeRate: v.brakeRate as number } : {}),
     ...(typeof v.speedFrom === "string" ? { speedFrom: v.speedFrom } : {}),
     ...(typeof v.turnRateFrom === "string"
       ? { turnRateFrom: v.turnRateFrom }
+      : {}),
+    ...(typeof v.accelerationFrom === "string"
+      ? { accelerationFrom: v.accelerationFrom }
+      : {}),
+    ...(typeof v.brakeRateFrom === "string"
+      ? { brakeRateFrom: v.brakeRateFrom }
       : {}),
   };
 }

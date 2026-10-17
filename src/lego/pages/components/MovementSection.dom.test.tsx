@@ -271,6 +271,42 @@ describe("MovementSection", () => {
     });
   });
 
+  it("edits acceleration and brake rate, and clearing one drops its note", () => {
+    const onMovementChange = vi.fn();
+    render(
+      <MovementSection
+        project={project("wheel", {
+          movement: {
+            moveClass: "WHEELEDTANK2",
+            speed: 120,
+            acceleration: 0.5,
+            accelerationFrom: "Median of 2 SF units on WHEELEDTANK2",
+          },
+        })}
+        bounds={BOUNDS}
+        onMovementChange={onMovementChange}
+      />,
+    );
+    expect(
+      screen.getByText("Median of 2 SF units on WHEELEDTANK2"),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("Not set, the engine brakes at the acceleration"),
+    ).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/^Brake rate/), {
+      target: { value: "0.075" },
+    });
+    expect(onMovementChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ brakeRate: 0.075, acceleration: 0.5 }),
+    );
+    fireEvent.change(screen.getByLabelText(/^Acceleration/), {
+      target: { value: "" },
+    });
+    const cleared = onMovementChange.mock.calls.at(-1)?.[0];
+    expect(cleared).not.toHaveProperty("acceleration");
+    expect(cleared).not.toHaveProperty("accelerationFrom");
+  });
+
   it("says when the classes come off the unit table instead", () => {
     haveDefs([]);
     render(
