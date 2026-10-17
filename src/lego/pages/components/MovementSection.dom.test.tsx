@@ -230,7 +230,26 @@ describe("MovementSection", () => {
     expect(screen.queryByRole("combobox")).toBeNull();
   });
 
+  it("offers a legged build the vehicle classes and says the game has no walker class", () => {
+    render(
+      <MovementSection
+        project={project("leg.l1.thigh")}
+        bounds={BOUNDS}
+        onMovementChange={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByText(
+        "Splinter Faction 0.1.89 has no walker class, so these are its nearest kind",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("combobox", { name: "Movement class" }),
+    ).toBeTruthy();
+  });
+
   it("says when none of the game's classes fit the build", () => {
+    haveDefs([{ name: "SHIP3" }]);
     render(
       <MovementSection
         project={project("leg.l1.thigh")}

@@ -76,6 +76,13 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
 
   const movement = project.movement;
   const offered = state.state === "offer" ? state.offer.classes : [];
+  const standIns = [
+    ...new Set(
+      offered.flatMap((entry) =>
+        entry.standsInFor ? [KIND_LABEL[entry.standsInFor]] : [],
+      ),
+    ),
+  ];
   const options: {
     value: string;
     label: string;
@@ -88,6 +95,7 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
       label: entry.name,
       description: [
         entry.kind ? KIND_LABEL[entry.kind] : null,
+        entry.standsInFor ? `no ${KIND_LABEL[entry.standsInFor]} class` : null,
         entry.footprint ? `${entry.footprint} by ${entry.footprint}` : null,
         `${entry.units} ${entry.units === 1 ? "unit" : "units"}`,
       ]
@@ -156,7 +164,9 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
       ) : (
         <p className="text-xs text-muted-foreground">
           {state.offer.source === "movedefs"
-            ? `${state.gameName}'s ${kinds.length > 0 ? kinds.map((kind) => KIND_LABEL[kind]).join(" and ") : "movement"} classes, from its movedefs.lua`
+            ? standIns.length > 0
+              ? `${state.gameName} has no ${standIns.join(" or ")} class, so these are its nearest kind`
+              : `${state.gameName}'s ${kinds.length > 0 ? kinds.map((kind) => KIND_LABEL[kind]).join(" and ") : "movement"} classes, from its movedefs.lua`
             : `Classes ${state.gameName}'s units use, not narrowed by kind: its movedefs.lua could not be read`}
         </p>
       )}
