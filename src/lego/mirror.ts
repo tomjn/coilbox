@@ -27,6 +27,7 @@ import {
   type LegoProject,
   pieceById,
 } from "./model";
+import { pieceFingerprint } from "./moduleUpdates";
 import type { LoadedPack } from "./pack";
 import {
   framesAgree,
@@ -314,7 +315,14 @@ function joinsInstance(
     ...mirrored,
     pieces: mirrored.pieces.map((piece) =>
       copied.has(piece.id) && piece.module
-        ? { ...piece, module: { ...instance } }
+        ? {
+            ...piece,
+            module: {
+              ...piece.module,
+              instance: instance.instance,
+              fp: pieceFingerprint(piece, piece.id === copyId),
+            },
+          }
         : piece,
     ),
   };
