@@ -3279,6 +3279,10 @@ const SCRATCH_MODINFO: &[&str] = &["modinfo.lua"];
 const SCRATCH_SIDEDATA: &[&str] = &["gamedata", "sidedata.lua"];
 const SCRATCH_GADGET: &[&str] = &["LuaRules", "Gadgets", "coilbox_start_unit.lua"];
 const SCRATCH_UNIT_SCRIPT_GADGET: &[&str] = &["LuaRules", "Gadgets", "coilbox_unit_script.lua"];
+/// The two files the engine starts LuaRules from. The scratch game writes one
+/// only for a base game that lacks it (issue #4475).
+const SCRATCH_LUARULES_ENTRIES: [&[&str]; 2] =
+    [&["LuaRules", "main.lua"], &["LuaRules", "draw.lua"]];
 
 /// Write one generated file into the scratch game, creating its folder.
 ///
@@ -3305,9 +3309,15 @@ fn write_scratch_file(dir: &Path, relative: &[&str], contents: &str) -> Result<(
 /// before them when there is a sandbox. The sandbox goes first because
 /// installing the runtime removes the start unit gadget (see
 /// [`sandbox::write`]).
+///
+/// `lua_rules` holds `LuaRules/main.lua` and `LuaRules/draw.lua`, each given
+/// only when the base game lacks it. One not given is removed, because the
+/// folder is reused and a copy left from testing on another game would hide
+/// this game's own.
 fn write_scratch_game(
     dir: &Path,
     [modinfo, sidedata, gadget, unit_script_gadget]: [&str; 4],
+    lua_rules: [Option<&str>; 2],
     sandbox: Option<&sandbox::Sandbox>,
     runtime_src: Option<&Path>,
 ) -> Result<(), String> {
@@ -3328,7 +3338,25 @@ fn write_scratch_game(
     ] {
         write_scratch_file(dir, relative, contents)?;
     }
+    for (relative, contents) in SCRATCH_LUARULES_ENTRIES.into_iter().zip(lua_rules) {
+        match contents {
+            Some(contents) => write_scratch_file(dir, relative, contents)?,
+            None => remove_scratch_file(dir, relative)?,
+        }
+    }
     Ok(())
+}
+
+/// Remove one generated file from the scratch game, if it is there.
+fn remove_scratch_file(dir: &Path, relative: &[&str]) -> Result<(), String> {
+    let target = relative
+        .iter()
+        .fold(dir.to_path_buf(), |path, part| path.join(part));
+    match std::fs::remove_file(&target) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(format!("could not remove {}: {e}", target.display())),
+    }
 }
 
 /// `lego_scratch_game` prepares the `.sdd` a unit is tested in.
@@ -3337,7 +3365,9 @@ fn write_scratch_game(
 /// `<data_dir>/games/<folder>`: the `modinfo.lua` naming the base game, the
 /// `gamedata/sidedata.lua` declaring the built unit as a side's start unit,
 /// the gadget that spawns it, and the gadget that turns Lua unit scripts on
-/// where the base game has not. `sandbox` adds what "Play with this unit"
+/// where the base game has not. `lua_rules_main` and `lua_rules_draw` are
+/// `LuaRules/main.lua` and `LuaRules/draw.lua`, given only for a base game that
+/// lacks them and removed otherwise (issue #4475). `sandbox` adds what "Play with this unit"
 /// needs on top, see [`sandbox`]. The unit itself follows through
 /// `lego_export`, which treats the result as any other game folder. Nothing
 /// else in the content root is touched, so removing that one folder undoes the
@@ -3354,6 +3384,8 @@ async fn lego_scratch_game<R: Runtime>(
     sidedata: String,
     gadget: String,
     unit_script_gadget: String,
+    lua_rules_main: Option<String>,
+    lua_rules_draw: Option<String>,
     sandbox: Option<sandbox::Sandbox>,
 ) -> CliResult {
     if !valid_scratch_folder(&folder) {
@@ -3378,6 +3410,7 @@ async fn lego_scratch_game<R: Runtime>(
     if let Err(e) = write_scratch_game(
         &dir,
         [&modinfo, &sidedata, &gadget, &unit_script_gadget],
+        [lua_rules_main.as_deref(), lua_rules_draw.as_deref()],
         sandbox.as_ref(),
         runtime_src.as_deref(),
     ) {
@@ -4525,7 +4558,14 @@ mod tests {
 
         // Twice, so the second launch finds the first one's files in place.
         for _ in 0..2 {
-            write_scratch_game(dir.path(), files, Some(&sandbox), Some(src.path())).expect("write");
+            write_scratch_game(
+                dir.path(),
+                files,
+                [None, None],
+                Some(&sandbox),
+                Some(src.path()),
+            )
+            .expect("write");
         }
 
         let read = |rel: &str| std::fs::read_to_string(dir.path().join(rel)).expect(rel);
@@ -4543,6 +4583,30 @@ mod tests {
             "-- runtime"
         );
         assert_eq!(read("modinfo.lua"), "modinfo");
+    }
+
+    /// Issue #4475. A base game with no `LuaRules/draw.lua` gets one, and the
+    /// next launch on a game that has its own takes it away again, so the
+    /// reused folder never hides the game's file.
+    #[test]
+    fn a_luarules_entry_is_written_only_while_the_base_game_lacks_it() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let files = ["modinfo", "sidedata", "start unit", "unit script"];
+        let draw = dir.path().join("LuaRules/draw.lua");
+        let main = dir.path().join("LuaRules/main.lua");
+
+        write_scratch_game(dir.path(), files, [None, Some("-- handler")], None, None)
+            .expect("write");
+        assert_eq!(std::fs::read_to_string(&draw).expect("draw"), "-- handler");
+        assert!(!main.exists(), "the base game's main.lua is left to it");
+
+        write_scratch_game(dir.path(), files, [None, None], None, None).expect("write");
+        assert!(!draw.exists(), "the earlier copy would hide the game's own");
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("LuaRules/Gadgets/coilbox_start_unit.lua"))
+                .expect("gadget"),
+            "start unit"
+        );
     }
 
     #[test]

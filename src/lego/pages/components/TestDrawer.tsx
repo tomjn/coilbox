@@ -104,6 +104,7 @@ interface SandboxRun {
   /** Null until the engine process exists. */
   runId: string | null;
   baseGame: string;
+  baseArchive: string;
   sandbox: ScratchSandbox;
   loaded: LoadedSandbox;
 }
@@ -198,6 +199,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
     const written = await writeScratchGame({
       target,
       baseGame: game.name,
+      baseArchive: game.primaryArchive.name,
       project,
       pack,
       raw,
@@ -253,6 +255,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
         setSandboxRun({
           runId: null,
           baseGame: game.name,
+          baseArchive: game.primaryArchive.name,
           sandbox,
           loaded: loadedFrom(written),
         });
@@ -339,6 +342,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
       const written = await writeScratchUnit({
         target,
         baseGame: run.baseGame,
+        baseArchive: run.baseArchive,
         project,
         pack,
         raw,

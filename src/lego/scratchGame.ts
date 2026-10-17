@@ -19,6 +19,8 @@
  * game's own Lua does, and a game whose spawn gadget names its commander
  * outright (Balanced Annihilation does) never reads the side's start unit at
  * all. A fourth file turns Lua unit scripts on where the base game has not.
+ * A base game missing either of the two files that start the engine's gadget
+ * handler gets that file too (see `LUARULES_ENTRIES`).
  */
 
 import { luaString } from "./unitDef";
@@ -112,6 +114,65 @@ export function buildSideData(unitName: string): string {
     "end",
     "",
     "return sides",
+  ];
+  return `${lines.join("\n")}\n`;
+}
+
+/**
+ * The two files the engine starts LuaRules from: the synced half, then the
+ * unsynced half. When either is missing the engine drops LuaRules whole and
+ * logs nothing (`CSplitLuaHandle::InitUnsynced` in Recoil's
+ * `LuaHandleSynced.cpp`), so no gadget runs, the spawn gadget included. Empty
+ * Mod has `main.lua` and no `draw.lua`, and base content supplies neither
+ * (issue #4475).
+ */
+export const LUARULES_ENTRIES = [
+  "LuaRules/main.lua",
+  "LuaRules/draw.lua",
+] as const;
+export type LuaRulesEntry = (typeof LUARULES_ENTRIES)[number];
+
+/**
+ * Lua for unitsync's parser, run with the base game and its dependencies
+ * mounted, that answers which of `LUARULES_ENTRIES` the game has, joined by
+ * `;`.
+ */
+export const LUARULES_ENTRIES_LUA = `
+local found = {}
+for _, path in ipairs({ ${LUARULES_ENTRIES.map((p) => luaString(p)).join(", ")} }) do
+  if VFS.FileExists(path) then found[#found + 1] = path end
+end
+return table.concat(found, ';')
+`;
+
+/**
+ * Which of `LUARULES_ENTRIES` the base game lacks, from what
+ * `LUARULES_ENTRIES_LUA` answered. The parser hands the string back quoted.
+ */
+export function missingLuaRulesEntries(
+  result: string | undefined,
+): LuaRulesEntry[] {
+  const found = new Set(
+    (result ?? "")
+      .trim()
+      .replace(/^"|"$/g, "")
+      .split(";")
+      .map((path) => path.toLowerCase()),
+  );
+  return LUARULES_ENTRIES.filter((path) => !found.has(path.toLowerCase()));
+}
+
+/**
+ * What the scratch archive writes in place of a missing LuaRules entry file.
+ * It is the engine's own gadget handler from base content, which is what a
+ * game's own `main.lua` and `draw.lua` usually hold, and it runs both halves.
+ */
+export function buildLuaRulesEntry(): string {
+  const lines = [
+    "-- Starts the engine's gadget handler, for a base game that lacks this file.",
+    "-- Rewritten on every test launch. Delete this folder to undo it.",
+    "",
+    'VFS.Include("LuaGadgets/gadgets.lua", nil, VFS.BASE)',
   ];
   return `${lines.join("\n")}\n`;
 }

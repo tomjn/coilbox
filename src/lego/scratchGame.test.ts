@@ -2,10 +2,13 @@ import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 
 import {
+  buildLuaRulesEntry,
   buildModInfo,
   buildSideData,
   buildStartUnitGadget,
   buildUnitScriptGadget,
+  LUARULES_ENTRIES_LUA,
+  missingLuaRulesEntries,
   SCRATCH_SIDE,
   SPAWN_FRAME,
 } from "./scratchGame";
@@ -375,5 +378,69 @@ describe("buildUnitScriptGadget", () => {
     expect(run.lines).toEqual([
       "included LuaGadgets/Gadgets/unit_script.lua from zip",
     ]);
+  });
+});
+
+// Issue #4475. The engine runs no gadget at all when a game lacks either file
+// LuaRules starts from, and Empty Mod lacks `draw.lua`.
+describe("LuaRules entry files", () => {
+  /** Run the probe under luajit in a game holding `files`, and print its answer. */
+  function probe(files: string[]) {
+    return runLua(
+      LUARULES_ENTRIES_LUA,
+      `
+local files = { ${files.map((f) => JSON.stringify(f)).join(", ")} }
+VFS = {
+  FileExists = function(path)
+    for _, f in ipairs(files) do if f == path then return true end end
+    return false
+  end,
+}
+print(assert(loadstring(io.read("*a")))())
+`,
+    );
+  }
+
+  it("asks for both files and answers the ones the game has", () => {
+    const run = probe(["LuaRules/main.lua"]);
+    expect(run.stderr).toBe("");
+    expect(run.lines).toEqual(["LuaRules/main.lua"]);
+    expect(probe(["LuaRules/main.lua", "LuaRules/draw.lua"]).lines).toEqual([
+      "LuaRules/main.lua;LuaRules/draw.lua",
+    ]);
+  });
+
+  it("reads the parser's quoted answer back as what is missing", () => {
+    expect(missingLuaRulesEntries('"LuaRules/main.lua"')).toEqual([
+      "LuaRules/draw.lua",
+    ]);
+    expect(
+      missingLuaRulesEntries('"LuaRules/main.lua;LuaRules/draw.lua"'),
+    ).toEqual([]);
+    expect(missingLuaRulesEntries('""')).toEqual([
+      "LuaRules/main.lua",
+      "LuaRules/draw.lua",
+    ]);
+  });
+
+  it("matches a game's file whatever its case", () => {
+    expect(
+      missingLuaRulesEntries('"luarules/main.lua;LUARULES/DRAW.LUA"'),
+    ).toEqual([]);
+  });
+
+  it("starts the engine's own gadget handler from base content", () => {
+    const run = runLua(
+      buildLuaRulesEntry(),
+      `
+VFS = {
+  BASE = "base",
+  Include = function(path, env, mode) print(path .. " from " .. mode) end,
+}
+assert(loadstring(io.read("*a")))()
+`,
+    );
+    expect(run.stderr).toBe("");
+    expect(run.lines).toEqual(["LuaGadgets/gadgets.lua from base"]);
   });
 });
