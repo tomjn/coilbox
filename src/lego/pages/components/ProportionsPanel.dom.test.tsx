@@ -37,6 +37,7 @@ function show(project: LegoProject, plan: BodyPlan) {
   const onPreview = vi.fn();
   const onTarget = vi.fn();
   const onRemove = vi.fn();
+  const onReset = vi.fn();
   render(
     <ProportionsPanel
       project={project}
@@ -45,10 +46,11 @@ function show(project: LegoProject, plan: BodyPlan) {
       onPreview={onPreview}
       onTarget={onTarget}
       onRemove={onRemove}
+      onReset={onReset}
       preview={null}
     />,
   );
-  return { onChange, onPreview, onTarget, onRemove };
+  return { onChange, onPreview, onTarget, onRemove, onReset };
 }
 
 function type(label: string, text: string) {
@@ -283,6 +285,25 @@ describe("ProportionsPanel", () => {
       expect(screen.queryAllByRole("slider")).toHaveLength(0);
       expect(screen.queryAllByRole("textbox")).toHaveLength(0);
       expect(screen.queryByRole("button", { name: "Fit" })).toBeNull();
+    });
+
+    it("resets to the plan only after a confirm that names the pieces", () => {
+      const fitted: LegoProject = {
+        ...unit(BIPED),
+        skeleton: {
+          plan: "biped",
+          proportions: { legLength: 30 },
+          fitted: true,
+        },
+      };
+      const { onReset } = show(fitted, BIPED);
+
+      fireEvent.click(screen.getByRole("button", { name: "Reset to plan" }));
+      expect(onReset).not.toHaveBeenCalled();
+      expect(screen.getByText(/^Moves /).textContent).toContain("hip");
+      fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+
+      expect(onReset).toHaveBeenCalledTimes(1);
     });
   });
 });

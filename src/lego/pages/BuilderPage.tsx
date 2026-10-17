@@ -171,7 +171,7 @@ import { dragPiece, freeMoved, type Seat, typedTransform } from "../seat";
 import { isKnownShapeKind, type LegoShape, type ShapeKind } from "../shapes";
 import { isShortcut, shortcutLabel } from "../shortcuts";
 import { skeletonProblems } from "../skeletonChecks";
-import { applyProportions } from "../skeletonEdit";
+import { applyProportions, resetToPlan } from "../skeletonEdit";
 import { applyTarget } from "../skeletonSize";
 import { swapModule } from "../swapModule";
 import { swapPart } from "../swapPart";
@@ -304,6 +304,15 @@ function Builder({ id }: { id: string | undefined }) {
     },
     [edit, skeletonPlan],
   );
+  // Hands a fitted skeleton back to the plan, as one undo step.
+  const resetSkeleton = useCallback(() => {
+    setProportionPreview(null);
+    if (!skeletonPlan) return;
+    edit(
+      (project) =>
+        resetToPlan(project, skeletonPlan, () => crypto.randomUUID()).project,
+    );
+  }, [edit, skeletonPlan]);
   // Lets the skeleton go and keeps every piece, as one undo step.
   const removeSkeleton = useCallback(() => {
     setProportionPreview(null);
@@ -2474,6 +2483,7 @@ function Builder({ id }: { id: string | undefined }) {
                   onChange={changeProportions}
                   onTarget={changeTarget}
                   onRemove={removeSkeleton}
+                  onReset={resetSkeleton}
                   onPreview={setProportionPreview}
                   preview={proportionPreview}
                 />
