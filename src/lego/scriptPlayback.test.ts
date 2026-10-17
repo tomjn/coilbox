@@ -2,9 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   at,
+  CREATED,
   clampFrame,
   frameAt,
   hiddenAt,
+  ON_LAND,
+  ON_WATER,
+  onGround,
   PREVIEW_FRAMES,
   playable,
   poseAt,
@@ -484,5 +488,31 @@ describe("playable", () => {
     expect(playable(null)).toBe(false);
     expect(playable(timeline({ frames: [] }))).toBe(false);
     expect(playable(timeline({ error: "it threw" }))).toBe(true);
+  });
+});
+
+describe("onGround", () => {
+  const occupy = (events: ScriptEvent[]) =>
+    events.find((event) => event.callin === "setSFXoccupy")?.args;
+
+  it("tells a script it is on land on every ground but the sea", () => {
+    for (const id of ["grid", "terrain", "slope", "uneven", undefined]) {
+      expect(occupy(onGround(CREATED, id))).toEqual([ON_LAND]);
+    }
+  });
+
+  it("tells a script it is in water on the sea ground", () => {
+    expect(ON_WATER).toBe(2);
+    expect(occupy(onGround(CREATED, "water"))).toEqual([ON_WATER]);
+  });
+
+  it("leaves every other event alone", () => {
+    const events: ScriptEvent[] = [
+      ...CREATED,
+      { frame: 5, callin: "setSFXoccupy", args: [1] },
+    ];
+    const told = onGround(events, "water");
+    expect(told[0]).toEqual(events[0]);
+    expect(told[2]).toEqual(events[2]);
   });
 });
