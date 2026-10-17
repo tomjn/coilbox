@@ -133,7 +133,12 @@ import {
 } from "../model";
 import { swapCandidates, withLabels } from "../moduleFilter";
 import { defaultMount, moduleConnectors, placeModule } from "../moduleMount";
-import { type ModuleUpdate, moduleUpdates } from "../moduleUpdates";
+import {
+  type ModuleUpdate,
+  markModuleCurrent,
+  moduleUpdates,
+  type UntrackedModule,
+} from "../moduleUpdates";
 import { checkOverlap, overlapProblems } from "../overlap";
 import {
   type LegoPartInfo,
@@ -512,7 +517,7 @@ function Builder({ id }: { id: string | undefined }) {
   // A dismissal holds for these instances at these module stamps, so it lapses
   // when a module changes again or another unit is opened.
   const offerKey = moduleOffers
-    ? `${draft?.id}:${moduleOffers.outdated.map((u) => `${u.instance}@${u.stamp}`).join(",")}`
+    ? `${draft?.id}:${moduleOffers.outdated.map((u) => `${u.instance}@${u.stamp}`).join(",")}|${moduleOffers.untracked.map((u) => u.instance).join(",")}`
     : "";
   const missingModuleIds = useMemo(
     () => new Set(moduleOffers?.missing.map((m) => m.moduleId)),
@@ -1356,9 +1361,21 @@ function Builder({ id }: { id: string | undefined }) {
   }
 
   /** Update one out of date instance to the module as it is now. */
-  function updateInstance(update: ModuleUpdate) {
+  function updateInstance(update: ModuleUpdate | UntrackedModule) {
     const module = compounds.find((c) => c.id === update.moduleId);
     if (module) changeModule(update.rootPieceId, module, "Update module");
+  }
+
+  /** Record the module's stamp on an untracked instance. One edit, one undo. */
+  function markInstanceCurrent(item: UntrackedModule) {
+    const module = compounds.find((c) => c.id === item.moduleId);
+    if (!module) return;
+    edit(
+      (project) =>
+        markModuleCurrent(project, item.rootPieceId, module, {
+          symmetry: symmetry.on,
+        }) ?? project,
+    );
   }
 
   function movePivot(pieceId: string, pivot: [number, number, number]) {
@@ -2102,11 +2119,14 @@ function Builder({ id }: { id: string | undefined }) {
                     </div>
 
                     {moduleOffers &&
-                    moduleOffers.outdated.length > 0 &&
+                    (moduleOffers.outdated.length > 0 ||
+                      moduleOffers.untracked.length > 0) &&
                     dismissedUpdates !== offerKey ? (
                       <ModuleUpdateBanner
                         updates={moduleOffers.outdated}
+                        untracked={moduleOffers.untracked}
                         onUpdate={updateInstance}
+                        onMark={markInstanceCurrent}
                         onDismiss={() => setDismissedUpdates(offerKey)}
                       />
                     ) : null}

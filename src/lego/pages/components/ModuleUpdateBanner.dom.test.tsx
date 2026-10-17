@@ -85,4 +85,31 @@ describe("the module update banner", () => {
     expect(onDismiss).toHaveBeenCalled();
     expect(onUpdate).not.toHaveBeenCalled();
   });
+
+  it("lists an untracked instance with both actions", () => {
+    const onUpdate = vi.fn();
+    const onMark = vi.fn();
+    const item = {
+      instance: "i",
+      moduleId: "wheel",
+      moduleName: "Wheel",
+      name: "front",
+      rootPieceId: "front",
+    };
+    render(
+      <ModuleUpdateBanner
+        updates={[]}
+        untracked={[item]}
+        onUpdate={onUpdate}
+        onMark={onMark}
+        onDismiss={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/Added before changes were tracked/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Mark as current" }));
+    expect(onMark).toHaveBeenCalledWith(item);
+    expect(onUpdate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Update now" }));
+    expect(onUpdate).toHaveBeenCalledWith(item);
+  });
 });
