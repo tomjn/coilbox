@@ -257,6 +257,9 @@ export type BalanceResult =
        *  negative. Zero with no width, where neither is meant. */
       outsideBy: number;
       basis: BalanceBasis;
+      /** True when the unit has no foot, wheel or track role and the lowest
+       *  pieces stand in for the support. */
+      guessed?: boolean;
     };
 
 export interface Geometry {
@@ -332,6 +335,19 @@ function supportGeometry(
 }
 
 /**
+ * The pieces that stand in for the support when a unit has no support role:
+ * those whose lowest point is within `SAME_POSITION` of the unit's lowest. That
+ * is the distance this file already uses to say a foot is on the ground.
+ */
+function lowestPieces(geometry: Geometry[]): Geometry[] {
+  const lowestOf = (g: Geometry) => Math.min(...g.points.map((p) => p[1]));
+  const lowest = Math.min(...geometry.map(lowestOf));
+  return geometry
+    .filter((g) => lowestOf(g) <= lowest + SAME_POSITION)
+    .map((g) => ({ id: g.id, points: g.points, indices: [] }));
+}
+
+/**
  * Compare the unit's centre of mass with the ground its feet and wheels cover.
  *
  * The support area is the convex hull, seen from above, of the lowest points of
@@ -348,7 +364,9 @@ export function checkBalance(
   const geometry = worldGeometry(project, pieces);
 
   const roles = new Map(project.pieces.map((p) => [p.id, p.role]));
-  const supports = supportGeometry(project, geometry, roles);
+  let supports = supportGeometry(project, geometry, roles);
+  const guessed = supports.length === 0 && geometry.length > 0;
+  if (guessed) supports = lowestPieces(geometry);
   if (supports.length === 0) {
     return {
       status: "notApplicable",
@@ -408,6 +426,7 @@ export function checkBalance(
       resting,
       outsideBy: 0,
       basis,
+      ...(guessed ? { guessed } : {}),
     };
   }
   const outsideBy = signedDistanceToHull(centre, support);
@@ -418,11 +437,21 @@ export function checkBalance(
     resting,
     outsideBy,
     basis,
+    ...(guessed ? { guessed } : {}),
   };
 }
 
+const GUESSED = "Support guessed from the lowest pieces.";
+
 /** What the viewport says about a result, kept short. */
 export function balanceSummary(result: BalanceResult): string {
+  const text = summaryText(result);
+  return result.status !== "notApplicable" && result.guessed
+    ? `${text} ${GUESSED}`
+    : text;
+}
+
+function summaryText(result: BalanceResult): string {
   switch (result.status) {
     case "notApplicable":
       return `Balance not checked. ${result.reason}`;
@@ -446,7 +475,7 @@ export function balanceProblem(result: BalanceResult): Problem | null {
     ? problem(
         "balance",
         "warning",
-        `Looks as if it would tip: the weight centre is ${Number(result.outsideBy.toFixed(2))} elmos outside the feet.`,
+        `Looks as if it would tip: the weight centre is ${Number(result.outsideBy.toFixed(2))} elmos outside the feet.${result.guessed ? ` ${GUESSED}` : ""}`,
         result.resting,
       )
     : null;
