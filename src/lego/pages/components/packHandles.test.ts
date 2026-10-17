@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { type LegoProject, newProject } from "../../model";
 import type { LegoPartInfo, LoadedPack } from "../../pack";
+import type { LegoShape } from "../../shapes";
 import { buildCollisionHandles } from "./collisionHandles";
 import {
   beginPackDrag,
@@ -40,7 +41,7 @@ function part(id: string, size: Vec3, extra: Partial<LegoPartInfo> = {}) {
   } as LegoPartInfo;
 }
 
-function setup(rotationY = 0) {
+function setup(rotationY = 0, shape?: LegoShape) {
   const parts = [
     part("z1", [1, 1, 1]),
     part("z2", [1, 1, 2]),
@@ -68,7 +69,8 @@ function setup(rotationY = 0) {
         id: "a",
         name: "a",
         parentId: "root",
-        partId: "z2",
+        partId: shape ? null : "z2",
+        ...(shape ? { shape } : {}),
         position: [0, 0, 0],
         rotation: [0, rotationY, 0],
         scale: [1, 1, 1],
@@ -84,6 +86,7 @@ function setup(rotationY = 0) {
   });
   const camera = new THREE.PerspectiveCamera();
   const resized = vi.fn();
+  const shapeResized = vi.fn();
   const readout = vi.fn();
   const state = {
     scene,
@@ -107,12 +110,14 @@ function setup(rotationY = 0) {
     packHandleHotMaterial: new THREE.MeshBasicMaterial(),
     packPreview: buildPackPreview(new THREE.LineBasicMaterial()),
     packDrag: null,
+    snapping: true,
     onPackResizeRef: { current: resized },
+    onShapeResizeRef: { current: shapeResized },
     onPackReadoutRef: { current: readout },
     render: vi.fn(),
   } as unknown as SceneState;
   scene.add(state.packHandles);
-  return { state, resized, readout, camera };
+  return { state, resized, shapeResized, readout, camera };
 }
 
 /** A ray from `from` through `to`. */
@@ -295,5 +300,125 @@ describe("a face drag", () => {
     movePackDrag(state, ray([10, 0, 0], [0, 0, 6]));
     endPackDrag(state);
     expect(state.onPackResizeRef.current).not.toHaveBeenCalled();
+  });
+});
+
+describe("a face drag on a generated shape", () => {
+  const wedge: LegoShape = { kind: "wedge", size: [1, 1, 2], swatch: "grey" };
+
+  /** The camera sits on +x looking at the shape, so z runs across the screen. */
+  function grabFront(shape: LegoShape = wedge, rotationY = 0) {
+    const s = setup(rotationY, shape);
+    s.camera.position.set(10, 0, 0);
+    s.camera.lookAt(0, 0, 0);
+    s.camera.updateMatrixWorld(true);
+    showPackHandles(s.state);
+    s.state.packHandles.updateMatrixWorld(true);
+    return s;
+  }
+
+  it("is the selected shape in scale mode", () => {
+    expect(packSubject(setup(0, wedge).state)?.shape?.kind).toBe("wedge");
+  });
+
+  it("is nothing when the page gives no way to resize a shape", () => {
+    const { state } = setup(0, wedge);
+    state.onShapeResizeRef.current = undefined;
+    expect(packSubject(state)).toBeNull();
+  });
+
+  it("puts a plate on each face of the shape", () => {
+    const { state } = grabFront();
+    const front = state.packHandles.children.find(
+      (c) => c.userData.axis === 2 && c.userData.sign === 1,
+    );
+    expect(front?.position.toArray()).toEqual([0, 0, 1]);
+  });
+
+  it("hands over the size dragged to, in whole part units, as one edit", () => {
+    const { state, shapeResized, resized, readout } = grabFront();
+    expect(beginPackDrag(state, ray([10, 0, 0], [0, 0, 1]))).toBe(true);
+    movePackDrag(state, ray([10, 0, 0], [0, 0, 1.4]));
+    movePackDrag(state, ray([10, 0, 0], [0, 0, 1.9]));
+    expect(readout).toHaveBeenLastCalledWith("3 elmos, 12 units");
+    expect(shapeResized).not.toHaveBeenCalled();
+    endPackDrag(state);
+    expect(shapeResized).toHaveBeenCalledTimes(1);
+    expect(shapeResized).toHaveBeenCalledWith("a", 2, 1, 3);
+    expect(resized).not.toHaveBeenCalled();
+    expect(readout).toHaveBeenLastCalledWith(null);
+  });
+
+  it("drags the low face the other way round", () => {
+    const { state, shapeResized } = grabFront();
+    beginPackDrag(state, ray([10, 0, 0], [0, 0, -1]));
+    movePackDrag(state, ray([10, 0, 0], [0, 0, -2]));
+    endPackDrag(state);
+    expect(shapeResized).toHaveBeenCalledWith("a", 2, -1, 3);
+  });
+
+  it("turns the step off while Alt is held", () => {
+    const { state, shapeResized } = grabFront();
+    state.snapping = false;
+    beginPackDrag(state, ray([10, 0, 0], [0, 0, 1]));
+    movePackDrag(state, ray([10, 0, 0], [0, 0, 1.3]));
+    endPackDrag(state);
+    expect(shapeResized).toHaveBeenCalledTimes(1);
+    const [, , , size] = shapeResized.mock.calls[0];
+    expect(size).toBeCloseTo(2.3);
+  });
+
+  it("stops at the smallest size", () => {
+    const { state, shapeResized, readout } = grabFront();
+    beginPackDrag(state, ray([10, 0, 0], [0, 0, 1]));
+    movePackDrag(state, ray([10, 0, 0], [0, 0, -5]));
+    expect(readout).toHaveBeenLastCalledWith("0.25 elmos, 1 units");
+    endPackDrag(state);
+    expect(shapeResized).toHaveBeenCalledWith("a", 2, 1, 0.25);
+  });
+
+  it("makes no edit for a press that goes nowhere", () => {
+    const { state, shapeResized } = grabFront();
+    beginPackDrag(state, ray([10, 0, 0], [0, 0, 1]));
+    movePackDrag(state, ray([10, 0, 0], [0, 0, 1]));
+    endPackDrag(state);
+    expect(shapeResized).not.toHaveBeenCalled();
+  });
+
+  it("outlines the size it would land on, with the other face still", () => {
+    const { state } = grabFront();
+    beginPackDrag(state, ray([10, 0, 0], [0, 0, 1]));
+    movePackDrag(state, ray([10, 0, 0], [0, 0, 2.6]));
+    expect(state.packPreview.scale.toArray()).toEqual([1, 1, 3.5]);
+    expect(state.packPreview.position.toArray()).toEqual([0, 0, 0.75]);
+  });
+
+  it("outlines both cross axes of a round shape", () => {
+    const cylinder: LegoShape = {
+      kind: "cylinder",
+      size: [2, 4, 2],
+      swatch: "grey",
+      options: { axis: 1, sides: 12 },
+    };
+    const { state, shapeResized } = grabFront(cylinder);
+    beginPackDrag(state, ray([10, 0, 0], [0, 0, 1]));
+    movePackDrag(state, ray([10, 0, 0], [0, 0, 2]));
+    // z is a cross axis: the width grows to match, about the middle.
+    expect(state.packPreview.scale.toArray()).toEqual([3, 4, 3]);
+    endPackDrag(state);
+    expect(shapeResized).toHaveBeenCalledWith("a", 2, 1, 3);
+  });
+
+  it("follows the piece's own axis when it is turned", () => {
+    const { state, shapeResized, camera } = setup(Math.PI / 2, wedge);
+    camera.position.set(0, 10, 0.001);
+    camera.lookAt(0, 0, 0);
+    camera.updateMatrixWorld(true);
+    showPackHandles(state);
+    state.packHandles.updateMatrixWorld(true);
+    expect(beginPackDrag(state, ray([0, 10, 0], [1, 0, 0]))).toBe(true);
+    movePackDrag(state, ray([0, 10, 0], [2, 0, 0]));
+    endPackDrag(state);
+    expect(shapeResized).toHaveBeenCalledWith("a", 2, 1, 3);
   });
 });

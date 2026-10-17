@@ -678,6 +678,14 @@ interface Props {
      *  `sign` the end dragged and `size` the size of the part to swap to. One
      *  edit, so one step of undo. */
     onResize: (pieceId: string, axis: Axis, sign: 1 | -1, size: number) => void;
+    /** The same for a generated shape (#3331). `size` is the size the shape
+     *  lands on, along its own axis. */
+    onResizeShape: (
+      pieceId: string,
+      axis: Axis,
+      sign: 1 | -1,
+      size: number,
+    ) => void;
   };
 }
 
@@ -756,6 +764,7 @@ export function ModelViewport({
   const { showAimPoint = false, onAimChange } = aimPoint;
   const onGuidesEdit = guides?.onEdit;
   const onPackResize = packResize?.onResize;
+  const onShapeResize = packResize?.onResizeShape;
   // The one selected piece, when there is exactly one. Anchors, the key at the
   // bottom of the view and the pivot dot are all about a single piece: a set
   // is dragged about its midpoint and seats against nothing.
@@ -902,6 +911,8 @@ export function ModelViewport({
   onAimChangeRef.current = onAimChange;
   const onPackResizeRef = useRef(onPackResize);
   onPackResizeRef.current = onPackResize;
+  const onShapeResizeRef = useRef(onShapeResize);
+  onShapeResizeRef.current = onShapeResize;
   const onPackReadoutRef = useRef(setResizeNote);
   // The frame comes from the ref when the stand-in is let go rather than when
   // the scenario started, since the run has played on since then.
@@ -1316,6 +1327,7 @@ export function ModelViewport({
         packPreview,
         packDrag: null,
         onPackResizeRef,
+        onShapeResizeRef,
         onPackReadoutRef,
         pieceCollision: null,
         pieceCollisionMaterial,
