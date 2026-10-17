@@ -13,6 +13,7 @@ import {
   pickWeaponFile,
   pickWeaponParts,
   sameWeapon,
+  scriptWeapons,
   slotTarget,
   weaponCarriers,
   weaponExportPlan,
@@ -497,6 +498,75 @@ describe("pickWeaponParts and buildWeaponModule", () => {
     expect(project.animations).toEqual([
       { presetId: "recoil", params: { kick: 0.5 } },
       { presetId: "turret.track", params: {} },
+    ]);
+  });
+});
+
+describe("scriptWeapons", () => {
+  /** Two modules on one unit, as two presses of the Weapon button add them. */
+  function twoModules(): LegoProject {
+    const parts = pickWeaponParts(PARTS);
+    if (!parts) throw new Error("fixture has no weapon parts");
+    let n = 0;
+    const options = { parentId: "root", newId: () => `id${++n}`, now: "now" };
+    const one = addWeaponModule(unit(), parts, options).project;
+    return addWeaponModule(one, parts, options).project;
+  }
+
+  it("gives each inserted module its own barrel and flare", () => {
+    const project = twoModules();
+    const weapons = scriptWeapons(project);
+    expect(weapons).toHaveLength(2);
+    const [first, second] = weapons;
+    expect(first.carrier?.id).not.toBe(second.carrier?.id);
+    for (const weapon of weapons) {
+      expect(weapon.barrel?.parentId).toBe(weapon.carrier?.id);
+      expect(weapon.flare?.parentId).toBe(weapon.barrel?.id);
+    }
+  });
+
+  it("numbers weapons in the same order as the weapons table", () => {
+    const project = twoModules();
+    const [a, b] = weaponCarriers(project);
+    const picked: LegoProject = {
+      ...project,
+      pieces: project.pieces.map((piece) =>
+        piece.id === a.id
+          ? { ...piece, weapon: { fires: { from: "game", name: "laser" } } }
+          : piece.id === b.id
+            ? { ...piece, weapon: { fires: { from: "game", name: "cannon" } } }
+            : piece,
+      ),
+    };
+    const slots = weaponExportPlan(picked, []).slots.map((slot) => slot.name);
+    const script = scriptWeapons(picked).map(
+      (weapon) => weapon.carrier?.weapon?.fires,
+    );
+    expect(slots).toEqual(["laser", "cannon"]);
+    expect(script).toEqual([
+      { from: "game", name: "laser" },
+      { from: "game", name: "cannon" },
+    ]);
+  });
+
+  it("hands a barrel beside its turret to the turret that has none", () => {
+    const weapons = scriptWeapons(
+      unit([
+        { id: "t", role: "turret" },
+        { id: "b", role: "barrel" },
+      ]),
+    );
+    expect(weapons.map((weapon) => weapon.barrel?.id)).toEqual(["b"]);
+  });
+
+  it("is one weapon with no carrier on a unit with no turret or aim point", () => {
+    const weapons = scriptWeapons(unit([{ id: "b", role: "barrel" }]));
+    expect(weapons).toEqual([
+      {
+        carrier: null,
+        barrel: expect.objectContaining({ id: "b" }),
+        flare: null,
+      },
     ]);
   });
 });
