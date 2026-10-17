@@ -87,6 +87,7 @@ describe("describedPlan", () => {
     expect(plan.id).toBe("hover+gun+build");
     expect(plan.presets.map((p) => p.presetId)).toEqual([
       "hover.bob",
+      "wake.moving",
       "turret.track",
       "recoil",
       "build.aim",

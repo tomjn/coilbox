@@ -269,7 +269,7 @@ Unlike the grid and the axes helper, this one has no toggle. Get a unit's facing
 
 An animation preset is a canned motion. It does not ask you to key anything: it asks which piece is the turret, which is the barrel, which is the front left thigh. That is what a **role** is, and it is why roles are a fixed list rather than free text.
 
-Set a role on the selected piece in the Pieces panel. The roles are grouped: Body and Door under Structure, Turret, Barrel, Muzzle flare and Aim point under Weapon, Wheel, Track and Rudder under Movement, three segments for each of four legs, and three parts of a build arm.
+Set a role on the selected piece in the Pieces panel. The roles are grouped: Body and Door under Structure, Turret, Barrel, Muzzle flare and Aim point under Weapon, Wheel, Track, Rudder and Wake point under Movement, three segments for each of four legs, and three parts of a build arm.
 
 Then open the **Animation** tab. Each preset says what it does and what it needs, and one it cannot use yet names the missing role rather than sitting greyed out with no explanation:
 
@@ -280,6 +280,7 @@ Then open the **Animation** tab. Each preset says what it does and what it needs
 | Turret sweep | A turret, and a barrel if there is one |
 | Wheels turning | At least one wheel |
 | Rudder follows turns | At least one rudder |
+| Wake while moving | At least one wake point |
 | Build arm | A build arm |
 | Doors | At least one door |
 | Hover and bob | A body |
@@ -419,9 +420,9 @@ Neither plan has a width or a depth, because no bone sits at the edge of the bas
 
 [Hovercraft, aircraft and ships](#hovercraft-aircraft-and-ships) says what each of these can be given today.
 
-The hovercraft has a root on the ground and a hull at the gap above it. **Hover and bob** bobs and rocks the hull. A deck bone sits on top of the hull, a skirt bone on each side and a wake bone at the stern, none with a role. The deck is where a turret goes, and the wake is the piece a script written by hand emits a wake from. Its proportions are the hull length, width and height, and the gap under the hull. Splinter Faction has no hover movement class, so the defaults are the median of Beyond All Reason's 20 hovercraft: 40.2 long, 31.1 wide, 14.9 high, 0.1 off the ground. Two of them dip just below the ground, so the gap starts at 0.
+The hovercraft has a root on the ground and a hull at the gap above it. **Hover and bob** bobs and rocks the hull. A deck bone sits on top of the hull, a skirt bone on each side and a wake bone at the stern. The wake bone has the Wake point role and the plan applies **Wake while moving**. The deck is where a turret goes. Its proportions are the hull length, width and height, and the gap under the hull. Splinter Faction has no hover movement class, so the defaults are the median of Beyond All Reason's 20 hovercraft: 40.2 long, 31.1 wide, 14.9 high, 0.1 off the ground. Two of them dip just below the ground, so the gap starts at 0.
 
-The ship is the turret building on a hull. The hull is the root, at the waterline. A wake bone with no role and a rudder bone with the Rudder role sit at the stern. Its proportions are the hull length, the deck height, which is the turret's joint above the hull's, the turret height and the barrel length. The defaults are the median of Splinter Faction's 10 ships: 89.2, 9.3, 5.8 and 14.3, with the gun's three from the 8 that carry a turret. No bone sits at the side of the hull, so the plan has no beam. It does not rock, so add **Hover and bob** with a small bob for a ship on a swell.
+The ship is the turret building on a hull. The hull is the root, at the waterline. A wake bone with the Wake point role and a rudder bone with the Rudder role sit at the stern. Its proportions are the hull length, the deck height, which is the turret's joint above the hull's, the turret height and the barrel length. The defaults are the median of Splinter Faction's 10 ships: 89.2, 9.3, 5.8 and 14.3, with the gun's three from the 8 that carry a turret. No bone sits at the side of the hull, so the plan has no beam. It does not rock, so add **Hover and bob** with a small bob for a ship on a swell.
 
 The aircraft is a body and a gun, with the barrel's joint on the turret's, which is how all 7 of Splinter Faction's aircraft with a gun carry it. Its proportions are how far the gun sits ahead of the body's joint, which is negative for a tail gun, how far above, and the barrel length. The defaults are the median of those 7: 5.1, 1.9 and 5.2. **Hover and bob** is not applied, because it keeps running after the aircraft lands.
 
@@ -793,9 +794,8 @@ Each of the three has a body plan to start from, built from the roles and preset
 
 A hovercraft:
 
-- Works today. The engine sends it `StartMoving` and `StopMoving` like a tank, so **Driving along a path** steers it as a game would. **Hover and bob** on the Body piece bobs and rocks the hull for the unit's whole life. **Idle sway**, turrets and weapons work as on any unit.
-- Does not work. It does not lean into turns ([issue #3359](https://github.com/tomjn/coilbox/issues/3359)) and leaves no wake ([issue #4368](https://github.com/tomjn/coilbox/issues/4368)).
-- By hand. For a wake, take ownership of the script and call `EmitSfx(piece, SFX.WAKE)` every few frames while it moves. The engine drops a wake emitted on land, so the script does not need to check.
+- Works today. The engine sends it `StartMoving` and `StopMoving` like a tank, so **Driving along a path** steers it as a game would. **Hover and bob** on the Body piece bobs and rocks the hull for the unit's whole life. **Wake while moving** emits a wake from the wake bone while it moves, which the engine draws fainter for a hovercraft than a ship. **Idle sway**, turrets and weapons work as on any unit.
+- Does not work. It does not lean into turns ([issue #3359](https://github.com/tomjn/coilbox/issues/3359)).
 
 An aircraft:
 
@@ -805,9 +805,9 @@ An aircraft:
 
 A ship:
 
-- Works today. The engine sends it `StartMoving` and `StopMoving` like a tank, so Driving along a path, Idle sway, turrets and weapons all work. **Rudder follows turns** swings the rudder with the ship's turning, up to its **Largest angle** slider. It reads the heading every 6 frames, because the engine never sends a Lua script `ChangeHeading` for a turn it can make, and gives 0.5 degrees of rudder for each degree a second the ship turns. Play it under **Driving along a path**. **Hover and bob** with a small bob reads as a ship rolling on the swell. The sea under **Ground** shows how the hull sits in the water.
-- Does not work. There is no wake ([issue #4368](https://github.com/tomjn/coilbox/issues/4368)). The preview tells the script it is on land even on the sea ([issue #4367](https://github.com/tomjn/coilbox/issues/4367)).
-- By hand. A ship floats with the model's origin at sea level unless its definition sets `waterline`, the depth in elmos it sits below the surface. The builder does not write it, so set it in Unit tweaks. A ship class in `movedefs.lua` can override it with `overrideUnitWaterline`. Write a wake by hand, as for a hovercraft.
+- Works today. The engine sends it `StartMoving` and `StopMoving` like a tank, so Driving along a path, Idle sway, turrets and weapons all work. **Rudder follows turns** swings the rudder with the ship's turning, up to its **Largest angle** slider. It reads the heading every 6 frames, because the engine never sends a Lua script `ChangeHeading` for a turn it can make, and gives 0.5 degrees of rudder for each degree a second the ship turns. Play it under **Driving along a path**. **Wake while moving** emits a wake from each wake point every **Time between wakes**, which starts at 0.12 seconds, Balanced Annihilation's interval at full speed. It emits a reverse wake when the engine says the ship is backing up. The engine drops a wake emitted on land, so the script does not check. **Hover and bob** with a small bob reads as a ship rolling on the swell. The sea under **Ground** shows how the hull sits in the water.
+- Does not work. The preview tells the script it is on land even on the sea ([issue #4367](https://github.com/tomjn/coilbox/issues/4367)).
+- By hand. A ship floats with the model's origin at sea level unless its definition sets `waterline`, the depth in elmos it sits below the surface. The builder does not write it, so set it in Unit tweaks. A ship class in `movedefs.lua` can override it with `overrideUnitWaterline`. 
 
 ### Fit to the game
 

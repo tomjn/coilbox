@@ -37,6 +37,10 @@ export const ROLES: LegoRole[] = [
   // A ship's rudder, at the stern with its joint at the hinge. It swings about
   // the vertical axis with the ship's turning, by `RUDDER_FOLLOWS`.
   { id: "rudder", label: "Rudder", group: "Movement" },
+  // Where a ship's or hovercraft's wake comes from, usually an empty piece at
+  // the stern on the waterline. Nothing moves it. `WAKE_WHILE_MOVING` emits a
+  // wake from it while the unit moves.
+  { id: "wake", label: "Wake point", group: "Movement" },
   { id: "leg.l1.thigh", label: "Front left thigh", group: "Legs" },
   { id: "leg.l1.shin", label: "Front left shin", group: "Legs" },
   { id: "leg.l1.foot", label: "Front left foot", group: "Legs" },
@@ -923,6 +927,81 @@ export const RUDDER_FOLLOWS: AnimPreset = {
   },
 };
 
+/** Seconds between wakes at full speed in Balanced Annihilation's ships. */
+const WAKE_INTERVAL_SECONDS = 0.12;
+
+/**
+ * A wake from each wake point while the unit moves.
+ *
+ * The engine draws no wake of its own, so the script emits one from a piece
+ * every few frames (`UnitScript.cpp:634-676`). It drops a wake emitted while
+ * the unit is out of the water, so the script does not check. The engine hands
+ * `StartMoving` whether the unit is reversing, as 1 or 0 (`LuaUnitScript.cpp:1004`),
+ * so a reversing unit emits `SFX.REVERSE_WAKE` for the whole move.
+ *
+ * The default interval is Balanced Annihilation's: its ship scripts sleep
+ * `12000 / waketime` between wakes, with `waketime` the percentage of full
+ * speed, so 120 ms at full speed.
+ *
+ * `SFX.WAKE` is 2 and `SFX.REVERSE_WAKE` is 4. The engine's 3 and 5 are the
+ * same wakes under other names (`CobDefines.h:10-13`), so there is one of each
+ * to emit.
+ */
+export const WAKE_WHILE_MOVING: AnimPreset = {
+  id: "wake.moving",
+  label: "Wake while moving",
+  description:
+    "Emits a wake from each wake point while the unit moves, and a reverse wake while it backs up.",
+  requires: [{ role: "wake", count: 1 }],
+  animates: [],
+  params: [
+    {
+      id: "interval",
+      label: "Time between wakes",
+      unit: "s",
+      min: 0.05,
+      max: 0.5,
+      step: 0.01,
+      fallback: WAKE_INTERVAL_SECONDS,
+    },
+  ],
+  /** Nothing moves: the wake is a particle the preview draws. */
+  track() {
+    return null;
+  },
+  emit(ctx) {
+    const points = ctx.pieces("wake");
+    if (points.length === 0) return null;
+    // The sleep is a whole number of frames, and never none.
+    const frames = Math.max(
+      1,
+      Math.round(value(this, ctx.params, "interval") * ENGINE_FPS),
+    );
+    return {
+      functions: [
+        "local function wakeWhileMoving(reversing)",
+        `  SetSignalMask(${ctx.signal})`,
+        // The engine passes 1 or 0, and 0 is true in Lua. A preview event that
+        // passes nothing is a unit going forwards.
+        "  local sfx = SFX.WAKE",
+        "  if reversing and reversing ~= 0 then sfx = SFX.REVERSE_WAKE end",
+        "  while true do",
+        ...points.map((point) => `    EmitSfx(${point}, sfx)`),
+        `    Sleep(${frames * SLEEP_FRAME_MS})`,
+        "  end",
+        "end",
+      ],
+      hooks: {
+        StartMoving: [
+          `  Signal(${ctx.signal})`,
+          "  StartThread(wakeWhileMoving, reversing)",
+        ],
+        StopMoving: [`  Signal(${ctx.signal})`],
+      },
+    };
+  },
+};
+
 export const BUILDARM: AnimPreset = {
   id: "buildarm",
   label: "Build arm",
@@ -1685,6 +1764,7 @@ export const PRESETS: AnimPreset[] = [
   TURRET_TRACK,
   WHEELS_ROLL,
   RUDDER_FOLLOWS,
+  WAKE_WHILE_MOVING,
   BUILDARM,
   BUILD_AIM,
   BUILD_FACTORY,
