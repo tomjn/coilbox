@@ -40,6 +40,7 @@ import {
   standInAt,
   standInHeight,
 } from "./standIn";
+import { aimFromPosition, outOfReach, type WeaponReach } from "./weaponReach";
 
 type Vec3 = [number, number, number];
 
@@ -66,6 +67,10 @@ export interface AimContext {
    *  replaces `up` above, because it changes as the unit moves. Absent or null
    *  for a unit that stays at the origin. */
   drive?: DriveFrame[] | null;
+  /** Each weapon's range and arc, from `unitReaches`. A weapon that keeps its
+   *  target stops aiming while the target is out of its reach, as the engine's
+   *  does (#4134). Absent or null for a weapon that always aims. */
+  reaches?: WeaponReach[] | null;
 }
 
 export interface ResolvedScenario {
@@ -105,13 +110,13 @@ export function standInMid(
  * tilt then turns that (`SolidObject.cpp:435-451`), so the heading is a turn
  * of the level axes before the tilt takes them.
  */
-interface Basis {
+export interface Basis {
   right: Vec3;
   up: Vec3;
   front: Vec3;
 }
 
-function basisOf(up?: Vec3 | null, heading = 0): Basis {
+export function basisOf(up?: Vec3 | null, heading = 0): Basis {
   const angle = headingRadians(heading);
   // `GetVectorFromHeading`, and `frontdir x updir` for the right.
   const level: Basis = {
@@ -247,7 +252,8 @@ export function resolveScenario(
   const track = scenario.standIn;
 
   let series = false;
-  const events = scenario.events.flatMap((event): ScriptEvent[] => {
+  const held = new Map<number, HeldWeapon>();
+  const aimed = scenario.events.flatMap((event): ScriptEvent[] => {
     if (event.dropAtStandIn)
       return [putDown(event, track, ctx.radius, ctx.ground, notes)];
 
@@ -271,7 +277,28 @@ export function resolveScenario(
       return [{ ...rest, args: [heading, pitch] }];
     }
     series = true;
-    return keptAiming(rest, marker.until, track, ctx, angles);
+    const kept = keptAiming(rest, marker.until, track, ctx, angles);
+    if (kept.canFire) {
+      held.set(weaponNumberOf(event.callin), {
+        from: event.frame,
+        until: marker.until,
+        canFire: kept.canFire,
+      });
+    }
+    if (kept.note) notes.push(kept.note);
+    return kept.aims;
+  });
+
+  // A weapon with no target, or one outside its arc, does not fire.
+  const events = aimed.filter((event) => {
+    if (event.engine !== "fire") return true;
+    const weapon = held.get(event.args?.[0] ?? 1);
+    return (
+      !weapon ||
+      event.frame < weapon.from ||
+      event.frame > weapon.until ||
+      weapon.canFire.has(event.frame)
+    );
   });
 
   // A re-aim can fire many times in one scenario, and each miss produces the
@@ -358,20 +385,88 @@ const REAIM_INTERVAL_FRAMES = 15;
  */
 const REAIM_TURN_COS = Math.cos((20 * Math.PI) / 180);
 
-/** An aiming call-in on every frame from `event`'s to `until` that the
- *  engine would call it, for a weapon that keeps the stand-in as its target. */
+/**
+ * How often the engine checks a weapon still has a valid target.
+ * `CWeapon::SlowUpdate` runs every `UNIT_SLOWUPDATE_RATE` frames, 15, and
+ * `HoldIfTargetInvalid` drops a target `TestRange` refuses
+ * (`Weapon.cpp:780-824`, `GlobalConstants.h:60`). The preview has no unit
+ * creation frame to count from, so it takes the multiples of 15 from frame 0.
+ */
+const SLOW_UPDATE_FRAMES = 15;
+
+/** A weapon that keeps its target: the frames it can fire on, and the
+ *  scenario frames the series covers. */
+interface HeldWeapon {
+  from: number;
+  until: number;
+  canFire: Set<number>;
+}
+
+/** Why the engine's `TestRange` would refuse the stand-in on `frame`, for a
+ *  unit standing as `ctx` has it then. */
+function reachFault(
+  reach: WeaponReach,
+  target: Vec3,
+  ctx: AimContext,
+  frame: number,
+): "range" | "arc" | null {
+  const pose = poseAt(ctx, frame);
+  const up = pose ? pose.up : ctx.up;
+  const basis = basisOf(up, pose?.heading);
+  const piece = aimFromPosition(reach, ctx.pieceRest);
+  const turned = up || pose ? toWorld(piece, basis) : piece;
+  const from: Vec3 = pose
+    ? [
+        turned[0] + pose.pos[0],
+        turned[1] + pose.pos[1],
+        turned[2] + pose.pos[2],
+      ]
+    : turned;
+  return outOfReach(reach, from, target, "unit", basis);
+}
+
+/**
+ * An aiming call-in on every frame from `event`'s to `until` that the engine
+ * would call it, for a weapon that keeps the stand-in as its target.
+ *
+ * With the weapon's reach known, the target is tested on the first frame and
+ * then on each slow update. A target out of range or arc is dropped, and no
+ * aim is called until a later slow update finds it back inside. Between
+ * updates the weapon still aims at a target that has left its arc, but cannot
+ * fire at it (`Weapon.cpp:352-357,428-433`). `canFire` is null when there is
+ * no reach to test.
+ */
 function keptAiming(
   event: ScriptEvent,
   until: number,
   track: StandInTrack,
   ctx: AimContext,
   angles: Angles,
-): ScriptEvent[] {
+): { aims: ScriptEvent[]; canFire: Set<number> | null; note: string | null } {
   const aims: ScriptEvent[] = [];
+  const number = weaponNumberOf(event.callin);
+  const reach = ctx.reaches?.find((r) => r.number === number);
+  const canFire = reach ? new Set<number>() : null;
+  let note: string | null = null;
+  let holding = true;
   let last: { frame: number; dir: Vec3 } | null = null;
   for (let frame = event.frame; frame <= until; frame++) {
     const target = standInMid(track, frame, ctx.radius, ctx.ground);
     if (!target) continue;
+    if (reach) {
+      const fault = reachFault(reach, target, ctx, frame);
+      if (frame === event.frame || frame % SLOW_UPDATE_FRAMES === 0) {
+        const was = holding;
+        holding = fault === null;
+        if (!holding) {
+          note ??= `${reach.name} (weapon ${number}) stopped aiming on frame ${frame}: the target is ${fault === "range" ? "out of range" : "outside its arc"}.`;
+        }
+        // Picking the target up again aims at once.
+        if (holding && !was) last = null;
+      }
+      if (holding && fault !== "arc") canFire?.add(frame);
+      if (!holding) continue;
+    }
     const { heading, pitch } = angles(target, frame);
     // In the world, because the engine checks the wanted direction there
     // (`Weapon.cpp:376-383`). A unit that stays put turns both directions the
@@ -387,7 +482,7 @@ function keptAiming(
     aims.push({ ...event, frame, args: [heading, pitch] });
     last = { frame, dir };
   }
-  return aims;
+  return { aims, canFire, note };
 }
 
 /** `TransportDrop`'s Lua arguments for a `dropAtStandIn` marker. */

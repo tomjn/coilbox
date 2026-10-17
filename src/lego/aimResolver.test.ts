@@ -33,6 +33,7 @@ import {
   type StandInTrack,
 } from "./scriptPlayback";
 import { standInHeight } from "./standIn";
+import type { WeaponReach } from "./weaponReach";
 
 /**
  * The unit's own axes in the editor: `+z` front, `+y` up, `+x` its left. Pinned
@@ -870,6 +871,9 @@ describe("aiming while the unit drives", () => {
   /** Still, well off to one side of where the drive starts. */
   const STILL: StandInTrack = { keys: [{ frame: 0, pos: [-8, 0, 6] }] };
 
+  const AHEAD_AFTER_TURN: StandInTrack = {
+    keys: [{ frame: 0, pos: [-40, 0, 23.5] }],
+  };
   const scenario = (standIn: StandInTrack): Scenario => ({
     id: "t",
     label: "t",
@@ -1068,4 +1072,155 @@ describe("aiming while the unit drives", () => {
       true,
     );
   });
+
+  it("starts aiming once the unit has turned the target into its arc", () => {
+    const { frames } = run("bend");
+    const reach: WeaponReach = {
+      ...REACH,
+      range: 1000,
+      arc: { kind: "forward", minDot: Math.cos(Math.PI / 6) },
+    };
+    const reaching = { ...context(frames), reaches: [reach] };
+    const free = aims(
+      resolveScenario(scenario(AHEAD_AFTER_TURN), context(frames)).events,
+    );
+    const { events, notes } = resolveScenario(
+      scenario(AHEAD_AFTER_TURN),
+      reaching,
+    );
+
+    // Without the arc it aims from the first frame, so the gap is the arc's.
+    expect(free[0].frame).toBe(10);
+    expect(aims(events).length).toBeGreaterThan(0);
+    expect(aims(events)[0].frame).toBeGreaterThan(100);
+    expect(aims(events)[0].frame % 15).toBe(0);
+    expect(notes).toEqual([
+      "Gun (weapon 1) stopped aiming on frame 10: the target is outside its arc.",
+    ]);
+
+    // The same unit left standing never has the target in its arc.
+    const standing = resolveScenario(scenario(AHEAD_AFTER_TURN), {
+      ...context(null),
+      reaches: [reach],
+    });
+    expect(aims(standing.events)).toEqual([]);
+  });
 });
+
+describe("a weapon that gives up on a target out of its reach", () => {
+  const flare = new Map([["flare", [0, 0, 0] as [number, number, number]]]);
+  const context = (reach: WeaponReach): AimContext => ({
+    radius: 10,
+    mid: ORIGIN,
+    pieceRest: flare,
+    probed: () => "flare",
+    reaches: [reach],
+  });
+  const scenario = (standIn: StandInTrack): Scenario => ({
+    id: "t",
+    label: "t",
+    description: "t",
+    events: [
+      { frame: 0, callin: "Create" },
+      {
+        frame: 10,
+        callin: "AimWeapon1",
+        aimAtStandIn: { from: "AimFromWeapon", until: 100 },
+      },
+      { frame: 40, engine: "fire", args: [1] },
+      { frame: 55, engine: "fire", args: [1] },
+      { frame: 80, engine: "fire", args: [1] },
+    ],
+    standIn,
+  });
+  const frames = (events: ScriptEvent[], callin?: string) =>
+    events
+      .filter((e) => (callin ? e.callin === callin : e.engine === "fire"))
+      .map((e) => e.frame);
+
+  /** A radius is 10 elmos, so this goes from 20 to 220 elmos ahead at 5 a
+   *  frame and passes the range of 100 on frame 16. */
+  const OUT: StandInTrack = {
+    keys: [
+      { frame: 0, pos: [0, 0, 2] },
+      { frame: 40, pos: [0, 0, 22] },
+    ],
+  };
+
+  it("stops aiming on the first slow update after the target leaves its range", () => {
+    const { events, notes } = resolveScenario(scenario(OUT), context(REACH));
+    // The target is out of range from frame 16, and frame 30 is the next
+    // multiple of 15.
+    expect(frames(events, "AimWeapon1")).toEqual([10, 25]);
+    expect(notes).toEqual([
+      "Gun (weapon 1) stopped aiming on frame 30: the target is out of range.",
+    ]);
+  });
+
+  it("leaves out the shots of a weapon with no target", () => {
+    const { events } = resolveScenario(scenario(OUT), context(REACH));
+    expect(frames(events)).toEqual([]);
+  });
+
+  it("picks the aim up again at the next slow update once the target is back", () => {
+    const back: StandInTrack = {
+      keys: [...OUT.keys, { frame: 80, pos: [0, 0, 2] }],
+    };
+    const { events } = resolveScenario(scenario(back), context(REACH));
+    // Back inside 100 elmos on frame 65, and frame 75 is the next update.
+    expect(frames(events, "AimWeapon1")).toEqual([10, 25, 75, 90]);
+    expect(frames(events)).toEqual([80]);
+  });
+
+  /** The target sweeps from the unit's front to its side, 45 degrees from the
+   *  front on frame 50. */
+  const ROUND: StandInTrack = {
+    keys: [
+      { frame: 0, pos: [0, 0, 5] },
+      { frame: 100, pos: [5, 0, 0] },
+    ],
+  };
+  const FRONT_ONLY: WeaponReach = {
+    ...REACH,
+    range: 1000,
+    arc: { kind: "forward", minDot: Math.cos(Math.PI / 4) },
+  };
+
+  it("stops aiming on the first slow update after the target leaves the arc", () => {
+    const { events, notes } = resolveScenario(
+      scenario(ROUND),
+      context(FRONT_ONLY),
+    );
+    // Out of the arc from frame 51. Frame 55 still aims, since the engine
+    // calls the aiming script until the next slow update, which is 60.
+    expect(frames(events, "AimWeapon1")).toEqual([10, 25, 40, 55]);
+    expect(notes).toEqual([
+      "Gun (weapon 1) stopped aiming on frame 60: the target is outside its arc.",
+    ]);
+  });
+
+  it("does not fire at a target outside the arc before the weapon gives up", () => {
+    const { events } = resolveScenario(scenario(ROUND), context(FRONT_ONLY));
+    expect(frames(events)).toEqual([40]);
+  });
+
+  it("changes nothing for a weapon the reaches do not describe", () => {
+    const { events, notes } = resolveScenario(scenario(OUT), {
+      ...context(REACH),
+      reaches: [{ ...REACH, number: 2 }],
+    });
+    expect(frames(events, "AimWeapon1")).toEqual([10, 25, 40, 55, 70, 85, 100]);
+    expect(notes).toEqual([]);
+  });
+});
+
+const REACH: WeaponReach = {
+  number: 1,
+  name: "Gun",
+  range: 100,
+  rangeKind: "sphere",
+  heightMod: 0,
+  cylinderTargeting: 0,
+  aimFrom: "flare",
+  arc: { kind: "full" },
+};

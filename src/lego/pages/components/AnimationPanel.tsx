@@ -121,6 +121,8 @@ import {
 } from "../../targetMotion";
 import { isBuilder } from "../../unitDef";
 import { controlFor } from "../../unitValueControls";
+import { pickedWeapon } from "../../weaponModule";
+import { unitReaches } from "../../weaponReach";
 import type { LegoWorth } from "../../worth";
 import { BuilderReport } from "./BuilderReport";
 import { GameFitSection } from "./GameFitSection";
@@ -129,7 +131,7 @@ import type { ReferenceUnit } from "./ReferencePicker";
 import { ScrubberMarks } from "./ScrubberMarks";
 import { StatsSection } from "./StatsSection";
 import type { DrivePlacement } from "./standInPlayback";
-import { WeaponsSection } from "./WeaponsSection";
+import { useWeaponSource, WeaponsSection } from "./WeaponsSection";
 import { WorthSection } from "./WorthSection";
 
 /** The scenario Select's own entry for firing an arbitrary function by name,
@@ -424,6 +426,7 @@ export function AnimationPanel({
    *  script does not name, a transport piece it does not name. Said rather
    *  than hidden, because that is exactly the bug the preview exists to show. */
   const [standInNotes, setStandInNotes] = useState<string[]>([]);
+  const weaponSource = useWeaponSource(project);
   // Memoised: measuring the unit bakes every piece, and this is read on each
   // run rather than on each render.
   const bounds = useMemo(
@@ -808,6 +811,21 @@ export function AnimationPanel({
           ground: scriptGround.current?.shape ?? null,
           up: scriptGround.current?.up ?? null,
           drive: driven?.run.frames ?? null,
+          reaches: unitReaches(
+            project,
+            (fires) => {
+              const picked = pickedWeapon(
+                fires,
+                weaponSource.gameName ?? "",
+                weaponSource.weaponDefs,
+                weaponSource.projects,
+              );
+              return picked && "def" in picked ? picked.def : null;
+            },
+            weaponSource.weaponDefs ?? {},
+            (number, mountedOn) =>
+              named.get(`AimFromWeapon${number}`) ?? mountedOn,
+          ),
         },
       );
       const events = driven
@@ -873,6 +891,9 @@ export function AnimationPanel({
       raw,
       size,
       onStandIn,
+      weaponSource.gameName,
+      weaponSource.weaponDefs,
+      weaponSource.projects,
     ],
   );
 

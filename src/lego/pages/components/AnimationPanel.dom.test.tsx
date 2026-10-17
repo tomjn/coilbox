@@ -66,6 +66,16 @@ vi.mock("./BuilderReport", () => ({ BuilderReport: () => null }));
 vi.mock("./GameFitSection", () => ({ GameFitSection: () => null }));
 vi.mock("./WorthSection", () => ({ WorthSection: () => null }));
 vi.mock("./StatsSection", () => ({ StatsSection: () => null }));
+vi.mock("./WeaponsSection", () => {
+  // One object, as the real hook's result is stable between renders.
+  const source = {
+    gameName: null,
+    weaponDefs: null,
+    projects: [],
+    unavailable: null,
+  };
+  return { WeaponsSection: () => null, useWeaponSource: () => source };
+});
 
 function timeline(over: Partial<ScriptTimeline> = {}): ScriptTimeline {
   return {
