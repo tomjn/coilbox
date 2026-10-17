@@ -86,7 +86,7 @@ describe("legoUnitDef", () => {
       project("Sky Fortress", "skyfort"),
       bounds({ x: 32, z: 48 }),
     );
-    expect(def.customparams).toEqual({ unitdefbuildtime: 100 });
+    expect(def.customparams).toEqual({ unitdefbuildtime: 100, corpse: "" });
     expect(def.buildtime).toBe(100);
     expect(def.buildcostmetal).toBe(100);
     expect(def.buildcostenergy).toBe(0);
@@ -118,7 +118,7 @@ describe("legoUnitDef", () => {
       buildtime: 70,
       mass: 33,
     });
-    expect(def.customparams).toEqual({ unitdefbuildtime: 70 });
+    expect(def.customparams).toEqual({ unitdefbuildtime: 70, corpse: "" });
   });
 
   it("leaves mass out when it is zero, so the engine uses the metal cost", () => {
@@ -238,7 +238,9 @@ describe("legoUnitDef", () => {
     );
     expect(text).toContain('unitname = "skyfort",');
     expect(text).toContain("sightdistance = 0,");
-    expect(text).toContain("customparams = { unitdefbuildtime = 100 },");
+    expect(text).toContain(
+      'customparams = { unitdefbuildtime = 100, corpse = "" },',
+    );
   });
 
   it("keys the definition the way the engine reads one: lower case", () => {
@@ -853,6 +855,15 @@ describe("DERIVED_FIELDS", () => {
   it("names the wreck the export writes beside the unit (#3310)", () => {
     expect(mobile.corpse).toBe("conbot_dead");
     expect(DERIVED_FIELDS).toContain("corpse");
+  });
+
+  // Splinter Faction's death gadget drops `customparams.corpse` on a ship or a
+  // heat kill, on top of the engine's `corpse` wreck. An empty name is one it
+  // cannot create, so a built unit leaves one wreck (#4283).
+  it("leaves Splinter Faction's death gadget no wreck of its own to drop", () => {
+    expect(mobile.customparams).toMatchObject({ corpse: "" });
+    expect(still.customparams).toMatchObject({ corpse: "" });
+    expect(DERIVED_FIELDS).toContain("customparams.corpse");
   });
 
   it("lists only fields the builder can write", () => {
