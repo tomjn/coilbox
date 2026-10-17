@@ -20,6 +20,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BIPED, projectFromPlan } from "../bodyPlans";
 import { type LegoProject, newProject } from "../model";
 import type { RawGeometry } from "../rawGeometry";
+import type { ShapeKind } from "../shapes";
 import type { LegoDocumentSession } from "../useLegoDocument";
 
 const doc: { current: LegoDocumentSession } = { current: null as never };
@@ -59,9 +60,12 @@ vi.mock("../pack", async () => {
 /** What the parts library read answers with, swapped per test: the wait, the
  *  failure and the success all take different paths through the guard. */
 let packLoad: Promise<unknown>;
-const loadedPack = (parts: unknown[] = []) =>
+const SWATCHES = [
+  { id: "grey", uv: { min: [0, 0], max: [0.1, 0.1] }, tile: 1.56 },
+];
+const loadedPack = (parts: unknown[] = [], swatches: unknown[] = SWATCHES) =>
   Promise.resolve({
-    manifest: { categories: [] } as never,
+    manifest: { categories: [], swatches } as never,
     library: {
       packs: [],
       atlases: [{ tex1: "atlas.png", packId: "lego", folder: null }],
@@ -98,7 +102,25 @@ vi.mock("./components/TestDrawer", () => ({
   TestDrawer: () => null,
 }));
 // Reads a display setting from the app frame, which nothing here provides.
-vi.mock("./components/PartPicker", () => ({ PartPicker: () => null }));
+// Draws one button for each shape, which is how a test chooses one.
+vi.mock("./components/PartPicker", () => ({
+  PartPicker: ({
+    shapes,
+    onSelectShape,
+  }: {
+    shapes?: ShapeKind[];
+    onSelectShape?: (shape: ShapeKind, alt: boolean) => void;
+  }) =>
+    shapes?.map((shape) => (
+      <button
+        key={shape.kind}
+        type="button"
+        onClick={() => onSelectShape?.(shape, false)}
+      >
+        {`Add the ${shape.label} shape`}
+      </button>
+    )),
+}));
 // Reads the unit's file in its game through unitsync, for a factory's yardmap.
 vi.mock("./components/useBuiltUnitDef", () => ({
   useBuiltUnitDef: () => ({ game: undefined, key: null, def: undefined }),
@@ -180,6 +202,42 @@ describe("a unit built out of parts", () => {
     await screen.findByRole("button", { name: "Script" });
     expect(screen.getByRole("button", { name: "Inventory" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Compounds" })).toBeNull();
+  });
+});
+
+describe("a shape chosen in the strip (#3337)", () => {
+  it("is added in one edit under the unit's root, at its default size", async () => {
+    show(unit());
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Add the Cylinder shape" }),
+    );
+    const edit = doc.current.edit as ReturnType<typeof vi.fn>;
+    expect(edit).toHaveBeenCalledTimes(1);
+    const next = edit.mock.calls[0][0](unit());
+    const added = next.pieces.find((p: { shape?: unknown }) => p.shape);
+    expect(added).toMatchObject({
+      name: "cylinder",
+      parentId: "base",
+      partId: null,
+      shape: { kind: "cylinder", size: [1, 1, 1], swatch: "grey" },
+    });
+  });
+
+  it("is not offered when the pack lists no swatches", async () => {
+    packLoad = loadedPack([], []);
+    show(unit());
+    await screen.findByRole("button", { name: "Script" });
+    expect(
+      screen.queryByRole("button", { name: "Add the Cylinder shape" }),
+    ).toBeNull();
+  });
+
+  it("is not offered for a unit imported whole", async () => {
+    show(unit({ imported: { source: "/tmp/unit.s3o" } }));
+    await screen.findByRole("button", { name: "Script" });
+    expect(
+      screen.queryByRole("button", { name: "Add the Cylinder shape" }),
+    ).toBeNull();
   });
 });
 

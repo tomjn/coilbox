@@ -7,6 +7,7 @@ import {
   movesInGame,
   offerMoveClasses,
   slopeVerdict,
+  suggestFlight,
   suggestMotion,
 } from "./movement";
 
@@ -403,5 +404,86 @@ describe("slopeVerdict", () => {
     expect(slopeVerdict({ moveClass: "BOAT2" }, { moveDefs }, 10)).toBe(
       "BOAT2 is a ship class, which has no maxSlope.",
     );
+  });
+});
+
+describe("suggestFlight", () => {
+  const AIR: GameMovementData = {
+    moveDefs: [],
+    units: {
+      gunone: {
+        canfly: true,
+        canmove: true,
+        hoverattack: true,
+        speed: 100,
+        cruisealtitude: 80,
+      },
+      guntwo: {
+        canfly: true,
+        canmove: true,
+        hoverattack: true,
+        speed: 140,
+        cruisealt: 100,
+      },
+      con: {
+        canfly: true,
+        canmove: true,
+        builder: true,
+        speed: 120,
+        cruisealtitude: 90,
+      },
+      fighter: {
+        canfly: true,
+        canmove: true,
+        maxvelocity: 10,
+        cruisealtitude: 200,
+        maxacc: 0.25,
+      },
+      bomber: { canfly: true, canmove: true, speed: 320, cruisealtitude: 240 },
+      tank: { canmove: true, movementclass: "TANK2", speed: 60 },
+    },
+  };
+
+  it("takes a gunship's numbers from the game's hovering fliers", () => {
+    const m = suggestFlight(AIR, "Test Game", "gunship");
+    expect(m).toMatchObject({
+      moveClass: "",
+      flies: "gunship",
+      speed: 120,
+      cruiseAltitude: 90,
+      speedFrom: "Median of 3 Test Game gunships",
+    });
+  });
+
+  it("takes a plane's numbers from the game's strafing fliers", () => {
+    const m = suggestFlight(AIR, "Test Game", "plane");
+    expect(m).toMatchObject({
+      flies: "plane",
+      speed: 310,
+      cruiseAltitude: 220,
+      acceleration: 0.25,
+      speedFrom: "Median of 2 Test Game planes",
+      accelerationFrom: "Median of 1 Test Game planes",
+    });
+  });
+
+  it("falls back on every flier when none has the style", () => {
+    const only = { moveDefs: [], units: { bomber: AIR.units.bomber } };
+    const m = suggestFlight(only, "Test Game", "gunship");
+    expect(m.speed).toBe(320);
+    expect(m.speedFrom).toBe("Median of 1 Test Game fliers");
+  });
+
+  it("sets nothing when the game has no flier", () => {
+    const m = suggestFlight(SPLINTER, "Splinter Faction", "plane");
+    expect(m).toEqual({ moveClass: "", flies: "plane" });
+  });
+
+  it("counts as moving once it has a speed, and survives a save", () => {
+    const m = suggestFlight(AIR, "Test Game", "plane");
+    expect(movesInGame(m)).toBe(true);
+    expect(movesInGame({ moveClass: "", flies: "plane" })).toBe(false);
+    const saved = { ...project([]), movement: m };
+    expect(parseLegoProjectJson(JSON.stringify(saved))?.movement).toEqual(m);
   });
 });

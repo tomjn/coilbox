@@ -5,10 +5,11 @@ import { useInventoryView } from "../inventory";
 import { withLabels } from "../moduleFilter";
 import { type LegoPartInfo, type LoadedPack, loadPack } from "../pack";
 import { deleteCompound, saveCompound, useModules } from "../projects";
+import type { ShapeKind } from "../shapes";
 import { useModuleFiles } from "../useModuleFiles";
 import { useSharedModuleImport, useShareModule } from "../useModuleShare";
 import { InventoryFilters, InventoryGrids } from "./components/Inventory";
-import { PartDetail } from "./components/PartDetail";
+import { PartDetail, ShapeDetail } from "./components/PartDetail";
 import { PackAtlases, PackProblems } from "./components/PartFilters";
 
 type Status =
@@ -26,6 +27,7 @@ type Status =
 export default function PartsPage() {
   const [status, setStatus] = useState<Status>({ state: "loading" });
   const [selected, setSelected] = useState<LegoPartInfo | null>(null);
+  const [selectedShape, setSelectedShape] = useState<ShapeKind | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -83,7 +85,15 @@ export default function PartsPage() {
             pack={pack}
             compounds={compounds}
             selectedPartId={selected?.id}
-            onSelectPart={setSelected}
+            onSelectPart={(part) => {
+              setSelectedShape(null);
+              setSelected(part);
+            }}
+            selectedShape={selectedShape?.id}
+            onSelectShape={(shape) => {
+              setSelected(null);
+              setSelectedShape(shape);
+            }}
             onDeleteModule={(id) => void deleteCompound(id)}
             onRenameModule={(compound, name) =>
               void saveCompound({ ...compound, name })
@@ -95,7 +105,13 @@ export default function PartsPage() {
               void saveCompound(withLabels(compound, labels))
             }
             aside={
-              selected ? (
+              selectedShape ? (
+                <ShapeDetail
+                  pack={pack}
+                  shape={selectedShape}
+                  onClose={() => setSelectedShape(null)}
+                />
+              ) : selected ? (
                 <PartDetail
                   pack={pack}
                   part={selected}

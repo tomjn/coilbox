@@ -294,13 +294,24 @@ export const DEFAULT_BUILDER: Required<LegoBuilder> = {
   canAssist: true,
 };
 
+/** The two ways the engine moves an aircraft (`UnitDef.h:76-77`). */
+export type FlightStyle = "gunship" | "plane";
+
 /**
  * How the unit moves, once the game maker has picked one of the game's movement
  * classes for it (issue #3255). Absent means it does not move. See `movement.ts`.
  */
 export interface LegoMovement {
-  /** A class out of the game's `gamedata/movedefs.lua`, as the game spells it. */
+  /** A class out of the game's `gamedata/movedefs.lua`, as the game spells it.
+   *  Empty for a flier, which the engine gives no movement class (issue #4370). */
   moveClass: string;
+  /** Set when the unit flies. A gunship hovers (`hoverAttack`), a plane strafes.
+   *  Written as `canfly`, with no movement class. */
+  flies?: FlightStyle;
+  /** Written as `cruisealtitude`, in elmos, for a flier. */
+  cruiseAltitude?: number;
+  /** Where `cruiseAltitude` came from, when the game suggested it. */
+  cruiseAltitudeFrom?: string;
   /** Written as `speed`, in elmos a second. Absent until somebody or the game
    *  gives it one, and the unit stays static to the engine until then. */
   speed?: number;
@@ -1955,10 +1966,20 @@ function parseBuilder(value: unknown): LegoBuilder | null {
 function parseMovement(value: unknown): LegoMovement | null {
   if (typeof value !== "object" || value === null) return null;
   const v = value as Record<string, unknown>;
-  if (typeof v.moveClass !== "string" || v.moveClass.trim() === "") return null;
+  if (typeof v.moveClass !== "string") return null;
+  const flies =
+    v.flies === "gunship" || v.flies === "plane" ? v.flies : undefined;
+  if (v.moveClass.trim() === "" && !flies) return null;
   const number = (x: unknown) => typeof x === "number" && Number.isFinite(x);
   return {
     moveClass: v.moveClass,
+    ...(flies ? { flies } : {}),
+    ...(number(v.cruiseAltitude)
+      ? { cruiseAltitude: v.cruiseAltitude as number }
+      : {}),
+    ...(typeof v.cruiseAltitudeFrom === "string"
+      ? { cruiseAltitudeFrom: v.cruiseAltitudeFrom }
+      : {}),
     ...(number(v.speed) ? { speed: v.speed as number } : {}),
     ...(number(v.turnRate) ? { turnRate: v.turnRate as number } : {}),
     ...(number(v.reverseSpeed)

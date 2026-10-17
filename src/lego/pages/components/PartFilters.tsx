@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import { SHAPES_CATEGORY } from "../../filter";
 import type { LoadedPack } from "../../pack";
 
 /** Radix needs a non-empty value, so "every pack" gets one of its own. */
@@ -42,6 +43,8 @@ interface Props {
   onPackId: (packId: string | null) => void;
   /** How many the grid is showing, so the count follows the filter. */
   shown: number;
+  /** Adds the Shapes category, for a grid that lists generated shapes. */
+  showShapes?: boolean;
   className?: string;
 }
 
@@ -54,6 +57,7 @@ export function PartFilters({
   packId,
   onPackId,
   shown,
+  showShapes = false,
   className,
 }: Props) {
   const packs = pack.library.packs;
@@ -106,6 +110,16 @@ export function PartFilters({
             {c.label}
           </Button>
         ))}
+        {showShapes ? (
+          <Button
+            size="sm"
+            variant={category === SHAPES_CATEGORY ? "default" : "outline"}
+            onClick={() => onCategory(SHAPES_CATEGORY)}
+            aria-pressed={category === SHAPES_CATEGORY}
+          >
+            Shapes
+          </Button>
+        ) : null}
       </ButtonGroup>
       <span className="ml-auto text-sm text-muted-foreground">
         {shown} {shown === 1 ? "part" : "parts"}

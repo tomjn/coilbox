@@ -71,6 +71,12 @@ describe("reading the stored lists", () => {
     ).toEqual([part("a"), module("m")]);
   });
 
+  it("keeps a shape, which is referenced by its kind", () => {
+    expect(parseRefs([{ kind: "shape", id: "cylinder" }])).toEqual([
+      { kind: "shape", id: "cylinder" },
+    ]);
+  });
+
   it("keys a part and a module with the same id differently", () => {
     expect(refKey(part("x"))).not.toBe(refKey(module("x")));
   });
