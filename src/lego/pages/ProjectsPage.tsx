@@ -27,11 +27,16 @@ import type { LegoAtlas } from "../atlas";
 import { BODY_PLANS, type BodyPlan, projectFromPlan } from "../bodyPlans";
 import { type LegoProject, newProject, type SkeletonTarget } from "../model";
 import { loadPack } from "../pack";
-import { filterGrouped, groupProjects } from "../projectGroups";
+import {
+  carryFoldedKeys,
+  filterGrouped,
+  groupProjects,
+  type LegoGameGroup,
+} from "../projectGroups";
 import { validateProjectName } from "../projectNames";
 import { deleteProject, saveProject, useLegoProjects } from "../projects";
 import { projectFromTarget } from "../skeletonSize";
-import { gameRecordFor, unitGame } from "../unitGame";
+import { gameRecordFor } from "../unitGame";
 import { GameModelDrawer } from "./components/GameModelDrawer";
 import { ImportDrawer } from "./components/ImportDrawer";
 import { NewUnitPopover } from "./components/NewUnitPopover";
@@ -52,8 +57,12 @@ const COLLAPSED_GAMES_KEY = "coilbox.lego.collapsedGames";
 
 /** The game sections folded away, by group key, and a toggle that remembers
  *  the answer. Storage that cannot be read or written leaves every section
- *  open, and folding then lasts for the visit. */
-function useCollapsedGames(): [ReadonlySet<string>, (key: string) => void] {
+ *  open, and folding then lasts for the visit. Sections used to be remembered
+ *  by archive name, so once the groups are known those are carried over to the
+ *  game's key (#4328). */
+function useCollapsedGames(
+  groups: readonly LegoGameGroup[],
+): [ReadonlySet<string>, (key: string) => void] {
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => {
     try {
       const stored = JSON.parse(
@@ -68,6 +77,15 @@ function useCollapsedGames(): [ReadonlySet<string>, (key: string) => void] {
       return new Set();
     }
   });
+
+  useEffect(() => {
+    const carried = carryFoldedKeys(collapsed, groups);
+    if (carried === collapsed) return;
+    setCollapsed(carried);
+    try {
+      localStorage.setItem(COLLAPSED_GAMES_KEY, JSON.stringify([...carried]));
+    } catch {}
+  }, [collapsed, groups]);
 
   function toggle(key: string) {
     setCollapsed((was) => {
@@ -127,11 +145,15 @@ export default function ProjectsPage() {
   /** The units whose thumbnail would not load, so the card says so instead. */
   const [noPicture, setNoPicture] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
-  const grouped = useMemo(() => groupProjects(projects), [projects]);
+  const installed = scan.data?.games;
+  const grouped = useMemo(
+    () => groupProjects(projects, installed ?? []),
+    [projects, installed],
+  );
   const [query, setQuery] = useState("");
   const shown = useMemo(() => filterGrouped(grouped, query), [grouped, query]);
   const searching = query.trim() !== "";
-  const [collapsedGames, toggleGame] = useCollapsedGames();
+  const [collapsedGames, toggleGame] = useCollapsedGames(grouped.games);
   /** Whether anything here came from somebody else's model, which is the only
    *  reason to split the page up at all. */
   const sectioned = grouped.games.length > 0 || grouped.files.length > 0;
@@ -257,8 +279,6 @@ export default function ProjectsPage() {
    */
   function card(project: LegoProject) {
     const isRenaming = renaming?.id === project.id;
-    // A unit opened from a game already sits under that game's heading.
-    const game = project.imported ? null : unitGame(project);
     return (
       <li
         key={project.id}
@@ -296,11 +316,6 @@ export default function ProjectsPage() {
                     project.pieces.length === 1 ? "piece" : "pieces"
                   } · ${project.unitName}`}
             </p>
-            {game && !isRenaming ? (
-              <p className="truncate text-xs text-muted-foreground">
-                {game.name}
-              </p>
-            ) : null}
           </div>
         </Link>
         {isRenaming ? (
@@ -509,18 +524,9 @@ export default function ProjectsPage() {
             </p>
           ) : null}
 
-          {/* A heading over your own units only earns its space once there is
-              something else below it to tell it apart from. */}
-          {shown.own.length > 0 ? (
-            <section className="space-y-3">
-              {sectioned ? <h2 className={SECTION}>Built from parts</h2> : null}
-              {grid(shown.own)}
-            </section>
-          ) : null}
-
           {shown.games.length > 0 ? (
             <section className="space-y-4">
-              <h2 className={SECTION}>Opened from a game</h2>
+              <h2 className={SECTION}>Games</h2>
               {shown.games.map((game) => {
                 // A search opens every game it found something in, since a
                 // match hidden in a folded section reads as no match at all.
@@ -550,6 +556,15 @@ export default function ProjectsPage() {
                   </div>
                 );
               })}
+            </section>
+          ) : null}
+
+          {/* A heading over units for no game only earns its space once there
+              is something else on the page to tell it apart from. */}
+          {shown.own.length > 0 ? (
+            <section className="space-y-3">
+              {sectioned ? <h2 className={SECTION}>No game</h2> : null}
+              {grid(shown.own)}
             </section>
           ) : null}
 
