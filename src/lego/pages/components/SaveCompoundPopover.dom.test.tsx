@@ -31,13 +31,32 @@ describe("SaveCompoundPopover", () => {
   it("saves with the default connector as the mount", () => {
     const onSave = open({ piece: "leg", connector: "-y" });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    expect(onSave).toHaveBeenCalledWith({ piece: "leg", connector: "-y" });
+    expect(onSave).toHaveBeenCalledWith(
+      { piece: "leg", connector: "-y" },
+      { category: undefined, tags: [] },
+    );
+  });
+
+  it("saves the category and tags typed beside the mount", () => {
+    const onSave = open({ piece: "leg", connector: "-y" });
+    fireEvent.click(screen.getByRole("button", { name: "Leg" }));
+    fireEvent.change(screen.getByLabelText("Module tags"), {
+      target: { value: "walker, big" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(onSave).toHaveBeenCalledWith(
+      { piece: "leg", connector: "-y" },
+      { category: "Leg", tags: ["walker", "big"] },
+    );
   });
 
   it("saves with no mount when the module has no default", () => {
     const onSave = open(null);
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    expect(onSave).toHaveBeenCalledWith(null);
+    expect(onSave).toHaveBeenCalledWith(null, {
+      category: undefined,
+      tags: [],
+    });
   });
 
   it("does not open for a disabled button", () => {

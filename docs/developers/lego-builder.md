@@ -89,6 +89,8 @@ Select the top piece of the assembly and press the compound button in the left-h
 
 The compound button opens a small panel that asks which connector mounts the compound on a unit. It opens on the connector at the lowest point of the first piece, which is the bottom face of a leg or a turret. Choose another connector, or "No mount", and press Save. When you click a compound that has a mount, it joins to a free face of the selected piece by that connector, the way a part from the strip does. If the mount is on a piece deeper in the compound, the whole compound is placed with that connector on the face but no join is saved. If the selected piece has no face to join, the compound is placed with its mount connector on the selected piece's origin. A compound saved with no mount drops its first piece on the selected piece's origin, as before.
 
+A module can have a category and tags. The compound button's panel has fields for both, and the tag button on a module's cell in the strip edits them later. A category is one typed word or two, picked from the starter list (Chassis, Wheel, Leg, Turret, Arm, Detail) and the categories already in use. A module with no category is "Uncategorised". The Compounds tab of the strip and the Lego Parts page both have a search box and a category menu. Search needs every term to appear in the name, the category or the tags.
+
 ## Judging size
 
 A unit built from small parts can look substantial and be a fraction of a real one, so the builder gives you two readings.
