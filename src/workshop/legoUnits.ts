@@ -33,7 +33,7 @@
  * export. Running the export again rewrites that receipt rather than adding a
  * second, so a re-export can never become a second unit.
  */
-import { samePath } from "@/lego/exportRecord";
+import { receiptFor, samePath } from "@/lego/exportRecord";
 import type { LegoProject } from "@/lego/model";
 import { type CloneOrigin, normaliseCloneKey, type UnitClones } from "./clones";
 
@@ -45,8 +45,8 @@ export function exportedInto(
   project: LegoProject,
   gameFolder: string | undefined,
 ): boolean {
-  if (!gameFolder || !project.exported) return false;
-  return samePath(project.exported.dir, gameFolder);
+  if (!gameFolder) return false;
+  return receiptFor(project, gameFolder) !== undefined;
 }
 
 /** What a game folder was given, and what the page could not take. */
@@ -102,7 +102,7 @@ export function withLegoUnits(
   const builtBy: Record<string, CloneOrigin> = {};
   const conflicts: string[] = [];
   for (const project of built) {
-    const exported = project.exported;
+    const exported = gameFolder ? receiptFor(project, gameFolder) : undefined;
     if (!exported) continue;
     const key = normaliseCloneKey(exported.unitName);
     if (!key) continue;
