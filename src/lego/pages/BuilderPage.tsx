@@ -78,6 +78,7 @@ import {
   transformRoots,
 } from "../groupTransform";
 import { useInventoryView } from "../inventory";
+import { liftedModuleRefusal } from "../liftPiece";
 import { canFixMesh, DEFAULT_SMOOTHING_ANGLE_DEG } from "../meshFix";
 import {
   canMirror,
@@ -472,6 +473,7 @@ function Builder({ id }: { id: string | undefined }) {
    * part to hover yet, adds it to the selected piece straight away.
    */
   function startPlacingModule(module: LegoProject, now: boolean) {
+    if (refuseLifted(module)) return;
     setPlacingAnchor(false);
     if (now || !draft?.pieces.some((piece) => piece.partId)) {
       addCompound(module);
@@ -744,6 +746,16 @@ function Builder({ id }: { id: string | undefined }) {
     inventoryView.setList("all");
   }
 
+  /**
+   * Whether a module holding pieces lifted from a game has to stay out of this
+   * unit, saying why when it does. See `liftedModuleRefusal`.
+   */
+  function refuseLifted(module: LegoProject, title = "Add module"): boolean {
+    const refused = draft ? liftedModuleRefusal(draft, module) : null;
+    if (refused) void notify({ title, body: refused, level: "warning" });
+    return refused !== null;
+  }
+
   function addCompound(compound: LegoProject) {
     if (!draft) return;
     const inserted = doc.insert(
@@ -878,7 +890,8 @@ function Builder({ id }: { id: string | undefined }) {
     );
     void legoTexturePrune({
       keep: [
-        ...texturesInUse(projects),
+        // A lifted piece in the inventory draws with a game's texture too.
+        ...texturesInUse([...projects, ...compounds]),
         ...[next.texture, next.texture2].flatMap((texture) =>
           texture?.key ? [texture.key] : [],
         ),
@@ -919,7 +932,7 @@ function Builder({ id }: { id: string | undefined }) {
     title = "Swap module",
   ) {
     setSwappingModule(false);
-    if (!draft || !pack) return;
+    if (!draft || !pack || refuseLifted(module, title)) return;
     const result = swapModule(draft, pack, pieceId, module, () =>
       crypto.randomUUID(),
     );
@@ -1933,6 +1946,9 @@ function Builder({ id }: { id: string | undefined }) {
                         <GameUnitBrowser
                           project={draft}
                           query={inventoryView.query}
+                          onLift={async (module) => {
+                            await saveCompound(module);
+                          }}
                         />
                       }
                     />

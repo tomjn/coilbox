@@ -8,7 +8,12 @@
 //! button and the sidecar is left with no document naming it, and until this
 //! nothing ever removed it (#1902).
 //!
-//! So the store is swept once at startup, against the documents in `projects/`.
+//! A piece lifted off a game's unit into the inventory (#3262) is a compound
+//! with a sidecar of its own, named after the compound, so `compounds/` owns
+//! sidecars as well.
+//!
+//! So the store is swept once at startup, against the documents in `projects/`
+//! and `compounds/`.
 //! Startup rather than on save, which is when textures are pruned. A texture is
 //! shared and content addressed, so its keep-set is every saved unit's keys and
 //! is knowable at any moment. A sidecar's owner does not exist yet during the
@@ -92,9 +97,13 @@ fn prune(geometry: &Path, keep: &HashSet<String>) -> usize {
 /// is, because a sweep that cannot see the documents cannot tell an orphan from
 /// a unit and would take both.
 pub fn sweep(lego: &Path) -> usize {
-    let Some(keep) = saved_ids(&lego.join("projects")) else {
+    let Some(mut keep) = saved_ids(&lego.join("projects")) else {
         return 0;
     };
+    let Some(compounds) = saved_ids(&lego.join("compounds")) else {
+        return 0;
+    };
+    keep.extend(compounds);
     prune(&lego.join("geometry"), &keep)
 }
 
@@ -125,6 +134,27 @@ mod tests {
 
         assert!(dir.path().join("geometry/kept.bin.gz").is_file());
         assert!(!dir.path().join("geometry/abandoned.bin.gz").exists());
+    }
+
+    #[test]
+    fn a_lifted_piece_in_the_inventory_keeps_its_sidecar() {
+        let dir = store(&[], &["lifted.bin.gz", "abandoned.bin.gz"]);
+        std::fs::create_dir_all(dir.path().join("compounds")).expect("mkdir");
+        std::fs::write(dir.path().join("compounds/lifted.json"), "{}").expect("write");
+
+        assert_eq!(sweep(dir.path()), 1);
+
+        assert!(dir.path().join("geometry/lifted.bin.gz").is_file());
+        assert!(!dir.path().join("geometry/abandoned.bin.gz").exists());
+    }
+
+    #[test]
+    fn modules_that_cannot_be_listed_leave_every_sidecar_alone() {
+        let dir = store(&[], &["lifted.bin.gz"]);
+        std::fs::write(dir.path().join("compounds"), b"not a folder").expect("write");
+
+        assert_eq!(sweep(dir.path()), 0);
+        assert!(dir.path().join("geometry/lifted.bin.gz").is_file());
     }
 
     #[test]

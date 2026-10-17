@@ -112,4 +112,21 @@ describe("buildCompoundHolder", () => {
     expect(inAssembly(holder, "left").toArray()).toEqual([0, 0, 0]);
     expect(inAssembly(holder, "right").toArray()).toEqual([4, 0, 0]);
   });
+
+  it("asks for each piece's geometry by the piece, so a lifted mesh draws too", () => {
+    // A piece lifted from a game (#3262) has a mesh and no part.
+    const project = compound([
+      { name: "turret", partId: null, meshId: "m2" },
+      { name: "flare", partId: null },
+    ]);
+    const holder = buildCompoundHolder(
+      project,
+      (piece) => (piece.meshId === "m2" ? brick() : null),
+      new THREE.MeshBasicMaterial(),
+      100,
+    );
+
+    expect(inAssembly(holder, "turret").toArray()).toEqual([0, 0, 0]);
+    expect(() => meshFor(holder, "flare")).toThrow();
+  });
 });

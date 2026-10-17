@@ -9,6 +9,11 @@
  *
  * There is no virtualisation, unlike the parts grid. Compounds are made by hand
  * one at a time, so there are tens of them where there are hundreds of parts.
+ *
+ * A piece lifted from a game (#3262) has meshes rather than parts. Its cell
+ * waits for the module's own geometry file and draws with the game's texture,
+ * and it is marked with the game's name. It has no save to file, because a
+ * file would carry the game's geometry off the machine.
  */
 
 import { Button, Input } from "@picoframe/frame";
@@ -21,9 +26,20 @@ import { useReduceMotion } from "../../../general/display";
 import { baseAtlas, type LegoAtlas } from "../../atlas";
 import { buildCompoundHolder } from "../../compoundPreview";
 import { validateCompoundName } from "../../compounds";
-import { addStandardLights, partMaterial } from "../../geometry";
+import {
+  addStandardLights,
+  importedMaterial,
+  partMaterial,
+} from "../../geometry";
+import { holdsLiftedPieces } from "../../liftPiece";
 import type { LegoProject } from "../../model";
 import { getPartGeometry, type LoadedPack } from "../../pack";
+import {
+  disposeRawGeometry,
+  getMeshGeometry,
+  loadRawGeometry,
+  type RawGeometry,
+} from "../../rawGeometry";
 import { isBuiltInModule } from "../../starterModules";
 import { ModuleLabelsPopover } from "./ModuleLabelsPopover";
 import { gridLayout } from "./moduleGrid";
@@ -106,6 +122,11 @@ export function CompoundPicker({
   const [columns, setColumns] = useState(1);
   const [hovered, setHovered] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<Renaming | null>(null);
+  /** A lifted module's geometry by its id, or null when it would not load. */
+  const [raws, setRaws] = useState<ReadonlyMap<string, RawGeometry | null>>(
+    () => new Map(),
+  );
+  const asked = useRef(new Set<string>());
   const reduceMotion = useReduceMotion();
 
   function startRename(compound: LegoProject) {
@@ -151,6 +172,7 @@ export function CompoundPicker({
         scene,
         camera,
         holders: new Map(),
+        ownMaterials: new Map(),
         order: [],
         builtIn: [],
         columns: 1,
@@ -174,9 +196,35 @@ export function CompoundPicker({
         dispose: () => {
           scroller.removeEventListener("scroll", render);
           for (const holder of state.holders.values()) scene.remove(holder);
+          for (const dispose of state.ownMaterials.values()) dispose();
           stateRef.current = null;
         },
       };
+    },
+    [],
+  );
+
+  // A lifted module's meshes are in a file of its own, read once per module.
+  useEffect(() => {
+    for (const compound of compounds) {
+      if (!holdsLiftedPieces(compound) || asked.current.has(compound.id))
+        continue;
+      asked.current.add(compound.id);
+      const { id } = compound;
+      void loadRawGeometry(id).then(
+        (raw) => setRaws((was) => new Map(was).set(id, raw)),
+        () => setRaws((was) => new Map(was).set(id, null)),
+      );
+    }
+  }, [compounds]);
+
+  // Freed with the grid, not when another module's file arrives.
+  const rawsRef = useRef(raws);
+  rawsRef.current = raws;
+  useEffect(
+    () => () => {
+      for (const raw of rawsRef.current.values())
+        if (raw) disposeRawGeometry(raw);
     },
     [],
   );
@@ -185,6 +233,7 @@ export function CompoundPicker({
   // the object it already had and only new ones are built. The material is
   // reassigned on every holder regardless, not only a freshly built one,
   // because the unit's atlas can change under a compound that already exists.
+  // A lifted module keeps the game's texture it was built with.
   useEffect(() => {
     const state = stateRef.current;
     const scroller = scrollRef.current;
@@ -196,14 +245,36 @@ export function CompoundPicker({
       if (wanted.has(id)) continue;
       state.scene.remove(holder);
       state.holders.delete(id);
+      state.ownMaterials.get(id)?.();
+      state.ownMaterials.delete(id);
     }
     for (const compound of compounds) {
       if (state.holders.has(compound.id)) continue;
-      const holder = buildHolder(pack, compound, material);
+      if (holdsLiftedPieces(compound)) {
+        const raw = raws.get(compound.id);
+        // Not read yet, or unreadable: the cell shows its name and no model.
+        if (!raw || !compound.imported) continue;
+        const own = importedMaterial(compound.imported);
+        const holder = buildHolder(
+          compound,
+          (piece) => (piece.meshId ? getMeshGeometry(raw, piece.meshId) : null),
+          own.material,
+        );
+        state.scene.add(holder);
+        state.holders.set(compound.id, holder);
+        state.ownMaterials.set(compound.id, own.dispose);
+        continue;
+      }
+      const holder = buildHolder(
+        compound,
+        (piece) => (piece.partId ? getPartGeometry(pack, piece.partId) : null),
+        material,
+      );
       state.scene.add(holder);
       state.holders.set(compound.id, holder);
     }
-    for (const holder of state.holders.values()) {
+    for (const [id, holder] of state.holders) {
+      if (state.ownMaterials.has(id)) continue;
       holder.traverse((child) => {
         if (child instanceof THREE.Mesh) child.material = material;
       });
@@ -211,7 +282,7 @@ export function CompoundPicker({
     state.order = compounds.map((compound) => compound.id);
     state.builtIn = compounds.map(isBuiltInModule);
     layout(state, scroller.scrollTop, scroller.clientHeight);
-  }, [pack, compounds, atlas]);
+  }, [pack, compounds, atlas, raws]);
 
   // Turn the compound under the pointer, so its far side can be seen without
   // inserting it. Runs only while one is hovered.
@@ -276,6 +347,9 @@ export function CompoundPicker({
               const builtIn = isBuiltInModule(compound);
               const at = grid.cells[index];
               const starred = favourites?.has(compound.id) ?? false;
+              const liftedFrom = holdsLiftedPieces(compound)
+                ? compound.game?.name
+                : undefined;
               return (
                 <div
                   key={compound.id}
@@ -307,17 +381,25 @@ export function CompoundPicker({
                     onBlur={() =>
                       setHovered((at) => (at === compound.id ? null : at))
                     }
-                    title={
+                    title={[
                       onInsert
                         ? `Place ${compound.name} on a connector. Alt adds it to the selected piece`
-                        : `${compound.name}, ${compound.pieces.length} pieces`
-                    }
+                        : `${compound.name}, ${compound.pieces.length} pieces`,
+                      liftedFrom ? `From ${liftedFrom}` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(". ")}
                     className={`flex h-full w-full flex-col justify-end rounded border pb-1 text-center hover:border-border ${placingId === compound.id ? "border-ring bg-muted/40" : "border-transparent"} hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
                   >
                     <span className="truncate px-1 text-xs">
                       {isRenaming ? "" : compound.name}
                     </span>
                   </button>
+                  {liftedFrom ? (
+                    <span className="pointer-events-none absolute inset-x-6 top-1 truncate text-center text-[10px] text-muted-foreground">
+                      {liftedFrom}
+                    </span>
+                  ) : null}
                   {isRenaming ? (
                     <div className="absolute inset-x-1 bottom-1">
                       <Input
@@ -376,7 +458,7 @@ export function CompoundPicker({
                       <Pencil size={14} />
                     </Button>
                   )}
-                  {onSaveFile ? (
+                  {onSaveFile && !liftedFrom ? (
                     <Button
                       size="sm"
                       variant="ghost"
@@ -439,6 +521,8 @@ interface GridState {
   camera: THREE.OrthographicCamera;
   /** Compound id to the object drawn for it, one per compound. */
   holders: Map<string, THREE.Group>;
+  /** A lifted module's own material, by compound id, and how to free it. */
+  ownMaterials: Map<string, () => void>;
   /** The order the cells are in, which is the order the list is in. */
   order: string[];
   /** Whether each cell, in the same order, is a built in module. */
@@ -449,13 +533,13 @@ interface GridState {
 
 /** One compound in its resting pose, sized to a cell. */
 function buildHolder(
-  pack: LoadedPack,
   compound: LegoProject,
+  geometryFor: Parameters<typeof buildCompoundHolder>[1],
   material: THREE.MeshStandardMaterial,
 ): THREE.Group {
   const holder = buildCompoundHolder(
     compound,
-    (partId) => getPartGeometry(pack, partId),
+    geometryFor,
     material,
     CELL * 0.58,
   );
