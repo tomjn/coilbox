@@ -364,21 +364,24 @@ pub(crate) fn read_model(
     object_name: &str,
     fallbacks: &[ModelArchive],
 ) -> UnitModelOutput {
+    let game_source = TextureSource { handle, list };
     let lists = fallbacks.iter().map(|a| a.list.as_slice());
-    if let Some(i) = fallback_with_model(list, lists, object_name) {
-        let from = &fallbacks[i];
-        return read_model(
-            us,
-            from.handle,
-            &from.list,
-            &from.teamtex,
-            palette,
-            cache,
-            &from.name,
-            object_name,
-            &[],
-        );
-    }
+    // The archive the model itself is read from: the game's, or the first
+    // fallback that has it. Its `teamtex.txt` and metafile are the ones that
+    // apply to the model, but its textures are not looked for there alone.
+    let (handle, list, teamtex, game_archive) = match fallback_with_model(list, lists, object_name)
+    {
+        Some(i) => {
+            let from = &fallbacks[i];
+            (
+                from.handle,
+                from.list.as_slice(),
+                from.teamtex.as_slice(),
+                from.name.as_str(),
+            )
+        }
+        None => (handle, list, teamtex, game_archive),
+    };
     let mut out = match find_model(list, object_name) {
         Some(path) => match us.read_archive_member(handle, &path, MODEL_READ_CAP) {
             Some((_, bytes)) => build(&path, &bytes, palette),
@@ -413,11 +416,29 @@ pub(crate) fn read_model(
     }
 
     let format = out.format.clone();
+    // The engine mounts the game with its dependencies and base content into
+    // one file system, so a texture is found wherever any of them holds it, and
+    // the game's own copy wins (issue #4239). That holds whichever archive the
+    // model came out of.
+    let sources: Vec<TextureSource> = std::iter::once(game_source)
+        .chain(fallbacks.iter().map(|a| TextureSource {
+            handle: a.handle,
+            list: &a.list,
+        }))
+        .collect();
     for tex in out.textures.iter_mut().chain(out.texture2.iter_mut()) {
-        resolve_texture(us, handle, list, &format, teamtex, cache, tex);
+        resolve_texture(us, &sources, &format, teamtex, cache, tex);
     }
     rename_empty_textures(&mut out);
     out
+}
+
+/// An archive a texture can be found in: its handle, and its member listing as
+/// `(lower case, real)` pairs.
+#[derive(Clone, Copy)]
+pub(crate) struct TextureSource<'a> {
+    pub handle: i32,
+    pub list: &'a [(String, String)],
 }
 
 /// Rewrite an empty `.3do` texture name to `coilbox_3do::EMPTY_TEXTURE_NAME`
@@ -1241,8 +1262,7 @@ fn palette_tile_name(entry: i32) -> String {
 /// with no texture and no explanation.
 fn resolve_texture(
     us: &Unitsync,
-    handle: i32,
-    list: &[(String, String)],
+    sources: &[TextureSource],
     format: &str,
     teamtex: &[String],
     cache: Option<(&Path, &str)>,
@@ -1258,9 +1278,10 @@ fn resolve_texture(
         tex.team_colour = true;
         return;
     }
-    let Some(actual) = locate_texture(list, format, teamtex, &tex.name) else {
+    let Some((found, actual)) = locate_texture_across(sources, format, teamtex, &tex.name) else {
         return;
     };
+    let handle = found.handle;
     tex.source = actual.clone();
 
     let Some((dir, base)) = cache else { return };
@@ -1406,6 +1427,20 @@ fn locate_texture(
     // from `.tga` to `.dds` without rewriting its headers.
     let stem = want.rsplit_once('.').map(|(s, _)| s).unwrap_or(&want);
     find_with_ext(list, S3O_TEXTURE_DIR, stem)
+}
+
+/// [`locate_texture`] across the archives the engine mounts together, in the
+/// order it searches them: the first archive that holds the texture wins. Says
+/// which archive that was, so the bytes are read from it.
+fn locate_texture_across<'a>(
+    sources: &[TextureSource<'a>],
+    format: &str,
+    teamtex: &[String],
+    name: &str,
+) -> Option<(TextureSource<'a>, String)> {
+    sources.iter().find_map(|source| {
+        locate_texture(source.list, format, teamtex, name).map(|member| (*source, member))
+    })
 }
 
 /// Find `<dir>/<stem>.<ext>` for the first extension that exists.
@@ -1776,6 +1811,97 @@ mod tests {
             Some("unittextures/tatex/arm01a00.tga")
         );
         assert_eq!(locate_texture(&list, "3do", &teamtex, "Arm32Lt"), None);
+    }
+
+    #[test]
+    fn a_texture_only_a_dependency_holds_is_found_there() {
+        let game = listing(&["objects3d/armsolar.3do"]);
+        let dep = listing(&["unittextures/tatex/32xgouraud00.tga"]);
+        let sources = [
+            TextureSource {
+                handle: 1,
+                list: &game,
+            },
+            TextureSource {
+                handle: 2,
+                list: &dep,
+            },
+        ];
+        let (from, member) = locate_texture_across(&sources, "3do", &[], "32xgouraud")
+            .expect("found in the dependency");
+        assert_eq!(from.handle, 2);
+        assert_eq!(member, "unittextures/tatex/32xgouraud00.tga");
+    }
+
+    #[test]
+    fn a_texture_the_game_replaces_wins_over_its_dependency() {
+        let game = listing(&["unittextures/tatex/metal3b00.tga"]);
+        let dep = listing(&["unittextures/tatex/metal3b00.tga"]);
+        let base = listing(&["unittextures/tatex/metal3b00.tga"]);
+        let sources = [
+            TextureSource {
+                handle: 1,
+                list: &game,
+            },
+            TextureSource {
+                handle: 2,
+                list: &dep,
+            },
+            TextureSource {
+                handle: 3,
+                list: &base,
+            },
+        ];
+        let (from, _) = locate_texture_across(&sources, "3do", &[], "metal3b").expect("found");
+        assert_eq!(from.handle, 1);
+        let later = [sources[1], sources[2]];
+        let (from, _) = locate_texture_across(&later, "3do", &[], "metal3b").expect("found");
+        assert_eq!(
+            from.handle, 2,
+            "an earlier dependency wins over a later one"
+        );
+    }
+
+    #[test]
+    fn a_texture_in_no_archive_is_not_found() {
+        let game = listing(&["objects3d/armsolar.3do"]);
+        let sources = [TextureSource {
+            handle: 1,
+            list: &game,
+        }];
+        assert!(locate_texture_across(&sources, "3do", &[], "missing").is_none());
+    }
+
+    #[test]
+    fn a_models_texture_in_a_dependency_is_read_from_it() {
+        let (us, cache) = stub_session("dep-texture");
+        // The game holds the model and not the texture it names. The stub
+        // answers every archive from one member set, so the listings are what
+        // say which archive holds what.
+        let game = listing(&["objects3d/armcom.s3o"]);
+        let teamtex = Vec::new();
+        let dependency = ModelArchive {
+            name: "dependency.sdz".into(),
+            handle: 7,
+            list: listing(&["unittextures/arm.png"]),
+            teamtex: Vec::new(),
+        };
+        let out = read_model(
+            &us,
+            1,
+            &game,
+            &teamtex,
+            None,
+            Some((cache.as_path(), "k")),
+            World::GAME,
+            "ArmCom",
+            std::slice::from_ref(&dependency),
+        );
+        assert!(out.root.is_some(), "{:?}", out.errors);
+        let tex = out.textures.first().expect("a texture");
+        assert_eq!(tex.source, "unittextures/arm.png");
+        assert!(!tex.file.is_empty(), "the texture was not copied out");
+        let _ = std::fs::remove_dir_all(cache.parent().unwrap());
     }
 
     #[test]
