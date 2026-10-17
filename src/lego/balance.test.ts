@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
-
 import {
   balanceProblem,
   balanceSummary,
@@ -237,7 +236,13 @@ describe("checkBalance", () => {
     // (each foot's own centre is 0.5 in, so its lowest points reach -4).
     expect(result.centre[1]).toBeGreaterThan(-12);
     expect(result.outsideBy).toBeGreaterThan(0);
-    expect(balanceProblem(result)).toMatch(/tip.*elmos outside/);
+    expect(balanceProblem(result)?.message).toMatch(/tip.*elmos outside/);
+    expect(balanceProblem(result)).toMatchObject({
+      source: "balance",
+      severity: "warning",
+      pieceIds: result.resting,
+    });
+    expect(result.resting.length).toBeGreaterThan(0);
   });
 
   it("weighs a piece by its volume after scaling", () => {

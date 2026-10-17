@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-
 import {
   descendantIds,
   isEffectivelyHidden,
@@ -16,6 +15,7 @@ import {
   uniquePieceName,
   walkPieces,
 } from "./model";
+import { problemTexts } from "./problems";
 
 function piece(id: string, parentId: string | null, name = id): LegoPiece {
   return {
@@ -229,12 +229,16 @@ describe("projectProblems", () => {
       piece("a", "root", "turret"),
       piece("b", "root", "turret"),
     ]);
-    expect(projectProblems(doc)).toContain('2 pieces are called "turret".');
+    expect(problemTexts(projectProblems(doc))).toContain(
+      '2 pieces are called "turret".',
+    );
   });
 
   it("catches a name a unit script could not use", () => {
     const doc = project([piece("root", null), piece("a", "root", "Left Foot")]);
-    expect(projectProblems(doc).join(" ")).toMatch(/not usable as a name/);
+    expect(problemTexts(projectProblems(doc)).join(" ")).toMatch(
+      /not usable as a name/,
+    );
   });
 
   it("catches a lifted piece in a unit for another game, naming it", () => {
@@ -245,10 +249,12 @@ describe("projectProblems", () => {
     const turret = { ...piece("a", "root", "turret"), meshId: "x/m2", lifted };
     const xta = { name: "XTA", archive: "xta.sdz", shortname: "XTA" };
     expect(
-      projectProblems({
-        ...project([piece("root", null), turret]),
-        game: xta,
-      }),
+      problemTexts(
+        projectProblems({
+          ...project([piece("root", null), turret]),
+          game: xta,
+        }),
+      ),
     ).toEqual([
       "This piece is from Splinter Faction. This unit is for XTA. Pieces from a game: turret.",
     ]);
@@ -270,17 +276,56 @@ describe("projectProblems", () => {
       piece("a", "b"),
       piece("b", "a"),
     ]);
-    expect(projectProblems(doc).join(" ")).toMatch(/in a loop or detached/);
+    expect(problemTexts(projectProblems(doc)).join(" ")).toMatch(
+      /in a loop or detached/,
+    );
   });
 
   it("catches a second root", () => {
     const doc = project([piece("root", null), piece("other", null)]);
-    expect(projectProblems(doc).join(" ")).toMatch(/have no parent/);
+    expect(problemTexts(projectProblems(doc)).join(" ")).toMatch(
+      /have no parent/,
+    );
+  });
+
+  it("records the pieces a problem is about and how bad it is", () => {
+    const dup = projectProblems(
+      project([
+        piece("root", null),
+        piece("a", "root", "turret"),
+        piece("b", "root", "turret"),
+      ]),
+    ).find((p) => p.message.includes("are called"));
+    expect(dup).toMatchObject({
+      source: "document",
+      severity: "error",
+      pieceIds: ["a", "b"],
+    });
+
+    const orphan = projectProblems(
+      project([piece("root", null), piece("a", "gone")]),
+    ).find((p) => p.message.includes("no longer exists"));
+    expect(orphan?.pieceIds).toEqual(["a"]);
+
+    const name = projectProblems(
+      project([piece("root", null), piece("a", "root", "Left Foot")]),
+    )[0];
+    expect(name).toMatchObject({ severity: "warning", pieceIds: ["a"] });
+  });
+
+  it("has no piece for a missing root", () => {
+    const missing = projectProblems({
+      ...project([piece("a", null)]),
+      rootPieceId: "none",
+    }).find((p) => p.message === "The root piece is missing.");
+    expect(missing).toMatchObject({ severity: "error", pieceIds: [] });
   });
 
   it("catches a missing parent", () => {
     const doc = project([piece("root", null), piece("a", "gone")]);
-    expect(projectProblems(doc).join(" ")).toMatch(/no longer exists/);
+    expect(problemTexts(projectProblems(doc)).join(" ")).toMatch(
+      /no longer exists/,
+    );
   });
 });
 

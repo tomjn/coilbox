@@ -14,6 +14,7 @@ import { roleLabel } from "./animPresets";
 import { SAME_POSITION } from "./balance";
 import type { LegoProject } from "./model";
 import type { LoadedPack } from "./pack";
+import { type Problem, problem } from "./problems";
 import type { RawGeometry } from "./rawGeometry";
 import { bakedPieces } from "./s3oBuild";
 import { ELMOS_PER_FOOTPRINT, footprintSteps } from "./unitDef";
@@ -229,14 +230,17 @@ export function footprintLines(result: FootprintResult): string[] {
 }
 
 /** The lines for the problems list: only a unit sticking out of its footprint. */
-export function footprintProblems(result: FootprintResult): string[] {
+export function footprintProblems(result: FootprintResult): Problem[] {
   if (result.status !== "ok") return [];
   const { overhang, written, now } = result;
   const inForce = written ?? now;
   return (["x", "z"] as const)
     .filter((axis) => overhang[axis] > 0)
-    .map(
-      (axis) =>
+    .map((axis) =>
+      problem(
+        "footprint",
+        "warning",
         `Sticks out of its ${inForce.x}x${inForce.z} footprint by ${Number(overhang[axis].toFixed(2))} elmos on ${axis}.`,
+      ),
     );
 }

@@ -17,7 +17,6 @@ import { cleanup, render } from "@testing-library/react";
 import { act, useState } from "react";
 import * as THREE from "three";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
 import { type AnimPreset, presetById } from "./animPresets";
 import {
   duplicatePiece,
@@ -33,6 +32,7 @@ import {
   parseLegoProjectJson,
   projectProblems,
 } from "./model";
+import { problemTexts } from "./problems";
 import { worldMatrix } from "./reparent";
 import { ringMembers } from "./ringSet";
 import { type SymmetrySession, useSymmetry } from "./useSymmetry";
@@ -509,7 +509,7 @@ describe("a pair saved with the unit (issue #3315)", () => {
       ...project,
       pieces: project.pieces.filter((piece) => piece.id !== twinId),
     }));
-    expect(projectProblems(bench.project())).toEqual([
+    expect(problemTexts(projectProblems(bench.project()))).toEqual([
       '"piece0" has a twin that no longer exists.',
     ]);
     bench.run(() =>

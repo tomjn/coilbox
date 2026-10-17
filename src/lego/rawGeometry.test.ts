@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-
 import type { LegoPiece } from "./model";
 import {
   encodeRawGeometry,
@@ -252,6 +251,8 @@ describe("rawGeometryProblems", () => {
     );
 
     expect(problems).toHaveLength(1);
-    expect(problems[0]).toContain("2 pieces");
+    expect(problems[0].message).toContain("2 pieces");
+    expect(problems[0].source).toBe("geometry");
+    expect(problems[0].pieceIds).toEqual(["p1", "p2"]);
   });
 });

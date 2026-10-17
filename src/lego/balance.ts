@@ -14,6 +14,7 @@
 
 import { childrenOf, type LegoProject } from "./model";
 import type { LoadedPack } from "./pack";
+import { type Problem, problem } from "./problems";
 import type { RawGeometry } from "./rawGeometry";
 import { type BakedPiece, bakedPieces } from "./s3oBuild";
 
@@ -398,9 +399,17 @@ export function balanceSummary(result: BalanceResult): string {
   }
 }
 
-/** The line for the problems list, or null when there is no problem. */
-export function balanceProblem(result: BalanceResult): string | null {
+/**
+ * The problem for the list, or null when there is none. It is about the feet
+ * and wheels the weight should be over.
+ */
+export function balanceProblem(result: BalanceResult): Problem | null {
   return result.status === "outside"
-    ? `Looks as if it would tip: the weight centre is ${Number(result.outsideBy.toFixed(2))} elmos outside the feet.`
+    ? problem(
+        "balance",
+        "warning",
+        `Looks as if it would tip: the weight centre is ${Number(result.outsideBy.toFixed(2))} elmos outside the feet.`,
+        result.resting,
+      )
     : null;
 }
