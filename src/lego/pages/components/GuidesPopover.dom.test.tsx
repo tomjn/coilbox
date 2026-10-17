@@ -18,7 +18,7 @@ const BASE: LegoProject = newProject({
   now: "2026-10-17T00:00:00Z",
 });
 
-function open(guides: LegoGuide[] = []) {
+function open(guides: LegoGuide[] = [], symmetryPlane = false) {
   const onEdit = vi.fn();
   const onPick = vi.fn();
   render(
@@ -27,6 +27,7 @@ function open(guides: LegoGuide[] = []) {
       onEdit={onEdit}
       picking={null}
       onPick={onPick}
+      symmetryPlane={symmetryPlane}
     />,
   );
   fireEvent.click(screen.getByRole("button", { name: "Guides" }));
@@ -148,5 +149,20 @@ describe("GuidesPopover", () => {
     expect(applied({ ...BASE, guides: [line] }).guides?.[0].point).toEqual([
       3, 7, 0,
     ]);
+  });
+
+  it("lists the symmetry plane as locked, with nothing to edit or delete", () => {
+    open([], true);
+
+    expect(screen.getByText("Symmetry (x = 0)")).toBeTruthy();
+    expect(screen.getByText("Locked")).toBeTruthy();
+    expect(screen.queryByLabelText(/Delete Symmetry/)).toBeNull();
+    expect(screen.queryByLabelText(/Name of Symmetry/)).toBeNull();
+  });
+
+  it("does not list the symmetry plane unless symmetry is on", () => {
+    open([GUIDE]);
+
+    expect(screen.queryByText("Symmetry (x = 0)")).toBeNull();
   });
 });
