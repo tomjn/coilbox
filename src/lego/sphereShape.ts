@@ -9,12 +9,7 @@
  * vertical radius, and that is the number the panel calls its height.
  */
 
-import type { LegoProject } from "./model";
-import type { LoadedPack } from "./pack";
-import { mostUsedSwatch } from "./roundShape";
 import {
-  DEFAULT_SPHERE_RINGS,
-  DEFAULT_SPHERE_SIDES,
   type LegoShape,
   SPHERE_BOWL,
   SPHERE_DOME,
@@ -32,34 +27,6 @@ export interface SphereNumbers {
   keep: SphereKeep;
   rings: number;
   sides: number;
-}
-
-/** A new sphere is 1 across, like the pack's smaller blocks. */
-const NEW_SIZE = 1;
-
-/**
- * A new sphere, or a new dome, for this unit, or null when the pack lists no
- * swatches, which means it offers no shapes. It takes the colourway most of
- * the unit's parts use, or the pack's first swatch when none has one. A dome is
- * half as tall as it is wide, so it is half of a sphere 1 across.
- */
-export function newSphereShape(
-  dome: boolean,
-  project: LegoProject,
-  pack: Pick<LoadedPack, "manifest" | "byId">,
-): LegoShape | null {
-  const swatches = pack.manifest.swatches ?? [];
-  if (swatches.length === 0) return null;
-  return {
-    kind: "sphere",
-    size: [NEW_SIZE, dome ? NEW_SIZE / 2 : NEW_SIZE, NEW_SIZE],
-    swatch: mostUsedSwatch(project, pack, swatches),
-    options: {
-      keep: dome ? SPHERE_DOME : SPHERE_WHOLE,
-      rings: DEFAULT_SPHERE_RINGS,
-      sides: DEFAULT_SPHERE_SIDES,
-    },
-  };
 }
 
 /** A sphere's numbers as it is drawn, defaults filled in. */

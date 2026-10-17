@@ -1,37 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { type LegoProject, newProject } from "./model";
-import type { LoadedPack } from "./pack";
 import type { LegoShape } from "./shapes";
-import {
-  newSphereShape,
-  sphereAnchors,
-  sphereNumbers,
-  withSphereNumber,
-} from "./sphereShape";
-
-const SWATCHES = ["green", "tan"].map((id) => ({
-  id,
-  uv: { min: [0, 0] as [number, number], max: [0.1, 0.1] as [number, number] },
-  tile: 1.56,
-}));
-
-function pack(swatches = SWATCHES): Pick<LoadedPack, "manifest" | "byId"> {
-  return {
-    manifest: { swatches } as LoadedPack["manifest"],
-    byId: new Map(),
-  };
-}
-
-function unit(): LegoProject {
-  return newProject({
-    id: "p",
-    rootPieceId: "root",
-    name: "u",
-    packId: "lego",
-    packVersion: "1",
-    now: "2026-10-17T00:00:00Z",
-  });
-}
+import { sphereAnchors, sphereNumbers, withSphereNumber } from "./sphereShape";
 
 const ball: LegoShape = {
   kind: "sphere",
@@ -50,20 +19,6 @@ function applied(shape: LegoShape, name: never, value: number): LegoShape {
   if ("problem" in result) throw new Error(result.problem);
   return result.shape;
 }
-
-describe("newSphereShape", () => {
-  it("is a whole sphere 1 across, or a dome half as tall", () => {
-    expect(newSphereShape(false, unit(), pack())?.size).toEqual([1, 1, 1]);
-    expect(newSphereShape(false, unit(), pack())?.options?.keep).toBe(0);
-    const made = newSphereShape(true, unit(), pack());
-    expect(made?.size).toEqual([1, 0.5, 1]);
-    expect(made?.options?.keep).toBe(1);
-  });
-
-  it("is null when the pack lists no swatches", () => {
-    expect(newSphereShape(false, unit(), pack([]))).toBeNull();
-  });
-});
 
 describe("sphereNumbers", () => {
   it("reads three radii from a whole sphere's box", () => {
