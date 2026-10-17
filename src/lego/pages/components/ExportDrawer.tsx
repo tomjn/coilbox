@@ -68,6 +68,7 @@ import {
   receiptFor,
   recordExport,
 } from "../../exportRecord";
+import { textureSheetRefusal } from "../../liftPiece";
 import { unitScript } from "../../luaScript";
 import type {
   ExportedFile,
@@ -491,6 +492,9 @@ export function ExportDrawer({
   // A unit imported from somebody else's model draws with its own textures out
   // of the store, and none of the atlas below applies to it.
   const imported = project.imported ? importedTextures(project.imported) : null;
+  // A unit of parts holding a lifted piece has two textures and a model can
+  // name one, so nothing is written out until they share a sheet (#3260).
+  const heldBack = textureSheetRefusal(project);
   // The same two textures again, named as the PNGs a Blender file can carry.
   const blender = project.imported ? blenderTextures(project.imported) : null;
   const unit = unitAtlas(project, pack.library.atlases);
@@ -540,6 +544,10 @@ export function ExportDrawer({
       filters: [{ name: "glTF Binary", extensions: ["glb"] }],
     });
     if (typeof target !== "string") return;
+    if (heldBack) {
+      setGlbSave({ state: "failed", message: heldBack });
+      return;
+    }
     setGlbSave({ state: "working" });
     try {
       const colourUrl = await glbColourUrl();
@@ -565,6 +573,10 @@ export function ExportDrawer({
   }
 
   async function runExport() {
+    if (heldBack) {
+      setResult({ state: "failed", message: heldBack });
+      return;
+    }
     // The s3o header names the atlas whether or not this export copies it, so a
     // unit exported without the texture still finds one already installed.
     const model = buildS3o(project, pack, raw, {
@@ -1080,7 +1092,9 @@ export function ExportDrawer({
                   variant="outline"
                   size="sm"
                   disabled={
-                    (!blender && !installed) || glbSave.state === "working"
+                    (!blender && !installed) ||
+                    glbSave.state === "working" ||
+                    heldBack !== null
                   }
                   onClick={() => void saveGlb()}
                 >
@@ -1219,9 +1233,14 @@ export function ExportDrawer({
             ) : null}
 
             <div className="flex flex-col gap-2 border-t border-border/60 pt-4">
+              {heldBack ? (
+                <p className="text-xs text-muted-foreground">{heldBack}</p>
+              ) : null}
               <Button
                 onClick={() => void runExport()}
-                disabled={!dir || result.state === "working"}
+                disabled={
+                  !dir || result.state === "working" || heldBack !== null
+                }
               >
                 {result.state === "working" ? "Exporting" : "Export"}
               </Button>

@@ -137,6 +137,32 @@ afterEach(() => {
   cleanup();
 });
 
+describe("a unit of parts holding a piece lifted from a game", () => {
+  it("says why it cannot be exported and writes nothing", async () => {
+    legoGameLanguage.mockResolvedValue({ texts: {} });
+    show({
+      ...project,
+      pieces: [
+        ...project.pieces,
+        {
+          ...project.pieces[0],
+          id: "turret",
+          name: "turret",
+          parentId: "base",
+          meshId: "mod/m0",
+        },
+      ],
+    });
+    expect(
+      await screen.findByText(/combining the two into one sheet/),
+    ).toBeTruthy();
+    const exportButton = screen.getByRole("button", { name: "Export" });
+    expect((exportButton as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(exportButton);
+    expect(legoExport).not.toHaveBeenCalled();
+  });
+});
+
 describe("where the unit's name is going", () => {
   it("says the definition for a game with no localisation file", async () => {
     legoGameLanguage.mockResolvedValue({ texts: {} });
