@@ -30,6 +30,8 @@ vi.mock("@picoframe/frame", async () => ({
   // The recent and favourite lists are app settings, which need the frame's
   // store. This test is not about them.
   useSetting: (_key: string, fallback: unknown) => [fallback, () => {}],
+  // The module share drawer is the frame's, which needs its provider.
+  useDrawer: () => ({ open: () => {}, close: () => {} }),
 }));
 
 vi.mock("../useLegoDocument", () => ({

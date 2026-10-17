@@ -164,6 +164,7 @@ import { swapPart } from "../swapPart";
 import { useEditShortcuts } from "../useEditShortcuts";
 import { useLegoDocument } from "../useLegoDocument";
 import { useModuleFiles } from "../useModuleFiles";
+import { useShareModule } from "../useModuleShare";
 import { useRawGeometry } from "../useRawGeometry";
 import { useSymmetry } from "../useSymmetry";
 import { addWeaponModule, pickWeaponParts } from "../weaponModule";
@@ -254,6 +255,7 @@ function Builder({ id }: { id: string | undefined }) {
   // The built in modules first, then the user's own.
   const compounds = useModules(pack);
   const moduleFiles = useModuleFiles(pack, compounds);
+  const shareModule = useShareModule();
   const { loading: modulesLoading } = useLegoCompounds();
   // Only for the keep-set when a texture changes: the store is shared, so
   // nothing can decide a key is dead by looking at one unit.
@@ -2147,6 +2149,7 @@ function Builder({ id }: { id: string | undefined }) {
                       }
                       onCopyModule={(compound) => void saveCompound(compound)}
                       onSaveModuleFile={moduleFiles.saveFile}
+                      onShareModule={shareModule}
                       onLabelsModule={(compound, labels) =>
                         void saveCompound(withLabels(compound, labels))
                       }

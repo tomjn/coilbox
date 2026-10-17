@@ -6,6 +6,7 @@ import { withLabels } from "../moduleFilter";
 import { type LegoPartInfo, type LoadedPack, loadPack } from "../pack";
 import { deleteCompound, saveCompound, useModules } from "../projects";
 import { useModuleFiles } from "../useModuleFiles";
+import { useSharedModuleImport, useShareModule } from "../useModuleShare";
 import { InventoryFilters, InventoryGrids } from "./components/Inventory";
 import { PartDetail } from "./components/PartDetail";
 import { PackAtlases, PackProblems } from "./components/PartFilters";
@@ -46,6 +47,8 @@ export default function PartsPage() {
   // The built in modules first, then the user's own.
   const compounds = useModules(pack);
   const moduleFiles = useModuleFiles(pack, compounds);
+  const shareModule = useShareModule();
+  useSharedModuleImport(pack, status.state !== "loading", compounds);
   const view = useInventoryView(pack, compounds);
 
   return (
@@ -87,6 +90,7 @@ export default function PartsPage() {
             }
             onCopyModule={(compound) => void saveCompound(compound)}
             onSaveModuleFile={moduleFiles.saveFile}
+            onShareModule={shareModule}
             onLabelsModule={(compound, labels) =>
               void saveCompound(withLabels(compound, labels))
             }

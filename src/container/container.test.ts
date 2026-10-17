@@ -11,6 +11,7 @@ import {
   encodeContainerJson,
   identify,
   makeContainer,
+  moduleGeometryRefusal,
   readContainer,
   sniffPayloadKind,
   tryEncodeContainerCode,
@@ -361,5 +362,85 @@ describe("sniffPayloadKind", () => {
         keysyms: [],
       }),
     ).toBe("keymap");
+  });
+});
+
+describe("module containers (#3272)", () => {
+  const piece = (name: string, extra: Record<string, unknown> = {}) => ({
+    id: name,
+    name,
+    parentId: null,
+    partId: null,
+    position: [0, 0, 0],
+    rotation: [0, 0, 0],
+    scale: [1, 1, 1],
+    ...extra,
+  });
+  const module = (pieces: unknown[]) => ({
+    schemaVersion: 1,
+    id: "m1",
+    name: "Turret",
+    unitName: "turret",
+    packId: "lego",
+    packVersion: "1",
+    rootPieceId: "root",
+    pieces,
+  });
+  const bar = { name: "Beyond All Reason", archive: "bar.sdd" };
+  const lifted = (game = bar) => ({ lifted: { game, member: "a.s3o" } });
+
+  it("identifies a module container", () => {
+    const id = identify(encodeContainerJson("module", 1, module([])));
+    expect(id.kind).toBe("module");
+    expect(id.compatibility).toBe("ok");
+    expect(id.warnings).toEqual([]);
+  });
+
+  it("recognises a module by its shape", () => {
+    expect(sniffPayloadKind(module([piece("root")]))).toBe("module");
+  });
+
+  it("takes a module of parts and empty pieces", () => {
+    const parts = module([piece("root"), piece("barrel", { partId: "p1" })]);
+    expect(moduleGeometryRefusal(parts)).toBeNull();
+  });
+
+  it("names the lifted piece and its game", () => {
+    const one = module([piece("root"), piece("barrel", lifted())]);
+    expect(moduleGeometryRefusal(one)).toBe(
+      "This module holds a piece from Beyond All Reason: barrel. Geometry lifted from a game cannot be uploaded to the hub.",
+    );
+  });
+
+  it("names every lifted piece and every game they came from", () => {
+    const xta = { name: "XTA", archive: "xta.sdd" };
+    const two = module([
+      piece("root", lifted()),
+      piece("barrel", lifted(xta)),
+      piece("sleeve", lifted()),
+    ]);
+    expect(moduleGeometryRefusal(two)).toBe(
+      "This module holds pieces from Beyond All Reason and XTA: root, barrel, sleeve. Geometry lifted from a game cannot be uploaded to the hub.",
+    );
+  });
+
+  it("refuses a lifted piece even when the module is tagged to its game", () => {
+    const tagged = { ...module([piece("root", lifted())]), game: bar };
+    expect(moduleGeometryRefusal(tagged)).toContain(
+      "cannot be uploaded to the hub",
+    );
+  });
+
+  it("refuses a mesh with no record of where it came from", () => {
+    const mesh = module([piece("root"), piece("hull", { meshId: "m0" })]);
+    expect(moduleGeometryRefusal(mesh)).toBe(
+      "This module holds imported meshes: hull. The hub carries modules built from parts and empty pieces only.",
+    );
+  });
+
+  it("refuses a payload that is not a module at all", () => {
+    expect(moduleGeometryRefusal({ name: "x" })).toBe(
+      "That module could not be read.",
+    );
   });
 });

@@ -194,6 +194,19 @@ export function prepareImport(code: string): PrepareImportResult {
             "It is saved to Unit tweaks and opened, which needs Advanced mode turned on in Settings.",
         },
       };
+    case "module":
+      // The parts page lists every module, so a shared one is added there
+      // (#3272). Like Unit tweaks it is behind Advanced mode.
+      return {
+        ok: true,
+        plan: {
+          ...(base as ImportPlan),
+          route: importRoute("/lego/parts", code),
+          label: containerKindName("module"),
+          detail:
+            "It is added to your modules, which needs Advanced mode turned on in Settings.",
+        },
+      };
   }
 }
 

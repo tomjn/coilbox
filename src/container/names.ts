@@ -28,6 +28,7 @@ const KIND_NAMES: Record<ContainerKind, string> = {
   keymap: "keymap",
   blueprint: "base blueprint",
   "mod-project": "unit tweak project",
+  module: "unit builder module",
 };
 
 /** What to call one kind, for a sentence a person reads. */

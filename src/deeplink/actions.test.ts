@@ -115,6 +115,26 @@ describe("prepareImport", () => {
   });
 });
 
+describe("prepareImport for a module", () => {
+  it("sends a module to the parts page, where modules are kept", () => {
+    const code = encodeContainerCode("module", 1, {
+      schemaVersion: 1,
+      id: "m1",
+      name: "Turret",
+      packId: "lego",
+      rootPieceId: "root",
+      pieces: [],
+    });
+    const r = prepareImport(code);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.plan.kind).toBe("module");
+      expect(r.plan.route).toContain("/lego/parts?import=");
+      expect(r.plan.label).toBe("unit builder module");
+    }
+  });
+});
+
 describe("describeOpen", () => {
   it("names the map for a map screen", () => {
     expect(describeOpen({ screen: "map", id: "Comet Catcher" })).toContain(

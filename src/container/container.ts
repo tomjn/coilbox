@@ -57,7 +57,8 @@ export type ContainerKind =
   | "scenario"
   | "keymap"
   | "blueprint"
-  | "mod-project";
+  | "mod-project"
+  | "module";
 
 export const CONTAINER_KINDS: readonly ContainerKind[] = [
   "campaign",
@@ -68,6 +69,7 @@ export const CONTAINER_KINDS: readonly ContainerKind[] = [
   "keymap",
   "blueprint",
   "mod-project",
+  "module",
 ];
 
 /**
@@ -84,6 +86,7 @@ export const SUPPORTED_KIND_VERSIONS: Record<ContainerKind, number> = {
   keymap: 1,
   blueprint: 1,
   "mod-project": 1,
+  module: 1,
 };
 
 export interface Container<P = unknown> {
@@ -378,6 +381,15 @@ export function sniffPayloadKind(payload: unknown): ContainerKind | null {
   ) {
     return "mod-project";
   }
+  // A unit builder module: a named tree of pieces built against one parts pack.
+  // `src/lego/model.ts` in tomjn/coilbox is the shape and the reader.
+  if (
+    typeof p.packId === "string" &&
+    typeof p.rootPieceId === "string" &&
+    Array.isArray(p.pieces)
+  ) {
+    return "module";
+  }
   // A base blueprint: a named layout of buildings, each with an offset and a
   // facing, plus how much ground each def stands on. `src/blueprint/payload.ts`
   // in tomjn/coilbox is the shape and the reader for it.
@@ -390,6 +402,64 @@ export function sniffPayloadKind(payload: unknown): ContainerKind | null {
     typeof p.mapName === "string"
   ) {
     return "preset";
+  }
+  return null;
+}
+
+/** "A and B", or "A, B and C". */
+function joinNames(names: string[]): string {
+  if (names.length <= 1) return names.join("");
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+/**
+ * Why a module payload cannot go on the hub, or null when it can (#3272).
+ *
+ * The hub carries modules made of parts and empty pieces. A piece lifted from
+ * a game records the game in `lifted`, and the owner has ruled that such
+ * geometry never goes on the hub, whatever game the upload is tagged to. A
+ * mesh with no such record is refused too, because its geometry lives in a
+ * file beside the module that a container does not carry, and because a mesh
+ * whose record was lost could still be a game's.
+ *
+ * Here rather than in the unit builder so the hub, which vendors this file,
+ * refuses with the same rule and the same words. A skeleton kind, when there
+ * is one, holds the same pieces and takes the same check.
+ */
+export function moduleGeometryRefusal(payload: unknown): string | null {
+  const pieces =
+    typeof payload === "object" && payload !== null
+      ? (payload as Record<string, unknown>).pieces
+      : undefined;
+  if (!Array.isArray(pieces)) return "That module could not be read.";
+
+  const liftedNames: string[] = [];
+  const games: string[] = [];
+  const meshNames: string[] = [];
+  for (const piece of pieces) {
+    if (typeof piece !== "object" || piece === null) continue;
+    const p = piece as Record<string, unknown>;
+    const name = typeof p.name === "string" ? p.name : "a piece";
+    if (typeof p.lifted === "object" && p.lifted !== null) {
+      liftedNames.push(name);
+      const game = (p.lifted as Record<string, unknown>).game;
+      const gameName =
+        typeof game === "object" && game !== null
+          ? (game as Record<string, unknown>).name
+          : undefined;
+      const label = typeof gameName === "string" ? gameName : "a game";
+      if (!games.includes(label)) games.push(label);
+    } else if (typeof p.meshId === "string") {
+      meshNames.push(name);
+    }
+  }
+
+  if (liftedNames.length > 0) {
+    const what = liftedNames.length === 1 ? "a piece" : "pieces";
+    return `This module holds ${what} from ${joinNames(games)}: ${liftedNames.join(", ")}. Geometry lifted from a game cannot be uploaded to the hub.`;
+  }
+  if (meshNames.length > 0) {
+    return `This module holds imported meshes: ${meshNames.join(", ")}. The hub carries modules built from parts and empty pieces only.`;
   }
   return null;
 }
