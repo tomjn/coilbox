@@ -80,6 +80,9 @@ export interface BodyPlan {
     joints: Joints,
     values: Record<string, number>,
   ): Record<string, number | undefined>;
+  /** The plan this one adds bone groups to (`describedPlan.ts`). It is sized
+   *  by that plan's rule, because the groups add no proportion to the size. */
+  basedOn?: string;
 }
 
 /*

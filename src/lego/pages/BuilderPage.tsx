@@ -62,7 +62,6 @@ import { presetById, ROLES, restAngleWarnings } from "../animPresets";
 import { unitAtlas } from "../atlas";
 import { balanceProblem, checkBalance } from "../balance";
 import { legoTexturePrune } from "../bindings";
-import { bodyPlanById } from "../bodyPlans";
 import { addBuildArm, builderKind, pickArmParts } from "../buildArm";
 import { pictureIsStale } from "../buildPicture";
 import {
@@ -79,6 +78,7 @@ import {
   pieceConnectors,
   setJoinPlace,
 } from "../connectors";
+import { planById } from "../describedPlan";
 import {
   DEFAULT_GROUND,
   footprintWidth,
@@ -253,7 +253,7 @@ function Builder({ id }: { id: string | undefined }) {
   // before it is let go. The preview is not an edit: it only changes what the
   // viewport and the panel show.
   const skeletonPlan = draft?.skeleton
-    ? bodyPlanById(draft.skeleton.plan)
+    ? planById(draft.skeleton.plan)
     : undefined;
   const [proportionPreview, setProportionPreview] = useState<{
     id: string;
