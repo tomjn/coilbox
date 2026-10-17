@@ -82,6 +82,7 @@ import {
   pieceById,
 } from "../../model";
 import type { LoadedPack } from "../../pack";
+import type { FaceTarget } from "../../placePart";
 import type { RawGeometry } from "../../rawGeometry";
 import {
   buildReferenceUnit,
@@ -90,6 +91,7 @@ import {
 import { unitBounds } from "../../s3oBuild";
 import type { ScriptTimeline } from "../../scriptPlayback";
 import type { Seat } from "../../seat";
+import { shortcutLabel } from "../../shortcuts";
 import type { Vec3 } from "../../snapping";
 import { buildStandIn, disposeStandIn, standInRadius } from "../../standIn";
 import {
@@ -125,6 +127,11 @@ import {
   dragGroup,
   pieceIdOf,
 } from "./gizmoCommit";
+import {
+  clearPlaceGhost,
+  type PlacingPart,
+  showPlaceGhost,
+} from "./placeByFace";
 import { attachPointerHandlers } from "./pointerHandlers";
 import {
   type GameReferenceChoice,
@@ -455,6 +462,13 @@ interface Props {
     /** A click that missed the model, which is how you change your mind. */
     onCancelAnchor?: () => void;
   };
+  /** Putting a part on a face of the unit: hovering shows it there, and a
+   *  click on the face adds it. */
+  partPlacement: {
+    placing?: PlacingPart | null;
+    /** The face that was clicked, or null for a click that hit nothing. */
+    onPlace?: (target: FaceTarget | null) => void;
+  };
   /** The collision volume, the unit's own or one piece's, while its panel
    *  has the gizmo on it. */
   collisionEditing: {
@@ -513,6 +527,7 @@ export function ModelViewport({
   pieceActions,
   symmetry,
   anchorPlacement,
+  partPlacement,
   collisionEditing,
   aimPoint,
 }: Props) {
@@ -548,6 +563,7 @@ export function ModelViewport({
     onPlaceAnchor,
     onCancelAnchor,
   } = anchorPlacement;
+  const { placing: placingPart = null, onPlace: onPlacePart } = partPlacement;
   const {
     editCollision = false,
     onCollisionChange,
@@ -670,6 +686,10 @@ export function ModelViewport({
   onPlaceAnchorRef.current = onPlaceAnchor;
   const onCancelAnchorRef = useRef(onCancelAnchor);
   onCancelAnchorRef.current = onCancelAnchor;
+  const placingPartRef = useRef(placingPart);
+  placingPartRef.current = placingPart;
+  const onPlacePartRef = useRef(onPlacePart);
+  onPlacePartRef.current = onPlacePart;
   const onCollisionChangeRef = useRef(onCollisionChange);
   onCollisionChangeRef.current = onCollisionChange;
   const onPieceVolumeChangeRef = useRef(onPieceCollisionVolumeChange);
@@ -894,6 +914,36 @@ export function ModelViewport({
       seatMark.raycast = () => {};
       scene.add(seatMark);
 
+      // The part being placed, drawn flat and see through where it would sit,
+      // with a dot on the face it would join. Not the unit's atlas material:
+      // that one is shared, and a translucent copy of it would disturb it.
+      const placeGhost = new THREE.Mesh(
+        undefined,
+        new THREE.MeshBasicMaterial({
+          color: SEAT_COLOUR,
+          transparent: true,
+          opacity: 0.45,
+          depthWrite: false,
+        }),
+      );
+      placeGhost.matrixAutoUpdate = false;
+      placeGhost.visible = false;
+      placeGhost.renderOrder = 2;
+      placeGhost.raycast = () => {};
+      scene.add(placeGhost);
+
+      const placeMark = new THREE.Points(
+        new THREE.BufferGeometry().setAttribute(
+          "position",
+          new THREE.Float32BufferAttribute([0, 0, 0], 3),
+        ),
+        dotMaterial(SEAT_DOT, renderer.getPixelRatio(), false, SEAT_COLOUR),
+      );
+      placeMark.visible = false;
+      placeMark.renderOrder = 3;
+      placeMark.raycast = () => {};
+      scene.add(placeMark);
+
       const camera = new THREE.PerspectiveCamera(40, 1, 0.05, MIN_FAR);
       camera.position.set(...HOME_CAMERA);
 
@@ -1004,6 +1054,11 @@ export function ModelViewport({
         placingAnchorRef,
         onPlaceAnchorRef,
         onCancelAnchorRef,
+        placingPartRef,
+        onPlacePartRef,
+        placeTarget: null,
+        placeGhost,
+        placeMark,
         onTransformRef,
         onTransformManyRef,
         seat: null,
@@ -1119,6 +1174,9 @@ export function ModelViewport({
           state.seatMark.geometry.dispose();
           (state.seatMark.material as THREE.PointsMaterial).dispose();
           state.seatOutline.dispose();
+          (state.placeGhost.material as THREE.Material).dispose();
+          state.placeMark.geometry.dispose();
+          (state.placeMark.material as THREE.PointsMaterial).dispose();
           state.hoverOutline.dispose();
           state.hoverMark.geometry.dispose();
           (state.hoverMark.material as THREE.PointsMaterial).dispose();
@@ -1191,7 +1249,23 @@ export function ModelViewport({
     show: showReach,
   });
 
-  useModelSelection(sceneRef, selectedIds, project, placingAnchor);
+  useModelSelection(
+    sceneRef,
+    selectedIds,
+    project,
+    placingAnchor || placingPart !== null,
+  );
+
+  // The ghost follows the part, the key presses that turn it, and the document
+  // it is placed against.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: placingPart and project are what the ghost is redrawn for; showPlaceGhost reads them from the scene's refs
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (!state) return;
+    if (placingPart) showPlaceGhost(state);
+    else clearPlaceGhost(state);
+    state.render();
+  }, [placingPart, project]);
 
   useModelHover(sceneRef, hoveredId, project);
 
@@ -1288,7 +1362,7 @@ export function ModelViewport({
     <div className="relative h-full w-full bg-black/30">
       <div
         ref={containerRef}
-        className={`h-full w-full ${placingAnchor ? "cursor-crosshair" : ""}`}
+        className={`h-full w-full ${placingAnchor || placingPart ? "cursor-crosshair" : ""}`}
       />
 
       {/* One column rather than four overlays pinned to the same box. The
@@ -1522,13 +1596,15 @@ export function ModelViewport({
             <span>
               {placingAnchor
                 ? "Click the model to put an anchor there. Escape to stop"
-                : snapped
-                  ? snappedTo
-                    ? `Snapped to "${snappedTo}". Hold Alt to place freely`
-                    : "Snapped. Hold Alt to place freely"
-                  : steppedBy !== null
-                    ? `Moving in steps of ${steppedBy}. Hold Alt to place freely`
-                    : "Hold Alt to place freely"}
+                : placingPart
+                  ? `Click a face to place the part. ${shortcutLabel("place-face")} next face, ${shortcutLabel("place-twist")} twist, Escape to stop`
+                  : snapped
+                    ? snappedTo
+                      ? `Snapped to "${snappedTo}". Hold Alt to place freely`
+                      : "Snapped. Hold Alt to place freely"
+                    : steppedBy !== null
+                      ? `Moving in steps of ${steppedBy}. Hold Alt to place freely`
+                      : "Hold Alt to place freely"}
             </span>
           </div>
 

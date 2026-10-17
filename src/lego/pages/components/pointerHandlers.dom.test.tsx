@@ -75,6 +75,7 @@ describe("a click on the ground while a path is being made", () => {
       onStandInDragRef: { current: undefined },
       standInDrag: null,
       placingAnchorRef: { current: false },
+      placingPartRef: { current: null },
       onGroundPickRef: { current: pick },
       onSelectRef: { current: vi.fn() },
       groundShape: null,

@@ -104,6 +104,18 @@ export const SHORTCUTS: Shortcut[] = [
     combos: [{ key: "m", mod: false, shift: false }],
   },
   {
+    id: "place-face",
+    group: "Transform",
+    description: "While placing a part, join by its next face",
+    combos: [{ key: "n", mod: false, shift: false }],
+  },
+  {
+    id: "place-twist",
+    group: "Transform",
+    description: "While placing a part, turn it a quarter about the face",
+    combos: [{ key: "t", mod: false, shift: false }],
+  },
+  {
     id: "frame",
     group: "View",
     description: "Frame the selection",

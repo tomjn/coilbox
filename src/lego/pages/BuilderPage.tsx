@@ -95,6 +95,7 @@ import {
 import { usePanelHeight, usePanelOpen } from "../panels";
 import { buildPieceCollisionScript } from "../pieceCollisionScript";
 import { currentPivot, pivotChoices, setPivot } from "../pivot";
+import { type FaceTarget, placePart } from "../placePart";
 import {
   deleteCompound,
   saveCompound,
@@ -111,7 +112,7 @@ import type {
   StandInTrack,
 } from "../scriptPlayback";
 import { dragPiece, freeMoved, type Seat } from "../seat";
-import { shortcutLabel } from "../shortcuts";
+import { isShortcut, shortcutLabel } from "../shortcuts";
 import { useEditShortcuts } from "../useEditShortcuts";
 import { useLegoDocument } from "../useLegoDocument";
 import { useRawGeometry } from "../useRawGeometry";
@@ -131,6 +132,7 @@ import { NoMatches, PartFilters } from "./components/PartFilters";
 import { PartPicker } from "./components/PartPicker";
 import { collisionHandlePieceId } from "./components/PieceCollisionFields";
 import { PieceTree } from "./components/PieceTree";
+import type { PlacingPart } from "./components/placeByFace";
 import type { ReferenceUnit } from "./components/ReferencePicker";
 import { SaveModelPopover } from "./components/SaveModelPopover";
 import { ScriptTab } from "./components/ScriptTab";
@@ -306,6 +308,8 @@ function Builder({ id }: { id: string | undefined }) {
   }, [selectedIds]);
   /** Whether the next click in the viewport drops a snap anchor. */
   const [placingAnchor, setPlacingAnchor] = useState(false);
+  /** The part chosen in the strip, waiting for a face to be clicked. */
+  const [placingPart, setPlacingPart] = useState<PlacingPart | null>(null);
   /**
    * Symmetry mode: a piece added now gets a mirrored twin the first time it is
    * put somewhere off the centre line, and the twin then follows it for as long
@@ -370,6 +374,75 @@ function Builder({ id }: { id: string | undefined }) {
     });
     queueTwin(pieceId);
   }
+
+  /** Choosing a part starts placing it, and choosing it again stops. */
+  function startPlacing(part: LegoPartInfo) {
+    setPlacingAnchor(false);
+    setPlacingPart((was) =>
+      was?.part.id === part.id ? null : { part, cycle: 0, twist: 0 },
+    );
+  }
+
+  /**
+   * A click while placing. A face adds the part joined to it, in one edit with
+   * its twin when symmetry is on. A click that hit nothing adds the part at the
+   * selected piece's origin, but only in a unit with no part yet, where there
+   * is no face to click.
+   */
+  function placeOnFace(target: FaceTarget | null) {
+    if (!placingPart || !draft || !pack) return;
+    if (!target) {
+      if (draft.pieces.some((piece) => piece.partId)) return;
+      addPart(placingPart.part);
+      setPlacingPart(null);
+      return;
+    }
+    const pieceId = crypto.randomUUID();
+    if (!placePart(draft, pack, placingPart.part, target, placingPart, pieceId))
+      return;
+    queueTwin(pieceId);
+    place([pieceId], (project) => {
+      return (
+        placePart(
+          project,
+          pack,
+          placingPart.part,
+          target,
+          placingPart,
+          pieceId,
+        ) ?? project
+      );
+    });
+    setPlacingPart(null);
+  }
+
+  // Arming an anchor takes over the click, so a part waiting for a face stops.
+  useEffect(() => {
+    if (placingAnchor) setPlacingPart(null);
+  }, [placingAnchor]);
+
+  // Only while placing, so these keys stay free everywhere else.
+  useEffect(() => {
+    if (!placingPart) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        (target instanceof HTMLElement && target.isContentEditable)
+      ) {
+        return;
+      }
+      if (event.key === "Escape") setPlacingPart(null);
+      else if (isShortcut("place-face", event)) {
+        setPlacingPart((was) => was && { ...was, cycle: was.cycle + 1 });
+      } else if (isShortcut("place-twist", event)) {
+        setPlacingPart((was) => was && { ...was, twist: was.twist + 1 });
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [placingPart]);
 
   function addEmpty() {
     const pieceId = crypto.randomUUID();
@@ -1324,6 +1397,10 @@ function Builder({ id }: { id: string | undefined }) {
                   onPlaceAnchor: placeAnchor,
                   onCancelAnchor: () => setPlacingAnchor(false),
                 }}
+                partPlacement={{
+                  placing: placingPart,
+                  onPlace: placeOnFace,
+                }}
                 collisionEditing={{
                   // The panel is where a volume is read and changed, so
                   // opening it is what puts the handles on the volume.
@@ -1535,7 +1612,8 @@ function Builder({ id }: { id: string | undefined }) {
                       pack={pack}
                       parts={filter.parts}
                       atlas={drawAtlas}
-                      onSelect={addPart}
+                      selectedId={placingPart?.part.id}
+                      onSelect={startPlacing}
                     />
                   )}
                 </div>

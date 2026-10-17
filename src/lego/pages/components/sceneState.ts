@@ -21,12 +21,14 @@ import type { PieceTransform } from "../../groupTransform";
 import type { LegoCollisionVolume, LegoPiece, LegoProject } from "../../model";
 import { getPartGeometry, type LoadedPack } from "../../pack";
 import { seatPieceMesh } from "../../pivot";
+import type { FaceTarget } from "../../placePart";
 import { getFixedPieceGeometry, type RawGeometry } from "../../rawGeometry";
 import type { Seat } from "../../seat";
 import type { Vec3 } from "../../snapping";
 import { onGround } from "../../standIn";
 import type { CollisionFaceDrag } from "./collisionHandles";
 import type { EffectsLayer } from "./effectsLayer";
+import type { PlacingPart } from "./placeByFace";
 
 export interface SceneState {
   renderer: THREE.WebGLRenderer;
@@ -254,6 +256,17 @@ export interface SceneState {
       | undefined;
   };
   onCancelAnchorRef: { current: (() => void) | undefined };
+  /** The part being placed on a face, or null when no part is. */
+  placingPartRef: { current: PlacingPart | null };
+  /** Told the face a click chose, or null for a click that hit nothing. */
+  onPlacePartRef: {
+    current: ((target: FaceTarget | null) => void) | undefined;
+  };
+  /** The face under the pointer while placing, and the translucent part and
+   *  the dot that show it. */
+  placeTarget: FaceTarget | null;
+  placeGhost: THREE.Mesh;
+  placeMark: THREE.Points;
   /** Told a finished drag with the join it ended on, or null for a drag that
    *  seated nothing. */
   onTransformRef: {
