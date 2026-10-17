@@ -113,6 +113,7 @@ import type {
 } from "../scriptPlayback";
 import { dragPiece, freeMoved, type Seat } from "../seat";
 import { isShortcut, shortcutLabel } from "../shortcuts";
+import { swapPart } from "../swapPart";
 import { useEditShortcuts } from "../useEditShortcuts";
 import { useLegoDocument } from "../useLegoDocument";
 import { useRawGeometry } from "../useRawGeometry";
@@ -138,6 +139,7 @@ import { SaveModelPopover } from "./components/SaveModelPopover";
 import { ScriptTab } from "./components/ScriptTab";
 import { SetPanel } from "./components/SetPanel";
 import { StripResizer } from "./components/StripResizer";
+import { SwapPartDrawer } from "./components/SwapPartDrawer";
 import { TestDrawer } from "./components/TestDrawer";
 import { TextureBuilderPanel } from "./components/TextureBuilderPanel";
 import { TexturePicker } from "./components/TexturePicker";
@@ -230,6 +232,10 @@ function Builder({ id }: { id: string | undefined }) {
   const [exporting, setExporting] = useState(false);
   const [testing, setTesting] = useState(false);
   const [picturing, setPicturing] = useState(false);
+  /** Whether the part picker for "Change part" is open, and what the last
+   *  swap left behind. */
+  const [swapping, setSwapping] = useState(false);
+  const [swapNote, setSwapNote] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   /**
    * What playing means for a unit that owns its script: the poses a run of that
@@ -719,6 +725,26 @@ function Builder({ id }: { id: string | undefined }) {
     });
   }
 
+  function changePart(pieceId: string, part: LegoPartInfo) {
+    setSwapping(false);
+    if (!draft || !pack) return;
+    const result = swapPart(draft, pack, pieceId, part.id);
+    if (!result) return;
+    edit(
+      (project) =>
+        swapPart(project, pack, pieceId, part.id)?.project ?? project,
+    );
+    const notes = [
+      result.droppedAnchors.length > 0
+        ? `Dropped ${result.droppedAnchors.length === 1 ? "an anchor" : `${result.droppedAnchors.length} anchors`} outside the new part: ${result.droppedAnchors.join(", ")}.`
+        : null,
+      result.broken.length > 0
+        ? "A join lost its connector. See the problems list."
+        : null,
+    ].filter(Boolean);
+    setSwapNote(notes.length > 0 ? notes.join(" ") : null);
+  }
+
   function movePivot(pieceId: string, pivot: [number, number, number]) {
     edit((project) => setPivot(project, pieceId, pivot));
   }
@@ -1120,6 +1146,17 @@ function Builder({ id }: { id: string | undefined }) {
           capture={doc.capture}
           onTaken={(picture) => edit((project) => ({ ...project, picture }))}
         />
+
+        {selected && selectedPart ? (
+          <SwapPartDrawer
+            open={swapping}
+            onOpenChange={setSwapping}
+            pack={pack}
+            current={selectedPart}
+            atlas={drawAtlas}
+            onPick={(part) => changePart(selected.id, part)}
+          />
+        ) : null}
 
         <TestDrawer
           open={testing}
@@ -2122,6 +2159,27 @@ function Builder({ id }: { id: string | undefined }) {
                               </Select>
                             </div>
                           )}
+
+                          {selectedPart ? (
+                            <div className="mt-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="w-full"
+                                onClick={() => {
+                                  setSwapNote(null);
+                                  setSwapping(true);
+                                }}
+                              >
+                                Change part
+                              </Button>
+                              {swapNote ? (
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {swapNote}
+                                </p>
+                              ) : null}
+                            </div>
+                          ) : null}
 
                           {selectedPart ? (
                             <div className="mt-2">
