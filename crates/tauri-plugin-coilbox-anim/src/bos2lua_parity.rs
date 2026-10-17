@@ -960,6 +960,110 @@ fn a_thread_back_from_a_wait_carries_on_on_the_frame_cob_does() {
     }
 }
 
+/// A started script takes the signal mask its thread had at the
+/// `start-script` (`CobThread.cpp:372-388`), not the one it has when it next
+/// waits, so a signal by the new mask passes it by. One a call-in began under
+/// a mask, and not yet run, is still reached by a signal under that mask,
+/// because the engine adds it to the unit's threads as the call-in returns
+/// (`CobInstance.cpp:584-625,744-756`).
+#[test]
+fn a_started_script_takes_the_signal_mask_its_thread_had_when_it_began_it() {
+    let (cob, lua, pieces) = both(
+        r#"
+        piece base, kept, killed;
+        Keep() { sleep 200; move kept to z-axis [1] now; }
+        Kill() { move killed to z-axis [1] now; }
+        Create()
+        {
+            start-script Keep();
+            set-signal-mask 2;
+            sleep 100;
+            signal 2;
+        }
+        Deactivate()
+        {
+            set-signal-mask 4;
+            start-script Kill();
+            sleep 300;
+        }
+        StartMoving()
+        {
+            signal 4;
+        }
+    "#,
+    );
+    // `StartMoving` arrives on the frame after `Deactivate`, before `Kill`
+    // first runs.
+    let events = [
+        event(0, "Create", &[]),
+        event(20, "Deactivate", &[]),
+        event(20, "StartMoving", &[]),
+    ];
+    let from_cob = crate::cobrun::run(&cob, &pieces, &events, 30, &[], &HashMap::new());
+    let from_lua = run_lua(
+        &lua,
+        "masks.lua",
+        &Unit::new(&pieces),
+        &events,
+        30,
+        &HashMap::new(),
+    );
+    assert_eq!(from_cob.error, None);
+    assert_eq!(from_lua.error, None);
+    let z = |piece: &str| pieces.iter().position(|p| p == piece).unwrap() * 6 + 2;
+    assert_eq!(
+        from_cob.frames[29][z("kept")],
+        1.0,
+        "the COB never kept Keep"
+    );
+    assert_eq!(
+        from_cob.frames[29][z("killed")],
+        0.0,
+        "the COB never killed Kill"
+    );
+    assert_eq!(
+        first_difference(&from_cob, &from_lua, &pieces, "masks", false),
+        None,
+        "{lua}"
+    );
+}
+
+/// Scripts two threads begin on one frame start in the order they were begun,
+/// as COB's waiting list keeps them (`CobEngine.cpp:92-105`), though the
+/// engine's Lua wakes threads due together last asleep first
+/// (`unit_script.lua:812-836`).
+#[test]
+fn scripts_two_threads_begin_together_start_in_the_order_they_were_begun() {
+    let (cob, lua, pieces) = both(
+        r#"
+        piece base;
+        One() { move base to z-axis [1] now; }
+        Two() { move base to z-axis [2] now; }
+        First() { start-script One(); }
+        Second() { start-script Two(); }
+        Create() { start-script First(); start-script Second(); }
+    "#,
+    );
+    let events = [event(0, "Create", &[])];
+    let from_cob = crate::cobrun::run(&cob, &pieces, &events, 6, &[], &HashMap::new());
+    let from_lua = run_lua(
+        &lua,
+        "order.lua",
+        &Unit::new(&pieces),
+        &events,
+        6,
+        &HashMap::new(),
+    );
+    assert_eq!(from_cob.error, None);
+    assert_eq!(from_lua.error, None);
+    assert_eq!(from_cob.frames[5][2], 2.0);
+    assert_eq!(
+        first_difference(&from_cob, &from_lua, &pieces, "order", false),
+        None,
+        "{lua}"
+    );
+}
+
 /// `TransportPickup(2)`, with the stand-in parked at (30, 0, 40).
 fn pickup_at(frame: u32) -> ScriptEvent {
     ScriptEvent {
