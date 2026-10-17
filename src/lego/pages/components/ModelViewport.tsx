@@ -89,6 +89,7 @@ import {
 } from "../../referenceObject";
 import { unitBounds } from "../../s3oBuild";
 import type { ScriptTimeline } from "../../scriptPlayback";
+import type { Seat } from "../../seat";
 import type { Vec3 } from "../../snapping";
 import { buildStandIn, disposeStandIn, standInRadius } from "../../standIn";
 import {
@@ -333,8 +334,13 @@ interface Props {
     /** `additive` is a Shift or Cmd click: add this piece to the selection
      *  rather than replacing it. */
     onSelect: (pieceId: string | null, additive: boolean) => void;
-    /** Committed when a drag ends, not on every frame of it. */
-    onTransform: (pieceId: string, change: Partial<LegoPiece>) => void;
+    /** Committed when a drag ends, not on every frame of it. `seat` is the
+     *  join the drag ended on, or null when it ended on none. */
+    onTransform: (
+      pieceId: string,
+      change: Partial<LegoPiece>,
+      seat: Seat | null,
+    ) => void;
     /** The same, for a set: every piece's new transform in one edit, so a
      *  group drag is one undo step rather than one per piece. */
     onTransformMany: (changes: Map<string, PieceTransform>) => void;
@@ -445,7 +451,7 @@ interface Props {
      */
     placingAnchor?: boolean;
     /** Where the click landed, in the clicked piece's part space. */
-    onPlaceAnchor?: (pieceId: string, position: Vec3) => void;
+    onPlaceAnchor?: (pieceId: string, position: Vec3, facing?: Vec3) => void;
     /** A click that missed the model, which is how you change your mind. */
     onCancelAnchor?: () => void;
   };
@@ -1000,6 +1006,7 @@ export function ModelViewport({
         onCancelAnchorRef,
         onTransformRef,
         onTransformManyRef,
+        seat: null,
         selectedIdsRef,
         onHoverRef,
         onSelectRef,
