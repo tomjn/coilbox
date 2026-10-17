@@ -344,6 +344,9 @@ struct Call {
 enum State {
     /// Run as soon as the scheduler gets to it.
     Ready,
+    /// Begun with `start-script`, and first run on this frame. See
+    /// `Run::start_thread`.
+    Starting(u32),
     /// Run once the clock passes this, in milliseconds.
     Sleeping(i64),
     /// Run once this piece's animation on this axis finishes.
@@ -406,6 +409,9 @@ struct Run {
     /// after the tick that made them, so a started script never runs inside the
     /// call that started it.
     queued: Vec<Thread>,
+    /// Whether the thread running now woke from a sleep to run, which decides
+    /// the frame a script it starts first runs on.
+    woke: bool,
     frame: u32,
     /// The clock a `SLEEP` is measured against, in milliseconds.
     time: i64,
@@ -462,6 +468,7 @@ impl Run {
             statics: HashMap::new(),
             threads: Vec::new(),
             queued: Vec::new(),
+            woke: false,
             frame: 0,
             time: 0,
             budget: FRAME_INSTRUCTIONS,
@@ -963,8 +970,8 @@ impl Run {
             .count()
     }
 
-    /// Run every thread that can run, then anything they started, until nothing
-    /// is left that can run this frame.
+    /// Run every thread that can run, until nothing is left that can run this
+    /// frame. A script one of them starts waits for a later frame.
     fn run_threads(&mut self) -> Result<(), String> {
         // A thread that comes back ready every time, on a wait already
         // satisfied, would spin here forever without a ceiling.
@@ -984,6 +991,7 @@ impl Run {
     fn next_ready(&self) -> Option<usize> {
         self.threads.iter().position(|thread| match thread.state {
             State::Ready => true,
+            State::Starting(frame) => frame <= self.frame,
             // The engine wakes a sleeper once the clock has passed its wake
             // time rather than reached it, so `Sleep(33)` costs two frames.
             State::Sleeping(wake) => wake < self.time,
@@ -1047,6 +1055,7 @@ impl Run {
 
     /// Run one thread until it sleeps, waits or dies.
     fn tick_thread(&mut self, index: usize) -> Result<(), String> {
+        self.woke = matches!(self.threads[index].state, State::Sleeping(_));
         self.threads[index].state = State::Ready;
         while matches!(self.threads[index].state, State::Ready) {
             self.budget -= 1;
@@ -1594,8 +1603,15 @@ impl Run {
     /// Start another script on a thread of its own.
     ///
     /// It takes on the signal mask of the thread that started it, so a signal
-    /// raised later reaches both, and it does not run until the tick that
-    /// started it has finished.
+    /// raised later reaches both.
+    ///
+    /// The engine puts it on the waiting list (`CobThread.cpp:372-388`,
+    /// `CobEngine.cpp:92-105`), which becomes the running list when the
+    /// running threads have had their tick and before sleepers wake
+    /// (`CobEngine.cpp:173-200`). Call-ins run before that tick
+    /// (`Game.cpp:1784-1800`). So a script begun by a call-in or by a thread
+    /// on the running list first runs on the next frame, and one begun by a
+    /// thread that woke from a sleep misses that swap and runs the frame after.
     fn start_thread(&mut self, i: usize, function: usize, args: usize) {
         if self.program.lengths.get(function).copied().unwrap_or(0) == 0 {
             for _ in 0..args {
@@ -1612,6 +1628,7 @@ impl Run {
             let value = self.pop(i);
             thread.data.push(value);
         }
+        thread.state = State::Starting(self.frame + if self.woke { 2 } else { 1 });
         self.queued.push(thread);
     }
 
