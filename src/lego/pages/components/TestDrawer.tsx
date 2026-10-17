@@ -140,8 +140,13 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
     target?.dataDir,
     game?.primaryArchive.name,
   );
-  const gameWeapons =
-    defs && defsFor === game?.primaryArchive.name ? defs.weaponDefs : null;
+  const gameDefs = defs && defsFor === game?.primaryArchive.name ? defs : null;
+  const gameWeapons = gameDefs ? gameDefs.weaponDefs : null;
+  // A unit built to move with no movement of its own walks on one of the test
+  // game's classes (issue #4472).
+  const gameMovement = gameDefs
+    ? { units: gameDefs.units, moveDefs: gameDefs.moveDefs }
+    : null;
 
   const [mapName, setMapName] = useSetting<string>("lego.testMap", "");
 
@@ -203,6 +208,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
       raw,
       workshopProjects,
       gameWeapons,
+      gameMovement,
       sandbox,
       onWritten: setScratchDir,
       onScanning: () => setPhase({ state: "scanning" }),
@@ -344,6 +350,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
         raw,
         workshopProjects,
         gameWeapons,
+        gameMovement,
         sandbox: run.sandbox,
       });
       setWeaponsLeftOut(written.weaponsLeftOut);

@@ -31,6 +31,7 @@ import {
   unitTurnRateOf,
 } from "@/workshop/moveClasses";
 import type { FlightStyle, LegoMovement, LegoProject } from "./model";
+import { type Problem, problem } from "./problems";
 
 /**
  * The kinds of mover the build is. Empty for a unit with neither wheels nor legs,
@@ -42,6 +43,69 @@ export function movementKinds(project: LegoProject): MoveKind[] {
   if (roles.some((role) => role.startsWith("leg."))) kinds.push("kbot");
   if (roles.includes("wheel") || roles.includes("track")) kinds.push("tank");
   return kinds;
+}
+
+/** The presets that only play while the unit moves, and the kind each makes it. */
+const MOVING_PRESETS: Record<string, MoveKind> = {
+  "walk.biped": "kbot",
+  "walk.quad": "kbot",
+  "wheels.roll": "tank",
+};
+
+/**
+ * The kinds of mover the unit was built as: its roles, or failing those its
+ * walk or roll presets.
+ */
+function builtAs(project: LegoProject): MoveKind[] {
+  const kinds = movementKinds(project);
+  if (kinds.length > 0) return kinds;
+  return [
+    ...new Set(
+      (project.animations ?? []).flatMap((applied) => {
+        const kind = MOVING_PRESETS[applied.presetId];
+        return kind ? [kind] : [];
+      }),
+    ),
+  ];
+}
+
+/**
+ * The movement the Test drawer writes into the scratch game (issue #4472).
+ *
+ * A unit built to move with no movement chosen, such as one with no game to
+ * pick a class from, would otherwise go in as a building. It gets the first
+ * class `offerMoveClasses` offers it from the test game, with that class's
+ * numbers from `suggestMotion`. Anything chosen is kept. Nothing is guessed
+ * when the game's move definitions were not read, since the classes off the
+ * unit table carry no kind to pick a walker by.
+ */
+export function scratchMovement(
+  project: LegoProject,
+  game: GameMovementData | null,
+  gameName: string,
+  footprint: number,
+): LegoMovement | undefined {
+  if (project.movement || !game) return project.movement;
+  const kinds = builtAs(project);
+  if (kinds.length === 0) return undefined;
+  const offer = offerMoveClasses(game, kinds, footprint);
+  const pick = offer.source === "movedefs" ? offer.classes[0] : undefined;
+  return pick ? suggestMotion(game, gameName, pick.name) : undefined;
+}
+
+/** A warning for a unit built to move that has no movement (issue #4472). */
+export function movementProblems(project: LegoProject): Problem[] {
+  if (project.movement) return [];
+  const kinds = builtAs(project);
+  if (kinds.length === 0) return [];
+  const parts = kinds.includes("kbot") ? "legs" : "wheels or tracks";
+  return [
+    problem(
+      "skeleton",
+      "warning",
+      `It has ${parts} but no movement class, so it exports as a building.`,
+    ),
+  ];
 }
 
 /** One class the picker offers. */
