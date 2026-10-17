@@ -14,6 +14,7 @@ import {
   recordWithLayout,
   type StoredBlueprint,
   scenarioSource,
+  setupPackSource,
   sortLibrary,
   sourceFileName,
   sourceLabel,
@@ -281,8 +282,30 @@ describe("the other ways a layout arrives (issue #1473)", () => {
     expect(sourceSummary(source)).toContain("Tutorial");
   });
 
+  it("names the setup pack a layout came in, apart from a file of them", () => {
+    const source = setupPackSource("Comet nights", "Wall", at);
+    expect(source).toEqual({
+      kind: "setup-pack",
+      title: "Comet nights",
+      wasCalled: "Wall",
+      at: when,
+    });
+    expect(sourceLabel(source)).toBe("From the setup pack Comet nights");
+    expect(sourceSummary(source)).toContain('setup pack "Comet nights"');
+    expect(sourceSummary(source)).not.toContain("file");
+  });
+
+  it("says a setup pack with no name was a setup pack all the same", () => {
+    const source = setupPackSource(undefined, undefined, at);
+    expect(source).toEqual({ kind: "setup-pack", at: when });
+    expect(sourceLabel(source)).toBe("From a setup pack");
+    expect(sourceSummary(source)).toContain("setup pack");
+  });
+
   it("survives a trip through the stored document, whichever way it came", () => {
     const sources = [
+      setupPackSource("Comet nights", "Wall", at),
+      setupPackSource(undefined, undefined, at),
       packSource("/tmp/pack.json", "Wall", at),
       fileSource("/tmp/opening.json", undefined, at),
       codeSource("Wall", at),

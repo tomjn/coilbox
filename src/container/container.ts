@@ -210,9 +210,10 @@ export type ContainerCodeResult =
  * at the point of copying is the only place the author can still do something
  * about it.
  *
- * Use this wherever a payload has no fixed upper size. {@link encodeContainerCode}
- * stays for the kinds that are bounded by their own shape (a preset, a challenge,
- * a setup pack), where a check would only ever answer yes.
+ * Use this wherever a payload has no fixed upper size, which includes a setup
+ * pack since it can carry blueprints (issue #1727). {@link encodeContainerCode}
+ * stays for the kinds that are bounded by their own shape (a preset, a
+ * challenge), where a check would only ever answer yes.
  */
 export function tryEncodeContainerCode<P>(
   kind: ContainerKind,

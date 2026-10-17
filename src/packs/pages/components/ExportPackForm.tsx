@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
+import { recordGameName } from "../../../blueprint/library";
+import { useBlueprintLibrary } from "../../../blueprint/store";
 import { ChallengeCodeView } from "../../../challenge/ChallengeCodeView";
 import { useUnitsyncScan } from "../../../content/config";
 import { ErrorBanner } from "../../../content/pages/components/states";
@@ -12,7 +14,8 @@ import { useSkirmishPresets } from "../../../play/presets";
 import { buildPackManifest } from "../../build";
 import { encodeSetupPack } from "../../manifest";
 
-/** A scrollable multi-select list of checkboxes, for maps and presets. Kept as
+/** A scrollable multi-select list of checkboxes, for maps, presets and
+ * blueprints. Kept as
  * one small local component rather than a picoframe primitive, since the
  * shadcn registry has no multi-select list widget. */
 function CheckList({
@@ -55,7 +58,7 @@ function CheckList({
 
 /**
  * "Export a setup pack" (issue #415): pick any mix of installed games and
- * maps, plus optional presets, and produce a pasteable pack code. A pack now
+ * maps, plus optional presets and blueprints, and produce a pasteable pack code. A pack now
  * offers its games and maps as downloads and no longer carries an engine
  * version. The user chooses what goes in rather than the pack dumping every
  * installed game, map and preset.
@@ -68,6 +71,7 @@ export function ExportPackForm() {
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const { presets } = useSkirmishPresets();
+  const { records: blueprints } = useBlueprintLibrary();
 
   // Coilbox's own generated games are never a pack's game: the machine that
   // imports the pack rewrites its own on the next test, and has no way to get
@@ -100,6 +104,9 @@ export function ExportPackForm() {
   const [selectedPresetIds, setSelectedPresetIds] = useState<Set<string>>(
     new Set(),
   );
+  const [selectedBlueprintIds, setSelectedBlueprintIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [code, setCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -122,6 +129,24 @@ export function ExportPackForm() {
       return next;
     });
 
+  const toggleBlueprint = (id: string) =>
+    setSelectedBlueprintIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  const blueprintItems = useMemo(
+    () =>
+      blueprints.map((b) => ({
+        id: b.id,
+        label: b.layout.name,
+        // The shortname, because a full archive name would crowd the label.
+        hint: b.layout.game?.shortname ?? (recordGameName(b) || undefined),
+      })),
+    [blueprints],
+  );
+
   const presetItems = useMemo(
     () => presets.map((p) => ({ id: p.id, label: p.name, hint: p.mapName })),
     [presets],
@@ -134,6 +159,7 @@ export function ExportPackForm() {
       gameNames: [...selectedGames],
       mapNames: [...selectedMaps],
       presets: presets.filter((p) => selectedPresetIds.has(p.id)),
+      blueprints: blueprints.filter((b) => selectedBlueprintIds.has(b.id)),
       installedGames: games.map((g) => ({
         name: g.name,
         shortname: g.info.shortname,
@@ -143,14 +169,19 @@ export function ExportPackForm() {
       setError("Pick at least one game or map first.");
       return;
     }
-    setCode(encodeSetupPack(built));
+    const encoded = encodeSetupPack(built);
+    if (!encoded.ok) {
+      setError(encoded.message);
+      return;
+    }
+    setCode(encoded.code);
   };
 
   if (code) {
     return (
       <ChallengeCodeView
         code={code}
-        helpText="Anyone who pastes this into Import setup pack gets its games and maps offered as downloads (or confirmed already installed), plus any presets you included."
+        helpText="Anyone who pastes this into Import setup pack gets its games and maps offered as downloads (or confirmed already installed), plus any presets and blueprints you included."
       />
     );
   }
@@ -202,6 +233,16 @@ export function ExportPackForm() {
           selected={selectedPresetIds}
           onToggle={togglePreset}
           emptyMessage="No saved presets to include."
+        />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label>Blueprints (optional)</Label>
+        <CheckList
+          items={blueprintItems}
+          selected={selectedBlueprintIds}
+          onToggle={toggleBlueprint}
+          emptyMessage="No saved blueprints to include."
         />
       </div>
 
