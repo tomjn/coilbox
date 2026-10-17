@@ -24,6 +24,7 @@ import type {
 } from "../../inventory";
 import type { LegoProject } from "../../model";
 import type { LegoPartInfo, LoadedPack } from "../../pack";
+import type { ShapeKind } from "../../shapes";
 import { CompoundPicker } from "./CompoundPicker";
 import { ModuleFilters } from "./ModuleFilters";
 import { PartFilters } from "./PartFilters";
@@ -72,6 +73,8 @@ export function InventoryFilters({
   className,
 }: FiltersProps) {
   const { partFilter, moduleFilter } = view;
+  // A shape is listed with the parts, so it counts as one.
+  const partCount = view.parts.length + view.shapes.length;
   const loadButton = onLoadModuleFile ? (
     <Button size="sm" variant="outline" onClick={onLoadModuleFile}>
       <FileUp size={14} /> Load from file
@@ -126,7 +129,8 @@ export function InventoryFilters({
           onCategory={partFilter.setCategory}
           packId={partFilter.packId}
           onPackId={partFilter.setPackId}
-          shown={view.parts.length}
+          shown={view.parts.length + view.shapes.length}
+          showShapes
           className="flex-1"
         />
       ) : view.kind === "modules" ? (
@@ -150,7 +154,7 @@ export function InventoryFilters({
             aria-label="Search the inventory"
           />
           <span className="ml-auto text-sm text-muted-foreground">
-            {view.parts.length} {view.parts.length === 1 ? "part" : "parts"},{" "}
+            {partCount} {partCount === 1 ? "part" : "parts"},{" "}
             {view.modules.length}{" "}
             {view.modules.length === 1 ? "module" : "modules"}
           </span>
@@ -170,6 +174,9 @@ interface GridsProps {
   selectedPartId?: string;
   /** Absent on the Lego Parts page, which has no unit to take a part. */
   onSelectPart?: (part: LegoPartInfo, alt: boolean) => void;
+  selectedShape?: string;
+  /** The builder adds the shape. The Lego Parts page shows its detail. */
+  onSelectShape?: (shape: ShapeKind, alt: boolean) => void;
   /** Absent on the Lego Parts page, as `CompoundPicker` allows. */
   onInsertModule?: (module: LegoProject, now: boolean) => void;
   placingModuleId?: string;
@@ -203,6 +210,8 @@ export function InventoryGrids({
   atlas,
   selectedPartId,
   onSelectPart,
+  selectedShape,
+  onSelectShape,
   onInsertModule,
   placingModuleId,
   onDeleteModule,
@@ -221,7 +230,11 @@ export function InventoryGrids({
   const favouriteModules = new Set(
     inventory.favourites.filter((r) => r.kind === "module").map((r) => r.id),
   );
-  const empty = view.parts.length === 0 && view.modules.length === 0;
+  const favouriteShapes = new Set(
+    inventory.favourites.filter((r) => r.kind === "shape").map((r) => r.id),
+  );
+  const hasCells = view.parts.length > 0 || view.shapes.length > 0;
+  const empty = !hasCells && view.modules.length === 0;
 
   if (view.kind === "units") {
     return (
@@ -239,10 +252,17 @@ export function InventoryGrids({
             {emptyText(view.list)}
           </p>
         ) : null}
-        {view.parts.length > 0 ? (
+        {hasCells ? (
           <PartPicker
             pack={pack}
             parts={view.parts}
+            shapes={view.shapes}
+            selectedShape={selectedShape}
+            onSelectShape={onSelectShape}
+            favouriteShapes={favouriteShapes}
+            onFavouriteShape={(shape) =>
+              inventory.toggleFavourite({ kind: "shape", id: shape.kind })
+            }
             atlas={atlas}
             selectedId={selectedPartId}
             onSelect={onSelectPart}
@@ -256,7 +276,7 @@ export function InventoryGrids({
           <div
             className={cn(
               "flex min-h-0 flex-1",
-              view.parts.length > 0 && "border-t border-border",
+              hasCells && "border-t border-border",
             )}
           >
             <CompoundPicker

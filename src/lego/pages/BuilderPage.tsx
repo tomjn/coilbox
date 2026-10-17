@@ -55,6 +55,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { notify } from "@/notify/notify";
+import { addShape } from "../addShape";
 import { aimPoint } from "../aimPoint";
 import { type ArrangeAction, arrange } from "../align";
 import { addAnchor, removeAnchor, updateAnchor } from "../anchors";
@@ -165,6 +166,7 @@ import type {
   StandInTrack,
 } from "../scriptPlayback";
 import { dragPiece, freeMoved, type Seat, typedTransform } from "../seat";
+import type { ShapeKind } from "../shapes";
 import { isShortcut, shortcutLabel } from "../shortcuts";
 import { skeletonProblems } from "../skeletonChecks";
 import { applyProportions } from "../skeletonEdit";
@@ -620,6 +622,20 @@ function Builder({ id }: { id: string | undefined }) {
         ],
       };
     });
+    queueTwin(pieceId);
+  }
+
+  /**
+   * Choosing a shape adds it where `addPart` adds a part: a new piece hanging
+   * off the selection, at its origin, at the kind's default size (#3337). The
+   * placing-by-face and bone rules are for pack parts and do not apply yet.
+   */
+  function addShapePiece(info: ShapeKind) {
+    inventoryView.inventory.record({ kind: "shape", id: info.kind });
+    const pieceId = crypto.randomUUID();
+    edit((project) =>
+      addShape(project, info, selectedId ?? project.rootPieceId, pieceId),
+    );
     queueTwin(pieceId);
   }
 
@@ -2308,6 +2324,7 @@ function Builder({ id }: { id: string | undefined }) {
                           : undefined
                       }
                       onSelectPart={startPlacing}
+                      onSelectShape={addShapePiece}
                       onInsertModule={startPlacingModule}
                       placingModuleId={
                         placingPart && "module" in placingPart

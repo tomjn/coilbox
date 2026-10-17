@@ -80,6 +80,25 @@ export const DEFAULT_CYLINDER_SIDES = 12;
 /** The axis an upright cylinder runs along, y. */
 const DEFAULT_CYLINDER_AXIS = 1;
 
+/**
+ * What the parts strip lists for a kind (#3337): its name, the size a click
+ * adds it at, and the words search finds it by. Each kind added to
+ * `GENERATORS` adds a line here and appears in the strip with no other change.
+ * The default size is 2 along every side because 2 is the longest side of the
+ * median part in the bundled pack, and is a whole number of its 0.25 steps.
+ */
+export interface ShapeKind {
+  kind: string;
+  label: string;
+  size: [number, number, number];
+  options?: Record<string, number>;
+  tags: string[];
+}
+
+export const SHAPE_KINDS: ShapeKind[] = [
+  { kind: "cylinder", label: "Cylinder", size: [2, 2, 2], tags: ["round"] },
+];
+
 const GENERATORS: Record<string, (shape: LegoShape) => ShapeSolid> = {
   cylinder,
 };

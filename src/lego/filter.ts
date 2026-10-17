@@ -20,6 +20,30 @@
 import { useMemo, useState } from "react";
 
 import type { LegoPartInfo, LoadedPack } from "./pack";
+import { SHAPE_KINDS, type ShapeKind } from "./shapes";
+
+/**
+ * The category button for generated shapes (#3337). Not a colour, so it cannot
+ * be a pack category id: the `@` is not in any. Choosing it lists shapes alone,
+ * and choosing a colour lists no shapes, since a shape has no colour of its own.
+ * The pack menu does not touch shapes.
+ */
+export const SHAPES_CATEGORY = "@shapes";
+
+/** Shapes match a search by their name, kind and tags, as parts do. */
+export function filterShapes(
+  kinds: ShapeKind[],
+  query: string,
+  category: string | null,
+): ShapeKind[] {
+  if (category !== null && category !== SHAPES_CATEGORY) return [];
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  return kinds.filter((info) => {
+    const haystack =
+      `${info.label} ${info.kind} ${info.tags.join(" ")}`.toLowerCase();
+    return terms.every((term) => haystack.includes(term));
+  });
+}
 
 export function filterParts(
   parts: LegoPartInfo[],
@@ -48,6 +72,8 @@ export interface PartFilter {
   setPackId: (packId: string | null) => void;
   /** What is left after the search, the category and the pack. */
   parts: LegoPartInfo[];
+  /** The generated shapes left after the search and the category. */
+  shapes: ShapeKind[];
 }
 
 /** Filter state and its result, for a pack that may not have loaded yet. */
@@ -59,6 +85,10 @@ export function usePartFilter(pack: LoadedPack | null): PartFilter {
     () => (pack ? filterParts(pack.parts, query, category, packId) : []),
     [pack, query, category, packId],
   );
+  const shapes = useMemo(
+    () => filterShapes(SHAPE_KINDS, query, category),
+    [query, category],
+  );
   return {
     query,
     setQuery,
@@ -67,5 +97,6 @@ export function usePartFilter(pack: LoadedPack | null): PartFilter {
     packId,
     setPackId,
     parts,
+    shapes,
   };
 }
