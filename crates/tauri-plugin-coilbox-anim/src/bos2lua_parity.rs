@@ -749,7 +749,8 @@ fn a_started_script_gets_its_arguments_in_the_engine_s_order() {
 /// COB runs a started script once the thread that started it waits or
 /// finishes (`CobThread.cpp:372-388`), where `StartThread` runs it at once
 /// (`unit_script.lua:384-405`). So the thrust thread sees `moving` set by the
-/// line after the `start-script`. Shaped like Expand and Exterminate's
+/// line after the `start-script`. Begun by a call-in, it first runs on the
+/// next frame (`CobEngine.cpp:173-189`). Shaped like Expand and Exterminate's
 /// `urcbanshee2.bos`.
 #[test]
 fn a_started_script_sees_what_its_starter_set_after_starting_it() {
@@ -783,7 +784,7 @@ fn a_started_script_sees_what_its_starter_set_after_starting_it() {
     assert_eq!(
         from_cob.events.first(),
         Some(&ScriptOutput::Sfx {
-            frame: 0,
+            frame: 1,
             piece: "thrust1".into(),
             sfx: 1024
         })
@@ -822,6 +823,60 @@ fn a_script_create_starts_runs_after_set_max_reload_time() {
     assert!(from_cob.frames[9][barrel] != 0.0, "the COB never turned");
     assert_eq!(
         first_difference(&from_cob, &from_lua, &pieces, "restore", false),
+        None,
+        "{lua}"
+    );
+}
+
+/// A started script first runs on the next frame, or the one after when the
+/// thread that began it woke from a sleep (`CobEngine.cpp:92-105,173-200`).
+/// The converted Lua sleeps those frames before it starts one, from each
+/// place a script can be begun: a call-in, a thread on its first run, a
+/// thread back from a wait and a thread back from a sleep.
+#[test]
+fn a_started_script_first_runs_on_the_frame_cob_runs_it() {
+    let (cob, lua, pieces) = both(
+        r#"
+        piece base, first, second, waited, slept, called;
+        RaiseFirst() { move first to z-axis [1] now; }
+        RaiseSecond() { move second to z-axis [1] now; }
+        RaiseWaited() { move waited to z-axis [1] now; }
+        RaiseSlept() { move slept to z-axis [1] now; }
+        RaiseCalled() { move called to z-axis [1] now; }
+        Second() { start-script RaiseSecond(); }
+        First() { start-script RaiseFirst(); start-script Second(); }
+        Waited()
+        {
+            turn base to x-axis <10> speed <300>;
+            wait-for-turn base around x-axis;
+            start-script RaiseWaited();
+        }
+        Slept() { sleep 100; start-script RaiseSlept(); }
+        Create() { start-script First(); start-script Waited(); start-script Slept(); }
+        Activate() { start-script RaiseCalled(); }
+    "#,
+    );
+    let events = [event(0, "Create", &[]), event(5, "Activate", &[])];
+    let from_cob = crate::cobrun::run(&cob, &pieces, &events, 14, &[], &HashMap::new());
+    let from_lua = run_lua(
+        &lua,
+        "started.lua",
+        &Unit::new(&pieces),
+        &events,
+        14,
+        &HashMap::new(),
+    );
+    assert_eq!(from_cob.error, None);
+    assert_eq!(from_lua.error, None);
+    for piece in ["first", "second", "waited", "slept", "called"] {
+        let z = pieces.iter().position(|p| p == piece).unwrap() * 6 + 2;
+        assert!(
+            from_cob.frames[13][z] != 0.0,
+            "the COB never raised {piece}"
+        );
+    }
+    assert_eq!(
+        first_difference(&from_cob, &from_lua, &pieces, "started", false),
         None,
         "{lua}"
     );
