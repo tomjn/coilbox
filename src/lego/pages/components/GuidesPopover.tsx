@@ -8,11 +8,11 @@
 
 import { Button, Input } from "@picoframe/frame";
 import {
+  DraftingCompass,
   Eye,
   EyeOff,
   Lock,
   MousePointerClick,
-  Ruler,
   Trash2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -107,12 +107,12 @@ export function GuidesPopover({
       <PopoverTrigger asChild>
         <Button
           size="icon"
-          variant="outline"
+          variant={picking !== null ? "default" : "outline"}
           title="Guides"
           aria-label="Guides"
           aria-pressed={picking !== null}
         >
-          <Ruler className="size-4" />
+          <DraftingCompass className="size-4" />
         </Button>
       </PopoverTrigger>
       <PopoverContent side="top" align="end" className="w-80 space-y-3">
