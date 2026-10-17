@@ -62,6 +62,16 @@ describe("unitEditPath", () => {
     );
   });
 
+  it("names a field when it is given one", () => {
+    const saved = project({ id: "abc" });
+    expect(
+      unitEditPath([saved], "Balanced Annihilation", "armcom", "maxdamage"),
+    ).toBe("/workshop/abc?unit=armcom&field=maxdamage");
+    expect(unitEditPath([], "Splinter", "rover", "speed")).toBe(
+      "/workshop/new?game=Splinter&unit=rover&field=speed",
+    );
+  });
+
   /** The one answer that must not happen is a list with the unit lost. */
   it("opens the editor with no project when the game has none", () => {
     expect(unitEditPath([], "Beyond All Reason test-1234", "armaak")).toBe(

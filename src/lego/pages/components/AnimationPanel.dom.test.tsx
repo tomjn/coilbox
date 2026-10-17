@@ -65,6 +65,7 @@ vi.mock("./MovementSection", () => ({ MovementSection: () => null }));
 vi.mock("./BuilderReport", () => ({ BuilderReport: () => null }));
 vi.mock("./GameFitSection", () => ({ GameFitSection: () => null }));
 vi.mock("./WorthSection", () => ({ WorthSection: () => null }));
+vi.mock("./StatsSection", () => ({ StatsSection: () => null }));
 vi.mock("./WeaponsSection", () => {
   // One object, as the real hook's result is stable between renders.
   const source = {

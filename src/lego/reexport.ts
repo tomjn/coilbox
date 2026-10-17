@@ -88,7 +88,7 @@ export function derivedFields(
 }
 
 /** `def` with the value at a dotted `path` set, or taken out for undefined. */
-function withValue(
+export function withValue(
   def: Record<string, unknown>,
   path: string,
   value: unknown,
