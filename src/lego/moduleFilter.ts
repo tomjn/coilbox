@@ -56,6 +56,23 @@ export function filterModules(
   });
 }
 
+/**
+ * The modules to offer in place of one (#3303): every other module, those of
+ * its category first. The list order is kept within each group. A module with
+ * no category has no group of its own, so everything follows in list order.
+ */
+export function swapCandidates(
+  modules: LegoProject[],
+  currentId: string,
+  category: string | undefined,
+): LegoProject[] {
+  const others = modules.filter((module) => module.id !== currentId);
+  if (!category) return others;
+  const same = (module: LegoProject) =>
+    !!module.category && sameCategory(module.category, category);
+  return [...others.filter(same), ...others.filter((m) => !same(m))];
+}
+
 /** The distinct categories in use, sorted. The first spelling seen wins. */
 export function categoriesInUse(modules: LegoProject[]): string[] {
   const seen: string[] = [];

@@ -484,6 +484,12 @@ export function buildWeaponModule(
 }
 
 /**
+ * The module id the pieces of a generated weapon record (#3302), fixed for the
+ * same reason as `BUILD_ARM_ID`.
+ */
+export const WEAPON_ID = "generated:weapon";
+
+/**
  * Put the module on a unit and apply the turret sweep and recoil presets, as
  * one change. A preset the unit already has stays as it is.
  */
@@ -497,9 +503,10 @@ export function addWeaponModule(
     : project.rootPieceId;
   const inserted = insertCompound(
     project,
-    buildWeaponModule(parts, options.newId, options.now),
+    { ...buildWeaponModule(parts, options.newId, options.now), id: WEAPON_ID },
     parentId,
     options.newId,
+    true,
   );
   const applied = inserted.project.animations ?? [];
   const added = ["turret.track", "recoil"]

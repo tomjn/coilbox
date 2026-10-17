@@ -8,6 +8,7 @@ import {
   filterModules,
   parseTags,
   STARTER_CATEGORIES,
+  swapCandidates,
   UNCATEGORISED,
   withLabels,
 } from "./moduleFilter";
@@ -138,5 +139,32 @@ describe("a module document", () => {
     const back = parseLegoProjectJson(json);
     expect(back?.category).toBeUndefined();
     expect(back?.tags).toEqual(["ok", "spaced"]);
+  });
+});
+
+describe("swapCandidates", () => {
+  const list = [
+    module("Big wheel", { category: "Wheel" }),
+    module("Small turret", { category: "Turret" }),
+    module("Big turret", { category: "turret" }),
+    module("Plain", {}),
+  ];
+
+  it("lists the same category first, ignoring case, and leaves out the module itself", () => {
+    const out = swapCandidates(list, "Small turret", "Turret");
+    expect(out.map((m) => m.name)).toEqual([
+      "Big turret",
+      "Big wheel",
+      "Plain",
+    ]);
+  });
+
+  it("keeps the list order when the module has no category", () => {
+    const out = swapCandidates(list, "Plain", undefined);
+    expect(out.map((m) => m.name)).toEqual([
+      "Big wheel",
+      "Small turret",
+      "Big turret",
+    ]);
   });
 });

@@ -395,6 +395,30 @@ export interface LegoPiece {
    * `weaponModule.ts`.
    */
   weapon?: LegoPieceWeapon;
+  /**
+   * The module insert this piece arrived in (#3302). Absent on a piece that
+   * did not come from a module. See `LegoModuleRef`.
+   */
+  module?: LegoModuleRef;
+}
+
+/**
+ * Which module a piece came from, and which insert of it.
+ *
+ * Every piece of one insert shares `instance`, so a unit holding the same
+ * module twice can tell the two apart. The script builder groups a role's
+ * pieces by instance, which is what lets a second build arm or a second set of
+ * legs animate on its own (`roleInstances` in `luaScript.ts`).
+ *
+ * `insertCompound` writes it. A copy keeps the module id and gets an instance
+ * of its own, and `reparentPiece` drops it from a piece moved out of its
+ * instance.
+ */
+export interface LegoModuleRef {
+  /** The module's own id, the `id` of the compound document. */
+  id: string;
+  /** Shared by every piece of one insert, and by no other piece. */
+  instance: string;
 }
 
 /**
@@ -1207,7 +1231,20 @@ function parsePiece(raw: unknown): LegoPiece | null {
       const weapon = parsePieceWeapon(p.weapon);
       return weapon ? { weapon } : {};
     })(),
+    ...(() => {
+      const module = parseModuleRef(p.module);
+      return module ? { module } : {};
+    })(),
   };
+}
+
+/** A piece's module, or null unless it names both a module and an instance. */
+function parseModuleRef(value: unknown): LegoModuleRef | null {
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  if (typeof v.id !== "string" || v.id === "") return null;
+  if (typeof v.instance !== "string" || v.instance === "") return null;
+  return { id: v.id, instance: v.instance };
 }
 
 /** A piece's weapon, or null when there is nothing usable in it. */

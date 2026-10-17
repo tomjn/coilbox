@@ -49,14 +49,14 @@ import {
 import { notify } from "@/notify/notify";
 import { aimPoint } from "../aimPoint";
 import { addAnchor, removeAnchor, updateAnchor } from "../anchors";
-import { ROLES, restAngleWarnings } from "../animPresets";
+import { presetById, ROLES, restAngleWarnings } from "../animPresets";
 import { unitAtlas } from "../atlas";
 import { legoTexturePrune } from "../bindings";
 import { addBuildArm, builderKind, pickArmParts } from "../buildArm";
 import { pictureIsStale } from "../buildPicture";
 import { parseClipboardPiece, serializeClipboardPiece } from "../clipboard";
 import { reanchorCollisionVolume } from "../collisionVolume";
-import { selectionAsCompound } from "../compounds";
+import { describePresets, selectionAsCompound } from "../compounds";
 import {
   describeJoin,
   disconnectPiece,
@@ -93,7 +93,7 @@ import {
   type StaleExport,
   uniquePieceName,
 } from "../model";
-import { useModuleFilter, withLabels } from "../moduleFilter";
+import { swapCandidates, useModuleFilter, withLabels } from "../moduleFilter";
 import { defaultMount, moduleConnectors, placeModule } from "../moduleMount";
 import {
   type LegoPartInfo,
@@ -122,6 +122,7 @@ import type {
 } from "../scriptPlayback";
 import { dragPiece, freeMoved, type Seat, typedTransform } from "../seat";
 import { isShortcut, shortcutLabel } from "../shortcuts";
+import { swapModule } from "../swapModule";
 import { swapPart } from "../swapPart";
 import { useEditShortcuts } from "../useEditShortcuts";
 import { useLegoDocument } from "../useLegoDocument";
@@ -154,6 +155,7 @@ import { SaveModelPopover } from "./components/SaveModelPopover";
 import { ScriptTab } from "./components/ScriptTab";
 import { SetPanel } from "./components/SetPanel";
 import { StripResizer } from "./components/StripResizer";
+import { SwapModuleDrawer } from "./components/SwapModuleDrawer";
 import { SwapPartDrawer } from "./components/SwapPartDrawer";
 import { TestDrawer } from "./components/TestDrawer";
 import { TextureBuilderPanel } from "./components/TextureBuilderPanel";
@@ -257,6 +259,8 @@ function Builder({ id }: { id: string | undefined }) {
   const [swapping, setSwapping] = useState(false);
   const [showFreeFaces, setShowFreeFaces] = useState(false);
   const [swapNote, setSwapNote] = useState<string | null>(null);
+  /** Whether the module picker for "Swap module" is open. */
+  const [swappingModule, setSwappingModule] = useState(false);
   const [playing, setPlaying] = useState(false);
   /**
    * What playing means for a unit that owns its script: the poses a run of that
@@ -703,7 +707,11 @@ function Builder({ id }: { id: string | undefined }) {
 
   function addCompound(compound: LegoProject) {
     if (!draft) return;
-    const inserted = doc.insert(compound, selectedId ?? draft.rootPieceId);
+    const inserted = doc.insert(
+      compound,
+      selectedId ?? draft.rootPieceId,
+      true,
+    );
     if (inserted.length === 0) return;
     doc.selectMany(inserted);
     for (const pieceId of inserted) queueTwin(pieceId);
@@ -837,6 +845,39 @@ function Builder({ id }: { id: string | undefined }) {
         : null,
     ].filter(Boolean);
     setSwapNote(notes.length > 0 ? notes.join(" ") : null);
+  }
+
+  /**
+   * Put another module where the selected piece's module is. One edit, so one
+   * undo. What the swap did to kept pieces and presets is told in a notice.
+   */
+  function changeModule(pieceId: string, module: LegoProject) {
+    setSwappingModule(false);
+    if (!draft || !pack) return;
+    const result = swapModule(draft, pack, pieceId, module, () =>
+      crypto.randomUUID(),
+    );
+    if (!result) return;
+    edit(() => result.project);
+    doc.selectMany(result.rootPieceIds);
+    const said = [
+      result.moved.length > 0
+        ? `Moved ${result.moved.join(", ")} to the new root.`
+        : null,
+      result.removedPresets.length > 0
+        ? `Removed ${result.removedPresets.map((id) => presetById(id)?.label ?? id).join(", ")}, no piece uses it now.`
+        : null,
+      describePresets(result.presets),
+      result.broken.length > 0
+        ? "A join lost its connector. See the problems list."
+        : null,
+    ].filter(Boolean);
+    if (said.length > 0)
+      void notify({
+        title: "Swap module",
+        body: said.join(" "),
+        level: "info",
+      });
   }
 
   function movePivot(pieceId: string, pivot: [number, number, number]) {
@@ -1265,6 +1306,22 @@ function Builder({ id }: { id: string | undefined }) {
             current={selectedPart}
             atlas={drawAtlas}
             onPick={(part) => changePart(selected.id, part)}
+          />
+        ) : null}
+
+        {selected?.module ? (
+          <SwapModuleDrawer
+            open={swappingModule}
+            onOpenChange={setSwappingModule}
+            modules={swapCandidates(
+              compounds,
+              selected.module.id,
+              compounds.find((c) => c.id === selected.module?.id)?.category,
+            )}
+            category={
+              compounds.find((c) => c.id === selected.module?.id)?.category
+            }
+            onPick={(module) => changeModule(selected.id, module)}
           />
         ) : null}
 
@@ -2334,6 +2391,19 @@ function Builder({ id }: { id: string | undefined }) {
                                   {swapNote}
                                 </p>
                               ) : null}
+                            </div>
+                          ) : null}
+
+                          {selected.module ? (
+                            <div className="mt-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="w-full"
+                                onClick={() => setSwappingModule(true)}
+                              >
+                                Swap module
+                              </Button>
                             </div>
                           ) : null}
 

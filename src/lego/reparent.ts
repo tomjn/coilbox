@@ -204,20 +204,49 @@ export function reparentPiece(
   const scale = new THREE.Vector3();
   local.decompose(position, rotation, scale);
   const euler = new THREE.Euler().setFromQuaternion(rotation);
+  const leaving = leavesInstance(project, pieceId, parentId);
 
   return {
     ...project,
-    pieces: project.pieces.map((piece) =>
-      piece.id === pieceId
-        ? {
-            // Its join was to the old parent's part, so it lands free.
-            ...freePiece(piece),
-            parentId,
-            position: [position.x, position.y, position.z],
-            rotation: [euler.x, euler.y, euler.z],
-            scale: [scale.x, scale.y, scale.z],
-          }
-        : piece,
-    ),
+    pieces: project.pieces.map((piece) => {
+      const moved: LegoPiece =
+        piece.id === pieceId
+          ? {
+              // Its join was to the old parent's part, so it lands free.
+              ...freePiece(piece),
+              parentId,
+              position: [position.x, position.y, position.z],
+              rotation: [euler.x, euler.y, euler.z],
+              scale: [scale.x, scale.y, scale.z],
+            }
+          : piece;
+      if (!leaving.has(moved.id)) return moved;
+      const { module: _left, ...rest } = moved;
+      return rest;
+    }),
   };
+}
+
+/**
+ * The pieces that stop being part of their module instance when `pieceId` moves
+ * to `parentId` (#3302): the piece and those under it in the same instance,
+ * when it was inside the instance and the new parent is not. Moving the
+ * instance's own top piece takes the whole instance along, so nothing leaves.
+ */
+function leavesInstance(
+  project: LegoProject,
+  pieceId: string,
+  parentId: string,
+): Set<string> {
+  const piece = pieceById(project, pieceId);
+  const instance = piece?.module?.instance;
+  if (!piece || !instance) return new Set();
+  const inside = (id: string | null) =>
+    !!id && pieceById(project, id)?.module?.instance === instance;
+  if (!inside(piece.parentId) || inside(parentId)) return new Set();
+  return new Set(
+    descendantIds(project, pieceId).filter(
+      (id) => pieceById(project, id)?.module?.instance === instance,
+    ),
+  );
 }

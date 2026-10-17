@@ -56,7 +56,7 @@ function distance(a: Vec3, b: Vec3): number {
  * still there, else the connector that faces the same way, the nearest when
  * several do, else the id unchanged.
  */
-function carriedId(
+export function carriedId(
   id: string,
   was: readonly LegoConnector[],
   now: readonly LegoConnector[],

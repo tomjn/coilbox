@@ -73,7 +73,7 @@ import {
 } from "../../drive";
 import { type UnitMotion, unitMotion } from "../../effects";
 import type { GroundShape } from "../../environment";
-import { unitScript } from "../../luaScript";
+import { presetCopies, unitScript } from "../../luaScript";
 import {
   DEFAULT_BUILDER,
   type LegoBuilder,
@@ -1707,6 +1707,7 @@ export function AnimationPanel({
           {PRESETS.map((preset) => {
             const entry = applied.find((a) => a.presetId === preset.id);
             const missing = unmetRequirements(preset, counts);
+            const copies = entry ? presetCopies(project, preset) : 1;
 
             return (
               <div
@@ -1715,7 +1716,12 @@ export function AnimationPanel({
               >
                 <div className="flex items-start gap-2">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">{preset.label}</p>
+                    <p className="text-sm font-medium">
+                      {preset.label}
+                      {copies > 1 && preset.copies
+                        ? `, ${copies} ${preset.copies.noun}`
+                        : ""}
+                    </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {preset.description}
                     </p>

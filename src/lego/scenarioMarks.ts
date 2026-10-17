@@ -84,6 +84,9 @@ function presetsFilling(callins: string[]): string[] {
         signal: "SIG",
         pieces: () => ["piece"],
         weapons: () => [{ number: 1, piece: () => "piece", signal: "SIG" }],
+        instances: () => [
+          { number: 1, pieces: () => ["piece"], signal: "SIG", name: (n) => n },
+        ],
       });
       return callins.some((name) =>
         (result?.hooks[name as keyof typeof result.hooks] ?? []).some(doesWork),

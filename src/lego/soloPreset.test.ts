@@ -32,6 +32,9 @@ describe("the scenario for each preset", () => {
         signal: "SIG",
         pieces: () => ["piece"],
         weapons: () => [{ number: 1, piece: () => "piece", signal: "SIG" }],
+        instances: () => [
+          { number: 1, pieces: () => ["piece"], signal: "SIG", name: (n) => n },
+        ],
       });
       const filled = Object.entries(result?.hooks ?? {})
         .filter(([, lines]) => (lines?.length ?? 0) > 0)
