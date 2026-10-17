@@ -126,6 +126,7 @@ const DEFAULT_TUBE_HOLE = 0.5;
 const GENERATORS: Record<string, (shape: LegoShape) => ShapeSolid> = {
   cylinder,
   tube,
+  wedge,
 };
 
 /** Every kind this build can make, so a test can cover each one. */
@@ -722,6 +723,140 @@ function tube(shape: LegoShape): ShapeSolid {
   end(out, s, 1, hole);
   end(out, s, -1, hole);
   return out.solid;
+}
+
+/**
+ * A wedge's slope as it is drawn: `low`, the height of the low end from the
+ * bottom (0 comes to an edge, the full height is a box), and whether the
+ * slope is `flip`ped. A low end that is not between 0 and the height is 0.
+ */
+export function wedgeProfile(shape: LegoShape): {
+  low: number;
+  flip: boolean;
+} {
+  const low = shape.options?.low;
+  return {
+    low: low !== undefined && low >= 0 && low <= shape.size[1] ? low : 0,
+    flip: (shape.options?.flip ?? 0) !== 0,
+  };
+}
+
+/**
+ * A wedge or a ramp filling its box: `size` is width (x), height at the high
+ * end (y) and depth (z). The slope runs along z, high at the back (-z) and low
+ * at the front (+z), the way a unit faces. Options: `low`, the height of the
+ * low end (see `wedgeProfile`), and `flip`, 1 to put the high end at the front.
+ *
+ * Every face is flat with its own vertices and normal. A pure wedge has no
+ * front face. Each face is unwrapped by a planar projection in its own plane,
+ * from the box's minimum corner, so the slope is not squashed: along it, v is
+ * the distance from the back or front edge, whichever has the smaller z.
+ */
+function wedge(shape: LegoShape): ShapeSolid {
+  const [w, h, d] = shape.size;
+  const { low, flip } = wedgeProfile(shape);
+  const [x0, x1, y0, y1] = [-w / 2, w / 2, -h / 2, h / 2];
+  const zHigh = flip ? d / 2 : -d / 2;
+  const zLow = -zHigh;
+  // Which way along z the surface runs down.
+  const down = flip ? -1 : 1;
+  const yLow = y0 + low;
+  const rise = h - low;
+  const stretch = Math.hypot(d, rise) / d;
+
+  const solid: ShapeSolid = {
+    positions: [],
+    normals: [],
+    indices: [],
+    unwrapped: [],
+  };
+  // A convex polygon as a fan, wound to face along `normal`.
+  const face = (
+    points: Vec3[],
+    normal: Vec3,
+    unwrap: (p: Vec3) => [number, number],
+  ) => {
+    const [a, b, c] = points;
+    const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    const ac = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    const wound =
+      (ab[1] * ac[2] - ab[2] * ac[1]) * normal[0] +
+      (ab[2] * ac[0] - ab[0] * ac[2]) * normal[1] +
+      (ab[0] * ac[1] - ab[1] * ac[0]) * normal[2];
+    const ordered = wound >= 0 ? points : [...points].reverse();
+    const length = Math.hypot(...normal);
+    const base = solid.positions.length / 3;
+    for (const p of ordered) {
+      solid.positions.push(...p);
+      solid.normals.push(
+        normal[0] / length,
+        normal[1] / length,
+        normal[2] / length,
+      );
+      solid.unwrapped.push(...unwrap(p));
+    }
+    for (let i = 1; i + 1 < ordered.length; i++) {
+      solid.indices.push(base, base + i, base + i + 1);
+    }
+  };
+  const acrossZ = (p: Vec3): [number, number] => [p[0] - x0, p[1] - y0];
+  const alongZ = (p: Vec3): [number, number] => [p[2] + d / 2, p[1] - y0];
+
+  face(
+    [
+      [x0, y0, -d / 2],
+      [x1, y0, -d / 2],
+      [x1, y0, d / 2],
+      [x0, y0, d / 2],
+    ],
+    [0, -1, 0],
+    (p) => [p[0] - x0, p[2] + d / 2],
+  );
+  face(
+    [
+      [x0, y0, zHigh],
+      [x1, y0, zHigh],
+      [x1, y1, zHigh],
+      [x0, y1, zHigh],
+    ],
+    [0, 0, -down],
+    acrossZ,
+  );
+  if (low > 0) {
+    face(
+      [
+        [x0, y0, zLow],
+        [x1, y0, zLow],
+        [x1, yLow, zLow],
+        [x0, yLow, zLow],
+      ],
+      [0, 0, down],
+      acrossZ,
+    );
+  }
+  face(
+    [
+      [x0, y1, zHigh],
+      [x1, y1, zHigh],
+      [x1, yLow, zLow],
+      [x0, yLow, zLow],
+    ],
+    [0, d, rise * down],
+    (p) => [p[0] - x0, (p[2] + d / 2) * stretch],
+  );
+  for (const x of [x0, x1]) {
+    face(
+      [
+        [x, y0, zHigh],
+        [x, y0, zLow],
+        ...(low > 0 ? [[x, yLow, zLow] as Vec3] : []),
+        [x, y1, zHigh],
+      ],
+      [x === x0 ? -1 : 1, 0, 0],
+      alongZ,
+    );
+  }
+  return solid;
 }
 
 /**

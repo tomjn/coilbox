@@ -1,7 +1,9 @@
 /**
- * A cylinder's or a tube's numbers in the piece panel (#3327): the axis it runs
- * along, its radius, length, wall and sides. A number the shape cannot take is
- * refused with a line saying why, and the shape keeps what it had.
+ * A generated shape's numbers in the piece panel. A cylinder or a tube has the
+ * axis it runs along, its radius, length, wall and sides (#3327). A wedge has
+ * its width, depth, height, the height of its low end and which way it slopes
+ * (#3328). A number the shape cannot take is refused with a line saying why,
+ * and the shape keeps what it had.
  */
 
 import { Button, Input } from "@picoframe/frame";
@@ -14,6 +16,11 @@ import {
   withRoundNumber,
 } from "../../roundShape";
 import type { LegoShape } from "../../shapes";
+import {
+  type WedgeNumbers,
+  wedgeNumbers,
+  withWedgeNumber,
+} from "../../wedgeShape";
 import { AXES } from "./TransformFields";
 
 interface Props {
@@ -22,6 +29,77 @@ interface Props {
 }
 
 export function ShapeFields({ shape, onChange }: Props) {
+  return shape.kind === "wedge" ? (
+    <WedgeFields shape={shape} onChange={onChange} />
+  ) : (
+    <RoundFields shape={shape} onChange={onChange} />
+  );
+}
+
+function WedgeFields({ shape, onChange }: Props) {
+  const numbers = wedgeNumbers(shape);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  function set(name: keyof WedgeNumbers, value: number) {
+    const result = withWedgeNumber(shape, name, value);
+    if ("problem" in result) {
+      setProblem(result.problem);
+      return;
+    }
+    setProblem(null);
+    onChange(result.shape);
+  }
+
+  const fields: {
+    name: "width" | "depth" | "height" | "low";
+    label: string;
+  }[] = [
+    { name: "width", label: "Width" },
+    { name: "depth", label: "Depth" },
+    { name: "height", label: "Height" },
+    { name: "low", label: "Low end" },
+  ];
+  const directions = [
+    { flip: false, label: "High at back" },
+    { flip: true, label: "High at front" },
+  ];
+
+  return (
+    <div className="mt-2 flex flex-col gap-2">
+      <ButtonGroup className="flex w-full" aria-label="Slope direction">
+        {directions.map(({ flip, label }) => (
+          <Button
+            key={label}
+            size="sm"
+            variant={numbers.flip === flip ? "default" : "outline"}
+            className="flex-1"
+            aria-pressed={numbers.flip === flip}
+            onClick={() => set("flip", flip ? 1 : 0)}
+          >
+            {label}
+          </Button>
+        ))}
+      </ButtonGroup>
+      <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+        {fields.map(({ name, label }) => (
+          <ShapeNumber
+            key={name}
+            label={label}
+            value={numbers[name]}
+            onCommit={(value) => set(name, value)}
+          />
+        ))}
+      </div>
+      {problem ? (
+        <p role="alert" className="text-xs text-destructive">
+          {problem}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function RoundFields({ shape, onChange }: Props) {
   const numbers = roundNumbers(shape);
   // About the number just typed. The panel is keyed by piece, so another
   // piece starts clear.
