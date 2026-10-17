@@ -155,6 +155,7 @@ import {
 import { rawGeometryProblems } from "../rawGeometry";
 import { texturesInUse } from "../rawImport";
 import { parentOptions, reparentPiece } from "../reparent";
+import { type Axis, resizePackBlock } from "../resizePackBlock";
 import { unringPiece } from "../ring";
 import { ringMembers } from "../ringSet";
 import { bakedPieces, sitOnGround, unitBounds } from "../s3oBuild";
@@ -1173,6 +1174,35 @@ function Builder({ id }: { id: string | undefined }) {
   }
 
   /**
+   * A pack block's face was dragged to a size the pack has (#3332). One edit,
+   * so one undo. The notes are the ones a part swap gives.
+   */
+  function resizeBlock(
+    pieceId: string,
+    axis: Axis,
+    sign: 1 | -1,
+    size: number,
+  ) {
+    if (!draft || !pack) return;
+    const result = resizePackBlock(draft, pack, pieceId, axis, sign, size);
+    if (!result) return;
+    edit(
+      (project) =>
+        resizePackBlock(project, pack, pieceId, axis, sign, size)?.project ??
+        project,
+    );
+    const notes = [
+      result.droppedAnchors.length > 0
+        ? `Dropped ${result.droppedAnchors.length === 1 ? "an anchor" : `${result.droppedAnchors.length} anchors`} outside the new part: ${result.droppedAnchors.join(", ")}.`
+        : null,
+      result.broken.length > 0
+        ? "A join lost its connector. See the problems list."
+        : null,
+    ].filter(Boolean);
+    setSwapNote(notes.length > 0 ? notes.join(" ") : null);
+  }
+
+  /**
    * Put another module where the selected piece's module is. One edit, so one
    * undo. What the swap did to kept pieces and presets is told in a notice.
    */
@@ -2127,6 +2157,7 @@ function Builder({ id }: { id: string | undefined }) {
                   onAimChange: setAimPoint,
                 }}
                 guides={{ onEdit: edit }}
+                packResize={imported ? undefined : { onResize: resizeBlock }}
               />
             </div>
 

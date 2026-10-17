@@ -26,6 +26,7 @@ import { getPartGeometry, type LoadedPack } from "../../pack";
 import { seatPieceMesh } from "../../pivot";
 import type { FaceTarget } from "../../placePart";
 import { getFixedPieceGeometry, type RawGeometry } from "../../rawGeometry";
+import type { Axis } from "../../resizePackBlock";
 import type { Seat } from "../../seat";
 import { getShapeGeometry } from "../../shapes";
 import type { Vec3 } from "../../snapping";
@@ -34,6 +35,7 @@ import type { CollisionFaceDrag } from "./collisionHandles";
 import type { DrawLayer } from "./drawMode";
 import type { EffectsLayer } from "./effectsLayer";
 import type { MeasureScene } from "./measureLayer";
+import type { PackFaceDrag } from "./packHandles";
 import type { Placing } from "./placeByFace";
 
 export interface SceneState {
@@ -167,6 +169,24 @@ export interface SceneState {
   onCollisionChangeRef: {
     current: ((volume: LegoCollisionVolume) => void) | undefined;
   };
+  /** A grab plate on each face of the selected pack block while the size tool
+   *  is active (#3332). Built with the scene and moved onto the block. */
+  packHandles: THREE.Group;
+  packHandleMaterial: THREE.MeshBasicMaterial;
+  packHandleHotMaterial: THREE.MeshBasicMaterial;
+  /** The outline of the part a drag would swap to. */
+  packPreview: THREE.LineSegments;
+  /** The block face drag in progress, or null while nothing is being sized. */
+  packDrag: PackFaceDrag | null;
+  /** Told the size a finished drag landed on, along the part's own axis, with
+   *  which end was dragged. */
+  onPackResizeRef: {
+    current:
+      | ((pieceId: string, axis: Axis, sign: 1 | -1, size: number) => void)
+      | undefined;
+  };
+  /** Told what to say about the drag in progress, and null when it ends. */
+  onPackReadoutRef: { current: ((text: string | null) => void) | undefined };
   /** A box per piece, while the unit is hit piece by piece and the volume is
    *  being shown. Null the rest of the time, including for a unit that leaves
    *  piece collision off. */
