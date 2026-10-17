@@ -28,7 +28,7 @@ import {
   pieceById,
 } from "./model";
 import type { LoadedPack } from "./pack";
-import { freeFace } from "./placePart";
+import { type FaceTarget, freeFace, type PlaceOptions } from "./placePart";
 import { worldMatrix } from "./reparent";
 
 /** A module with its mount dropped when the piece it names is gone. */
@@ -125,6 +125,53 @@ function resolveMount(
     : null;
 }
 
+/** The face of the parent a module is put on, and how it sits on it. */
+export interface ModulePlacement extends PlaceOptions {
+  /** The connector on the parent. */
+  to: string;
+}
+
+/**
+ * The connector of the module that joins when it is placed on `theirs`.
+ *
+ * A module with a mount joins by it, and `cycle` steps on through the connectors
+ * of the mount's piece. A module without one (or whose mount no longer
+ * resolves) joins by the connector of its first piece that faces most nearly
+ * back at `theirs`, stepped on by `cycle`: the pick a part gets in `ownFace`.
+ * Null when that piece has no connectors.
+ */
+function chooseMount(
+  module: LegoProject,
+  pack: LoadedPack,
+  theirs: LegoConnector,
+  cycle: number,
+): ResolvedMount | null {
+  const mounted = resolveMount(module, pack);
+  const piece = mounted?.piece ?? pieceById(module, module.rootPieceId);
+  if (!piece) return null;
+  const own = pieceConnectors(pack, piece);
+  if (own.length === 0) return null;
+  let first = 0;
+  if (mounted) {
+    first = own.findIndex((c) => c.id === mounted.connector.id);
+  } else {
+    let lowest = Number.POSITIVE_INFINITY;
+    own.forEach((connector, index) => {
+      const dot =
+        connector.facing[0] * theirs.facing[0] +
+        connector.facing[1] * theirs.facing[1] +
+        connector.facing[2] * theirs.facing[2];
+      if (dot < lowest) {
+        lowest = dot;
+        first = index;
+      }
+    });
+  }
+  const connector =
+    own[(((first + cycle) % own.length) + own.length) % own.length];
+  return { piece, connector, world: worldMatrix(module, piece.id) };
+}
+
 /** `matrix` applied to a root's own transform, written back to the piece. */
 function moved(piece: LegoPiece, matrix: THREE.Matrix4): LegoPiece {
   const own = new THREE.Matrix4().compose(
@@ -147,6 +194,10 @@ function moved(piece: LegoPiece, matrix: THREE.Matrix4): LegoPiece {
  * When the parent has no face to offer, the module is moved so its mount is at
  * the parent's origin. With no pack loaded, no mount, or a mount that does not
  * resolve, this is `insertCompound`.
+ *
+ * With a `placement`, the module joins that face of the parent instead of the
+ * first free one, by the connector `chooseMount` picks, turned by the twist. A
+ * module with no mount is then joined too, rather than left as it came.
  */
 export function insertModule(
   project: LegoProject,
@@ -154,22 +205,35 @@ export function insertModule(
   parentId: string,
   newId: () => string,
   pack: LoadedPack | null,
+  placement?: ModulePlacement,
 ): ReturnType<typeof insertCompound> {
   const inserted = insertCompound(project, module, parentId, newId);
-  const mount = pack && resolveMount(module, pack);
-  if (!pack || !mount) return inserted;
-
   const parentKey = pieceById(project, parentId)
     ? parentId
     : project.rootPieceId;
   const parent = pieceById(inserted.project, parentKey);
+  const theirs =
+    pack && parent && placement
+      ? pieceConnectors(pack, parent).find((c) => c.id === placement.to)
+      : undefined;
+  const mount =
+    pack &&
+    (placement
+      ? theirs && chooseMount(module, pack, theirs, placement.cycle)
+      : resolveMount(module, pack));
+  if (!pack || !mount) return inserted;
   const mountId = inserted.idMap.get(mount.piece.id);
   if (!parent || !mountId) return inserted;
 
   const scale = new THREE.Vector3();
   mount.world.decompose(new THREE.Vector3(), new THREE.Quaternion(), scale);
-  const face = freeFace(project, pack, parent.id);
-  const join = face && { connector: mount.connector.id, to: face.to };
+  const face = placement ?? freeFace(project, pack, parent.id);
+  const quarter = placement ? ((placement.twist % 4) + 4) % 4 : 0;
+  const join = face && {
+    connector: mount.connector.id,
+    to: face.to,
+    ...(quarter ? { twist: (quarter * Math.PI) / 2 } : {}),
+  };
   // Where the mount piece goes under the parent for that join.
   const placed =
     join &&
@@ -216,4 +280,27 @@ export function insertModule(
       : next;
   });
   return { ...inserted, project: { ...inserted.project, pieces } };
+}
+
+/**
+ * A module added under the target's piece, joined to the face by its mount (or
+ * the pick `chooseMount` makes without one). Null when the piece or its face is
+ * missing, or the module has no connector to join by.
+ */
+export function placeModule(
+  project: LegoProject,
+  module: LegoProject,
+  pack: LoadedPack,
+  target: FaceTarget,
+  options: PlaceOptions,
+  newId: () => string,
+): ReturnType<typeof insertCompound> | null {
+  const parent = pieceById(project, target.parentId);
+  if (!parent) return null;
+  const theirs = pieceConnectors(pack, parent).find((c) => c.id === target.to);
+  if (!theirs || !chooseMount(module, pack, theirs, options.cycle)) return null;
+  return insertModule(project, module, parent.id, newId, pack, {
+    ...options,
+    to: target.to,
+  });
 }

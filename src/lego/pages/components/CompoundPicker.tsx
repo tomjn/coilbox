@@ -59,7 +59,9 @@ interface Props {
    */
   atlas?: LegoAtlas;
   /** Absent on the parts browser, which has no unit to insert into. */
-  onInsert?: (compound: LegoProject) => void;
+  onInsert?: (compound: LegoProject, now: boolean) => void;
+  /** The module waiting for a connector to be clicked, drawn as chosen. */
+  placingId?: string;
   onDelete: (id: string) => void;
   onRename: (compound: LegoProject, name: string) => void;
   /** Saves the user's own copy of a built in module. */
@@ -84,6 +86,7 @@ export function CompoundPicker({
   known = compounds,
   atlas,
   onInsert,
+  placingId,
   onDelete,
   onRename,
   onCopy,
@@ -282,7 +285,11 @@ export function CompoundPicker({
                       but leaves it in place, so hover and spin still work. */}
                   <button
                     type="button"
-                    onClick={onInsert ? () => onInsert(compound) : undefined}
+                    onClick={
+                      onInsert
+                        ? (event) => onInsert(compound, event.altKey)
+                        : undefined
+                    }
                     onMouseEnter={() => setHovered(compound.id)}
                     onMouseLeave={() =>
                       setHovered((at) => (at === compound.id ? null : at))
@@ -293,10 +300,10 @@ export function CompoundPicker({
                     }
                     title={
                       onInsert
-                        ? `Add ${compound.name} to the unit`
+                        ? `Place ${compound.name} on a connector. Alt adds it to the selected piece`
                         : `${compound.name}, ${compound.pieces.length} pieces`
                     }
-                    className="flex h-full w-full flex-col justify-end rounded border border-transparent pb-1 text-center hover:border-border hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className={`flex h-full w-full flex-col justify-end rounded border pb-1 text-center hover:border-border ${placingId === compound.id ? "border-ring bg-muted/40" : "border-transparent"} hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
                   >
                     <span className="truncate px-1 text-xs">
                       {isRenaming ? "" : compound.name}
