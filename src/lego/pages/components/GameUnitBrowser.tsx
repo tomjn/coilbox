@@ -35,8 +35,9 @@ import {
   searchUnitRows,
 } from "../../gameUnits";
 import type { S3oModel } from "../../importS3o";
-import { liftFromImport } from "../../liftPiece";
+import { liftFromImport, withMeshBoxes } from "../../liftPiece";
 import type { LegoProject } from "../../model";
+import { loadRawGeometry } from "../../rawGeometry";
 import { gameRecordFor } from "../../unitGame";
 
 /** How many rows are drawn at once. A big game has thousands of units, so the
@@ -211,7 +212,11 @@ export function GameUnitBrowser({ project, query, onLift }: Props) {
         newId: () => crypto.randomUUID(),
       });
       if (!module) throw new Error(`${line.name} is not in this model.`);
-      await onLift(module);
+      // Its meshes were just written, so the box of each is read back for the
+      // connectors and pivots the piece gets. A piece without one is measured
+      // when it goes into a unit, so a failed read does not fail the lift.
+      const raw = await loadRawGeometry(id).catch(() => null);
+      await onLift(raw ? withMeshBoxes(module, raw) : module);
       setLift({ path: line.path, state: "done" });
     } catch (error) {
       setLift({

@@ -10,6 +10,7 @@ import {
 import { placeModule } from "../../moduleMount";
 import { getPartGeometry, type LegoPartInfo } from "../../pack";
 import { type FaceTarget, faceUnder, placePart } from "../../placePart";
+import { getMeshGeometry } from "../../rawGeometry";
 import { worldMatrix } from "../../reparent";
 import { hitInPart } from "./anchorsAndSnapping";
 import { pieceIdOf } from "./gizmoCommit";
@@ -97,7 +98,7 @@ function hideModuleGhost(state: SceneState) {
 
 /**
  * The module's pieces drawn where placing it would put them, one translucent
- * mesh per piece with a part. Returns whether anything was drawn.
+ * mesh per piece with a part or a mesh. Returns whether anything was drawn.
  */
 function showModuleGhost(
   state: SceneState,
@@ -105,6 +106,7 @@ function showModuleGhost(
   target: FaceTarget,
 ): boolean {
   const pack = state.packRef.current;
+  const raw = state.rawRef.current;
   let count = 0;
   const out = placeModule(
     state.projectRef.current,
@@ -119,7 +121,12 @@ function showModuleGhost(
   if (!out) return false;
   for (const piece of orderedPieces(placing.module)) {
     const placed = out.idMap.get(piece.id);
-    const geometry = piece.partId ? getPartGeometry(pack, piece.partId) : null;
+    // A lifted piece draws its mesh out of the unit's own geometry.
+    const geometry = piece.partId
+      ? getPartGeometry(pack, piece.partId)
+      : raw && piece.meshId
+        ? getMeshGeometry(raw, piece.meshId)
+        : null;
     if (!placed || !geometry) continue;
     const pivot = piece.pivot ?? [0, 0, 0];
     const mesh = new THREE.Mesh(geometry, state.placeGhost.material);

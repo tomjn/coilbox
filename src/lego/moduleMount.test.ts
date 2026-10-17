@@ -431,3 +431,94 @@ describe("placeModule", () => {
     expect(go(bare, "hull", "+y")).toBeNull();
   });
 });
+
+describe("a lifted module (#3269)", () => {
+  const none = { cycle: 0, twist: 0 };
+  // A turret whose origin is at the ground under the unit, not at its middle:
+  // the mesh runs from y 2 to y 6.
+  const turret = piece({
+    id: "turret",
+    parentId: null,
+    meshId: "mod/m0",
+    meshBox: { min: [-1, 2, -1], max: [1, 6, 1] },
+  });
+  const lifted: LegoProject = {
+    ...doc([turret]),
+    id: "lifted",
+    rootPieceId: "turret",
+    pieces: [turret],
+  };
+
+  function root(out: ReturnType<typeof insertModule> | null) {
+    return out?.project.pieces.find((p) => p.id === out.rootPieceIds[0]);
+  }
+
+  it("has the six faces of its mesh", () => {
+    expect(moduleConnectors(lifted, pack()).map((c) => c.connector)).toEqual([
+      "+x",
+      "-x",
+      "+y",
+      "-y",
+      "+z",
+      "-z",
+    ]);
+  });
+
+  it("sits by its bottom face on the face that was chosen", () => {
+    const out = placeModule(
+      UNIT,
+      lifted,
+      pack(),
+      { parentId: "hull", to: "+y" },
+      none,
+      counter("n"),
+    );
+    expect(root(out)?.connection).toEqual({ connector: "-y", to: "+y" });
+    // The mesh bottom (y 2 in its own space) rests on the hull top at y 0.5.
+    expect(
+      at(out?.project as LegoProject, root(out)?.id as string, [0, 2, 0]),
+    ).toEqual([0, 0.5, 0]);
+  });
+
+  it("takes a pack part on its own faces", () => {
+    const unit = doc([
+      piece({ ...turret, id: "gun", parentId: "root", position: [0, 3, 0] }),
+    ]);
+    const out = placeModule(
+      unit,
+      MODULE,
+      pack(),
+      { parentId: "gun", to: "+y" },
+      none,
+      counter("n"),
+    );
+    expect(root(out)?.parentId).toBe("gun");
+    expect(root(out)?.connection).toEqual({ connector: "-y", to: "+y" });
+  });
+
+  it("is placed by its mount like any module", () => {
+    const out = placeModule(
+      UNIT,
+      { ...lifted, mount: { piece: "turret", connector: "-x" } },
+      pack(),
+      { parentId: "hull", to: "+z" },
+      none,
+      counter("n"),
+    );
+    expect(root(out)?.connection).toEqual({ connector: "-x", to: "+z" });
+  });
+
+  it("has no faces until its mesh box is known", () => {
+    const { meshBox: _box, ...bare } = turret;
+    expect(
+      placeModule(
+        UNIT,
+        { ...lifted, pieces: [bare] },
+        pack(),
+        { parentId: "hull", to: "+y" },
+        none,
+        counter("n"),
+      ),
+    ).toBeNull();
+  });
+});

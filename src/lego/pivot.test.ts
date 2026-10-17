@@ -161,3 +161,15 @@ describe("setPivot", () => {
     expect(setPivot(doc, "ghost", [0, 1, 0])).toBe(doc);
   });
 });
+
+describe("pivot choices for a lifted piece", () => {
+  const MESH: Pick<LegoPartInfo, "bbox"> = {
+    bbox: { min: [2, 0, 0], max: [4, 6, 2] },
+  };
+
+  it("are the middle and faces of the mesh's own box", () => {
+    const top = pivotChoices(MESH).find((c) => c.id === "top");
+    expect(top?.position).toEqual([3, 6, 1]);
+    expect(currentPivot(MESH, [3, 6, 1])).toBe("top");
+  });
+});

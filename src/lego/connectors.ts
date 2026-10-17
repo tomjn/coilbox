@@ -226,10 +226,12 @@ export function pieceConnectors(
   piece: LegoPiece,
 ): LegoConnector[] {
   const part = piece.partId ? pack.byId.get(piece.partId) : undefined;
-  const own = customConnectors(piece.customAnchors ?? [], part?.bbox);
+  const bounds = part?.bbox ?? piece.meshBox;
+  const own = customConnectors(piece.customAnchors ?? [], bounds);
   if (own.length > 0) return own;
-  if (!part) return [];
-  return part.connectors ?? boxConnectors(part.bbox);
+  if (part) return part.connectors ?? boxConnectors(part.bbox);
+  // A lifted piece has no part, so its mesh's box stands in for the part's.
+  return piece.meshBox ? boxConnectors(piece.meshBox) : [];
 }
 
 /**
@@ -607,7 +609,8 @@ export function faceName(
 ): string {
   const part = piece?.partId ? pack.byId.get(piece.partId) : undefined;
   const boxed =
-    part && !part.connectors && !(piece?.customAnchors?.length ?? 0);
+    (part ? !part.connectors : piece?.meshBox !== undefined) &&
+    !(piece?.customAnchors?.length ?? 0);
   return (boxed && BOX_FACE_NAMES[id]) || id;
 }
 
@@ -662,7 +665,9 @@ function outlineOf(
   const facing = new THREE.Vector3(...connector.facing).normalize();
   const up = new THREE.Vector3(...connector.up).normalize();
   const side = new THREE.Vector3().crossVectors(facing, up);
-  const bbox = piece.partId ? pack.byId.get(piece.partId)?.bbox : undefined;
+  const bbox =
+    (piece.partId ? pack.byId.get(piece.partId)?.bbox : undefined) ??
+    piece.meshBox;
   const half = (axis: THREE.Vector3) =>
     bbox
       ? 0.5 *

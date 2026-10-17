@@ -116,3 +116,37 @@ export function pieceSize(
     box.max[2] - box.min[2],
   ];
 }
+
+/**
+ * The piece scaled evenly until its longest side, with everything under it, is
+ * a whole number of `step`s, and at least one (#3269). A lifted piece arrives
+ * at its game's size, which a pack's part unit does not divide. The signs of
+ * the scale stay, so a mirror stays a mirror.
+ *
+ * The same document when the piece has no geometry, there is no step, or it
+ * already fits.
+ */
+export function fitToSteps(
+  project: LegoProject,
+  pack: LoadedPack,
+  raw: RawGeometry | null,
+  pieceId: string,
+  step: number,
+): LegoProject {
+  const size = pieceSize(project, pack, raw, pieceId);
+  const longest = size ? Math.max(...size) : 0;
+  if (!size || !(step > 0) || !(longest > 0)) return project;
+  const factor = (Math.max(1, Math.round(longest / step)) * step) / longest;
+  if (Math.abs(factor - 1) < 1e-9) return project;
+  return {
+    ...project,
+    pieces: project.pieces.map((piece) =>
+      piece.id === pieceId
+        ? {
+            ...piece,
+            scale: piece.scale.map((s) => s * factor) as Vec3,
+          }
+        : piece,
+    ),
+  };
+}
