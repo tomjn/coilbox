@@ -50,6 +50,7 @@ export const HUB_API_VERSION = 1;
  * hub for a kind it did not carry and got its 400 back, worded as the hub words
  * it. `mod-project` followed the same order: the kind waited here unlisted
  * until tomjn/coilbox-hub#323 taught the hub to accept it (issue #2727).
+ * `module` is waiting the same way, on tomjn/coilbox-hub#507 (issue #3272).
  */
 export const HUB_KINDS = [
   "preset",

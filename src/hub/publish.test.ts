@@ -30,7 +30,7 @@ const BASE = "https://hub.example";
 /** A share code as the drawer would hand one over. Raw JSON rather than a
  * base64 code: `identify()` reads either, and this keeps the test readable. */
 function code(
-  kind: "preset" | "campaign" | "scenario",
+  kind: "preset" | "campaign" | "scenario" | "module",
   payload: unknown = {},
 ): string {
   return JSON.stringify(makeContainer(kind, 1, payload));
@@ -108,6 +108,42 @@ describe("whyNotPublishable", () => {
       mapName: "Comet Catcher",
     });
     expect(whyNotPublishable(publication({ code: ready }))).toBeNull();
+  });
+
+  it("refuses a module holding a lifted piece, naming the piece and the game", () => {
+    const lifted = code("module", {
+      schemaVersion: 1,
+      id: "m1",
+      name: "Turret",
+      packId: "lego",
+      rootPieceId: "root",
+      pieces: [
+        {
+          id: "root",
+          name: "turret",
+          partId: null,
+          meshId: "m0",
+          lifted: { game: { name: "Beyond All Reason" }, member: "a.s3o" },
+        },
+      ],
+    });
+    expect(whyNotPublishable(publication({ code: lifted }))).toBe(
+      "This module holds a piece from Beyond All Reason: turret. Geometry lifted from a game cannot be uploaded to the hub.",
+    );
+  });
+
+  it("holds back a module of parts until the hub carries modules", () => {
+    const parts = code("module", {
+      schemaVersion: 1,
+      id: "m1",
+      name: "Turret",
+      packId: "lego",
+      rootPieceId: "root",
+      pieces: [{ id: "root", name: "turret", partId: "p1" }],
+    });
+    expect(whyNotPublishable(publication({ code: parts }))).toBe(
+      "The hub does not carry modules yet.",
+    );
   });
 
   it("refuses a container past the size the app would import", () => {

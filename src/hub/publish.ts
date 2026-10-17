@@ -4,6 +4,7 @@ import {
   decodeContainerText,
   identify,
   makeContainer,
+  moduleGeometryRefusal,
 } from "@/container/container";
 import { MAX_IMPORT_BYTES } from "@/deeplink/fetchImport";
 import { isSetUp } from "@/scenario/listing";
@@ -72,17 +73,27 @@ export function whyNotPublishable(publication: Publication): string | null {
   if (found.kind === "unknown") {
     return "That is not something coilbox made, so the hub will not take it.";
   }
+
+  const decoded = decodeContainerText(code);
+  if (decoded === null) return "That share code could not be read.";
+  const container =
+    asContainer(decoded) ??
+    makeContainer(found.kind, found.version || 1, decoded);
+
+  // Geometry lifted from a game never goes on the hub (#3272). Checked before
+  // whether the hub carries modules, because this answer will not change when
+  // it does.
+  if (found.kind === "module") {
+    const refused = moduleGeometryRefusal(container.payload);
+    if (refused) return refused;
+  }
+
   if (!(HUB_KINDS as readonly string[]).includes(found.kind)) {
     return `The hub does not carry ${found.kind}s yet.`;
   }
 
   // The ceiling the hub enforces, measured the way it measures it: on the
   // container's JSON, not on the code, which is compressed and much shorter.
-  const decoded = decodeContainerText(code);
-  if (decoded === null) return "That share code could not be read.";
-  const container =
-    asContainer(decoded) ??
-    makeContainer(found.kind, found.version || 1, decoded);
   const size = new TextEncoder().encode(JSON.stringify(container)).byteLength;
   if (size > MAX_IMPORT_BYTES) {
     return "This is too large to share. Coilbox would refuse to import it.";
