@@ -68,6 +68,15 @@ describe("serializeClipboardPiece and parseClipboardPiece", () => {
     }
   });
 
+  it("carries the unit the pieces were copied from", () => {
+    const lifted = liftTurret();
+    const parsed = parseClipboardPiece(
+      serializeClipboardPiece(lifted, "unit-a"),
+      new Set(),
+    );
+    expect(parsed.ok && parsed.piece.sourceUnitId).toBe("unit-a");
+  });
+
   it("round-trips a set of pieces, keeping the distance between them", () => {
     const legs = project([
       { id: "left", name: "left", parentId: "root", position: [-3, 0, 0] },
