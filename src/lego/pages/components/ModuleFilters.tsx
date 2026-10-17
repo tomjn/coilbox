@@ -7,6 +7,7 @@
  */
 
 import { cn, Input } from "@picoframe/frame";
+import type { ReactNode } from "react";
 
 import {
   Select,
@@ -34,6 +35,8 @@ interface Props {
   onCategory: (category: string | null) => void;
   /** How many the grid is showing, so the count follows the filter. */
   shown: number;
+  /** After the count, such as the load from file button. */
+  trailing?: ReactNode;
   className?: string;
 }
 
@@ -54,6 +57,7 @@ export function ModuleFilters({
   category,
   onCategory,
   shown,
+  trailing,
   className,
 }: Props) {
   const used = categoriesInUse(compounds);
@@ -89,6 +93,7 @@ export function ModuleFilters({
       <span className="ml-auto text-sm text-muted-foreground">
         {shown} {shown === 1 ? "module" : "modules"}
       </span>
+      {trailing}
     </div>
   );
 }

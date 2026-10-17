@@ -12,7 +12,7 @@
  */
 
 import { Button, Input } from "@picoframe/frame";
-import { Copy, Pencil, Star, Trash2 } from "lucide-react";
+import { Copy, FileDown, Pencil, Star, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
@@ -66,6 +66,8 @@ interface Props {
   onRename: (compound: LegoProject, name: string) => void;
   /** Saves the user's own copy of a built in module. */
   onCopy: (compound: LegoProject) => void;
+  /** Absent hides the save to file button. */
+  onSaveFile?: (compound: LegoProject) => void;
   /** Ids of the favourite modules. With `onFavourite`, each cell gets a star. */
   favourites?: ReadonlySet<string>;
   onFavourite?: (compound: LegoProject) => void;
@@ -93,6 +95,7 @@ export function CompoundPicker({
   onDelete,
   onRename,
   onCopy,
+  onSaveFile,
   favourites,
   onFavourite,
   onLabels,
@@ -373,6 +376,18 @@ export function CompoundPicker({
                       <Pencil size={14} />
                     </Button>
                   )}
+                  {onSaveFile ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="absolute bottom-6 left-0 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
+                      onClick={() => onSaveFile(compound)}
+                      aria-label={`Save the ${compound.name} module to a file`}
+                      title="Save to file"
+                    >
+                      <FileDown size={14} />
+                    </Button>
+                  ) : null}
                   {onFavourite ? (
                     <Button
                       size="sm"

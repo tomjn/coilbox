@@ -12,6 +12,7 @@
  */
 
 import { Button, cn, Input } from "@picoframe/frame";
+import { FileUp } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { ButtonGroup } from "@/components/ui/button-group";
@@ -44,6 +45,8 @@ interface FiltersProps {
   pack: LoadedPack;
   /** Every module, filtered or not. */
   compounds: LegoProject[];
+  /** Absent hides the load from file button. */
+  onLoadModuleFile?: () => void;
   className?: string;
 }
 
@@ -56,9 +59,15 @@ export function InventoryFilters({
   view,
   pack,
   compounds,
+  onLoadModuleFile,
   className,
 }: FiltersProps) {
   const { partFilter, moduleFilter } = view;
+  const loadButton = onLoadModuleFile ? (
+    <Button size="sm" variant="outline" onClick={onLoadModuleFile}>
+      <FileUp size={14} /> Load from file
+    </Button>
+  ) : null;
   return (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
       <ButtonGroup aria-label="Kind">
@@ -108,6 +117,7 @@ export function InventoryFilters({
           onCategory={moduleFilter.setCategory}
           shown={view.modules.length}
           className="flex-1"
+          trailing={loadButton}
         />
       ) : (
         <div className="flex flex-1 flex-wrap items-center gap-2">
@@ -121,6 +131,7 @@ export function InventoryFilters({
           <span className="ml-auto text-sm text-muted-foreground">
             {view.parts.length} parts, {view.modules.length} modules
           </span>
+          {loadButton}
         </div>
       )}
     </div>
@@ -142,6 +153,8 @@ interface GridsProps {
   onDeleteModule: (id: string) => void;
   onRenameModule: (module: LegoProject, name: string) => void;
   onCopyModule: (module: LegoProject) => void;
+  /** Absent hides each cell's save to file button. */
+  onSaveModuleFile?: (module: LegoProject) => void;
   onLabelsModule?: (
     module: LegoProject,
     labels: { category: string | undefined; tags: string[] },
@@ -168,6 +181,7 @@ export function InventoryGrids({
   onDeleteModule,
   onRenameModule,
   onCopyModule,
+  onSaveModuleFile,
   onLabelsModule,
   aside,
 }: GridsProps) {
@@ -218,6 +232,7 @@ export function InventoryGrids({
               onDelete={onDeleteModule}
               onRename={onRenameModule}
               onCopy={onCopyModule}
+              onSaveFile={onSaveModuleFile}
               favourites={favouriteModules}
               onFavourite={(module) =>
                 inventory.toggleFavourite({ kind: "module", id: module.id })

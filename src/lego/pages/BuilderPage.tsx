@@ -126,6 +126,7 @@ import { swapModule } from "../swapModule";
 import { swapPart } from "../swapPart";
 import { useEditShortcuts } from "../useEditShortcuts";
 import { useLegoDocument } from "../useLegoDocument";
+import { useModuleFiles } from "../useModuleFiles";
 import { useRawGeometry } from "../useRawGeometry";
 import { useSymmetry } from "../useSymmetry";
 import { addWeaponModule, pickWeaponParts } from "../weaponModule";
@@ -206,6 +207,7 @@ function Builder({ id }: { id: string | undefined }) {
   );
   // The built in modules first, then the user's own.
   const compounds = useModules(pack);
+  const moduleFiles = useModuleFiles(pack, compounds);
   // Only for the keep-set when a texture changes: the store is shared, so
   // nothing can decide a key is dead by looking at one unit.
   const { projects } = useLegoProjects();
@@ -1768,6 +1770,7 @@ function Builder({ id }: { id: string | undefined }) {
 
                 {stripOpen && effectiveStrip === "inventory" && pack ? (
                   <InventoryFilters
+                    onLoadModuleFile={moduleFiles.loadFile}
                     view={inventoryView}
                     pack={pack}
                     compounds={compounds}
@@ -1835,6 +1838,7 @@ function Builder({ id }: { id: string | undefined }) {
                         void saveCompound({ ...compound, name })
                       }
                       onCopyModule={(compound) => void saveCompound(compound)}
+                      onSaveModuleFile={moduleFiles.saveFile}
                       onLabelsModule={(compound, labels) =>
                         void saveCompound(withLabels(compound, labels))
                       }
