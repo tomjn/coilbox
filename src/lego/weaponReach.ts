@@ -34,9 +34,8 @@ export type RangeKind =
   | "sphere"
   /** `CStarburstLauncher::GetRange2D`: the range grows with height. */
   | "starburst"
-  /** `CCannon::GetRange2D` works the range out from the shell's speed and
-   *  the map's gravity, which the builder does not have. The stated range
-   *  is used, so treat it as an estimate (#4274). */
+  /** `CCannon::GetRange2D`: the range follows from the shell's speed and
+   *  gravity, see {@link cannonRange2D}. */
   | "ballistic";
 
 /** Which directions a weapon can fire in. */
@@ -52,6 +51,16 @@ export type WeaponArc =
   /** A weapon with `turret = false`: the same test against the unit's front. */
   | { kind: "forward"; minDot: number };
 
+/** What a cannon's reach is worked out from, in the engine's own units. */
+export interface BallisticShell {
+  /** `projectilespeed`, in elmos per frame: `weaponVelocity` / 30. */
+  speed: number;
+  /** Per frame squared, negative for a fall. */
+  gravity: number;
+  /** `heightBoostFactor`, -1 meaning the engine works it out. */
+  heightBoostFactor: number;
+}
+
 /** One weapon's range and arc. */
 export interface WeaponReach {
   /** `n` in `AimWeapon<n>`, counting from 1. */
@@ -61,6 +70,8 @@ export interface WeaponReach {
   /** `range`, in elmos. The engine's default is 10 (`WeaponDef.cpp:106`). */
   range: number;
   rangeKind: RangeKind;
+  /** Set for a cannon. Without it a ballistic weapon reaches its range. */
+  shell?: BallisticShell;
   heightMod: number;
   cylinderTargeting: number;
   /** The piece `AimFromWeapon<n>` names, null when it names none. */
@@ -78,6 +89,63 @@ export interface ReachSource {
    *  live. Absent for a slot written as a bare name. */
   slot: Record<string, unknown> | undefined;
   aimFrom: string | null;
+}
+
+/** `GAME_SPEED` (`GlobalConstants.h:52`), simulation frames per second. */
+const GAME_SPEED = 30;
+
+/** The map's default gravity in elmos per second squared
+ *  (`MapInfo.cpp:101`, `topTable.GetFloat("gravity", 130.0f)`). The builder
+ *  has no map, so a cannon is worked out on this. */
+export const DEFAULT_MAP_GRAVITY = 130;
+
+/** Sine and cosine of 45 degrees, as `GetStaticRange2D` writes them
+ *  (`Cannon.cpp:256`). */
+const CANNON_SPEED_FACTOR = 0.7071067;
+
+/** Below this far under the shooter the height boost applies whole
+ *  (`Cannon.cpp:232`). */
+const CANNON_SMOOTH_HEIGHT = 100;
+
+/**
+ * `CCannon::GetStaticRange2D` (`Cannon.cpp:226-269`) with the range boost
+ * factor worked out from scratch, as `CCannon::UpdateRange` does
+ * (`Cannon.cpp:48-56`). `ydiff` is the height of the target above the shooter,
+ * already scaled by `heightMod`.
+ *
+ * The range boost factor is the stated range over what the shell reaches on
+ * level ground, capped at 1, so a shell too slow for its range falls short.
+ * Firing downhill is boosted by the height boost factor, which is
+ * `(2 - rangeBoostFactor) / sqrt(rangeBoostFactor)` unless the def gives one.
+ */
+export function cannonRange2D(
+  range: number,
+  ydiff: number,
+  { speed, gravity, heightBoostFactor }: BallisticShell,
+): number {
+  const speed2D = speed * CANNON_SPEED_FACTOR;
+  const sqSpeed2D = speed2D * speed2D;
+  const calc = (
+    heightDiff: number,
+    rangeBoost: number,
+    heightBoost: number,
+  ) => {
+    let diff = heightDiff;
+    if (diff < -CANNON_SMOOTH_HEIGHT) {
+      diff *= heightBoost;
+    } else if (diff < 0) {
+      diff *= 1 + ((heightBoost - 1) * -diff) / CANNON_SMOOTH_HEIGHT;
+    }
+    const root = sqSpeed2D + 2 * gravity * diff;
+    if (root < 0) return 0;
+    return (rangeBoost * (sqSpeed2D + speed2D * Math.sqrt(root))) / -gravity;
+  };
+  const levelRange = calc(0, 1, heightBoostFactor);
+  const rangeBoost = Math.min(Math.max(range / levelRange, 0), 1);
+  let heightBoost = heightBoostFactor;
+  if (heightBoost < 0 && rangeBoost > 0)
+    heightBoost = (2 - rangeBoost) / Math.sqrt(rangeBoost);
+  return calc(ydiff, rangeBoost, heightBoost);
 }
 
 /** A key read whichever case it came in, as the engine's lower-cased
@@ -171,6 +239,26 @@ export function weaponArc(
   return { kind: "mainDir", dir, minDot };
 }
 
+/**
+ * The shell of a cannon. `projectilespeed` is `weaponVelocity` (or
+ * `maxVelocity`) per second, divided by 30 and held to at least 0.01
+ * (`WeaponDef.cpp:76`, `DefinitionTag.h:128-132`). `Cannon::Init`
+ * (`Cannon.cpp:35`) takes `-myGravity` when it is not 0 and the map's gravity
+ * otherwise, which is `-gravity / 30^2` (`MapInfo.cpp:103`).
+ */
+function shellOf(def: Record<string, unknown>): BallisticShell {
+  const velocity = numberOf(field(def, "weaponVelocity", "maxVelocity")) ?? 0;
+  const myGravity = numberOf(field(def, "myGravity")) ?? 0;
+  return {
+    speed: Math.max(velocity / GAME_SPEED, 0.01),
+    gravity:
+      myGravity !== 0
+        ? -myGravity
+        : -DEFAULT_MAP_GRAVITY / (GAME_SPEED * GAME_SPEED),
+    heightBoostFactor: numberOf(field(def, "heightBoostFactor")) ?? -1,
+  };
+}
+
 /** One weapon's reach, from its slot and definition. */
 export function weaponReach(source: ReachSource): WeaponReach {
   const { def } = source;
@@ -196,6 +284,7 @@ export function weaponReach(source: ReachSource): WeaponReach {
         : type === "StarburstLauncher"
           ? "starburst"
           : "sphere",
+    ...(type === "Cannon" ? { shell: shellOf(def) } : {}),
     heightMod: numberOf(field(def, "heightMod")) ?? heightModDefault,
     cylinderTargeting: Math.min(
       Math.max(cylinder ?? (type === "Melee" ? 1 : 0), 0),
@@ -280,7 +369,8 @@ export function rangeAt(
   }
   const ydiff = heightDiff * heightMod;
   if (reach.rangeKind === "starburst") return range + ydiff * heightMod;
-  if (reach.rangeKind === "ballistic") return range;
+  if (reach.rangeKind === "ballistic")
+    return reach.shell ? cannonRange2D(range, ydiff, reach.shell) : range;
   return Math.sqrt(Math.max(range * range - ydiff * ydiff, 0));
 }
 

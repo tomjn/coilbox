@@ -43,6 +43,19 @@ vi.mock("../../../content/config", () => ({
 }));
 
 const toBattleConfig = vi.fn();
+const unitDefs = vi.hoisted(() => ({
+  defs: null as { weaponDefs: Record<string, unknown> } | null,
+}));
+vi.mock("@/workshop/config", () => ({
+  useUnitDefs: () => ({
+    defs: unitDefs.defs,
+    defsFor: unitDefs.defs ? "splinterfaction_0.1.89.sdz" : null,
+  }),
+}));
+vi.mock("@/workshop/project", () => ({
+  useModProjects: () => ({ projects: [] }),
+}));
+
 vi.mock("../../../play/config", () => ({
   gameOptionSchema: vi.fn().mockResolvedValue([]),
   initialParticipants: () => [{}],
@@ -133,6 +146,7 @@ function unitFiles(
     dir: DIR,
     textures: changed.texture ? "atlas-2" : "atlas",
     textureFiles: ["coilbox_atlas.png"],
+    weaponsLeftOut: [],
     files: [
       {
         path: `${DIR}/objects3d/probe_unit.s3o`,
@@ -164,6 +178,31 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+});
+
+describe("TestDrawer's weapons", () => {
+  it("hands the scratch game the test game's weapons and names those left out", async () => {
+    unitDefs.defs = { weaponDefs: { gun: {} } };
+    writeScratchGame.mockResolvedValue({
+      ...unitFiles(),
+      name: "Coilbox unit test scratch",
+      weaponsLeftOut: ["armcom_laser (not in this game)."],
+    });
+    open();
+    fireEvent.click(screen.getByRole("button", { name: /^Launch$/ }));
+    await waitFor(() => expect(launch).toHaveBeenCalled());
+
+    expect(writeScratchGame).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gameWeapons: { gun: {} },
+        workshopProjects: [],
+      }),
+    );
+    expect(
+      screen.getByText("Left out: armcom_laser (not in this game)."),
+    ).toBeTruthy();
+    unitDefs.defs = null;
+  });
 });
 
 describe("TestDrawer's Play with this unit", () => {

@@ -517,6 +517,17 @@ export const SCENARIOS: Scenario[] = [
     events: [...CREATED, { frame: 0, callin: "Activate" }],
   },
   {
+    id: "take-off-landing",
+    label: "Take off and land",
+    description:
+      "Activated as an aircraft takes off, then deactivated once it has landed, as the engine does for both air move types.",
+    events: [
+      ...CREATED,
+      { frame: at(1), callin: "Activate" },
+      { frame: at(8), callin: "Deactivate" },
+    ],
+  },
+  {
     id: "building",
     label: "Building (mobile)",
     description:
