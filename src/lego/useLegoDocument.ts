@@ -11,8 +11,12 @@
  */
 
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-
-import { duplicatePiece, selectionAsCompound } from "./compounds";
+import { notify } from "@/notify/notify";
+import {
+  describePresets,
+  duplicatePiece,
+  selectionAsCompound,
+} from "./compounds";
 import { withConnections } from "./connectors";
 import { emptyDocument, primarySelection, reduceDocument } from "./document";
 import type { LegoProject } from "./model";
@@ -228,6 +232,9 @@ export function useLegoDocument(
     // One edit however many roots the cutting has, so a paste of several pieces
     // takes one undo step.
     edit(() => inserted.project);
+    const said = describePresets(inserted.presets);
+    if (said)
+      void notify({ title: "Module animations", body: said, level: "info" });
     return inserted.rootPieceIds;
   }
 

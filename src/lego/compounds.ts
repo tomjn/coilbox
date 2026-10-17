@@ -17,6 +17,12 @@
  */
 
 import * as THREE from "three";
+import {
+  type AppliedPreset,
+  countRoles,
+  presetById,
+  unmetRequirements,
+} from "./animPresets";
 import { freePiece } from "./connectors";
 import {
   descendantIds,
@@ -63,7 +69,10 @@ export function subtreeAsCompound(
   pieceId: string,
   options: { id: string; now: string; newId: () => string },
 ): LegoProject | null {
-  return selectionAsCompound(project, [pieceId], options);
+  // For duplicate and mirror: the copy lands in the unit it came from, so what
+  // the unit has applied is its own business, and a preset the maker removed
+  // must not come back with a duplicate.
+  return selectionAsCompound(project, [pieceId], options, false);
 }
 
 /**
@@ -78,6 +87,7 @@ export function selectionAsCompound(
   project: LegoProject,
   pieceIds: string[],
   options: { id: string; now: string; newId: () => string },
+  carryPresets = true,
 ): LegoProject | null {
   const roots = cuttingRoots(project, pieceIds);
   const anchorId = roots[0];
@@ -108,6 +118,13 @@ export function selectionAsCompound(
     }
   }
 
+  const presets = carryPresets ? presetsFor(project, pieces) : [];
+  // The builder block describes a module only when a build preset came with it.
+  const builder =
+    project.builder && presets.some((entry) => isBuildPreset(entry.presetId))
+      ? { builder: { ...project.builder } }
+      : {};
+
   return {
     schemaVersion: LEGO_SCHEMA_VERSION,
     id: options.id,
@@ -119,7 +136,110 @@ export function selectionAsCompound(
     updatedAt: options.now,
     rootPieceId: remap.get(anchorId) as string,
     pieces,
+    ...(presets.length > 0 ? { animations: presets } : {}),
+    ...builder,
   };
+}
+
+/** `buildarm`, `build.aim`, `build.factory` and `build.nano`. */
+function isBuildPreset(presetId: string): boolean {
+  return presetId.startsWith("build");
+}
+
+/**
+ * The unit's applied presets that belong to a set of pieces: those where a role
+ * the preset animates, or needs, is carried by one of the pieces. Needs as well
+ * as animates because `build.nano` moves nothing but cannot work without its
+ * emit point. Parameters are copied.
+ */
+function presetsFor(
+  project: LegoProject,
+  pieces: { role?: string }[],
+): AppliedPreset[] {
+  const roles = new Set(
+    pieces.flatMap((piece) => (piece.role ? [piece.role] : [])),
+  );
+  return (project.animations ?? []).flatMap((applied) => {
+    const preset = presetById(applied.presetId);
+    if (!preset) return [];
+    const belongs = [
+      ...preset.animates,
+      ...preset.requires.map((need) => need.role),
+    ].some((role) => roles.has(role));
+    return belongs
+      ? [{ presetId: applied.presetId, params: { ...applied.params } }]
+      : [];
+  });
+}
+
+/** What inserting a module did about the presets it carried. */
+export interface PresetOutcome {
+  /** Added to the unit's animations. */
+  added: string[];
+  /** The unit already had these, so its own parameters stand. */
+  present: string[];
+  /** Not added, because the unit still lacks these roles after the insert. */
+  held: { presetId: string; missing: string[] }[];
+  /** The unit had no builder block and took the module's. */
+  builderTaken: boolean;
+}
+
+/** The presets a module carries, added to a unit that has just received it. */
+function mergePresets(
+  project: LegoProject,
+  module: LegoProject,
+): { project: LegoProject; outcome: PresetOutcome } {
+  const outcome: PresetOutcome = {
+    added: [],
+    present: [],
+    held: [],
+    builderTaken: false,
+  };
+  const applied = [...(project.animations ?? [])];
+  const roles = countRoles(project.pieces);
+  for (const entry of module.animations ?? []) {
+    const preset = presetById(entry.presetId);
+    if (!preset) continue;
+    if (applied.some((have) => have.presetId === entry.presetId)) {
+      outcome.present.push(entry.presetId);
+      continue;
+    }
+    const missing = unmetRequirements(preset, roles);
+    if (missing.length > 0) {
+      outcome.held.push({ presetId: entry.presetId, missing });
+      continue;
+    }
+    applied.push({ presetId: entry.presetId, params: { ...entry.params } });
+    outcome.added.push(entry.presetId);
+  }
+  outcome.builderTaken = !project.builder && !!module.builder;
+  return {
+    outcome,
+    project: {
+      ...project,
+      ...(applied.length > 0 ? { animations: applied } : {}),
+      ...(outcome.builderTaken && module.builder
+        ? { builder: { ...module.builder } }
+        : {}),
+    },
+  };
+}
+
+/** One line for the user about what a module insert did with its presets. */
+export function describePresets(outcome: PresetOutcome): string | null {
+  const parts: string[] = [];
+  const label = (id: string) => presetById(id)?.label ?? id;
+  if (outcome.added.length > 0)
+    parts.push(`Added ${outcome.added.map(label).join(", ")}.`);
+  if (outcome.present.length > 0)
+    parts.push(
+      `Already on the unit: ${outcome.present.map(label).join(", ")}.`,
+    );
+  for (const held of outcome.held)
+    parts.push(
+      `${label(held.presetId)} not added, the unit has no ${held.missing.join(", ")}.`,
+    );
+  return parts.length > 0 ? parts.join(" ") : null;
 }
 
 type Placement = Pick<LegoPiece, "position" | "rotation" | "scale">;
@@ -181,6 +301,11 @@ export function validateCompoundName(
  * hangs off the same parent, keeping the spacing between them, and they come
  * back as `rootPieceIds` so the selection can land on all of them. `idMap` says
  * which new piece each of the compound's pieces became.
+ *
+ * The presets the compound carries join the unit's `animations`: one the unit
+ * already has is left as it is, parameters and all, and one whose roles the unit
+ * still lacks after the insert is held back and reported in `presets`. The
+ * compound's `builder` block is taken only by a unit with none.
  */
 export function insertCompound(
   project: LegoProject,
@@ -191,6 +316,7 @@ export function insertCompound(
   project: LegoProject;
   rootPieceIds: string[];
   idMap: Map<string, string>;
+  presets: PresetOutcome;
 } {
   const parent = pieceById(project, parentId) ? parentId : project.rootPieceId;
   const taken = project.pieces.map((piece) => piece.name);
@@ -221,10 +347,17 @@ export function insertCompound(
     return { ...rest, id, name, parentId: under };
   });
 
+  // Presets are judged against the unit as it is after the insert, so a module
+  // that completes what a preset needs brings it in.
+  const merged = mergePresets(
+    { ...project, pieces: [...project.pieces, ...added] },
+    compound,
+  );
   return {
-    project: { ...project, pieces: [...project.pieces, ...added] },
+    project: merged.project,
     rootPieceIds,
     idMap: remap,
+    presets: merged.outcome,
   };
 }
 
