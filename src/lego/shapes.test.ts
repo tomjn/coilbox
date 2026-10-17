@@ -11,6 +11,7 @@ import {
   type ShapeSwatch,
   setShapeSwatches,
   shapeBox,
+  shapeKey,
   shapeMesh,
   shapeSwatches,
   tubeInnerRadius,
@@ -658,6 +659,9 @@ describe("shape UVs (#3326)", () => {
   });
 
   it("puts every UV inside the shape's swatch, at any size", () => {
+    // Collected rather than expected one by one: there are a few hundred
+    // thousand values, and an expect each is slow enough to time out under load.
+    const outside: string[] = [];
     for (const shape of shapes()) {
       const mesh = shapeMesh(shape);
       if (!mesh) throw new Error("no mesh");
@@ -666,13 +670,16 @@ describe("shape UVs (#3326)", () => {
       for (let i = 0; i < mesh.vCount; i++) {
         for (const k of [0, 1]) {
           const uv = mesh.vertices[i * 8 + 6 + k];
-          expect(uv).toBeGreaterThanOrEqual(
-            Math.fround(swatch.uv.min[k]) - 1e-7,
-          );
-          expect(uv).toBeLessThanOrEqual(Math.fround(swatch.uv.max[k]) + 1e-7);
+          if (
+            uv < Math.fround(swatch.uv.min[k]) - 1e-7 ||
+            uv > Math.fround(swatch.uv.max[k]) + 1e-7
+          ) {
+            outside.push(`${shapeKey(shape)} vertex ${i} uv ${k}: ${uv}`);
+          }
         }
       }
     }
+    expect(outside).toEqual([]);
   });
 
   it("draws every triangle at the pack's density, at any size", () => {
