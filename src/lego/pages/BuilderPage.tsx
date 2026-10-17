@@ -98,7 +98,7 @@ import {
   transformRoots,
 } from "../groupTransform";
 import { useInventoryView } from "../inventory";
-import { liftIntoUnit, pasteIntoUnit } from "../liftIntoUnit";
+import { liftIntoUnit, pasteIntoUnit, saveModuleMeshes } from "../liftIntoUnit";
 import {
   holdsLiftedPieces,
   liftCredit,
@@ -1026,9 +1026,26 @@ function Builder({ id }: { id: string | undefined }) {
     const compound = liftedRef.current ?? liftSelection();
     liftedRef.current = null;
     if (!compound) return;
-    await saveCompound(
-      withLabels(mount ? { ...compound, mount } : compound, labels),
+    const module = withLabels(
+      mount ? { ...compound, mount } : compound,
+      labels,
     );
+    // A module holding lifted pieces needs its meshes in a file of its own,
+    // written before the document so no module names meshes it lacks.
+    const unitId = docRef.current.project?.id;
+    if (unitId) {
+      try {
+        await saveModuleMeshes(unitId, module);
+      } catch (error) {
+        void notify({
+          title: "Save as module",
+          body: error instanceof Error ? error.message : String(error),
+          level: "error",
+        });
+        return;
+      }
+    }
+    await saveCompound(module);
     // Showing where it went is the only confirmation the save needs.
     setStrip("inventory");
     inventoryView.setKind("modules");
@@ -2187,13 +2204,17 @@ function Builder({ id }: { id: string | undefined }) {
                     : (mount, labels) =>
                         void saveSelectionAsCompound(mount, labels),
                   compoundMounts,
-                  // Nor a selection holding a lifted piece: a module keeps its
-                  // meshes in a file of its own, and these are in the unit's.
+                  // A selection holding lifted pieces saves with its meshes in
+                  // a file of its own. A mesh that records no game cannot,
+                  // since the module could not be held to one.
                   canSaveAsCompound:
                     selectedIds.length > 0 &&
                     !selectedIds
                       .flatMap((pieceId) => descendantIds(draft, pieceId))
-                      .some((pieceId) => pieceById(draft, pieceId)?.meshId),
+                      .some((pieceId) => {
+                        const held = pieceById(draft, pieceId);
+                        return held?.meshId && !held.lifted;
+                      }),
                   onDelete: removeSelected,
                   canDelete: transformRoots(draft, selectedIds).length > 0,
                 }}

@@ -74,6 +74,43 @@ async function copyMeshes(
 }
 
 /**
+ * Write the geometry file of a module saved out of the unit `unitId` (#4344).
+ *
+ * The file is named after the module and holds exactly the meshes its pieces
+ * name, copied out of the unit's own file under the keys they already have, so
+ * the pieces need no rewriting. A module of parts needs none: null. Throws,
+ * saying why, when either file cannot be read or written, and then the module
+ * has not been saved.
+ */
+export async function saveModuleMeshes(
+  unitId: string,
+  module: LegoProject,
+): Promise<RawGeometry | null> {
+  const keys = new Map<string, string>();
+  for (const piece of module.pieces) {
+    if (piece.meshId) keys.set(piece.meshId, piece.meshId);
+  }
+  if (keys.size === 0) return null;
+
+  const from = await loadRawGeometry(unitId).catch((error: unknown) => {
+    throw new Error(
+      `The meshes of ${module.name} could not be read: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  });
+  const raw = mergeRawGeometry(null, from, keys);
+  if (raw.byId.size < keys.size) {
+    throw new Error(
+      `${module.name} names meshes this unit's geometry file does not hold.`,
+    );
+  }
+  await legoGeometrySave({
+    id: module.id,
+    bytes: Array.from(gzipSync(encodeRawGeometry(raw))),
+  });
+  return raw;
+}
+
+/**
  * Give the unit `unitId` the meshes of pieces pasted into it (#4343).
  *
  * The pieces keep the mesh keys they had in the unit `sourceId` they were
