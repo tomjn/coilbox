@@ -131,7 +131,7 @@ const GENERATORS: Record<string, (shape: LegoShape) => ShapeSolid> = {
   wedge,
 };
 
-/** Every kind this build can make, so a test can cover each one. */
+/** Every kind this build can make, in the order they are offered. */
 export function shapeKinds(): string[] {
   return Object.keys(GENERATORS);
 }
@@ -522,12 +522,46 @@ interface Section {
   ring: { b: number; c: number; nb: number; nc: number }[];
 }
 
-function section(shape: LegoShape): Section {
+/** The axis a round shape runs along: its `axis` option, else y. */
+export function shapeAxis(shape: LegoShape): number {
   const axisOption = shape.options?.axis;
-  const axis =
-    axisOption === 0 || axisOption === 1 || axisOption === 2
-      ? axisOption
-      : DEFAULT_CYLINDER_AXIS;
+  return axisOption === 0 || axisOption === 1 || axisOption === 2
+    ? axisOption
+    : DEFAULT_CYLINDER_AXIS;
+}
+
+/**
+ * How far out the outer wall of a round shape is going straight out from its
+ * middle in one direction across it: `which` 0 or 1 is the first or second
+ * axis across the shape, and `across` the way along it. The wall is a polygon,
+ * so for a side count that is not a multiple of 4 this can be less than half
+ * the box: a triangle's wall is on its corner one way and a flat edge the other.
+ */
+export function wallReach(
+  shape: LegoShape,
+  which: 0 | 1,
+  across: 1 | -1,
+): number {
+  const s = section(shape);
+  const own = (p: { b: number; c: number }) => (which === 0 ? p.b : p.c);
+  const other = (p: { b: number; c: number }) => (which === 0 ? p.c : p.b);
+  let reach = s.half[which === 0 ? s.b : s.c];
+  for (let k = 0; k < s.ring.length; k++) {
+    const p = s.ring[k];
+    const q = s.ring[(k + 1) % s.ring.length];
+    // The edge crosses the line where the other coordinate is 0.
+    const a = other(p);
+    const d = other(q);
+    if (a === d || a * d > 0) continue;
+    const t = a / (a - d);
+    const at = own(p) + t * (own(q) - own(p));
+    if (at * across > 0) reach = Math.abs(at);
+  }
+  return reach;
+}
+
+function section(shape: LegoShape): Section {
+  const axis = shapeAxis(shape);
   const sidesOption = Math.round(shape.options?.sides ?? NaN);
   const sides = sidesOption >= 3 ? sidesOption : DEFAULT_CYLINDER_SIDES;
   const b = (axis + 1) % 3;

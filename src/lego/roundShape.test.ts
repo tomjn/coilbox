@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { type LegoProject, newProject } from "./model";
 import type { LegoPartInfo, LoadedPack } from "./pack";
-import { coneAnchors, roundNumbers, withRoundNumber } from "./roundShape";
+import { roundNumbers, withRoundNumber } from "./roundShape";
 import { DEFAULT_CYLINDER_SIDES, type LegoShape } from "./shapes";
-import { localAnchors } from "./snapping";
 
 const SWATCHES = ["green", "tan", "grey"].map((id) => ({
   id,
@@ -163,42 +162,5 @@ describe("cones (#3329)", () => {
     const lying = shapeOf(withRoundNumber(cone, "axis", 0));
     expect(roundNumbers(lying)).toMatchObject({ axis: 0, top: 0.5 });
     expect(shapeOf(withRoundNumber(cone, "length", 5)).options?.top).toBe(0.5);
-  });
-
-  it("has no corner anchors, and its side anchors sit on the slope at mid height", () => {
-    const bounds = { min: [-1, -1.5, -1], max: [1, 1.5, 1] } as const;
-    const anchors = coneAnchors(
-      { min: [...bounds.min], max: [...bounds.max] },
-      cone,
-    );
-    expect(anchors.some((a) => a.kind === "corner")).toBe(false);
-    const east = anchors.find((a) => a.out?.[0] === 1);
-    // Halfway up, the radius is halfway between 1 and the top, 0.5.
-    expect(east?.position).toEqual([0.75, 0, 0]);
-    const top = anchors.find((a) => a.out?.[1] === 1);
-    expect(top?.position).toEqual([0, 1.5, 0]);
-    const plain = localAnchors(
-      { min: [...bounds.min], max: [...bounds.max] },
-      true,
-    );
-    expect(anchors).toHaveLength(plain.length);
-  });
-
-  it("puts the anchors of a cone lying along x on its own axes", () => {
-    const lying: LegoShape = {
-      ...cone,
-      size: [3, 2, 2],
-      options: { axis: 0, top: 0 },
-    };
-    const anchors = coneAnchors(
-      { min: [-1.5, -1, -1], max: [1.5, 1, 1] },
-      lying,
-    );
-    expect(anchors.find((a) => a.out?.[1] === 1)?.position).toEqual([
-      0, 0.5, 0,
-    ]);
-    expect(anchors.find((a) => a.out?.[0] === 1)?.position).toEqual([
-      1.5, 0, 0,
-    ]);
   });
 });

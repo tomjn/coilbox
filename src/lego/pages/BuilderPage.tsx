@@ -63,6 +63,7 @@ import { presetById, ROLES, restAngleWarnings } from "../animPresets";
 import { unitAtlas } from "../atlas";
 import { balanceProblem, checkBalance } from "../balance";
 import { legoTexturePrune } from "../bindings";
+import { releaseSkeleton } from "../bodyPlans";
 import { addBuildArm, builderKind, pickArmParts } from "../buildArm";
 import { pictureIsStale } from "../buildPicture";
 import {
@@ -78,6 +79,7 @@ import {
   type JoinSummary,
   pieceConnectors,
   pieceOwnBox,
+  same,
   setJoinPlace,
 } from "../connectors";
 import { planById } from "../describedPlan";
@@ -166,12 +168,13 @@ import type {
   ScriptTimeline,
   StandInTrack,
 } from "../scriptPlayback";
-import { dragPiece, freeMoved, type Seat, typedTransform } from "../seat";
+import { dragPiece, freeMoved, type Seat, typedJoinedTransform } from "../seat";
 import { isKnownShapeKind, type LegoShape, type ShapeKind } from "../shapes";
 import { isShortcut, shortcutLabel } from "../shortcuts";
 import { skeletonProblems } from "../skeletonChecks";
 import { applyProportions } from "../skeletonEdit";
 import { applyTarget } from "../skeletonSize";
+import type { Vec3 } from "../snapping";
 import { swapModule } from "../swapModule";
 import { swapPart } from "../swapPart";
 import { useEditShortcuts } from "../useEditShortcuts";
@@ -266,6 +269,8 @@ function Builder({ id }: { id: string | undefined }) {
     id: string;
     value: number;
   } | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: clears on selection
+  useEffect(() => setJoinNotice(null), [selectedId]);
   const shown = useMemo(
     () =>
       draft && skeletonPlan && proportionPreview
@@ -303,6 +308,12 @@ function Builder({ id }: { id: string | undefined }) {
     },
     [edit, skeletonPlan],
   );
+  // Lets the skeleton go and keeps every piece, as one undo step.
+  const removeSkeleton = useCallback(() => {
+    setProportionPreview(null);
+    setAside("pieces");
+    edit(releaseSkeleton);
+  }, [edit]);
   // The document as it is now, for an edit made after waiting on a file.
   const docRef = useRef(doc);
   docRef.current = doc;
@@ -380,6 +391,11 @@ function Builder({ id }: { id: string | undefined }) {
    *  swap left behind. */
   const [swapping, setSwapping] = useState(false);
   const [showFreeFaces, setShowFreeFaces] = useState(false);
+  // Why the selected piece was just freed from its join, for the join section.
+  const [joinNotice, setJoinNotice] = useState<{
+    pieceId: string;
+    text: string;
+  } | null>(null);
   const [swapNote, setSwapNote] = useState<string | null>(null);
   /** Whether the module picker for "Swap module" is open. */
   const [swappingModule, setSwappingModule] = useState(false);
@@ -1066,23 +1082,38 @@ function Builder({ id }: { id: string | undefined }) {
     //
     // A `seat` (or null for a drag that seated nothing) says this is a drag,
     // which saves the join it ended on and frees a piece it moved off its join.
-    // Typing a number is not a drag, but it frees a joined piece it moves or
-    // turns all the same.
-    place([pieceId], (project) =>
+    // Typing a number is not a drag. It edits the join where the join can hold
+    // it and frees the piece where not, and says so when it frees it.
+    const drag =
       seat !== undefined && pack && change.position && change.rotation
-        ? dragPiece(
-            project,
-            pack,
-            pieceId,
-            {
-              position: change.position,
-              rotation: change.rotation,
-              scale: change.scale ?? [1, 1, 1],
-            },
-            seat,
-            slide ?? null,
-          )
-        : typedTransform(project, pieceId, change),
+        ? () => ({
+            position: change.position as Vec3,
+            rotation: change.rotation as Vec3,
+            scale: change.scale ?? ([1, 1, 1] as Vec3),
+          })
+        : null;
+    const before = draft ? pieceById(draft, pieceId) : undefined;
+    if (before?.connection && pack && draft) {
+      let detached: string | null = null;
+      if (drag) {
+        const after = pieceById(
+          dragPiece(draft, pack, pieceId, drag(), seat ?? null, slide ?? null),
+          pieceId,
+        );
+        if (after && !after.connection) {
+          detached = same(after.position, before.position)
+            ? "Detached: turned off its face."
+            : "Detached: moved off its face.";
+        }
+      } else {
+        detached = typedJoinedTransform(draft, pack, pieceId, change).detached;
+      }
+      setJoinNotice(detached ? { pieceId, text: detached } : null);
+    }
+    place([pieceId], (project) =>
+      drag && pack
+        ? dragPiece(project, pack, pieceId, drag(), seat ?? null, slide ?? null)
+        : typedJoinedTransform(project, pack, pieceId, change).project,
     );
   }
 
@@ -2466,6 +2497,7 @@ function Builder({ id }: { id: string | undefined }) {
                   plan={skeletonPlan}
                   onChange={changeProportions}
                   onTarget={changeTarget}
+                  onRemove={removeSkeleton}
                   onPreview={setProportionPreview}
                   preview={proportionPreview}
                 />
@@ -2948,6 +2980,11 @@ function Builder({ id }: { id: string | undefined }) {
                               onDetach={() => detach(selected.id)}
                               onPlace={(change) =>
                                 placeJoin(selected.id, change)
+                              }
+                              notice={
+                                joinNotice?.pieceId === selected.id
+                                  ? joinNotice.text
+                                  : null
                               }
                               showFree={showFreeFaces}
                               onShowFreeChange={setShowFreeFaces}
