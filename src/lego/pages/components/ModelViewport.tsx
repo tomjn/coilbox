@@ -20,6 +20,7 @@ import { Button } from "@picoframe/frame";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowDownToLine,
+  Bone,
   Box,
   ClipboardPaste,
   Combine,
@@ -213,6 +214,7 @@ import {
   refreshSelectionOutlines,
   setHoveredAndNotify,
 } from "./selectionAndHoverOutlines";
+import { disposeSkeleton } from "./skeletonLayer";
 import { type StandInPlacement, standInFor } from "./standInPlayback";
 import { useBalance } from "./useBalance";
 import { useCollisionAndAimVisibility } from "./useCollisionAndAimVisibility";
@@ -228,6 +230,7 @@ import { useModelSelection } from "./useModelSelection";
 import { useModelShortcuts } from "./useModelShortcuts";
 import { useOverlap } from "./useOverlap";
 import { useScriptFrameStepping } from "./useScriptFrameStepping";
+import { useSkeleton } from "./useSkeleton";
 import { useWeaponReach } from "./useWeaponReach";
 import { disposeWeaponReach, reachColour } from "./weaponReachLayer";
 
@@ -751,6 +754,11 @@ export function ModelViewport({
   const [showAim, setShowAim] = useState(false);
   const [showReach, setShowReach] = useState(false);
   const [showBalance, setShowBalance] = useState(false);
+  /** Null until somebody chooses, so the overlay follows whether the unit has
+   *  a skeleton: on for one that has, off for one that has not. */
+  const [skeletonChoice, setSkeletonChoice] = useState<boolean | null>(null);
+  const hasSkeleton = project.skeleton !== undefined;
+  const showSkeleton = skeletonChoice ?? hasSkeleton;
   // Held for the session rather than the viewport, so switching unit keeps it.
   const [drawMode, setDrawMode] = useState<DrawMode>(rememberedDrawMode);
   const [showFootprint, setShowFootprint] = useState(false);
@@ -1251,6 +1259,7 @@ export function ModelViewport({
         aimMark,
         weaponReach: null,
         balance: null,
+        skeleton: null,
         footprint: null,
         overlap: null,
         draw: newDrawLayer(),
@@ -1466,6 +1475,7 @@ export function ModelViewport({
           aimMaterial.dispose();
           if (state.weaponReach) disposeWeaponReach(state.weaponReach);
           if (state.balance) disposeBalance(state.balance);
+          if (state.skeleton) disposeSkeleton(state.skeleton);
           if (state.footprint) disposeFootprint(state.footprint);
           if (state.overlap) disposeOverlap(state.overlap);
           disposeDrawLayer(state.draw, state.groups.values());
@@ -1508,6 +1518,15 @@ export function ModelViewport({
   }, [drawMode]);
 
   useBalance(sceneRef, { result: balance, show: showBalance });
+
+  // The rest pose only, as the anchor dots are: while the pieces move, the
+  // bones would be drawn where they are not.
+  useSkeleton(sceneRef, {
+    project,
+    pack,
+    raw,
+    show: showSkeleton && hasSkeleton && !playing && scriptTimeline === null,
+  });
   useFootprint(sceneRef, {
     result: footprint?.result ?? null,
     show: showFootprint,
@@ -1646,6 +1665,7 @@ export function ModelViewport({
     setMode,
     setShortcutsOpen,
     setDrawMode,
+    toggleSkeleton: () => setSkeletonChoice(!showSkeleton),
   });
 
   const DrawModeFace = DRAW_MODE_ICONS[drawMode];
@@ -1986,6 +2006,15 @@ export function ModelViewport({
               hideTitle="Hide the collision volume"
               showTitle="Show the collision volume, the shape the engine hits and clicks"
             />
+            {hasSkeleton ? (
+              <ViewToggle
+                icon={Bone}
+                on={showSkeleton}
+                onChange={setSkeletonChoice}
+                hideTitle={`Hide the skeleton (${shortcutLabel("skeleton")})`}
+                showTitle={`Show the skeleton: a line from each bone to its parent, a dot on each joint and its role (${shortcutLabel("skeleton")})`}
+              />
+            ) : null}
             <ViewToggle
               icon={Scale}
               on={showBalance}

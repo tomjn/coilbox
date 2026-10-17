@@ -196,6 +196,9 @@ export interface SceneState {
   /** Each weapon's range and arc while their toggle is on, in `overlay`.
    *  Rebuilt whenever a weapon or a piece changes. */
   weaponReach: THREE.Group | null;
+  /** The skeleton's bone lines, joint dots and role labels, in `overlay`.
+   *  Rebuilt whenever a piece changes. */
+  skeleton: THREE.Group | null;
   /** The balance check's dot and outline on the ground, in `overlay`.
    *  Rebuilt whenever the result changes. */
   balance: THREE.Group | null;
