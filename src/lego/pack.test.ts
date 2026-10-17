@@ -425,6 +425,35 @@ describe("projectPackProblems", () => {
     ]);
   });
 
+  it("names a piece whose shape kind this build cannot make (#3325)", () => {
+    const base = unit([null, null], "base");
+    const shaped = {
+      ...base,
+      pieces: base.pieces.map((piece) =>
+        piece.id === "p0"
+          ? {
+              ...piece,
+              shape: { kind: "torus", size: [1, 1, 1], swatch: "green" },
+            }
+          : piece.id === "p1"
+            ? {
+                ...piece,
+                shape: {
+                  kind: "cylinder",
+                  size: [1, 1, 1],
+                  swatch: "green",
+                },
+              }
+            : piece,
+      ),
+    } as typeof base;
+    const problems = projectPackProblems(shaped, pack);
+    expect(problemTexts(problems)).toEqual([
+      "1 piece is a shape this version of coilbox cannot make, so it shows no geometry.",
+    ]);
+    expect(problems[0].pieceIds).toEqual(["p0"]);
+  });
+
   it("names the pieces whose part is missing", () => {
     const [missing] = projectPackProblems(
       unit(["a", "gone", "also"], "base"),

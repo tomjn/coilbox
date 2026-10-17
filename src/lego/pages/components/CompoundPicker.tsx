@@ -41,6 +41,7 @@ import {
   loadRawGeometry,
   type RawGeometry,
 } from "../../rawGeometry";
+import { getShapeGeometry } from "../../shapes";
 import { isBuiltInModule } from "../../starterModules";
 import { ModuleLabelsPopover } from "./ModuleLabelsPopover";
 import { gridLayout } from "./moduleGrid";
@@ -271,7 +272,12 @@ export function CompoundPicker({
       }
       const holder = buildHolder(
         compound,
-        (piece) => (piece.partId ? getPartGeometry(pack, piece.partId) : null),
+        (piece) =>
+          piece.shape
+            ? getShapeGeometry(piece.shape)
+            : piece.partId
+              ? getPartGeometry(pack, piece.partId)
+              : null,
         material,
       );
       state.scene.add(holder);

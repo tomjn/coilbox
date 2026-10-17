@@ -45,6 +45,7 @@ import type { LegoProject } from "./model";
 import type { LoadedPack } from "./pack";
 import { pieceMesh, type RawGeometry } from "./rawGeometry";
 import { type BakedPiece, engineUv } from "./s3oBuild";
+import { isKnownShapeKind } from "./shapes";
 
 /**
  * Texels of real neighbouring pixels kept around every region, and what region
@@ -141,8 +142,8 @@ export function sheetTextureNames(unitName: string): {
  * sheet: one opened whole from a model, and one with no lifted mesh in it.
  * Those export exactly as they did before sheets existed.
  *
- * A piece draws a lifted mesh when the unit's geometry holds it, and a part
- * otherwise, the same test the bake makes. A piece with no geometry is on no
+ * A piece draws a lifted mesh when the unit's geometry holds it, and a shape or
+ * a part otherwise, the same test the bake makes. A piece with no geometry is on no
  * source.
  */
 export function sheetSources(
@@ -183,7 +184,11 @@ export function sheetSources(
       });
       continue;
     }
-    if (!piece.partId || !pack.byId.has(piece.partId)) continue;
+    // A generated shape samples the atlas, as a part does.
+    const onAtlas = piece.shape
+      ? isKnownShapeKind(piece.shape.kind)
+      : piece.partId !== null && pack.byId.has(piece.partId);
+    if (!onAtlas) continue;
     const found = sources.get("atlas");
     if (found) {
       found.pieceIds.push(piece.id);

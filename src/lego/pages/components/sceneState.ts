@@ -27,6 +27,7 @@ import { seatPieceMesh } from "../../pivot";
 import type { FaceTarget } from "../../placePart";
 import { getFixedPieceGeometry, type RawGeometry } from "../../rawGeometry";
 import type { Seat } from "../../seat";
+import { getShapeGeometry } from "../../shapes";
 import type { Vec3 } from "../../snapping";
 import { onGround } from "../../standIn";
 import type { CollisionFaceDrag } from "./collisionHandles";
@@ -500,13 +501,15 @@ export function pieceMaterials(
   };
 }
 
-/** The geometry a piece draws, out of the pack or out of an imported model. */
+/** The geometry a piece draws: out of an imported model, generated from its
+ *  shape, or out of the pack. */
 function pieceGeometry(
   pack: LoadedPack,
   raw: RawGeometry | null,
   piece: LegoPiece,
 ): THREE.BufferGeometry | null {
   if (raw && piece.meshId) return getFixedPieceGeometry(raw, piece);
+  if (piece.shape) return getShapeGeometry(piece.shape);
   return piece.partId ? getPartGeometry(pack, piece.partId) : null;
 }
 

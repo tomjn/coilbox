@@ -18,6 +18,7 @@
 
 import type { LegoProject } from "./model";
 import type { LegoPartInfo } from "./pack";
+import { shapeBox } from "./shapes";
 
 export const WORTH_FIELDS = [
   "health",
@@ -64,16 +65,31 @@ export function usedShapes(
 ): string[] {
   const shapes = new Set<string>();
   for (const piece of project.pieces) {
-    const info = piece.partId ? pack.byId.get(piece.partId) : undefined;
-    if (info) shapes.add(info.shape);
+    const sized = sizedAs(piece, pack);
+    if (sized) shapes.add(sized.shape);
   }
   return [...shapes];
+}
+
+/**
+ * What a piece is totalled as: its part's shape and box, or a generated shape's
+ * kind and box (#3325). Null for a piece with neither.
+ */
+function sizedAs(
+  piece: LegoProject["pieces"][number],
+  pack: { byId: Map<string, LegoPartInfo> },
+): Pick<LegoPartInfo, "shape" | "bbox"> | null {
+  if (piece.shape) {
+    const bbox = shapeBox(piece.shape);
+    return bbox ? { shape: piece.shape.kind, bbox } : null;
+  }
+  return (piece.partId ? pack.byId.get(piece.partId) : undefined) ?? null;
 }
 
 function volumeOf(
   byId: Map<string, LegoProject["pieces"][number]>,
   pieceId: string,
-  part: LegoPartInfo,
+  part: Pick<LegoPartInfo, "bbox">,
 ): number {
   const { min, max } = part.bbox;
   let volume =
@@ -108,7 +124,7 @@ export function worthTotals(
   const byId = new Map(project.pieces.map((piece) => [piece.id, piece]));
   const sums: WorthAmounts = { ...table.base };
   for (const piece of project.pieces) {
-    const info = piece.partId ? pack.byId.get(piece.partId) : undefined;
+    const info = sizedAs(piece, pack);
     if (!info) continue;
     const volume = volumeOf(byId, piece.id, info);
     const override = table.shapes?.[info.shape];

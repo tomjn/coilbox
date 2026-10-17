@@ -351,6 +351,7 @@ export function bonesLostWithParts(
     (piece) =>
       piece.partId !== null ||
       piece.meshId !== undefined ||
+      piece.shape !== undefined ||
       childrenOf(project, piece.id).some((child) => !lostIds.has(child.id)),
   );
 }

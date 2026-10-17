@@ -75,6 +75,7 @@ import {
   disconnectPiece,
   type JoinSummary,
   pieceConnectors,
+  pieceOwnBox,
   setJoinPlace,
 } from "../connectors";
 import { planById } from "../describedPlan";
@@ -686,7 +687,9 @@ function Builder({ id }: { id: string | undefined }) {
     const current = docRef.current.project;
     if (
       now ||
-      !current?.pieces.some((piece) => piece.partId || piece.meshBox)
+      !current?.pieces.some(
+        (piece) => piece.partId || piece.shape || piece.meshBox,
+      )
     ) {
       addCompound(module, docRef.current);
       setPlacingPart(null);
@@ -728,7 +731,7 @@ function Builder({ id }: { id: string | undefined }) {
       return;
     }
     if (!target) {
-      if (draft.pieces.some((piece) => piece.partId)) return;
+      if (draft.pieces.some((piece) => piece.partId || piece.shape)) return;
       addPart(placingPart.part);
       setPlacingPart(null);
       return;
@@ -1631,10 +1634,10 @@ function Builder({ id }: { id: string | undefined }) {
   const selectedPart = selected?.partId
     ? (pack.byId.get(selected.partId) ?? null)
     : null;
-  // What the pivot choices are measured from: the part's box, or for a lifted
-  // piece the box of its mesh.
-  const pivotBox =
-    selectedPart ?? (selected?.meshBox ? { bbox: selected.meshBox } : null);
+  // What the pivot choices are measured from: the part's box, a shape's, or for
+  // a lifted piece the box of its mesh.
+  const selectedBox = selected ? pieceOwnBox(pack, selected) : undefined;
+  const pivotBox = selectedBox ? { bbox: selectedBox } : null;
   // Whether "whole model" flip, mirror and recalculate normals have anything
   // to reach: an imported unit with every geometry piece deleted has none,
   // same as a unit built out of parts.
