@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   readS3o: vi.fn(),
   importS3o: vi.fn(),
   stageTextures: vi.fn(),
+  adopt: vi.fn(),
 }));
 
 vi.mock("@/play/config", () => ({
@@ -85,6 +86,10 @@ vi.mock("../../gameImport", () => ({
     `${picked.archive}/${picked.member}`,
 }));
 
+vi.mock("../../adoptGameScript", () => ({
+  adoptGameScript: (...args: unknown[]) => mocks.adopt(...args),
+}));
+
 vi.mock("../../bindings", () => ({
   legoReadS3o: (args: unknown) => mocks.readS3o(args),
   legoImportS3o: (args: unknown) => mocks.importS3o(args),
@@ -129,6 +134,8 @@ beforeEach(() => {
   mocks.readS3o.mockReset();
   mocks.importS3o.mockReset();
   mocks.stageTextures.mockReset();
+  mocks.adopt.mockReset();
+  mocks.adopt.mockResolvedValue({ findings: null });
   mocks.stageTextures.mockResolvedValue(undefined);
 });
 afterEach(cleanup);
@@ -255,7 +262,62 @@ describe("GameUnitBrowser", () => {
         id: compound.id,
       });
       expect(mocks.stageTextures).toHaveBeenCalled();
-      expect(await screen.findByText("Lifted.")).toBeTruthy();
+      expect(await screen.findByText(/^Lifted\./)).toBeTruthy();
+    });
+
+    it("brings the roles the unit's script gives the lifted pieces", async () => {
+      mocks.adopt.mockResolvedValue({
+        findings: {
+          proposals: [
+            {
+              pieceName: "turret",
+              role: "turret",
+              evidence: "observed",
+              callin: "AimWeapon1",
+            },
+            {
+              pieceName: "barrel",
+              role: "barrel",
+              evidence: "observed",
+              callin: "AimWeapon1",
+            },
+          ],
+        },
+      });
+      const onLift = vi.fn(async (_compound: LegoProject) => {});
+      openCommander(onLift);
+      fireEvent.click(
+        await screen.findByRole("button", {
+          name: "Lift turret into the inventory",
+        }),
+      );
+      await waitFor(() => expect(onLift).toHaveBeenCalledTimes(1));
+      const compound = onLift.mock.calls[0][0];
+      expect(compound.pieces.map((p) => p.role)).toEqual(["turret", "barrel"]);
+      expect(compound.animations?.map((a) => a.presetId)).toEqual([
+        "turret.track",
+        "recoil",
+      ]);
+      expect(mocks.adopt.mock.calls[0][0].imported.game.unit).toBe("armcom");
+      expect(
+        await screen.findByText("Lifted. Roles: Turret, Barrel."),
+      ).toBeTruthy();
+    });
+
+    it("falls back to piece names when the script cannot be read", async () => {
+      mocks.adopt.mockRejectedValue(new Error("no archive"));
+      const onLift = vi.fn(async (_compound: LegoProject) => {});
+      openCommander(onLift);
+      fireEvent.click(
+        await screen.findByRole("button", {
+          name: "Lift turret into the inventory",
+        }),
+      );
+      await waitFor(() => expect(onLift).toHaveBeenCalledTimes(1));
+      expect(onLift.mock.calls[0][0].pieces.map((p) => p.role)).toEqual([
+        "turret",
+        "barrel",
+      ]);
     });
 
     it("says why when the lift fails", async () => {

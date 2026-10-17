@@ -19,6 +19,7 @@ import {
 } from "@/content/config";
 import { UnitIcon } from "@/content/pages/components/UnitIcon";
 import { usePreferredTarget } from "@/play/config";
+import { adoptGameScript } from "../../adoptGameScript";
 import { legoImportS3o, legoReadS3o } from "../../bindings";
 import {
   modelSource,
@@ -35,7 +36,13 @@ import {
   searchUnitRows,
 } from "../../gameUnits";
 import type { S3oModel } from "../../importS3o";
-import { liftFromImport, withMeshBoxes } from "../../liftPiece";
+import type { RoleProposal } from "../../inferRoles";
+import {
+  liftFromImport,
+  wholeFromImport,
+  withMeshBoxes,
+} from "../../liftPiece";
+import { liftedRolesSummary } from "../../liftRoles";
 import type { LegoProject } from "../../model";
 import { loadRawGeometry } from "../../rawGeometry";
 import { gameRecordFor } from "../../unitGame";
@@ -59,7 +66,7 @@ type Pieces =
 /** One piece's lift, shown on its line. */
 type Lift =
   | { path: string; state: "lifting" }
-  | { path: string; state: "done" }
+  | { path: string; state: "done"; roles: string | null }
   | { path: string; state: "failed"; message: string };
 
 interface Props {
@@ -195,9 +202,8 @@ export function GameUnitBrowser({ project, query, onLift }: Props) {
       ]);
       const id = crypto.randomUUID();
       const result = await legoImportS3o({ path: staged.path, id });
-      const module = liftFromImport(result, line.path, {
+      const options = {
         id,
-        game: gameRecordFor(source.game, installed),
         from: {
           name: source.game.name,
           archive,
@@ -210,6 +216,15 @@ export function GameUnitBrowser({ project, query, onLift }: Props) {
         packVersion: project.packVersion,
         now: new Date().toISOString(),
         newId: () => crypto.randomUUID(),
+      };
+      // The script names every piece of the model, so it is asked about the
+      // whole unit and the lifted pieces take their share of the answer.
+      const whole = wholeFromImport(result, options);
+      const module = liftFromImport(result, line.path, {
+        ...options,
+        game: gameRecordFor(source.game, installed),
+        whole,
+        roles: await scriptRoles(whole, target),
       });
       if (!module) throw new Error(`${line.name} is not in this model.`);
       // Its meshes were just written, so the box of each is read back for the
@@ -217,7 +232,11 @@ export function GameUnitBrowser({ project, query, onLift }: Props) {
       // when it goes into a unit, so a failed read does not fail the lift.
       const raw = await loadRawGeometry(id).catch(() => null);
       await onLift(raw ? withMeshBoxes(module, raw) : module);
-      setLift({ path: line.path, state: "done" });
+      setLift({
+        path: line.path,
+        state: "done",
+        roles: liftedRolesSummary(module),
+      });
     } catch (error) {
       setLift({
         path: line.path,
@@ -298,6 +317,23 @@ function Note({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * What the unit's own script says its pieces are for. A script that cannot be
+ * read or run is no reason to fail the lift, so it answers with nothing and the
+ * piece names are left to decide.
+ */
+async function scriptRoles(
+  whole: LegoProject,
+  engine: { enginePath: string; dataDir: string },
+): Promise<RoleProposal[]> {
+  try {
+    const adopted = await adoptGameScript(whole, engine);
+    return adopted.findings?.proposals ?? [];
+  } catch {
+    return [];
+  }
+}
+
 function PieceList({
   pieces,
   lift,
@@ -346,7 +382,9 @@ function PieceList({
                 {here.state === "lifting"
                   ? "Lifting."
                   : here.state === "done"
-                    ? "Lifted."
+                    ? here.roles
+                      ? `Lifted. Roles: ${here.roles}.`
+                      : "Lifted."
                     : here.message}
               </span>
             ) : null}

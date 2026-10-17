@@ -5,7 +5,12 @@ import {
   pastedForUnit,
   serializeClipboardPiece,
 } from "./clipboard";
-import { duplicatePiece, selectionAsCompound } from "./compounds";
+import {
+  duplicatePiece,
+  insertCompound,
+  selectionAsCompound,
+} from "./compounds";
+import type { RoleProposal } from "./inferRoles";
 import {
   holdsLiftedPieces,
   liftCredit,
@@ -79,9 +84,10 @@ const sf: LegoUnitGame = {
   version: "0.1.86",
 };
 
-function lift(path: string) {
+function lift(path: string, roles?: RoleProposal[]) {
   let n = 0;
   return liftFromImport(result(), path, {
+    ...(roles ? { roles } : {}),
     id: "lifted-1",
     game: sf,
     from: {
@@ -556,5 +562,71 @@ describe("withMeshBoxes (#3269)", () => {
     expect(parseLegoProjectJson(JSON.stringify(bad))?.pieces[0].meshBox).toBe(
       undefined,
     );
+  });
+});
+
+describe("lifting roles with a turret (#3270)", () => {
+  const stated: RoleProposal[] = [
+    {
+      pieceName: "turret",
+      role: "turret",
+      evidence: "observed",
+      callin: "AimWeapon1",
+    },
+    {
+      pieceName: "barrel",
+      role: "barrel",
+      evidence: "observed",
+      callin: "AimWeapon1",
+    },
+  ];
+
+  it("lifts geometry only when no roles are passed", () => {
+    const lifted = lift("0.0.0");
+    expect(lifted?.pieces.some((p) => p.role)).toBe(false);
+    expect(lifted?.animations).toBeUndefined();
+  });
+
+  it("brings the roles of the lifted pieces and the presets they run", () => {
+    const lifted = lift("0.0.0", stated);
+    expect(lifted?.pieces.map((p) => p.role)).toEqual(["turret", "barrel"]);
+    expect(lifted?.animations?.map((a) => a.presetId)).toEqual([
+      "turret.track",
+      "recoil",
+    ]);
+  });
+
+  it("leaves out the roles of pieces that were not lifted", () => {
+    const lifted = lift("0.0.0.0", [
+      ...stated,
+      {
+        pieceName: "flare",
+        role: "flare",
+        evidence: "stated",
+        callin: "QueryWeapon1",
+      },
+    ]);
+    expect(lifted?.pieces.map((p) => p.role)).toEqual(["barrel"]);
+    expect(lifted?.animations?.map((a) => a.presetId)).toEqual(["recoil"]);
+  });
+
+  it("puts the presets on a unit the module is dropped into", () => {
+    const lifted = lift("0.0.0", stated);
+    let n = 0;
+    const inserted = insertCompound(
+      unit(),
+      lifted as LegoProject,
+      "root",
+      () => `new-${++n}`,
+      true,
+    );
+    expect(inserted.presets.added).toEqual(["turret.track", "recoil"]);
+    expect(inserted.project.animations?.map((a) => a.presetId)).toEqual([
+      "turret.track",
+      "recoil",
+    ]);
+    expect(
+      inserted.project.pieces.filter((p) => p.role).map((p) => p.role),
+    ).toEqual(["turret", "barrel"]);
   });
 });
