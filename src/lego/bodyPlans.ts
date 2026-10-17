@@ -17,19 +17,22 @@
 
 import type { AppliedPreset, PresetParam } from "./animPresets";
 import {
+  childrenOf,
   type LegoPiece,
   type LegoProject,
   newProject,
   uniquePieceName,
 } from "./model";
+import { TRACKED, WHEELED } from "./vehiclePlans";
 
 /**
  * A number the skeleton is shaped by, such as leg length. The same shape as a
- * preset's parameter, except that every proportion is a length in elmos, the
- * unit a piece's position is in.
+ * preset's parameter, except that a proportion is either a length in elmos,
+ * the unit a piece's position is in, or a count of something the plan repeats,
+ * such as axles, which is always a whole number.
  */
 export interface BodyPlanProportion extends Omit<PresetParam, "unit"> {
-  unit: "elmo";
+  unit: "elmo" | "count";
 }
 
 /** One joint of a skeleton, which becomes one empty piece. */
@@ -202,8 +205,8 @@ export const QUADRUPED: BodyPlan = {
   presets: [{ presetId: "walk.quad", params: {} }],
 };
 
-/** Every plan a unit can start from. More come with #3250 and #3251. */
-export const BODY_PLANS: BodyPlan[] = [BIPED, QUADRUPED];
+/** Every plan a unit can start from. More come with #3251. */
+export const BODY_PLANS: BodyPlan[] = [BIPED, QUADRUPED, WHEELED, TRACKED];
 
 export function bodyPlanById(id: string): BodyPlan | undefined {
   return BODY_PLANS.find((plan) => plan.id === id);
@@ -211,19 +214,22 @@ export function bodyPlanById(id: string): BodyPlan | undefined {
 
 /**
  * A value for each of the plan's proportions: the one given, held to the
- * proportion's range, or its default. Values the plan has no proportion for
- * are dropped.
+ * proportion's range, or its default. A count is rounded to a whole number
+ * first. Values the plan has no proportion for are dropped.
  */
 export function planProportions(
   plan: BodyPlan,
   given: Record<string, number> = {},
 ): Record<string, number> {
   const values: Record<string, number> = {};
-  for (const { id, min, max, fallback } of plan.proportions) {
+  for (const { id, unit, min, max, fallback } of plan.proportions) {
     const value = given[id];
     values[id] =
       typeof value === "number" && Number.isFinite(value)
-        ? Math.min(max, Math.max(min, value))
+        ? Math.min(
+            max,
+            Math.max(min, unit === "count" ? Math.round(value) : value),
+          )
         : fallback;
   }
   return values;
@@ -284,6 +290,33 @@ export function projectFromPlan(
       : {}),
     skeleton: { plan: plan.id, proportions },
   };
+}
+
+/**
+ * The bone pieces that new proportions would delete, because the plan no
+ * longer has their bone, and that hold more than a bare joint: a part, a mesh,
+ * or a piece hung on them that is not itself going. Fewer axles on a wheeled
+ * unit is the usual case. Whatever applies the change says so before it
+ * deletes these.
+ */
+export function bonesLostWithParts(
+  project: LegoProject,
+  plan: BodyPlan,
+  proportions: Record<string, number>,
+): LegoPiece[] {
+  const kept = new Set(
+    plan.bones(planProportions(plan, proportions)).map((bone) => bone.id),
+  );
+  const lost = project.pieces.filter(
+    (piece) => piece.bone !== undefined && !kept.has(piece.bone),
+  );
+  const lostIds = new Set(lost.map((piece) => piece.id));
+  return lost.filter(
+    (piece) =>
+      piece.partId !== null ||
+      piece.meshId !== undefined ||
+      childrenOf(project, piece.id).some((child) => !lostIds.has(child.id)),
+  );
 }
 
 /** The unit with its skeleton let go: no record and no bones, so every piece
