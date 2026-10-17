@@ -22,8 +22,8 @@ import raw from "../../../shared/asset-vocabulary.json";
  * reasoning this file only records the outcome of.
  */
 
-/** Which of the hub's two key shapes addresses this class of picture. */
-export type AssetKeyedOn = "unit" | "map";
+/** Which of the hub's three key shapes addresses this class of picture. */
+export type AssetKeyedOn = "unit" | "map" | "faction";
 
 /**
  * What one class of picture may be, checked against the encoded bytes by the hub
@@ -70,6 +70,9 @@ export interface AssetVocabulary {
     buildpicVariant: string;
     renderVariantPrefix: string;
     renderAngles: readonly string[];
+  };
+  faction: {
+    logoVariant: string;
   };
   mapVariants: readonly string[];
   origins: readonly string[];
@@ -118,6 +121,13 @@ export const PLAN_ANGLE = TOP_RENDER_ANGLE;
 export const PICTURE_ANGLES = RENDER_ANGLES.filter(
   (angle) => angle !== PLAN_ANGLE,
 );
+
+/**
+ * The only variant a faction has: its logo, keyed on a game and a faction key
+ * (issue #4378). Sent under the hub's third key shape, alongside the unit and map
+ * ones.
+ */
+export const FACTION_LOGO_VARIANT = vocabulary.faction.logoVariant;
 
 /**
  * The map side of the vocabulary, and a closed list, unlike the unit side. None

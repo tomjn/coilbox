@@ -4,6 +4,9 @@
     "renderVariantPrefix": "render:",
     "renderAngles": ["top", "front", "side", "angled"]
   },
+  "faction": {
+    "logoVariant": "logo"
+  },
   "mapVariants": ["minimap", "overlay:metal", "overlay:type", "overlay:height"],
   "origins": ["extracted", "rendered", "uploaded"],
   "classes": {
@@ -75,6 +78,18 @@
       "quality": null,
       "maxEdgePx": 512,
       "maxBytes": 1048576,
+      "square": false,
+      "minBitDepth": null,
+      "grayscale": false
+    },
+    "logo": {
+      "keyedOn": "faction",
+      "mime": "image/webp",
+      "encodeProfile": "webp-lossless-128",
+      "lossless": true,
+      "quality": null,
+      "maxEdgePx": 128,
+      "maxBytes": 65536,
       "square": false,
       "minBitDepth": null,
       "grayscale": false
