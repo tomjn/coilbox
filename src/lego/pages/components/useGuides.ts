@@ -23,7 +23,14 @@ export function useGuides(
     project,
     pack,
     show,
-  }: { project: LegoProject; pack: LoadedPack; show: boolean },
+    symmetry = false,
+  }: {
+    project: LegoProject;
+    pack: LoadedPack;
+    show: boolean;
+    /** Add the built-in symmetry plane. */
+    symmetry?: boolean;
+  },
   scene: unknown,
 ) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: scene is only here to rerun the effect on a rebuilt scene
@@ -33,7 +40,7 @@ export function useGuides(
     if (state.guideLayer) disposeGuides(state.guideLayer);
     state.guideLayer = null;
 
-    const planes = show ? guidePlanes(project) : [];
+    const planes = show ? guidePlanes(project, { symmetry }) : [];
     const lines = show ? guideLines(project) : [];
     state.guidePlanes = planes;
     state.guideLines = lines;
@@ -47,5 +54,5 @@ export function useGuides(
       state.overlay.add(state.guideLayer);
     }
     state.render();
-  }, [sceneRef, project, pack, show, scene]);
+  }, [sceneRef, project, pack, show, symmetry, scene]);
 }

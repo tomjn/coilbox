@@ -102,12 +102,18 @@ function tidy(v: THREE.Vector3): Vec3 {
   return [v.x + 0, v.y + 0, v.z + 0];
 }
 
-/** Every guide that is shown, as a plane in the world. A hidden guide is not
- *  here, so it neither draws nor snaps. */
-export function guidePlanes(project: LegoProject): GuidePlane[] {
-  const guides = (project.guides ?? []).filter(
-    (guide) => !guide.hidden && guide.kind !== "line",
-  );
+/** The id of the built-in symmetry plane. A saved guide never has it, so it
+ *  cannot be edited, removed or saved by anything that works on `project.guides`. */
+export const SYMMETRY_GUIDE_ID = "symmetry";
+
+/** The plane x = 0 in the root's frame, which symmetry mode mirrors across. */
+export function symmetryPlane(project: LegoProject): GuidePlane {
+  return placePlanes(project, [
+    { id: SYMMETRY_GUIDE_ID, name: "Symmetry", axis: "x", offset: 0 },
+  ])[0];
+}
+
+function placePlanes(project: LegoProject, guides: LegoGuide[]): GuidePlane[] {
   if (guides.length === 0) return [];
   const frame = guideFrame(project);
   const turn = new THREE.Matrix3().setFromMatrix4(frame);
@@ -126,6 +132,22 @@ export function guidePlanes(project: LegoProject): GuidePlane[] {
       ),
     };
   });
+}
+
+/** Every guide that is shown, as a plane in the world. A hidden guide is not
+ *  here, so it neither draws nor snaps. With `symmetry`, the built-in symmetry
+ *  plane is added, which is drawn and snapped to like any other. */
+export function guidePlanes(
+  project: LegoProject,
+  { symmetry = false }: { symmetry?: boolean } = {},
+): GuidePlane[] {
+  const planes = placePlanes(
+    project,
+    (project.guides ?? []).filter(
+      (guide) => !guide.hidden && guide.kind !== "line",
+    ),
+  );
+  return symmetry ? [...planes, symmetryPlane(project)] : planes;
 }
 
 /** Where a point in the world sits along `axis` of the unit's own space. */
