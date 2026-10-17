@@ -4,9 +4,12 @@
  * The destination is a game folder, chosen once and remembered on the project,
  * so exporting again after a change is one click. The model in `objects3d/` is
  * rewritten every export, since the builder alone owns it. The atlas, the unit
- * script and the unit definition are different. Each is written once and then
- * left alone, so hand edits to any of them survive a re-export. The atlas and
- * the script are checkboxes, since a game may already have either. The unit
+ * script and the unit definition are different, so hand edits to any of them
+ * survive a re-export. The atlas is written once and then left alone. The
+ * script is replaced only while it is still the one the last export wrote, and
+ * the unit definition has only the fields the build decides brought up to
+ * date, and only those nobody has changed (issue #3245). The atlas and the
+ * script are checkboxes, since a game may already have either. The unit
  * definition always goes to `units/`, since without one the engine has nothing
  * to spawn.
  *
@@ -74,8 +77,15 @@ import {
 } from "../../pieceCollisionScript";
 import type { RawGeometry } from "../../rawGeometry";
 import { blenderTextures, importedTextures } from "../../rawImport";
+import {
+  derivedFields,
+  type FieldChange,
+  type KeptWhole,
+  receiptDef,
+  writtenDigest,
+} from "../../reexport";
 import { bakedPieces, buildS3o, unitBounds } from "../../s3oBuild";
-import { buildUnitDef, legoUnitDef, unitWords } from "../../unitDef";
+import { buildUnitDef, defValue, legoUnitDef, unitWords } from "../../unitDef";
 import { exportWeapons } from "../../weaponModule";
 import { worthTotals } from "../../worth";
 import { ShowMe } from "./ShowMe";
@@ -130,7 +140,10 @@ type Result =
       cobVarsKept: boolean;
       pieceCollision: string | null;
       unitDef: string | null;
-      unitDefKept: boolean;
+      unitDefKept: KeptWhole | null;
+      unitDefFields: FieldChange[];
+      /** The definition this build gives, to set beside a field that was kept. */
+      built: Record<string, unknown>;
       /** The library weapon files written under `weapons/` (issue #3274). */
       weapons: string[];
       /** How many weapon slots the definition names. */
@@ -194,6 +207,114 @@ async function decodedTexture(texture: BlenderTextureRef) {
     const reason = error instanceof Error ? error.message : String(error);
     throw new Error(`${texture.writeAs}: ${reason}`);
   }
+}
+
+/** A field's value as the drawer shows it. */
+function shown(value: unknown): string {
+  if (value === null || value === undefined) return "nothing";
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+}
+
+/** Why the whole unit definition was left as it was (issue #3245). */
+function KeptDefinition({
+  kept,
+  weapons,
+}: {
+  kept: KeptWhole;
+  /** Whether the build has weapons, which then stay as the file has them. */
+  weapons: boolean;
+}) {
+  const weaponLine = weapons ? " Its weapons are as that file has them." : null;
+  if (kept.reason === "workshopBackup")
+    return (
+      <p className="text-muted-foreground">
+        The unit definition has been left alone, because the workshop has
+        changes in it that you have not accepted or undone. Undo would put the
+        old file back over this export. Accept or undo them, then export again.
+        {weaponLine}
+      </p>
+    );
+  if (kept.reason === "unreadable")
+    return (
+      <p className="text-muted-foreground">
+        The unit definition there does not run, so it has been left alone:{" "}
+        {kept.message}
+        {weaponLine}
+      </p>
+    );
+  return (
+    <p className="text-muted-foreground">
+      A unit definition was already there that coilbox has no record of writing,
+      so it has been left alone.
+      {weaponLine}
+    </p>
+  );
+}
+
+/** What a re-export did to each field the build decides (issue #3245). */
+function FieldChanges({
+  changes,
+  built,
+}: {
+  changes: FieldChange[];
+  built: Record<string, unknown>;
+}) {
+  const written = changes.filter(
+    (field) => field.change !== "kept" && field.change !== "refused",
+  );
+  const kept = changes.filter((field) => field.change === "kept");
+  const refused = changes.filter((field) => field.change === "refused");
+  return (
+    <>
+      {written.length > 0 ? (
+        <>
+          <p className="text-muted-foreground">
+            Brought up to date in the unit definition:
+          </p>
+          <ul className="flex flex-col gap-0.5">
+            {written.map((field) => (
+              <li key={field.path}>
+                <code>{field.path}</code>{" "}
+                {field.change === "removed"
+                  ? `taken out, was ${shown(field.was)}`
+                  : field.change === "added"
+                    ? `added as ${shown(defValue(built, field.path))}`
+                    : `${shown(field.was)} to ${shown(defValue(built, field.path))}`}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+      {kept.length > 0 ? (
+        <>
+          <p className="text-muted-foreground">
+            Kept, because they were changed after the last export:
+          </p>
+          <ul className="flex flex-col gap-0.5">
+            {kept.map((field) => (
+              <li key={field.path}>
+                <code>{field.path}</code> is {shown(field.was)}, the build gives{" "}
+                {shown(defValue(built, field.path))}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+      {refused.length > 0 ? (
+        <>
+          <p className="text-destructive">Not brought up to date:</p>
+          <ul className="flex flex-col gap-0.5">
+            {refused.map((field) => (
+              <li key={field.path}>
+                <code>{field.path}</code>: {field.message}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+    </>
+  );
 }
 
 export function ExportDrawer({
@@ -471,6 +592,13 @@ export function ExportDrawer({
           : null,
         overwriteTexture: withOverwriteTexture,
         script: withScript ? unitScript(project) : null,
+        // A script still exactly as the last export wrote it has not been
+        // touched, so it is replaced with this build's (issue #3245).
+        scriptWritten: writtenDigest(
+          project.exported,
+          dir,
+          `scripts/${project.unitName}.lua`,
+        ),
         // Not behind the script checkbox. That one is about not clobbering a
         // game's own hand-written script, and this file is coilbox's: it is
         // rewritten, or taken away, on every export.
@@ -482,6 +610,14 @@ export function ExportDrawer({
         // built unit should export without one: with no unit definition the
         // engine has nothing to spawn.
         unitDef: buildUnitDef(project, bounds, home, totals, weapons.slots),
+        // The fields the build decides, beside what the last export wrote
+        // there, so a re-export updates the ones nobody has changed.
+        unitDefFields: derivedFields(
+          def,
+          project.exported,
+          dir,
+          project.unitName,
+        ),
         // Where the name goes for a game that will not read one in the
         // definition. Coilbox's own file beside the game's, never the game's
         // (issue #2683).
@@ -602,7 +738,16 @@ export function ExportDrawer({
             dir,
             at: new Date().toISOString(),
             unitName: project.unitName,
-            def,
+            // What the file got from coilbox, not only what this build gives:
+            // a field kept because it was edited stays at the value last
+            // written, so the next export still sees the edit.
+            def: receiptDef(
+              def,
+              project.exported,
+              dir,
+              project.unitName,
+              exported,
+            ),
           },
           owned,
         ),
@@ -610,6 +755,7 @@ export function ExportDrawer({
       setResult({
         state: "done",
         ...exported,
+        built: def,
         weaponSlots: weapons.slots.length,
         weaponsMissing: weapons.missing,
         glb: glbPath,
@@ -673,8 +819,8 @@ export function ExportDrawer({
                 Export always writes <code>{project.unitName}.lua</code> to{" "}
                 <code>units</code>, the definition the engine spawns from. There
                 is no checkbox for it: without one, the engine has nothing to
-                give a model to. It is written once and then left alone, so hand
-                edits survive a re-export.
+                give a model to. A re-export updates only the fields the build
+                decides, and never one you have changed.
               </p>
             </div>
 
@@ -733,7 +879,7 @@ export function ExportDrawer({
               />
               <div>
                 <Label htmlFor="lego-export-script">
-                  Write a unit script if there is none
+                  Write the unit script
                 </Label>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   Puts <code>{project.unitName}.lua</code> in{" "}
@@ -741,8 +887,7 @@ export function ExportDrawer({
                   {project.script === undefined
                     ? "generated from the animations applied to this unit"
                     : "the script this unit owns, exactly as it stands"}
-                  . An existing script is never overwritten, so hand edits
-                  survive a re-export.
+                  . A script you have changed is never overwritten.
                 </p>
               </div>
             </div>
@@ -1082,7 +1227,8 @@ export function ExportDrawer({
                 ) : null}
                 {result.scriptKept ? (
                   <p className="text-muted-foreground">
-                    The unit script was already there and has been left alone.
+                    The unit script there has been changed since coilbox wrote
+                    it, or coilbox did not write it, so it has been left alone.
                   </p>
                 ) : null}
                 {result.cobVars ? (
@@ -1109,14 +1255,15 @@ export function ExportDrawer({
                   <code className="break-all">{result.unitDef}</code>
                 ) : null}
                 {result.unitDefKept ? (
-                  <p className="text-muted-foreground">
-                    The unit definition was already there and has been left
-                    alone.
-                    {result.weaponSlots > 0
-                      ? " Its weapons are as that file has them."
-                      : null}
-                  </p>
+                  <KeptDefinition
+                    kept={result.unitDefKept}
+                    weapons={result.weaponSlots > 0}
+                  />
                 ) : null}
+                <FieldChanges
+                  changes={result.unitDefFields}
+                  built={result.built}
+                />
                 {result.weapons.map((written) => (
                   <code key={written} className="break-all">
                     {written}

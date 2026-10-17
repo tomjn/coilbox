@@ -142,7 +142,7 @@ fn tidy(value: Json) -> Json {
     }
 }
 
-fn at<'a>(root: &'a Json, path: &[String]) -> Option<&'a Json> {
+pub fn at<'a>(root: &'a Json, path: &[String]) -> Option<&'a Json> {
     path.iter()
         .try_fold(root, |value, key| value.as_object()?.get(key))
 }
@@ -163,7 +163,7 @@ pub fn holds(root: &Json, path: &[String], value: &Value) -> bool {
     at(root, path).is_some_and(|found| matches(found, value))
 }
 
-fn matches(found: &Json, value: &Value) -> bool {
+pub fn matches(found: &Json, value: &Value) -> bool {
     match (found, value) {
         (Json::Bool(a), Value::Bool(b)) => a == b,
         (Json::Number(a), Value::Number(b)) => a.as_f64() == Some(*b),
@@ -313,6 +313,32 @@ pub fn confirm(
             expected.join(".")
         )),
     }
+}
+
+/// Confirm `after` is `before` with the field at `expected` gone and nothing
+/// else changed (issue #3245).
+pub fn confirm_removed(before: &Json, after: &Json, expected: &[String]) -> Result<(), String> {
+    let mut found = Vec::new();
+    differences(before, after, &mut Vec::new(), &mut found);
+    let others: Vec<String> = found
+        .iter()
+        .filter(|path| path.as_slice() != expected)
+        .take(5)
+        .map(|path| path.join("."))
+        .collect();
+    if !others.is_empty() {
+        return Err(format!(
+            "Removing the field would also change {}, so it was not removed.",
+            others.join(", ")
+        ));
+    }
+    if at(after, expected).is_some() {
+        return Err(format!(
+            "The file still returns a value for {} without the field. Something later in the file, or a table it inherits from, sets it too.",
+            expected.join(".")
+        ));
+    }
+    Ok(())
 }
 
 /// [`confirm`] for a whole table. `after` has to be exactly `before` with the
