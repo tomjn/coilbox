@@ -181,8 +181,9 @@ function PlanProportions({
           className="rounded border border-destructive/50 p-2 text-xs"
         >
           <p>
-            This removes {asking.lost.map((piece) => piece.name).join(", ")} and
-            what is on {asking.lost.length === 1 ? "it" : "them"}.
+            This removes {asking.lost.map((piece) => piece.name).join(", ")}.
+            What is hung on {asking.lost.length === 1 ? "it" : "them"} stays
+            where it is, on the bone above.
           </p>
           <div className="mt-2 flex gap-1">
             <Button
