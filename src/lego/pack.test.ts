@@ -15,6 +15,7 @@ vi.mock("@picoframe/plugin-sdk", () => ({
 import type { LegoAtlas } from "./atlas";
 import { newProject } from "./model";
 import {
+  colourwayLabel,
   DEFAULT_PART_UNIT,
   extensionProblem,
   type LegoPackManifest,
@@ -659,6 +660,39 @@ describe("the bundled pack", () => {
     for (const swatch of bundled.swatches ?? []) {
       expect(colourways.has(swatch.id)).toBe(true);
     }
+  });
+
+  // The first atlas column is KaiserJ's red team colour set, not green. Its id
+  // stays "green" because a saved unit names a shape's swatch by it (#4466).
+  it("names the red column team colour wherever a person reads it (#4466)", () => {
+    expect(bundled.categories).toContainEqual({
+      id: "green",
+      label: "Team colour",
+    });
+    const red = bundled.parts.filter((p) => p.colourway === "green");
+    expect(red.length).toBeGreaterThan(0);
+    for (const p of red) expect(p.name).toMatch(/^team colour /);
+    for (const p of bundled.parts) expect(p.name).not.toMatch(/green/);
+  });
+});
+
+describe("colourwayLabel", () => {
+  const pack = {
+    manifest: manifest("base", [], {
+      categories: [
+        { id: "green", label: "Team colour" },
+        { id: "tan", label: "Tan" },
+      ],
+    }),
+  };
+
+  it("reads a colourway by its category's label (#4466)", () => {
+    expect(colourwayLabel(pack, "green")).toBe("Team colour");
+    expect(colourwayLabel(pack, "tan")).toBe("Tan");
+  });
+
+  it("falls back to the id for a colourway no category names", () => {
+    expect(colourwayLabel(pack, "chitin")).toBe("chitin");
   });
 });
 
