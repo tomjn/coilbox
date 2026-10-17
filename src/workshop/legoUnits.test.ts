@@ -105,6 +105,33 @@ describe("exportedInto", () => {
 describe("withLegoUnits", () => {
   const clones: UnitClones = {};
 
+  it("lists a unit in the first game after a later export into a second", () => {
+    const later = {
+      dir: SF_FOLDER,
+      at: "2026-09-08T12:00:00.000Z",
+      unitName: "skyfort",
+      files: [],
+      def: { ...BUILT_DEF, health: 999 },
+    };
+    const exportedTwice = project({
+      exported: later,
+      exportedElsewhere: [
+        {
+          dir: BA_FOLDER,
+          at: "2026-09-07T12:00:00.000Z",
+          unitName: "skyfort",
+          files: [],
+          def: BUILT_DEF,
+        },
+      ],
+    });
+    expect(exportedInto(exportedTwice, BA_FOLDER)).toBe(true);
+    expect(exportedInto(exportedTwice, SF_FOLDER)).toBe(true);
+    const inBa = withLegoUnits(clones, [exportedTwice], BA_FOLDER, {});
+    expect(Object.keys(inBa.builtBy)).toEqual(["skyfort"]);
+    expect(inBa.clones.skyfort.def).toEqual(BUILT_DEF);
+  });
+
   it("attributes a unit exported into this game to the project that built it", () => {
     const { builtBy, conflicts } = withLegoUnits(
       clones,
