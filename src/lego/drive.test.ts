@@ -60,8 +60,8 @@ describe("driveAlong", () => {
     });
     expect(callins.at(-1)).toBe("StopMoving");
     // Eight seconds of travel at its own speed, 480 elmos at two a frame,
-    // less the goal radius it stops inside.
-    expect(run.arrived).toBe(15 + 237);
+    // two frames later than at once because it ramps up and brakes.
+    expect(run.arrived).toBe(15 + 239);
     expect(run.events.at(-1)?.frame).toBe(run.arrived);
   });
 
@@ -72,9 +72,81 @@ describe("driveAlong", () => {
     expect(run.frames.every((frame) => frame.heading === 0)).toBe(true);
     // Not moving before the order or after arriving, its speed while it does.
     expect(run.frames[15].speed).toBe(0);
-    expect(run.frames[16].speed).toBe(2);
-    expect(run.frames[16].pos).toEqual([0, 0, 2]);
-    expect(run.frames[run.arrived ?? 0].speed).toBe(0);
+    // The default acceleration, half an elmo a frame squared, from rest.
+    expect(run.frames[16].speed).toBe(0.5);
+    expect(run.frames[16].pos).toEqual([0, 0, 0.5]);
+    // It rolls on at the brake rate after arriving rather than stopping dead.
+    expect(run.frames[run.arrived ?? 0].speed).toBe(1.5);
+    expect(run.frames.at(-1)?.speed).toBe(0);
+  });
+
+  /** `GetDeltaSpeed`: no more than `accRate` a frame towards the wanted speed. */
+  it("speeds up at the unit's acceleration to its top speed", () => {
+    const motion: DriveMotion = { ...MOTION, acceleration: 0.25 };
+    const run = driveAlong(pathPoints("straight", motion, []), motion, {
+      start: 15,
+      frames: PREVIEW_FRAMES,
+      ground: null,
+      tilts: false,
+      minScriptChangeHeading: 1,
+    });
+    const speeds = run.frames.slice(15, 26).map((frame) => frame.speed);
+    expect(speeds).toEqual([0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2, 2]);
+  });
+
+  /** `decRate` slows it, once the goal is inside its braking distance. */
+  it("brakes at the unit's brake rate on arriving", () => {
+    const motion: DriveMotion = { ...MOTION, acceleration: 1, brakeRate: 0.05 };
+    const run = driveAlong(pathPoints("straight", motion, []), motion, {
+      start: 15,
+      frames: PREVIEW_FRAMES,
+      ground: null,
+      tilts: false,
+      minScriptChangeHeading: 1,
+    });
+    const speeds = run.frames.map((frame) => frame.speed);
+    const peak = speeds.lastIndexOf(2);
+    // From the last frame at full speed it falls by the brake rate each frame
+    // until it stops, which is also after `StopMoving`.
+    expect(speeds[peak + 1]).toBeCloseTo(1.95, 10);
+    for (let index = peak + 1; index < peak + 30; index++) {
+      expect(speeds[index - 1] - speeds[index]).toBeCloseTo(0.05, 10);
+    }
+    expect(run.arrived ?? 0).toBeGreaterThan(peak);
+    expect(speeds.at(-1)).toBe(0);
+  });
+
+  /** `UnitDef.cpp:455,459`: no rates at all means 0.5 for both. */
+  it("falls back to the engine's 0.5 when the unit has no rates", () => {
+    const run = drive(pathPoints("straight", MOTION, []));
+    const explicit = drive(pathPoints("straight", MOTION, []), {});
+    const withRates = driveAlong(
+      pathPoints("straight", MOTION, []),
+      { ...MOTION, acceleration: 0.5, brakeRate: 0.5 },
+      {
+        start: 15,
+        frames: PREVIEW_FRAMES,
+        ground: null,
+        tilts: false,
+        minScriptChangeHeading: 1,
+      },
+    );
+    expect(run.frames.map((f) => f.speed)).toEqual(
+      withRates.frames.map((f) => f.speed),
+    );
+    expect(explicit.arrived).toBe(run.arrived);
+  });
+
+  it("a slower unit takes longer to get there", () => {
+    const slow: DriveMotion = { ...MOTION, acceleration: 0.05 };
+    const run = driveAlong(pathPoints("straight", slow, []), slow, {
+      start: 15,
+      frames: PREVIEW_FRAMES,
+      ground: null,
+      tilts: false,
+      minScriptChangeHeading: 1,
+    });
+    expect(run.arrived ?? Infinity).toBeGreaterThan(15 + 239);
   });
 
   /**
@@ -196,8 +268,9 @@ describe("driveAlong reversing", () => {
     // It never turns, and it moves against its heading at the reverse speed.
     expect(result.events.some((e) => e.callin === "ChangeHeading")).toBe(false);
     expect(result.frames.every((f) => f.heading === 0)).toBe(true);
-    expect(result.frames[16].pos).toEqual([0, 0, -1]);
-    expect(result.frames[16].speed).toBe(1);
+    expect(result.frames[16].pos).toEqual([0, 0, -0.5]);
+    expect(result.frames[16].speed).toBe(0.5);
+    expect(result.frames[17].speed).toBe(1);
     expect(result.frames[16].reversing).toBe(true);
     expect(result.frames[14].reversing).toBe(false);
     expect(result.arrived).not.toBeNull();
