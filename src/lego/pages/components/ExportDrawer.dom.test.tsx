@@ -22,12 +22,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EMPTY_EDITS, type ModProject } from "@/workshop/project";
 import { newProject } from "../../model";
 import type { LoadedPack } from "../../pack";
+import type { RawGeometry } from "../../rawGeometry";
 import { ExportDrawer } from "./ExportDrawer";
 
 const legoGameLanguage = vi.fn();
 const legoExport = vi.fn();
 const legoExportPicture = vi.fn();
 const legoAtlasPng = vi.fn();
+const legoTextureSizes = vi.fn();
+const legoTextureSheet = vi.fn();
 const exportGlb = vi.fn();
 
 vi.mock("../../exportGlb", () => ({
@@ -60,6 +63,8 @@ vi.mock("../../bindings", () => ({
   legoGameLanguage: (args: { dir: string }) => legoGameLanguage(args),
   legoOpenPath: vi.fn(),
   legoTexturePng: vi.fn(),
+  legoTextureSizes: (args: unknown) => legoTextureSizes(args),
+  legoTextureSheet: (args: unknown) => legoTextureSheet(args),
 }));
 
 /** What `legoExport` answers for a successful export, with `cobVars: null`
@@ -109,14 +114,18 @@ const pack = {
   },
 } as unknown as LoadedPack;
 
-function show(shown = project, onRemember = vi.fn()) {
+function show(
+  shown = project,
+  onRemember = vi.fn(),
+  raw: RawGeometry | null = null,
+) {
   return render(
     <ExportDrawer
       open
       onOpenChange={vi.fn()}
       project={shown}
       pack={pack}
-      raw={null}
+      raw={raw}
       onRemember={onRemember}
       onStale={vi.fn()}
     />,
@@ -128,6 +137,8 @@ beforeEach(() => {
   legoExport.mockReset();
   legoExportPicture.mockReset();
   legoAtlasPng.mockReset();
+  legoTextureSizes.mockReset();
+  legoTextureSheet.mockReset();
   exportGlb.mockReset();
   workshopCompile.mockReset();
   workshopProjects.mockReturnValue([]);
@@ -138,32 +149,102 @@ afterEach(() => {
 });
 
 describe("a unit of parts holding a piece lifted from a game", () => {
-  it("says why it cannot be exported and writes nothing", async () => {
-    legoGameLanguage.mockResolvedValue({ texts: {} });
-    show({
-      ...project,
-      pieces: [
-        ...project.pieces,
+  /** The turret's one triangle, so the unit has lifted geometry to bake. */
+  const raw: RawGeometry = {
+    byId: new Map([
+      [
+        "mod/m0",
         {
-          ...project.pieces[0],
-          id: "turret",
-          name: "turret",
-          parentId: "base",
-          meshId: "mod/m0",
-          lifted: {
-            game: { name: "Splinter Faction", archive: "sf.sdz" },
-            member: "objects3d/armcom.s3o",
-            unit: "armcom",
-          },
+          id: "mod/m0",
+          vFirst: 0,
+          vCount: 3,
+          iFirst: 0,
+          iCount: 3,
+          bbox: { min: [0, 0, 0], max: [0, 2, 2] },
         },
       ],
+    ]),
+    vertices: new Float32Array([
+      0, 0, 0, 1, 0, 0, 0, 0, 0, 2, 0, 1, 0, 0, 0.5, 0, 0, 0, 2, 1, 0, 0, 0.5,
+      0.5,
+    ]),
+    indices: new Uint32Array([0, 1, 2]),
+  };
+
+  const turret = (texture?: { key: string; name: string }) => ({
+    ...project,
+    pieces: [
+      ...project.pieces,
+      {
+        ...project.pieces[0],
+        id: "turret",
+        name: "turret",
+        parentId: "base",
+        meshId: "mod/m0",
+        lifted: {
+          game: { name: "Splinter Faction", archive: "sf.sdz" },
+          member: "objects3d/armcom.s3o",
+          unit: "armcom",
+          ...(texture ? { texture } : {}),
+        },
+      },
+    ],
+  });
+
+  it("writes the unit with one sheet made from the game's texture", async () => {
+    legoGameLanguage.mockResolvedValue({ texts: {} });
+    legoTextureSizes.mockResolvedValue([{ width: 256, height: 256 }]);
+    legoTextureSheet.mockResolvedValue({
+      texture: {
+        key: "s1.png",
+        name: "coilbox_skyfort_sheet.png",
+        source: null,
+      },
+      texture2: {
+        key: "s2.png",
+        name: "coilbox_skyfort_sheet2.png",
+        source: null,
+      },
     });
+    legoExport.mockResolvedValue(exportResult());
+    show(turret({ key: "arm.dds", name: "arm_color.dds" }), vi.fn(), raw);
+
+    expect(
+      await screen.findByText(
+        "arm_color.dds (From Splinter Faction, unit armcom)",
+      ),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Export" }));
+    await waitFor(() => expect(legoExport).toHaveBeenCalled());
+
+    expect(legoTextureSizes).toHaveBeenCalledWith({
+      images: [{ key: "arm.dds", flipY: true }],
+    });
+    const painted = legoTextureSheet.mock.calls[0][0];
+    expect(painted.names).toEqual({
+      texture1: "coilbox_skyfort_sheet.png",
+      texture2: "coilbox_skyfort_sheet2.png",
+    });
+    expect(painted.regions).toHaveLength(1);
+    const sent = legoExport.mock.calls[0][0];
+    expect(sent.model.texture1).toBe("coilbox_skyfort_sheet.png");
+    expect(sent.model.texture2).toBe("coilbox_skyfort_sheet2.png");
+    expect(sent.textures).toEqual({
+      atlas: null,
+      stored: [
+        { key: "s1.png", writeAs: "coilbox_skyfort_sheet.png", rewrite: true },
+        { key: "s2.png", writeAs: "coilbox_skyfort_sheet2.png", rewrite: true },
+      ],
+    });
+  });
+
+  it("says why a lifted piece with no texture cannot be exported", async () => {
+    legoGameLanguage.mockResolvedValue({ texts: {} });
+    show(turret(), vi.fn(), raw);
     expect(
       await screen.findByText("From Splinter Faction, unit armcom"),
     ).toBeTruthy();
-    expect(
-      await screen.findByText(/combining the two into one sheet/),
-    ).toBeTruthy();
+    expect(await screen.findByText(/no texture recorded/)).toBeTruthy();
     const exportButton = screen.getByRole("button", { name: "Export" });
     expect((exportButton as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(exportButton);

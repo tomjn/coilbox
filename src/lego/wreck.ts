@@ -30,6 +30,7 @@ import type { LegoProject } from "./model";
 import type { LoadedPack } from "./pack";
 import type { RawGeometry } from "./rawGeometry";
 import { buildS3o, type S3oBuild } from "./s3oBuild";
+import type { SheetUv } from "./textureSheet";
 import { luaValue, wreckName } from "./unitDef";
 
 /**
@@ -146,9 +147,12 @@ export function buildWreck(
   raw: RawGeometry | null,
   textures: { texture1: string; texture2?: string },
   def: Record<string, unknown>,
+  /** The unit's combined sheet, for a unit that has one (#3260). */
+  sheet?: SheetUv,
 ): { model: S3oBuild; feature: string } | null {
   const model = buildS3o(project, pack, raw, textures, {
     pose: wreckPose(project),
+    sheet,
   });
   if (!model) return null;
   return { model, feature: buildWreckFeature(project, def) };

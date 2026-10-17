@@ -281,17 +281,3 @@ export function moduleForUnit(module: LegoProject): {
   });
   return { module: { ...module, pieces }, keys };
 }
-
-/**
- * Why a unit cannot be written out as a model yet, or null when it can.
- *
- * A model names one colour texture for all its pieces. A unit of parts samples
- * the pack's atlas, and a lifted piece's UVs point onto its game's texture, so
- * a unit holding both has no one texture to name until the two are combined
- * into one sheet (#3260).
- */
-export function textureSheetRefusal(project: LegoProject): string | null {
-  if (project.imported) return null;
-  if (!project.pieces.some((piece) => piece.meshId)) return null;
-  return "This unit holds pieces lifted from a game, which draw with the game's texture rather than the pack's atlas. A model has one texture, and combining the two into one sheet is not built yet, so this unit cannot be exported or tested in a game yet.";
-}

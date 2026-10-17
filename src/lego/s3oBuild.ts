@@ -24,6 +24,7 @@ import {
 } from "./model";
 import type { LoadedPack } from "./pack";
 import { pieceMesh, type RawGeometry } from "./rawGeometry";
+import type { SheetUv } from "./textureSheet";
 
 /** x, y, z, nx, ny, nz, u, v, the s3o vertex record the pack also uses. */
 const FLOATS_PER_VERTEX = 8;
@@ -287,6 +288,12 @@ export function buildS3o(
      * not describe it any more.
      */
     pose?: Map<string, TrackDelta>;
+    /**
+     * Where each piece's UVs go on the combined sheet of a unit that mixes
+     * parts and lifted pieces (#3260). Absent for every other unit, whose
+     * UVs are written exactly as they were before sheets existed.
+     */
+    sheet?: SheetUv;
   },
 ): S3oBuild | null {
   if (!pieceById(project, project.rootPieceId)) return null;
@@ -319,6 +326,7 @@ export function buildS3o(
       pieces,
       project.rootPieceId,
       options?.useOriginalNames ?? false,
+      options?.sheet,
     ),
   };
 }
@@ -407,6 +415,7 @@ function assemble(
   pieces: Map<string, BakedPiece>,
   pieceId: string,
   useOriginalNames: boolean,
+  sheet: SheetUv | undefined,
 ): S3oPiece {
   const baked = pieces.get(pieceId) as BakedPiece;
   const piece = pieceById(project, pieceId);
@@ -417,12 +426,20 @@ function assemble(
     name: useOriginalNames ? (piece?.originalName ?? baked.name) : baked.name,
     primitiveType: 0,
     offset: baked.offset,
-    vertices: fromPack
-      ? baked.vertices.map((vertex) => ({ ...vertex, uv: engineUv(vertex.uv) }))
-      : baked.vertices,
+    vertices: sheet
+      ? baked.vertices.map((vertex) => ({
+          ...vertex,
+          uv: sheet(pieceId, vertex.uv),
+        }))
+      : fromPack
+        ? baked.vertices.map((vertex) => ({
+            ...vertex,
+            uv: engineUv(vertex.uv),
+          }))
+        : baked.vertices,
     indices: baked.indices,
     children: childrenOf(project, pieceId).map((child) =>
-      assemble(project, raw, pieces, child.id, useOriginalNames),
+      assemble(project, raw, pieces, child.id, useOriginalNames, sheet),
     ),
   };
 }

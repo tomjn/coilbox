@@ -26,6 +26,8 @@ permissions = [
   "allow-lego-texture-prune",
   "allow-lego-texture-compose-colour",
   "allow-lego-texture-compose-shading",
+  "allow-lego-texture-sizes",
+  "allow-lego-texture-sheet",
   "allow-lego-export",
   "allow-lego-game-language",
   "allow-lego-export-glb",

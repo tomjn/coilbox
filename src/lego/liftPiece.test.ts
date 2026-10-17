@@ -20,7 +20,6 @@ import {
   markLifted,
   moduleForUnit,
   openedFrom,
-  textureSheetRefusal,
   withMeshBoxes,
 } from "./liftPiece";
 import {
@@ -294,27 +293,6 @@ describe("moduleForUnit", () => {
     const { module, keys } = moduleForUnit(unit());
     expect(module.pieces).toEqual(unit().pieces);
     expect(keys.size).toBe(0);
-  });
-});
-
-describe("textureSheetRefusal", () => {
-  it("lets a unit of parts and a unit opened from a model out", () => {
-    expect(textureSheetRefusal(unit())).toBeNull();
-    const opened = unit({
-      imported: { source: "/x.s3o" },
-      pieces: [{ ...unit().pieces[0], meshId: "m0" }],
-    });
-    expect(textureSheetRefusal(opened)).toBeNull();
-  });
-
-  it("holds back a unit of parts that holds a lifted mesh, saying why", () => {
-    const mixed = unit({
-      pieces: [
-        ...unit().pieces,
-        ...moduleForUnit(lift("0.0.0") as LegoProject).module.pieces,
-      ],
-    });
-    expect(textureSheetRefusal(mixed)).toMatch(/one texture/);
   });
 });
 

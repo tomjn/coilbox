@@ -28,6 +28,7 @@ import type { LoadedPack } from "./pack";
 import type { RawGeometry } from "./rawGeometry";
 import { importedVZeroAtTop } from "./rawImport";
 import { type BakedPiece, bakedPieces } from "./s3oBuild";
+import type { SheetUv } from "./textureSheet";
 
 /**
  * The baked piece tree as a `THREE.Object3D` graph, with no material
@@ -44,6 +45,7 @@ export function buildGlbScene(
   project: LegoProject,
   pack: LoadedPack,
   raw: RawGeometry | null,
+  sheet?: SheetUv,
 ): THREE.Object3D | null {
   if (!pieceById(project, project.rootPieceId)) return null;
   const { pieces } = bakedPieces(project, pack, raw);
@@ -56,7 +58,7 @@ export function buildGlbScene(
     // flares and aim points, and glTF carries one the same way.
     const node =
       baked.vertices.length > 0
-        ? new THREE.Mesh(bakedGeometry(baked))
+        ? new THREE.Mesh(bakedGeometry(baked, pieceId, sheet))
         : new THREE.Group();
     node.name = baked.name;
     node.position.set(...baked.offset);
@@ -71,14 +73,19 @@ export function buildGlbScene(
   return build(project.rootPieceId);
 }
 
-function bakedGeometry(baked: BakedPiece): THREE.BufferGeometry {
+/** `sheet` moves each UV onto a mixed unit's combined sheet (#3260). */
+function bakedGeometry(
+  baked: BakedPiece,
+  pieceId: string,
+  sheet?: SheetUv,
+): THREE.BufferGeometry {
   const positions = new Float32Array(baked.vertices.length * 3);
   const normals = new Float32Array(baked.vertices.length * 3);
   const uvs = new Float32Array(baked.vertices.length * 2);
   baked.vertices.forEach((vertex, i) => {
     positions.set(vertex.pos, i * 3);
     normals.set(vertex.normal, i * 3);
-    uvs.set(vertex.uv, i * 2);
+    uvs.set(sheet ? sheet(pieceId, vertex.uv) : vertex.uv, i * 2);
   });
 
   const geometry = new THREE.BufferGeometry();
@@ -142,8 +149,9 @@ export async function exportGlb(
   pack: LoadedPack,
   raw: RawGeometry | null,
   textureUrl: string | null,
+  sheet?: SheetUv,
 ): Promise<ArrayBuffer | null> {
-  const scene = buildGlbScene(project, pack, raw);
+  const scene = buildGlbScene(project, pack, raw, sheet);
   if (!scene) return null;
 
   const texture = textureUrl
@@ -160,7 +168,8 @@ export async function exportGlb(
     // bottom, and so does an imported mesh painted with a .dds, which the
     // engine flips on load. One painted with anything else is read top row
     // first by the engine already, so its picture goes in as it is (#4174).
-    texture.flipY = !importedVZeroAtTop(project);
+    // A combined sheet is a PNG and its UVs are the engine's (#3260).
+    texture.flipY = !sheet && !importedVZeroAtTop(project);
   }
   const material = new THREE.MeshStandardMaterial({ map: texture });
 
