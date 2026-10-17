@@ -6,10 +6,14 @@
  * Drawn over everything, like the aim point, since empty pieces have no
  * geometry to be seen against and a bone inside a hull is still one to read.
  * Nothing in it can be picked, and it is never exported.
+ *
+ * It is built at the rest pose. While a script poses the pieces, `poseSkeleton`
+ * moves it onto them, so a skeleton with no parts on it still shows the motion.
  */
 
 import * as THREE from "three";
 import type { SkeletonJoint } from "../../skeletonJoints";
+import type { SceneState } from "./sceneState";
 import { label } from "./weaponReachLayer";
 
 /** Fuchsia, apart from the orange collision box, the red aim point, the violet
@@ -34,6 +38,10 @@ export function buildSkeleton(
 ): THREE.Group | null {
   if (joints.length === 0) return null;
   const group = new THREE.Group();
+  group.userData.joints = joints.map(({ pieceId, parentId }) => ({
+    pieceId,
+    parentId,
+  }));
 
   const segments: number[] = [];
   for (const joint of joints) {
@@ -51,6 +59,7 @@ export function buildSkeleton(
       depthTest: false,
     }),
   );
+  bones.userData.role = "bones";
   bones.renderOrder = 4;
   bones.raycast = () => {};
   group.add(bones);
@@ -65,6 +74,7 @@ export function buildSkeleton(
     ),
     marker,
   );
+  dots.userData.role = "dots";
   dots.renderOrder = 5;
   dots.raycast = () => {};
   group.add(dots);
@@ -72,6 +82,7 @@ export function buildSkeleton(
   for (const joint of joints) {
     const tag = skeletonLabel(joint.label);
     tag.position.set(...joint.at);
+    tag.userData.pieceId = joint.pieceId;
     group.add(tag);
   }
   return group;
@@ -95,4 +106,71 @@ export function disposeSkeleton(group: THREE.Group): void {
     }
   });
   group.removeFromParent();
+}
+
+const ROOT_INVERSE = new THREE.Matrix4();
+const WORLD = new THREE.Vector3();
+
+/**
+ * Put the skeleton on the pieces where a script has them now. Each joint is its
+ * piece's origin and each bone runs from there to the origin of the piece it
+ * hangs from, measured in the root's space because the overlay follows the root.
+ * Pieces are read from their groups whether or not they carry a part.
+ */
+export function poseSkeleton(
+  state: Pick<SceneState, "root" | "groups" | "skeleton">,
+): void {
+  const skeleton = state.skeleton;
+  if (!skeleton) return;
+  const joints = skeleton.userData.joints as {
+    pieceId: string;
+    parentId: string | null;
+  }[];
+  state.root.updateMatrixWorld(true);
+  ROOT_INVERSE.copy(state.root.matrixWorld).invert();
+
+  const origins = new Map<string, [number, number, number]>();
+  const originOf = (pieceId: string) => {
+    const known = origins.get(pieceId);
+    if (known) return known;
+    const group = state.groups.get(pieceId);
+    if (!group) return undefined;
+    WORLD.setFromMatrixPosition(group.matrixWorld).applyMatrix4(ROOT_INVERSE);
+    const at: [number, number, number] = [WORLD.x, WORLD.y, WORLD.z];
+    origins.set(pieceId, at);
+    return at;
+  };
+
+  const bones = skeleton.children.find((c) => c.userData.role === "bones") as
+    | THREE.LineSegments
+    | undefined;
+  const dots = skeleton.children.find((c) => c.userData.role === "dots") as
+    | THREE.Points
+    | undefined;
+  const lines = bones?.geometry.getAttribute("position");
+  const points = dots?.geometry.getAttribute("position");
+  const labels = new Map<string, THREE.Object3D>();
+  for (const child of skeleton.children) {
+    if (child instanceof THREE.Sprite)
+      labels.set(child.userData.pieceId, child);
+  }
+
+  let segment = 0;
+  joints.forEach((joint, index) => {
+    const at = originOf(joint.pieceId);
+    if (!at) return;
+    points?.setXYZ(index, ...at);
+    labels.get(joint.pieceId)?.position.set(...at);
+    const parentAt = joint.parentId ? originOf(joint.parentId) : undefined;
+    if (!joint.parentId) return;
+    if (parentAt) {
+      lines?.setXYZ(segment * 2, ...parentAt);
+      lines?.setXYZ(segment * 2 + 1, ...at);
+    }
+    segment++;
+  });
+  if (lines) lines.needsUpdate = true;
+  if (points) points.needsUpdate = true;
+  bones?.geometry.computeBoundingSphere();
+  dots?.geometry.computeBoundingSphere();
 }

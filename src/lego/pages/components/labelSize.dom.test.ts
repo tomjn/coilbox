@@ -59,7 +59,15 @@ describe("weapon range labels", () => {
 describe("skeleton labels", () => {
   it("size the same way as the weapon labels", () => {
     const skeleton = buildSkeleton(
-      [{ pieceId: "a", label: "Body", at: [0, 10, 0], parentAt: null }],
+      [
+        {
+          pieceId: "a",
+          label: "Body",
+          at: [0, 10, 0],
+          parentAt: null,
+          parentId: null,
+        },
+      ],
       new THREE.PointsMaterial(),
     ) as THREE.Group;
     const tag = skeleton.children.find(
