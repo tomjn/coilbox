@@ -204,6 +204,12 @@ export interface LegoMovement {
   /** Written as `rSpeed`, in elmos a second. Absent means the unit never
    *  backs up, which is the engine's default of 0. */
   reverseSpeed?: number;
+  /** Written as `acceleration`, in elmos a frame squared (the unit the engine
+   *  reads it in, and the one BA and Splinter Faction write). */
+  acceleration?: number;
+  /** Written as `brakeRate`, in the same unit. Absent means the engine brakes
+   *  at the acceleration. */
+  brakeRate?: number;
   /** Where `speed` came from, when the game suggested it. Gone once it is set
    *  by hand. */
   speedFrom?: string;
@@ -211,6 +217,10 @@ export interface LegoMovement {
   turnRateFrom?: string;
   /** Where `reverseSpeed` came from, the same way. */
   reverseSpeedFrom?: string;
+  /** Where `acceleration` came from, the same way. */
+  accelerationFrom?: string;
+  /** Where `brakeRate` came from, the same way. */
+  brakeRateFrom?: string;
 }
 
 export interface LegoImported {
@@ -1246,12 +1256,22 @@ function parseMovement(value: unknown): LegoMovement | null {
     ...(number(v.reverseSpeed)
       ? { reverseSpeed: v.reverseSpeed as number }
       : {}),
+    ...(number(v.acceleration)
+      ? { acceleration: v.acceleration as number }
+      : {}),
+    ...(number(v.brakeRate) ? { brakeRate: v.brakeRate as number } : {}),
     ...(typeof v.speedFrom === "string" ? { speedFrom: v.speedFrom } : {}),
     ...(typeof v.turnRateFrom === "string"
       ? { turnRateFrom: v.turnRateFrom }
       : {}),
     ...(typeof v.reverseSpeedFrom === "string"
       ? { reverseSpeedFrom: v.reverseSpeedFrom }
+      : {}),
+    ...(typeof v.accelerationFrom === "string"
+      ? { accelerationFrom: v.accelerationFrom }
+      : {}),
+    ...(typeof v.brakeRateFrom === "string"
+      ? { brakeRateFrom: v.brakeRateFrom }
       : {}),
   };
 }

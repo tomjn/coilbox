@@ -25,6 +25,8 @@
  */
 
 import {
+  unitAccelerationOf,
+  unitBrakeRateOf,
   unitReverseSpeedOf,
   unitSpeedOf,
   unitTurnRateOf,
@@ -74,9 +76,12 @@ const LEAST_TURN_SPEED = 0.1;
 const GAME_SPEED = 30;
 
 /** `maxAcc` for a unit that states none, `UnitDef.cpp:455`. The brake rate
- *  defaults to it (`UnitDef.cpp:459`), and the drive does not yet read the
- *  unit's own. */
+ *  defaults to the acceleration (`UnitDef.cpp:459`). */
 const DEFAULT_ACCELERATION = 0.5;
+
+/** The least `accRate` and `decRate` the move type holds
+ *  (`GroundMoveType.cpp:521-522`). */
+const LEAST_RATE = 0.01;
 
 /** How fast the unit goes and turns, in the units the engine holds them in. */
 export interface DriveMotion {
@@ -87,6 +92,11 @@ export interface DriveMotion {
   /** Elmos a frame it backs up at, the engine's `maxReverseSpeed`. Absent or 0
    *  for a unit that cannot reverse. */
   reverseSpeed?: number;
+  /** Elmos a frame squared it speeds up by, only used to decide whether to
+   *  reverse. Absent means the engine's 0.5. */
+  acceleration?: number;
+  /** Elmos a frame squared it slows by. Absent means the acceleration. */
+  brakeRate?: number;
 }
 
 /** Where `DriveMotion`'s two numbers came from, for the panel to say. */
@@ -136,9 +146,17 @@ export function driveMotion(project: LegoProject): DriveSource {
         ? { value: defReverse / GAME_SPEED, from: "definition" as const }
         : { value: 0, from: "none" as const };
 
+  const acceleration =
+    project.movement?.acceleration ??
+    (def ? unitAccelerationOf(def) : undefined);
+  const brakeRate =
+    project.movement?.brakeRate ?? (def ? unitBrakeRateOf(def) : undefined);
+
   return {
     motion: {
       speed: speed.value,
+      ...(acceleration !== undefined ? { acceleration } : {}),
+      ...(brakeRate !== undefined ? { brakeRate } : {}),
       turnRate: Math.min(Math.max(turn.value, 1), MAX_HEADING - 1),
       ...(reverse.value > 0 ? { reverseSpeed: reverse.value } : {}),
     },
@@ -391,22 +409,26 @@ function wantsReverse(
     reverseTurn / motion.turnRate - turnTimeMod,
   );
 
-  const rate = DEFAULT_ACCELERATION;
+  const accRate = Math.max(
+    LEAST_RATE,
+    motion.acceleration ?? DEFAULT_ACCELERATION,
+  );
+  const decRate = Math.max(LEAST_RATE, motion.brakeRate ?? accRate);
   const forwardSpeedAfterTurn = Math.max(
     0,
-    currentSpeed - 0.125 * (forwardTurnTime * rate),
+    currentSpeed - 0.125 * (forwardTurnTime * decRate),
   );
   const reverseSpeedAfterTurn = Math.max(
     0,
-    currentSpeed - 0.125 * (reverseTurnTime * rate),
+    currentSpeed - 0.125 * (reverseTurnTime * decRate),
   );
 
-  const forwardBrake = (reversing ? forwardSpeedAfterTurn : 0) / rate;
-  const reverseBrake = (reversing ? 0 : reverseSpeedAfterTurn) / rate;
+  const forwardBrake = (reversing ? forwardSpeedAfterTurn : 0) / decRate;
+  const reverseBrake = (reversing ? 0 : reverseSpeedAfterTurn) / decRate;
   const forwardAccelerate =
-    (motion.speed - (reversing ? 0 : forwardSpeedAfterTurn)) / rate;
+    (motion.speed - (reversing ? 0 : forwardSpeedAfterTurn)) / accRate;
   const reverseAccelerate =
-    (maxReverseSpeed - (reversing ? reverseSpeedAfterTurn : 0)) / rate;
+    (maxReverseSpeed - (reversing ? reverseSpeedAfterTurn : 0)) / accRate;
 
   const forwardETA =
     goalForwardETA + forwardTurnTime + forwardAccelerate + forwardBrake;

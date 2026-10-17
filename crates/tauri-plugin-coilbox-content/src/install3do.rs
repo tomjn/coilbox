@@ -426,6 +426,30 @@ pub fn status(game_dir: &Path) -> usize {
     coilbox_gamebackup::collect(game_dir, BACKUP_SUFFIX).len()
 }
 
+/// How many converted sheets in `game_dir` were written before #4174, when a
+/// conversion counted a sheet's rows from the bottom and every model drew from
+/// the wrong part of it (#4196). Each is one faction's `.json` record under
+/// `unittextures/3do/`. A record that cannot be read is not counted.
+pub fn old_sheets(game_dir: &Path) -> usize {
+    let dir = game_dir
+        .join("unittextures")
+        .join(coilbox_3do_convert::SHEET_DIR);
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return 0;
+    };
+    entries
+        .filter_map(Result::ok)
+        .map(|e| e.path())
+        .filter(|p| {
+            p.extension()
+                .is_some_and(|x| x.eq_ignore_ascii_case("json"))
+        })
+        .filter_map(|p| std::fs::read(p).ok())
+        .filter_map(|bytes| coilbox_3do_convert::Sheet::read(&bytes).ok())
+        .filter(coilbox_3do_convert::Sheet::is_pre_top_rows)
+        .count()
+}
+
 /// Reverse every [`install`] into `game_dir`: for every backup file found,
 /// remove whatever currently sits at the original name and put the backup
 /// back under it.
@@ -493,12 +517,15 @@ pub(crate) async fn content_undo_3do_install(game_dir: String) -> CliResult {
 
 /// `content_3do_install_status`: how many backups an earlier install left
 /// under `gameDir`, so the frontend can offer undo even in a freshly opened
-/// drawer that never ran the install itself this session.
+/// drawer that never ran the install itself this session. Also how many
+/// converted sheets there were written before #4174 (`oldSheets`).
 #[tauri::command]
 pub(crate) async fn content_3do_install_status(game_dir: String) -> CliResult {
     let g = PathBuf::from(game_dir);
-    match tauri::async_runtime::spawn_blocking(move || status(&g)).await {
-        Ok(backups) => CliResult::ok(json!({ "backups": backups })),
+    match tauri::async_runtime::spawn_blocking(move || (status(&g), old_sheets(&g))).await {
+        Ok((backups, old_sheets)) => {
+            CliResult::ok(json!({ "backups": backups, "oldSheets": old_sheets }))
+        }
         Err(e) => CliResult::err(format!("install status task failed: {e}")),
     }
 }
@@ -696,6 +723,27 @@ mod tests {
         assert_eq!(status(&game), 0);
         install(&game, &out).expect("install");
         assert_eq!(status(&game), 3);
+    }
+
+    #[test]
+    fn counts_only_sheets_recorded_before_the_row_fix() {
+        let game = tmp("old-sheets").join("games").join("ba.sdd");
+        assert_eq!(old_sheets(&game), 0, "no folder, no sheets");
+
+        let record = |version: u32| {
+            format!(
+                r#"{{"kind":"coilbox-3do-atlas","version":{version},"image":"a.png","side":64,"border":1,"tiles":[]}}"#
+            )
+        };
+        write(&game.join("unittextures/3do/old.json"), &record(1));
+        write(
+            &game.join("unittextures/3do/new.json"),
+            &record(coilbox_3do_convert::SHEET_VERSION),
+        );
+        write(&game.join("unittextures/3do/notes.json"), "{}");
+        write(&game.join("unittextures/3do/old.png"), "not json");
+
+        assert_eq!(old_sheets(&game), 1);
     }
 
     /// Set `path`'s mtime a day in the past, so a later touch to now has

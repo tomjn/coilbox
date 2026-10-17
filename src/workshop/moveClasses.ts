@@ -276,6 +276,38 @@ export function unitTurnRateOf(
 }
 
 /**
+ * A def's acceleration in elmos a frame squared, read as `UnitDef.cpp` does:
+ * `maxAcc`, else `acceleration`. Nothing when it states neither, or states a
+ * negative, which the engine throws the unit away for.
+ */
+export function unitAccelerationOf(
+  def: Record<string, unknown> | undefined,
+): number | undefined {
+  return (
+    nonNegative(field(def, "maxacc")) ?? nonNegative(field(def, "acceleration"))
+  );
+}
+
+/**
+ * A def's brake rate in elmos a frame squared: `maxDec`, else `brakeRate`.
+ * Nothing when it states neither. The engine then brakes at the unit's
+ * acceleration, which is not a number this def wrote.
+ */
+export function unitBrakeRateOf(
+  def: Record<string, unknown> | undefined,
+): number | undefined {
+  return (
+    nonNegative(field(def, "maxdec")) ?? nonNegative(field(def, "brakerate"))
+  );
+}
+
+function nonNegative(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : undefined;
+}
+
+/**
  * Every movement class the game's units name, commonest first and then
  * alphabetically.
  *

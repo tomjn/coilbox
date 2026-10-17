@@ -158,6 +158,33 @@ describe("legoUnitDef", () => {
     expect(legoUnitDef(forwardsOnly, b)).not.toHaveProperty("rSpeed");
   });
 
+  it("writes acceleration and brakeRate only when they are set", () => {
+    const b = bounds({ x: 32, z: 32 });
+    const set = {
+      ...project("Rover", "rover"),
+      movement: {
+        moveClass: "WHEELEDTANK2",
+        speed: 90,
+        acceleration: 0.026,
+        brakeRate: 0.057,
+      },
+    };
+    expect(legoUnitDef(set, b)).toMatchObject({
+      acceleration: 0.026,
+      brakeRate: 0.057,
+    });
+    const text = buildUnitDef(set, b);
+    expect(text).toContain("acceleration = 0.026,");
+    expect(text).toContain("brakeRate = 0.057,");
+    const unset = {
+      ...project("Rover", "rover"),
+      movement: { moveClass: "WHEELEDTANK2", speed: 90 },
+    };
+    const def = legoUnitDef(unset, b);
+    expect(def).not.toHaveProperty("acceleration");
+    expect(def).not.toHaveProperty("brakeRate");
+  });
+
   it("writes customparams as a Lua table with its keys in the file", () => {
     const text = buildUnitDef(
       project("Sky Fortress", "skyfort"),

@@ -64,6 +64,7 @@ import { legoProbeScript, legoRunScript } from "../../bindings";
 import {
   DRIVE_PATHS,
   type DrivePath,
+  type DriveRun,
   type DriveSource,
   driveAlong,
   driveMotion,
@@ -145,6 +146,18 @@ const NO_STAND_IN: {
   attachPieces: Map<string, string>;
   nano?: NanoStyle | null;
 } = { track: null, attachPieces: new Map() };
+
+/** A drive worked out for a scenario that also aims, to be merged with the
+ *  firing events once the stand-in's track is known. */
+interface Driven {
+  run: DriveRun;
+  source: DriveSource;
+  placement: DrivePlacement;
+  /** The drive's `StartMoving`, `ChangeHeading` and `StopMoving`. */
+  moving: ScriptEvent[];
+  /** The ambient event on each frame that says where the unit is. */
+  poses: ScriptEvent[];
+}
 
 /** The unit value the engine answers `get CURRENT_SPEED` with
  *  (`rts/Sim/Units/Scripts/CobDefines.h:53`), in 65536ths of an elmo a
@@ -624,8 +637,10 @@ export function AnimationPanel({
       const scenario = scenarioById(scenarioId);
       if (!scenario) return;
 
+      // A scenario that drives and also aims is worked out as a drive first,
+      // then as a firing scenario from where the unit is on each frame.
+      let driven: Driven | null = null;
       if (scenario.drive) {
-        setStandInNotes([]);
         const source = driveMotion(project);
         const settings = driveRef.current;
         const points = pathPoints(settings.path, source.motion, settings.own);
@@ -651,30 +666,36 @@ export function AnimationPanel({
           frame,
           ambient: true,
         }));
-        const events = [...CREATED, ...moving, ...poses].sort(
-          (a, b) => a.frame - b.frame,
-        );
-        onStandIn({
-          ...NO_STAND_IN,
-          // The unit really moves, so what it leaves behind stays put on its
-          // own rather than being carried back past it.
-          motion: null,
-          drive: {
-            frames: run.frames,
-            path: points,
-            ...(settings.path === "own"
-              ? { onPick: (point: [number, number]) => pickRef.current(point) }
-              : {}),
-          },
-        });
-        const scene = withWorld(events, null, {
-          radius: 0,
-          self: size,
-          attachPiece: () => null,
-          ground,
-          drive: { frames: run.frames, maxSpeed: source.motion.speed },
-        });
-        return runEvents(scene, withValues, resume);
+        const placement: DrivePlacement = {
+          frames: run.frames,
+          path: points,
+          ...(settings.path === "own"
+            ? { onPick: (point: [number, number]) => pickRef.current(point) }
+            : {}),
+        };
+        if (scenario.movingTarget) {
+          driven = { run, source, placement, moving, poses };
+        } else {
+          setStandInNotes([]);
+          const events = [...CREATED, ...moving, ...poses].sort(
+            (a, b) => a.frame - b.frame,
+          );
+          onStandIn({
+            ...NO_STAND_IN,
+            // The unit really moves, so what it leaves behind stays put on its
+            // own rather than being carried back past it.
+            motion: null,
+            drive: placement,
+          });
+          const scene = withWorld(events, null, {
+            radius: 0,
+            self: size,
+            attachPiece: () => null,
+            ground,
+            drive: { frames: run.frames, maxSpeed: source.motion.speed },
+          });
+          return runEvents(scene, withValues, resume);
+        }
       }
 
       if (!scenario.standIn && !scenario.events.some((e) => e.aimAtStandIn)) {
@@ -739,7 +760,11 @@ export function AnimationPanel({
       // times the game maker's choice, and no nearer than touching the unit.
       const scale: TargetScale = {
         radius,
-        unitSpeed: (withValues[CURRENT_SPEED] ?? COB_SCALE) / COB_SCALE,
+        // A drive answers `CURRENT_SPEED` itself, so the unit's pace is its
+        // top speed in elmos a frame.
+        unitSpeed: driven
+          ? driven.source.motion.speed
+          : (withValues[CURRENT_SPEED] ?? COB_SCALE) / COB_SCALE,
         nearest: (Math.max(bounds.sizeX, bounds.sizeZ) / 2 + radius) / radius,
       };
       const track = scenario.movingTarget
@@ -747,7 +772,7 @@ export function AnimationPanel({
         : scenario.standIn
           ? trackBesideUnit(scenario.standIn, bounds, radius)
           : null;
-      const { events, notes } = resolveScenario(
+      const { events: aimed, notes } = resolveScenario(
         {
           ...scenario,
           events: expandForWeapons(
@@ -764,16 +789,24 @@ export function AnimationPanel({
           probed: (callin) => named.get(callin) ?? null,
           ground: scriptGround.current?.shape ?? null,
           up: scriptGround.current?.up ?? null,
+          drive: driven?.run.frames ?? null,
         },
       );
+      const events = driven
+        ? [...aimed, ...driven.moving, ...driven.poses].sort(
+            (a, b) => a.frame - b.frame,
+          )
+        : aimed;
 
       setStandInNotes([...notes, ...attachNotes(scenario, named)]);
       onStandIn({
         track,
         attachPieces: named,
         nano: scenario.nano ?? null,
-        aims: aimsOf(events),
-        motion: motionOf(events, withValues),
+        aims: aimsOf(events, driven?.run.frames),
+        // A drive really moves the unit, so what it leaves behind stays put.
+        motion: driven ? null : motionOf(events, withValues),
+        ...(driven ? { drive: driven.placement } : {}),
         ...(scenario.movingTarget
           ? {
               onDrag: (at: [number, number], frame: number) =>
@@ -800,6 +833,14 @@ export function AnimationPanel({
           return piece ? (rest.get(piece) ?? null) : null;
         },
         ground: scriptGround.current,
+        ...(driven
+          ? {
+              drive: {
+                frames: driven.run.frames,
+                maxSpeed: driven.source.motion.speed,
+              },
+            }
+          : {}),
       });
       return runEvents(scene, withValues, resume);
     },

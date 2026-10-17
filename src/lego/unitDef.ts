@@ -110,6 +110,9 @@ const DEFAULT_BUILD_COST_METAL = DEFAULT_BUILD_TIME;
  * is a unit that cannot turn and is better left visibly unset than written.
  * `rSpeed` is likewise written only when above 0, since 0 is the engine's
  * default and a unit with it never reverses.
+ * `acceleration` and `brakeRate` are the spellings Splinter Faction and Balanced
+ * Annihilation write, and likewise only when set, so the engine's own defaults
+ * (0.5, and a brake rate equal to the acceleration) apply otherwise.
  */
 function movementFields(project: LegoProject): Record<string, unknown> {
   const movement = project.movement;
@@ -125,6 +128,12 @@ function movementFields(project: LegoProject): Record<string, unknown> {
       : {}),
     ...(typeof movement.reverseSpeed === "number" && movement.reverseSpeed > 0
       ? { rSpeed: movement.reverseSpeed }
+      : {}),
+    ...(typeof movement.acceleration === "number"
+      ? { acceleration: movement.acceleration }
+      : {}),
+    ...(typeof movement.brakeRate === "number"
+      ? { brakeRate: movement.brakeRate }
       : {}),
   };
 }

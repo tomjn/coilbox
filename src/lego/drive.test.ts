@@ -220,6 +220,16 @@ describe("driveAlong reversing", () => {
     expect(result.frames.some((f) => f.reversing)).toBe(false);
   });
 
+  /** A goal 100 elmos behind is a near tie: the engine's 0.5 acceleration
+   *  makes the slower speed up worth it, an instant one does not. */
+  it("weighs the unit's own acceleration in choosing to reverse", () => {
+    const far: [number, number][] = [[0, -100]];
+    expect(run(REVERSER, far).events[0].args).toEqual([1]);
+    expect(run({ ...REVERSER, acceleration: 100 }, far).events[0].args).toEqual(
+      [0],
+    );
+  });
+
   it("drives forwards to a goal ahead, however fast it reverses", () => {
     const result = run({ ...MOTION, reverseSpeed: 100 }, [[0, 100]]);
     expect(result.events[0].args).toEqual([0]);
@@ -287,6 +297,23 @@ describe("driveMotion", () => {
     const def = driveMotion(project({ gameUnitDef: { rSpeed: 15 } }));
     expect(def.motion.reverseSpeed).toBe(0.5);
     expect(def.reverseSpeed).toBe("definition");
+  });
+
+  it("reads the acceleration and brake rate for deciding to reverse", () => {
+    const own = driveMotion(
+      project({
+        movement: {
+          moveClass: "TANK2",
+          speed: 60,
+          acceleration: 0.1,
+          brakeRate: 0.2,
+        },
+      }),
+    );
+    expect(own.motion).toMatchObject({ acceleration: 0.1, brakeRate: 0.2 });
+    const def = driveMotion(project({ gameUnitDef: { maxacc: 0.3 } }));
+    expect(def.motion.acceleration).toBe(0.3);
+    expect(def.motion).not.toHaveProperty("brakeRate");
   });
 
   it("reads a game unit's own definition when the unit has no movement", () => {

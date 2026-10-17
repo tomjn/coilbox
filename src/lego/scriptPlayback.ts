@@ -405,6 +405,32 @@ function aimedFire(aims: ScriptEvent[], fires: ScriptEvent[]): ScriptEvent[] {
 }
 
 /**
+ * The firing scenarios' events after `Create`: the weapon kept aimed at the
+ * stand-in with two volleys fired at it. Shared by the scenario that stands
+ * still and the one that drives.
+ */
+const FIRING_EVENTS: ScriptEvent[] = [
+  // Aimed at the stand-in rather than at two numbers, and measured from
+  // the piece `AimFromWeapon1` names, as the engine measures it
+  // (`rts/Sim/Weapons/Weapon.cpp:241-244,286-304,410-424`). Kept aimed for
+  // as long as the preview runs, since the engine keeps calling a
+  // weapon's aiming script for as long as it has a target
+  // (`Weapon.cpp:352-357`). Which frames it calls on depends on how fast
+  // the target turns away from the last aim, so `resolveScenario` works
+  // them out once the track is known.
+  ...aimedFire(
+    [
+      {
+        frame: at(0.5),
+        callin: "AimWeapon1",
+        aimAtStandIn: { from: "AimFromWeapon", until: PREVIEW_FRAMES - 1 },
+      },
+    ],
+    [...fireVolley(1, 4), ...fireVolley(7, 10)],
+  ),
+];
+
+/**
  * What a preview can put a unit through.
  *
  * Every one of them starts with `Create`, because the engine does and because a
@@ -579,27 +605,18 @@ export const SCENARIOS: Scenario[] = [
     description:
       "Aims at a target that keeps moving and fires two volleys at it.",
     movingTarget: true,
-    events: [
-      ...CREATED,
-      // Aimed at the stand-in rather than at two numbers, and measured from
-      // the piece `AimFromWeapon1` names, as the engine measures it
-      // (`rts/Sim/Weapons/Weapon.cpp:241-244,286-304,410-424`). Kept aimed for
-      // as long as the preview runs, since the engine keeps calling a
-      // weapon's aiming script for as long as it has a target
-      // (`Weapon.cpp:352-357`). Which frames it calls on depends on how fast
-      // the target turns away from the last aim, so `resolveScenario` works
-      // them out once the track is known.
-      ...aimedFire(
-        [
-          {
-            frame: at(0.5),
-            callin: "AimWeapon1",
-            aimAtStandIn: { from: "AimFromWeapon", until: PREVIEW_FRAMES - 1 },
-          },
-        ],
-        [...fireVolley(1, 4), ...fireVolley(7, 10)],
-      ),
-    ],
+    events: [...CREATED, ...FIRING_EVENTS],
+  },
+  {
+    id: "driving-firing",
+    label: "Aiming and firing while driving",
+    description:
+      "Drives along a path while its weapon keeps aiming at a target that keeps moving, from where the unit is and which way it faces.",
+    drive: true,
+    movingTarget: true,
+    // The drive's own call-ins come from `drive.ts`, so the marks on the
+    // picker show only the firing.
+    events: [...CREATED, ...FIRING_EVENTS],
   },
   {
     id: "transport-pickup",

@@ -119,7 +119,10 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
     onMovementChange(suggestMotion(current, game.name, value));
   }
 
-  function setNumber(key: "speed" | "turnRate" | "reverseSpeed", text: string) {
+  function setNumber(
+    key: "speed" | "turnRate" | "reverseSpeed" | "acceleration" | "brakeRate",
+    text: string,
+  ) {
     if (!movement) return;
     const fromKey = `${key}From` as const;
     const { [key]: _value, [fromKey]: _from, ...rest } = movement;
@@ -224,6 +227,42 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
               onChange={(event) =>
                 setNumber("reverseSpeed", event.target.value)
               }
+            />
+          </Field>
+          <Field
+            label="Acceleration, elmos a frame squared"
+            hint={
+              movement.accelerationFrom ??
+              (movement.acceleration !== undefined
+                ? undefined
+                : "Not set, the engine uses 0.5")
+            }
+          >
+            <Input
+              type="number"
+              min={0}
+              step="any"
+              value={movement.acceleration ?? ""}
+              onChange={(event) =>
+                setNumber("acceleration", event.target.value)
+              }
+            />
+          </Field>
+          <Field
+            label="Brake rate, elmos a frame squared"
+            hint={
+              movement.brakeRateFrom ??
+              (movement.brakeRate !== undefined
+                ? undefined
+                : "Not set, the engine brakes at the acceleration")
+            }
+          >
+            <Input
+              type="number"
+              min={0}
+              step="any"
+              value={movement.brakeRate ?? ""}
+              onChange={(event) => setNumber("brakeRate", event.target.value)}
             />
           </Field>
           {!movement.speed ? (
