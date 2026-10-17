@@ -9,6 +9,7 @@ import {
 } from "./collisionHandles";
 import { pickGround } from "./drivePlayback";
 import { pieceIdOf } from "./gizmoCommit";
+import { firstPieceHit, hoverPlaceFace, placeOnClick } from "./placeByFace";
 import type { SceneState } from "./sceneState";
 import { setHoveredAndNotify } from "./selectionAndHoverOutlines";
 import { grabStandIn, letGoOfStandIn, moveStandIn } from "./standInDrag";
@@ -136,6 +137,10 @@ export function attachPointerHandlers(state: SceneState): () => void {
       placeAnchor(state, hit);
       return;
     }
+    if (state.placingPartRef.current) {
+      placeOnClick(state, firstPieceHit(state, raycaster));
+      return;
+    }
     // A click that misses the unit while the panel takes points for a path
     // puts one on the ground there. One on the unit still selects.
     const pick = state.onGroundPickRef.current;
@@ -165,6 +170,12 @@ export function attachPointerHandlers(state: SceneState): () => void {
     pointer.x = hoverAt.x;
     pointer.y = hoverAt.y;
     raycaster.setFromCamera(pointer, camera);
+    // Placing a part: the face under the pointer is what matters, not the piece.
+    if (state.placingPartRef.current) {
+      setHoveredAndNotify(state, null);
+      hoverPlaceFace(state, firstPieceHit(state, raycaster));
+      return;
+    }
     // The plates sit over the model, so they answer first: a face about to
     // be grabbed is not a piece about to be picked.
     const plate = state.collisionHandles.visible

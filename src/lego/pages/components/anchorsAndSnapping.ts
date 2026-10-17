@@ -167,26 +167,44 @@ export function placeAnchor(
   state: SceneState,
   hit: THREE.Intersection | undefined,
 ) {
+  const inPart = hitInPart(state, hit);
+  if (!inPart) {
+    state.onCancelAnchorRef.current?.();
+    return;
+  }
+  state.onPlaceAnchorRef.current?.(
+    inPart.pieceId,
+    inPart.position,
+    inPart.facing,
+  );
+}
+
+/**
+ * Where a hit on the model is in the piece it landed on: the point and the way
+ * the surface faces, both in that piece's part space, which is the frame
+ * anchors and connectors are written in. Null for a miss.
+ */
+export function hitInPart(
+  state: SceneState,
+  hit: THREE.Intersection | undefined,
+): { pieceId: string; position: Vec3; facing?: Vec3 } | null {
   const pieceId = hit ? pieceIdOf(hit.object) : null;
   const group = pieceId ? state.groups.get(pieceId) : undefined;
   const piece = pieceId
     ? pieceById(state.projectRef.current, pieceId)
     : undefined;
-  if (!hit || !pieceId || !group || !piece) {
-    state.onCancelAnchorRef.current?.();
-    return;
-  }
+  if (!hit || !pieceId || !group || !piece) return null;
 
   group.updateWorldMatrix(true, false);
   const local = hit.point
     .clone()
     .applyMatrix4(new THREE.Matrix4().copy(group.matrixWorld).invert());
   const pivot = piece.pivot ?? [0, 0, 0];
-  state.onPlaceAnchorRef.current?.(
+  return {
     pieceId,
-    [local.x + pivot[0], local.y + pivot[1], local.z + pivot[2]],
-    clickedFacing(hit, group),
-  );
+    position: [local.x + pivot[0], local.y + pivot[1], local.z + pivot[2]],
+    facing: clickedFacing(hit, group),
+  };
 }
 
 /**
