@@ -93,7 +93,7 @@ export const SHORTCUTS: Shortcut[] = [
     id: "snap-hold",
     group: "Transform",
     description:
-      "Hold to place freely, with no move step, rotation step or snap to anchors",
+      "Hold while dragging to place freely, with no step or snap. A joined part is detached",
     combos: [{ key: "Alt" }],
     matches: (event) => event.altKey,
   },
@@ -114,6 +114,12 @@ export const SHORTCUTS: Shortcut[] = [
     group: "Transform",
     description: "While placing a part, turn it a quarter about the face",
     combos: [{ key: "t", mod: false, shift: false }],
+  },
+  {
+    id: "place-stop",
+    group: "Transform",
+    description: "Stop placing a part or a connector",
+    combos: [{ key: "Escape" }],
   },
   {
     id: "frame",
