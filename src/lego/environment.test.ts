@@ -326,3 +326,29 @@ describe("ground under a drive", () => {
     expect(terrainScale(GROUND_ELMOS / 2)).toBe(1);
   });
 });
+
+// Issue #4160: a fast unit's reach made the uneven ground millions of points.
+describe("uneven ground over a long reach", () => {
+  const shape = { kind: "uneven", degrees: 10, width: 48 } as const;
+  const points = (mesh: THREE.Mesh) =>
+    mesh.geometry.getAttribute("position").count;
+
+  it("bounds the points however far the unit reaches", () => {
+    expect(points(buildShapedTerrain(shape, 1600))).toBeLessThanOrEqual(
+      513 * 513,
+    );
+    expect(points(buildShapedTerrain(shape, 100000))).toBe(
+      points(buildShapedTerrain(shape, 1600)),
+    );
+  });
+
+  it("keeps full detail on the ground a unit that goes nowhere gets", () => {
+    expect(points(buildShapedTerrain(shape))).toBe(46225);
+  });
+
+  it("still covers the reach", () => {
+    const box = new THREE.Box3().setFromObject(buildShapedTerrain(shape, 1600));
+    expect(box.max.x).toBeGreaterThanOrEqual(1600);
+    expect(box.min.z).toBeLessThanOrEqual(-1600);
+  });
+});
