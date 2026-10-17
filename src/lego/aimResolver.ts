@@ -23,7 +23,7 @@
  * double the latency of every scrub.
  */
 
-import { type DriveFrame, scriptDrive } from "./drive";
+import { type DriveFrame, headingRadians, scriptDrive } from "./drive";
 import type { GroundShape } from "./environment";
 import {
   type Scenario,
@@ -60,6 +60,12 @@ export interface AimContext {
    *  null for a unit that stands level. The unit tilts only while it plays, and
    *  an upright unit stays level, so this is null for both. */
   up?: Vec3 | null;
+  /** The unit's pose on each frame of a drive, for a scenario that aims while
+   *  the unit drives. Where it is and which way it faces move the weapon's
+   *  piece and turn the axes the angles are measured against, and its `up`
+   *  replaces `up` above, because it changes as the unit moves. Absent or null
+   *  for a unit that stays at the origin. */
+  drive?: DriveFrame[] | null;
 }
 
 export interface ResolvedScenario {
@@ -95,7 +101,9 @@ export function standInMid(
  * `GetVectorFromHeading(0)` being `(0,0,1)`). On a slope the engine turns all
  * three by the shortest rotation from `+y` to the ground's normal
  * (`SolidObject.cpp:442-450`), which is what the viewport does to the unit.
- * The editor never turns a unit about its up, so the heading stays zero.
+ * A driving unit is turned about straight up by its heading first, and the
+ * tilt then turns that (`SolidObject.cpp:435-451`), so the heading is a turn
+ * of the level axes before the tilt takes them.
  */
 interface Basis {
   right: Vec3;
@@ -103,15 +111,22 @@ interface Basis {
   front: Vec3;
 }
 
-function basisOf(up?: Vec3 | null): Basis {
-  if (!up) return { right: [-1, 0, 0], up: [0, 1, 0], front: [0, 0, 1] };
+function basisOf(up?: Vec3 | null, heading = 0): Basis {
+  const angle = headingRadians(heading);
+  // `GetVectorFromHeading`, and `frontdir x updir` for the right.
+  const level: Basis = {
+    right: [-Math.cos(angle), 0, Math.sin(angle)],
+    up: [0, 1, 0],
+    front: [Math.sin(angle), 0, Math.cos(angle)],
+  };
+  if (!up) return level;
   // `CQuaternion quat(uDir.z, 0, -uDir.x, 1 + uDir.y)`, normalised: x, y, z, w.
   const length = Math.hypot(up[2], up[0], 1 + up[1]);
   const q = [up[2] / length, 0, -up[0] / length, (1 + up[1]) / length];
   return {
-    right: rotate(q, [-1, 0, 0]),
+    right: rotate(q, level.right),
     up,
-    front: rotate(q, [0, 0, 1]),
+    front: rotate(q, level.front),
   };
 }
 
@@ -142,15 +157,27 @@ function dot(a: Vec3, b: Vec3): number {
  * `rts/Sim/Weapons/Weapon.cpp:410-424`, written out rather than reduced so it
  * can be read against the engine line for line. `from` is the piece in unit
  * space and `to` is in the world, so a tilted unit's piece is turned with it
- * first. `up` is the unit's up on a slope, absent for a level unit.
+ * first. `up` is the unit's up on a slope, absent for a level unit. `placed`
+ * is where a driving unit stands and which way it faces, absent for a unit at
+ * the origin facing +z. The piece is measured from where it is in the world
+ * (`Weapon.cpp:410-424`), so the unit's position moves it, and the heading
+ * turns the axes the direction is projected onto.
  */
 export function aimWeaponAngles(
   from: Vec3,
   to: Vec3,
   up?: Vec3 | null,
+  placed?: { pos: Vec3; heading: number } | null,
 ): { heading: number; pitch: number } {
-  const basis = basisOf(up);
-  const at = up ? toWorld(from, basis) : from;
+  const basis = basisOf(up, placed?.heading);
+  const turned = up || placed ? toWorld(from, basis) : from;
+  const at: Vec3 = placed
+    ? [
+        turned[0] + placed.pos[0],
+        turned[1] + placed.pos[1],
+        turned[2] + placed.pos[2],
+      ]
+    : turned;
   const dir = normalize([to[0] - at[0], to[1] - at[1], to[2] - at[2]]);
 
   const localX = dot(dir, basis.right);
@@ -240,7 +267,7 @@ export function resolveScenario(
 
     const angles = anglesFor(event, marker.from, ctx, notes);
     if (marker.until === undefined) {
-      const { heading, pitch } = angles(target);
+      const { heading, pitch } = angles(target, event.frame);
       return [{ ...rest, args: [heading, pitch] }];
     }
     series = true;
@@ -266,7 +293,18 @@ function byFrameAimFirst(a: ScriptEvent, b: ScriptEvent): number {
   return a.frame - b.frame || Number(!a.callin) - Number(!b.callin);
 }
 
-type Angles = (target: Vec3) => { heading: number; pitch: number };
+type Angles = (
+  target: Vec3,
+  frame: number,
+) => { heading: number; pitch: number };
+
+/** The unit's pose on `frame` of a drive, the last one past its end, or null
+ *  for a unit that does not drive. */
+function poseAt(ctx: AimContext, frame: number): DriveFrame | null {
+  const frames = ctx.drive;
+  if (!frames || frames.length === 0) return null;
+  return frames[Math.min(Math.max(frame, 0), frames.length - 1)];
+}
 
 /** The formula an aiming event's call-in is handed its angles by. */
 function anglesFor(
@@ -290,7 +328,15 @@ function anglesFor(
       `This script names no ${callin} piece, so the aim is measured from the unit's origin rather than from where its weapon sits.`,
     );
   }
-  return (target) => aimWeaponAngles(at ?? [0, 0, 0], target, ctx.up);
+  return (target, frame) => {
+    const pose = poseAt(ctx, frame);
+    return aimWeaponAngles(
+      at ?? [0, 0, 0],
+      target,
+      pose ? pose.up : ctx.up,
+      pose,
+    );
+  };
 }
 
 /**
@@ -326,10 +372,12 @@ function keptAiming(
   for (let frame = event.frame; frame <= until; frame++) {
     const target = standInMid(track, frame, ctx.radius, ctx.ground);
     if (!target) continue;
-    const { heading, pitch } = angles(target);
-    // In the unit's own frame rather than the world's, which is the same
-    // turn applied to both, so the angle between them is the same.
-    const dir = aimDirection(heading, pitch);
+    const { heading, pitch } = angles(target, frame);
+    // In the world, because the engine checks the wanted direction there
+    // (`Weapon.cpp:376-383`). A unit that stays put turns both directions the
+    // same way, so the angle between them is the same in its own frame. A
+    // driving unit turns between frames, so its own frame would not do.
+    const dir = worldAim(heading, pitch, poseAt(ctx, frame));
     if (
       last &&
       frame < last.frame + REAIM_INTERVAL_FRAMES &&
@@ -461,6 +509,13 @@ export function withWorld(
   });
 }
 
+/** An aim in the world for a unit standing as `pose` has it, or as it is for
+ *  a unit with no pose. */
+function worldAim(heading: number, pitch: number, pose: DriveFrame | null) {
+  const dir = aimDirection(heading, pitch);
+  return pose ? toWorld(dir, basisOf(pose.up, pose.heading)) : dir;
+}
+
 /**
  * The unit direction `AimWeapon`'s heading and pitch point along, which is
  * the inverse of `aimWeaponAngles` and the engine's `wantedDir`.
@@ -480,14 +535,22 @@ export interface Aim {
 }
 
 /** Every resolved `AimWeapon<n>` in a run's events, in order. A muzzle flame
- *  faces the latest one (`Weapon.cpp:509-510`). */
-export function aimsOf(events: ScriptEvent[]): Aim[] {
+ *  faces the latest one (`Weapon.cpp:509-510`). `drive` is the unit's pose on
+ *  each frame when it drives, which turns each aim into the world's, where a
+ *  flame is drawn. */
+export function aimsOf(
+  events: ScriptEvent[],
+  drive?: DriveFrame[] | null,
+): Aim[] {
   const aims: Aim[] = [];
   for (const event of events) {
     const [heading, pitch] = event.args ?? [];
     if (!/^AimWeapon\d+$/.test(event.callin ?? "")) continue;
     if (typeof heading !== "number" || typeof pitch !== "number") continue;
-    aims.push({ frame: event.frame, dir: aimDirection(heading, pitch) });
+    const pose = drive?.length
+      ? drive[Math.min(Math.max(event.frame, 0), drive.length - 1)]
+      : null;
+    aims.push({ frame: event.frame, dir: worldAim(heading, pitch, pose) });
   }
   return aims;
 }
