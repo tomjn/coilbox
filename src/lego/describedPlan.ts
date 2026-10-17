@@ -36,6 +36,7 @@ import {
   bodyPlanById,
 } from "./bodyPlans";
 import { BARREL_LENGTH, TURRET_HEIGHT } from "./buildingPlans";
+import { between, rise } from "./planMeasure";
 
 /** The movement answers, in the order the form lists them. */
 export const MOVES = [
@@ -204,6 +205,20 @@ export function withGroups(
           ]
         : []),
     ],
+    // The groups' lengths are read off their joints as the turret building's
+    // are, and the nano point's rise is the nozzle's above the arm (#3261).
+    measure: (joints, values) => ({
+      ...base.measure?.(joints, values),
+      ...(weapon
+        ? {
+            turretHeight: rise(joints, "turret", "barrel"),
+            barrelLength: between(joints, "barrel", "flare"),
+          }
+        : {}),
+      ...(groups.builds
+        ? { nanoRise: rise(joints, "buildarm.arm", "buildarm.nozzle") }
+        : {}),
+    }),
   };
 }
 
