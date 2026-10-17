@@ -91,6 +91,8 @@ The compound button opens a small panel that asks which connector mounts the com
 
 A module can have a category and tags. The compound button's panel has fields for both, and the tag button on a module's cell in the strip edits them later. A category is one typed word or two, picked from the starter list (Chassis, Wheel, Leg, Turret, Arm, Detail) and the categories already in use. A module with no category is "Uncategorised". The Compounds tab of the strip and the Lego Parts page both have a search box and a category menu. Search needs every term to appear in the name, the category or the tags.
 
+A unit can hold the same module more than once, and each copy animates on its own. Every piece of one drop remembers the module it came from and which drop it was, so two build arms are two arms rather than one arm and a spare. A preset written for one build arm or one set of legs is then written for each copy: each arm aims at the build target, and each set of legs walks in a thread of its own with its own signal. The Animation panel says how many it found, as in "Aim while building, 2 build arms". A duplicate or a pasted copy of a whole module is another copy of it. A piece duplicated inside a module, such as a second barrel on the same turret, stays part of that copy, and a piece dragged out of a module to hang off something else stops being part of it. Pieces that came from no module count as one copy between them, so a unit built without modules gets the script it always had.
+
 ## Judging size
 
 A unit built from small parts can look substantial and be a fraction of a real one, so the builder gives you two readings.
