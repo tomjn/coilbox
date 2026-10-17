@@ -27,7 +27,7 @@ function written(
   const files = (["model", "script", "collision", "def"] as const).map(
     (kind) => ({ path: paths[kind], sha256: digests[kind] ?? `${kind}-1` }),
   );
-  return { dir: DIR, files, textures, textureFiles };
+  return { dir: DIR, files, textures, textureFiles, weaponsLeftOut: [] };
 }
 
 describe("sandboxChanges", () => {
