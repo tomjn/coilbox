@@ -15,7 +15,7 @@ import { childrenOf, type LegoProject, pieceById } from "./model";
 import type { LoadedPack } from "./pack";
 import { pieceMesh, type RawGeometry } from "./rawGeometry";
 import { importedVZeroAtTop } from "./rawImport";
-import { bakedPieces } from "./s3oBuild";
+import { assertShapesKnown, bakedPieces } from "./s3oBuild";
 import type { SheetUv } from "./textureSheet";
 
 export interface ObjBuild {
@@ -53,6 +53,7 @@ export function buildObj(
   },
 ): ObjBuild | null {
   if (!pieceById(project, project.rootPieceId)) return null;
+  assertShapesKnown(project);
   const { pieces } = bakedPieces(project, pack, raw);
   // An .obj counts v from the bottom of the picture. A part's UVs already do,
   // and so does an imported mesh painted with a .dds, which the engine flips on

@@ -495,6 +495,10 @@ It writes, if you leave the boxes ticked:
 
 It can also write a `.glb`, or an `.obj` with its `.mtl` and a copy of the atlas beside them. Neither is read by the engine. Both go into a `blender` folder alongside the game's own, for taking the unit into Blender to check it against the `.s3o` or finish it by hand.
 
+**Generated shapes are exported as they are drawn.** A cylinder, tube or other generated shape is written into the `.s3o`, `.glb` and `.obj` with its own UVs inside its swatch on the atlas, and counts in the footprint, the collision volume and the model's radius and height. A shape whose kind this version of coilbox cannot make, for example one saved by a newer version, stops the export and the message names the piece. The export does not leave it out.
+
+**A model with a generated shape cannot be turned back into a project.** Opening an exported `.s3o` as a project matches each piece to a part from the installed packs. A generated shape is not a pack part, so the model is refused and the message names the first piece that did not match. The same happens to a mesh made somewhere else.
+
 **A re-export keeps your edits.** The script and the unit definition are meant to be edited, so export never overwrites a change you made to either, whether you made it in a text editor or through the workshop.
 
 - The unit definition is updated field by field. Some fields come from the build: the name and description, the footprint, the collision volume, the worth table's totals, movement, the builder keys, the weapon slots and the wreck's name. Export rewrites one of those only while the file still holds the value the last export wrote. A field holding anything else was changed by hand and stays, and a field you deleted stays deleted. A change written in from Unit tweaks counts as a change by hand. A field the build has started writing is added, and one it has stopped writing is taken out. Every other field is written on the first export and then left alone. Comments and the order of the file are kept. The export drawer lists each field it changed and each one it kept.
