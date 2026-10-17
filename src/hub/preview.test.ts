@@ -137,6 +137,7 @@ describe("readPreview", () => {
       games: ["Splinter Faction 1.0"],
       engine: "105.1.1",
       maps: ["Comet Catcher Redux", "Supreme Isthmus"],
+      blueprints: [],
     });
   });
 
@@ -153,6 +154,7 @@ describe("readPreview", () => {
       games: ["BAR"],
       engine: null,
       maps: ["Comet Catcher Redux"],
+      blueprints: [],
     });
   });
 
@@ -182,6 +184,7 @@ describe("readPreview", () => {
       games: ["BAR"],
       engine: null,
       maps: [],
+      blueprints: [],
     });
   });
 
@@ -196,7 +199,35 @@ describe("readPreview", () => {
       games: [],
       engine: null,
       maps: ["Comet Catcher Redux", "Supreme Isthmus"],
+      blueprints: [],
     });
+  });
+
+  it("names and draws each blueprint a pack carries", () => {
+    const preview = readPreview(
+      container("setup-pack", {
+        games: [{ name: "BAR" }],
+        blueprints: [
+          {
+            name: "Opening solars",
+            buildings: [
+              { def: "armsolar", offset: { x: 0, z: 0 }, facing: 0 },
+              { def: "armlab", offset: { x: 96, z: 0 }, facing: 1 },
+            ],
+            footprints: { armsolar: { x: 4, z: 4 }, armlab: { x: 8, z: 6 } },
+          },
+          { name: "Nothing yet", buildings: [], footprints: {} },
+          { name: "Damaged", buildings: "no" },
+        ],
+      }),
+    );
+    if (preview?.kind !== "setup-pack") throw new Error("expected a pack");
+    expect(preview.blueprints.map((b) => b.name)).toEqual([
+      "Opening solars",
+      "Nothing yet",
+    ]);
+    expect(preview.blueprints[0].layout?.squares).toHaveLength(2);
+    expect(preview.blueprints[1].layout).toBeNull();
   });
 
   it("names a map a pack lists twice once, and drops the blanks", () => {
@@ -211,6 +242,7 @@ describe("readPreview", () => {
       games: [],
       engine: null,
       maps: ["Supreme Isthmus"],
+      blueprints: [],
     });
   });
 

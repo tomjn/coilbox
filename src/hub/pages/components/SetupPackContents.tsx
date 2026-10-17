@@ -5,7 +5,8 @@
  * pack of four maps spent two thirds of the panel saying "None" and "Whatever you
  * have" and ran its actual contents together in the last third. Each sort now
  * gets a heading and the width of the panel, a sort the pack says nothing about
- * gets neither, and the maps are drawn rather than named.
+ * gets neither, and the maps are drawn rather than named. Blueprints the pack
+ * bundles are drawn as plans (issue #1727).
  *
  * The website draws the same pack the same way, in `components/SetupPackContents.tsx`
  * in tomjn/coilbox-hub. Two things differ here, both because this side is a
@@ -29,12 +30,16 @@
  */
 
 import type { ReactNode } from "react";
+import { LayoutPlan } from "@/blueprint/LayoutPlan";
 import { useScanTargetSelection, useUnitsyncMinimap } from "@/content/config";
 import { MapPictureCard } from "../../assets/MapPicture";
 import { useMapPictureLadder } from "../../assets/useMapPicture";
 import { mapDisplayName, mapFactsLabel } from "../../maps/facts";
 import { useMapFacts } from "../../maps/useMapFacts";
-import type { SetupPackContents as PackContents } from "../../preview";
+import type {
+  PackBlueprint,
+  SetupPackContents as PackContents,
+} from "../../preview";
 
 /**
  * The resolution a pack's minimaps are rendered at: `1024 >> 2` = 256px.
@@ -87,6 +92,39 @@ export function SetupPackContents({ pack }: { pack: PackContents }) {
           </ul>
         </Section>
       )}
+
+      {pack.blueprints.length > 0 && (
+        <Section
+          title={pack.blueprints.length === 1 ? "Blueprint" : "Blueprints"}
+        >
+          <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {pack.blueprints.map((blueprint, index) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: two layouts in one pack can share a name, and the list is never reordered
+              <li key={index}>
+                <PackLayout blueprint={blueprint} />
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+    </div>
+  );
+}
+
+/** One layout a pack bundles, drawn as the plan the hub draws of it alone. */
+function PackLayout({ blueprint }: { blueprint: PackBlueprint }) {
+  const buildings = blueprint.layout?.squares.length ?? 0;
+  return (
+    <div className="flex flex-col gap-2">
+      {blueprint.layout && (
+        <LayoutPlan shape={blueprint.layout} className="aspect-[4/3] w-full" />
+      )}
+      <div className="flex flex-col">
+        <span className="text-sm">{blueprint.name}</span>
+        <span className="text-xs text-muted-foreground">
+          {buildings} {buildings === 1 ? "building" : "buildings"}
+        </span>
+      </div>
     </div>
   );
 }

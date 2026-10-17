@@ -242,6 +242,23 @@ describe("ItemPreview, for a setup pack", () => {
     expect(html).not.toContain("Game");
     expect(html).not.toContain("None");
     expect(html).not.toContain("Whatever you have");
+    expect(html).not.toContain("Blueprint");
+  });
+
+  it("gives the blueprints a pack carries their own heading", () => {
+    const html = markup(
+      pack({
+        games: [{ name: "BAR" }],
+        blueprints: [
+          BLUEPRINT.payload,
+          { ...(BLUEPRINT.payload as object), name: "Wall" },
+        ],
+      }),
+    );
+    expect(html).toContain("Blueprints<");
+    expect(html).toContain("A lab and a solar");
+    expect(html).toContain("Wall");
+    expect(html).toContain("2 buildings");
   });
 });
 
