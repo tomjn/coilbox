@@ -32,13 +32,14 @@ const VOCABULARY_JSON: &str = include_str!("../../../shared/asset-vocabulary.jso
 /// identity and changes nothing about what the picture may be.
 pub const RENDER_CLASS: &str = "render";
 
-/// Which of the hub's two key shapes addresses this class of picture. They are
+/// Which of the hub's three key shapes addresses this class of picture. They are
 /// different shapes on purpose and are not unified.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum KeyedOn {
     Unit,
     Map,
+    Faction,
 }
 
 /// What one class of picture may be, checked against the encoded bytes by the hub
@@ -99,6 +100,14 @@ pub struct UnitVariants {
     pub render_angles: Vec<String>,
 }
 
+/// The one variant a faction has (issue #4378).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FactionVariants {
+    /// A faction's logo, keyed on a game and a faction key.
+    pub logo_variant: String,
+}
+
 /// How a top down render is framed. The rule itself is in the spec and in
 /// `renderFrame` in `src/hub/assets/vocabulary.ts`, which is where the render
 /// runs.
@@ -132,6 +141,7 @@ pub struct MapExtent {
 #[serde(rename_all = "camelCase")]
 pub struct AssetVocabulary {
     pub unit: UnitVariants,
+    pub faction: FactionVariants,
     /// A closed list, unlike the unit side. None of the four is open ended the way
     /// a render angle is, so a typo mints an identity nothing ever asks for.
     pub map_variants: Vec<String>,
@@ -482,6 +492,7 @@ mod tests {
         assert_eq!(profile("overlay:metal"), "webp-lossless-source");
         assert_eq!(profile("overlay:type"), "webp-lossless-source");
         assert_eq!(profile("overlay:height"), "webp-lossless-512");
+        assert_eq!(profile("logo"), "webp-lossless-128");
     }
 
     #[test]
@@ -520,6 +531,16 @@ mod tests {
             class_for_variant("overlay:height").unwrap().max_edge_px,
             Some(512)
         );
+    }
+
+    /// 128 is `ICON_MAX` in the unitsync worker, the largest a faction emblem is
+    /// ever held at. Every Sidepic measured in five installed games is 16px and
+    /// the hub draws the logo at 24px.
+    #[test]
+    fn caps_a_faction_logo_at_128_which_is_above_the_24_the_hub_draws() {
+        let logo = class_for_variant(&vocabulary().faction.logo_variant).unwrap();
+        assert_eq!(logo.max_edge_px, Some(128));
+        assert_eq!(logo.max_bytes, Some(65536));
     }
 
     #[test]
@@ -578,6 +599,17 @@ mod tests {
         }
         assert!(!class_for_variant("render:top").unwrap().lossless);
         assert!(!class_for_variant("minimap").unwrap().lossless);
+        // A logo is flat colour in a few pixels, which lossy compression smears.
+        assert!(class_for_variant("logo").unwrap().lossless);
+    }
+
+    #[test]
+    fn a_faction_logo_keys_on_the_game_and_the_faction() {
+        assert_eq!(vocabulary().faction.logo_variant, "logo");
+        assert_eq!(
+            class_for_variant("logo").unwrap().keyed_on,
+            KeyedOn::Faction
+        );
     }
 
     #[test]
@@ -618,7 +650,7 @@ mod tests {
     fn digests_the_shared_document_as_an_outside_tool_does() {
         assert_eq!(
             vocabulary_digest(),
-            "sha256:4879f85b17a5cee05e71b04fbe44607ba2cfb957bef0b2ac7c3dd658519d8b4e"
+            "sha256:aa7bb65284e18bc20baa21e6179f01b3d06d7a574efcafceb7d036d4f90fa007"
         );
     }
 

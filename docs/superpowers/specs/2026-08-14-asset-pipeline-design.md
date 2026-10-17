@@ -306,6 +306,11 @@ Build pics have knowable invariants. Per the maintainer:
 | `render:<angle>` | **exactly the pinned render profile** (§4.5) | **256px** |
 | `minimap` | **unconstrained** — maps are not all square | **512px longest edge** |
 | extracted overlays | as source | as source, lossless (§4.5) |
+| `logo` (faction, #4378) | unconstrained | **128px longest edge**, lossless |
+
+A faction logo's 128px is the unitsync worker's `ICON_MAX` for an emblem. Every
+Sidepic measured in five installed games is 16px and the hub draws the logo at
+24px. Its byte cap is derived the same way as the other classes, 128 x 128 x 4.
 
 **Unit images and map images have different caps** — 256px and 512px
 respectively. Do not unify them. A minimap is a spatial reference the user
