@@ -448,6 +448,38 @@ fn a_started_thread_runs_before_the_line_after_it() {
     assert_close(rot_y(&timeline, 0, "turret"), 0.5);
 }
 
+/// Converted BOS runs coroutines of its own, and one of them may start a
+/// framework thread. The engine starts it from inside the coroutine
+/// (`unit_script.lua:384-405`), so the coroutine carries on to its own yield
+/// rather than handing the `StartThread` to the scheduler, and the new thread
+/// still sleeps and wakes as any other.
+#[test]
+fn a_coroutine_the_script_runs_itself_may_start_a_thread() {
+    let timeline = play(
+        r#"
+        local base = piece("base")
+        local turret = piece("turret")
+        local co = coroutine.create(function()
+            StartThread(function() Sleep(66) Turn(turret, y_axis, 1.0) end)
+            Turn(base, y_axis, 0.5)
+            coroutine.yield()
+            Turn(base, y_axis, 0.75)
+        end)
+        function script.Create()
+            coroutine.resume(co)
+            StartThread(function() Sleep(33) coroutine.resume(co) end)
+        end
+        "#,
+        4,
+    );
+    assert_eq!(timeline.error, None);
+    assert_eq!(timeline.warnings, Vec::<String>::new());
+    assert_close(rot_y(&timeline, 0, "base"), 0.5);
+    assert_close(rot_y(&timeline, 0, "turret"), 0.0);
+    assert_close(rot_y(&timeline, 1, "base"), 0.75);
+    assert_close(rot_y(&timeline, 2, "turret"), 1.0);
+}
+
 /// A thread started at once runs as itself: the mask it sets in that first
 /// run is its own, and the thread that started it keeps the mask it had. So a
 /// later signal for the child's mask stops the child and not its parent.

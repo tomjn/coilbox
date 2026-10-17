@@ -132,16 +132,12 @@ fn reads_zero_as_false() {
 fn hands_call_ins_to_the_engine_under_its_names() {
     let lua = walker();
     assert_eq!(lua.matches("function script.Create()").count(), 1, "{lua}");
+    assert!(lua.contains("\tspawn(Create)\n"), "{lua}");
+    assert!(lua.contains("\tSetMaxReloadTime(math.floor("), "{lua}");
     assert!(
-        lua.contains("\tStartThread(runStarted, 0, Create)\n"),
-        "{lua}"
-    );
-    assert!(
-        lua.contains("StartThread(SetMaxReloadTime, math.floor("),
-        "{lua}"
-    );
-    assert!(
-        lua.contains("function script.AimWeapon1(heading, pitch)"),
+        lua.contains(
+            "function script.AimWeapon1(heading, pitch)\n\treturn carry(AimWeapon1, heading, pitch)\nend"
+        ),
         "{lua}"
     );
     assert!(lua.contains("\theading = toCobAngle(heading)"), "{lua}");
@@ -186,9 +182,26 @@ fn a_call_in_that_waits_for_its_answer_runs_as_a_thread() {
         ("TargetWeight1", "targetID", "(targetID or 0) / 65536"),
         ("HitByWeapon", "x, z, weaponDefID, damage", "damage / 100"),
     ] {
-        let adapter = format!("function script.{callin}({args})\n\tlocal answer = {fallback}\n\tStartThread(function()\n\t\tanswer = ");
+        let adapter = format!("function script.{callin}({args})\n\tlocal t = spawn(");
         assert!(lua.contains(&adapter), "{adapter}\n{lua}");
+        let answer = format!("\tif t.ret then return t.ret[1] end\n\treturn {fallback}\nend");
+        assert!(lua.contains(&answer), "{answer}\n{lua}");
     }
+    // With one of them, nothing else waits, so it runs as the framework's own
+    // thread.
+    let single = convert_with(
+        r#"
+        piece base, turret, flare;
+        QueryWeapon1(piecenum) { sleep 100; piecenum = flare; }
+        "#,
+        &HashMap::new(),
+        65536,
+    )
+    .lua;
+    assert!(
+        single.contains("function script.QueryWeapon1()\n\tlocal answer = turret\n\tStartThread(function()\n\t\tanswer = "),
+        "{single}"
+    );
     assert!(
         !lua.contains("function script.QueryWeapon1()\n\tlocal piecenum"),
         "{lua}"
@@ -225,7 +238,7 @@ fn converts_units_and_the_axes_cob_mirrors() {
         lua.contains("Turn(pad, y_axis, math.rad(179.9561))"),
         "{lua}"
     );
-    assert!(lua.contains("Sleep(150 + 33)"), "{lua}");
+    assert!(lua.contains("Sleep(150)"), "{lua}");
 }
 
 #[test]
