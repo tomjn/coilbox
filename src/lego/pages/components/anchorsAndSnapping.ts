@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { pieceConnectors, slideJoin } from "../../connectors";
 import { snapToGuides } from "../../guides";
+import { snapMeasurePoint } from "../../measure";
 import type { LegoPiece, LegoProject } from "../../model";
 import { descendantIds, pieceById } from "../../model";
 import { type LoadedPack, partUnit } from "../../pack";
@@ -264,6 +265,37 @@ export function forceUniformScale(state: SceneState) {
     piece.scale[1] * ratio,
     piece.scale[2] * ratio,
   );
+}
+
+/**
+ * Where a click or the pointer lands when measuring: on the nearest anchor of
+ * any piece, else on a guide, else where the ray met the model or the ground.
+ * Alt held, as in a drag, places it freely.
+ *
+ * The reach is the drag's own, in screen pixels, so a point snaps from as far
+ * away on screen as a piece does.
+ */
+export function measurePoint(state: SceneState, at: Vec3): Vec3 {
+  if (!state.snapping) return at;
+  const project = state.projectRef.current;
+  const pack = state.packRef.current;
+  const anchors = project.pieces.flatMap((piece) =>
+    worldAnchors(state, pack, piece).map((anchor) => anchor.position),
+  );
+  const distance = state.camera.position.distanceTo(new THREE.Vector3(...at));
+  const threshold = screenPixelsToWorld(
+    THREE.MathUtils.degToRad(state.camera.fov),
+    state.renderer.getSize(new THREE.Vector2()).y,
+    distance,
+    SNAP_PIXELS,
+  );
+  return snapMeasurePoint(
+    at,
+    anchors,
+    state.guidePlanes,
+    state.guideLines,
+    threshold,
+  ).point;
 }
 
 /**
