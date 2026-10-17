@@ -20,6 +20,12 @@
  *   proportion they already have. No joint places the base's width and depth,
  *   so the footprint is the target itself.
  * - Building: nothing is a proportion, so the whole size is the target.
+ * - Hovercraft: hull width, hull length, and the gap under the hull and the
+ *   hull height share the height in the proportion they already have.
+ * - Ship: hull length, and deck height and turret height share the height.
+ *   No joint places the beam, so the width is the target's.
+ * - Aircraft: no joint places its width, length or height, so the whole size
+ *   is the target, as for a building.
  *
  * A plan that is square on the ground takes the smaller side of the footprint,
  * so the box stays inside what was asked for. A value past a proportion's range
@@ -55,6 +61,8 @@ interface Rule {
   fit(values: Values, goal: Goal, plan: BodyPlan): Values;
   /** The footprint in steps when the proportions do not give one. */
   footprint?: { x: number; z: number };
+  /** The height in elmos when the proportions do not give one. */
+  height?: number;
 }
 
 /**
@@ -68,6 +76,13 @@ export const BUILDING_HEIGHT = 29.1;
 const TURRET_FOOTPRINT = { x: 4, z: 4 };
 /** The 23 Splinter Faction buildings with no weapon, median footprint (#3251). */
 const BUILDING_FOOTPRINT = { x: 9, z: 9 };
+/** The 10 Splinter Faction ships' median footprint (#3252). Only the width is
+ *  used, since the hull length sets the depth. */
+const SHIP_FOOTPRINT = { x: 6, z: 6 };
+/** The 17 Splinter Faction aircraft, less the chickens: their median footprint
+ *  and model height (#3252). */
+const AIRCRAFT_FOOTPRINT = { x: 4, z: 4 };
+const AIRCRAFT_HEIGHT = 14.5;
 
 /**
  * `total` shared between the proportions in `ids` in the proportion they have
@@ -170,6 +185,35 @@ const RULES: Record<string, Rule> = {
     fit: () => ({}),
     footprint: BUILDING_FOOTPRINT,
   },
+  hover: {
+    measure: (v) => ({
+      x: v.hullWidth,
+      z: v.hullLength,
+      height: v.gap + v.hullHeight,
+    }),
+    fit: (v, g, plan) => ({
+      hullWidth: g.x,
+      hullLength: g.z,
+      ...splitHeight(plan, ["gap", "hullHeight"], v, g.height),
+    }),
+  },
+  ship: {
+    measure: (v) => ({
+      z: v.hullLength,
+      height: v.deckHeight + v.turretHeight,
+    }),
+    fit: (v, g, plan) => ({
+      hullLength: g.z,
+      ...splitHeight(plan, ["deckHeight", "turretHeight"], v, g.height),
+    }),
+    footprint: SHIP_FOOTPRINT,
+  },
+  aircraft: {
+    measure: () => ({}),
+    fit: () => ({}),
+    footprint: AIRCRAFT_FOOTPRINT,
+    height: AIRCRAFT_HEIGHT,
+  },
 };
 
 /** Elmos in a footprint, per axis. */
@@ -234,7 +278,9 @@ export function defaultTarget(plan: BodyPlan): SkeletonTarget {
       x: steps(measured.x, rule?.footprint?.x),
       z: steps(measured.z, rule?.footprint?.z),
     },
-    height: Number((measured.height ?? BUILDING_HEIGHT).toFixed(1)),
+    height: Number(
+      (measured.height ?? rule?.height ?? BUILDING_HEIGHT).toFixed(1),
+    ),
   };
 }
 

@@ -7,6 +7,7 @@ import {
   QUADRUPED,
 } from "./bodyPlans";
 import { BUILDING, TURRET_BUILDING } from "./buildingPlans";
+import { AIRCRAFT, HOVER, SHIP } from "./hoverAirShipPlans";
 import type { LegoProject, SkeletonTarget } from "./model";
 import {
   applyTarget,
@@ -97,6 +98,35 @@ describe("skeletonSize", () => {
     });
   });
 
+  it("measures a hovercraft by hull width, hull length, and the gap plus hull height", () => {
+    const size = skeletonSize(HOVER, {
+      hullLength: 40,
+      hullWidth: 30,
+      hullHeight: 15,
+      gap: 1,
+    });
+    expect(size).toEqual({ x: 30, z: 40, height: 16 });
+  });
+
+  it("measures a ship by hull length and deck plus turret height, its beam from the target", () => {
+    const goal = target(5, 6, 40);
+    const size = skeletonSize(
+      SHIP,
+      { hullLength: 90, deckHeight: 9, turretHeight: 6, barrelLength: 14 },
+      goal,
+    );
+    expect(size).toEqual({ x: 5 * STEP, z: 90, height: 15 });
+  });
+
+  it("takes an aircraft's whole size from the target, since no joint places it", () => {
+    const goal = target(4, 4, 15);
+    expect(skeletonSize(AIRCRAFT, planProportions(AIRCRAFT), goal)).toEqual({
+      x: 4 * STEP,
+      z: 4 * STEP,
+      height: 15,
+    });
+  });
+
   it("leaves a building's axes unknown without a target", () => {
     expect(skeletonSize(BUILDING, {})).toEqual({
       x: null,
@@ -151,6 +181,30 @@ describe("fitProportions", () => {
     );
   });
 
+  it("fits a hovercraft's hull to the footprint and splits the height with the gap", () => {
+    const before = planProportions(HOVER);
+    const { values, size } = fitted(HOVER, target(2, 3, 20));
+    expect(size.x).toBeCloseTo(2 * STEP);
+    expect(size.z).toBeCloseTo(3 * STEP);
+    expect(size.height).toBeCloseTo(20);
+    expect(values.gap / values.hullHeight).toBeCloseTo(
+      before.gap / before.hullHeight,
+    );
+  });
+
+  it("fits a ship's length and splits the height between the deck and the turret", () => {
+    const { values, size } = fitted(SHIP, target(6, 5, 20));
+    expect(size.z).toBeCloseTo(5 * STEP);
+    expect(size.height).toBeCloseTo(20);
+    expect(values.barrelLength).toBe(planProportions(SHIP).barrelLength);
+  });
+
+  it("leaves an aircraft's proportions alone", () => {
+    expect(
+      fitProportions(AIRCRAFT, planProportions(AIRCRAFT), target(8, 8, 40)),
+    ).toEqual(planProportions(AIRCRAFT));
+  });
+
   it("holds to each proportion's range and reports the size that results", () => {
     const { values, size } = fitted(BIPED, target(30, 30, 500));
     const range = BIPED.proportions.find((p) => p.id === "stance");
@@ -185,6 +239,12 @@ describe("defaultTarget", () => {
   it("uses the measured medians for the buildings: 4 by 4 and 9 by 9", () => {
     expect(defaultTarget(TURRET_BUILDING).footprint).toEqual({ x: 4, z: 4 });
     expect(defaultTarget(BUILDING).footprint).toEqual({ x: 9, z: 9 });
+  });
+
+  it("uses Splinter Faction's medians for a ship's beam and an aircraft's size", () => {
+    // A 6 by 6 median ship footprint, and a 4 by 4 aircraft 14.5 elmos tall.
+    expect(defaultTarget(SHIP).footprint.x).toBe(6);
+    expect(defaultTarget(AIRCRAFT)).toEqual(target(4, 4, 14.5));
   });
 
   it("is whole footprint steps and a positive height for every plan", () => {
