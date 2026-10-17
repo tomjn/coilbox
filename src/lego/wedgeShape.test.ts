@@ -142,17 +142,10 @@ describe("wedgeAnchors", () => {
     expect(anchors.filter((a) => a.kind === "corner")).toHaveLength(8);
   });
 
-  it("puts the top and low end face middles on the faces that exist", () => {
-    const anchors = wedgeAnchors(bounds, ramp);
-    const face = (out: [number, number, number]) =>
-      anchors.find((a) => a.kind === "face" && a.out?.join() === out.join());
-    // Slope: halfway along z, halfway between the two ends' heights.
-    expect(face([0, 1, 0])?.position).toEqual([0, 0.5, 0]);
-    // The low end is 1 high from the bottom, so its middle is half way up that.
-    expect(face([0, 0, 1])?.position).toEqual([0, -1.5, 1.5]);
-    // The others are where the box has them.
-    expect(face([0, 0, -1])?.position).toEqual([0, 0, -1.5]);
-    expect(face([0, -1, 0])?.position).toEqual([0, -2, 0]);
+  it("leaves the faces to the shape's connectors", () => {
+    expect(wedgeAnchors(bounds, ramp).some((a) => a.kind === "face")).toBe(
+      false,
+    );
   });
 
   it("keeps the middle of the box", () => {

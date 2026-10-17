@@ -88,34 +88,24 @@ export function withWedgeNumber(
 }
 
 /**
- * A wedge's anchors in its part's own space: the box's, less what is not on
- * it. The two corners at the top of the low end are in empty space unless the
- * low end is as tall as the high end, so they go. The middles of the top and
- * of the low end move onto the sloped face and the low end's own face, which
- * stop short of the box's.
+ * A wedge's corner and middle anchors in its part's own space: the box's, less
+ * what is not on it. The two corners at the top of the low end are in empty
+ * space unless the low end is as tall as the high end, so they go. Its faces
+ * are connectors (`shapeConnectors`), not anchors from here.
  */
 export function wedgeAnchors(bounds: Bounds, shape: LegoShape): Anchor[] {
   const { min, max } = bounds;
   const { low, flip } = wedgeProfile(shape);
-  const height = max[1] - min[1];
+  const ramp = low < max[1] - min[1];
   const lowOut = flip ? -1 : 1;
-  const ramp = low < height;
-  const at = (anchor: Anchor, y: number): Anchor => ({
-    ...anchor,
-    position: [anchor.position[0], y, anchor.position[2]],
-  });
-  return localAnchors(bounds).flatMap((anchor): Anchor[] => {
-    const out = anchor.out;
-    if (!out) return [anchor];
-    if (anchor.kind === "corner" && ramp && out[1] === 1 && out[2] === lowOut) {
-      return [];
-    }
-    if (anchor.kind === "face" && out[1] === 1) {
-      return [at(anchor, min[1] + (height + low) / 2)];
-    }
-    if (anchor.kind === "face" && out[2] === lowOut) {
-      return [at(anchor, min[1] + low / 2)];
-    }
-    return [anchor];
-  });
+  return localAnchors(bounds).filter(
+    (anchor) =>
+      anchor.kind !== "face" &&
+      !(
+        anchor.kind === "corner" &&
+        ramp &&
+        anchor.out?.[1] === 1 &&
+        anchor.out[2] === lowOut
+      ),
+  );
 }

@@ -1,5 +1,10 @@
 import * as THREE from "three";
-import { pieceConnectors, pieceOwnBox, slideJoin } from "../../connectors";
+import {
+  type LegoConnector,
+  pieceConnectors,
+  pieceOwnBox,
+  slideJoin,
+} from "../../connectors";
 import { snapToGuides } from "../../guides";
 import { snapMeasurePoint } from "../../measure";
 import type { LegoPiece, LegoProject } from "../../model";
@@ -7,10 +12,11 @@ import { descendantIds, pieceById } from "../../model";
 import { type LoadedPack, partUnit } from "../../pack";
 import { pieceMesh, type RawGeometry } from "../../rawGeometry";
 import type { Seat } from "../../seat";
-import { isRoundShapeKind } from "../../shapes";
+import { isRoundShapeKind, type LegoShape } from "../../shapes";
 import {
   type Anchor,
   facesOppose,
+  localAnchors,
   moveStep,
   nearestSnap,
   pieceAnchors,
@@ -89,16 +95,10 @@ function localAnchorsOf(
       connector: c.id,
       facing: c.facing,
     }));
+  } else if (piece.shape && connectors.length > 0) {
+    anchors = shapeAnchors(box, piece.shape, connectors);
   } else {
-    anchors = (
-      piece.shape?.kind === "wedge" && box
-        ? wedgeAnchors(box, piece.shape)
-        : pieceAnchors(
-            box,
-            undefined,
-            piece.shape !== undefined && isRoundShapeKind(piece.shape.kind),
-          )
-    ).map((anchor) =>
+    anchors = pieceAnchors(box).map((anchor) =>
       anchor.connector && ids.has(anchor.connector)
         ? anchor
         : stripConnector(anchor),
@@ -113,6 +113,37 @@ function localAnchorsOf(
       anchor.position[2] - pivot[2],
     ],
   }));
+}
+
+/**
+ * A generated shape's anchors: the corners it has and its middle, with its
+ * connectors as the face anchors between them. Corners come first, then faces,
+ * then the middle, the order every piece's anchors are in.
+ */
+function shapeAnchors(
+  box: { min: Vec3; max: Vec3 } | null,
+  shape: LegoShape,
+  connectors: readonly LegoConnector[],
+): Anchor[] {
+  const rest = box
+    ? shape.kind === "wedge"
+      ? wedgeAnchors(box, shape)
+      : localAnchors(box, isRoundShapeKind(shape.kind)).filter(
+          (anchor) => anchor.kind !== "face",
+        )
+    : [];
+  const faces: Anchor[] = connectors.map((c) => ({
+    position: c.position,
+    kind: "face",
+    out: c.facing,
+    connector: c.id,
+    facing: c.facing,
+  }));
+  return [
+    ...rest.filter((anchor) => anchor.kind === "corner"),
+    ...faces,
+    ...rest.filter((anchor) => anchor.kind !== "corner"),
+  ];
 }
 
 /** The same anchor with nothing to join by: a face of a piece that has no part
