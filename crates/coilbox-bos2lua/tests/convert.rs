@@ -706,3 +706,144 @@ fn a_started_script_s_arguments_are_reversed_but_worked_out_in_order() {
         .count();
     assert_eq!(said, 1, "{:?}", conversion.warnings);
 }
+
+/// Convert `source` and play `actions` against it, handing back what the
+/// script announced and the Lua itself.
+fn play_engine(
+    source: &str,
+    pieces: &[&str],
+    actions: &[(u32, coilbox_springlua::unitscript::EngineAction)],
+    prune: bool,
+) -> (Vec<coilbox_unitpose::ScriptOutput>, String) {
+    let includes = HashMap::new();
+    let model: Vec<String> = pieces.iter().map(|s| s.to_string()).collect();
+    let lua = convert(
+        source,
+        &Options {
+            name: "scripts/unit.bos",
+            includes: &includes,
+            pieces: Some(&model),
+            linear_scale: MODERN_LINEAR,
+            precedence: Precedence::Modern,
+            prune,
+        },
+    )
+    .unwrap()
+    .lua;
+    let events: Vec<ScriptEvent> = actions
+        .iter()
+        .map(|(frame, action)| ScriptEvent {
+            frame: *frame,
+            callin: String::new(),
+            args: Vec::new(),
+            ambient: false,
+            world: None,
+            engine: Some(*action),
+        })
+        .collect();
+    let timeline = run(
+        &lua,
+        "unit.lua",
+        &Unit::new(&model),
+        &events,
+        10,
+        &HashMap::new(),
+    );
+    assert_eq!(timeline.error, None, "{lua}");
+    (timeline.events, lua)
+}
+
+/// A COB script with no `QueryNanoPiece` sprays from script piece 1 (`CobInstance.cpp:411-420`).
+#[test]
+fn a_script_with_no_query_nano_piece_sprays_from_its_second_piece() {
+    use coilbox_springlua::unitscript::EngineAction::{NanoStart, NanoStop};
+    let source = "piece base, nozzle, arm;\n\nCreate()\n{\n\thide nozzle;\n}\n";
+    for prune in [false, true] {
+        let (events, lua) = play_engine(
+            source,
+            &["arm", "nozzle", "base"],
+            &[(1, NanoStart), (5, NanoStop)],
+            prune,
+        );
+        let nano: Vec<_> = events
+            .iter()
+            .filter_map(|e| match e {
+                coilbox_unitpose::ScriptOutput::Nano { piece, .. } => Some(piece.clone()),
+                _ => None,
+            })
+            .collect();
+        assert!(!nano.is_empty(), "prune {prune}: no nano\n{lua}");
+        assert!(
+            nano.iter().all(|p| p.as_deref() == Some("nozzle")),
+            "prune {prune}: {nano:?}\n{lua}"
+        );
+        assert!(lua.contains("function script.QueryNanoPiece()"), "{lua}");
+        assert!(lua.contains("return nozzle\n"), "{lua}");
+    }
+}
+
+/// With one piece there is no script piece 1, and the engine sprays from nothing.
+#[test]
+fn a_script_with_one_piece_and_no_query_nano_piece_gets_none_written() {
+    let (_, lua) = play_engine("piece base;\n\nCreate()\n{\n}\n", &["base"], &[], false);
+    assert!(!lua.contains("QueryNanoPiece"), "{lua}");
+}
+
+/// A script that answers `QueryNanoPiece` and `QueryWeapon1` itself keeps its own.
+#[test]
+fn a_script_that_answers_its_own_pieces_gets_nothing_added() {
+    let source = "piece base, flare, nozzle;\n\nQueryNanoPiece(p) { p = nozzle; }\nQueryWeapon1(p) { p = flare; }\nAimFromWeapon1(p) { p = base; }\nAimWeapon1(h, pt) { return (1); }\nFireWeapon1() { }\n";
+    let (_, lua) = play_engine(source, &["base", "flare", "nozzle"], &[], false);
+    assert_eq!(
+        lua.matches("function script.QueryNanoPiece").count(),
+        1,
+        "{lua}"
+    );
+    assert_eq!(
+        lua.matches("function script.QueryWeapon1").count(),
+        1,
+        "{lua}"
+    );
+    assert_eq!(
+        lua.matches("function script.AimFromWeapon1").count(),
+        1,
+        "{lua}"
+    );
+    assert!(!lua.contains("The engine answers script piece 1"), "{lua}");
+}
+
+/// A weapon the script aims and fires but never queries shoots from script piece 1,
+/// for the weapon numbers the script names and no others.
+#[test]
+fn a_weapon_with_no_query_weapon_shoots_from_the_second_piece() {
+    use coilbox_springlua::unitscript::EngineAction::Fire;
+    let source = "piece base, lnanospray, turret;\n\nstatic-var ready;\n\nAimWeapon1(h, pt)\n{\n\treturn (1);\n}\n\nFireWeapon1()\n{\n\tready = 1;\n}\n\nShot2(z)\n{\n\tready = 2;\n}\n\nQueryNanoPiece(p)\n{\n\tp = turret;\n}\n";
+    for prune in [false, true] {
+        let (events, lua) = play_engine(
+            source,
+            &["base", "lnanospray", "turret"],
+            &[(1, Fire)],
+            prune,
+        );
+        assert!(
+            events.iter().any(|e| matches!(e, coilbox_unitpose::ScriptOutput::Shot { weapon: 1, piece: Some(p), .. } if p == "lnanospray")),
+            "prune {prune}: {events:?}\n{lua}"
+        );
+        for name in [
+            "QueryWeapon1",
+            "AimFromWeapon1",
+            "QueryWeapon2",
+            "AimFromWeapon2",
+        ] {
+            assert!(
+                lua.contains(&format!("function script.{name}()")),
+                "{name}\n{lua}"
+            );
+        }
+        assert!(!lua.contains("script.QueryWeapon3"), "{lua}");
+        assert!(
+            !lua.contains("function script.QueryNanoPiece()\n\treturn PIECES[2]"),
+            "{lua}"
+        );
+    }
+}

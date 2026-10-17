@@ -225,15 +225,11 @@ fn converted_scripts_move_pieces_as_their_cobs_do() {
                 })
                 .collect()
         };
-        // A COB script with no QueryNanoPiece sprays from its piece 1 and a Lua
-        // one sprays nothing, in the engine as in the runtimes, so only an
-        // answer the script gives is compared.
-        let answers = conversion.lua.contains("QueryNanoPiece");
         let (cob_nano, lua_nano) = (nano(&from_cob), nano(&from_lua));
-        if answers && cob_nano != lua_nano && !known {
+        if cob_nano != lua_nano && !known {
             let at = cob_nano.iter().zip(&lua_nano).position(|(a, b)| a != b);
             differ.push(format!(
-                "{name}: QueryNanoPiece names {:?} in COB and {:?} in Lua, first apart at spray {at:?}",
+                "{name}: the nano piece is {:?} in COB and {:?} in Lua, first apart at spray {at:?}",
                 cob_nano.iter().flatten().collect::<std::collections::BTreeSet<_>>(),
                 lua_nano.iter().flatten().collect::<std::collections::BTreeSet<_>>(),
             ));
@@ -485,6 +481,52 @@ fn both_runtimes_fire_and_spray_alike() {
         assert!(timeline.hidden[39][flare1]);
         assert!(!timeline.hidden[39][flare2]);
     }
+}
+
+/// A script with no `QueryNanoPiece` or `QueryWeapon1` answers script piece 1
+/// in the COB runtime, and the converter writes the same answer into the Lua.
+#[test]
+fn both_runtimes_answer_script_piece_one_for_call_ins_the_script_lacks() {
+    let source = r#"
+        piece base, turret, flare;
+        AimWeapon1(heading, pitch) { return (1); }
+        FirePrimary() { show flare; }
+    "#;
+    let (cob, lua, pieces) = both(source);
+    let events = [
+        event(0, "Create", &[]),
+        ScriptEvent {
+            frame: 10,
+            callin: String::new(),
+            args: vec![1.0],
+            ambient: false,
+            world: None,
+            engine: Some(EngineAction::Fire),
+        },
+        action(20, EngineAction::NanoStart),
+        action(30, EngineAction::NanoStop),
+    ];
+    let from_cob = crate::cobrun::run(&cob, &pieces, &events, 40, &[], &HashMap::new());
+    let from_lua = run_lua(
+        &lua,
+        "gun.lua",
+        &Unit::new(&pieces),
+        &events,
+        40,
+        &HashMap::new(),
+    );
+    assert_eq!(from_cob.error, None);
+    assert_eq!(from_lua.error, None);
+    assert_eq!(from_cob.events, from_lua.events, "{lua}");
+    assert!(from_cob.events.contains(&ScriptOutput::Shot {
+        frame: 10,
+        weapon: 1,
+        piece: Some("turret".into())
+    }));
+    assert!(from_cob
+        .events
+        .iter()
+        .any(|e| matches!(e, ScriptOutput::Nano { piece: Some(p), .. } if p == "turret")));
 }
 
 /// The engine pops a started script's arguments off the caller and pushes
