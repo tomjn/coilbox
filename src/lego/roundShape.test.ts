@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { type LegoProject, newProject } from "./model";
 import type { LegoPartInfo, LoadedPack } from "./pack";
-import { newRoundShape, roundNumbers, withRoundNumber } from "./roundShape";
+import {
+  coneAnchors,
+  newRoundShape,
+  roundNumbers,
+  withRoundNumber,
+} from "./roundShape";
 import { DEFAULT_CYLINDER_SIDES, type LegoShape } from "./shapes";
+import { localAnchors } from "./snapping";
 
 const SWATCHES = ["green", "tan", "grey"].map((id) => ({
   id,
@@ -138,5 +144,106 @@ describe("withRoundNumber", () => {
     expect(shapeOf(withRoundNumber(cylinder, "sides", 24)).options?.sides).toBe(
       24,
     );
+  });
+});
+
+describe("cones (#3329)", () => {
+  const cone: LegoShape = {
+    kind: "cone",
+    size: [2, 3, 2],
+    swatch: "grey",
+    options: { axis: 1, sides: 12, top: 0.5 },
+  };
+  const shapeOf = (result: ReturnType<typeof withRoundNumber>) => {
+    if ("problem" in result) throw new Error(result.problem);
+    return result.shape;
+  };
+
+  it("starts as a point, upright, with the default sides", () => {
+    const made = newRoundShape("cone", unit([]), pack());
+    if (!made) throw new Error("no shape");
+    expect(roundNumbers(made)).toEqual({
+      axis: 1,
+      radius: 0.5,
+      length: 1,
+      sides: DEFAULT_CYLINDER_SIDES,
+      top: 0,
+    });
+  });
+
+  it("reads its numbers back, the bottom radius from the box", () => {
+    expect(roundNumbers(cone)).toEqual({
+      axis: 1,
+      radius: 1,
+      length: 3,
+      sides: 12,
+      top: 0.5,
+    });
+  });
+
+  it("sets the top radius, and a top of 0 is a cone", () => {
+    expect(shapeOf(withRoundNumber(cone, "top", 0.8)).options?.top).toBe(0.8);
+    expect(shapeOf(withRoundNumber(cone, "top", 0)).options?.top).toBe(0);
+  });
+
+  it("tells the user to use a cylinder for a top as wide as the bottom", () => {
+    expect(withRoundNumber(cone, "top", 1)).toEqual({
+      problem:
+        "A top as wide as the bottom is a cylinder. Add a cylinder instead.",
+    });
+    expect(withRoundNumber(cone, "radius", 0.5)).toEqual({
+      problem:
+        "A top as wide as the bottom is a cylinder. Add a cylinder instead.",
+    });
+  });
+
+  it("refuses a top wider than the bottom or below 0", () => {
+    const problem = "Top radius must be 0 or more and below the bottom radius.";
+    expect(withRoundNumber(cone, "top", 1.5)).toEqual({ problem });
+    expect(withRoundNumber(cone, "top", -0.1)).toEqual({ problem });
+    expect(withRoundNumber(cone, "radius", 0.2)).toEqual({ problem });
+  });
+
+  it("keeps the top when the axis or length changes", () => {
+    const lying = shapeOf(withRoundNumber(cone, "axis", 0));
+    expect(roundNumbers(lying)).toMatchObject({ axis: 0, top: 0.5 });
+    expect(shapeOf(withRoundNumber(cone, "length", 5)).options?.top).toBe(0.5);
+  });
+
+  it("has no corner anchors, and its side anchors sit on the slope at mid height", () => {
+    const bounds = { min: [-1, -1.5, -1], max: [1, 1.5, 1] } as const;
+    const anchors = coneAnchors(
+      { min: [...bounds.min], max: [...bounds.max] },
+      cone,
+    );
+    expect(anchors.some((a) => a.kind === "corner")).toBe(false);
+    const east = anchors.find((a) => a.out?.[0] === 1);
+    // Halfway up, the radius is halfway between 1 and the top, 0.5.
+    expect(east?.position).toEqual([0.75, 0, 0]);
+    const top = anchors.find((a) => a.out?.[1] === 1);
+    expect(top?.position).toEqual([0, 1.5, 0]);
+    const plain = localAnchors(
+      { min: [...bounds.min], max: [...bounds.max] },
+      true,
+    );
+    expect(anchors).toHaveLength(plain.length);
+  });
+
+  it("puts the anchors of a cone lying along x on its own axes", () => {
+    const lying: LegoShape = {
+      ...cone,
+      size: [3, 2, 2],
+      options: { axis: 0, top: 0 },
+    };
+    const anchors = coneAnchors(
+      { min: [-1.5, -1, -1], max: [1.5, 1, 1] },
+      lying,
+    );
+    expect(anchors.find((a) => a.out?.[1] === 1)?.position).toEqual([
+      0, 0.5, 0,
+    ]);
+    expect(anchors.find((a) => a.out?.[0] === 1)?.position).toEqual([
+      1.5, 0, 0,
+    ]);
   });
 });

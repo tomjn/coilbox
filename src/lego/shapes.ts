@@ -126,6 +126,7 @@ const DEFAULT_TUBE_HOLE = 0.5;
 const GENERATORS: Record<string, (shape: LegoShape) => ShapeSolid> = {
   cylinder,
   tube,
+  cone,
   wedge,
 };
 
@@ -136,7 +137,7 @@ export function shapeKinds(): string[] {
 
 /** Whether a shape of this kind is round, so its box corners are not on it. */
 export function isRoundShapeKind(kind: string): boolean {
-  return kind === "cylinder" || kind === "tube";
+  return kind === "cylinder" || kind === "tube" || kind === "cone";
 }
 
 /** Whether this build can make a shape of this kind. */
@@ -591,17 +592,29 @@ function builder(s: Section) {
 type Builder = ReturnType<typeof builder>;
 
 /**
- * A round wall the full length of the section, its ring scaled by `scale`.
- * Smooth all the way round. Unwrapped by the length round the ring and the
- * distance along the axis, so its facets are not stretched. The seam has a
- * vertex on each side, at the start of the ring and at its full length.
+ * A round wall the full length of the section, its ring scaled by `scale` at
+ * the low end and by `top` at the high end. Smooth all the way round. The seam
+ * has a vertex on each side, at the start of the ring and at its full length.
  * `inward` faces it in, for a tube's hole, and winds it to be seen from there.
+ *
+ * With the same scale at both ends the wall is a cylinder's, unwrapped by the
+ * length round the ring and the distance along the axis, so its facets are not
+ * stretched. With a smaller `top` it is a cone's, or a cut cone's, and
+ * `taper` makes it. A `top` of 0 gives each side its own point at the tip.
  */
-function wall(out: Builder, s: Section, scale: number, inward: boolean) {
+function wall(
+  out: Builder,
+  s: Section,
+  scale: number,
+  inward: boolean,
+  top = scale,
+) {
   const h = s.half[s.axis];
   const facing = inward ? -1 : 1;
   const low: number[] = [];
   const high: number[] = [];
+  const flat = top === scale;
+  const unrolled = flat ? null : taper(s, scale, top);
   let u = 0;
   for (let k = 0; k <= s.sides; k++) {
     const r = s.ring[k % s.sides];
@@ -609,9 +622,35 @@ function wall(out: Builder, s: Section, scale: number, inward: boolean) {
       const before = s.ring[k - 1];
       u += Math.hypot(r.b - before.b, r.c - before.c) * scale;
     }
-    const n = out.vector(0, r.nb * facing, r.nc * facing);
-    low.push(out.vertex(-h, r.b * scale, r.c * scale, n, [u, 0]));
-    high.push(out.vertex(h, r.b * scale, r.c * scale, n, [u, 2 * h]));
+    const n = unrolled
+      ? out.vector(...unrolled.normal(r))
+      : out.vector(0, r.nb * facing, r.nc * facing);
+    low.push(
+      out.vertex(-h, r.b * scale, r.c * scale, n, unrolled?.low[k] ?? [u, 0]),
+    );
+    if (top > 0) {
+      high.push(
+        out.vertex(h, r.b * top, r.c * top, n, unrolled?.high[k] ?? [u, 2 * h]),
+      );
+    }
+  }
+  if (top === 0) {
+    // Every side gets its own point at the tip, facing as the side does half
+    // way along it, so the shading does not pinch.
+    for (let k = 0; k < s.sides; k++) {
+      const a = out.solid.normals.slice(low[k] * 3, low[k] * 3 + 3);
+      const b = out.solid.normals.slice(low[k + 1] * 3, low[k + 1] * 3 + 3);
+      const n: Vec3 = [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+      const tip = out.vertex(
+        h,
+        0,
+        0,
+        out.vector(...([n[s.axis], n[s.b], n[s.c]] as Vec3)),
+        unrolled?.tip ?? [0, 0],
+      );
+      out.solid.indices.push(low[k], low[k + 1], tip);
+    }
+    return;
   }
   for (let k = 0; k < s.sides; k++) {
     if (inward) {
@@ -637,16 +676,85 @@ function wall(out: Builder, s: Section, scale: number, inward: boolean) {
 }
 
 /**
+ * What a tapering wall needs beyond a straight one: its normals, which lean
+ * towards the narrow end, and its unwrapped UVs.
+ *
+ * The side of a cone is a pyramid of flat sides meeting at an apex, and a
+ * pyramid unrolls with no stretch at all: lay its sides out one after another
+ * round the apex, each sharing the edge it shares in 3D. That is the "ring
+ * sector" the cone's side unrolls to. A cut cone is the same pyramid with the
+ * top taken off, so its top ring is the bottom's, `top / scale` of the way in.
+ * Each side is measured by its edges, so oval rings unroll as exactly as round
+ * ones. The sides are laid from the apex at the origin, then moved to start at
+ * (0, 0).
+ */
+function taper(s: Section, scale: number, top: number) {
+  const h = s.half[s.axis];
+  const ratio = top / scale;
+  // How far from the low end the apex is, along the axis.
+  const reach = (2 * h) / (1 - ratio);
+  const distance = (k: number) => {
+    const r = s.ring[k % s.sides];
+    return Math.hypot(reach, r.b * scale, r.c * scale);
+  };
+  const angle: number[] = [0];
+  for (let k = 0; k < s.sides; k++) {
+    const a = s.ring[k];
+    const b = s.ring[(k + 1) % s.sides];
+    const chord = Math.hypot(b.b - a.b, b.c - a.c) * scale;
+    const da = distance(k);
+    const db = distance(k + 1);
+    const cos = (da * da + db * db - chord * chord) / (2 * da * db);
+    angle.push(angle[k] + Math.acos(Math.min(1, Math.max(-1, cos))));
+  }
+  const at = (k: number, along: number): [number, number] => [
+    distance(k) * along * Math.cos(angle[k]),
+    distance(k) * along * Math.sin(angle[k]),
+  ];
+  const lows = Array.from({ length: s.sides + 1 }, (_, k) => at(k, 1));
+  const highs = Array.from({ length: s.sides + 1 }, (_, k) => at(k, ratio));
+  const shift: [number, number] = [0, 1].map((a) =>
+    Math.min(
+      ...lows.map((p) => p[a]),
+      ...highs.map((p) => p[a]),
+      top === 0 ? 0 : Infinity,
+    ),
+  ) as [number, number];
+  const moved = (p: [number, number]): [number, number] => [
+    p[0] - shift[0],
+    p[1] - shift[1],
+  ];
+  return {
+    low: lows.map(moved),
+    high: highs.map(moved),
+    tip: moved([0, 0]),
+    /**
+     * The side's normal at a ring point, as (along, b, c): perpendicular to
+     * both the ring and the way the side runs, which is what an oval ring
+     * needs, where the radial direction is not.
+     */
+    normal(r: Section["ring"][number]): Vec3 {
+      return [
+        scale * (1 - ratio) * (r.b * r.nb + r.c * r.nc),
+        r.nb * 2 * h,
+        r.nc * 2 * h,
+      ];
+    },
+  };
+}
+
+/**
  * A flat end facing out along the axis at `end` (1 or -1): a full disc when
  * `hole` is 0, otherwise a ring round a hole that share of the ring's size.
- * Projected flat in its own plane, measured from the box's corner.
+ * `scale` shrinks the ring, for the narrow end of a cone. Projected flat in its
+ * own plane, measured from the box's corner.
  */
-function end(out: Builder, s: Section, side: 1 | -1, hole: number) {
+function end(out: Builder, s: Section, side: 1 | -1, hole: number, scale = 1) {
   const along = side * s.half[s.axis];
   const normal = out.vector(side, 0, 0);
   const at = (pb: number, pc: number) =>
     out.vertex(along, pb, pc, normal, [pb + s.half[s.b], pc + s.half[s.c]]);
-  const rim = s.ring.map((r) => at(r.b, r.c));
+  const rim = s.ring.map((r) => at(r.b * scale, r.c * scale));
   const push = (a: number, b: number, c: number) => {
     if (side > 0) out.solid.indices.push(a, b, c);
     else out.solid.indices.push(a, c, b);
@@ -722,6 +830,39 @@ function tube(shape: LegoShape): ShapeSolid {
   wall(out, s, hole, true);
   end(out, s, 1, hole);
   end(out, s, -1, hole);
+  return out.solid;
+}
+
+/**
+ * The radius of a cone's top as it is drawn, in elmos: its `top` option, or 0
+ * (a point) when that is missing or not below the bottom radius, which would be
+ * a cylinder or wider. The bottom radius is the smaller half-size across the
+ * axis, as a tube's outer radius is.
+ */
+export function coneTopRadius(shape: LegoShape): number {
+  const s = section(shape);
+  const bottom = Math.min(s.half[s.b], s.half[s.c]);
+  const top = shape.options?.top;
+  return top !== undefined && top > 0 && top < bottom ? top : 0;
+}
+
+/**
+ * A cone or a cut cone filling its box: the bottom, at the low end of the
+ * axis, touches the box as a cylinder does, and the top is narrower. Options as
+ * a cylinder, plus `top`, the top's radius (see `coneTopRadius`). 0 is a cone.
+ *
+ * The side is smooth, with normals leaning towards the top, and shares its
+ * generator with the cylinder's. The bottom is a flat disc, and so is the top
+ * of a cut cone. A cone's tip has a point for each side so each keeps its own
+ * normal.
+ */
+function cone(shape: LegoShape): ShapeSolid {
+  const s = section(shape);
+  const out = builder(s);
+  const ratio = coneTopRadius(shape) / Math.min(s.half[s.b], s.half[s.c]);
+  wall(out, s, 1, false, ratio);
+  end(out, s, -1, 0);
+  if (ratio > 0) end(out, s, 1, 0, ratio);
   return out.solid;
 }
 

@@ -6,6 +6,7 @@ import type { LegoPiece, LegoProject } from "../../model";
 import { descendantIds, pieceById } from "../../model";
 import { type LoadedPack, partUnit } from "../../pack";
 import { pieceMesh, type RawGeometry } from "../../rawGeometry";
+import { coneAnchors } from "../../roundShape";
 import type { Seat } from "../../seat";
 import { isRoundShapeKind } from "../../shapes";
 import {
@@ -93,11 +94,13 @@ function localAnchorsOf(
     anchors = (
       piece.shape?.kind === "wedge" && box
         ? wedgeAnchors(box, piece.shape)
-        : pieceAnchors(
-            box,
-            undefined,
-            piece.shape !== undefined && isRoundShapeKind(piece.shape.kind),
-          )
+        : piece.shape?.kind === "cone" && box
+          ? coneAnchors(box, piece.shape)
+          : pieceAnchors(
+              box,
+              undefined,
+              piece.shape !== undefined && isRoundShapeKind(piece.shape.kind),
+            )
     ).map((anchor) =>
       anchor.connector && ids.has(anchor.connector)
         ? anchor

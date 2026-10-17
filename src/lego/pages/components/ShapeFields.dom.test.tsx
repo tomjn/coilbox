@@ -110,3 +110,40 @@ describe("ShapeFields for a wedge (#3328)", () => {
     );
   });
 });
+
+describe("ShapeFields for a cone (#3329)", () => {
+  const cone: LegoShape = {
+    kind: "cone",
+    size: [2, 3, 2],
+    swatch: "green",
+    options: { axis: 1, sides: 12, top: 0.5 },
+  };
+
+  it("shows the bottom radius, top radius, height and sides", () => {
+    render(<ShapeFields shape={cone} onChange={onChange} />);
+    expect(screen.getByLabelText<HTMLInputElement>("Bottom radius").value).toBe(
+      "1",
+    );
+    expect(screen.getByLabelText<HTMLInputElement>("Top radius").value).toBe(
+      "0.5",
+    );
+    expect(screen.getByLabelText<HTMLInputElement>("Height").value).toBe("3");
+    expect(screen.getByLabelText<HTMLInputElement>("Sides").value).toBe("12");
+    expect(screen.queryByLabelText("Wall")).toBeNull();
+  });
+
+  it("sets the top radius", () => {
+    render(<ShapeFields shape={cone} onChange={onChange} />);
+    type("Top radius", "0");
+    expect(onChange.mock.calls[0][0].options.top).toBe(0);
+  });
+
+  it("says to use a cylinder for a top as wide as the bottom", () => {
+    render(<ShapeFields shape={cone} onChange={onChange} />);
+    type("Top radius", "1");
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert").textContent).toBe(
+      "A top as wide as the bottom is a cylinder. Add a cylinder instead.",
+    );
+  });
+});

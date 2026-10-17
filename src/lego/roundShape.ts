@@ -1,22 +1,26 @@
 /**
- * A cylinder or a tube as the numbers a person sets (#3327): radius, length,
- * the axis it runs along, its sides and, for a tube, its wall. The document
- * stores a box `size` and options, so this turns one into the other.
+ * A cylinder, a tube or a cone as the numbers a person sets (#3327, #3329):
+ * radius, length, the axis it runs along, its sides and, for a tube, its wall
+ * or, for a cone, its top radius. The document stores a box `size` and options,
+ * so this turns one into the other.
  *
  * The radius is half the smaller size across the axis, the size a tube's hole
- * is measured against. Setting it makes the shape round again.
+ * and a cone's top are measured against. For a cone it is the bottom radius,
+ * at the low end of the axis. Setting it makes the shape round again.
  */
 
 import type { LegoProject } from "./model";
 import type { LoadedPack } from "./pack";
 import {
+  coneTopRadius,
   DEFAULT_CYLINDER_SIDES,
   type LegoShape,
   type ShapeSwatch,
   tubeInnerRadius,
 } from "./shapes";
+import { type Anchor, type Bounds, localAnchors } from "./snapping";
 
-export type RoundKind = "cylinder" | "tube";
+export type RoundKind = "cylinder" | "tube" | "cone";
 
 export interface RoundNumbers {
   /** 0, 1 or 2 for x, y or z. */
@@ -26,6 +30,8 @@ export interface RoundNumbers {
   sides: number;
   /** Only a tube has one. */
   wall?: number;
+  /** Only a cone has one: the radius of its top, 0 for a point. */
+  top?: number;
 }
 
 /** A new one is 1 across and 1 long, upright, near the size of the pack's
@@ -51,6 +57,7 @@ export function newRoundShape(
     sides: DEFAULT_CYLINDER_SIDES,
   };
   if (kind === "tube") options.inner = NEW_SIZE / 2 - NEW_WALL;
+  if (kind === "cone") options.top = 0;
   return {
     kind,
     size: [NEW_SIZE, NEW_SIZE, NEW_SIZE],
@@ -97,6 +104,7 @@ export function roundNumbers(shape: LegoShape): RoundNumbers {
     length: shape.size[axis],
     sides: sides >= 3 ? sides : DEFAULT_CYLINDER_SIDES,
     ...(shape.kind === "tube" ? { wall: radius - tubeInnerRadius(shape) } : {}),
+    ...(shape.kind === "cone" ? { top: coneTopRadius(shape) } : {}),
   };
 }
 
@@ -118,6 +126,19 @@ export function withRoundNumber(
   if (next.wall !== undefined && !(next.wall > 0 && next.wall < next.radius)) {
     return { problem: "Wall must be above 0 and below the radius." };
   }
+  if (next.top !== undefined) {
+    if (next.top === next.radius) {
+      return {
+        problem:
+          "A top as wide as the bottom is a cylinder. Add a cylinder instead.",
+      };
+    }
+    if (!(next.top >= 0 && next.top < next.radius)) {
+      return {
+        problem: "Top radius must be 0 or more and below the bottom radius.",
+      };
+    }
+  }
   const size: [number, number, number] = [
     next.radius * 2,
     next.radius * 2,
@@ -130,5 +151,28 @@ export function withRoundNumber(
     sides: next.sides,
   };
   if (next.wall !== undefined) options.inner = next.radius - next.wall;
+  if (next.top !== undefined) options.top = next.top;
   return { shape: { ...shape, size, options } };
+}
+
+/**
+ * A cone's anchors in its part's own space: a round shape's, with its side
+ * ones moved in from the box to the slope at mid height, where the side is
+ * halfway between the bottom radius and the top. The middle of the top is the
+ * tip of a cone, or the middle of a cut cone's top disc.
+ */
+export function coneAnchors(bounds: Bounds, shape: LegoShape): Anchor[] {
+  const { axis, radius, top } = roundNumbers(shape);
+  const inward = (1 + (top ?? 0) / radius) / 2;
+  return localAnchors(bounds, true).map((anchor) => {
+    const out = anchor.out;
+    if (!out || out[axis] !== 0) return anchor;
+    const position = [...anchor.position] as Anchor["position"];
+    for (let a = 0; a < 3; a++) {
+      if (a === axis || out[a] === 0) continue;
+      const centre = (bounds.min[a] + bounds.max[a]) / 2;
+      position[a] = centre + (position[a] - centre) * inward;
+    }
+    return { ...anchor, position };
+  });
 }
