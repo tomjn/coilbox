@@ -7,6 +7,7 @@
  */
 
 import { cleanup, fireEvent, render } from "@testing-library/react";
+import { useRef } from "react";
 import * as THREE from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -28,8 +29,11 @@ vi.mock("@/lib/useCanvas3D", async () => {
       ) =>
         | { resize: (w: number, h: number) => void; dispose: () => void }
         | undefined,
+      _deps: unknown,
+      ready = true,
     ) => {
       useLayoutEffect(() => {
+        if (!ready) return;
         const renderer = {
           domElement: { clientWidth: 600 },
           render: (scene: unknown) => drawn.scenes.push(scene),
@@ -37,9 +41,8 @@ vi.mock("@/lib/useCanvas3D", async () => {
         const scene = build({ renderer, host, render() {}, resize() {} });
         scene?.resize(600, 400);
         return () => scene?.dispose();
-        // Once, as the real hook builds once for the picker's `[]` deps.
-        // biome-ignore lint/correctness/useExhaustiveDependencies: see above
-      }, []);
+        // Once ready, as the real hook builds once for the picker's `[]` deps.
+      }, [ready]);
     },
   };
 });
@@ -200,5 +203,71 @@ describe("shape cells", () => {
       <PartPicker pack={pack} parts={[part("beam")]} />,
     );
     expect(cells(container).map((cell) => cell.textContent)).toEqual(["beam"]);
+  });
+});
+
+/**
+ * On the Lego Parts page the grid scrolls with the page rather than in a box of
+ * its own (#4468). happy-dom lays nothing out, so these check the structure the
+ * sticky canvas rests on, not where it lands on screen.
+ */
+describe("scrolling with the page", () => {
+  const many = Array.from({ length: 30 }, (_, i) => part(`p${i}`));
+
+  function Page() {
+    const root = useRef<HTMLDivElement>(null);
+    return (
+      <div ref={root} data-testid="page">
+        <PartPicker pack={pack} parts={many} scrollRoot={root} />
+      </div>
+    );
+  }
+
+  it("has no scroller of its own, and is as tall as its rows", () => {
+    const { getByTestId } = render(<Page />);
+    const page = getByTestId("page");
+    expect(page.querySelector('[class*="overflow-y-auto"]')).toBeNull();
+    // 600 pixels wide holds 7 cells of 72 with gaps of 8, so 30 cells are 5
+    // rows: 5 pitches of 80 less the last gap.
+    const content = page.firstElementChild as HTMLElement;
+    expect(content.style.height).toBe("392px");
+  });
+
+  it("keeps the canvas in a sticky box no taller than the page", () => {
+    const { getByTestId } = render(<Page />);
+    const content = getByTestId("page").firstElementChild as HTMLElement;
+    const host = content.firstElementChild as HTMLElement;
+    expect(host.className).toContain("sticky");
+    expect(host.className).toContain("top-0");
+    // Every element reports a client height of 400 here, so the page is 400
+    // tall and the grid, at 392, is shorter.
+    expect(host.style.height).toBe("392px");
+  });
+
+  it("scrolls the page, not itself, to bring a cell into view", () => {
+    const tall = Array.from({ length: 70 }, (_, i) => part(`t${i}`));
+    function TallPage() {
+      const root = useRef<HTMLDivElement>(null);
+      return (
+        <div ref={root} data-testid="tall">
+          <PartPicker pack={pack} parts={tall} scrollRoot={root} />
+        </div>
+      );
+    }
+    const { getByTestId, container } = render(<TallPage />);
+    const page = getByTestId("tall");
+    const content = page.firstElementChild as HTMLElement;
+    // 70 cells are 10 rows, 792 tall, so the canvas stops at the page's 400.
+    expect(content.style.height).toBe("792px");
+    expect((content.firstElementChild as HTMLElement).style.height).toBe(
+      "400px",
+    );
+    // Page Down twice is 8 rows down. Row 8 starts at 640 and its cell ends
+    // at 712, so the page scrolls until that is its bottom edge: 712 - 400.
+    fireEvent.keyDown(cells(container)[0], { key: "PageDown" });
+    const focused = () =>
+      cells(container).find((cell) => cell.tabIndex === 0) as HTMLElement;
+    fireEvent.keyDown(focused(), { key: "PageDown" });
+    expect(page.scrollTop).toBe(312);
   });
 });
