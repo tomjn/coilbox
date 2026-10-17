@@ -61,6 +61,32 @@
       "tile": 1.56
     }
   ],
+  "roundPanels": [
+    {
+      "id": "green",
+      "centre": [
+        0.061035,
+        0.272461
+      ],
+      "radius": 0.032227
+    },
+    {
+      "id": "tan",
+      "centre": [
+        0.394531,
+        0.272461
+      ],
+      "radius": 0.032227
+    },
+    {
+      "id": "grey",
+      "centre": [
+        0.727051,
+        0.272461
+      ],
+      "radius": 0.032227
+    }
+  ],
   "geometry": {
     "file": "parts.bin.gz",
     "encoding": "gzip",

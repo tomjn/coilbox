@@ -4,12 +4,15 @@ import { describe, expect, it } from "vitest";
 
 import { buildGlbScene } from "./exportGlb";
 import { buildObj } from "./exportObj";
-import { bundledSwatches } from "./fixtures/bundledSwatches";
+import {
+  bundledRoundPanels,
+  bundledSwatches,
+} from "./fixtures/bundledSwatches";
 import { type LegoPiece, type LegoProject, newProject } from "./model";
 import type { LegoPartInfo, LoadedPack } from "./pack";
 import type { RawGeometry } from "./rawGeometry";
 import { bakedPieces, buildS3o, type S3oPiece } from "./s3oBuild";
-import { setShapeSwatches } from "./shapes";
+import { setShapeRoundPanels, setShapeSwatches } from "./shapes";
 import {
   cropUv,
   planSheet,
@@ -324,6 +327,47 @@ describe("sheetBounds", () => {
     expect(v1).toBeLessThanOrEqual(1 - grey.min[1] + slack);
     expect(u1 - u0).toBeGreaterThan(0);
     setShapeSwatches([]);
+  });
+
+  it("takes in a shape's round panel when its ends show one (#4398)", () => {
+    const swatches = bundledSwatches();
+    const panels = bundledRoundPanels();
+    setShapeSwatches(swatches);
+    setShapeRoundPanels(panels);
+    try {
+      const doc = mixed();
+      const shaped = project([
+        {
+          id: "wheel",
+          partId: null,
+          shape: {
+            kind: "cylinder",
+            size: [3, 2, 3],
+            swatch: "grey",
+            options: { hub: 1 },
+          },
+        },
+        doc.pieces[2],
+      ]);
+      const found = sheetSources(shaped, pack(), raw());
+      if (!found || "refused" in found) throw new Error("no sources");
+      const { pieces } = bakedPieces(shaped, pack(), raw());
+      const [u0, v0, u1, v1] = sheetBounds(found.sources[0], pieces);
+      const grey = swatches[2].uv;
+      const { centre, radius } = panels[2];
+      // The engine's v runs down from the top. The side is longer than a
+      // tile, so it covers the swatch, and a 12 sided end reaches the panel's
+      // edge left, right, top and bottom.
+      const slack = 1e-6;
+      expect(u0).toBeCloseTo(centre[0] - radius, 6);
+      expect(u1).toBeCloseTo(grey.max[0], 6);
+      expect(v0).toBeCloseTo(1 - grey.max[1], 6);
+      expect(v1).toBeLessThanOrEqual(1 - (centre[1] - radius) + slack);
+      expect(v1).toBeCloseTo(1 - (centre[1] - radius), 6);
+    } finally {
+      setShapeSwatches([]);
+      setShapeRoundPanels([]);
+    }
   });
 });
 

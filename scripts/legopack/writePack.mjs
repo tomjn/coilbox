@@ -46,6 +46,19 @@ export const SWATCHES = [
     tile: 1.56,
   },
 ];
+/**
+ * The round panels of the atlas a generated shape can show on its flat ends,
+ * one per colourway, in the pack's UVs with v up from the bottom (#4398). Each
+ * is the seven spoked wheel drawn in that colourway's column. Measured on the
+ * 2048 pixel atlas: centres at pixels (125, 1490), (808, 1490) and (1489,
+ * 1490), with the background starting 68 pixels out. The radius is 66 pixels,
+ * which keeps the rim and stops short of its soft edge.
+ */
+export const ROUND_PANELS = [
+  { id: "green", centre: [0.061035, 0.272461], radius: 0.032227 },
+  { id: "tan", centre: [0.394531, 0.272461], radius: 0.032227 },
+  { id: "grey", centre: [0.727051, 0.272461], radius: 0.032227 },
+];
 
 const BLOB_HEADER_SIZE = 32;
 
@@ -139,6 +152,7 @@ export function writePack({
     textures: { tex1: "atlas.png" },
     unit: PART_UNIT,
     swatches: SWATCHES,
+    roundPanels: ROUND_PANELS,
     geometry: {
       file: "parts.bin.gz",
       encoding: "gzip",

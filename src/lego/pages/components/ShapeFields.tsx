@@ -5,12 +5,14 @@
  * its width, depth, height, the height of its low end and which way it slopes
  * (#3328). A sphere has its three radii (so it can be an ellipsoid), whether
  * it is whole, a dome or a bowl, and its rings and sides (#3330). A number the shape cannot take is refused with a line saying why,
- * and the shape keeps what it had.
+ * and the shape keeps what it had. A shape with round ends can show the
+ * pack's round panel on them (#4398), when the pack has one for its colourway.
  */
 
 import { Button, Input } from "@picoframe/frame";
 import { useEffect, useId, useState } from "react";
 
+import { CheckField } from "@/components/Field";
 import { ButtonGroup } from "@/components/ui/button-group";
 import {
   type RoundNumbers,
@@ -19,6 +21,7 @@ import {
 } from "../../roundShape";
 import {
   type LegoShape,
+  roundPanelFor,
   SPHERE_BOWL,
   SPHERE_DOME,
   SPHERE_WHOLE,
@@ -234,6 +237,16 @@ function RoundFields({ shape, onChange }: Props) {
           />
         ))}
       </div>
+      {roundPanelFor(shape) ? (
+        <CheckField
+          label="Hub on ends"
+          checked={(shape.options?.hub ?? 0) !== 0}
+          onChange={(on) => {
+            const { hub: _hub, ...rest } = shape.options ?? {};
+            onChange({ ...shape, options: on ? { ...rest, hub: 1 } : rest });
+          }}
+        />
+      ) : null}
       <p className="text-xs text-muted-foreground">
         Dragging a round side sets the radius.
       </p>

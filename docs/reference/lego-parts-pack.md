@@ -87,7 +87,7 @@ An atlas pack is an extension pack's mirror image. It ships a texture and no par
 - `textures.tex1` is the PNG the pack ships, and it must not be the name any other installed atlas uses. Two atlases with the same file name would land on top of each other in a game's `unittextures/`.
 - It has no `parts` and no `geometry`. A pack that brings both an atlas and parts is skipped: that would be a second parts library, and a unit cannot mix two.
 - **It has to keep the base atlas's UV layout.** Nothing can check this. Every part's UVs are the base pack's, so a redrawn sheet that moves anything leaves those parts sampling the wrong pixels. Resizing the sheet is fine, since UVs are normalised.
-- **It has to keep the base pack's swatches plain.** Generated shapes tile the [swatches](#swatches) the base pack lists, so they are part of the layout too. Keep each swatch, and 8 pixels round it, a plain surface that looks right repeated and mirrored. Paint alpha there to give shapes team colour.
+- **It has to keep the base pack's swatches plain.** Generated shapes tile the [swatches](#swatches) the base pack lists, so they are part of the layout too. Keep each swatch, and 8 pixels round it, a plain surface that looks right repeated and mirrored. Paint alpha there to give shapes team colour. Keep each of its [round panels](#round-panels) round and in place too.
 
 A unit samples one atlas, chosen when the unit is created and changeable at any point while editing. Changing it does nothing to the pieces: every part is mapped into every atlas, so nothing is dropped and nothing is remapped. The change is an ordinary edit, and undo takes it back.
 
@@ -232,6 +232,25 @@ The bundled pack has three swatches, green, tan and grey, each 64 pixels square.
 Only the base pack's swatches count. Extension packs and atlas packs use them. A base pack that lists none offers no shapes. A swatch with no id, an id another swatch has, a rectangle outside the atlas or a `tile` that is not a positive number is skipped, and the Lego Parts screen reports how many.
 
 Choose swatches with an 8 pixel margin of the same surface round each one. That keeps the smaller mipmap levels on the same surface at a tile edge, so filtering does not pull in a neighbouring panel.
+
+## Round panels
+
+A round panel is a circle on the atlas that a cylinder, a tube or a cone can show on its flat ends, in place of its tiled swatch, when **Hub on ends** is ticked in the piece panel. `roundPanels` in the manifest lists them, one per colourway:
+
+```json
+"roundPanels": [
+  { "id": "green", "centre": [0.061035, 0.272461], "radius": 0.032227 }
+]
+```
+
+- `id` matches a swatch's `id`. A shape in a colourway with no round panel has no **Hub on ends** choice.
+- `centre` is in the pack's UVs, v up from the bottom, and `radius` is in the same units. The whole circle must be on the atlas.
+
+The panel is fitted to the end, so it stretches as the radius grows. A tube's end ring shows the outer part of the panel, from the hole's share of the radius out. A shape's UVs on its ends never leave the circle.
+
+The bundled pack's round panels are the seven spoked wheel drawn in each column, 66 pixels in radius. That is the pack's own density on an end 1.6 units in radius. At 3.2 units, twice that, the panel is soft but still reads as drawn. Past that it is visibly blurred.
+
+Only the base pack's round panels count, as with swatches. A panel with no id, an id another panel has, a circle that leaves the atlas or a radius that is not a positive number is skipped, and the Lego Parts screen reports how many.
 
 ## parts.bin
 

@@ -27,6 +27,7 @@ import {
   type RawAtlasManifest,
   type RawPackManifest,
   readAtlasPack,
+  readRoundPanels,
   readSwatches,
 } from "./pack";
 
@@ -658,6 +659,89 @@ describe("the bundled pack", () => {
     for (const swatch of bundled.swatches ?? []) {
       expect(colourways.has(swatch.id)).toBe(true);
     }
+  });
+});
+
+describe("round panels (#4398)", () => {
+  const panel = { id: "grey", centre: [0.5, 0.25], radius: 0.03 };
+
+  it("lists a wheel for each colourway in the bundled pack", () => {
+    const pack = JSON.parse(
+      readFileSync(
+        fileURLToPath(
+          new URL("../../src-tauri/legoparts/pack.json", import.meta.url),
+        ),
+        "utf8",
+      ),
+    ) as LegoPackManifest;
+    expect(readRoundPanels(pack.roundPanels)).toEqual({
+      usable: pack.roundPanels,
+      problem: null,
+    });
+    expect(pack.roundPanels?.map((p) => p.id)).toEqual(
+      pack.swatches?.map((s) => s.id),
+    );
+  });
+
+  it("keeps the base pack's and ignores an extension pack's", () => {
+    const merged = mergePacks([
+      source("base", [part({ id: "a" })], {
+        roundPanels: [panel] as LegoPackManifest["roundPanels"],
+      }),
+      source("extra", [part({ id: "b" })], {
+        extends: "base",
+        roundPanels: [
+          { ...panel, id: "pink" },
+        ] as LegoPackManifest["roundPanels"],
+      }),
+    ]);
+    expect(merged.manifest.roundPanels).toEqual([panel]);
+    expect(merged.problems).toEqual([]);
+  });
+
+  it("leaves a pack that lists none without any", () => {
+    const merged = mergePacks([source("base", [part({ id: "a" })])]);
+    expect(merged.manifest.roundPanels).toBeUndefined();
+    expect(readRoundPanels(undefined)).toEqual({ usable: [], problem: null });
+  });
+
+  it("drops a panel it cannot use and says how many", () => {
+    const read = readRoundPanels([
+      panel,
+      { ...panel },
+      { ...panel, id: "a", radius: 0 },
+      { ...panel, id: "b", centre: [0.99, 0.5] },
+      { ...panel, id: "c", centre: [0.5] },
+      { ...panel, id: "d", radius: "big" },
+      { ...panel, id: "" },
+      null,
+    ]);
+    expect(read.usable).toEqual([panel]);
+    expect(read.problem).toBe(
+      "states 7 round panels that cannot be used, so shapes cannot show them.",
+    );
+  });
+
+  it("refuses round panels that are not a list", () => {
+    expect(readRoundPanels({ grey: panel })).toEqual({
+      usable: [],
+      problem:
+        'states "roundPanels" that are not a list, so shapes cannot show them.',
+    });
+  });
+
+  it("reports a base pack's broken panel when the packs merge", () => {
+    const merged = mergePacks([
+      source("base", [part({ id: "a" })], {
+        roundPanels: [
+          { ...panel, radius: -1 },
+        ] as LegoPackManifest["roundPanels"],
+      }),
+    ]);
+    expect(merged.manifest.roundPanels).toEqual([]);
+    expect(merged.problems).toEqual([
+      '"base" states 1 round panel that cannot be used, so shapes cannot show it.',
+    ]);
   });
 });
 

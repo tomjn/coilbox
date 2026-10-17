@@ -46,7 +46,20 @@ export interface ShapeSwatch {
   tile: number;
 }
 
+/**
+ * A round panel of the atlas a shape with round ends can show on them, as the
+ * base pack's `roundPanels` lists it (#4398). `centre` is in the pack's UVs, v
+ * up from the bottom, and `radius` is in UV units.
+ */
+export interface ShapeRoundPanel {
+  /** Matches a colourway, as a swatch's id does. */
+  id: string;
+  centre: [number, number];
+  radius: number;
+}
+
 let swatches: readonly ShapeSwatch[] = [];
+let roundPanels: readonly ShapeRoundPanel[] = [];
 
 /**
  * Use the base pack's swatches for every shape from now on. The pack loader
@@ -61,6 +74,22 @@ export function setShapeSwatches(list: readonly ShapeSwatch[]): void {
   geometryCache.clear();
 }
 
+/**
+ * Use the base pack's round panels from now on. The pack loader calls this
+ * with the swatches. A change throws away every mesh made with the old ones.
+ */
+export function setShapeRoundPanels(list: readonly ShapeRoundPanel[]): void {
+  if (JSON.stringify(list) === JSON.stringify(roundPanels)) return;
+  roundPanels = list;
+  meshCache.clear();
+  geometryCache.clear();
+}
+
+/** The round panels shapes can show on their ends: the base pack's. */
+export function shapeRoundPanels(): readonly ShapeRoundPanel[] {
+  return roundPanels;
+}
+
 /** The swatches shapes are drawn with: the base pack's. */
 export function shapeSwatches(): readonly ShapeSwatch[] {
   return swatches;
@@ -71,6 +100,22 @@ export function swatchOf(shape: LegoShape): ShapeSwatch | null {
   return (
     swatches.find((swatch) => swatch.id === shape.swatch) ?? swatches[0] ?? null
   );
+}
+
+/**
+ * The round panel a shape could show on its ends: the one for its swatch's
+ * colourway. Null when the kind has no round ends or the pack has no panel for
+ * that colourway. Whether it is shown is the `hub` option.
+ */
+export function roundPanelFor(shape: LegoShape): ShapeRoundPanel | null {
+  if (!isRoundShapeKind(shape.kind)) return null;
+  const swatch = swatchOf(shape);
+  return roundPanels.find((panel) => panel.id === swatch?.id) ?? null;
+}
+
+/** The round panel a shape shows on its ends, or null when it shows none. */
+function shownPanel(shape: LegoShape): ShapeRoundPanel | null {
+  return (shape.options?.hub ?? 0) !== 0 ? roundPanelFor(shape) : null;
 }
 
 /** A shape's mesh in the pack's vertex record, with its own index run. */
@@ -96,6 +141,12 @@ export interface ShapeSolid {
   indices: number[];
   /** Two numbers a vertex, in pack units. */
   unwrapped: number[];
+  /**
+   * Where each vertex of a flat round end is on that end's disc, by vertex:
+   * -1 to 1 across it, 0 at the middle, read as seen from outside. A round
+   * panel is drawn from these (#4398).
+   */
+  disc?: Map<number, [number, number]>;
 }
 
 /** A solid with its atlas UVs, two numbers a vertex. */
@@ -243,14 +294,15 @@ export function getShapeGeometry(
  * #3326 decided how shapes are textured. Each generator unwraps its faces in
  * pack units, and `cutAndTile` cuts the triangles along a grid one tile wide
  * and samples the swatch in each piece, mirrored. With no swatch, which is a
- * pack that lists none, every UV is (0, 0).
+ * pack that lists none, every UV is (0, 0). A shape that shows a round panel
+ * on its ends (#4398) has those ends fitted to the panel instead.
  */
 export function textureShape(
   shape: LegoShape,
   solid: ShapeSolid,
 ): TexturedSolid {
   const swatch = swatchOf(shape);
-  if (swatch) return cutAndTile(solid, swatch);
+  if (swatch) return cutAndTile(solid, swatch, shownPanel(shape));
   return {
     positions: solid.positions,
     normals: solid.normals,
@@ -260,11 +312,12 @@ export function textureShape(
 }
 
 /** One corner of a polygon being cut: where, which way it faces, and its UV
- *  in tiles. */
+ *  in tiles, or on the disc of a round end that shows a panel. */
 interface Corner {
   p: Vec3;
   n: Vec3;
   t: [number, number];
+  onDisc?: true;
 }
 
 /** A UV this close to a grid line is on it, so a cut never leaves a sliver. */
@@ -284,12 +337,21 @@ const SAME_POINT = 1e-6;
  * Where two faces meet at a hard edge, a cap and a side, each is cut on its own
  * grid, so one side has points along the edge the other does not. Those points
  * are added to the other side's edge too, so the mesh stays closed.
+ *
+ * With a `panel`, a triangle on a round end's disc is not cut. Its UVs are the
+ * disc fitted to the panel's circle, so the panel scales with the end.
  */
 export function cutAndTile(
   solid: ShapeSolid,
   swatch: ShapeSwatch,
+  panel: ShapeRoundPanel | null = null,
 ): TexturedSolid {
-  const corner = (i: number): Corner => ({
+  const corner = (i: number): Corner => {
+    const disc = panel ? solid.disc?.get(i) : undefined;
+    if (disc) return { ...place(i), t: [disc[0], disc[1]], onDisc: true };
+    return place(i);
+  };
+  const place = (i: number): Corner => ({
     p: [
       solid.positions[i * 3],
       solid.positions[i * 3 + 1],
@@ -310,11 +372,17 @@ export function cutAndTile(
     polygons.push([0, 1, 2].map((k) => corner(solid.indices[i + k])));
   }
   for (const axis of [0, 1] as const) {
-    polygons = polygons.flatMap((polygon) => cutAlong(polygon, axis));
+    polygons = polygons.flatMap((polygon) =>
+      polygon[0].onDisc ? [polygon] : cutAlong(polygon, axis),
+    );
   }
   polygons = closeEdges(polygons, swatch.tile);
 
   const { min, max } = swatch.uv;
+  const uvOf = (c: Corner) =>
+    c.onDisc && panel
+      ? [0, 1].map((k) => panel.centre[k] + c.t[k] * panel.radius)
+      : [0, 1].map((k) => min[k] + mirror(c.t[k]) * (max[k] - min[k]));
   const out: TexturedSolid = {
     positions: [],
     normals: [],
@@ -323,7 +391,7 @@ export function cutAndTile(
   };
   const ids = new Map<string, number>();
   const id = (c: Corner) => {
-    const uv = [0, 1].map((k) => min[k] + mirror(c.t[k]) * (max[k] - min[k]));
+    const uv = uvOf(c);
     const key = [...c.p, ...c.n, ...uv]
       .map((x) => Math.round(x / SAME_POINT))
       .join(",");
@@ -400,6 +468,7 @@ function between(a: Corner, b: Corner, s: number): Corner {
     p: [mix(a.p[0], b.p[0]), mix(a.p[1], b.p[1]), mix(a.p[2], b.p[2])],
     n: [n[0] / length, n[1] / length, n[2] / length],
     t: [mix(a.t[0], b.t[0]), mix(a.t[1], b.t[1])],
+    ...(a.onDisc ? { onDisc: true as const } : {}),
   };
 }
 
@@ -518,8 +587,16 @@ interface Section {
   c: number;
   half: Vec3;
   sides: number;
-  /** The outer ring, touching all four sides of the box. */
-  ring: { b: number; c: number; nb: number; nc: number }[];
+  /** The outer ring, touching all four sides of the box. `ub` and `uc` are
+   *  the point on a circle of radius 1 it was made from. */
+  ring: {
+    b: number;
+    c: number;
+    nb: number;
+    nc: number;
+    ub: number;
+    uc: number;
+  }[];
 }
 
 /** The axis a round shape runs along: its `axis` option, else y. */
@@ -589,6 +666,8 @@ function section(shape: LegoShape): Section {
     // A stretched circle's normal is stretched the other way.
     nb: cos[k] / (fb.scale * half[b]),
     nc: sin[k] / (fc.scale * half[c]),
+    ub: cos[k],
+    uc: sin[k],
   }));
   return { axis, b, c, half, sides, ring };
 }
@@ -783,25 +862,40 @@ function taper(s: Section, scale: number, top: number) {
  * `hole` is 0, otherwise a ring round a hole that share of the ring's size.
  * `scale` shrinks the ring, for the narrow end of a cone. Projected flat in its
  * own plane, measured from the box's corner.
+ *
+ * Each vertex also gets its place on the end's disc, from the circle the ring
+ * was made from, so a ring that is stretched to fill its box still lands
+ * inside a round panel. The low end is turned over, so a panel reads the same
+ * way round from outside at both ends.
  */
 function end(out: Builder, s: Section, side: 1 | -1, hole: number, scale = 1) {
   const along = side * s.half[s.axis];
   const normal = out.vector(side, 0, 0);
-  const at = (pb: number, pc: number) =>
-    out.vertex(along, pb, pc, normal, [pb + s.half[s.b], pc + s.half[s.c]]);
-  const rim = s.ring.map((r) => at(r.b * scale, r.c * scale));
+  const disc = out.solid.disc ?? new Map<number, [number, number]>();
+  out.solid.disc = disc;
+  const at = (pb: number, pc: number, ub: number, uc: number) => {
+    const i = out.vertex(along, pb, pc, normal, [
+      pb + s.half[s.b],
+      pc + s.half[s.c],
+    ]);
+    disc.set(i, [ub * side, uc]);
+    return i;
+  };
+  const rim = s.ring.map((r) => at(r.b * scale, r.c * scale, r.ub, r.uc));
   const push = (a: number, b: number, c: number) => {
     if (side > 0) out.solid.indices.push(a, b, c);
     else out.solid.indices.push(a, c, b);
   };
   if (hole === 0) {
-    const middle = at(0, 0);
+    const middle = at(0, 0, 0, 0);
     for (let k = 0; k < s.sides; k++) {
       push(middle, rim[k], rim[(k + 1) % s.sides]);
     }
     return;
   }
-  const inner = s.ring.map((r) => at(r.b * hole, r.c * hole));
+  const inner = s.ring.map((r) =>
+    at(r.b * hole, r.c * hole, r.ub * hole, r.uc * hole),
+  );
   for (let k = 0; k < s.sides; k++) {
     const next = (k + 1) % s.sides;
     push(rim[k], rim[next], inner[next]);

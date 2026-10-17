@@ -34,7 +34,13 @@ import {
 } from "./connectors";
 import type { LegoProject } from "./model";
 import { type Problem, problem } from "./problems";
-import { isKnownShapeKind, type ShapeSwatch, setShapeSwatches } from "./shapes";
+import {
+  isKnownShapeKind,
+  type ShapeRoundPanel,
+  type ShapeSwatch,
+  setShapeRoundPanels,
+  setShapeSwatches,
+} from "./shapes";
 
 const BLOB_MAGIC = "CBLEGO\0\0";
 const SUPPORTED_SCHEMA = 1;
@@ -108,6 +114,12 @@ export interface LegoPackManifest {
    * offers no shapes. See `readSwatches`.
    */
   swatches?: ShapeSwatch[];
+  /**
+   * The round panels of the atlas a shape with round ends can show on them,
+   * one per colourway, matched to a swatch by id (#4398). Optional, and only
+   * the base pack's count, as with `swatches`. See `readRoundPanels`.
+   */
+  roundPanels?: ShapeRoundPanel[];
   geometry: {
     file: string;
     encoding: string;
@@ -266,6 +278,55 @@ export function readSwatches(value: unknown): {
   };
 }
 
+/**
+ * The round panels a pack lists that a shape can show, and what was wrong with
+ * the rest, as the end of a sentence about the pack. A panel needs an id no
+ * other panel has, a centre and a positive radius, with the whole circle
+ * inside the atlas.
+ */
+export function readRoundPanels(value: unknown): {
+  usable: ShapeRoundPanel[];
+  problem: string | null;
+} {
+  if (value === undefined) return { usable: [], problem: null };
+  if (!Array.isArray(value)) {
+    return {
+      usable: [],
+      problem:
+        'states "roundPanels" that are not a list, so shapes cannot show them.',
+    };
+  }
+  const usable: ShapeRoundPanel[] = [];
+  let refused = 0;
+  for (const item of value as unknown[]) {
+    const panel = item as Partial<ShapeRoundPanel> | null;
+    const centre = panel?.centre;
+    const radius = panel?.radius;
+    if (
+      typeof panel?.id === "string" &&
+      panel.id !== "" &&
+      !usable.some((p) => p.id === panel.id) &&
+      Array.isArray(centre) &&
+      centre.length === 2 &&
+      isUnit(radius) &&
+      centre.every(
+        (x) => typeof x === "number" && x - radius >= 0 && x + radius <= 1,
+      )
+    ) {
+      usable.push({ id: panel.id, centre: [centre[0], centre[1]], radius });
+    } else {
+      refused++;
+    }
+  }
+  return {
+    usable,
+    problem:
+      refused === 0
+        ? null
+        : `states ${refused} ${refused === 1 ? "round panel" : "round panels"} that cannot be used, so shapes cannot show ${refused === 1 ? "it" : "them"}.`,
+  };
+}
+
 function isUnit(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
@@ -405,6 +466,10 @@ export function mergePacks(sources: PackSource[]): MergedPacks {
   if (swatches.problem) {
     problems.push(`"${base.manifest.id}" ${swatches.problem}`);
   }
+  const roundPanels = readRoundPanels(base.manifest.roundPanels);
+  if (roundPanels.problem) {
+    problems.push(`"${base.manifest.id}" ${roundPanels.problem}`);
+  }
   const parts: LegoPartInfo[] = [];
   const byId = new Map<string, LegoPartInfo>();
   const vertexBlocks: Float32Array[] = [];
@@ -488,6 +553,9 @@ export function mergePacks(sources: PackSource[]): MergedPacks {
       ...(base.manifest.swatches === undefined
         ? {}
         : { swatches: swatches.usable }),
+      ...(base.manifest.roundPanels === undefined
+        ? {}
+        : { roundPanels: roundPanels.usable }),
     },
     parts,
     byId,
@@ -675,6 +743,7 @@ async function fetchLibrary(): Promise<LoadedPack> {
 
   const merged = mergePacks(sources);
   setShapeSwatches(merged.manifest.swatches ?? []);
+  setShapeRoundPanels(merged.manifest.roundPanels ?? []);
   return {
     manifest: merged.manifest,
     parts: merged.parts,
