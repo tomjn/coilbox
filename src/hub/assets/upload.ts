@@ -181,12 +181,13 @@ export async function uploadAssetsToHub(
  * Read off the assets rather than passed in alongside them, so a caller cannot
  * name one game in the report and send another game's pictures. A map picture
  * has no game at all, which makes the whole run unattributable rather than
- * attributable to whatever the units in it happened to say.
+ * attributable to whatever the units in it happened to say. A faction logo is
+ * for a game the way a unit picture is.
  */
 export function gameUploadedFor(assets: readonly AssetUpload[]): string | null {
   let game: string | null = null;
   for (const asset of assets) {
-    if (asset.keyed_on !== "unit") return null;
+    if (asset.keyed_on === "map") return null;
     if (game === null) game = asset.game;
     else if (game !== asset.game) return null;
   }
