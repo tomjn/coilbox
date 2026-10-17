@@ -160,7 +160,7 @@ mod tests {
         let json = serde_json::json!({
             "path": archive, "size": md.len(), "mtime": mtime,
         });
-        std::fs::write(cache.join(format!("v3-{key}.source")), json.to_string()).unwrap();
+        std::fs::write(cache.join(format!("v4-{key}.source")), json.to_string()).unwrap();
     }
 
     /// An installed archive, as a file with some bytes in it.
@@ -183,7 +183,7 @@ mod tests {
     fn a_file_from_an_old_cache_version_goes_and_the_current_one_stays() {
         let games = tempfile::tempdir().unwrap();
         let dir = cache(&[
-            "v3-abcd_unittextures_atlas_dds.dds",
+            "v4-abcd_unittextures_atlas_dds.dds",
             "abcd_unittextures_atlas_dds.dds", // pre-#1919, no version prefix at all
             "v2-abcd_unittextures_atlas_dds.dds",
         ]);
@@ -193,7 +193,7 @@ mod tests {
 
         assert_eq!(
             left(dir.path()),
-            ["v3-abcd.source", "v3-abcd_unittextures_atlas_dds.dds"]
+            ["v4-abcd.source", "v4-abcd_unittextures_atlas_dds.dds"]
         );
     }
 
@@ -217,9 +217,9 @@ mod tests {
     fn a_cache_whose_archives_are_all_installed_loses_nothing() {
         let games = tempfile::tempdir().unwrap();
         let dir = cache(&[
-            "v3-abcd_unittextures_atlas_dds.dds",
-            "v3-abcd_objects3d_armcom_s3o.json",
-            "v3-ef01_unittextures_skin_png.png",
+            "v4-abcd_unittextures_atlas_dds.dds",
+            "v4-abcd_objects3d_armcom_s3o.json",
+            "v4-ef01_unittextures_skin_png.png",
         ]);
         record(dir.path(), "abcd", &archive(games.path(), "ba.sdz"));
         record(dir.path(), "ef01", &archive(games.path(), "sf.sdd"));
@@ -234,9 +234,9 @@ mod tests {
     fn an_uninstalled_archive_s_files_go_and_its_neighbour_s_stay() {
         let games = tempfile::tempdir().unwrap();
         let dir = cache(&[
-            "v3-abcd_unittextures_atlas_dds.dds",
-            "v3-abcd_objects3d_armcom_s3o.json",
-            "v3-ef01_unittextures_skin_png.png",
+            "v4-abcd_unittextures_atlas_dds.dds",
+            "v4-abcd_objects3d_armcom_s3o.json",
+            "v4-ef01_unittextures_skin_png.png",
         ]);
         let gone = archive(games.path(), "ba.sdz");
         record(dir.path(), "abcd", &gone);
@@ -246,7 +246,7 @@ mod tests {
         assert_eq!(sweep(dir.path()), 3);
         assert_eq!(
             left(dir.path()),
-            ["v3-ef01.source", "v3-ef01_unittextures_skin_png.png"]
+            ["v4-ef01.source", "v4-ef01_unittextures_skin_png.png"]
         );
     }
 
@@ -256,7 +256,7 @@ mod tests {
     #[test]
     fn an_archive_replaced_in_place_by_a_new_version_loses_the_old_files() {
         let games = tempfile::tempdir().unwrap();
-        let dir = cache(&["v3-abcd_unittextures_atlas_dds.dds"]);
+        let dir = cache(&["v4-abcd_unittextures_atlas_dds.dds"]);
         let path = archive(games.path(), "ba.sdz");
         record(dir.path(), "abcd", &path);
         std::fs::write(&path, b"a new version, longer than the old").unwrap();
@@ -270,8 +270,8 @@ mod tests {
     #[test]
     fn a_key_with_no_source_record_is_swept() {
         let dir = cache(&[
-            "v3-abcd_unittextures_atlas_dds.dds",
-            "v3-abcd_objects3d_armcom_s3o.json",
+            "v4-abcd_unittextures_atlas_dds.dds",
+            "v4-abcd_objects3d_armcom_s3o.json",
         ]);
 
         assert_eq!(sweep(dir.path()), 2);
@@ -282,7 +282,7 @@ mod tests {
     /// its files, so the worker writes a fresh one rather than skipping it.
     #[test]
     fn a_key_whose_record_does_not_parse_is_swept_with_the_record() {
-        let dir = cache(&["v3-abcd_unittextures_atlas_dds.dds", "v3-abcd.source"]);
+        let dir = cache(&["v4-abcd_unittextures_atlas_dds.dds", "v4-abcd.source"]);
 
         assert_eq!(sweep(dir.path()), 2);
         assert!(left(dir.path()).is_empty());
@@ -298,7 +298,7 @@ mod tests {
         let games = tempfile::tempdir().unwrap();
         let locked = games.path().join("locked");
         std::fs::create_dir(&locked).unwrap();
-        let dir = cache(&["v3-abcd_unittextures_atlas_dds.dds"]);
+        let dir = cache(&["v4-abcd_unittextures_atlas_dds.dds"]);
         record(dir.path(), "abcd", &archive(&locked, "ba.sdz"));
         std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).unwrap();
         let blocked = std::fs::metadata(locked.join("ba.sdz")).is_err();
@@ -317,7 +317,7 @@ mod tests {
     /// there is no evidence either way and it stays.
     #[test]
     fn a_current_file_with_no_readable_key_is_left_alone() {
-        let dir = cache(&["v3-not-a-key.dds", "v3-.source"]);
+        let dir = cache(&["v4-not-a-key.dds", "v4-.source"]);
 
         assert_eq!(sweep(dir.path()), 0);
         assert_eq!(left(dir.path()).len(), 2);
