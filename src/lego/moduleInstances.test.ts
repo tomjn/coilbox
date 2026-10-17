@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
-import { presetById } from "./animPresets";
+import { type AnimPreset, presetById } from "./animPresets";
 import { addBuildArm, BUILD_ARM_ID } from "./buildArm";
 import {
   duplicatePiece,
@@ -323,11 +323,12 @@ describe("two of the same module in the script", () => {
 
   it("counts the copies for the Animation panel", () => {
     const project = twice(ARM);
-    expect(presetCopies(project, presetById("build.aim")!)).toBe(2);
-    expect(presetCopies(project, presetById("buildarm")!)).toBe(2);
-    expect(presetCopies(twice(LEGS), presetById("walk.biped")!)).toBe(2);
+    const preset = (id: string) => presetById(id) as AnimPreset;
+    expect(presetCopies(project, preset("build.aim"))).toBe(2);
+    expect(presetCopies(project, preset("buildarm"))).toBe(2);
+    expect(presetCopies(twice(LEGS), preset("walk.biped"))).toBe(2);
     const one = insertCompound(unit([]), ARM, "root", counter("n"), true);
-    expect(presetCopies(one.project, presetById("build.aim")!)).toBe(1);
+    expect(presetCopies(one.project, preset("build.aim"))).toBe(1);
   });
 
   it("orders instances by where their pieces first appear", () => {
