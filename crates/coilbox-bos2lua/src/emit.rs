@@ -1240,6 +1240,8 @@ const STARTING_HELPERS: &[&str] = &[
     "WaitForMove",
     "WaitForScale",
     "startsHeld",
+    "signal",
+    "setSignalMask",
 ];
 
 const STARTING: &str = "
@@ -1247,31 +1249,71 @@ const STARTING: &str = "
 -- waits or finishes (CobThread.cpp:372-388), and not before the next frame, or
 -- the one after if that thread woke from a sleep to begin it (CobEngine.cpp:
 -- 92-105,173-200). StartThread runs it at once. So each one waits here until
--- then, sleeps those frames, and starts in the order it was begun.
+-- then, and starts in the order it was begun with the signal mask its thread
+-- had when it began it. One sleeping thread starts every one due on a frame,
+-- because the engine's Lua wakes threads due together last asleep first
+-- (unit_script.lua:812-836).
 local starting = {}
 local startsHeld = false
 local woke = false
+local masks = setmetatable({}, {__mode = \"k\"})
+local due = {}
 local startScripts
-local function runStarted(fn, ...)
+local function runStarted(mask, fn, ...)
 \twoke = false
+\tSetSignalMask(mask)
+\tmasks[coroutine.running()] = mask
 \tfn(...)
 \tstartScripts()
 end
 function startScripts()
 \tif #starting == 0 or startsHeld then return end
-\tlocal batch = starting
+\tlocal frame = Spring.GetGameFrame() + (woke and 2 or 1)
+\tlocal list = due[frame]
+\tif not list then
+\t\tlist = {}
+\t\tdue[frame] = list
+\t\tStartThread(function()
+\t\t\tSetSignalMask(0)
+\t\t\tUnitScript.Sleep((frame - Spring.GetGameFrame()) * 33)
+\t\t\tdue[frame] = nil
+\t\t\tfor i = 1, #list do
+\t\t\t\tif not list[i].dead then
+\t\t\t\t\tStartThread(runStarted, list[i].mask, unpack(list[i]))
+\t\t\t\tend
+\t\t\tend
+\t\tend)
+\tend
+\tfor i = 1, #starting do
+\t\tlist[#list + 1] = starting[i]
+\tend
 \tstarting = {}
-\tStartThread(function(frames)
-\t\tUnitScript.Sleep(frames * 33)
-\t\tfor i = 1, #batch do
-\t\t\tStartThread(runStarted, unpack(batch[i]))
-\t\tend
-\tend, woke and 2 or 1)
 end
 ";
 
 const START_SCRIPT: &str = "local function startScript(...)
-\tstarting[#starting + 1] = {...}
+\tstarting[#starting + 1] = {mask = masks[coroutine.running()] or 0, ...}
+end
+";
+
+const SET_SIGNAL_MASK: &str = "local function setSignalMask(mask)
+\tSetSignalMask(mask)
+\tmasks[coroutine.running()] = mask
+end
+";
+
+const SIGNAL: &str =
+    "-- A signal also reaches a script begun before it that has yet to start, which
+-- the engine has added to the unit's threads (CobInstance.cpp:625,744-756).
+local function signal(mask)
+\tSignal(mask)
+\tfor _, list in pairs(due) do
+\t\tfor i = 1, #list do
+\t\t\tif math.bit_and(list[i].mask, mask) ~= 0 then
+\t\t\t\tlist[i].dead = true
+\t\t\tend
+\t\tend
+\tend
 end
 ";
 
@@ -1296,32 +1338,27 @@ const WAIT_SLEEP: &str = "local function Sleep(ms)
 end
 ";
 
-const WAIT_TURN: &str = "local function WaitForTurn(piece, axis)
-\tif UnitScript.IsInTurn(piece, axis) then
-\t\tstartScripts()
-\t\tUnitScript.WaitForTurn(piece, axis)
-\t\twoke = false
-\tend
-end
+const WAITS: &str = "
+-- COB runs a thread whose wait has ended two frames after the animation ends
+-- (UnitScriptEngine.cpp:131-163, CobThread.cpp:838-852, CobEngine.cpp:173-189),
+-- where Lua resumes it in that frame (unit_script.lua:265-280). So each wait
+-- here sleeps those two frames after.
 ";
 
-const WAIT_MOVE: &str = "local function WaitForMove(piece, axis)
-\tif UnitScript.IsInMove(piece, axis) then
-\t\tstartScripts()
-\t\tUnitScript.WaitForMove(piece, axis)
-\t\twoke = false
-\tend
-end
-";
-
-const WAIT_SCALE: &str = "local function WaitForScale(piece)
-\tif UnitScript.IsInScale(piece) then
-\t\tstartScripts()
-\t\tUnitScript.WaitForScale(piece)
-\t\twoke = false
-\tend
-end
-";
+/// The function a `wait-for-turn`, `wait-for-move` or `wait-for-scale` calls,
+/// which waits as `kind` does and then sleeps the frames COB takes to resume.
+/// In a script that holds back `start-script`, it starts what the thread began
+/// before it waits.
+fn wait_helper(kind: &str, params: &str, defers: bool) -> String {
+    let (start, woke) = if defers {
+        ("\t\tstartScripts()\n", "\t\twoke = false\n")
+    } else {
+        ("", "")
+    };
+    format!(
+        "local function WaitFor{kind}({params})\n\tif UnitScript.IsIn{kind}({params}) then\n{start}\t\tUnitScript.WaitFor{kind}({params})\n\t\tUnitScript.Sleep(66)\n{woke}\tend\nend\n"
+    )
+}
 
 const SHARED_VALUES: &str = include_str!("shared_values.lua");
 
@@ -1370,7 +1407,7 @@ struct Writer<'p, 'a> {
 }
 
 impl<'p, 'a> Writer<'p, 'a> {
-    const HELPER_NAMES: [&'static str; 17] = [
+    const HELPER_NAMES: [&'static str; 21] = [
         PIECES,
         "COB_ANGLE",
         "COB_LINEAR",
@@ -1388,6 +1425,10 @@ impl<'p, 'a> Writer<'p, 'a> {
         "WaitForScale",
         "startsHeld",
         "woke",
+        "masks",
+        "due",
+        "signal",
+        "setSignalMask",
     ];
 
     fn new(p: &'p Program<'a>, mode: Mode) -> Self {
@@ -1485,14 +1526,26 @@ impl<'p, 'a> Writer<'p, 'a> {
             lua.push_str(STARTING);
             for (name, text) in [
                 ("startScript", START_SCRIPT),
+                ("setSignalMask", SET_SIGNAL_MASK),
+                ("signal", SIGNAL),
                 ("callStarting", CALL_STARTING),
                 ("Sleep", WAIT_SLEEP),
-                ("WaitForTurn", WAIT_TURN),
-                ("WaitForMove", WAIT_MOVE),
-                ("WaitForScale", WAIT_SCALE),
             ] {
                 if helpers.contains(name) {
                     lua.push_str(text);
+                }
+            }
+        }
+        let waits = [
+            ("WaitForTurn", "Turn", "piece, axis"),
+            ("WaitForMove", "Move", "piece, axis"),
+            ("WaitForScale", "Scale", "piece"),
+        ];
+        if waits.iter().any(|(name, _, _)| helpers.contains(name)) {
+            lua.push_str(WAITS);
+            for (name, kind, params) in waits {
+                if helpers.contains(name) {
+                    lua.push_str(&wait_helper(kind, params, self.p.defers));
                 }
             }
         }
@@ -1649,11 +1702,13 @@ impl<'p, 'a> Writer<'p, 'a> {
         if name == "cobGet" || name == "cobSet" {
             self.helpers.extend(["cobAllied", "cobGet", "cobSet"]);
         }
-        if STARTING_HELPERS.contains(&name) {
+        if STARTING_HELPERS.contains(&name) && self.p.defers {
             self.helpers.extend([
                 "starting",
                 "startsHeld",
                 "woke",
+                "masks",
+                "due",
                 "startScripts",
                 "runStarted",
             ]);
@@ -2769,7 +2824,8 @@ impl<'p, 'a> Writer<'p, 'a> {
             let start = self.header("StartThread");
             let mut all = vec![target.to_string()];
             if starts {
-                all.insert(0, self.helper("runStarted"));
+                // A call-in's thread has no signal mask.
+                all.splice(0..0, [self.helper("runStarted"), "0".to_string()]);
             }
             all.extend(values.iter().cloned());
             format!("{start}({})", all.join(", "))
@@ -3269,11 +3325,7 @@ impl<'p, 'a> Writer<'p, 'a> {
                 self.code(&text, t);
             }
             StmtKind::WaitScale(piece) => {
-                let f = if self.p.defers {
-                    self.helper("WaitForScale")
-                } else {
-                    format!("{}.WaitForScale", self.header("UnitScript"))
-                };
+                let f = self.helper("WaitForScale");
                 let p = self.piece(piece);
                 self.code(&format!("{f}({p})"), t);
             }
@@ -3313,7 +3365,7 @@ impl<'p, 'a> Writer<'p, 'a> {
                 } else {
                     "WaitForMove"
                 };
-                let f = self.waiting(name);
+                let f = self.helper(name);
                 let p = self.piece(piece);
                 let a = self.axis(*axis);
                 self.code(&format!("{f}({p}, {a})"), t);
@@ -3350,11 +3402,13 @@ impl<'p, 'a> Writer<'p, 'a> {
                 self.code(&format!("{f}({p}, {v})"), t);
             }
             StmtKind::Signal(e) | StmtKind::SetSignalMask(e) => {
-                let f = self.header(if matches!(s.kind, StmtKind::Signal(_)) {
-                    "Signal"
-                } else {
-                    "SetSignalMask"
-                });
+                let signal = matches!(s.kind, StmtKind::Signal(_));
+                let f = match (self.p.defers, signal) {
+                    (true, true) => self.helper("signal"),
+                    (true, false) => self.helper("setSignalMask"),
+                    (false, true) => self.header("Signal"),
+                    (false, false) => self.header("SetSignalMask"),
+                };
                 let v = self.num(e).text;
                 self.code(&format!("{f}({v})"), t);
             }
