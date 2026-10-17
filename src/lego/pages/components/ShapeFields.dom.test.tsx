@@ -66,3 +66,47 @@ describe("ShapeFields", () => {
     );
   });
 });
+
+describe("ShapeFields for a wedge (#3328)", () => {
+  const wedge: LegoShape = {
+    kind: "wedge",
+    size: [2, 4, 3],
+    swatch: "green",
+    options: { low: 1 },
+  };
+
+  it("shows width, depth, height and the low end", () => {
+    render(<ShapeFields shape={wedge} onChange={onChange} />);
+    expect(screen.getByLabelText<HTMLInputElement>("Width").value).toBe("2");
+    expect(screen.getByLabelText<HTMLInputElement>("Depth").value).toBe("3");
+    expect(screen.getByLabelText<HTMLInputElement>("Height").value).toBe("4");
+    expect(screen.getByLabelText<HTMLInputElement>("Low end").value).toBe("1");
+    expect(screen.queryByLabelText("Radius")).toBeNull();
+  });
+
+  it("sets the low end", () => {
+    render(<ShapeFields shape={wedge} onChange={onChange} />);
+    type("Low end", "2");
+    expect(onChange.mock.calls[0][0].options.low).toBe(2);
+  });
+
+  it("flips the direction of the slope", () => {
+    render(<ShapeFields shape={wedge} onChange={onChange} />);
+    expect(
+      screen
+        .getByRole("button", { name: "High at back" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "High at front" }));
+    expect(onChange.mock.calls[0][0].options.flip).toBe(1);
+  });
+
+  it("refuses a low end above the height and says why", () => {
+    render(<ShapeFields shape={wedge} onChange={onChange} />);
+    type("Low end", "9");
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert").textContent).toBe(
+      "Low end must be between 0 and the height.",
+    );
+  });
+});
