@@ -430,6 +430,63 @@ describe("parseLegoProjectJson", () => {
     );
   });
 
+  it("round-trips the receipts for the other folders (#4267)", () => {
+    const receipt = (dir: string) => ({
+      dir,
+      at: "2026-09-07T12:00:00.000Z",
+      unitName: "skyfort",
+      def: { maxdamage: 1000 },
+      files: [{ path: `${dir}/units/skyfort.lua`, sha256: "abc" }],
+    });
+    const doc = {
+      ...project([piece("root", null)]),
+      exported: receipt("/games/SF.sdd"),
+      exportedElsewhere: [receipt("/games/BA.sdd")],
+    };
+    expect(parseLegoProjectJson(JSON.stringify(doc))).toEqual(doc);
+  });
+
+  it("loads a project that holds only the single receipt it was saved with (#4267)", () => {
+    const doc = {
+      ...project([piece("root", null)]),
+      exported: {
+        dir: "/games/BA.sdd",
+        at: "",
+        unitName: "skyfort",
+        def: { maxdamage: 1000 },
+        files: [],
+      },
+    };
+    const parsed = parseLegoProjectJson(JSON.stringify(doc));
+    expect(parsed?.exported?.dir).toBe("/games/BA.sdd");
+    expect(parsed?.exportedElsewhere).toBeUndefined();
+  });
+
+  it("keeps one receipt per folder and none for the latest export's folder (#4267)", () => {
+    const receipt = (dir: string) => ({
+      dir,
+      at: "",
+      unitName: "skyfort",
+      def: {},
+      files: [],
+    });
+    const parsed = parseLegoProjectJson(
+      JSON.stringify({
+        ...project([piece("root", null)]),
+        exported: receipt("/games/SF.sdd"),
+        exportedElsewhere: [
+          receipt("/games/sf.sdd/"),
+          receipt("/games/BA.sdd"),
+          receipt("/games/BA.sdd/"),
+          { dir: "", unitName: "x", def: {} },
+        ],
+      }),
+    );
+    expect(parsed?.exportedElsewhere?.map((r) => r.dir)).toEqual([
+      "/games/BA.sdd",
+    ]);
+  });
+
   it("round-trips the names a rename left behind (#2680)", () => {
     const doc = {
       ...project([piece("root", null)]),

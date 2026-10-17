@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { digestsOf, forgetStale, recordExport, samePath } from "./exportRecord";
+import {
+  digestsOf,
+  forgetStale,
+  receiptFor,
+  recordExport,
+  samePath,
+} from "./exportRecord";
 import type { ExportedFile, LegoExport, StaleExport } from "./model";
+import { derivedFields } from "./reexport";
 
 const BA = "/Users/someone/.spring/games/BA.sdd";
 const SF = "/Users/someone/.spring/games/SF.sdd";
@@ -164,5 +171,77 @@ describe("forgetStale", () => {
       files: [],
     };
     expect(forgetStale([one, two], one)).toEqual([two]);
+  });
+});
+
+/**
+ * Issue #4267. A project once held one receipt, so exporting into a second
+ * game and back left the first game's definition with no record of being ours.
+ */
+describe("a receipt per folder", () => {
+  const defFile = (dir: string, sha = "def") =>
+    file(`${dir}/units/skyfort.lua`, sha);
+
+  it("keeps the first folder's receipt when the next export goes elsewhere", () => {
+    const first = recordExport({}, next({ def: { footprintx: 2 } }), [
+      defFile(BA),
+    ]);
+    const second = recordExport(first, next({ dir: SF }), [defFile(SF)]);
+    expect(second.exported.dir).toBe(SF);
+    expect(second.exportedElsewhere.map((r) => r.dir)).toEqual([BA]);
+    expect(receiptFor(second, BA)?.files).toEqual([defFile(BA)]);
+    expect(receiptFor(second, `${SF}/`)?.dir).toBe(SF);
+    expect(receiptFor(second, "/nowhere")).toBeUndefined();
+  });
+
+  it("updates the first folder's definition after an export to the second and back", () => {
+    let project = recordExport({}, next({ def: { footprintx: 2 } }), [
+      defFile(BA),
+    ]);
+    project = recordExport(project, next({ dir: SF, def: { footprintx: 2 } }), [
+      defFile(SF),
+    ]);
+
+    // The build changes, then the unit goes back into the first folder.
+    const build = { footprintx: 3 };
+    const fields = derivedFields(build, receiptFor(project, BA), BA, "skyfort");
+    expect(fields).not.toBeNull();
+    expect(fields?.find((f) => f.path === "footprintx")).toEqual({
+      path: "footprintx",
+      now: 3,
+      last: 2,
+    });
+
+    const back = recordExport(project, next({ def: build }), []);
+    expect(back.exported.dir).toBe(BA);
+    // The digest of the definition written the first time survives the trip.
+    expect(back.exported.files).toEqual([defFile(BA)]);
+    expect(back.exportedElsewhere.map((r) => r.dir)).toEqual([SF]);
+  });
+
+  it("holds one receipt per folder however often the unit moves between them", () => {
+    let project = recordExport({}, next(), []);
+    for (const dir of [SF, BA, SF, BA]) {
+      project = recordExport(project, next({ dir }), []);
+    }
+    expect(project.exportedElsewhere).toHaveLength(1);
+    expect(project.exportedElsewhere[0].dir).toBe(SF);
+  });
+
+  it("leaves a file alone in a folder it has no receipt for", () => {
+    const project = recordExport({}, next(), [defFile(BA)]);
+    expect(
+      derivedFields({ footprintx: 3 }, receiptFor(project, SF), SF, "skyfort"),
+    ).toBeNull();
+  });
+
+  it("calls a rename in a folder stale even when another folder was exported since", () => {
+    let project = recordExport({}, next(), [defFile(BA)]);
+    project = recordExport(project, next({ dir: SF }), []);
+    const renamed = recordExport(project, next({ unitName: "skyfort2" }), []);
+    expect(renamed.staleExports.map((e) => [e.dir, e.unitName])).toEqual([
+      [BA, "skyfort"],
+    ]);
+    expect(renamed.exportedElsewhere.map((r) => r.dir)).toEqual([SF]);
   });
 });

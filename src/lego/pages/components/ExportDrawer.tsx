@@ -62,7 +62,12 @@ import {
 import { pictureDigest } from "../../buildPicture";
 import { exportGlb } from "../../exportGlb";
 import { buildObj } from "../../exportObj";
-import { digestsOf, forgetStale, recordExport } from "../../exportRecord";
+import {
+  digestsOf,
+  forgetStale,
+  receiptFor,
+  recordExport,
+} from "../../exportRecord";
 import { unitScript } from "../../luaScript";
 import type {
   ExportedFile,
@@ -108,6 +113,7 @@ interface Props {
     exportGlb: boolean;
     exportObj: boolean;
     exported: LegoExport;
+    exportedElsewhere: LegoExport[];
     staleExports: StaleExport[];
   }) => void;
   /** The leftovers alone, for when the drawer clears a name's files without
@@ -578,6 +584,9 @@ export function ExportDrawer({
         workshopCompile({ project: made }),
       );
       const def = legoUnitDef(project, bounds, home, totals, weapons.slots);
+      // What coilbox wrote into this folder, which is not always the latest
+      // export's receipt (issue #4267).
+      const folderReceipt = receiptFor(project, dir);
       const exported = await legoExport({
         dir,
         unitName: project.unitName,
@@ -595,7 +604,7 @@ export function ExportDrawer({
         // A script still exactly as the last export wrote it has not been
         // touched, so it is replaced with this build's (issue #3245).
         scriptWritten: writtenDigest(
-          project.exported,
+          folderReceipt,
           dir,
           `scripts/${project.unitName}.lua`,
         ),
@@ -612,12 +621,7 @@ export function ExportDrawer({
         unitDef: buildUnitDef(project, bounds, home, totals, weapons.slots),
         // The fields the build decides, beside what the last export wrote
         // there, so a re-export updates the ones nobody has changed.
-        unitDefFields: derivedFields(
-          def,
-          project.exported,
-          dir,
-          project.unitName,
-        ),
+        unitDefFields: derivedFields(def, folderReceipt, dir, project.unitName),
         // Where the name goes for a game that will not read one in the
         // definition. Coilbox's own file beside the game's, never the game's
         // (issue #2683).
@@ -651,7 +655,7 @@ export function ExportDrawer({
             dir,
             unitName: project.unitName,
             id: project.id,
-            written: pictureDigest(project.exported, dir, project.unitName),
+            written: pictureDigest(folderReceipt, dir, project.unitName),
           });
           pictureKept = placed.kept;
           picturePath = placed.kept ? null : placed.path;
@@ -720,8 +724,9 @@ export function ExportDrawer({
 
       // Only on the way out of a successful export, so the receipt never claims
       // a folder holds a unit that failed to reach it. A re-export overwrites
-      // the one before it: a project has one current export, which is what keeps
-      // a second run from becoming a second unit (issue #2651). Where the name
+      // the receipt for its folder, which is what keeps a second run from
+      // becoming a second unit (issue #2651). The receipts for other folders are
+      // kept (issue #4267). Where the name
       // changed, the receipt it replaces is moved aside rather than dropped,
       // since the files under the old name are still in the folder and after
       // this nothing else knows they are there (issue #2680).
@@ -743,7 +748,7 @@ export function ExportDrawer({
             // written, so the next export still sees the edit.
             def: receiptDef(
               def,
-              project.exported,
+              folderReceipt,
               dir,
               project.unitName,
               exported,

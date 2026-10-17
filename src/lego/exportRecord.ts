@@ -25,6 +25,10 @@
  * Only a rename inside one folder. Exporting into a second game leaves the first
  * game's copy alone, because that is an install somebody asked for rather than
  * something a rename left behind.
+ *
+ * A project keeps one receipt per folder (issue #4267). `exported` is the latest
+ * and the rest are in `exportedElsewhere`, so a folder's record of what coilbox
+ * wrote survives an export into another folder.
  */
 import type {
   ExportedFile,
@@ -76,9 +80,22 @@ function mergeFiles(
   return [...written, ...kept];
 }
 
+/** The receipt for one game folder, whichever export it was. */
+export function receiptFor(
+  project: Pick<LegoProject, "exported" | "exportedElsewhere">,
+  dir: string,
+): LegoExport | undefined {
+  if (project.exported && samePath(project.exported.dir, dir))
+    return project.exported;
+  return project.exportedElsewhere?.find((receipt) =>
+    samePath(receipt.dir, dir),
+  );
+}
+
 /** What one export does to a project's record of where it has been. */
 export interface ExportRecord {
   exported: LegoExport;
+  exportedElsewhere: LegoExport[];
   staleExports: StaleExport[];
 }
 
@@ -89,20 +106,31 @@ export interface ExportRecord {
  * `written` is the files this run actually put on disk, from the Rust half.
  */
 export function recordExport(
-  project: Pick<LegoProject, "exported" | "staleExports">,
+  project: Pick<LegoProject, "exported" | "exportedElsewhere" | "staleExports">,
   next: Omit<LegoExport, "files">,
   written: ExportedFile[],
 ): ExportRecord {
-  const previous = project.exported;
+  // This folder's own receipt, not the latest export's: the latest may be for
+  // another folder.
+  const previous = receiptFor(project, next.dir);
   const sameTarget =
-    previous !== undefined &&
-    samePath(previous.dir, next.dir) &&
-    previous.unitName === next.unitName;
+    previous !== undefined && previous.unitName === next.unitName;
 
   const exported: LegoExport = {
     ...next,
     files: mergeFiles(sameTarget ? previous.files : [], written),
   };
+
+  // The receipts for the other folders: the latest export's, if it was for a
+  // different folder, joins the ones already held.
+  const exportedElsewhere = [
+    ...(project.exported && !samePath(project.exported.dir, next.dir)
+      ? [project.exported]
+      : []),
+    ...(project.exportedElsewhere ?? []).filter(
+      (receipt) => !samePath(receipt.dir, next.dir),
+    ),
+  ];
 
   // The name that has just been exported is not stale, whatever it was before.
   // Renaming back to a name still sitting in the folder is a real way out of
@@ -113,7 +141,7 @@ export function recordExport(
       !(samePath(stale.dir, next.dir) && stale.unitName === next.unitName),
   );
 
-  if (previous && !sameTarget && samePath(previous.dir, next.dir)) {
+  if (previous && !sameTarget) {
     staleExports = [
       ...staleExports.filter((stale) => stale.unitName !== previous.unitName),
       {
@@ -125,7 +153,7 @@ export function recordExport(
     ];
   }
 
-  return { exported, staleExports };
+  return { exported, exportedElsewhere, staleExports };
 }
 
 /** Drop one name from the leftovers, once its files are gone. */

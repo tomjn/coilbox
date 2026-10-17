@@ -20,6 +20,7 @@
  * `project.imported` is what says which kind a unit is.
  */
 
+import { comparablePath } from "./exportRecord";
 import type { RawGeometry } from "./rawGeometry";
 import { type LegoWorth, parseWorth } from "./worth";
 
@@ -521,6 +522,17 @@ export interface LegoProject {
   /** What the last export actually put in a game folder (issue #2651). */
   exported?: LegoExport;
   /**
+   * The receipts for every other game folder the unit has been exported into,
+   * one per folder (issue #4267).
+   *
+   * `exported` is the latest export and stays the one the workshop reads. When
+   * an export goes into a different folder, the receipt it displaces moves here
+   * rather than being dropped, so exporting into a second game does not make
+   * the first forget that coilbox wrote its files. A project saved before this
+   * field has none, and its single receipt is already `exported`.
+   */
+  exportedElsewhere?: LegoExport[];
+  /**
    * The build picture last taken, which an export writes to
    * `unitpics/<unit>.png` (issue #3347). The picture's bytes are stored beside
    * the thumbnail; this is what it was taken with and when.
@@ -659,6 +671,22 @@ function parseExport(raw: unknown): LegoExport | null {
     def: e.def as Record<string, unknown>,
     files: parseExportedFiles(e.files),
   };
+}
+
+/** One receipt per folder, dropping any for the folder `exported` is in. */
+function parseOtherExports(raw: unknown, exported?: LegoExport): LegoExport[] {
+  if (!Array.isArray(raw)) return [];
+  const out: LegoExport[] = [];
+  for (const entry of raw) {
+    const receipt = parseExport(entry);
+    if (!receipt) continue;
+    const taken = (other: LegoExport) =>
+      comparablePath(other.dir) === comparablePath(receipt.dir);
+    if (exported && taken(exported)) continue;
+    if (out.some(taken)) continue;
+    out.push(receipt);
+  }
+  return out;
 }
 
 function parseStaleExports(raw: unknown): StaleExport[] {
@@ -1003,6 +1031,13 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
     ...(() => {
       const exported = parseExport(d.exported);
       return exported ? { exported } : {};
+    })(),
+    ...(() => {
+      const elsewhere = parseOtherExports(
+        d.exportedElsewhere,
+        parseExport(d.exported) ?? undefined,
+      );
+      return elsewhere.length > 0 ? { exportedElsewhere: elsewhere } : {};
     })(),
     ...(() => {
       const picture = parseBuildPicture(d.picture);
