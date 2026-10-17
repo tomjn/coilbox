@@ -115,7 +115,7 @@ function comparable(value: unknown): unknown {
     .sort(([a], [b]) => a.localeCompare(b));
 }
 
-function sameValue(a: unknown, b: unknown): boolean {
+export function sameValue(a: unknown, b: unknown): boolean {
   return JSON.stringify(comparable(a)) === JSON.stringify(comparable(b));
 }
 

@@ -47,6 +47,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Link } from "react-router";
 import { OptionSelect } from "@/components/OptionSelect";
 import {
   Popover,
@@ -63,6 +64,7 @@ import {
 // The "?" tooltip mapconv already built for its own labelled fields. Shared
 // rather than copied: it is a generic control that happens to live in that
 // plugin's folder.
+import type { BuilderFieldMark } from "@/lego/builderFields";
 import { luaLiteral } from "@/lib/lua";
 import { HelpTip } from "@/mapconv/pages/components/Help";
 import {
@@ -78,6 +80,42 @@ import type { FieldRow } from "../../unitSections";
 import { AssetPicker } from "./AssetPicker";
 import { AssetPreview } from "./AssetPreview";
 import { LuaTableValue } from "./LuaTableValue";
+
+/** What the unit builder does with a field of a unit built in it (issue #4242),
+ *  and the project to open in the builder. */
+export interface BuilderMark {
+  kind: BuilderFieldMark;
+  projectId: string;
+  projectName: string;
+}
+
+/** The short label for a field the builder writes, linked to the unit there. */
+function BuilderFieldNote({ mark }: { mark: BuilderMark }) {
+  const label =
+    mark.kind === "set" ? "Set by the unit builder" : "Kept by hand";
+  const detail =
+    mark.kind === "set"
+      ? `${mark.projectName} writes this field on each export. Writing a change to it into the game stops the builder updating it.`
+      : `The file differs from what the last export wrote, so the builder will not change this field again.`;
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Link
+            to={`/lego/${mark.projectId}`}
+            aria-label={`${label}. Open ${mark.projectName} in the unit builder.`}
+            className="shrink-0 rounded-full bg-muted px-1.5 text-[10px] font-medium text-muted-foreground hover:text-foreground"
+          >
+            {label}
+          </Link>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs text-left leading-snug">
+          {detail}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
 
 /** Which editor a value gets, or none. */
 export type ControlKind = "boolean" | "number" | "numberList" | "text" | "raw";
@@ -395,6 +433,7 @@ export function UnitFieldRow({
   choices,
   warning,
   checkMarker,
+  builderMark,
   inheritedLabel = "Game value",
   inPlace,
   post,
@@ -415,6 +454,9 @@ export function UnitFieldRow({
    *  game no longer has the table this value is written into, or the table
    *  itself but nothing left that reads it. */
   checkMarker?: CheckMarker;
+  /** Whether the unit builder keeps this field up to date, on a unit built in
+   *  it (issue #4242). Absent for a field the builder does not write. */
+  builderMark?: BuilderMark;
   /** The game's archive, for a field that names a file in it (issue #2648).
    *  Absent until the listing lands, and on a page with no game picked. */
   assets?: AssetBrowsing;
@@ -547,6 +589,7 @@ export function UnitFieldRow({
               edited
             </span>
           )}
+          {builderMark && <BuilderFieldNote mark={builderMark} />}
           {checkMarker && (
             <TooltipProvider delayDuration={150}>
               <Tooltip>
