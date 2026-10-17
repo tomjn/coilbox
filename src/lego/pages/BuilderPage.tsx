@@ -1,6 +1,7 @@
 import { Button, cn, Input, useHideSidebar } from "@picoframe/frame";
 import {
   Blocks,
+  Bone,
   ChevronDown,
   ChevronRight,
   ChevronUp,
@@ -85,6 +86,7 @@ import {
   groundShape,
   unitUp,
 } from "../environment";
+import { fitPlan } from "../fitPlan";
 import { checkFootprint, footprintProblems } from "../footprint";
 import {
   applyGroupTransform,
@@ -180,6 +182,7 @@ import { AtlasPicker } from "./components/AtlasPicker";
 import { BuildPictureDrawer } from "./components/BuildPictureDrawer";
 import { CollisionPanel } from "./components/CollisionPanel";
 import { ExportDrawer } from "./components/ExportDrawer";
+import { FitPlanDrawer } from "./components/FitPlanDrawer";
 import { GameUnitBrowser } from "./components/GameUnitBrowser";
 import { InventoryFilters, InventoryGrids } from "./components/Inventory";
 import { JoinedTo } from "./components/JoinedTo";
@@ -363,6 +366,8 @@ function Builder({ id }: { id: string | undefined }) {
   const [exporting, setExporting] = useState(false);
   const [testing, setTesting] = useState(false);
   const [picturing, setPicturing] = useState(false);
+  /** Whether the drawer that fits a body plan to the unit's pieces is open. */
+  const [fitting, setFitting] = useState(false);
   /** Whether the part picker for "Change part" is open, and what the last
    *  swap left behind. */
   const [swapping, setSwapping] = useState(false);
@@ -1680,6 +1685,18 @@ function Builder({ id }: { id: string | undefined }) {
           />
         ) : null}
 
+        {fitting ? (
+          <FitPlanDrawer
+            project={draft}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onOpenChange={setFitting}
+            onFit={(plan, counts, picks) =>
+              edit((project) => fitPlan(project, plan, counts, picks).project)
+            }
+          />
+        ) : null}
+
         <TestDrawer
           open={testing}
           onOpenChange={setTesting}
@@ -1838,6 +1855,26 @@ function Builder({ id }: { id: string | undefined }) {
                               </TooltipTrigger>
                               <TooltipContent side="bottom">
                                 Test in game
+                              </TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  onClick={() => {
+                                    // A selection made after this picks a
+                                    // piece, so none is left over from before.
+                                    setSelectedId(null);
+                                    setFitting(true);
+                                  }}
+                                  aria-label="Fit a body plan"
+                                >
+                                  <Bone size={14} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">
+                                Fit a body plan
                               </TooltipContent>
                             </Tooltip>
                             <Tooltip>
