@@ -40,6 +40,11 @@ import {
 } from "@/components/CheckItem";
 import { SourceEditor } from "@/components/SourceEditor";
 import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import {
   Tooltip,
@@ -51,6 +56,7 @@ import { errorText } from "@/lib/helpers";
 import { usePreferredTarget } from "@/play/config";
 import type { LuaMatch } from "@/scenario/pages/components/missionLuaSearch";
 import { adoptGameScript } from "../../adoptGameScript";
+import { hasOldPieceNumbering, isBosConversion } from "../../bosConversion";
 import { lintLuaCallins } from "../../luaCallinLint";
 import { lineNamingPiece, missingPieces } from "../../luaPieces";
 import { buildLuaScript, unitScript } from "../../luaScript";
@@ -111,6 +117,7 @@ export function ScriptTab({
   const [showCoverage, setShowCoverage] = useState(true);
   const [reloading, setReloading] = useState(false);
   const [reloadNote, setReloadNote] = useState<string | null>(null);
+  const [confirmConvert, setConfirmConvert] = useState(false);
   const { target } = usePreferredTarget();
   const owned = project.script !== undefined;
   const compiled = owned ? undefined : project.compiledScript;
@@ -284,6 +291,36 @@ export function ScriptTab({
     }
   }
 
+  // A stored conversion can be made again from the game's `.bos`.
+  const canConvertAgain = Boolean(
+    owned && isBosConversion(project.script) && fromGame?.unit && target,
+  );
+  const outdated = owned && hasOldPieceNumbering(project.script);
+
+  /**
+   * Replace the stored script with a fresh conversion. Only runs once somebody
+   * has confirmed, because the stored Lua may have been edited since.
+   */
+  async function convertAgain() {
+    if (!target) return;
+    setConfirmConvert(false);
+    setReloading(true);
+    setReloadNote(null);
+    try {
+      const found = await adoptGameScript(project, target);
+      if (found.converted && found.script !== null) {
+        onScriptChange(found.script);
+      } else {
+        setReloadNote(
+          found.notes[0] ??
+            `${fromGame?.name ?? "The game"} has no .bos to convert for this unit.`,
+        );
+      }
+    } finally {
+      setReloading(false);
+    }
+  }
+
   async function copy() {
     try {
       await navigator.clipboard.writeText(shown);
@@ -368,6 +405,44 @@ export function ScriptTab({
               {reloading ? "Reading" : "Reload"}
             </Button>
           )}
+          {canConvertAgain && (
+            <Popover open={confirmConvert} onOpenChange={setConfirmConvert}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" disabled={reloading}>
+                  <RefreshCw
+                    className={`size-4 ${reloading ? "animate-spin" : ""}`}
+                  />
+                  {reloading ? "Converting" : "Convert again"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="flex w-72 flex-col gap-3">
+                <div className="flex flex-col gap-1">
+                  <h3 className="text-sm font-medium">Replace this script?</h3>
+                  <p className="text-xs text-muted-foreground">
+                    It is converted from the game's BOS again. Edits you made
+                    since are lost.
+                  </p>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setConfirmConvert(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void convertAgain()}
+                  >
+                    Replace
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
           <Button variant="outline" size="sm" onClick={() => void copy()}>
             {copied ? (
               <Check className="size-4" />
@@ -404,6 +479,12 @@ export function ScriptTab({
               never overwritten, so hand edits survive a re-export.
             </>
           )}
+        </p>
+      )}
+
+      {outdated && (
+        <p className="border-b border-border/60 px-3 py-2 text-xs text-amber-500">
+          Converted before piece numbers were fixed. Convert again.
         </p>
       )}
 
