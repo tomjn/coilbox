@@ -204,17 +204,19 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
         </p>
       )}
 
-      <OptionSelect
-        value={
-          movement?.flies
-            ? FLIES[movement.flies]
-            : (movement?.moveClass ?? STATIC)
-        }
-        onValueChange={pick}
-        options={options}
-        ariaLabel="Movement class"
-        size="sm"
-      />
+      {state.state === "offer" || state.state === "none-fit" || movement ? (
+        <OptionSelect
+          value={
+            movement?.flies
+              ? FLIES[movement.flies]
+              : (movement?.moveClass ?? STATIC)
+          }
+          onValueChange={pick}
+          options={options}
+          ariaLabel="Movement class"
+          size="sm"
+        />
+      ) : null}
       {stored && !own ? (
         <p className="text-xs text-destructive">
           {stored} is not from this unit's game, because it has none.
