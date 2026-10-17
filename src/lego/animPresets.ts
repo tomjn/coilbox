@@ -30,6 +30,10 @@ export const ROLES: LegoRole[] = [
   { id: "flare", label: "Muzzle flare", group: "Weapon" },
   { id: "aim", label: "Aim point", group: "Weapon" },
   { id: "wheel", label: "Wheel", group: "Movement" },
+  // The tread a tracked unit stands on. Nothing animates it, since a unit
+  // script cannot scroll a texture, so it only tells the balance check where
+  // the ground contact is.
+  { id: "track", label: "Track", group: "Movement" },
   { id: "leg.l1.thigh", label: "Front left thigh", group: "Legs" },
   { id: "leg.l1.shin", label: "Front left shin", group: "Legs" },
   { id: "leg.l1.foot", label: "Front left foot", group: "Legs" },
