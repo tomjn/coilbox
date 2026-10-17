@@ -626,9 +626,11 @@ function weaponCountFromDef(unitDef: Record<string, unknown>): number | null {
   const weapons = unitDef.weapons;
   if (!weapons || typeof weapons !== "object") return null;
   const table = weapons as Record<string, unknown>;
+  const entryAt = (slot: number): unknown =>
+    Array.isArray(weapons) ? weapons[slot] : table[String(slot + 1)];
   let highest = 0;
   for (let slot = 0; slot < MAX_WEAPONS_PER_UNIT; slot++) {
-    if (weaponEntryName(table[String(slot + 1)])) {
+    if (weaponEntryName(entryAt(slot))) {
       highest = slot + 1;
       continue;
     }

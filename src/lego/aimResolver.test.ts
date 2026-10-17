@@ -401,6 +401,13 @@ describe("weaponCount", () => {
     expect(weaponCount({ weapons }, [])).toBe(32);
   });
 
+  it("counts a weapons table handed over as a list", () => {
+    expect(weaponCount({ weapons: [{ name: "gatling" }] }, [])).toBe(1);
+    expect(
+      weaponCount({ weapons: [{ name: "gatling" }, { name: "cannon" }] }, []),
+    ).toBe(2);
+  });
+
   it("is 1 for a definition with no weapons table", () => {
     expect(weaponCount({}, ["AimWeapon3"])).toBe(1);
   });
