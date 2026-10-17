@@ -23,6 +23,8 @@ import {
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useEffect, useRef, useState } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
+import { useUnitDefs } from "@/workshop/config";
+import { useModProjects } from "@/workshop/project";
 import {
   contentUnitCheck,
   contentUnitCheckCancel,
@@ -130,6 +132,16 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
     target?.dataDir,
   );
   const { running, launch, cancel } = usePlay();
+  // The test game's own weapons, which a game weapon the unit names is checked
+  // against, and the workshop a library weapon is read from (issue #4264).
+  const { projects: workshopProjects } = useModProjects();
+  const { defs, defsFor } = useUnitDefs(
+    target?.enginePath,
+    target?.dataDir,
+    game?.primaryArchive.name,
+  );
+  const gameWeapons =
+    defs && defsFor === game?.primaryArchive.name ? defs.weaponDefs : null;
 
   const [mapName, setMapName] = useSetting<string>("lego.testMap", "");
 
@@ -143,6 +155,8 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
   }, [open]);
   /** Kept once written, so the reveal button survives a later failure. */
   const [scratchDir, setScratchDir] = useState<string | null>(null);
+  /** The weapons the last write left out of the scratch unit. */
+  const [weaponsLeftOut, setWeaponsLeftOut] = useState<string[]>([]);
   /** The last load check's report, cleared when another run starts. */
   const [check, setCheck] = useState<UnitCheckReport | null>(null);
   /** Which action the busy phases belong to. */
@@ -181,16 +195,20 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
   ): Promise<(WrittenScratchUnit & { name: string }) | null> {
     if (!target || !game) return null;
     setPhase({ state: "writing" });
-    return writeScratchGame({
+    const written = await writeScratchGame({
       target,
       baseGame: game.name,
       project,
       pack,
       raw,
+      workshopProjects,
+      gameWeapons,
       sandbox,
       onWritten: setScratchDir,
       onScanning: () => setPhase({ state: "scanning" }),
     });
+    setWeaponsLeftOut(written.weaponsLeftOut);
+    return written;
   }
 
   /** Write the scratch game, launch it, and say how the engine exited. */
@@ -324,8 +342,11 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
         project,
         pack,
         raw,
+        workshopProjects,
+        gameWeapons,
         sandbox: run.sandbox,
       });
+      setWeaponsLeftOut(written.weaponsLeftOut);
       const changes = sandboxChanges(run.loaded, written);
       const said: string[] = [];
       if (changes.reload) {
@@ -603,6 +624,12 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
                   The game has closed. Launch again to test a change.
                 </p>
               ) : null}
+
+              {weaponsLeftOut.map((line) => (
+                <p key={line} className="text-xs text-muted-foreground">
+                  Left out: {line}
+                </p>
+              ))}
 
               {scratchDir ? (
                 <div className="flex flex-col gap-2 text-xs">
