@@ -34,6 +34,7 @@ vi.mock("../useLegoDocument", () => ({
 
 vi.mock("../projects", () => ({
   useModules: () => [],
+  useLegoCompounds: () => ({ compounds: [], loading: false }),
   useLegoProjects: () => ({ projects: [] }),
   deleteCompound: vi.fn(),
   saveCompound: vi.fn(),

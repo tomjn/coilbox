@@ -229,9 +229,9 @@ describe("copies and moves", () => {
       ["lthigh", "lshin"].includes(p.name),
     );
     expect(out.every((p) => !p.module)).toBe(true);
-    expect(moved.pieces.find((p) => p.name === "rthigh")?.module).toEqual(
-      hip.module,
-    );
+    expect(
+      moved.pieces.find((p) => p.name === "rthigh")?.module?.instance,
+    ).toEqual(hip.module?.instance);
   });
 
   it("keeps the instance when its top piece moves, taking the rest along", () => {

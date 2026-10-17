@@ -95,6 +95,7 @@ import {
 } from "../model";
 import { swapCandidates, useModuleFilter, withLabels } from "../moduleFilter";
 import { defaultMount, moduleConnectors, placeModule } from "../moduleMount";
+import { type ModuleUpdate, moduleUpdates } from "../moduleUpdates";
 import {
   type LegoPartInfo,
   type LoadedPack,
@@ -108,6 +109,7 @@ import { attachToFreeFace, type FaceTarget, placePart } from "../placePart";
 import {
   deleteCompound,
   saveCompound,
+  useLegoCompounds,
   useLegoProjects,
   useModules,
 } from "../projects";
@@ -140,6 +142,7 @@ import { ExportDrawer } from "./components/ExportDrawer";
 import { JoinedTo } from "./components/JoinedTo";
 import { ModelViewport } from "./components/ModelViewport";
 import { ModuleFilters, NoModuleMatches } from "./components/ModuleFilters";
+import { ModuleUpdateBanner } from "./components/ModuleUpdateBanner";
 import { NameInput } from "./components/NameInput";
 import { NoMatches, PartFilters } from "./components/PartFilters";
 import { PartPicker } from "./components/PartPicker";
@@ -209,6 +212,7 @@ function Builder({ id }: { id: string | undefined }) {
   );
   // The built in modules first, then the user's own.
   const compounds = useModules(pack);
+  const { loading: modulesLoading } = useLegoCompounds();
   const moduleFilter = useModuleFilter(compounds);
   // Only for the keep-set when a texture changes: the store is shared, so
   // nothing can decide a key is dead by looking at one unit.
@@ -261,6 +265,8 @@ function Builder({ id }: { id: string | undefined }) {
   const [swapNote, setSwapNote] = useState<string | null>(null);
   /** Whether the module picker for "Swap module" is open. */
   const [swappingModule, setSwappingModule] = useState(false);
+  /** What the module update banner was dismissed at (#3304). */
+  const [dismissedUpdates, setDismissedUpdates] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   /**
    * What playing means for a unit that owns its script: the poses a run of that
@@ -355,6 +361,20 @@ function Builder({ id }: { id: string | undefined }) {
     loadPack().then(setPack, () => setPackFailed(true));
   }, []);
 
+  const moduleOffers = useMemo(
+    () =>
+      draft && pack && !modulesLoading ? moduleUpdates(draft, compounds) : null,
+    [draft, pack, compounds, modulesLoading],
+  );
+  // A dismissal holds for these instances at these module stamps, so it lapses
+  // when a module changes again or another unit is opened.
+  const offerKey = moduleOffers
+    ? `${draft?.id}:${moduleOffers.outdated.map((u) => `${u.instance}@${u.stamp}`).join(",")}`
+    : "";
+  const missingModuleIds = useMemo(
+    () => new Set(moduleOffers?.missing.map((m) => m.moduleId)),
+    [moduleOffers],
+  );
   // The document's own problems, plus anything wrong between it and the packs
   // installed. Both are things to say rather than reasons to refuse the unit.
   const problems = useMemo(
@@ -853,7 +873,11 @@ function Builder({ id }: { id: string | undefined }) {
    * Put another module where the selected piece's module is. One edit, so one
    * undo. What the swap did to kept pieces and presets is told in a notice.
    */
-  function changeModule(pieceId: string, module: LegoProject) {
+  function changeModule(
+    pieceId: string,
+    module: LegoProject,
+    title = "Swap module",
+  ) {
     setSwappingModule(false);
     if (!draft || !pack) return;
     const result = swapModule(draft, pack, pieceId, module, () =>
@@ -876,10 +900,16 @@ function Builder({ id }: { id: string | undefined }) {
     ].filter(Boolean);
     if (said.length > 0)
       void notify({
-        title: "Swap module",
+        title,
         body: said.join(" "),
         level: "info",
       });
+  }
+
+  /** Update one out of date instance to the module as it is now. */
+  function updateInstance(update: ModuleUpdate) {
+    const module = compounds.find((c) => c.id === update.moduleId);
+    if (module) changeModule(update.rootPieceId, module, "Update module");
   }
 
   function movePivot(pieceId: string, pivot: [number, number, number]) {
@@ -1569,6 +1599,16 @@ function Builder({ id }: { id: string | undefined }) {
                         </div>
                       </TooltipProvider>
                     </div>
+
+                    {moduleOffers &&
+                    moduleOffers.outdated.length > 0 &&
+                    dismissedUpdates !== offerKey ? (
+                      <ModuleUpdateBanner
+                        updates={moduleOffers.outdated}
+                        onUpdate={updateInstance}
+                        onDismiss={() => setDismissedUpdates(offerKey)}
+                      />
+                    ) : null}
 
                     {problems.length > 0 ? (
                       <ul className="pointer-events-none mx-auto w-fit max-w-[80%] rounded-md border border-amber-500/40 bg-background/90 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur">
@@ -2399,6 +2439,11 @@ function Builder({ id }: { id: string | undefined }) {
 
                           {selected.module ? (
                             <div className="mt-2">
+                              {missingModuleIds.has(selected.module.id) ? (
+                                <p className="mb-1 text-xs text-muted-foreground">
+                                  Module missing
+                                </p>
+                              ) : null}
                               <Button
                                 size="sm"
                                 variant="outline"

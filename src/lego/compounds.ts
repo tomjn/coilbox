@@ -34,6 +34,7 @@ import {
   pieceById,
   uniquePieceName,
 } from "./model";
+import { moduleStamp, pieceFingerprint } from "./moduleUpdates";
 import { worldMatrix } from "./reparent";
 
 /**
@@ -375,7 +376,11 @@ export function insertCompound(
   // ids as any other insert.
   let moduleRef: LegoModuleRef | undefined;
   const ownModule = () => {
-    moduleRef ??= { id: compound.id, instance: newId() };
+    moduleRef ??= {
+      id: compound.id,
+      instance: newId(),
+      rev: moduleStamp(compound),
+    };
     return moduleRef;
   };
 
@@ -403,18 +408,21 @@ export function insertCompound(
       module: from,
       ...rest
     } = under === parent ? freePiece(piece) : piece;
-    const module = asModule
-      ? ownModule()
-      : from
-        ? { id: from.id, instance: instanceOf(from.instance) }
-        : undefined;
-    return {
+    const placed: LegoPiece = {
       ...rest,
       id,
       name,
       parentId: under,
-      ...(module ? { module } : {}),
     };
+    const module = asModule
+      ? {
+          ...ownModule(),
+          fp: pieceFingerprint(placed, under === parent),
+        }
+      : from
+        ? { ...from, instance: instanceOf(from.instance) }
+        : undefined;
+    return { ...placed, ...(module ? { module } : {}) };
   });
 
   // Presets are judged against the unit as it is after the insert, so a module

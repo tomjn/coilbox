@@ -419,6 +419,19 @@ export interface LegoModuleRef {
   id: string;
   /** Shared by every piece of one insert, and by no other piece. */
   instance: string;
+  /**
+   * The module's content stamp when it was inserted (`moduleStamp`, #3304).
+   * Compared with the module's stamp now to tell the instance is out of date.
+   * Absent on a piece inserted before this existed, which is never offered an
+   * update because nothing says what it was inserted at.
+   */
+  rev?: string;
+  /**
+   * The piece's name and place when it was inserted (`pieceFingerprint`), so a
+   * piece the user has renamed or moved since can be told from one they have
+   * not.
+   */
+  fp?: string;
 }
 
 /**
@@ -1244,7 +1257,12 @@ function parseModuleRef(value: unknown): LegoModuleRef | null {
   const v = value as Record<string, unknown>;
   if (typeof v.id !== "string" || v.id === "") return null;
   if (typeof v.instance !== "string" || v.instance === "") return null;
-  return { id: v.id, instance: v.instance };
+  return {
+    id: v.id,
+    instance: v.instance,
+    ...(typeof v.rev === "string" && v.rev !== "" ? { rev: v.rev } : {}),
+    ...(typeof v.fp === "string" && v.fp !== "" ? { fp: v.fp } : {}),
+  };
 }
 
 /** A piece's weapon, or null when there is nothing usable in it. */
