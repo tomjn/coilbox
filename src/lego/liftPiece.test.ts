@@ -2,12 +2,20 @@ import { describe, expect, it } from "vitest";
 
 import type { ImportedPiece, S3oImport } from "./bindings";
 import {
+  parseClipboardPiece,
+  pastedForUnit,
+  serializeClipboardPiece,
+} from "./clipboard";
+import { duplicatePiece, selectionAsCompound } from "./compounds";
+import {
   holdsLiftedPieces,
   liftCredit,
   liftCredits,
   liftedModuleRefusal,
   liftFromImport,
+  markLifted,
   moduleForUnit,
+  openedFrom,
   textureSheetRefusal,
 } from "./liftPiece";
 import {
@@ -15,8 +23,11 @@ import {
   type LegoUnitGame,
   newProject,
   parseLegoProjectJson,
+  projectProblems,
 } from "./model";
+import { parseModuleFile, serializeModuleFile } from "./moduleFile";
 import { moduleStamp } from "./moduleUpdates";
+import { gameChangeRefusal } from "./unitGame";
 
 function piece(
   name: string,
@@ -339,5 +350,153 @@ describe("the credit a lifted piece shows", () => {
     if (!lifted) throw new Error("no lift");
     const back = parseLegoProjectJson(JSON.stringify(lifted));
     expect(back && liftCredits(back)).toEqual(liftCredits(lifted));
+  });
+});
+
+/**
+ * Issue #3268: every way a lifted piece can reach a unit meets the same rule.
+ * A piece lifted from a game is only for units of that game.
+ */
+describe("a lifted piece in a unit for a different game", () => {
+  const xta: LegoUnitGame = {
+    name: "XTA 9.8",
+    archive: "xta.sdz",
+    shortname: "XTA",
+  };
+  const lifted = () => lift("0.0.0") as LegoProject;
+  const PASTE_REFUSAL =
+    "This piece is from Splinter Faction 0.1.86. This unit is for XTA 9.8.";
+  const ids = () => {
+    let n = 0;
+    return () => `n${++n}`;
+  };
+
+  it("refuses a module with pieces from two games, even when the first is the unit's own", () => {
+    const module = lifted();
+    const mixed = {
+      ...module,
+      pieces: module.pieces.map((p, i) =>
+        i === 1 && p.lifted ? { ...p, lifted: { ...p.lifted, game: xta } } : p,
+      ),
+    };
+    expect(liftedModuleRefusal(unit({ game: sf }), mixed)).toBe(
+      "This piece is from XTA 9.8. This unit is for Splinter Faction 0.1.86.",
+    );
+  });
+
+  it("refuses a paste of a lifted module, which keeps its record through the clipboard", () => {
+    const text = serializeClipboardPiece(lifted(), "other-unit");
+    const parsed = parseClipboardPiece(text, new Set());
+    if (!parsed.ok) throw new Error(parsed.reason);
+    const pasted = pastedForUnit(parsed.piece, "u");
+    expect(pasted.pieces.every((p) => p.lifted?.game.shortname === "SF")).toBe(
+      true,
+    );
+    expect(liftedModuleRefusal(unit({ game: xta }), pasted)).toBe(
+      PASTE_REFUSAL,
+    );
+    expect(liftedModuleRefusal(unit({ game: sf }), pasted)).toBeNull();
+  });
+
+  it("refuses a paste of meshes copied from a unit opened from a game", () => {
+    const opened = lifted();
+    // A unit opened from the game: its meshes carry no lifted record.
+    const source: LegoProject = {
+      ...opened,
+      pieces: opened.pieces.map(({ lifted: _l, ...p }) => p),
+    };
+    expect(openedFrom(source)?.game.shortname).toBe("SF");
+    const text = serializeClipboardPiece(
+      selectionAsCompound(source, [source.rootPieceId], {
+        id: "copy",
+        now: "2026-10-17T00:00:00Z",
+        newId: ids(),
+      }) as LegoProject,
+      "opened-unit",
+      openedFrom(source),
+    );
+    const parsed = parseClipboardPiece(text, new Set());
+    if (!parsed.ok) throw new Error(parsed.reason);
+
+    const pasted = pastedForUnit(parsed.piece, "u");
+    expect(pasted.pieces.every((p) => p.lifted)).toBe(true);
+    expect(liftedModuleRefusal(unit({ game: xta }), pasted)).toBe(
+      "This piece is from Splinter Faction 0.1.86. This unit is for XTA 9.8.",
+    );
+    expect(liftedModuleRefusal(unit({ game: null }), pasted)).toBe(
+      "This unit is for no game. Choose a game first.",
+    );
+    // Pasted back where it came from, it stays a plain copy of the unit's own.
+    expect(
+      pastedForUnit(parsed.piece, "opened-unit").pieces.some((p) => p.lifted),
+    ).toBe(false);
+  });
+
+  it("marks only meshes that have no record, and leaves parts alone", () => {
+    const [root, mesh] = lifted().pieces;
+    const part = {
+      ...root,
+      partId: "barrel_a",
+      meshId: undefined,
+      lifted: undefined,
+    };
+    const marked = markLifted(
+      { ...lifted(), pieces: [part, { ...mesh, lifted: undefined }] },
+      mesh.lifted as NonNullable<typeof mesh.lifted>,
+    );
+    expect(marked.pieces[0].lifted).toBeUndefined();
+    expect(marked.pieces[1].lifted).toBeDefined();
+  });
+
+  it("keeps the record on a duplicate, which stays in its own unit", () => {
+    const module = lifted();
+    const duplicated = duplicatePiece(module, module.rootPieceId, {
+      now: "2026-10-17T00:00:00Z",
+      newId: ids(),
+    });
+    expect(duplicated?.project.pieces.every((p) => p.lifted)).toBe(true);
+  });
+
+  it("keeps the record when a selection is saved as a module", () => {
+    const module = lifted();
+    const saved = selectionAsCompound(module, [module.rootPieceId], {
+      id: "saved",
+      now: "2026-10-17T00:00:00Z",
+      newId: ids(),
+    }) as LegoProject;
+    expect(holdsLiftedPieces(saved)).toBe(true);
+    expect(liftedModuleRefusal(unit({ game: xta }), saved)).toBe(PASTE_REFUSAL);
+  });
+
+  it("keeps the record through a module file, so a loaded module is still refused", () => {
+    const parsed = parseModuleFile(serializeModuleFile(lifted()), new Set());
+    if (!parsed.ok) throw new Error(parsed.reason);
+    expect(liftedModuleRefusal(unit({ game: xta }), parsed.piece.project)).toBe(
+      PASTE_REFUSAL,
+    );
+  });
+
+  it("flags the piece when a saved unit is opened for a different game", () => {
+    const module = lifted();
+    const saved = JSON.stringify({ ...module, id: "u", game: xta });
+    const opened = parseLegoProjectJson(saved);
+    expect(opened).not.toBeNull();
+    expect(projectProblems(opened as LegoProject)).toEqual([
+      `${PASTE_REFUSAL} Pieces from a game: turret, barrel.`,
+    ]);
+  });
+
+  it("refuses to change the unit's game while the pieces are in it", () => {
+    const base = unit({ game: sf });
+    const holding = {
+      ...base,
+      pieces: [...base.pieces, ...lifted().pieces],
+    };
+    expect(gameChangeRefusal(holding, xta)).toBe(
+      "Remove the pieces from Splinter Faction 0.1.86 first: turret, barrel.",
+    );
+    expect(gameChangeRefusal(holding, null)).toBe(
+      "Remove the pieces from Splinter Faction 0.1.86 first: turret, barrel.",
+    );
   });
 });

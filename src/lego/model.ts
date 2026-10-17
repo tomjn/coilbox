@@ -1457,7 +1457,7 @@ function parsePiece(raw: unknown): LegoPiece | null {
 }
 
 /** Where a lifted piece came from, or null without a game and a model. */
-function parseLifted(value: unknown): LegoLifted | null {
+export function parseLifted(value: unknown): LegoLifted | null {
   if (typeof value !== "object" || value === null) return null;
   const v = value as Record<string, unknown>;
   const game = parseUnitGame(v.game);
