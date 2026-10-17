@@ -119,9 +119,12 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
     onMovementChange(suggestMotion(current, game.name, value));
   }
 
-  function setNumber(key: "speed" | "turnRate", text: string) {
+  function setNumber(
+    key: "speed" | "turnRate" | "acceleration" | "brakeRate",
+    text: string,
+  ) {
     if (!movement) return;
-    const fromKey = key === "speed" ? "speedFrom" : "turnRateFrom";
+    const fromKey = `${key}From` as const;
     const { [key]: _value, [fromKey]: _from, ...rest } = movement;
     const value = Number(text);
     onMovementChange(
@@ -206,6 +209,42 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
               min={0}
               value={movement.turnRate ?? ""}
               onChange={(event) => setNumber("turnRate", event.target.value)}
+            />
+          </Field>
+          <Field
+            label="Acceleration, elmos a frame squared"
+            hint={
+              movement.accelerationFrom ??
+              (movement.acceleration !== undefined
+                ? undefined
+                : "Not set, the engine uses 0.5")
+            }
+          >
+            <Input
+              type="number"
+              min={0}
+              step="any"
+              value={movement.acceleration ?? ""}
+              onChange={(event) =>
+                setNumber("acceleration", event.target.value)
+              }
+            />
+          </Field>
+          <Field
+            label="Brake rate, elmos a frame squared"
+            hint={
+              movement.brakeRateFrom ??
+              (movement.brakeRate !== undefined
+                ? undefined
+                : "Not set, the engine brakes at the acceleration")
+            }
+          >
+            <Input
+              type="number"
+              min={0}
+              step="any"
+              value={movement.brakeRate ?? ""}
+              onChange={(event) => setNumber("brakeRate", event.target.value)}
             />
           </Field>
           {!movement.speed ? (

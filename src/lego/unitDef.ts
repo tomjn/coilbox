@@ -108,6 +108,9 @@ const DEFAULT_BUILD_COST_METAL = DEFAULT_BUILD_TIME;
  *
  * `turnrate` is written only when there is one, since the engine's default of 0
  * is a unit that cannot turn and is better left visibly unset than written.
+ * `acceleration` and `brakeRate` are the spellings Splinter Faction and Balanced
+ * Annihilation write, and likewise only when set, so the engine's own defaults
+ * (0.5, and a brake rate equal to the acceleration) apply otherwise.
  */
 function movementFields(project: LegoProject): Record<string, unknown> {
   const movement = project.movement;
@@ -120,6 +123,12 @@ function movementFields(project: LegoProject): Record<string, unknown> {
     speed: movement.speed,
     ...(typeof movement.turnRate === "number"
       ? { turnrate: movement.turnRate }
+      : {}),
+    ...(typeof movement.acceleration === "number"
+      ? { acceleration: movement.acceleration }
+      : {}),
+    ...(typeof movement.brakeRate === "number"
+      ? { brakeRate: movement.brakeRate }
       : {}),
   };
 }

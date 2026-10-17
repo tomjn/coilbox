@@ -22,6 +22,8 @@ import {
   moveClassOf,
   moveDefsOf,
   requiresMoveDef,
+  unitAccelerationOf,
+  unitBrakeRateOf,
   unitSpeedOf,
   unitTurnRateOf,
 } from "@/workshop/moveClasses";
@@ -110,7 +112,10 @@ export function offerMoveClasses(
   return { source: "movedefs", classes };
 }
 
-function median(values: number[]): number | undefined {
+function median(
+  values: number[],
+  round: (value: number) => number = tenth,
+): number | undefined {
   if (values.length === 0) return undefined;
   const sorted = [...values].sort((a, b) => a - b);
   const middle = Math.floor(sorted.length / 2);
@@ -118,9 +123,19 @@ function median(values: number[]): number | undefined {
     sorted.length % 2 === 1
       ? sorted[middle]
       : (sorted[middle - 1] + sorted[middle]) / 2;
-  // The parser holds numbers as 32 bit floats, so a game's 96 arrives as
-  // 96.0000015. A tenth is finer than any speed or turn rate a game writes.
+  return round(value);
+}
+
+// The parser holds numbers as 32 bit floats, so a game's 96 arrives as
+// 96.0000015. A tenth is finer than any speed or turn rate a game writes.
+function tenth(value: number): number {
   return Math.round(value * 10) / 10;
+}
+
+// Accelerations are small: BA writes 0.026 and 0.057, which a tenth would turn
+// into 0. Six significant figures drops the float noise and keeps those.
+function significant(value: number): number {
+  return Number(value.toPrecision(6));
 }
 
 /**
@@ -172,6 +187,26 @@ export function suggestMotion(
     if (turnRate === undefined) continue;
     movement.turnRate = turnRate;
     movement.turnRateFrom = `Median of ${rates.length} ${gameName} units ${pool.label}`;
+    break;
+  }
+  for (const pool of pools) {
+    const values = pool.units
+      .map(unitAccelerationOf)
+      .filter((value): value is number => value !== undefined);
+    const acceleration = median(values, significant);
+    if (acceleration === undefined) continue;
+    movement.acceleration = acceleration;
+    movement.accelerationFrom = `Median of ${values.length} ${gameName} units ${pool.label}`;
+    break;
+  }
+  for (const pool of pools) {
+    const values = pool.units
+      .map(unitBrakeRateOf)
+      .filter((value): value is number => value !== undefined);
+    const brakeRate = median(values, significant);
+    if (brakeRate === undefined) continue;
+    movement.brakeRate = brakeRate;
+    movement.brakeRateFrom = `Median of ${values.length} ${gameName} units ${pool.label}`;
     break;
   }
   return movement;
