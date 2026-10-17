@@ -71,12 +71,12 @@ import {
   groundShape,
   unitUp,
 } from "../environment";
-import { usePartFilter } from "../filter";
 import {
   applyGroupTransform,
   type PieceTransform,
   transformRoots,
 } from "../groupTransform";
+import { useInventoryView } from "../inventory";
 import { canFixMesh, DEFAULT_SMOOTHING_ANGLE_DEG } from "../meshFix";
 import { canMirror, mirrorCopy, mirrorPiece } from "../mirror";
 import {
@@ -93,7 +93,7 @@ import {
   type StaleExport,
   uniquePieceName,
 } from "../model";
-import { swapCandidates, useModuleFilter, withLabels } from "../moduleFilter";
+import { swapCandidates, withLabels } from "../moduleFilter";
 import { defaultMount, moduleConnectors, placeModule } from "../moduleMount";
 import {
   type LegoPartInfo,
@@ -135,14 +135,11 @@ import { AnimationPanel } from "./components/AnimationPanel";
 import { AtlasPicker } from "./components/AtlasPicker";
 import { BuildPictureDrawer } from "./components/BuildPictureDrawer";
 import { CollisionPanel } from "./components/CollisionPanel";
-import { CompoundPicker } from "./components/CompoundPicker";
 import { ExportDrawer } from "./components/ExportDrawer";
+import { InventoryFilters, InventoryGrids } from "./components/Inventory";
 import { JoinedTo } from "./components/JoinedTo";
 import { ModelViewport } from "./components/ModelViewport";
-import { ModuleFilters, NoModuleMatches } from "./components/ModuleFilters";
 import { NameInput } from "./components/NameInput";
-import { NoMatches, PartFilters } from "./components/PartFilters";
-import { PartPicker } from "./components/PartPicker";
 import { collisionHandlePieceId } from "./components/PieceCollisionFields";
 import { PieceTree } from "./components/PieceTree";
 import type { Placing } from "./components/placeByFace";
@@ -209,7 +206,6 @@ function Builder({ id }: { id: string | undefined }) {
   );
   // The built in modules first, then the user's own.
   const compounds = useModules(pack);
-  const moduleFilter = useModuleFilter(compounds);
   // Only for the keep-set when a texture changes: the store is shared, so
   // nothing can decide a key is dead by looking at one unit.
   const { projects } = useLegoProjects();
@@ -224,7 +220,7 @@ function Builder({ id }: { id: string | undefined }) {
   // onto its own texture rather than onto the pack's sheet, so a part dropped
   // into it would sample the wrong image and nothing could put that right.
   const imported = draft?.imported ?? null;
-  const [strip, setStrip] = useState<"parts" | "compounds" | "script">("parts");
+  const [strip, setStrip] = useState<"inventory" | "script">("inventory");
   // Parts and Compounds have nothing for a unit imported whole (issue #712):
   // it has no parts to build with. Script is the one tab that still applies,
   // since an imported unit is usually the one carrying its game's own script.
@@ -349,7 +345,7 @@ function Builder({ id }: { id: string | undefined }) {
    */
   const symmetry = useSymmetry({ project: draft, selectedIds, edit, pack });
   const { queueTwin, place } = symmetry;
-  const filter = usePartFilter(pack);
+  const inventoryView = useInventoryView(pack, compounds);
 
   useEffect(() => {
     loadPack().then(setPack, () => setPackFailed(true));
@@ -379,6 +375,7 @@ function Builder({ id }: { id: string | undefined }) {
   );
 
   function addPart(part: LegoPartInfo) {
+    inventoryView.inventory.record({ kind: "part", id: part.id });
     const pieceId = crypto.randomUUID();
     edit((project) => {
       // New pieces hang off whatever is selected, so building outward from a
@@ -424,6 +421,7 @@ function Builder({ id }: { id: string | undefined }) {
             project
           );
         });
+        inventoryView.inventory.record({ kind: "part", id: part.id });
         setPlacingPart(null);
         return;
       }
@@ -477,6 +475,7 @@ function Builder({ id }: { id: string | undefined }) {
       doc.selectMany(inserted.rootPieceIds);
       for (const pieceId of inserted.rootPieceIds)
         queueTwin(pieceId, inserted.presets.held);
+      inventoryView.inventory.record({ kind: "module", id: module.id });
       setPlacingPart(null);
       return;
     }
@@ -502,6 +501,7 @@ function Builder({ id }: { id: string | undefined }) {
         ) ?? project
       );
     });
+    inventoryView.inventory.record({ kind: "part", id: placingPart.part.id });
     setPlacingPart(null);
   }
 
@@ -703,7 +703,9 @@ function Builder({ id }: { id: string | undefined }) {
       withLabels(mount ? { ...compound, mount } : compound, labels),
     );
     // Showing where it went is the only confirmation the save needs.
-    setStrip("compounds");
+    setStrip("inventory");
+    inventoryView.setKind("modules");
+    inventoryView.setList("all");
   }
 
   function addCompound(compound: LegoProject) {
@@ -714,6 +716,7 @@ function Builder({ id }: { id: string | undefined }) {
       true,
     );
     if (inserted.rootPieceIds.length === 0) return;
+    inventoryView.inventory.record({ kind: "module", id: compound.id });
     doc.selectMany(inserted.rootPieceIds);
     for (const pieceId of inserted.rootPieceIds)
       queueTwin(pieceId, inserted.held);
@@ -1737,25 +1740,14 @@ function Builder({ id }: { id: string | undefined }) {
                     <>
                       <Button
                         size="sm"
-                        variant={strip === "parts" ? "default" : "outline"}
+                        variant={strip === "inventory" ? "default" : "outline"}
                         onClick={() => {
-                          setStrip("parts");
+                          setStrip("inventory");
                           setStripOpen(true);
                         }}
-                        aria-pressed={strip === "parts"}
+                        aria-pressed={strip === "inventory"}
                       >
-                        Parts
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={strip === "compounds" ? "default" : "outline"}
-                        onClick={() => {
-                          setStrip("compounds");
-                          setStripOpen(true);
-                        }}
-                        aria-pressed={strip === "compounds"}
-                      >
-                        Compounds
+                        Inventory
                       </Button>
                     </>
                   )}
@@ -1774,28 +1766,11 @@ function Builder({ id }: { id: string | undefined }) {
                   </Button>
                 </ButtonGroup>
 
-                {stripOpen && effectiveStrip === "parts" ? (
-                  <PartFilters
+                {stripOpen && effectiveStrip === "inventory" && pack ? (
+                  <InventoryFilters
+                    view={inventoryView}
                     pack={pack}
-                    query={filter.query}
-                    onQuery={filter.setQuery}
-                    category={filter.category}
-                    onCategory={filter.setCategory}
-                    packId={filter.packId}
-                    onPackId={filter.setPackId}
-                    shown={filter.parts.length}
-                    className="flex-1"
-                  />
-                ) : null}
-
-                {stripOpen && effectiveStrip === "compounds" ? (
-                  <ModuleFilters
                     compounds={compounds}
-                    query={moduleFilter.query}
-                    onQuery={moduleFilter.setQuery}
-                    category={moduleFilter.category}
-                    onCategory={moduleFilter.setCategory}
-                    shown={moduleFilter.modules.length}
                     className="flex-1"
                   />
                 ) : null}
@@ -1835,46 +1810,36 @@ function Builder({ id }: { id: string | undefined }) {
                       onCompiledReload={reloadCompiled}
                       lastRun={lastScriptRun}
                     />
-                  ) : effectiveStrip === "compounds" &&
-                    compounds.length > 0 &&
-                    moduleFilter.modules.length === 0 ? (
-                    <NoModuleMatches />
-                  ) : effectiveStrip === "compounds" ? (
-                    <CompoundPicker
+                  ) : pack ? (
+                    <InventoryGrids
+                      view={inventoryView}
                       pack={pack}
-                      compounds={moduleFilter.modules}
-                      known={compounds}
+                      compounds={compounds}
                       atlas={drawAtlas}
-                      onInsert={startPlacingModule}
-                      placingId={
-                        placingPart && "module" in placingPart
-                          ? placingPart.module.id
-                          : undefined
-                      }
-                      onDelete={(compoundId) => void deleteCompound(compoundId)}
-                      onRename={(compound, name) =>
-                        void saveCompound({ ...compound, name })
-                      }
-                      onCopy={(compound) => void saveCompound(compound)}
-                      onLabels={(compound, labels) =>
-                        void saveCompound(withLabels(compound, labels))
-                      }
-                    />
-                  ) : filter.parts.length === 0 ? (
-                    <NoMatches />
-                  ) : (
-                    <PartPicker
-                      pack={pack}
-                      parts={filter.parts}
-                      atlas={drawAtlas}
-                      selectedId={
+                      selectedPartId={
                         placingPart && "part" in placingPart
                           ? placingPart.part.id
                           : undefined
                       }
-                      onSelect={startPlacing}
+                      onSelectPart={startPlacing}
+                      onInsertModule={startPlacingModule}
+                      placingModuleId={
+                        placingPart && "module" in placingPart
+                          ? placingPart.module.id
+                          : undefined
+                      }
+                      onDeleteModule={(compoundId) =>
+                        void deleteCompound(compoundId)
+                      }
+                      onRenameModule={(compound, name) =>
+                        void saveCompound({ ...compound, name })
+                      }
+                      onCopyModule={(compound) => void saveCompound(compound)}
+                      onLabelsModule={(compound, labels) =>
+                        void saveCompound(withLabels(compound, labels))
+                      }
                     />
-                  )}
+                  ) : null}
                 </div>
               ) : null}
             </div>

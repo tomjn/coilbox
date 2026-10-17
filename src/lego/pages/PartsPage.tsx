@@ -1,21 +1,13 @@
-import { Button } from "@picoframe/frame";
 import { ToyBrick, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { usePartFilter } from "../filter";
-import { useModuleFilter, withLabels } from "../moduleFilter";
+import { useInventoryView } from "../inventory";
+import { withLabels } from "../moduleFilter";
 import { type LegoPartInfo, type LoadedPack, loadPack } from "../pack";
 import { deleteCompound, saveCompound, useModules } from "../projects";
-import { CompoundPicker } from "./components/CompoundPicker";
-import { ModuleFilters, NoModuleMatches } from "./components/ModuleFilters";
+import { InventoryFilters, InventoryGrids } from "./components/Inventory";
 import { PartDetail } from "./components/PartDetail";
-import {
-  NoMatches,
-  PackAtlases,
-  PackProblems,
-  PartFilters,
-} from "./components/PartFilters";
-import { PartPicker } from "./components/PartPicker";
+import { PackAtlases, PackProblems } from "./components/PartFilters";
 
 type Status =
   | { state: "loading" }
@@ -32,7 +24,6 @@ type Status =
 export default function PartsPage() {
   const [status, setStatus] = useState<Status>({ state: "loading" });
   const [selected, setSelected] = useState<LegoPartInfo | null>(null);
-  const [tab, setTab] = useState<"parts" | "compounds">("parts");
 
   useEffect(() => {
     let live = true;
@@ -53,9 +44,7 @@ export default function PartsPage() {
   const pack = status.state === "ready" ? status.pack : null;
   // The built in modules first, then the user's own.
   const compounds = useModules(pack);
-  const moduleFilter = useModuleFilter(compounds);
-  const filter = usePartFilter(pack);
-  const parts = filter.parts;
+  const view = useInventoryView(pack, compounds);
 
   return (
     <div className="flex h-full flex-col">
@@ -77,88 +66,37 @@ export default function PartsPage() {
         <>
           <PackProblems pack={pack} />
           <PackAtlases pack={pack} />
-          <div className="flex items-center gap-2 border-b border-border px-6 py-3">
-            <div className="flex gap-1">
-              <Button
-                size="sm"
-                variant={tab === "parts" ? "default" : "ghost"}
-                onClick={() => setTab("parts")}
-              >
-                Parts
-              </Button>
-              <Button
-                size="sm"
-                variant={tab === "compounds" ? "default" : "ghost"}
-                onClick={() => setTab("compounds")}
-              >
-                Compounds
-              </Button>
-            </div>
-            {tab === "parts" ? (
-              <PartFilters
-                pack={pack}
-                query={filter.query}
-                onQuery={filter.setQuery}
-                category={filter.category}
-                onCategory={filter.setCategory}
-                packId={filter.packId}
-                onPackId={filter.setPackId}
-                shown={parts.length}
-                className="flex-1"
-              />
-            ) : (
-              <ModuleFilters
-                compounds={compounds}
-                query={moduleFilter.query}
-                onQuery={moduleFilter.setQuery}
-                category={moduleFilter.category}
-                onCategory={moduleFilter.setCategory}
-                shown={moduleFilter.modules.length}
-                className="flex-1"
-              />
-            )}
-          </div>
-
-          {tab === "compounds" ? (
-            compounds.length > 0 && moduleFilter.modules.length === 0 ? (
-              <NoModuleMatches />
-            ) : (
-              <div className="flex min-h-0 flex-1">
-                <CompoundPicker
-                  pack={pack}
-                  compounds={moduleFilter.modules}
-                  known={compounds}
-                  onDelete={(id) => void deleteCompound(id)}
-                  onRename={(compound, name) =>
-                    void saveCompound({ ...compound, name })
-                  }
-                  onCopy={(compound) => void saveCompound(compound)}
-                  onLabels={(compound, labels) =>
-                    void saveCompound(withLabels(compound, labels))
-                  }
-                />
-              </div>
-            )
-          ) : parts.length === 0 ? (
-            <NoMatches />
-          ) : (
-            <div className="flex min-h-0 flex-1">
-              <PartPicker
-                pack={pack}
-                parts={parts}
-                selectedId={selected?.id}
-                onSelect={setSelected}
-              />
-              {selected ? (
+          <InventoryFilters
+            view={view}
+            pack={pack}
+            compounds={compounds}
+            className="border-b border-border px-6 py-3"
+          />
+          <InventoryGrids
+            view={view}
+            pack={pack}
+            compounds={compounds}
+            selectedPartId={selected?.id}
+            onSelectPart={setSelected}
+            onDeleteModule={(id) => void deleteCompound(id)}
+            onRenameModule={(compound, name) =>
+              void saveCompound({ ...compound, name })
+            }
+            onCopyModule={(compound) => void saveCompound(compound)}
+            onLabelsModule={(compound, labels) =>
+              void saveCompound(withLabels(compound, labels))
+            }
+            aside={
+              selected ? (
                 <PartDetail
                   pack={pack}
                   part={selected}
                   onSelect={setSelected}
                   onClose={() => setSelected(null)}
                 />
-              ) : null}
-            </div>
-          )}
+              ) : null
+            }
+          />
         </>
       ) : null}
     </div>
