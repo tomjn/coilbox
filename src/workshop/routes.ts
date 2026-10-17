@@ -67,13 +67,16 @@ export function unitEditPath(
   projects: readonly ModProject[],
   gameName: string,
   unitKey: string,
+  fieldPath?: string,
 ): string {
   const project = newestProjectForGame(projects, gameName);
-  if (project) return projectPath(project.id, unitKey);
+  if (project) return projectPath(project.id, unitKey, fieldPath);
   // Built with `URLSearchParams` rather than `encodeURIComponent`, because the
   // page reads it back with `useSearchParams` and a game installs under a name
   // with spaces in it ("Beyond All Reason test-...").
-  return `/workshop/new?${new URLSearchParams({ game: gameName, unit: unitKey })}`;
+  const params: Record<string, string> = { game: gameName, unit: unitKey };
+  if (fieldPath) params.field = fieldPath;
+  return `/workshop/new?${new URLSearchParams(params)}`;
 }
 
 /**
