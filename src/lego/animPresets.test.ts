@@ -18,9 +18,9 @@ import {
   restAngleWarnings,
   TURRET_TRACK,
   unmetRequirements,
+  WAKE_WHILE_MOVING,
   WALK_BIPED,
   WALK_QUAD,
-  WAKE_WHILE_MOVING,
   WHEELS_ROLL,
   WRECK_POSE,
 } from "./animPresets";
