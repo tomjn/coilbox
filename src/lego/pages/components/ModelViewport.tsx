@@ -129,6 +129,7 @@ import {
   captureThumbnail,
   readyToCapture,
 } from "../../thumbnail";
+import { ELMOS_PER_FOOTPRINT } from "../../unitDef";
 import type { SymmetryMode } from "../../useSymmetry";
 import {
   applySnap,
@@ -1629,6 +1630,9 @@ export function ModelViewport({
     showGrid,
     showReference,
     gameReference,
+    unitWidth: project.skeleton?.target
+      ? project.skeleton.target.footprint.x * ELMOS_PER_FOOTPRINT
+      : 0,
     backdrop,
     ground: ground.choice.id,
     shape: ground.shape,

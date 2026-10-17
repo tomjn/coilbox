@@ -10,7 +10,9 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { BIPED, type BodyPlan, projectFromPlan } from "../../bodyPlans";
+import { BUILDING } from "../../buildingPlans";
 import type { LegoProject } from "../../model";
+import { projectFromTarget } from "../../skeletonSize";
 import { WHEELED } from "../../vehiclePlans";
 import { ProportionsPanel } from "./ProportionsPanel";
 
@@ -33,16 +35,18 @@ function unit(plan: BodyPlan, proportions?: Record<string, number>) {
 function show(project: LegoProject, plan: BodyPlan) {
   const onChange = vi.fn();
   const onPreview = vi.fn();
+  const onTarget = vi.fn();
   render(
     <ProportionsPanel
       project={project}
       plan={plan}
       onChange={onChange}
       onPreview={onPreview}
+      onTarget={onTarget}
       preview={null}
     />,
   );
-  return { onChange, onPreview };
+  return { onChange, onPreview, onTarget };
 }
 
 function type(label: string, text: string) {
@@ -131,5 +135,118 @@ describe("ProportionsPanel", () => {
 
     expect(onChange).toHaveBeenCalledWith({ axles: 2 });
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  describe("size", () => {
+    const options = {
+      id: "u",
+      rootPieceId: "root",
+      name: "Unit",
+      packId: "p",
+      packVersion: "1",
+      now: "2026-01-01T00:00:00.000Z",
+      newId: (() => {
+        let n = 0;
+        return () => `piece-${++n}`;
+      })(),
+    };
+
+    it("reads out the skeleton's size in steps, elmos and height", () => {
+      show(
+        unit(WHEELED, {
+          axles: 3,
+          axleSpacing: 20,
+          trackWidth: 28,
+          wheelHeight: 5,
+        }),
+        WHEELED,
+      );
+
+      expect(
+        screen.getByText("Size 2 by 3 steps (28 by 40 elmos), 5 elmos tall"),
+      ).toBeTruthy();
+    });
+
+    it("starts the target fields from the size when the unit has no target", () => {
+      show(unit(WHEELED), WHEELED);
+
+      expect(
+        (screen.getByLabelText("Footprint across") as HTMLInputElement).value,
+      ).toBe("2");
+      expect((screen.getByLabelText("Height") as HTMLInputElement).value).toBe(
+        "4.7",
+      );
+    });
+
+    it("fits to the target typed", () => {
+      const { onTarget } = show(unit(WHEELED), WHEELED);
+
+      fireEvent.change(screen.getByLabelText("Footprint deep"), {
+        target: { value: "4" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Fit" }));
+
+      expect(onTarget).toHaveBeenCalledExactlyOnceWith({
+        footprint: { x: 2, z: 4 },
+        height: 4.7,
+      });
+    });
+
+    it("does not fit to a target that is not a number", () => {
+      const { onTarget } = show(unit(WHEELED), WHEELED);
+
+      fireEvent.change(screen.getByLabelText("Height"), {
+        target: { value: "tall" },
+      });
+
+      const fit = screen.getByRole("button", {
+        name: "Fit",
+      }) as HTMLButtonElement;
+      expect(fit.disabled).toBe(true);
+      expect(onTarget).not.toHaveBeenCalled();
+    });
+
+    it("says where the skeleton is past its target", () => {
+      const fitted = projectFromTarget(
+        WHEELED,
+        { footprint: { x: 2, z: 2 }, height: 5 },
+        options,
+      );
+      const longer: LegoProject = {
+        ...fitted,
+        skeleton: fitted.skeleton && {
+          ...fitted.skeleton,
+          proportions: { ...fitted.skeleton.proportions, axleSpacing: 40 },
+        },
+      };
+      show(longer, WHEELED);
+
+      expect(screen.getByText("Past the target in length.")).toBeTruthy();
+    });
+
+    it("says nothing about the target when the skeleton is inside it", () => {
+      const fitted = projectFromTarget(
+        WHEELED,
+        { footprint: { x: 2, z: 2 }, height: 5 },
+        options,
+      );
+      show(fitted, WHEELED);
+
+      expect(screen.queryByText(/Past the target/)).toBeNull();
+    });
+
+    it("still offers a size to a plan with nothing to slide", () => {
+      const building = projectFromTarget(
+        BUILDING,
+        { footprint: { x: 9, z: 9 }, height: 30 },
+        options,
+      );
+      show(building, BUILDING);
+
+      expect(
+        screen.getByText("Size 9 by 9 steps (144 by 144 elmos), 30 elmos tall"),
+      ).toBeTruthy();
+      expect(screen.queryAllByRole("slider")).toHaveLength(0);
+    });
   });
 });
