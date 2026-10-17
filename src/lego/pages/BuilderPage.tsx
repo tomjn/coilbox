@@ -629,7 +629,7 @@ function Builder({ id }: { id: string | undefined }) {
   }
 
   /**
-   * Add a cylinder, tube or wedge at the selected piece's origin, as a part added
+   * Add a cylinder, tube, cone or wedge at the selected piece's origin, as a part added
    * with Alt is. It is sized in the piece panel. #3337 moves shapes into the
    * strip beside the parts.
    */
@@ -2331,6 +2331,13 @@ function Builder({ id }: { id: string | undefined }) {
                       onClick={() => addShape("tube")}
                     >
                       Tube
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => addShape("cone")}
+                    >
+                      Cone
                     </Button>
                     <Button
                       size="sm"

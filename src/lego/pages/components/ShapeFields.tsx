@@ -1,6 +1,7 @@
 /**
  * A generated shape's numbers in the piece panel. A cylinder or a tube has the
- * axis it runs along, its radius, length, wall and sides (#3327). A wedge has
+ * axis it runs along, its radius, length, wall and sides (#3327). A cone has
+ * its bottom and top radius, height and sides (#3329). A wedge has
  * its width, depth, height, the height of its low end and which way it slopes
  * (#3328). A number the shape cannot take is refused with a line saying why,
  * and the shape keeps what it had.
@@ -115,9 +116,13 @@ function RoundFields({ shape, onChange }: Props) {
     onChange(result.shape);
   }
 
+  const cone = shape.kind === "cone";
   const fields: { name: keyof RoundNumbers; label: string }[] = [
-    { name: "radius", label: "Radius" },
-    { name: "length", label: "Length" },
+    { name: "radius", label: cone ? "Bottom radius" : "Radius" },
+    ...(numbers.top === undefined
+      ? []
+      : [{ name: "top" as const, label: "Top radius" }]),
+    { name: "length", label: cone ? "Height" : "Length" },
     ...(numbers.wall === undefined
       ? []
       : [{ name: "wall" as const, label: "Wall" }]),
