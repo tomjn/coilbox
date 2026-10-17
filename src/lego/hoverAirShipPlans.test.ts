@@ -230,13 +230,25 @@ describe("the hovercraft plan", () => {
     });
   });
 
-  it("applies Hover and bob, and gives the role to the hull alone", () => {
-    expect(HOVER.presets).toEqual([{ presetId: "hover.bob", params: {} }]);
+  it("applies Hover and bob and Wake while moving, and gives the roles to the hull and the wake", () => {
+    expect(HOVER.presets).toEqual([
+      { presetId: "hover.bob", params: {} },
+      { presetId: "wake.moving", params: {} },
+    ]);
     const project = fromPlan(HOVER);
     expect(pieceForBone(project, "hull").role).toBe("base");
+    expect(pieceForBone(project, "wake").role).toBe("wake");
     expect(
-      project.pieces.filter((p) => p.bone !== "hull").map((p) => p.role),
-    ).toEqual([undefined, undefined, undefined, undefined, undefined]);
+      project.pieces
+        .filter((p) => p.bone !== "hull" && p.bone !== "wake")
+        .map((p) => p.role),
+    ).toEqual([undefined, undefined, undefined, undefined]);
+  });
+
+  it("emits a wake from the stern, forwards and reversing, in the generated script", () => {
+    const lua = buildLuaScript(fromPlan(HOVER));
+    expect(lua).toContain("EmitSfx(wake, sfx)");
+    expect(lua).toContain("SFX.REVERSE_WAKE");
   });
 
   it.each<Record<string, number>>([
@@ -299,12 +311,13 @@ describe("the ship plan", () => {
       ["turret", "turret"],
       ["barrel", "barrel"],
       ["flare", "flare"],
-      ["wake", undefined],
+      ["wake", "wake"],
       ["rudder", "rudder"],
     ]);
-    expect(project.animations?.map((a) => a.presetId)).toContain(
-      "rudder.follow",
+    expect(project.animations?.map((a) => a.presetId)).toEqual(
+      expect.arrayContaining(["rudder.follow", "wake.moving"]),
     );
+    expect(pieceForBone(project, "wake").role).toBe("wake");
     expect(pieceForBone(project, "hull").id).toBe(project.rootPieceId);
   });
 

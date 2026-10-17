@@ -1373,7 +1373,7 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
     parsed,
   );
   const skeleton = parseSkeleton(d.skeleton);
-  const pieces = withTrackRoles(
+  const pieces = withPlanRoles(
     withOwnedBones(sheeted, skeleton !== null),
     skeleton,
   );
@@ -1546,21 +1546,33 @@ function withOwnedBones(
 }
 
 /**
- * A tracked unit saved before the track role has its two track bones without a
- * role. Give them the role, but only where the bone is the plan's own `track.l`
- * or `track.r` and the piece has no role of its own.
+ * The roles a body plan gave its own bones after units were first saved from
+ * it: the track role on a tracked unit's two track bones, and the wake point
+ * role on a ship's or hovercraft's wake bone.
  */
-function withTrackRoles(
+const PLAN_BONE_ROLES: Record<string, Record<string, string>> = {
+  tracked: { "track.l": "track", "track.r": "track" },
+  ship: { wake: "wake" },
+  hover: { wake: "wake" },
+};
+
+/**
+ * A unit saved before a plan gave a bone its role has that bone without one.
+ * Give it the role, but only where the bone is the plan's own and the piece
+ * has no role of its own.
+ */
+function withPlanRoles(
   pieces: LegoPiece[],
   skeleton: LegoSkeleton | null,
 ): LegoPiece[] {
-  if (skeleton?.plan !== "tracked") return pieces;
-  return pieces.map((piece) =>
-    piece.role === undefined &&
-    (piece.bone === "track.l" || piece.bone === "track.r")
-      ? { ...piece, role: "track" }
-      : piece,
-  );
+  const roles = skeleton ? PLAN_BONE_ROLES[skeleton.plan] : undefined;
+  if (!roles) return pieces;
+  return pieces.map((piece) => {
+    const role = piece.bone === undefined ? undefined : roles[piece.bone];
+    return piece.role === undefined && role !== undefined
+      ? { ...piece, role }
+      : piece;
+  });
 }
 
 /** A module's tags, trimmed. Blank and non-text entries are dropped. */

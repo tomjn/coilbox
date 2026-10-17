@@ -18,6 +18,7 @@ import {
   restAngleWarnings,
   TURRET_TRACK,
   unmetRequirements,
+  WAKE_WHILE_MOVING,
   WALK_BIPED,
   WALK_QUAD,
   WHEELS_ROLL,
@@ -184,7 +185,8 @@ describe("presets", () => {
   it("gives a preset that animates nothing no parameters to animate with", () => {
     for (const preset of PRESETS) {
       if (preset.animates.length > 0) continue;
-      expect(preset.params).toEqual([]);
+      // The wake's interval is how often it emits, not how far anything moves.
+      if (preset !== WAKE_WHILE_MOVING) expect(preset.params).toEqual([]);
       expect(preset.track(0, {}, preset.requires[0].role)).toBeNull();
     }
   });
