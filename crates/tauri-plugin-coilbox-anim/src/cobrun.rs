@@ -374,6 +374,9 @@ struct Thread {
     lua: [i32; 10],
     /// The call-in this thread came from, so an error can name it.
     origin: String,
+    /// When it last joined the engine's waiting list, which is the order the
+    /// engine runs that list in.
+    joined: u64,
 }
 
 impl Thread {
@@ -391,6 +394,7 @@ impl Thread {
             state: State::Ready,
             lua: [0; 10],
             origin,
+            joined: 0,
         }
     }
 
@@ -416,6 +420,8 @@ struct Run {
     frame: u32,
     /// The clock a `SLEEP` is measured against, in milliseconds.
     time: i64,
+    /// How many times a thread has joined the waiting list so far.
+    joins: u64,
     budget: i64,
     /// Set when something has gone wrong with the run itself rather than with
     /// one of its threads, which is the difference between stopping and
@@ -472,6 +478,7 @@ impl Run {
             woke: false,
             frame: 0,
             time: 0,
+            joins: 0,
             budget: FRAME_INSTRUCTIONS,
             fatal: false,
             rng: 0x2545_F491_4F6C_DD1D,
@@ -538,16 +545,29 @@ impl Run {
     }
 
     /// Put every thread waiting on an animation that is no longer running back
-    /// on the waiting list, to run on `frame` (`CobThread.cpp:838-852`).
+    /// on the waiting list, to run on `frame` (`CobThread.cpp:838-852`). They
+    /// join it in the order the engine finishes animations, by piece, then
+    /// turns before moves, then axis (`UnitScript.cpp:199-226,287-298`), and
+    /// on each one in thread order (`CobInstance.cpp:526-533`).
     fn end_waits(&mut self, frame: u32) {
-        for thread in &mut self.threads {
-            let State::Waiting { piece, axis, kind } = thread.state else {
-                continue;
-            };
-            let still_going = piece.is_some_and(|piece| self.model.animating(piece, axis, kind));
-            if !still_going {
-                thread.state = State::Starting(frame);
-            }
+        let mut ended: Vec<_> = self
+            .threads
+            .iter()
+            .enumerate()
+            .filter_map(|(index, thread)| match thread.state {
+                State::Waiting { piece, axis, kind }
+                    if !piece.is_some_and(|piece| self.model.animating(piece, axis, kind)) =>
+                {
+                    Some((piece, u8::from(matches!(kind, Wait::Move)), axis, index))
+                }
+                _ => None,
+            })
+            .collect();
+        ended.sort_unstable();
+        for (.., index) in ended {
+            self.joins += 1;
+            self.threads[index].joined = self.joins;
+            self.threads[index].state = State::Starting(frame);
         }
     }
 
@@ -996,14 +1016,38 @@ impl Run {
         Err("this frame's threads never settled: one is waiting on itself".to_string())
     }
 
+    /// The engine runs its running list first, in the order threads joined it,
+    /// and then wakes the sleepers by wake time and then age
+    /// (`CobEngine.h:36-41`, `CobEngine.cpp:136-200`). A call-in's thread is
+    /// the newest there is, so it comes last as it did when the scheduler took
+    /// threads oldest first.
     fn next_ready(&self) -> Option<usize> {
-        self.threads.iter().position(|thread| match thread.state {
-            State::Ready => true,
-            State::Starting(frame) => frame <= self.frame,
-            // The engine wakes a sleeper once the clock has passed its wake
-            // time rather than reached it, so `Sleep(33)` costs two frames.
-            State::Sleeping(wake) => wake < self.time,
-            _ => false,
+        let due = |key: fn(&Thread, u32, i64) -> Option<(i64, u64)>| {
+            self.threads
+                .iter()
+                .enumerate()
+                .filter_map(|(index, thread)| {
+                    key(thread, self.frame, self.time).map(|k| (k, index))
+                })
+                .min()
+                .map(|(_, index)| index)
+        };
+        due(|thread, frame, _| match thread.state {
+            State::Starting(at) if at <= frame => Some((0, thread.joined)),
+            _ => None,
+        })
+        .or_else(|| {
+            due(|thread, _, time| match thread.state {
+                // The engine wakes a sleeper once the clock has passed its wake
+                // time rather than reached it, so `Sleep(33)` costs two frames.
+                State::Sleeping(wake) if wake < time => Some((wake, 0)),
+                _ => None,
+            })
+        })
+        .or_else(|| {
+            self.threads
+                .iter()
+                .position(|thread| matches!(thread.state, State::Ready))
         })
     }
 
@@ -1642,6 +1686,8 @@ impl Run {
             thread.data.push(value);
         }
         thread.state = State::Starting(self.frame + if self.woke { 2 } else { 1 });
+        self.joins += 1;
+        thread.joined = self.joins;
         self.queued.push(thread);
     }
 
