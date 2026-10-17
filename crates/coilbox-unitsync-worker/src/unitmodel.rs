@@ -218,11 +218,6 @@ const PALETTE_READ_CAP: usize = 8192;
 /// installed games use them for unit art.
 const TEXTURE_EXTS: &[&str] = &["dds", "tga", "png", "bmp", "jpg", "jpeg"];
 
-/// A `.3do` face is stretched over the whole of its texture, so its corners take
-/// the corners of the texture rather than a stored UV. Faces with more than four
-/// corners wrap, which is what the engine's own quad-oriented mapping does.
-const CORNER_UV: [[f32; 2]; 4] = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]];
-
 /// Print a `UnitModelOutput` carrying only an error (used on panic/setup fail).
 pub fn emit_error(msg: String) {
     let out = UnitModelOutput {
@@ -1054,7 +1049,11 @@ fn do3_piece(
                 .unwrap_or(prim.normal);
             group.positions.extend_from_slice(&pos);
             group.normals.extend_from_slice(&normal);
-            group.uvs.extend_from_slice(&CORNER_UV[corner % 4]);
+            // A `.3do` face is stretched over the whole of its texture, so its
+            // corners take the corners of the texture rather than a stored UV.
+            group
+                .uvs
+                .extend_from_slice(&coilbox_3do_convert::corner_uv(corner, prim.indices.len()));
         }
         // A face of any corner count is a fan around its first corner. The
         // reader has already dropped everything with fewer than three.
@@ -2102,6 +2101,48 @@ mod tests {
             primitives,
             children: Vec::new(),
         }
+    }
+
+    /// The UVs of the one face in a single-face model, two floats a corner.
+    fn uvs_of_one_face(corners: usize) -> Vec<f32> {
+        let mut root = a_piece(vec![coilbox_3do::Primitive {
+            indices: (0..corners as u32).collect(),
+            texture: coilbox_3do::Texture::Name("arm2".into()),
+            normal: [0.0, 1.0, 0.0],
+            vertex_normals: vec![[0.0, 1.0, 0.0]; corners],
+        }]);
+        root.vertices = (0..corners).map(|i| [i as f32, 0.0, 0.0]).collect();
+        let model = coilbox_3do::Model {
+            radius: 1.0,
+            height: 1.0,
+            mid: [0.0; 3],
+            base_plate_faces: 0,
+            root,
+        };
+        let out = from_3do("objects3d/armcom.3do", &model, None);
+        out.root.expect("root").groups[0].uvs.clone()
+    }
+
+    #[test]
+    fn a_triangle_takes_the_first_three_corners_of_its_texture() {
+        assert_eq!(uvs_of_one_face(3), vec![0.0, 0.0, 1.0, 0.0, 1.0, 1.0]);
+    }
+
+    #[test]
+    fn a_quad_takes_all_four_corners_of_its_texture() {
+        assert_eq!(
+            uvs_of_one_face(4),
+            vec![0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0]
+        );
+    }
+
+    /// The engine's `S3DOPiece::PostProcessGeometry` gives every vertex of a
+    /// face with more than four corners the texture's top left, so the whole
+    /// face is one colour in game (issue #4240).
+    #[test]
+    fn a_face_with_more_than_four_corners_is_all_the_textures_top_left() {
+        assert_eq!(uvs_of_one_face(5), vec![0.0; 10]);
+        assert_eq!(uvs_of_one_face(6), vec![0.0; 12]);
     }
 
     #[test]
