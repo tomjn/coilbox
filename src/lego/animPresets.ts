@@ -1430,7 +1430,7 @@ export const WRECK_POSE: AnimPreset = {
   id: "wreck.pose",
   label: "Wreck pose",
   description:
-    "Poses the body as a collapsed wreck the instant the unit is killed. Not an animation: there is nothing to sample over time, so the piece snaps straight into the pose and stays there.",
+    "Sinks and tilts the body into the wreck the unit leaves when it dies. Export bakes this pose into the wreck's own model. Not an animation: the piece snaps straight into the pose and stays there.",
   requires: [{ role: "base", count: 1 }],
   animates: ["base"],
   params: [
@@ -1469,6 +1469,15 @@ export const WRECK_POSE: AnimPreset = {
   /**
    * Killed is the real death callin (the BOS to Lua converter keeps its name,
    * the same evidence that placed recoil on `Shot1`).
+   *
+   * In a game nobody sees these lines. A `Killed` that returns a number marks
+   * the death script finished (`CLuaUnitScript::Killed`), which is what
+   * `CUnitHandler::QueueDeleteUnit` waits for to remove the unit, and the wreck
+   * the engine puts in its place is a feature with no script.
+   * The pose reaches the game through the wreck's model instead, which
+   * `wreck.ts` bakes from `track` (issue #3310). The lines stay because the
+   * preview runs this script, and they are what make its "Hit and destroyed"
+   * run end on the wreck the game will draw.
    * It already runs once, so this needs no thread and no signal, unlike a
    * looping preset or one that might restart mid-flight.
    *
