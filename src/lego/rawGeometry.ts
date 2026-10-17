@@ -109,12 +109,134 @@ export function parseRawGeometry(blob: Uint8Array): RawGeometry {
   };
 }
 
+/**
+ * The inflated blob for some meshes, in the layout `parseRawGeometry` reads and
+ * `import.rs` writes.
+ */
+export function encodeRawGeometry(raw: RawGeometry): Uint8Array {
+  const meshes = [...raw.byId.values()].map(
+    ({ id, vFirst, vCount, iFirst, iCount, bbox }) => ({
+      id,
+      vFirst,
+      vCount,
+      iFirst,
+      iCount,
+      bbox,
+    }),
+  );
+  const directory = new TextEncoder().encode(JSON.stringify(meshes));
+  const vertexBytes = raw.vertices.byteLength;
+  const indexBytes = raw.indices.byteLength;
+  const indexOffset = BLOB_HEADER_SIZE + vertexBytes;
+  const directoryOffset = indexOffset + indexBytes;
+  const out = new Uint8Array(directoryOffset + directory.length);
+  const view = new DataView(out.buffer);
+  for (let i = 0; i < 8; i++) out[i] = BLOB_MAGIC.charCodeAt(i);
+  view.setUint32(8, SUPPORTED_BLOB_VERSION, true);
+  view.setUint32(12, meshes.length, true);
+  view.setUint32(16, BLOB_HEADER_SIZE, true);
+  view.setUint32(20, vertexBytes, true);
+  view.setUint32(24, indexOffset, true);
+  view.setUint32(28, indexBytes, true);
+  view.setUint32(32, directoryOffset, true);
+  view.setUint32(36, directory.length, true);
+  raw.vertices.forEach((value, i) => {
+    view.setFloat32(BLOB_HEADER_SIZE + i * 4, value, true);
+  });
+  raw.indices.forEach((value, i) => {
+    view.setUint32(indexOffset + i * 4, value, true);
+  });
+  out.set(directory, directoryOffset);
+  return out;
+}
+
+/**
+ * `into` with meshes copied in from `from`, each under a new key (#3259).
+ *
+ * This is how a unit takes in the meshes of a piece lifted from a game: they
+ * are copied into the unit's own sidecar, so the unit owns its geometry the way
+ * an imported unit does and deleting the module from the inventory takes
+ * nothing from it. `keys` maps a mesh's key in `from` to its key in the result.
+ * A key the result already holds is left as it is, which makes taking in the
+ * same module twice add nothing, and a key `from` does not hold is skipped.
+ * Nothing is ever removed, so undoing an insert and redoing it finds the meshes
+ * still there.
+ */
+export function mergeRawGeometry(
+  into: RawGeometry | null,
+  from: RawGeometry,
+  keys: ReadonlyMap<string, string>,
+): RawGeometry {
+  const kept = into ? [...into.byId.values()] : [];
+  const taken = new Set(kept.map((mesh) => mesh.id));
+  const copies: { mesh: RawMesh; id: string }[] = [];
+  for (const [fromKey, toKey] of keys) {
+    const mesh = from.byId.get(fromKey);
+    if (!mesh || taken.has(toKey)) continue;
+    taken.add(toKey);
+    copies.push({ mesh, id: toKey });
+  }
+
+  const baseVertices = into?.vertices.length ?? 0;
+  const baseIndices = into?.indices.length ?? 0;
+  const vertices = new Float32Array(
+    baseVertices +
+      copies.reduce((n, { mesh }) => n + mesh.vCount * FLOATS_PER_VERTEX, 0),
+  );
+  const indices = new Uint32Array(
+    baseIndices + copies.reduce((n, { mesh }) => n + mesh.iCount, 0),
+  );
+  if (into) {
+    vertices.set(into.vertices);
+    indices.set(into.indices);
+  }
+
+  const byId = new Map(kept.map((mesh) => [mesh.id, mesh]));
+  let vAt = baseVertices / FLOATS_PER_VERTEX;
+  let iAt = baseIndices;
+  for (const { mesh, id } of copies) {
+    vertices.set(
+      from.vertices.subarray(
+        mesh.vFirst * FLOATS_PER_VERTEX,
+        (mesh.vFirst + mesh.vCount) * FLOATS_PER_VERTEX,
+      ),
+      vAt * FLOATS_PER_VERTEX,
+    );
+    // Indices address the mesh's own vertices, so they copy unchanged.
+    indices.set(
+      from.indices.subarray(mesh.iFirst, mesh.iFirst + mesh.iCount),
+      iAt,
+    );
+    byId.set(id, { ...mesh, id, vFirst: vAt, iFirst: iAt });
+    vAt += mesh.vCount;
+    iAt += mesh.iCount;
+  }
+  return { byId, vertices, indices };
+}
+
 /** Read one project's geometry sidecar, or throw saying why it could not be. */
 export async function loadRawGeometry(projectId: string): Promise<RawGeometry> {
+  const raw = await loadRawGeometryIfAny(projectId);
+  if (!raw) {
+    throw new Error(
+      "this unit's geometry file is missing (404). It was written when the model was imported, and it is the only copy of the meshes.",
+    );
+  }
+  return raw;
+}
+
+/**
+ * Read one project's geometry sidecar, or null when it has none. A unit built
+ * from parts has none until a lifted piece first goes into it.
+ */
+export async function loadRawGeometryIfAny(
+  projectId: string,
+): Promise<RawGeometry | null> {
   const response = await fetch(legoGeometryUrl(projectId));
+  if (response.status === 404) return null;
   if (!response.ok) {
     throw new Error(
-      `this unit's geometry file is missing (${response.status}). It was written when the model was imported, and it is the only copy of the meshes.`,
+      `this unit's geometry file could not be read (${response.status}). It is the only copy of the meshes.`,
     );
   }
   const packed = new Uint8Array(await response.arrayBuffer());

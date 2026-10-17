@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import type { LegoPiece } from "./model";
 import {
+  encodeRawGeometry,
   getFixedPieceGeometry,
   getMeshGeometry,
+  mergeRawGeometry,
   parseRawGeometry,
   pieceMesh,
   type RawMesh,
@@ -110,6 +112,69 @@ describe("parseRawGeometry", () => {
   it("refuses a file whose directory runs off the end", () => {
     const truncated = blob([MESH], VERTICES, [0, 1, 0]).slice(0, 60);
     expect(() => parseRawGeometry(truncated)).toThrow(/truncated/);
+  });
+});
+
+describe("encodeRawGeometry", () => {
+  it("writes exactly the layout the importer writes", () => {
+    const written = blob([MESH], VERTICES, [0, 1, 0]);
+    expect([...encodeRawGeometry(parseRawGeometry(written))]).toEqual([
+      ...written,
+    ]);
+  });
+});
+
+describe("mergeRawGeometry", () => {
+  /** A second model whose one mesh has the same key as the first's. */
+  const OTHER: RawMesh = { ...MESH, vCount: 1, iCount: 3 };
+  const other = parseRawGeometry(
+    blob([OTHER], [7, 8, 9, 0, 0, 1, 0.1, 0.2], [0, 0, 0]),
+  );
+  const unit = () => parseRawGeometry(blob([MESH], VERTICES, [0, 1, 0]));
+
+  it("starts a unit's geometry when it has none", () => {
+    const merged = mergeRawGeometry(null, unit(), new Map([["m1", "a/m1"]]));
+    expect([...merged.byId.keys()]).toEqual(["a/m1"]);
+    expect([...merged.vertices]).toEqual(VERTICES);
+  });
+
+  it("adds after what the unit holds, under the new key, so two models' keys never meet", () => {
+    const merged = mergeRawGeometry(unit(), other, new Map([["m1", "b/m1"]]));
+    expect([...merged.byId.keys()]).toEqual(["m1", "b/m1"]);
+    const added = merged.byId.get("b/m1");
+    expect(added).toMatchObject({ vFirst: 2, vCount: 1, iFirst: 3 });
+    const geometry = getMeshGeometry(merged, "b/m1");
+    const position = geometry?.getAttribute("position");
+    const first = geometry?.index?.getX(0) ?? -1;
+    expect([
+      position?.getX(first),
+      position?.getY(first),
+      position?.getZ(first),
+    ]).toEqual([7, 8, 9]);
+    // The unit's own mesh is where it was.
+    expect(merged.byId.get("m1")).toMatchObject({ vFirst: 0, iFirst: 0 });
+  });
+
+  it("adds nothing for a key already there, or one the source does not hold", () => {
+    const once = mergeRawGeometry(unit(), other, new Map([["m1", "b/m1"]]));
+    const twice = mergeRawGeometry(
+      once,
+      other,
+      new Map([
+        ["m1", "b/m1"],
+        ["m9", "b/m9"],
+      ]),
+    );
+    expect([...twice.byId.keys()]).toEqual(["m1", "b/m1"]);
+    expect(twice.vertices.length).toBe(once.vertices.length);
+  });
+
+  it("survives being written and read again", () => {
+    const merged = mergeRawGeometry(unit(), other, new Map([["m1", "b/m1"]]));
+    const back = parseRawGeometry(encodeRawGeometry(merged));
+    expect([...back.byId.values()]).toEqual([...merged.byId.values()]);
+    expect([...back.vertices]).toEqual([...merged.vertices]);
+    expect([...back.indices]).toEqual([...merged.indices]);
   });
 });
 
