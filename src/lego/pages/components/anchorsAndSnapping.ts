@@ -1,13 +1,15 @@
 import * as THREE from "three";
 import type { LegoPiece, LegoProject } from "../../model";
 import { descendantIds, pieceById } from "../../model";
-import type { LoadedPack } from "../../pack";
+import { type LoadedPack, partUnit } from "../../pack";
 import { pieceMesh, type RawGeometry } from "../../rawGeometry";
 import {
   type Anchor,
+  moveStep,
   nearestSnap,
   pieceAnchors,
   screenPixelsToWorld,
+  snapPosition,
   snapRotation,
   type Vec3,
 } from "../../snapping";
@@ -219,9 +221,19 @@ export function applySnap(state: SceneState) {
 
   const snap = nearestSnap(mine, targetPoints, threshold);
   const seated = snap ? targets[snap.targetIndex] : undefined;
-  state.onSnapChange(snap !== null, seated?.name);
   showSeat(state, snap ? { at: snap.at, owner: seated?.owner } : null);
-  if (!snap) return;
+  if (!snap) {
+    // No anchor in range, so a free piece steps in part units instead. The
+    // position is the one stored, in the parent's axes, which for a piece on
+    // the root are the world's.
+    const step = moveStep([piece], partUnit(pack));
+    if (step !== null) {
+      group.position.set(...snapPosition(group.position.toArray(), step));
+    }
+    state.onSnapChange(false, undefined, step ?? undefined);
+    return;
+  }
+  state.onSnapChange(true, seated?.name);
 
   // The delta is in world space and the group's position is relative to its
   // parent, so it has to be rotated into the parent's frame before it is added.

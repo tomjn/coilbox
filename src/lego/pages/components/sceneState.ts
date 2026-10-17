@@ -233,7 +233,11 @@ export interface SceneState {
   /** Both plain values rather than one object: this fires on every frame of a
    *  drag, and an object would be a fresh identity each time and a re-render
    *  with it. */
-  onSnapChange: (snapped: boolean, anchorName?: string) => void;
+  onSnapChange: (
+    snapped: boolean,
+    anchorName?: string,
+    moveStep?: number,
+  ) => void;
   /** Read during a drag, so the helpers see the current document, not the one
    *  the scene was built with. */
   projectRef: { current: LegoProject };

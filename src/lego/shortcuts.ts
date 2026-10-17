@@ -92,7 +92,8 @@ export const SHORTCUTS: Shortcut[] = [
   {
     id: "snap-hold",
     group: "Transform",
-    description: "Hold to place freely, off the grid",
+    description:
+      "Hold to place freely, with no move step, rotation step or snap to anchors",
     combos: [{ key: "Alt" }],
     matches: (event) => event.altKey,
   },

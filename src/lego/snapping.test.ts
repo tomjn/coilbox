@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   localAnchors,
+  moveStep,
   nearestSnap,
   pieceAnchors,
   screenPixelsToWorld,
+  snapPosition,
   snapRotation,
   type Vec3,
 } from "./snapping";
@@ -123,6 +125,43 @@ describe("snapRotation", () => {
   it("leaves the rotation alone when there is no step", () => {
     const free: Vec3 = [0.123, 0.456, 0.789];
     expect(snapRotation(free, 0)).toEqual(free);
+  });
+});
+
+describe("snapPosition", () => {
+  it("rounds each axis to the nearest multiple of the step", () => {
+    expect(snapPosition([0.37, -0.62, 1.01], 0.25)).toEqual([0.25, -0.5, 1]);
+  });
+
+  it("leaves the position alone when there is no step", () => {
+    const free: Vec3 = [0.123, 0.456, 0.789];
+    expect(snapPosition(free, 0)).toEqual(free);
+  });
+
+  it("does not return a negative zero", () => {
+    expect(Object.is(snapPosition([-0.01, 0, 0], 0.25)[0], 0)).toBe(true);
+  });
+});
+
+describe("moveStep", () => {
+  const free = { partId: "box", connection: undefined };
+  const joined = { partId: "box", connection: { connector: "a", to: "b" } };
+  const imported = { partId: null, connection: undefined };
+
+  it("is the part unit for free pack parts", () => {
+    expect(moveStep([free, free], 0.25)).toBe(0.25);
+  });
+
+  it("is none when any piece is joined by a saved connection", () => {
+    expect(moveStep([free, joined], 0.25)).toBeNull();
+  });
+
+  it("is none when any piece is not a pack part", () => {
+    expect(moveStep([free, imported], 0.25)).toBeNull();
+  });
+
+  it("is none for nothing", () => {
+    expect(moveStep([], 0.25)).toBeNull();
   });
 });
 
