@@ -265,7 +265,7 @@ pub fn refresh(
     })
 }
 
-/// What exporting the script did.
+/// What exporting the script, or the wreck's feature file, did.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ScriptWrite {
     Written(PathBuf),
@@ -286,10 +286,44 @@ pub fn write_script(
     script: &str,
     known: Option<&str>,
 ) -> Result<ScriptWrite, String> {
-    let scripts = root.join("scripts");
-    std::fs::create_dir_all(&scripts)
-        .map_err(|e| format!("could not create {}: {e}", scripts.display()))?;
-    let target = scripts.join(format!("{unit_name}.lua"));
+    let target = root.join("scripts").join(format!("{unit_name}.lua"));
+    write_while_ours(target, scratch, script, known)
+}
+
+/// `features/coilbox/<unit>_dead.lua`, the unit's wreck (issue #3310), under
+/// the script's rule: rewritten while it is still exactly what the last export
+/// wrote, whose digest is `known`, and left alone once somebody has changed it.
+pub fn write_feature(
+    root: &Path,
+    unit_name: &str,
+    scratch: bool,
+    feature: &str,
+    known: Option<&str>,
+) -> Result<ScriptWrite, String> {
+    write_while_ours(feature_path(root, unit_name), scratch, feature, known)
+}
+
+/// Where a unit's wreck feature is written. In a `coilbox` folder, which the
+/// engine's `gamedata/featuredefs.lua` reads because it lists `features/` with
+/// its folders, so the file can never be one the game shipped.
+pub fn feature_path(root: &Path, unit_name: &str) -> PathBuf {
+    root.join("features")
+        .join("coilbox")
+        .join(format!("{unit_name}_dead.lua"))
+}
+
+/// Write `text` to `target` unless a file is there that does not hash to
+/// `known`. The scratch game is always written.
+fn write_while_ours(
+    target: PathBuf,
+    scratch: bool,
+    text: &str,
+    known: Option<&str>,
+) -> Result<ScriptWrite, String> {
+    if let Some(folder) = target.parent() {
+        std::fs::create_dir_all(folder)
+            .map_err(|e| format!("could not create {}: {e}", folder.display()))?;
+    }
     if target.exists() && !scratch {
         let ours = match (known, std::fs::read(&target)) {
             (Some(known), Ok(on_disk)) => hex_digest(&on_disk) == known,
@@ -299,7 +333,7 @@ pub fn write_script(
             return Ok(ScriptWrite::Kept(target));
         }
     }
-    std::fs::write(&target, script)
+    std::fs::write(&target, text)
         .map_err(|e| format!("could not write {}: {e}", target.display()))?;
     Ok(ScriptWrite::Written(target))
 }
@@ -544,5 +578,32 @@ mod tests {
 
         let unknown = write_script(game.path(), "tank", false, "four", None).expect("export");
         assert_eq!(unknown, ScriptWrite::Kept(path.clone()));
+    }
+
+    #[test]
+    fn the_wreck_feature_is_replaced_only_while_it_is_the_last_export() {
+        let game = game();
+        let path = game.path().join("features/coilbox/tank_dead.lua");
+        assert_eq!(feature_path(game.path(), "tank"), path);
+
+        let first = write_feature(game.path(), "tank", false, "one", None).expect("export");
+        assert_eq!(first, ScriptWrite::Written(path.clone()));
+
+        let known = hex_digest(b"one");
+        let second =
+            write_feature(game.path(), "tank", false, "two", Some(&known)).expect("export");
+        assert_eq!(second, ScriptWrite::Written(path.clone()));
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "two");
+
+        std::fs::write(&path, "metal = 9000").unwrap();
+        let known = hex_digest(b"two");
+        let third =
+            write_feature(game.path(), "tank", false, "three", Some(&known)).expect("export");
+        assert_eq!(third, ScriptWrite::Kept(path.clone()));
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "metal = 9000");
+
+        let scratch = write_feature(game.path(), "tank", true, "four", None).expect("export");
+        assert_eq!(scratch, ScriptWrite::Written(path.clone()));
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "four");
     }
 }
