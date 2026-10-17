@@ -12,7 +12,7 @@
  */
 
 import { Button, Input } from "@picoframe/frame";
-import { Pencil, Trash2 } from "lucide-react";
+import { Copy, Pencil, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
@@ -24,14 +24,16 @@ import { validateCompoundName } from "../../compounds";
 import { addStandardLights, partMaterial } from "../../geometry";
 import type { LegoProject } from "../../model";
 import { getPartGeometry, type LoadedPack } from "../../pack";
+import { isBuiltInModule } from "../../starterModules";
 import { ModuleLabelsPopover } from "./ModuleLabelsPopover";
+import { gridLayout } from "./moduleGrid";
 
 /** Cell size in pixels: a square of model, with the name under it. */
 const CELL = 108;
 const LABEL = 24;
 const GAP = 8;
 const PITCH_X = CELL + GAP;
-const PITCH_Y = CELL + LABEL + GAP;
+const METRICS = { cell: CELL, label: LABEL, gap: GAP, heading: 24 };
 /** How a compound sits when it is not being looked at. */
 const REST_PITCH = 0.42;
 const REST_YAW = 0.72;
@@ -62,6 +64,8 @@ interface Props {
   placingId?: string;
   onDelete: (id: string) => void;
   onRename: (compound: LegoProject, name: string) => void;
+  /** Saves the user's own copy of a built in module. */
+  onCopy: (compound: LegoProject) => void;
   /** Absent hides the category and tags button. */
   onLabels?: (
     compound: LegoProject,
@@ -85,6 +89,7 @@ export function CompoundPicker({
   placingId,
   onDelete,
   onRename,
+  onCopy,
   onLabels,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -139,6 +144,7 @@ export function CompoundPicker({
         camera,
         holders: new Map(),
         order: [],
+        builtIn: [],
         columns: 1,
         onColumns: setColumns,
       };
@@ -195,6 +201,7 @@ export function CompoundPicker({
       });
     }
     state.order = compounds.map((compound) => compound.id);
+    state.builtIn = compounds.map(isBuiltInModule);
     layout(state, scroller.scrollTop, scroller.clientHeight);
   }, [pack, compounds, atlas]);
 
@@ -230,7 +237,7 @@ export function CompoundPicker({
     };
   }, [hovered, reduceMotion]);
 
-  const rows = Math.ceil(compounds.length / columns);
+  const grid = gridLayout(compounds.map(isBuiltInModule), columns, METRICS);
 
   // The host and scroller stay in the tree even with nothing saved yet, so the
   // canvas the mount effect builds always has somewhere to attach. Returning
@@ -246,19 +253,27 @@ export function CompoundPicker({
             compound to keep the assembly under it for reuse.
           </p>
         ) : (
-          <div
-            className="relative"
-            style={{ height: Math.max(rows * PITCH_Y - GAP, 0) }}
-          >
+          <div className="relative" style={{ height: grid.height }}>
+            {grid.headings.map((heading) => (
+              <h3
+                key={heading.label}
+                className="absolute left-1 text-xs font-medium text-muted-foreground"
+                style={{ top: heading.top }}
+              >
+                {heading.label}
+              </h3>
+            ))}
             {compounds.map((compound, index) => {
               const isRenaming = renaming?.id === compound.id;
+              const builtIn = isBuiltInModule(compound);
+              const at = grid.cells[index];
               return (
                 <div
                   key={compound.id}
                   className="group absolute"
                   style={{
-                    left: (index % columns) * PITCH_X,
-                    top: Math.floor(index / columns) * PITCH_Y,
+                    left: at?.left,
+                    top: at?.top,
                     width: CELL,
                     height: CELL + LABEL,
                   }}
@@ -328,16 +343,31 @@ export function CompoundPicker({
                       ) : null}
                     </div>
                   ) : null}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="absolute left-0 top-0 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
-                    onClick={() => startRename(compound)}
-                    aria-label={`Rename the ${compound.name} compound`}
-                  >
-                    <Pencil size={14} />
-                  </Button>
-                  {onLabels ? (
+                  {/* A built in module cannot be renamed, relabelled or deleted,
+                      so its one action is to become the user's own. */}
+                  {builtIn ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="absolute right-0 top-0 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
+                      onClick={() => onCopy(compound)}
+                      aria-label={`Make my own copy of the ${compound.name} module`}
+                      title="Make my own copy"
+                    >
+                      <Copy size={14} />
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="absolute left-0 top-0 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
+                      onClick={() => startRename(compound)}
+                      aria-label={`Rename the ${compound.name} compound`}
+                    >
+                      <Pencil size={14} />
+                    </Button>
+                  )}
+                  {onLabels && !builtIn ? (
                     <ModuleLabelsPopover
                       compound={compound}
                       known={known}
@@ -345,15 +375,17 @@ export function CompoundPicker({
                       className="absolute left-8 top-0 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
                     />
                   ) : null}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="absolute right-0 top-0 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
-                    onClick={() => onDelete(compound.id)}
-                    aria-label={`Delete the ${compound.name} compound`}
-                  >
-                    <Trash2 size={14} />
-                  </Button>
+                  {builtIn ? null : (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="absolute right-0 top-0 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
+                      onClick={() => onDelete(compound.id)}
+                      aria-label={`Delete the ${compound.name} compound`}
+                    >
+                      <Trash2 size={14} />
+                    </Button>
+                  )}
                 </div>
               );
             })}
@@ -372,6 +404,8 @@ interface GridState {
   holders: Map<string, THREE.Group>;
   /** The order the cells are in, which is the order the list is in. */
   order: string[];
+  /** Whether each cell, in the same order, is a built in module. */
+  builtIn: boolean[];
   columns: number;
   onColumns: (columns: number) => void;
 }
@@ -395,6 +429,7 @@ function buildHolder(
 /** Put every compound in its cell and draw once. World units are pixels. */
 function layout(state: GridState, scrollTop: number, viewportHeight: number) {
   const { renderer, camera, columns, order, holders } = state;
+  const { cells } = gridLayout(state.builtIn, columns, METRICS);
   if (viewportHeight === 0) return;
 
   camera.left = 0;
@@ -405,12 +440,9 @@ function layout(state: GridState, scrollTop: number, viewportHeight: number) {
 
   order.forEach((id, index) => {
     const holder = holders.get(id);
-    if (!holder) return;
-    holder.position.set(
-      (index % columns) * PITCH_X + CELL / 2,
-      -(Math.floor(index / columns) * PITCH_Y + CELL / 2),
-      0,
-    );
+    const at = cells[index];
+    if (!holder || !at) return;
+    holder.position.set(at.left + CELL / 2, -(at.top + CELL / 2), 0);
   });
 
   renderer.render(state.scene, state.camera);
