@@ -14,6 +14,7 @@ import * as THREE from "three";
 
 import { ENGINE_ROTATION_ORDER, type TrackDelta } from "./animPresets";
 import { resolveConnections } from "./connectors";
+import { joinedWorld } from "./joinedWorld";
 import { computeSmoothedNormals, fixUv, hasMeshFix } from "./meshFix";
 import {
   childrenOf,
@@ -397,7 +398,10 @@ function bakePiece(
     new THREE.Quaternion().setFromEuler(new THREE.Euler(...piece.rotation)),
     new THREE.Vector3(...piece.scale),
   );
-  const matrix = parentWorld.clone().multiply(local);
+  // A joined piece follows its parent's connector but keeps its own size.
+  const matrix = piece.connection
+    ? joinedWorld(parentWorld, local)
+    : parentWorld.clone().multiply(local);
   const translation = new THREE.Vector3().setFromMatrixPosition(matrix);
 
   // The rotation and scale, without the translation. This is what the vertices
