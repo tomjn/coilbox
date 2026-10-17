@@ -15,10 +15,10 @@ import {
   movementKinds,
   movementState,
   suggestMotion,
-  unitGame,
 } from "../../movement";
 import type { UnitBounds } from "../../s3oBuild";
 import { footprintSteps } from "../../unitDef";
+import { installedGameFor, unitGame } from "../../unitGame";
 import { useTestGame } from "./useTestGame";
 
 /** The option that leaves the unit static. Radix's select has no empty value. */
@@ -35,9 +35,7 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
   // classes come from the unit's own game, never from the drawer's pick.
   const { target, targetLoading, scan } = useTestGame();
   const own = unitGame(project);
-  const game = own
-    ? scan.data?.games.find((g) => g.primaryArchive.name === own.archive)
-    : undefined;
+  const game = installedGameFor(own, scan.data?.games ?? []);
   const { defs, defsFor, status, error } = useUnitDefs(
     target?.enginePath,
     target?.dataDir,
@@ -56,7 +54,7 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
       : null;
 
   const noGame = !own
-    ? "This unit has no game, so there are no movement classes to offer."
+    ? "Choose a game for this unit to pick one of its movement classes."
     : !targetLoading && !target
       ? "No engine is installed, so there is no game to read classes from."
       : scan.error

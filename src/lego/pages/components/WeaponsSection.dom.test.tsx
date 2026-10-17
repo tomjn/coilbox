@@ -123,11 +123,7 @@ describe("WeaponsSection", () => {
     show(project(undefined, { imported: undefined }));
     expect(screen.queryByText(/Choose a game for this unit first/)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Weapon for turret" }));
-    expect(
-      screen.getByText(
-        "Choose a game for this unit first: export it into the game's folder.",
-      ),
-    ).toBeTruthy();
+    expect(screen.getByText("Choose a game for this unit first.")).toBeTruthy();
   });
 
   it("offers the library and the game's weapons, and picks one", () => {
@@ -140,6 +136,35 @@ describe("WeaponsSection", () => {
     expect(onWeaponChange).toHaveBeenCalledWith("t", {
       fires: { from: "game", name: "armpw_emg" },
     });
+  });
+
+  it("offers the weapons of the game a unit of parts records (#3257)", () => {
+    show(
+      project(undefined, {
+        imported: undefined,
+        game: { name: GAME.name, archive: GAME.primaryArchive.name },
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Weapon for turret" }));
+    expect(screen.getByText("armpw_emg")).toBeTruthy();
+  });
+
+  it("does not fall back to the export folder for a unit for no game", () => {
+    show(
+      project(undefined, {
+        imported: undefined,
+        game: null,
+        exported: {
+          dir: GAME.primaryArchive.path ?? "",
+          at: "2026-10-17T00:00:00Z",
+          unitName: "rover",
+          def: {},
+          files: [],
+        },
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Weapon for turret" }));
+    expect(screen.getByText("Choose a game for this unit first.")).toBeTruthy();
   });
 
   it("shows the picked weapon's numbers and takes an arc", () => {

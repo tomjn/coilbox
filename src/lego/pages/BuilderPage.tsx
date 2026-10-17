@@ -92,6 +92,7 @@ import {
   type LegoMount,
   type LegoPiece,
   type LegoProject,
+  type LegoUnitGame,
   normalisePieceName,
   pieceById,
   pieceKind,
@@ -168,6 +169,7 @@ import { TestDrawer } from "./components/TestDrawer";
 import { TextureBuilderPanel } from "./components/TextureBuilderPanel";
 import { TexturePicker } from "./components/TexturePicker";
 import { TransformFields } from "./components/TransformFields";
+import { UnitGamePicker } from "./components/UnitGamePicker";
 import { useBuiltUnitDef } from "./components/useBuiltUnitDef";
 import { useEffectBitmaps } from "./components/useEffectBitmaps";
 import { useMoreBelow } from "./components/useMoreBelow";
@@ -821,6 +823,12 @@ function Builder({ id }: { id: string | undefined }) {
     });
   }
 
+  // An ordinary edit, so undo takes it back. `UnitGamePicker` has already
+  // refused a change the unit's pieces do not allow.
+  function setGame(game: LegoUnitGame | null) {
+    edit((project) => ({ ...project, game }));
+  }
+
   /**
    * Point an imported unit at a different texture, or at a re-read of the same
    * file after it was edited elsewhere.
@@ -1436,6 +1444,7 @@ function Builder({ id }: { id: string | undefined }) {
                               onChange={setAtlas}
                             />
                           )}
+                          <UnitGamePicker project={draft} onChange={setGame} />
                         </div>
                       </div>
 

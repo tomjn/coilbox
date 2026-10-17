@@ -4,9 +4,11 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { useUnitsyncScan } from "@/content/config";
 import { usePreferredTarget } from "@/play/config";
 import { type EffectBitmaps, loadEffectBitmaps } from "../../effectBitmaps";
 import type { LegoProject } from "../../model";
+import { installedGameFor, unitGame } from "../../unitGame";
 
 const NO_GAME: EffectBitmaps = {
   atlas: null,
@@ -25,7 +27,13 @@ const LOADING: EffectBitmaps = { atlas: null, note: null };
  *  project reads the same as one with no game. */
 export function useEffectBitmaps(project: LegoProject | null): EffectBitmaps {
   const { target } = usePreferredTarget();
-  const archive = project?.imported?.game?.archive;
+  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  // The unit's own game (#3257), read from the installed build of it. A game
+  // that is not installed is still tried, so the note says it could not be read.
+  const own = project ? unitGame(project) : null;
+  const archive =
+    installedGameFor(own, scan.data?.games ?? [])?.primaryArchive.name ??
+    own?.archive;
   const enginePath = target?.enginePath;
   const dataDir = target?.dataDir;
 

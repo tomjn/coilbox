@@ -17,6 +17,7 @@
  */
 
 import type { LegoProject } from "./model";
+import { unitGame } from "./unitGame";
 
 /** The archive extensions a game's models can arrive from. */
 const ARCHIVE_EXT = /\.(sdd|sdz|sd7|sdp)$/i;
@@ -113,9 +114,9 @@ export function groupProjects(projects: LegoProject[]): GroupedProjects {
 /**
  * Only the units a search asks for, still in their groups.
  *
- * Matches the unit's name and its unit name, ignoring case. A game's own name
- * matches too, and brings every unit in it, so typing a game finds its units
- * even when none of them is named after it. A group left with nothing is
+ * Matches the unit's name, its unit name and the name of the game it is for,
+ * ignoring case. A group's own name matches too, and brings every unit in it,
+ * so typing a game finds its units even when none of them is named after it. A group left with nothing is
  * dropped. An empty or blank query changes nothing.
  */
 export function filterGrouped(
@@ -126,7 +127,8 @@ export function filterGrouped(
   if (!needle) return grouped;
   const matches = (project: LegoProject) =>
     project.name.toLowerCase().includes(needle) ||
-    project.unitName.toLowerCase().includes(needle);
+    project.unitName.toLowerCase().includes(needle) ||
+    (unitGame(project)?.name.toLowerCase().includes(needle) ?? false);
 
   return {
     own: grouped.own.filter(matches),

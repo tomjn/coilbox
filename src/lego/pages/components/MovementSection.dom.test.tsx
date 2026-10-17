@@ -111,7 +111,7 @@ describe("MovementSection", () => {
     );
     expect(
       screen.getByText(
-        "This unit has no game, so there are no movement classes to offer.",
+        "Choose a game for this unit to pick one of its movement classes.",
       ),
     ).toBeTruthy();
     expect(screen.queryByRole("combobox")).toBeNull();
@@ -137,7 +137,7 @@ describe("MovementSection", () => {
     );
     expect(
       screen.getByText(
-        "This unit has no game, so there are no movement classes to offer.",
+        "Choose a game for this unit to pick one of its movement classes.",
       ),
     ).toBeTruthy();
     expect(screen.queryByRole("combobox")).toBeNull();

@@ -11,9 +11,9 @@ import { useModProjects } from "../../../workshop/project";
 import { unitEditPath } from "../../../workshop/routes";
 import { type FitRow, gameFit } from "../../gameFit";
 import type { LegoProject } from "../../model";
-import { unitGame } from "../../movement";
 import type { UnitBounds } from "../../s3oBuild";
 import { legoUnitDef } from "../../unitDef";
+import { installedGameFor, unitGame } from "../../unitGame";
 import { useTestGame } from "./useTestGame";
 
 interface Props {
@@ -25,9 +25,7 @@ export function GameFitSection({ project, bounds }: Props) {
   const { target, targetLoading, scan } = useTestGame();
   const { projects: tweakProjects } = useModProjects();
   const own = unitGame(project);
-  const game = own
-    ? scan.data?.games.find((g) => g.primaryArchive.name === own.archive)
-    : undefined;
+  const game = installedGameFor(own, scan.data?.games ?? []);
   const { defs, defsFor, status, error } = useUnitDefs(
     target?.enginePath,
     target?.dataDir,
@@ -36,7 +34,7 @@ export function GameFitSection({ project, bounds }: Props) {
   const current = defs && defsFor === game?.primaryArchive.name ? defs : null;
 
   const unavailable = !own
-    ? "This unit has no game to check against."
+    ? "Choose a game for this unit to check it against."
     : !targetLoading && !target
       ? "No engine is installed, so the game cannot be read."
       : scan.error
@@ -62,8 +60,8 @@ export function GameFitSection({ project, bounds }: Props) {
         ? current.units[key]
         : undefined;
     fromFile = !!entry;
-    // No totals: the rows read armour, categories and movement, and a unit with
-    // a game is an import, which has no parts to total.
+    // No totals: the rows read armour, categories and movement, which the
+    // totals do not change.
     rows = gameFit(entry ?? legoUnitDef(project, bounds, "def", null), key, {
       units: current.units,
       moveDefs: current.moveDefs,

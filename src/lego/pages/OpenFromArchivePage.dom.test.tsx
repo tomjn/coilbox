@@ -42,6 +42,7 @@ vi.mock("@/content/config", () => ({
     tree: archive ? { files: [], errors: [] } : null,
     loading: false,
   }),
+  useUnitsyncScan: () => ({ data: null, loading: false, error: null }),
 }));
 
 vi.mock("../projects", () => ({

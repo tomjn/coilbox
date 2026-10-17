@@ -197,6 +197,21 @@ describe("filterGrouped", () => {
     expect(filterGrouped(all, "   ")).toBe(all);
   });
 
+  it("finds a unit of parts by the game it is for (#3257)", () => {
+    const rover = {
+      ...cakebot,
+      id: "rover",
+      name: "Rover",
+      unitName: "rover",
+      game: { name: "Splinter Faction 0.1.89", archive: "sf.sdz" },
+    } as LegoProject;
+    const found = filterGrouped(
+      groupProjects([adder, rover, cakebot]),
+      "splinter",
+    );
+    expect(found.own).toEqual([rover]);
+  });
+
   it("keeps the units whose name or unit name matches, in any case", () => {
     const found = filterGrouped(all, "ADD");
     expect(found.games).toHaveLength(1);

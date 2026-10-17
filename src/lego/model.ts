@@ -211,6 +211,31 @@ export interface LegoImportedGame {
   unit?: string;
 }
 
+/** One installed game as unitsync reported it when it was chosen. */
+export interface LegoGameRef {
+  /** The game's name as unitsync reports it, which is what a list shows. */
+  name: string;
+  /** The primary archive's file name. Pins one build, and is what a read of
+   *  the game takes. */
+  archive: string;
+  /** The modinfo short name, which stays the same across versions. Absent
+   *  when the game's modinfo has none. */
+  shortname?: string;
+  /** The modinfo version, when it has one. */
+  version?: string;
+}
+
+/**
+ * The game a unit is for (issue #3257). See `unitGame.ts` for how two of these
+ * are compared.
+ */
+export interface LegoUnitGame extends LegoGameRef {
+  /** When the game is a mutator, the game it builds on, traced through any
+   *  mutator in between. Kept so the comparison still works once neither is
+   *  installed. */
+  base?: LegoGameRef;
+}
+
 /**
  * What a unit that builds is worth, as three unit definition keys.
  *
@@ -499,6 +524,12 @@ export interface LegoProject {
    * pieces name meshes in the geometry sidecar rather than parts in the pack.
    */
   imported?: LegoImported;
+  /**
+   * The game this unit is for, chosen by the game maker (issue #3257). `null`
+   * means "No game", a choice of its own. Absent means a unit saved before
+   * this existed, which `unitGame` reads off `imported.game` instead.
+   */
+  game?: LegoUnitGame | null;
   createdAt: string;
   updatedAt: string;
   rootPieceId: string;
@@ -554,9 +585,8 @@ export interface LegoProject {
   /**
    * What each kind of part is worth, which sets the unit's health, cost and
    * mass (issue #3280). Absent means the placeholder table in `worth.ts`.
-   * Stored on the unit rather than per game, because a unit built from parts
-   * does not record a game yet (#3257), and an export then needs nothing from
-   * outside the document.
+   * Stored on the unit rather than per game, because a unit may be for no
+   * game (#3257), and an export then needs nothing from outside the document.
    */
   worth?: LegoWorth;
   unitDef?: Record<string, string | number | boolean>;
@@ -1010,6 +1040,9 @@ export function newProject(options: {
   packVersion: string;
   /** Left off for the base pack's atlas, which is what most units use. */
   atlas?: string;
+  /** The game the unit is for, or null for no game. Left off, it is not
+   *  written at all. */
+  game?: LegoUnitGame | null;
   now: string;
 }): LegoProject {
   return {
@@ -1020,6 +1053,7 @@ export function newProject(options: {
     packId: options.packId,
     packVersion: options.packVersion,
     ...(options.atlas ? { atlas: options.atlas } : {}),
+    ...(options.game !== undefined ? { game: options.game } : {}),
     createdAt: options.now,
     updatedAt: options.now,
     rootPieceId: options.rootPieceId,
@@ -1114,6 +1148,12 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
       ? { atlas: d.atlas }
       : {}),
     ...(imported ? { imported } : {}),
+    ...(d.game === null
+      ? { game: null }
+      : (() => {
+          const game = parseUnitGame(d.game);
+          return game ? { game } : {};
+        })()),
     createdAt: typeof d.createdAt === "string" ? d.createdAt : "",
     updatedAt: typeof d.updatedAt === "string" ? d.updatedAt : "",
     rootPieceId: d.rootPieceId,
@@ -1407,6 +1447,33 @@ function parseImportedGame(value: unknown): LegoImportedGame | null {
     // Absent for a feature or a wreck, which no unitdef names.
     ...(typeof v.unit === "string" ? { unit: v.unit } : {}),
   };
+}
+
+/** One game as a unit records it. Without a name and an archive it is no use,
+ *  so it is dropped and the unit reads as one saved before this existed. */
+function parseGameRef(value: unknown): LegoGameRef | null {
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  if (typeof v.name !== "string" || typeof v.archive !== "string") return null;
+  if (v.name === "" || v.archive === "") return null;
+  return {
+    name: v.name,
+    archive: v.archive,
+    ...(typeof v.shortname === "string" && v.shortname !== ""
+      ? { shortname: v.shortname }
+      : {}),
+    ...(typeof v.version === "string" && v.version !== ""
+      ? { version: v.version }
+      : {}),
+  };
+}
+
+/** The game a unit is for, with the game under it when it is a mutator. */
+function parseUnitGame(value: unknown): LegoUnitGame | null {
+  const game = parseGameRef(value);
+  if (!game) return null;
+  const base = parseGameRef((value as Record<string, unknown>).base);
+  return base ? { ...game, base } : game;
 }
 
 /** One stored texture. `packed` drops the source, for the reason above. */
