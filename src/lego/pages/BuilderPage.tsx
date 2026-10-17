@@ -52,6 +52,7 @@ import { type ArrangeAction, arrange } from "../align";
 import { addAnchor, removeAnchor, updateAnchor } from "../anchors";
 import { presetById, ROLES, restAngleWarnings } from "../animPresets";
 import { unitAtlas } from "../atlas";
+import { balanceProblem, checkBalance } from "../balance";
 import { legoTexturePrune } from "../bindings";
 import { addBuildArm, builderKind, pickArmParts } from "../buildArm";
 import { pictureIsStale } from "../buildPicture";
@@ -409,6 +410,18 @@ function Builder({ id }: { id: string | undefined }) {
         : [],
     [draft, pack, geometry.error, geometry.raw, geometry.missingTextures],
   );
+
+  // The rest pose only: while a script preview moves the pieces, the support
+  // changes with them, and the check would be about a pose that is not the
+  // unit's.
+  const balance = useMemo(
+    () =>
+      draft && pack && !playing && scriptTimeline === null
+        ? checkBalance(draft, pack, raw)
+        : null,
+    [draft, pack, raw, playing, scriptTimeline],
+  );
+  const balanceNote = balance ? balanceProblem(balance) : null;
 
   function addPart(part: LegoPartInfo) {
     inventoryView.inventory.record({ kind: "part", id: part.id });
@@ -1665,16 +1678,19 @@ function Builder({ id }: { id: string | undefined }) {
                       />
                     ) : null}
 
-                    {problems.length > 0 ? (
+                    {problems.length > 0 || balanceNote ? (
                       <ul className="pointer-events-none mx-auto w-fit max-w-[80%] rounded-md border border-amber-500/40 bg-background/90 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur">
-                        {problems.map((problem) => (
+                        {[
+                          ...problems,
+                          ...(balanceNote ? [balanceNote] : []),
+                        ].map((problem) => (
                           <li key={problem}>{problem}</li>
                         ))}
                       </ul>
                     ) : null}
                   </>
                 }
-                document={{ pack, raw, project: draft }}
+                document={{ pack, raw, project: draft, balance }}
                 selection={{
                   selectedIds,
                   onSelect: selectPiece,
