@@ -27,7 +27,8 @@ const FRAMES: u32 = 300;
 /// Balanced Annihilation's have Lua that is right for the engine, which
 /// these two previews play a frame or a cycle apart. The rest ship a `.cob`
 /// that was not compiled from the `.bos` beside it, so no conversion of the
-/// `.bos` can match it.
+/// `.bos` can match it, apart from the `WAKE_ORDER` ones, which are a converter
+/// bug still to fix.
 const KNOWN: &[(&str, &str)] = &[
     (
         "scripts/gdadvhfact2.bos",
@@ -125,7 +126,34 @@ const KNOWN: &[(&str, &str)] = &[
         "scripts/corcrw.bos",
         "the .cob has no StartMoving or StopMoving and the .bos has both",
     ),
+    ("scripts/alienanni.bos", WAKE_ORDER),
+    ("scripts/aliencom.bos", WAKE_ORDER),
+    ("scripts/aliencon.bos", WAKE_ORDER),
+    ("scripts/alienhamh.bos", WAKE_ORDER),
+    ("scripts/alienhcon.bos", WAKE_ORDER),
+    ("scripts/alienmamh.bos", WAKE_ORDER),
+    ("scripts/alienmcon.bos", WAKE_ORDER),
+    ("scripts/alienscout.bos", WAKE_ORDER),
+    ("scripts/alienwstrider.bos", WAKE_ORDER),
+    ("scripts/armack.bos", WAKE_ORDER),
+    ("scripts/armcs.bos", WAKE_ORDER),
+    ("scripts/armham.bos", WAKE_ORDER),
+    ("scripts/armss.bos", WAKE_ORDER),
+    ("scripts/armzeus.bos", WAKE_ORDER),
+    ("scripts/corss.bos", WAKE_ORDER),
+    ("scripts/gdadvmex2.bos", WAKE_ORDER),
+    ("scripts/gdgeo2.bos", WAKE_ORDER),
+    ("scripts/gdmex2.bos", WAKE_ORDER),
+    ("scripts/gduniquemex2.bos", WAKE_ORDER),
+    ("scripts/packo.bos", WAKE_ORDER),
+    ("scripts/urcadvmex2.bos", WAKE_ORDER),
+    ("scripts/urcgeo2.bos", WAKE_ORDER),
 ];
+
+/// Every one of these matches when the Lua preview wakes threads due on one
+/// frame in creation order instead of the engine's Lua order. Measured on
+/// Expand and Exterminate 0.46 and Balanced Annihilation 15.9.8.
+const WAKE_ORDER: &str = "two threads due on one frame, which COB wakes in thread order (CobEngine.h:36-41) and the engine's Lua last asleep first (unit_script.lua:812-836): #4456";
 
 fn files(dir: &Path, out: &mut Vec<PathBuf>) {
     for entry in std::fs::read_dir(dir).unwrap().flatten() {

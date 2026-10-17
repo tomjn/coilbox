@@ -328,6 +328,49 @@ fn a_thread_back_from_a_wait_counts_its_sleep_from_the_frame_the_turn_landed() {
     assert_eq!(moved, Some(landed));
 }
 
+/// The framework wakes the threads due on a frame last asleep first
+/// (`unit_script.lua:812-836`), so the first to sleep has the last word.
+#[test]
+fn threads_due_on_the_same_frame_wake_last_asleep_first() {
+    let timeline = play(
+        r#"
+        local base = piece("base")
+        function script.Create()
+            StartThread(function() Sleep(100) Move(base, z_axis, 1) end)
+            StartThread(function() Sleep(100) Move(base, z_axis, 2) end)
+        end
+        "#,
+        6,
+    );
+    assert_eq!(timeline.error, None);
+    assert_close(pose(&timeline, 5, "base")[2], 1.0);
+}
+
+/// The engine finishes animations in order of piece, then turns before moves,
+/// then axis (`UnitScript.cpp:199-226,287-298`), and the framework resumes the
+/// threads waiting on each one last to wait first (`unit_script.lua:265-280`).
+#[test]
+fn threads_waiting_on_animations_that_end_together_resume_in_the_engine_s_order() {
+    let timeline = play(
+        r#"
+        local base = piece("base")
+        local turret = piece("turret")
+        local barrel = piece("barrel")
+        function script.Create()
+            Turn(barrel, x_axis, 0.5, 30)
+            Turn(turret, y_axis, 0.5, 30)
+            StartThread(function() WaitForTurn(turret, y_axis) Move(base, z_axis, 1) end)
+            StartThread(function() WaitForTurn(barrel, x_axis) Move(base, z_axis, 2) end)
+            StartThread(function() WaitForTurn(turret, y_axis) Move(base, z_axis, 3) end)
+        end
+        "#,
+        4,
+    );
+    assert_eq!(timeline.error, None);
+    // The turret's waiters, the third then the first, then the barrel's.
+    assert_close(pose(&timeline, 3, "base")[2], 2.0);
+}
+
 /// The engine asks whether there is anything to wait for before it suspends, so
 /// a wait on an axis standing still does not even cost a frame.
 #[test]

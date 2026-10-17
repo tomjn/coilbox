@@ -253,6 +253,9 @@ struct Runner {
     mask: Mask,
     /// What started it, so an error can say which call-in was to blame.
     origin: String,
+    /// When it last slept or began to wait, counted over the whole run, which
+    /// decides the order the framework wakes it in.
+    parked: u64,
 }
 
 /// Why a thread stopped running before it waited or finished.
@@ -402,6 +405,8 @@ struct Run {
     /// chunk's top level has run and it has whatever it is going to define.
     functions: Vec<String>,
     runners: Vec<Runner>,
+    /// How many times a thread has slept or begun to wait so far.
+    parks: u64,
     frame: u32,
 }
 
@@ -469,6 +474,7 @@ impl Run {
             script: table,
             functions,
             runners: Vec::new(),
+            parks: 0,
             frame: 0,
         })
     }
@@ -597,18 +603,29 @@ impl Run {
     /// call-ins and sleepers, and on the frame before as far as a `Sleep` or
     /// `Spring.GetGameFrame` can tell.
     fn wake_finished(&mut self) -> Result<(), String> {
-        let finished: Vec<usize> = {
+        // In the order the engine finishes animations, by piece, then turns
+        // before moves, then axis (`UnitScript.cpp:199-226,287-298`), and on
+        // each one the last to wait first (`unit_script.lua:265-280`).
+        let mut finished: Vec<_> = {
             let sim = self.sim.borrow();
-            (0..self.runners.len())
-                .filter(|&index| {
+            self.runners
+                .iter()
+                .enumerate()
+                .filter_map(|(index, runner)| match runner.state {
                     // A spin started on the axis a thread was waiting to finish
                     // turning wakes it, because the spin removed the turn it
                     // was waiting on.
-                    matches!(self.runners[index].state, State::Waiting { piece, axis, kind }
-                        if !sim.model.animating(piece, axis, kind))
+                    State::Waiting { piece, axis, kind }
+                        if !sim.model.animating(piece, axis, kind) =>
+                    {
+                        let kind = u8::from(matches!(kind, Wait::Move));
+                        Some((piece, kind, axis, std::cmp::Reverse(runner.parked), index))
+                    }
+                    _ => None,
                 })
                 .collect()
         };
+        finished.sort_unstable();
         if finished.is_empty() {
             return Ok(());
         }
@@ -616,7 +633,7 @@ impl Run {
         self.frame = frame.saturating_sub(1);
         self.sim.borrow_mut().frame = self.frame;
         let mut result = Ok(());
-        for index in finished {
+        for (.., index) in finished {
             // One resumed before it may have signalled it.
             if matches!(self.runners[index].state, State::Waiting { .. }) {
                 result = self.resume(index);
@@ -998,6 +1015,7 @@ impl Run {
             state: State::Ready,
             mask,
             origin,
+            parked: 0,
         });
         Ok(())
     }
@@ -1018,12 +1036,18 @@ impl Run {
         Err("this frame's threads never settled: one is waiting on itself".to_string())
     }
 
+    /// The framework wakes the frame's sleepers before the engine makes the
+    /// frame's call-ins (`Game.cpp:1777-1785`), the last to fall asleep first
+    /// (`unit_script.lua:812-836`).
     fn next_ready(&self) -> Option<usize> {
-        self.runners.iter().position(|runner| match runner.state {
-            State::Ready => true,
-            State::Sleeping(frame) => frame <= self.frame,
-            _ => false,
-        })
+        (0..self.runners.len())
+            .filter(|&index| matches!(self.runners[index].state, State::Sleeping(frame) if frame <= self.frame))
+            .max_by_key(|&index| self.runners[index].parked)
+            .or_else(|| {
+                self.runners
+                    .iter()
+                    .position(|runner| matches!(runner.state, State::Ready))
+            })
     }
 
     /// Give a first tick to every call-in runner this frame's `fire_due` has
@@ -1121,6 +1145,8 @@ impl Run {
                 continue;
             }
             self.runners[index].state = self.read_yield(index, yielded).map_err(Stop::Run)?;
+            self.parks += 1;
+            self.runners[index].parked = self.parks;
             return Ok(None);
         }
     }
