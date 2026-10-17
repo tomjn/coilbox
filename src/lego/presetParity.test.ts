@@ -347,6 +347,40 @@ function wheelsPlan(): Plan {
   };
 }
 
+/**
+ * No drive, so the heading reads 0 throughout and the rudder holds straight.
+ * `track()` cannot say more, since the rudder follows the heading and not the
+ * time. What this checks is that the script runs under the runtime.
+ */
+function rudderPlan(): Plan {
+  const frames = CALLIN + 5 * FPS;
+  return {
+    events: [...CREATED, { frame: CALLIN, callin: "StartMoving" }],
+    frames,
+    spans: [{ from: CALLIN, to: frames - 1, t0: 0 }],
+    exceptions: [
+      "The unit is not driven, so its heading does not change and the rudder stays straight. A turning heading is checked in rudder.test.ts.",
+    ],
+  };
+}
+
+/**
+ * The wake emits a particle and moves no piece, so what is checked is that the
+ * script runs under the runtime, with a reversing unit's flag, and leaves the
+ * wake point where it was.
+ */
+function wakePlan(): Plan {
+  const frames = CALLIN + 5 * FPS;
+  return {
+    events: [...CREATED, { frame: CALLIN, callin: "StartMoving", args: [1] }],
+    frames,
+    spans: [{ from: CALLIN, to: frames - 1, t0: 0 }],
+    exceptions: [
+      "The wake is a particle, so nothing moves. The emitted types are checked in wake.test.ts.",
+    ],
+  };
+}
+
 function plan(preset: AnimPreset, params: Record<string, number>): Plan {
   switch (preset.id) {
     case "walk.biped":
@@ -376,6 +410,10 @@ function plan(preset: AnimPreset, params: Record<string, number>): Plan {
       return nanoPlan();
     case "wheels.roll":
       return wheelsPlan();
+    case "rudder.follow":
+      return rudderPlan();
+    case "wake.moving":
+      return wakePlan();
   }
   throw new Error(`no parity plan for ${preset.id}`);
 }
@@ -545,9 +583,9 @@ function buildCases() {
 describe("preset parity fixture", () => {
   const cases = buildCases();
 
-  it("covers all 14 presets", () => {
-    expect(new Set(cases.map((entry) => entry.preset.id)).size).toBe(14);
-    expect(PRESETS).toHaveLength(14);
+  it("covers all 16 presets", () => {
+    expect(new Set(cases.map((entry) => entry.preset.id)).size).toBe(16);
+    expect(PRESETS).toHaveLength(16);
   });
 
   it("matches what the presets generate today", () => {

@@ -531,6 +531,47 @@ describe("parseLegoProjectJson", () => {
     expect(parsed?.pieces[1].role).toBeUndefined();
   });
 
+  it("gives the wake point role to a ship's and a hovercraft's unroled wake bone", () => {
+    for (const plan of ["ship", "hover"]) {
+      const doc: LegoProject = {
+        ...project([
+          { ...piece("root", null), bone: "hull", role: "base" },
+          { ...piece("w", "root"), bone: "wake" },
+          { ...piece("x", "root"), bone: "deck" },
+        ]),
+        skeleton: { plan, proportions: {} },
+      };
+      const parsed = parseLegoProjectJson(JSON.stringify(doc));
+      const role = (bone: string) =>
+        parsed?.pieces.find((p) => p.bone === bone)?.role;
+      expect(role("wake")).toBe("wake");
+      expect(role("deck")).toBeUndefined();
+    }
+  });
+
+  it("leaves a wake bone of another plan, or with a role, as it is", () => {
+    const other: LegoProject = {
+      ...project([
+        { ...piece("root", null), bone: "base" },
+        { ...piece("w", "root"), bone: "wake" },
+      ]),
+      skeleton: { plan: "wheeled", proportions: {} },
+    };
+    expect(
+      parseLegoProjectJson(JSON.stringify(other))?.pieces[1].role,
+    ).toBeUndefined();
+    const own: LegoProject = {
+      ...project([
+        { ...piece("root", null), bone: "hull" },
+        { ...piece("w", "root"), bone: "wake", role: "rudder" },
+      ]),
+      skeleton: { plan: "ship", proportions: {} },
+    };
+    expect(parseLegoProjectJson(JSON.stringify(own))?.pieces[1].role).toBe(
+      "rudder",
+    );
+  });
+
   it("round-trips a skeleton's target (#3254)", () => {
     const doc: LegoProject = {
       ...project([{ ...piece("root", null), bone: "base" }]),

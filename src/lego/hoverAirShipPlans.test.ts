@@ -230,13 +230,25 @@ describe("the hovercraft plan", () => {
     });
   });
 
-  it("applies Hover and bob, and gives the role to the hull alone", () => {
-    expect(HOVER.presets).toEqual([{ presetId: "hover.bob", params: {} }]);
+  it("applies Hover and bob and Wake while moving, and gives the roles to the hull and the wake", () => {
+    expect(HOVER.presets).toEqual([
+      { presetId: "hover.bob", params: {} },
+      { presetId: "wake.moving", params: {} },
+    ]);
     const project = fromPlan(HOVER);
     expect(pieceForBone(project, "hull").role).toBe("base");
+    expect(pieceForBone(project, "wake").role).toBe("wake");
     expect(
-      project.pieces.filter((p) => p.bone !== "hull").map((p) => p.role),
-    ).toEqual([undefined, undefined, undefined, undefined, undefined]);
+      project.pieces
+        .filter((p) => p.bone !== "hull" && p.bone !== "wake")
+        .map((p) => p.role),
+    ).toEqual([undefined, undefined, undefined, undefined]);
+  });
+
+  it("emits a wake from the stern, forwards and reversing, in the generated script", () => {
+    const lua = buildLuaScript(fromPlan(HOVER));
+    expect(lua).toContain("EmitSfx(wake, sfx)");
+    expect(lua).toContain("SFX.REVERSE_WAKE");
   });
 
   it.each<Record<string, number>>([
@@ -292,15 +304,20 @@ describe("the ship plan", () => {
     });
   });
 
-  it("is a hull at the waterline with one gun turret and a wake at the stern", () => {
+  it("is a hull at the waterline with one gun turret, a wake and a rudder at the stern", () => {
     const project = fromPlan(SHIP);
     expect(project.pieces.map((p) => [p.bone, p.role])).toEqual([
       ["hull", "base"],
       ["turret", "turret"],
       ["barrel", "barrel"],
       ["flare", "flare"],
-      ["wake", undefined],
+      ["wake", "wake"],
+      ["rudder", "rudder"],
     ]);
+    expect(project.animations?.map((a) => a.presetId)).toEqual(
+      expect.arrayContaining(["rudder.follow", "wake.moving"]),
+    );
+    expect(pieceForBone(project, "wake").role).toBe("wake");
     expect(pieceForBone(project, "hull").id).toBe(project.rootPieceId);
   });
 
@@ -317,6 +334,7 @@ describe("the ship plan", () => {
     expect(world.get("barrel")?.[1]).toBeCloseTo(trunnion, 9);
     expect(world.get("flare")?.[2]).toBeCloseTo(barrelLength as number, 9);
     expect(world.get("wake")).toEqual([0, 0, -(hullLength as number) / 2]);
+    expect(world.get("rudder")).toEqual([0, 0, -(hullLength as number) / 2]);
   });
 
   it("aims and fires in the generated script with no parts, and does not rock", () => {

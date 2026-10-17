@@ -17,6 +17,10 @@ export const SOLO_SCENARIOS: Record<string, string> = {
   "walk.quad": "moving",
   "turret.track": "firing",
   "wheels.roll": "moving",
+  // Reads the heading, which only the driving scenario changes.
+  "rudder.follow": "driving",
+  // Emits the reverse wake when told the unit backs up, which only a drive says.
+  "wake.moving": "driving",
   buildarm: "building",
   "build.aim": "building",
   "build.factory": "building-factory",
@@ -33,6 +37,7 @@ export const SOLO_SCENARIOS: Record<string, string> = {
  *  from. The row says so. */
 export const SOLO_MOVES_NOTHING: Record<string, string> = {
   "build.nano": "Moves nothing. The run shows where the spray comes from.",
+  "wake.moving": "Moves nothing. The run shows where the wake comes from.",
 };
 
 export function soloScenario(presetId: string): string | undefined {

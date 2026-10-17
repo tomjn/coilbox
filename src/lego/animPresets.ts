@@ -34,6 +34,13 @@ export const ROLES: LegoRole[] = [
   // script cannot scroll a texture, so it only tells the balance check where
   // the ground contact is.
   { id: "track", label: "Track", group: "Movement" },
+  // A ship's rudder, at the stern with its joint at the hinge. It swings about
+  // the vertical axis with the ship's turning, by `RUDDER_FOLLOWS`.
+  { id: "rudder", label: "Rudder", group: "Movement" },
+  // Where a ship's or hovercraft's wake comes from, usually an empty piece at
+  // the stern on the waterline. Nothing moves it. `WAKE_WHILE_MOVING` emits a
+  // wake from it while the unit moves.
+  { id: "wake", label: "Wake point", group: "Movement" },
   { id: "leg.l1.thigh", label: "Front left thigh", group: "Legs" },
   { id: "leg.l1.shin", label: "Front left shin", group: "Legs" },
   { id: "leg.l1.foot", label: "Front left foot", group: "Legs" },
@@ -813,6 +820,188 @@ export const WHEELS_ROLL: AnimPreset = {
   },
 };
 
+/**
+ * How often the rudder reads the unit's heading, in frames. A fifth of a
+ * second is short enough to follow a turn and long enough to smooth over the
+ * frame to frame wobble in a driven heading, which a shorter poll swings the
+ * rudder with. A design choice, not an engine figure.
+ */
+const RUDDER_POLL_FRAMES = 6;
+
+/**
+ * Degrees of rudder for each degree a second the unit turns. A design choice:
+ * the engine says only that a heading is 65536 to a circle and the sim runs 30
+ * frames a second, so a turn of 60 degrees a second reads as 30 degrees of
+ * rudder. The slider caps what that reaches.
+ */
+const RUDDER_PER_TURN_RATE = 0.5;
+
+/** The rudder reaches its angle in this many seconds, then holds it. */
+const RUDDER_SWING_SECONDS = 0.2;
+
+/** `SPRING_CIRCLE_DIVS`: the engine's heading is this many to a circle. */
+const HEADING_CIRCLE = 65536;
+
+/**
+ * Radians of rudder for each heading unit turned in one poll. Turned units a
+ * poll are `turn rate * poll seconds` heading units, so this is
+ * `rudder per turn rate * radians per heading unit / poll seconds`.
+ */
+const RUDDER_PER_HEADING =
+  (RUDDER_PER_TURN_RATE * (TAU / HEADING_CIRCLE)) /
+  (RUDDER_POLL_FRAMES / ENGINE_FPS);
+
+/**
+ * A rudder that swings as the unit turns.
+ *
+ * The engine sends a Lua unit script `ChangeHeading` only for a turn above
+ * `minScriptChangeHeading`, which no unchanged game ever reaches
+ * (`ENGINE_MIN_SCRIPT_CHANGE_HEADING`), and a COB script never. So this reads
+ * the heading itself, with `GetUnitValue(COB.HEADING)`, which is the unit's
+ * `heading` (`UnitScript.cpp:1175`) and is what the preview answers from each
+ * frame of a drive. A positive heading is a turn to the left and a positive
+ * `Turn` about y is the same way.
+ */
+export const RUDDER_FOLLOWS: AnimPreset = {
+  id: "rudder.follow",
+  label: "Rudder follows turns",
+  description:
+    "Swings each rudder with the unit's turning while it moves, and straightens it when the turn ends.",
+  requires: [{ role: "rudder", count: 1 }],
+  animates: ["rudder"],
+  params: [
+    {
+      id: "max",
+      label: "Largest angle",
+      unit: "deg",
+      min: 0,
+      max: 45,
+      step: 1,
+      fallback: 30,
+    },
+  ],
+  /**
+   * The angle depends on the unit's heading, which a time cannot give. The
+   * preview plays the script, and the parity test holds the unit straight.
+   */
+  track() {
+    return null;
+  },
+  emit(ctx) {
+    const rudders = ctx.pieces("rudder");
+    if (rudders.length === 0) return null;
+    const most = deg(value(this, ctx.params, "max"));
+    const speed = lua(most / RUDDER_SWING_SECONDS);
+    const turnAll = (angle: string) =>
+      rudders.map(
+        (rudder) => `    Turn(${rudder}, y_axis, ${angle}, ${speed})`,
+      );
+    const half = HEADING_CIRCLE / 2;
+    return {
+      functions: [
+        "local function rudderFollow()",
+        `  SetSignalMask(${ctx.signal})`,
+        "  local last = GetUnitValue(COB.HEADING)",
+        "  while true do",
+        `    Sleep(${RUDDER_POLL_FRAMES * SLEEP_FRAME_MS})`,
+        "    local now = GetUnitValue(COB.HEADING)",
+        // The heading is a signed short, so a turn across the wrap is the
+        // short way round.
+        `    local swing = ((now - last + ${half}) % ${HEADING_CIRCLE} - ${half}) * ${Number(RUDDER_PER_HEADING.toPrecision(6))}`,
+        "    last = now",
+        `    if swing > ${lua(most)} then swing = ${lua(most)} end`,
+        `    if swing < -${lua(most)} then swing = -${lua(most)} end`,
+        ...turnAll("swing"),
+        "  end",
+        "end",
+        "",
+        "local function rudderFollowStop()",
+        ...turnAll("0"),
+        "end",
+      ],
+      hooks: {
+        StartMoving: [`  Signal(${ctx.signal})`, "  StartThread(rudderFollow)"],
+        StopMoving: [`  Signal(${ctx.signal})`, "  rudderFollowStop()"],
+      },
+    };
+  },
+};
+
+/** Seconds between wakes at full speed in Balanced Annihilation's ships. */
+const WAKE_INTERVAL_SECONDS = 0.12;
+
+/**
+ * A wake from each wake point while the unit moves.
+ *
+ * The engine draws no wake of its own, so the script emits one from a piece
+ * every few frames (`UnitScript.cpp:634-676`). It drops a wake emitted while
+ * the unit is out of the water, so the script does not check. The engine hands
+ * `StartMoving` whether the unit is reversing, as 1 or 0 (`LuaUnitScript.cpp:1004`),
+ * so a reversing unit emits `SFX.REVERSE_WAKE` for the whole move.
+ *
+ * The default interval is Balanced Annihilation's: its ship scripts sleep
+ * `12000 / waketime` between wakes, with `waketime` the percentage of full
+ * speed, so 120 ms at full speed.
+ *
+ * `SFX.WAKE` is 2 and `SFX.REVERSE_WAKE` is 4. The engine's 3 and 5 are the
+ * same wakes under other names (`CobDefines.h:10-13`), so there is one of each
+ * to emit.
+ */
+export const WAKE_WHILE_MOVING: AnimPreset = {
+  id: "wake.moving",
+  label: "Wake while moving",
+  description:
+    "Emits a wake from each wake point while the unit moves, and a reverse wake while it backs up.",
+  requires: [{ role: "wake", count: 1 }],
+  animates: [],
+  params: [
+    {
+      id: "interval",
+      label: "Time between wakes",
+      unit: "s",
+      min: 0.05,
+      max: 0.5,
+      step: 0.01,
+      fallback: WAKE_INTERVAL_SECONDS,
+    },
+  ],
+  /** Nothing moves: the wake is a particle the preview draws. */
+  track() {
+    return null;
+  },
+  emit(ctx) {
+    const points = ctx.pieces("wake");
+    if (points.length === 0) return null;
+    // The sleep is a whole number of frames, and never none.
+    const frames = Math.max(
+      1,
+      Math.round(value(this, ctx.params, "interval") * ENGINE_FPS),
+    );
+    return {
+      functions: [
+        "local function wakeWhileMoving(reversing)",
+        `  SetSignalMask(${ctx.signal})`,
+        // The engine passes 1 or 0, and 0 is true in Lua. A preview event that
+        // passes nothing is a unit going forwards.
+        "  local sfx = SFX.WAKE",
+        "  if reversing and reversing ~= 0 then sfx = SFX.REVERSE_WAKE end",
+        "  while true do",
+        ...points.map((point) => `    EmitSfx(${point}, sfx)`),
+        `    Sleep(${frames * SLEEP_FRAME_MS})`,
+        "  end",
+        "end",
+      ],
+      hooks: {
+        StartMoving: [
+          `  Signal(${ctx.signal})`,
+          "  StartThread(wakeWhileMoving, reversing)",
+        ],
+        StopMoving: [`  Signal(${ctx.signal})`],
+      },
+    };
+  },
+};
+
 export const BUILDARM: AnimPreset = {
   id: "buildarm",
   label: "Build arm",
@@ -1574,6 +1763,8 @@ export const PRESETS: AnimPreset[] = [
   WALK_QUAD,
   TURRET_TRACK,
   WHEELS_ROLL,
+  RUDDER_FOLLOWS,
+  WAKE_WHILE_MOVING,
   BUILDARM,
   BUILD_AIM,
   BUILD_FACTORY,

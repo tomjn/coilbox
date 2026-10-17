@@ -61,15 +61,15 @@ function elmos(
 /**
  * The root on the ground, the hull at the gap above it with the Body role,
  * which Hover and bob moves, and bones at the hull's edges: the deck on top, a
- * skirt on each side and the wake at the stern. Only the hull has a role. The
- * deck is where a turret goes, the skirts where side skirts or fans go, and the
- * wake is the piece a hand written script emits a wake from (#4368).
+ * skirt on each side and the wake at the stern. The wake has the Wake point
+ * role, which `wake.moving` emits a wake from (#4368). The deck is where a
+ * turret goes and the skirts where side skirts or fans go.
  */
 export const HOVER: BodyPlan = {
   id: "hover",
   label: "Hovercraft",
   description:
-    "A hull that bobs over land and water. It does not lean into turns or leave a wake.",
+    "A hull that bobs over land and water and leaves a wake. It does not lean into turns.",
   proportions: [
     elmos("hullLength", "Hull length", 20, 65, 40.2, {
       bone: "wake",
@@ -116,22 +116,28 @@ export const HOVER: BodyPlan = {
         name: "wake",
         parent: "hull",
         position: [0, 0, -(hullLength as number) / 2],
+        role: "wake",
       },
     ];
   },
-  presets: [{ presetId: "hover.bob", params: {} }],
+  presets: [
+    { presetId: "hover.bob", params: {} },
+    { presetId: "wake.moving", params: {} },
+  ],
 };
 
 /**
  * The hull is the root, at the waterline, with the Body role. A turret on the
- * deck holds a barrel holding a muzzle flare, as on the turret building, and a
- * wake bone with no role sits at the stern on the waterline.
+ * deck holds a barrel holding a muzzle flare, as on the turret building. A
+ * wake bone with the Wake point role and a rudder bone sit at the stern on the
+ * waterline.
+ * There is one rudder, which turns about its joint at the hinge.
  */
 export const SHIP: BodyPlan = {
   id: "ship",
   label: "Ship",
   description:
-    "A hull with a gun turret. It does not rock on the water, leave a wake or steer with a rudder.",
+    "A hull with a gun turret, a wake and a rudder that swings as it turns. It does not rock on the water.",
   proportions: [
     elmos("hullLength", "Hull length", 45, 135, 89.2, {
       bone: "wake",
@@ -185,12 +191,22 @@ export const SHIP: BodyPlan = {
         name: "wake",
         parent: "hull",
         position: [0, 0, -(hullLength as number) / 2],
+        role: "wake",
+      },
+      {
+        id: "rudder",
+        name: "rudder",
+        parent: "hull",
+        position: [0, 0, -(hullLength as number) / 2],
+        role: "rudder",
       },
     ];
   },
   presets: [
     { presetId: "turret.track", params: {} },
     { presetId: "recoil", params: {} },
+    { presetId: "rudder.follow", params: {} },
+    { presetId: "wake.moving", params: {} },
   ],
 };
 

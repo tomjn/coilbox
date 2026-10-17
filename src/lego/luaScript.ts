@@ -356,7 +356,14 @@ export function buildLuaScript(project: LegoProject): string {
       ...preset,
       ...(stance?.after ? [stance.after] : []),
     ];
-    out.push(`function ${signature}`, ...lines, "end", "");
+    // The engine hands `StartMoving` whether the unit is reversing, but it is
+    // only named where a preset reads it, so a unit without one writes the
+    // script it always did.
+    const named =
+      hook === "StartMoving" && lines.some((line) => /\breversing\b/.test(line))
+        ? "script.StartMoving(reversing)"
+        : signature;
+    out.push(`function ${named}`, ...lines, "end", "");
   }
 
   out.push(
