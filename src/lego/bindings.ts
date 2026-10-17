@@ -449,6 +449,18 @@ export const legoSaveGlb = defineCommand<
   { path: string }
 >("coilbox-lego", "lego_save_glb");
 
+/** Write text to an exact path the user chose. `path` must be absolute. */
+export const legoWriteTextFile = defineCommand<
+  { path: string; text: string },
+  { path: string }
+>("coilbox-lego", "lego_write_text_file");
+
+/** Read a UTF-8 text file the user chose. `path` must be absolute. */
+export const legoReadTextFile = defineCommand<
+  { path: string },
+  { text: string }
+>("coilbox-lego", "lego_read_text_file");
+
 /** One piece of an imported model. The vertices are in the sidecar, not here. */
 export interface ImportedPiece {
   name: string;

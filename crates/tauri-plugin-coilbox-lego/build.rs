@@ -36,6 +36,8 @@ const COMMANDS: &[&str] = &[
     "lego_scratch_game",
     "lego_run_script",
     "lego_probe_script",
+    "lego_write_text_file",
+    "lego_read_text_file",
 ];
 
 fn main() {

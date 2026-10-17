@@ -1044,6 +1044,48 @@ async fn lego_save_glb(path: String, bytes: Vec<u8>) -> CliResult {
     CliResult::ok(json!({ "path": file.to_string_lossy() }))
 }
 
+/// Write `text` to an absolute path, making the folder it goes in.
+fn write_text_at(path: &str, text: &str) -> Result<(), String> {
+    let file = PathBuf::from(path);
+    if !file.is_absolute() {
+        return Err(format!("not an absolute path: {path}"));
+    }
+    if let Some(parent) = file.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("could not create {}: {e}", parent.display()))?;
+    }
+    std::fs::write(&file, text).map_err(|e| format!("could not write {}: {e}", file.display()))
+}
+
+/// Read a UTF-8 text file from an absolute path.
+fn read_text_at(path: &str) -> Result<String, String> {
+    let file = PathBuf::from(path);
+    if !file.is_absolute() {
+        return Err(format!("not an absolute path: {path}"));
+    }
+    std::fs::read_to_string(&file).map_err(|e| format!("could not read {}: {e}", file.display()))
+}
+
+/// `lego_write_text_file` writes text the frontend serialized to an exact path
+/// the user chose in a save dialog. Used to save a module to a file.
+#[tauri::command]
+async fn lego_write_text_file(path: String, text: String) -> CliResult {
+    match write_text_at(&path, &text) {
+        Ok(()) => CliResult::ok(json!({ "path": path })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// `lego_read_text_file` reads a text file the user chose in an open dialog.
+/// The frontend validates the content. Used to load a module from a file.
+#[tauri::command]
+async fn lego_read_text_file(path: String) -> CliResult {
+    match read_text_at(&path) {
+        Ok(text) => CliResult::ok(json!({ "text": text })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
 /// A texture the model header names, once the import has looked for it.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -3202,7 +3244,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_picture_survey,
             lego_scratch_game,
             lego_run_script,
-            lego_probe_script
+            lego_probe_script,
+            lego_write_text_file,
+            lego_read_text_file
         ])
         .build()
 }
@@ -3442,6 +3486,28 @@ mod glb_picture {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_text_file_written_reads_back_and_makes_its_folder() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let file = dir.path().join("a/b/module.json");
+        let path = file.to_string_lossy().to_string();
+        write_text_at(&path, "{\"x\":1}").expect("write");
+        assert_eq!(read_text_at(&path).expect("read"), "{\"x\":1}");
+    }
+
+    #[test]
+    fn text_files_refuse_a_relative_path_and_say_when_the_file_is_missing() {
+        assert!(write_text_at("rel.json", "x")
+            .unwrap_err()
+            .contains("absolute"));
+        assert!(read_text_at("rel.json").unwrap_err().contains("absolute"));
+        let dir = tempfile::tempdir().expect("tempdir");
+        let missing = dir.path().join("nope.json").to_string_lossy().to_string();
+        assert!(read_text_at(&missing)
+            .unwrap_err()
+            .contains("could not read"));
+    }
 
     /// The polyfill is one file every sharing unit in the game uses, so it is
     /// written once and left alone like the script, refreshed in the scratch
