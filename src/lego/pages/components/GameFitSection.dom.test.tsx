@@ -109,7 +109,24 @@ describe("GameFitSection", () => {
   it("says a unit with no game cannot be checked", () => {
     show(project({ imported: undefined }));
     expect(
-      screen.getByText("This unit has no game to check against."),
+      screen.getByText("Choose a game for this unit to check it against."),
+    ).toBeTruthy();
+  });
+
+  it("checks a unit of parts against the game it records (#3257)", () => {
+    show(
+      project({
+        imported: undefined,
+        game: { name: GAME.name, archive: GAME.primaryArchive.name },
+      }),
+    );
+    expect(screen.getByText("As the builder would write it")).toBeTruthy();
+  });
+
+  it("says nothing can be checked for a unit for no game", () => {
+    show(project({ game: null }));
+    expect(
+      screen.getByText("Choose a game for this unit to check it against."),
     ).toBeTruthy();
   });
 

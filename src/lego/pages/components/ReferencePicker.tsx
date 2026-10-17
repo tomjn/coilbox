@@ -57,6 +57,7 @@ import type { LoadedPack } from "../../pack";
 import type { RawGeometry } from "../../rawGeometry";
 import { REFERENCE_COUNTS } from "../../referenceObject";
 import { bakedCounts, type ModelCounts } from "../../s3oBuild";
+import { installedGameFor, unitGame } from "../../unitGame";
 import { UnitCounts } from "./UnitCounts";
 
 /** What the viewport needs to stand a unit in the scene, and what to call it. */
@@ -113,13 +114,18 @@ export function ReferencePicker({
 }) {
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
-  const [gameName, setGameName] = useState(BUILT_IN);
+  /** Null until somebody picks, so the list opens on the unit's own game. */
+  const [picked, setPicked] = useState<string | null>(null);
   /** Empty until a unit is picked, so the select shows its placeholder. */
   const [unitName, setUnitName] = useState("");
 
   // Coilbox's own scratch game holds whatever was last tested, which is the
   // unit being built. Standing that beside itself measures nothing.
   const games = uniqueByName(withoutGeneratedGames(scan.data?.games ?? []));
+  const gameName =
+    picked ??
+    installedGameFor(unitGame(unitSource.project), games)?.name ??
+    BUILT_IN;
   const game = games.find((g) => g.name === gameName);
   const archive = game?.primaryArchive.name;
 
@@ -200,7 +206,7 @@ export function ReferencePicker({
           <OptionSelect
             value={gameName}
             onValueChange={(value) => {
-              setGameName(value);
+              setPicked(value);
               setUnitName("");
             }}
             options={[

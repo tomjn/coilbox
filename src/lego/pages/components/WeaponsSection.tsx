@@ -2,8 +2,8 @@
  * What each turret and aim point fires, and over what arc (issue #3274). See
  * `weaponModule.ts` for how the choice reaches the exported unit.
  *
- * The game is the unit's own, else the game it was exported into, since a unit
- * built from parts records no game of its own yet.
+ * The game is the unit's own (#3257). A unit saved before it could record one
+ * falls back to the game it was exported into.
  */
 
 import { Button, Input } from "@picoframe/frame";
@@ -28,7 +28,7 @@ import { useUnitDefs } from "@/workshop/config";
 import { exportedInto } from "@/workshop/legoUnits";
 import { type ModProject, useModProjects } from "@/workshop/project";
 import type { LegoPieceWeapon, LegoProject, LegoWeaponRef } from "../../model";
-import { unitGame } from "../../movement";
+import { installedGameFor, unitGame } from "../../unitGame";
 import {
   mountedWeapons,
   pickedWeapon,
@@ -60,9 +60,14 @@ export function useWeaponSource(project: LegoProject): WeaponSource {
   const { projects } = useModProjects();
   const own = unitGame(project);
   const games = scan.data?.games ?? [];
+  // Only a unit that has never been asked falls back to its export folder. One
+  // for no game said so, and gets no game's weapons.
+  const legacy = project.game === undefined;
   const game = own
-    ? games.find((g) => g.primaryArchive.name === own.archive)
-    : games.find((g) => exportedInto(project, g.primaryArchive.path));
+    ? installedGameFor(own, games)
+    : legacy
+      ? games.find((g) => exportedInto(project, g.primaryArchive.path))
+      : undefined;
   const { defs, defsFor, status, error } = useUnitDefs(
     target?.enginePath,
     target?.dataDir,
@@ -71,8 +76,8 @@ export function useWeaponSource(project: LegoProject): WeaponSource {
   const current = defs && defsFor === game?.primaryArchive.name ? defs : null;
   const named = own?.name ?? "The game it was exported into";
   const unavailable =
-    !own && !project.exported
-      ? "Choose a game for this unit first: export it into the game's folder."
+    !own && !(legacy && project.exported)
+      ? "Choose a game for this unit first."
       : !targetLoading && !target
         ? "No engine is installed, so the game cannot be read."
         : scan.error

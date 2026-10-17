@@ -19,11 +19,11 @@ import { unitEditPath } from "@/workshop/routes";
 import { unitEffectiveWeapons } from "@/workshop/unitWeapons";
 import { receiptFor } from "../../exportRecord";
 import type { LegoProject } from "../../model";
-import { unitGame } from "../../movement";
 import type { LoadedPack } from "../../pack";
 import { writtenDigest } from "../../reexport";
 import type { UnitBounds } from "../../s3oBuild";
 import { legoUnitDef } from "../../unitDef";
+import { gameRecordFor, sameGame, unitGame } from "../../unitGame";
 import {
   STATS,
   type StatId,
@@ -60,11 +60,12 @@ export function StatsSection({ project, pack, bounds, reference }: Props) {
 
   // The game the unit was exported into, which is where its file is.
   const own = unitGame(project);
-  const exportedGames = (scan.data?.games ?? []).filter((g) =>
+  const games = scan.data?.games ?? [];
+  const exportedGames = games.filter((g) =>
     exportedInto(project, g.primaryArchive.path),
   );
   const game =
-    exportedGames.find((g) => own && g.primaryArchive.name === own.archive) ??
+    exportedGames.find((g) => sameGame(own, gameRecordFor(g, games))) ??
     exportedGames[0];
   const built = useUnitDefs(
     target?.enginePath,

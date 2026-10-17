@@ -1055,3 +1055,60 @@ describe("parseLegoProjectJson", () => {
     ).toBeNull();
   });
 });
+
+describe("the unit's game (#3257)", () => {
+  const sf = {
+    name: "Splinter Faction 0.1.89",
+    archive: "SplinterFaction_0.1.89.sdz",
+    shortname: "SF",
+    version: "0.1.89",
+  };
+  const parse = (extra: Record<string, unknown>) =>
+    parseLegoProjectJson(
+      JSON.stringify({ ...project([piece("root", null)]), ...extra }),
+    );
+
+  it("keeps a recorded game, with the game a mutator builds on", () => {
+    const game = {
+      name: "SF Hover 1",
+      archive: "sfhover.sdd",
+      shortname: "SFH",
+      base: sf,
+    };
+    expect(parse({ game })?.game).toEqual(game);
+  });
+
+  it("keeps no game as a choice of its own", () => {
+    const parsed = parse({ game: null });
+    expect(parsed).not.toBeNull();
+    expect(parsed?.game).toBeNull();
+  });
+
+  it("leaves a unit saved before this with no game recorded", () => {
+    expect(parse({})).not.toHaveProperty("game");
+  });
+
+  it("drops a record with no archive rather than failing the unit", () => {
+    const parsed = parse({ game: { name: "Splinter Faction" } });
+    expect(parsed).not.toBeNull();
+    expect(parsed).not.toHaveProperty("game");
+  });
+
+  it("drops a base that is only half there", () => {
+    expect(parse({ game: { ...sf, base: { name: "x" } } })?.game).toEqual(sf);
+  });
+
+  it("is written by newProject only when given", () => {
+    const base = {
+      id: "p",
+      rootPieceId: "r",
+      name: "N",
+      packId: "pack",
+      packVersion: "1",
+      now: "2026-10-17T00:00:00Z",
+    };
+    expect(newProject(base)).not.toHaveProperty("game");
+    expect(newProject({ ...base, game: null }).game).toBeNull();
+    expect(newProject({ ...base, game: sf }).game).toEqual(sf);
+  });
+});

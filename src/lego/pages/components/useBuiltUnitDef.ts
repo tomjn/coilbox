@@ -8,13 +8,19 @@ import { normaliseCloneKey } from "../../../workshop/clones";
 import { useUnitDefs } from "../../../workshop/config";
 import { exportedInto } from "../../../workshop/legoUnits";
 import type { LegoProject } from "../../model";
+import { gameRecordFor, sameGame, unitGame } from "../../unitGame";
 import { useTestGame } from "./useTestGame";
 
 export function useBuiltUnitDef(project: LegoProject | null | undefined) {
   const { target, scan } = useTestGame();
-  const game = project
-    ? scan.data?.games.find((g) => exportedInto(project, g.primaryArchive.path))
-    : undefined;
+  // The unit's own game first, when it was exported into more than one.
+  const games = scan.data?.games ?? [];
+  const exported = project
+    ? games.filter((g) => exportedInto(project, g.primaryArchive.path))
+    : [];
+  const own = project ? unitGame(project) : null;
+  const game =
+    exported.find((g) => sameGame(own, gameRecordFor(g, games))) ?? exported[0];
   const { defs, defsFor } = useUnitDefs(
     target?.enginePath,
     target?.dataDir,
