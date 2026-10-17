@@ -109,7 +109,8 @@ export function selectionAsCompound(
     const ids = descendantIds(project, rootId);
     for (const id of ids) remap.set(id, options.newId());
     for (const id of ids) {
-      const piece = pieceById(project, id) as LegoPiece;
+      // A compound has no skeleton, so a body plan's bone stays behind (#3246).
+      const { bone: _bone, ...piece } = pieceById(project, id) as LegoPiece;
       // A root has no parent in the compound, so nothing to be joined to.
       pieces.push({
         ...(id === rootId ? freePiece(piece) : piece),
@@ -435,8 +436,11 @@ export function insertCompound(
     // `LegoPiece.originalName` (#2613).
     // A piece landing on the new parent was joined, if at all, to something
     // else, so it lands free. Joins inside the compound come along.
+    // A copy of a body plan's bone is a free piece, or a proportion would move
+    // the copy onto the original (#3246).
     const {
       originalName: _dropped,
+      bone: _copied,
       module: from,
       ...rest
     } = under === parent ? freePiece(piece) : piece;

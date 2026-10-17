@@ -7,9 +7,10 @@
  * copies, so an item that is no longer installed simply stops matching and
  * drops out of the view without an error.
  *
- * Skeletons (milestone 63) do not exist yet. A third kind is added by widening
- * `InventoryKind`, giving it a `kind` in `InventoryRef`, and one more call to
- * `inList` in the view hook.
+ * Skeletons (milestone 63) are not listed yet. They are the body plans in
+ * `bodyPlans.ts`, referenced by `BodyPlan.id`. A third kind is added by
+ * widening `InventoryKind`, giving it a `kind` in `InventoryRef`, and one more
+ * call to `inList` in the view hook.
  */
 
 import { useSetting } from "@picoframe/frame";

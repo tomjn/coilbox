@@ -433,6 +433,81 @@ describe("parseLegoProjectJson", () => {
     expect(parseLegoProjectJson(JSON.stringify(doc))).toEqual(doc);
   });
 
+  it("round-trips a skeleton and its bones (#3246)", () => {
+    const doc: LegoProject = {
+      ...project([
+        { ...piece("root", null), bone: "base" },
+        { ...piece("a", "root"), role: "leg.l1.thigh", bone: "thigh.l" },
+        piece("b", "a"),
+      ]),
+      skeleton: { plan: "biped", proportions: { legLength: 12, stance: 4 } },
+    };
+    expect(parseLegoProjectJson(JSON.stringify(doc))).toEqual(doc);
+  });
+
+  it("opens a unit saved before skeletons with neither field", () => {
+    const parsed = parseLegoProjectJson(
+      JSON.stringify(project([piece("root", null), piece("a", "root")])),
+    );
+    expect(parsed && "skeleton" in parsed).toBe(false);
+    expect(parsed?.pieces.some((p) => "bone" in p)).toBe(false);
+  });
+
+  it("keeps a skeleton whose plan this version does not have", () => {
+    const doc: LegoProject = {
+      ...project([{ ...piece("root", null), bone: "base" }]),
+      skeleton: { plan: "from.the.future", proportions: {} },
+    };
+    expect(parseLegoProjectJson(JSON.stringify(doc))?.skeleton).toEqual(
+      doc.skeleton,
+    );
+  });
+
+  it("drops proportions that are not numbers", () => {
+    const parsed = parseLegoProjectJson(
+      JSON.stringify({
+        ...project([piece("root", null)]),
+        skeleton: {
+          plan: "biped",
+          proportions: { legLength: 12, stance: "wide", height: null },
+        },
+      }),
+    );
+    expect(parsed?.skeleton).toEqual({
+      plan: "biped",
+      proportions: { legLength: 12 },
+    });
+  });
+
+  it("drops a skeleton with no plan, and the bones with it", () => {
+    const parsed = parseLegoProjectJson(
+      JSON.stringify({
+        ...project([{ ...piece("root", null), bone: "base" }]),
+        skeleton: { plan: "", proportions: {} },
+      }),
+    );
+    expect(parsed && "skeleton" in parsed).toBe(false);
+    expect(parsed?.pieces[0] && "bone" in parsed.pieces[0]).toBe(false);
+  });
+
+  it("gives a bone to one piece only", () => {
+    const parsed = parseLegoProjectJson(
+      JSON.stringify({
+        ...project([
+          piece("root", null),
+          { ...piece("a", "root"), bone: "thigh.l" },
+          { ...piece("b", "root"), bone: "thigh.l" },
+        ]),
+        skeleton: { plan: "biped", proportions: {} },
+      }),
+    );
+    expect(parsed?.pieces.map((p) => p.bone)).toEqual([
+      undefined,
+      "thigh.l",
+      undefined,
+    ]);
+  });
+
   it("round-trips the weapon a turret fires and its arc (#3274)", () => {
     const doc = project([
       piece("root", null),
