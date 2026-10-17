@@ -234,6 +234,9 @@ function RoundFields({ shape, onChange }: Props) {
           />
         ))}
       </div>
+      <p className="text-xs text-muted-foreground">
+        Dragging a round side sets the radius.
+      </p>
       {problem ? (
         <p role="alert" className="text-xs text-destructive">
           {problem}

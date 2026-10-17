@@ -185,6 +185,13 @@ export interface SceneState {
       | ((pieceId: string, axis: Axis, sign: 1 | -1, size: number) => void)
       | undefined;
   };
+  /** Told the size a finished drag landed on for a generated shape (#3331),
+   *  along its own axis, with which end was dragged. */
+  onShapeResizeRef: {
+    current:
+      | ((pieceId: string, axis: Axis, sign: 1 | -1, size: number) => void)
+      | undefined;
+  };
   /** Told what to say about the drag in progress, and null when it ends. */
   onPackReadoutRef: { current: ((text: string | null) => void) | undefined };
   /** A box per piece, while the unit is hit piece by piece and the volume is

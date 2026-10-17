@@ -3,12 +3,18 @@ import { isEffectivelyHidden } from "../../model";
 import { type LegoPartInfo, partUnit } from "../../pack";
 import {
   type Axis,
-  blockSizes,
   nearestSize,
   resizeReadout,
   type SizeChoice,
   sizeChoices,
 } from "../../resizePackBlock";
+import {
+  faceSizes,
+  landSize,
+  linkedAxes,
+  shapeReadout,
+} from "../../resizeShape";
+import { isKnownShapeKind, type LegoShape } from "../../shapes";
 import type { Vec3 } from "../../snapping";
 import { handleBox, plateSize } from "./collisionHandles";
 import type { SceneState } from "./sceneState";
@@ -27,7 +33,13 @@ interface Frame {
   scale: THREE.Vector3;
 }
 
-/** A face of a pack block being dragged. */
+/** The box a piece is sized by, in its own space. */
+interface Box {
+  min: Vec3;
+  max: Vec3;
+}
+
+/** A face of a pack block or a generated shape being dragged. */
 export interface PackFaceDrag extends PackFace {
   pieceId: string;
   /** The pointer is followed on this plane. It holds the axis and faces the
@@ -35,31 +47,40 @@ export interface PackFaceDrag extends PackFace {
   plane: THREE.Plane;
   frame: Frame;
   pivot: Vec3;
-  part: LegoPartInfo;
+  box: Box;
+  /** The pack part being sized, or null for a generated shape. */
+  part: LegoPartInfo | null;
+  /** The generated shape being sized, or null for a pack part. */
+  shape: LegoShape | null;
+  /** The sizes the pack has along the axis. Empty for a shape. */
   choices: SizeChoice[];
   /** Where the pointer was on the axis, in the part's space, when it grabbed. */
   grabbedAt: number;
-  /** The part's size along the axis when it was grabbed. */
+  /** The size along the axis when it was grabbed. */
   from: number;
   /** The size the pointer asks for now. */
   wanted: number;
+  /** The size a shape lands on: in part units unless Alt is held, and not
+   *  below its limit. A part's is `nearestSize` of `choices`. */
+  landed: number;
 }
 
 /**
  * The piece the face plates are on, or null when there is none.
  *
- * Plates stand in for the scale gizmo on one pack block while the size tool is
- * active: a stretch and a swap to the part of the size dragged cannot both
- * answer the same handle. The uniform scale lock keeps the gizmo, since that is
- * a stretch of the whole piece.
+ * Plates stand in for the scale gizmo on one pack block or generated shape
+ * while the size tool is active: a stretch and a resize to the size dragged
+ * cannot both answer the same handle. The uniform scale lock keeps the gizmo,
+ * since that is a stretch of the whole piece.
  */
 export function packSubject(state: SceneState): {
   id: string;
-  part: LegoPartInfo;
+  part: LegoPartInfo | null;
+  shape: LegoShape | null;
+  box: Box;
   group: THREE.Group;
   pivot: Vec3;
 } | null {
-  if (!state.onPackResizeRef.current) return null;
   if (state.gizmo.getMode() !== "scale" || state.uniformScale) return null;
   if (handleBox(state) || state.editAim || state.placingAnchorRef.current) {
     return null;
@@ -68,12 +89,28 @@ export function packSubject(state: SceneState): {
   if (ids.length !== 1 || state.groupIds.length !== 1) return null;
   const project = state.projectRef.current;
   const piece = project.pieces.find((p) => p.id === ids[0]);
-  if (!piece?.partId || piece.meshId || isEffectivelyHidden(project, piece.id))
+  if (!piece || piece.meshId || isEffectivelyHidden(project, piece.id)) {
     return null;
-  const part = state.packRef.current.byId.get(piece.partId);
+  }
   const group = state.groups.get(piece.id);
-  if (!part || !group) return null;
-  return { id: piece.id, part, group, pivot: piece.pivot ?? [0, 0, 0] };
+  if (!group) return null;
+  const pivot = piece.pivot ?? [0, 0, 0];
+  if (piece.partId) {
+    const part = state.packRef.current.byId.get(piece.partId);
+    if (!part || !state.onPackResizeRef.current) return null;
+    return { id: piece.id, part, shape: null, box: part.bbox, group, pivot };
+  }
+  if (piece.shape && isKnownShapeKind(piece.shape.kind)) {
+    if (!state.onShapeResizeRef.current) return null;
+    // Centred on its box, as every shape is.
+    const half = faceSizes(piece.shape).map((size) => size / 2) as Vec3;
+    const box = {
+      min: half.map((n) => -n) as Vec3,
+      max: half,
+    };
+    return { id: piece.id, part: null, shape: piece.shape, box, group, pivot };
+  }
+  return null;
 }
 
 function frameOf(state: SceneState, group: THREE.Group): Frame {
@@ -96,12 +133,15 @@ function inFrame(frame: Frame, pivot: Vec3, point: Vec3): THREE.Vector3 {
   );
 }
 
-function middle(part: LegoPartInfo): Vec3 {
-  const { min, max } = part.bbox;
+function boxSizes({ min, max }: Box): Vec3 {
+  return [max[0] - min[0], max[1] - min[1], max[2] - min[2]];
+}
+
+function middle({ min, max }: Box): Vec3 {
   return [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2];
 }
 
-/** The outline of the part a drag would swap to, built once with the scene.
+/** The outline of the part or shape a drag would land on, built once with the scene.
  *  The plates themselves are `buildCollisionHandles`, so a face is grabbed the
  *  same way whichever box it is on. */
 export function buildPackPreview(
@@ -132,15 +172,15 @@ export function showPackHandles(state: SceneState) {
   const frame = state.packDrag?.frame ?? frameOf(state, subject.group);
   state.packHandles.position.copy(frame.origin);
   state.packHandles.quaternion.copy(frame.turn);
-  const sizes = blockSizes(subject.part).map(
+  const sizes = boxSizes(subject.box).map(
     (size, k) => size * Math.abs(frame.scale.getComponent(k)),
   );
   for (const plate of state.packHandles.children) {
     const { axis, sign } = plate.userData as PackFace;
     const across = [0, 1, 2].filter((other) => other !== axis);
     // The face of the part, which a mirrored piece draws on the other side.
-    const face = middle(subject.part);
-    face[axis] = subject.part.bbox[sign > 0 ? "max" : "min"][axis];
+    const face = middle(subject.box);
+    face[axis] = subject.box[sign > 0 ? "max" : "min"][axis];
     plate.position.copy(inFrame(frame, subject.pivot, face));
     const side = plateSize(sizes[across[0]], sizes[across[1]]);
     plate.scale.set(side, side, 1);
@@ -206,7 +246,7 @@ export function beginPackDrag(
   const normal = eye.sub(along.clone().multiplyScalar(eye.dot(along)));
   if (normal.lengthSq() < 1e-6) return false;
 
-  const from = blockSizes(subject.part)[axis];
+  const from = boxSizes(subject.box)[axis];
   const drag: PackFaceDrag = {
     axis,
     sign,
@@ -217,20 +257,23 @@ export function beginPackDrag(
     ),
     frame,
     pivot: subject.pivot,
+    box: subject.box,
     part: subject.part,
-    choices: sizeChoices(state.packRef.current, subject.part, axis),
+    shape: subject.shape,
+    choices: subject.part
+      ? sizeChoices(state.packRef.current, subject.part, axis)
+      : [],
     grabbedAt: 0,
     from,
     wanted: from,
+    landed: from,
   };
   drag.grabbedAt = coordinateAt(drag, hit.point);
   state.packDrag = drag;
   highlightPlate(state, hit.object);
   state.controls.enabled = false;
   showPreview(state, drag);
-  state.onPackReadoutRef.current?.(
-    resizeReadout(drag.choices, from, partUnit(state.packRef.current)),
-  );
+  state.onPackReadoutRef.current?.(readoutOf(state, drag));
   return true;
 }
 
@@ -243,23 +286,47 @@ export function movePackDrag(state: SceneState, raycaster: THREE.Raycaster) {
 
   drag.wanted =
     drag.from + drag.sign * (coordinateAt(drag, at) - drag.grabbedAt);
+  if (drag.shape) {
+    // Alt turns the step off, as it does for moving.
+    drag.landed =
+      Math.abs(drag.wanted - drag.from) < 1e-9
+        ? drag.from
+        : landSize(
+            drag.shape,
+            drag.axis,
+            drag.wanted,
+            state.snapping ? partUnit(state.packRef.current) : null,
+          );
+  }
   showPreview(state, drag);
-  state.onPackReadoutRef.current?.(
-    resizeReadout(drag.choices, drag.wanted, partUnit(state.packRef.current)),
-  );
+  state.onPackReadoutRef.current?.(readoutOf(state, drag));
   state.render();
+}
+
+/** What to say about the size the drag is at now. */
+function readoutOf(state: SceneState, drag: PackFaceDrag): string {
+  const unit = partUnit(state.packRef.current);
+  return drag.shape
+    ? shapeReadout(drag.landed, unit)
+    : resizeReadout(drag.choices, drag.wanted, unit);
 }
 
 /** Draw the outline of the part the drag has landed on, its fixed face where
  *  the block's was. */
 function showPreview(state: SceneState, drag: PackFaceDrag) {
-  const chosen = nearestSize(drag.choices, drag.wanted);
-  const size = chosen?.size ?? drag.from;
-  const { min, max } = drag.part.bbox;
+  const size = drag.shape
+    ? drag.landed
+    : (nearestSize(drag.choices, drag.wanted)?.size ?? drag.from);
+  const { min, max } = drag.box;
   const lo: Vec3 = [...min];
   const hi: Vec3 = [...max];
   if (drag.sign > 0) hi[drag.axis] = lo[drag.axis] + size;
   else lo[drag.axis] = hi[drag.axis] - size;
+  // A round shape's other cross axis is the same radius, about its middle.
+  for (const other of drag.shape ? linkedAxes(drag.shape, drag.axis) : []) {
+    lo[other] = -size / 2;
+    hi[other] = size / 2;
+  }
 
   const centre = inFrame(drag.frame, drag.pivot, [
     (lo[0] + hi[0]) / 2,
@@ -287,8 +354,21 @@ export function endPackDrag(state: SceneState) {
   highlightPlate(state, null);
   state.onPackReadoutRef.current?.(null);
   if (!drag) return;
+  if (drag.shape) {
+    if (Math.abs(drag.landed - drag.from) < 1e-9) {
+      state.render();
+      return;
+    }
+    state.onShapeResizeRef.current?.(
+      drag.pieceId,
+      drag.axis,
+      drag.sign,
+      drag.landed,
+    );
+    return;
+  }
   const chosen = nearestSize(drag.choices, drag.wanted);
-  if (chosen && chosen.part.id !== drag.part.id) {
+  if (chosen && drag.part && chosen.part.id !== drag.part.id) {
     state.onPackResizeRef.current?.(
       drag.pieceId,
       drag.axis,

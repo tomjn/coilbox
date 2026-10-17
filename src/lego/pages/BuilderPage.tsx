@@ -157,6 +157,7 @@ import { rawGeometryProblems } from "../rawGeometry";
 import { texturesInUse } from "../rawImport";
 import { parentOptions, reparentPiece } from "../reparent";
 import { type Axis, resizePackBlock } from "../resizePackBlock";
+import { resizeShapeFace } from "../resizeShape";
 import { unringPiece } from "../ring";
 import { ringMembers } from "../ringSet";
 import { newRoundShape, type RoundKind } from "../roundShape";
@@ -1259,6 +1260,26 @@ function Builder({ id }: { id: string | undefined }) {
   }
 
   /**
+   * A generated shape's face was dragged (#3331). One edit, so one undo, by the
+   * path the piece panel uses so a wheel keeps its axle. Children that are not
+   * joined stay where they are.
+   */
+  function resizeShapeBox(
+    pieceId: string,
+    axis: Axis,
+    sign: 1 | -1,
+    size: number,
+  ) {
+    if (!pack) return;
+    place(
+      [pieceId],
+      (project) =>
+        resizeShapeFace(project, pack, pieceId, axis, sign, size)?.project ??
+        project,
+    );
+  }
+
+  /**
    * Put another module where the selected piece's module is. One edit, so one
    * undo. What the swap did to kept pieces and presets is told in a notice.
    */
@@ -2206,7 +2227,11 @@ function Builder({ id }: { id: string | undefined }) {
                   onAimChange: setAimPoint,
                 }}
                 guides={{ onEdit: edit }}
-                packResize={imported ? undefined : { onResize: resizeBlock }}
+                packResize={
+                  imported
+                    ? undefined
+                    : { onResize: resizeBlock, onResizeShape: resizeShapeBox }
+                }
               />
             </div>
 
