@@ -223,7 +223,8 @@ export function insertCompound(
 }
 
 /**
- * Insert a compound, then put back the transform lifting it dropped.
+ * Insert a compound, then put back the transform lifting it dropped, and the
+ * join when one is given.
  *
  * `subtreeAsCompound` resets the root's position, rotation and scale so a
  * compound can be placed anywhere, which is right for something pulled from the
@@ -231,12 +232,15 @@ export function insertCompound(
  * and mirror-as-copy both want the copy to land where the source already sits,
  * not at its parent's origin. Shared so the two do not grow their own answers to
  * the same question.
+ *
+ * A duplicate lands in the same place under the same parent as its source, so
+ * it keeps the source's join too (issue #3309).
  */
 export function insertCompoundAt(
   project: LegoProject,
   compound: LegoProject,
   parentId: string,
-  transform: Placement,
+  transform: Placement & Pick<LegoPiece, "connection">,
   newId: () => string,
 ): { project: LegoProject; rootPieceId: string } {
   const inserted = insertCompound(project, compound, parentId, newId);
@@ -252,4 +256,41 @@ export function insertCompoundAt(
     },
     rootPieceId,
   };
+}
+
+/**
+ * A copy of a piece and its subtree, alongside the original and in the same
+ * place, or null when the piece is not there.
+ *
+ * Lifting drops the subtree root's transform and join, which is right for
+ * something bound for the library but not for a copy that is meant to sit
+ * exactly where the original does until it is dragged elsewhere. Both are put
+ * back, so a joined piece's copy is joined to the same face.
+ */
+export function duplicatePiece(
+  project: LegoProject,
+  pieceId: string,
+  options: { now: string; newId: () => string },
+): { project: LegoProject; rootPieceId: string } | null {
+  const source = pieceById(project, pieceId);
+  const cutting = subtreeAsCompound(project, pieceId, {
+    id: options.newId(),
+    ...options,
+  });
+  if (!source || !cutting) return null;
+  // Alongside the original rather than inside it, which is what duplicate
+  // means everywhere else.
+  const parentId = source.parentId ?? project.rootPieceId;
+  return insertCompoundAt(
+    project,
+    cutting,
+    parentId,
+    {
+      position: source.position,
+      rotation: source.rotation,
+      scale: source.scale,
+      ...(source.connection ? { connection: source.connection } : {}),
+    },
+    options.newId,
+  );
 }
