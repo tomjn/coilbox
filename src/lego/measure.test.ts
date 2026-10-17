@@ -4,6 +4,7 @@ import type { GuideLine, GuidePlane } from "./guides";
 import {
   axesText,
   figure,
+  fitToSteps,
   formatNumber,
   measureBetween,
   pieceSize,
@@ -225,5 +226,41 @@ describe("pieceSize", () => {
 
   it("is null for a piece with no geometry", () => {
     expect(pieceSize(project([1, 1, 1]), pack(), null, "empty")).toBeNull();
+  });
+});
+
+describe("fitToSteps", () => {
+  it("scales a piece evenly until its longest side is a whole number of steps", () => {
+    const fitted = fitToSteps(project([3, 1, 2]), pack(), null, "a", 2);
+    const scale = fitted.pieces.find((p) => p.id === "a")?.scale ?? [];
+    expect(scale[0]).toBeCloseTo(4);
+    expect(scale[1]).toBeCloseTo(4 / 3);
+    expect(scale[2]).toBeCloseTo(8 / 3);
+    expect(pieceSize(fitted, pack(), null, "a")?.[0]).toBeCloseTo(4);
+  });
+
+  it("never fits a piece to less than one step", () => {
+    const fitted = fitToSteps(
+      project([0.01, 0.01, 0.01]),
+      pack(),
+      null,
+      "a",
+      2,
+    );
+    expect(pieceSize(fitted, pack(), null, "a")?.[1]).toBeCloseTo(2);
+  });
+
+  it("keeps a mirror's sign", () => {
+    const fitted = fitToSteps(project([-3, 1, 2]), pack(), null, "a", 2);
+    expect(fitted.pieces.find((p) => p.id === "a")?.scale[0]).toBeCloseTo(-4);
+  });
+
+  it("returns the same document for a piece already on a step, one with no geometry, or no step", () => {
+    const sized = project([1, 1, 1]);
+    expect(fitToSteps(sized, pack(), null, "a", 2)).toBe(sized);
+    expect(fitToSteps(sized, pack(), null, "empty", 2)).toBe(sized);
+    expect(fitToSteps(project([3, 1, 2]), pack(), null, "a", 0)).toEqual(
+      project([3, 1, 2]),
+    );
   });
 });

@@ -30,7 +30,7 @@ export interface PivotChoice {
  * Corners are offered by snapping, which is about seating two parts together.
  * A joint turns about a face or the middle, so those are what this lists.
  */
-export function pivotChoices(part: LegoPartInfo): PivotChoice[] {
+export function pivotChoices(part: Pick<LegoPartInfo, "bbox">): PivotChoice[] {
   const { min, max } = part.bbox;
   const mid: Vec3 = [
     (min[0] + max[0]) / 2,
@@ -51,7 +51,7 @@ export function pivotChoices(part: LegoPartInfo): PivotChoice[] {
 
 /** Which choice a piece's pivot currently sits on, if any. */
 export function currentPivot(
-  part: LegoPartInfo,
+  part: Pick<LegoPartInfo, "bbox">,
   pivot: Vec3 | undefined,
 ): string | null {
   const at = pivot ?? [0, 0, 0];

@@ -91,6 +91,7 @@ import {
   liftedModuleRefusal,
   openedFrom,
 } from "../liftPiece";
+import { fitToSteps } from "../measure";
 import { canFixMesh, DEFAULT_SMOOTHING_ANGLE_DEG } from "../meshFix";
 import {
   canMirror,
@@ -122,6 +123,7 @@ import {
   type LegoPartInfo,
   type LoadedPack,
   loadPack,
+  partUnit,
   projectPackProblems,
 } from "../pack";
 import { usePanelHeight, usePanelOpen } from "../panels";
@@ -528,15 +530,26 @@ function Builder({ id }: { id: string | undefined }) {
   function startPlacingModule(module: LegoProject, now: boolean) {
     if (refuseLifted(module)) return;
     setPlacingAnchor(false);
-    // A lifted piece has no connectors yet (#3269), so it goes on the selected
-    // piece straight away.
+    // A lifted piece's meshes go into the unit first, so it has faces to join
+    // by and a ghost to draw, like any module.
     if (holdsLiftedPieces(module)) {
       setPlacingPart(null);
-      void addLifted(module);
+      void takeInLifted(module, "Add module").then((placed) => {
+        if (placed) beginPlacingModule(placed, now);
+      });
       return;
     }
-    if (now || !draft?.pieces.some((piece) => piece.partId)) {
-      addCompound(module);
+    beginPlacingModule(module, now);
+  }
+
+  function beginPlacingModule(module: LegoProject, now: boolean) {
+    // Read off the document, because a lifted module gets here after a wait.
+    const current = docRef.current.project;
+    if (
+      now ||
+      !current?.pieces.some((piece) => piece.partId || piece.meshBox)
+    ) {
+      addCompound(module, docRef.current);
       setPlacingPart(null);
       return;
     }
@@ -854,11 +867,6 @@ function Builder({ id }: { id: string | undefined }) {
       });
       return null;
     }
-  }
-
-  async function addLifted(module: LegoProject) {
-    const placed = await takeInLifted(module, "Add module");
-    if (placed) addCompound(placed, docRef.current);
   }
 
   function transformPiece(
@@ -1480,6 +1488,10 @@ function Builder({ id }: { id: string | undefined }) {
   const selectedPart = selected?.partId
     ? (pack.byId.get(selected.partId) ?? null)
     : null;
+  // What the pivot choices are measured from: the part's box, or for a lifted
+  // piece the box of its mesh.
+  const pivotBox =
+    selectedPart ?? (selected?.meshBox ? { bbox: selected.meshBox } : null);
   // Whether "whole model" flip, mirror and recalculate normals have anything
   // to reach: an imported unit with every geometry piece deleted has none,
   // same as a unit built out of parts.
@@ -2426,6 +2438,26 @@ function Builder({ id }: { id: string | undefined }) {
                             raw={raw}
                             pieceId={selected.id}
                           />
+                          {selected.meshBox ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="mt-2 w-full"
+                              onClick={() =>
+                                edit((project) =>
+                                  fitToSteps(
+                                    project,
+                                    pack,
+                                    raw,
+                                    selected.id,
+                                    partUnit(pack),
+                                  ),
+                                )
+                              }
+                            >
+                              Fit to steps
+                            </Button>
+                          ) : null}
                           {canMirror(draft, selected.id) ? (
                             <div className="mt-2">
                               <span className="text-xs text-muted-foreground">
@@ -2705,20 +2737,20 @@ function Builder({ id }: { id: string | undefined }) {
                             </div>
                           ) : null}
 
-                          {selectedPart ? (
+                          {pivotBox ? (
                             <div className="mt-2">
                               <span className="text-xs text-muted-foreground">
                                 Turns about
                               </span>
                               <Select
                                 value={
-                                  currentPivot(selectedPart, selected.pivot) ??
+                                  currentPivot(pivotBox, selected.pivot) ??
                                   "middle"
                                 }
                                 onValueChange={(id) => {
-                                  const choice = pivotChoices(
-                                    selectedPart,
-                                  ).find((option) => option.id === id);
+                                  const choice = pivotChoices(pivotBox).find(
+                                    (option) => option.id === id,
+                                  );
                                   if (choice)
                                     movePivot(selected.id, choice.position);
                                 }}
@@ -2731,7 +2763,7 @@ function Builder({ id }: { id: string | undefined }) {
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {pivotChoices(selectedPart).map((choice) => (
+                                  {pivotChoices(pivotBox).map((choice) => (
                                     <SelectItem
                                       key={choice.id}
                                       value={choice.id}

@@ -17,6 +17,7 @@ import {
   moduleForUnit,
   openedFrom,
   textureSheetRefusal,
+  withMeshBoxes,
 } from "./liftPiece";
 import {
   type LegoProject,
@@ -27,6 +28,7 @@ import {
 } from "./model";
 import { parseModuleFile, serializeModuleFile } from "./moduleFile";
 import { moduleStamp } from "./moduleUpdates";
+import type { RawGeometry } from "./rawGeometry";
 import { gameChangeRefusal } from "./unitGame";
 
 function piece(
@@ -497,6 +499,62 @@ describe("a lifted piece in a unit for a different game", () => {
     );
     expect(gameChangeRefusal(holding, null)).toBe(
       "Remove the pieces from Splinter Faction 0.1.86 first: turret, barrel.",
+    );
+  });
+});
+
+describe("withMeshBoxes (#3269)", () => {
+  const raw: RawGeometry = {
+    byId: new Map([
+      [
+        "m2",
+        {
+          id: "m2",
+          vFirst: 0,
+          vCount: 0,
+          iFirst: 0,
+          iCount: 0,
+          bbox: { min: [-1, 2, -1], max: [1, 6, 1] },
+        },
+      ],
+    ]),
+    vertices: new Float32Array(),
+    indices: new Uint32Array(),
+  };
+
+  it("records each mesh piece's box from its geometry", () => {
+    const module = lift("0.0.0") as LegoProject;
+    const boxed = withMeshBoxes(module, raw);
+    const turret = boxed.pieces.find((p) => p.meshId === "m2");
+    expect(turret?.meshBox).toEqual({ min: [-1, 2, -1], max: [1, 6, 1] });
+    // The sidecar holds a mesh for no other piece of this module.
+    expect(boxed.pieces.filter((p) => p.meshId && p.meshId !== "m2")).toSatisfy(
+      (others: { meshBox?: unknown }[]) =>
+        others.every((p) => p.meshBox === undefined),
+    );
+  });
+
+  it("keeps a box a piece already has and returns the same document when nothing changes", () => {
+    const module = lift("0.0.0") as LegoProject;
+    const boxed = withMeshBoxes(module, raw);
+    expect(withMeshBoxes(boxed, raw)).toBe(boxed);
+  });
+
+  it("survives saving", () => {
+    const boxed = withMeshBoxes(lift("0.0.0") as LegoProject, raw);
+    const back = parseLegoProjectJson(JSON.stringify(boxed));
+    expect(back?.pieces.find((p) => p.meshId === "m2")?.meshBox).toEqual({
+      min: [-1, 2, -1],
+      max: [1, 6, 1],
+    });
+  });
+
+  it("is dropped from a parsed piece when it is not a box", () => {
+    const boxed = withMeshBoxes(lift("0.0.0") as LegoProject, raw);
+    const bad = JSON.parse(JSON.stringify(boxed));
+    bad.pieces[0].meshBox = { min: [0, 0], max: "x" };
+    expect(parseLegoProjectJson(JSON.stringify(bad))?.pieces[0].meshBox).toBe(
+      undefined,
     );
   });
 });

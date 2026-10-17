@@ -11,7 +11,7 @@
 import { gzipSync } from "fflate";
 
 import { legoGeometrySave } from "./bindings";
-import { moduleForUnit } from "./liftPiece";
+import { moduleForUnit, withMeshBoxes } from "./liftPiece";
 import type { LegoProject } from "./model";
 import {
   encodeRawGeometry,
@@ -35,7 +35,12 @@ export async function liftIntoUnit(
   if (placed.keys.size === 0) return { module: placed.module, raw: null };
 
   const raw = await copyMeshes(unitId, module.id, module.name, placed.keys);
-  return { module: placed.module, raw };
+  // The pieces take their boxes from the unit's meshes, which hold the keys
+  // they now name. A module lifted before boxes were recorded gets them here.
+  return {
+    module: raw ? withMeshBoxes(placed.module, raw) : placed.module,
+    raw,
+  };
 }
 
 /**
