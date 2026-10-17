@@ -15,6 +15,7 @@ import { insertCompound } from "./compounds";
 import {
   faceName,
   type LegoConnector,
+  parentScaleOf,
   pieceConnectors,
   placeJoin,
   transformOf,
@@ -183,6 +184,7 @@ export function insertModule(
       },
       parent,
       join,
+      parentScaleOf(inserted.project, parent.id),
     );
 
   let shift: THREE.Matrix4;
