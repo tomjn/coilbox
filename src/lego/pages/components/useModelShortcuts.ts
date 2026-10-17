@@ -14,6 +14,7 @@ export interface ModelShortcutsDeps {
   setSnapped: Dispatch<SetStateAction<boolean>>;
   setSnappedTo: Dispatch<SetStateAction<string | null>>;
   setSteppedBy: Dispatch<SetStateAction<number | null>>;
+  setSlidBy: Dispatch<SetStateAction<string | null>>;
   setMode: Dispatch<SetStateAction<GizmoMode>>;
   setShortcutsOpen: Dispatch<SetStateAction<boolean>>;
 }
@@ -32,6 +33,7 @@ export function useModelShortcuts(
     setSnapped,
     setSnappedTo,
     setSteppedBy,
+    setSlidBy,
     setMode,
     setShortcutsOpen,
   }: ModelShortcutsDeps,
@@ -39,12 +41,16 @@ export function useModelShortcuts(
   useEffect(() => {
     const state = sceneRef.current;
     if (!state) return;
-    state.onSnapChange = (on, anchorName, step) => {
+    state.onSnapChange = (on, anchorName, step, slide) => {
       setSnapped(on);
       setSnappedTo(anchorName ?? null);
       setSteppedBy(step ?? null);
+      // A string, so a drag that has not changed the offset is not a re-render.
+      setSlidBy(
+        slide ? slide.map((n) => Number(n.toFixed(3))).join(", ") : null,
+      );
     };
-  }, [sceneRef, setSnapped, setSnappedTo, setSteppedBy]);
+  }, [sceneRef, setSnapped, setSnappedTo, setSteppedBy, setSlidBy]);
 
   // Held rather than toggled: snapping is on, and letting go of it is a
   // deliberate act for the one piece that has to sit off the grid.

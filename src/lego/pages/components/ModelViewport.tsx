@@ -347,6 +347,7 @@ interface Props {
       pieceId: string,
       change: Partial<LegoPiece>,
       seat: Seat | null,
+      slide: [number, number] | null,
     ) => void;
     /** The same, for a set: every piece's new transform in one edit, so a
      *  group drag is one undo step rather than one per piece. */
@@ -588,6 +589,7 @@ export function ModelViewport({
   const [snappedTo, setSnappedTo] = useState<string | null>(null);
   /** The part unit a move is stepping in, while one is. */
   const [steppedBy, setSteppedBy] = useState<number | null>(null);
+  const [slidBy, setSlidBy] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(true);
   const [showReference, setShowReference] = useState(false);
   /** A unit read out of an installed game to stand instead of the built-in
@@ -1062,6 +1064,7 @@ export function ModelViewport({
         onTransformRef,
         onTransformManyRef,
         seat: null,
+        slide: null,
         selectedIdsRef,
         onHoverRef,
         onSelectRef,
@@ -1345,6 +1348,7 @@ export function ModelViewport({
     setSnapped,
     setSnappedTo,
     setSteppedBy,
+    setSlidBy,
     setMode,
     setShortcutsOpen,
   });
@@ -1602,9 +1606,11 @@ export function ModelViewport({
                     ? snappedTo
                       ? `Snapped to "${snappedTo}". Hold Alt to place freely`
                       : "Snapped. Hold Alt to place freely"
-                    : steppedBy !== null
-                      ? `Moving in steps of ${steppedBy}. Hold Alt to place freely`
-                      : "Hold Alt to place freely"}
+                    : slidBy !== null
+                      ? `Sliding on the face, offset ${slidBy}, in steps of ${steppedBy}. Hold Alt to place freely and detach`
+                      : steppedBy !== null
+                        ? `Moving in steps of ${steppedBy}. Hold Alt to place freely`
+                        : "Hold Alt to place freely"}
             </span>
           </div>
 

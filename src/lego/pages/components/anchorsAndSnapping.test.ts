@@ -88,6 +88,7 @@ function drag(
   const dragged = groups.get("leg") as THREE.Group;
   const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
   camera.position.set(0, 0, 10);
+  const changes: unknown[][] = [];
   const state = {
     gizmo: { object: dragged, getMode: () => "translate" },
     groups,
@@ -98,12 +99,13 @@ function drag(
     rawRef: { current: null },
     snapping: true,
     seat: null,
+    slide: null,
     targetAnchors: null,
-    onSnapChange: () => {},
+    onSnapChange: (...args: unknown[]) => changes.push(args),
     seatMark: new THREE.Object3D(),
     seatOutline: { visible: false, setFromObject: () => {} },
   } as unknown as SceneState;
-  return { state, dragged };
+  return { state, dragged, changes };
 }
 
 describe("applySnap", () => {
@@ -176,5 +178,66 @@ describe("applySnap", () => {
 
     expect(state.seat?.to).toBe("nose");
     expect(state.seat?.parentId).toBe("hull");
+  });
+});
+
+describe("applySnap on a joined piece", () => {
+  const joined = (position: Vec3) =>
+    drag({
+      parentId: "hull",
+      position,
+      connection: { connector: "-y", to: "+y" },
+    });
+
+  it("slides along the face in steps of the part unit", () => {
+    const { state, dragged, changes } = joined([0.6, 3, 0.3]);
+
+    applySnap(state);
+
+    // The face is the hull's top, so the drag up off it is dropped.
+    expect(dragged.position.toArray().map((n) => Number(n.toFixed(6)))).toEqual(
+      [0.5, 1.5, 0.25],
+    );
+    expect(state.slide).toEqual([0.5, 0.25]);
+    expect(state.seat).toBeNull();
+    expect(changes.at(-1)).toEqual([false, undefined, 0.25, [0.5, 0.25]]);
+  });
+
+  it("does not seat against a neighbour's anchor", () => {
+    // Within reach of the hull's own top anchor, which would seat a free piece.
+    const { state } = joined([0.01, 1.52, 0.01]);
+
+    applySnap(state);
+
+    expect(state.seat).toBeNull();
+    expect(state.slide).toEqual([0, 0]);
+  });
+
+  it("places freely with no step and no slide while Alt is held", () => {
+    const { state, dragged } = joined([0.6, 3, 0.3]);
+    state.snapping = false;
+
+    applySnap(state);
+
+    expect(dragged.position.toArray()).toEqual([0.6, 3, 0.3]);
+    expect(state.slide).toBeNull();
+  });
+
+  it("leaves a free piece to the move step", () => {
+    const { state } = drag({ position: [0.6, 3, 0.3] });
+
+    applySnap(state);
+
+    expect(state.slide).toBeNull();
+  });
+
+  it("clears the slide when the drag turns to Alt", () => {
+    const { state } = joined([0.6, 3, 0.3]);
+    applySnap(state);
+    state.snapping = false;
+
+    applySnap(state);
+
+    expect(state.slide).toBeNull();
   });
 });

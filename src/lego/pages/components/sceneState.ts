@@ -241,6 +241,7 @@ export interface SceneState {
     snapped: boolean,
     anchorName?: string,
     moveStep?: number,
+    slide?: [number, number],
   ) => void;
   /** Read during a drag, so the helpers see the current document, not the one
    *  the scene was built with. */
@@ -275,11 +276,15 @@ export interface SceneState {
       pieceId: string,
       change: Partial<LegoPiece>,
       seat: Seat | null,
+      slide: [number, number] | null,
     ) => void;
   };
   /** What the current drag is snapped to, if it is two faces that point at each
    *  other. Set on every move of a drag and read when it is let go. */
   seat: Seat | null;
+  /** The offset along its face a joined piece is being slid to, or null when
+   *  the drag is not a slide: a free piece, or Alt held. */
+  slide: [number, number] | null;
   onTransformManyRef: {
     current: (changes: Map<string, PieceTransform>) => void;
   };
