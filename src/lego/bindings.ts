@@ -147,6 +147,12 @@ export const legoExport = defineCommand<
      */
     text: { language: string; name: string; description: string } | null;
     model: S3oBuild;
+    /**
+     * Library weapons the unit fires, each as the workshop's compile wrote
+     * `weapons/coilbox_<unit>_<key>.lua` (issue #3274). Rewritten on every
+     * export. Absent or empty writes none.
+     */
+    weapons?: { name: string; contents: string }[];
   },
   {
     model: string;
@@ -180,6 +186,8 @@ export const legoExport = defineCommand<
     textures: string[];
     /** Stored textures already there under that name, and left alone. */
     texturesKept: string[];
+    /** The weapon files written. */
+    weapons: string[];
     /**
      * The files this run wrote, with the digest of what it wrote, for the
      * receipt (issue #2680). Never a file it kept, and never a texture: an

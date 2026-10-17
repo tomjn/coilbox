@@ -95,6 +95,12 @@ vi.mock("./components/useBuiltUnitDef", () => ({
 vi.mock("@/play/config", () => ({
   usePreferredTarget: () => ({ target: undefined }),
 }));
+// The export drawer reads the workshop's projects for library weapons, out of
+// the app's settings store, which nothing here provides.
+vi.mock("@/workshop/project", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/workshop/project")>()),
+  useModProjects: () => ({ projects: [] }),
+}));
 
 import BuilderPage from "./BuilderPage";
 
@@ -206,6 +212,28 @@ describe("the build arm button", () => {
     expect(
       screen.queryByRole("button", { name: "Add a build arm" }),
     ).toBeNull();
+  });
+
+  // The weapon module, beside it (issue #3274).
+  it("adds a turret, barrel and flare with the aim and recoil presets", async () => {
+    packLoad = loadedPack([part("blk", "block", 0.5), part("bm", "beam", 2)]);
+    show(unit());
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Add a weapon" }),
+    );
+
+    const edit = doc.current.edit as ReturnType<typeof vi.fn>;
+    expect(edit).toHaveBeenCalledTimes(1);
+    const next = edit.mock.calls[0][0](unit());
+    expect(next.pieces.map((p: { role?: string }) => p.role).sort()).toEqual([
+      "barrel",
+      "flare",
+      "turret",
+      undefined,
+    ]);
+    expect(
+      next.animations.map((a: { presetId: string }) => a.presetId),
+    ).toEqual(["turret.track", "recoil"]);
   });
 });
 

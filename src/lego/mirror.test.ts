@@ -603,6 +603,34 @@ describe("followMirror", () => {
   });
 });
 
+describe("mirroring a weapon's arc (#3274)", () => {
+  it("points a mirrored turret's arc to the other side, and keeps its weapon", () => {
+    const fires = { from: "game" as const, name: "gun" };
+    const doc = project([
+      {
+        id: "gun",
+        parentId: "root",
+        position: [3, 1, 0],
+        role: "turret",
+        weapon: { fires, arc: 90, heading: 45 },
+      },
+      {
+        id: "plain",
+        parentId: "gun",
+        role: "barrel",
+        weapon: { arc: 90 },
+      },
+    ]);
+    const mirrored = mirrorPiece(doc, "gun");
+    expect(pieceOf(mirrored, "gun")?.weapon).toEqual({
+      fires,
+      arc: 90,
+      heading: -45,
+    });
+    expect(pieceOf(mirrored, "plain")?.weapon).toEqual({ arc: 90 });
+  });
+});
+
 describe("mirrorRole", () => {
   it("swaps the side of a leg role", () => {
     expect(mirrorRole("leg.l1.thigh")).toBe("leg.r1.thigh");

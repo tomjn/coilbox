@@ -36,6 +36,8 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { workshopCompile } from "@/workshop/compile";
+import { useModProjects } from "@/workshop/project";
 import {
   baseLanguage,
   type LanguageTexts,
@@ -84,6 +86,7 @@ import {
 } from "../../reexport";
 import { bakedPieces, buildS3o, unitBounds } from "../../s3oBuild";
 import { buildUnitDef, defValue, legoUnitDef, unitWords } from "../../unitDef";
+import { exportWeapons } from "../../weaponModule";
 import { worthTotals } from "../../worth";
 import { ShowMe } from "./ShowMe";
 
@@ -141,6 +144,12 @@ type Result =
       unitDefFields: FieldChange[];
       /** The definition this build gives, to set beside a field that was kept. */
       built: Record<string, unknown>;
+      /** The library weapon files written under `weapons/` (issue #3274). */
+      weapons: string[];
+      /** How many weapon slots the definition names. */
+      weaponSlots: number;
+      /** A line for each weapon left out, and why. */
+      weaponsMissing: string[];
       glb: string | null;
       obj: string | null;
       mtl: string | null;
@@ -208,13 +217,22 @@ function shown(value: unknown): string {
 }
 
 /** Why the whole unit definition was left as it was (issue #3245). */
-function KeptDefinition({ kept }: { kept: KeptWhole }) {
+function KeptDefinition({
+  kept,
+  weapons,
+}: {
+  kept: KeptWhole;
+  /** Whether the build has weapons, which then stay as the file has them. */
+  weapons: boolean;
+}) {
+  const weaponLine = weapons ? " Its weapons are as that file has them." : null;
   if (kept.reason === "workshopBackup")
     return (
       <p className="text-muted-foreground">
         The unit definition has been left alone, because the workshop has
         changes in it that you have not accepted or undone. Undo would put the
         old file back over this export. Accept or undo them, then export again.
+        {weaponLine}
       </p>
     );
   if (kept.reason === "unreadable")
@@ -222,12 +240,14 @@ function KeptDefinition({ kept }: { kept: KeptWhole }) {
       <p className="text-muted-foreground">
         The unit definition there does not run, so it has been left alone:{" "}
         {kept.message}
+        {weaponLine}
       </p>
     );
   return (
     <p className="text-muted-foreground">
       A unit definition was already there that coilbox has no record of writing,
       so it has been left alone.
+      {weaponLine}
     </p>
   );
 }
@@ -320,6 +340,8 @@ export function ExportDrawer({
   const [result, setResult] = useState<Result>({ state: "idle" });
   const [glbSave, setGlbSave] = useState<GlbSave>({ state: "idle" });
   const [gameText, setGameText] = useState<GameText>({ state: "unread" });
+  // Where a library weapon is read from on each export (issue #3274).
+  const { projects: workshopProjects } = useModProjects();
 
   // Asked of the folder as soon as there is one, so the drawer can say where
   // this unit's name is going before anybody presses the button rather than
@@ -549,8 +571,13 @@ export function ExportDrawer({
     // loads, and the receipt the workshop turns into a unit (issue #2651).
     const bounds = unitBounds(project, pack, raw);
     const totals = worthTotals(project, pack);
-    const def = legoUnitDef(project, bounds, home, totals);
     try {
+      // Read again from the workshop every time, so the weapon it writes is
+      // the one the workshop holds now (issue #3274).
+      const weapons = await exportWeapons(project, workshopProjects, (made) =>
+        workshopCompile({ project: made }),
+      );
+      const def = legoUnitDef(project, bounds, home, totals, weapons.slots);
       const exported = await legoExport({
         dir,
         unitName: project.unitName,
@@ -582,7 +609,7 @@ export function ExportDrawer({
         // Unlike the atlas and the script, there is no scenario where a
         // built unit should export without one: with no unit definition the
         // engine has nothing to spawn.
-        unitDef: buildUnitDef(project, bounds, home, totals),
+        unitDef: buildUnitDef(project, bounds, home, totals, weapons.slots),
         // The fields the build decides, beside what the last export wrote
         // there, so a re-export updates the ones nobody has changed.
         unitDefFields: derivedFields(
@@ -596,6 +623,7 @@ export function ExportDrawer({
         // (issue #2683).
         text: writesLanguage ? { language, ...unitWords(project) } : null,
         model,
+        weapons: weapons.files,
       });
 
       // The Blender half, which the engine reads none of. A texture the decoder
@@ -728,6 +756,8 @@ export function ExportDrawer({
         state: "done",
         ...exported,
         built: def,
+        weaponSlots: weapons.slots.length,
+        weaponsMissing: weapons.missing,
         glb: glbPath,
         obj: objPath,
         mtl: mtlPath,
@@ -1225,12 +1255,25 @@ export function ExportDrawer({
                   <code className="break-all">{result.unitDef}</code>
                 ) : null}
                 {result.unitDefKept ? (
-                  <KeptDefinition kept={result.unitDefKept} />
+                  <KeptDefinition
+                    kept={result.unitDefKept}
+                    weapons={result.weaponSlots > 0}
+                  />
                 ) : null}
                 <FieldChanges
                   changes={result.unitDefFields}
                   built={result.built}
                 />
+                {result.weapons.map((written) => (
+                  <code key={written} className="break-all">
+                    {written}
+                  </code>
+                ))}
+                {result.weaponsMissing.map((line) => (
+                  <p key={line} className="text-destructive">
+                    Weapon left out: {line}
+                  </p>
+                ))}
                 {result.language ? (
                   <code className="break-all">{result.language}</code>
                 ) : null}

@@ -19,6 +19,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { EMPTY_EDITS, type ModProject } from "@/workshop/project";
 import { newProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import { ExportDrawer } from "./ExportDrawer";
@@ -33,6 +34,17 @@ vi.mock("../../exportGlb", () => ({
   exportGlb: (...args: unknown[]) => exportGlb(...args),
 }));
 
+// The export drawer reads the workshop's projects for library weapons, out of
+// the app's settings store, which nothing here provides.
+const workshopProjects = vi.fn((): ModProject[] => []);
+const workshopCompile = vi.fn();
+vi.mock("@/workshop/project", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/workshop/project")>()),
+  useModProjects: () => ({ projects: workshopProjects() }),
+}));
+vi.mock("@/workshop/compile", () => ({
+  workshopCompile: (args: unknown) => workshopCompile(args),
+}));
 vi.mock("../../bindings", () => ({
   legoAtlasPng: (args: unknown) => legoAtlasPng(args),
   legoExport: (args: unknown) => legoExport(args),
@@ -68,6 +80,7 @@ function exportResult(over: Record<string, unknown> = {}) {
     textureKept: false,
     textures: [],
     texturesKept: [],
+    weapons: [],
     owned: [],
     ...over,
   };
@@ -112,6 +125,8 @@ beforeEach(() => {
   legoExportPicture.mockReset();
   legoAtlasPng.mockReset();
   exportGlb.mockReset();
+  workshopCompile.mockReset();
+  workshopProjects.mockReturnValue([]);
 });
 
 afterEach(() => {
@@ -196,6 +211,108 @@ describe("where the unit's name is going", () => {
  * `lualibs/cob_vars.lua`, so the drawer says the path it went to and the line
  * that wires it in.
  */
+/**
+ * A turret's weapon reaches the definition, and a library weapon is read from
+ * the workshop and written as its own file (issue #3274).
+ */
+describe("weapons", () => {
+  const armed: typeof project = {
+    ...project,
+    pieces: [
+      project.pieces[0],
+      {
+        ...project.pieces[0],
+        id: "gun",
+        name: "gun",
+        parentId: project.rootPieceId,
+        role: "turret",
+        weapon: {
+          fires: { from: "library", projectId: "w1", key: "laser_copy" },
+        },
+      },
+      {
+        ...project.pieces[0],
+        id: "gun2",
+        name: "gun2",
+        parentId: project.rootPieceId,
+        role: "turret",
+        weapon: { fires: { from: "game", name: "armpw_emg" }, arc: 90 },
+      },
+    ],
+  };
+  const library: ModProject = {
+    id: "w1",
+    name: "Lasers",
+    gameName: "Splinter Faction",
+    edits: {
+      ...EMPTY_EDITS,
+      weapons: {
+        laser_copy: { key: "laser_copy", source: "emg", def: { range: 1 } },
+      },
+    },
+    createdAt: "",
+    updatedAt: "",
+  };
+
+  it("writes the slots into the definition and the library weapon's file", async () => {
+    workshopProjects.mockReturnValue([library]);
+    workshopCompile.mockResolvedValue({
+      chunks: [],
+      notes: [],
+      tweakdefs: null,
+      files: [
+        {
+          path: "weapons/coilbox_skyfort_laser_copy.lua",
+          contents: "return {}",
+        },
+      ],
+    });
+    legoGameLanguage.mockResolvedValue({ texts: {} });
+    legoExport.mockResolvedValue(
+      exportResult({
+        weapons: ["/game/weapons/coilbox_skyfort_laser_copy.lua"],
+      }),
+    );
+    show(armed);
+    await waitFor(() =>
+      expect(screen.getByText(/goes into the definition/)).toBeTruthy(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Export" }));
+    await waitFor(() =>
+      expect(
+        screen.getByText("/game/weapons/coilbox_skyfort_laser_copy.lua"),
+      ).toBeTruthy(),
+    );
+    const sent = legoExport.mock.calls[0][0];
+    expect(sent.weapons).toEqual([
+      { name: "coilbox_skyfort_laser_copy.lua", contents: "return {}" },
+    ]);
+    expect(sent.unitDef).toContain(
+      'weapons = { { def = "laser_copy", name = "skyfort_laser_copy" }, { def = "armpw_emg", name = "armpw_emg", maxangledif = 90, maindir = "0 0 1" } },',
+    );
+  });
+
+  it("says which weapon it left out and why", async () => {
+    workshopProjects.mockReturnValue([]);
+    legoGameLanguage.mockResolvedValue({ texts: {} });
+    legoExport.mockResolvedValue(exportResult());
+    show(armed);
+    await waitFor(() =>
+      expect(screen.getByText(/goes into the definition/)).toBeTruthy(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Export" }));
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "Weapon left out: laser_copy: its workshop project is gone.",
+        ),
+      ).toBeTruthy(),
+    );
+    expect(workshopCompile).not.toHaveBeenCalled();
+    expect(legoExport.mock.calls[0][0].weapons).toEqual([]);
+  });
+});
+
 describe("the shared values polyfill", () => {
   it("shows where it was written and the line that includes it", async () => {
     legoGameLanguage.mockResolvedValue({ texts: {} });

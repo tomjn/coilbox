@@ -133,6 +133,22 @@ Its definition is written as a builder, with `builder`, `workerTime`, `builddist
 
 Its script sets build stance. That one is written for every unit, builder or not. `CBuilder::StartBuild` refuses to begin until the unit says it is in stance, and a script is the only thing in the engine that can say so, so a builder whose script leaves it out queues a build and waits forever with nothing in the infolog to explain it.
 
+### Units that fight
+
+The **Weapon** button above the piece list (the crosshair) adds a weapon module in one step: a turret, a barrel pointing forward and an empty muzzle flare at the barrel's end, each with its role set. It also applies **Turret sweep** and **Recoil on firing**, and it is one undo step.
+
+Every turret and aim point on the unit is listed under **Weapons** in the Animation panel, with a picker for what it fires. The picker offers the weapons in the workshop projects for the unit's game, then the game's own weapon table. Beside a pick it shows the weapon's range, damage and reload time. **Arc, degrees** narrows where it can fire, and **Facing, degrees right** turns that arc away from the front. Left empty, the arc is the engine's full circle.
+
+The unit's game is the one it was opened from, or else the game it was exported into. A unit with neither has no weapons to offer, and the picker says so when it is opened.
+
+On export, slot 1 of the definition's `weapons` table is the first turret or aim point with a weapon picked, slot 2 the next, and so on in piece order. A slot names a game weapon as the game keys it, in both `name` and `def`. A narrower arc adds `maxangledif` and `maindir`.
+
+A weapon from a workshop project is a reference, not a copy. Each export reads it from the project again, so the weapon you edit in the workshop is the one the game gets, and writes it to `weapons/coilbox_<unit>_<key>.lua`. That is the file and the full name `<unit>_<key>` the workshop's own compile writes for an equipped weapon. If the project or the weapon is gone, export leaves that slot out and says so.
+
+Splinter Faction, Balanced Annihilation 15.9.8 and Beyond All Reason all read `weapons/*.lua` through the engine's `gamedata/weapondefs.lua`, and all three also copy a unit's own `weapondefs` into the weapon table from their `gamedata/weapondefs_post.lua`. The builder uses the file, so the weapon stays out of the unit definition, which is written once.
+
+The `weapons` table is part of that definition, so it has the same rule: a weapon picked after the first export does not reach a definition already in the game folder. Export says so. Issue #3245 is the re-export that updates it.
+
 ### The script behind the presets
 
 The **Script** tab, in the strip along the bottom, shows the Lua the presets generate, ready to copy. The **Script** button at the top of the Animation panel opens it. It declares a local only for the pieces it actually uses. It is also the script the preview runs, so what plays in the viewport and what an export writes cannot drift apart.
@@ -175,6 +191,7 @@ It always writes:
 - `objects3d/<unit>.s3o`, the model.
 - `units/<unit>.lua`, a unit definition. Without one the engine has nothing to spawn.
 - `language/en/coilbox.json`, but only for a game that names its units in a localisation file rather than in their definitions. See [Where the unit's name goes](#where-the-unit-s-name-goes).
+- `weapons/coilbox_<unit>_<key>.lua` for each workshop weapon the unit fires, rewritten every export. See [Units that fight](#units-that-fight).
 
 It writes, if you leave the boxes ticked:
 
@@ -230,7 +247,7 @@ In the workshop, a unit left behind this way is marked `stale` in the unit list,
 
 Its name in `language/<code>/coilbox.json` is not removed. That unit is still in the game until you clear it, and a leftover with a name reads better than a leftover called `units.names.mytank`. Exporting under the new name adds a key beside it rather than replacing one.
 
-**What it deliberately does not write:** anything about the game around the unit. No weapon definitions, no cost, no build picture, no side or category, and no edit to any other unit's `buildoptions`. Export puts a unit in a game folder. [Making the game use it](#making-the-game-use-the-unit) happens in the workshop, against the game itself.
+**What it deliberately does not write:** anything about the game around the unit. No definition of a game weapon, no cost, no build picture, no side or category, and no edit to any other unit's `buildoptions`. Export puts a unit in a game folder. [Making the game use it](#making-the-game-use-the-unit) happens in the workshop, against the game itself.
 
 ## The collision volume
 
