@@ -285,7 +285,7 @@ A unit opened out of a game brings its own script with it. See [Opening a unit f
 
 A skeleton is the stick figure of a unit: where its joints are, what each joint is for and how it moves. A unit started from one walks, rolls or aims in the preview before it has a single part, and its parts go on joints that are already in place.
 
-Press **New unit** and pick a body plan from the list under **Blank**. Set the size it should fit, as in [Size a skeleton](#size-a-skeleton), and press **Start**. **Back** returns to the list. The unit opens with an empty piece for each bone, each with its role set, and the plan's presets applied in the Animation panel. Then [hang parts on the bones](#hang-a-part-on-a-bone).
+Press **New unit** and pick a body plan from the list under **Blank**. Set the size it should fit, as in [Size a skeleton](#size-a-skeleton), and press **Start**. **Back** returns to the list. The unit opens with an empty piece for each bone, each with its role set, and the plan's presets applied in the Animation panel. Then [hang parts on the bones](#hang-a-part-on-a-bone). A unit that already has pieces can be given a plan too. See [Fit a body plan to a unit you already have](#fit-a-body-plan-to-a-unit-you-already-have).
 
 ### The body plans
 
@@ -404,11 +404,27 @@ Three checks look for mistakes that look right in the view and go wrong in a gam
 
 A piece is not listed when the piece it hangs off is, because one mistake moves everything below it.
 
+### Fit a body plan to a unit you already have
+
+A unit built without a plan, or opened from a game, can be given one by saying which of its pieces is each bone. Press **Fit a body plan**, the bone button beside **Test in game** at the top of the builder, and pick a plan.
+
+The drawer on the left lists the plan's bones, with one highlighted. Select a piece in the view or the piece tree and it fills that bone, and the next unmatched bone is highlighted. Click a bone to highlight it again, or its cross to unmatch it. The view and the tree stay usable while the drawer is open.
+
+- **Gun** and **Builds** add the same bones as [Describe it instead](#describe-it-instead). Gun is not offered for a plan that already has a turret.
+- A plan with a count, such as **Axles**, asks for it first, because the count decides which bones there are.
+- Coilbox suggests pieces but never picks them. **Use suggestions** takes them all, and the **Use** button on a bone's row takes one. It suggests the unit's root for the root bone, the only piece with a bone's role, or a piece with the bone's name. It suggests a leg only from a role already set, never from a name.
+
+Before you press **Fit**, the drawer lists each role it will replace, each preset it will hold back and what that preset needs, and each proportion it cannot measure. **Fit** is one undo step. It sets the role of each piece you picked, marks it as that bone and adds the plan's presets. A preset the unit already has keeps its settings. A bone with no role in the plan, such as a torso or a track, leaves its piece's role alone. Fitting replaces any skeleton the unit had.
+
+Nothing moves. Each proportion is measured from where the picked pieces are, and one whose joints you did not pick is left out. The Skeleton tab then reads, for example, "Two legs, fitted to this unit's pieces" and lists each value or "Not measured". It has no sliders, handles or size fields, because changing a proportion would move pieces you placed.
+
+Fitting differs from [opening a unit from a game](#opening-a-unit-from-a-game). Opening one proposes roles read from the unit's script, and never overwrites a role you set. Fitting is you saying what each piece is, so it replaces the role of every piece you pick. Opening a unit never proposes legs, so fitting a leg plan is how a walker from a game gets its walk.
+
 ### What is stored with the unit
 
 A unit started from a plan holds ordinary empty pieces, one per bone, with their roles set, and the plan's presets in its animations. Export, the script and the `.s3o` see nothing but pieces. The plans are part of coilbox, in `src/lego/bodyPlans.ts`, `src/lego/vehiclePlans.ts`, `src/lego/buildingPlans.ts` and `src/lego/hoverAirShipPlans.ts`. The unit file records two things more:
 
-- `skeleton` on the unit, which names the plan, holds the current value of each proportion and, in `target`, the size it was fitted to
+- `skeleton` on the unit, which names the plan and holds the current value of each proportion, the size in `target`, and `fitted` for a plan fitted to the unit's own pieces
 - `bone` on each piece the plan made, which names its bone in the plan
 
 A piece with no `bone` is free, and changing a proportion never moves it. A copy of a bone, by duplicate, paste, mirror or a ring, is free. A bone moved to hang off a different piece is free too, because the plan places a bone against its own parent. A unit made before skeletons existed has neither field and opens as it always has. A unit made from a plan that this version of coilbox does not have still opens, and keeps its record and its bones.
@@ -454,7 +470,7 @@ Alongside the script come proposals for what its pieces are for, in two groups, 
 - **The script named these.** It hands the piece back when the engine asks. `QueryNanoPiece` answering `nano2` is the script saying what `nano2` is for.
 - **These moved when the unit was asked to work.** Worked out from what turned and which way. A piece that turns horizontally when the unit is told to aim is a turret on nearly every unit ever shipped, and it is still a reading rather than a declaration.
 
-Legs are never proposed. Which of six moving pieces is the front left shin is not something motion reveals, and the walk presets animate a unit inside out if it is guessed wrong.
+Legs are never proposed. Which of six moving pieces is the front left shin is not something motion reveals, and the walk presets animate a unit inside out if it is guessed wrong. To give a walker its legs, [fit a body plan](#fit-a-body-plan-to-a-unit-you-already-have).
 
 Nothing is applied until you accept the unit, every proposal is on screen before that, and a role already set by hand is never overwritten.
 
