@@ -43,6 +43,7 @@ export const MOVES = [
   { id: "quadruped", label: "Four legs" },
   { id: "wheeled", label: "Wheels" },
   { id: "tracked", label: "Tracks" },
+  { id: "hover", label: "Hovers" },
   { id: "static", label: "Does not move" },
 ] as const;
 
@@ -70,6 +71,7 @@ const MOUNT: Record<string, string> = {
   quadruped: "torso",
   wheeled: "body",
   tracked: "body",
+  hover: "deck",
 };
 
 const NANO_RISE: BodyPlanProportion = {
