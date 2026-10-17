@@ -8,6 +8,7 @@ import {
   resolveLoad,
   serializeModuleFile,
 } from "./moduleFile";
+import { moduleStamp } from "./moduleUpdates";
 
 function module(id: string, name: string, partId: string | null = null) {
   const base = newProject({
@@ -123,5 +124,19 @@ describe("resolveLoad", () => {
   it("gives a file that claims a built in id a new id even when none is listed", () => {
     const out = resolveLoad(module("builtin.gone", "Gone"), [], "replace", NEW);
     expect(out.id).toBe("fresh");
+  });
+});
+
+describe("the content stamp across a file", () => {
+  it("is unchanged by a round trip, and differs after a replace with new content", () => {
+    const source = module("a", "Turret", "part1");
+    const parsed = parseModuleFile(serializeModuleFile(source), new Set());
+    if (!parsed.ok) throw new Error("did not parse");
+    expect(moduleStamp(parsed.piece.project)).toBe(moduleStamp(source));
+
+    const edited = module("a", "Turret", "part2");
+    const replaced = resolveLoad(edited, [source], "replace", NEW);
+    expect(replaced.id).toBe("a");
+    expect(moduleStamp(replaced)).not.toBe(moduleStamp(source));
   });
 });
