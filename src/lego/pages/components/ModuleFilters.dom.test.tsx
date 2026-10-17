@@ -75,7 +75,7 @@ describe("the labels popover", () => {
     );
     fireEvent.click(
       screen.getByRole("button", {
-        name: `Category and tags of the ${compound.name} compound`,
+        name: `Category and tags of the ${compound.name} module`,
       }),
     );
     return onSave;

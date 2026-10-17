@@ -396,9 +396,9 @@ describe("validateCompoundName", () => {
     );
   });
 
-  it("rejects a name another compound already has, regardless of case", () => {
+  it("rejects a name another module already has, regardless of case", () => {
     expect(validateCompoundName(compounds, "a", "Wheel")).toBe(
-      "Another compound already has this name",
+      "Another module already has this name",
     );
   });
 
