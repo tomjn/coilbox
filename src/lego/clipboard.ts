@@ -31,20 +31,33 @@ interface ClipboardEnvelope {
   marker: typeof CLIPBOARD_MARKER;
   schemaVersion: typeof LEGO_SCHEMA_VERSION;
   project: LegoProject;
+  /**
+   * The unit the pieces were copied from. Pieces that draw a mesh name it by
+   * a key in that unit's geometry file, so paste reads the meshes from there
+   * (#4343). The file is on disk, so this works between windows, and keeps a
+   * large mesh off the clipboard.
+   */
+  sourceUnitId?: string;
 }
 
 /** Wrap a lifted subtree for writing to the system clipboard. */
-export function serializeClipboardPiece(project: LegoProject): string {
+export function serializeClipboardPiece(
+  project: LegoProject,
+  sourceUnitId?: string,
+): string {
   const envelope: ClipboardEnvelope = {
     marker: CLIPBOARD_MARKER,
     schemaVersion: LEGO_SCHEMA_VERSION,
     project,
+    ...(sourceUnitId ? { sourceUnitId } : {}),
   };
   return JSON.stringify(envelope);
 }
 
 export interface ClipboardPiece {
   project: LegoProject;
+  /** The unit the pieces were copied from, when the payload says. */
+  sourceUnitId?: string;
   /**
    * Names of pieces whose part is not in the pack that is currently loaded.
    * They still paste in: the hierarchy and names are real work even without
@@ -98,5 +111,12 @@ export function parseClipboardPiece(
     .filter((piece) => piece.partId !== null && !knownPartIds.has(piece.partId))
     .map((piece) => piece.name);
 
-  return { ok: true, piece: { project, missingParts } };
+  const sourceUnitId =
+    typeof envelope.sourceUnitId === "string" && envelope.sourceUnitId
+      ? envelope.sourceUnitId
+      : undefined;
+  return {
+    ok: true,
+    piece: { project, missingParts, ...(sourceUnitId ? { sourceUnitId } : {}) },
+  };
 }
