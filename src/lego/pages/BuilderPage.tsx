@@ -108,8 +108,8 @@ import { attachToFreeFace, type FaceTarget, placePart } from "../placePart";
 import {
   deleteCompound,
   saveCompound,
-  useLegoCompounds,
   useLegoProjects,
+  useModules,
 } from "../projects";
 import { rawGeometryProblems } from "../rawGeometry";
 import { texturesInUse } from "../rawImport";
@@ -207,7 +207,8 @@ function Builder({ id }: { id: string | undefined }) {
       edit((project) => ({ ...project, staleExports })),
     [edit],
   );
-  const { compounds } = useLegoCompounds();
+  // The built in modules first, then the user's own.
+  const compounds = useModules(pack);
   const moduleFilter = useModuleFilter(compounds);
   // Only for the keep-set when a texture changes: the store is shared, so
   // nothing can decide a key is dead by looking at one unit.
@@ -1851,6 +1852,7 @@ function Builder({ id }: { id: string | undefined }) {
                       onRename={(compound, name) =>
                         void saveCompound({ ...compound, name })
                       }
+                      onCopy={(compound) => void saveCompound(compound)}
                       onLabels={(compound, labels) =>
                         void saveCompound(withLabels(compound, labels))
                       }

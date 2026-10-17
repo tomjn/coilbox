@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { usePartFilter } from "../filter";
 import { useModuleFilter, withLabels } from "../moduleFilter";
 import { type LegoPartInfo, type LoadedPack, loadPack } from "../pack";
-import { deleteCompound, saveCompound, useLegoCompounds } from "../projects";
+import { deleteCompound, saveCompound, useModules } from "../projects";
 import { CompoundPicker } from "./components/CompoundPicker";
 import { ModuleFilters, NoModuleMatches } from "./components/ModuleFilters";
 import { PartDetail } from "./components/PartDetail";
@@ -33,8 +33,6 @@ export default function PartsPage() {
   const [status, setStatus] = useState<Status>({ state: "loading" });
   const [selected, setSelected] = useState<LegoPartInfo | null>(null);
   const [tab, setTab] = useState<"parts" | "compounds">("parts");
-  const { compounds } = useLegoCompounds();
-  const moduleFilter = useModuleFilter(compounds);
 
   useEffect(() => {
     let live = true;
@@ -53,6 +51,9 @@ export default function PartsPage() {
   }, []);
 
   const pack = status.state === "ready" ? status.pack : null;
+  // The built in modules first, then the user's own.
+  const compounds = useModules(pack);
+  const moduleFilter = useModuleFilter(compounds);
   const filter = usePartFilter(pack);
   const parts = filter.parts;
 
@@ -131,6 +132,7 @@ export default function PartsPage() {
                   onRename={(compound, name) =>
                     void saveCompound({ ...compound, name })
                   }
+                  onCopy={(compound) => void saveCompound(compound)}
                   onLabels={(compound, labels) =>
                     void saveCompound(withLabels(compound, labels))
                   }
