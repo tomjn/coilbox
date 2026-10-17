@@ -11,6 +11,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { adoptHeldPresets, type HeldPreset } from "./compounds";
 import { followMirror, mirrorTwin } from "./mirror";
 import type { LegoProject } from "./model";
 import type { LoadedPack } from "./pack";
@@ -27,8 +28,12 @@ export interface SymmetrySession {
   /**
    * Remember a piece that arrived while symmetry was on, so its first placement
    * mirrors it. Off, this is nothing: the piece is an ordinary piece.
+   *
+   * `held` is what the insert that brought the piece could not add to the unit
+   * for want of roles. The twin may supply them, so they are judged again once
+   * it exists.
    */
-  queueTwin: (pieceId: string) => void;
+  queueTwin: (pieceId: string, held?: HeldPreset[]) => void;
   /**
    * Apply a placement, then let symmetry mode answer for each piece it moved:
    * bring the piece's twin along, or give it one if it is still owed one.
@@ -70,7 +75,7 @@ export function useSymmetry(options: {
    * state: nothing on screen reads it, and it is written from the same handlers
    * that edit the document.
    */
-  const awaitingTwin = useRef(new Set<string>());
+  const awaitingTwin = useRef(new Map<string, HeldPreset[]>());
   /**
    * The pairs symmetry mode is currently holding together: a piece and the twin
    * that follows it.
@@ -87,7 +92,7 @@ export function useSymmetry(options: {
   useEffect(() => {
     if (!project) return;
     const present = new Set(project.pieces.map((piece) => piece.id));
-    for (const pieceId of awaitingTwin.current) {
+    for (const pieceId of awaitingTwin.current.keys()) {
       if (!present.has(pieceId)) awaitingTwin.current.delete(pieceId);
     }
     for (const [pieceId, twinId] of twins.current) {
@@ -117,8 +122,8 @@ export function useSymmetry(options: {
         twins.current.clear();
       }
     },
-    queueTwin: (pieceId: string) => {
-      if (on) awaitingTwin.current.add(pieceId);
+    queueTwin: (pieceId: string, held: HeldPreset[] = []) => {
+      if (on) awaitingTwin.current.set(pieceId, held);
     },
     place: (pieceIds, change) => {
       if (!project) return;
@@ -129,7 +134,8 @@ export function useSymmetry(options: {
           next = followMirror(next, pieceId, twinId, pack);
           continue;
         }
-        if (!awaitingTwin.current.has(pieceId)) continue;
+        const held = awaitingTwin.current.get(pieceId);
+        if (!held) continue;
         const twinned = mirrorTwin(
           next,
           pieceId,
@@ -139,7 +145,7 @@ export function useSymmetry(options: {
         if (!twinned) continue;
         awaitingTwin.current.delete(pieceId);
         twins.current.set(pieceId, twinned.twinId);
-        next = twinned.project;
+        next = adoptHeldPresets(twinned.project, held);
       }
       edit(() => next);
     },

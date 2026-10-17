@@ -475,7 +475,8 @@ function Builder({ id }: { id: string | undefined }) {
       if (!inserted) return;
       edit(() => inserted.project);
       doc.selectMany(inserted.rootPieceIds);
-      for (const pieceId of inserted.rootPieceIds) queueTwin(pieceId);
+      for (const pieceId of inserted.rootPieceIds)
+        queueTwin(pieceId, inserted.presets.held);
       setPlacingPart(null);
       return;
     }
@@ -712,9 +713,10 @@ function Builder({ id }: { id: string | undefined }) {
       selectedId ?? draft.rootPieceId,
       true,
     );
-    if (inserted.length === 0) return;
-    doc.selectMany(inserted);
-    for (const pieceId of inserted) queueTwin(pieceId);
+    if (inserted.rootPieceIds.length === 0) return;
+    doc.selectMany(inserted.rootPieceIds);
+    for (const pieceId of inserted.rootPieceIds)
+      queueTwin(pieceId, inserted.held);
   }
 
   function transformPiece(
@@ -961,9 +963,10 @@ function Builder({ id }: { id: string | undefined }) {
       result.piece.project,
       selectedId ?? draft.rootPieceId,
     );
-    if (inserted.length === 0) return;
-    doc.selectMany(inserted);
-    for (const pieceId of inserted) queueTwin(pieceId);
+    if (inserted.rootPieceIds.length === 0) return;
+    doc.selectMany(inserted.rootPieceIds);
+    for (const pieceId of inserted.rootPieceIds)
+      queueTwin(pieceId, inserted.held);
   }
 
   function duplicateSelection() {

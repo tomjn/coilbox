@@ -15,6 +15,7 @@ import { notify } from "@/notify/notify";
 import {
   describePresets,
   duplicatePiece,
+  type HeldPreset,
   selectionAsCompound,
 } from "./compounds";
 import { withConnections } from "./connectors";
@@ -66,12 +67,13 @@ export interface LegoDocumentSession {
   lift: (pieceIds: string[]) => LegoProject | null;
   /** Replaces the selection with a whole set at once. */
   selectMany: (ids: string[]) => void;
-  /** Puts a cutting under `parentId`, answering with its new root pieces. */
+  /** Puts a cutting under `parentId`, answering with its new root pieces and
+   *  the presets it carried that the unit could not take yet. */
   insert: (
     cutting: LegoProject,
     parentId: string,
     asModule?: boolean,
-  ) => string[];
+  ) => { rootPieceIds: string[]; held: HeldPreset[] };
   /** Copies each piece and its subtree alongside itself, in one edit, and
    *  answers the copies so the selection can move onto them. */
   duplicate: (pieceIds: string[]) => string[];
@@ -230,8 +232,8 @@ export function useLegoDocument(
     cutting: LegoProject,
     parentId: string,
     asModule = false,
-  ): string[] {
-    if (!project) return [];
+  ): { rootPieceIds: string[]; held: HeldPreset[] } {
+    if (!project) return { rootPieceIds: [], held: [] };
     const inserted = insertModule(
       project,
       cutting,
@@ -247,7 +249,10 @@ export function useLegoDocument(
     const said = describePresets(inserted.presets);
     if (said)
       void notify({ title: "Module animations", body: said, level: "info" });
-    return inserted.rootPieceIds;
+    return {
+      rootPieceIds: inserted.rootPieceIds,
+      held: inserted.presets.held,
+    };
   }
 
   return {
