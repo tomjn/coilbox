@@ -8,16 +8,26 @@
 
 import { Button } from "@picoframe/frame";
 
-import type { ModuleUpdate } from "../../moduleUpdates";
+import type { ModuleUpdate, UntrackedModule } from "../../moduleUpdates";
 
 interface Props {
   updates: ModuleUpdate[];
-  onUpdate: (update: ModuleUpdate) => void;
+  /** Instances added before stamps were recorded (#4323). */
+  untracked?: UntrackedModule[];
+  onUpdate: (update: ModuleUpdate | UntrackedModule) => void;
+  onMark?: (untracked: UntrackedModule) => void;
   onDismiss: () => void;
 }
 
-export function ModuleUpdateBanner({ updates, onUpdate, onDismiss }: Props) {
-  if (updates.length === 0) return null;
+export function ModuleUpdateBanner({
+  updates,
+  untracked = [],
+  onUpdate,
+  onMark,
+  onDismiss,
+}: Props) {
+  if (updates.length === 0 && untracked.length === 0) return null;
+  const count = updates.length;
   return (
     <div
       role="status"
@@ -25,9 +35,11 @@ export function ModuleUpdateBanner({ updates, onUpdate, onDismiss }: Props) {
     >
       <div className="flex items-center justify-between gap-3">
         <span>
-          {updates.length === 1
-            ? "1 part of this unit uses an older module."
-            : `${updates.length} parts of this unit use an older module.`}
+          {count === 0
+            ? "Some parts of this unit are not tracked."
+            : count === 1
+              ? "1 part of this unit uses an older module."
+              : `${count} parts of this unit use an older module.`}
         </span>
         <Button size="sm" variant="ghost" onClick={onDismiss}>
           Dismiss
@@ -52,6 +64,33 @@ export function ModuleUpdateBanner({ updates, onUpdate, onDismiss }: Props) {
             >
               Update
             </Button>
+          </li>
+        ))}
+        {untracked.map((item) => (
+          <li
+            key={item.instance}
+            className="flex items-center justify-between gap-3"
+          >
+            <span className="text-muted-foreground">
+              {item.name} ({item.moduleName}). Added before changes were
+              tracked.
+            </span>
+            <span className="flex gap-1">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onMark?.(item)}
+              >
+                Mark as current
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onUpdate(item)}
+              >
+                Update now
+              </Button>
+            </span>
           </li>
         ))}
       </ul>
