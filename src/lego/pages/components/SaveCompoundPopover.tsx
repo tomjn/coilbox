@@ -17,8 +17,17 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import type { LegoMount } from "../../model";
+import type { LegoMount, LegoProject } from "../../model";
+import {
+  canonicalCategory,
+  categorySuggestions,
+  parseTags,
+} from "../../moduleFilter";
 import type { ModuleConnector } from "../../moduleMount";
+import {
+  type ModuleLabelsDraft,
+  ModuleLabelsFields,
+} from "./ModuleLabelsFields";
 
 const NONE = "none";
 
@@ -27,13 +36,21 @@ export interface MountOptions {
   choices: ModuleConnector[];
   /** The connector it opens on, or null for no mount. */
   initial: LegoMount | null;
+  /** The modules already saved, for the categories in use. */
+  known?: LegoProject[];
+}
+
+/** What the save step stores on the module besides its mount. */
+export interface ModuleLabels {
+  category: string | undefined;
+  tags: string[];
 }
 
 interface Props {
   disabled: boolean;
   /** Asked each time the popover opens, because the selection changes. */
   options: () => MountOptions | null;
-  onSave: (mount: LegoMount | null) => void;
+  onSave: (mount: LegoMount | null, labels: ModuleLabels) => void;
 }
 
 function keyOf(mount: LegoMount | null): string {
@@ -44,12 +61,17 @@ export function SaveCompoundPopover({ disabled, options, onSave }: Props) {
   const [open, setOpen] = useState(false);
   const [offered, setOffered] = useState<MountOptions | null>(null);
   const [picked, setPicked] = useState(NONE);
+  const [labels, setLabels] = useState<ModuleLabelsDraft>({
+    category: "",
+    tags: "",
+  });
 
   function onOpenChange(next: boolean) {
     if (next) {
       const fresh = options();
       setOffered(fresh);
       setPicked(keyOf(fresh?.initial ?? null));
+      setLabels({ category: "", tags: "" });
     }
     setOpen(next);
   }
@@ -60,6 +82,10 @@ export function SaveCompoundPopover({ disabled, options, onSave }: Props) {
     );
     onSave(
       choice ? { piece: choice.piece, connector: choice.connector } : null,
+      {
+        category: canonicalCategory(labels.category, offered?.known ?? []),
+        tags: parseTags(labels.tags),
+      },
     );
     setOpen(false);
   }
@@ -77,7 +103,7 @@ export function SaveCompoundPopover({ disabled, options, onSave }: Props) {
           <PackagePlus className="size-4" />
         </TipButton>
       </PopoverTrigger>
-      <PopoverContent side="right" align="start" className="w-64 space-y-3">
+      <PopoverContent side="right" align="start" className="w-72 space-y-3">
         <Field label="Mounts on the unit by">
           <OptionSelect
             ariaLabel="Mount connector"
@@ -92,6 +118,11 @@ export function SaveCompoundPopover({ disabled, options, onSave }: Props) {
             ]}
           />
         </Field>
+        <ModuleLabelsFields
+          draft={labels}
+          onChange={setLabels}
+          suggestions={categorySuggestions(offered?.known ?? [])}
+        />
         <Button size="sm" onClick={save}>
           Save
         </Button>

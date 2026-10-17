@@ -512,6 +512,14 @@ export interface LegoProject {
   worth?: LegoWorth;
   unitDef?: Record<string, string | number | boolean>;
   notes?: string;
+  /**
+   * On a module: what kind of thing it is, as one word or two ("Wheel"), so the
+   * module list can be narrowed to it (#3298). Absent means uncategorised,
+   * which is every module saved before this existed.
+   */
+  category?: string;
+  /** On a module: free words the module list's search also matches. */
+  tags?: string[];
   /** Canned animations applied to this unit, from `animPresets.ts`. */
   animations?: { presetId: string; params: Record<string, number> }[];
   /**
@@ -1072,6 +1080,10 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
       ? { unitDef: d.unitDef as Record<string, string | number | boolean> }
       : {}),
     ...(typeof d.notes === "string" ? { notes: d.notes } : {}),
+    ...(typeof d.category === "string" && d.category.trim() !== ""
+      ? { category: d.category.trim() }
+      : {}),
+    ...(parseTagList(d.tags) ?? {}),
     ...(Array.isArray(d.animations)
       ? { animations: d.animations.map(parseApplied).filter((a) => a !== null) }
       : {}),
@@ -1117,6 +1129,16 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
   // may not have its parents first. Normalise here so the invariant holds the
   // moment a project is in memory, not only after its next save.
   return { ...project, pieces: orderedPieces(project) };
+}
+
+/** A module's tags, trimmed. Blank and non-text entries are dropped. */
+function parseTagList(value: unknown): { tags: string[] } | null {
+  if (!Array.isArray(value)) return null;
+  const tags = value
+    .filter((tag): tag is string => typeof tag === "string")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+  return tags.length > 0 ? { tags } : null;
 }
 
 /** A module's mount, or null when it is not a piece of the module and a

@@ -135,7 +135,11 @@ import {
   ReferencePicker,
   type ReferenceUnit,
 } from "./ReferencePicker";
-import { type MountOptions, SaveCompoundPopover } from "./SaveCompoundPopover";
+import {
+  type ModuleLabels,
+  type MountOptions,
+  SaveCompoundPopover,
+} from "./SaveCompoundPopover";
 import { ShortcutSheet } from "./ShortcutSheet";
 import type { SceneState } from "./sceneState";
 import {
@@ -434,7 +438,7 @@ interface Props {
     onPaste: () => void;
     /** Save the selected piece and everything under it, to reuse in another
      *  unit. Absent hides the button, for a unit whose pieces are not parts. */
-    onSaveAsCompound?: (mount: LegoMount | null) => void;
+    onSaveAsCompound?: (mount: LegoMount | null, labels: ModuleLabels) => void;
     /** The connectors the save step offers as the mount, for the selection. */
     compoundMounts?: () => MountOptions | null;
     canSaveAsCompound: boolean;

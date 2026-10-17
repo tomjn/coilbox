@@ -93,6 +93,7 @@ import {
   type StaleExport,
   uniquePieceName,
 } from "../model";
+import { useModuleFilter, withLabels } from "../moduleFilter";
 import { defaultMount, moduleConnectors, placeModule } from "../moduleMount";
 import {
   type LegoPartInfo,
@@ -137,6 +138,7 @@ import { CompoundPicker } from "./components/CompoundPicker";
 import { ExportDrawer } from "./components/ExportDrawer";
 import { JoinedTo } from "./components/JoinedTo";
 import { ModelViewport } from "./components/ModelViewport";
+import { ModuleFilters, NoModuleMatches } from "./components/ModuleFilters";
 import { NameInput } from "./components/NameInput";
 import { NoMatches, PartFilters } from "./components/PartFilters";
 import { PartPicker } from "./components/PartPicker";
@@ -144,7 +146,10 @@ import { collisionHandlePieceId } from "./components/PieceCollisionFields";
 import { PieceTree } from "./components/PieceTree";
 import type { Placing } from "./components/placeByFace";
 import type { ReferenceUnit } from "./components/ReferencePicker";
-import type { MountOptions } from "./components/SaveCompoundPopover";
+import type {
+  ModuleLabels,
+  MountOptions,
+} from "./components/SaveCompoundPopover";
 import { SaveModelPopover } from "./components/SaveModelPopover";
 import { ScriptTab } from "./components/ScriptTab";
 import { SetPanel } from "./components/SetPanel";
@@ -201,6 +206,7 @@ function Builder({ id }: { id: string | undefined }) {
     [edit],
   );
   const { compounds } = useLegoCompounds();
+  const moduleFilter = useModuleFilter(compounds);
   // Only for the keep-set when a texture changes: the store is shared, so
   // nothing can decide a key is dead by looking at one unit.
   const { projects } = useLegoProjects();
@@ -676,14 +682,20 @@ function Builder({ id }: { id: string | undefined }) {
     return {
       choices: moduleConnectors(compound, pack),
       initial: defaultMount(compound, pack),
+      known: compounds,
     };
   }
 
-  async function saveSelectionAsCompound(mount: LegoMount | null) {
+  async function saveSelectionAsCompound(
+    mount: LegoMount | null,
+    labels: ModuleLabels,
+  ) {
     const compound = liftedRef.current ?? liftSelection();
     liftedRef.current = null;
     if (!compound) return;
-    await saveCompound(mount ? { ...compound, mount } : compound);
+    await saveCompound(
+      withLabels(mount ? { ...compound, mount } : compound, labels),
+    );
     // Showing where it went is the only confirmation the save needs.
     setStrip("compounds");
   }
@@ -1540,7 +1552,8 @@ function Builder({ id }: { id: string | undefined }) {
                   // came from. It can never have one, so the button goes.
                   onSaveAsCompound: imported
                     ? undefined
-                    : (mount) => void saveSelectionAsCompound(mount),
+                    : (mount, labels) =>
+                        void saveSelectionAsCompound(mount, labels),
                   compoundMounts,
                   canSaveAsCompound: selectedIds.length > 0,
                   onDelete: removeSelected,
@@ -1714,6 +1727,18 @@ function Builder({ id }: { id: string | undefined }) {
                   />
                 ) : null}
 
+                {stripOpen && effectiveStrip === "compounds" ? (
+                  <ModuleFilters
+                    compounds={compounds}
+                    query={moduleFilter.query}
+                    onQuery={moduleFilter.setQuery}
+                    category={moduleFilter.category}
+                    onCategory={moduleFilter.setCategory}
+                    shown={moduleFilter.modules.length}
+                    className="flex-1"
+                  />
+                ) : null}
+
                 {stripOpen ? (
                   <Button
                     size="icon"
@@ -1749,10 +1774,15 @@ function Builder({ id }: { id: string | undefined }) {
                       onCompiledReload={reloadCompiled}
                       lastRun={lastScriptRun}
                     />
+                  ) : effectiveStrip === "compounds" &&
+                    compounds.length > 0 &&
+                    moduleFilter.modules.length === 0 ? (
+                    <NoModuleMatches />
                   ) : effectiveStrip === "compounds" ? (
                     <CompoundPicker
                       pack={pack}
-                      compounds={compounds}
+                      compounds={moduleFilter.modules}
+                      known={compounds}
                       atlas={drawAtlas}
                       onInsert={startPlacingModule}
                       placingId={
@@ -1763,6 +1793,9 @@ function Builder({ id }: { id: string | undefined }) {
                       onDelete={(compoundId) => void deleteCompound(compoundId)}
                       onRename={(compound, name) =>
                         void saveCompound({ ...compound, name })
+                      }
+                      onLabels={(compound, labels) =>
+                        void saveCompound(withLabels(compound, labels))
                       }
                     />
                   ) : filter.parts.length === 0 ? (

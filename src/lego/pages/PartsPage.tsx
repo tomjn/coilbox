@@ -3,9 +3,11 @@ import { ToyBrick, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { usePartFilter } from "../filter";
+import { useModuleFilter, withLabels } from "../moduleFilter";
 import { type LegoPartInfo, type LoadedPack, loadPack } from "../pack";
 import { deleteCompound, saveCompound, useLegoCompounds } from "../projects";
 import { CompoundPicker } from "./components/CompoundPicker";
+import { ModuleFilters, NoModuleMatches } from "./components/ModuleFilters";
 import { PartDetail } from "./components/PartDetail";
 import {
   NoMatches,
@@ -32,6 +34,7 @@ export default function PartsPage() {
   const [selected, setSelected] = useState<LegoPartInfo | null>(null);
   const [tab, setTab] = useState<"parts" | "compounds">("parts");
   const { compounds } = useLegoCompounds();
+  const moduleFilter = useModuleFilter(compounds);
 
   useEffect(() => {
     let live = true;
@@ -103,23 +106,37 @@ export default function PartsPage() {
                 className="flex-1"
               />
             ) : (
-              <span className="ml-auto text-sm text-muted-foreground">
-                Assemblies you saved while building. Open a unit to use one.
-              </span>
+              <ModuleFilters
+                compounds={compounds}
+                query={moduleFilter.query}
+                onQuery={moduleFilter.setQuery}
+                category={moduleFilter.category}
+                onCategory={moduleFilter.setCategory}
+                shown={moduleFilter.modules.length}
+                className="flex-1"
+              />
             )}
           </div>
 
           {tab === "compounds" ? (
-            <div className="flex min-h-0 flex-1">
-              <CompoundPicker
-                pack={pack}
-                compounds={compounds}
-                onDelete={(id) => void deleteCompound(id)}
-                onRename={(compound, name) =>
-                  void saveCompound({ ...compound, name })
-                }
-              />
-            </div>
+            compounds.length > 0 && moduleFilter.modules.length === 0 ? (
+              <NoModuleMatches />
+            ) : (
+              <div className="flex min-h-0 flex-1">
+                <CompoundPicker
+                  pack={pack}
+                  compounds={moduleFilter.modules}
+                  known={compounds}
+                  onDelete={(id) => void deleteCompound(id)}
+                  onRename={(compound, name) =>
+                    void saveCompound({ ...compound, name })
+                  }
+                  onLabels={(compound, labels) =>
+                    void saveCompound(withLabels(compound, labels))
+                  }
+                />
+              </div>
+            )
           ) : parts.length === 0 ? (
             <NoMatches />
           ) : (

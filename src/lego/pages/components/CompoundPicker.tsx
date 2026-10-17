@@ -24,6 +24,7 @@ import { validateCompoundName } from "../../compounds";
 import { addStandardLights, partMaterial } from "../../geometry";
 import type { LegoProject } from "../../model";
 import { getPartGeometry, type LoadedPack } from "../../pack";
+import { ModuleLabelsPopover } from "./ModuleLabelsPopover";
 
 /** Cell size in pixels: a square of model, with the name under it. */
 const CELL = 108;
@@ -39,7 +40,14 @@ const SPIN_RATE = 1.05;
 
 interface Props {
   pack: LoadedPack;
+  /** The ones to draw: the module list after any search and category filter. */
   compounds: LegoProject[];
+  /**
+   * Every module, filtered or not. A name must be unique among all of them, and
+   * the category menu offers the categories of all of them. Defaults to
+   * `compounds`.
+   */
+  known?: LegoProject[];
   /**
    * Drawn with the base pack's atlas when absent. A compound is geometry, not
    * a texture, so once inserted it takes on whatever atlas the unit around it
@@ -54,6 +62,11 @@ interface Props {
   placingId?: string;
   onDelete: (id: string) => void;
   onRename: (compound: LegoProject, name: string) => void;
+  /** Absent hides the category and tags button. */
+  onLabels?: (
+    compound: LegoProject,
+    labels: { category: string | undefined; tags: string[] },
+  ) => void;
 }
 
 /** The name field being edited, and why it cannot be saved yet, if at all. */
@@ -66,11 +79,13 @@ interface Renaming {
 export function CompoundPicker({
   pack,
   compounds,
+  known = compounds,
   atlas,
   onInsert,
   placingId,
   onDelete,
   onRename,
+  onLabels,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
@@ -96,10 +111,10 @@ export function CompoundPicker({
   function commitRename() {
     setRenaming((current) => {
       if (!current) return current;
-      const error = validateCompoundName(compounds, current.id, current.draft);
+      const error = validateCompoundName(known, current.id, current.draft);
       if (error) return { ...current, error };
       const trimmed = current.draft.trim();
-      const compound = compounds.find((c) => c.id === current.id);
+      const compound = known.find((c) => c.id === current.id);
       if (compound && trimmed !== compound.name) onRename(compound, trimmed);
       return null;
     });
@@ -322,6 +337,14 @@ export function CompoundPicker({
                   >
                     <Pencil size={14} />
                   </Button>
+                  {onLabels ? (
+                    <ModuleLabelsPopover
+                      compound={compound}
+                      known={known}
+                      onSave={onLabels}
+                      className="absolute left-8 top-0 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
+                    />
+                  ) : null}
                   <Button
                     size="sm"
                     variant="ghost"
