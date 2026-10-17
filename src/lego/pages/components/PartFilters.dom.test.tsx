@@ -60,7 +60,10 @@ const onQuery = vi.fn();
 const onCategory = vi.fn();
 const onPackId = vi.fn();
 
-function show(loaded: LoadedPack, over: { category?: string | null; shown?: number } = {}) {
+function show(
+  loaded: LoadedPack,
+  over: { category?: string | null; shown?: number } = {},
+) {
   return render(
     <PartFilters
       pack={loaded}
