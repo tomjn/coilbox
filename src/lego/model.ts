@@ -34,6 +34,32 @@ export interface LegoAnchor {
 }
 
 /**
+ * How a piece is joined to its parent (issue #3273): which of its own
+ * connectors meets which connector on the parent, where along the parent's face
+ * and with what twist. The connectors themselves belong to the parts, see
+ * `connectors.ts`, so this names them by id rather than copying them.
+ *
+ * The piece's `position` and `rotation` are still stored, as the result of
+ * resolving this. Every reader of a transform keeps reading those, and an edit
+ * that could move the piece resolves the connection again (`resolveConnections`).
+ */
+export interface LegoConnection {
+  /** The connector on this piece's own part that does the joining. */
+  connector: string;
+  /** The connector on the parent piece's part it joins. */
+  to: string;
+  /**
+   * How far from the parent connector the join sits, along the parent's face:
+   * first along the connector's side direction, then along its up direction,
+   * in the parent's own units. Absent means on the connector itself.
+   */
+  offset?: [number, number];
+  /** Radians about the parent connector's facing, turning the piece on the
+   *  face. Absent means none. */
+  twist?: number;
+}
+
+/**
  * The shapes the engine will build a collision volume out of.
  *
  * These exact strings because of how the engine reads them: `CollisionVolume`
@@ -313,6 +339,11 @@ export interface LegoPiece {
   /** Editor only, never affects export. */
   hidden?: boolean;
   customAnchors?: LegoAnchor[];
+  /**
+   * Joined to the parent by a connector. Absent means a free piece, placed by
+   * its own `position` and `rotation`, which is every piece made before #3273.
+   */
+  connection?: LegoConnection;
   /**
    * What this piece is hit with, when the box the engine measures round its own
    * vertices is not what should stop a shot. Absent means that box, which is
@@ -852,6 +883,11 @@ export function projectProblems(project: LegoProject): string[] {
     if (piece.parentId !== null && !byId.has(piece.parentId)) {
       problems.push(`"${piece.name}" hangs off a piece that no longer exists.`);
     }
+    if (piece.parentId === null && piece.connection) {
+      problems.push(
+        `"${piece.name}" is saved as joined to a parent, but it has none.`,
+      );
+    }
   }
   for (const [name, count] of names) {
     if (count > 1) problems.push(`${count} pieces are called "${name}".`);
@@ -1094,6 +1130,10 @@ function parsePiece(raw: unknown): LegoPiece | null {
             .filter((a): a is LegoAnchor => a !== null),
         }
       : {}),
+    ...(() => {
+      const connection = parseConnection(p.connection);
+      return connection ? { connection } : {};
+    })(),
     ...(p.uvFlip === true ? { uvFlip: true } : {}),
     ...(p.uvMirror === true ? { uvMirror: true } : {}),
     ...(typeof p.normalsAngle === "number" && Number.isFinite(p.normalsAngle)
@@ -1399,6 +1439,32 @@ function parsePieceCollision(value: unknown): LegoPieceCollision | null {
   const hit = v.hit !== false;
   if (hit && !volume) return null;
   return { hit, ...(volume ? { volume } : {}) };
+}
+
+/**
+ * A piece's connection, or null when it does not name both connectors. A bad
+ * offset or twist is dropped on its own, which leaves the join on the
+ * connector, rather than costing the piece its join.
+ */
+function parseConnection(value: unknown): LegoConnection | null {
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  if (typeof v.connector !== "string" || v.connector === "") return null;
+  if (typeof v.to !== "string" || v.to === "") return null;
+  const offset =
+    Array.isArray(v.offset) &&
+    v.offset.length === 2 &&
+    v.offset.every((n) => typeof n === "number" && Number.isFinite(n))
+      ? ([v.offset[0], v.offset[1]] as [number, number])
+      : null;
+  return {
+    connector: v.connector,
+    to: v.to,
+    ...(offset ? { offset } : {}),
+    ...(typeof v.twist === "number" && Number.isFinite(v.twist)
+      ? { twist: v.twist }
+      : {}),
+  };
 }
 
 function parseAnchor(raw: unknown): LegoAnchor | null {

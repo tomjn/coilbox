@@ -20,6 +20,7 @@
 import * as THREE from "three";
 
 import { insertCompoundAt, subtreeAsCompound } from "./compounds";
+import { freePiece } from "./connectors";
 import {
   descendantIds,
   type LegoPiece,
@@ -161,7 +162,12 @@ export function mirrorPiece(
               weapon: { ...roled.weapon, heading: -roled.weapon.heading || 0 },
             }
           : roled;
-      return current.id === pieceId ? { ...sided, ...transform } : sided;
+      // The mirrored piece is placed by the mirror now, not by its join, which
+      // would put it straight back. Joins below it are written against it and
+      // still hold.
+      return current.id === pieceId
+        ? { ...freePiece(sided), ...transform }
+        : sided;
     }),
   };
 }

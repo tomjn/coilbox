@@ -27,6 +27,7 @@ import * as THREE from "three";
 import { legoExtraPackUrl, legoPackUrl } from "../lib/assetUrl";
 import { type LegoAtlas, unitAtlas } from "./atlas";
 import { legoPacks } from "./bindings";
+import { resolveConnections } from "./connectors";
 import type { LegoProject } from "./model";
 
 const BLOB_MAGIC = "CBLEGO\0\0";
@@ -389,6 +390,17 @@ export function projectPackProblems(
       missing === 1
         ? "1 piece names a part no installed pack has, so it shows no geometry."
         : `${missing} pieces name parts no installed pack has, so they show no geometry.`,
+    );
+  }
+
+  // A join on a piece with no parent is the document's own problem, and
+  // `projectProblems` says so. This is the join a part swap left behind.
+  const { broken } = resolveConnections(project, pack);
+  for (const id of broken) {
+    const piece = project.pieces.find((p) => p.id === id);
+    if (piece?.parentId === null) continue;
+    problems.push(
+      `"${piece?.name}" is joined by a connector that its part or its parent's part does not have, so it stays where it was.`,
     );
   }
   return problems;

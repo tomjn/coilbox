@@ -13,6 +13,7 @@
 import * as THREE from "three";
 
 import { ENGINE_ROTATION_ORDER, type TrackDelta } from "./animPresets";
+import { resolveConnections } from "./connectors";
 import { computeSmoothedNormals, fixUv, hasMeshFix } from "./meshFix";
 import {
   childrenOf,
@@ -92,10 +93,14 @@ export interface BakedPiece {
  * what you ship.
  */
 export function bakedPieces(
-  project: LegoProject,
+  stored: LegoProject,
   pack: LoadedPack,
   raw: RawGeometry | null,
 ): { pieces: Map<string, BakedPiece>; world: THREE.Vector3[] } {
+  // Every edit already resolves joins, so this is a check that changes nothing
+  // unless the stored transforms went stale, for example a unit edited while
+  // the pack was still loading. What ships is where the joins put each piece.
+  const { project } = resolveConnections(stored, pack);
   const pieces = new Map<string, BakedPiece>();
   const world: THREE.Vector3[] = [];
   const root = pieceById(project, project.rootPieceId);
