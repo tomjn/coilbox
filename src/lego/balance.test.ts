@@ -277,14 +277,62 @@ describe("checkBalance", () => {
     expect(result.basis.mesh).toBe(4);
   });
 
-  it("does not apply to a unit with no feet or wheels", () => {
-    const doc = project([{ id: "body", position: [0, 0, 0] }]);
+  it("checks a unit with no support roles on its lowest pieces and says so", () => {
+    const doc = project([
+      { id: "a", position: [-4, 0, -4] },
+      { id: "b", position: [4, 0, -4] },
+      { id: "c", position: [0, 0, 4] },
+      { id: "body", position: [-1, 1, -1], scale: [2, 2, 2] },
+    ]);
 
     const result = checkBalance(doc, pack(), null);
 
-    expect(result.status).toBe("notApplicable");
-    expect(balanceProblem(result)).toBeNull();
-    expect(balanceSummary(result)).toMatch(/foot or wheel/);
+    expect(result.status).toBe("inside");
+    if (result.status === "notApplicable") return;
+    expect(result.guessed).toBe(true);
+    expect([...result.resting].sort()).toEqual(["a", "b", "c"]);
+    expect(balanceSummary(result)).toMatch(/Support guessed from the lowest/);
+  });
+
+  it("names the guess in the tipping problem too", () => {
+    const doc = project([
+      { id: "a", position: [-4, 0, -4] },
+      { id: "b", position: [4, 0, -4] },
+      { id: "c", position: [0, 0, 4] },
+      { id: "body", position: [-1, 1, -12], scale: [2, 2, 2] },
+    ]);
+
+    const result = checkBalance(doc, pack(), null);
+
+    expect(result.status).toBe("outside");
+    expect(balanceProblem(result)?.message).toMatch(/Support guessed/);
+  });
+
+  it("does not mark a unit with support roles as guessed", () => {
+    const doc = project([
+      ...feet,
+      { id: "body", position: [-1, 1, -1], scale: [2, 2, 2] },
+    ]);
+
+    const result = checkBalance(doc, pack(), null);
+
+    if (result.status === "notApplicable") throw new Error("expected a result");
+    expect(result.guessed).toBeUndefined();
+    expect(balanceSummary(result)).not.toMatch(/guessed/);
+  });
+
+  it("guesses on a lowest piece that is a single point", () => {
+    const doc = project([
+      { id: "tip", position: [0, 0, 0], scale: [0, 1, 0] },
+      { id: "body", position: [5, 1, 0] },
+    ]);
+
+    const result = checkBalance(doc, pack(), null);
+
+    expect(result.status).toBe("noWidth");
+    if (result.status === "notApplicable") return;
+    expect(result.guessed).toBe(true);
+    expect(balanceSummary(result)).toMatch(/no width.*guessed/);
   });
 
   it("balances a tracked unit on its treads when the tread is lowest", () => {

@@ -1324,8 +1324,13 @@ function Builder({ id }: { id: string | undefined }) {
     title: string,
   ) {
     if (!pack) return;
-    const result = swapModule(project, pack, pieceId, module, () =>
-      crypto.randomUUID(),
+    const result = swapModule(
+      project,
+      pack,
+      pieceId,
+      module,
+      () => crypto.randomUUID(),
+      { symmetry: symmetry.on },
     );
     if (!result) return;
     docRef.current.edit(() => result.project);
