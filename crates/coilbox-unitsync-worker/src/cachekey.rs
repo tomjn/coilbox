@@ -402,7 +402,7 @@ mod tests {
         assert_eq!(game_key(&game()), "d3845a01c0d1a1f8");
         assert_eq!(dataset_key(&game()), "133c5e5e864d370b");
         assert_eq!(archive_hash_key(&game()), "99882e00c06a3b89");
-        assert_eq!(model_key(&game()), "be4f25e10807c273");
+        assert_eq!(model_key(&game()), "d74c5de2934710cb");
         assert_eq!(buildpic_key(&game()), "cfd53b8ab59cbad7");
         assert_eq!(faction_logo_key(&game()), "3424bfae2fdee0a1");
         assert_eq!(header_key(&game()), "7628cfa0c7249680");
