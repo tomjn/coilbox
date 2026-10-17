@@ -227,12 +227,19 @@ impl AssetUpload {
                 variant,
             } => format!("{game}'s {unit_name} {variant}"),
             AssetIdentity::Map { map_name, variant } => format!("{map_name}'s {variant}"),
+            AssetIdentity::Faction {
+                game,
+                faction_key,
+                variant,
+            } => format!("{game}'s {faction_key} {variant}"),
         }
     }
 
     fn variant(&self) -> &str {
         match &self.identity {
-            AssetIdentity::Unit { variant, .. } | AssetIdentity::Map { variant, .. } => variant,
+            AssetIdentity::Unit { variant, .. }
+            | AssetIdentity::Map { variant, .. }
+            | AssetIdentity::Faction { variant, .. } => variant,
         }
     }
 
@@ -455,6 +462,7 @@ fn check(asset: &AssetUpload, bytes: u64) -> Result<(), String> {
     let keyed_on = match asset.identity {
         AssetIdentity::Unit { .. } => KeyedOn::Unit,
         AssetIdentity::Map { .. } => KeyedOn::Map,
+        AssetIdentity::Faction { .. } => KeyedOn::Faction,
     };
     if class.keyed_on != keyed_on {
         return Err(format!(
@@ -507,7 +515,9 @@ fn check(asset: &AssetUpload, bytes: u64) -> Result<(), String> {
         ));
     }
     if !is_map && extent {
-        return Err(format!("{what} is a unit picture carrying a map's size."));
+        return Err(format!(
+            "{what} is not a map picture and carries a map's size."
+        ));
     }
 
     let range = (asset.world_height_min, asset.world_height_max);
@@ -1322,6 +1332,36 @@ mod tests {
             declaration_json(&map, bytes).unwrap(),
             WORKER_MAP_DECLARATION
         );
+    }
+
+    /// The faction logo declaration carries the issue's fields and no others:
+    /// the hub refuses `width`, `height`, `hash`, `map_*` and `unit_name` with a
+    /// 400 (issue #4387).
+    #[test]
+    fn a_faction_logo_declaration_has_exactly_the_fields_the_hub_takes() {
+        let logo = AssetUpload {
+            identity: AssetIdentity::Faction {
+                game: "bar".into(),
+                faction_key: "armada".into(),
+                variant: "logo".into(),
+            },
+            source_hash: "src-f".into(),
+            encode_profile: "webp-lossless-128".into(),
+            origin: AssetOrigin::Extracted,
+            mime: "image/webp".into(),
+            source_archive: "Beyond All Reason test-1.sdd".into(),
+            map_width: None,
+            map_height: None,
+            world_height_min: None,
+            world_height_max: None,
+            path: PathBuf::from("/tmp/never-sent.webp"),
+        };
+        assert_eq!(
+            declaration_json(&logo, 321).unwrap(),
+            r#"{"keyed_on":"faction","game":"bar","faction_key":"armada","variant":"logo","source_hash":"src-f","encode_profile":"webp-lossless-128","origin":"extracted","mime":"image/webp","source_archive":"Beyond All Reason test-1.sdd","bytes":321}"#
+        );
+        check(&logo, 321).expect("a logo within the class is sendable");
+        assert!(check(&logo, 65537).unwrap_err().contains("at most 65536"));
     }
 
     #[test]
