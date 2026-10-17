@@ -16,6 +16,7 @@
   "textures": {
     "tex1": "atlas.png"
   },
+  "unit": 0.25,
   "geometry": {
     "file": "parts.bin.gz",
     "encoding": "gzip",

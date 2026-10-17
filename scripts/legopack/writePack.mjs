@@ -21,6 +21,8 @@ export const PACK_SCHEMA_VERSION = 1;
 export const BLOB_MAGIC = "CBLEGO\0\0";
 export const BLOB_VERSION = 1;
 export const VERTEX_STRIDE = 32;
+/** The step most of the bundled parts sit on: 295 of 373 have all three sides on it. */
+export const PART_UNIT = 0.25;
 
 const BLOB_HEADER_SIZE = 32;
 
@@ -112,6 +114,7 @@ export function writePack({
     licence,
     atlas,
     textures: { tex1: "atlas.png" },
+    unit: PART_UNIT,
     geometry: {
       file: "parts.bin.gz",
       encoding: "gzip",

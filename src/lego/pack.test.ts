@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 
 // pack.ts reaches the `lego_packs` command through bindings.ts, and the
@@ -12,12 +14,14 @@ vi.mock("@picoframe/plugin-sdk", () => ({
 import type { LegoAtlas } from "./atlas";
 import { newProject } from "./model";
 import {
+  DEFAULT_PART_UNIT,
   extensionProblem,
   type LegoPackManifest,
   type LegoPartInfo,
   type LoadedPack,
   mergePacks,
   type PackSource,
+  partUnit,
   projectPackProblems,
   type RawAtlasManifest,
   type RawPackManifest,
@@ -435,5 +439,152 @@ describe("projectPackProblems", () => {
     expect(projectPackProblems(project, pack)[0]).toMatch(
       /"desert\.png", is not installed, so it is drawn with "atlas\.png"/,
     );
+  });
+});
+
+describe("part connectors in a merged library", () => {
+  const top = {
+    id: "top",
+    position: [0, 0.5, 0] as [number, number, number],
+    facing: [0, 1, 0] as [number, number, number],
+    up: [0, 0, 1] as [number, number, number],
+  };
+
+  it("keeps the connectors a part states", () => {
+    const merged = mergePacks([
+      source("base", [part({ id: "a", connectors: [top] })]),
+    ]);
+    expect(merged.parts[0].connectors).toEqual([top]);
+    expect(merged.problems).toEqual([]);
+  });
+
+  it("leaves a part that states none without a list, so it derives them", () => {
+    const merged = mergePacks([source("base", [part({ id: "a" })])]);
+    expect(merged.parts[0].connectors).toBeUndefined();
+  });
+
+  it("drops an invalid list, reports it and names the part", () => {
+    const bad = { ...top, facing: [0, 2, 0] as [number, number, number] };
+    const merged = mergePacks([
+      source("base", [part({ id: "a", name: "grey beam", connectors: [bad] })]),
+    ]);
+    expect(merged.parts[0].connectors).toBeUndefined();
+    expect(merged.problems).toHaveLength(1);
+    expect(merged.problems[0]).toMatch(/"base"/);
+    expect(merged.problems[0]).toMatch(/grey beam/);
+    expect(merged.problems[0]).toMatch(/facing/);
+  });
+
+  it("counts every part with an invalid list in one problem per pack", () => {
+    const bad = { ...top, id: "" };
+    const merged = mergePacks([
+      source("base", [
+        part({ id: "a", connectors: [bad] }),
+        part({ id: "b", connectors: [bad] }),
+      ]),
+    ]);
+    expect(merged.problems).toHaveLength(1);
+    expect(merged.problems[0]).toMatch(/2 parts/);
+  });
+
+  it("applies the same rules to an extension pack's parts", () => {
+    const merged = mergePacks([
+      source("base", [part({ id: "a" })]),
+      source("extra", [
+        part({ id: "b", connectors: [top] }),
+        part({ id: "c", connectors: [{ ...top, up: [0, 1, 0] }] }),
+      ]),
+    ]);
+    expect(merged.byId.get("b")?.connectors).toEqual([top]);
+    expect(merged.byId.get("c")?.connectors).toBeUndefined();
+    expect(merged.problems).toHaveLength(1);
+    expect(merged.problems[0]).toMatch(/"extra"/);
+  });
+});
+
+describe("the part unit", () => {
+  function loadedWith(unit: number | undefined, extra?: PackSource) {
+    const base = source(
+      "base",
+      [part({ id: "a" })],
+      unit === undefined ? {} : { unit },
+    );
+    const merged = mergePacks(extra ? [base, extra] : [base]);
+    return merged;
+  }
+
+  it("is the unit the base pack states", () => {
+    const merged = loadedWith(0.5);
+    expect(partUnit(merged)).toBe(0.5);
+    expect(merged.problems).toEqual([]);
+  });
+
+  it("is the default for a pack that states none", () => {
+    expect(partUnit(loadedWith(undefined))).toBe(DEFAULT_PART_UNIT);
+  });
+
+  it("is 0.25, the step most of the bundled pack's parts sit on", () => {
+    expect(DEFAULT_PART_UNIT).toBe(0.25);
+  });
+
+  for (const unit of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+    it(`falls back to the default for a stated unit of ${unit} and says so`, () => {
+      const merged = loadedWith(unit);
+      expect(partUnit(merged)).toBe(DEFAULT_PART_UNIT);
+      expect(merged.problems).toHaveLength(1);
+      expect(merged.problems[0]).toMatch(/"base"/);
+      expect(merged.problems[0]).toMatch(/unit/);
+    });
+  }
+
+  it("is the base pack's when an extension pack states another", () => {
+    const merged = loadedWith(
+      0.5,
+      source("extra", [part({ id: "b" })], { unit: 0.25 }),
+    );
+    expect(partUnit(merged)).toBe(0.5);
+    expect(merged.problems).toHaveLength(1);
+    expect(merged.problems[0]).toMatch(/"extra"/);
+  });
+
+  it("accepts an extension pack that states the base pack's unit", () => {
+    const merged = loadedWith(
+      0.5,
+      source("extra", [part({ id: "b" })], { unit: 0.5 }),
+    );
+    expect(merged.problems).toEqual([]);
+  });
+
+  it("compares an extension pack's unit with the default when the base states none", () => {
+    const merged = loadedWith(
+      undefined,
+      source("extra", [part({ id: "b" })], { unit: 0.5 }),
+    );
+    expect(partUnit(merged)).toBe(DEFAULT_PART_UNIT);
+    expect(merged.problems).toHaveLength(1);
+  });
+});
+
+describe("the bundled pack", () => {
+  const bundled = JSON.parse(
+    readFileSync(
+      fileURLToPath(
+        new URL("../../src-tauri/legoparts/pack.json", import.meta.url),
+      ),
+      "utf8",
+    ),
+  ) as LegoPackManifest;
+
+  it("states the default unit and merges with no problems", () => {
+    expect(bundled.unit).toBe(DEFAULT_PART_UNIT);
+    const merged = mergePacks([
+      {
+        manifest: bundled,
+        vertices: new Float32Array(),
+        indices: new Uint16Array(),
+      },
+    ]);
+    expect(merged.problems).toEqual([]);
+    expect(partUnit(merged)).toBe(DEFAULT_PART_UNIT);
   });
 });

@@ -107,6 +107,7 @@ The manifest is the index. Search and filtering run entirely against it, so a pi
   "licence": "...",
   "atlas": { "width": 2048, "height": 2048 },
   "textures": { "tex1": "atlas.png" },
+  "unit": 0.25,
   "geometry": {
     "file": "parts.bin.gz", "encoding": "gzip", "bytes": 24438000,
     "sha256": "...", "vertexStride": 32
@@ -136,6 +137,66 @@ The manifest is the index. Search and filtering run entirely against it, so a pi
 `vFirst` and `vCount` are in vertices, `iFirst` and `iCount` in indices. `uvIncomplete` counts faces the original model never unwrapped, and is absent when there are none.
 
 Parts are recentred on their own bounding box, so a part's origin is its middle. `pivot` shifts that when the middle is wrong, which is what a wheel wants.
+
+## Connectors
+
+A connector is a place where a part can be joined to another. Every part has them: the pack either states them or the builder works them out.
+
+A connector has four fields, all in the part's own space, the same space as `bbox` and `pivot`:
+
+```json
+{
+  "id": "top",
+  "position": [0, 0.5, 0],
+  "facing": [0, 1, 0],
+  "up": [0, 0, 1]
+}
+```
+
+- `id` is a name, unique within the part. A join records connector ids rather than positions, so swapping one part for another that has the same ids keeps the join.
+- `position` is where the connector is.
+- `facing` is the way out of the part, with a length of 1.
+- `up` has a length of 1 and is at right angles to `facing`. It fixes the twist: a join turns the piece until its `up` lines up with the other connector's, so "twist 90 degrees" means the same on every part.
+
+Lengths and angles are checked to within 0.001, so a value rounded to four decimals passes.
+
+To state connectors, give a part a `connectors` list:
+
+```json
+{ "id": "c7a55d17c378", "bbox": {...}, "connectors": [{ "id": "top", "position": [0, 0.5, 0], "facing": [0, 1, 0], "up": [0, 0, 1] }] }
+```
+
+A part with a `connectors` list uses that list and none of the derived ones. An empty list is allowed and means nothing joins to the part. A part with no `connectors` field gets derived ones, which is every part in the bundled pack. Extension packs follow the same rules.
+
+A list is used whole or not at all. If any connector in it is invalid, or two share an id, the part falls back to its derived connectors, and the Lego Parts screen reports the pack and the first part affected. Half a list would leave joins to the missing connectors broken without a word.
+
+Overriding a bundled part goes through `scripts/legopack/overrides.json` like the rest of a part's fields.
+
+### Derived connectors
+
+The builder derives six connectors for a part from its `bbox`, one at the middle of each face, facing out of it. The id is the sign and axis of the facing: `+x`, `-x`, `+y`, `-y`, `+z`, `-z`. `+y` is the top of any part.
+
+`up` follows one rule on every part: it is `[0, 1, 0]` on the four side faces and `[0, 0, 1]` (the unit's forward) on the top and the bottom, where +y would be the facing itself.
+
+The box's guess is wrong for a part that is not boxy, such as a wheel or a hexagonal block, and those are the parts that want a stated list. Corners and the middle of the box are not connectors, because a corner has no facing.
+
+A piece's scale and pivot move its connectors with it. A mirrored piece's `+x` faces the way the piece now points, so it joins on the side it sits on.
+
+## Part unit
+
+`unit` in the manifest is the pack's step size in the same units as `bbox`: the spacing its parts are built on. Moving and sliding a piece in steps uses it. It is a positive number and optional.
+
+A pack that states none gets 0.25, which `DEFAULT_PART_UNIT` in `src/lego/pack.ts` exports. `partUnit(pack)` gives the value for a loaded library. A stated `unit` that is not a positive number is ignored and reported.
+
+A library has one unit, the base pack's, because parts from every pack mix in one unit and a piece cannot sit on two grids. An extension pack that states a different `unit` is reported and its value is ignored. Stating the base pack's own value is fine.
+
+The bundled pack states 0.25. Counting its 373 parts from `pack.json` to within 0.002:
+
+- 295 have all three sides on a 0.25 step, and 207 on a 0.5 step.
+- 78 have a side off the 0.25 step: 51 blocks, 21 beams and 6 plates, such as `grey block 1.5x1.5x1.25`.
+- Parts are centred on their bounding box, so a face connector sits half a side from the middle. That half side is on a 0.25 step for 207 parts and on a 0.125 step for 295. A part 0.75 wide has its side faces half a step off the grid.
+
+Choose a `unit` for your own pack by the same count: the step that most of its parts' sides fall on.
 
 ## parts.bin
 

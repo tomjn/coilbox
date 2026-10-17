@@ -27,7 +27,11 @@ import * as THREE from "three";
 import { legoExtraPackUrl, legoPackUrl } from "../lib/assetUrl";
 import { type LegoAtlas, unitAtlas } from "./atlas";
 import { legoPacks } from "./bindings";
-import { resolveConnections } from "./connectors";
+import {
+  type LegoConnector,
+  readPartConnectors,
+  resolveConnections,
+} from "./connectors";
 import type { LegoProject } from "./model";
 
 const BLOB_MAGIC = "CBLEGO\0\0";
@@ -67,6 +71,12 @@ export interface LegoPartInfo {
   aliasCount: number;
   /** Faces the original model never unwrapped, absent when there are none. */
   uvIncomplete?: number;
+  /**
+   * Where this part can be joined, when the pack states it. Absent means the
+   * connectors are derived from `bbox`. Present means exactly this list, so an
+   * empty one is a part nothing joins to. Checked when packs are merged.
+   */
+  connectors?: LegoConnector[];
 }
 
 export interface LegoPackManifest {
@@ -83,6 +93,12 @@ export interface LegoPackManifest {
    * pack's.
    */
   extends?: string;
+  /**
+   * The pack's step size: the spacing its parts are built on, in the same
+   * units as `bbox`. Optional, and a positive number when present. See
+   * `partUnit` for what a pack without one gets.
+   */
+  unit?: number;
   geometry: {
     file: string;
     encoding: string;
@@ -166,6 +182,26 @@ export interface LoadedPack {
 /** Every pack's parts as one library, plus what merging had to leave out. */
 export interface MergedPacks extends Omit<LoadedPack, "library"> {
   problems: string[];
+}
+
+/**
+ * The part unit of a pack that states none. 0.25 is the step the most of the
+ * bundled pack's parts sit on: 295 of its 373 have all three sides on it, where
+ * 207 do on 0.5 (counted from `pack.json`, to within 0.002).
+ */
+export const DEFAULT_PART_UNIT = 0.25;
+
+/**
+ * The step size a unit built from this library moves and slides in. One value
+ * for the whole library, the base pack's, because parts from every pack mix in
+ * one unit and a piece cannot be on two grids. Always a positive number.
+ */
+export function partUnit(pack: Pick<LoadedPack, "manifest">): number {
+  return pack.manifest.unit ?? DEFAULT_PART_UNIT;
+}
+
+function isUnit(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
 let pending: Promise<LoadedPack> | null = null;
@@ -290,6 +326,15 @@ export function readAtlasPack(
 export function mergePacks(sources: PackSource[]): MergedPacks {
   const base = sources[0];
   const problems: string[] = [];
+  // The base pack's unit, or the default when it states none or a bad one. An
+  // extension pack cannot move it, so it is settled before the packs are read.
+  const baseUnit = base.manifest.unit;
+  if (baseUnit !== undefined && !isUnit(baseUnit)) {
+    problems.push(
+      `"${base.manifest.id}" states a unit of ${baseUnit}, which is not a positive number. The unit is ${DEFAULT_PART_UNIT} instead.`,
+    );
+  }
+  const unit = isUnit(baseUnit) ? baseUnit : DEFAULT_PART_UNIT;
   const parts: LegoPartInfo[] = [];
   const byId = new Map<string, LegoPartInfo>();
   const vertexBlocks: Float32Array[] = [];
@@ -301,23 +346,45 @@ export function mergePacks(sources: PackSource[]): MergedPacks {
 
   for (const source of sources) {
     let taken = 0;
+    const unusable: { name: string; problem: string }[] = [];
+    if (
+      source !== base &&
+      source.manifest.unit !== undefined &&
+      source.manifest.unit !== unit
+    ) {
+      problems.push(
+        `"${source.manifest.id}" states a unit of ${source.manifest.unit}, and the library's is ${unit}, the base pack's. A unit built from several packs has one step size, so this one is ignored.`,
+      );
+    }
     for (const part of source.manifest.parts) {
       if (byId.has(part.id)) {
         taken++;
         continue;
       }
+      const { connectors: stated, ...rest } = part;
       const moved: LegoPartInfo = {
-        ...part,
+        ...rest,
         packId: source.manifest.id,
         vFirst: part.vFirst + vertexBase,
         iFirst: part.iFirst + indexBase,
       };
+      if (stated !== undefined) {
+        const read = readPartConnectors(stated);
+        if ("connectors" in read) moved.connectors = read.connectors;
+        else unusable.push({ name: part.name, problem: read.problem });
+      }
       parts.push(moved);
       byId.set(moved.id, moved);
     }
     if (taken > 0) {
       problems.push(
         `"${source.manifest.id}" reuses ${taken} part ${taken === 1 ? "id" : "ids"} an earlier pack already uses. Those parts were skipped, so a part id always means the same geometry.`,
+      );
+    }
+    if (unusable.length > 0) {
+      const [first] = unusable;
+      problems.push(
+        `"${source.manifest.id}" states connectors that cannot be used for ${unusable.length} ${unusable.length === 1 ? "part" : "parts"}, which get the connectors their bounding boxes give them. The first is "${first.name}": ${first.problem}.`,
       );
     }
     vertexBlocks.push(source.vertices);
@@ -343,7 +410,7 @@ export function mergePacks(sources: PackSource[]): MergedPacks {
   }
 
   return {
-    manifest: { ...base.manifest, categories, parts },
+    manifest: { ...base.manifest, unit, categories, parts },
     parts,
     byId,
     vertices: concatFloat32(vertexBlocks),
