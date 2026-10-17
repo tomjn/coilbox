@@ -17,6 +17,7 @@ vi.mock("../content/config", () => ({ primeScan: scan }));
 import {
   modelSource,
   paletteMember,
+  stageModel,
   stageTextures,
   textureMember,
 } from "./gameImport";
@@ -235,5 +236,93 @@ describe("stageTextures", () => {
 
     expect(scan).not.toHaveBeenCalled();
     expect(tree).not.toHaveBeenCalled();
+  });
+});
+
+describe("a loose game", () => {
+  const target = { enginePath: "/engine", dataDir: "/data" };
+  const picked = {
+    archive: "game.sdd",
+    archivePath: "/games/game.sdd",
+    member: "objects3d/armsolar.3do",
+  };
+  const gameFiles = [
+    { path: "objects3d/armsolar.3do", size: 1 },
+    { path: "unittextures/tatex/metal3b00.tga", size: 1 },
+  ];
+
+  function scanWith(dependencies: string[]) {
+    scan.mockReset().mockResolvedValue({
+      games: [
+        {
+          primaryArchive: { name: "game.sdd" },
+          dependencyArchives: dependencies.map((name) => ({ name })),
+        },
+      ],
+    });
+  }
+
+  beforeEach(() => {
+    extract.mockReset().mockResolvedValue({ size: 1, errors: [] });
+    tree.mockReset().mockImplementation(async ({ archive }) => ({
+      files:
+        archive === "dep.sdz"
+          ? [{ path: "unittextures/tatex/32xgouraud00.tga", size: 1 }]
+          : [],
+      errors: [],
+    }));
+  });
+
+  it("is read in place when it depends on nothing", async () => {
+    scanWith([]);
+
+    const staged = await stageModel(target, picked, gameFiles);
+
+    expect(staged).toEqual({
+      path: "/games/game.sdd/objects3d/armsolar.3do",
+      staged: null,
+    });
+    expect(extract).not.toHaveBeenCalled();
+  });
+
+  it("is copied to a temp folder when it has a dependency, never into the game folder", async () => {
+    scanWith(["dep.sdz"]);
+
+    const staged = await stageModel(target, picked, gameFiles);
+
+    expect(staged.staged).toMatch(/^\/tmp\/coilbox-lego-model-/);
+    expect(staged.path.startsWith("/games/")).toBe(false);
+    for (const [args] of extract.mock.calls) {
+      expect(args.dest).not.toContain("/games/");
+    }
+  });
+
+  it("takes a texture only the dependency holds from it, and its own copy first", async () => {
+    scanWith(["dep.sdz"]);
+    const staged = await stageModel(target, picked, gameFiles);
+    extract.mockClear();
+
+    await stageTextures(target, picked, staged, gameFiles, [
+      "32xgouraud00",
+      "metal3b00",
+    ]);
+
+    const taken = extract.mock.calls.map(([args]) => [args.archive, args.file]);
+    expect(taken).toContainEqual([
+      "dep.sdz",
+      "unittextures/tatex/32xgouraud00.tga",
+    ]);
+    expect(taken).toContainEqual([
+      "game.sdd",
+      "unittextures/tatex/metal3b00.tga",
+    ]);
+  });
+
+  it("is read in place when the scan fails", async () => {
+    scan.mockReset().mockRejectedValue(new Error("no unitsync"));
+
+    const staged = await stageModel(target, picked, gameFiles);
+
+    expect(staged.staged).toBeNull();
   });
 });

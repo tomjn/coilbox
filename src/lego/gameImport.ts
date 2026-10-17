@@ -153,6 +153,31 @@ async function firstSource(
   return null;
 }
 
+/** The archives a game depends on, in the order the engine mounts them. */
+async function dependencyNames(
+  target: UnitsyncTarget,
+  game: string,
+): Promise<string[]> {
+  const scan = await primeScan(target.enginePath, target.dataDir);
+  const item = scan.games.find((g) => g.primaryArchive.name === game);
+  return item?.dependencyArchives.map((a) => a.name) ?? [];
+}
+
+/**
+ * Whether a game depends on another archive. A scan that fails counts as no,
+ * so the model is read in place as it was before rather than not at all.
+ */
+async function hasDependencies(
+  target: UnitsyncTarget,
+  game: string,
+): Promise<boolean> {
+  try {
+    return (await dependencyNames(target, game)).length > 0;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * A game's dependencies and then base content, each with its member listing.
  *
@@ -163,10 +188,8 @@ async function laterSources(
   target: UnitsyncTarget,
   game: string,
 ): Promise<MemberSource[]> {
-  const scan = await primeScan(target.enginePath, target.dataDir);
-  const item = scan.games.find((g) => g.primaryArchive.name === game);
   const names = [
-    ...(item?.dependencyArchives.map((a) => a.name) ?? []),
+    ...(await dependencyNames(target, game)),
     BASE_CONTENT_ARCHIVE,
   ].filter(
     (name, i, all) =>
@@ -217,8 +240,13 @@ function searchFolders(member: string): string[] {
 /**
  * Put the model where it can be read from.
  *
- * A loose game answers immediately with the file it already has. A packed one
- * costs one member extraction, into a folder named after nothing but a fresh
+ * A loose game with no dependencies answers with the file it already has. One
+ * with dependencies is copied out like a packed game, because the import finds
+ * textures by walking up from the model on disk and cannot see into another
+ * archive, and copying them next to the real file would write into the user's
+ * game folder (issue #4248). The project still records the real file as its
+ * source, so the unit can be refreshed from it. A packed game costs one member
+ * extraction, into a folder named after nothing but a fresh
  * id, so two imports of one model never land on each other.
  *
  * The temp folder is left for the OS to reclaim rather than deleted, which is
@@ -231,7 +259,11 @@ export async function stageModel(
   picked: PickedModel,
   files: ArchiveFileEntry[],
 ): Promise<StagedModel> {
-  if (isLooseArchive(picked.archive) && picked.archivePath) {
+  if (
+    isLooseArchive(picked.archive) &&
+    picked.archivePath &&
+    !(await hasDependencies(target, picked.archive))
+  ) {
     return {
       path: await join(picked.archivePath, picked.member),
       staged: null,
@@ -301,13 +333,12 @@ export function paletteMember(files: ArchiveFileEntry[]): string | null {
 /**
  * Unpack the textures a staged model's header names, beside it.
  *
- * Nothing to do for a loose game, whose textures never moved. For a packed one
+ * Nothing to do for a model read in place, whose textures never moved. For a packed one
  * this is what makes the import's own walk up to `unittextures/` find anything,
  * so a model opened out of a `.sdz` arrives painted rather than grey.
  *
  * A texture the game does not hold is taken from its dependencies, then base
- * content, the way the engine finds it (issue #4239). A loose game still reads
- * only what its own folder holds.
+ * content, the way the engine finds it (issues #4239 and #4248).
  *
  * A texture no archive holds is not an error. The import already
  * reports a named-but-missing texture and offers to point at one, which is the
