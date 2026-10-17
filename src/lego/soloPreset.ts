@@ -17,6 +17,8 @@ export const SOLO_SCENARIOS: Record<string, string> = {
   "walk.quad": "moving",
   "turret.track": "firing",
   "wheels.roll": "moving",
+  // Reads the heading, which only the driving scenario changes.
+  "rudder.follow": "driving",
   buildarm: "building",
   "build.aim": "building",
   "build.factory": "building-factory",

@@ -124,14 +124,15 @@ export const HOVER: BodyPlan = {
 
 /**
  * The hull is the root, at the waterline, with the Body role. A turret on the
- * deck holds a barrel holding a muzzle flare, as on the turret building, and a
- * wake bone with no role sits at the stern on the waterline.
+ * deck holds a barrel holding a muzzle flare, as on the turret building. A
+ * wake bone with no role and a rudder bone sit at the stern on the waterline.
+ * There is one rudder, which turns about its joint at the hinge.
  */
 export const SHIP: BodyPlan = {
   id: "ship",
   label: "Ship",
   description:
-    "A hull with a gun turret. It does not rock on the water, leave a wake or steer with a rudder.",
+    "A hull with a gun turret and a rudder that swings as it turns. It does not rock on the water or leave a wake.",
   proportions: [
     elmos("hullLength", "Hull length", 45, 135, 89.2, {
       bone: "wake",
@@ -186,11 +187,19 @@ export const SHIP: BodyPlan = {
         parent: "hull",
         position: [0, 0, -(hullLength as number) / 2],
       },
+      {
+        id: "rudder",
+        name: "rudder",
+        parent: "hull",
+        position: [0, 0, -(hullLength as number) / 2],
+        role: "rudder",
+      },
     ];
   },
   presets: [
     { presetId: "turret.track", params: {} },
     { presetId: "recoil", params: {} },
+    { presetId: "rudder.follow", params: {} },
   ],
 };
 
