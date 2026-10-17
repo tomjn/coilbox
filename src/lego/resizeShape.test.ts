@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
+import type { LegoConnector } from "./connectors";
 import { type LegoPiece, type LegoProject, newProject } from "./model";
 import type { LoadedPack } from "./pack";
 import { worldMatrix } from "./reparent";
@@ -12,6 +13,7 @@ import {
   resizeShapeFace,
   shapeReadout,
 } from "./resizeShape";
+import { shapeConnectors } from "./shapeConnectors";
 import { type LegoShape, shapeKinds } from "./shapes";
 
 type Vec3 = [number, number, number];
@@ -200,10 +202,13 @@ describe("resizeShapeFace", () => {
     ]);
     const out = resizeShapeFace(project, PACK, "a", 1, 1, 8)
       ?.project as LegoProject;
-    // The wedge's top is now at y 4 above its origin, and the child sits on it.
+    // The child sits on the middle of the wedge's slope, which is where the
+    // wedge's "+y" connector now is.
     expect(piece(out, "a").position).toEqual([0, 1, 0]);
-    expect(piece(out, "kid").position[1]).toBeCloseTo(5);
-    near(world(out, "kid", [0, -1, 0]), new THREE.Vector3(0, 5, 0));
+    const slope = shapeConnectors(piece(out, "a").shape as LegoShape).find(
+      (c) => c.id === "+y",
+    ) as LegoConnector;
+    near(world(out, "kid", [0, -1, 0]), world(out, "a", slope.position));
   });
 
   it("keeps a joined piece on its join rather than the opposite face", () => {

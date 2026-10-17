@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { LegoShape } from "./shapes";
-import { sphereAnchors, sphereNumbers, withSphereNumber } from "./sphereShape";
+import { sphereNumbers, withSphereNumber } from "./sphereShape";
 
 const ball: LegoShape = {
   kind: "sphere",
@@ -58,25 +58,5 @@ describe("withSphereNumber", () => {
       problem: "Sides must be a whole number, 3 or more.",
     });
     expect(withSphereNumber(ball, "keep", 3)).toHaveProperty("problem");
-  });
-});
-
-describe("sphereAnchors", () => {
-  const bounds = { min: [-1, -2, -3], max: [1, 2, 3] } as Parameters<
-    typeof sphereAnchors
-  >[0];
-  const outs = (shape: LegoShape) =>
-    sphereAnchors(bounds, shape).map(
-      (anchor) => anchor.out?.join(",") ?? "mid",
-    );
-
-  it("gives a whole sphere the middle of every face and no corners", () => {
-    expect(outs(ball).sort()).toEqual(
-      ["-1,0,0", "1,0,0", "0,-1,0", "0,1,0", "0,0,-1", "0,0,1", "mid"].sort(),
-    );
-  });
-
-  it("gives a dome only its base and its apex", () => {
-    expect(outs(dome).sort()).toEqual(["0,-1,0", "0,1,0", "mid"].sort());
   });
 });

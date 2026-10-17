@@ -18,7 +18,6 @@ import {
   type ShapeSwatch,
   tubeInnerRadius,
 } from "./shapes";
-import { type Anchor, type Bounds, localAnchors } from "./snapping";
 
 export interface RoundNumbers {
   /** 0, 1 or 2 for x, y or z. */
@@ -119,26 +118,4 @@ export function withRoundNumber(
   if (next.wall !== undefined) options.inner = next.radius - next.wall;
   if (next.top !== undefined) options.top = next.top;
   return { shape: { ...shape, size, options } };
-}
-
-/**
- * A cone's anchors in its part's own space: a round shape's, with its side
- * ones moved in from the box to the slope at mid height, where the side is
- * halfway between the bottom radius and the top. The middle of the top is the
- * tip of a cone, or the middle of a cut cone's top disc.
- */
-export function coneAnchors(bounds: Bounds, shape: LegoShape): Anchor[] {
-  const { axis, radius, top } = roundNumbers(shape);
-  const inward = (1 + (top ?? 0) / radius) / 2;
-  return localAnchors(bounds, true).map((anchor) => {
-    const out = anchor.out;
-    if (!out || out[axis] !== 0) return anchor;
-    const position = [...anchor.position] as Anchor["position"];
-    for (let a = 0; a < 3; a++) {
-      if (a === axis || out[a] === 0) continue;
-      const centre = (bounds.min[a] + bounds.max[a]) / 2;
-      position[a] = centre + (position[a] - centre) * inward;
-    }
-    return { ...anchor, position };
-  });
 }
