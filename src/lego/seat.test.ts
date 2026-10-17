@@ -176,12 +176,12 @@ describe("dragPiece without a seat", () => {
     expect(resolveConnections(doc, pack()).project).toBe(doc);
   });
 
-  it("frees a joined piece that was turned", () => {
+  it("frees a joined piece that was turned off its face", () => {
     const doc = dragPiece(
       joined(),
       pack(),
       "leg",
-      dropped([0, 1.5, 0], [0, 0.3, 0]),
+      dropped([0, 1.5, 0], [0.3, 0, 0]),
       null,
     );
 

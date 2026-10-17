@@ -7,7 +7,7 @@
  * would resolve the join and carry the piece straight back.
  */
 
-import { freePiece, same, twistOf } from "./connectors";
+import { editJoined, freePiece, same, twistOf } from "./connectors";
 import { type LegoPiece, type LegoProject, pieceById } from "./model";
 import type { LoadedPack } from "./pack";
 import { reparentPiece, worldMatrix } from "./reparent";
@@ -108,6 +108,19 @@ export function dragPiece(
     };
   }
 
+  // A turn about the face is the join's twist, so the rotate handle keeps the
+  // join for it and frees the piece for any other turn (issue #4281).
+  if (
+    before.connection &&
+    same(before.position, transform.position) &&
+    !same(before.rotation, transform.rotation)
+  ) {
+    return editJoined(project, pack, pieceId, {
+      rotation: transform.rotation,
+      scale: transform.scale,
+    }).project;
+  }
+
   return moved ? freeAt(next, pieceId) : next;
 }
 
@@ -144,6 +157,34 @@ export function freeMoved(
     return freePiece(piece);
   });
   return changed ? { ...after, pieces } : after;
+}
+
+/**
+ * The document after a number is typed into a piece's transform fields, and the
+ * one line to show when that freed the piece (issue #4281).
+ *
+ * A joined piece keeps its join where it can: a position along its face is the
+ * join's offset and a turn about the face is its twist. A position off the face
+ * or any other turn frees the piece where it was typed, or the join would put
+ * it straight back. A new scale keeps the join (issue #3309). Without a pack
+ * there is nothing to measure a join by, so any move or turn frees the piece.
+ */
+export function typedJoinedTransform(
+  project: LegoProject,
+  pack: LoadedPack | null,
+  pieceId: string,
+  change: Partial<LegoPiece>,
+): { project: LegoProject; detached: string | null } {
+  if (pack) return editJoined(project, pack, pieceId, change);
+  const next = typedTransform(project, pieceId, change);
+  const was = pieceById(project, pieceId)?.connection;
+  return {
+    project: next,
+    detached:
+      was && !pieceById(next, pieceId)?.connection
+        ? "Detached: moved off its face."
+        : null,
+  };
 }
 
 /**
