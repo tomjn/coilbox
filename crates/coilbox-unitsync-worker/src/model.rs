@@ -1385,6 +1385,39 @@ pub struct FactionLogoEntry {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data_uri: Option<String>,
     pub max_dim: u32,
+    /// The emblem encoded as the hub's `logo` asset and written to disk. Set only
+    /// by a run that was given an asset directory, and such a run sets no `file`
+    /// or `dataUri` (issue #4387).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset: Option<FactionLogoAsset>,
+}
+
+/// A faction emblem encoded as the asset the hub takes, written to disk. The same
+/// shape as [`UnitBuildpicAsset`] with `variant` always `logo`, and the bytes are
+/// in the file at `path` rather than here.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct FactionLogoAsset {
+    /// The hub's variant name, always `logo`.
+    pub variant: String,
+    /// Always `extracted`.
+    pub origin: String,
+    /// The name the game archive declares for itself, see
+    /// [`crate::archive::archive_name_for_game`].
+    pub source_archive: String,
+    /// Absolute path to the encoded file, named after `hash`.
+    pub path: String,
+    /// sha256 of the encoded bytes.
+    pub hash: String,
+    /// sha256 of the `Sidepics/` member as read, before any decode or keying.
+    pub source_hash: String,
+    /// The archive member the emblem came from, as the archive stores it.
+    pub source_member: String,
+    pub encode_profile: String,
+    pub mime: String,
+    pub width: u32,
+    pub height: u32,
+    pub bytes: u64,
 }
 
 /// Output of `--faction-logos`: each requested side whose `Sidepics/<side>` emblem

@@ -464,8 +464,9 @@ fn dispatch(args: &Args) -> i32 {
     // --game modes.
     if let Some(Mode::FactionLogos(mode)) = &args.faction_logos {
         let cache_dir = mode.cache_dir.as_deref().map(Path::new);
+        let asset_dir = mode.asset_dir.as_deref().map(Path::new);
         return run_mode(
-            || factionlogo::render(&args.lib, &mode.game, &mode.sides, cache_dir),
+            || factionlogo::render(&args.lib, &mode.game, &mode.sides, cache_dir, asset_dir),
             print_ok,
             || factionlogo::emit_error("worker panicked while resolving faction logos".into()),
         );
@@ -1596,14 +1597,18 @@ fn absolutize(args: &mut Args) {
             }
         }
     }
-    // `Mode::FactionLogos` holds its own copy of `--cache-dir`, read
-    // separately from `raw` in `parse_args`, so it needs the same treatment.
+    // `Mode::FactionLogos` holds its own copy of `--cache-dir` and
+    // `--asset-dir`, read separately from `raw` in `parse_args`, so it needs the
+    // same treatment.
     // `--game` and `--sides` are unitsync names, not paths, so they are left
     // alone.
     if let Some(Mode::FactionLogos(mode)) = args.faction_logos.as_mut() {
-        if let Some(dir) = &mut mode.cache_dir {
-            if let Some(abs) = absolute_path(dir) {
-                *dir = abs;
+        for path in [mode.cache_dir.as_mut(), mode.asset_dir.as_mut()]
+            .into_iter()
+            .flatten()
+        {
+            if let Some(abs) = absolute_path(path) {
+                *path = abs;
             }
         }
     }
