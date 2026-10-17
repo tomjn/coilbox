@@ -515,5 +515,119 @@ describe("swapModule", () => {
       expect(rootsOf(out?.project as LegoProject, "big")).toHaveLength(1);
       expect(rootsOf(out?.project as LegoProject, "small")).toHaveLength(2);
     });
+
+    describe("a sided module sharing one instance with its twin (#4316)", () => {
+      const LEG = moduleOf(
+        "leg",
+        [
+          piece({
+            id: "thigh",
+            name: "thigh",
+            partId: "leg",
+            role: "leg.l1.thigh",
+          }),
+          piece({
+            id: "shin",
+            name: "shin",
+            partId: "leg",
+            parentId: "thigh",
+            position: [0, -1.5, 0],
+            role: "leg.l1.shin",
+          }),
+        ],
+        { category: "Leg" },
+      );
+      const LONG = moduleOf(
+        "long",
+        [
+          piece({
+            id: "thigh",
+            name: "long thigh",
+            partId: "hull",
+            role: "leg.l1.thigh",
+          }),
+          piece({
+            id: "shin",
+            name: "long shin",
+            partId: "leg",
+            parentId: "thigh",
+            position: [0, -1.5, 0],
+            role: "leg.l1.shin",
+          }),
+        ],
+        { category: "Leg" },
+      );
+
+      function legs() {
+        const placed = placeModule(
+          UNIT,
+          LEG,
+          pack(),
+          { parentId: "hull", to: "+x" },
+          { cycle: 0, twist: 0 },
+          counter("a"),
+        );
+        const left = placed?.rootPieceIds[0] as string;
+        const twinned = mirrorTwin(
+          placed?.project as LegoProject,
+          left,
+          counter("t"),
+          pack(),
+        );
+        return {
+          project: twinned?.project as LegoProject,
+          left,
+          right: twinned?.twinId as string,
+        };
+      }
+
+      function tally(project: LegoProject, moduleId: string) {
+        const of = project.pieces.filter((p) => p.module?.id === moduleId);
+        return {
+          roles: of.map((p) => p.role).sort(),
+          instances: new Set(of.map((p) => p.module?.instance)).size,
+          sides: of
+            .filter((p) => p.role?.endsWith("thigh"))
+            .map((p) => p.connection?.to)
+            .sort(),
+        };
+      }
+
+      it("starts as one instance holding both sides", () => {
+        const { project } = legs();
+        expect(tally(project, "leg")).toEqual({
+          roles: ["leg.l1.shin", "leg.l1.thigh", "leg.r1.shin", "leg.r1.thigh"],
+          instances: 1,
+          sides: ["+x", "-x"],
+        });
+      });
+
+      it("swaps both sides for the module and its mirror with symmetry on", () => {
+        const { project, left } = legs();
+        const out = swapModule(project, pack(), left, LONG, counter("b"), {
+          symmetry: true,
+        });
+        const swapped = out?.project as LegoProject;
+        expect(tally(swapped, "leg").roles).toEqual([]);
+        expect(tally(swapped, "long")).toEqual({
+          roles: ["leg.l1.shin", "leg.l1.thigh", "leg.r1.shin", "leg.r1.thigh"],
+          instances: 1,
+          sides: ["+x", "-x"],
+        });
+        expect(out?.broken).toEqual([]);
+      });
+
+      it("swaps only the chosen side with symmetry off", () => {
+        const { project, left } = legs();
+        const out = swapModule(project, pack(), left, LONG, counter("b"));
+        const swapped = out?.project as LegoProject;
+        expect(tally(swapped, "long").sides).toEqual(["+x"]);
+        expect(tally(swapped, "leg")).toMatchObject({
+          roles: ["leg.r1.shin", "leg.r1.thigh"],
+          sides: ["-x"],
+        });
+        expect(out?.broken).toEqual([]);
+      });
+    });
   });
 });

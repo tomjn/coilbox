@@ -1,7 +1,8 @@
 /**
  * Swapping a module in a unit for another, in place (issue #3303).
  *
- * The instance's pieces are removed and the new module's put where the old
+ * The instance's pieces are removed (only the chosen side's, when the instance
+ * holds a sided pair sharing it, #4316) and the new module's put where the old
  * root was:
  *
  * - Joined root: the new module joins the same face of the same parent by its
@@ -41,8 +42,14 @@ import {
   pairPieces,
   withoutDanglingTwins,
 } from "./mirror";
-import { type LegoPiece, type LegoProject, pieceById } from "./model";
+import {
+  descendantIds,
+  type LegoPiece,
+  type LegoProject,
+  pieceById,
+} from "./model";
 import { placeModule } from "./moduleMount";
+import { pieceFingerprint } from "./moduleUpdates";
 import type { LoadedPack } from "./pack";
 import { ringMembers } from "./ringSet";
 import { carriedId } from "./swapPart";
@@ -69,13 +76,20 @@ function presetRoles(presetId: string): string[] {
   return [...preset.animates, ...preset.requires.map((need) => need.role)];
 }
 
-/** The piece of a module instance that hangs from outside it. */
+/**
+ * The piece at the top of the part of a module instance `pieceId` is in: the
+ * highest piece above it that has the same instance. An instance holding a
+ * sided pair (#4316) has a top for each side.
+ */
 function instanceTop(project: LegoProject, pieceId: string) {
   const instance = pieceById(project, pieceId)?.module?.instance;
   if (instance === undefined) return undefined;
-  const inside = project.pieces.filter((p) => p.module?.instance === instance);
-  const ids = new Set(inside.map((p) => p.id));
-  return inside.find((p) => !p.parentId || !ids.has(p.parentId));
+  let top = pieceById(project, pieceId);
+  for (;;) {
+    const parent = top?.parentId ? pieceById(project, top.parentId) : undefined;
+    if (!parent || parent.module?.instance !== instance) return top;
+    top = parent;
+  }
 }
 
 /** The module as its mirror image would carry it: sided roles and weapon arcs
@@ -168,9 +182,8 @@ export function swapModule(
 
   const twin = top.twin ? pieceById(project, top.twin) : undefined;
   const twinTop = twin ? instanceTop(project, twin.id) : undefined;
-  if (!twinTop || twinTop.module?.instance === top.module?.instance) {
-    return chosen;
-  }
+  if (!twinTop || twinTop.id === top.id) return chosen;
+  const sharesInstance = twinTop.module?.instance === top.module?.instance;
   // The module goes in as it is on the side that is not already a reflection,
   // and the other side follows it.
   const chosenLeads = !reflected(top) || reflected(twinTop);
@@ -188,11 +201,30 @@ export function swapModule(
   if (!follower) return chosen;
   const leadRoot = lead.rootPieceIds[0];
   const followerRoot = follower.rootPieceIds[0];
-  const paired = pairPieces(
-    followMirror(follower.project, leadRoot, followerRoot, pack),
-    leadRoot,
-    followerRoot,
-  );
+  const followed = followMirror(follower.project, leadRoot, followerRoot, pack);
+  const instance = pieceById(followed, leadRoot)?.module?.instance;
+  // The two sides of a sided pair count as one set, as they did before.
+  const joined: LegoProject =
+    sharesInstance && instance !== undefined
+      ? {
+          ...followed,
+          pieces: followed.pieces.map((piece) =>
+            piece.module &&
+            piece.module.instance ===
+              pieceById(followed, followerRoot)?.module?.instance
+              ? {
+                  ...piece,
+                  module: {
+                    ...piece.module,
+                    instance,
+                    fp: pieceFingerprint(piece, piece.id === followerRoot),
+                  },
+                }
+              : piece,
+          ),
+        }
+      : followed;
+  const paired = pairPieces(joined, leadRoot, followerRoot);
   const result = combined(lead, [follower], paired, pack, project);
   return {
     ...result,
@@ -211,11 +243,16 @@ function swapOne(
   const chosen = pieceById(project, pieceId);
   const ref = chosen?.module;
   if (!ref) return null;
-  const old = project.pieces.filter((p) => p.module?.instance === ref.instance);
+  const top = instanceTop(project, pieceId);
+  if (!top) return null;
+  // Only the side the chosen piece is on, when the instance holds a pair.
+  const side = new Set(descendantIds(project, top.id));
+  const old = project.pieces.filter(
+    (p) => p.module?.instance === ref.instance && side.has(p.id),
+  );
   const oldIds = new Set(old.map((p) => p.id));
-  const top = old.find((p) => !p.parentId || !oldIds.has(p.parentId));
-  const parentId = top?.parentId;
-  if (!top || !parentId || !pieceById(project, parentId)) return null;
+  const parentId = top.parentId;
+  if (!parentId || !pieceById(project, parentId)) return null;
 
   // What is kept: pieces hanging off the instance that are not part of it.
   const kept = project.pieces.filter(
