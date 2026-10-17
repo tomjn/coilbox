@@ -371,3 +371,42 @@ describe("selecting more than one piece", () => {
     expect(broken.selectedIds).toEqual([]);
   });
 });
+
+describe("filling in what the document can work out for itself (#4354)", () => {
+  const unboxed = (p: LegoProject): LegoProject => ({
+    ...p,
+    name: "measured",
+  });
+
+  it("changes the document without marking it changed or adding an undo step", () => {
+    const next = reduceDocument(opened, { type: "fill", fill: unboxed });
+    expect(next.project?.name).toBe("measured");
+    expect(next.dirty).toBe(false);
+    expect(next.past).toEqual([]);
+    expect(next.future).toEqual([]);
+  });
+
+  it("leaves a document that is already dirty dirty, and the history in step", () => {
+    const edited = reduceDocument(opened, rename("a", 1000));
+    const next = reduceDocument(edited, { type: "fill", fill: unboxed });
+    expect(next.dirty).toBe(true);
+    // The step undo returns to is filled too, or undo would lose the fill.
+    expect(next.past).toHaveLength(1);
+    expect(next.past[0].name).toBe("measured");
+    const undone = reduceDocument(next, { type: "undo" });
+    expect(undone.project?.name).toBe("measured");
+  });
+
+  it("fills the redo steps too", () => {
+    const edited = reduceDocument(opened, rename("a", 1000));
+    const undone = reduceDocument(edited, { type: "undo" });
+    const next = reduceDocument(undone, { type: "fill", fill: unboxed });
+    expect(next.future[0].name).toBe("measured");
+  });
+
+  it("returns the same state when nothing was missing", () => {
+    expect(reduceDocument(opened, { type: "fill", fill: (p) => p })).toBe(
+      opened,
+    );
+  });
+});

@@ -136,6 +136,24 @@ describe("opening a unit", () => {
   });
 });
 
+describe("filling in a unit as it opens (#4354)", () => {
+  it("is not written, not an undo step, and not a change", async () => {
+    const session = open();
+    act(() => {
+      session.doc().fill((project) => ({ ...project, name: "filled" }));
+    });
+    expect(session.doc().project?.name).toBe("filled");
+    expect([
+      session.doc().dirty,
+      session.doc().canUndo,
+      session.doc().canRedo,
+    ]).toEqual([false, false, false]);
+
+    await autosave();
+    expect(saveProject).not.toHaveBeenCalled();
+  });
+});
+
 describe("the autosave", () => {
   it("writes shortly after an edit rather than on the edit", async () => {
     const session = open();

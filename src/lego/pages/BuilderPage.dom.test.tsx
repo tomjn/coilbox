@@ -18,6 +18,7 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { type LegoProject, newProject } from "../model";
+import type { RawGeometry } from "../rawGeometry";
 import type { LegoDocumentSession } from "../useLegoDocument";
 
 const doc: { current: LegoDocumentSession } = { current: null as never };
@@ -70,9 +71,12 @@ const loadedPack = (parts: unknown[] = []) =>
     indices: new Uint16Array(0),
   });
 
+/** What the unit's geometry file holds, swapped per test. */
+let loadedRaw: RawGeometry | null = null;
+
 vi.mock("../useRawGeometry", () => ({
   useRawGeometry: () => ({
-    raw: null,
+    raw: loadedRaw,
     loading: false,
     error: null,
     missingTextures: [],
@@ -133,6 +137,7 @@ function session(project: LegoProject): LegoDocumentSession {
     select: vi.fn(),
     toggleSelect: vi.fn(),
     edit: vi.fn(),
+    fill: vi.fn(),
     undo: vi.fn(),
     redo: vi.fn(),
     save: vi.fn(),
@@ -159,6 +164,7 @@ function show(project: LegoProject) {
 beforeEach(() => {
   localStorage.clear();
   packLoad = loadedPack();
+  loadedRaw = null;
 });
 
 afterEach(() => {
@@ -171,6 +177,56 @@ describe("a unit built out of parts", () => {
     await screen.findByRole("button", { name: "Script" });
     expect(screen.getByRole("button", { name: "Inventory" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Compounds" })).toBeNull();
+  });
+});
+
+describe("a lifted piece saved before its box was recorded (#4354)", () => {
+  it("is given the box of its mesh when the geometry has loaded, as a fill and not an edit", async () => {
+    loadedRaw = {
+      byId: new Map([
+        [
+          "m0",
+          {
+            id: "m0",
+            vFirst: 0,
+            vCount: 0,
+            iFirst: 0,
+            iCount: 0,
+            bbox: { min: [-1, 0, -1], max: [1, 4, 1] },
+          },
+        ],
+      ]),
+      vertices: new Float32Array(),
+      indices: new Uint32Array(),
+    };
+    const old = unit();
+    const withMesh: LegoProject = {
+      ...old,
+      pieces: [
+        ...old.pieces,
+        {
+          id: "lifted",
+          name: "lifted",
+          parentId: "base",
+          partId: null,
+          meshId: "m0",
+          position: [0, 0, 0],
+          rotation: [0, 0, 0],
+          scale: [1, 1, 1],
+        },
+      ],
+    };
+    show(withMesh);
+    await screen.findByRole("button", { name: "Script" });
+
+    const fill = vi.mocked(doc.current.fill);
+    expect(fill).toHaveBeenCalled();
+    const filled = fill.mock.calls[0][0](withMesh);
+    expect(filled.pieces.find((p) => p.id === "lifted")?.meshBox).toEqual({
+      min: [-1, 0, -1],
+      max: [1, 4, 1],
+    });
+    expect(doc.current.edit).not.toHaveBeenCalled();
   });
 });
 

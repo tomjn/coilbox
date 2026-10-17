@@ -51,6 +51,13 @@ export const emptyDocument: LegoDocument = {
 export type LegoDocumentAction =
   | { type: "open"; project: LegoProject }
   | { type: "edit"; change: (project: LegoProject) => LegoProject; at: number }
+  /**
+   * Fills in what a document can work out for itself, such as the box of a
+   * mesh (#4354). Not an edit: it does not mark the document changed, and it
+   * is not an undo step. It runs over the undo and redo steps too, so undoing
+   * never returns to a document without it.
+   */
+  | { type: "fill"; fill: (project: LegoProject) => LegoProject }
   | { type: "undo" }
   | { type: "redo" }
   | { type: "saved" }
@@ -147,6 +154,19 @@ export function reduceDocument(
         editedAt: action.at,
         selectedIds: reseatSelection(state.selectedIds, current, next),
       };
+    }
+
+    case "fill": {
+      const current = state.project;
+      if (!current) return state;
+      const next = action.fill(current);
+      const past = state.past.map(action.fill);
+      const future = state.future.map(action.fill);
+      const same =
+        next === current &&
+        past.every((p, i) => p === state.past[i]) &&
+        future.every((p, i) => p === state.future[i]);
+      return same ? state : { ...state, project: next, past, future };
     }
 
     case "undo": {
