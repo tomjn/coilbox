@@ -75,23 +75,65 @@ print(tostring(assert(loadstring(io.read("*a")))()))
   );
 }
 
+/** A unit already on the map when the gadget spawns, such as a commander. */
+interface StandingUnit {
+  x: number;
+  z: number;
+  radius: number;
+  /** Half the width of the ground it blocks, in elmos. */
+  half: number;
+}
+
 /**
  * Load the start unit gadget on `loadFrame`, play `frames`, and print each unit
- * it created. Team 0 has none of the unit, so it gets one whenever the gadget
- * decides to spawn.
+ * it created with where it went. Team 0 has none of the unit, so it gets one
+ * whenever the gadget decides to spawn. The map is 512 elmos square, the team
+ * starts at (256, 256), and the built unit has a 2 by 2 square footprint, so
+ * 16 elmos, and a radius of 5. `TestBuildOrder` answers 1 for a footprint that
+ * meets a standing unit's blocked ground, 0 inside `blocked`, and 2 elsewhere.
  */
-function runStartUnitGadget(loadFrame: number, frames: number[]) {
+function runStartUnitGadget(
+  loadFrame: number,
+  frames: number[],
+  opts: { standing?: StandingUnit[]; blocked?: string } = {},
+) {
+  const standing = (opts.standing ?? [])
+    .map(
+      (u) =>
+        `{ x = ${u.x}, z = ${u.z}, radius = ${u.radius}, half = ${u.half} }`,
+    )
+    .join(", ");
   const harness = `
 gadget = {}
 gadgetHandler = { IsSyncedCode = function() return true end }
-UnitDefNames = { cakebot_test = { id = 3 } }
+UnitDefNames = { cakebot_test = { id = 3, xsize = 2, zsize = 2, radius = 5 } }
+Game = { squareSize = 8, mapSizeX = 512, mapSizeZ = 512 }
+local standing = { ${standing} }
+local function blocked(x, z) return ${opts.blocked ?? "false"} end
 Spring = {
   GetGameFrame = function() return ${loadFrame} end,
   GetGaiaTeamID = function() return 9 end,
   GetTeamList = function() return { 0 } end,
   GetTeamUnitDefCount = function() return 0 end,
-  GetTeamStartPosition = function() return 1, 2, 3 end,
-  CreateUnit = function(d, x, y, z, f, t) print("create " .. d .. " " .. t) end,
+  GetTeamStartPosition = function() return 256, 2, 256 end,
+  GetGroundHeight = function() return 7 end,
+  GetAllUnits = function()
+    local ids = {}
+    for i in ipairs(standing) do ids[#ids + 1] = i end
+    return ids
+  end,
+  GetUnitPosition = function(id) return standing[id].x, 7, standing[id].z end,
+  GetUnitRadius = function(id) return standing[id].radius end,
+  TestBuildOrder = function(d, x, y, z, facing)
+    if blocked(x, z) then return 0 end
+    for _, u in ipairs(standing) do
+      if math.abs(x - u.x) < u.half + 8 and math.abs(z - u.z) < u.half + 8 then return 1 end
+    end
+    return 2
+  end,
+  CreateUnit = function(d, x, y, z, f, t)
+    print("create " .. d .. " " .. t .. " at " .. x .. " " .. y .. " " .. z)
+  end,
   Echo = print,
 }
 assert(loadstring(io.read("*a")))()
@@ -200,12 +242,46 @@ describe("buildStartUnitGadget", () => {
     expect(lua).toContain("return false");
   });
 
-  it("spawns the built unit at each team's start position", () => {
-    const lua = buildStartUnitGadget("cakebot_test");
+  it("spawns the built unit at a team's start position when it is clear", () => {
+    expect(buildStartUnitGadget("cakebot_test")).toContain(
+      'local UNIT_NAME = "cakebot_test"',
+    );
+    const run = runStartUnitGadget(0, [SPAWN_FRAME]);
+    expect(run.stderr).toBe("");
+    expect(run.lines).toEqual(["create 3 0 at 256 7 256"]);
+  });
 
-    expect(lua).toContain('local UNIT_NAME = "cakebot_test"');
-    expect(lua).toContain("Spring.GetTeamStartPosition(teamID)");
-    expect(lua).toContain("Spring.CreateUnit(def.id, x, y, z, 0, teamID)");
+  // Issue #4476. Metal Factions puts its commander on the start position too,
+  // and the unit used to land inside it. In an engine run the commander's
+  // radius was 39 and the engine called ground 25 elmos from its centre open,
+  // because its model reaches well past the ground it blocks.
+  it("spawns clear of a commander standing on the start position", () => {
+    const commander = { x: 263, z: 250, radius: 39, half: 12 };
+    const run = runStartUnitGadget(0, [SPAWN_FRAME], { standing: [commander] });
+    expect(run.stderr).toBe("");
+    expect(run.lines).toHaveLength(1);
+    const [, , , , x, , z] = run.lines[0].split(" ").map(Number);
+    // Clear of the commander's model, not just of its blocked ground.
+    expect(Math.hypot(x - commander.x, z - commander.z)).toBeGreaterThanOrEqual(
+      commander.radius + 5,
+    );
+    // And in the nearest ring that has such a spot. Every spot one footprint
+    // step out, 16 elmos, is closer to the commander than the two radii.
+    expect(Math.max(Math.abs(x - 256), Math.abs(z - 256))).toBe(32);
+  });
+
+  it("keeps the start position when no ground on the map is clear", () => {
+    const run = runStartUnitGadget(0, [SPAWN_FRAME], { blocked: "true" });
+    expect(run.stderr).toBe("");
+    expect(run.lines).toEqual(["create 3 0 at 256 7 256"]);
+  });
+
+  it("skips ground the engine calls blocked, such as a cliff", () => {
+    const run = runStartUnitGadget(0, [SPAWN_FRAME], {
+      blocked: "x <= 256",
+    });
+    expect(run.stderr).toBe("");
+    expect(run.lines).toEqual(["create 3 0 at 272 7 240"]);
   });
 
   it("leaves the team alone if it already has one", () => {
@@ -219,7 +295,7 @@ describe("buildStartUnitGadget", () => {
   it("spawns once, on its frame", () => {
     const run = runStartUnitGadget(0, [1, SPAWN_FRAME, SPAWN_FRAME + 1]);
     expect(run.stderr).toBe("");
-    expect(run.lines).toEqual(["create 3 0"]);
+    expect(run.lines).toEqual(["create 3 0 at 256 7 256"]);
   });
 
   // Issue #3346. `/luarules reload` loads it again into a running game, which
