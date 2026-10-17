@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 
 import { describe, expect, it } from "vitest";
 
+import { weaponCount } from "./aimResolver";
 import { declaredPieces, missingPieces } from "./luaPieces";
 import { buildLuaScript, unitScript } from "./luaScript";
 import {
@@ -10,6 +11,7 @@ import {
   newProject,
   parseLegoProjectJson,
 } from "./model";
+import { answeredCallins } from "./scenarioMarks";
 
 /**
  * Whether luajit can compile `lua` without a syntax error. Uses `loadstring`
@@ -363,7 +365,7 @@ describe("buildLuaScript", () => {
     );
 
     expect(lua).toMatch(
-      /function script\.Shot1\(\)\n {2}Signal\(SIG_RECOIL\)\n {2}SetSignalMask\(SIG_RECOIL\)\n {2}Move\(barrel, z_axis, -0\.2,/,
+      /function script\.Shot1\(\)\n {2}Signal\(SIG_RECOIL_1\)\n {2}SetSignalMask\(SIG_RECOIL_1\)\n {2}Move\(barrel, z_axis, -0\.2,/,
     );
     expect(lua).toContain("WaitForMove(barrel, z_axis)");
     expect(lua).toContain("Move(barrel, z_axis, 0,");
@@ -598,6 +600,141 @@ describe("buildLuaScript", () => {
     );
 
     expect(luaCompiles(lua)).toBe(true);
+  });
+});
+
+/** The lines of one call-in's body, or null when the script has no such
+ *  call-in. */
+function body(lua: string, callin: string): string[] | null {
+  const lines = lua.split("\n");
+  const start = lines.findIndex((line) =>
+    line.startsWith(`function script.${callin}(`),
+  );
+  if (start < 0) return null;
+  const end = lines.indexOf("end", start);
+  return lines.slice(start + 1, end);
+}
+
+const LASER = { fires: { from: "game" as const, name: "laser" } };
+
+/** Two weapon modules, each a turret with its barrel under it and its flare
+ *  under the barrel, as the Weapon button inserts them. */
+const TWO_MODULES: Partial<LegoPiece>[] = [
+  { id: "tl", name: "turretl", role: "turret", weapon: LASER },
+  { id: "bl", name: "barrell", role: "barrel", parentId: "tl" },
+  { id: "fl", name: "flarel", role: "flare", parentId: "bl" },
+  { id: "tr", name: "turretr", role: "turret", weapon: LASER },
+  { id: "br", name: "barrelr", role: "barrel", parentId: "tr" },
+  { id: "fr", name: "flarer", role: "flare", parentId: "br" },
+];
+
+const WEAPON_PRESETS = [
+  { presetId: "turret.track", params: {} },
+  { presetId: "recoil", params: {} },
+];
+
+describe("buildLuaScript with more than one weapon", () => {
+  const lua = buildLuaScript(project(TWO_MODULES, WEAPON_PRESETS));
+
+  it("aims each weapon with its own turret and barrel", () => {
+    const first = body(lua, "AimWeapon1")?.join("\n") ?? "";
+    const second = body(lua, "AimWeapon2")?.join("\n") ?? "";
+    expect(first).toContain("Turn(turretl, y_axis, heading,");
+    expect(first).toContain("Turn(barrell, x_axis, -pitch,");
+    expect(first).not.toMatch(/turretr|barrelr/);
+    expect(second).toContain("Turn(turretr, y_axis, heading,");
+    expect(second).toContain("Turn(barrelr, x_axis, -pitch,");
+    expect(second).not.toMatch(/turretl|barrell/);
+  });
+
+  it("aims from each weapon's turret and fires from its own flare", () => {
+    expect(body(lua, "AimFromWeapon1")).toEqual(["  return turretl"]);
+    expect(body(lua, "AimFromWeapon2")).toEqual(["  return turretr"]);
+    expect(body(lua, "QueryWeapon1")).toEqual(["  return flarel"]);
+    expect(body(lua, "QueryWeapon2")).toEqual(["  return flarer"]);
+  });
+
+  it("kicks the barrel of the weapon that fired", () => {
+    const first = body(lua, "Shot1")?.join("\n") ?? "";
+    const second = body(lua, "Shot2")?.join("\n") ?? "";
+    expect(first).toContain("Move(barrell, z_axis, -0.2,");
+    expect(first).not.toContain("barrelr");
+    expect(second).toContain("Move(barrelr, z_axis, -0.2,");
+    expect(second).not.toContain("barrell");
+  });
+
+  it("gives each weapon its own signal, so aiming one does not cancel the other", () => {
+    const signal = (callin: string) =>
+      /Signal\((\w+)\)/.exec(body(lua, callin)?.join("\n") ?? "")?.[1];
+    const signals = ["AimWeapon1", "AimWeapon2", "Shot1", "Shot2"].map(signal);
+    expect(signals.every(Boolean)).toBe(true);
+    expect(new Set(signals).size).toBe(4);
+    for (const name of signals) {
+      expect(lua).toMatch(new RegExp(`^local ${name} = `, "m"));
+    }
+  });
+
+  it("has the preview drive both weapons", () => {
+    expect(weaponCount(null, [...answeredCallins(lua).keys()])).toBe(2);
+  });
+
+  it("writes no third weapon", () => {
+    expect(body(lua, "AimWeapon3")).toBeNull();
+  });
+
+  it("compiles", () => {
+    expect(luaCompiles(lua)).toBe(true);
+  });
+
+  it("numbers only the turrets with a weapon picked, as the weapons table does", () => {
+    const [, , , unpicked, ...rest] = TWO_MODULES;
+    const only = buildLuaScript(
+      project(
+        [
+          ...TWO_MODULES.slice(0, 3).map((piece) =>
+            piece.id === "tl" ? { ...piece, weapon: {} } : piece,
+          ),
+          unpicked,
+          ...rest,
+        ],
+        WEAPON_PRESETS,
+      ),
+    );
+    expect(body(only, "AimFromWeapon1")).toEqual(["  return turretr"]);
+    expect(body(only, "Shot1")?.join("\n")).toContain("barrelr");
+    expect(body(only, "AimWeapon2")).toBeNull();
+  });
+
+  it("numbers every turret in piece order before any weapon is picked", () => {
+    const unpicked = buildLuaScript(
+      project(
+        TWO_MODULES.map(({ weapon: _weapon, ...piece }) => piece),
+        WEAPON_PRESETS,
+      ),
+    );
+    expect(body(unpicked, "AimFromWeapon1")).toEqual(["  return turretl"]);
+    expect(body(unpicked, "AimFromWeapon2")).toEqual(["  return turretr"]);
+  });
+
+  it("aims a turret and an aim point as two weapons", () => {
+    const mixed = buildLuaScript(
+      project(
+        [
+          { id: "t", name: "turret", role: "turret", weapon: LASER },
+          { id: "a", name: "gimbal", role: "aim", weapon: LASER },
+        ],
+        [
+          { presetId: "turret.track", params: {} },
+          { presetId: "aim.track", params: {} },
+        ],
+      ),
+    );
+    expect(body(mixed, "AimFromWeapon1")).toEqual(["  return turret"]);
+    expect(body(mixed, "AimFromWeapon2")).toEqual(["  return gimbal"]);
+    expect(body(mixed, "AimWeapon2")?.join("\n")).toContain(
+      "Turn(gimbal, y_axis, heading,",
+    );
+    expect(luaCompiles(mixed)).toBe(true);
   });
 });
 

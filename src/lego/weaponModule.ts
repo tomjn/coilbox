@@ -69,6 +69,64 @@ export function mountedWeapons(project: LegoProject): MountedWeapon[] {
   });
 }
 
+/** A weapon as the unit script sees it: the pieces that are its own. */
+export interface ScriptWeapon {
+  /** The turret or aim point it is on, null on a unit that has neither. */
+  carrier: LegoPiece | null;
+  barrel: LegoPiece | null;
+  flare: LegoPiece | null;
+}
+
+/**
+ * The weapons the generated script writes call-ins for, in slot order, so
+ * `AimWeapon<n>` and slot n of the `weapons` table are the same weapon.
+ *
+ * Before any weapon is picked, every carrier is numbered in piece order, so the
+ * preview can aim each turret while the unit is being built. A unit with no
+ * carrier at all gets one weapon, which is what the script wrote before it
+ * wrote more than one.
+ *
+ * A barrel or flare belongs to the nearest carrier above it in the tree, which
+ * is how the Weapon button inserts them. One with no carrier above it goes to
+ * the first weapon still without one, in piece order, so a hand-built unit
+ * whose barrel sits beside its turret still has it.
+ */
+export function scriptWeapons(project: LegoProject): ScriptWeapon[] {
+  const carriers = weaponCarriers(project);
+  const picked = mountedWeapons(project).map((mounted) => mounted.piece);
+  const slots: (LegoPiece | null)[] =
+    picked.length > 0 ? picked : carriers.length > 0 ? carriers : [null];
+  const carrierIds = new Set(carriers.map((piece) => piece.id));
+
+  const owner = (piece: LegoPiece): string | null => {
+    const seen = new Set<string>();
+    let parentId = piece.parentId;
+    while (parentId && !seen.has(parentId)) {
+      if (carrierIds.has(parentId)) return parentId;
+      seen.add(parentId);
+      parentId = pieceById(project, parentId)?.parentId ?? null;
+    }
+    return null;
+  };
+
+  const weapons: ScriptWeapon[] = slots.map((carrier) => ({
+    carrier,
+    barrel: null,
+    flare: null,
+  }));
+  for (const role of ["barrel", "flare"] as const) {
+    const pieces = project.pieces.filter((piece) => piece.role === role);
+    const loose = pieces.filter((piece) => owner(piece) === null);
+    for (const weapon of weapons) {
+      const own = weapon.carrier
+        ? pieces.find((piece) => owner(piece) === weapon.carrier?.id)
+        : undefined;
+      weapon[role] = own ?? loose.shift() ?? null;
+    }
+  }
+  return weapons;
+}
+
 /** The full name a library weapon has on `unit`, as the workshop gives it. */
 export function libraryWeaponName(unit: string, key: string): string {
   return `${unit.toLowerCase()}_${key}`;

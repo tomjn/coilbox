@@ -31,9 +31,10 @@ describe("the scenario for each preset", () => {
         ),
         signal: "SIG",
         pieces: () => ["piece"],
+        weapons: () => [{ number: 1, piece: () => "piece", signal: "SIG" }],
       });
       const filled = Object.entries(result?.hooks ?? {})
-        .filter(([, lines]) => lines.length > 0)
+        .filter(([, lines]) => (lines?.length ?? 0) > 0)
         .map(([name]) => name);
       const fired = scenarioCallins(scenarioById(SOLO_SCENARIOS[preset.id])!);
       if (preset.id === "build.nano") {

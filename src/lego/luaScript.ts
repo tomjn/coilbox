@@ -16,12 +16,13 @@ import {
   type LuaHook,
   presetById,
 } from "./animPresets";
-import type { LegoProject } from "./model";
+import type { LegoPiece, LegoProject } from "./model";
 import {
   hasPieceCollision,
   pieceCollisionInclude,
 } from "./pieceCollisionScript";
 import { luaString } from "./unitDef";
+import { scriptWeapons } from "./weaponModule";
 
 /**
  * Lua's reserved words. A piece called `end` is a legal piece name and an
@@ -60,7 +61,8 @@ export function localName(piece: string): string {
 }
 
 /**
- * The callins, in the order they are written.
+ * The callins, in the order they are written, with one set of weapon
+ * call-ins for each of `weapons`.
  *
  * `Killed` is deliberately not here: it always explodes the root piece and
  * returns 1 regardless of what is applied, so it keeps its own hardcoded
@@ -68,29 +70,43 @@ export function localName(piece: string): string {
  * any other callin, that block just reads the map directly instead of going
  * through this list.
  */
-const HOOKS: { hook: LuaHook; signature: string }[] = [
-  { hook: "Create", signature: "script.Create()" },
-  { hook: "StartMoving", signature: "script.StartMoving()" },
-  { hook: "StopMoving", signature: "script.StopMoving()" },
-  { hook: "Activate", signature: "script.Activate()" },
-  { hook: "Deactivate", signature: "script.Deactivate()" },
-  { hook: "AimWeapon1", signature: "script.AimWeapon1(heading, pitch)" },
-  { hook: "AimFromWeapon1", signature: "script.AimFromWeapon1()" },
-  { hook: "QueryWeapon1", signature: "script.QueryWeapon1()" },
-  { hook: "Shot1", signature: "script.Shot1()" },
-  // One name, two shapes. A builder is handed a heading and a pitch worked out
-  // from its build target, a factory is handed nothing at all, and the engine
-  // calls the same function either way (`LuaScriptNames.h`, `Builder.cpp` and
-  // `Factory.cpp`). Anything reading the arguments has to check it got them.
-  { hook: "StartBuilding", signature: "script.StartBuilding(heading, pitch)" },
-  { hook: "StopBuilding", signature: "script.StopBuilding()" },
-  { hook: "QueryNanoPiece", signature: "script.QueryNanoPiece()" },
-];
+function hookList(weapons: number): { hook: LuaHook; signature: string }[] {
+  return [
+    { hook: "Create", signature: "script.Create()" },
+    { hook: "StartMoving", signature: "script.StartMoving()" },
+    { hook: "StopMoving", signature: "script.StopMoving()" },
+    { hook: "Activate", signature: "script.Activate()" },
+    { hook: "Deactivate", signature: "script.Deactivate()" },
+    // Weapon 1's are written even on a unit with no weapon, because the unit
+    // script gadget only dispatches numbered weapon call-ins at all once
+    // `AimWeapon1` is defined (`luaCallinLint.ts`).
+    ...Array.from({ length: Math.max(1, weapons) }, (_, index) => index + 1)
+      .flatMap((n) => [
+        [`AimWeapon${n}`, "(heading, pitch)"] as const,
+        [`AimFromWeapon${n}`, "()"] as const,
+        [`QueryWeapon${n}`, "()"] as const,
+        [`Shot${n}`, "()"] as const,
+      ])
+      .map(([hook, args]) => ({ hook, signature: `script.${hook}${args}` })),
+    // One name, two shapes. A builder is handed a heading and a pitch worked
+    // out from its build target, a factory is handed nothing at all, and the
+    // engine calls the same function either way (`LuaScriptNames.h`,
+    // `Builder.cpp` and `Factory.cpp`). Anything reading the arguments has to
+    // check it got them.
+    {
+      hook: "StartBuilding",
+      signature: "script.StartBuilding(heading, pitch)",
+    },
+    { hook: "StopBuilding", signature: "script.StopBuilding()" },
+    { hook: "QueryNanoPiece", signature: "script.QueryNanoPiece()" },
+  ];
+}
 
-/** What a callin returns when no preset has anything to say. */
-const HOOK_FALLBACK: Partial<Record<LuaHook, string[]>> = {
-  AimWeapon1: ["  return true"],
-};
+/** What a callin returns when no preset has anything to say. An aim that
+ *  never answers would leave its weapon unable to fire. */
+function hookFallback(hook: LuaHook): string[] {
+  return /^AimWeapon\d+$/.test(hook) ? ["  return true"] : [];
+}
 
 /**
  * The line that lets a builder build at all, and where it goes.
@@ -156,27 +172,61 @@ export function buildLuaScript(project: LegoProject): string {
         entry.preset !== undefined,
     );
 
+  const weapons = scriptWeapons(project);
+  const use = (piece: LegoPiece | null | undefined) => {
+    if (!piece) return undefined;
+    used.add(piece.name);
+    return localName(piece.name);
+  };
+
   applied.forEach(({ preset, params }, index) => {
     const signal = `SIG_${preset.id.replace(/[^a-z0-9]+/gi, "_").toUpperCase()}`;
+    let presetSignal = false;
+    const weaponSignals = new Set<string>();
     const result: EmitResult | null = preset.emit({
       params,
-      signal,
+      get signal() {
+        presetSignal = true;
+        return signal;
+      },
       pieces(role) {
         const names = byRole.get(role) ?? [];
         for (const name of names) used.add(name);
         return names.map(localName);
       },
+      weapons: () =>
+        weapons.map((weapon, slot) => ({
+          number: slot + 1,
+          piece(role) {
+            if (role === "barrel" || role === "flare") return use(weapon[role]);
+            return weapon.carrier?.role === role
+              ? use(weapon.carrier)
+              : undefined;
+          },
+          get signal() {
+            const name = `${signal}_${slot + 1}`;
+            weaponSignals.add(name);
+            return name;
+          },
+        })),
     });
     if (!result) return;
 
-    signals.push(`local ${signal} = ${1 << index}`);
+    if (presetSignal) signals.push(`local ${signal} = ${1 << index}`);
+    // A string rather than a bit. Spring's bit operations keep 24 bits
+    // (`EXACT_INTEGER_MASK` in `rts/Lua/LuaMathExtra.cpp`), too few for a bit
+    // per weapon per preset on a unit with many weapons. The gadget's `Signal`
+    // matches a mask that is not a number by equality (`unit_script.lua`).
+    for (const name of weaponSignals) {
+      signals.push(`local ${name} = ${luaString(name)}`);
+    }
     if (result.functions.length > 0) {
       functions.push(`-- ${preset.label}`, ...result.functions, "");
     }
     for (const [hook, lines] of Object.entries(result.hooks)) {
       hooks.set(hook as LuaHook, [
         ...(hooks.get(hook as LuaHook) ?? []),
-        ...lines,
+        ...(lines ?? []),
       ]);
     }
   });
@@ -223,9 +273,9 @@ export function buildLuaScript(project: LegoProject): string {
   // root's local name is only known once the document has been read.
   const nanoFallback = root ? [`  return ${localName(root)}`] : [];
 
-  for (const { hook, signature } of HOOKS) {
+  for (const { hook, signature } of hookList(weapons.length)) {
     const fallback =
-      hook === "QueryNanoPiece" ? nanoFallback : (HOOK_FALLBACK[hook] ?? []);
+      hook === "QueryNanoPiece" ? nanoFallback : hookFallback(hook);
     const preset = hooks.get(hook) ?? fallback;
     const stance = BUILD_STANCE[hook];
     const lines = [
