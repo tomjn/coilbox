@@ -10,7 +10,13 @@ import {
   newProject,
   parseLegoProjectJson,
 } from "./model";
-import { applyProportions, proportionHandles } from "./skeletonEdit";
+import { worldMatrix } from "./reparent";
+import {
+  applyProportions,
+  boneWorldPositions,
+  proportionHandles,
+  resetToPlan,
+} from "./skeletonEdit";
 import { applyTarget } from "./skeletonSize";
 import { TRACKED, WHEELED } from "./vehiclePlans";
 
@@ -451,5 +457,112 @@ describe("suggestPicks", () => {
     const picks = suggestPicks(one, planBones(BIPED, {}));
     const pieces = Object.values(picks);
     expect(new Set(pieces).size).toBe(pieces.length);
+  });
+});
+
+describe("resetToPlan", () => {
+  const ids = () => {
+    let n = 0;
+    return () => `new${++n}`;
+  };
+  const fitted = (project: LegoProject = walker()) =>
+    fitPlan(project, BIPED, {}, WALKER_PICKS).project;
+  const byId = (project: LegoProject, id: string) =>
+    project.pieces.find((p) => p.id === id) as LegoPiece;
+
+  it("lists the pieces it moves and the pieces it reparents", () => {
+    // The left foot hangs from the pelvis instead of the shin.
+    const odd = walker();
+    odd.pieces = odd.pieces.map((p) =>
+      p.id === "lfoot"
+        ? { ...p, parentId: "pelvis", position: [7, -20, 0] }
+        : p,
+    );
+    const reset = resetToPlan(fitted(odd), BIPED, ids());
+    expect(reset.reparented).toEqual([
+      { pieceId: "lfoot", name: "lfoot", from: "pelvis", to: "lleg" },
+    ]);
+    const moved = reset.moved.map((p) => p.id);
+    expect(moved).toContain("lfoot");
+    expect(moved).toContain("lleg");
+    expect(moved).not.toContain("pelvis");
+    expect(reset.added).toEqual([]);
+    expect(byId(reset.project, "lfoot").parentId).toBe("lleg");
+    expect(byId(reset.project, "lfoot").position).toEqual(
+      byId(reset.project, "rfoot").position,
+    );
+  });
+
+  it("lets the plan edit proportions afterwards", () => {
+    const start = fitted();
+    expect(proportionHandles(start, BIPED)).toEqual([]);
+    const { project } = resetToPlan(start, BIPED, ids());
+    expect(project.skeleton?.fitted).toBeUndefined();
+    expect(project.skeleton?.proportions).toEqual({
+      legLength: 20,
+      stance: 14,
+      bodyHeight: 6,
+    });
+    expect(proportionHandles(project, BIPED).length).toBeGreaterThan(0);
+    const longer = applyProportions(
+      project,
+      BIPED,
+      { legLength: 30 },
+      ids(),
+    ).project;
+    expect(longer).not.toBe(project);
+    expect(boneWorldPositions(longer).get("hip")?.[1]).toBe(30);
+    expect(boneWorldPositions(longer).get("foot.l1")?.[1]).toBeCloseTo(0);
+  });
+
+  it("adds a bone the fit left unmatched", () => {
+    const noFoot = walker();
+    noFoot.pieces = noFoot.pieces.filter((p) => p.id !== "rfoot");
+    const picks = { ...WALKER_PICKS } as Record<string, string>;
+    delete picks["foot.r1"];
+    const start = fitPlan(noFoot, BIPED, {}, picks).project;
+    const reset = resetToPlan(start, BIPED, ids());
+    expect(reset.added).toEqual(["rfoot"]);
+    const foot = reset.project.pieces.find((p) => p.bone === "foot.r1");
+    expect(foot?.parentId).toBe("rleg");
+    expect(foot?.twin).toBeDefined();
+    expect(boneWorldPositions(reset.project).get("foot.r1")?.[1]).toBeCloseTo(
+      0,
+    );
+  });
+
+  it("keeps a piece hung on a bone where it was in the unit", () => {
+    const hung = walker();
+    hung.pieces = [
+      ...hung.pieces,
+      piece("plate", "lleg", [1, -3, 0.5], {
+        rotation: [0.2, 0.4, 0],
+        scale: [2, 1, 1],
+        meshId: "m9",
+      }),
+    ];
+    const start = fitted(hung);
+    const reset = resetToPlan(start, BIPED, ids());
+    expect(reset.moved.map((p) => p.id)).toContain("lleg");
+    expect(byId(reset.project, "lleg").position).not.toEqual(
+      byId(start, "lleg").position,
+    );
+    const before = worldMatrix(start, "plate").elements;
+    const after = worldMatrix(reset.project, "plate").elements;
+    before.forEach((n, i) => {
+      expect(after[i]).toBeCloseTo(n, 6);
+    });
+    expect(byId(reset.project, "plate").parentId).toBe("lleg");
+  });
+
+  it("is one new project and leaves the fitted one alone", () => {
+    const start = fitted();
+    const frozen = JSON.stringify(start);
+    const reset = resetToPlan(start, BIPED, ids());
+    expect(reset.project).not.toBe(start);
+    expect(JSON.stringify(start)).toBe(frozen);
+    expect(resetToPlan(reset.project, BIPED, ids()).project).toBe(
+      reset.project,
+    );
   });
 });
