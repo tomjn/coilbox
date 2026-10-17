@@ -33,7 +33,7 @@ import {
   partMaterial,
 } from "../../geometry";
 import { holdsLiftedPieces, liftCredits } from "../../liftPiece";
-import type { LegoProject } from "../../model";
+import type { LegoLifted, LegoPiece, LegoProject } from "../../model";
 import { getPartGeometry, type LoadedPack } from "../../pack";
 import {
   disposeRawGeometry,
@@ -258,16 +258,40 @@ export function CompoundPicker({
       if (holdsLiftedPieces(compound)) {
         const raw = raws.get(compound.id);
         // Not read yet, or unreadable: the cell shows its name and no model.
-        if (!raw || !compound.imported) continue;
-        const own = importedMaterial(compound.imported);
+        if (!raw) continue;
+        // A module lifted whole draws everything with its game's texture. One
+        // saved out of a selection (#4344) has none of its own, so each lifted
+        // piece draws with the textures it records and a pack part with the
+        // pack's.
+        const own = new Map<string, ReturnType<typeof importedMaterial>>();
+        const lifted = (piece: LegoPiece) => {
+          const source: Pick<LegoLifted, "texture" | "texture2"> =
+            compound.imported ?? piece.lifted ?? {};
+          const key = `${source.texture?.key ?? ""}|${source.texture2?.key ?? ""}`;
+          let held = own.get(key);
+          if (!held) {
+            held = importedMaterial(source);
+            own.set(key, held);
+          }
+          return held.material;
+        };
         const holder = buildHolder(
           compound,
-          (piece) => (piece.meshId ? getMeshGeometry(raw, piece.meshId) : null),
-          own.material,
+          (piece) =>
+            piece.meshId
+              ? getMeshGeometry(raw, piece.meshId)
+              : piece.shape
+                ? getShapeGeometry(piece.shape)
+                : piece.partId
+                  ? getPartGeometry(pack, piece.partId)
+                  : null,
+          (piece) => (piece.meshId ? lifted(piece) : material),
         );
         state.scene.add(holder);
         state.holders.set(compound.id, holder);
-        state.ownMaterials.set(compound.id, own.dispose);
+        state.ownMaterials.set(compound.id, () => {
+          for (const held of own.values()) held.dispose();
+        });
         continue;
       }
       const holder = buildHolder(
@@ -283,10 +307,22 @@ export function CompoundPicker({
       state.scene.add(holder);
       state.holders.set(compound.id, holder);
     }
+    const byId = new Map(compounds.map((compound) => [compound.id, compound]));
     for (const [id, holder] of state.holders) {
-      if (state.ownMaterials.has(id)) continue;
+      // A lifted module keeps its game's textures, but the pack parts in a
+      // mixed one follow the unit's atlas like any other module's.
+      const own = state.ownMaterials.has(id);
+      const pieces = own ? byId.get(id)?.pieces : undefined;
       holder.traverse((child) => {
-        if (child instanceof THREE.Mesh) child.material = material;
+        if (!(child instanceof THREE.Mesh)) return;
+        if (!own) {
+          child.material = material;
+          return;
+        }
+        const drawn = pieces?.find(
+          (piece) => piece.id === child.parent?.userData.pieceId,
+        );
+        if (drawn && !drawn.meshId) child.material = material;
       });
     }
     state.order = compounds.map((compound) => compound.id);
@@ -557,7 +593,7 @@ interface GridState {
 function buildHolder(
   compound: LegoProject,
   geometryFor: Parameters<typeof buildCompoundHolder>[1],
-  material: THREE.MeshStandardMaterial,
+  material: Parameters<typeof buildCompoundHolder>[2],
 ): THREE.Group {
   const holder = buildCompoundHolder(
     compound,

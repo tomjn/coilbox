@@ -37,6 +37,7 @@ import {
 } from "../../gameUnits";
 import type { S3oModel } from "../../importS3o";
 import type { RoleProposal } from "../../inferRoles";
+import { trimLiftedMeshes } from "../../liftIntoUnit";
 import {
   liftFromImport,
   wholeFromImport,
@@ -227,10 +228,14 @@ export function GameUnitBrowser({ project, query, onLift }: Props) {
         roles: await scriptRoles(whole, target),
       });
       if (!module) throw new Error(`${line.name} is not in this model.`);
-      // Its meshes were just written, so the box of each is read back for the
-      // connectors and pivots the piece gets. A piece without one is measured
-      // when it goes into a unit, so a failed read does not fail the lift.
-      const raw = await loadRawGeometry(id).catch(() => null);
+      // The import wrote every mesh of the model. Keep only the lifted ones.
+      // Its meshes are then read back for the box of each, for the connectors
+      // and pivots the piece gets. A piece without one is measured when it goes
+      // into a unit, so a failed trim does not fail the lift: the full file
+      // still holds every mesh the pieces name.
+      const raw = await trimLiftedMeshes(module).catch(() =>
+        loadRawGeometry(id).catch(() => null),
+      );
       await onLift(raw ? withMeshBoxes(module, raw) : module);
       setLift({
         path: line.path,

@@ -29,7 +29,7 @@ import { seatPieceMesh } from "./pivot";
 export function buildCompoundHolder(
   compound: LegoProject,
   geometryFor: (piece: LegoPiece) => THREE.BufferGeometry | null,
-  material: THREE.Material,
+  material: THREE.Material | ((piece: LegoPiece) => THREE.Material),
   fit: number,
 ): THREE.Group {
   const holder = new THREE.Group();
@@ -58,7 +58,10 @@ export function buildCompoundHolder(
 
     const geometry = geometryFor(piece);
     if (!geometry) continue;
-    const mesh = new THREE.Mesh(geometry, material);
+    const mesh = new THREE.Mesh(
+      geometry,
+      typeof material === "function" ? material(piece) : material,
+    );
     seatPieceMesh(mesh, piece.pivot);
     group.add(mesh);
   }
