@@ -220,7 +220,7 @@ import {
   refreshSelectionOutlines,
   setHoveredAndNotify,
 } from "./selectionAndHoverOutlines";
-import { disposeSkeleton } from "./skeletonLayer";
+import { disposeSkeleton, layoutSkeletonLabels } from "./skeletonLayer";
 import { followSlideFrame, settleSlideFrame } from "./slideHandle";
 import { type StandInPlacement, standInFor } from "./standInPlayback";
 import { useBalance } from "./useBalance";
@@ -1253,6 +1253,19 @@ export function ModelViewport({
 
       const render = () => {
         refreshDrawMode(state.draw, state.groups.values());
+        if (state.skeleton) {
+          const hovered = state.hoveredId;
+          layoutSkeletonLabels(
+            state.skeleton,
+            state.camera,
+            renderer.getSize(new THREE.Vector2()),
+            new Set(
+              hovered
+                ? [...state.selectedIdsRef.current, hovered]
+                : state.selectedIdsRef.current,
+            ),
+          );
+        }
         renderer.render(scene, state.camera);
         // After the render, so the camera's inverse matrix is the one just used.
         if (compassRef.current) paintCompass(compassRef.current, state.camera);

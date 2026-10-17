@@ -1,38 +1,58 @@
 /**
  * How the unit builder's text labels (the skeleton's role names, the weapon
- * rings' range tags) keep a readable size on screen.
+ * rings' range tags) keep one size on screen.
  *
- * A sprite with `sizeAttenuation: false` holds a screen size only in a
- * perspective camera. An orthographic camera has no depth to scale by, so the
- * sprite would be `scale` world units tall at any zoom: a fraction of an elmo
- * in the front, side and top views (#3323).
+ * A label is a sprite with `sizeAttenuation: false`. three.js draws such a
+ * sprite `scale` view units tall, times the depth in a perspective camera, and
+ * then projects it. Either way its height in clip space is `scale` times the
+ * projection matrix's y scale, so one formula gives a fixed pixel height in
+ * the perspective view and in the front, side and top views (#3323, #4481).
  */
 
 import * as THREE from "three";
 
-/** A label's height as a share of the view's height. */
-export const LABEL_SHARE = 0.035;
-/**
- * The same share in an orthographic view: `LABEL_SHARE` over the height a
- * perspective view of 40 degrees shows at distance 1, which is what a
- * perspective label measures against.
- */
-const ORTHO_LABEL_SHARE = LABEL_SHARE / (2 * Math.tan((40 * Math.PI) / 360));
+/** The label text's height on screen, in CSS pixels: the app's small text,
+ *  Tailwind's `text-xs`. */
+export const LABEL_TEXT_PX = 12;
+/** The font size a label's text is drawn at on its canvas. */
+export const LABEL_CANVAS_FONT = 28;
+/** The canvas space above and below the text, in canvas pixels. */
+export const LABEL_CANVAS_PAD = 8;
+/** A label plate's height on screen, in CSS pixels. */
+export const LABEL_PX =
+  (LABEL_TEXT_PX * (LABEL_CANVAS_FONT + 2 * LABEL_CANVAS_PAD)) /
+  LABEL_CANVAS_FONT;
 
-/** The height a label is drawn at for `camera`, in world units. */
-export function labelHeight(camera: THREE.Camera): number {
-  if (camera instanceof THREE.OrthographicCamera) {
-    return (ORTHO_LABEL_SHARE * (camera.top - camera.bottom)) / camera.zoom;
-  }
-  return LABEL_SHARE;
+/** The `scale` that draws a label `LABEL_PX` tall in a view `viewportHeight`
+ *  CSS pixels tall. */
+export function labelHeight(
+  camera: THREE.Camera,
+  viewportHeight: number,
+): number {
+  return (
+    (2 * LABEL_PX) / (viewportHeight * camera.projectionMatrix.elements[5])
+  );
 }
 
-/** Makes `sprite` take its height from the camera each time it is drawn,
- *  keeping the width-to-height ratio it has now. */
+/** A label's size on screen, in CSS pixels. */
+export function labelPixelSize(sprite: THREE.Sprite): {
+  width: number;
+  height: number;
+} {
+  return {
+    width: (LABEL_PX * sprite.scale.x) / sprite.scale.y,
+    height: LABEL_PX,
+  };
+}
+
+const SIZE = new THREE.Vector2();
+
+/** Makes `sprite` take its height from the camera and the view each time it
+ *  is drawn, keeping the width-to-height ratio it has now. */
 export function keepLabelSize(sprite: THREE.Sprite): void {
   const aspect = sprite.scale.x / sprite.scale.y;
-  sprite.onBeforeRender = (_renderer, _scene, camera) => {
-    const height = labelHeight(camera);
+  sprite.onBeforeRender = (renderer, _scene, camera) => {
+    const height = labelHeight(camera, renderer.getSize(SIZE).y || 1);
     sprite.scale.set(height * aspect, height, 1);
     // three reads the world matrix straight after this returns.
     sprite.updateMatrixWorld(true);

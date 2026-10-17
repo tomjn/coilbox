@@ -20,7 +20,11 @@ import {
   rangeAt,
   type WeaponReach,
 } from "../../weaponReach";
-import { keepLabelSize, LABEL_SHARE } from "./labelSize";
+import {
+  keepLabelSize,
+  LABEL_CANVAS_FONT,
+  LABEL_CANVAS_PAD,
+} from "./labelSize";
 
 /** One colour per weapon, in slot order, chosen apart from the scene's
  *  orange collision box, red aim point and violet selection. */
@@ -94,7 +98,7 @@ function sector(
 
 export function label(text: string, colour: string): THREE.Sprite {
   const canvas = document.createElement("canvas");
-  const font = 28;
+  const font = LABEL_CANVAS_FONT;
   const context = canvas.getContext("2d");
   const measure = () => {
     if (!context) return 0;
@@ -102,7 +106,7 @@ export function label(text: string, colour: string): THREE.Sprite {
     return context.measureText(text).width;
   };
   canvas.width = Math.ceil(measure()) + 20;
-  canvas.height = font + 16;
+  canvas.height = font + 2 * LABEL_CANVAS_PAD;
   if (context) {
     context.font = `600 ${font}px system-ui, sans-serif`;
     context.fillStyle = "rgba(0,0,0,0.6)";
@@ -123,11 +127,8 @@ export function label(text: string, colour: string): THREE.Sprite {
       transparent: true,
     }),
   );
-  sprite.scale.set(
-    (LABEL_SHARE * canvas.width) / canvas.height,
-    LABEL_SHARE,
-    1,
-  );
+  // Only the shape: `keepLabelSize` sets the size each frame.
+  sprite.scale.set(canvas.width / canvas.height, 1, 1);
   sprite.center.set(0.5, 0);
   sprite.renderOrder = 6;
   sprite.raycast = () => {};
