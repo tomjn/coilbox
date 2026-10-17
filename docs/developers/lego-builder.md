@@ -14,7 +14,7 @@ Three things to know before you spend an evening on this:
 
 ## Build a unit
 
-Go to **Units** and press **New unit**. That gives you an empty unit with one piece, `base`, which is the root everything else hangs off.
+Go to **Units** and press **New unit**. **Blank** gives you an empty unit with one piece, `base`, which is the root everything else hangs off. A body plan, such as **Two legs** or **Wheels**, gives you a unit whose bones are already placed and moving. See [Start from a skeleton](#start-from-a-skeleton).
 
 **Name it.** The name at the top left is what the unit is called in the overview. Under it is the export name, which is the base name of every file the export writes, and a Lua identifier, so it is lower case with underscores. It follows the title until you set it to something of its own.
 
@@ -281,24 +281,33 @@ A unit opened out of a game brings its own script with it. See [Opening a unit f
 
 **Discard this script and use the presets** gives it back. The stored text goes and the unit is generated from its presets again. Undo brings the text back if that was a mistake, so copy it first if you want to keep it past this session. The case worth knowing about: a unit whose script was taken over and then emptied animates nothing and no preset can reach it, and this is the only way out short of editing files on disk.
 
-## Skeletons
+## Start from a skeleton
 
-A skeleton is the stick figure of a unit: where its joints are, what each one is for and how it moves, before it has any parts. There is no way to start a unit from one in the builder yet. Milestone 63 adds it, and this is how a skeleton is stored.
+A skeleton is the stick figure of a unit: where its joints are, what each joint is for and how it moves. A unit started from one walks, rolls or aims in the preview before it has a single part, and its parts go on joints that are already in place.
 
-A skeleton comes from a body plan, such as two legs or wheeled. The plans are part of coilbox, in `src/lego/bodyPlans.ts`, `src/lego/vehiclePlans.ts` for wheels and tracks, `src/lego/buildingPlans.ts` for buildings, and `src/lego/hoverAirShipPlans.ts` for hovercraft, ships and aircraft. Each plan has:
+Press **New unit** and pick a body plan from the list under **Blank**. Set the size it should fit, as in [Size a skeleton](#size-a-skeleton), and press **Start**. **Back** returns to the list. The unit opens with an empty piece for each bone, each with its role set, and the plan's presets applied in the Animation panel. Then [hang parts on the bones](#hang-a-part-on-a-bone). A unit that already has pieces can be given a plan too. See [Fit a body plan to a unit you already have](#fit-a-body-plan-to-a-unit-you-already-have).
 
-- named proportions, such as leg length and stance width, each with a range and a default, in elmos or, for something the plan repeats such as axles, a whole number
-- bones, worked out from those proportions, each with a name, a parent, a position against its parent, and a role
-- the animation presets that drive the bones, with their settings
+### The body plans
 
-A unit made from a plan holds ordinary empty pieces, one per bone, with their roles set, and the plan's presets in its animations. Export, the script and the `.s3o` see nothing but pieces. The unit file also records two things:
+A plan is built only from the roles and presets that already exist, so it can do only what they can. The line under each plan in the list says what it is, and for a hovercraft, ship or aircraft what it will not do.
 
-- `skeleton` on the unit, which names the plan and holds the current value of each proportion
-- `bone` on each piece the plan made, which names its bone in the plan
+| Plan | Bones with a role | Presets it applies |
+| --- | --- | --- |
+| Two legs | A hip with the Body role, and a thigh, shin and foot on each side | Walk, two legs |
+| Four legs | A body, and a thigh, shin and foot on each of four legs | Walk, four legs |
+| Wheels | A body, and a wheel at each end of each axle | Wheels turning |
+| Tracks | A body, and a run of road wheels on each track | Wheels turning |
+| Turret building | A base with the Body role, a turret, a barrel and a muzzle flare | Turret sweep, Recoil on firing |
+| Building | A base with the Body role | None |
+| Hovercraft | A hull with the Body role | Hover and bob |
+| Ship | A hull with the Body role, a turret, a barrel and a muzzle flare | Turret sweep, Recoil on firing |
+| Aircraft | A body, a turret, a barrel and a muzzle flare | Turret sweep, Recoil on firing |
 
-A piece with no `bone` is free, and changing a proportion never moves it. A copy of a bone, by duplicate, paste, mirror or a ring, is free. A bone moved to hang off a different piece is free too, because the plan places a bone against its own parent. Removing the skeleton removes every `bone` as well and leaves the pieces where they are, roles and presets included. A unit made before skeletons existed has neither field and opens as it always has. A unit made from a plan that this version of coilbox does not have still opens, and keeps its record and its bones.
+No plan sets a movement class, so every one exports as a unit that cannot move until you pick one under [Movement](#movement).
 
-A skeleton is for a whole unit, and a [module](#modules) is for a part of one, so they are kept separate. A module never carries a `bone`.
+### Legs
+
+Both leg plans have a leg length from hip to ankle, a stance width between the hips, and a body height, which places an empty `torso` bone above the hip where a turret goes. Each ankle is on the ground. The defaults are the medians of Splinter Faction's 23 two legged walkers: 18.8 leg length, 29.8 stance and 5.4 body height. Four legs uses the same legs and adds a body length of 27.7 between the front and back hips.
 
 ### Wheels and tracks
 
@@ -306,37 +315,48 @@ The wheeled plan has a body and a pair of wheels for each axle. Its proportions 
 
 The tracked plan has a body, a bone for each track and a run of road wheels hung off each track. Its proportions are the track length, the track width between the two tracks' middles, the track height and the number of road wheels a side. Splinter Faction has no tracked model with a separate track, so the defaults are the median Spring 1944 tank: 47.4 long, 18.3 wide, 8.8 high, with 6 road wheels a side. The road wheels are spread over 0.65 of the track's length, with their middles 0.34 of the track's height above the ground, both also Spring 1944 medians.
 
-Every wheel and road wheel has the Wheel role, and both plans apply **Wheels turning**, so the wheels spin in the preview before the unit has any parts. A wheel bone sits on its axle with no pivot, so a part hung on it turns about its own middle. It spins about the unit's left to right axis, so a part modelled with its axle along another axis turns end over end.
+A wheel spins about the unit's left to right axis, so a part modelled with its axle along another axis turns end over end.
 
 There is no role for a track, so a track bone has none. Hang the tread on it. The road wheels turn and the tread does not. A unit script cannot scroll a texture: the calls a Lua unit script has in Recoil move, turn, spin, scale, show, hide and explode pieces, and none of them reads or writes texture coordinates.
 
-Fewer axles or road wheels delete the bones that are no longer needed. `bonesLostWithParts` lists the ones carrying a part or with a piece hung on them, so a change can say so before it deletes anything.
-
 ### Buildings
 
-The turret building and the plain building are in `src/lego/buildingPlans.ts`. Neither sets a movement class, so export writes a unit that cannot move. The root bone is the base, on the ground, with the Body role.
+The turret building's proportions are the base height, which is the turret's joint above the ground, the turret height, which is the barrel's joint above the turret's, and the barrel length, from the barrel's joint to the flare. The defaults are the median of Splinter Faction's 13 static defences: 41, 13.7 and 41.1.
 
-The turret building has a turret on the base, a barrel on the turret and a muzzle flare at the end of the barrel, each with the role of the same name. It applies **Turret sweep** and **Recoil on firing**, so the generated script aims the turret and barrel at a target and kicks the barrel back on each shot. Its proportions are the base height, which is the turret's joint above the ground, the turret height, which is the barrel's joint above the turret's, and the barrel length, from the barrel's joint to the flare. The defaults are the median of Splinter Faction's 13 static defences: 41, 13.7 and 41.1.
+It has no aim point. A piece with the Aim point role carries a weapon of its own, so a turret and an aim point together are two weapons, and the script would aim a second weapon the unit does not have.
 
-There is no aim point. A piece with the Aim point role carries a weapon of its own, so a turret and an aim point together are two weapons, and the script would aim a second weapon the unit does not have. The turret is already where the weapon aims from. **Aim point** is not applied for the same reason.
+The plain building is the base alone, with no proportions and nothing to animate. No Splinter Faction building has a door piece, so add a door by hand with the Door role and **Doors**.
 
-The plain building is the base alone, with no proportions and nothing to animate. No Splinter Faction building has a door piece, so a door is added by hand with the Door role and **Doors**.
-
-Neither plan has a width or a depth, because no bone sits at the edge of the base for them to move. A building's width and depth are its footprint, which comes from the parts hung on it. A building with no parts yet exports with a 1 by 1 footprint.
+Neither plan has a width or a depth, because no bone sits at the edge of the base. A building's width and depth are its footprint, which comes from the parts hung on it. A building with no parts yet exports with a 1 by 1 footprint.
 
 ### Hovercraft, ships and aircraft
 
-The hovercraft, ship and aircraft plans are in `src/lego/hoverAirShipPlans.ts`. They use only roles and presets that already exist, so each description says what the plan will not do. Like every plan, none sets a movement class, so export writes a unit that cannot move until one is picked under Movement. See [Hovercraft, aircraft and ships](#hovercraft-aircraft-and-ships) for what each can be given today.
+[Hovercraft, aircraft and ships](#hovercraft-aircraft-and-ships) says what each of these can be given today.
 
-The hovercraft has a root on the ground and a hull at the gap above it, with the Body role. **Hover and bob** bobs and rocks the hull. A deck bone sits on top of the hull, a skirt bone on each side and a wake bone at the stern. None of those has a role: the deck is where a turret goes, and the wake is the piece a script written by hand emits a wake from ([issue #4368](https://github.com/tomjn/coilbox/issues/4368)). It does not lean into turns ([issue #3359](https://github.com/tomjn/coilbox/issues/3359)). Its proportions are the hull length, the hull width, the hull height and the gap under the hull. Splinter Faction has no hover movement class, so the defaults are the median of Beyond All Reason's 20 hovercraft: 40.2 long, 31.1 wide, 14.9 high, 0.1 off the ground. Two of them dip just below the ground, so the gap starts at 0.
+The hovercraft has a root on the ground and a hull at the gap above it. **Hover and bob** bobs and rocks the hull. A deck bone sits on top of the hull, a skirt bone on each side and a wake bone at the stern, none with a role. The deck is where a turret goes, and the wake is the piece a script written by hand emits a wake from. Its proportions are the hull length, width and height, and the gap under the hull. Splinter Faction has no hover movement class, so the defaults are the median of Beyond All Reason's 20 hovercraft: 40.2 long, 31.1 wide, 14.9 high, 0.1 off the ground. Two of them dip just below the ground, so the gap starts at 0.
 
-The ship is the turret building on a hull. The root is the hull, at the waterline, with the Body role, and a wake bone with no role sits at the stern. It applies **Turret sweep** and **Recoil on firing**. Its proportions are the hull length, the deck height, which is the turret's joint above the hull's, the turret height and the barrel length. The defaults are the median of Splinter Faction's 10 ships: 89.2, 9.3, 5.8 and 14.3, with the gun's three from the 8 that carry a turret. No bone sits at the side of the hull, so the plan has no beam. It does not rock, so add **Hover and bob** with a small bob for a ship on a swell. It leaves no wake ([issue #4368](https://github.com/tomjn/coilbox/issues/4368)) and has no rudder ([issue #4396](https://github.com/tomjn/coilbox/issues/4396)).
+The ship is the turret building on a hull. The hull is the root, at the waterline, and a wake bone with no role sits at the stern. Its proportions are the hull length, the deck height, which is the turret's joint above the hull's, the turret height and the barrel length. The defaults are the median of Splinter Faction's 10 ships: 89.2, 9.3, 5.8 and 14.3, with the gun's three from the 8 that carry a turret. No bone sits at the side of the hull, so the plan has no beam. It does not rock, so add **Hover and bob** with a small bob for a ship on a swell.
 
-The aircraft is a body, the root, with the Body role and a gun: a turret with the barrel's joint on the turret's, and a flare at the end of the barrel. That is how all 7 of Splinter Faction's aircraft with a gun carry it. It applies **Turret sweep** and **Recoil on firing**. Its proportions are how far the gun sits ahead of the body's joint, which is negative for a tail gun, how far above, and the barrel length. The defaults are the median of those 7: 5.1, 1.9 and 5.2. It does not fly once exported ([issue #4370](https://github.com/tomjn/coilbox/issues/4370)), and has no rotors ([issue #3359](https://github.com/tomjn/coilbox/issues/3359)) or landing gear ([issue #4369](https://github.com/tomjn/coilbox/issues/4369)). **Hover and bob** is not applied, because it keeps running after the aircraft lands.
+The aircraft is a body and a gun, with the barrel's joint on the turret's, which is how all 7 of Splinter Faction's aircraft with a gun carry it. Its proportions are how far the gun sits ahead of the body's joint, which is negative for a tail gun, how far above, and the barrel length. The defaults are the median of those 7: 5.1, 1.9 and 5.2. **Hover and bob** is not applied, because it keeps running after the aircraft lands.
 
-### Sizing a skeleton
+### Describe it instead
 
-A unit made from a plan is sized to a target: a footprint in steps of 16 elmos (`ELMOS_PER_FOOTPRINT`) and a height in elmos. **New unit** asks for it after a plan is chosen, starting from the plan's own size, and the Skeleton panel can fit it again. The target is stored as `skeleton.target`, and the panel says when the skeleton passes it. The rules are in `src/lego/skeletonSize.ts`, and the size they measure is the box the proportions describe, from joint to joint. The footprint check measures the finished unit.
+**Describe it instead**, under the plan list, asks four questions in place of a plan:
+
+- **How does it move?** Two legs, Four legs, Wheels, Tracks, Hovers or Does not move.
+- **How many weapons?** 0 or 1.
+- **Does it build?** No or Yes.
+- **How big?** The same size fields as for a plan.
+
+The first answer picks the plan. A unit that does not move is the turret building with a weapon, and the plain building without one. A weapon adds a turret, a barrel and a muzzle flare, with **Turret sweep** and **Recoil on firing**. Building adds a build arm base, an arm, a nozzle and a nano emit point, with **Aim while building** and **Nano from the nozzle**. These hang off the torso of a walker, the body of a vehicle, the deck of a hovercraft and the base of a building. The gun takes the turret building's turret height and barrel length, and the nano point starts 17.1 elmos up, the median of 63 Splinter Faction models with a nano piece. The Skeleton tab lists these with the plan's own proportions.
+
+The unit is named for the answers, such as "Wheels, gun, builds". The form has no ship or aircraft, because both plans always carry a gun. For a second weapon, use the **Weapon** button afterwards. See [Units that fight](#units-that-fight).
+
+### Size a skeleton
+
+After you pick a plan, **New unit** asks for **Footprint across** and **Footprint deep** in steps of 16 elmos, the step the engine reserves ground in, and a **Height** in elmos. The fields start at the plan's own size. Coilbox sets the proportions to fit, and keeps the size as the unit's target.
+
+The size is the box the joints span, not the parts. The footprint check in the problems list measures the finished unit. Each plan fits the size its own way:
 
 - Two legs: stance is the width and the length, since the plan has no body length. Leg length and body height share the height in the proportion they already have. A footprint that is not square gives the stance of the smaller side.
 - Four legs: stance is the width and body length is the length. The height is shared as for two legs.
@@ -348,7 +368,68 @@ A unit made from a plan is sized to a target: a footprint in steps of 16 elmos (
 - Ship: hull length, and deck height and turret height share the height. No joint places the beam, so the width is the target's. Its default is 6 steps, the median of Splinter Faction's ships.
 - Aircraft: no joint places its width, length or height, so the target is the whole size. Its default is 4 by 4 steps and 14.5 elmos tall, the median of Splinter Faction's 17 aircraft.
 
-A value that passes a proportion's range is held to it, so the size read out can differ from the target. Where a height is shared and one part is held, the other takes what is left.
+A size that needs a proportion past its range holds that proportion to the range, so the size can come out different from the target. Where a height is shared and one part is held, the other takes what is left.
+
+The Skeleton tab shows the size, as in "Size 3 by 5 steps (48 by 80 elmos), 40 elmos tall". When a proportion change takes it past the target it says which way, as in "Past the target in height." Type a new size under it and press **Fit** to fit the skeleton again, as one undo step.
+
+The [reference unit](#judging-size) stands beside the largest ground plate. A unit sized wider than that plate moves it further out, so the two do not overlap.
+
+### Change the proportions
+
+The **Skeleton** tab in the side panel, after **Aim**, is there on any unit with a skeleton. It lists each of the plan's proportions with a number and a slider. While it is open, the view shows a handle on the joint each proportion moves most, such as the top of a leg or a foot. The number, the slider and the handle all change the same value. A drag shows the result as you go, and letting go is one undo step. A count, such as axles, has no handle. A number past the proportion's range is held to it, and the field says so, as in "Held to 5 to 40."
+
+A bone is a piece like any other, so you can drag it by hand. It keeps your change until a proportion that places it changes, and then goes back to where the plan puts it.
+
+Fewer axles or road wheels remove the bones no longer needed. A bare bone goes without asking. When one carries a part or has a piece hung on it, the panel names it and asks first, with **Remove** and **Keep**. A piece hung on a removed bone moves up to the bone's parent and stays where it was.
+
+### Hang a part on a bone
+
+Select a bone and click a part in the inventory. The part hangs off the bone and lies along it towards the next bone, with its near end on the joint, so a thigh hangs from the hip towards the knee and turns about the hip. The part keeps its own size and is not stretched to fit the bone. A bone with no bone below it, such as a foot, gets the part centred on its joint, unturned. Hold `Alt` as you click to put the part on the joint without turning it.
+
+A bone has no faces, so nothing joins to it. With symmetry on, the twin bone on the other side gets the mirrored part.
+
+### See the skeleton
+
+A unit with a skeleton shows it in the view: a line from each bone to its parent, a dot on each joint and the bone's role beside the dot. The bone button beside the collision button, or `K`, shows and hides it. It is on whenever a unit with a skeleton opens. It draws through the parts, a click passes through it to the part behind, and it is never exported.
+
+While the preview plays, the skeleton moves with the pieces, so a skeleton with no parts walks, rolls or aims on screen. The proportion handles hide until it stops.
+
+### Skeleton checks
+
+Three checks look for mistakes that look right in the view and go wrong in a game. They run on every unit, skeleton or not, and list under **Skeleton** in the problems above the viewport. Click one to select the piece.
+
+- A foot or a wheel off the ground, as in `"lfoot" is 2 elmos above the ground.` It measures the lowest point of the piece and what hangs off it. A foot with no part is judged by its joint, the ankle. A wheel with no part is skipped, because its joint is the axle.
+- A thigh, shin or build arm that turns about its middle, as in `"lthigh" turns about its middle, not its joint.` Set its **Turns about** to the end at the joint. Feet are not checked, because a part on a foot bone sits centred on the ankle.
+- A side that does not match the other, as in `"rshin" does not mirror "lshin".` or `"lthigh" has no right side piece.` A pair is matched by the twin the plan saved, or else by the nearest piece with the mirrored role.
+
+A piece is not listed when the piece it hangs off is, because one mistake moves everything below it.
+
+### Fit a body plan to a unit you already have
+
+A unit built without a plan, or opened from a game, can be given one by saying which of its pieces is each bone. Press **Fit a body plan**, the bone button beside **Test in game** at the top of the builder, and pick a plan.
+
+The drawer on the left lists the plan's bones, with one highlighted. Select a piece in the view or the piece tree and it fills that bone, and the next unmatched bone is highlighted. Click a bone to highlight it again, or its cross to unmatch it. The view and the tree stay usable while the drawer is open.
+
+- **Gun** and **Builds** add the same bones as [Describe it instead](#describe-it-instead). Gun is not offered for a plan that already has a turret.
+- A plan with a count, such as **Axles**, asks for it first, because the count decides which bones there are.
+- Coilbox suggests pieces but never picks them. **Use suggestions** takes them all, and the **Use** button on a bone's row takes one. It suggests the unit's root for the root bone, the only piece with a bone's role, or a piece with the bone's name. It suggests a leg only from a role already set, never from a name.
+
+Before you press **Fit**, the drawer lists each role it will replace, each preset it will hold back and what that preset needs, and each proportion it cannot measure. **Fit** is one undo step. It sets the role of each piece you picked, marks it as that bone and adds the plan's presets. A preset the unit already has keeps its settings. A bone with no role in the plan, such as a torso or a track, leaves its piece's role alone. Fitting replaces any skeleton the unit had.
+
+Nothing moves. Each proportion is measured from where the picked pieces are, and one whose joints you did not pick is left out. The Skeleton tab then reads, for example, "Two legs, fitted to this unit's pieces" and lists each value or "Not measured". It has no sliders, handles or size fields, because changing a proportion would move pieces you placed.
+
+Fitting differs from [opening a unit from a game](#opening-a-unit-from-a-game). Opening one proposes roles read from the unit's script, and never overwrites a role you set. Fitting is you saying what each piece is, so it replaces the role of every piece you pick. Opening a unit never proposes legs, so fitting a leg plan is how a walker from a game gets its walk.
+
+### What is stored with the unit
+
+A unit started from a plan holds ordinary empty pieces, one per bone, with their roles set, and the plan's presets in its animations. Export, the script and the `.s3o` see nothing but pieces. The plans are part of coilbox, in `src/lego/bodyPlans.ts`, `src/lego/vehiclePlans.ts`, `src/lego/buildingPlans.ts` and `src/lego/hoverAirShipPlans.ts`. The unit file records two things more:
+
+- `skeleton` on the unit, which names the plan and holds the current value of each proportion, the size in `target`, and `fitted` for a plan fitted to the unit's own pieces
+- `bone` on each piece the plan made, which names its bone in the plan
+
+A piece with no `bone` is free, and changing a proportion never moves it. A copy of a bone, by duplicate, paste, mirror or a ring, is free. A bone moved to hang off a different piece is free too, because the plan places a bone against its own parent. A unit made before skeletons existed has neither field and opens as it always has. A unit made from a plan that this version of coilbox does not have still opens, and keeps its record and its bones.
+
+A skeleton is for a whole unit, and a [module](#modules) is for a part of one, so they are kept separate. A module never carries a `bone`.
 
 ## Health, cost and stats
 
@@ -389,7 +470,7 @@ Alongside the script come proposals for what its pieces are for, in two groups, 
 - **The script named these.** It hands the piece back when the engine asks. `QueryNanoPiece` answering `nano2` is the script saying what `nano2` is for.
 - **These moved when the unit was asked to work.** Worked out from what turned and which way. A piece that turns horizontally when the unit is told to aim is a turret on nearly every unit ever shipped, and it is still a reading rather than a declaration.
 
-Legs are never proposed. Which of six moving pieces is the front left shin is not something motion reveals, and the walk presets animate a unit inside out if it is guessed wrong.
+Legs are never proposed. Which of six moving pieces is the front left shin is not something motion reveals, and the walk presets animate a unit inside out if it is guessed wrong. To give a walker its legs, [fit a body plan](#fit-a-body-plan-to-a-unit-you-already-have).
 
 Nothing is applied until you accept the unit, every proposal is on screen before that, and a role already set by hand is never overwritten.
 
