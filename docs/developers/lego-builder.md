@@ -543,6 +543,30 @@ With a class and a speed the definition is written with `canmove = true`, `movem
 
 When the game's `movedefs.lua` cannot be read, the picker falls back on the classes the game's units use, and says it has not narrowed them.
 
+### Hovercraft, aircraft and ships
+
+The roles and presets were made for units that walk or roll. To the engine a hovercraft and a ship are ground units with a different movement class, so most of what works for a tank works for them. An aircraft is not a ground unit, and the builder cannot export one yet.
+
+A unit with no wheels and no legs is offered every movement class its game has, so you can pick a hover or a ship class under Movement. A unit built from parts has no game yet, so it gets no classes at all ([issue #3257](https://github.com/tomjn/coilbox/issues/3257)).
+
+A hovercraft:
+
+- Works today. The engine sends it `StartMoving` and `StopMoving` like a tank, so **Driving along a path** steers it as a game would. **Hover and bob** on the Body piece bobs and rocks the hull for the unit's whole life. **Idle sway**, turrets and weapons work as on any unit.
+- Does not work. It does not lean into turns ([issue #3359](https://github.com/tomjn/coilbox/issues/3359)) and leaves no wake ([issue #4368](https://github.com/tomjn/coilbox/issues/4368)).
+- By hand. For a wake, take ownership of the script and call `EmitSfx(piece, SFX.WAKE)` every few frames while it moves. The engine drops a wake emitted on land, so the script does not need to check.
+
+An aircraft:
+
+- Works today. **Hover and bob** suits a gunship holding position, but it keeps running after the aircraft lands. Turrets and weapons work. The engine sends `StartMoving` when the aircraft's speed rises from zero and `StopMoving` when it falls to zero.
+- Does not work. Movement offers only ground classes, so export writes a static unit or a ground unit ([issue #4370](https://github.com/tomjn/coilbox/issues/4370)). There is no rotor role or spin ([issue #3359](https://github.com/tomjn/coilbox/issues/3359)). Driving along a path is for ground units only. The engine switches an aircraft on as it takes off and off once it has landed, so **Doors** swings open and shut for the whole flight and is no use as landing gear ([issue #4369](https://github.com/tomjn/coilbox/issues/4369)).
+- By hand. In Unit tweaks, set `canFly`, `canMove`, `speed` and `cruiseAltitude`, and clear `movementClass`. Add `hoverAttack` for a gunship rather than a plane that makes strafing runs. The engine banks and pitches the whole aircraft itself, so the script should not. Take ownership of the script for rotors: `Spin` on `StartMoving` and `StopSpin` on `StopMoving`. Stow landing gear in `Activate` and lower it in `Deactivate`. A gunship is also sent `MoveRate` with 0, 1 or 2 as it speeds up, which a script can use to tilt rotors or wings. `Falling` and `Landed` are not for aircraft: they are for a unit dropped from a transport.
+
+A ship:
+
+- Works today. The engine sends it `StartMoving` and `StopMoving` like a tank, so Driving along a path, Idle sway, turrets and weapons all work. **Hover and bob** with a small bob reads as a ship rolling on the swell. The sea under **Ground** shows how the hull sits in the water.
+- Does not work. There is no wake ([issue #4368](https://github.com/tomjn/coilbox/issues/4368)) and no rudder role. The preview tells the script it is on land even on the sea ([issue #4367](https://github.com/tomjn/coilbox/issues/4367)).
+- By hand. A ship floats with the model's origin at sea level unless its definition sets `waterline`, the depth in elmos it sits below the surface. The builder does not write it, so set it in Unit tweaks. A ship class in `movedefs.lua` can override it with `overrideUnitWaterline`. Write a wake by hand, as for a hovercraft.
+
 ### Fit to the game
 
 Below Movement, **Fit to the game** compares the unit with the game it belongs to and changes nothing. It has three rows:
