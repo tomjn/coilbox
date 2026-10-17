@@ -9,10 +9,8 @@
  * pair too long and a piece drags a stranger around with it. Drop one too early
  * and it stops twinning with nothing to say so.
  *
- * The selection here is handed in as a fresh array on every render, because
- * that is what the document reducer does: it rebuilds `selectedIds` on every
- * edit whether or not the selection changed. A pairing compared by array
- * identity would break on the first drag.
+ * The pairing is saved on the pieces (issue #3315), so these tests also reload
+ * a unit through its JSON and check the pair still follows.
  */
 
 import { cleanup, render } from "@testing-library/react";
@@ -21,9 +19,20 @@ import * as THREE from "three";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { type AnimPreset, presetById } from "./animPresets";
-import { insertCompound } from "./compounds";
+import {
+  duplicatePiece,
+  insertCompound,
+  selectionAsCompound,
+} from "./compounds";
 import { presetCopies } from "./luaScript";
-import { type LegoPiece, type LegoProject, newProject } from "./model";
+import { unpairPiece, withoutDanglingTwins } from "./mirror";
+import {
+  type LegoPiece,
+  type LegoProject,
+  newProject,
+  parseLegoProjectJson,
+  projectProblems,
+} from "./model";
 import { worldMatrix } from "./reparent";
 import { type SymmetrySession, useSymmetry } from "./useSymmetry";
 
@@ -89,30 +98,24 @@ interface Bench {
   /** How many separate edits the document has taken, so a piece and its twin
    *  arriving in one can be told from two. */
   edits: () => number;
-  select: (ids: string[]) => void;
   /** An edit from outside symmetry mode: a delete, an undo, a redo. */
   change: (change: (project: LegoProject) => LegoProject) => void;
   run: (fn: () => void) => void;
 }
 
-function open(initial: LegoProject, selected: string[] = []): Bench {
+function open(initial: LegoProject): Bench {
   const known = new Set(initial.pieces.map((piece) => piece.id));
   let session: SymmetrySession | null = null;
   let project = initial;
   let setProject: (change: (p: LegoProject) => LegoProject) => void = () => {};
-  let setSelected: (ids: string[]) => void = () => {};
   const edit = vi.fn();
 
   function Harness() {
     const [doc, setDoc] = useState(initial);
-    const [ids, setIds] = useState(selected);
     project = doc;
     setProject = (change) => setDoc((current) => change(current));
-    setSelected = setIds;
     session = useSymmetry({
       project: doc,
-      // Rebuilt every render, as the reducer rebuilds it.
-      selectedIds: [...ids],
       edit: (change) => {
         edit();
         setDoc((current) => change(current));
@@ -135,7 +138,6 @@ function open(initial: LegoProject, selected: string[] = []): Bench {
     project: () => project,
     extras: () => project.pieces.filter((piece) => !known.has(piece.id)),
     edits: () => edit.mock.calls.length,
-    select: (ids) => run(() => setSelected(ids)),
     change: (change) => run(() => setProject(change)),
     run,
   };
@@ -144,7 +146,7 @@ function open(initial: LegoProject, selected: string[] = []): Bench {
 /** Symmetry on, with `pieceId` freshly added and selected: the state the
  *  builder is in the moment somebody drops a part in. */
 function armed(project: LegoProject, pieceId: string): Bench {
-  const bench = open(project, [pieceId]);
+  const bench = open(project);
   bench.run(() => bench.session().setOn(true));
   bench.run(() => bench.session().queueTwin(pieceId));
   return bench;
@@ -205,7 +207,7 @@ describe("giving a piece a twin", () => {
   });
 
   it("twins each piece of a set placed at once", () => {
-    const bench = open(unit([{ id: "arm" }, { id: "leg" }]), ["arm", "leg"]);
+    const bench = open(unit([{ id: "arm" }, { id: "leg" }]));
     bench.run(() => bench.session().setOn(true));
     bench.run(() => {
       bench.session().queueTwin("arm");
@@ -223,7 +225,7 @@ describe("giving a piece a twin", () => {
   });
 
   it("does nothing at all while symmetry is off", () => {
-    const bench = open(unit([{ id: "leg" }]), ["leg"]);
+    const bench = open(unit([{ id: "leg" }]));
     bench.run(() => bench.session().queueTwin("leg"));
     bench.run(() =>
       bench.session().place(["leg"], (p) => moveTo(p, "leg", [3, 0, 0])),
@@ -247,7 +249,7 @@ describe("giving a piece a twin", () => {
     let session: SymmetrySession | null = null;
     const edit = vi.fn();
     function Harness() {
-      session = useSymmetry({ project: null, selectedIds: [], edit });
+      session = useSymmetry({ project: null, edit });
       return null;
     }
     render(<Harness />);
@@ -301,7 +303,7 @@ describe("a leg module dropped in with symmetry on (issue #4316)", () => {
       true,
     );
     const legId = inserted.rootPieceIds[0];
-    const bench = open(inserted.project, [legId]);
+    const bench = open(inserted.project);
     bench.run(() => bench.session().setOn(true));
     bench.run(() => bench.session().queueTwin(legId, inserted.presets.held));
     return { bench, legId, inserted };
@@ -363,9 +365,7 @@ describe("keeping a pair in step", () => {
     expect(bench.extras()).toHaveLength(1);
   });
 
-  it("keeps following across an edit that rebuilds the selection", () => {
-    // The reducer hands back a new `selectedIds` array on every edit. Compared
-    // by identity rather than contents, the pair would break on the first drag.
+  it("keeps following across repeated drags", () => {
     const { bench, twinId } = paired();
     for (const x of [4, 5, 6]) {
       bench.run(() =>
@@ -392,6 +392,176 @@ describe("keeping a pair in step", () => {
   });
 });
 
+describe("a pair saved with the unit (issue #3315)", () => {
+  function paired(): { bench: Bench; twinId: string } {
+    const bench = armed(unit([{ id: "leg" }, { id: "hull" }]), "leg");
+    bench.run(() =>
+      bench.session().place(["leg"], (p) => moveTo(p, "leg", [3, 0, 0])),
+    );
+    return { bench, twinId: bench.extras()[0].id };
+  }
+
+  /** The unit as it comes back from disk. */
+  function reloaded(project: LegoProject): LegoProject {
+    const parsed = parseLegoProjectJson(JSON.stringify(project));
+    if (!parsed) throw new Error("the unit did not reload");
+    return parsed;
+  }
+
+  it("names each piece on the other", () => {
+    const { bench, twinId } = paired();
+    const byId = (id: string) =>
+      bench.project().pieces.find((piece) => piece.id === id);
+    expect(byId("leg")?.twin).toBe(twinId);
+    expect(byId(twinId)?.twin).toBe("leg");
+  });
+
+  it("follows after the unit is saved and reopened", () => {
+    const { bench, twinId } = paired();
+    const again = open(reloaded(bench.project()));
+    again.run(() => again.session().setOn(true));
+    again.run(() =>
+      again.session().place(["leg"], (p) => moveTo(p, "leg", [7, 1, 2])),
+    );
+    expect(origin(again.project(), twinId)).toEqual([-7, 1, 2]);
+    expect(again.project().pieces).toHaveLength(4);
+  });
+
+  it("lets the twin lead", () => {
+    const { bench, twinId } = paired();
+    const again = open(reloaded(bench.project()));
+    again.run(() => again.session().setOn(true));
+    again.run(() =>
+      again.session().place([twinId], (p) => moveTo(p, twinId, [-6, 0, 0])),
+    );
+    expect(origin(again.project(), "leg")).toEqual([6, 0, 0]);
+  });
+
+  it("keeps following after something else has been selected", () => {
+    // Selection is no longer part of the pairing: it is in the document.
+    const { bench, twinId } = paired();
+    bench.run(() =>
+      bench.session().place(["hull"], (p) => moveTo(p, "hull", [1, 1, 1])),
+    );
+    bench.run(() =>
+      bench.session().place(["leg"], (p) => moveTo(p, "leg", [9, 0, 0])),
+    );
+    expect(origin(bench.project(), twinId)).toEqual([-9, 0, 0]);
+  });
+
+  it("does not follow while symmetry is off, and resumes when it is on", () => {
+    const { bench, twinId } = paired();
+    bench.run(() => bench.session().setOn(false));
+    bench.run(() =>
+      bench.session().place(["leg"], (p) => moveTo(p, "leg", [9, 0, 0])),
+    );
+    expect(origin(bench.project(), twinId)).toEqual([-3, 0, 0]);
+    bench.run(() => bench.session().setOn(true));
+    bench.run(() =>
+      bench.session().place(["leg"], (p) => moveTo(p, "leg", [8, 0, 0])),
+    );
+    expect(origin(bench.project(), twinId)).toEqual([-8, 0, 0]);
+  });
+
+  it("leaves both alone when both are moved in one go", () => {
+    const { bench, twinId } = paired();
+    bench.run(() =>
+      bench
+        .session()
+        .place(["leg", twinId], (p) =>
+          moveTo(moveTo(p, "leg", [5, 0, 0]), twinId, [-4, 0, 0]),
+        ),
+    );
+    expect(origin(bench.project(), "leg")).toEqual([5, 0, 0]);
+    expect(origin(bench.project(), twinId)).toEqual([-4, 0, 0]);
+  });
+
+  it("does not follow once the pair is broken", () => {
+    const { bench, twinId } = paired();
+    bench.change((project) => unpairPiece(project, "leg"));
+    bench.run(() =>
+      bench.session().place(["leg"], (p) => moveTo(p, "leg", [9, 0, 0])),
+    );
+    expect(origin(bench.project(), twinId)).toEqual([-3, 0, 0]);
+    expect(
+      bench.project().pieces.every((piece) => piece.twin === undefined),
+    ).toBe(true);
+  });
+
+  it("leaves the other piece ordinary when one of the pair is deleted", () => {
+    const { bench, twinId } = paired();
+    bench.change((project) =>
+      withoutDanglingTwins({
+        ...project,
+        pieces: project.pieces.filter((piece) => piece.id !== twinId),
+      }),
+    );
+    expect(
+      bench.project().pieces.find((piece) => piece.id === "leg")?.twin,
+    ).toBeUndefined();
+    expect(projectProblems(bench.project())).toEqual([]);
+  });
+
+  it("ignores, and reports, a pairing that names a missing piece", () => {
+    const { bench, twinId } = paired();
+    bench.change((project) => ({
+      ...project,
+      pieces: project.pieces.filter((piece) => piece.id !== twinId),
+    }));
+    expect(projectProblems(bench.project())).toEqual([
+      '"piece0" has a twin that no longer exists.',
+    ]);
+    bench.run(() =>
+      bench.session().place(["leg"], (p) => moveTo(p, "leg", [9, 0, 0])),
+    );
+    expect(origin(bench.project(), "leg")).toEqual([9, 0, 0]);
+    expect(bench.project().pieces).toHaveLength(3);
+  });
+
+  it("changes nothing in a unit saved before pairs existed", () => {
+    const old = reloaded(unit([{ id: "left" }, { id: "right" }]));
+    expect(old.pieces.every((piece) => piece.twin === undefined)).toBe(true);
+    const bench = open(old);
+    bench.run(() => bench.session().setOn(true));
+    bench.run(() =>
+      bench.session().place(["left"], (p) => moveTo(p, "left", [4, 0, 0])),
+    );
+    expect(origin(bench.project(), "right")).toEqual([0, 0, 0]);
+    expect(bench.project().pieces).toHaveLength(old.pieces.length);
+  });
+
+  it("copies a pair with both ids remapped, and drops a lone half", () => {
+    const { bench, twinId } = paired();
+    let count = 0;
+    const newId = () => `copy${++count}`;
+    const both = selectionAsCompound(bench.project(), ["leg", twinId], {
+      id: "set",
+      now: "2026-08-21T00:00:00Z",
+      newId,
+    }) as LegoProject;
+    const inserted = insertCompound(bench.project(), both, "root", newId);
+    const copies = inserted.rootPieceIds.map((id) =>
+      inserted.project.pieces.find((piece) => piece.id === id),
+    );
+    expect(copies).toHaveLength(2);
+    expect(copies[0]?.twin).toBe(copies[1]?.id);
+    expect(copies[1]?.twin).toBe(copies[0]?.id);
+
+    const lone = duplicatePiece(bench.project(), "leg", {
+      now: "2026-08-21T00:00:00Z",
+      newId,
+    });
+    const copy = lone?.project.pieces.find(
+      (piece) => piece.id === lone.rootPieceId,
+    );
+    expect(copy?.twin).toBeUndefined();
+    // And the original's pairing is untouched.
+    expect(lone?.project.pieces.find((piece) => piece.id === "leg")?.twin).toBe(
+      twinId,
+    );
+  });
+});
+
 describe("letting a pair go", () => {
   function paired(): { bench: Bench; twinId: string } {
     const bench = armed(unit([{ id: "leg" }, { id: "hull" }]), "leg");
@@ -401,52 +571,18 @@ describe("letting a pair go", () => {
     return { bench, twinId: bench.extras()[0].id };
   }
 
-  it("stops following once something else is selected", () => {
-    const { bench, twinId } = paired();
-    bench.select(["hull"]);
-    bench.select(["leg"]);
-    bench.run(() =>
-      bench.session().place(["leg"], (p) => moveTo(p, "leg", [9, 0, 0])),
-    );
-    // The twin is an ordinary piece now: it stayed where the pairing left it.
-    expect(origin(bench.project(), twinId)).toEqual([-3, 0, 0]);
-    // And letting the pair go is not the same as putting the piece back in the
-    // queue. A piece that has had its twin does not get a second one.
-    expect(bench.extras()).toHaveLength(1);
-  });
-
-  it("stops following when the piece joins a wider selection", () => {
-    const { bench, twinId } = paired();
-    bench.select(["leg", "hull"]);
-    bench.run(() =>
-      bench.session().place(["leg"], (p) => moveTo(p, "leg", [9, 0, 0])),
-    );
-    expect(origin(bench.project(), twinId)).toEqual([-3, 0, 0]);
-    expect(bench.extras()).toHaveLength(1);
-  });
-
-  it("holds on while the same selection is handed back", () => {
-    const { bench, twinId } = paired();
-    bench.select(["leg"]);
-    bench.run(() =>
-      bench.session().place(["leg"], (p) => moveTo(p, "leg", [9, 0, 0])),
-    );
-    expect(origin(bench.project(), twinId)).toEqual([-9, 0, 0]);
-  });
-
-  it("forgets a pair whose twin has been deleted, so a redo cannot revive it", () => {
+  it("keeps a pair whose twin was deleted and brought back by an undo", () => {
     const { bench, twinId } = paired();
     const before = bench.project();
     bench.change((project) => ({
       ...project,
       pieces: project.pieces.filter((piece) => piece.id !== twinId),
     }));
-    // The same piece back under the same id, which is what undo hands over.
     bench.change(() => before);
     bench.run(() =>
       bench.session().place(["leg"], (p) => moveTo(p, "leg", [9, 0, 0])),
     );
-    expect(origin(bench.project(), twinId)).toEqual([-3, 0, 0]);
+    expect(origin(bench.project(), twinId)).toEqual([-9, 0, 0]);
   });
 
   it("forgets a queued piece that has been deleted, so a redo cannot twin it", () => {
@@ -461,17 +597,6 @@ describe("letting a pair go", () => {
       bench.session().place(["leg"], (p) => moveTo(p, "leg", [3, 0, 0])),
     );
     expect(bench.extras()).toHaveLength(0);
-  });
-
-  it("forgets everything when symmetry is switched off", () => {
-    const { bench, twinId } = paired();
-    bench.run(() => bench.session().setOn(false));
-    bench.run(() => bench.session().setOn(true));
-    bench.run(() =>
-      bench.session().place(["leg"], (p) => moveTo(p, "leg", [9, 0, 0])),
-    );
-    expect(origin(bench.project(), twinId)).toEqual([-3, 0, 0]);
-    expect(bench.extras()).toHaveLength(1);
   });
 
   it("forgets a piece that was waiting when symmetry was switched off", () => {

@@ -1,28 +1,28 @@
 /**
- * Symmetry mode: the pairing that gives a piece a mirrored twin and keeps the
- * two in step.
+ * Symmetry mode: gives a piece a mirrored twin and keeps the two in step.
  *
- * `mirror.ts` answers where a twin belongs. This is the bookkeeping around it,
- * which is the part that can go silently wrong: which pieces are still owed a
- * twin, which pairs are being held together, and when each of those is
- * forgotten. Nothing here is written to the document, so a unit reopened
- * tomorrow has two pieces and no memory of which made which.
+ * `mirror.ts` answers where a twin belongs. This is the bookkeeping around it:
+ * which pieces are still owed a twin, and moving a twin when its partner moves.
+ * The pairing itself is saved on the pieces (`LegoPiece.twin`), so it survives a
+ * change of selection and reopening the unit. Whether the mode is on is not
+ * saved: it is a preference for the session, and toggling it would otherwise
+ * be an undo step that marks the unit as changed.
  */
 
 import { useEffect, useRef, useState } from "react";
 
 import { adoptHeldPresets, type HeldPreset } from "./compounds";
 import { followMirror, mirrorTwin } from "./mirror";
-import type { LegoProject } from "./model";
+import { type LegoProject, pieceById } from "./model";
 import type { LoadedPack } from "./pack";
 
 export interface SymmetrySession {
   /** Whether a piece added now should get a twin. */
   on: boolean;
   /**
-   * Switch symmetry on or off. Off forgets what was waiting and lets go of
-   * every pair: those pieces are ordinary pieces now, and turning it back on
-   * hours later should not suddenly twin one of them.
+   * Switch symmetry on or off. Off forgets what was waiting, so turning it
+   * back on hours later does not suddenly twin a piece added in an earlier
+   * session. Saved pairs stay, and are not followed while it is off.
    */
   setOn: (on: boolean) => void;
   /**
@@ -53,12 +53,11 @@ export interface SymmetrySession {
 
 export function useSymmetry(options: {
   project: LegoProject | null;
-  selectedIds: string[];
   edit: (change: (project: LegoProject) => LegoProject) => void;
   /** What a twin's join to a face is measured by. With none, twins are free. */
   pack?: LoadedPack | null;
 }): SymmetrySession {
-  const { project, selectedIds, edit, pack = null } = options;
+  const { project, edit, pack = null } = options;
 
   /**
    * A preference for the session rather than something the unit carries, so it
@@ -76,15 +75,6 @@ export function useSymmetry(options: {
    * that edit the document.
    */
   const awaitingTwin = useRef(new Map<string, HeldPreset[]>());
-  /**
-   * The pairs symmetry mode is currently holding together: a piece and the twin
-   * that follows it.
-   *
-   * Kept only while the piece stays selected. Moving on to something else ends
-   * it, and the two are ordinary pieces from then on.
-   */
-  const twins = useRef(new Map<string, string>());
-
   // A piece that has left the document is not waiting for anything and has
   // nothing following it: deleting it, or undoing the add that made it, takes it
   // off both rather than leaving an id that could be twinned or moved if a redo
@@ -95,32 +85,13 @@ export function useSymmetry(options: {
     for (const pieceId of awaitingTwin.current.keys()) {
       if (!present.has(pieceId)) awaitingTwin.current.delete(pieceId);
     }
-    for (const [pieceId, twinId] of twins.current) {
-      if (!present.has(pieceId) || !present.has(twinId))
-        twins.current.delete(pieceId);
-    }
   }, [project]);
-
-  // Selecting something else ends whatever symmetry was holding together. Read
-  // during the render that brings the new selection in, so the pair is already
-  // broken by the time anything can act on it, and compared by the contents of
-  // the selection rather than the array, which is rebuilt on every edit and
-  // would otherwise break the pair on the first drag.
-  const selectionKey = selectedIds.join(" ");
-  const pairedFor = useRef(selectionKey);
-  if (pairedFor.current !== selectionKey) {
-    pairedFor.current = selectionKey;
-    twins.current.clear();
-  }
 
   return {
     on,
     setOn: (next: boolean) => {
       setOn(next);
-      if (!next) {
-        awaitingTwin.current.clear();
-        twins.current.clear();
-      }
+      if (!next) awaitingTwin.current.clear();
     },
     queueTwin: (pieceId: string, held: HeldPreset[] = []) => {
       if (on) awaitingTwin.current.set(pieceId, held);
@@ -129,9 +100,13 @@ export function useSymmetry(options: {
       if (!project) return;
       let next = change(project);
       for (const pieceId of pieceIds) {
-        const twinId = twins.current.get(pieceId);
+        // The pairing is in the document, so it holds across selections and
+        // reopening. A twin placed in the same go has already been moved.
+        const twinId = pieceById(next, pieceId)?.twin;
         if (twinId) {
-          next = followMirror(next, pieceId, twinId, pack);
+          if (on && !pieceIds.includes(twinId)) {
+            next = followMirror(next, pieceId, twinId, pack);
+          }
           continue;
         }
         const held = awaitingTwin.current.get(pieceId);
@@ -144,7 +119,6 @@ export function useSymmetry(options: {
         );
         if (!twinned) continue;
         awaitingTwin.current.delete(pieceId);
-        twins.current.set(pieceId, twinned.twinId);
         next = adoptHeldPresets(twinned.project, held);
       }
       edit(() => next);

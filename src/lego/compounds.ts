@@ -121,6 +121,7 @@ export function selectionAsCompound(
   }
 
   const presets = carryPresets ? presetsFor(project, pieces) : [];
+  const copied = pieces.map((piece) => withTwinRemapped(piece, remap));
   // The builder block describes a module only when a build preset came with it.
   const builder =
     project.builder && presets.some((entry) => isBuildPreset(entry.presetId))
@@ -137,7 +138,7 @@ export function selectionAsCompound(
     createdAt: options.now,
     updatedAt: options.now,
     rootPieceId: remap.get(anchorId) as string,
-    pieces,
+    pieces: copied,
     ...(presets.length > 0 ? { animations: presets } : {}),
     ...builder,
   };
@@ -332,6 +333,21 @@ export function validateCompoundName(
 }
 
 /**
+ * A copied piece with its twin (#3315) renamed to the copy of that twin, or with
+ * the pairing dropped when the twin was not copied too. Left alone it would name
+ * the original's partner, so moving the copy would move a stranger.
+ */
+function withTwinRemapped(
+  piece: LegoPiece,
+  remap: Map<string, string>,
+): LegoPiece {
+  if (piece.twin === undefined) return piece;
+  const { twin, ...rest } = piece;
+  const copy = remap.get(twin);
+  return copy ? { ...rest, twin: copy } : rest;
+}
+
+/**
  * Add a compound's pieces to a unit, hanging off `parentId`.
  *
  * Names are made unique as they land, because a script addresses pieces by
@@ -428,7 +444,13 @@ export function insertCompound(
   // Presets are judged against the unit as it is after the insert, so a module
   // that completes what a preset needs brings it in.
   const merged = mergePresets(
-    { ...project, pieces: [...project.pieces, ...added] },
+    {
+      ...project,
+      pieces: [
+        ...project.pieces,
+        ...added.map((piece) => withTwinRemapped(piece, remap)),
+      ],
+    },
     compound,
   );
   return {
