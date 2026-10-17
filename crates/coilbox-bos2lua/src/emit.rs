@@ -2003,7 +2003,8 @@ impl<'p, 'a> Writer<'p, 'a> {
     }
 
     /// How many elmos `[1]` is: one for scripts compiled today, two and a half
-    /// for Scriptor's.
+    /// for Scriptor's, and one and a quarter for a few of Balanced
+    /// Annihilation's.
     fn elmos_per_bracket(&self) -> f64 {
         self.p.options.linear_scale as f64 / 65536.0
     }

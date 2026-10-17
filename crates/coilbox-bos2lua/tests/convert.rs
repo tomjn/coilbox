@@ -5,7 +5,8 @@
 //! is the failure this crate exists to end.
 
 use coilbox_bos2lua::{
-    convert, linear_scale, Conversion, Options, Precedence, MODERN_LINEAR, SCRIPTOR_LINEAR,
+    convert, linear_scale, Conversion, Options, Precedence, FIVE_QUARTERS_LINEAR, MODERN_LINEAR,
+    SCRIPTOR_LINEAR,
 };
 use coilbox_springlua::unitscript::{run, ScriptEvent, Unit};
 use std::collections::HashMap;
@@ -203,8 +204,14 @@ fn tells_the_linear_scale_from_the_cob() {
     // The fixture's distances are [-2.5], [-1] and [2].
     let scriptor = words(&[7, -409_600, -163_840, 327_680]);
     let modern = words(&[7, -163_840, -65_536, 131_072]);
+    // Balanced Annihilation's armcom.cob holds [8] as 655360.
+    let five_quarters = words(&[7, -204_800, -81_920, 163_840]);
     assert_eq!(linear_scale(WALKER, &scriptor), Some(SCRIPTOR_LINEAR));
     assert_eq!(linear_scale(WALKER, &modern), Some(MODERN_LINEAR));
+    assert_eq!(
+        linear_scale(WALKER, &five_quarters),
+        Some(FIVE_QUARTERS_LINEAR)
+    );
     assert_eq!(linear_scale(WALKER, &words(&[1, 2, 3])), None);
 }
 
