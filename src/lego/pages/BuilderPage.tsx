@@ -23,7 +23,14 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useParams } from "react-router";
 
 import { TipButton } from "@/components/TipButton";
@@ -130,6 +137,7 @@ import { usePanelHeight, usePanelOpen } from "../panels";
 import { buildPieceCollisionScript } from "../pieceCollisionScript";
 import { currentPivot, pivotChoices, setPivot } from "../pivot";
 import { attachToFreeFace, type FaceTarget, placePart } from "../placePart";
+import { type Problem, type ProblemSource, problem } from "../problems";
 import {
   deleteCompound,
   saveCompound,
@@ -174,6 +182,8 @@ import { ModuleUpdateBanner } from "./components/ModuleUpdateBanner";
 import { NameInput } from "./components/NameInput";
 import { collisionHandlePieceId } from "./components/PieceCollisionFields";
 import { PieceTree } from "./components/PieceTree";
+import { ProblemErrors } from "./components/ProblemErrors";
+import type { CheckStatus } from "./components/ProblemsButton";
 import type { Placing } from "./components/placeByFace";
 import type { ReferenceUnit } from "./components/ReferencePicker";
 import type {
@@ -407,7 +417,7 @@ function Builder({ id }: { id: string | undefined }) {
   );
   // The document's own problems, plus anything wrong between it and the packs
   // installed. Both are things to say rather than reasons to refuse the unit.
-  const problems = useMemo(
+  const documentProblems = useMemo<Problem[]>(
     () =>
       draft
         ? [
@@ -420,8 +430,12 @@ function Builder({ id }: { id: string | undefined }) {
               : []),
             ...(draft.imported || draft.pieces.some((piece) => piece.meshId)
               ? [
-                  ...(geometry.error ? [geometry.error] : []),
-                  ...geometry.missingTextures,
+                  ...(geometry.error
+                    ? [problem("geometry", "error", geometry.error)]
+                    : []),
+                  ...geometry.missingTextures.map((texture) =>
+                    problem("geometry", "warning", texture),
+                  ),
                   ...rawGeometryProblems(draft.pieces, geometry.raw),
                 ]
               : []),
@@ -430,27 +444,37 @@ function Builder({ id }: { id: string | undefined }) {
     [draft, pack, geometry.error, geometry.raw, geometry.missingTextures],
   );
 
-  // The rest pose only: while a script preview moves the pieces, the support
-  // changes with them, and the check would be about a pose that is not the
-  // unit's.
+  // The two checks that cost the most run on the deferred copy of the document,
+  // so React paints an edit first and checks after it. They look at the rest pose only: while
+  // a script preview moves the pieces, the support and the overlaps change with
+  // them, and the checks would be about a pose that is not the unit's.
+  const checkedDraft = useDeferredValue(draft);
+  const checksCurrent = checkedDraft === draft;
+  const atRest = !playing && scriptTimeline === null;
   const balance = useMemo(
     () =>
-      draft && pack && !playing && scriptTimeline === null
-        ? checkBalance(draft, pack, raw)
+      checkedDraft && pack && atRest
+        ? checkBalance(checkedDraft, pack, raw)
         : null,
-    [draft, pack, raw, playing, scriptTimeline],
+    [checkedDraft, pack, raw, atRest],
   );
-  const balanceNote = balance ? balanceProblem(balance) : null;
+  const balanceNote = useMemo(
+    () => (balance ? balanceProblem(balance) : null),
+    [balance],
+  );
 
-  // The rest pose only, for the same reason as the balance check.
   const overlap = useMemo(
     () =>
-      draft && pack && !playing && scriptTimeline === null
-        ? checkOverlap(draft, pack, raw)
+      checkedDraft && pack && atRest
+        ? checkOverlap(checkedDraft, pack, raw)
         : null,
-    [draft, pack, raw, playing, scriptTimeline],
+    [checkedDraft, pack, raw, atRest],
   );
-  const overlapNotes = overlap && draft ? overlapProblems(draft, overlap) : [];
+  const overlapNotes = useMemo(
+    () =>
+      overlap && checkedDraft ? overlapProblems(checkedDraft, overlap) : [],
+    [overlap, checkedDraft],
+  );
 
   // Whether the base footprint leaves out a barrel, flare, aim point and build
   // nozzle. The problems below do not depend on it: they judge the whole unit.
@@ -462,7 +486,25 @@ function Builder({ id }: { id: string | undefined }) {
         : null,
     [draft, pack, raw, footprintLeaveOut],
   );
-  const footprintNotes = footprint ? footprintProblems(footprint) : [];
+  const footprintNotes = useMemo(
+    () => (footprint ? footprintProblems(footprint) : []),
+    [footprint],
+  );
+
+  const problems = useMemo<Problem[]>(
+    () => [
+      ...documentProblems,
+      ...(balanceNote ? [balanceNote] : []),
+      ...footprintNotes,
+      ...overlapNotes,
+    ],
+    [documentProblems, balanceNote, footprintNotes, overlapNotes],
+  );
+  const checkStatuses: Partial<Record<ProblemSource, CheckStatus>> = atRest
+    ? checksCurrent
+      ? {}
+      : { balance: "checking", overlap: "checking" }
+    : { balance: "paused", overlap: "paused" };
 
   function addPart(part: LegoPartInfo) {
     inventoryView.inventory.record({ kind: "part", id: part.id });
@@ -744,6 +786,10 @@ function Builder({ id }: { id: string | undefined }) {
   function selectPiece(pieceId: string | null, additive = false) {
     if (!additive) setSelectedId(pieceId);
     else if (pieceId) doc.toggleSelect(pieceId);
+  }
+
+  function selectProblem(pieceIds: string[]) {
+    doc.selectMany(pieceIds);
   }
 
   // The pieces stay where they are on screen: only what carries them changes.
@@ -1806,21 +1852,7 @@ function Builder({ id }: { id: string | undefined }) {
                       />
                     ) : null}
 
-                    {problems.length > 0 ||
-                    balanceNote ||
-                    footprintNotes.length > 0 ||
-                    overlapNotes.length > 0 ? (
-                      <ul className="pointer-events-none mx-auto w-fit max-w-[80%] rounded-md border border-amber-500/40 bg-background/90 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur">
-                        {[
-                          ...problems,
-                          ...(balanceNote ? [balanceNote] : []),
-                          ...footprintNotes,
-                          ...overlapNotes,
-                        ].map((problem) => (
-                          <li key={problem}>{problem}</li>
-                        ))}
-                      </ul>
-                    ) : null}
+                    <ProblemErrors problems={problems} />
                   </>
                 }
                 document={{ pack, raw, project: draft, balance, overlap }}
@@ -1828,6 +1860,11 @@ function Builder({ id }: { id: string | undefined }) {
                   result: footprint,
                   leaveOut: footprintLeaveOut,
                   onLeaveOutChange: setFootprintLeaveOut,
+                }}
+                problems={{
+                  items: problems,
+                  statuses: checkStatuses,
+                  onSelect: selectProblem,
                 }}
                 selection={{
                   selectedIds,

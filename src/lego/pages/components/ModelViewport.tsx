@@ -109,6 +109,7 @@ import type { StandardView } from "../../orthoViews";
 import { type OverlapResult, overlapSummary } from "../../overlap";
 import { type LoadedPack, partUnit } from "../../pack";
 import type { FaceTarget } from "../../placePart";
+import type { Problem, ProblemSource } from "../../problems";
 import type { RawGeometry } from "../../rawGeometry";
 import {
   buildReferenceUnit,
@@ -135,7 +136,13 @@ import {
 } from "./anchorsAndSnapping";
 import { disposeBaked } from "./bakedPlayback";
 import { disposeBalance } from "./balanceLayer";
-import { boundsBox, frameBounds, homeView, showView } from "./cameraFraming";
+import {
+  boundsBox,
+  focusSelection,
+  frameBounds,
+  homeView,
+  showView,
+} from "./cameraFraming";
 import {
   leaveStandardView,
   ORBIT_MAX_POLAR,
@@ -185,6 +192,7 @@ import {
   newMeasureScene,
 } from "./measureLayer";
 import { disposeOverlap } from "./overlapLayer";
+import { type CheckStatus, ProblemsButton } from "./ProblemsButton";
 import { clearPlaceGhost, type Placing, showPlaceGhost } from "./placeByFace";
 import { attachPointerHandlers } from "./pointerHandlers";
 import {
@@ -443,6 +451,15 @@ interface Props {
     leaveOut: boolean;
     onLeaveOutChange: (leaveOut: boolean) => void;
   };
+  /**
+   * Everything the checks found. A button in the view's controls opens the
+   * list. Clicking a problem hands its pieces to `onSelect` and frames them.
+   */
+  problems?: {
+    items: Problem[];
+    statuses: Partial<Record<ProblemSource, CheckStatus>>;
+    onSelect: (pieceIds: string[]) => void;
+  };
   /** Which pieces are picked, and what a click, a drag or a hover does. */
   selection: {
     /** Every selected piece, oldest first. One is the ordinary case. */
@@ -653,6 +670,7 @@ export function ModelViewport({
   aimPoint,
   guides,
   footprint,
+  problems,
   showFreeFaces = false,
 }: Props) {
   const { pack, raw, project, balance = null, overlap = null } = document;
@@ -1939,6 +1957,17 @@ export function ModelViewport({
           </div>
 
           <ViewControls className="pointer-events-auto shrink-0">
+            {problems ? (
+              <ProblemsButton
+                problems={problems.items}
+                statuses={problems.statuses}
+                onSelect={(found) => {
+                  problems.onSelect(found.pieceIds);
+                  const state = sceneRef.current;
+                  if (state) focusSelection(state, found.pieceIds);
+                }}
+              />
+            ) : null}
             <GridToggle
               on={showGrid}
               onChange={setShowGrid}
