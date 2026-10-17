@@ -144,13 +144,17 @@ pub(crate) fn resolve(
         .map(|(path, _)| (path.to_lowercase(), path))
         .collect();
 
-    let digest = crate::unitmodel::digest_reader(us, handle, &list);
+    let fallbacks = crate::unitmodel::fallback_archives(us, game_archive);
+    let digest = crate::unitmodel::digest_reader(us, handle, &list, &fallbacks);
     // Read inside the session, since the archive list goes with unitsync. One per
     // batch because a batch is one game, and it is here so `--unit-render` can be
     // handed the whole of what it would otherwise mount for (issue #1720).
     let source_archive = crate::archive::archive_name_for_game(us, game_archive);
     let batch = build_keys(requests, variants, renderer_version, digest, source_archive);
 
+    for archive in fallbacks {
+        archive.close(us);
+    }
     us.close_archive(handle);
     errors.extend(us.drain_errors());
     us.remove_all_archives();

@@ -222,7 +222,12 @@ fn read_source_digest(
         .into_iter()
         .map(|(path, _)| (path.to_lowercase(), path))
         .collect();
-    let digest = crate::unitmodel::source_digest(us, handle, &list, req.object_name);
+    let fallbacks = crate::unitmodel::fallback_archives(us, req.game_archive);
+    let digest = crate::unitmodel::source_digest(us, handle, &list, req.object_name, &fallbacks);
+
+    for archive in fallbacks {
+        archive.close(us);
+    }
 
     us.close_archive(handle);
     errors.extend(us.drain_errors());
