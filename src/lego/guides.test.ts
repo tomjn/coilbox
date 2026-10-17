@@ -17,6 +17,7 @@ import {
   guidePlanes,
   guidePointAt,
   removeGuide,
+  SYMMETRY_GUIDE_ID,
   snapToGuides,
   updateGuide,
 } from "./guides";
@@ -544,5 +545,64 @@ describe("guides belong to the unit, not to a piece", () => {
     expect(text).not.toContain("wheel line");
     const read = parseClipboardPiece(text, new Set(["tri"]));
     expect(read.ok && read.piece.project.guides).toBeUndefined();
+  });
+});
+
+describe("the symmetry plane guide (#4334)", () => {
+  const round = (v: Vec3) => v.map((n) => Math.round(n * 1e6) / 1e6);
+
+  it("is there only while symmetry asks for it", () => {
+    expect(guidePlanes(project())).toEqual([]);
+    expect(guidePlanes(project(), { symmetry: false })).toEqual([]);
+    const [plane] = guidePlanes(project(), { symmetry: true });
+    expect(plane.id).toBe(SYMMETRY_GUIDE_ID);
+    expect(plane.normal).toEqual([1, 0, 0]);
+    expect(plane.point).toEqual([0, 0, 0]);
+  });
+
+  it("sits beside the guides the game maker placed", () => {
+    const ids = guidePlanes(withGuides(project()), { symmetry: true }).map(
+      (p) => p.id,
+    );
+    expect(ids).toEqual(["g1", SYMMETRY_GUIDE_ID]);
+  });
+
+  it("pulls a point to x = 0 like any other guide plane", () => {
+    const planes = guidePlanes(project(), { symmetry: true });
+    const snapped = snapToGuides([[0.3, 5, 2]], planes, 0.5);
+    expect(snapped.delta).toEqual([-0.3, 0, 0]);
+    expect(snapped.guides.map((g) => g.id)).toEqual([SYMMETRY_GUIDE_ID]);
+    expect(snapToGuides([[2, 5, 2]], planes, 0.5).guides).toEqual([]);
+  });
+
+  it("cannot be removed or edited through the guide list", () => {
+    const doc = withGuides(project());
+    expect(removeGuide(doc, SYMMETRY_GUIDE_ID)).toBe(doc);
+    expect(updateGuide(doc, SYMMETRY_GUIDE_ID, { offset: 3 })).toBe(doc);
+  });
+
+  it("is not saved with the unit", () => {
+    const doc = project();
+    guidePlanes(doc, { symmetry: true });
+    const read = parseLegoProjectJson(JSON.stringify(doc));
+    expect(read && "guides" in read).toBe(false);
+    const withOne = parseLegoProjectJson(JSON.stringify(withGuides(doc)));
+    expect(withOne?.guides?.map((g) => g.id)).toEqual(["g1", "g2", "g3"]);
+  });
+
+  it("follows a root that moves and turns", () => {
+    const doc = rootAt(project(), {
+      position: [4, 0, 2],
+      rotation: [0, Math.PI / 2, 0],
+    });
+    const [plane] = guidePlanes(doc, { symmetry: true });
+    expect(round(plane.normal)).toEqual([0, 0, -1]);
+    expect(round(plane.point)).toEqual([4, 0, 2]);
+    // The turned plane is z = 2, so a point at z = 2.2 is pulled back 0.2.
+    expect(
+      snapToGuides([[9, 1, 2.2]], [plane], 0.5).delta.map(
+        (n) => Math.round(n * 1e6) / 1e6,
+      ),
+    ).toEqual([0, 0, -0.2]);
   });
 });

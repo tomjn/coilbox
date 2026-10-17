@@ -63,7 +63,7 @@ A join holds a part to a face of the piece it hangs off. Move, turn or resize th
 
 A part is joined when you add it from the strip with a part selected, place it on a face, or drag one of its faces onto a face that points back at it. Units built before joins existed open unchanged, with every part free, until you do one of those.
 
-Every part has six faces, named for the unit's directions: top, bottom, front, back, left and right, as in [Which way it faces](#which-way-it-faces). A pack can state a part's connectors instead, and those keep the names the pack gives them. See [connectors](../reference/lego-parts-pack.md#connectors) in the pack guide. **Connectors** in the piece panel gives one piece connectors of its own, clicked onto the model or added at its origin, each with a facing and an up direction. A piece with its own connectors joins only through those, not through its part's faces.
+Every part has six faces, named for the unit's directions: top, bottom, front, back, left and right, as in [Which way it faces](#which-way-it-faces). A pack can state a part's connectors instead, and those keep the names the pack gives them. See [connectors](../reference/lego-parts-pack.md#connectors) in the pack guide. **Connectors** in the piece panel gives one piece connectors of its own, clicked onto the model or added at its origin, each with a facing and an up direction. A piece with its own connectors joins only through those, not through its part's faces. A generated shape has connectors worked out from its kind and size, so they move when it is resized. A cylinder or tube has one at the middle of each end and four round the side, a cone one at each flat end and none at its tip, a dome or bowl one at its base and one at its apex, a whole sphere the same two and four round its equator, and a wedge one on each flat face and one on the slope facing along its normal. A cylinder's side connector sits at the point where the side is met going straight out from the middle, so a part slid along it by grid steps leaves the curve.
 
 **See a join.** A joined piece has a link mark on its row in the piece tree, and hovering the mark names both faces. With the piece selected, the view outlines the face it is joined by and the face it is joined to. **Show free faces**, in the piece panel, outlines the rest of its faces too. The outlines are drawn only in the builder and are never exported.
 
@@ -387,6 +387,8 @@ Fewer axles or road wheels remove the bones no longer needed. A bare bone goes w
 Select a bone and click a part in the inventory. The part hangs off the bone and lies along it towards the next bone, with its near end on the joint, so a thigh hangs from the hip towards the knee and turns about the hip. The part keeps its own size and is not stretched to fit the bone. A bone with no bone below it, such as a foot, gets the part centred on its joint, unturned. Hold `Alt` as you click to put the part on the joint without turning it.
 
 A bone has no faces, so nothing joins to it. With symmetry on, the twin bone on the other side gets the mirrored part.
+
+To remove a skeleton, open the **Skeleton** tab, press **Remove skeleton** and confirm. Every piece, role and preset stays, the tab and the skeleton in the view go, and it is one undo step.
 
 ### See the skeleton
 

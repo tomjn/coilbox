@@ -7,7 +7,14 @@
  */
 
 import { Button, Input } from "@picoframe/frame";
-import { Eye, EyeOff, MousePointerClick, Ruler, Trash2 } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  Lock,
+  MousePointerClick,
+  Ruler,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 
 import {
@@ -38,13 +45,21 @@ interface Props {
   /** What the next click on the model places, or null. */
   picking: GuidePick | null;
   onPick: (pick: GuidePick | null) => void;
+  /** Whether the built-in symmetry plane is in play, listed as locked. */
+  symmetryPlane?: boolean;
 }
 
 const AXIS_COLOUR = Object.fromEntries(
   AXES.map((axis) => [axis.label.toLowerCase(), axis.colour]),
 ) as Record<GuideAxis, string>;
 
-export function GuidesPopover({ guides, onEdit, picking, onPick }: Props) {
+export function GuidesPopover({
+  guides,
+  onEdit,
+  picking,
+  onPick,
+  symmetryPlane = false,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [axis, setAxis] = useState<GuideAxis>("x");
   const [kind, setKind] = useState<GuidePick["kind"]>("plane");
@@ -101,8 +116,15 @@ export function GuidesPopover({ guides, onEdit, picking, onPick }: Props) {
         </Button>
       </PopoverTrigger>
       <PopoverContent side="top" align="end" className="w-80 space-y-3">
-        {guides.length > 0 ? (
+        {guides.length > 0 || symmetryPlane ? (
           <ul className="space-y-1">
+            {symmetryPlane ? (
+              <li className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Lock className="size-3.5 shrink-0" />
+                <span className="flex-1">Symmetry (x = 0)</span>
+                <span>Locked</span>
+              </li>
+            ) : null}
             {guides.map((guide) => (
               <GuideRow
                 key={guide.id}
