@@ -2,6 +2,8 @@ import { Button } from "@picoframe/frame";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 
+import { Field } from "@/components/Field";
+import { OptionSelect } from "@/components/OptionSelect";
 import {
   Popover,
   PopoverContent,
@@ -13,12 +15,23 @@ import { defaultTarget } from "../../skeletonSize";
 import { DescribeUnitForm } from "./DescribeUnitForm";
 import { SkeletonTargetFields } from "./SkeletonTargetFields";
 
+/** The game a new unit is for, chosen in the popover beside the plan. */
+export interface GameChoice {
+  /** The chosen option's value. */
+  value: string;
+  onChange: (value: string) => void;
+  /** "No game" first, then each installed game. */
+  options: { value: string; label: string }[];
+}
+
 interface Props {
   /** The starting points besides Blank, from the body plan registry. */
   plans: readonly BodyPlan[];
   /** The button's text. */
   label: string;
   busy?: boolean;
+  /** Shows a labelled Game field above the choices when given. */
+  game?: GameChoice;
   /** The plan chosen with the size to fit it to, or null for the blank start. */
   onChoose: (plan: BodyPlan | null, target?: SkeletonTarget) => void;
 }
@@ -29,7 +42,7 @@ interface Props {
  * Blank first and then each plan with its one line description. A plan then
  * asks for the footprint and height to fit its skeleton to.
  */
-export function NewUnitPopover({ plans, label, busy, onChoose }: Props) {
+export function NewUnitPopover({ plans, label, busy, game, onChoose }: Props) {
   const [open, setOpen] = useState(false);
   const [picked, setPicked] = useState<BodyPlan | null>(null);
   const [target, setTarget] = useState<SkeletonTarget | null>(null);
@@ -75,6 +88,18 @@ export function NewUnitPopover({ plans, label, busy, onChoose }: Props) {
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72 p-1">
+        {game ? (
+          <div className="p-2">
+            <Field label="Game">
+              <OptionSelect
+                size="sm"
+                value={game.value}
+                onValueChange={game.onChange}
+                options={game.options}
+              />
+            </Field>
+          </div>
+        ) : null}
         {describing ? (
           <DescribeUnitForm
             onBack={() => setDescribing(false)}
