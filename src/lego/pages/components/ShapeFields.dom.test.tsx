@@ -8,7 +8,11 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { LegoShape } from "../../shapes";
+import {
+  type LegoShape,
+  setShapeRoundPanels,
+  setShapeSwatches,
+} from "../../shapes";
 import { ShapeFields } from "./ShapeFields";
 
 const tube: LegoShape = {
@@ -185,5 +189,83 @@ describe("ShapeFields for a sphere (#3330)", () => {
     expect(screen.getByRole("alert").textContent).toBe(
       "Rings must be a whole number, 2 or more.",
     );
+  });
+});
+
+describe("ShapeFields round panel (#4398)", () => {
+  beforeEach(() => {
+    setShapeSwatches(
+      ["grey", "green", "tan"].map((id) => ({
+        id,
+        uv: { min: [0.1, 0.1], max: [0.2, 0.2] },
+        tile: 1.5,
+      })),
+    );
+    setShapeRoundPanels([
+      { id: "grey", centre: [0.5, 0.5], radius: 0.03 },
+      { id: "green", centre: [0.2, 0.5], radius: 0.03 },
+    ]);
+  });
+  afterEach(() => {
+    setShapeRoundPanels([]);
+    setShapeSwatches([]);
+  });
+
+  const hub = () => screen.queryByRole("checkbox", { name: "Hub on ends" });
+
+  it("is off by default on a tube, and turns on", () => {
+    render(<ShapeFields shape={tube} onChange={onChange} />);
+    expect(hub()?.getAttribute("aria-checked")).toBe("false");
+    fireEvent.click(hub() as HTMLElement);
+    expect(onChange.mock.calls[0][0].options).toEqual({
+      ...tube.options,
+      hub: 1,
+    });
+  });
+
+  it("turns off again", () => {
+    render(
+      <ShapeFields
+        shape={{ ...tube, options: { ...tube.options, hub: 1 } }}
+        onChange={onChange}
+      />,
+    );
+    expect(hub()?.getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(hub() as HTMLElement);
+    expect(onChange.mock.calls[0][0].options.hub).toBeUndefined();
+  });
+
+  it("is offered on a cylinder and a cone", () => {
+    render(
+      <ShapeFields shape={{ ...tube, kind: "cylinder" }} onChange={onChange} />,
+    );
+    expect(hub()).not.toBeNull();
+    cleanup();
+    render(
+      <ShapeFields
+        shape={{ ...tube, kind: "cone", options: { top: 0 } }}
+        onChange={onChange}
+      />,
+    );
+    expect(hub()).not.toBeNull();
+  });
+
+  it("is not offered on a wedge or a sphere", () => {
+    render(
+      <ShapeFields shape={{ ...tube, kind: "wedge" }} onChange={onChange} />,
+    );
+    expect(hub()).toBeNull();
+    cleanup();
+    render(
+      <ShapeFields shape={{ ...tube, kind: "sphere" }} onChange={onChange} />,
+    );
+    expect(hub()).toBeNull();
+  });
+
+  it("is not offered when the pack has no panel for the colourway", () => {
+    render(
+      <ShapeFields shape={{ ...tube, swatch: "tan" }} onChange={onChange} />,
+    );
+    expect(hub()).toBeNull();
   });
 });
