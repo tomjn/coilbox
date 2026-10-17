@@ -7,6 +7,7 @@ import {
 import { isShortcut } from "../../shortcuts";
 import { focusSelection, showView } from "./cameraFraming";
 import { type DrawMode, nextDrawMode } from "./drawMode";
+import { attachGizmo } from "./gizmoCommit";
 import type { GizmoMode } from "./ModelViewport";
 import type { SceneState } from "./sceneState";
 
@@ -63,7 +64,18 @@ export function useModelShortcuts(
   useEffect(() => {
     const setSnapping = (on: boolean) => {
       const state = sceneRef.current;
-      if (state) state.snapping = on;
+      if (!state || state.snapping === on) return;
+      state.snapping = on;
+      // A joined piece's handle shows two axes while it slides and three once
+      // Alt has freed it. Not mid-drag, because that would swap what is held.
+      if (state.dragging) return;
+      attachGizmo(
+        state,
+        state.projectRef.current,
+        state.selectedIdsRef.current,
+        state.placingAnchorRef.current,
+      );
+      state.render();
     };
     const down = (event: KeyboardEvent) => {
       if (event.target instanceof HTMLInputElement) return;
