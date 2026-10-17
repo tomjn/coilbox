@@ -12,7 +12,7 @@
  */
 
 import { Button, Input } from "@picoframe/frame";
-import { Copy, Pencil, Trash2 } from "lucide-react";
+import { Copy, Pencil, Star, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
@@ -66,6 +66,9 @@ interface Props {
   onRename: (compound: LegoProject, name: string) => void;
   /** Saves the user's own copy of a built in module. */
   onCopy: (compound: LegoProject) => void;
+  /** Ids of the favourite modules. With `onFavourite`, each cell gets a star. */
+  favourites?: ReadonlySet<string>;
+  onFavourite?: (compound: LegoProject) => void;
   /** Absent hides the category and tags button. */
   onLabels?: (
     compound: LegoProject,
@@ -90,6 +93,8 @@ export function CompoundPicker({
   onDelete,
   onRename,
   onCopy,
+  favourites,
+  onFavourite,
   onLabels,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -267,6 +272,7 @@ export function CompoundPicker({
               const isRenaming = renaming?.id === compound.id;
               const builtIn = isBuiltInModule(compound);
               const at = grid.cells[index];
+              const starred = favourites?.has(compound.id) ?? false;
               return (
                 <div
                   key={compound.id}
@@ -367,6 +373,22 @@ export function CompoundPicker({
                       <Pencil size={14} />
                     </Button>
                   )}
+                  {onFavourite ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className={`absolute bottom-6 right-0 transition-opacity focus:opacity-100 group-hover:opacity-100 ${starred ? "opacity-100" : "opacity-0"}`}
+                      onClick={() => onFavourite(compound)}
+                      aria-pressed={starred}
+                      aria-label={`Favourite the ${compound.name} module`}
+                      title={starred ? "Remove from favourites" : "Favourite"}
+                    >
+                      <Star
+                        size={14}
+                        fill={starred ? "currentColor" : "none"}
+                      />
+                    </Button>
+                  ) : null}
                   {onLabels && !builtIn ? (
                     <ModuleLabelsPopover
                       compound={compound}

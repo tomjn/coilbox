@@ -14,6 +14,8 @@
  * move between them.
  */
 
+import { Button } from "@picoframe/frame";
+import { Star } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
@@ -53,6 +55,9 @@ interface Props {
   atlas?: LegoAtlas;
   selectedId?: string;
   onSelect?: (part: LegoPartInfo) => void;
+  /** Ids of the favourite parts. With `onFavourite`, each cell gets a star. */
+  favourites?: ReadonlySet<string>;
+  onFavourite?: (part: LegoPartInfo) => void;
 }
 
 interface Visible {
@@ -67,6 +72,8 @@ export function PartPicker({
   atlas,
   selectedId,
   onSelect,
+  favourites,
+  onFavourite,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
@@ -245,31 +252,11 @@ export function PartPicker({
             const part = parts[index];
             const row = Math.floor(index / view.columns);
             const column = index % view.columns;
+            const starred = favourites?.has(part.id) ?? false;
             return (
-              <button
+              <div
                 key={part.id}
-                type="button"
-                data-index={index}
-                tabIndex={index === focusIndex ? 0 : -1}
-                aria-pressed={part.id === selectedId}
-                title={`${part.name}, ${part.tags.join(", ")}`}
-                onMouseEnter={() => setHoverIndex(index)}
-                onMouseLeave={() =>
-                  setHoverIndex((at) => (at === index ? null : at))
-                }
-                onFocus={() => {
-                  setFocusIndex(index);
-                  // Keyboard users get the same look at the part as the pointer.
-                  setHoverIndex(index);
-                }}
-                onBlur={() => setHoverIndex((at) => (at === index ? null : at))}
-                onKeyDown={onKeyDown}
-                onClick={() => onSelect?.(part)}
-                className={`absolute rounded border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                  part.id === selectedId
-                    ? "border-primary bg-primary/10"
-                    : "border-transparent hover:border-border hover:bg-muted/40"
-                }`}
+                className="group absolute"
                 style={{
                   left: column * PITCH,
                   top: row * PITCH,
@@ -277,8 +264,64 @@ export function PartPicker({
                   height: CELL,
                 }}
               >
-                <span className="sr-only">{part.name}</span>
-              </button>
+                <button
+                  type="button"
+                  data-index={index}
+                  tabIndex={index === focusIndex ? 0 : -1}
+                  aria-pressed={part.id === selectedId}
+                  title={`${part.name}, ${part.tags.join(", ")}`}
+                  onMouseEnter={() => setHoverIndex(index)}
+                  onMouseLeave={() =>
+                    setHoverIndex((at) => (at === index ? null : at))
+                  }
+                  onFocus={() => {
+                    setFocusIndex(index);
+                    // Keyboard users get the same look at the part as the pointer.
+                    setHoverIndex(index);
+                  }}
+                  onBlur={() =>
+                    setHoverIndex((at) => (at === index ? null : at))
+                  }
+                  onKeyDown={(event) => {
+                    // The stars are out of the tab order, like the other cells,
+                    // so F is how the keyboard reaches one.
+                    if (
+                      event.key.toLowerCase() === "f" &&
+                      !event.ctrlKey &&
+                      !event.metaKey &&
+                      !event.altKey &&
+                      onFavourite
+                    ) {
+                      event.preventDefault();
+                      onFavourite(part);
+                      return;
+                    }
+                    onKeyDown(event);
+                  }}
+                  onClick={() => onSelect?.(part)}
+                  className={`absolute inset-0 rounded border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    part.id === selectedId
+                      ? "border-primary bg-primary/10"
+                      : "border-transparent hover:border-border hover:bg-muted/40"
+                  }`}
+                >
+                  <span className="sr-only">{part.name}</span>
+                </button>
+                {onFavourite ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    tabIndex={-1}
+                    className={`absolute right-0 top-0 transition-opacity focus:opacity-100 group-hover:opacity-100 ${starred ? "opacity-100" : "opacity-0"}`}
+                    onClick={() => onFavourite(part)}
+                    aria-pressed={starred}
+                    aria-label={`Favourite the ${part.name} part`}
+                    title={starred ? "Remove from favourites" : "Favourite"}
+                  >
+                    <Star size={14} fill={starred ? "currentColor" : "none"} />
+                  </Button>
+                ) : null}
+              </div>
             );
           })}
         </div>
