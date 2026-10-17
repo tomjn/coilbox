@@ -8,6 +8,9 @@
  *
  * A count that would delete bones carrying a part, a mesh or a hung piece asks
  * first, naming the bones.
+ *
+ * A skeleton fitted to pieces the unit already had (#3261) is shown and not
+ * edited.
  */
 
 import { Button, Input } from "@picoframe/frame";
@@ -44,6 +47,69 @@ interface Props {
 }
 
 export function ProportionsPanel({
+  project,
+  plan,
+  onChange,
+  onPreview,
+  onTarget,
+  preview,
+}: Props) {
+  if (project.skeleton?.fitted) {
+    return (
+      <FittedProportions plan={plan} measured={project.skeleton.proportions} />
+    );
+  }
+  return (
+    <PlanProportions
+      project={project}
+      plan={plan}
+      onChange={onChange}
+      onPreview={onPreview}
+      onTarget={onTarget}
+      preview={preview}
+    />
+  );
+}
+
+/**
+ * A skeleton fitted to the unit's own pieces (#3261) shows what was measured
+ * and nothing to change: changing a proportion would move pieces the game
+ * maker placed by hand.
+ */
+function FittedProportions({
+  plan,
+  measured,
+}: {
+  plan: BodyPlan;
+  measured: Record<string, number>;
+}) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 py-3">
+      <p className="text-xs text-muted-foreground">
+        {plan.label}, fitted to this unit's pieces
+      </p>
+      <dl className="space-y-1 text-xs">
+        {plan.proportions.map((proportion) => {
+          const value = measured[proportion.id];
+          return (
+            <div key={proportion.id} className="flex justify-between gap-2">
+              <dt className="text-muted-foreground">{proportion.label}</dt>
+              <dd>
+                {value === undefined
+                  ? "Not measured"
+                  : proportion.unit === "elmo"
+                    ? `${Number(value.toFixed(3))} elmos`
+                    : String(value)}
+              </dd>
+            </div>
+          );
+        })}
+      </dl>
+    </div>
+  );
+}
+
+function PlanProportions({
   project,
   plan,
   onChange,

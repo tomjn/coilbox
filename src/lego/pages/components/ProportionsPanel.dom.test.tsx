@@ -249,4 +249,24 @@ describe("ProportionsPanel", () => {
       expect(screen.queryAllByRole("slider")).toHaveLength(0);
     });
   });
+
+  describe("a fitted skeleton (#3261)", () => {
+    it("shows what was measured and offers nothing to change", () => {
+      const fitted: LegoProject = {
+        ...unit(BIPED),
+        skeleton: {
+          plan: "biped",
+          proportions: { legLength: 20 },
+          fitted: true,
+        },
+      };
+      show(fitted, BIPED);
+
+      expect(screen.getByText("20 elmos")).toBeTruthy();
+      expect(screen.getAllByText("Not measured")).toHaveLength(2);
+      expect(screen.queryAllByRole("slider")).toHaveLength(0);
+      expect(screen.queryAllByRole("textbox")).toHaveLength(0);
+      expect(screen.queryByRole("button", { name: "Fit" })).toBeNull();
+    });
+  });
 });
