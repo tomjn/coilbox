@@ -40,6 +40,7 @@ import { modelSource, stageModel, stageTextures } from "../../gameImport";
 import { type GameModelRow, gameModelRows } from "../../gameModels";
 import type { LegoProject } from "../../model";
 import { useLegoProjects } from "../../projects";
+import { gameRecordFor } from "../../unitGame";
 import {
   defaultTakenRoles,
   defaultTakeScript,
@@ -263,6 +264,7 @@ export function GameModelDrawer({
     const compiled = adopted?.compiled;
     onOpened({
       ...withRoles,
+      ...(game ? { game: gameRecordFor(game, scan.data?.games ?? []) } : {}),
       ...(script ? { script } : {}),
       ...(compiled ? { compiledScript: compiled } : {}),
       ...(adopted?.unitDef ? { gameUnitDef: adopted.unitDef } : {}),

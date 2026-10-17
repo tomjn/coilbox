@@ -30,8 +30,13 @@ import { loadPack } from "../pack";
 import { filterGrouped, groupProjects } from "../projectGroups";
 import { validateProjectName } from "../projectNames";
 import { deleteProject, saveProject, useLegoProjects } from "../projects";
+import { gameRecordFor, unitGame } from "../unitGame";
 import { GameModelDrawer } from "./components/GameModelDrawer";
 import { ImportDrawer } from "./components/ImportDrawer";
+import { useTestGame } from "./components/useTestGame";
+
+/** Radix's select has no empty value, so "No game" needs one of its own. */
+const NO_GAME = "coilbox:no-game";
 
 /** A section label, sized as a label rather than as a title so the game names
  *  under it stay the thing you read. */
@@ -112,6 +117,9 @@ export default function ProjectsPage() {
   const [renaming, setRenaming] = useState<Renaming | null>(null);
   const [atlases, setAtlases] = useState<LegoAtlas[]>([]);
   const [atlas, setAtlas] = useState<string | null>(null);
+  /** The game a new unit is for, by archive. "No game" unless one is picked. */
+  const [newGame, setNewGame] = useState(NO_GAME);
+  const { games, scan } = useTestGame();
   const [opening, setOpening] = useState(false);
   const [picking, setPicking] = useState(false);
   /** The units whose thumbnail would not load, so the card says so instead. */
@@ -144,6 +152,7 @@ export default function ProjectsPage() {
     setProblem(null);
     try {
       const pack = await loadPack();
+      const picked = games.find((g) => g.primaryArchive.name === newGame);
       const project = newProject({
         id: crypto.randomUUID(),
         rootPieceId: crypto.randomUUID(),
@@ -153,6 +162,7 @@ export default function ProjectsPage() {
         // Left off for the base pack's atlas, so a unit built with one atlas
         // installed is stored exactly as it always was.
         ...(atlas ? { atlas } : {}),
+        game: picked ? gameRecordFor(picked, scan.data?.games ?? []) : null,
         now: new Date().toISOString(),
       });
       await saveProject(project);
@@ -232,6 +242,8 @@ export default function ProjectsPage() {
    */
   function card(project: LegoProject) {
     const isRenaming = renaming?.id === project.id;
+    // A unit opened from a game already sits under that game's heading.
+    const game = project.imported ? null : unitGame(project);
     return (
       <li
         key={project.id}
@@ -269,6 +281,11 @@ export default function ProjectsPage() {
                     project.pieces.length === 1 ? "piece" : "pieces"
                   } · ${project.unitName}`}
             </p>
+            {game && !isRenaming ? (
+              <p className="truncate text-xs text-muted-foreground">
+                {game.name}
+              </p>
+            ) : null}
           </div>
         </Link>
         {isRenaming ? (
@@ -364,6 +381,28 @@ export default function ProjectsPage() {
                   {atlases.map((option) => (
                     <SelectItem key={option.tex1} value={option.tex1}>
                       {option.packId}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
+            {games.length > 0 ? (
+              <Select value={newGame} onValueChange={setNewGame}>
+                <SelectTrigger
+                  size="sm"
+                  className="w-52"
+                  aria-label="Game for a new model"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_GAME}>No game</SelectItem>
+                  {games.map((g) => (
+                    <SelectItem
+                      key={g.primaryArchive.name}
+                      value={g.primaryArchive.name}
+                    >
+                      {g.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

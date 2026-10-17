@@ -27,6 +27,7 @@ import { PageHeader } from "@/components/PageHeader";
 import {
   useScanTargetSelection,
   useUnitsyncArchiveTree,
+  useUnitsyncScan,
 } from "@/content/config";
 import { modelName, openableInBuilder, openRequest } from "../archiveOpen";
 import {
@@ -38,6 +39,7 @@ import {
 } from "../gameImport";
 import { openedProjectFor } from "../gameModels";
 import { saveProject, useLegoProjects } from "../projects";
+import { gameRecordFor } from "../unitGame";
 import {
   ImportResult,
   type ImportStage,
@@ -50,6 +52,7 @@ export default function OpenFromArchivePage() {
   const request = useMemo(() => openRequest(params), [params]);
   const navigate = useNavigate();
   const { selected, loading: targetLoading } = useScanTargetSelection();
+  const scan = useUnitsyncScan(selected?.enginePath, selected?.rootPath);
   const { projects, loading: projectsLoading } = useLegoProjects();
   const { tree, loading: treeLoading } = useUnitsyncArchiveTree(
     selected?.enginePath,
@@ -169,8 +172,15 @@ export default function OpenFromArchivePage() {
   ]);
 
   async function accept() {
-    const project = stageProject(stage);
-    if (!project) return;
+    const staged = stageProject(stage);
+    if (!staged) return;
+    // The archive is the unit's game when it is one. Any other archive leaves
+    // the unit to its import record, as before.
+    const games = scan.data?.games ?? [];
+    const item = games.find((g) => g.primaryArchive.name === request?.archive);
+    const project = item
+      ? { ...staged, game: gameRecordFor(item, games) }
+      : staged;
     try {
       await saveProject(project);
       navigate(`/lego/${project.id}`, { replace: true });
