@@ -17,7 +17,9 @@ const parse = (v: unknown): Payload | null => {
 
 describe("envelope", () => {
   it("round-trips a payload", () => {
-    const code = encodePackEnvelope<Payload>({ n: 42 });
+    const encoded = encodePackEnvelope<Payload>({ n: 42 });
+    if (!encoded.ok) throw new Error("expected a code");
+    const code = encoded.code;
     const result = decodePackEnvelope(code, parse);
     expect(result).toEqual({ ok: true, settings: { n: 42 } });
   });
@@ -83,7 +85,9 @@ describe("envelope", () => {
   });
 
   it("rejects a settings shape the caller's parser refuses", () => {
-    const code = encodePackEnvelope({ wrong: true });
+    const encoded = encodePackEnvelope({ wrong: true });
+    if (!encoded.ok) throw new Error("expected a code");
+    const code = encoded.code;
     expect(decodePackEnvelope(code, parse)).toEqual({
       ok: false,
       error: "malformed",

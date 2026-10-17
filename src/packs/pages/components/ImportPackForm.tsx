@@ -1,6 +1,12 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { summarizeSubstitutions } from "@/conquest/ai";
 import { reconcileParticipantAis } from "@/play/reconcileAi";
+import type { StoredBlueprint } from "../../../blueprint/library";
+import {
+  cachedBlueprint,
+  refreshBlueprints,
+  saveBlueprints,
+} from "../../../blueprint/store";
 import { ChallengeCodeInput } from "../../../challenge/ChallengeCodeInput";
 import { identify } from "../../../container/container";
 import { rememberCarriedShortname } from "../../../container/shortnames";
@@ -12,6 +18,7 @@ import { useSkirmishPresets } from "../../../play/presets";
 import { aiGameNameForPack } from "../../build";
 import { packDecodeErrorMessage } from "../../envelope";
 import {
+  blueprintsFromPack,
   decodeSetupPack,
   namesForPackPresets,
   requirementsForPack,
@@ -22,8 +29,8 @@ import {
  * "Import a setup pack" (issue #415): paste a pack code, resolve its games
  * and maps through issue #387's `ResolveContentGate` (nothing is applied
  * until every download clears, so a partial failure can't half-apply the
- * pack), then save any bundled presets, renaming on a name collision rather
- * than overwriting an existing preset.
+ * pack), then save any bundled blueprints and presets, renaming on a name
+ * collision rather than overwriting an existing one.
  */
 export function ImportPackForm({
   initialCode,
@@ -42,6 +49,10 @@ export function ImportPackForm({
 }) {
   const { presets, savePreset } = useSkirmishPresets();
   const [pending, setPending] = useState<SetupPackManifest | null>(null);
+  // The pack's blueprints as library records, minted once per pack. A failed
+  // save is retried from the gate, and the same ids are what let the retry
+  // skip the ones already written rather than keep a second copy of them.
+  const blueprintRecords = useRef<StoredBlueprint[] | null>(null);
 
   // Read the target here rather than taking it from the page. A drawer's
   // content is built once, when the button is pressed, so a target passed in as
@@ -84,11 +95,40 @@ export function ImportPackForm({
     // Take the pack's word for the shortname of the build it pins, so a re-share
     // from here carries it on (issue #1383).
     rememberCarriedShortname(identify(code).game);
+    blueprintRecords.current = null;
     setPending(result.settings);
   };
 
-  const applyPack = () => {
+  const applyPack = async () => {
     if (!pending) return;
+    // Blueprints first, because they are the part that can fail: a throw here
+    // reaches the gate's "Try again" before any preset has been saved.
+    // Named against the library as it is on disk now rather than as a hook last
+    // saw it, because the gate can fire before the library's first read lands.
+    if (!blueprintRecords.current) {
+      const library = pending.blueprints?.length
+        ? await refreshBlueprints()
+        : [];
+      blueprintRecords.current = blueprintsFromPack(
+        library.map((record) => record.layout.name),
+        pending,
+      );
+    }
+    const layouts = blueprintRecords.current;
+    const unsaved = layouts.filter((r) => !cachedBlueprint(r.id));
+    if (unsaved.length > 0) {
+      try {
+        await saveBlueprints(unsaved);
+      } catch (e) {
+        throw new Error(
+          `The blueprints were not all saved: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+    }
+    const layoutsAdded = layouts.length
+      ? `${layouts.length} blueprint${layouts.length === 1 ? "" : "s"} added to your library.`
+      : "";
+
     const bundled = pending.presets ?? [];
     const savedIds: string[] = [];
     if (bundled.length > 0) {
@@ -110,7 +150,13 @@ export function ImportPackForm({
       const base = `${bundled.length} preset${bundled.length === 1 ? "" : "s"} added. Load ${bundled.length === 1 ? "it" : "one"} from Singleplayer → Presets.`;
       notify({
         title: "Setup pack imported",
-        body: subNotice ? `${base} ${subNotice}` : base,
+        body: [base, subNotice, layoutsAdded].filter(Boolean).join(" "),
+        level: "success",
+      });
+    } else if (layoutsAdded) {
+      notify({
+        title: "Setup pack imported",
+        body: layoutsAdded,
         level: "success",
       });
     } else {
@@ -132,13 +178,14 @@ export function ImportPackForm({
       games: (pending.games ?? []).map((g) => g.name),
       maps: pending.maps ?? [],
     });
+    blueprintRecords.current = null;
     setPending(null);
   };
 
   return (
     <>
       <ChallengeCodeInput
-        helpText="Paste a setup pack code shared by another player to install its games and maps, and add any presets it includes."
+        helpText="Paste a setup pack code shared by another player to install its games and maps, and add any presets and blueprints it includes."
         placeholder="Paste a setup pack code…"
         submitLabel="Import setup pack"
         busyLabel="Checking…"
