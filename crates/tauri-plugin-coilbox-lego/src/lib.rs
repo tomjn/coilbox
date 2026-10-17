@@ -27,6 +27,7 @@ mod glb;
 mod import;
 mod reexport;
 mod sandbox;
+mod sheet;
 mod texture;
 
 use coilbox_3do_convert as atlas3do;
@@ -726,10 +727,13 @@ fn owned_file(path: &Path, bytes: &[u8]) -> serde_json::Value {
 /// Every file an export writes under one unit name, derived from the folder and
 /// the name alone.
 ///
-/// Never a texture. An atlas is shared by every unit that samples it, and a unit
-/// imported from somebody else's model places its textures under the names that
-/// model already gives them, which are the game's own. Neither is keyed on the
-/// unit name, so neither is part of a rename.
+/// Never a texture of the game's or of a pack's. An atlas is shared by every unit
+/// that samples it, and a unit imported from somebody else's model places its
+/// textures under the names that model already gives them, which are the
+/// game's own. Neither is keyed on the unit name, so neither is part of a
+/// rename. A mixed unit's combined sheet is the exception, because it is made
+/// from this unit alone and named after it (`sheetTextureNames` in
+/// `src/lego/textureSheet.ts`, #3260).
 fn export_paths(root: &Path, unit_name: &str) -> Vec<PathBuf> {
     vec![
         root.join("objects3d").join(format!("{unit_name}.s3o")),
@@ -744,6 +748,10 @@ fn export_paths(root: &Path, unit_name: &str) -> Vec<PathBuf> {
         root.join("blender").join(format!("{unit_name}.glb")),
         root.join("blender").join(format!("{unit_name}.obj")),
         root.join("blender").join(format!("{unit_name}.mtl")),
+        root.join("unittextures")
+            .join(format!("coilbox_{unit_name}_sheet.png")),
+        root.join("unittextures")
+            .join(format!("coilbox_{unit_name}_sheet2.png")),
     ]
 }
 
@@ -2078,6 +2086,217 @@ async fn lego_texture_compose_shading<R: Runtime>(
     }
 }
 
+/// One picture a combined sheet copies from (#3260): a parts atlas, or a
+/// texture in the store by its key. Exactly one of the two.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SheetImage {
+    #[serde(default)]
+    atlas: Option<AtlasRef>,
+    #[serde(default)]
+    key: Option<String>,
+    /// Whether the engine reads its v from the bottom row, as it does a `.dds`.
+    #[serde(default)]
+    flip_y: bool,
+}
+
+/// Where a sheet's picture is on disk, and whether it is a parts atlas.
+fn sheet_image_path<R: Runtime>(
+    app: &AppHandle<R>,
+    store: &Path,
+    image: &SheetImage,
+) -> Result<(PathBuf, bool), String> {
+    match (&image.atlas, &image.key) {
+        (Some(atlas), None) => Ok((atlas_source(app, atlas)?, true)),
+        (None, Some(key)) => Ok((stored_texture_source(store, key)?, false)),
+        _ => Err("a sheet picture names either an atlas or a stored texture".to_string()),
+    }
+}
+
+/// A sheet's picture decoded. A parts atlas goes through the rule an export
+/// writes one by (see [`sheet::atlas_pixels`]), and a game's texture is read as
+/// the game ships it, its team colour or visibility mask and all.
+fn read_sheet_image<R: Runtime>(
+    app: &AppHandle<R>,
+    store: &Path,
+    image: &SheetImage,
+) -> Result<image::RgbaImage, String> {
+    let (path, atlas) = sheet_image_path(app, store, image)?;
+    if atlas {
+        let bytes = std::fs::read(&path).map_err(|e| format!("could not read the atlas: {e}"))?;
+        return sheet::atlas_pixels(&bytes);
+    }
+    read_texture(path.to_str().ok_or("the store holds a non-UTF-8 path")?)
+}
+
+/// A picture's width and height, read off a `.dds` header where it can be and
+/// decoded otherwise.
+fn sheet_image_size<R: Runtime>(
+    app: &AppHandle<R>,
+    store: &Path,
+    image: &SheetImage,
+) -> Result<(u32, u32), String> {
+    let (path, _) = sheet_image_path(app, store, image)?;
+    let bytes =
+        std::fs::read(&path).map_err(|e| format!("could not read {}: {e}", path.display()))?;
+    if let Some(size) = sheet::dds_size(&bytes) {
+        return Ok(size);
+    }
+    let decoded = read_sheet_image(app, store, image)?;
+    Ok((decoded.width(), decoded.height()))
+}
+
+/// `lego_texture_sizes` answers the width and height of each picture a mixed
+/// unit's sheet is laid out from, in the order given. The frontend lays the
+/// sheet out, and it cannot measure a `.dds` itself.
+#[tauri::command]
+async fn lego_texture_sizes<R: Runtime>(app: AppHandle<R>, images: Vec<SheetImage>) -> CliResult {
+    let store = match lego_dir(&app) {
+        Ok(dir) => dir.join("textures"),
+        Err(e) => return CliResult::err(e),
+    };
+    let mut sizes = Vec::new();
+    for image in &images {
+        match sheet_image_size(&app, &store, image) {
+            Ok((width, height)) => sizes.push(json!({ "width": width, "height": height })),
+            Err(e) => return CliResult::err(e),
+        }
+    }
+    CliResult::ok(json!(sizes))
+}
+
+/// One region of a combined sheet: what to copy, and where. `crop` is in the
+/// source's own UVs and `dest` in sheet pixels (see [`sheet::Region`]). The
+/// second texture is copied with the same crop, so the two sheets line up.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SheetRegionArg {
+    colour: SheetImage,
+    shading: Option<SheetImage>,
+    crop: [f64; 4],
+    dest: [u32; 4],
+}
+
+/// The file names the two sheets are recorded under in the store.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SheetNames {
+    texture1: String,
+    texture2: String,
+}
+
+/// The biggest sheet this will make, as a guard on what crosses the IPC. The
+/// frontend's own limit is `SHEET_MAX_SIDE` in `src/lego/textureSheet.ts`.
+const SHEET_MAX_SIDE: u32 = 4096;
+
+/// The index of `image` in `decoded`, decoding it the first time it is asked
+/// for. Keyed by what it names, so two regions on one picture share one decode.
+fn decode_once<R: Runtime>(
+    app: &AppHandle<R>,
+    store: &Path,
+    decoded: &mut Vec<(String, image::RgbaImage)>,
+    image: &SheetImage,
+) -> Result<usize, String> {
+    let id = match (&image.atlas, &image.key) {
+        (Some(atlas), _) => format!(
+            "atlas:{}:{}",
+            atlas.pack.as_deref().unwrap_or(""),
+            atlas.name
+        ),
+        (None, key) => format!("key:{}", key.as_deref().unwrap_or("")),
+    };
+    if let Some(at) = decoded.iter().position(|(seen, _)| *seen == id) {
+        return Ok(at);
+    }
+    decoded.push((id, read_sheet_image(app, store, image)?));
+    Ok(decoded.len() - 1)
+}
+
+/// `lego_texture_sheet` paints a mixed unit's two combined sheets (#3260) and
+/// puts both in the store, answering them as stored textures.
+///
+/// The first texture's regions keep each source's alpha, which is the team
+/// colour mask, and the space between them has none. The second texture's
+/// regions are each source's own second texture, or what the engine stands in
+/// for a missing one ([`sheet::NO_SHADING`]) for a source that has none, which
+/// is every part.
+#[tauri::command]
+async fn lego_texture_sheet<R: Runtime>(
+    app: AppHandle<R>,
+    width: u32,
+    height: u32,
+    regions: Vec<SheetRegionArg>,
+    names: SheetNames,
+) -> CliResult {
+    if width == 0 || height == 0 || width > SHEET_MAX_SIDE || height > SHEET_MAX_SIDE {
+        return CliResult::err(format!(
+            "a {width} by {height} sheet is not one coilbox makes"
+        ));
+    }
+    let store = match lego_dir(&app) {
+        Ok(dir) => dir.join("textures"),
+        Err(e) => return CliResult::err(e),
+    };
+    // Each picture once, however many regions share it.
+    let mut decoded = Vec::new();
+    let mut colour_at = Vec::with_capacity(regions.len());
+    let mut shading_at = Vec::with_capacity(regions.len());
+    for region in &regions {
+        match decode_once(&app, &store, &mut decoded, &region.colour) {
+            Ok(at) => colour_at.push(at),
+            Err(e) => return CliResult::err(e),
+        }
+        let shading = match &region.shading {
+            None => None,
+            Some(image) => match decode_once(&app, &store, &mut decoded, image) {
+                Ok(at) => Some(at),
+                Err(e) => return CliResult::err(e),
+            },
+        };
+        shading_at.push(shading);
+    }
+
+    let colour_regions: Vec<sheet::Region> = regions
+        .iter()
+        .zip(&colour_at)
+        .map(|(region, &at)| sheet::Region {
+            source: Some((&decoded[at].1, region.colour.flip_y)),
+            crop: region.crop,
+            dest: region.dest,
+            fill: sheet::NO_COLOUR,
+        })
+        .collect();
+    let shading_regions: Vec<sheet::Region> = regions
+        .iter()
+        .zip(&shading_at)
+        .map(|(region, at)| sheet::Region {
+            source: at
+                .zip(region.shading.as_ref())
+                .map(|(at, image)| (&decoded[at].1, image.flip_y)),
+            crop: region.crop,
+            dest: region.dest,
+            fill: sheet::NO_SHADING,
+        })
+        .collect();
+    let colour = match sheet::compose(width, height, sheet::NO_COLOUR, &colour_regions) {
+        Ok(img) => img,
+        Err(e) => return CliResult::err(e),
+    };
+    let shading = match sheet::compose(width, height, sheet::NO_SHADING, &shading_regions) {
+        Ok(img) => img,
+        Err(e) => return CliResult::err(e),
+    };
+    let texture = match store_sheet(&store, &colour, &names.texture1) {
+        Ok(value) => value,
+        Err(e) => return CliResult::err(e),
+    };
+    let texture2 = match store_sheet(&store, &shading, &names.texture2) {
+        Ok(value) => value,
+        Err(e) => return CliResult::err(e),
+    };
+    CliResult::ok(json!({ "texture": texture, "texture2": texture2 }))
+}
+
 /// A texture to place out of the shared store, for a unit imported from
 /// somebody else's model rather than built out of the parts pack.
 #[derive(Deserialize)]
@@ -2087,6 +2306,12 @@ struct StoredTextureRef {
     key: String,
     /// What to call it in the game folder, which is what the s3o names.
     write_as: String,
+    /// Written over whatever is there on every export, and recorded as the
+    /// export's own, rather than written once and then left alone. Set for a
+    /// mixed unit's combined sheet (#3260), which is made from the build like
+    /// the model is, so a copy from an earlier build is never right.
+    #[serde(default)]
+    rewrite: bool,
 }
 
 /// What an export places in `unittextures`, which is one thing or the other.
@@ -2371,7 +2596,23 @@ async fn lego_export<R: Runtime>(
                 Ok(path) => path,
                 Err(e) => return CliResult::err(e),
             };
-            if keep_existing(&target, scratch, overwrite_texture) {
+            if stored.rewrite {
+                let read = std::fs::read(&source).map_err(|e| {
+                    format!(
+                        "could not read {}: {e}. The texture may have been deleted from the store.",
+                        stored.write_as
+                    )
+                });
+                let bytes = match read {
+                    Ok(bytes) => bytes,
+                    Err(e) => return CliResult::err(e),
+                };
+                if let Err(e) = std::fs::write(&target, &bytes) {
+                    return CliResult::err(format!("could not write {}: {e}", target.display()));
+                }
+                owned.push(owned_file(&target, &bytes));
+                stored_paths.push(target.to_string_lossy().to_string());
+            } else if keep_existing(&target, scratch, overwrite_texture) {
                 stored_kept.push(stored.write_as);
             } else if let Err(e) = std::fs::copy(&source, &target) {
                 return CliResult::err(format!(
@@ -3261,6 +3502,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_texture_prune,
             lego_texture_compose_colour,
             lego_texture_compose_shading,
+            lego_texture_sizes,
+            lego_texture_sheet,
             lego_export,
             lego_game_language,
             lego_export_glb,
@@ -4015,20 +4258,24 @@ mod tests {
     }
 
     #[test]
-    fn a_rename_leaves_ten_files_behind_and_the_digests_find_them() {
+    fn a_rename_leaves_twelve_files_behind_and_the_digests_find_them() {
         let dir = tempfile::tempdir().expect("tempdir");
         let digests = exported_unit(dir.path(), "skyfort");
 
         let dry = sort_stale_files(dir.path(), "skyfort", &digests, true).expect("dry run");
-        assert_eq!(dry.ours.len(), 10);
+        assert_eq!(dry.ours.len(), 12);
         assert!(dry.kept.is_empty());
         assert!(dry.missing.is_empty());
         // A dry run removes none of them.
         assert!(dir.path().join("units/skyfort.lua").is_file());
 
         let done = sort_stale_files(dir.path(), "skyfort", &digests, false).expect("removal");
-        assert_eq!(done.ours.len(), 10);
+        assert_eq!(done.ours.len(), 12);
         assert!(!dir.path().join("unitpics/skyfort.png").exists());
+        assert!(!dir
+            .path()
+            .join("unittextures/coilbox_skyfort_sheet.png")
+            .exists());
         assert!(!dir
             .path()
             .join("objects3d/coilbox/skyfort_dead.s3o")
@@ -4118,7 +4365,7 @@ mod tests {
 
         let sorted = sort_stale_files(dir.path(), "skyfort", &digests, false).expect("removal");
         assert_eq!(sorted.kept, vec![edited.to_string_lossy().to_string()]);
-        assert_eq!(sorted.ours.len(), 9);
+        assert_eq!(sorted.ours.len(), 11);
         assert!(edited.is_file());
     }
 
@@ -4144,11 +4391,11 @@ mod tests {
         digests.extend([laser_digest, rocket_digest]);
 
         let dry = sort_stale_files(dir.path(), "skyfort", &digests, true).expect("dry run");
-        assert_eq!(dry.ours.len(), 12);
+        assert_eq!(dry.ours.len(), 14);
         assert!(laser.is_file() && rocket.is_file());
 
         let done = sort_stale_files(dir.path(), "skyfort", &digests, false).expect("removal");
-        assert_eq!(done.ours.len(), 12);
+        assert_eq!(done.ours.len(), 14);
         assert!(done.kept.is_empty());
         assert!(!laser.exists() && !rocket.exists());
     }
@@ -4192,7 +4439,7 @@ mod tests {
 
         let sorted = sort_stale_files(dir.path(), "skyfort", &[], false).expect("removal");
         assert!(sorted.ours.is_empty());
-        assert_eq!(sorted.kept.len(), 10);
+        assert_eq!(sorted.kept.len(), 12);
         assert!(dir.path().join("units/skyfort.lua").is_file());
     }
 
@@ -4200,7 +4447,7 @@ mod tests {
     fn a_name_that_left_nothing_behind_is_all_missing() {
         let dir = tempfile::tempdir().expect("tempdir");
         let sorted = sort_stale_files(dir.path(), "skyfort", &[], false).expect("removal");
-        assert_eq!(sorted.missing.len(), 10);
+        assert_eq!(sorted.missing.len(), 12);
         assert!(sorted.ours.is_empty());
         assert!(sorted.kept.is_empty());
     }
@@ -4208,11 +4455,22 @@ mod tests {
     /// The textures are the reason this walks a fixed list rather than the
     /// folder: an atlas is shared by every unit that samples it, and an imported
     /// unit's textures land under the game's own names, so a rename owns
-    /// neither.
+    /// neither. The only textures on the list are a mixed unit's own sheets.
     #[test]
-    fn no_texture_is_ever_a_candidate() {
+    fn no_texture_but_the_units_own_sheets_is_ever_a_candidate() {
         let paths = export_paths(Path::new("/game"), "skyfort");
-        assert!(!paths.iter().any(|p| p.starts_with("/game/unittextures")));
+        let textures: Vec<PathBuf> = paths
+            .iter()
+            .filter(|p| p.starts_with("/game/unittextures"))
+            .cloned()
+            .collect();
+        assert_eq!(
+            textures,
+            vec![
+                PathBuf::from("/game/unittextures/coilbox_skyfort_sheet.png"),
+                PathBuf::from("/game/unittextures/coilbox_skyfort_sheet2.png"),
+            ]
+        );
         assert_eq!(
             paths.first(),
             Some(&PathBuf::from("/game/objects3d/skyfort.s3o"))
