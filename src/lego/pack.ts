@@ -33,6 +33,7 @@ import {
   resolveConnections,
 } from "./connectors";
 import type { LegoProject } from "./model";
+import { type Problem, problem } from "./problems";
 
 const BLOB_MAGIC = "CBLEGO\0\0";
 const SUPPORTED_SCHEMA = 1;
@@ -433,30 +434,44 @@ export function mergePacks(sources: PackSource[]): MergedPacks {
 export function projectPackProblems(
   project: LegoProject,
   pack: LoadedPack,
-): string[] {
-  const problems: string[] = [];
+): Problem[] {
+  const problems: Problem[] = [];
   const installed = pack.library.packs.map((manifest) => manifest.id);
   if (project.packId && !installed.includes(project.packId)) {
     problems.push(
-      `This unit was built against the "${project.packId}" pack, and that pack is not installed.`,
+      problem(
+        "pack",
+        "warning",
+        `This unit was built against the "${project.packId}" pack, and that pack is not installed.`,
+      ),
     );
   }
 
   const atlas = unitAtlas(project, pack.library.atlases);
   if (!atlas.installed) {
     problems.push(
-      `This unit's atlas, "${atlas.texture}", is not installed, so it is drawn with "${atlas.drawWith.tex1}" instead. An export still names its own.`,
+      problem(
+        "pack",
+        "warning",
+        `This unit's atlas, "${atlas.texture}", is not installed, so it is drawn with "${atlas.drawWith.tex1}" instead. An export still names its own.`,
+      ),
     );
   }
 
-  const missing = project.pieces.filter(
+  const lost = project.pieces.filter(
     (piece) => piece.partId !== null && !pack.byId.has(piece.partId),
-  ).length;
+  );
+  const missing = lost.length;
   if (missing > 0) {
     problems.push(
-      missing === 1
-        ? "1 piece names a part no installed pack has, so it shows no geometry."
-        : `${missing} pieces name parts no installed pack has, so they show no geometry.`,
+      problem(
+        "pack",
+        "warning",
+        missing === 1
+          ? "1 piece names a part no installed pack has, so it shows no geometry."
+          : `${missing} pieces name parts no installed pack has, so they show no geometry.`,
+        lost.map((piece) => piece.id),
+      ),
     );
   }
 
@@ -467,7 +482,12 @@ export function projectPackProblems(
     const piece = project.pieces.find((p) => p.id === id);
     if (piece?.parentId === null) continue;
     problems.push(
-      `"${piece?.name}" is joined by a connector that its part or its parent's part does not have, so it stays where it was.`,
+      problem(
+        "pack",
+        "warning",
+        `"${piece?.name}" is joined by a connector that its part or its parent's part does not have, so it stays where it was.`,
+        [id],
+      ),
     );
   }
   return problems;

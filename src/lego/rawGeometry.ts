@@ -22,6 +22,7 @@ import * as THREE from "three";
 import { legoGeometryUrl } from "../lib/assetUrl";
 import { computeSmoothedNormals, fixUv, hasMeshFix } from "./meshFix";
 import type { LegoPiece } from "./model";
+import { type Problem, problem } from "./problems";
 
 const BLOB_MAGIC = "CBLEGO\0\0";
 /** Raw imported geometry. The parts pack is version 1 and is a different shape. */
@@ -471,14 +472,20 @@ export function pieceMesh(
 export function rawGeometryProblems(
   pieces: LegoPiece[],
   raw: RawGeometry | null,
-): string[] {
-  const missing = pieces.filter(
+): Problem[] {
+  const lost = pieces.filter(
     (piece) => piece.meshId !== undefined && !pieceMesh(raw, piece),
-  ).length;
+  );
+  const missing = lost.length;
   if (missing === 0) return [];
   return [
-    missing === 1
-      ? "1 piece names geometry this unit does not have, so it shows nothing. Geometry belongs to the unit it was imported into."
-      : `${missing} pieces name geometry this unit does not have, so they show nothing. Geometry belongs to the unit it was imported into.`,
+    problem(
+      "geometry",
+      "warning",
+      missing === 1
+        ? "1 piece names geometry this unit does not have, so it shows nothing. Geometry belongs to the unit it was imported into."
+        : `${missing} pieces name geometry this unit does not have, so they show nothing. Geometry belongs to the unit it was imported into.`,
+      lost.map((piece) => piece.id),
+    ),
   ];
 }

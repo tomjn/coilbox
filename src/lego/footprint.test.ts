@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-
 import {
   checkFootprint,
   footprintLines,
@@ -8,6 +7,7 @@ import {
 } from "./footprint";
 import { type LegoPiece, type LegoProject, newProject } from "./model";
 import type { LoadedPack } from "./pack";
+import { problemTexts } from "./problems";
 import { footprintSteps } from "./unitDef";
 
 /** A pack with one part: a unit cube from the origin to (1, 1, 1). */
@@ -187,8 +187,8 @@ describe("checkFootprint", () => {
     expect(result.overhang.x).toBe(0);
     expect(result.overhang.z).toBeCloseTo(8, 9);
     expect(footprintProblems(result)).toHaveLength(1);
-    expect(footprintProblems(result)[0]).toContain("8 elmos");
-    expect(footprintProblems(result)[0]).toContain("z");
+    expect(footprintProblems(result)[0].message).toContain("8 elmos");
+    expect(footprintProblems(result)[0].message).toContain("z");
   });
 
   it("reports no problem for a unit inside its footprint", () => {
@@ -258,7 +258,9 @@ describe("checkFootprint", () => {
 
     expect(result.wasted).toEqual({ x: 0, z: 2 });
     expect(footprintLines(result).join(" ")).toContain("2 steps");
-    expect(footprintProblems(result).join(" ")).not.toContain("steps bigger");
+    expect(problemTexts(footprintProblems(result)).join(" ")).not.toContain(
+      "steps bigger",
+    );
   });
 
   it("notes no waste when nothing is left out", () => {

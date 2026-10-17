@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
+import { problemTexts } from "./problems";
 
 // pack.ts reaches the `lego_packs` command through bindings.ts, and the
 // published plugin-sdk dist uses extensionless relative imports that Vitest's
@@ -409,7 +410,7 @@ describe("projectPackProblems", () => {
   });
 
   it("names the pack a unit was built against when it is not installed", () => {
-    expect(projectPackProblems(unit(["a"], "aliens"), pack)[0]).toMatch(
+    expect(projectPackProblems(unit(["a"], "aliens"), pack)[0].message).toMatch(
       /"aliens" pack, and that pack is not installed/,
     );
   });
@@ -419,13 +420,30 @@ describe("projectPackProblems", () => {
       unit(["a", "gone", "also"], "base"),
       pack,
     );
-    expect(problems).toEqual([
+    expect(problemTexts(problems)).toEqual([
       "2 pieces name parts no installed pack has, so they show no geometry.",
     ]);
   });
 
+  it("names the pieces whose part is missing", () => {
+    const [missing] = projectPackProblems(
+      unit(["a", "gone", "also"], "base"),
+      pack,
+    );
+    expect(missing.source).toBe("pack");
+    expect(missing.pieceIds).toHaveLength(2);
+  });
+
+  it("has no piece for a pack that is not installed", () => {
+    expect(
+      projectPackProblems(unit(["a"], "aliens"), pack)[0].pieceIds,
+    ).toEqual([]);
+  });
+
   it("reads as one piece when only one is missing", () => {
-    expect(projectPackProblems(unit(["gone"], "base"), pack)).toEqual([
+    expect(
+      problemTexts(projectPackProblems(unit(["gone"], "base"), pack)),
+    ).toEqual([
       "1 piece names a part no installed pack has, so it shows no geometry.",
     ]);
   });
@@ -436,7 +454,7 @@ describe("projectPackProblems", () => {
 
   it("says a unit's atlas is missing, and what it is drawn with instead", () => {
     const project = { ...unit(["a"], "base"), atlas: "desert.png" };
-    expect(projectPackProblems(project, pack)[0]).toMatch(
+    expect(projectPackProblems(project, pack)[0].message).toMatch(
       /"desert\.png", is not installed, so it is drawn with "atlas\.png"/,
     );
   });

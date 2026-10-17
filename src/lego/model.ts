@@ -25,6 +25,7 @@
  */
 
 import { comparablePath } from "./exportRecord";
+import { type Problem, type ProblemSeverity, problem } from "./problems";
 import type { RawGeometry } from "./rawGeometry";
 import { ringMembers, validRingCount } from "./ringSet";
 import { liftRefusal } from "./unitGame";
@@ -1102,63 +1103,91 @@ export function isEffectivelyHidden(
 }
 
 /**
- * Everything wrong with a project, as sentences meant to be shown.
+ * Everything wrong with a project, as records whose messages are meant to be
+ * shown.
  *
  * Separate from parsing because the editor can hold a document mid-edit that is
  * momentarily invalid, and wants to say so rather than refuse to load it.
  */
-export function projectProblems(project: LegoProject): string[] {
-  const problems: string[] = [];
+export function projectProblems(project: LegoProject): Problem[] {
+  const problems: Problem[] = [];
+  const add = (
+    severity: ProblemSeverity,
+    message: string,
+    pieceIds: string[] = [],
+  ) => problems.push(problem("document", severity, message, pieceIds));
   const byId = new Map(project.pieces.map((piece) => [piece.id, piece]));
 
   if (!byId.has(project.rootPieceId)) {
-    problems.push("The root piece is missing.");
+    add("error", "The root piece is missing.");
   }
 
   const names = new Map<string, number>();
   for (const piece of project.pieces) {
     names.set(piece.name, (names.get(piece.name) ?? 0) + 1);
     if (piece.name !== normalisePieceName(piece.name)) {
-      problems.push(
+      add(
+        "warning",
         `"${piece.name}" is not usable as a name in a unit script.`,
+        [piece.id],
       );
     }
     if (piece.parentId !== null && !byId.has(piece.parentId)) {
-      problems.push(`"${piece.name}" hangs off a piece that no longer exists.`);
+      add("error", `"${piece.name}" hangs off a piece that no longer exists.`, [
+        piece.id,
+      ]);
     }
     if (piece.parentId === null && piece.connection) {
-      problems.push(
+      add(
+        "warning",
         `"${piece.name}" is saved as joined to a parent, but it has none.`,
+        [piece.id],
       );
     }
     if (piece.twin !== undefined && !byId.has(piece.twin)) {
-      problems.push(`"${piece.name}" has a twin that no longer exists.`);
+      add("warning", `"${piece.name}" has a twin that no longer exists.`, [
+        piece.id,
+      ]);
     }
     if (piece.ring !== undefined && !ringMembers(project.pieces, piece.id)) {
-      problems.push(`"${piece.name}" is in a ring that is not whole.`);
+      add("warning", `"${piece.name}" is in a ring that is not whole.`, [
+        piece.id,
+      ]);
     }
   }
   for (const [name, count] of names) {
-    if (count > 1) problems.push(`${count} pieces are called "${name}".`);
+    if (count > 1) {
+      add(
+        "error",
+        `${count} pieces are called "${name}".`,
+        project.pieces.filter((piece) => piece.name === name).map((p) => p.id),
+      );
+    }
   }
 
   // A lifted piece belongs only in a unit for its own game (#3259). Said once
   // per reason, naming the pieces, so a whole turret is one line.
-  const misplaced = new Map<string, string[]>();
+  const misplaced = new Map<string, LegoPiece[]>();
   for (const piece of project.pieces) {
     if (!piece.lifted) continue;
     const refused = liftRefusal(project, piece.lifted.game);
     if (refused)
-      misplaced.set(refused, [...(misplaced.get(refused) ?? []), piece.name]);
+      misplaced.set(refused, [...(misplaced.get(refused) ?? []), piece]);
   }
   for (const [refused, pieces] of misplaced) {
-    problems.push(`${refused} Pieces from a game: ${pieces.join(", ")}.`);
+    add(
+      "warning",
+      `${refused} Pieces from a game: ${pieces.map((p) => p.name).join(", ")}.`,
+      pieces.map((p) => p.id),
+    );
   }
 
   const roots = project.pieces.filter((piece) => piece.parentId === null);
   if (roots.length > 1) {
-    problems.push(
+    add(
+      "error",
       `${roots.length} pieces have no parent, but a model has one root.`,
+      roots.map((p) => p.id),
     );
   }
 
@@ -1167,8 +1196,10 @@ export function projectProblems(project: LegoProject): string[] {
   const reached = new Set(walkPieces(project).map((piece) => piece.id));
   const stranded = project.pieces.filter((piece) => !reached.has(piece.id));
   if (stranded.length > 0) {
-    problems.push(
+    add(
+      "error",
       `${stranded.length} pieces cannot be reached from the root, so they are in a loop or detached.`,
+      stranded.map((p) => p.id),
     );
   }
 

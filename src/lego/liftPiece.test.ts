@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-
 import type { ImportedPiece, S3oImport } from "./bindings";
 import {
   parseClipboardPiece,
@@ -28,6 +27,7 @@ import {
 } from "./model";
 import { parseModuleFile, serializeModuleFile } from "./moduleFile";
 import { moduleStamp } from "./moduleUpdates";
+import { problemTexts } from "./problems";
 import type { RawGeometry } from "./rawGeometry";
 import { gameChangeRefusal } from "./unitGame";
 
@@ -483,7 +483,7 @@ describe("a lifted piece in a unit for a different game", () => {
     const saved = JSON.stringify({ ...module, id: "u", game: xta });
     const opened = parseLegoProjectJson(saved);
     expect(opened).not.toBeNull();
-    expect(projectProblems(opened as LegoProject)).toEqual([
+    expect(problemTexts(projectProblems(opened as LegoProject))).toEqual([
       `${PASTE_REFUSAL} Pieces from a game: turret, barrel.`,
     ]);
   });

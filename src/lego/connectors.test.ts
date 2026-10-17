@@ -1,6 +1,5 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
-
 import { insertCompound, selectionAsCompound } from "./compounds";
 import {
   boxConnectors,
@@ -32,6 +31,7 @@ import {
   type LoadedPack,
   projectPackProblems,
 } from "./pack";
+import { problemTexts } from "./problems";
 import { reparentPiece, worldMatrix } from "./reparent";
 import { bakedPieces, buildS3o } from "./s3oBuild";
 
@@ -389,7 +389,7 @@ describe("resolveConnections", () => {
     const result = resolveConnections(doc, pack());
     expect(result.project).toBe(doc);
     expect(result.broken).toEqual(["gone", "onEmpty"]);
-    const joins = projectPackProblems(doc, pack()).filter((p) =>
+    const joins = problemTexts(projectPackProblems(doc, pack())).filter((p) =>
       p.includes("joined"),
     );
     expect(joins).toEqual([
@@ -698,7 +698,7 @@ describe("saved connections", () => {
         connection: { connector: "+y", to: "-y" },
       })),
     };
-    expect(projectProblems(joined)).toContain(
+    expect(problemTexts(projectProblems(joined))).toContain(
       `"base" is saved as joined to a parent, but it has none.`,
     );
   });

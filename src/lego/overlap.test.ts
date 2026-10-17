@@ -2,12 +2,12 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
-
 import { meshVolume, SAME_POSITION } from "./balance";
 import { type LegoPiece, type LegoProject, newProject } from "./model";
 import { checkOverlap, overlapProblems, overlapSummary } from "./overlap";
 import type { LegoPackManifest, LoadedPack } from "./pack";
 import { mergePacks } from "./pack";
+import { problemTexts } from "./problems";
 
 /** A pack of a closed unit cube and the same cube without its top. */
 function pack(): LoadedPack {
@@ -256,10 +256,20 @@ describe("overlapProblems and overlapSummary", () => {
     ]);
     const result = checkOverlap(doc, pack(), null);
 
-    expect(overlapProblems(doc, result)).toEqual([
+    expect(problemTexts(overlapProblems(doc, result))).toEqual([
       "small is buried inside big and wastes 12 triangles.",
     ]);
     expect(overlapSummary(result)).toBe("1 buried piece wastes 12 triangles.");
+  });
+
+  it("is about the buried piece and the one holding it", () => {
+    const doc = project([
+      big,
+      { id: "small", position: [4, 4, 4], scale: [2, 2, 2] },
+    ]);
+    const [line] = overlapProblems(doc, checkOverlap(doc, pack(), null));
+    expect(line.source).toBe("overlap");
+    expect(line.pieceIds).toEqual(["small", "big"]);
   });
 
   it("says nothing for a unit with nothing buried", () => {
@@ -282,7 +292,7 @@ describe("overlapProblems and overlapSummary", () => {
     const lines = overlapProblems(doc, checkOverlap(doc, pack(), null));
 
     expect(lines).toHaveLength(4);
-    expect(lines[3]).toBe(
+    expect(lines[3].message).toBe(
       "And 2 more. Buried pieces waste 60 triangles in all.",
     );
   });

@@ -33,6 +33,7 @@ import {
 } from "./balance";
 import type { LegoProject } from "./model";
 import type { LoadedPack } from "./pack";
+import { type Problem, problem } from "./problems";
 import type { RawGeometry } from "./rawGeometry";
 import { bakedPieces, type PieceBox } from "./s3oBuild";
 
@@ -405,23 +406,35 @@ export function overlapSummary(result: OverlapResult): string {
 /** Pieces named before the list says "and N more". */
 const LISTED = 3;
 
-/** The lines for the problems list. */
+/**
+ * The problems for the list. Each buried piece is about itself and the piece
+ * holding it. The line after the first few is about all the rest.
+ */
 export function overlapProblems(
   project: LegoProject,
   result: OverlapResult,
-): string[] {
+): Problem[] {
   const name = (id: string) =>
     project.pieces.find((p) => p.id === id)?.name ?? id;
   const lines = result.buried
     .slice(0, LISTED)
-    .map(
-      (b) =>
+    .map((b) =>
+      problem(
+        "overlap",
+        "warning",
         `${name(b.id)} is buried inside ${name(b.holderId)} and wastes ${plural(b.triangles, "triangle")}.`,
+        [b.id, b.holderId],
+      ),
     );
-  const more = result.buried.length - LISTED;
-  if (more > 0) {
+  const rest = result.buried.slice(LISTED);
+  if (rest.length > 0) {
     lines.push(
-      `And ${more} more. Buried pieces waste ${plural(result.wastedTriangles, "triangle")} in all.`,
+      problem(
+        "overlap",
+        "warning",
+        `And ${rest.length} more. Buried pieces waste ${plural(result.wastedTriangles, "triangle")} in all.`,
+        [...new Set(rest.flatMap((b) => [b.id, b.holderId]))],
+      ),
     );
   }
   return lines;
