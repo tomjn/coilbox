@@ -139,6 +139,7 @@ import {
   moduleUpdates,
   type UntrackedModule,
 } from "../moduleUpdates";
+import { movementProblems } from "../movement";
 import { checkOverlap, overlapProblems } from "../overlap";
 import {
   type LegoPartInfo,
@@ -590,6 +591,7 @@ function Builder({ id }: { id: string | undefined }) {
         ? [
             ...skeletonProblems(checkedDraft, pack, raw),
             ...wheelAxleProblems(checkedDraft),
+            ...movementProblems(checkedDraft),
           ]
         : [],
     [checkedDraft, pack, raw, atRest],
