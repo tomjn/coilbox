@@ -59,9 +59,12 @@ vi.mock("../pack", async () => {
 /** What the parts library read answers with, swapped per test: the wait, the
  *  failure and the success all take different paths through the guard. */
 let packLoad: Promise<unknown>;
-const loadedPack = (parts: unknown[] = []) =>
+const SWATCHES = [
+  { id: "grey", uv: { min: [0, 0], max: [0.1, 0.1] }, tile: 1.56 },
+];
+const loadedPack = (parts: unknown[] = [], swatches: unknown[] = SWATCHES) =>
   Promise.resolve({
-    manifest: { categories: [] } as never,
+    manifest: { categories: [], swatches } as never,
     library: {
       packs: [],
       atlases: [{ tex1: "atlas.png", packId: "lego", folder: null }],
@@ -215,8 +218,17 @@ describe("a shape chosen in the strip (#3337)", () => {
       name: "cylinder",
       parentId: "base",
       partId: null,
-      shape: { kind: "cylinder", size: [2, 2, 2] },
+      shape: { kind: "cylinder", size: [1, 1, 1], swatch: "grey" },
     });
+  });
+
+  it("is not offered when the pack lists no swatches", async () => {
+    packLoad = loadedPack([], []);
+    show(unit());
+    await screen.findByRole("button", { name: "Script" });
+    expect(
+      screen.queryByRole("button", { name: "Add the Cylinder shape" }),
+    ).toBeNull();
   });
 
   it("is not offered for a unit imported whole", async () => {

@@ -166,7 +166,7 @@ import type {
   StandInTrack,
 } from "../scriptPlayback";
 import { dragPiece, freeMoved, type Seat, typedTransform } from "../seat";
-import type { ShapeKind } from "../shapes";
+import { isKnownShapeKind, type LegoShape, type ShapeKind } from "../shapes";
 import { isShortcut, shortcutLabel } from "../shortcuts";
 import { skeletonProblems } from "../skeletonChecks";
 import { applyProportions } from "../skeletonEdit";
@@ -180,6 +180,7 @@ import { useShareModule } from "../useModuleShare";
 import { useRawGeometry } from "../useRawGeometry";
 import { useSymmetry } from "../useSymmetry";
 import { addWeaponModule, pickWeaponParts } from "../weaponModule";
+import { setPieceRole, setPieceShape, wheelAxleProblems } from "../wheelAxle";
 import { AimPointPanel } from "./components/AimPointPanel";
 import { AnchorList } from "./components/AnchorList";
 import { AnimationPanel } from "./components/AnimationPanel";
@@ -209,6 +210,7 @@ import type {
 import { SaveModelPopover } from "./components/SaveModelPopover";
 import { ScriptTab } from "./components/ScriptTab";
 import { SetPanel } from "./components/SetPanel";
+import { ShapeFields } from "./components/ShapeFields";
 import { StripResizer } from "./components/StripResizer";
 import { SwapModuleDrawer } from "./components/SwapModuleDrawer";
 import { SwapPartDrawer } from "./components/SwapPartDrawer";
@@ -554,7 +556,10 @@ function Builder({ id }: { id: string | undefined }) {
   const skeletonNotes = useMemo(
     () =>
       checkedDraft && pack && atRest
-        ? skeletonProblems(checkedDraft, pack, raw)
+        ? [
+            ...skeletonProblems(checkedDraft, pack, raw),
+            ...wheelAxleProblems(checkedDraft),
+          ]
         : [],
     [checkedDraft, pack, raw, atRest],
   );
@@ -627,16 +632,28 @@ function Builder({ id }: { id: string | undefined }) {
 
   /**
    * Choosing a shape adds it where `addPart` adds a part: a new piece hanging
-   * off the selection, at its origin, at the kind's default size (#3337). The
-   * placing-by-face and bone rules are for pack parts and do not apply yet.
+   * off the selection, at its origin, at the kind's default size (#3337), and
+   * selects it. The placing-by-face and bone rules are for pack parts and do
+   * not apply yet. A pack that lists no swatches offers no shapes.
    */
-  function addShapePiece(info: ShapeKind) {
-    inventoryView.inventory.record({ kind: "shape", id: info.kind });
+  function addStripShape(info: ShapeKind) {
+    if (!draft || !pack) return;
     const pieceId = crypto.randomUUID();
-    edit((project) =>
-      addShape(project, info, selectedId ?? project.rootPieceId, pieceId),
+    const parentId = selectedId ?? draft.rootPieceId;
+    if (!addShape(draft, info, pack, parentId, pieceId)) return;
+    inventoryView.inventory.record({ kind: "shape", id: info.kind });
+    edit(
+      (project) => addShape(project, info, pack, parentId, pieceId) ?? project,
     );
     queueTwin(pieceId);
+    setSelectedId(pieceId);
+  }
+
+  /** Resize the selected cylinder or tube from the piece panel. */
+  function reshapeSelected(shape: LegoShape) {
+    if (!selectedId) return;
+    const pieceId = selectedId;
+    place([pieceId], (project) => setPieceShape(project, pieceId, shape));
   }
 
   /**
@@ -1468,14 +1485,7 @@ function Builder({ id }: { id: string | undefined }) {
   });
 
   function setRole(pieceId: string, role: string | undefined) {
-    edit((project) => ({
-      ...project,
-      pieces: project.pieces.map((piece) => {
-        if (piece.id !== pieceId) return piece;
-        const { role: _dropped, ...rest } = piece;
-        return role ? { ...rest, role } : rest;
-      }),
-    }));
+    edit((project) => setPieceRole(project, pieceId, role));
   }
 
   function renameSelected(name: string) {
@@ -2324,7 +2334,7 @@ function Builder({ id }: { id: string | undefined }) {
                           : undefined
                       }
                       onSelectPart={startPlacing}
-                      onSelectShape={addShapePiece}
+                      onSelectShape={addStripShape}
                       onInsertModule={startPlacingModule}
                       placingModuleId={
                         placingPart && "module" in placingPart
@@ -2697,6 +2707,14 @@ function Builder({ id }: { id: string | undefined }) {
                             raw={raw}
                             pieceId={selected.id}
                           />
+                          {selected.shape &&
+                          isKnownShapeKind(selected.shape.kind) ? (
+                            <ShapeFields
+                              key={selected.id}
+                              shape={selected.shape}
+                              onChange={reshapeSelected}
+                            />
+                          ) : null}
                           {selected.meshBox ? (
                             <Button
                               size="sm"

@@ -1,15 +1,26 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { meshVolume } from "./balance";
+import { bundledSwatches } from "./fixtures/bundledSwatches";
 import {
+  cutAndTile,
   DEFAULT_CYLINDER_SIDES,
-  INTERIM_SWATCH_POINTS,
   isKnownShapeKind,
   type LegoShape,
   parseShape,
   SHAPE_KINDS,
+  type ShapeMesh,
+  type ShapeSwatch,
+  setShapeSwatches,
   shapeBox,
   shapeMesh,
+  shapeSwatches,
+  tubeInnerRadius,
+  wedgeProfile,
 } from "./shapes";
+
+beforeAll(() => {
+  setShapeSwatches(bundledSwatches());
+});
 
 type Vec3 = [number, number, number];
 
@@ -107,13 +118,18 @@ describe("cylinder mesh", () => {
     expect(capNormals(lying as NonNullable<typeof lying>)).toContain("1,0,0");
   });
 
-  it("has the default number of sides, with caps that share no vertices with the side", () => {
-    const mesh = shapeMesh(cylinder([1, 1, 1]));
-    const n = DEFAULT_CYLINDER_SIDES;
-    // Two rings of the side, and a ring plus a middle for each cap.
-    expect(mesh?.vCount).toBe(2 * n + 2 * (n + 1));
-    // Two triangles a side, and one a side on each cap.
-    expect(mesh?.iCount).toBe(3 * 4 * n);
+  it("has caps that share no vertices with the side", () => {
+    const mesh = shapeMesh(cylinder([2, 3, 2]));
+    if (!mesh) throw new Error("no mesh");
+    // Every normal is along the axis, on a cap, or across it, on the side.
+    for (let i = 0; i < mesh.vCount; i++) {
+      const ny = mesh.vertices[i * 8 + 4];
+      expect(Math.abs(ny) < 1e-6 || Math.abs(Math.abs(ny) - 1) < 1e-6).toBe(
+        true,
+      );
+    }
+    // Two triangles a side and one a side on each cap, before cutting.
+    expect(mesh.iCount).toBeGreaterThanOrEqual(3 * 4 * DEFAULT_CYLINDER_SIDES);
   });
 
   it("winds every triangle counter clockwise seen from outside", () => {
@@ -181,35 +197,414 @@ describe("cylinder mesh", () => {
   });
 });
 
-describe("shape UVs", () => {
-  const uvsOf = (shape: LegoShape) => {
+function tube(
+  size: Vec3,
+  options?: Record<string, number>,
+  swatch = "green",
+): LegoShape {
+  return { kind: "tube", size, swatch, ...(options ? { options } : {}) };
+}
+
+function triangles(mesh: ShapeMesh) {
+  const out: { p: Vec3[]; n: Vec3[]; uv: [number, number][] }[] = [];
+  const at = (i: number, from: number, count: number) =>
+    Array.from({ length: count }, (_, k) => mesh.vertices[i * 8 + from + k]);
+  for (let t = 0; t < mesh.iCount; t += 3) {
+    const ids = [0, 1, 2].map((k) => mesh.indices[t + k]);
+    out.push({
+      p: ids.map((i) => at(i, 0, 3) as Vec3),
+      n: ids.map((i) => at(i, 3, 3) as Vec3),
+      uv: ids.map((i) => at(i, 6, 2) as [number, number]),
+    });
+  }
+  return out;
+}
+
+function faceOf([a, b, c]: Vec3[]): Vec3 {
+  const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  const ac = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+  return [
+    ab[1] * ac[2] - ab[2] * ac[1],
+    ab[2] * ac[0] - ab[0] * ac[2],
+    ab[0] * ac[1] - ab[1] * ac[0],
+  ];
+}
+
+describe("tube mesh", () => {
+  it("has the box its size says, whatever the axis", () => {
+    for (const axis of [0, 1, 2]) {
+      const shape = tube([1.5, 2.25, 0.75], { axis, sides: 7, inner: 0.2 });
+      const bounds = meshBounds(positionsOf(shape));
+      const box = shapeBox(shape);
+      for (let a = 0; a < 3; a++) {
+        expect(bounds.min[a]).toBeCloseTo(box?.min[a] ?? NaN, 6);
+        expect(bounds.max[a]).toBeCloseTo(box?.max[a] ?? NaN, 6);
+      }
+    }
+  });
+
+  it("is a closed solid of the ring's area times its length", () => {
+    const sides = 12;
+    const mesh = shapeMesh(tube([2, 3, 2], { sides, inner: 0.6 }));
+    if (!mesh) throw new Error("no mesh");
+    const measured = meshVolume(
+      positionsOf(tube([2, 3, 2], { sides, inner: 0.6 })),
+      [...mesh.indices],
+    );
+    expect(measured.closed).toBe(true);
+    const polygon = (r: number) =>
+      (sides / 2) * r * r * Math.sin((2 * Math.PI) / sides);
+    expect(measured.volume).toBeCloseTo((polygon(1) - polygon(0.6)) * 3, 6);
+  });
+
+  it("faces its hole inwards and winds it to be seen from inside", () => {
+    const mesh = shapeMesh(tube([2, 3, 2], { sides: 9, inner: 0.5 }));
+    if (!mesh) throw new Error("no mesh");
+    let inner = 0;
+    for (const { p, n } of triangles(mesh)) {
+      const face = faceOf(p);
+      // Each triangle's winding agrees with the way its vertices face.
+      for (const normal of n) {
+        expect(
+          face[0] * normal[0] + face[1] * normal[1] + face[2] * normal[2],
+        ).toBeGreaterThan(0);
+      }
+      const middle = [0, 1, 2].map((k) => (p[0][k] + p[1][k] + p[2][k]) / 3);
+      const across = Math.hypot(middle[0], middle[2]);
+      if (Math.abs(n[0][1]) < 1e-6 && across < 0.75) {
+        inner++;
+        // Pointing at the axis.
+        expect(n[0][0] * middle[0] + n[0][2] * middle[2]).toBeLessThan(0);
+      }
+    }
+    expect(inner).toBeGreaterThanOrEqual(2 * 9);
+  });
+
+  it("uses half the outer radius for a hole it cannot use", () => {
+    expect(tubeInnerRadius(tube([2, 1, 2]))).toBe(0.5);
+    expect(tubeInnerRadius(tube([2, 1, 2], { inner: 1 }))).toBe(0.5);
+    expect(tubeInnerRadius(tube([2, 1, 2], { inner: 0 }))).toBe(0.5);
+    expect(tubeInnerRadius(tube([2, 1, 2], { inner: 0.8 }))).toBeCloseTo(
+      0.8,
+      9,
+    );
+  });
+
+  it("keeps 32 bit indices in range for many sides on a long tube", () => {
+    const mesh = shapeMesh(tube([2, 10, 2], { sides: 64, inner: 0.8 }));
+    if (!mesh) throw new Error("no mesh");
+    expect(Math.max(...mesh.indices)).toBeLessThan(mesh.vCount);
+  });
+});
+
+function wedge(
+  size: Vec3,
+  options?: Record<string, number>,
+  swatch = "green",
+): LegoShape {
+  return { kind: "wedge", size, swatch, ...(options ? { options } : {}) };
+}
+
+describe("wedge mesh (#3328)", () => {
+  it("has the box its size says, for a wedge, a ramp and a flipped one", () => {
+    for (const options of [
+      {},
+      { low: 1 },
+      { flip: 1 },
+      { low: 3, flip: 1 },
+    ] as Record<string, number>[]) {
+      const shape = wedge([2, 4, 3], options);
+      const bounds = meshBounds(positionsOf(shape));
+      const box = shapeBox(shape);
+      for (let a = 0; a < 3; a++) {
+        expect(bounds.min[a]).toBeCloseTo(box?.min[a] ?? NaN, 6);
+        expect(bounds.max[a]).toBeCloseTo(box?.max[a] ?? NaN, 6);
+      }
+    }
+  });
+
+  it("is closed and holds the volume of a prism with a trapezoid end", () => {
+    for (const [low, flip] of [
+      [0, 0],
+      [1, 0],
+      [3.5, 1],
+      [4, 0],
+    ]) {
+      const shape = wedge([2, 4, 3], { low, flip });
+      const mesh = shapeMesh(shape);
+      if (!mesh) throw new Error("no mesh");
+      const measured = meshVolume(positionsOf(shape), [...mesh.indices]);
+      expect(measured.closed).toBe(true);
+      expect(measured.volume).toBeCloseTo((2 * 3 * (4 + low)) / 2, 5);
+    }
+  });
+
+  it("is high at the back (-z) and low at the front, and flips on request", () => {
+    const heightAt = (shape: LegoShape, z: number) =>
+      Math.max(
+        ...positionsOf(shape)
+          .filter((p) => Math.abs(p[2] - z) < 1e-6)
+          .map((p) => p[1]),
+      );
+    const plain = wedge([2, 4, 3], { low: 1 });
+    expect(heightAt(plain, -1.5)).toBeCloseTo(2, 6);
+    expect(heightAt(plain, 1.5)).toBeCloseTo(-1, 6);
+    const flipped = wedge([2, 4, 3], { low: 1, flip: 1 });
+    expect(heightAt(flipped, 1.5)).toBeCloseTo(2, 6);
+    expect(heightAt(flipped, -1.5)).toBeCloseTo(-1, 6);
+  });
+
+  it("makes the sides of a pure wedge triangles and of a ramp four sided", () => {
+    // Small enough to sit inside one tile, so nothing is cut and each side face
+    // is the triangles it was made of: one for a triangle, two for a quad.
+    const sideTriangles = (shape: LegoShape) => {
+      const mesh = shapeMesh(shape);
+      if (!mesh) throw new Error("no mesh");
+      return triangles(mesh).filter(({ n }) => n[0][0] === -1).length;
+    };
+    expect(sideTriangles(wedge([0.5, 0.8, 1]))).toBe(1);
+    expect(sideTriangles(wedge([0.5, 0.8, 1], { low: 0.3 }))).toBe(2);
+  });
+
+  it("gives every flat face one normal and the slope one for the whole face", () => {
+    const mesh = shapeMesh(wedge([2, 4, 3], { low: 1 }));
+    if (!mesh) throw new Error("no mesh");
+    const normals = new Set<string>();
+    for (let i = 0; i < mesh.vCount; i++) {
+      normals.add(
+        [3, 4, 5].map((k) => mesh.vertices[i * 8 + k].toFixed(5)).join(","),
+      );
+    }
+    const slope = Math.hypot(3, 3);
+    expect([...normals].sort()).toEqual(
+      [
+        "-1.00000,0.00000,0.00000",
+        "1.00000,0.00000,0.00000",
+        "0.00000,-1.00000,0.00000",
+        "0.00000,0.00000,-1.00000",
+        "0.00000,0.00000,1.00000",
+        `0.00000,${(3 / slope).toFixed(5)},${(3 / slope).toFixed(5)}`,
+      ].sort(),
+    );
+  });
+
+  it("winds every triangle counter clockwise seen from outside, with its normal", () => {
+    for (const options of [
+      {},
+      { low: 1 },
+      { flip: 1 },
+      { low: 2, flip: 1 },
+    ] as Record<string, number>[]) {
+      const mesh = shapeMesh(wedge([2, 4, 3], options));
+      if (!mesh) throw new Error("no mesh");
+      for (const { p, n } of triangles(mesh)) {
+        const face = faceOf(p);
+        for (const normal of n) {
+          expect(
+            face[0] * normal[0] + face[1] * normal[1] + face[2] * normal[2],
+          ).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
+  it("is made once for the same numbers and again for another", () => {
+    expect(shapeMesh(wedge([1, 1, 1]))).toBe(shapeMesh(wedge([1, 1, 1])));
+    expect(shapeMesh(wedge([1, 1, 1]))).not.toBe(
+      shapeMesh(wedge([1, 1, 1], { low: 0.5 })),
+    );
+  });
+
+  it("reads a low end it cannot use as a pure wedge", () => {
+    expect(wedgeProfile(wedge([1, 2, 1], { low: -1 })).low).toBe(0);
+    expect(wedgeProfile(wedge([1, 2, 1], { low: 3 })).low).toBe(0);
+    expect(wedgeProfile(wedge([1, 2, 1], { low: Number.NaN })).low).toBe(0);
+    expect(wedgeProfile(wedge([1, 2, 1], { low: 2 })).low).toBe(2);
+    expect(wedgeProfile(wedge([1, 2, 1], { flip: 1 })).flip).toBe(true);
+    expect(wedgeProfile(wedge([1, 2, 1])).flip).toBe(false);
+  });
+
+  it("unwraps the slope in its own plane, measured from the back", () => {
+    // Rise 3 over run 4 is a 5 long slope. Before tiling its v runs 0 to 5, so
+    // after tiling no triangle on it is squashed (the density test below).
+    const shape = wedge([2, 3, 4]);
     const mesh = shapeMesh(shape);
     if (!mesh) throw new Error("no mesh");
-    const out = new Set<string>();
-    for (let i = 0; i < mesh.vCount; i++) {
-      out.add(`${mesh.vertices[i * 8 + 6]},${mesh.vertices[i * 8 + 7]}`);
+    let area = 0;
+    for (const { p, n } of triangles(mesh)) {
+      if (n[0][1] > 0.1 && n[0][2] > 0.1) area += Math.hypot(...faceOf(p)) / 2;
     }
-    return [...out].map((s) => s.split(",").map(Number));
-  };
+    expect(area).toBeCloseTo(2 * 5, 5);
+  });
+});
 
-  it("samples the middle of its swatch for every vertex (#3326)", () => {
-    expect(uvsOf(cylinder([1, 1, 1], undefined, "green"))).toEqual([
-      [0.1836, 0.9648].map(Math.fround),
-    ]);
-    expect(uvsOf(cylinder([1, 1, 1], undefined, "tan"))).toEqual([
-      [0.5952, 0.9648].map(Math.fround),
-    ]);
-    expect(uvsOf(cylinder([1, 1, 1], undefined, "grey"))).toEqual([
-      [0.9795, 0.2969].map(Math.fround),
-    ]);
+/**
+ * The pack's own texel density, the area weighted median over every triangle
+ * of every part, measured in #3326.
+ */
+const PACK_DENSITY = 41.1;
+/** The bundled atlas is 2048 pixels square. */
+const ATLAS = 2048;
+/**
+ * How far a shape's density may sit from the pack's. The swatches are a
+ * whole number of 1/10000 UV steps and `tile` is two decimals, which leaves
+ * 40.96 pixels a unit across and 41.09 along. 1% covers that.
+ */
+const DENSITY_TOLERANCE = 0.01;
+
+describe("shape UVs (#3326)", () => {
+  const SIZES: Vec3[] = [
+    [2, 0.5, 2],
+    [1, 6, 1],
+    [4, 4, 4],
+    [2, 10, 2],
+    [0.3, 0.3, 0.3],
+    [3, 1.7, 1.2],
+  ];
+  const shapes = () =>
+    SIZES.flatMap((size) =>
+      [0, 1, 2].flatMap((axis) =>
+        shapeSwatches().flatMap((swatch) => [
+          cylinder(size, { axis }, swatch.id),
+          tube(
+            size,
+            { axis, inner: Math.min(size[0], size[2]) / 4 },
+            swatch.id,
+          ),
+        ]),
+      ),
+    ).concat(
+      SIZES.flatMap((size) =>
+        shapeSwatches().flatMap((swatch) =>
+          (
+            [
+              {},
+              { low: size[1] / 2 },
+              { flip: 1 },
+              { low: size[1], flip: 1 },
+            ] as Record<string, number>[]
+          ).map((options) => wedge(size, options, swatch.id)),
+        ),
+      ),
+    );
+
+  it("has three swatches from the bundled pack", () => {
+    expect(shapeSwatches().map((s) => s.id)).toEqual(["green", "tan", "grey"]);
+  });
+
+  it("puts every UV inside the shape's swatch, at any size", () => {
+    for (const shape of shapes()) {
+      const mesh = shapeMesh(shape);
+      if (!mesh) throw new Error("no mesh");
+      const swatch = shapeSwatches().find((s) => s.id === shape.swatch);
+      if (!swatch) throw new Error("no swatch");
+      for (let i = 0; i < mesh.vCount; i++) {
+        for (const k of [0, 1]) {
+          const uv = mesh.vertices[i * 8 + 6 + k];
+          expect(uv).toBeGreaterThanOrEqual(
+            Math.fround(swatch.uv.min[k]) - 1e-7,
+          );
+          expect(uv).toBeLessThanOrEqual(Math.fround(swatch.uv.max[k]) + 1e-7);
+        }
+      }
+    }
+  });
+
+  it("draws every triangle at the pack's density, at any size", () => {
+    for (const shape of shapes()) {
+      const mesh = shapeMesh(shape);
+      if (!mesh) throw new Error("no mesh");
+      for (const { p, uv } of triangles(mesh)) {
+        const area = Math.hypot(...faceOf(p));
+        const uvArea = Math.abs(
+          (uv[1][0] - uv[0][0]) * (uv[2][1] - uv[0][1]) -
+            (uv[2][0] - uv[0][0]) * (uv[1][1] - uv[0][1]),
+        );
+        // Slivers along a cut are too small to measure in float32.
+        if (area < 1e-4) continue;
+        const density = Math.sqrt(uvArea / area) * ATLAS;
+        expect(Math.abs(density / PACK_DENSITY - 1)).toBeLessThan(
+          DENSITY_TOLERANCE,
+        );
+      }
+    }
+  });
+
+  it("keeps the mesh closed after cutting", () => {
+    for (const shape of shapes()) {
+      const mesh = shapeMesh(shape);
+      if (!mesh) throw new Error("no mesh");
+      expect(meshVolume(positionsOf(shape), [...mesh.indices]).closed).toBe(
+        true,
+      );
+    }
   });
 
   it("draws an unknown swatch, or none, with the first", () => {
-    const first = uvsOf(cylinder([1, 1, 1], undefined, "green"));
-    expect(uvsOf(cylinder([1, 1, 1], undefined, "purple"))).toEqual(first);
-    expect(uvsOf(cylinder([1, 1, 1], undefined, "toString"))).toEqual(first);
-    expect(uvsOf({ kind: "cylinder", size: [1, 1, 1] })).toEqual(first);
-    expect(Object.keys(INTERIM_SWATCH_POINTS)[0]).toBe("green");
+    const uvs = (shape: LegoShape) => [...(shapeMesh(shape)?.vertices ?? [])];
+    const first = uvs(cylinder([1, 1, 1], undefined, "green"));
+    expect(uvs(cylinder([1, 1, 1], undefined, "purple"))).toEqual(first);
+    expect(uvs({ kind: "cylinder", size: [1, 1, 1] })).toEqual(first);
+  });
+
+  it("samples nothing but (0, 0) when the pack lists no swatches", () => {
+    const before = shapeSwatches();
+    setShapeSwatches([]);
+    try {
+      const mesh = shapeMesh(cylinder([1, 1, 1]));
+      if (!mesh) throw new Error("no mesh");
+      for (let i = 0; i < mesh.vCount; i++) {
+        expect(mesh.vertices[i * 8 + 6]).toBe(0);
+        expect(mesh.vertices[i * 8 + 7]).toBe(0);
+      }
+    } finally {
+      setShapeSwatches(before);
+    }
+  });
+});
+
+describe("cutAndTile", () => {
+  const swatch: ShapeSwatch = {
+    id: "s",
+    uv: { min: [0.5, 0.25], max: [0.75, 0.5] },
+    tile: 2,
+  };
+  // A strip 6 long and 1 high, two triangles, unwrapped as it lies.
+  const strip = {
+    positions: [0, 0, 0, 6, 0, 0, 6, 1, 0, 0, 1, 0],
+    normals: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
+    indices: [0, 1, 2, 0, 2, 3],
+    unwrapped: [0, 0, 6, 0, 6, 1, 0, 1],
+  };
+
+  it("cuts where each tile ends and shares the vertices along a cut", () => {
+    const out = cutAndTile(strip, swatch);
+    // Three tiles across: four columns of two vertices, and the two places the
+    // diagonal crosses a cut.
+    expect(out.positions.length / 3).toBe(10);
+    const xs = new Set<number>();
+    for (let i = 0; i < out.positions.length; i += 3) xs.add(out.positions[i]);
+    expect([...xs].sort((a, b) => a - b)).toEqual([0, 2, 4, 6]);
+  });
+
+  it("runs every other tile backwards", () => {
+    const out = cutAndTile(strip, swatch);
+    const uAt = new Map<number, number>();
+    for (let i = 0; i < out.positions.length / 3; i++) {
+      uAt.set(out.positions[i * 3], out.uvs[i * 2]);
+    }
+    expect([0, 2, 4, 6].map((x) => uAt.get(x))).toEqual([0.5, 0.75, 0.5, 0.75]);
+  });
+
+  it("keeps the winding", () => {
+    const out = cutAndTile(strip, swatch);
+    for (let t = 0; t < out.indices.length; t += 3) {
+      const p = [0, 1, 2].map((k) => {
+        const i = out.indices[t + k];
+        return out.positions.slice(i * 3, i * 3 + 3) as Vec3;
+      });
+      expect(faceOf(p)[2]).toBeGreaterThan(0);
+    }
   });
 });
 

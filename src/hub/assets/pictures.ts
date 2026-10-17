@@ -93,9 +93,19 @@ function echoes(
 ): boolean {
   if (result.keyed_on !== identity.keyed_on) return false;
   if (result.variant !== identity.variant) return false;
-  return identity.keyed_on === "map"
-    ? result.map_name === identity.map_name
-    : result.game === identity.game && result.unit_name === identity.unit_name;
+  switch (identity.keyed_on) {
+    case "map":
+      return result.map_name === identity.map_name;
+    case "faction":
+      return (
+        result.game === identity.game &&
+        result.faction_key === identity.faction_key
+      );
+    case "unit":
+      return (
+        result.game === identity.game && result.unit_name === identity.unit_name
+      );
+  }
 }
 
 /** One answer's picture, or null for anything that is not one. A result whose

@@ -7,6 +7,7 @@ import { descendantIds, pieceById } from "../../model";
 import { type LoadedPack, partUnit } from "../../pack";
 import { pieceMesh, type RawGeometry } from "../../rawGeometry";
 import type { Seat } from "../../seat";
+import { isRoundShapeKind } from "../../shapes";
 import {
   type Anchor,
   facesOppose,
@@ -19,6 +20,7 @@ import {
   snapRotation,
   type Vec3,
 } from "../../snapping";
+import { wedgeAnchors } from "../../wedgeShape";
 import { cornerMark, faceMark, points } from "./dotsAndPoints";
 import { pieceIdOf } from "./gizmoCommit";
 import {
@@ -88,7 +90,15 @@ function localAnchorsOf(
       facing: c.facing,
     }));
   } else {
-    anchors = pieceAnchors(box, undefined).map((anchor) =>
+    anchors = (
+      piece.shape?.kind === "wedge" && box
+        ? wedgeAnchors(box, piece.shape)
+        : pieceAnchors(
+            box,
+            undefined,
+            piece.shape !== undefined && isRoundShapeKind(piece.shape.kind),
+          )
+    ).map((anchor) =>
       anchor.connector && ids.has(anchor.connector)
         ? anchor
         : stripConnector(anchor),

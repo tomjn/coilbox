@@ -130,7 +130,7 @@ export function InventoryFilters({
           packId={partFilter.packId}
           onPackId={partFilter.setPackId}
           shown={view.parts.length + view.shapes.length}
-          showShapes
+          showShapes={(pack.manifest.swatches?.length ?? 0) > 0}
           className="flex-1"
         />
       ) : view.kind === "modules" ? (

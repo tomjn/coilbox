@@ -1070,6 +1070,11 @@ async fn unitsync_unit_buildpics<R: Runtime>(
 /// for a game in one session. `sides` are the side names (from `unitsync_game_info`).
 /// Disk-cached under the app cache dir, keyed on cheap file identity. Returns
 /// `{ logos: [{ side, dataUri, maxDim }], errors }`.
+///
+/// `assets` additionally encodes each emblem as the hub's `logo` asset and puts the
+/// file where the uploader can read it, reporting it as `asset` on the entry
+/// (issue #4387). Such a run reads and writes no cache, since the file is what it
+/// is asked for, and the entries carry no PNG.
 #[tauri::command]
 async fn unitsync_faction_logos<R: Runtime>(
     app: AppHandle<R>,
@@ -1077,28 +1082,44 @@ async fn unitsync_faction_logos<R: Runtime>(
     data_dir: String,
     game_archive: String,
     sides: Vec<String>,
+    assets: Option<bool>,
     archive_path: Option<String>,
 ) -> CliResult {
-    if let Some(hit) = answered(
-        "faction logos",
-        faction_logo_cache_dir(&app)
-            .zip(archive_path.as_deref())
-            .and_then(|(dir, path)| cached::faction_logos(&dir, Path::new(path), &sides))
-            .and_then(|out| serde_json::to_value(out).ok()),
-    ) {
-        return hit;
+    if assets != Some(true) {
+        if let Some(hit) = answered(
+            "faction logos",
+            faction_logo_cache_dir(&app)
+                .zip(archive_path.as_deref())
+                .and_then(|(dir, path)| cached::faction_logos(&dir, Path::new(path), &sides))
+                .and_then(|out| serde_json::to_value(out).ok()),
+        ) {
+            return hit;
+        }
     }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
     };
     let cache_dir = faction_logo_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
+    let asset_dir = match assets {
+        Some(true) => match hub_asset_dir(&app) {
+            Some(dir) => Some(dir.to_string_lossy().into_owned()),
+            None => {
+                return CliResult::err(
+                    "no cache directory on this platform, so there is nowhere to write the faction logos"
+                        .to_string(),
+                )
+            }
+        },
+        _ => None,
+    };
     let args = build_faction_logos_args(
         &libpath.to_string_lossy(),
         &data_dir,
         &game_archive,
         &sides,
         cache_dir.as_deref(),
+        asset_dir.as_deref(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
     run_worker(bin, args, envs, SCAN_TIMEOUT, "faction logos", None).await

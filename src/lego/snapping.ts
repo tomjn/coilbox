@@ -67,9 +67,11 @@ function face(position: Vec3, out: Vec3): Anchor {
  * Anchors in a part's own space.
  *
  * Corners first, because a corner is the more precise fit and ordering decides
- * ties when two anchors sit at the same distance.
+ * ties when two anchors sit at the same distance. A `round` piece, a cylinder
+ * or a tube, has no corners on it, so it gets none. Its face middles are then
+ * the middle of each end and the four points where its side touches the box.
  */
-export function localAnchors(bounds: Bounds): Anchor[] {
+export function localAnchors(bounds: Bounds, round = false): Anchor[] {
   const { min, max } = bounds;
   const mid: Vec3 = [
     (min[0] + max[0]) / 2,
@@ -78,7 +80,7 @@ export function localAnchors(bounds: Bounds): Anchor[] {
   ];
 
   const anchors: Anchor[] = [];
-  for (const [ix, x] of [min[0], max[0]].entries()) {
+  for (const [ix, x] of (round ? [] : [min[0], max[0]]).entries()) {
     for (const [iy, y] of [min[1], max[1]].entries()) {
       for (const [iz, z] of [min[2], max[2]].entries()) {
         anchors.push({
@@ -114,6 +116,7 @@ export function localAnchors(bounds: Bounds): Anchor[] {
 export function pieceAnchors(
   bounds: Bounds | null,
   custom: readonly { name: string; position: Vec3 }[] | undefined,
+  round = false,
 ): Anchor[] {
   if (custom && custom.length > 0) {
     return custom.map((anchor) => ({
@@ -122,7 +125,7 @@ export function pieceAnchors(
       name: anchor.name,
     }));
   }
-  if (bounds) return localAnchors(bounds);
+  if (bounds) return localAnchors(bounds, round);
   return [{ position: [0, 0, 0], kind: "centre" }];
 }
 

@@ -3,18 +3,44 @@
  * that read geometry, the connectors and every way a piece is copied see it.
  */
 
-import { describe, expect, it } from "vitest";
+import type * as THREE from "three";
+import { beforeAll, describe, expect, it } from "vitest";
 import { parseClipboardPiece, serializeClipboardPiece } from "./clipboard";
 import { duplicatePiece, insertCompound } from "./compounds";
 import { boxConnectors, pieceConnectors, pieceOwnBox } from "./connectors";
+import { buildGlbScene } from "./exportGlb";
+import { buildObj } from "./exportObj";
+import { bundledSwatches } from "./fixtures/bundledSwatches";
 import { mirrorCopy } from "./mirror";
 import { type LegoPiece, type LegoProject, newProject } from "./model";
 import { moduleShareCode, readSharedModule } from "./moduleShare";
 import { checkOverlap } from "./overlap";
 import type { LoadedPack } from "./pack";
 import { pivotChoices } from "./pivot";
-import { bakedPieces, pieceBoxes } from "./s3oBuild";
-import { type LegoShape, shapeBox, shapeMesh } from "./shapes";
+import { bakedPieces, buildS3o, pieceBoxes, type S3oPiece } from "./s3oBuild";
+import {
+  type LegoShape,
+  setShapeSwatches,
+  shapeBox,
+  shapeMesh,
+} from "./shapes";
+
+beforeAll(() => {
+  setShapeSwatches(bundledSwatches());
+});
+
+/** The grey swatch in the bundled pack's UVs, v up from the bottom. */
+const GREY = bundledSwatches()[2].uv;
+const SLACK = 1e-6;
+
+function insideGrey([u, v]: [number, number]): boolean {
+  return (
+    u >= GREY.min[0] - SLACK &&
+    u <= GREY.max[0] + SLACK &&
+    v >= GREY.min[1] - SLACK &&
+    v <= GREY.max[1] + SLACK
+  );
+}
 
 type Vec3 = [number, number, number];
 
@@ -118,6 +144,63 @@ describe("a shape in the bake", () => {
     expect(result.buried.map((b) => [b.id, b.holderId])).toEqual([
       ["core", "drum"],
     ]);
+  });
+});
+
+describe("a shape in the exports (#3327)", () => {
+  const unit = project([
+    { id: "drum", shape: cylinder([4, 6, 4]) },
+    {
+      id: "pipe",
+      shape: { kind: "tube", size: [2, 9, 2], swatch: "grey" },
+      position: [5, 0, 0],
+    },
+  ]);
+
+  it("writes the s3o's UVs inside the swatch, turned for the engine", () => {
+    const built = buildS3o(unit, pack(), null, { texture1: "atlas.png" });
+    if (!built) throw new Error("no build");
+    const all: S3oPiece[] = [];
+    const walk = (piece: S3oPiece) => {
+      all.push(piece);
+      piece.children.forEach(walk);
+    };
+    walk(built.root);
+    const shaped = all.filter((piece) => piece.vertices.length > 0);
+    expect(shaped).toHaveLength(2);
+    for (const piece of shaped) {
+      for (const { uv } of piece.vertices) {
+        expect(insideGrey([uv[0], 1 - uv[1]])).toBe(true);
+      }
+      expect(Math.max(...piece.indices)).toBeLessThan(piece.vertices.length);
+    }
+  });
+
+  it("writes the .obj's UVs inside the swatch, v up from the bottom", () => {
+    const built = buildObj(unit, pack(), null, {
+      unitName: "roller",
+      textureName: "atlas.png",
+    });
+    const uvs = (built?.obj.split("\n") ?? [])
+      .filter((line) => line.startsWith("vt "))
+      .map((line) => line.split(" ").slice(1).map(Number) as [number, number]);
+    expect(uvs.length).toBeGreaterThan(0);
+    expect(uvs.every(insideGrey)).toBe(true);
+  });
+
+  it("writes the .glb's UVs inside the swatch", () => {
+    const scene = buildGlbScene(unit, pack(), null);
+    const meshes: THREE.Mesh[] = [];
+    scene?.traverse((node) => {
+      if ((node as THREE.Mesh).isMesh) meshes.push(node as THREE.Mesh);
+    });
+    expect(meshes).toHaveLength(2);
+    for (const mesh of meshes) {
+      const uv = mesh.geometry.getAttribute("uv");
+      for (let i = 0; i < uv.count; i++) {
+        expect(insideGrey([uv.getX(i), uv.getY(i)])).toBe(true);
+      }
+    }
   });
 });
 

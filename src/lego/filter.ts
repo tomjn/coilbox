@@ -85,9 +85,12 @@ export function usePartFilter(pack: LoadedPack | null): PartFilter {
     () => (pack ? filterParts(pack.parts, query, category, packId) : []),
     [pack, query, category, packId],
   );
+  // A pack that lists no swatches cannot give a shape its surface, so it
+  // offers no shapes.
+  const hasSwatches = (pack?.manifest.swatches?.length ?? 0) > 0;
   const shapes = useMemo(
-    () => filterShapes(SHAPE_KINDS, query, category),
-    [query, category],
+    () => (hasSwatches ? filterShapes(SHAPE_KINDS, query, category) : []),
+    [hasSwatches, query, category],
   );
   return {
     query,

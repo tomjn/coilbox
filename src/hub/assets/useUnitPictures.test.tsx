@@ -110,7 +110,13 @@ function stubHub(units: string[] = []) {
 function askedOf(batches: AssetIdentity[][]): string[] {
   return batches
     .flat()
-    .map((key) => (key.keyed_on === "unit" ? key.unit_name : key.map_name));
+    .map((key) =>
+      key.keyed_on === "map"
+        ? key.map_name
+        : key.keyed_on === "unit"
+          ? key.unit_name
+          : "",
+    );
 }
 
 /** The settings store `useHubUrl` reads through, which the frame's `useSetting`

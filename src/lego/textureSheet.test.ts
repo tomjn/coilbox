@@ -4,10 +4,12 @@ import { describe, expect, it } from "vitest";
 
 import { buildGlbScene } from "./exportGlb";
 import { buildObj } from "./exportObj";
+import { bundledSwatches } from "./fixtures/bundledSwatches";
 import { type LegoPiece, type LegoProject, newProject } from "./model";
 import type { LegoPartInfo, LoadedPack } from "./pack";
 import type { RawGeometry } from "./rawGeometry";
 import { bakedPieces, buildS3o, type S3oPiece } from "./s3oBuild";
+import { setShapeSwatches } from "./shapes";
 import {
   cropUv,
   planSheet,
@@ -295,6 +297,33 @@ describe("sheetBounds", () => {
       0.25, 0.5, 0.5, 0.75,
     ]);
     expect(sheetBounds(found.sources[1], pieces)).toEqual([0, 0, 0.5, 0.5]);
+  });
+
+  it("takes in a shape's swatch and nothing past it (#3327)", () => {
+    const swatches = bundledSwatches();
+    setShapeSwatches(swatches);
+    const doc = mixed();
+    const shaped = project([
+      {
+        id: "wheel",
+        partId: null,
+        shape: { kind: "tube", size: [3, 7, 3], swatch: "grey" },
+      },
+      doc.pieces[2],
+    ]);
+    const found = sheetSources(shaped, pack(), raw());
+    if (!found || "refused" in found) throw new Error("no sources");
+    const { pieces } = bakedPieces(shaped, pack(), raw());
+    const [u0, v0, u1, v1] = sheetBounds(found.sources[0], pieces);
+    const grey = swatches[2].uv;
+    // The engine's v runs down from the top.
+    const slack = 1e-6;
+    expect(u0).toBeGreaterThanOrEqual(grey.min[0] - slack);
+    expect(u1).toBeLessThanOrEqual(grey.max[0] + slack);
+    expect(v0).toBeGreaterThanOrEqual(1 - grey.max[1] - slack);
+    expect(v1).toBeLessThanOrEqual(1 - grey.min[1] + slack);
+    expect(u1 - u0).toBeGreaterThan(0);
+    setShapeSwatches([]);
   });
 });
 

@@ -1,61 +1,157 @@
 import { describe, expect, it } from "vitest";
 
 import { addShape } from "./addShape";
-import { newProject } from "./model";
-import type { ShapeKind } from "./shapes";
+import { type LegoProject, newProject } from "./model";
+import type { LegoPartInfo, LoadedPack } from "./pack";
+import { roundNumbers } from "./roundShape";
+import { SHAPE_KINDS, type ShapeKind } from "./shapes";
+import { wedgeNumbers } from "./wedgeShape";
 
-const cylinder: ShapeKind = {
-  kind: "cylinder",
-  label: "Cylinder",
-  size: [2, 2, 2],
-  tags: ["round"],
+const SWATCHES = ["green", "tan", "grey"].map((id) => ({
+  id,
+  uv: { min: [0, 0] as [number, number], max: [0.1, 0.1] as [number, number] },
+  tile: 1.56,
+}));
+
+function pack(swatches = SWATCHES): Pick<LoadedPack, "manifest" | "byId"> {
+  const parts = [
+    { id: "g", colourway: "green" },
+    { id: "t", colourway: "tan" },
+  ] as LegoPartInfo[];
+  return {
+    manifest: { swatches } as LoadedPack["manifest"],
+    byId: new Map(parts.map((part) => [part.id, part])),
+  };
+}
+
+function unit(partIds: string[] = []): LegoProject {
+  const base = newProject({
+    id: "p",
+    rootPieceId: "root",
+    name: "unit",
+    packId: "lego",
+    packVersion: "1",
+    now: "2026-10-17T00:00:00Z",
+  });
+  return {
+    ...base,
+    pieces: [
+      ...base.pieces,
+      ...partIds.map((partId, i) => ({
+        id: `p${i}`,
+        name: `p${i}`,
+        parentId: "root",
+        partId,
+        position: [0, 0, 0] as [number, number, number],
+        rotation: [0, 0, 0] as [number, number, number],
+        scale: [1, 1, 1] as [number, number, number],
+      })),
+    ],
+  };
+}
+
+const kindOf = (kind: string): ShapeKind => {
+  const info = SHAPE_KINDS.find((candidate) => candidate.kind === kind);
+  if (!info) throw new Error(`no ${kind}`);
+  return info;
 };
 
-const base = newProject({
-  id: "p",
-  rootPieceId: "root",
-  name: "unit",
-  packId: "lego",
-  packVersion: "1",
-  now: "2026-10-17T00:00:00Z",
-});
+function added(
+  kind: string,
+  project = unit(),
+  swatches = SWATCHES,
+  parentId = "root",
+) {
+  const next = addShape(
+    project,
+    kindOf(kind),
+    pack(swatches),
+    parentId,
+    "new1",
+  );
+  return next?.pieces.find((piece) => piece.id === "new1");
+}
 
 describe("addShape", () => {
-  it("adds a piece with the kind and its default size under the parent", () => {
-    const next = addShape(base, cylinder, "root", "new1");
-    const piece = next.pieces.find((p) => p.id === "new1");
-    expect(piece).toMatchObject({
+  it("adds a piece with the kind and its default numbers under the parent", () => {
+    expect(added("cylinder")).toMatchObject({
       parentId: "root",
       partId: null,
       position: [0, 0, 0],
       rotation: [0, 0, 0],
       scale: [1, 1, 1],
-      shape: { kind: "cylinder", size: [2, 2, 2] },
+      shape: { kind: "cylinder", size: [1, 1, 1] },
     });
   });
 
-  it("copies the size, so editing the piece cannot change the default", () => {
-    const next = addShape(base, cylinder, "root", "new1");
-    const piece = next.pieces.find((p) => p.id === "new1");
-    expect(piece?.shape?.size).not.toBe(cylinder.size);
+  it("copies the size and options, so editing the piece cannot change the default", () => {
+    const piece = added("tube");
+    expect(piece?.shape?.size).not.toBe(kindOf("tube").size);
+    expect(piece?.shape?.options).not.toBe(kindOf("tube").options);
   });
 
-  it("carries the kind's default options", () => {
-    const next = addShape(
-      base,
-      { ...cylinder, options: { sides: 8 } },
-      "root",
-      "new1",
-    );
-    expect(next.pieces.at(-1)?.shape?.options).toEqual({ sides: 8 });
+  it("makes an upright cylinder, a tube with a wall and a pure wedge", () => {
+    const tube = added("tube")?.shape;
+    expect(tube && roundNumbers(tube)).toMatchObject({
+      axis: 1,
+      radius: 0.5,
+      length: 1,
+      wall: 0.25,
+    });
+    const wedge = added("wedge")?.shape;
+    expect(wedge && wedgeNumbers(wedge)).toMatchObject({
+      low: 0,
+      flip: false,
+    });
+  });
+
+  it("takes the colourway most of the unit's parts use", () => {
+    expect(added("cylinder", unit(["t", "g", "t"]))?.shape?.swatch).toBe("tan");
+  });
+
+  it("takes the first swatch when no part has one", () => {
+    expect(added("cylinder")?.shape?.swatch).toBe("green");
+  });
+
+  it("adds nothing when the pack lists no swatches", () => {
+    expect(
+      addShape(unit(), kindOf("tube"), pack([]), "root", "new1"),
+    ).toBeNull();
   });
 
   it("names pieces after the kind and keeps the names unique", () => {
-    const once = addShape(base, cylinder, "root", "a");
-    const twice = addShape(once, cylinder, "a", "b");
-    expect(twice.pieces.filter((p) => p.shape).map((p) => p.name)).toEqual([
+    const once = addShape(unit(), kindOf("cylinder"), pack(), "root", "a");
+    if (!once) throw new Error("no project");
+    const twice = addShape(once, kindOf("cylinder"), pack(), "a", "b");
+    expect(twice?.pieces.filter((p) => p.shape).map((p) => p.name)).toEqual([
       "cylinder",
       "cylinder2",
+    ]);
+  });
+
+  it("turns a round shape under a wheel to spin about its axle", () => {
+    const base = unit();
+    const withWheel: LegoProject = {
+      ...base,
+      pieces: [
+        ...base.pieces,
+        {
+          id: "w",
+          name: "wheel",
+          parentId: "root",
+          partId: null,
+          role: "wheel",
+          position: [0, 0, 0],
+          rotation: [0, 0, 0],
+          scale: [1, 1, 1],
+        },
+      ],
+    };
+    expect(added("cylinder", withWheel, SWATCHES, "w")?.rotation).not.toEqual([
+      0, 0, 0,
+    ]);
+    expect(added("cylinder", withWheel, SWATCHES, "root")?.rotation).toEqual([
+      0, 0, 0,
     ]);
   });
 });

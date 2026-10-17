@@ -27,6 +27,7 @@ import {
   type RawAtlasManifest,
   type RawPackManifest,
   readAtlasPack,
+  readSwatches,
 } from "./pack";
 
 /** Eight floats per vertex, so a part of n vertices is 8n floats. */
@@ -633,5 +634,89 @@ describe("the bundled pack", () => {
     ]);
     expect(merged.problems).toEqual([]);
     expect(partUnit(merged)).toBe(DEFAULT_PART_UNIT);
+  });
+
+  it("lists a swatch for each colourway, as #3326 measured them", () => {
+    expect(bundled.swatches).toEqual([
+      {
+        id: "green",
+        uv: { min: [0.168, 0.9492], max: [0.1992, 0.9805] },
+        tile: 1.56,
+      },
+      {
+        id: "tan",
+        uv: { min: [0.5796, 0.9492], max: [0.6108, 0.9805] },
+        tile: 1.56,
+      },
+      {
+        id: "grey",
+        uv: { min: [0.9639, 0.2813], max: [0.9951, 0.3125] },
+        tile: 1.56,
+      },
+    ]);
+    const colourways = new Set(bundled.parts.map((p) => p.colourway));
+    for (const swatch of bundled.swatches ?? []) {
+      expect(colourways.has(swatch.id)).toBe(true);
+    }
+  });
+});
+
+describe("swatches", () => {
+  const swatch = {
+    id: "grey",
+    uv: { min: [0.1, 0.2], max: [0.2, 0.3] },
+    tile: 1.5,
+  };
+
+  it("keeps the base pack's and ignores an extension pack's", () => {
+    const merged = mergePacks([
+      source("base", [part({ id: "a" })], {
+        swatches: [swatch] as LegoPackManifest["swatches"],
+      }),
+      source("extra", [part({ id: "b" })], {
+        extends: "base",
+        swatches: [{ ...swatch, id: "pink" }] as LegoPackManifest["swatches"],
+      }),
+    ]);
+    expect(merged.manifest.swatches).toEqual([swatch]);
+    expect(merged.problems).toEqual([]);
+  });
+
+  it("leaves a pack that lists none without any", () => {
+    const merged = mergePacks([source("base", [part({ id: "a" })])]);
+    expect(merged.manifest.swatches).toBeUndefined();
+    expect(readSwatches(undefined)).toEqual({ usable: [], problem: null });
+  });
+
+  it("drops a swatch it cannot use and says how many", () => {
+    const read = readSwatches([
+      swatch,
+      { ...swatch },
+      { ...swatch, id: "a", tile: 0 },
+      { ...swatch, id: "b", uv: { min: [0.3, 0.2], max: [0.2, 0.3] } },
+      { ...swatch, id: "c", uv: { min: [0.1, 0.2], max: [1.2, 0.3] } },
+      { ...swatch, id: "" },
+      null,
+    ]);
+    expect(read.usable).toEqual([swatch]);
+    expect(read.problem).toBe(
+      "states 6 swatches that cannot be used, so shapes cannot take them.",
+    );
+  });
+
+  it("refuses swatches that are not a list", () => {
+    expect(readSwatches({ grey: swatch }).usable).toEqual([]);
+  });
+
+  it("reports a base pack's broken swatch when the packs merge", () => {
+    const merged = mergePacks([
+      source("base", [part({ id: "a" })], {
+        swatches: [{ ...swatch, tile: -1 }] as LegoPackManifest["swatches"],
+      }),
+    ]);
+    expect(merged.manifest.swatches).toEqual([]);
+    expect(merged.problems).toEqual([
+      '"base" states 1 swatch that cannot be used, so shapes cannot take it.',
+    ]);
   });
 });

@@ -20,7 +20,7 @@
 import { defineCommand } from "@picoframe/plugin-sdk";
 
 /**
- * Which of the hub's two key shapes addresses a picture. They are different
+ * Which of the hub's three key shapes addresses a picture. They are different
  * shapes on purpose and do not unify: a caller says which one it means rather
  * than filling in whichever fields it happens to have.
  *
@@ -40,6 +40,16 @@ export type AssetIdentity =
       keyed_on: "map";
       /** The full name unitsync reports, version string and all, never split. */
       map_name: string;
+      variant: string;
+    }
+  | {
+      keyed_on: "faction";
+      /** The game's modinfo shortname, as for a unit. */
+      game: string;
+      /** The key the game's facts gave the faction, which is `gameFactions`'s
+       *  `key`: the side name, trimmed and lowercased. The hub makes the faction
+       *  row from those facts and refuses a logo for one it has no row for. */
+      faction_key: string;
       variant: string;
     };
 
