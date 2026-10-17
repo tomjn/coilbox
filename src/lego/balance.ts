@@ -33,9 +33,13 @@ export type GroundPoint = [number, number];
  */
 export const SAME_POSITION = 1e-6;
 
-/** The roles that hold a unit up: a foot of any leg, and a wheel. */
+/** The roles that hold a unit up: a foot of any leg, a wheel, and a track. */
 export function isSupportRole(role: string | undefined): boolean {
-  return role === "wheel" || /^leg\.[lr][12]\.foot$/.test(role ?? "");
+  return (
+    role === "wheel" ||
+    role === "track" ||
+    /^leg\.[lr][12]\.foot$/.test(role ?? "")
+  );
 }
 
 export interface MeshVolume {
@@ -294,6 +298,40 @@ export function worldGeometry(
 }
 
 /**
+ * What each support piece stands on. A foot or wheel is its own vertices. A
+ * track is usually an empty bone with the tread and road wheels hung under it,
+ * so it takes everything under it, and the tread's underside is its lowest
+ * point.
+ */
+function supportGeometry(
+  project: LegoProject,
+  geometry: Geometry[],
+  roles: Map<string, string | undefined>,
+): Geometry[] {
+  const out: Geometry[] = [];
+  for (const [id, role] of roles) {
+    if (!isSupportRole(role)) continue;
+    let own = geometry.filter((g) => g.id === id);
+    if (role === "track") {
+      const under = new Set<string>();
+      const collect = (at: string) => {
+        under.add(at);
+        for (const child of childrenOf(project, at)) collect(child.id);
+      };
+      collect(id);
+      own = geometry.filter((g) => under.has(g.id));
+    }
+    if (own.length === 0) continue;
+    out.push({
+      id,
+      points: own.flatMap((g) => g.points),
+      indices: [],
+    });
+  }
+  return out;
+}
+
+/**
  * Compare the unit's centre of mass with the ground its feet and wheels cover.
  *
  * The support area is the convex hull, seen from above, of the lowest points of
@@ -310,7 +348,7 @@ export function checkBalance(
   const geometry = worldGeometry(project, pieces);
 
   const roles = new Map(project.pieces.map((p) => [p.id, p.role]));
-  const supports = geometry.filter((g) => isSupportRole(roles.get(g.id)));
+  const supports = supportGeometry(project, geometry, roles);
   if (supports.length === 0) {
     return {
       status: "notApplicable",
