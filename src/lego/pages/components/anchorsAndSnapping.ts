@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { pieceConnectors, slideJoin } from "../../connectors";
+import { snapToGuides } from "../../guides";
 import type { LegoPiece, LegoProject } from "../../model";
 import { descendantIds, pieceById } from "../../model";
 import { type LoadedPack, partUnit } from "../../pack";
@@ -271,6 +272,10 @@ export function forceUniformScale(state: SceneState) {
  * Applied live rather than on release, so the piece visibly clicks into place
  * and there is no jump at the end of a drag. Rotation lands on 15 degree steps
  * for the same reason.
+ *
+ * A move snaps in this order: another piece's anchor, which fixes all three
+ * coordinates, then a guide plane, which fixes the one it stands across, then
+ * the move step for whatever is left. See `guides.ts`.
  */
 export function applySnap(state: SceneState) {
   const group = state.gizmo.object;
@@ -357,7 +362,22 @@ export function applySnap(state: SceneState) {
     if (step !== null) {
       group.position.set(...snapPosition(group.position.toArray(), step));
     }
-    state.onSnapChange(false, undefined, step ?? undefined);
+    // A guide plane then settles the one coordinate it stands across, over the
+    // step. It is measured from where the step left the piece, so the other
+    // two coordinates keep their step.
+    const guides = snapToGuides(
+      worldAnchors(state, pack, piece).map((anchor) => anchor.position),
+      state.guidePlanes,
+      threshold,
+    );
+    if (guides.guides.length > 0) moveByWorldDelta(group, guides.delta);
+    state.onSnapChange(
+      guides.guides.length > 0,
+      guides.guides.length > 0
+        ? guides.guides.map((guide) => guide.name).join(", ")
+        : undefined,
+      step ?? undefined,
+    );
     return;
   }
   state.onSnapChange(true, seated?.name);
@@ -380,9 +400,17 @@ export function applySnap(state: SceneState) {
         }
       : null;
 
-  // The delta is in world space and the group's position is relative to its
-  // parent, so it has to be rotated into the parent's frame before it is added.
-  const delta = new THREE.Vector3(...snap.delta);
+  moveByWorldDelta(group, snap.delta);
+}
+
+/**
+ * Move a group by a distance measured in the world.
+ *
+ * The group's position is relative to its parent, so the delta has to be
+ * rotated into the parent's frame before it is added.
+ */
+function moveByWorldDelta(group: THREE.Object3D, worldDelta: Vec3) {
+  const delta = new THREE.Vector3(...worldDelta);
   const parent = group.parent;
   if (parent) {
     parent.updateWorldMatrix(true, false);

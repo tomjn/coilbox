@@ -23,6 +23,8 @@ import {
   ClipboardPaste,
   Copy,
   Crosshair,
+  Eye,
+  EyeOff,
   FlipHorizontal2,
   Keyboard,
   Move,
@@ -74,7 +76,9 @@ import {
 } from "../../environment";
 import { addStandardLights } from "../../geometry";
 import type { PieceTransform } from "../../groupTransform";
+import { addGuide, guideOffsetAt } from "../../guides";
 import {
+  type GuideAxis,
   type LegoCollisionVolume,
   type LegoMount,
   type LegoPiece,
@@ -121,6 +125,7 @@ import { drawDrivePath } from "./drivePlayback";
 import { EnvironmentPicker } from "./EnvironmentPicker";
 import type { EffectsAtlas } from "./effectsLayer";
 import { buildEffectsLayer } from "./effectsLayer";
+import { GuidesPopover } from "./GuidesPopover";
 import {
   commitAim,
   commitGizmo,
@@ -128,6 +133,7 @@ import {
   dragGroup,
   pieceIdOf,
 } from "./gizmoCommit";
+import { GUIDE_COLOUR } from "./guideLayer";
 import { clearJoinFaces } from "./joinFaceMarks";
 import { clearPlaceGhost, type Placing, showPlaceGhost } from "./placeByFace";
 import { attachPointerHandlers } from "./pointerHandlers";
@@ -152,6 +158,7 @@ import {
 import { type StandInPlacement, standInFor } from "./standInPlayback";
 import { useCollisionAndAimVisibility } from "./useCollisionAndAimVisibility";
 import { useGizmoMode } from "./useGizmoMode";
+import { useGuides } from "./useGuides";
 import { useModelAnchors } from "./useModelAnchors";
 import { useModelEnvironment } from "./useModelEnvironment";
 import { useModelHover } from "./useModelHover";
@@ -523,6 +530,11 @@ interface Props {
      */
     onAimChange?: (mid: [number, number, number]) => void;
   };
+  /** The guide planes (issue #3318). Absent hides their controls. */
+  guides?: {
+    /** One edit of the unit, so a change is one step of undo. */
+    onEdit: (edit: (project: LegoProject) => LegoProject) => void;
+  };
 }
 
 export function ModelViewport({
@@ -543,6 +555,7 @@ export function ModelViewport({
   partPlacement,
   collisionEditing,
   aimPoint,
+  guides,
   showFreeFaces = false,
 }: Props) {
   const { pack, raw, project } = document;
@@ -593,6 +606,7 @@ export function ModelViewport({
     onPieceCollisionVolumeChange,
   } = collisionEditing;
   const { showAimPoint = false, onAimChange } = aimPoint;
+  const onGuidesEdit = guides?.onEdit;
   // The one selected piece, when there is exactly one. Anchors, the key at the
   // bottom of the view and the pivot dot are all about a single piece: a set
   // is dragged about its midpoint and seats against nothing.
@@ -621,6 +635,9 @@ export function ModelViewport({
   const [showCollision, setShowCollision] = useState(false);
   const [showAim, setShowAim] = useState(false);
   const [showReach, setShowReach] = useState(false);
+  const [showGuides, setShowGuides] = useState(true);
+  /** The axis the next click on the model puts a guide on, or null. */
+  const [pickingGuide, setPickingGuide] = useState<GuideAxis | null>(null);
   // On by default: a scenario that defines a track wants it seen, and the
   // toggle exists for getting it out of the way rather than for opting in.
   const [showStandIn, setShowStandIn] = useState(true);
@@ -728,6 +745,29 @@ export function ModelViewport({
   onStandInDragRef.current = onDrag
     ? (at) => onDrag(at, scriptFrameRef.current)
     : undefined;
+  // A click on the model puts a guide where it landed, on the chosen axis. A
+  // click on nothing is how you change your mind.
+  const onPickGuideRef = useRef<((at: Vec3 | null) => void) | undefined>(
+    undefined,
+  );
+  onPickGuideRef.current =
+    pickingGuide && onGuidesEdit
+      ? (at) => {
+          setPickingGuide(null);
+          if (!at) return;
+          const axis = pickingGuide;
+          setShowGuides(true);
+          onGuidesEdit((current) => {
+            const offset = Number(guideOffsetAt(current, axis, at).toFixed(3));
+            return addGuide(current, {
+              id: crypto.randomUUID(),
+              name: `${axis} = ${offset}`,
+              axis,
+              offset,
+            });
+          });
+        }
+      : undefined;
   // A click on the ground adds a point to the game maker's own path, while
   // the drive playing is taking them.
   const onGroundPickRef = useRef<((at: [number, number]) => void) | undefined>(
@@ -1056,6 +1096,9 @@ export function ModelViewport({
         onAimChangeRef,
         aimMark,
         weaponReach: null,
+        guideLayer: null,
+        guidePlanes: [],
+        onPickGuideRef,
         sky: null,
         terrain: null,
         water: null,
@@ -1280,6 +1323,18 @@ export function ModelViewport({
     show: showReach,
   });
 
+  useGuides(sceneRef, { project, pack, show: showGuides }, reduceMotion);
+
+  // Escape stops placing a guide, as it stops placing an anchor.
+  useEffect(() => {
+    if (!pickingGuide) return;
+    const stop = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPickingGuide(null);
+    };
+    window.addEventListener("keydown", stop);
+    return () => window.removeEventListener("keydown", stop);
+  }, [pickingGuide]);
+
   useModelSelection(
     sceneRef,
     selectedIds,
@@ -1401,7 +1456,7 @@ export function ModelViewport({
     <div className="relative h-full w-full bg-black/30">
       <div
         ref={containerRef}
-        className={`h-full w-full ${placingAnchor || placingPart ? "cursor-crosshair" : ""}`}
+        className={`h-full w-full ${placingAnchor || placingPart || pickingGuide ? "cursor-crosshair" : ""}`}
       />
 
       {/* One column rather than four overlays pinned to the same box. The
@@ -1616,6 +1671,11 @@ export function ModelViewport({
                 <Dot colour="#ef4444" label="Aim point" />
               </div>
             ) : null}
+            {showGuides && (project.guides ?? []).some((g) => !g.hidden) ? (
+              <div className="flex gap-3">
+                <Dot colour={`#${GUIDE_COLOUR.toString(16)}`} label="Guides" />
+              </div>
+            ) : null}
             {showReach && reaches.length > 0 ? (
               <div className="flex gap-3">
                 {reaches.map((reach, index) => (
@@ -1628,19 +1688,21 @@ export function ModelViewport({
               </div>
             ) : null}
             <span>
-              {placingAnchor
-                ? "Click the model to put an anchor there. Escape to stop"
-                : placingPart
-                  ? `Click a face to place the ${"module" in placingPart ? (placingPart.module.mount ? "module" : "module, which has no mount so joins by its first piece") : "part"}. ${shortcutLabel("place-face")} next face, ${shortcutLabel("place-twist")} twist, Escape to stop`
-                  : snapped
-                    ? snappedTo
-                      ? `Snapped to "${snappedTo}". Hold Alt to place freely`
-                      : "Snapped. Hold Alt to place freely"
-                    : slidBy !== null
-                      ? `Sliding on the face, offset ${slidBy}, in steps of ${steppedBy}. Hold Alt to place freely and detach`
-                      : steppedBy !== null
-                        ? `Moving in steps of ${steppedBy}. Hold Alt to place freely`
-                        : "Hold Alt to place freely"}
+              {pickingGuide
+                ? `Click the model to put a ${pickingGuide.toUpperCase()} guide there. Escape to stop`
+                : placingAnchor
+                  ? "Click the model to put an anchor there. Escape to stop"
+                  : placingPart
+                    ? `Click a face to place the ${"module" in placingPart ? (placingPart.module.mount ? "module" : "module, which has no mount so joins by its first piece") : "part"}. ${shortcutLabel("place-face")} next face, ${shortcutLabel("place-twist")} twist, Escape to stop`
+                    : snapped
+                      ? snappedTo
+                        ? `Snapped to "${snappedTo}". Hold Alt to place freely`
+                        : "Snapped. Hold Alt to place freely"
+                      : slidBy !== null
+                        ? `Sliding on the face, offset ${slidBy}, in steps of ${steppedBy}. Hold Alt to place freely and detach`
+                        : steppedBy !== null
+                          ? `Moving in steps of ${steppedBy}. Hold Alt to place freely`
+                          : "Hold Alt to place freely"}
             </span>
           </div>
 
@@ -1672,6 +1734,30 @@ export function ModelViewport({
                 hideTitle="Hide weapon ranges"
                 showTitle="Show each weapon's stated range and firing arc"
               />
+            ) : null}
+            {guides ? (
+              <>
+                <GuidesPopover
+                  guides={project.guides ?? []}
+                  onEdit={(edit) => {
+                    // A guide added while they are hidden would be invisible.
+                    setShowGuides(true);
+                    guides.onEdit(edit);
+                  }}
+                  picking={pickingGuide}
+                  onPick={setPickingGuide}
+                />
+                {(project.guides ?? []).length > 0 ? (
+                  <ViewToggle
+                    icon={EyeOff}
+                    onIcon={Eye}
+                    on={showGuides}
+                    onChange={setShowGuides}
+                    hideTitle="Hide the guides"
+                    showTitle="Show the guides"
+                  />
+                ) : null}
+              </>
             ) : null}
             <EnvironmentPicker
               backdrop={backdrop}

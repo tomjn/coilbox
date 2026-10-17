@@ -1744,6 +1744,7 @@ function Builder({ id }: { id: string | undefined }) {
                   showAimPoint: asideOpen && aside === "aim",
                   onAimChange: setAimPoint,
                 }}
+                guides={{ onEdit: edit }}
               />
             </div>
 

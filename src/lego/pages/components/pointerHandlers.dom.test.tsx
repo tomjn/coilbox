@@ -76,6 +76,7 @@ describe("a click on the ground while a path is being made", () => {
       standInDrag: null,
       placingAnchorRef: { current: false },
       placingPartRef: { current: null },
+      onPickGuideRef: { current: undefined },
       onGroundPickRef: { current: pick },
       onSelectRef: { current: vi.fn() },
       groundShape: null,
@@ -98,5 +99,74 @@ describe("a click on the ground while a path is being made", () => {
     expect(x).toBeCloseTo(0, 1);
     expect(z).toBeCloseTo(0, 1);
     expect(scene.onSelectRef.current).not.toHaveBeenCalled();
+  });
+});
+
+describe("a click while a guide is being placed", () => {
+  function above(canvas: HTMLElement, withModel: boolean) {
+    const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
+    camera.position.set(0, 100, 0);
+    camera.lookAt(0, 0, 0);
+    camera.updateMatrixWorld(true);
+    canvas.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 100, height: 100 }) as DOMRect;
+    const root = new THREE.Group();
+    if (withModel) {
+      const slab = new THREE.Mesh(
+        new THREE.PlaneGeometry(10, 10).rotateX(-Math.PI / 2),
+        new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }),
+      );
+      slab.position.y = 3;
+      root.add(slab);
+    }
+    root.updateMatrixWorld(true);
+    const placed = vi.fn();
+    return {
+      placed,
+      scene: {
+        renderer: { domElement: canvas } as unknown as THREE.WebGLRenderer,
+        camera,
+        root,
+        gizmo: { dragging: false, axis: null },
+        collisionDrag: null,
+        collisionHandles: { visible: false, children: [] },
+        standIn: { visible: false },
+        onStandInDragRef: { current: undefined },
+        standInDrag: null,
+        placingAnchorRef: { current: false },
+        placingPartRef: { current: null },
+        onPickGuideRef: { current: placed },
+        onGroundPickRef: { current: undefined },
+        onSelectRef: { current: vi.fn() },
+      } as unknown as SceneState,
+    };
+  }
+
+  function click(canvas: HTMLElement) {
+    const at = { clientX: 50, clientY: 50, button: 0, pointerId: 1 };
+    canvas.dispatchEvent(new PointerEvent("pointerdown", at));
+    canvas.dispatchEvent(new PointerEvent("pointerup", at));
+  }
+
+  it("hands over the point on the model and selects nothing", () => {
+    const canvas = document.createElement("canvas");
+    const { placed, scene } = above(canvas, true);
+    const dispose = attachPointerHandlers(scene);
+    click(canvas);
+    dispose();
+
+    const [[at]] = placed.mock.calls;
+    expect(at[1]).toBeCloseTo(3);
+    expect(scene.onSelectRef.current).not.toHaveBeenCalled();
+  });
+
+  it("hands over null for a click that missed, which is how it is cancelled", () => {
+    const canvas = document.createElement("canvas");
+    const { placed, scene } = above(canvas, false);
+    const dispose = attachPointerHandlers(scene);
+    click(canvas);
+    dispose();
+
+    expect(placed).toHaveBeenCalledWith(null);
   });
 });

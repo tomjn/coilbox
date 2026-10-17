@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { isEffectivelyHidden } from "../../model";
+import type { Vec3 } from "../../snapping";
 import { placeAnchor } from "./anchorsAndSnapping";
 import {
   beginFaceDrag,
@@ -133,6 +134,11 @@ export function attachPointerHandlers(state: SceneState): () => void {
     pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
     raycaster.setFromCamera(pointer, camera);
     const hit = raycaster.intersectObject(root, true)[0];
+    const pickGuide = state.onPickGuideRef.current;
+    if (pickGuide) {
+      pickGuide(hit ? ([hit.point.x, hit.point.y, hit.point.z] as Vec3) : null);
+      return;
+    }
     if (state.placingAnchorRef.current) {
       placeAnchor(state, hit);
       return;
