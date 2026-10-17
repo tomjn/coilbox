@@ -193,6 +193,21 @@ describe("the kind filter", () => {
   });
 });
 
+describe("the count", () => {
+  it("uses the plural for 2 or more and the singular for 1", () => {
+    render(<Harness />);
+    expect(screen.getByText("3 parts, 2 modules")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Search the inventory"), {
+      target: { value: "tur" },
+    });
+    expect(screen.getByText("0 parts, 1 module")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Search the inventory"), {
+      target: { value: "beam" },
+    });
+    expect(screen.getByText("1 part, 0 modules")).toBeTruthy();
+  });
+});
+
 describe("game units", () => {
   it("are not offered where there is no unit to take from", () => {
     render(<Harness />);

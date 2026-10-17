@@ -60,7 +60,7 @@ const onQuery = vi.fn();
 const onCategory = vi.fn();
 const onPackId = vi.fn();
 
-function show(loaded: LoadedPack, over: { category?: string | null } = {}) {
+function show(loaded: LoadedPack, over: { category?: string | null; shown?: number } = {}) {
   return render(
     <PartFilters
       pack={loaded}
@@ -70,7 +70,7 @@ function show(loaded: LoadedPack, over: { category?: string | null } = {}) {
       onCategory={onCategory}
       packId={null}
       onPackId={onPackId}
-      shown={7}
+      shown={over.shown ?? 7}
     />,
   );
 }
@@ -122,6 +122,11 @@ describe("the filter row", () => {
   it("says how many parts the grid is showing", () => {
     show(pack());
     expect(screen.getByText("7 parts")).toBeTruthy();
+  });
+
+  it("says 1 part, not 1 parts", () => {
+    show(pack(), { shown: 1 });
+    expect(screen.getByText("1 part")).toBeTruthy();
   });
 });
 
