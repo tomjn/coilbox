@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
+import { paintTeamColour } from "../../../lib/springTexture";
 import {
   disposeDrawLayer,
   newDrawLayer,
@@ -23,6 +24,26 @@ function edgesOf(mesh: THREE.Mesh) {
       (child as THREE.LineSegments).isLineSegments === true,
   );
 }
+
+describe("team colour in solid with edges", () => {
+  it("follows the solid material when its team colour is decided after the copy", () => {
+    const solid = new THREE.MeshStandardMaterial();
+    const { group, mesh } = piece(new THREE.BoxGeometry(2, 2, 2), solid);
+    const layer = newDrawLayer();
+    layer.mode = "both";
+    refreshDrawMode(layer, [group]);
+
+    // The alpha check answers a frame after the material was first drawn.
+    paintTeamColour(solid);
+    refreshDrawMode(layer, [group]);
+
+    const copy = mesh.material as THREE.MeshStandardMaterial;
+    expect(copy).not.toBe(solid);
+    expect(copy.onBeforeCompile).toBe(solid.onBeforeCompile);
+    expect(copy.customProgramCacheKey()).toContain("coilbox-spring:team");
+    disposeDrawLayer(layer, [group]);
+  });
+});
 
 describe("nextDrawMode", () => {
   it("cycles solid, wireframe, both, and back", () => {

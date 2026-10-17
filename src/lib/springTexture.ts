@@ -13,6 +13,7 @@ import * as THREE from "three";
 import { DDSLoader } from "three/addons/loaders/DDSLoader.js";
 
 import { fullyTransparent, fullyTransparentPngPixels } from "./pngDecode";
+import { textureHasAlpha } from "./textureAlpha";
 import { onTextureArrived, textureArrived } from "./textureArrival";
 
 /**
@@ -251,6 +252,50 @@ export function paintTeamColour(
   colour: THREE.ColorRepresentation = TEAM_COLOUR,
 ): void {
   shade(material, { teamColour: new THREE.Color(colour) });
+}
+
+/** Where a material says its team colour is not decided yet. */
+const PENDING = "teamColourPending";
+
+/**
+ * Whether the material is still finding out if its texture has a team colour
+ * mask. A picture taken meanwhile would show the unit without its player's
+ * colour.
+ */
+export function teamColourPending(material: THREE.Material): boolean {
+  return material.userData[PENDING] === true;
+}
+
+/**
+ * Paint the team colour on a material whose texture at `url` carries an alpha
+ * channel, once the file's header has been read. Returns the means to stop.
+ *
+ * A texture with no alpha samples as 1 everywhere, which would paint the whole
+ * unit rather than none of it, so such a file is drawn as it is. A file this
+ * cannot read is trusted, because the engine paints from that alpha whatever
+ * the file is. Shared by the unit atlas pieces of parts sample and the textures
+ * of lifted and imported models, so both kinds take the colour the same way.
+ */
+export function paintTeamColourIfMasked(
+  material: THREE.MeshStandardMaterial,
+  url: string,
+): () => void {
+  let live = true;
+  material.userData[PENDING] = true;
+  void textureHasAlpha(url).then((alpha) => {
+    if (!live) return;
+    material.userData[PENDING] = false;
+    if (alpha !== false) {
+      paintTeamColour(material);
+      material.needsUpdate = true;
+    }
+    textureArrived();
+  });
+  const stop = () => {
+    live = false;
+  };
+  material.addEventListener("dispose", stop);
+  return stop;
 }
 
 /** Below this the engine draws nothing. One bit, not a gradient. */

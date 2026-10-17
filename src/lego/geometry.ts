@@ -17,11 +17,10 @@ import * as THREE from "three";
 import { legoTextureUrl } from "../lib/assetUrl";
 import {
   cutOutHiddenPixels,
-  paintTeamColour,
+  paintTeamColourIfMasked,
   releaseSpringTexture,
   springTexture,
 } from "../lib/springTexture";
-import { textureHasAlpha } from "../lib/textureAlpha";
 import { textureArrived } from "../lib/textureArrival";
 import { atlasUrl, type LegoAtlas } from "./atlas";
 import type { LegoImported } from "./model";
@@ -61,6 +60,9 @@ export function partMaterial(atlas: LegoAtlas): THREE.MeshStandardMaterial {
     roughness: 0.75,
     metalness: 0.05,
   });
+  // The atlas's alpha is the team colour mask, as it is in an `.s3o`'s first
+  // texture. The base atlas has none, so its parts are drawn as they are.
+  paintTeamColourIfMasked(material, textureUrl);
   materials.set(textureUrl, { material, texture });
   return material;
 }
@@ -120,22 +122,11 @@ export function importedMaterial(
   const mask = load(imported.texture2?.key);
   if (mask) cutOutHiddenPixels(material, mask);
 
-  let live = true;
-  if (map && key) {
-    void textureHasAlpha(legoTextureUrl(key)).then((alpha) => {
-      // Not a format this reads is a reason to trust the file, not to distrust
-      // it: the engine paints from that alpha whatever the file is.
-      if (!live || alpha === false) return;
-      paintTeamColour(material);
-      material.needsUpdate = true;
-      textureArrived();
-    });
-  }
+  if (map && key) paintTeamColourIfMasked(material, legoTextureUrl(key));
 
   return {
     material,
     dispose: () => {
-      live = false;
       material.dispose();
       for (const url of urls) releaseSpringTexture(url);
     },

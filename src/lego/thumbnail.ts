@@ -21,6 +21,7 @@
 
 import * as THREE from "three";
 
+import { teamColourPending } from "../lib/springTexture";
 import { frameBox } from "./framing";
 import type { Vec3 } from "./snapping";
 
@@ -136,6 +137,7 @@ export function readyToCapture(unit: THREE.Object3D): boolean {
       ? mesh.material
       : [mesh.material];
     for (const material of materials) {
+      if (teamColourPending(material)) waiting += 1;
       const standard = material as THREE.MeshStandardMaterial;
       for (const texture of [standard.map, standard.alphaMap]) {
         // `image` is whatever the loader put there: an `HTMLImageElement`, an
