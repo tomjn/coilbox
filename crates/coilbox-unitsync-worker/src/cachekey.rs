@@ -79,7 +79,11 @@ pub const INFO_CACHE_VERSION: u32 = 24;
 /// is flattened or a texture is transcoded changes, so every entry is read again.
 /// The plugin's startup sweep reads this number too, to tell a current file from
 /// an orphan.
-pub const MODEL_CACHE_VERSION: u32 = 3;
+///
+/// 4: a model's textures are looked for across the game, its dependencies and
+/// base content rather than in one archive (#4239), and a model cached before
+/// that holds plain faces for every texture a dependency supplies.
+pub const MODEL_CACHE_VERSION: u32 = 4;
 
 /// Salts the buildpic cache key, independent of the header cache so this cache can
 /// be invalidated on its own. Bump when the icon encoding, cache format, or the
