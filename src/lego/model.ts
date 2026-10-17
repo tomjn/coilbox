@@ -1373,7 +1373,10 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
     parsed,
   );
   const skeleton = parseSkeleton(d.skeleton);
-  const pieces = withOwnedBones(sheeted, skeleton !== null);
+  const pieces = withTrackRoles(
+    withOwnedBones(sheeted, skeleton !== null),
+    skeleton,
+  );
 
   const mid = parseVec3(d.mid);
   const collisionVolume = parseCollisionVolume(d.collisionVolume);
@@ -1540,6 +1543,24 @@ function withOwnedBones(
     const { bone: _unowned, ...rest } = piece;
     return rest;
   });
+}
+
+/**
+ * A tracked unit saved before the track role has its two track bones without a
+ * role. Give them the role, but only where the bone is the plan's own `track.l`
+ * or `track.r` and the piece has no role of its own.
+ */
+function withTrackRoles(
+  pieces: LegoPiece[],
+  skeleton: LegoSkeleton | null,
+): LegoPiece[] {
+  if (skeleton?.plan !== "tracked") return pieces;
+  return pieces.map((piece) =>
+    piece.role === undefined &&
+    (piece.bone === "track.l" || piece.bone === "track.r")
+      ? { ...piece, role: "track" }
+      : piece,
+  );
 }
 
 /** A module's tags, trimmed. Blank and non-text entries are dropped. */

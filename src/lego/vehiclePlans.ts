@@ -175,9 +175,10 @@ export const WHEELED: BodyPlan = {
 };
 
 /**
- * There is no role for a track, so each side's track is a bone with no role,
- * at the middle of the track. It is the place to hang the tread, and that
- * side's road wheels hang off it. The road wheels turn and the tread does not.
+ * Each side's track is a bone with the track role, at the middle of the track.
+ * It is the place to hang the tread, and that side's road wheels hang off it.
+ * The road wheels turn and the tread does not, and the balance check counts
+ * the tread as what the unit stands on.
  */
 export const TRACKED: BodyPlan = {
   id: "tracked",
@@ -212,6 +213,7 @@ export const TRACKED: BodyPlan = {
         name: `${side}track`,
         parent: "body",
         position: [sign * half, 0, 0],
+        role: "track",
       })),
     ];
     for (let i = 0; i < count; i++) {

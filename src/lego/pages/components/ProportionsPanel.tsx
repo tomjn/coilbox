@@ -10,7 +10,8 @@
  * first, naming the bones.
  *
  * A skeleton fitted to pieces the unit already had (#3261) is shown and not
- * edited.
+ * edited, until it is reset to the plan (#4395), which asks first, naming the
+ * pieces it moves and reparents.
  */
 
 import { Button, Input } from "@picoframe/frame";
@@ -28,7 +29,7 @@ import {
   planProportions,
 } from "../../bodyPlans";
 import type { LegoPiece, LegoProject, SkeletonTarget } from "../../model";
-import { clampProportion } from "../../skeletonEdit";
+import { clampProportion, resetToPlan } from "../../skeletonEdit";
 import {
   currentTarget,
   describeSize,
@@ -49,6 +50,8 @@ interface Props {
   onTarget: (target: SkeletonTarget) => void;
   /** Lets the skeleton go as one edit, keeping every piece. */
   onRemove: () => void;
+  /** Hands a fitted skeleton back to the plan as one edit. */
+  onReset: () => void;
   /** The value being dragged by a viewport handle, if one is. */
   preview: { id: string; value: number } | null;
 }
@@ -60,14 +63,17 @@ export function ProportionsPanel({
   onPreview,
   onTarget,
   onRemove,
+  onReset,
   preview,
 }: Props) {
   if (project.skeleton?.fitted) {
     return (
       <FittedProportions
+        project={project}
         plan={plan}
         measured={project.skeleton.proportions}
         onRemove={onRemove}
+        onReset={onReset}
       />
     );
   }
@@ -115,19 +121,87 @@ function RemoveSkeleton({ onRemove }: { onRemove: () => void }) {
   );
 }
 
+const NAMES_SHOWN = 6;
+
+function nameList(names: string[]): string {
+  const shown = names.slice(0, NAMES_SHOWN).join(", ");
+  return names.length > NAMES_SHOWN
+    ? `${shown} and ${names.length - NAMES_SHOWN} more`
+    : shown;
+}
+
+/** Hands the fitted skeleton back to the plan, after saying what that does. */
+function ResetToPlan({
+  project,
+  plan,
+  onReset,
+}: {
+  project: LegoProject;
+  plan: BodyPlan;
+  onReset: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const { moved, reparented, added } = open
+    ? resetToPlan(project, plan, () => "preview")
+    : { moved: [], reparented: [], added: [] };
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button size="sm" variant="outline" className="self-start">
+          Reset to plan
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64 space-y-1 p-2 text-xs">
+        {moved.length + reparented.length + added.length === 0 ? (
+          <p>Nothing moves.</p>
+        ) : null}
+        {moved.length > 0 ? (
+          <p>Moves {nameList(moved.map((piece) => piece.name))}.</p>
+        ) : null}
+        {reparented.map((piece) => (
+          <p key={piece.pieceId}>
+            Reparents {piece.name} from {piece.from ?? "the unit"} to {piece.to}
+            .
+          </p>
+        ))}
+        {added.length > 0 ? <p>Adds {nameList(added)}.</p> : null}
+        <p>Other pieces stay where they are.</p>
+        <div className="flex gap-1 pt-1">
+          <Button
+            size="sm"
+            onClick={() => {
+              setOpen(false);
+              onReset();
+            }}
+          >
+            Reset
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 /**
  * A skeleton fitted to the unit's own pieces (#3261) shows what was measured
  * and nothing to change: changing a proportion would move pieces the game
  * maker placed by hand.
  */
 function FittedProportions({
+  project,
   plan,
   measured,
   onRemove,
+  onReset,
 }: {
+  project: LegoProject;
   plan: BodyPlan;
   measured: Record<string, number>;
   onRemove: () => void;
+  onReset: () => void;
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 py-3">
@@ -151,6 +225,7 @@ function FittedProportions({
           );
         })}
       </dl>
+      <ResetToPlan project={project} plan={plan} onReset={onReset} />
       <RemoveSkeleton onRemove={onRemove} />
     </div>
   );
@@ -164,7 +239,7 @@ function PlanProportions({
   onTarget,
   onRemove,
   preview,
-}: Props) {
+}: Omit<Props, "onReset">) {
   const values = planProportions(plan, project.skeleton?.proportions);
   const shownValues =
     preview && preview.id in values

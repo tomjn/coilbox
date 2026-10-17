@@ -196,6 +196,130 @@ export function applyProportions(
   };
 }
 
+/** A piece reparented by a reset to the plan, with the names it moves between. */
+export interface ResetReparent {
+  pieceId: string;
+  name: string;
+  from: string | null;
+  to: string;
+}
+
+/** What a reset to the plan does, by piece. */
+export interface PlanReset {
+  project: LegoProject;
+  /** Pieces whose position the plan now sets. */
+  moved: LegoPiece[];
+  /** Pieces that hang from another piece afterwards. */
+  reparented: ResetReparent[];
+  /** Bones the fit left unmatched, which the plan adds. */
+  added: string[];
+}
+
+const near = (a: THREE.Matrix4, b: THREE.Matrix4) =>
+  a.elements.every((n, i) => Math.abs(n - b.elements[i]) < 1e-9);
+
+/**
+ * A skeleton fitted to the unit's own pieces (#3261) handed back to the plan.
+ * Every bone piece goes to the position the plan gives it, under the piece of
+ * the bone the plan hangs it from, and the bones the fit left unmatched are
+ * added. Rotation and scale of the pieces stay. The proportions are the
+ * measured ones, and any that could not be measured take the plan's default.
+ *
+ * A piece that is not a bone and hangs from a bone keeps its place and turn in
+ * the unit, the way a piece does when its bone is removed. A unit with no
+ * fitted skeleton on this plan comes back as it was.
+ */
+export function resetToPlan(
+  project: LegoProject,
+  plan: BodyPlan,
+  newId: () => string,
+): PlanReset {
+  const skeleton = project.skeleton;
+  if (!skeleton || skeleton.plan !== plan.id || !skeleton.fitted) {
+    return { project, moved: [], reparented: [], added: [] };
+  }
+  const values = planProportions(plan, skeleton.proportions);
+  const bones = plan.bones(values);
+  const { fitted: _fitted, ...kept } = skeleton;
+  const unfitted: LegoProject = {
+    ...project,
+    skeleton: { ...kept, proportions: values },
+  };
+  // The unmatched bones are added first, so every bone has a piece to hang on.
+  const hadBone = new Set(
+    project.pieces.flatMap((p) => (p.bone === undefined ? [] : [p.bone])),
+  );
+  const filled = applyProportions(unfitted, plan, {}, newId).project;
+  const added = filled.pieces
+    .filter((p) => p.bone !== undefined && !hadBone.has(p.bone))
+    .map((p) => p.name);
+
+  const pieceOf = new Map<string, LegoPiece>();
+  for (const piece of filled.pieces) {
+    if (piece.bone !== undefined) pieceOf.set(piece.bone, piece);
+  }
+  const planned = new Map<
+    string,
+    { position: Vec3; parentId: string | null }
+  >();
+  for (const bone of bones) {
+    const piece = pieceOf.get(bone.id);
+    if (!piece || planned.has(piece.id)) continue;
+    const parent = bone.parent === null ? undefined : pieceOf.get(bone.parent);
+    planned.set(piece.id, {
+      position: [...bone.position],
+      parentId: bone.parent === null ? piece.parentId : (parent?.id ?? null),
+    });
+  }
+
+  const name = (id: string | null) =>
+    filled.pieces.find((p) => p.id === id)?.name ?? "the unit";
+  const moved: LegoPiece[] = [];
+  const reparented: ResetReparent[] = [];
+  const placed = filled.pieces.map((piece): LegoPiece => {
+    const goal = planned.get(piece.id);
+    if (!goal || !hadBone.has(piece.bone as string)) return piece;
+    if (!same(piece.position, goal.position)) moved.push(piece);
+    if (piece.parentId !== goal.parentId) {
+      reparented.push({
+        pieceId: piece.id,
+        name: piece.name,
+        from: piece.parentId === null ? null : name(piece.parentId),
+        to: name(goal.parentId),
+      });
+    }
+    return { ...piece, position: goal.position, parentId: goal.parentId };
+  });
+  const placedProject: LegoProject = { ...filled, pieces: placed };
+
+  // Hung pieces stay where they are in the unit while their bone goes.
+  const pieces = placed.map((piece): LegoPiece => {
+    if (planned.has(piece.id) || piece.parentId === null) return piece;
+    if (!planned.has(piece.parentId)) return piece;
+    const before = worldMatrix(filled, piece.parentId);
+    const after = worldMatrix(placedProject, piece.parentId);
+    if (near(before, after)) return piece;
+    const local = localFromWorld(
+      placedProject,
+      piece.parentId,
+      worldMatrix(filled, piece.id),
+      false,
+    );
+    const position = new THREE.Vector3();
+    const rotation = new THREE.Quaternion();
+    const scale = new THREE.Vector3();
+    local.decompose(position, rotation, scale);
+    const euler = new THREE.Euler().setFromQuaternion(rotation);
+    return {
+      ...piece,
+      position: [position.x, position.y, position.z],
+      rotation: [euler.x, euler.y, euler.z],
+      scale: [scale.x, scale.y, scale.z],
+    };
+  });
+  return { project: { ...placedProject, pieces }, moved, reparented, added };
+}
+
 /** A drag handle on a skeleton. */
 export interface ProportionHandle {
   id: string;

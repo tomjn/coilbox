@@ -482,6 +482,165 @@ describe("changing the count", () => {
   });
 });
 
+describe("changing the count of a ring with rings under it", () => {
+  /** `count` thighs round the axis, each with a chain of children one level
+   *  down per name, every level a ring of the same count. */
+  function legs(
+    count: number,
+    names: string[],
+    options: { counts?: Record<string, number> } = {},
+  ): LegoProject {
+    const pieces: Partial<LegoPiece>[] = [];
+    names.forEach((name, level) => {
+      const n = options.counts?.[name] ?? count;
+      for (let i = 0; i < n; i++) {
+        const angle = (i * 2 * Math.PI) / n;
+        pieces.push({
+          id: `${name}${i}`,
+          parentId: level === 0 ? "root" : `${names[level - 1]}${i % count}`,
+          position:
+            level === 0
+              ? [3 * Math.cos(angle), 0, -3 * Math.sin(angle)]
+              : [0, -level, 0.5 * level],
+          rotation: level === 0 ? [0, angle, 0] : [0, 0, 0],
+          ring: { next: `${name}${(i + 1) % n}`, count: n },
+        });
+      }
+    });
+    return project(pieces);
+  }
+
+  function chain(doc: LegoProject, name: string): string[] {
+    return ringMembers(doc.pieces, `${name}0`) as string[];
+  }
+
+  it("resizes a shin ring with its thigh ring, up and down", () => {
+    const doc = legs(6, ["thigh", "shin"]);
+    const up = resizeRing(doc, "thigh0", 8, ids());
+    const thighs = chain(up, "thigh");
+    const shins = chain(up, "shin");
+    expect(thighs).toHaveLength(8);
+    expect(shins).toHaveLength(8);
+    expect(up.pieces.filter((piece) => piece.ring)).toHaveLength(16);
+    shins.forEach((id, i) => {
+      const shin = pieceOf(up, id);
+      expect(shin.parentId).toBe(thighs[i]);
+      expect(shin.position).toEqual([0, -1, 0.5]);
+      expect(shin.ring?.count).toBe(8);
+    });
+    expect(up.pieces.filter((piece) => piece.parentId === "root")).toHaveLength(
+      8,
+    );
+    expect(projectProblems(up)).toEqual([]);
+
+    const down = resizeRing(up, "thigh0", 4, ids());
+    expect(chain(down, "thigh")).toHaveLength(4);
+    const kept = chain(down, "shin");
+    expect(kept).toHaveLength(4);
+    kept.forEach((id, i) => {
+      expect(pieceOf(down, id).parentId).toBe(chain(down, "thigh")[i]);
+    });
+    expect(down.pieces).toHaveLength(1 + 8);
+    expect(projectProblems(down)).toEqual([]);
+  });
+
+  it("resizes a ring three deep", () => {
+    const doc = legs(3, ["thigh", "shin", "foot"]);
+    const out = resizeRing(doc, "thigh0", 5, ids());
+    for (const name of ["thigh", "shin", "foot"]) {
+      expect(chain(out, name)).toHaveLength(5);
+    }
+    const [thighs, shins, feet] = ["thigh", "shin", "foot"].map((n) =>
+      chain(out, n),
+    );
+    shins.forEach((id, i) => {
+      expect(pieceOf(out, id).parentId).toBe(thighs[i]);
+    });
+    feet.forEach((id, i) => {
+      expect(pieceOf(out, id).parentId).toBe(shins[i]);
+      expect(pieceOf(out, id).position).toEqual([0, -2, 1]);
+    });
+    expect(projectProblems(out)).toEqual([]);
+    const back = resizeRing(out, "thigh0", 2, ids());
+    expect(back.pieces).toHaveLength(1 + 6);
+    expect(chain(back, "foot")).toHaveLength(2);
+  });
+
+  it("starts a ring from any thigh", () => {
+    const doc = legs(4, ["thigh", "shin"]);
+    const out = resizeRing(doc, "thigh2", 6, ids());
+    expect(ringMembers(out.pieces, "shin2")).toHaveLength(6);
+    expect(ringMembers(out.pieces, "shin0")).toHaveLength(6);
+  });
+
+  it("keeps plain children as plain copies", () => {
+    const doc = legs(3, ["thigh", "shin"]);
+    const { ring: _none, ...knob } = pieceOf(doc, "shin0");
+    const withKnob: LegoProject = {
+      ...doc,
+      pieces: [
+        ...doc.pieces,
+        { ...knob, id: "knob", name: "knob", parentId: "thigh0" },
+      ],
+    };
+    const out = resizeRing(withKnob, "thigh0", 5, ids());
+    // The one knob gains a copy under each of the two new thighs.
+    const knobs = out.pieces.filter((piece) => piece.name.startsWith("knob"));
+    expect(knobs).toHaveLength(3);
+    expect(knobs.every((piece) => piece.ring === undefined)).toBe(true);
+    expect(chain(out, "shin")).toHaveLength(5);
+  });
+
+  it("keeps a joined child joined to its own parent copy", () => {
+    const doc = legs(3, ["thigh", "shin"]);
+    const joinedDoc: LegoProject = {
+      ...doc,
+      pieces: doc.pieces.map((piece) =>
+        piece.id.startsWith("shin")
+          ? { ...piece, connection: { connector: "top", to: "bottom" } }
+          : piece,
+      ),
+    };
+    const out = resizeRing(joinedDoc, "thigh0", 4, ids());
+    const copy = pieceOf(out, chain(out, "shin")[3]);
+    expect(copy.parentId).toBe(chain(out, "thigh")[3]);
+    expect(copy.connection).toEqual({ connector: "top", to: "bottom" });
+    expect(projectProblems(out)).toEqual([]);
+  });
+
+  it("keeps mirrored twins among the children paired", () => {
+    const doc = legs(3, ["thigh", "shin"]);
+    const { ring: _none, ...base } = pieceOf(doc, "shin0");
+    const twinned: LegoProject = {
+      ...doc,
+      pieces: [
+        ...doc.pieces,
+        { ...base, id: "a", name: "a", twin: "b", parentId: "thigh0" },
+        { ...base, id: "b", name: "b", twin: "a", parentId: "thigh0" },
+      ],
+    };
+    const out = resizeRing(twinned, "thigh0", 4, ids());
+    const pairs = out.pieces.filter((piece) => piece.twin !== undefined);
+    expect(pairs).toHaveLength(4);
+    for (const piece of pairs) {
+      const other = pieceOf(out, piece.twin as string);
+      expect(other.twin).toBe(piece.id);
+      expect(other.parentId).toBe(piece.parentId);
+    }
+    expect(projectProblems(out)).toEqual([]);
+  });
+
+  it("leaves a child ring with a different count as it was", () => {
+    // Two shins per three thighs is not one per parent.
+    const doc = legs(3, ["thigh", "shin"], { counts: { shin: 2 } });
+    const out = resizeRing(doc, "thigh0", 4, ids());
+    expect(chain(out, "thigh")).toHaveLength(4);
+    expect(out.pieces.filter((piece) => piece.name.startsWith("shin"))).toEqual(
+      doc.pieces.filter((piece) => piece.name.startsWith("shin")).concat([]),
+    );
+  });
+});
+
 describe("a ring saved with the unit", () => {
   it("survives a reload", () => {
     const doc = ringOf(project([{ id: "leg", position: [3, 0, 0] }]), "leg");

@@ -239,7 +239,8 @@ describe.each([
     expect(result.status).toBe("inside");
     if (result.status === "inside") {
       expect([...result.resting].sort()).toEqual(
-        wheels(project)
+        project.pieces
+          .filter((p) => p.role === "wheel" || p.role === "track")
           .map((p) => p.id)
           .sort(),
       );
@@ -302,11 +303,14 @@ describe("the tracked plan", () => {
     });
   });
 
-  it("hangs each side's road wheels off a track bone with no role", () => {
+  it("hangs each side's road wheels off a track bone with the track role", () => {
     const project = fromPlan(TRACKED);
     for (const side of ["l", "r"]) {
       const track = pieceForBone(project, `track.${side}`);
-      expect(track.role).toBeUndefined();
+      expect(track.role).toBe("track");
+      expect(track.twin).toBe(
+        pieceForBone(project, `track.${side === "l" ? "r" : "l"}`).id,
+      );
       expect(track.name).toBe(`${side}track`);
       const run = wheels(project).filter((p) => p.parentId === track.id);
       expect(run).toHaveLength(6);

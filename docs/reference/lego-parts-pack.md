@@ -87,6 +87,7 @@ An atlas pack is an extension pack's mirror image. It ships a texture and no par
 - `textures.tex1` is the PNG the pack ships, and it must not be the name any other installed atlas uses. Two atlases with the same file name would land on top of each other in a game's `unittextures/`.
 - It has no `parts` and no `geometry`. A pack that brings both an atlas and parts is skipped: that would be a second parts library, and a unit cannot mix two.
 - **It has to keep the base atlas's UV layout.** Nothing can check this. Every part's UVs are the base pack's, so a redrawn sheet that moves anything leaves those parts sampling the wrong pixels. Resizing the sheet is fine, since UVs are normalised.
+- **It has to keep the base pack's swatches plain.** Generated shapes tile the [swatches](#swatches) the base pack lists, so they are part of the layout too. Keep each swatch, and 8 pixels round it, a plain surface that looks right repeated and mirrored. Paint alpha there to give shapes team colour.
 
 A unit samples one atlas, chosen when the unit is created and changeable at any point while editing. Changing it does nothing to the pieces: every part is mapped into every atlas, so nothing is dropped and nothing is remapped. The change is an ordinary edit, and undo takes it back.
 
@@ -197,6 +198,40 @@ The bundled pack states 0.25. Counting its 373 parts from `pack.json` to within 
 - Parts are centred on their bounding box, so a face connector sits half a side from the middle. That half side is on a 0.25 step for 207 parts and on a 0.125 step for 295. A part 0.75 wide has its side faces half a step off the grid.
 
 Choose a `unit` for your own pack by the same count: the step that most of its parts' sides fall on.
+
+### Sizes in the bundled pack
+
+The builder resizes a pack part by swapping it for another part of the same pack, colourway, shape and material whose other two sides match. A pack with more sizes gives a drag more to land on. The bundled pack has gaps. Counted on its green colourway, which the other two repeat:
+
+- 36 of its 82 blocks have no other size along their longest side, and 110 of their 246 sides have no other size at all.
+- 49 of the 84 sides of its beams have no other size.
+- 40 of the 42 sides of its plates have no other size.
+
+A generated shape has no such gap, because it is made at whatever size is asked for.
+
+## Swatches
+
+A swatch is a rectangle of plain surface on the atlas that the unit builder's generated shapes tile. Shapes such as cylinders and wedges are made in code, not stored in any pack, so they have no panels of their own. A pack neither adds shapes nor changes their numbers. It only says where on the atlas they sample.
+
+`swatches` in the manifest lists them, one per colourway:
+
+```json
+"swatches": [
+  { "id": "green", "uv": { "min": [0.168, 0.9492], "max": [0.1992, 0.9805] }, "tile": 1.56 }
+]
+```
+
+- `id` matches a part's `colourway`. A new shape takes the colourway most of the unit's pieces use.
+- `uv` is the rectangle in the pack's UVs, v up from the bottom, each number from 0 to 1 with `min` below `max`.
+- `tile` is how many pack units one copy of the swatch covers. Set it so a shape is drawn at the same pixels per unit as the parts. The bundled atlas has 41.1 pixels per unit and 64 pixel swatches, so its `tile` is 1.56.
+
+A shape is cut on a grid one `tile` wide, and each piece samples the swatch with every other copy mirrored, so there is no seam and nothing stretches as the shape is resized. A shape's UVs never leave its swatch.
+
+The bundled pack has three swatches, green, tan and grey, each 64 pixels square. The green one is plain red, as the whole green column of the atlas is. Tan is grainy concrete. Grey is a flat light grey.
+
+Only the base pack's swatches count. Extension packs and atlas packs use them. A base pack that lists none offers no shapes. A swatch with no id, an id another swatch has, a rectangle outside the atlas or a `tile` that is not a positive number is skipped, and the Lego Parts screen reports how many.
+
+Choose swatches with an 8 pixel margin of the same surface round each one. That keeps the smaller mipmap levels on the same surface at a tile edge, so filtering does not pull in a neighbouring panel.
 
 ## parts.bin
 

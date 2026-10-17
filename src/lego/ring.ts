@@ -25,6 +25,7 @@ import { insertCompoundAt, subtreeAsCompound } from "./compounds";
 import { freePiece } from "./connectors";
 import { asTransform, rejoined } from "./mirror";
 import {
+  childrenOf,
   descendantIds,
   type LegoPiece,
   type LegoProject,
@@ -295,15 +296,58 @@ export function unringPiece(
 }
 
 /**
+ * The rings that go round in step with a ring: the same count, each member
+ * hanging off the matching member of `parents`, in the same direction. Rings
+ * in step with those are found too, however deep. A ring that is not one per
+ * parent is not in step and is not listed.
+ *
+ * Each ring is listed in the order of the parents it hangs off.
+ */
+function ringsInStep(project: LegoProject, parents: string[]): string[][] {
+  const found: string[][] = [];
+  for (const candidate of childrenOf(project, parents[0])) {
+    if (!candidate.ring) continue;
+    const chain = ringMembers(project.pieces, candidate.id);
+    if (chain?.length !== parents.length) continue;
+    const hangs = chain.every(
+      (id, i) => pieceById(project, id)?.parentId === parents[i],
+    );
+    if (hangs) found.push(chain, ...ringsInStep(project, chain));
+  }
+  return found;
+}
+
+/** Which piece in the copy of a subtree stands for each piece in the original,
+ *  found by walking both together. */
+function matchCopy(
+  project: LegoProject,
+  original: string,
+  copy: string,
+  into: Map<string, string> = new Map(),
+): Map<string, string> {
+  into.set(original, copy);
+  const from = childrenOf(project, original);
+  const to = childrenOf(project, copy);
+  from.forEach((child, i) => {
+    if (to[i]) matchCopy(project, child.id, to[i].id, into);
+  });
+  return into;
+}
+
+/**
  * Change how many pieces a ring has, keeping `pieceId` where it is and spacing
  * the whole ring evenly again.
  *
  * Fewer removes the last members round the ring along with their subtrees.
  * More adds copies of `pieceId`. One edit either way, and removing asks nothing.
  *
- * Rings further down, whose members hang off members of this one, are let go
- * first: their count would be left behind by this change, and a ring that
- * follows at the wrong spacing is worse than one that does not follow.
+ * Rings further down that go round in step with this one (the same count, one
+ * member under each of its members) are resized with it, to any depth. A new
+ * copy of a member brings a copy of each child ring's lead under it, with the
+ * child's own place against its parent, and that copy joins the child ring.
+ * Rings further down that are not in step are let go first: their count would
+ * be left behind by this change, and a ring that follows at the wrong spacing
+ * is worse than one that does not follow.
  *
  * Returns the project untouched when the piece is in no ring, the count is the
  * same, or the count is not one a ring can have.
@@ -320,13 +364,17 @@ export function resizeRing(
     return project;
   }
 
+  const stepRings = ringsInStep(project, members);
+  const inStep = new Set(stepRings.flat());
   const below = new Set(
     members.flatMap((id) => descendantIds(project, id).slice(1)),
   );
   let next: LegoProject = {
     ...project,
     pieces: project.pieces.map((piece) => {
-      if (!piece.ring || !below.has(piece.id)) return piece;
+      if (!piece.ring || !below.has(piece.id) || inStep.has(piece.id)) {
+        return piece;
+      }
       const nested = ringMembers(project.pieces, piece.id);
       if (!nested?.every((id) => below.has(id))) return piece;
       const { ring: _gone, ...rest } = piece;
@@ -335,6 +383,7 @@ export function resizeRing(
   };
 
   const keep = members.slice(0, count);
+  const keepSteps = stepRings.map((chain) => chain.slice(0, count));
   if (count < members.length) {
     const doomed = new Set(
       members.slice(count).flatMap((id) => descendantIds(next, id)),
@@ -357,7 +406,14 @@ export function resizeRing(
       if (!copy) return project;
       next = copy.project;
       keep.push(copy.pieceId);
+      const matched = matchCopy(next, pieceId, copy.pieceId);
+      stepRings.forEach((chain, i) => {
+        const made = matched.get(chain[0]);
+        if (!made) return;
+        keepSteps[i].push(made);
+      });
     }
   }
+  for (const chain of keepSteps) next = linked(next, chain);
   return followRing(linked(next, keep), pieceId, pack);
 }
