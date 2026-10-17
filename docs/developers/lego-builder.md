@@ -281,6 +281,25 @@ A unit opened out of a game brings its own script with it. See [Opening a unit f
 
 **Discard this script and use the presets** gives it back. The stored text goes and the unit is generated from its presets again. Undo brings the text back if that was a mistake, so copy it first if you want to keep it past this session. The case worth knowing about: a unit whose script was taken over and then emptied animates nothing and no preset can reach it, and this is the only way out short of editing files on disk.
 
+## Skeletons
+
+A skeleton is the stick figure of a unit: where its joints are, what each one is for and how it moves, before it has any parts. There is no way to start a unit from one in the builder yet. Milestone 63 adds it, and this is how a skeleton is stored.
+
+A skeleton comes from a body plan, such as two legs or wheeled. The plans are part of coilbox, in `src/lego/bodyPlans.ts`. Each plan has:
+
+- named proportions, such as leg length and stance width, each with a range and a default, in elmos
+- bones, worked out from those proportions, each with a name, a parent, a position against its parent, and a role
+- the animation presets that drive the bones, with their settings
+
+A unit made from a plan holds ordinary empty pieces, one per bone, with their roles set, and the plan's presets in its animations. Export, the script and the `.s3o` see nothing but pieces. The unit file also records two things:
+
+- `skeleton` on the unit, which names the plan and holds the current value of each proportion
+- `bone` on each piece the plan made, which names its bone in the plan
+
+A piece with no `bone` is free, and changing a proportion never moves it. A copy of a bone, by duplicate, paste, mirror or a ring, is free. A bone moved to hang off a different piece is free too, because the plan places a bone against its own parent. Removing the skeleton removes every `bone` as well and leaves the pieces where they are, roles and presets included. A unit made before skeletons existed has neither field and opens as it always has. A unit made from a plan that this version of coilbox does not have still opens, and keeps its record and its bones.
+
+A skeleton is for a whole unit, and a [module](#modules) is for a part of one, so they are kept separate. A module never carries a `bone`.
+
 ## Health, cost and stats
 
 A built unit's health, metal cost, energy cost, build time and mass come from the **Worth** table in the Animation panel. There is no field for one unit's health or cost. The table works them out from what the unit is made of, so a bigger unit is worth more.
