@@ -180,7 +180,12 @@ const CHANGE_HEADING_OPTIONS = [
 ];
 
 /** Where a drive's speed and turn rate came from, in words. */
-function driveSourceText({ motion, speed, turnRate }: DriveSource): string {
+function driveSourceText({
+  motion,
+  speed,
+  turnRate,
+  reverseSpeed,
+}: DriveSource): string {
   const speedFrom = {
     movement: "from Movement",
     definition: "from the game's definition",
@@ -192,7 +197,14 @@ function driveSourceText({ motion, speed, turnRate }: DriveSource): string {
       : turnRate === "movement"
         ? "from Movement"
         : "from the game's definition";
-  return `Speed ${Math.round(motion.speed * 30 * 10) / 10} elmos/s, ${speedFrom}. Turn rate ${Math.round(motion.turnRate * 10) / 10}, ${turnFrom}.`;
+  const reverseFrom =
+    reverseSpeed === "none"
+      ? "none set, so it never reverses"
+      : reverseSpeed === "movement"
+        ? "from Movement"
+        : "from the game's definition";
+  const reverse = `Reverse speed ${Math.round((motion.reverseSpeed ?? 0) * 30 * 10) / 10} elmos/s, ${reverseFrom}.`;
+  return `Speed ${Math.round(motion.speed * 30 * 10) / 10} elmos/s, ${speedFrom}. Turn rate ${Math.round(motion.turnRate * 10) / 10}, ${turnFrom}. ${reverse}`;
 }
 
 /** How fast a scenario's unit moves and when, from the speed the script is

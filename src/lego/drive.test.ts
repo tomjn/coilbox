@@ -170,6 +170,101 @@ describe("driveAlong", () => {
   });
 });
 
+describe("driveAlong reversing", () => {
+  /** Half the forward speed, as a tank with `rSpeed` of 60 against a `speed`
+   *  of 120 would have. */
+  const REVERSER: DriveMotion = { ...MOTION, reverseSpeed: 1 };
+  const behind = pathPoints("behind", REVERSER, []);
+  const run = (motion: DriveMotion, points: [number, number][]) =>
+    driveAlong(points, motion, {
+      start: 15,
+      frames: PREVIEW_FRAMES,
+      ground: null,
+      tilts: false,
+      minScriptChangeHeading: 1,
+    });
+
+  /** A goal one second behind is quicker to back up to than to turn round for
+   *  (`WantReverse`, `GroundMoveType.cpp:3665-3668`). */
+  it("backs up to a goal behind it, telling the script it is reversing", () => {
+    const result = run(REVERSER, behind);
+    expect(result.events[0]).toEqual({
+      frame: 15,
+      callin: "StartMoving",
+      args: [1],
+    });
+    // It never turns, and it moves against its heading at the reverse speed.
+    expect(result.events.some((e) => e.callin === "ChangeHeading")).toBe(false);
+    expect(result.frames.every((f) => f.heading === 0)).toBe(true);
+    expect(result.frames[16].pos).toEqual([0, 0, -1]);
+    expect(result.frames[16].speed).toBe(1);
+    expect(result.frames[16].reversing).toBe(true);
+    expect(result.frames[14].reversing).toBe(false);
+    expect(result.arrived).not.toBeNull();
+    expect(result.events.at(-1)?.callin).toBe("StopMoving");
+  });
+
+  /** No `rSpeed`, so the engine's `canReverse` is false. */
+  it("turns round instead when the unit cannot reverse", () => {
+    const result = run(MOTION, behind);
+    expect(result.events[0].args).toEqual([0]);
+    expect(result.events.some((e) => e.callin === "ChangeHeading")).toBe(true);
+    expect(result.frames.some((f) => f.reversing)).toBe(false);
+  });
+
+  /** Far enough that the turn is worth making, which is the engine's
+   *  comparison of the two journeys. */
+  it("turns round for a goal far behind it", () => {
+    const result = run(REVERSER, [[0, -480]]);
+    expect(result.events[0].args).toEqual([0]);
+    expect(result.frames.some((f) => f.reversing)).toBe(false);
+  });
+
+  /** A goal 100 elmos behind is a near tie: the engine's 0.5 acceleration
+   *  makes the slower speed up worth it, an instant one does not. */
+  it("weighs the unit's own acceleration in choosing to reverse", () => {
+    const far: [number, number][] = [[0, -100]];
+    expect(run(REVERSER, far).events[0].args).toEqual([1]);
+    expect(run({ ...REVERSER, acceleration: 100 }, far).events[0].args).toEqual(
+      [0],
+    );
+  });
+
+  it("drives forwards to a goal ahead, however fast it reverses", () => {
+    const result = run({ ...MOTION, reverseSpeed: 100 }, [[0, 100]]);
+    expect(result.events[0].args).toEqual([0]);
+    expect(result.frames.some((f) => f.reversing)).toBe(false);
+  });
+
+  /** The unit puts its back to a goal behind and to the side, so it turns
+   *  the short way, less than a quarter circle, not the long way. */
+  it("turns its back to a goal behind it and to one side", () => {
+    const result = run(REVERSER, [[-20, -20]]);
+    expect(result.events[0].args).toEqual([1]);
+    const finalHeading = result.frames.at(-1)?.heading ?? 0;
+    expect(Math.abs(finalHeading)).toBeLessThan(16384);
+    expect(result.arrived).not.toBeNull();
+  });
+
+  it("tells the script a reversing frame's speed and pose", () => {
+    const result = run(REVERSER, behind);
+    const events = withWorld([{ frame: 20, ambient: true }], null, {
+      radius: 0,
+      self: { radius: 10, height: 12 },
+      attachPiece: () => null,
+      ground: null,
+      drive: { frames: result.frames, maxSpeed: 2 },
+    });
+    expect(events[0].world?.drive?.reversing).toBe(true);
+  });
+});
+
+describe("pathPoints behind", () => {
+  it("is one second's travel straight back", () => {
+    expect(pathPoints("behind", MOTION, [])).toEqual([[0, -60]]);
+  });
+});
+
 describe("driveMotion", () => {
   const project = (extra: Partial<LegoProject>) =>
     ({ pieces: [], ...extra }) as unknown as LegoProject;
@@ -184,7 +279,41 @@ describe("driveMotion", () => {
       motion: { speed: 2, turnRate: 450 },
       speed: "movement",
       turnRate: "movement",
+      reverseSpeed: "none",
     });
+  });
+
+  /** `rSpeed` is elmos a second like `speed`, and the movement section's own
+   *  wins over the game unit's. */
+  it("reads the reverse speed from movement, else the game's definition", () => {
+    const own = driveMotion(
+      project({
+        movement: { moveClass: "TANK2", speed: 60, reverseSpeed: 30 },
+        gameUnitDef: { rspeed: 15 },
+      }),
+    );
+    expect(own.motion.reverseSpeed).toBe(1);
+    expect(own.reverseSpeed).toBe("movement");
+    const def = driveMotion(project({ gameUnitDef: { rSpeed: 15 } }));
+    expect(def.motion.reverseSpeed).toBe(0.5);
+    expect(def.reverseSpeed).toBe("definition");
+  });
+
+  it("reads the acceleration and brake rate for deciding to reverse", () => {
+    const own = driveMotion(
+      project({
+        movement: {
+          moveClass: "TANK2",
+          speed: 60,
+          acceleration: 0.1,
+          brakeRate: 0.2,
+        },
+      }),
+    );
+    expect(own.motion).toMatchObject({ acceleration: 0.1, brakeRate: 0.2 });
+    const def = driveMotion(project({ gameUnitDef: { maxacc: 0.3 } }));
+    expect(def.motion.acceleration).toBe(0.3);
+    expect(def.motion).not.toHaveProperty("brakeRate");
   });
 
   it("reads a game unit's own definition when the unit has no movement", () => {
@@ -202,6 +331,7 @@ describe("driveMotion", () => {
       motion: { speed: 1, turnRate: 1 },
       speed: "preview",
       turnRate: "none",
+      reverseSpeed: "none",
     });
   });
 });
@@ -225,6 +355,7 @@ describe("withWorld on a drive", () => {
       heading: run.frames[100].heading,
       speed: 2,
       maxSpeed: 2,
+      reversing: false,
     });
     expect(world?.ground?.up).toEqual(run.frames[100].up);
   });

@@ -2402,6 +2402,8 @@ mod drive {
                         heading: -8192,
                         speed: 0.5 * f64::from(frame),
                         max_speed: 2.0,
+                        // It backs up from frame 4 on.
+                        reversing: frame >= 4,
                     }),
                     stand_in: None,
                     own: coilbox_unitpose::Size::default(),
@@ -2421,6 +2423,39 @@ mod drive {
         code.push(op("GET"));
         code.extend([op("MOVE_NOW"), piece, 1]);
         code
+    }
+
+    /// `get REVERSING` is 0 while the unit drives forwards and 1 once it backs
+    /// up (`UnitScript.cpp:1151-1153`). The answer is scaled by an elmo so it
+    /// shows in the piece's position.
+    #[test]
+    fn a_driven_unit_reads_whether_it_is_reversing() {
+        let read = |sleep: u32| {
+            let mut code = push(sleep);
+            code.push(op("SLEEP"));
+            code.extend(push(109)); // REVERSING
+            for _ in 0..4 {
+                code.extend(push(0));
+            }
+            code.push(op("GET"));
+            code.extend(push(ELMO));
+            code.push(op("MUL"));
+            code.extend([op("MOVE_NOW"), 1, 1]);
+            code.push(op("RETURN"));
+            let timeline = run(
+                &create_only(code),
+                &model_pieces(),
+                &driven(8),
+                8,
+                &[],
+                &HashMap::new(),
+            );
+            assert_eq!(timeline.error, None);
+            pose(&timeline, 7, "turret")[1]
+        };
+        // Wakes on frame 2, then on frame 5.
+        assert!(close(read(66), 0.0));
+        assert!(close(read(165), 1.0));
     }
 
     /// A `.cob` reads a driven unit's heading and speed as the engine answers
