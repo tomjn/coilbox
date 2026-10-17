@@ -175,6 +175,9 @@ export interface SceneState {
   /** The dot on the unit's aim point. Built with the scene and moved, since it
    *  is one point wherever it is and there is nothing to rebuild. */
   aimMark: THREE.Points;
+  /** Each weapon's range and arc while their toggle is on, in `overlay`.
+   *  Rebuilt whenever a weapon or a piece changes. */
+  weaponReach: THREE.Group | null;
   /** The sky now drawn, and which backdrop built it, so going back to one
    *  already seen does not draw its gradient again. Null while the plain
    *  backdrop shows, which is what the canvas does with no background at all. */
