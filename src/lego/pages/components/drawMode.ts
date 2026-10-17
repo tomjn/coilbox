@@ -179,6 +179,13 @@ export function refreshDrawMode(
     layer.edges.delete(geometry);
   }
   for (const [solid, copy] of layer.offsetFaces) {
+    // The solid material is patched a frame after it is first drawn, once its
+    // texture is known to carry a team colour mask. The copy follows.
+    if (copy.onBeforeCompile !== solid.onBeforeCompile) {
+      copy.onBeforeCompile = solid.onBeforeCompile;
+      copy.customProgramCacheKey = solid.customProgramCacheKey;
+      copy.needsUpdate = true;
+    }
     if (layer.mode === "both" && usedSolid.has(solid)) continue;
     copy.dispose();
     layer.offsetFaces.delete(solid);

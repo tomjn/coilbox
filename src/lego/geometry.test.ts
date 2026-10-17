@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { teamColourPending } from "../lib/springTexture";
 import type { LegoAtlas } from "./atlas";
 import {
   disposeSharedMaterial,
@@ -105,5 +106,67 @@ describe("importedMaterial", () => {
     expect(material.alphaMap).toBeNull();
     expect(material.alphaTest).toBe(0);
     dispose();
+  });
+});
+
+/** The first bytes of a PNG, with the colour type the header carries. */
+function pngHeader(colourType: number): Uint8Array {
+  const bytes = new Uint8Array(33);
+  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  bytes[25] = colourType;
+  return bytes;
+}
+
+function answerWith(colourType: number) {
+  vi.stubGlobal(
+    "fetch",
+    async () => new Response(pngHeader(colourType) as BlobPart),
+  );
+}
+
+/** Whether the shader patch that mixes the team colour in is on the material. */
+function paintsTeamColour(material: {
+  customProgramCacheKey: () => string;
+}): boolean {
+  return material.customProgramCacheKey().includes("coilbox-spring:team");
+}
+
+/**
+ * The engine mixes the player's colour in by the first texture's alpha, for any
+ * unit (issue #3271). A unit of parts samples an atlas, so the atlas's own alpha
+ * is the mask, the same as a lifted piece's texture.
+ */
+describe("partMaterial team colour", () => {
+  afterEach(() => {
+    disposeSharedMaterial();
+    vi.unstubAllGlobals();
+  });
+
+  it("paints the team colour where an atlas with an alpha channel marks it", async () => {
+    answerWith(6);
+    const material = partMaterial(atlas("masked.png"));
+    expect(teamColourPending(material)).toBe(true);
+    await vi.waitFor(() => expect(paintsTeamColour(material)).toBe(true));
+    expect(teamColourPending(material)).toBe(false);
+  });
+
+  it("draws an atlas with no alpha channel as it is, with no team colour", async () => {
+    answerWith(2);
+    const material = partMaterial(atlas("plain.png"));
+    await vi.waitFor(() => expect(teamColourPending(material)).toBe(false));
+    expect(paintsTeamColour(material)).toBe(false);
+  });
+
+  it("paints a lifted piece's texture and an atlas with the same colour", async () => {
+    answerWith(6);
+    const part = partMaterial(atlas("masked.png"));
+    const lifted = importedMaterial({
+      texture: { key: "aa11.png", name: "probe_1.png" },
+    });
+    await vi.waitFor(() => {
+      expect(paintsTeamColour(part)).toBe(true);
+      expect(paintsTeamColour(lifted.material)).toBe(true);
+    });
+    lifted.dispose();
   });
 });

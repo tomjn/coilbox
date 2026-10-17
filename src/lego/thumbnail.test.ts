@@ -111,6 +111,20 @@ describe("readyToCapture", () => {
     expect(readyToCapture(unit)).toBe(true);
   });
 
+  /** The team colour goes on a frame late, so a picture taken before it is
+   *  a unit without its player's colour (issue #3271). */
+  it("waits for the team colour to be decided", () => {
+    const unit = textured(true);
+    const mesh = unit.children[0] as THREE.Mesh;
+    const material = mesh.material as THREE.MeshStandardMaterial;
+    material.userData.teamColourPending = true;
+
+    expect(readyToCapture(unit)).toBe(false);
+
+    material.userData.teamColourPending = false;
+    expect(readyToCapture(unit)).toBe(true);
+  });
+
   it("has nothing to photograph in a unit with no pieces", () => {
     const empty = new THREE.Group();
     // The pivot dot the builder puts in the unit's own group, which is not the
