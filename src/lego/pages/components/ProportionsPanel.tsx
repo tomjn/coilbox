@@ -15,6 +15,11 @@
 
 import { Button, Input } from "@picoframe/frame";
 import { useEffect, useState } from "react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
 import {
   type BodyPlan,
@@ -42,6 +47,8 @@ interface Props {
   /** Fits the skeleton to a footprint and height and keeps them as its target,
    *  as one edit. */
   onTarget: (target: SkeletonTarget) => void;
+  /** Lets the skeleton go as one edit, keeping every piece. */
+  onRemove: () => void;
   /** The value being dragged by a viewport handle, if one is. */
   preview: { id: string; value: number } | null;
 }
@@ -52,11 +59,16 @@ export function ProportionsPanel({
   onChange,
   onPreview,
   onTarget,
+  onRemove,
   preview,
 }: Props) {
   if (project.skeleton?.fitted) {
     return (
-      <FittedProportions plan={plan} measured={project.skeleton.proportions} />
+      <FittedProportions
+        plan={plan}
+        measured={project.skeleton.proportions}
+        onRemove={onRemove}
+      />
     );
   }
   return (
@@ -66,8 +78,40 @@ export function ProportionsPanel({
       onChange={onChange}
       onPreview={onPreview}
       onTarget={onTarget}
+      onRemove={onRemove}
       preview={preview}
     />
+  );
+}
+
+function RemoveSkeleton({ onRemove }: { onRemove: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button size="sm" variant="outline" className="self-start">
+          Remove skeleton
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-56 p-2 text-xs">
+        <p>Keeps every piece.</p>
+        <div className="mt-2 flex gap-1">
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => {
+              setOpen(false);
+              onRemove();
+            }}
+          >
+            Remove
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -79,9 +123,11 @@ export function ProportionsPanel({
 function FittedProportions({
   plan,
   measured,
+  onRemove,
 }: {
   plan: BodyPlan;
   measured: Record<string, number>;
+  onRemove: () => void;
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 py-3">
@@ -105,6 +151,7 @@ function FittedProportions({
           );
         })}
       </dl>
+      <RemoveSkeleton onRemove={onRemove} />
     </div>
   );
 }
@@ -115,6 +162,7 @@ function PlanProportions({
   onChange,
   onPreview,
   onTarget,
+  onRemove,
   preview,
 }: Props) {
   const values = planProportions(plan, project.skeleton?.proportions);
@@ -206,6 +254,7 @@ function PlanProportions({
         A bone you moved by hand goes back to the plan when a proportion that
         places it changes.
       </p>
+      <RemoveSkeleton onRemove={onRemove} />
     </div>
   );
 }

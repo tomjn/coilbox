@@ -36,6 +36,7 @@ function show(project: LegoProject, plan: BodyPlan) {
   const onChange = vi.fn();
   const onPreview = vi.fn();
   const onTarget = vi.fn();
+  const onRemove = vi.fn();
   render(
     <ProportionsPanel
       project={project}
@@ -43,10 +44,11 @@ function show(project: LegoProject, plan: BodyPlan) {
       onChange={onChange}
       onPreview={onPreview}
       onTarget={onTarget}
+      onRemove={onRemove}
       preview={null}
     />,
   );
-  return { onChange, onPreview, onTarget };
+  return { onChange, onPreview, onTarget, onRemove };
 }
 
 function type(label: string, text: string) {
@@ -138,6 +140,17 @@ describe("ProportionsPanel", () => {
 
     expect(onChange).toHaveBeenCalledWith({ axles: 2 });
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("removes the skeleton only after a confirm", () => {
+    const { onRemove } = show(unit(BIPED), BIPED);
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove skeleton" }));
+    expect(onRemove).not.toHaveBeenCalled();
+    expect(screen.getByText("Keeps every piece.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+
+    expect(onRemove).toHaveBeenCalledTimes(1);
   });
 
   describe("size", () => {

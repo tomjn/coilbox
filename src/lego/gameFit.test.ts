@@ -153,3 +153,40 @@ describe("gameFit movement", () => {
     expect(row(rows, "movement")).toBeUndefined();
   });
 });
+
+describe("gameFit fliers", () => {
+  const WITH_FLIERS: GameFitData = {
+    ...GAME,
+    armorDefs: { ...GAME.armorDefs, air: ["swift"] },
+    units: {
+      ...GAME.units,
+      swift: {
+        category: "AIR MOBILE",
+        canfly: true,
+        canmove: true,
+        speed: 300,
+      },
+    },
+  };
+  const FLIER = { canfly: true, canmove: true, speed: 200 };
+
+  it("checks a flier's armour class like any other unit", () => {
+    const r = row(gameFit(FLIER, "swift", WITH_FLIERS), "armour");
+    expect(r?.status).toBe("ok");
+    expect(r?.text).toContain("air");
+    expect(row(gameFit(FLIER, "mine", WITH_FLIERS), "armour")?.status).toBe(
+      "warn",
+    );
+  });
+
+  it("flags a flier with no category and offers the other fliers'", () => {
+    const r = row(gameFit(FLIER, "mine", WITH_FLIERS), "category");
+    expect(r?.status).toBe("warn");
+    expect(r?.suggested).toEqual(["air", "mobile"]);
+  });
+
+  it("does not offer a static unit the categories of fliers", () => {
+    const r = row(gameFit({ canmove: false }, "mine", WITH_FLIERS), "category");
+    expect(r?.suggested).toEqual(["building", "notair"]);
+  });
+});

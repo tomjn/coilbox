@@ -8,12 +8,13 @@ import { Input } from "@picoframe/frame";
 import { Field } from "../../../components/Field";
 import { OptionSelect } from "../../../components/OptionSelect";
 import { useUnitDefs } from "../../../workshop/config";
-import type { LegoMovement, LegoProject } from "../../model";
+import type { FlightStyle, LegoMovement, LegoProject } from "../../model";
 import {
   declaresMoveClass,
   KIND_LABEL,
   movementKinds,
   movementState,
+  suggestFlight,
   suggestMotion,
 } from "../../movement";
 import type { UnitBounds } from "../../s3oBuild";
@@ -23,6 +24,12 @@ import { useTestGame } from "./useTestGame";
 
 /** The option that leaves the unit static. Radix's select has no empty value. */
 const STATIC = "__static";
+
+/** The options that fly, beside the game's classes. */
+const FLIES: Record<FlightStyle, string> = {
+  gunship: "__flies_gunship",
+  plane: "__flies_plane",
+};
 
 interface Props {
   project: LegoProject;
@@ -88,6 +95,16 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
     disabled?: boolean;
   }[] = [
     { value: STATIC, label: "Does not move" },
+    {
+      value: FLIES.gunship,
+      label: "Flies, gunship",
+      description: "hovers over its target",
+    },
+    {
+      value: FLIES.plane,
+      label: "Flies, plane",
+      description: "strafes past its target",
+    },
     ...offered.map((entry) => ({
       value: entry.name,
       label: entry.name,
@@ -106,6 +123,7 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
   // unit the engine drops, said only once the game is read.
   const stored =
     movement &&
+    !movement.flies &&
     !offered.some(
       (entry) => entry.name.toLowerCase() === movement.moveClass.toLowerCase(),
     )
@@ -121,12 +139,29 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
       onMovementChange(undefined);
       return;
     }
+    const style = (Object.keys(FLIES) as FlightStyle[]).find(
+      (key) => FLIES[key] === value,
+    );
+    if (style) {
+      onMovementChange(
+        current && game
+          ? suggestFlight(current, game.name, style)
+          : { moveClass: "", flies: style },
+      );
+      return;
+    }
     if (!current || !game) return;
     onMovementChange(suggestMotion(current, game.name, value));
   }
 
   function setNumber(
-    key: "speed" | "turnRate" | "reverseSpeed" | "acceleration" | "brakeRate",
+    key:
+      | "speed"
+      | "turnRate"
+      | "reverseSpeed"
+      | "acceleration"
+      | "brakeRate"
+      | "cruiseAltitude",
     text: string,
   ) {
     if (!movement) return;
@@ -169,9 +204,13 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
         </p>
       )}
 
-      {state.state === "offer" || movement ? (
+      {state.state === "offer" || state.state === "none-fit" || movement ? (
         <OptionSelect
-          value={movement?.moveClass ?? STATIC}
+          value={
+            movement?.flies
+              ? FLIES[movement.flies]
+              : (movement?.moveClass ?? STATIC)
+          }
           onValueChange={pick}
           options={options}
           ariaLabel="Movement class"
@@ -219,24 +258,43 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
               onChange={(event) => setNumber("turnRate", event.target.value)}
             />
           </Field>
-          <Field
-            label="Reverse speed, elmos a second"
-            hint={
-              movement.reverseSpeedFrom ??
-              (movement.reverseSpeed
-                ? undefined
-                : "Not set, the unit never backs up")
-            }
-          >
-            <Input
-              type="number"
-              min={0}
-              value={movement.reverseSpeed ?? ""}
-              onChange={(event) =>
-                setNumber("reverseSpeed", event.target.value)
+          {movement.flies ? (
+            <Field
+              label="Cruise altitude, elmos"
+              hint={
+                movement.cruiseAltitudeFrom ??
+                (movement.cruiseAltitude ? undefined : "Not set")
               }
-            />
-          </Field>
+            >
+              <Input
+                type="number"
+                min={0}
+                value={movement.cruiseAltitude ?? ""}
+                onChange={(event) =>
+                  setNumber("cruiseAltitude", event.target.value)
+                }
+              />
+            </Field>
+          ) : (
+            <Field
+              label="Reverse speed, elmos a second"
+              hint={
+                movement.reverseSpeedFrom ??
+                (movement.reverseSpeed
+                  ? undefined
+                  : "Not set, the unit never backs up")
+              }
+            >
+              <Input
+                type="number"
+                min={0}
+                value={movement.reverseSpeed ?? ""}
+                onChange={(event) =>
+                  setNumber("reverseSpeed", event.target.value)
+                }
+              />
+            </Field>
+          )}
           <Field
             label="Acceleration, elmos a frame squared"
             hint={

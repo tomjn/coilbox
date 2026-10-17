@@ -29,6 +29,7 @@ import type {
 } from "./model";
 import type { LoadedPack } from "./pack";
 import { framesAgree, isJoined, localFromWorld, worldMatrix } from "./reparent";
+import { shapeConnectors } from "./shapeConnectors";
 import { shapeBox } from "./shapes";
 import type { Bounds, Vec3 } from "./snapping";
 
@@ -220,7 +221,8 @@ export function customConnectors(
  * join by. A piece's own custom anchors come first and stand in for the
  * part's, as they do for snapping. Otherwise a part's own list is used as it is
  * and the box's are not added to it: the box is a guess, and the parts that
- * state their own are the ones it gets wrong.
+ * state their own are the ones it gets wrong. A generated shape's come from
+ * `shapeConnectors`.
  */
 export function pieceConnectors(
   pack: LoadedPack,
@@ -231,7 +233,9 @@ export function pieceConnectors(
   const own = customConnectors(piece.customAnchors ?? [], bounds);
   if (own.length > 0) return own;
   if (part) return part.connectors ?? boxConnectors(part.bbox);
-  // A shape or a lifted piece has no part, so its own box stands in.
+  // A generated shape works its own out from its kind and numbers.
+  if (piece.shape) return shapeConnectors(piece.shape);
+  // A lifted piece has no part, so its own box stands in.
   return bounds ? boxConnectors(bounds) : [];
 }
 

@@ -63,6 +63,7 @@ import { presetById, ROLES, restAngleWarnings } from "../animPresets";
 import { unitAtlas } from "../atlas";
 import { balanceProblem, checkBalance } from "../balance";
 import { legoTexturePrune } from "../bindings";
+import { releaseSkeleton } from "../bodyPlans";
 import { addBuildArm, builderKind, pickArmParts } from "../buildArm";
 import { pictureIsStale } from "../buildPicture";
 import {
@@ -307,6 +308,12 @@ function Builder({ id }: { id: string | undefined }) {
     },
     [edit, skeletonPlan],
   );
+  // Lets the skeleton go and keeps every piece, as one undo step.
+  const removeSkeleton = useCallback(() => {
+    setProportionPreview(null);
+    setAside("pieces");
+    edit(releaseSkeleton);
+  }, [edit]);
   // The document as it is now, for an edit made after waiting on a file.
   const docRef = useRef(doc);
   docRef.current = doc;
@@ -2490,6 +2497,7 @@ function Builder({ id }: { id: string | undefined }) {
                   plan={skeletonPlan}
                   onChange={changeProportions}
                   onTarget={changeTarget}
+                  onRemove={removeSkeleton}
                   onPreview={setProportionPreview}
                   preview={proportionPreview}
                 />
