@@ -181,7 +181,12 @@ import { useShareModule } from "../useModuleShare";
 import { useRawGeometry } from "../useRawGeometry";
 import { useSymmetry } from "../useSymmetry";
 import { addWeaponModule, pickWeaponParts } from "../weaponModule";
-import { setPieceRole } from "../wheelAxle";
+import {
+  addShapePiece,
+  setPieceRole,
+  setPieceShape,
+  wheelAxleProblems,
+} from "../wheelAxle";
 import { AimPointPanel } from "./components/AimPointPanel";
 import { AnchorList } from "./components/AnchorList";
 import { AnimationPanel } from "./components/AnimationPanel";
@@ -557,7 +562,10 @@ function Builder({ id }: { id: string | undefined }) {
   const skeletonNotes = useMemo(
     () =>
       checkedDraft && pack && atRest
-        ? skeletonProblems(checkedDraft, pack, raw)
+        ? [
+            ...skeletonProblems(checkedDraft, pack, raw),
+            ...wheelAxleProblems(checkedDraft),
+          ]
         : [],
     [checkedDraft, pack, raw, atRest],
   );
@@ -638,25 +646,21 @@ function Builder({ id }: { id: string | undefined }) {
     const shape = newRoundShape(kind, draft, pack);
     if (!shape) return;
     const pieceId = crypto.randomUUID();
-    edit((project) => ({
-      ...project,
-      pieces: [
-        ...project.pieces,
-        {
-          id: pieceId,
-          name: uniquePieceName(
-            kind,
-            project.pieces.map((piece) => piece.name),
-          ),
-          parentId: selectedId ?? project.rootPieceId,
-          partId: null,
-          shape,
-          position: [0, 0, 0],
-          rotation: [0, 0, 0],
-          scale: [1, 1, 1],
-        },
-      ],
-    }));
+    edit((project) =>
+      addShapePiece(project, {
+        id: pieceId,
+        name: uniquePieceName(
+          kind,
+          project.pieces.map((piece) => piece.name),
+        ),
+        parentId: selectedId ?? project.rootPieceId,
+        partId: null,
+        shape,
+        position: [0, 0, 0],
+        rotation: [0, 0, 0],
+        scale: [1, 1, 1],
+      }),
+    );
     queueTwin(pieceId);
     setSelectedId(pieceId);
   }
@@ -665,12 +669,7 @@ function Builder({ id }: { id: string | undefined }) {
   function reshapeSelected(shape: LegoShape) {
     if (!selectedId) return;
     const pieceId = selectedId;
-    place([pieceId], (project) => ({
-      ...project,
-      pieces: project.pieces.map((piece) =>
-        piece.id === pieceId ? { ...piece, shape } : piece,
-      ),
-    }));
+    place([pieceId], (project) => setPieceShape(project, pieceId, shape));
   }
 
   /**

@@ -23,7 +23,7 @@ import {
 import { setPivot } from "./pivot";
 import { type Problem, problem } from "./problems";
 import { worldMatrix } from "./reparent";
-import type { LegoShape } from "./shapes";
+import { isRoundShapeKind, type LegoShape } from "./shapes";
 import type { Vec3 } from "./snapping";
 
 /** The axis the unit script spins a wheel about, x. */
@@ -34,9 +34,7 @@ const SPIN_AXIS = 0;
  * way the generators read it: 0, 1 or 2, else y.
  */
 function cylinderAxle(piece: LegoPiece): 0 | 1 | 2 | null {
-  if (piece.shape?.kind !== "cylinder" && piece.shape?.kind !== "tube") {
-    return null;
-  }
+  if (!piece.shape || !isRoundShapeKind(piece.shape.kind)) return null;
   const axis = piece.shape.options?.axis;
   return axis === 0 || axis === 1 || axis === 2 ? axis : 1;
 }
@@ -142,6 +140,21 @@ export function setPieceRole(
   };
   visit(pieceId);
   return next;
+}
+
+/**
+ * The project with a new shape piece added, and turned to spin about its axle
+ * when it lands at or under a wheel. Every way of adding a cylinder or tube
+ * goes through this.
+ */
+export function addShapePiece(
+  project: LegoProject,
+  piece: LegoPiece,
+): LegoProject {
+  return turnWheelAxleToSpin(
+    { ...project, pieces: [...project.pieces, piece] },
+    piece.id,
+  );
 }
 
 /**

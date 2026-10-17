@@ -12,6 +12,7 @@ import {
 import { worldMatrix } from "./reparent";
 import { shapeMesh } from "./shapes";
 import {
+  addShapePiece,
   setPieceRole,
   setPieceShape,
   turnWheelAxleToSpin,
@@ -386,10 +387,9 @@ describe("a newly added cylinder", () => {
       name: "bone",
       role: "wheel",
     };
-    // What the strip's add button does: append the piece, then align it.
-    const added = turnWheelAxleToSpin(
-      withPieces(bone, cylinder("cylinder", undefined, "bone")),
-      "cylinder",
+    const added = addShapePiece(
+      withPieces(bone),
+      cylinder("cylinder", undefined, "bone"),
     );
     expect(spunOnStartMoving(buildLuaScript(added))).toEqual({ bone: 0 });
     expect(turnsOntoItself(added, "cylinder", 0, Math.PI / 6)).toBe(true);
@@ -426,5 +426,31 @@ describe("the wheel axle warning", () => {
 
   it("ignores cylinders that are not on a wheel", () => {
     expect(wheelAxleProblems(withPieces(cylinder("pipe", 1)))).toEqual([]);
+  });
+});
+
+describe("addShapePiece", () => {
+  it("adds a cylinder that is not on a wheel as it comes", () => {
+    const added = addShapePiece(withPieces(), cylinder("pipe", 1));
+    expect(pieceById(added, "pipe")?.rotation).toEqual([0, 0, 0]);
+  });
+
+  it("aligns a tube added under a wheel", () => {
+    const bone: LegoPiece = {
+      ...cylinder("bone", undefined),
+      shape: undefined,
+      role: "wheel",
+    };
+    const tube = {
+      ...cylinder("rim", 1, "bone"),
+      shape: {
+        kind: "tube",
+        size: [10, 4, 10] as [number, number, number],
+        options: { axis: 1, inner: 3 },
+      },
+    };
+    expect(ALONG(axleOf(addShapePiece(withPieces(bone), tube), "rim"), 0)).toBe(
+      true,
+    );
   });
 });
