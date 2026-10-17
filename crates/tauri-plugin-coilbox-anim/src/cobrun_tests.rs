@@ -2486,3 +2486,111 @@ mod drive {
         assert!(close(pose(&timeline, 6, "barrel")[1], 2.5));
     }
 }
+
+/// The frame a script begun with `start-script` first runs on, which depends
+/// on what began it (`CobEngine.cpp:92-105,173-200`, `Game.cpp:1784-1800`).
+mod start_frame {
+    use super::*;
+    use std::path::Path;
+
+    fn compile(source: &str) -> Vec<u8> {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../coilbox-bos2lua/tests/fixtures");
+        crate::compile_bos(source, &dir).unwrap()
+    }
+
+    /// The first frame `piece` stands 1 elmo up the z axis.
+    fn moved(timeline: &Timeline, piece: &str) -> Option<usize> {
+        (0..timeline.frames.len()).find(|&frame| close(pose(timeline, frame, piece)[2], 1.0))
+    }
+
+    fn played(source: &str, events: &[ScriptEvent]) -> Timeline {
+        let timeline = run(
+            &compile(source),
+            &model_pieces(),
+            events,
+            12,
+            &[],
+            &HashMap::new(),
+        );
+        assert_eq!(timeline.error, None);
+        timeline
+    }
+
+    const CHILD: &str = "Child() { move base to z-axis [1] now; }\n";
+
+    /// `Create` is a call-in, and the engine runs `SetMaxReloadTime` after it
+    /// and before anything it began (`CobInstance.cpp:221-233`).
+    #[test]
+    fn begun_by_create_it_runs_on_the_next_frame() {
+        let source = format!(
+            "piece base, turret, barrel;\nCreate() {{ start-script Child(); }}\n\
+             SetMaxReloadTime(ms) {{ move turret to z-axis [1] now; }}\n{CHILD}"
+        );
+        let timeline = played(&source, &created());
+
+        assert_eq!(moved(&timeline, "turret"), Some(0));
+        assert_eq!(moved(&timeline, "base"), Some(1));
+    }
+
+    #[test]
+    fn begun_by_a_call_in_it_runs_on_the_next_frame() {
+        let source = format!(
+            "piece base, turret, barrel;\nCreate() {{ }}\nActivate() {{ start-script Child(); }}\n{CHILD}"
+        );
+        let mut events = created();
+        events.push(ScriptEvent {
+            frame: 3,
+            callin: "Activate".to_string(),
+            args: Vec::new(),
+            ambient: false,
+            world: None,
+            engine: None,
+        });
+        let timeline = played(&source, &events);
+
+        assert_eq!(moved(&timeline, "base"), Some(4));
+    }
+
+    /// `Middle` is on the running list when it first runs, so what it begins
+    /// runs the frame after.
+    #[test]
+    fn begun_by_a_running_thread_it_runs_on_the_next_frame() {
+        let source = format!(
+            "piece base, turret, barrel;\nCreate() {{ start-script Middle(); }}\n\
+             Middle() {{ move turret to z-axis [1] now; start-script Child(); }}\n{CHILD}"
+        );
+        let timeline = played(&source, &created());
+
+        assert_eq!(moved(&timeline, "turret"), Some(1));
+        assert_eq!(moved(&timeline, "base"), Some(2));
+    }
+
+    /// A thread woken from a sleep runs after the swap that would have made
+    /// what it begins run next frame, so that runs the frame after.
+    #[test]
+    fn begun_by_a_thread_woken_from_a_sleep_it_runs_two_frames_later() {
+        let source = format!(
+            "piece base, turret, barrel;\n\
+             Create() {{ sleep 33; move turret to z-axis [1] now; start-script Child(); }}\n{CHILD}"
+        );
+        let timeline = played(&source, &created());
+
+        let woke = moved(&timeline, "turret").expect("Create woke");
+        assert_eq!(moved(&timeline, "base"), Some(woke + 2));
+    }
+
+    /// A thread woken from a wait is back on the running list, unlike one
+    /// woken from a sleep.
+    #[test]
+    fn begun_by_a_thread_woken_from_a_wait_it_runs_on_the_next_frame() {
+        let source = format!(
+            "piece base, turret, barrel;\n\
+             Create() {{ turn barrel to x-axis <10> speed <300>; wait-for-turn barrel around x-axis;\n\
+             move turret to z-axis [1] now; start-script Child(); }}\n{CHILD}"
+        );
+        let timeline = played(&source, &created());
+
+        let woke = moved(&timeline, "turret").expect("Create woke");
+        assert_eq!(moved(&timeline, "base"), Some(woke + 1));
+    }
+}
