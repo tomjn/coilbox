@@ -285,9 +285,9 @@ A unit opened out of a game brings its own script with it. See [Opening a unit f
 
 A skeleton is the stick figure of a unit: where its joints are, what each one is for and how it moves, before it has any parts. There is no way to start a unit from one in the builder yet. Milestone 63 adds it, and this is how a skeleton is stored.
 
-A skeleton comes from a body plan, such as two legs or wheeled. The plans are part of coilbox, in `src/lego/bodyPlans.ts`. Each plan has:
+A skeleton comes from a body plan, such as two legs or wheeled. The plans are part of coilbox, in `src/lego/bodyPlans.ts` and, for wheels and tracks, `src/lego/vehiclePlans.ts`. Each plan has:
 
-- named proportions, such as leg length and stance width, each with a range and a default, in elmos
+- named proportions, such as leg length and stance width, each with a range and a default, in elmos or, for something the plan repeats such as axles, a whole number
 - bones, worked out from those proportions, each with a name, a parent, a position against its parent, and a role
 - the animation presets that drive the bones, with their settings
 
@@ -299,6 +299,18 @@ A unit made from a plan holds ordinary empty pieces, one per bone, with their ro
 A piece with no `bone` is free, and changing a proportion never moves it. A copy of a bone, by duplicate, paste, mirror or a ring, is free. A bone moved to hang off a different piece is free too, because the plan places a bone against its own parent. Removing the skeleton removes every `bone` as well and leaves the pieces where they are, roles and presets included. A unit made before skeletons existed has neither field and opens as it always has. A unit made from a plan that this version of coilbox does not have still opens, and keeps its record and its bones.
 
 A skeleton is for a whole unit, and a [module](#modules) is for a part of one, so they are kept separate. A module never carries a `bone`.
+
+### Wheels and tracks
+
+The wheeled plan has a body and a pair of wheels for each axle. Its proportions are the number of axles, the axle spacing, the track width between the left and right wheels' middles, and the wheel height, which is the height of a wheel's middle above the ground. The defaults are the median two axle vehicle in Splinter Faction: 2 axles, 19.6 apart, 28 wide, at 4.7.
+
+The tracked plan has a body, a bone for each track and a run of road wheels hung off each track. Its proportions are the track length, the track width between the two tracks' middles, the track height and the number of road wheels a side. Splinter Faction has no tracked model with a separate track, so the defaults are the median Spring 1944 tank: 47.4 long, 18.3 wide, 8.8 high, with 6 road wheels a side. The road wheels are spread over 0.65 of the track's length, with their middles 0.34 of the track's height above the ground, both also Spring 1944 medians.
+
+Every wheel and road wheel has the Wheel role, and both plans apply **Wheels turning**, so the wheels spin in the preview before the unit has any parts. A wheel bone sits on its axle with no pivot, so a part hung on it turns about its own middle. It spins about the unit's left to right axis, so a part modelled with its axle along another axis turns end over end.
+
+There is no role for a track, so a track bone has none. Hang the tread on it. The road wheels turn and the tread does not. A unit script cannot scroll a texture: the calls a Lua unit script has in Recoil move, turn, spin, scale, show, hide and explode pieces, and none of them reads or writes texture coordinates.
+
+Fewer axles or road wheels delete the bones that are no longer needed. `bonesLostWithParts` lists the ones carrying a part or with a piece hung on them, so a change can say so before it deletes anything.
 
 ## Health, cost and stats
 
