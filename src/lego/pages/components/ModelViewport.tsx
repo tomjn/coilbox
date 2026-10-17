@@ -99,6 +99,7 @@ import {
   captureThumbnail,
   readyToCapture,
 } from "../../thumbnail";
+import type { SymmetryMode } from "../../useSymmetry";
 import {
   applySnap,
   clearAnchors,
@@ -141,6 +142,7 @@ import {
   SaveCompoundPopover,
 } from "./SaveCompoundPopover";
 import { ShortcutSheet } from "./ShortcutSheet";
+import { SymmetryPopover } from "./SymmetryPopover";
 import type { SceneState } from "./sceneState";
 import {
   overlayMaterial,
@@ -454,6 +456,10 @@ interface Props {
   symmetry: {
     on: boolean;
     onChange: (on: boolean) => void;
+    mode: SymmetryMode;
+    onModeChange: (mode: SymmetryMode) => void;
+    count: number;
+    onCountChange: (count: number) => void;
   };
   /** Arming the next click to drop a snap anchor instead of selecting, and
    *  what to do with the click that follows. */
@@ -566,7 +572,14 @@ export function ModelViewport({
     onDelete,
     canDelete,
   } = pieceActions;
-  const { on: symmetryOn, onChange: onSymmetryChange } = symmetry;
+  const {
+    on: symmetryOn,
+    onChange: onSymmetryChange,
+    mode: symmetryMode,
+    onModeChange: onSymmetryModeChange,
+    count: symmetryCount,
+    onCountChange: onSymmetryCountChange,
+  } = symmetry;
   const {
     placingAnchor = false,
     onPlaceAnchor,
@@ -1493,10 +1506,16 @@ export function ModelViewport({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="right">
-                    Symmetry: a new piece gets a twin, which follows it for as
-                    long as it stays selected (M)
+                    Symmetry: a new piece gets a twin or a ring of copies, which
+                    follow it (M)
                   </TooltipContent>
                 </Tooltip>
+                <SymmetryPopover
+                  mode={symmetryMode}
+                  onModeChange={onSymmetryModeChange}
+                  count={symmetryCount}
+                  onCountChange={onSymmetryCountChange}
+                />
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <TipButton

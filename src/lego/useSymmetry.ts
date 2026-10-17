@@ -15,6 +15,16 @@ import { adoptHeldPresets, type HeldPreset } from "./compounds";
 import { followMirror, mirrorTwin } from "./mirror";
 import { type LegoProject, pieceById } from "./model";
 import type { LoadedPack } from "./pack";
+import { followRing, resizeRing, ringTwins } from "./ring";
+import { ringMembers, validRingCount } from "./ringSet";
+
+/** What a new piece gets when symmetry is on: a mirrored twin, or copies spaced
+ *  evenly round the vertical axis (#3317). */
+export type SymmetryMode = "mirror" | "ring";
+
+/** The ring size a session starts with, before anyone picks one. A choice, not
+ *  a measurement. */
+const DEFAULT_COUNT = 3;
 
 export interface SymmetrySession {
   /** Whether a piece added now should get a twin. */
@@ -25,6 +35,17 @@ export interface SymmetrySession {
    * session. Saved pairs stay, and are not followed while it is off.
    */
   setOn: (on: boolean) => void;
+  /** Whether a new piece gets one mirrored twin or a ring of copies. Saved
+   *  pairs and rings keep following whichever it is. */
+  mode: SymmetryMode;
+  setMode: (mode: SymmetryMode) => void;
+  /** How many pieces a new ring has, the original included. */
+  count: number;
+  /**
+   * Set the count for new rings. With `ringOf`, a piece in a ring, that ring is
+   * resized too, in one edit. A count a ring cannot have is ignored.
+   */
+  setCount: (count: number, ringOf?: string) => void;
   /**
    * Remember a piece that arrived while symmetry was on, so its first placement
    * mirrors it. Off, this is nothing: the piece is an ordinary piece.
@@ -64,6 +85,8 @@ export function useSymmetry(options: {
    * is state here rather than a field on the document.
    */
   const [on, setOn] = useState(false);
+  const [mode, setMode] = useState<SymmetryMode>("mirror");
+  const [count, setCount] = useState(DEFAULT_COUNT);
   /**
    * The pieces added since symmetry came on that have not been placed off the
    * centre line yet.
@@ -93,6 +116,18 @@ export function useSymmetry(options: {
       setOn(next);
       if (!next) awaitingTwin.current.clear();
     },
+    mode,
+    setMode,
+    count,
+    setCount: (next: number, ringOf?: string) => {
+      if (!validRingCount(next)) return;
+      setCount(next);
+      if (project && ringOf && ringMembers(project.pieces, ringOf)) {
+        edit((current) =>
+          resizeRing(current, ringOf, next, () => crypto.randomUUID(), pack),
+        );
+      }
+    },
     queueTwin: (pieceId: string, held: HeldPreset[] = []) => {
       if (on) awaitingTwin.current.set(pieceId, held);
     },
@@ -109,14 +144,22 @@ export function useSymmetry(options: {
           }
           continue;
         }
+        const members = ringMembers(next.pieces, pieceId);
+        if (members) {
+          if (
+            on &&
+            !members.some((id) => id !== pieceId && pieceIds.includes(id))
+          ) {
+            next = followRing(next, pieceId, pack);
+          }
+          continue;
+        }
         const held = awaitingTwin.current.get(pieceId);
         if (!held) continue;
-        const twinned = mirrorTwin(
-          next,
-          pieceId,
-          () => crypto.randomUUID(),
-          pack,
-        );
+        const twinned =
+          mode === "ring"
+            ? ringTwins(next, pieceId, count, () => crypto.randomUUID(), pack)
+            : mirrorTwin(next, pieceId, () => crypto.randomUUID(), pack);
         if (!twinned) continue;
         awaitingTwin.current.delete(pieceId);
         next = adoptHeldPresets(twinned.project, held);

@@ -79,6 +79,8 @@ Every part has six faces, named for the unit's directions: top, bottom, front, b
 
 **Copies.** Duplicate keeps the original's join. Mirroring a part, in place or as a copy, joins the copy to the face where its reflection sits, and so does a twin made in symmetry mode. When no face is there, the copy is free. A twin follows its partner: slide the partner along its face and the twin stays joined, drag the partner free and the twin goes free too. A pasted part lands free, keeping the joins inside what you copied.
 
+**Symmetry round the axis.** The symmetry options next to the button switch a new piece from one mirrored twin to a ring of copies round the vertical axis of the root piece, from 2 to 12 of them. Place a leg and the others follow it at equal angles. Each copy keeps the original's role and is a module instance of its own, so a ring of legs is not a walker by itself. A piece on the axis waits until it is moved off it. Change the count and the selected ring gains or loses copies in one undo step. Break in the piece panel lets the ring go and leaves the pieces where they are.
+
 ## Modules
 
 A module is an assembly you saved to use again, such as a leg, a turret or a cab. Build it once out of parts, save it, and drop it into the next unit. Earlier versions of coilbox called modules compounds. Modules saved under that name load unchanged.

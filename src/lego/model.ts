@@ -22,6 +22,7 @@
 
 import { comparablePath } from "./exportRecord";
 import type { RawGeometry } from "./rawGeometry";
+import { ringMembers, validRingCount } from "./ringSet";
 import { type LegoWorth, parseWorth } from "./worth";
 
 export const LEGO_SCHEMA_VERSION = 1;
@@ -429,14 +430,28 @@ export interface LegoPiece {
    * The piece this one is the mirror twin of (#3315). Both pieces of a pair
    * name each other, so either can lead. Symmetry mode moves the other when one
    * is placed, across the centre line of the root (x = 0 in its space), which is
-   * implied rather than stored: a later symmetry about the vertical axis adds a
-   * project level field that says which, and a pair with no such field is a
+   * implied rather than stored: a piece with `twin` and no `ring` is one of a
    * mirror pair. Stored on the pieces, not as a list on the project, so a copy
    * carries it and the id remap in `compounds.ts` can reach it. Absent on a
    * piece with no twin, which is every piece of a unit saved before this
    * existed.
    */
   twin?: string;
+  /**
+   * One of a ring of copies spaced evenly round the root's vertical axis
+   * (#3317). `next` is the member one step further round and `count` is how
+   * many the ring has, original included. A piece is in a mirror pair or a
+   * ring, never both. The count is per ring and not per project, because one
+   * unit can have a ring of six wheels and a ring of four legs. See
+   * `ringSet.ts`.
+   */
+  ring?: LegoPieceRing;
+}
+
+/** A piece's place in a ring of copies. See `LegoPiece.ring`. */
+export interface LegoPieceRing {
+  next: string;
+  count: number;
 }
 
 /**
@@ -1005,6 +1020,9 @@ export function projectProblems(project: LegoProject): string[] {
     if (piece.twin !== undefined && !byId.has(piece.twin)) {
       problems.push(`"${piece.name}" has a twin that no longer exists.`);
     }
+    if (piece.ring !== undefined && !ringMembers(project.pieces, piece.id)) {
+      problems.push(`"${piece.name}" is in a ring that is not whole.`);
+    }
   }
   for (const [name, count] of names) {
     if (count > 1) problems.push(`${count} pieces are called "${name}".`);
@@ -1304,7 +1322,20 @@ function parsePiece(raw: unknown): LegoPiece | null {
       return module ? { module } : {};
     })(),
     ...(typeof p.twin === "string" && p.twin !== "" ? { twin: p.twin } : {}),
+    ...(() => {
+      const ring = parsePieceRing(p.ring);
+      return ring ? { ring } : {};
+    })(),
   };
+}
+
+/** A piece's ring, or null unless it names a next piece and a usable count. */
+function parsePieceRing(value: unknown): LegoPieceRing | null {
+  if (typeof value !== "object" || value === null) return null;
+  const { next, count } = value as Record<string, unknown>;
+  if (typeof next !== "string" || next === "") return null;
+  if (typeof count !== "number" || !validRingCount(count)) return null;
+  return { next, count };
 }
 
 /** A piece's module, or null unless it names both a module and an instance. */
