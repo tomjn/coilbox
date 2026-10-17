@@ -7,10 +7,10 @@ import {
   isKnownShapeKind,
   isRoundShapeKind,
   type LegoShape,
+  type ShapeMesh,
   SPHERE_BOWL,
   SPHERE_DOME,
   SPHERE_WHOLE,
-  type ShapeMesh,
   setShapeSwatches,
   shapeBox,
   shapeKey,
@@ -170,7 +170,8 @@ describe("sphere mesh (#3330)", () => {
       // position. A point where a triangle was cut for tiling sits on its flat
       // face, a little inside, so allow for that.
       const along = Math.hypot(...points[i]);
-      const dot = n[0] * points[i][0] + n[1] * points[i][1] + n[2] * points[i][2];
+      const dot =
+        n[0] * points[i][0] + n[1] * points[i][1] + n[2] * points[i][2];
       expect(dot / along).toBeGreaterThan(0.98);
     }
   });

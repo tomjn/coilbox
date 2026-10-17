@@ -999,9 +999,7 @@ function sphere(shape: LegoShape): ShapeSolid {
         n: [0, side, 0] as Vec3,
       });
       triangle(
-        side < 0
-          ? [middle, rim(k + 1), rim(k)]
-          : [middle, rim(k), rim(k + 1)],
+        side < 0 ? [middle, rim(k + 1), rim(k)] : [middle, rim(k), rim(k + 1)],
       );
     }
   }

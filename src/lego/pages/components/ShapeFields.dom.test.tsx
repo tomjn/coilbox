@@ -147,3 +147,43 @@ describe("ShapeFields for a cone (#3329)", () => {
     );
   });
 });
+
+describe("ShapeFields for a sphere (#3330)", () => {
+  const sphere: LegoShape = {
+    kind: "sphere",
+    size: [2, 4, 6],
+    swatch: "green",
+    options: { keep: 0, rings: 4, sides: 12 },
+  };
+
+  it("shows three radii, rings and sides", () => {
+    render(<ShapeFields shape={sphere} onChange={onChange} />);
+    expect(screen.getByLabelText<HTMLInputElement>("Radius X").value).toBe("1");
+    expect(screen.getByLabelText<HTMLInputElement>("Radius Y").value).toBe("2");
+    expect(screen.getByLabelText<HTMLInputElement>("Radius Z").value).toBe("3");
+    expect(screen.getByLabelText<HTMLInputElement>("Rings").value).toBe("4");
+    expect(screen.getByLabelText<HTMLInputElement>("Sides").value).toBe("12");
+  });
+
+  it("makes it a dome, and calls the vertical radius a height", () => {
+    const { rerender } = render(
+      <ShapeFields shape={sphere} onChange={onChange} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Dome" }));
+    const dome = onChange.mock.calls[0][0] as LegoShape;
+    expect(dome.options?.keep).toBe(1);
+    expect(dome.size).toEqual([2, 2, 6]);
+    rerender(<ShapeFields shape={dome} onChange={onChange} />);
+    expect(screen.getByLabelText<HTMLInputElement>("Height").value).toBe("2");
+    expect(screen.queryByLabelText("Radius Y")).toBeNull();
+  });
+
+  it("refuses rings below 2 and keeps the shape", () => {
+    render(<ShapeFields shape={sphere} onChange={onChange} />);
+    type("Rings", "1");
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert").textContent).toBe(
+      "Rings must be a whole number, 2 or more.",
+    );
+  });
+});
