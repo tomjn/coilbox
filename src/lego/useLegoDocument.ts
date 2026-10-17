@@ -20,6 +20,7 @@ import {
 } from "./compounds";
 import { withConnections } from "./connectors";
 import { emptyDocument, primarySelection, reduceDocument } from "./document";
+import { liftedModuleRefusal } from "./liftPiece";
 import type { LegoProject } from "./model";
 import { insertModule } from "./moduleMount";
 import type { LoadedPack } from "./pack";
@@ -244,7 +245,8 @@ export function useLegoDocument(
     parentId: string,
     asModule = false,
   ): { rootPieceIds: string[]; held: HeldPreset[] } {
-    if (!project) return { rootPieceIds: [], held: [] };
+    if (!project || liftedModuleRefusal(project, cutting))
+      return { rootPieceIds: [], held: [] };
     const inserted = insertModule(
       project,
       cutting,

@@ -20,6 +20,7 @@ import {
   placeJoin,
   transformOf,
 } from "./connectors";
+import { liftedModuleRefusal } from "./liftPiece";
 import {
   type LegoMount,
   type LegoPiece,
@@ -286,7 +287,8 @@ export function insertModule(
 /**
  * A module added under the target's piece, joined to the face by its mount (or
  * the pick `chooseMount` makes without one). Null when the piece or its face is
- * missing, or the module has no connector to join by. Only a module from the
+ * missing, the module has no connector to join by, or the module holds pieces
+ * from a game this unit is not for (`liftedModuleRefusal`). Only a module from the
  * library is placed this way, so its pieces record the instance.
  */
 export function placeModule(
@@ -297,6 +299,7 @@ export function placeModule(
   options: PlaceOptions,
   newId: () => string,
 ): ReturnType<typeof insertCompound> | null {
+  if (liftedModuleRefusal(project, module)) return null;
   const parent = pieceById(project, target.parentId);
   if (!parent) return null;
   const theirs = pieceConnectors(pack, parent).find((c) => c.id === target.to);
