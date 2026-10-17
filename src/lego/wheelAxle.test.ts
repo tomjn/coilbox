@@ -11,7 +11,12 @@ import {
 } from "./model";
 import { worldMatrix } from "./reparent";
 import { shapeMesh } from "./shapes";
-import { setPieceRole, turnWheelAxleToSpin } from "./wheelAxle";
+import {
+  setPieceRole,
+  setPieceShape,
+  turnWheelAxleToSpin,
+  wheelAxleProblems,
+} from "./wheelAxle";
 
 function unit(): LegoProject {
   return {
@@ -306,5 +311,120 @@ describe("a cylinder placed on a wheel bone", () => {
   it("changes nothing when no piece above it is a wheel", () => {
     const project = withPieces(cylinder("tyre", 2));
     expect(turnWheelAxleToSpin(project, "tyre")).toBe(project);
+  });
+});
+
+describe("changing the axis of a wheel", () => {
+  it("turns it back onto the spin axis", () => {
+    const wheel = setPieceRole(
+      withPieces(cylinder("wheel", 0)),
+      "wheel",
+      "wheel",
+    );
+    const shape = {
+      kind: "cylinder",
+      size: [10, 4, 10] as [number, number, number],
+      options: { axis: 1 },
+    };
+    const project = setPieceShape(wheel, "wheel", shape);
+    expect(ALONG(axleOf(project, "wheel"), 0)).toBe(true);
+    const spun = spunOnStartMoving(buildLuaScript(project));
+    expect(spun).toEqual({ wheel: 0 });
+    expect(turnsOntoItself(project, "wheel", 0, Math.PI / 6)).toBe(true);
+  });
+
+  it("re-aligns a tire under a wheel bone", () => {
+    const bone: LegoPiece = {
+      ...cylinder("bone", undefined),
+      shape: undefined,
+      name: "bone",
+      role: "wheel",
+    };
+    const placed = turnWheelAxleToSpin(
+      withPieces(bone, cylinder("tyre", 0, "bone")),
+      "tyre",
+    );
+    const project = setPieceShape(placed, "tyre", {
+      kind: "cylinder",
+      size: [10, 10, 4],
+      options: { axis: 2 },
+    });
+    expect(ALONG(axleOf(project, "tyre"), 0)).toBe(true);
+  });
+
+  it("leaves a cylinder that is not on a wheel as it is", () => {
+    const project = withPieces(cylinder("pipe", 0));
+    const next = setPieceShape(project, "pipe", {
+      kind: "cylinder",
+      size: [10, 4, 10],
+      options: { axis: 1 },
+    });
+    expect(pieceById(next, "pipe")?.rotation).toEqual([0, 0, 0]);
+  });
+});
+
+describe("a tube", () => {
+  it("is turned onto the spin axis like a cylinder", () => {
+    const tube = {
+      ...cylinder("rim", 1),
+      shape: {
+        kind: "tube",
+        size: [10, 4, 10] as [number, number, number],
+        options: { axis: 1, inner: 3 },
+      },
+    };
+    const project = setPieceRole(withPieces(tube), "rim", "wheel");
+    expect(ALONG(axleOf(project, "rim"), 0)).toBe(true);
+  });
+});
+
+describe("a newly added cylinder", () => {
+  it("under a wheel bone turns about its axle in the generated script", () => {
+    const bone: LegoPiece = {
+      ...cylinder("bone", undefined),
+      shape: undefined,
+      name: "bone",
+      role: "wheel",
+    };
+    // What the strip's add button does: append the piece, then align it.
+    const added = turnWheelAxleToSpin(
+      withPieces(bone, cylinder("cylinder", undefined, "bone")),
+      "cylinder",
+    );
+    expect(spunOnStartMoving(buildLuaScript(added))).toEqual({ bone: 0 });
+    expect(turnsOntoItself(added, "cylinder", 0, Math.PI / 6)).toBe(true);
+  });
+});
+
+describe("the wheel axle warning", () => {
+  it("is empty for a wheel turned onto x", () => {
+    const project = setPieceRole(
+      withPieces(cylinder("wheel", 1)),
+      "wheel",
+      "wheel",
+    );
+    expect(wheelAxleProblems(project)).toEqual([]);
+  });
+
+  it("says which axis the axle is along when a wheel is turned by hand", () => {
+    const project = withPieces(cylinder("wheel", 1, "root", { role: "wheel" }));
+    const found = wheelAxleProblems(project);
+    expect(found).toHaveLength(1);
+    expect(found[0].message).toBe(
+      '"wheel" turns about x but its axle is along y.',
+    );
+    expect(found[0].severity).toBe("warning");
+    expect(found[0].pieceIds).toEqual(["wheel"]);
+  });
+
+  it("says slanted for an axle between axes", () => {
+    const project = withPieces(
+      cylinder("wheel", 1, "root", { role: "wheel", rotation: [0, 0, 0.5] }),
+    );
+    expect(wheelAxleProblems(project)[0].message).toContain("slanted");
+  });
+
+  it("ignores cylinders that are not on a wheel", () => {
+    expect(wheelAxleProblems(withPieces(cylinder("pipe", 1)))).toEqual([]);
   });
 });

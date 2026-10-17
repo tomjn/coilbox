@@ -21,18 +21,22 @@ import {
   pieceById,
 } from "./model";
 import { setPivot } from "./pivot";
+import { type Problem, problem } from "./problems";
 import { worldMatrix } from "./reparent";
+import type { LegoShape } from "./shapes";
 import type { Vec3 } from "./snapping";
 
 /** The axis the unit script spins a wheel about, x. */
 const SPIN_AXIS = 0;
 
 /**
- * The axis a cylinder runs along, or null for a piece that is not a cylinder.
- * Read the way the cylinder generator reads it: 0, 1 or 2, else y.
+ * The axis a cylinder or tube runs along, or null for any other piece. Read the
+ * way the generators read it: 0, 1 or 2, else y.
  */
 function cylinderAxle(piece: LegoPiece): 0 | 1 | 2 | null {
-  if (piece.shape?.kind !== "cylinder") return null;
+  if (piece.shape?.kind !== "cylinder" && piece.shape?.kind !== "tube") {
+    return null;
+  }
   const axis = piece.shape.options?.axis;
   return axis === 0 || axis === 1 || axis === 2 ? axis : 1;
 }
@@ -138,4 +142,66 @@ export function setPieceRole(
   };
   visit(pieceId);
   return next;
+}
+
+/**
+ * The project with a piece's shape replaced, and its axle turned back onto the
+ * spin axis when it sits at or under a wheel, so changing the axis of a wheel
+ * does not leave it turning end over end.
+ */
+export function setPieceShape(
+  project: LegoProject,
+  pieceId: string,
+  shape: LegoShape,
+): LegoProject {
+  return turnWheelAxleToSpin(
+    {
+      ...project,
+      pieces: project.pieces.map((piece) =>
+        piece.id === pieceId ? { ...piece, shape } : piece,
+      ),
+    },
+    pieceId,
+  );
+}
+
+const AXIS_NAMES = ["x", "y", "z"];
+
+/**
+ * A warning for each cylinder or tube at or under a wheel whose axle is not
+ * along x, which is what the wheel spins about. It happens when the piece is
+ * turned by hand, or an ancestor is.
+ */
+export function wheelAxleProblems(project: LegoProject): Problem[] {
+  const found: Problem[] = [];
+  for (const piece of project.pieces) {
+    const axle = cylinderAxle(piece);
+    if (axle === null) continue;
+    const spinner = spinnerOf(project, piece);
+    if (!spinner) continue;
+    const along = new THREE.Vector3()
+      .setComponent(axle, 1)
+      .transformDirection(worldMatrix(project, piece.id));
+    if (Math.abs(Math.abs(along.getComponent(SPIN_AXIS)) - 1) < 1e-4) continue;
+    const nearest = [0, 1, 2].reduce((best, i) =>
+      Math.abs(along.getComponent(i)) > Math.abs(along.getComponent(best))
+        ? i
+        : best,
+    );
+    const lies =
+      Math.abs(Math.abs(along.getComponent(nearest)) - 1) < 1e-4
+        ? `along ${AXIS_NAMES[nearest]}`
+        : "slanted";
+    found.push(
+      problem(
+        "skeleton",
+        "warning",
+        spinner.id === piece.id
+          ? `"${piece.name}" turns about x but its axle is ${lies}.`
+          : `"${spinner.name}" turns about x but "${piece.name}" has its axle ${lies}.`,
+        [piece.id],
+      ),
+    );
+  }
+  return found;
 }
