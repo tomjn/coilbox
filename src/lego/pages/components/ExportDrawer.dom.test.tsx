@@ -150,9 +150,17 @@ describe("a unit of parts holding a piece lifted from a game", () => {
           name: "turret",
           parentId: "base",
           meshId: "mod/m0",
+          lifted: {
+            game: { name: "Splinter Faction", archive: "sf.sdz" },
+            member: "objects3d/armcom.s3o",
+            unit: "armcom",
+          },
         },
       ],
     });
+    expect(
+      await screen.findByText("From Splinter Faction, unit armcom"),
+    ).toBeTruthy();
     expect(
       await screen.findByText(/combining the two into one sheet/),
     ).toBeTruthy();

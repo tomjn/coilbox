@@ -80,7 +80,11 @@ import {
 } from "../groupTransform";
 import { useInventoryView } from "../inventory";
 import { liftIntoUnit, pasteIntoUnit } from "../liftIntoUnit";
-import { holdsLiftedPieces, liftedModuleRefusal } from "../liftPiece";
+import {
+  holdsLiftedPieces,
+  liftCredit,
+  liftedModuleRefusal,
+} from "../liftPiece";
 import { canFixMesh, DEFAULT_SMOOTHING_ANGLE_DEG } from "../meshFix";
 import {
   canMirror,
@@ -2361,6 +2365,11 @@ function Builder({ id }: { id: string | undefined }) {
                             onCommit={renameSelected}
                             className="mt-1"
                           />
+                          {selected.lifted ? (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {liftCredit(selected.lifted)}
+                            </p>
+                          ) : null}
 
                           <TransformFields
                             piece={selected}
