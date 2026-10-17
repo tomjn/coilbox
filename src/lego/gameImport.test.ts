@@ -1,6 +1,25 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { modelSource, paletteMember, textureMember } from "./gameImport";
+const extract = vi.hoisted(() => vi.fn());
+const tree = vi.hoisted(() => vi.fn());
+const scan = vi.hoisted(() => vi.fn());
+
+vi.mock("@tauri-apps/api/path", () => ({
+  join: async (...parts: string[]) => parts.join("/"),
+  tempDir: async () => "/tmp",
+}));
+vi.mock("../content/bindings", () => ({
+  unitsyncArchiveExtract: extract,
+  unitsyncArchiveTree: tree,
+}));
+vi.mock("../content/config", () => ({ primeScan: scan }));
+
+import {
+  modelSource,
+  paletteMember,
+  stageTextures,
+  textureMember,
+} from "./gameImport";
 
 const files = [
   { path: "unittextures/ARMCOM.png", size: 1 },
@@ -137,5 +156,84 @@ describe("paletteMember", () => {
 
   it("has nothing to find when the archive holds no palette", () => {
     expect(paletteMember(files)).toBeNull();
+  });
+});
+
+describe("stageTextures", () => {
+  const target = { enginePath: "/engine", dataDir: "/data" };
+  const picked = { archive: "game.sdz", member: "objects3d/armsolar.3do" };
+  const staged = { path: "/tmp/m/objects3d/armsolar.3do", staged: "/tmp/m" };
+  const listings: Record<string, { path: string; size: number }[]> = {
+    "dep.sdz": [
+      { path: "unittextures/tatex/32xgouraud00.tga", size: 1 },
+      { path: "unittextures/tatex/metal3b00.tga", size: 1 },
+      { path: "unittextures/tatex/palette.pal", size: 1 },
+    ],
+    "springcontent.sdz": [],
+  };
+  const gameFiles = [
+    { path: "objects3d/armsolar.3do", size: 1 },
+    { path: "unittextures/tatex/metal3b00.tga", size: 1 },
+  ];
+
+  beforeEach(() => {
+    extract.mockReset().mockResolvedValue({ size: 1, errors: [] });
+    tree.mockReset().mockImplementation(async ({ archive }) => ({
+      files: listings[archive] ?? [],
+      errors: [],
+    }));
+    scan.mockReset().mockResolvedValue({
+      games: [
+        {
+          primaryArchive: { name: "game.sdz" },
+          dependencyArchives: [{ name: "dep.sdz" }],
+        },
+      ],
+    });
+  });
+
+  it("takes a texture the game lacks from its dependency and the game's own copy of the rest", async () => {
+    await stageTextures(target, picked, staged, gameFiles, [
+      "32xgouraud00",
+      "metal3b00",
+    ]);
+
+    const taken = extract.mock.calls.map(([args]) => [args.archive, args.file]);
+    expect(taken).toContainEqual([
+      "dep.sdz",
+      "unittextures/tatex/32xgouraud00.tga",
+    ]);
+    expect(taken).toContainEqual([
+      "game.sdz",
+      "unittextures/tatex/metal3b00.tga",
+    ]);
+    expect(taken).not.toContainEqual([
+      "dep.sdz",
+      "unittextures/tatex/metal3b00.tga",
+    ]);
+  });
+
+  it("takes the palette from a dependency when the game has none", async () => {
+    await stageTextures(target, picked, staged, gameFiles, []);
+
+    expect(extract).toHaveBeenCalledWith(
+      expect.objectContaining({
+        archive: "dep.sdz",
+        file: "unittextures/tatex/palette.pal",
+      }),
+    );
+  });
+
+  it("lists no dependency when the game holds every texture", async () => {
+    await stageTextures(
+      target,
+      picked,
+      staged,
+      [...gameFiles, { path: "unittextures/tatex/palette.pal", size: 1 }],
+      ["metal3b00"],
+    );
+
+    expect(scan).not.toHaveBeenCalled();
+    expect(tree).not.toHaveBeenCalled();
   });
 });
