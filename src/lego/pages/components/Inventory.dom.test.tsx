@@ -11,7 +11,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { type LegoProject, newProject } from "../../model";
 import type { LegoPartInfo, LoadedPack } from "../../pack";
-import type { ShapeKind } from "../../shapes";
+import { SHAPE_KINDS, type ShapeKind } from "../../shapes";
+
+const ALL_SHAPES = SHAPE_KINDS.map((shape) => shape.label);
 
 const store = vi.hoisted(() => ({ values: new Map<string, unknown>() }));
 
@@ -228,7 +230,9 @@ describe("the kind filter", () => {
 describe("the count", () => {
   it("uses the plural for 2 or more and the singular for 1", () => {
     render(<Harness />);
-    expect(screen.getByText("6 parts, 2 modules")).toBeTruthy();
+    expect(
+      screen.getByText(`${3 + SHAPE_KINDS.length} parts, 2 modules`),
+    ).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Search the inventory"), {
       target: { value: "tur" },
     });
@@ -243,7 +247,7 @@ describe("the count", () => {
 describe("shapes", () => {
   it("are listed beside the parts by default", () => {
     render(<Harness />);
-    expect(names("shape grid")).toEqual(["Cylinder", "Tube", "Wedge"]);
+    expect(names("shape grid")).toEqual(ALL_SHAPES);
     expect(names("part grid")).toEqual(["beam", "block", "wedge"]);
   });
 
@@ -251,7 +255,9 @@ describe("shapes", () => {
     render(<Harness />);
     const search = screen.getByLabelText("Search the inventory");
     fireEvent.change(search, { target: { value: "round" } });
-    expect(names("shape grid")).toEqual(["Cylinder", "Tube"]);
+    expect(names("shape grid")).toEqual(
+      SHAPE_KINDS.filter((s) => s.tags.includes("round")).map((s) => s.label),
+    );
     fireEvent.change(search, { target: { value: "slope" } });
     expect(names("shape grid")).toEqual(["Wedge"]);
     fireEvent.change(search, { target: { value: "round" } });
@@ -264,7 +270,7 @@ describe("shapes", () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "Parts" }));
     fireEvent.click(screen.getByRole("button", { name: "Shapes" }));
-    expect(names("shape grid")).toEqual(["Cylinder", "Tube", "Wedge"]);
+    expect(names("shape grid")).toEqual(ALL_SHAPES);
     expect(names("part grid")).toEqual([]);
   });
 
@@ -280,7 +286,7 @@ describe("shapes", () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "pick another pack" }));
     expect(names("part grid")).toEqual([]);
-    expect(names("shape grid")).toEqual(["Cylinder", "Tube", "Wedge"]);
+    expect(names("shape grid")).toEqual(ALL_SHAPES);
   });
 
   it("are not offered by a pack that lists no swatches", () => {
