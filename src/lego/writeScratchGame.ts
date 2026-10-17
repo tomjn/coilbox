@@ -139,6 +139,9 @@ export async function writeScratchUnit({
     // thing that reads it for a real export.
     overwriteTexture: false,
     script: unitScript(project),
+    // The scratch game is always rewritten whole, so neither re-export input
+    // is read there.
+    scriptWritten: null,
     pieceCollision: buildPieceCollisionScript(
       project,
       bakedPieces(project, pack, raw).pieces,
@@ -154,6 +157,7 @@ export async function writeScratchUnit({
       "def",
       worthTotals(project, pack),
     ),
+    unitDefFields: null,
     text: null,
     model,
   });

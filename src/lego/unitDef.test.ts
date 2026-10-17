@@ -5,6 +5,8 @@ import { type LegoProject, newProject } from "./model";
 import type { UnitBounds } from "./s3oBuild";
 import {
   buildUnitDef as buildUnitDefWithHome,
+  DERIVED_FIELDS,
+  defValue,
   legoUnitDef as legoUnitDefWithHome,
   luaString,
   luaValue,
@@ -739,5 +741,74 @@ describe("buildUnitDef", () => {
       expect(lua).toContain("workertime = 250");
       expect(lua).toContain("builddistance = 128");
     });
+  });
+});
+
+/**
+ * The list a re-export updates (issue #3245). Every field the builder writes is
+ * either one the build decides, and so on the list, or one written on the
+ * first export only and named here, so a new field cannot slip in unclassified.
+ */
+describe("DERIVED_FIELDS", () => {
+  const everything: LegoProject = {
+    ...project("Con Bot", "conbot"),
+    pieceCollision: true,
+    pieceSelection: true,
+    movement: {
+      moveClass: "TANK2",
+      speed: 60,
+      turnRate: 500,
+      reverseSpeed: 20,
+      acceleration: 0.2,
+      brakeRate: 0.4,
+    },
+  };
+  everything.pieces = [
+    ...everything.pieces,
+    {
+      id: "arm",
+      name: "arm",
+      parentId: everything.rootPieceId,
+      partId: null,
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
+      scale: [1, 1, 1],
+      role: "buildarm.arm",
+    },
+  ];
+  const totals = {
+    health: 640,
+    metal: 55,
+    energy: 12,
+    buildTime: 70,
+    mass: 33,
+  };
+  const b = bounds({ x: 32, z: 48 });
+  const mobile = legoUnitDefWithHome(everything, b, "def", totals);
+  const still = legoUnitDefWithHome(
+    { ...everything, movement: undefined },
+    b,
+    "def",
+    totals,
+  );
+
+  it("names every field the builder writes, or says why it is not there", () => {
+    const written = new Set([...Object.keys(mobile), ...Object.keys(still)]);
+    // `customparams` is a table the game reads whole, so only the keys inside
+    // it that the build decides are on the list.
+    const firstExportOnly = [...written].filter(
+      (key) => !DERIVED_FIELDS.includes(key),
+    );
+    expect(firstExportOnly.sort()).toEqual(["customparams", "sightdistance"]);
+    for (const key of Object.keys(mobile.customparams as object))
+      expect(DERIVED_FIELDS).toContain(`customparams.${key}`);
+  });
+
+  it("lists only fields the builder can write", () => {
+    for (const path of DERIVED_FIELDS)
+      expect(
+        defValue(mobile, path) ?? defValue(still, path),
+        path,
+      ).toBeDefined();
   });
 });
