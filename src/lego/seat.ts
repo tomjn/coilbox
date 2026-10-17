@@ -7,9 +7,7 @@
  * would resolve the join and carry the piece straight back.
  */
 
-import * as THREE from "three";
-
-import { freePiece, pieceConnectors, same } from "./connectors";
+import { freePiece, same, twistOf } from "./connectors";
 import { type LegoPiece, type LegoProject, pieceById } from "./model";
 import type { LoadedPack } from "./pack";
 import { reparentPiece, worldMatrix } from "./reparent";
@@ -29,47 +27,6 @@ export interface DraggedTransform {
   position: Vec3;
   rotation: Vec3;
   scale: Vec3;
-}
-
-/**
- * The angle about the parent's connector that leaves the piece turned as it is.
- *
- * The piece's up direction is carried into the parent's child space, which is
- * where the join is written, and measured from the parent connector's up.
- * Nothing in a drag sets a twist, so this is what stops a join resolving to a
- * quarter turn from where the piece was dropped.
- */
-function twistOf(
-  project: LegoProject,
-  pack: LoadedPack,
-  piece: LegoPiece,
-  pieceWorld: THREE.Matrix4,
-  parent: LegoPiece,
-  seat: Seat,
-): number {
-  const own = pieceConnectors(pack, piece).find((c) => c.id === seat.connector);
-  const theirs = pieceConnectors(pack, parent).find((c) => c.id === seat.to);
-  if (!own || !theirs) return 0;
-
-  // The piece will be joined, so it takes the parent's turn and not its scale.
-  const parentTurn = new THREE.Quaternion();
-  worldMatrix(project, parent.id).decompose(
-    new THREE.Vector3(),
-    parentTurn,
-    new THREE.Vector3(),
-  );
-  const up = new THREE.Vector3(...own.up)
-    .transformDirection(pieceWorld)
-    .applyQuaternion(parentTurn.invert());
-  const facing = new THREE.Vector3(...theirs.facing).normalize();
-  up.addScaledVector(facing, -up.dot(facing)).normalize();
-
-  const from = new THREE.Vector3(...theirs.up).normalize();
-  const twist = Math.atan2(
-    facing.dot(new THREE.Vector3().crossVectors(from, up)),
-    from.dot(up),
-  );
-  return Number.isFinite(twist) ? twist : 0;
 }
 
 /**
@@ -187,4 +144,23 @@ export function freeMoved(
     return freePiece(piece);
   });
   return changed ? { ...after, pieces } : after;
+}
+
+/**
+ * The document after a number is typed into a piece's transform fields. A
+ * joined piece that the new number moves or turns is freed where it was typed
+ * to, as a drag frees it, or its join would put it straight back. A new scale
+ * keeps the join (issue #3309).
+ */
+export function typedTransform(
+  project: LegoProject,
+  pieceId: string,
+  change: Partial<LegoPiece>,
+): LegoProject {
+  return freeMoved(project, {
+    ...project,
+    pieces: project.pieces.map((piece) =>
+      piece.id === pieceId ? { ...piece, ...change } : piece,
+    ),
+  });
 }

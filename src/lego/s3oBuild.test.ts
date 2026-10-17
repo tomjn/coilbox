@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { resolveConnections } from "./connectors";
 import { emitPoint } from "./effects";
 import { type LegoPiece, type LegoProject, newProject } from "./model";
 import type { LegoPartInfo, LoadedPack } from "./pack";
@@ -400,6 +401,27 @@ describe("buildS3o", () => {
         grounded.pieces.find((piece) => piece.id === id)?.position,
       ).toEqual(doc.pieces.find((piece) => piece.id === id)?.position);
     }
+  });
+
+  it("leaves a joined piece where its join puts it (#3309)", () => {
+    const doc = resolveConnections(
+      project([
+        { id: "a", name: "a", parentId: "root", position: [0, 5, 0] },
+        {
+          id: "b",
+          name: "b",
+          parentId: "a",
+          connection: { connector: "-y", to: "+y", offset: [0.2, 0.1] },
+        },
+      ]),
+      pack(),
+    ).project;
+
+    const grounded = sitOnGround(doc, pack(), null);
+    const resolved = resolveConnections(grounded, pack()).project;
+
+    expect(grounded).not.toBe(doc);
+    expect(resolved).toBe(grounded);
   });
 
   it("leaves a unit already on the ground alone", () => {
