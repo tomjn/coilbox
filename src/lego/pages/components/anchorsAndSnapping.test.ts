@@ -36,6 +36,7 @@ const parts = [
   part("leg", [-0.25, -1, -0.25], [0.25, 1, 0.25]),
 ];
 const pack = {
+  manifest: {},
   parts,
   byId: new Map(parts.map((p) => [p.id, p])),
 } as unknown as LoadedPack;
@@ -138,6 +139,15 @@ describe("applySnap", () => {
     applySnap(state);
 
     expect(state.seat).toBeNull();
+  });
+
+  it("steps a free piece by the part unit when no anchor is in reach", () => {
+    const { state, dragged } = drag({ position: [0, 6.3, 0] });
+
+    applySnap(state);
+
+    expect(state.seat).toBeNull();
+    expect(dragged.position.y).toBeCloseTo(6.25);
   });
 
   it("saves nothing with snapping off", () => {
