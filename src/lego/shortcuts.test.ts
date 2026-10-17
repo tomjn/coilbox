@@ -46,6 +46,15 @@ describe("isShortcut", () => {
     expect(isShortcut("symmetry", key("M", { shiftKey: true }))).toBe(false);
   });
 
+  it("picks the next face on N, twists on T and stops on Escape while placing", () => {
+    expect(isShortcut("place-face", key("n"))).toBe(true);
+    expect(isShortcut("place-face", key("n", { metaKey: true }))).toBe(false);
+    expect(isShortcut("place-twist", key("t"))).toBe(true);
+    expect(isShortcut("place-twist", key("T", { shiftKey: true }))).toBe(false);
+    expect(isShortcut("place-stop", key("Escape"))).toBe(true);
+    expect(isShortcut("place-stop", key("n"))).toBe(false);
+  });
+
   it("frames on F, but not with Cmd or Ctrl held", () => {
     expect(isShortcut("frame", key("f"))).toBe(true);
     expect(isShortcut("frame", key("f", { metaKey: true }))).toBe(false);

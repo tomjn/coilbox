@@ -18,14 +18,22 @@ Go to **Units** and press **New unit**. That gives you an empty unit with one pi
 
 **Name it.** The name at the top left is what the unit is called in the overview. Under it is the export name, which is the base name of every file the export writes, and a Lua identifier, so it is lower case with underscores. It follows the title until you set it to something of its own.
 
-**Add parts.** The strip along the bottom is the parts library. Search it, narrow it by colourway, and click a part to add it. A new piece hangs off whatever is selected, so building outward from a hull section is the default rather than something to set up. Collapse the strip with the chevron when you are done reaching for parts.
+**Add parts.** The strip along the bottom is the parts library. Search it, narrow it by colourway, and click a part to add it. With a part selected in the unit, the new part is [joined](#joins) to a free face of it, in this order: top, front, back, left, right, bottom. The selected piece stays selected, so clicking more parts fills its other faces. Once every face has a part joined to it, the next goes on the face with the fewest. Collapse the strip with the chevron when you are done reaching for parts.
 
-**Move it.** Drag the gizmo in the 3D view, or type numbers into the selected piece's Position, Rotation and Scale fields. `G`, `R` and `S` switch the gizmo between move, turn and scale. Dragging snaps to the corners, face centres and middles of nearby pieces. Hold `Alt` while you drag to place freely. The view names what a drag has snapped to while you do it.
+**Place a part on a face.** With nothing selected, or with a piece that has no faces such as `base` or a flare, clicking a part in the strip starts placing it. Hover a face of any part and a translucent copy shows where it will go. Click to add it there, joined to that face. While placing, `N` joins it by its next face and `T` turns it a quarter turn about the face. `Escape`, or clicking the same part in the strip again, stops. In a unit with no parts yet there is no face to hover, so click anywhere in the view to add the first part at the origin.
+
+**Move it.** Drag the gizmo in the 3D view, or type numbers into the selected piece's Position, Rotation and Scale fields. `G`, `R` and `S` switch the gizmo between move, turn and scale. A move drag works differently for a joined part and a free one:
+
+- A joined part slides along the face it is joined to and stays joined. It moves in steps of the part unit, counted from where it rests.
+- A free part moves in steps of the part unit, measured on its parent's axes, so the Position fields read round numbers. It snaps to the corners, face centres and middles of nearby pieces. Snap one of its faces onto a face that points back at it and the two are joined, and the part now hangs off the piece it joined.
+- Hold `Alt` while you drag to place a part freely, with no step and no snap. A joined part dragged with `Alt` is detached and stays where you drop it.
+
+The part unit is set by the pack, and is 0.25 for the bundled one. See [part unit](../reference/lego-parts-pack.md#part-unit). Turning steps by 15 degrees, and `Alt` turns that off too. A part from an imported model has no move step. The view names what a drag has snapped to, or the step it is moving in, while you do it.
 
 **Say what each piece is.** With a piece selected, the panel on the right sets:
 
 - **Name.** Lower case and unique, because a unit script addresses pieces by name.
-- **Hangs off.** Which piece carries it. Dragging a row onto another in the tree does the same thing.
+- **Hangs off.** Which piece carries it. Dragging a row onto another in the tree does the same thing. Changing it detaches a joined part, which stays where it is.
 - **Turns about.** Where the piece's origin sits inside its part: middle, top, bottom, left, right, front or back. This is the point the piece turns about and the point its children hang from. A leg wants its top, not its middle.
 - **Role.** What the piece is, so the animation presets know what to move.
 
@@ -41,7 +49,7 @@ Everything saves itself shortly after your last edit. The Save button forces it,
 
 Press `?` for the full sheet, or the keyboard button in the bottom right of the view. It is generated from the same table the handlers dispatch through, so it cannot fall out of step with what the keys actually do.
 
-The ones worth learning first are `G`, `R` and `S` for the three gizmo modes, `F` to frame the selected piece, and `Alt` held down to place a piece off the snap grid.
+The ones worth learning first are `G`, `R` and `S` for the three gizmo modes, `F` to frame the selected piece, and `Alt` held down to place a piece freely.
 
 ### The piece actions
 
@@ -49,13 +57,35 @@ The buttons down the left of the 3D view act on the selected piece: duplicate, p
 
 Copy and paste go through the system clipboard, so they cross windows. Copy a leg in one unit, paste it into another. Anything on the clipboard that is not a piece is rejected with a reason. A pasted piece whose part is not in any installed pack still pastes: the names, the hierarchy and the transforms are real work, so they are kept and the missing geometry is reported rather than dropped.
 
+## Joins
+
+A join holds a part to a face of the piece it hangs off. Move, turn or resize that piece and the part stays on its face.
+
+A part is joined when you add it from the strip with a part selected, place it on a face, or drag one of its faces onto a face that points back at it. Units built before joins existed open unchanged, with every part free, until you do one of those.
+
+Every part has six faces, named for the unit's directions: top, bottom, front, back, left and right, as in [Which way it faces](#which-way-it-faces). A pack can state a part's connectors instead, and those keep the names the pack gives them. See [connectors](../reference/lego-parts-pack.md#connectors) in the pack guide. **Connectors** in the piece panel gives one piece connectors of its own, clicked onto the model or added at its origin, each with a facing and an up direction. A piece with its own connectors joins only through those, not through its part's faces.
+
+**See a join.** A joined piece has a link mark on its row in the piece tree, and hovering the mark names both faces. With the piece selected, the view outlines the face it is joined by and the face it is joined to. **Show free faces**, in the piece panel, outlines the rest of its faces too. The outlines are drawn only in the builder and are never exported.
+
+**Joined to**, in the piece panel, names the piece and face it is joined to and the face it is joined by, or reads **Free**. **Along** and **Up** move the part across the face, and **Twist** turns it about the face, in degrees.
+
+**Detach** frees the part where it is. Changing **Hangs off**, turning the part, typing a new position or rotation, and dragging it with `Alt` all do the same. Changing its scale keeps the join.
+
+**Scaling.** A joined part keeps its own size when the piece it is joined to is scaled, and stays on the scaled face. A free part still scales with the piece it hangs off. A joined part is not mirrored when the piece it is joined to is.
+
+**Change part**, in the piece panel, swaps a piece's part for another shape or colour without rebuilding what hangs off it. The drawer has the parts search and filters, with the current shape's other colourways first. Joins carry across. A join keeps its face when the new part has a face of the same name, or moves to the face that points the same way. Parts joined to the piece follow the new part's faces. **Turns about** keeps its setting, and any of the piece's own connectors that fall outside the new part are removed and named under the button.
+
+**Broken joins.** A join that names a face its part no longer has is broken, which a part swap can cause. The piece stays where it was, Joined to reads **Broken** in red, its tree mark is red, and the problem is listed above the viewport. Detach it, or drag it onto a face again.
+
+**Copies.** Duplicate keeps the original's join. Mirroring a part, in place or as a copy, joins the copy to the face where its reflection sits, and so does a twin made in symmetry mode. When no face is there, the copy is free. A twin follows its partner: slide the partner along its face and the twin stays joined, drag the partner free and the twin goes free too. A pasted part lands free, keeping the joins inside what you copied.
+
 ## Compounds
 
 A compound is an assembly you saved to use again: a leg, a turret, a cab. Build it once out of parts, save it, and drop it into the next unit.
 
 Compounds are the answer to "where do I get a leg from". The alternative is copying pieces out of somebody else's game, which is somebody else's work and somebody else's licence. A compound is yours.
 
-Select the top piece of the assembly and press the compound button in the left-hand toolbar. It appears under the **Compounds** tab of the parts strip, where you can rename it, delete it, and click it to drop a copy into the unit you are working on. A compound is defined by how its pieces sit against each other, so it lands wherever you put it rather than where it originally was. Names are made unique as it lands, because two pieces called `barrel` would be one piece too few for a script.
+Select the top piece of the assembly and press the compound button in the left-hand toolbar. It appears under the **Compounds** tab of the parts strip, where you can rename it, delete it, and click it to drop a copy into the unit you are working on. A compound keeps how its pieces sit against each other and the joins between them. Its top piece has no join, so the compound lands free at the selected piece's origin, and you drag it onto a face to join it. Names are made unique as it lands, because two pieces called `barrel` would be one piece too few for a script.
 
 ## Judging size
 

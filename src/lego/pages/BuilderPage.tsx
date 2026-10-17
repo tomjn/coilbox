@@ -466,7 +466,7 @@ function Builder({ id }: { id: string | undefined }) {
       ) {
         return;
       }
-      if (event.key === "Escape") setPlacingPart(null);
+      if (isShortcut("place-stop", event)) setPlacingPart(null);
       else if (isShortcut("place-face", event)) {
         setPlacingPart((was) => was && { ...was, cycle: was.cycle + 1 });
       } else if (isShortcut("place-twist", event)) {
@@ -789,7 +789,7 @@ function Builder({ id }: { id: string | undefined }) {
   useEffect(() => {
     if (!placingAnchor) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setPlacingAnchor(false);
+      if (isShortcut("place-stop", event)) setPlacingAnchor(false);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
