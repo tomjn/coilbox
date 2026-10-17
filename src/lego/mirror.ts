@@ -48,7 +48,7 @@ const REFLECT_X = new THREE.Matrix4().makeScale(-1, 1, 1);
  * world space before it is any use. A unit whose root is offset or turned still
  * mirrors about its own middle rather than about the world's.
  */
-function reflection(project: LegoProject): THREE.Matrix4 {
+export function reflection(project: LegoProject): THREE.Matrix4 {
   const root = worldMatrix(project, project.rootPieceId);
   return root.clone().multiply(REFLECT_X).multiply(root.clone().invert());
 }

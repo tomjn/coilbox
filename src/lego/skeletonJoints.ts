@@ -14,6 +14,9 @@ export interface SkeletonJoint {
   at: [number, number, number];
   /** The origin of the piece it hangs from, or null for the root. */
   parentAt: [number, number, number] | null;
+  /** The piece it hangs from, or null for the root. A piece that is not a bone
+   *  can stand between two bones, so this is not always a joint. */
+  parentId: string | null;
 }
 
 /**
@@ -30,7 +33,11 @@ export function skeletonJoints(
   const { pieces } = bakedPieces(project, pack, raw);
   const joints: SkeletonJoint[] = [];
 
-  const walk = (pieceId: string, parentAt: [number, number, number] | null) => {
+  const walk = (
+    pieceId: string,
+    parentAt: [number, number, number] | null,
+    parentId: string | null,
+  ) => {
     const baked = pieces.get(pieceId);
     const piece = project.pieces.find((p) => p.id === pieceId);
     if (!baked || !piece) return;
@@ -46,11 +53,13 @@ export function skeletonJoints(
         label: piece.role ? roleLabel(piece.role) : piece.name,
         at,
         parentAt,
+        parentId,
       });
     }
-    for (const child of childrenOf(project, pieceId)) walk(child.id, at);
+    for (const child of childrenOf(project, pieceId))
+      walk(child.id, at, pieceId);
   };
 
-  walk(project.rootPieceId, null);
+  walk(project.rootPieceId, null, null);
   return joints;
 }

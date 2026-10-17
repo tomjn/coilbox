@@ -1533,13 +1533,12 @@ export function ModelViewport({
 
   useBalance(sceneRef, { result: balance, show: showBalance });
 
-  // The rest pose only, as the anchor dots are: while the pieces move, the
-  // bones would be drawn where they are not.
+  // Built at the rest pose, and moved onto the pieces by the script playback.
   useSkeleton(sceneRef, {
     project,
     pack,
     raw,
-    show: showSkeleton && hasSkeleton && !playing && scriptTimeline === null,
+    show: showSkeleton && hasSkeleton,
   });
   const proportionHandles = useMemo(
     () => (proportions ? proportionHandlesOf(project, proportions.plan) : []),

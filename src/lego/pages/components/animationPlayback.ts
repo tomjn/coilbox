@@ -9,6 +9,7 @@ import {
 import { poseRoot, restoreFromDrive } from "./drivePlayback";
 import { followPieces, releasePieces } from "./overlayFollow";
 import type { SceneState } from "./sceneState";
+import { poseSkeleton } from "./skeletonLayer";
 
 /**
  * Pose every piece the way the unit's own script put it at one moment.
@@ -72,6 +73,7 @@ export function applyTimelineFrame(
     if (mesh) mesh.visible = !hiddenAt(timeline, frame, index);
   }
   followPieces(state);
+  poseSkeleton(state);
 }
 
 /**

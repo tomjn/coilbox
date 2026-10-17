@@ -164,6 +164,7 @@ import type {
 } from "../scriptPlayback";
 import { dragPiece, freeMoved, type Seat, typedTransform } from "../seat";
 import { isShortcut, shortcutLabel } from "../shortcuts";
+import { skeletonProblems } from "../skeletonChecks";
 import { applyProportions } from "../skeletonEdit";
 import { applyTarget } from "../skeletonSize";
 import { swapModule } from "../swapModule";
@@ -546,6 +547,14 @@ function Builder({ id }: { id: string | undefined }) {
     [overlap, checkedDraft],
   );
 
+  const skeletonNotes = useMemo(
+    () =>
+      checkedDraft && pack && atRest
+        ? skeletonProblems(checkedDraft, pack, raw)
+        : [],
+    [checkedDraft, pack, raw, atRest],
+  );
+
   // Whether the base footprint leaves out a barrel, flare, aim point and build
   // nozzle. The problems below do not depend on it: they judge the whole unit.
   const [footprintLeaveOut, setFootprintLeaveOut] = useState(true);
@@ -567,14 +576,21 @@ function Builder({ id }: { id: string | undefined }) {
       ...(balanceNote ? [balanceNote] : []),
       ...footprintNotes,
       ...overlapNotes,
+      ...skeletonNotes,
     ],
-    [documentProblems, balanceNote, footprintNotes, overlapNotes],
+    [
+      documentProblems,
+      balanceNote,
+      footprintNotes,
+      overlapNotes,
+      skeletonNotes,
+    ],
   );
   const checkStatuses: Partial<Record<ProblemSource, CheckStatus>> = atRest
     ? checksCurrent
       ? {}
-      : { balance: "checking", overlap: "checking" }
-    : { balance: "paused", overlap: "paused" };
+      : { balance: "checking", overlap: "checking", skeleton: "checking" }
+    : { balance: "paused", overlap: "paused", skeleton: "paused" };
 
   function addPart(part: LegoPartInfo) {
     inventoryView.inventory.record({ kind: "part", id: part.id });

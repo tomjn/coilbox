@@ -14,6 +14,7 @@ import { bakedVertices, placeEffects } from "./effectsPlayback";
 import { attachGizmo } from "./gizmoCommit";
 import { refreshSelection } from "./overlayFollow";
 import { type SceneState, syncScene } from "./sceneState";
+import { poseSkeleton } from "./skeletonLayer";
 import { placeStandIn, type StandInPlacement } from "./standInPlayback";
 
 export interface ScriptFrameSteppingDeps {
@@ -157,6 +158,7 @@ export function useScriptFrameStepping(
       disposeBaked(current);
       syncScene(current, packRef.current, rawRef.current, projectRef.current);
       refreshSelection(current);
+      poseSkeleton(current);
       attachGizmo(
         current,
         projectRef.current,
