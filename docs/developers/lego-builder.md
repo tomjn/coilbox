@@ -91,6 +91,16 @@ The compound button opens a small panel that asks which connector mounts the com
 
 A module can have a category and tags. The compound button's panel has fields for both, and the tag button on a module's cell in the strip edits them later. A category is one typed word or two, picked from the starter list (Chassis, Wheel, Leg, Turret, Arm, Detail) and the categories already in use. A module with no category is "Uncategorised". The Compounds tab of the strip and the Lego Parts page both have a search box and a category menu. Search needs every term to appear in the name, the category or the tags.
 
+### Built in modules
+
+The Compounds tab opens with a set of modules that come with the app, under a "Built in" heading above your own. There are nine: a wheel, an axle with two wheels, a turret with a barrel and a muzzle flare, a leg, a pair of legs, a build arm, a hull section, a long hull section and a deck plate. Each one has its roles, joins, mount, category and tags set, and carries the presets that drive it: **Wheels turning** for the wheels, **Walk, two legs** for the legs, **Turret sweep** and **Recoil on firing** for the turret, and **Aim while building** and **Nano from the nozzle** for the arm. The turret and the build arm are the same pieces the Weapon and Build arm buttons add.
+
+A single leg is the front left one. Its walk needs a right leg too, so it is held back until the unit has one. The pair of legs brings the walk with it.
+
+You cannot rename, relabel or delete a built in module. Its cell has one button instead, "Make my own copy", which saves a copy under your own compounds with a new id and a name like "Wheel copy". The copy is yours to change.
+
+Built in modules are not files. The app builds them each time it loads the parts pack, from parts in the bundled pack, so they work with any atlas. Each has a fixed id starting `builtin.`, which stays the same between versions. If you replace the bundled pack with one that lacks a part a built in module uses, that module does not appear.
+
 ## Judging size
 
 A unit built from small parts can look substantial and be a fraction of a real one, so the builder gives you two readings.
