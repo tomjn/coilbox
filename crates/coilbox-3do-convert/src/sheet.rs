@@ -40,7 +40,15 @@ pub const SHEET_KIND: &str = "coilbox-3do-atlas";
 
 /// Bump when a reader could be misled by a file an older writer produced.
 /// Adding a field nothing has to read is not that.
-pub const SHEET_VERSION: u32 = 1;
+///
+/// Version 2 is the first whose models count the sheet's rows from the top
+/// (#4174). A version 1 record is still read, because its rectangles are in
+/// pixels and mean the same thing, but every model written against it points
+/// at the wrong part of the sheet.
+pub const SHEET_VERSION: u32 = 2;
+
+/// The first [`SHEET_VERSION`] whose models count rows from the top.
+pub const FIRST_TOP_ROWS_VERSION: u32 = 2;
 
 /// One tile's rectangle on the sheet.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -122,6 +130,13 @@ impl Sheet {
         Ok(sheet)
     }
 
+    /// Whether the models converted against this sheet were written before
+    /// #4174, when a face's rows were counted from the bottom of a sheet the
+    /// engine reads from the top.
+    pub fn is_pre_top_rows(&self) -> bool {
+        self.version < FIRST_TOP_ROWS_VERSION
+    }
+
     pub fn write(&self) -> Result<Vec<u8>, String> {
         serde_json::to_vec_pretty(self)
             .map_err(|e| format!("could not write the atlas record: {e}"))
@@ -201,6 +216,18 @@ mod tests {
         assert_eq!(back.placements(), packed.placements);
         assert_eq!(back.side, packed.image.width());
         assert_eq!(back.image, "objects3d.png");
+    }
+
+    #[test]
+    fn a_version_1_record_is_read_and_flagged_as_written_before_the_row_fix() {
+        let packed = pack(&[tile("a", 32)]).expect("pack");
+        let mut old = Sheet::of(&packed, "x.png");
+        assert!(!old.is_pre_top_rows(), "a new record is current");
+
+        old.version = 1;
+        let back = Sheet::read(&old.write().unwrap()).expect("an old record still reads");
+        assert!(back.is_pre_top_rows());
+        assert_eq!(back.rects(), packed.rects);
     }
 
     /// Two runs over the same tiles write the same bytes, so a re-run that
