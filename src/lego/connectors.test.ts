@@ -6,7 +6,9 @@ import {
   boxConnectors,
   connectPiece,
   disconnectPiece,
+  type LegoConnector,
   pieceConnectors,
+  readPartConnectors,
   resolveConnections,
   withConnections,
 } from "./connectors";
@@ -25,7 +27,7 @@ import {
   projectPackProblems,
 } from "./pack";
 import { reparentPiece, worldMatrix } from "./reparent";
-import { bakedPieces } from "./s3oBuild";
+import { bakedPieces, buildS3o } from "./s3oBuild";
 
 type Vec3 = [number, number, number];
 
@@ -493,6 +495,25 @@ describe("the export", () => {
     const baked = bakedPieces(doc, pack(), null).pieces;
     expect(round(baked.get("leg")?.offset as number[])).toEqual([0, -1.5, 0]);
   });
+
+  it("poses the wreck from where the joins put each piece (#3310)", () => {
+    const doc = hullAndLeg({
+      position: [7, 7, 7],
+      connection: { connector: "+y", to: "-y" },
+    });
+    const wreck = buildS3o(
+      doc,
+      pack(),
+      null,
+      { texture1: "a.png" },
+      {
+        pose: new Map([["hull", { position: [0, -1, 0] as Vec3 }]]),
+      },
+    );
+    const hull = wreck?.root.children.find((piece) => piece.name === "hull");
+    expect(round(hull?.offset as number[])).toEqual([0, -1, 0]);
+    expect(round(hull?.children[0].offset as number[])).toEqual([0, -1.5, 0]);
+  });
 });
 
 describe("operations that give a piece a new place", () => {
@@ -552,5 +573,129 @@ describe("operations that give a piece a new place", () => {
     expect(pieceOf(inserted.project, landed).connection).toBeUndefined();
     const child = inserted.project.pieces.find((p) => p.parentId === landed);
     expect(child?.connection).toEqual({ connector: "+y", to: "-y" });
+  });
+});
+
+describe("connectors a part states itself", () => {
+  /** One socket on the top of the hull, set back from the middle. */
+  const socket: LegoConnector = {
+    id: "socket",
+    position: [0.5, 0.5, -1],
+    facing: [0, 1, 0],
+    up: [0, 0, 1],
+  };
+
+  function statedPack(connectors: LegoConnector[]): LoadedPack {
+    const base = pack();
+    const hull = { ...(base.byId.get("hull") as LegoPartInfo), connectors };
+    const parts = base.parts.map((p) => (p.id === "hull" ? hull : p));
+    return {
+      ...base,
+      parts,
+      byId: new Map(parts.map((p) => [p.id, p])),
+    };
+  }
+
+  it("uses the stated list and none of the derived ones", () => {
+    const stated = statedPack([socket]);
+    const hull = pieceOf(project([{ id: "hull", partId: "hull" }]), "hull");
+    expect(pieceConnectors(stated, hull).map((c) => c.id)).toEqual(["socket"]);
+  });
+
+  it("derives connectors for a part that states none", () => {
+    const stated = statedPack([socket]);
+    const leg = pieceOf(project([{ id: "leg", partId: "leg" }]), "leg");
+    expect(pieceConnectors(stated, leg)).toHaveLength(6);
+  });
+
+  it("treats a stated empty list as a part nothing can join", () => {
+    const stated = statedPack([]);
+    const hull = pieceOf(project([{ id: "hull", partId: "hull" }]), "hull");
+    expect(pieceConnectors(stated, hull)).toEqual([]);
+  });
+
+  it("joins a piece at a stated connector", () => {
+    const stated = statedPack([socket]);
+    const joined = connectPiece(hullAndLeg({}), stated, "leg", {
+      connector: "-y",
+      to: "socket",
+    });
+    // The leg's bottom centre sits on the socket.
+    expect(worldPoint(joined, "leg", [0, -1, 0])).toEqual([0.5, 0.5, -1]);
+  });
+
+  it("breaks a join to a derived connector the part no longer has", () => {
+    const stated = statedPack([socket]);
+    const joined = connectPiece(hullAndLeg({}), stated, "leg", {
+      connector: "-y",
+      to: "+y",
+    });
+    expect(resolveConnections(joined, stated).broken).toEqual(["leg"]);
+  });
+});
+
+describe("readPartConnectors", () => {
+  const good = {
+    id: "top",
+    position: [0, 0.5, 0],
+    facing: [0, 1, 0],
+    up: [0, 0, 1],
+  };
+
+  it("accepts a well formed list", () => {
+    expect(readPartConnectors([good])).toEqual({ connectors: [good] });
+  });
+
+  it("accepts an empty list", () => {
+    expect(readPartConnectors([])).toEqual({ connectors: [] });
+  });
+
+  it("accepts a facing that is unit length to within rounding", () => {
+    const rounded = { ...good, facing: [0, 0.99999, 0] };
+    expect(readPartConnectors([rounded])).toHaveProperty("connectors");
+  });
+
+  const bad: [string, unknown, RegExp][] = [
+    ["a list that is not a list", { good }, /list/],
+    ["an entry that is not an object", [null], /connector 1/],
+    ["an empty id", [{ ...good, id: "" }], /id/],
+    ["an id that is not a string", [{ ...good, id: 3 }], /id/],
+    ["a repeated id", [good, { ...good }], /"top" twice/],
+    [
+      "a position of the wrong length",
+      [{ ...good, position: [0, 1] }],
+      /position/,
+    ],
+    [
+      "a position that is not finite",
+      [{ ...good, position: [0, Number.NaN, 0] }],
+      /position/,
+    ],
+    [
+      "a facing that is not unit length",
+      [{ ...good, facing: [0, 2, 0] }],
+      /facing/,
+    ],
+    ["an up that is not unit length", [{ ...good, up: [0, 0, 0] }], /up/],
+    [
+      "an up that is not at right angles to the facing",
+      [{ ...good, up: [0, 1, 0] }],
+      /right angles/,
+    ],
+  ];
+  for (const [name, input, message] of bad) {
+    it(`rejects ${name}`, () => {
+      const result = readPartConnectors(input);
+      expect(result).toHaveProperty("problem");
+      expect((result as { problem: string }).problem).toMatch(message);
+    });
+  }
+
+  it("names the connector that is wrong", () => {
+    const result = readPartConnectors([
+      good,
+      { ...good, id: "b", facing: [0, 2, 0] },
+    ]);
+    expect((result as { problem: string }).problem).toMatch(/"b"/);
   });
 });

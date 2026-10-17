@@ -69,14 +69,87 @@ export function boxConnectors(bounds: Bounds): LegoConnector[] {
   return connectors;
 }
 
-/** The connectors a piece can be joined by: its part's, or none for a piece
- *  with no part in the pack. */
+/** How far from exact a stated length or angle may be: rounding in a
+ *  hand written or exported `pack.json`, not a different direction. */
+const STATED_TOLERANCE = 1e-3;
+
+function isVec3(value: unknown): value is Vec3 {
+  return (
+    Array.isArray(value) &&
+    value.length === 3 &&
+    value.every((n) => typeof n === "number" && Number.isFinite(n))
+  );
+}
+
+/** What is wrong with one stated connector, or null when it is fine. */
+function statedProblem(entry: unknown): string | null {
+  if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+    return "it is not an object";
+  }
+  const { id, position, facing, up } = entry as Record<string, unknown>;
+  if (typeof id !== "string" || id === "") {
+    return "its id is not a name";
+  }
+  if (!isVec3(position)) return "its position is not three numbers";
+  if (
+    !isVec3(facing) ||
+    Math.abs(Math.hypot(...facing) - 1) > STATED_TOLERANCE
+  ) {
+    return "its facing is not three numbers of unit length";
+  }
+  if (!isVec3(up) || Math.abs(Math.hypot(...up) - 1) > STATED_TOLERANCE) {
+    return "its up is not three numbers of unit length";
+  }
+  const dot = facing[0] * up[0] + facing[1] * up[1] + facing[2] * up[2];
+  if (Math.abs(dot) > STATED_TOLERANCE) {
+    return "its up is not at right angles to its facing";
+  }
+  return null;
+}
+
+/**
+ * The connectors a pack states for a part, or why they cannot be used.
+ *
+ * A list is taken whole or not at all. Half a list would leave a part with some
+ * of the connectors its author meant and a join to the others silently broken,
+ * so one bad entry sends the part back to the connectors its box gives it.
+ */
+export function readPartConnectors(
+  raw: unknown,
+): { connectors: LegoConnector[] } | { problem: string } {
+  if (!Array.isArray(raw)) {
+    return { problem: "connectors is not a list" };
+  }
+  const seen = new Set<string>();
+  for (const [index, entry] of raw.entries()) {
+    const problem = statedProblem(entry);
+    if (problem) {
+      const id = (entry as { id?: unknown } | null)?.id;
+      const name = typeof id === "string" && id !== "" ? ` "${id}"` : "";
+      return { problem: `connector ${index + 1}${name}: ${problem}` };
+    }
+    const { id } = entry as LegoConnector;
+    if (seen.has(id)) {
+      return { problem: `it names "${id}" twice` };
+    }
+    seen.add(id);
+  }
+  return { connectors: raw as LegoConnector[] };
+}
+
+/**
+ * The connectors a piece can be joined by, or none for a piece with no part in
+ * the pack. A part's own list is used as it is and the box's are not added to
+ * it, the way a piece's custom anchors replace the derived ones: the box is a
+ * guess, and the parts that state their own are the ones it gets wrong.
+ */
 export function pieceConnectors(
   pack: LoadedPack,
   piece: LegoPiece,
 ): LegoConnector[] {
   const part = piece.partId ? pack.byId.get(piece.partId) : undefined;
-  return part ? boxConnectors(part.bbox) : [];
+  if (!part) return [];
+  return part.connectors ?? boxConnectors(part.bbox);
 }
 
 /** Where a joined piece goes, against its parent. */
