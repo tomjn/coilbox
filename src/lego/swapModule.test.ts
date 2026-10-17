@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { mirrorTwin } from "./mirror";
 import { type LegoPiece, type LegoProject, newProject } from "./model";
 import { placeModule } from "./moduleMount";
 import type { LegoPartInfo, LoadedPack } from "./pack";
+import { ringTwins } from "./ring";
+import { ringMembers } from "./ringSet";
 import { swapModule } from "./swapModule";
 
 type Vec3 = [number, number, number];
@@ -333,6 +336,184 @@ describe("swapModule", () => {
       expect(out?.project.animations).toEqual([
         { presetId: "buildarm", params: {} },
       ]);
+    });
+  });
+
+  describe("with symmetry on", () => {
+    const ON = { symmetry: true };
+
+    /** SMALL on the hull's +x face with its mirrored twin on the -x face. */
+    function withPair(): { project: LegoProject; left: string; right: string } {
+      const placed = placeModule(
+        UNIT,
+        SMALL,
+        pack(),
+        { parentId: "hull", to: "+x" },
+        { cycle: 0, twist: 0 },
+        counter("a"),
+      );
+      if (!placed) throw new Error("the module did not place");
+      const left = placed.rootPieceIds[0];
+      const twinned = mirrorTwin(placed.project, left, counter("t"), pack());
+      if (!twinned) throw new Error("no twin");
+      return { project: twinned.project, left, right: twinned.twinId };
+    }
+
+    function rootsOf(project: LegoProject, moduleId: string) {
+      return project.pieces.filter(
+        (p) =>
+          p.module?.id === moduleId &&
+          !project.pieces.some(
+            (q) =>
+              q.id === p.parentId && q.module?.instance === p.module?.instance,
+          ),
+      );
+    }
+
+    it("swaps the twin for the mirror of the new module in one edit", () => {
+      const { project, left, right } = withPair();
+      const out = swapModule(project, pack(), left, BIG, counter("b"), ON);
+      expect(out?.project.pieces.some((p) => p.module?.id === "small")).toBe(
+        false,
+      );
+      const roots = rootsOf(out?.project as LegoProject, "big");
+      expect(roots).toHaveLength(2);
+      const [first, second] = roots;
+      expect(first.module?.instance).not.toBe(second.module?.instance);
+      // Pairs are saved on the pieces, so the new pair is one too.
+      expect(first.twin).toBe(second.id);
+      expect(second.twin).toBe(first.id);
+      expect(out?.rootPieceIds).toEqual([
+        roots.find((p) => p.id === out?.rootPieceIds[0])?.id,
+      ]);
+      expect(out?.project.pieces.some((p) => p.id === left)).toBe(false);
+      expect(out?.project.pieces.some((p) => p.id === right)).toBe(false);
+    });
+
+    it("puts the twin on the other side, reflected, joined by the mirror face", () => {
+      const { project, left } = withPair();
+      const out = swapModule(project, pack(), left, BIG, counter("b"), ON);
+      const [first, second] = rootsOf(out?.project as LegoProject, "big");
+      expect(first.connection?.to).toBe("+x");
+      expect(second.connection?.to).toBe("-x");
+      expect(second.connection?.connector).toBe(first.connection?.connector);
+      const negative = (p: LegoPiece) =>
+        p.scale[0] * p.scale[1] * p.scale[2] < 0;
+      expect(negative(first)).toBe(false);
+      expect(negative(second)).toBe(true);
+      expect(out?.broken).toEqual([]);
+    });
+
+    it("changes only the chosen instance with symmetry off", () => {
+      const { project, left, right } = withPair();
+      const out = swapModule(project, pack(), left, BIG, counter("b"));
+      expect(rootsOf(out?.project as LegoProject, "big")).toHaveLength(1);
+      const stays = out?.project.pieces.find((p) => p.id === right);
+      expect(stays?.module?.id).toBe("small");
+    });
+
+    it("swaps both the same way when the twin is the one chosen", () => {
+      const { project, left, right } = withPair();
+      const fromLeft = swapModule(project, pack(), left, BIG, counter("b"), ON);
+      const fromRight = swapModule(
+        project,
+        pack(),
+        right,
+        BIG,
+        counter("b"),
+        ON,
+      );
+      const shape = (out: typeof fromLeft) =>
+        rootsOf(out?.project as LegoProject, "big")
+          .map((p) => ({
+            to: p.connection?.to,
+            scale: p.scale.map((n) => Math.sign(n)),
+            position: p.position,
+          }))
+          .sort((a, b) => String(a.to).localeCompare(String(b.to)));
+      expect(shape(fromRight)).toEqual(shape(fromLeft));
+      // The selection follows the piece that was chosen.
+      const chosen = fromRight?.project.pieces.find(
+        (p) => p.id === fromRight.rootPieceIds[0],
+      );
+      expect(chosen?.connection?.to).toBe("-x");
+    });
+
+    it("swaps only the piece when its twin has been deleted", () => {
+      const { project, left, right } = withPair();
+      const gone = {
+        ...project,
+        pieces: project.pieces.filter(
+          (p) => p.id !== right && p.parentId !== right,
+        ),
+      };
+      const out = swapModule(gone, pack(), left, BIG, counter("b"), ON);
+      expect(rootsOf(out?.project as LegoProject, "big")).toHaveLength(1);
+      expect(out?.project.pieces.some((p) => p.twin !== undefined)).toBe(false);
+    });
+
+    it("swaps every copy of a ring and keeps the ring whole", () => {
+      const placed = placeModule(
+        UNIT,
+        SMALL,
+        pack(),
+        { parentId: "hull", to: "+x" },
+        { cycle: 0, twist: 0 },
+        counter("a"),
+      );
+      const lead = placed?.rootPieceIds[0] as string;
+      const ringed = ringTwins(
+        placed?.project as LegoProject,
+        lead,
+        3,
+        counter("r"),
+        pack(),
+      );
+      expect(ringed).not.toBeNull();
+      const out = swapModule(
+        ringed?.project as LegoProject,
+        pack(),
+        lead,
+        BIG,
+        counter("b"),
+        ON,
+      );
+      const project = out?.project as LegoProject;
+      expect(project.pieces.some((p) => p.module?.id === "small")).toBe(false);
+      const roots = rootsOf(project, "big");
+      expect(roots).toHaveLength(3);
+      expect(
+        ringMembers(project.pieces, out?.rootPieceIds[0] as string),
+      ).toEqual(expect.arrayContaining(roots.map((p) => p.id)));
+      expect(out?.broken).toEqual([]);
+    });
+
+    it("leaves the rest of a ring alone with symmetry off", () => {
+      const placed = placeModule(
+        UNIT,
+        SMALL,
+        pack(),
+        { parentId: "hull", to: "+x" },
+        { cycle: 0, twist: 0 },
+        counter("a"),
+      );
+      const lead = placed?.rootPieceIds[0] as string;
+      const ringed = ringTwins(
+        placed?.project as LegoProject,
+        lead,
+        3,
+        counter("r"),
+        pack(),
+      );
+      const out = swapModule(
+        ringed?.project as LegoProject,
+        pack(),
+        lead,
+        BIG,
+        counter("b"),
+      );
+      expect(rootsOf(out?.project as LegoProject, "big")).toHaveLength(1);
+      expect(rootsOf(out?.project as LegoProject, "small")).toHaveLength(2);
     });
   });
 });
