@@ -105,7 +105,10 @@ describe("ProportionsPanel", () => {
 
     type("Axles", "2");
     expect(onChange).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert").textContent).toContain(wheel.name);
+    const alert = screen.getByRole("alert").textContent ?? "";
+    expect(alert).toContain(wheel.name);
+    expect(alert).toContain("stays where it is, on the bone above");
+    expect(alert).not.toContain("and what is on");
 
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
     expect(onChange).toHaveBeenCalledWith({ axles: 2 });

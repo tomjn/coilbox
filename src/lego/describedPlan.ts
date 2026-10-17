@@ -51,10 +51,12 @@ export const MOVES = [
 export type MoveId = (typeof MOVES)[number]["id"];
 
 /**
- * The most weapons the form allows. The generated script writes `AimWeapon1`,
- * `QueryWeapon1` and `Shot1` only, because `turret.track` and `recoil` use the
- * first piece of each role (`HOOKS` in `luaScript.ts`). Raise this when numbered
- * roles exist.
+ * The most weapons the form allows. The script numbers a call-in for each
+ * weapon (`scriptWeapons`), so it is not the limit. The plan is: it adds one
+ * turret, barrel and flare with fixed bone ids, the id it saves names the group
+ * with a bare `+gun`, a turret building already has its one turret, and no
+ * measurement says where a second mobile weapon sits. More weapons are added to
+ * the started unit.
  */
 export const MAX_WEAPONS = 1;
 

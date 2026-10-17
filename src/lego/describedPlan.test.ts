@@ -145,7 +145,7 @@ describe("describedPlan", () => {
     expect(roles(plan).filter((r) => r === "turret")).toHaveLength(1);
   });
 
-  it("holds the weapon count to what the script supports", () => {
+  it("holds the weapon count to what a plan can describe", () => {
     expect(MAX_WEAPONS).toBe(1);
     expect(describedPlan({ move: "biped", weapons: 5, builds: false }).id).toBe(
       "biped+gun",
