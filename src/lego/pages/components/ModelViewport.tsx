@@ -30,6 +30,7 @@ import {
   Move,
   Radar,
   RotateCw,
+  Ruler,
   Scaling,
   Sparkles,
   Target,
@@ -83,6 +84,7 @@ import {
   guideOffsetAt,
   guidePointAt,
 } from "../../guides";
+import { pieceSize } from "../../measure";
 import {
   type LegoCollisionVolume,
   type LegoMount,
@@ -90,7 +92,7 @@ import {
   type LegoProject,
   pieceById,
 } from "../../model";
-import type { LoadedPack } from "../../pack";
+import { type LoadedPack, partUnit } from "../../pack";
 import type { FaceTarget } from "../../placePart";
 import type { RawGeometry } from "../../rawGeometry";
 import {
@@ -140,6 +142,14 @@ import {
 } from "./gizmoCommit";
 import { GUIDE_COLOUR } from "./guideLayer";
 import { clearJoinFaces } from "./joinFaceMarks";
+import { DragReadout, MeasureReadout } from "./MeasureReadout";
+import {
+  beginDragReadout,
+  disposeMeasure,
+  endDragReadout,
+  moveDragReadout,
+  newMeasureScene,
+} from "./measureLayer";
 import { clearPlaceGhost, type Placing, showPlaceGhost } from "./placeByFace";
 import { attachPointerHandlers } from "./pointerHandlers";
 import {
@@ -164,6 +174,7 @@ import { type StandInPlacement, standInFor } from "./standInPlayback";
 import { useCollisionAndAimVisibility } from "./useCollisionAndAimVisibility";
 import { useGizmoMode } from "./useGizmoMode";
 import { useGuides } from "./useGuides";
+import { useMeasure } from "./useMeasure";
 import { useModelAnchors } from "./useModelAnchors";
 import { useModelEnvironment } from "./useModelEnvironment";
 import { useModelHover } from "./useModelHover";
@@ -1115,6 +1126,7 @@ export function ModelViewport({
         guidePlanes: [],
         guideLines: [],
         onPickGuideRef,
+        measure: newMeasureScene(),
         sky: null,
         terrain: null,
         water: null,
@@ -1168,6 +1180,7 @@ export function ModelViewport({
         controls.enabled = false;
         state.dragging = true;
         setHoveredAndNotify(state, null);
+        beginDragReadout(state);
         // Built once per drag: the other pieces do not move while one is dragged,
         // so their anchors are fixed for the length of it.
         const pieceId = gizmo.object ? pieceIdOf(gizmo.object) : null;
@@ -1183,6 +1196,7 @@ export function ModelViewport({
       gizmo.addEventListener("mouseUp", () => {
         controls.enabled = true;
         state.dragging = false;
+        endDragReadout(state);
         showTargetAnchors(state, packRef.current, projectRef.current, null);
         showSeat(state, null);
         const dragged = gizmo.object;
@@ -1201,6 +1215,7 @@ export function ModelViewport({
         } else {
           forceUniformScale(state);
           applySnap(state);
+          moveDragReadout(state);
         }
         refreshSelectionOutlines(state);
         render();
@@ -1260,6 +1275,7 @@ export function ModelViewport({
           gizmo.dispose();
           clearAnchors(state);
           clearJoinFaces(state);
+          disposeMeasure(state);
           for (const helper of state.selectOutlines) helper.dispose();
           state.targetAnchors?.geometry.dispose();
           state.seatMark.geometry.dispose();
@@ -1342,6 +1358,18 @@ export function ModelViewport({
   });
 
   useGuides(sceneRef, { project, pack, show: showGuides }, reduceMotion);
+
+  const measure = useMeasure(sceneRef, reduceMotion);
+  // Asked for once a drag has begun rather than on every edit, since it bakes
+  // the whole unit.
+  const dragging = measure.moved !== null;
+  const draggedSize = useMemo(
+    () =>
+      dragging && soleSelectedId
+        ? pieceSize(project, pack, raw, soleSelectedId)
+        : null,
+    [dragging, project, pack, raw, soleSelectedId],
+  );
 
   // Escape stops placing a guide, as it stops placing an anchor.
   useEffect(() => {
@@ -1474,7 +1502,7 @@ export function ModelViewport({
     <div className="relative h-full w-full bg-black/30">
       <div
         ref={containerRef}
-        className={`h-full w-full ${placingAnchor || placingPart || pickingGuide ? "cursor-crosshair" : ""}`}
+        className={`h-full w-full ${placingAnchor || placingPart || pickingGuide || measure.active ? "cursor-crosshair" : ""}`}
       />
 
       {/* One column rather than four overlays pinned to the same box. The
@@ -1651,6 +1679,23 @@ export function ModelViewport({
             corner, so a long key runs out of room before it runs under the
             buttons. Stacked within their group, so the compass keeps the
             corner and the buttons do not push it inward. */}
+        {measure.active || measure.measurements.length > 0 ? (
+          <MeasureReadout
+            measurements={measure.measurements}
+            start={measure.active ? measure.start : null}
+            hover={measure.hover}
+            step={partUnit(pack)}
+            onClear={measure.clear}
+          />
+        ) : null}
+        {measure.moved ? (
+          <DragReadout
+            moved={measure.moved}
+            size={draggedSize}
+            step={partUnit(pack)}
+          />
+        ) : null}
+
         <div className="flex items-end justify-between gap-3">
           {/* One row, wrapping only when the view is too narrow to hold it:
               each group is a handful of words, and stacking them took a strip
@@ -1706,21 +1751,23 @@ export function ModelViewport({
               </div>
             ) : null}
             <span>
-              {pickingGuide
-                ? `Click the model to put a ${pickingGuide.axis.toUpperCase()} ${pickingGuide.kind === "line" ? "line" : "plane"} there. Escape to stop`
-                : placingAnchor
-                  ? "Click the model to put an anchor there. Escape to stop"
-                  : placingPart
-                    ? `Click a face to place the ${"module" in placingPart ? (placingPart.module.mount ? "module" : "module, which has no mount so joins by its first piece") : "part"}. ${shortcutLabel("place-face")} next face, ${shortcutLabel("place-twist")} twist, Escape to stop`
-                    : snapped
-                      ? snappedTo
-                        ? `Snapped to "${snappedTo}". Hold Alt to place freely`
-                        : "Snapped. Hold Alt to place freely"
-                      : slidBy !== null
-                        ? `Sliding on the face, offset ${slidBy}, in steps of ${steppedBy}. Hold Alt to place freely and detach`
-                        : steppedBy !== null
-                          ? `Moving in steps of ${steppedBy}. Hold Alt to place freely`
-                          : "Hold Alt to place freely"}
+              {measure.active
+                ? `Click two points to measure. ${shortcutLabel("measure-stop")} to leave`
+                : pickingGuide
+                  ? `Click the model to put a ${pickingGuide.axis.toUpperCase()} ${pickingGuide.kind === "line" ? "line" : "plane"} there. Escape to stop`
+                  : placingAnchor
+                    ? "Click the model to put an anchor there. Escape to stop"
+                    : placingPart
+                      ? `Click a face to place the ${"module" in placingPart ? (placingPart.module.mount ? "module" : "module, which has no mount so joins by its first piece") : "part"}. ${shortcutLabel("place-face")} next face, ${shortcutLabel("place-twist")} twist, Escape to stop`
+                      : snapped
+                        ? snappedTo
+                          ? `Snapped to "${snappedTo}". Hold Alt to place freely`
+                          : "Snapped. Hold Alt to place freely"
+                        : slidBy !== null
+                          ? `Sliding on the face, offset ${slidBy}, in steps of ${steppedBy}. Hold Alt to place freely and detach`
+                          : steppedBy !== null
+                            ? `Moving in steps of ${steppedBy}. Hold Alt to place freely`
+                            : "Hold Alt to place freely"}
             </span>
           </div>
 
@@ -1753,6 +1800,13 @@ export function ModelViewport({
                 showTitle="Show each weapon's stated range and firing arc"
               />
             ) : null}
+            <ViewToggle
+              icon={Ruler}
+              on={measure.active}
+              onChange={measure.setActive}
+              hideTitle={`Leave the measure tool (${shortcutLabel("measure")})`}
+              showTitle={`Measure between two points (${shortcutLabel("measure")})`}
+            />
             {guides ? (
               <>
                 <GuidesPopover

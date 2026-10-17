@@ -129,6 +129,18 @@ export const SHORTCUTS: Shortcut[] = [
     combos: [{ key: "f", mod: false, shift: false }],
   },
   {
+    id: "measure",
+    group: "View",
+    description: "Measure between two points",
+    combos: [{ key: "l", mod: false, shift: false }],
+  },
+  {
+    id: "measure-stop",
+    group: "View",
+    description: "Leave the measure tool",
+    combos: [{ key: "Escape" }],
+  },
+  {
     id: "shortcuts",
     group: "Help",
     description: "Show this sheet",

@@ -97,13 +97,19 @@ export function bakedPieces(
   stored: LegoProject,
   pack: LoadedPack,
   raw: RawGeometry | null,
-): { pieces: Map<string, BakedPiece>; world: THREE.Vector3[] } {
+): {
+  pieces: Map<string, BakedPiece>;
+  world: THREE.Vector3[];
+  /** Each piece's own and its descendants' points, as a slice of `world`. */
+  ranges: Map<string, [number, number]>;
+} {
   // Every edit already resolves joins, so this is a check that changes nothing
   // unless the stored transforms went stale, for example a unit edited while
   // the pack was still loading. What ships is where the joins put each piece.
   const { project } = resolveConnections(stored, pack);
   const pieces = new Map<string, BakedPiece>();
   const world: THREE.Vector3[] = [];
+  const ranges = new Map<string, [number, number]>();
   const root = pieceById(project, project.rootPieceId);
   if (root) {
     bakePiece(
@@ -115,9 +121,47 @@ export function bakedPieces(
       new THREE.Vector3(),
       pieces,
       world,
+      ranges,
     );
   }
-  return { pieces, world };
+  return { pieces, world, ranges };
+}
+
+/** An axis-aligned box in the unit's space. */
+export interface PieceBox {
+  min: [number, number, number];
+  max: [number, number, number];
+}
+
+/**
+ * The box of each named piece and everything under it, in the unit's space,
+ * off the bake. A piece with no geometry anywhere under it has no box, so it
+ * is left out of the answer.
+ */
+export function pieceBoxes(
+  project: LegoProject,
+  pack: LoadedPack,
+  raw: RawGeometry | null,
+  pieceIds: string[],
+): Map<string, PieceBox> {
+  const { world, ranges } = bakedPieces(project, pack, raw);
+  const boxes = new Map<string, PieceBox>();
+  for (const id of pieceIds) {
+    const range = ranges.get(id);
+    if (!range || range[0] === range[1]) continue;
+    const min: [number, number, number] = [Infinity, Infinity, Infinity];
+    const max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
+    for (let i = range[0]; i < range[1]; i++) {
+      const point = world[i];
+      for (let axis = 0; axis < 3; axis++) {
+        const value = point.getComponent(axis);
+        if (value < min[axis]) min[axis] = value;
+        if (value > max[axis]) max[axis] = value;
+      }
+    }
+    boxes.set(id, { min, max });
+  }
+  return boxes;
 }
 
 /**
@@ -392,7 +436,9 @@ function bakePiece(
   parentTranslation: THREE.Vector3,
   pieces: Map<string, BakedPiece>,
   world: THREE.Vector3[],
+  ranges: Map<string, [number, number]>,
 ): void {
+  const start = world.length;
   const local = new THREE.Matrix4().compose(
     new THREE.Vector3(...piece.position),
     new THREE.Quaternion().setFromEuler(new THREE.Euler(...piece.rotation)),
@@ -428,8 +474,19 @@ function bakePiece(
   });
 
   for (const child of childrenOf(project, piece.id)) {
-    bakePiece(project, pack, raw, child, matrix, translation, pieces, world);
+    bakePiece(
+      project,
+      pack,
+      raw,
+      child,
+      matrix,
+      translation,
+      pieces,
+      world,
+      ranges,
+    );
   }
+  ranges.set(piece.id, [start, world.length]);
 }
 
 /**

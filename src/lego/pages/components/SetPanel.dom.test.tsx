@@ -23,10 +23,14 @@ import { SetPanel } from "./SetPanel";
 
 const onSelect = vi.fn();
 const onReparent = vi.fn();
+const onAlign = vi.fn((): string[] => []);
+const onDistribute = vi.fn((): string[] => []);
 
 beforeEach(() => {
   onSelect.mockClear();
   onReparent.mockClear();
+  onAlign.mockReset().mockReturnValue([]);
+  onDistribute.mockReset().mockReturnValue([]);
 });
 
 afterEach(() => {
@@ -71,6 +75,8 @@ function show(selectedIds: string[], project: LegoProject = walker()) {
       selectedIds={selectedIds}
       onSelect={onSelect}
       onReparent={onReparent}
+      onAlign={onAlign}
+      onDistribute={onDistribute}
     />,
   );
 }
@@ -225,5 +231,52 @@ describe("the parent picker", () => {
     openPicker();
     choose("hull");
     expect(onReparent).toHaveBeenCalledWith("hull", ["thigh", "arm"]);
+  });
+});
+
+describe("align and distribute", () => {
+  const button = (name: string) =>
+    document.querySelector(`[aria-label="${name}"]`) as HTMLButtonElement;
+
+  it("aligns on the axis and edge of the button pressed", () => {
+    show(["hull", "arm"]);
+    act(() => button("Align Y high").click());
+    expect(onAlign).toHaveBeenCalledWith("y", "high");
+  });
+
+  it("offers low, middle and high on each of three axes", () => {
+    show(["hull", "arm"]);
+    expect(document.querySelectorAll('[aria-label^="Align "]')).toHaveLength(9);
+  });
+
+  it("holds distribute back until there are three pieces", () => {
+    show(["hull", "arm"]);
+    expect(button("Distribute X").disabled).toBe(true);
+  });
+
+  it("counts a piece carried by another as part of it", () => {
+    show(["hull", "thigh"]);
+    expect(document.querySelector('[aria-label="Align X low"]')).toBeNull();
+  });
+
+  it("distributes once there are three", () => {
+    const project = walker();
+    show(["hull", "arm", "shin"], {
+      ...project,
+      pieces: project.pieces.map((p) =>
+        p.id === "shin" ? { ...p, parentId: "root" } : p,
+      ),
+    });
+    act(() => button("Distribute Z").click());
+    expect(onDistribute).toHaveBeenCalledWith("z");
+  });
+
+  it("names the pieces an action detached", () => {
+    onAlign.mockReturnValue(["arm"]);
+    show(["hull", "arm"]);
+    act(() => button("Align X low").click());
+    expect(document.querySelector('[role="status"]')?.textContent).toBe(
+      "Detached: arm",
+    );
   });
 });

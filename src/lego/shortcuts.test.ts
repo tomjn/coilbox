@@ -61,6 +61,14 @@ describe("isShortcut", () => {
     expect(isShortcut("frame", key("f", { ctrlKey: true }))).toBe(false);
   });
 
+  it("measures on L, clear of Cmd L, and leaves on Escape", () => {
+    expect(isShortcut("measure", key("l"))).toBe(true);
+    expect(isShortcut("measure", key("l", { metaKey: true }))).toBe(false);
+    expect(isShortcut("measure", key("L", { shiftKey: true }))).toBe(false);
+    expect(isShortcut("measure-stop", key("Escape"))).toBe(true);
+    expect(isShortcut("measure-stop", key("l"))).toBe(false);
+  });
+
   it("opens the sheet on the resulting '?' character", () => {
     expect(isShortcut("shortcuts", key("?"))).toBe(true);
     expect(isShortcut("shortcuts", key("/"))).toBe(false);

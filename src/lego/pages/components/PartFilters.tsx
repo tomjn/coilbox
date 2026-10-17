@@ -108,7 +108,7 @@ export function PartFilters({
         ))}
       </ButtonGroup>
       <span className="ml-auto text-sm text-muted-foreground">
-        {shown} parts
+        {shown} {shown === 1 ? "part" : "parts"}
       </span>
     </div>
   );

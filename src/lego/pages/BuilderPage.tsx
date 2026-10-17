@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/tooltip";
 import { notify } from "@/notify/notify";
 import { aimPoint } from "../aimPoint";
+import { type ArrangeAction, arrange } from "../align";
 import { addAnchor, removeAnchor, updateAnchor } from "../anchors";
 import { presetById, ROLES, restAngleWarnings } from "../animPresets";
 import { unitAtlas } from "../atlas";
@@ -153,6 +154,7 @@ import { ExportDrawer } from "./components/ExportDrawer";
 import { GameUnitBrowser } from "./components/GameUnitBrowser";
 import { InventoryFilters, InventoryGrids } from "./components/Inventory";
 import { JoinedTo } from "./components/JoinedTo";
+import { PieceSize } from "./components/MeasureReadout";
 import { ModelViewport } from "./components/ModelViewport";
 import { ModuleUpdateBanner } from "./components/ModuleUpdateBanner";
 import { NameInput } from "./components/NameInput";
@@ -851,6 +853,21 @@ function Builder({ id }: { id: string | undefined }) {
     place([...changes.keys()], (project) =>
       freeMoved(project, applyGroupTransform(project, changes)),
     );
+  }
+
+  /** Align or distribute the selection as one edit. Answers who was freed. */
+  function arrangeSet(action: ArrangeAction): string[] {
+    if (!draft || !pack) return [];
+    const { changes, detached } = arrange(
+      draft,
+      pack,
+      raw,
+      selectedIds,
+      action,
+    );
+    if (changes.size === 0) return [];
+    transformPieces(changes);
+    return detached;
   }
 
   function renameUnit(name: string) {
@@ -2251,6 +2268,12 @@ function Builder({ id }: { id: string | undefined }) {
                       onReparent={(parentId, pieceIds) =>
                         reparentAll(pieceIds, parentId)
                       }
+                      onAlign={(axis, edge) =>
+                        arrangeSet({ kind: "align", axis, edge })
+                      }
+                      onDistribute={(axis) =>
+                        arrangeSet({ kind: "distribute", axis })
+                      }
                     />
                   ) : selected ? (
                     // Capped and scrollable, and free to shrink further still: the
@@ -2310,6 +2333,12 @@ function Builder({ id }: { id: string | undefined }) {
                             }
                             uniformScale={uniformScale}
                             onUniformScaleChange={setUniformScale}
+                          />
+                          <PieceSize
+                            project={draft}
+                            pack={pack}
+                            raw={raw}
+                            pieceId={selected.id}
                           />
                           {canMirror(draft, selected.id) ? (
                             <div className="mt-2">

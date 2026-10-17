@@ -77,6 +77,7 @@ describe("a click on the ground while a path is being made", () => {
       placingAnchorRef: { current: false },
       placingPartRef: { current: null },
       onPickGuideRef: { current: undefined },
+      measure: { active: false, dragFrom: null, layer: null },
       onGroundPickRef: { current: pick },
       onSelectRef: { current: vi.fn() },
       groundShape: null,
@@ -136,6 +137,7 @@ describe("a click while a guide is being placed", () => {
         placingAnchorRef: { current: false },
         placingPartRef: { current: null },
         onPickGuideRef: { current: placed },
+        measure: { active: false, dragFrom: null, layer: null },
         onGroundPickRef: { current: undefined },
         onSelectRef: { current: vi.fn() },
       } as unknown as SceneState,
@@ -168,5 +170,97 @@ describe("a click while a guide is being placed", () => {
     dispose();
 
     expect(placed).toHaveBeenCalledWith(null);
+  });
+});
+
+describe("a click while measuring", () => {
+  function measuring(canvas: HTMLElement, snapping: boolean) {
+    const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
+    camera.position.set(0, 100, 0);
+    camera.lookAt(0, 0, 0);
+    camera.updateMatrixWorld(true);
+    canvas.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 100, height: 100 }) as DOMRect;
+    const root = new THREE.Group();
+    const slab = new THREE.Mesh(
+      new THREE.PlaneGeometry(10, 10).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }),
+    );
+    slab.position.y = 3;
+    root.add(slab);
+    root.updateMatrixWorld(true);
+    const picked = vi.fn();
+    return {
+      picked,
+      scene: {
+        renderer: {
+          domElement: canvas,
+          getSize: (v: THREE.Vector2) => v.set(100, 100),
+        } as unknown as THREE.WebGLRenderer,
+        camera,
+        root,
+        gizmo: { dragging: false, axis: null },
+        collisionDrag: null,
+        collisionHandles: { visible: false, children: [] },
+        standIn: { visible: false },
+        onStandInDragRef: { current: undefined },
+        standInDrag: null,
+        placingAnchorRef: { current: false },
+        placingPartRef: { current: null },
+        onPickGuideRef: { current: undefined },
+        measure: {
+          active: true,
+          onPick: picked,
+          dragFrom: null,
+          layer: null,
+        },
+        onGroundPickRef: { current: undefined },
+        onSelectRef: { current: vi.fn() },
+        snapping,
+        projectRef: { current: { pieces: [] } },
+        packRef: { current: {} },
+        guidePlanes: [
+          {
+            id: "g",
+            name: "y = 4",
+            axis: "y",
+            normal: [0, 1, 0],
+            point: [0, 4, 0],
+          },
+        ],
+        guideLines: [],
+        groundShape: null,
+        shaped: null,
+      } as unknown as SceneState,
+    };
+  }
+
+  function click(canvas: HTMLElement) {
+    const at = { clientX: 50, clientY: 50, button: 0, pointerId: 1 };
+    canvas.dispatchEvent(new PointerEvent("pointerdown", at));
+    canvas.dispatchEvent(new PointerEvent("pointerup", at));
+  }
+
+  it("hands over the point on the model, snapped to a guide in reach, and selects nothing", () => {
+    const canvas = document.createElement("canvas");
+    const { picked, scene } = measuring(canvas, true);
+    const dispose = attachPointerHandlers(scene);
+    click(canvas);
+    dispose();
+
+    const [[at]] = picked.mock.calls;
+    expect(at[1]).toBeCloseTo(4);
+    expect(scene.onSelectRef.current).not.toHaveBeenCalled();
+  });
+
+  it("leaves the point where it landed while snapping is held off", () => {
+    const canvas = document.createElement("canvas");
+    const { picked, scene } = measuring(canvas, false);
+    const dispose = attachPointerHandlers(scene);
+    click(canvas);
+    dispose();
+
+    const [[at]] = picked.mock.calls;
+    expect(at[1]).toBeCloseTo(3);
   });
 });
