@@ -308,7 +308,7 @@ export function projectFromTarget(
 /**
  * The unit refitted to a new target, which it then keeps. One edit: the
  * proportions move as `applyProportions` moves them. A unit with no skeleton,
- * or one from another plan, comes back as it was.
+ * one from another plan, or one fitted to its own pieces comes back as it was.
  */
 export function applyTarget(
   project: LegoProject,
@@ -317,7 +317,7 @@ export function applyTarget(
   newId: () => string,
 ): LegoProject {
   const skeleton = project.skeleton;
-  if (!skeleton || skeleton.plan !== plan.id) return project;
+  if (!skeleton || skeleton.plan !== plan.id || skeleton.fitted) return project;
   const values = fitProportions(plan, skeleton.proportions, target);
   const { project: fitted } = applyProportions(project, plan, values, newId);
   return fitted.skeleton

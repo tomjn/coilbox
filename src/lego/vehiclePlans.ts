@@ -40,6 +40,7 @@
  */
 
 import type { BodyPlan, BodyPlanBone, BodyPlanProportion } from "./bodyPlans";
+import { between, type Joints, mean, spacingAlongZ } from "./planMeasure";
 
 /** How much of a track's length lies between its first and last road wheel. */
 const ROAD_WHEEL_SPAN = 0.65;
@@ -96,6 +97,29 @@ function bothSides(
   ];
 }
 
+/** The wheel bones of each axle or road wheel position, front first. */
+function wheelRows(count: number): string[][] {
+  return Array.from({ length: count }, (_, i) => [
+    `wheel.l${i + 1}`,
+    `wheel.r${i + 1}`,
+  ]);
+}
+
+/** The mean distance between the left and right wheel of each row. */
+function widthAcross(joints: Joints, count: number) {
+  return mean(wheelRows(count).map(([l, r]) => between(joints, l, r)));
+}
+
+/** The mean height of the picked wheel joints above the unit's origin, which
+ *  is on the ground. */
+function wheelY(joints: Joints, count: number) {
+  return mean(
+    wheelRows(count)
+      .flat()
+      .map((id) => joints.get(id)?.[1]),
+  );
+}
+
 /** Where wheel `i` of `count` sits along z, front first, `spacing` apart. */
 function along(i: number, count: number, spacing: number): number {
   return ((count - 1) / 2 - i) * spacing;
@@ -139,6 +163,15 @@ export const WHEELED: BodyPlan = {
     return bones;
   },
   presets: [{ presetId: "wheels.roll", params: {} }],
+  // The axle count is chosen, and the rest is read off the wheels.
+  measure(joints, { axles }) {
+    const count = axles as number;
+    return {
+      axleSpacing: spacingAlongZ(joints, wheelRows(count)),
+      trackWidth: widthAcross(joints, count),
+      wheelHeight: wheelY(joints, count),
+    };
+  },
 };
 
 /**
@@ -196,4 +229,33 @@ export const TRACKED: BodyPlan = {
     return bones;
   },
   presets: [{ presetId: "wheels.roll", params: {} }],
+  /**
+   * The road wheel count is chosen. The plan puts its first and last road
+   * wheel `ROAD_WHEEL_SPAN` of the track apart and each track bone at the
+   * track's middle height, so those give the track's length and height. The
+   * width is between the two tracks, or between the road wheels of a pair
+   * when no track was picked.
+   */
+  measure(joints, { roadWheels }) {
+    const count = roadWheels as number;
+    const spacing = spacingAlongZ(joints, wheelRows(count));
+    const trackY = mean(
+      ["track.l", "track.r"].map((id) => joints.get(id)?.[1]),
+    );
+    const wheel = wheelY(joints, count);
+    return {
+      trackLength:
+        spacing === undefined
+          ? undefined
+          : (spacing * (count - 1)) / ROAD_WHEEL_SPAN,
+      trackWidth:
+        between(joints, "track.l", "track.r") ?? widthAcross(joints, count),
+      trackHeight:
+        trackY !== undefined
+          ? trackY * 2
+          : wheel === undefined
+            ? undefined
+            : wheel / ROAD_WHEEL_HEIGHT,
+    };
+  },
 };
