@@ -1621,6 +1621,9 @@ function Builder({ id }: { id: string | undefined }) {
                       movement ? { ...project, movement } : project,
                     )
                   }
+                  onWorthChange={(worth) =>
+                    edit((project) => ({ ...project, worth }))
+                  }
                   effectsNote={effectBitmaps.note}
                 />
               ) : (
