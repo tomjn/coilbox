@@ -300,6 +300,34 @@ fn wait_for_turn_resumes_when_the_turn_lands() {
     assert_close(pose(&timeline, 30, "barrel")[3], 0.5);
 }
 
+/// The engine finishes a turn after the frame's threads have run and resumes
+/// the thread waiting on it there and then (`UnitScriptEngine.cpp:131-163`,
+/// `LuaUnitScript.cpp:931-944`, `unit_script.lua:265-280`), on the frame the
+/// turn landed in. So a `Sleep(33)` it goes on to wakes on the next frame,
+/// which is the first frame the preview shows the turn.
+#[test]
+fn a_thread_back_from_a_wait_counts_its_sleep_from_the_frame_the_turn_landed() {
+    let timeline = play(
+        r#"
+        local turret = piece("turret")
+        local barrel = piece("barrel")
+        function script.Create()
+            Turn(barrel, x_axis, math.rad(10), math.rad(300))
+            WaitForTurn(barrel, x_axis)
+            Sleep(33)
+            Move(turret, z_axis, 1)
+        end
+        "#,
+        12,
+    );
+    assert_eq!(timeline.error, None);
+    let landed = (0..12)
+        .find(|&frame| pose(&timeline, frame, "barrel")[3].abs() > 0.1)
+        .expect("the barrel turned");
+    let moved = (0..12).find(|&frame| pose(&timeline, frame, "turret")[2] == 1.0);
+    assert_eq!(moved, Some(landed));
+}
+
 /// The engine asks whether there is anything to wait for before it suspends, so
 /// a wait on an axis standing still does not even cost a frame.
 #[test]

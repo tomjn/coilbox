@@ -1296,32 +1296,27 @@ const WAIT_SLEEP: &str = "local function Sleep(ms)
 end
 ";
 
-const WAIT_TURN: &str = "local function WaitForTurn(piece, axis)
-\tif UnitScript.IsInTurn(piece, axis) then
-\t\tstartScripts()
-\t\tUnitScript.WaitForTurn(piece, axis)
-\t\twoke = false
-\tend
-end
+const WAITS: &str = "
+-- COB runs a thread whose wait has ended two frames after the animation ends
+-- (UnitScriptEngine.cpp:131-163, CobThread.cpp:838-852, CobEngine.cpp:173-189),
+-- where Lua resumes it in that frame (unit_script.lua:265-280). So each wait
+-- here sleeps those two frames after.
 ";
 
-const WAIT_MOVE: &str = "local function WaitForMove(piece, axis)
-\tif UnitScript.IsInMove(piece, axis) then
-\t\tstartScripts()
-\t\tUnitScript.WaitForMove(piece, axis)
-\t\twoke = false
-\tend
-end
-";
-
-const WAIT_SCALE: &str = "local function WaitForScale(piece)
-\tif UnitScript.IsInScale(piece) then
-\t\tstartScripts()
-\t\tUnitScript.WaitForScale(piece)
-\t\twoke = false
-\tend
-end
-";
+/// The function a `wait-for-turn`, `wait-for-move` or `wait-for-scale` calls,
+/// which waits as `kind` does and then sleeps the frames COB takes to resume.
+/// In a script that holds back `start-script`, it starts what the thread began
+/// before it waits.
+fn wait_helper(kind: &str, params: &str, defers: bool) -> String {
+    let (start, woke) = if defers {
+        ("\t\tstartScripts()\n", "\t\twoke = false\n")
+    } else {
+        ("", "")
+    };
+    format!(
+        "local function WaitFor{kind}({params})\n\tif UnitScript.IsIn{kind}({params}) then\n{start}\t\tUnitScript.WaitFor{kind}({params})\n\t\tUnitScript.Sleep(66)\n{woke}\tend\nend\n"
+    )
+}
 
 const SHARED_VALUES: &str = include_str!("shared_values.lua");
 
@@ -1487,12 +1482,22 @@ impl<'p, 'a> Writer<'p, 'a> {
                 ("startScript", START_SCRIPT),
                 ("callStarting", CALL_STARTING),
                 ("Sleep", WAIT_SLEEP),
-                ("WaitForTurn", WAIT_TURN),
-                ("WaitForMove", WAIT_MOVE),
-                ("WaitForScale", WAIT_SCALE),
             ] {
                 if helpers.contains(name) {
                     lua.push_str(text);
+                }
+            }
+        }
+        let waits = [
+            ("WaitForTurn", "Turn", "piece, axis"),
+            ("WaitForMove", "Move", "piece, axis"),
+            ("WaitForScale", "Scale", "piece"),
+        ];
+        if waits.iter().any(|(name, _, _)| helpers.contains(name)) {
+            lua.push_str(WAITS);
+            for (name, kind, params) in waits {
+                if helpers.contains(name) {
+                    lua.push_str(&wait_helper(kind, params, self.p.defers));
                 }
             }
         }
@@ -1649,7 +1654,7 @@ impl<'p, 'a> Writer<'p, 'a> {
         if name == "cobGet" || name == "cobSet" {
             self.helpers.extend(["cobAllied", "cobGet", "cobSet"]);
         }
-        if STARTING_HELPERS.contains(&name) {
+        if STARTING_HELPERS.contains(&name) && self.p.defers {
             self.helpers.extend([
                 "starting",
                 "startsHeld",
@@ -3269,11 +3274,7 @@ impl<'p, 'a> Writer<'p, 'a> {
                 self.code(&text, t);
             }
             StmtKind::WaitScale(piece) => {
-                let f = if self.p.defers {
-                    self.helper("WaitForScale")
-                } else {
-                    format!("{}.WaitForScale", self.header("UnitScript"))
-                };
+                let f = self.helper("WaitForScale");
                 let p = self.piece(piece);
                 self.code(&format!("{f}({p})"), t);
             }
@@ -3313,7 +3314,7 @@ impl<'p, 'a> Writer<'p, 'a> {
                 } else {
                     "WaitForMove"
                 };
-                let f = self.waiting(name);
+                let f = self.helper(name);
                 let p = self.piece(piece);
                 let a = self.axis(*axis);
                 self.code(&format!("{f}({p}, {a})"), t);

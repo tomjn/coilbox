@@ -882,6 +882,56 @@ fn a_started_script_first_runs_on_the_frame_cob_runs_it() {
     );
 }
 
+/// COB carries on two frames after the turn or move it waited on ends, where
+/// the engine's Lua framework resumes in that frame (`CobThread.cpp:838-852`,
+/// `CobEngine.cpp:173-189`, `unit_script.lua:265-299`). The converted Lua
+/// sleeps the difference, with and without a `start-script` in the script,
+/// and a walk that waits each step stays in step frame by frame.
+#[test]
+fn a_thread_back_from_a_wait_carries_on_on_the_frame_cob_does() {
+    for start in ["", "start-script Lift();"] {
+        let source = format!(
+            r#"
+            piece base, leg, foot;
+            Lift() {{ move base to z-axis [1] now; }}
+            Walk()
+            {{
+                while (TRUE)
+                {{
+                    turn leg to x-axis <25> speed <200>;
+                    wait-for-turn leg around x-axis;
+                    move foot to y-axis [1] speed [20];
+                    wait-for-move foot along y-axis;
+                    turn leg to x-axis <0> speed <200>;
+                    wait-for-turn leg around x-axis;
+                    sleep 50;
+                    move foot to y-axis [0] now;
+                }}
+            }}
+            Create() {{ {start} start-script Walk(); }}
+        "#
+        );
+        let (cob, lua, pieces) = both(&source);
+        let events = [event(0, "Create", &[])];
+        let from_cob = crate::cobrun::run(&cob, &pieces, &events, 90, &[], &HashMap::new());
+        let from_lua = run_lua(
+            &lua,
+            "walk.lua",
+            &Unit::new(&pieces),
+            &events,
+            90,
+            &HashMap::new(),
+        );
+        assert_eq!(from_cob.error, None);
+        assert_eq!(from_lua.error, None);
+        assert_eq!(
+            first_difference(&from_cob, &from_lua, &pieces, "walk", false),
+            None,
+            "{lua}"
+        );
+    }
+}
+
 /// `TransportPickup(2)`, with the stand-in parked at (30, 0, 40).
 fn pickup_at(frame: u32) -> ScriptEvent {
     ScriptEvent {

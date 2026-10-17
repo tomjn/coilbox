@@ -344,8 +344,9 @@ struct Call {
 enum State {
     /// Run as soon as the scheduler gets to it.
     Ready,
-    /// Begun with `start-script`, and first run on this frame. See
-    /// `Run::start_thread`.
+    /// On the engine's waiting list, and run on this frame: begun with
+    /// `start-script` (see `Run::start_thread`), or back from a wait (see
+    /// `Run::end_waits`).
     Starting(u32),
     /// Run once the clock passes this, in milliseconds.
     Sleeping(i64),
@@ -526,19 +527,26 @@ impl Run {
         Ok(())
     }
 
-    /// Anything waiting on an animation that is no longer running is ready.
+    /// What the animations this frame's tick finished were holding up.
     ///
-    /// A wait on an axis with nothing on it is satisfied at once, which is what
-    /// the engine does and what stops a wait on a turn that already finished
-    /// hanging the thread forever.
+    /// That tick is the engine's animation pass of the frame before, which
+    /// comes after its threads have run (`UnitScriptEngine.cpp:131-163`). So
+    /// the waiting list the engine puts each waiter on is only swapped in on
+    /// this frame, and the waiter runs on the next (`CobEngine.cpp:173-189`).
     fn wake_finished(&mut self) {
+        self.end_waits(self.frame + 1);
+    }
+
+    /// Put every thread waiting on an animation that is no longer running back
+    /// on the waiting list, to run on `frame` (`CobThread.cpp:838-852`).
+    fn end_waits(&mut self, frame: u32) {
         for thread in &mut self.threads {
             let State::Waiting { piece, axis, kind } = thread.state else {
                 continue;
             };
             let still_going = piece.is_some_and(|piece| self.model.animating(piece, axis, kind));
             if !still_going {
-                thread.state = State::Ready;
+                thread.state = State::Starting(frame);
             }
         }
     }
@@ -1248,6 +1256,11 @@ impl Run {
                         f64::from(speed) * TAANG2RAD,
                         f64::from(accel) * TAANG2RAD,
                     );
+                    // A spin removes a turn on its axis and ends any wait on it
+                    // there and then (`UnitScript.cpp:351-363,428-430`), so the
+                    // waiter takes the waiting list the way a started script
+                    // does. See `start_thread`.
+                    self.end_waits(self.frame + if self.woke { 2 } else { 1 });
                 }
             }
             w if w == op("STOP_SPIN") => {

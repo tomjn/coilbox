@@ -579,7 +579,7 @@ impl Run {
             sim.frame = self.frame;
             sim.model.tick();
         }
-        self.wake_finished();
+        self.wake_finished()?;
         self.fire_due(events)?;
         self.run_threads()?;
         // After every coroutine, as the engine moves its passengers once every
@@ -588,23 +588,46 @@ impl Run {
         Ok(())
     }
 
-    /// Anything waiting on an animation that is no longer running is ready.
+    /// Resume every thread waiting on an animation that is no longer running.
     ///
-    /// A wait on an axis with nothing on it is satisfied at once, which is what
-    /// the engine does and what stops a `WaitForTurn` on a turn that already
-    /// finished from hanging the thread forever.
-    fn wake_finished(&mut self) {
-        let sim = self.sim.borrow();
-        for runner in &mut self.runners {
-            let State::Waiting { piece, axis, kind } = runner.state else {
-                continue;
-            };
-            // A spin started on the axis a thread was waiting to finish turning
-            // wakes it, because the spin removed the turn it was waiting on.
-            if !sim.model.animating(piece, axis, kind) {
-                runner.state = State::Ready;
+    /// This frame's tick is the engine's animation pass of the frame before,
+    /// which resumes each waiter as its animation finishes
+    /// (`UnitScriptEngine.cpp:131-163`, `LuaUnitScript.cpp:931-944`,
+    /// `unit_script.lua:265-280`). So they run now, ahead of this frame's
+    /// call-ins and sleepers, and on the frame before as far as a `Sleep` or
+    /// `Spring.GetGameFrame` can tell.
+    fn wake_finished(&mut self) -> Result<(), String> {
+        let finished: Vec<usize> = {
+            let sim = self.sim.borrow();
+            (0..self.runners.len())
+                .filter(|&index| {
+                    // A spin started on the axis a thread was waiting to finish
+                    // turning wakes it, because the spin removed the turn it
+                    // was waiting on.
+                    matches!(self.runners[index].state, State::Waiting { piece, axis, kind }
+                        if !sim.model.animating(piece, axis, kind))
+                })
+                .collect()
+        };
+        if finished.is_empty() {
+            return Ok(());
+        }
+        let frame = self.frame;
+        self.frame = frame.saturating_sub(1);
+        self.sim.borrow_mut().frame = self.frame;
+        let mut result = Ok(());
+        for index in finished {
+            // One resumed before it may have signalled it.
+            if matches!(self.runners[index].state, State::Waiting { .. }) {
+                result = self.resume(index);
+                if result.is_err() {
+                    break;
+                }
             }
         }
+        self.frame = frame;
+        self.sim.borrow_mut().frame = frame;
+        result
     }
 
     fn fire_due(&mut self, events: &[ScriptEvent]) -> Result<(), String> {
