@@ -82,6 +82,9 @@ function exportResult(over: Record<string, unknown> = {}) {
     textures: [],
     texturesKept: [],
     weapons: [],
+    wreckModel: "/game/objects3d/coilbox/skyfort_dead.s3o",
+    wreckFeature: "/game/features/coilbox/skyfort_dead.lua",
+    wreckFeatureKept: false,
     owned: [],
     ...over,
   };
@@ -499,6 +502,10 @@ describe("re-export", () => {
           path: "/games/some.sdd/scripts/skyfort.lua",
           sha256: "script-digest",
         },
+        {
+          path: "/games/some.sdd/features/coilbox/skyfort_dead.lua",
+          sha256: "feature-digest",
+        },
       ],
     },
   };
@@ -526,6 +533,29 @@ describe("re-export", () => {
       now: "skyfort",
       last: "skyfort_old",
     });
+  });
+
+  it("sends the wreck with the feature file's digest (#3310)", async () => {
+    await exportIt({});
+    await waitFor(() => expect(legoExport).toHaveBeenCalled());
+    const sent = legoExport.mock.calls[0][0];
+    expect(sent.wreck.featureWritten).toBe("feature-digest");
+    expect(sent.wreck.feature).toContain('["skyfort_dead"]');
+    expect(sent.wreck.model.root.name).toBe("base");
+    expect(
+      sent.unitDefFields.find(
+        (field: { path: string }) => field.path === "corpse",
+      ),
+    ).toEqual({ path: "corpse", now: "skyfort_dead", last: null });
+  });
+
+  it("says when the wreck's feature file was left alone", async () => {
+    await exportIt({ wreckFeature: null, wreckFeatureKept: true });
+    await waitFor(() =>
+      expect(
+        screen.getByText(/The wreck's feature file there has been changed/),
+      ).toBeTruthy(),
+    );
   });
 
   it("lists the fields brought up to date and the ones kept", async () => {

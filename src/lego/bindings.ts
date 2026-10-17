@@ -153,6 +153,17 @@ export const legoExport = defineCommand<
      * export. Absent or empty writes none.
      */
     weapons?: { name: string; contents: string }[];
+    /**
+     * The wreck the unit leaves when it dies (issue #3310):
+     * `objects3d/coilbox/<unit>_dead.s3o`, rewritten on every export, and
+     * `features/coilbox/<unit>_dead.lua`, which follows the script's rule.
+     * `featureWritten` is the digest the receipt holds for that file.
+     */
+    wreck?: {
+      model: S3oBuild;
+      feature: string;
+      featureWritten: string | null;
+    };
   },
   {
     model: string;
@@ -188,6 +199,13 @@ export const legoExport = defineCommand<
     texturesKept: string[];
     /** The weapon files written. */
     weapons: string[];
+    /** The wreck's model, when a wreck was sent. */
+    wreckModel: string | null;
+    /** The wreck's feature file, when this export wrote it. */
+    wreckFeature: string | null;
+    /** True when the feature file there has been changed since coilbox wrote
+     *  it, or coilbox did not write it, and it was left alone. */
+    wreckFeatureKept: boolean;
     /**
      * The files this run wrote, with the digest of what it wrote, for the
      * receipt (issue #2680). Never a file it kept, and never a texture: an

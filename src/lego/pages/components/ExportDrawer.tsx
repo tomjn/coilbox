@@ -93,6 +93,7 @@ import { bakedPieces, buildS3o, unitBounds } from "../../s3oBuild";
 import { buildUnitDef, defValue, legoUnitDef, unitWords } from "../../unitDef";
 import { exportWeapons } from "../../weaponModule";
 import { worthTotals } from "../../worth";
+import { buildWreck, wreckFeaturePath } from "../../wreck";
 import { ShowMe } from "./ShowMe";
 
 interface Props {
@@ -152,6 +153,10 @@ type Result =
       built: Record<string, unknown>;
       /** The library weapon files written under `weapons/` (issue #3274). */
       weapons: string[];
+      /** The wreck's model and feature file (issue #3310). */
+      wreckModel: string | null;
+      wreckFeature: string | null;
+      wreckFeatureKept: boolean;
       /** How many weapon slots the definition names. */
       weaponSlots: number;
       /** A line for each weapon left out, and why. */
@@ -587,6 +592,15 @@ export function ExportDrawer({
       // What coilbox wrote into this folder, which is not always the latest
       // export's receipt (issue #4267).
       const folderReceipt = receiptFor(project, dir);
+      // The wreck the unit leaves, painted with the unit's own textures
+      // (issue #3310).
+      const wreck = buildWreck(
+        project,
+        pack,
+        raw,
+        { texture1: model.texture1, texture2: model.texture2 },
+        def,
+      );
       const exported = await legoExport({
         dir,
         unitName: project.unitName,
@@ -628,6 +642,19 @@ export function ExportDrawer({
         text: writesLanguage ? { language, ...unitWords(project) } : null,
         model,
         weapons: weapons.files,
+        ...(wreck
+          ? {
+              wreck: {
+                model: wreck.model,
+                feature: wreck.feature,
+                featureWritten: writtenDigest(
+                  folderReceipt,
+                  dir,
+                  wreckFeaturePath(project.unitName),
+                ),
+              },
+            }
+          : {}),
       });
 
       // The Blender half, which the engine reads none of. A texture the decoder
@@ -1269,6 +1296,19 @@ export function ExportDrawer({
                   changes={result.unitDefFields}
                   built={result.built}
                 />
+                {result.wreckModel ? (
+                  <code className="break-all">{result.wreckModel}</code>
+                ) : null}
+                {result.wreckFeature ? (
+                  <code className="break-all">{result.wreckFeature}</code>
+                ) : null}
+                {result.wreckFeatureKept ? (
+                  <p className="text-muted-foreground">
+                    The wreck's feature file there has been changed since
+                    coilbox wrote it, or coilbox did not write it, so it has
+                    been left alone.
+                  </p>
+                ) : null}
                 {result.weapons.map((written) => (
                   <code key={written} className="break-all">
                     {written}
