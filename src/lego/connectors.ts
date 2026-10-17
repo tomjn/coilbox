@@ -251,7 +251,10 @@ function scaledFrame(
 }
 
 /** A parent's scale in the world, which is the scale a joined child leaves out. */
-function parentScaleOf(project: LegoProject, parentId: string): THREE.Vector3 {
+export function parentScaleOf(
+  project: LegoProject,
+  parentId: string,
+): THREE.Vector3 {
   const scale = new THREE.Vector3();
   worldMatrix(project, parentId).decompose(
     new THREE.Vector3(),
