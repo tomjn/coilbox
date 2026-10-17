@@ -681,7 +681,11 @@ export interface LegoProject {
   /** On a module: free words the module list's search also matches. */
   tags?: string[];
   /** Canned animations applied to this unit, from `animPresets.ts`. */
-  animations?: { presetId: string; params: Record<string, number> }[];
+  animations?: {
+    presetId: string;
+    params: Record<string, number>;
+    instances?: Record<string, Record<string, number>>;
+  }[];
   /**
    * The unit's own Lua, once the user has taken it over.
    *
@@ -1936,22 +1940,37 @@ function parseCompiledScript(
  * One applied animation preset. Unknown preset ids survive parsing, because a
  * document written by a newer build should not lose them on a round trip here.
  */
+function parseNumbers(raw: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (typeof raw === "object" && raw !== null) {
+    for (const [key, value] of Object.entries(raw)) {
+      if (typeof value === "number" && Number.isFinite(value)) out[key] = value;
+    }
+  }
+  return out;
+}
+
 function parseApplied(
   raw: unknown,
-): { presetId: string; params: Record<string, number> } | null {
+): NonNullable<LegoProject["animations"]>[number] | null {
   if (typeof raw !== "object" || raw === null) return null;
   const a = raw as Record<string, unknown>;
   if (typeof a.presetId !== "string" || a.presetId === "") return null;
 
-  const params: Record<string, number> = {};
-  if (typeof a.params === "object" && a.params !== null) {
-    for (const [key, value] of Object.entries(a.params)) {
-      if (typeof value === "number" && Number.isFinite(value)) {
-        params[key] = value;
-      }
+  // Settings of single module instances, keyed by instance id. An instance
+  // with none of its own is left out rather than kept as an empty object.
+  const instances: Record<string, Record<string, number>> = {};
+  if (typeof a.instances === "object" && a.instances !== null) {
+    for (const [instance, given] of Object.entries(a.instances)) {
+      const own = parseNumbers(given);
+      if (Object.keys(own).length > 0) instances[instance] = own;
     }
   }
-  return { presetId: a.presetId, params };
+  return {
+    presetId: a.presetId,
+    params: parseNumbers(a.params),
+    ...(Object.keys(instances).length > 0 ? { instances } : {}),
+  };
 }
 
 /**

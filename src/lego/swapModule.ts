@@ -36,6 +36,10 @@ import * as THREE from "three";
 import { presetById } from "./animPresets";
 import { insertCompound, type PresetOutcome } from "./compounds";
 import { pieceConnectors, resolveConnections, transformOf } from "./connectors";
+import {
+  copyInstanceSettings,
+  pruneInstanceSettings,
+} from "./instanceSettings";
 import { liftedModuleRefusal } from "./liftPiece";
 import {
   followMirror,
@@ -352,10 +356,21 @@ function swapOne(
   const left = (animations ?? []).filter(
     (applied) => !removedPresets.includes(applied.presetId),
   );
-  const cleaned: LegoProject = {
+  // The copy's own settings go to the module that replaces it when the module
+  // has the same preset, and are dropped when it has not (#4315).
+  const newInstance = inserted.project.pieces.find((p) => fresh.has(p.id))
+    ?.module?.instance;
+  const carried: LegoProject = {
     ...bare,
     ...(left.length > 0 ? { animations: left } : {}),
   };
+  const cleaned = pruneInstanceSettings(
+    newInstance
+      ? copyInstanceSettings(carried, ref.instance, newInstance, (presetId) =>
+          (module.animations ?? []).some((a) => a.presetId === presetId),
+        )
+      : carried,
+  );
 
   const before = new Set(resolveConnections(project, pack).broken);
   const resolved = resolveConnections(cleaned, pack);

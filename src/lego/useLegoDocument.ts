@@ -20,6 +20,7 @@ import {
 } from "./compounds";
 import { withConnections } from "./connectors";
 import { emptyDocument, primarySelection, reduceDocument } from "./document";
+import { pruneInstanceSettings } from "./instanceSettings";
 import { liftedModuleRefusal } from "./liftPiece";
 import type { LegoProject } from "./model";
 import { insertModule } from "./moduleMount";
@@ -128,7 +129,11 @@ export function useLegoDocument(
     // their joins land in the same document and undo with it.
     dispatch({
       type: "edit",
-      change: withConnections(change, packRef.current),
+      change: (project) =>
+        // A removed instance takes its animation settings with it (#4315).
+        pruneInstanceSettings(
+          withConnections(change, packRef.current)(project),
+        ),
       at: Date.now(),
     });
   }, []);

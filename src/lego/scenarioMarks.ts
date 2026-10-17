@@ -77,15 +77,23 @@ export function scenarioCallins(scenario: Scenario): string[] {
 function presetsFilling(callins: string[]): string[] {
   return PRESETS.filter((preset) => {
     try {
+      const params = Object.fromEntries(
+        preset.params.map((param) => [param.id, param.fallback]),
+      );
       const result = preset.emit({
-        params: Object.fromEntries(
-          preset.params.map((param) => [param.id, param.fallback]),
-        ),
+        params,
         signal: "SIG",
         pieces: () => ["piece"],
         weapons: () => [{ number: 1, piece: () => "piece", signal: "SIG" }],
         instances: () => [
-          { number: 1, pieces: () => ["piece"], signal: "SIG", name: (n) => n },
+          {
+            id: "",
+            params,
+            number: 1,
+            pieces: () => ["piece"],
+            signal: "SIG",
+            name: (n) => n,
+          },
         ],
       });
       return callins.some((name) =>

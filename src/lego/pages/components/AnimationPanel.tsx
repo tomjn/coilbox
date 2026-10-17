@@ -52,6 +52,7 @@ import {
   withWorld,
 } from "../../aimResolver";
 import {
+  type AnimPreset,
   type AppliedPreset,
   countRoles,
   PRESETS,
@@ -73,7 +74,12 @@ import {
 } from "../../drive";
 import { type UnitMotion, unitMotion } from "../../effects";
 import type { GroundId, GroundShape } from "../../environment";
-import { presetCopies, unitScript } from "../../luaScript";
+import {
+  paramFor,
+  withInstanceParam,
+  withoutInstanceSettings,
+} from "../../instanceSettings";
+import { presetCopies, presetInstanceIds, unitScript } from "../../luaScript";
 import {
   DEFAULT_BUILDER,
   type LegoBuilder,
@@ -314,6 +320,12 @@ const BUILDER_FIELDS: {
  */
 const SETTLE_MS = 400;
 
+/** The instance picker's entry for the shared settings. Every other entry is
+ *  `copy:` and an instance id, because the id of pieces from no module is an
+ *  empty string, which a Select option cannot be. */
+const ALL_COPIES = "all";
+const COPY_PREFIX = "copy:";
+
 /** Where a run that replaces a playing one picks up from. */
 interface Resume {
   paused: boolean;
@@ -505,11 +517,29 @@ export function AnimationPanel({
       : null;
   const soloRef = useRef<string | null>(solo);
   soloRef.current = solo;
+  /** The copy of a module picked for each preset in its panel, by preset id.
+   *  Absent means all copies, the shared settings. */
+  const [picked, setPicked] = useState<Record<string, string>>({});
+  const copyOf = (preset: AnimPreset): string | null => {
+    const id = picked[preset.id];
+    return id !== undefined && presetInstanceIds(project, preset).includes(id)
+      ? id
+      : null;
+  };
+  /** The copy the solo run plays: the one picked for the soloed preset. */
+  const soloCopy = () => {
+    const preset = solo ? presetById(solo) : undefined;
+    return preset ? copyOf(preset) : null;
+  };
+  const soloCopyRef = useRef<string | null>(null);
+  soloCopyRef.current = soloCopy();
   /** The script a run plays now: the soloed preset's alone, or all of them. */
   const scriptNow = useCallback(
     () =>
       unitScript(
-        soloRef.current ? soloProject(project, soloRef.current) : project,
+        soloRef.current
+          ? soloProject(project, soloRef.current, soloCopyRef.current)
+          : project,
       ),
     [project],
   );
@@ -995,7 +1025,10 @@ export function AnimationPanel({
   const hasRunRef = useRef(hasRun);
   hasRunRef.current = hasRun;
   const currentScript = useMemo(
-    () => unitScript(solo ? soloProject(project, solo) : project),
+    () =>
+      unitScript(
+        solo ? soloProject(project, solo, soloCopyRef.current) : project,
+      ),
     [project, solo],
   );
   const lastScript = useRef(currentScript);
@@ -1067,10 +1100,11 @@ export function AnimationPanel({
   }, [groundKey]);
 
   /** Play one applied preset alone, in the scenario that shows it off. */
-  function playSolo(presetId: string) {
+  function playSolo(presetId: string, copy?: string | null) {
     const scenarioFor = soloScenario(presetId);
     if (!scenarioFor) return;
     soloRef.current = presetId;
+    if (copy !== undefined) soloCopyRef.current = copy;
     setSoloId(presetId);
     setScenarioId(scenarioFor);
     // The script is about to change because of this click, which has started
@@ -1098,14 +1132,29 @@ export function AnimationPanel({
     onChange(applied.filter((entry) => entry.presetId !== presetId));
   }
 
-  function setParam(presetId: string, param: string, next: number) {
+  function setParam(
+    presetId: string,
+    param: string,
+    next: number,
+    copy: string | null,
+  ) {
     onChange(
-      applied.map((entry) =>
-        entry.presetId === presetId
-          ? { ...entry, params: { ...entry.params, [param]: next } }
-          : entry,
-      ),
+      applied.map((entry) => {
+        if (entry.presetId !== presetId) return entry;
+        return copy !== null
+          ? withInstanceParam(entry, copy, param, next)
+          : { ...entry, params: { ...entry.params, [param]: next } };
+      }),
     );
+  }
+
+  function pickCopy(preset: AnimPreset, copy: string | null) {
+    setPicked((now) => {
+      const { [preset.id]: _old, ...rest } = now;
+      return copy === null ? rest : { ...rest, [preset.id]: copy };
+    });
+    // A solo run of this preset follows the pick.
+    if (solo === preset.id) playSolo(preset.id, copy);
   }
 
   {
@@ -1713,6 +1762,8 @@ export function AnimationPanel({
             const entry = applied.find((a) => a.presetId === preset.id);
             const missing = unmetRequirements(preset, counts);
             const copies = entry ? presetCopies(project, preset) : 1;
+            const copyIds = entry ? presetInstanceIds(project, preset) : [];
+            const copy = copyOf(preset);
 
             return (
               <div
@@ -1771,13 +1822,58 @@ export function AnimationPanel({
                   </p>
                 ) : null}
 
+                {entry && copyIds.length > 1 ? (
+                  <div className="mt-2 flex items-center gap-2">
+                    <OptionSelect
+                      size="sm"
+                      ariaLabel={`${preset.label}: copy`}
+                      value={copy === null ? ALL_COPIES : COPY_PREFIX + copy}
+                      options={[
+                        { value: ALL_COPIES, label: "All copies" },
+                        ...copyIds.map((id, index) => ({
+                          value: COPY_PREFIX + id,
+                          label: entry.instances?.[id]
+                            ? `Copy ${index + 1}, own settings`
+                            : `Copy ${index + 1}`,
+                        })),
+                      ]}
+                      onValueChange={(next) =>
+                        pickCopy(
+                          preset,
+                          next === ALL_COPIES
+                            ? null
+                            : next.slice(COPY_PREFIX.length),
+                        )
+                      }
+                    />
+                    {copy !== null && entry.instances?.[copy] ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 shrink-0 px-2 text-xs"
+                        onClick={() =>
+                          onChange(
+                            applied.map((a) =>
+                              a.presetId === preset.id
+                                ? withoutInstanceSettings(a, copy)
+                                : a,
+                            ),
+                          )
+                        }
+                      >
+                        Use shared
+                      </Button>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 {entry
                   ? preset.params.map((param) => (
                       <div key={param.id} className="mt-2">
                         <div className="flex items-center justify-between text-xs">
                           <span>{param.label}</span>
                           <span className="text-muted-foreground">
-                            {entry.params[param.id] ?? param.fallback}
+                            {paramFor(entry, copy, param.id)}
                             {PARAM_SUFFIX[param.unit]}
                           </span>
                         </div>
@@ -1786,9 +1882,9 @@ export function AnimationPanel({
                           min={param.min}
                           max={param.max}
                           step={param.step}
-                          value={[entry.params[param.id] ?? param.fallback]}
+                          value={[paramFor(entry, copy, param.id)]}
                           onValueChange={([next]) =>
-                            setParam(preset.id, param.id, next)
+                            setParam(preset.id, param.id, next, copy)
                           }
                           aria-label={`${preset.label}: ${param.label}`}
                         />
