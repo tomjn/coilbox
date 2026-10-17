@@ -164,7 +164,14 @@ export default function BuilderPage() {
 }
 
 function Builder({ id }: { id: string | undefined }) {
-  const doc = useLegoDocument(id);
+  const [pack, setPack] = useState<LoadedPack | null>(null);
+  // Its own flag, because a null pack is both "still reading the library" and
+  // "the library would not read". Without it the wait showed as a failure for
+  // however long the read took, which is the first thing anybody saw.
+  const [packFailed, setPackFailed] = useState(false);
+  // The document has the pack so an edit can place the pieces joined by
+  // connectors to the parts it changes (#3273).
+  const doc = useLegoDocument(id, pack);
   const { edit, selectedId, selectedIds, select: setSelectedId } = doc;
   const draft = doc.project;
   // The unit's file in its game, which is where a factory's yardmap would be.
@@ -182,11 +189,6 @@ function Builder({ id }: { id: string | undefined }) {
   // nothing can decide a key is dead by looking at one unit.
   const { projects } = useLegoProjects();
 
-  const [pack, setPack] = useState<LoadedPack | null>(null);
-  // Its own flag, because a null pack is both "still reading the library" and
-  // "the library would not read". Without it the wait showed as a failure for
-  // however long the read took, which is the first thing anybody saw.
-  const [packFailed, setPackFailed] = useState(false);
   // The meshes of a unit imported from somebody else's model. Read once
   // alongside the document, and null for a unit built out of parts.
   const geometry = useRawGeometry(draft);

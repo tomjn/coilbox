@@ -12,6 +12,7 @@
 
 import * as THREE from "three";
 
+import { freePiece } from "./connectors";
 import {
   childrenOf,
   descendantIds,
@@ -116,7 +117,8 @@ export function reparentPiece(
     pieces: project.pieces.map((piece) =>
       piece.id === pieceId
         ? {
-            ...piece,
+            // Its join was to the old parent's part, so it lands free.
+            ...freePiece(piece),
             parentId,
             position: [position.x, position.y, position.z],
             rotation: [euler.x, euler.y, euler.z],

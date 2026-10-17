@@ -18,8 +18,10 @@ import {
   selectionAsCompound,
   subtreeAsCompound,
 } from "./compounds";
+import { withConnections } from "./connectors";
 import { emptyDocument, primarySelection, reduceDocument } from "./document";
 import { type LegoProject, pieceById } from "./model";
+import type { LoadedPack } from "./pack";
 import {
   hasThumbnail,
   saveProject,
@@ -81,7 +83,12 @@ export interface LegoDocumentSession {
  * The document behind the builder: edits, history, selection, clipboard and
  * saving.
  */
-export function useLegoDocument(id: string | undefined): LegoDocumentSession {
+export function useLegoDocument(
+  id: string | undefined,
+  /** Measures parts, so an edit can place the pieces joined to them. Null
+   *  while the library is still loading, and edits then go through as made. */
+  pack: LoadedPack | null = null,
+): LegoDocumentSession {
   const { projects, loading } = useLegoProjects();
   const stored = projects.find((project) => project.id === id);
 
@@ -100,8 +107,17 @@ export function useLegoDocument(id: string | undefined): LegoDocumentSession {
     if (stored) dispatch({ type: "open", project: stored });
   }, [stored]);
 
+  // Read through a ref so `edit` keeps one identity once the pack arrives.
+  const packRef = useRef(pack);
+  packRef.current = pack;
   const edit = useCallback((change: (project: LegoProject) => LegoProject) => {
-    dispatch({ type: "edit", change, at: Date.now() });
+    // Joins are resolved inside the edit, so the pieces an edit moves through
+    // their joins land in the same document and undo with it.
+    dispatch({
+      type: "edit",
+      change: withConnections(change, packRef.current),
+      at: Date.now(),
+    });
   }, []);
   const undo = useCallback(() => dispatch({ type: "undo" }), []);
   const redo = useCallback(() => dispatch({ type: "redo" }), []);

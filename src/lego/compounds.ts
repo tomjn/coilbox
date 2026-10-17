@@ -17,7 +17,7 @@
  */
 
 import * as THREE from "three";
-
+import { freePiece } from "./connectors";
 import {
   descendantIds,
   LEGO_SCHEMA_VERSION,
@@ -97,8 +97,9 @@ export function selectionAsCompound(
     for (const id of ids) remap.set(id, options.newId());
     for (const id of ids) {
       const piece = pieceById(project, id) as LegoPiece;
+      // A root has no parent in the compound, so nothing to be joined to.
       pieces.push({
-        ...piece,
+        ...(id === rootId ? freePiece(piece) : piece),
         id: remap.get(id) as string,
         parentId:
           id === rootId ? null : (remap.get(piece.parentId as string) ?? null),
@@ -208,7 +209,10 @@ export function insertCompound(
     // the piece a file shipped any more, so any preserved original name goes
     // with the piece it was lifted from rather than the copy: see
     // `LegoPiece.originalName` (#2613).
-    const { originalName: _dropped, ...rest } = piece;
+    // A piece landing on the new parent was joined, if at all, to something
+    // else, so it lands free. Joins inside the compound come along.
+    const { originalName: _dropped, ...rest } =
+      under === parent ? freePiece(piece) : piece;
     return { ...rest, id, name, parentId: under };
   });
 

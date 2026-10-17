@@ -1,0 +1,249 @@
+/**
+ * Where parts join, and placing a piece from its join (issue #3273).
+ *
+ * A connector is a point on a part, the way out of the part it faces, and an up
+ * direction along the face that fixes the twist, all in the part's own space.
+ * A piece's `connection` names one of its own connectors and one of its
+ * parent's, and the piece is placed so the two points meet and the two faces
+ * point at each other.
+ *
+ * The result is written back to the piece's `position` and `rotation`, rather
+ * than worked out each time a transform is read. The scene, the bake, mirror,
+ * the clipboard and every exporter read those fields, and none of them has to
+ * know a join exists. The cost is that anything which could move a joined piece
+ * has to resolve again, which `withConnections` does for every builder edit and
+ * `bakedPieces` does once more before a bake.
+ *
+ * Only the piece's own frame and its parent's part go into a join, never the
+ * parent's transform, because the piece's transform is written against its
+ * parent. So joins resolve one piece at a time, in any order.
+ */
+
+import * as THREE from "three";
+
+import type { LegoConnection, LegoPiece, LegoProject } from "./model";
+import type { LoadedPack } from "./pack";
+import type { Bounds, Vec3 } from "./snapping";
+
+export interface LegoConnector {
+  /** Stable across parts, so a join survives a part being swapped. */
+  id: string;
+  /** In the part's own space, the same space as a piece's `pivot`. */
+  position: Vec3;
+  /** Unit length, pointing out of the part. */
+  facing: Vec3;
+  /** Unit length and along the face, so at right angles to `facing`. */
+  up: Vec3;
+}
+
+/**
+ * One connector at the middle of each face of a box, facing out of it.
+ *
+ * The up direction follows one rule, so a twist means the same on every part:
+ * up is +y on the four side faces, and +z (the unit's forward) on the top and
+ * the bottom, where +y would be the facing itself. Ids are the facing's axis
+ * and sign, so `+y` is the top of any part.
+ */
+export function boxConnectors(bounds: Bounds): LegoConnector[] {
+  const { min, max } = bounds;
+  const mid: Vec3 = [
+    (min[0] + max[0]) / 2,
+    (min[1] + max[1]) / 2,
+    (min[2] + max[2]) / 2,
+  ];
+  const connectors: LegoConnector[] = [];
+  for (const axis of [0, 1, 2]) {
+    for (const sign of [1, -1]) {
+      const position: Vec3 = [...mid];
+      position[axis] = sign > 0 ? max[axis] : min[axis];
+      const facing: Vec3 = [0, 0, 0];
+      facing[axis] = sign;
+      connectors.push({
+        id: `${sign > 0 ? "+" : "-"}${"xyz"[axis]}`,
+        position,
+        facing,
+        up: axis === 1 ? [0, 0, 1] : [0, 1, 0],
+      });
+    }
+  }
+  return connectors;
+}
+
+/** The connectors a piece can be joined by: its part's, or none for a piece
+ *  with no part in the pack. */
+export function pieceConnectors(
+  pack: LoadedPack,
+  piece: LegoPiece,
+): LegoConnector[] {
+  const part = piece.partId ? pack.byId.get(piece.partId) : undefined;
+  return part ? boxConnectors(part.bbox) : [];
+}
+
+/** Where a joined piece goes, against its parent. */
+interface Placement {
+  position: Vec3;
+  rotation: Vec3;
+}
+
+/**
+ * Where a piece's join puts it, or null when the join cannot be made: either
+ * connector is missing, the piece has no parent, or its scale has a zero in it.
+ */
+function placeJoin(
+  pack: LoadedPack,
+  piece: LegoPiece,
+  parent: LegoPiece,
+  connection: LegoConnection,
+): Placement | null {
+  const own = pieceConnectors(pack, piece).find(
+    (c) => c.id === connection.connector,
+  );
+  const theirs = pieceConnectors(pack, parent).find(
+    (c) => c.id === connection.to,
+  );
+  if (!own || !theirs) return null;
+  if (piece.scale.some((s) => s === 0)) return null;
+
+  // The parent's connector, in the space its children are written in: its
+  // part's space less its pivot.
+  const parentPivot = new THREE.Vector3(...(parent.pivot ?? [0, 0, 0]));
+  const facing = new THREE.Vector3(...theirs.facing).normalize();
+  const up = new THREE.Vector3(...theirs.up).normalize();
+  const side = new THREE.Vector3().crossVectors(facing, up);
+  const [along, across] = connection.offset ?? [0, 0];
+  const target = new THREE.Vector3(...theirs.position)
+    .sub(parentPivot)
+    .addScaledVector(side, along)
+    .addScaledVector(up, across);
+  const twistedUp = up
+    .clone()
+    .applyAxisAngle(facing, connection.twist ?? 0)
+    .normalize();
+
+  // The piece's own connector after its scale. A face's direction goes through
+  // the inverse scale, which is what turns a mirrored part's "+x" face round to
+  // the side it is now on.
+  const scale = new THREE.Vector3(...piece.scale);
+  const point = new THREE.Vector3(...own.position)
+    .sub(new THREE.Vector3(...(piece.pivot ?? [0, 0, 0])))
+    .multiply(scale);
+  const ownFacing = new THREE.Vector3(...own.facing).divide(scale).normalize();
+  const ownUp = new THREE.Vector3(...own.up).multiply(scale);
+  ownUp.addScaledVector(ownFacing, -ownUp.dot(ownFacing)).normalize();
+
+  // Turn the piece's connector frame onto the parent's, facing back into it.
+  const from = frame(ownFacing, ownUp);
+  const to = frame(facing.clone().negate(), twistedUp);
+  const turn = to.multiply(from.transpose());
+  const rotation = new THREE.Euler().setFromRotationMatrix(turn);
+
+  const position = target.sub(point.applyMatrix4(turn));
+  return {
+    position: [position.x, position.y, position.z],
+    rotation: [rotation.x, rotation.y, rotation.z],
+  };
+}
+
+/** A right-handed frame with `facing` and `up` as its first two columns. */
+function frame(facing: THREE.Vector3, up: THREE.Vector3): THREE.Matrix4 {
+  const third = new THREE.Vector3().crossVectors(facing, up);
+  return new THREE.Matrix4().makeBasis(facing, up, third);
+}
+
+/** Close enough that writing the new value would be rounding, not a move. */
+const SAME = 1e-9;
+
+function same(a: Vec3, b: Vec3): boolean {
+  return a.every((n, i) => Math.abs(n - b[i]) < SAME);
+}
+
+/**
+ * Every joined piece placed from its join.
+ *
+ * A join that cannot be made leaves the piece on the transform it last had and
+ * names it in `broken`, so a swapped part never throws or sends a piece to the
+ * origin. Answers the same document when nothing moved, so an edit that touches
+ * no joined piece costs no new copy.
+ */
+export function resolveConnections(
+  project: LegoProject,
+  pack: LoadedPack,
+): { project: LegoProject; broken: string[] } {
+  const byId = new Map(project.pieces.map((piece) => [piece.id, piece]));
+  const broken: string[] = [];
+  let moved = false;
+  const pieces = project.pieces.map((piece) => {
+    if (!piece.connection) return piece;
+    const parent = piece.parentId ? byId.get(piece.parentId) : undefined;
+    const placed = parent
+      ? placeJoin(pack, piece, parent, piece.connection)
+      : null;
+    if (!placed) {
+      broken.push(piece.id);
+      return piece;
+    }
+    if (
+      same(placed.position, piece.position) &&
+      same(placed.rotation, piece.rotation)
+    ) {
+      return piece;
+    }
+    moved = true;
+    return { ...piece, ...placed };
+  });
+  return { project: moved ? { ...project, pieces } : project, broken };
+}
+
+/**
+ * A builder edit followed by resolving every join, so the edit and the moves it
+ * causes are one document and one undo step. With no pack loaded yet there is
+ * nothing to measure parts by, and the edit goes through as it is.
+ */
+export function withConnections(
+  change: (project: LegoProject) => LegoProject,
+  pack: LoadedPack | null,
+): (project: LegoProject) => LegoProject {
+  if (!pack) return change;
+  return (project) => {
+    const next = change(project);
+    return next === project ? next : resolveConnections(next, pack).project;
+  };
+}
+
+/** Join a piece to its parent and place it there. */
+export function connectPiece(
+  project: LegoProject,
+  pack: LoadedPack,
+  pieceId: string,
+  connection: LegoConnection,
+): LegoProject {
+  return resolveConnections(
+    {
+      ...project,
+      pieces: project.pieces.map((piece) =>
+        piece.id === pieceId ? { ...piece, connection } : piece,
+      ),
+    },
+    pack,
+  ).project;
+}
+
+/** The piece without its join, left where the join had put it. */
+export function freePiece(piece: LegoPiece): LegoPiece {
+  if (!piece.connection) return piece;
+  const { connection: _dropped, ...rest } = piece;
+  return rest;
+}
+
+/** Take a piece's join away, leaving it where it stands as a free piece. */
+export function disconnectPiece(
+  project: LegoProject,
+  pieceId: string,
+): LegoProject {
+  const piece = project.pieces.find((p) => p.id === pieceId);
+  if (!piece?.connection) return project;
+  return {
+    ...project,
+    pieces: project.pieces.map((p) => (p.id === pieceId ? freePiece(p) : p)),
+  };
+}
