@@ -25,7 +25,7 @@ export interface Framed {
 const MIN_FRAME_DISTANCE = 1.5;
 /** Fitted tight against the box, the piece would sit flush with the edges of
  *  the view. This much slack keeps it comfortably inside them. */
-const FRAME_PADDING = 1.3;
+export const FRAME_PADDING = 1.3;
 
 /**
  * Where to put the orbit target and the camera to frame `box`.

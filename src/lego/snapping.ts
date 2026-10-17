@@ -261,7 +261,24 @@ export function screenPixelsToWorld(
   const safeHeight = Math.max(viewportHeightPx, 1);
   const worldPerPixel =
     (2 * safeDistance * Math.tan(verticalFovRadians / 2)) / safeHeight;
-  const threshold = pixels * worldPerPixel;
+  return clampThreshold(pixels * worldPerPixel);
+}
+
+/**
+ * The same conversion for an orthographic camera. What it covers per pixel
+ * does not depend on distance, only on how much height it shows, so the answer
+ * is the visible height over the viewport height.
+ */
+export function screenPixelsToWorldOrtho(
+  visibleHeight: number,
+  viewportHeightPx: number,
+  pixels: number,
+): number {
+  const safeHeight = Math.max(viewportHeightPx, 1);
+  return clampThreshold((pixels * visibleHeight) / safeHeight);
+}
+
+function clampThreshold(threshold: number): number {
   return Math.min(
     Math.max(threshold, MIN_SCREEN_THRESHOLD),
     MAX_SCREEN_THRESHOLD,
