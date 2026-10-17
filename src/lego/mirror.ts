@@ -306,12 +306,19 @@ export function onCentreLine(project: LegoProject, pieceId: string): boolean {
  * afterwards has somewhere on the right to go, and the pair keeps its
  * hierarchy instead of the twin dangling off the leg it was reflected from.
  *
+ * A parent on the centre line is its own reflection and is returned as is,
+ * mirrored or not (issue #4306).
+ *
  * Derived, never stored: the answer is read out of where the pieces stand each
  * time it is asked for, so nothing has to be kept in step. Two pieces standing
  * in the same reflected place is a document nobody can mean anything definite
  * by, so that falls back too. Nothing here ever invents a piece.
  */
 export function mirrorParent(project: LegoProject, parentId: string): string {
+  // A parent on the centre line is its own reflection. Its reflected frame is
+  // not its own frame when it is mirrored, and can be another piece's, such as
+  // the root's, so frames are only compared for a parent off the line.
+  if (onCentreLine(project, parentId)) return parentId;
   const reflected = reflection(project).multiply(
     worldMatrix(project, parentId),
   );
