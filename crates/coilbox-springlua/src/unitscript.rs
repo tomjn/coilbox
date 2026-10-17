@@ -1760,7 +1760,11 @@ fn install_spring(
                     let (sin, cos) = angle.sin_cos();
                     // A reversing unit moves against its heading, but the
                     // fourth is still the size of the velocity.
-                    let along = if drive.reversing { -drive.speed } else { drive.speed };
+                    let along = if drive.reversing {
+                        -drive.speed
+                    } else {
+                        drive.speed
+                    };
                     (along * sin, 0.0, along * cos, drive.speed)
                 }
                 None => (0.0, 0.0, speed, speed),
