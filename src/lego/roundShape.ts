@@ -19,8 +19,6 @@ import {
   tubeInnerRadius,
 } from "./shapes";
 
-export type RoundKind = "cylinder" | "tube" | "cone";
-
 export interface RoundNumbers {
   /** 0, 1 or 2 for x, y or z. */
   axis: number;
@@ -31,38 +29,6 @@ export interface RoundNumbers {
   wall?: number;
   /** Only a cone has one: the radius of its top, 0 for a point. */
   top?: number;
-}
-
-/** A new one is 1 across and 1 long, upright, near the size of the pack's
- *  smaller blocks. A tube's wall is a quarter of that. */
-const NEW_SIZE = 1;
-const NEW_WALL = 0.25;
-
-/**
- * A new cylinder or tube for this unit, or null when the pack lists no
- * swatches, which means it offers no shapes. It takes the colourway most of
- * the unit's parts use, or the pack's first swatch when none has one.
- */
-export function newRoundShape(
-  kind: RoundKind,
-  project: LegoProject,
-  pack: Pick<LoadedPack, "manifest" | "byId">,
-): LegoShape | null {
-  const swatches = pack.manifest.swatches ?? [];
-  if (swatches.length === 0) return null;
-  const swatch = mostUsedSwatch(project, pack, swatches);
-  const options: Record<string, number> = {
-    axis: 1,
-    sides: DEFAULT_CYLINDER_SIDES,
-  };
-  if (kind === "tube") options.inner = NEW_SIZE / 2 - NEW_WALL;
-  if (kind === "cone") options.top = 0;
-  return {
-    kind,
-    size: [NEW_SIZE, NEW_SIZE, NEW_SIZE],
-    swatch,
-    options,
-  };
 }
 
 export function mostUsedSwatch(

@@ -7,7 +7,6 @@ import {
   ChevronUp,
   Copy,
   Crosshair,
-  Cylinder,
   FlipHorizontal2,
   FlipVertical2,
   ImageIcon,
@@ -56,6 +55,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { notify } from "@/notify/notify";
+import { addShape } from "../addShape";
 import { aimPoint } from "../aimPoint";
 import { type ArrangeAction, arrange } from "../align";
 import { addAnchor, removeAnchor, updateAnchor } from "../anchors";
@@ -157,9 +157,9 @@ import { rawGeometryProblems } from "../rawGeometry";
 import { texturesInUse } from "../rawImport";
 import { parentOptions, reparentPiece } from "../reparent";
 import { type Axis, resizePackBlock } from "../resizePackBlock";
+import { resizeShapeFace } from "../resizeShape";
 import { unringPiece } from "../ring";
 import { ringMembers } from "../ringSet";
-import { newRoundShape, type RoundKind } from "../roundShape";
 import { bakedPieces, sitOnGround, unitBounds } from "../s3oBuild";
 import type {
   NanoStyle,
@@ -167,12 +167,11 @@ import type {
   StandInTrack,
 } from "../scriptPlayback";
 import { dragPiece, freeMoved, type Seat, typedTransform } from "../seat";
-import { isKnownShapeKind, type LegoShape } from "../shapes";
+import { isKnownShapeKind, type LegoShape, type ShapeKind } from "../shapes";
 import { isShortcut, shortcutLabel } from "../shortcuts";
 import { skeletonProblems } from "../skeletonChecks";
 import { applyProportions } from "../skeletonEdit";
 import { applyTarget } from "../skeletonSize";
-import { newSphereShape } from "../sphereShape";
 import { swapModule } from "../swapModule";
 import { swapPart } from "../swapPart";
 import { useEditShortcuts } from "../useEditShortcuts";
@@ -182,13 +181,7 @@ import { useShareModule } from "../useModuleShare";
 import { useRawGeometry } from "../useRawGeometry";
 import { useSymmetry } from "../useSymmetry";
 import { addWeaponModule, pickWeaponParts } from "../weaponModule";
-import { newWedgeShape } from "../wedgeShape";
-import {
-  addShapePiece,
-  setPieceRole,
-  setPieceShape,
-  wheelAxleProblems,
-} from "../wheelAxle";
+import { setPieceRole, setPieceShape, wheelAxleProblems } from "../wheelAxle";
 import { AimPointPanel } from "./components/AimPointPanel";
 import { AnchorList } from "./components/AnchorList";
 import { AnimationPanel } from "./components/AnimationPanel";
@@ -639,34 +632,19 @@ function Builder({ id }: { id: string | undefined }) {
   }
 
   /**
-   * Add a cylinder, tube, cone, sphere, dome or wedge at the selected piece's origin, as a part added
-   * with Alt is. It is sized in the piece panel. #3337 moves shapes into the
-   * strip beside the parts.
+   * Choosing a shape adds it where `addPart` adds a part: a new piece hanging
+   * off the selection, at its origin, at the kind's default size (#3337), and
+   * selects it. The placing-by-face and bone rules are for pack parts and do
+   * not apply yet. A pack that lists no swatches offers no shapes.
    */
-  function addShape(kind: RoundKind | "wedge" | "sphere" | "dome") {
+  function addStripShape(info: ShapeKind) {
     if (!draft || !pack) return;
-    const shape =
-      kind === "wedge"
-        ? newWedgeShape(draft, pack)
-        : kind === "sphere" || kind === "dome"
-          ? newSphereShape(kind === "dome", draft, pack)
-          : newRoundShape(kind, draft, pack);
-    if (!shape) return;
     const pieceId = crypto.randomUUID();
-    edit((project) =>
-      addShapePiece(project, {
-        id: pieceId,
-        name: uniquePieceName(
-          kind,
-          project.pieces.map((piece) => piece.name),
-        ),
-        parentId: selectedId ?? project.rootPieceId,
-        partId: null,
-        shape,
-        position: [0, 0, 0],
-        rotation: [0, 0, 0],
-        scale: [1, 1, 1],
-      }),
+    const parentId = selectedId ?? draft.rootPieceId;
+    if (!addShape(draft, info, pack, parentId, pieceId)) return;
+    inventoryView.inventory.record({ kind: "shape", id: info.id });
+    edit(
+      (project) => addShape(project, info, pack, parentId, pieceId) ?? project,
     );
     queueTwin(pieceId);
     setSelectedId(pieceId);
@@ -1256,6 +1234,26 @@ function Builder({ id }: { id: string | undefined }) {
         : null,
     ].filter(Boolean);
     setSwapNote(notes.length > 0 ? notes.join(" ") : null);
+  }
+
+  /**
+   * A generated shape's face was dragged (#3331). One edit, so one undo, by the
+   * path the piece panel uses so a wheel keeps its axle. Children that are not
+   * joined stay where they are.
+   */
+  function resizeShapeBox(
+    pieceId: string,
+    axis: Axis,
+    sign: 1 | -1,
+    size: number,
+  ) {
+    if (!pack) return;
+    place(
+      [pieceId],
+      (project) =>
+        resizeShapeFace(project, pack, pieceId, axis, sign, size)?.project ??
+        project,
+    );
   }
 
   /**
@@ -2206,7 +2204,11 @@ function Builder({ id }: { id: string | undefined }) {
                   onAimChange: setAimPoint,
                 }}
                 guides={{ onEdit: edit }}
-                packResize={imported ? undefined : { onResize: resizeBlock }}
+                packResize={
+                  imported
+                    ? undefined
+                    : { onResize: resizeBlock, onResizeShape: resizeShapeBox }
+                }
               />
             </div>
 
@@ -2310,55 +2312,6 @@ function Builder({ id }: { id: string | undefined }) {
                   />
                 ) : null}
 
-                {stripOpen &&
-                effectiveStrip === "inventory" &&
-                (pack?.manifest.swatches?.length ?? 0) > 0 ? (
-                  <ButtonGroup aria-label="Add a shape">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => addShape("cylinder")}
-                    >
-                      <Cylinder size={14} /> Cylinder
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => addShape("tube")}
-                    >
-                      Tube
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => addShape("cone")}
-                    >
-                      Cone
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => addShape("sphere")}
-                    >
-                      Sphere
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => addShape("dome")}
-                    >
-                      Dome
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => addShape("wedge")}
-                    >
-                      Wedge
-                    </Button>
-                  </ButtonGroup>
-                ) : null}
-
                 {stripOpen ? (
                   <Button
                     size="icon"
@@ -2406,6 +2359,7 @@ function Builder({ id }: { id: string | undefined }) {
                           : undefined
                       }
                       onSelectPart={startPlacing}
+                      onSelectShape={addStripShape}
                       onInsertModule={startPlacingModule}
                       placingModuleId={
                         placingPart && "module" in placingPart

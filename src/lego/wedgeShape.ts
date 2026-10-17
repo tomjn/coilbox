@@ -7,7 +7,6 @@
 
 import type { LegoProject } from "./model";
 import type { LoadedPack } from "./pack";
-import { mostUsedSwatch } from "./roundShape";
 import { type LegoShape, wedgeProfile } from "./shapes";
 import { type Anchor, type Bounds, localAnchors } from "./snapping";
 
@@ -20,29 +19,6 @@ export interface WedgeNumbers {
   low: number;
   /** Whether the high end is at the front (+z) rather than the back. */
   flip: boolean;
-}
-
-/** A new wedge is 1 each way, coming to an edge, like the pack's smaller
- *  blocks. */
-const NEW_SIZE = 1;
-
-/**
- * A new wedge for this unit, or null when the pack lists no swatches, which
- * means it offers no shapes. It takes the colourway most of the unit's parts
- * use, or the pack's first swatch when none has one.
- */
-export function newWedgeShape(
-  project: LegoProject,
-  pack: Pick<LoadedPack, "manifest" | "byId">,
-): LegoShape | null {
-  const swatches = pack.manifest.swatches ?? [];
-  if (swatches.length === 0) return null;
-  return {
-    kind: "wedge",
-    size: [NEW_SIZE, NEW_SIZE, NEW_SIZE],
-    swatch: mostUsedSwatch(project, pack, swatches),
-    options: { low: 0, flip: 0 },
-  };
 }
 
 /** A wedge's numbers as it is drawn, defaults filled in. */

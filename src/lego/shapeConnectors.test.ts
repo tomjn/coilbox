@@ -18,6 +18,7 @@ import { insertModule, moduleConnectors, placeModule } from "./moduleMount";
 import type { LegoPartInfo, LoadedPack } from "./pack";
 import { attachToFreeFace, faceUnder, placePart } from "./placePart";
 import { worldMatrix } from "./reparent";
+import { resizeShapeFace } from "./resizeShape";
 import { shapeConnectors } from "./shapeConnectors";
 import {
   type LegoShape,
@@ -505,6 +506,31 @@ describe("a part joined to a shape", () => {
     );
     // The drum's bottom end middle is on the hull's top.
     expect(worldPoint(joined, "drum", [0, -2, 0])).toEqual([0, 0.5, 0]);
+  });
+});
+
+describe("a face resize of a shape", () => {
+  it("moves the connector and the part joined to it", () => {
+    const joined = connectPiece(
+      doc([
+        piece({ id: "drum", shape: DRUM }),
+        piece({ id: "leg", parentId: "drum", partId: "leg" }),
+      ]),
+      pack(),
+      "leg",
+      { connector: "-y", to: "+y" },
+    );
+    expect(worldPoint(joined, "leg", [0, -1, 0])).toEqual([0, 2, 0]);
+
+    const result = resizeShapeFace(joined, pack(), "drum", 1, 1, 6);
+    expect(result?.broken).toEqual([]);
+    const next = result?.project as LegoProject;
+    const drum = pieceById(next, "drum") as LegoPiece;
+    const top = pieceConnectors(pack(), drum).find((c) => c.id === "+y");
+    expect(top?.position).toEqual([0, 3, 0]);
+    // The bottom face stays where it was in the world, so the top is 2 higher.
+    expect(worldPoint(next, "drum", [0, -3, 0])).toEqual([0, -2, 0]);
+    expect(worldPoint(next, "leg", [0, -1, 0])).toEqual([0, 4, 0]);
   });
 });
 

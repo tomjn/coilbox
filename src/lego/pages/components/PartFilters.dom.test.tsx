@@ -14,6 +14,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { SHAPES_CATEGORY } from "../../filter";
 import type { LegoPackManifest, LoadedPack } from "../../pack";
 import {
   NoMatches,
@@ -62,7 +63,11 @@ const onPackId = vi.fn();
 
 function show(
   loaded: LoadedPack,
-  over: { category?: string | null; shown?: number } = {},
+  over: {
+    category?: string | null;
+    shown?: number;
+    showShapes?: boolean;
+  } = {},
 ) {
   return render(
     <PartFilters
@@ -74,6 +79,7 @@ function show(
       packId={null}
       onPackId={onPackId}
       shown={over.shown ?? 7}
+      showShapes={over.showShapes}
     />,
   );
 }
@@ -130,6 +136,34 @@ describe("the filter row", () => {
   it("says 1 part, not 1 parts", () => {
     show(pack(), { shown: 1 });
     expect(screen.getByText("1 part")).toBeTruthy();
+  });
+});
+
+describe("the Shapes category", () => {
+  it("sits beside the colours when the grid lists shapes", () => {
+    show(pack(), { showShapes: true });
+    const names = screen
+      .getAllByRole("button")
+      .map((button) => button.textContent);
+    expect(names).toEqual(["All", "Grey", "Tan", "Shapes"]);
+  });
+
+  it("is left out of a grid that has no shapes", () => {
+    show(pack());
+    expect(screen.queryByRole("button", { name: "Shapes" })).toBeNull();
+  });
+
+  it("chooses the shapes category, and marks it when in force", () => {
+    show(pack(), { showShapes: true });
+    fireEvent.click(screen.getByRole("button", { name: "Shapes" }));
+    expect(onCategory).toHaveBeenCalledWith(SHAPES_CATEGORY);
+    cleanup();
+    show(pack(), { showShapes: true, category: SHAPES_CATEGORY });
+    expect(
+      screen
+        .getByRole("button", { name: "Shapes" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
   });
 });
 

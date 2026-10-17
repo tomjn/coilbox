@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { type LegoProject, newProject } from "./model";
 import type { LegoPartInfo, LoadedPack } from "./pack";
-import { newRoundShape, roundNumbers, withRoundNumber } from "./roundShape";
+import { roundNumbers, withRoundNumber } from "./roundShape";
 import { DEFAULT_CYLINDER_SIDES, type LegoShape } from "./shapes";
 
 const SWATCHES = ["green", "tan", "grey"].map((id) => ({
@@ -46,34 +46,6 @@ function unit(partIds: string[]): LegoProject {
     ],
   };
 }
-
-describe("newRoundShape", () => {
-  it("takes the colourway most of the unit's parts use", () => {
-    expect(
-      newRoundShape("cylinder", unit(["t", "g", "t"]), pack())?.swatch,
-    ).toBe("tan");
-  });
-
-  it("takes the first swatch when no part has one", () => {
-    expect(newRoundShape("cylinder", unit([]), pack())?.swatch).toBe("green");
-  });
-
-  it("is upright with the default sides, and a tube has a wall", () => {
-    const tube = newRoundShape("tube", unit([]), pack());
-    if (!tube) throw new Error("no shape");
-    expect(roundNumbers(tube)).toEqual({
-      axis: 1,
-      radius: 0.5,
-      length: 1,
-      sides: DEFAULT_CYLINDER_SIDES,
-      wall: 0.25,
-    });
-  });
-
-  it("offers nothing when the pack lists no swatches", () => {
-    expect(newRoundShape("tube", unit([]), pack([]))).toBeNull();
-  });
-});
 
 describe("withRoundNumber", () => {
   const cylinder: LegoShape = {
@@ -152,18 +124,6 @@ describe("cones (#3329)", () => {
     if ("problem" in result) throw new Error(result.problem);
     return result.shape;
   };
-
-  it("starts as a point, upright, with the default sides", () => {
-    const made = newRoundShape("cone", unit([]), pack());
-    if (!made) throw new Error("no shape");
-    expect(roundNumbers(made)).toEqual({
-      axis: 1,
-      radius: 0.5,
-      length: 1,
-      sides: DEFAULT_CYLINDER_SIDES,
-      top: 0,
-    });
-  });
 
   it("reads its numbers back, the bottom radius from the box", () => {
     expect(roundNumbers(cone)).toEqual({
