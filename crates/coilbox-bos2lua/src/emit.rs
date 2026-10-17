@@ -612,6 +612,9 @@ struct Program<'a> {
     /// Whether anything begins a script with `start-script`, whose start the
     /// Lua holds back until the thread that began it waits or finishes.
     defers: bool,
+    /// Whether two of the script's threads can be waiting at once, so the Lua
+    /// runs them as coroutines of its own to wake them in COB's order.
+    scheduled: bool,
     /// The constants something that is written uses, when leaving out the rest.
     live_consts: Option<HashSet<String>>,
     /// The constants declared in radians or elmos.
@@ -853,6 +856,30 @@ fn unreachable(funcs: &[(&Func, usize)], infos: &HashMap<String, FuncInfo>) -> H
         .collect()
 }
 
+/// How many threads that can wait these statements begin with `start-script`,
+/// counting one in a loop as two, since it can begin more than one.
+fn started_waiters(stmts: &[Stmt], looped: bool, blocking: &HashSet<String>) -> usize {
+    stmts
+        .iter()
+        .map(|s| match &s.kind {
+            StmtKind::Start(name, _) if blocking.contains(&name.to_lowercase()) => {
+                1 + usize::from(looped)
+            }
+            StmtKind::If { then, els, .. } => {
+                started_waiters(then, looped, blocking)
+                    + els
+                        .as_ref()
+                        .map_or(0, |(els, _)| started_waiters(els, looped, blocking))
+            }
+            StmtKind::While { body, .. } | StmtKind::For { body, .. } => {
+                started_waiters(body, true, blocking)
+            }
+            StmtKind::Block(body, _) => started_waiters(body, looped, blocking),
+            _ => 0,
+        })
+        .sum()
+}
+
 /// The `var`s of a function that are set and never read, lower-cased, when
 /// leaving out every line that sets them changes nothing.
 fn dead_locals(f: &Func) -> HashSet<String> {
@@ -900,6 +927,7 @@ impl<'a> Program<'a> {
             warnings: pre.warnings.clone(),
             has_reload: false,
             defers: false,
+            scheduled: false,
             dropped: HashSet::new(),
             live_consts: None,
             units: HashMap::new(),
@@ -1088,6 +1116,18 @@ impl<'a> Program<'a> {
                 }
             }
         }
+        let mut waiting = 0;
+        for (f, _) in &funcs {
+            let lower = f.name.to_lowercase();
+            if p.dropped.contains(&lower) {
+                continue;
+            }
+            if blocking.contains(&lower) && p.funcs[&lower].role.is_some() {
+                waiting += 1;
+            }
+            waiting += started_waiters(&f.body, false, &blocking);
+        }
+        p.scheduled = waiting >= 2;
         let has_reload = p
             .funcs
             .values()
@@ -1118,6 +1158,10 @@ impl<'a> Program<'a> {
                     true
                 }
                 Some(Role::Callin(s)) if s.lua == "script.Create" && has_reload => false,
+                // Its BOS runs as one of the Lua's own threads.
+                Some(Role::Callin(_)) if p.scheduled => {
+                    !info.called && !info.blocks && !info.starts
+                }
                 Some(Role::Callin(s)) => !info.called && (s.threaded || !info.blocks),
                 _ => false,
             };
@@ -1360,6 +1404,170 @@ fn wait_helper(kind: &str, params: &str, defers: bool) -> String {
     )
 }
 
+/// The names the Lua's own threads give the BOS, in the order they are
+/// declared. `spawn` stands for all of them, since everything else needs it.
+const SCHEDULED: &[&str] = &[
+    "spawn",
+    "carry",
+    "Sleep",
+    "WaitForTurn",
+    "WaitForMove",
+    "WaitForScale",
+    "startScript",
+    "signal",
+    "setSignalMask",
+];
+
+const SCHEDULER: &str = "
+-- COB runs the threads due on a frame in an order of its own: those begun with
+-- start-script or back from a wait first, in the order they got there, then
+-- the sleepers by when they are due and then by age (CobEngine.h:36-41,
+-- CobEngine.cpp:92-105,136-200). The engine's Lua wakes them last asleep first
+-- (unit_script.lua:812-836). So the BOS's threads are coroutines of the
+-- script's own, and one framework thread a frame runs those due in COB's
+-- order. Signals and masks are the script's own too, as the framework's only
+-- reach its own threads.
+";
+
+const SCHEDULER_CORE: &str = "\tlocal threads, due, current, made = {}, {}, nil, 0
+\tlocal resume
+\tlocal function before(a, b)
+\t\tif a.wake ~= b.wake then return a.wake < b.wake end
+\t\treturn a.n < b.n
+\tend
+\tlocal function at(frame)
+\t\tUnitScript.Sleep((frame - Spring.GetGameFrame()) * 33)
+\t\tlocal list, err = due[frame] or {}, nil
+\t\tdue[frame] = nil
+\t\ttable.sort(list, before)
+\t\tfor i = 1, #list do
+\t\t\tif not list[i].over then
+\t\t\t\terr = err or resume(list[i], list[i].wake > -math.huge)
+\t\t\tend
+\t\tend
+\t\tif err then error(err, 0) end
+\tend
+\tlocal function queue(t, frame, wake, n)
+\t\tt.frame, t.wake, t.n = frame, wake, n
+\t\tif not due[frame] then
+\t\t\tdue[frame] = {}
+\t\t\tStartThread(at, frame)
+\t\tend
+\t\ttable.insert(due[frame], t)
+\tend
+\tlocal function ready(t, frame)
+\t\tmade = made + 1
+\t\tqueue(t, frame, -math.huge, made)
+\tend
+\t-- A script begun with start-script first runs on the next frame, or the one
+\t-- after if its thread woke from a sleep to begin it (CobEngine.cpp:92-105,
+\t-- 173-200), and a signal reaches it once its thread has waited or finished
+\t-- (CobInstance.cpp:625,744-756).
+\tlocal function finish(t, outer, ok, ...)
+\t\tcurrent = outer
+\t\tlocal started = t.started
+\t\tt.started = nil
+\t\tfor i = 1, started and #started or 0 do
+\t\t\tthreads[started[i]] = true
+\t\t\tready(started[i], Spring.GetGameFrame() + (t.woke and 2 or 1))
+\t\tend
+\t\tif coroutine.status(t.co) == \"dead\" then
+\t\t\tt.over, t.ret, threads[t] = true, {...}, nil
+\t\tend
+\t\tif not ok then return (...) end
+\tend
+\tfunction resume(t, woke, ...)
+\t\tlocal outer = current
+\t\tcurrent, t.woke = t, woke
+\t\treturn finish(t, outer, coroutine.resume(t.co, ...))
+\tend
+\t-- A call-in's thread, run at once until it first waits.
+\tfunction spawn(fn, ...)
+\t\tmade = made + 1
+\t\tlocal t = {co = coroutine.create(fn), mask = 0, id = made}
+\t\tlocal err = resume(t, false, ...)
+\t\tif err then error(err, 0) end
+\t\tif not t.over then threads[t] = true end
+\t\treturn t
+\tend
+";
+
+const SCHEDULER_CARRY: &str =
+    "\t-- The framework reads this call-in's answer as it returns, and COB answers
+\t-- once the BOS has finished (CobInstance.cpp:725-733), so it returns then.
+\tfunction carry(fn, ...)
+\t\tlocal t = spawn(fn, ...)
+\t\twhile not t.over do
+\t\t\tif t.frame then at(t.frame) else UnitScript.Sleep(33) end
+\t\tend
+\t\treturn unpack(t.ret or {})
+\tend
+";
+
+const SCHEDULER_SLEEP: &str =
+    "\t-- COB wakes a sleeper once its sleep has passed (CobEngine.cpp:148-150).
+\tfunction Sleep(ms)
+\t\tlocal now = Spring.GetGameFrame()
+\t\tqueue(current, now + math.max(1, math.floor(ms / 33) + 1), now * 33 + ms, current.id)
+\t\tcoroutine.yield()
+\tend
+";
+
+const SCHEDULER_WAIT: &str =
+    "\t-- COB runs a thread whose wait has ended two frames after the animation
+\t-- ends, those on one animation in thread order (UnitScriptEngine.cpp:131-163,
+\t-- CobInstance.cpp:526-533, CobThread.cpp:838-852). One framework thread
+\t-- waits for each animation.
+\tlocal waits = {}
+\tlocal function wait(kind, piece, axis)
+\t\tif not UnitScript[\"IsIn\" .. kind](piece, axis) then return end
+\t\tlocal key = kind .. piece .. \",\" .. tostring(axis)
+\t\tlocal group = waits[key]
+\t\tcurrent.frame = nil
+\t\tif group then
+\t\t\ttable.insert(group, current)
+\t\telse
+\t\t\tgroup = {current}
+\t\t\twaits[key] = group
+\t\t\tStartThread(function()
+\t\t\t\tUnitScript[\"WaitFor\" .. kind](piece, axis)
+\t\t\t\twaits[key] = nil
+\t\t\t\ttable.sort(group, function(a, b) return a.id < b.id end)
+\t\t\t\tfor i = 1, #group do
+\t\t\t\t\tif not group[i].over then ready(group[i], Spring.GetGameFrame() + 2) end
+\t\t\t\tend
+\t\t\tend)
+\t\tend
+\t\tcoroutine.yield()
+\tend
+";
+
+const SCHEDULER_START: &str = "\t-- With the signal mask its thread has as it begins it (CobThread.cpp:372-388).
+\tfunction startScript(fn, ...)
+\t\tlocal args = {...}
+\t\tmade = made + 1
+\t\tlocal t = {co = coroutine.create(function() return fn(unpack(args)) end), mask = current.mask, id = made}
+\t\tcurrent.started = current.started or {}
+\t\ttable.insert(current.started, t)
+\tend
+";
+
+const SCHEDULER_SIGNAL: &str =
+    "\t-- COB's signal stops the thread that raises it too, if its mask matches, but
+\t-- not a call-in on its first run (CobInstance.cpp:584-625,744-756).
+\tfunction signal(mask)
+\t\tfor t in pairs(threads) do
+\t\t\tif math.bit_and(t.mask, mask) ~= 0 then t.over, threads[t] = true, nil end
+\t\tend
+\t\tif current and current.over then coroutine.yield() end
+\tend
+";
+
+const SCHEDULER_MASK: &str = "\tfunction setSignalMask(mask)
+\t\tif current then current.mask = mask end
+\tend
+";
+
 const SHARED_VALUES: &str = include_str!("shared_values.lua");
 
 struct Writer<'p, 'a> {
@@ -1407,7 +1615,7 @@ struct Writer<'p, 'a> {
 }
 
 impl<'p, 'a> Writer<'p, 'a> {
-    const HELPER_NAMES: [&'static str; 21] = [
+    const HELPER_NAMES: [&'static str; 23] = [
         PIECES,
         "COB_ANGLE",
         "COB_LINEAR",
@@ -1429,6 +1637,8 @@ impl<'p, 'a> Writer<'p, 'a> {
         "due",
         "signal",
         "setSignalMask",
+        "spawn",
+        "carry",
     ];
 
     fn new(p: &'p Program<'a>, mode: Mode) -> Self {
@@ -1488,7 +1698,7 @@ impl<'p, 'a> Writer<'p, 'a> {
             "-- {} converted from BOS by coilbox.\n",
             self.p.options.name
         );
-        if self.sleeps {
+        if self.sleeps && !self.p.scheduled {
             lua.push_str(&format!("\n-- A COB thread wakes once its sleep has passed, a frame later than Lua's\n-- Sleep wakes, so every Sleep here is {SLEEP_FRAME} milliseconds longer than the BOS's.\n"));
         }
         let mut out = self.out.clone();
@@ -1541,7 +1751,41 @@ impl<'p, 'a> Writer<'p, 'a> {
             ("WaitForMove", "Move", "piece, axis"),
             ("WaitForScale", "Scale", "piece"),
         ];
-        if waits.iter().any(|(name, _, _)| helpers.contains(name)) {
+        if helpers.contains("spawn") {
+            let names: Vec<&str> = SCHEDULED
+                .iter()
+                .copied()
+                .filter(|name| helpers.contains(name))
+                .collect();
+            lua.push_str(SCHEDULER);
+            lua.push_str(&format!("local {}\ndo\n", names.join(", ")));
+            lua.push_str(SCHEDULER_CORE);
+            for (name, text) in [("carry", SCHEDULER_CARRY), ("Sleep", SCHEDULER_SLEEP)] {
+                if helpers.contains(name) {
+                    lua.push_str(text);
+                }
+            }
+            if waits.iter().any(|(name, _, _)| helpers.contains(name)) {
+                lua.push_str(SCHEDULER_WAIT);
+                for (name, kind, params) in waits {
+                    if helpers.contains(name) {
+                        lua.push_str(&format!(
+                            "\tfunction {name}({params}) wait(\"{kind}\", {params}) end\n"
+                        ));
+                    }
+                }
+            }
+            for (name, text) in [
+                ("startScript", SCHEDULER_START),
+                ("signal", SCHEDULER_SIGNAL),
+                ("setSignalMask", SCHEDULER_MASK),
+            ] {
+                if helpers.contains(name) {
+                    lua.push_str(text);
+                }
+            }
+            lua.push_str("end\n");
+        } else if waits.iter().any(|(name, _, _)| helpers.contains(name)) {
             lua.push_str(WAITS);
             for (name, kind, params) in waits {
                 if helpers.contains(name) {
@@ -1702,7 +1946,9 @@ impl<'p, 'a> Writer<'p, 'a> {
         if name == "cobGet" || name == "cobSet" {
             self.helpers.extend(["cobAllied", "cobGet", "cobSet"]);
         }
-        if STARTING_HELPERS.contains(&name) && self.p.defers {
+        if self.p.scheduled && SCHEDULED.contains(&name) {
+            self.helpers.insert("spawn");
+        } else if STARTING_HELPERS.contains(&name) && self.p.defers {
             self.helpers.extend([
                 "starting",
                 "startsHeld",
@@ -2465,6 +2711,11 @@ impl<'p, 'a> Writer<'p, 'a> {
             info.waits,
             info.starts,
         );
+        // A call-in the framework runs as a thread and reads the answer of,
+        // whose BOS runs as one of the Lua's own threads.
+        let carried = self.p.scheduled
+            && info.blocks
+            && matches!(&role, Some(Role::Callin(spec)) if spec.threaded && spec.ret != Ret::Nothing);
         self.refs.clear();
         self.locals.clear();
         self.fire =
@@ -2634,7 +2885,7 @@ impl<'p, 'a> Writer<'p, 'a> {
                     };
                     prologue.extend(line);
                 }
-                let name = if waits || starts {
+                let name = if waits || starts || carried {
                     &lua_name
                 } else {
                     &spec.lua
@@ -2687,6 +2938,17 @@ impl<'p, 'a> Writer<'p, 'a> {
         if waits {
             if let Some(Role::Callin(spec)) = &role {
                 self.waiting_adapter(spec, &lua_name);
+            }
+        } else if carried {
+            if let Some(Role::Callin(spec)) = &role {
+                let args = spec.args.join(", ");
+                let mut all = vec![lua_name.clone()];
+                all.extend(spec.args.iter().map(|a| a.to_string()));
+                let call = format!("{}({})", self.helper("carry"), all.join(", "));
+                self.adapters.push(format!(
+                    "function {}({args})\n\treturn {call}\nend\n",
+                    spec.lua
+                ));
             }
         } else if direct && starts {
             if let Some(Role::Callin(spec)) = &role {
@@ -2761,12 +3023,26 @@ impl<'p, 'a> Writer<'p, 'a> {
             },
             Unfinished::Expr(template, _) => self.template(template, &args),
         };
-        let start = self.header("StartThread");
-        let call = format!("{target}({})", args.join(", "));
         let what = match answer {
             Unfinished::Piece(n) => format!("script piece {n}"),
             Unfinished::Expr(_, what) => what.to_string(),
         };
+        if self.p.scheduled {
+            let mut all = vec![target.to_string()];
+            all.extend(args.iter().cloned());
+            let spawn = self.helper("spawn");
+            self.adapters.push(format!(
+                "-- {target} may wait before it finishes, and then the engine answers {what}.\nfunction {}({})\n\tlocal t = {spawn}({})\n\tif t.ret then return t.ret[1] end\n\treturn {fallback}\nend\n",
+                spec.lua,
+                args.join(", "),
+                all.join(", ")
+            ));
+            self.worst_refs = self.worst_refs.max(self.refs.len());
+            self.refs = saved;
+            return;
+        }
+        let start = self.header("StartThread");
+        let call = format!("{target}({})", args.join(", "));
         // A target that begins scripts starts them as from a call-in, and the
         // thread that was running, if any, carries on as it was.
         let (enter, then, leave) = if self.starts(target) {
@@ -2803,10 +3079,17 @@ impl<'p, 'a> Writer<'p, 'a> {
         let args: Vec<String> = spec.args.iter().map(|a| a.to_string()).collect();
         let mut all = vec![target.to_string()];
         all.extend(args.iter().cloned());
-        let call = format!("{}({})", self.helper("callStarting"), all.join(", "));
-        let body = if spec.ret == Ret::Nothing {
-            call
+        let body = if self.p.scheduled {
+            // It never waits, so it has always finished.
+            format!(
+                "return unpack({}({}).ret)",
+                self.helper("spawn"),
+                all.join(", ")
+            )
+        } else if spec.ret == Ret::Nothing {
+            format!("{}({})", self.helper("callStarting"), all.join(", "))
         } else {
+            let call = format!("{}({})", self.helper("callStarting"), all.join(", "));
             format!("return {call}")
         };
         self.adapters.push(format!(
@@ -2820,6 +3103,15 @@ impl<'p, 'a> Writer<'p, 'a> {
 
     fn call_line(&mut self, target: &str, values: &[String], thread: bool) -> String {
         let starts = self.starts(target);
+        if self.p.scheduled {
+            let blocks = self.p.funcs.values().any(|f| f.lua == target && f.blocks);
+            if !blocks && !starts {
+                return format!("{target}({})", values.join(", "));
+            }
+            let mut all = vec![target.to_string()];
+            all.extend(values.iter().cloned());
+            return format!("{}({})", self.helper("spawn"), all.join(", "));
+        }
         if thread {
             let start = self.header("StartThread");
             let mut all = vec![target.to_string()];
@@ -2851,7 +3143,7 @@ impl<'p, 'a> Writer<'p, 'a> {
     /// A call that may wait. When a script begun with `start-script` may be
     /// held back, this is the Lua's own, which starts it first.
     fn waiting(&mut self, name: &'static str) -> String {
-        if self.p.defers {
+        if self.p.defers || self.p.scheduled {
             self.helper(name)
         } else {
             self.header(name)
@@ -2940,7 +3232,8 @@ impl<'p, 'a> Writer<'p, 'a> {
             // The engine runs Create and then SetMaxReloadTime before any
             // script Create began (`CobInstance.cpp:231-232`), so those are
             // held back until both have run.
-            let hold = create.as_ref().is_some_and(|(lua, _)| self.starts(lua));
+            let hold =
+                !self.p.scheduled && create.as_ref().is_some_and(|(lua, _)| self.starts(lua));
             if let Some((lua, _)) = &create {
                 let call = self.call_line(lua, &[], true);
                 if hold {
@@ -3379,8 +3672,13 @@ impl<'p, 'a> Writer<'p, 'a> {
             StmtKind::Sleep(e) => {
                 self.sleeps = true;
                 let f = self.waiting("Sleep");
-                let v = self.num(e).wrap(P_ADD);
-                self.code(&format!("{f}({v} + {SLEEP_FRAME})"), t);
+                if self.p.scheduled {
+                    let v = self.num(e).text;
+                    self.code(&format!("{f}({v})"), t);
+                } else {
+                    let v = self.num(e).wrap(P_ADD);
+                    self.code(&format!("{f}({v} + {SLEEP_FRAME})"), t);
+                }
             }
             StmtKind::Show(piece) if self.fire => {
                 let p = self.piece(piece);
@@ -3403,7 +3701,7 @@ impl<'p, 'a> Writer<'p, 'a> {
             }
             StmtKind::Signal(e) | StmtKind::SetSignalMask(e) => {
                 let signal = matches!(s.kind, StmtKind::Signal(_));
-                let f = match (self.p.defers, signal) {
+                let f = match (self.p.defers || self.p.scheduled, signal) {
                     (true, true) => self.helper("signal"),
                     (true, false) => self.helper("setSignalMask"),
                     (false, true) => self.header("Signal"),

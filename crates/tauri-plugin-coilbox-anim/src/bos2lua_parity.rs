@@ -27,8 +27,7 @@ const FRAMES: u32 = 300;
 /// Balanced Annihilation's have Lua that is right for the engine, which
 /// these two previews play a frame or a cycle apart. The rest ship a `.cob`
 /// that was not compiled from the `.bos` beside it, so no conversion of the
-/// `.bos` can match it, apart from the `WAKE_ORDER` ones, which are a converter
-/// bug still to fix.
+/// `.bos` can match it.
 const KNOWN: &[(&str, &str)] = &[
     (
         "scripts/gdadvhfact2.bos",
@@ -126,34 +125,7 @@ const KNOWN: &[(&str, &str)] = &[
         "scripts/corcrw.bos",
         "the .cob has no StartMoving or StopMoving and the .bos has both",
     ),
-    ("scripts/alienanni.bos", WAKE_ORDER),
-    ("scripts/aliencom.bos", WAKE_ORDER),
-    ("scripts/aliencon.bos", WAKE_ORDER),
-    ("scripts/alienhamh.bos", WAKE_ORDER),
-    ("scripts/alienhcon.bos", WAKE_ORDER),
-    ("scripts/alienmamh.bos", WAKE_ORDER),
-    ("scripts/alienmcon.bos", WAKE_ORDER),
-    ("scripts/alienscout.bos", WAKE_ORDER),
-    ("scripts/alienwstrider.bos", WAKE_ORDER),
-    ("scripts/armack.bos", WAKE_ORDER),
-    ("scripts/armcs.bos", WAKE_ORDER),
-    ("scripts/armham.bos", WAKE_ORDER),
-    ("scripts/armss.bos", WAKE_ORDER),
-    ("scripts/armzeus.bos", WAKE_ORDER),
-    ("scripts/corss.bos", WAKE_ORDER),
-    ("scripts/gdadvmex2.bos", WAKE_ORDER),
-    ("scripts/gdgeo2.bos", WAKE_ORDER),
-    ("scripts/gdmex2.bos", WAKE_ORDER),
-    ("scripts/gduniquemex2.bos", WAKE_ORDER),
-    ("scripts/packo.bos", WAKE_ORDER),
-    ("scripts/urcadvmex2.bos", WAKE_ORDER),
-    ("scripts/urcgeo2.bos", WAKE_ORDER),
 ];
-
-/// Every one of these matches when the Lua preview wakes threads due on one
-/// frame in creation order instead of the engine's Lua order. Measured on
-/// Expand and Exterminate 0.46 and Balanced Annihilation 15.9.8.
-const WAKE_ORDER: &str = "two threads due on one frame, which COB wakes in thread order (CobEngine.h:36-41) and the engine's Lua last asleep first (unit_script.lua:812-836): #4456";
 
 fn files(dir: &Path, out: &mut Vec<PathBuf>) {
     for entry in std::fs::read_dir(dir).unwrap().flatten() {
@@ -1059,6 +1031,172 @@ fn scripts_two_threads_begin_together_start_in_the_order_they_were_begun() {
     assert_eq!(from_cob.frames[5][2], 2.0);
     assert_eq!(
         first_difference(&from_cob, &from_lua, &pieces, "order", false),
+        None,
+        "{lua}"
+    );
+}
+
+/// Run a script's COB and its converted Lua for `frames` frames of `events`.
+fn run_both(
+    source: &str,
+    events: &[ScriptEvent],
+    frames: u32,
+) -> (
+    coilbox_unitpose::Timeline,
+    coilbox_unitpose::Timeline,
+    String,
+    Vec<String>,
+) {
+    let (cob, lua, pieces) = both(source);
+    let from_cob = crate::cobrun::run(&cob, &pieces, events, frames, &[], &HashMap::new());
+    let from_lua = run_lua(
+        &lua,
+        "scheduled.lua",
+        &Unit::new(&pieces),
+        events,
+        frames,
+        &HashMap::new(),
+    );
+    assert_eq!(from_cob.error, None);
+    assert_eq!(from_lua.error, None, "{lua}");
+    assert!(
+        !from_lua
+            .warnings
+            .iter()
+            .any(|w| w.contains("That thread stopped")),
+        "{:?}\n{lua}",
+        from_lua.warnings
+    );
+    (from_cob, from_lua, lua, pieces)
+}
+
+/// COB wakes two sleepers due on one frame oldest first (`CobEngine.h:36-41`),
+/// where the engine's Lua wakes the last asleep first
+/// (`unit_script.lua:812-836`). Shaped like Expand and Exterminate's
+/// `alienscout.bos`, where `MotionControl` sets `smoke` and `Smoking` reads it
+/// on the same frame, so the smoke starts and stops when COB's does.
+#[test]
+fn sleepers_due_on_one_frame_wake_in_cob_s_order() {
+    let (from_cob, from_lua, lua, _) = run_both(
+        r#"
+        piece base, point;
+        static-var moving, smoke;
+        MotionControl()
+        {
+            while (TRUE)
+            {
+                if (moving) { smoke = 1; }
+                sleep 300;
+                if (!moving) { smoke = 0; }
+            }
+        }
+        Smoking()
+        {
+            while (TRUE)
+            {
+                if (smoke == 1) { emit-sfx 1024 from point; sleep 100; }
+                if (smoke == 0) { sleep 300; }
+            }
+        }
+        Create() { start-script MotionControl(); start-script Smoking(); }
+        StartMoving() { moving = 1; }
+        StopMoving() { moving = 0; }
+    "#,
+        &[
+            event(0, "Create", &[]),
+            event(5, "StartMoving", &[]),
+            event(60, "StopMoving", &[]),
+        ],
+        120,
+    );
+    assert!(!from_cob.events.is_empty(), "the COB never smoked");
+    assert_eq!(from_cob.events, from_lua.events, "{lua}");
+}
+
+/// Of two sleepers due on one frame, the one due sooner wakes first even when
+/// it is the younger, and a thread back from a wait runs ahead of both
+/// (`CobEngine.h:36-41`, `CobEngine.cpp:136-200`).
+#[test]
+fn sleepers_wake_by_wake_time_after_threads_back_from_waits() {
+    let (from_cob, from_lua, lua, pieces) = run_both(
+        r#"
+        piece base, turret, barrel;
+        static-var woken, back;
+        Older() { sleep 110; if (woken) { move turret to z-axis [1] now; } }
+        Younger() { sleep 100; woken = 1; }
+        Sentry() { while (!back) { sleep 1; } move base to z-axis [1] now; }
+        Waiter() { turn barrel to x-axis <10> speed <300>; wait-for-turn barrel around x-axis; back = 1; }
+        Create() { start-script Older(); start-script Younger(); start-script Sentry(); start-script Waiter(); }
+    "#,
+        &[event(0, "Create", &[])],
+        20,
+    );
+    let z = |piece: &str| pieces.iter().position(|p| p == piece).unwrap() * 6 + 2;
+    assert_eq!(from_cob.frames[19][z("turret")], 1.0);
+    assert_eq!(
+        first_difference(&from_cob, &from_lua, &pieces, "order", false),
+        None,
+        "{lua}"
+    );
+}
+
+/// A signal from the first of two threads due on one frame stops the second
+/// before it runs, and a thread whose own mask a signal it raises matches stops
+/// there, as COB stops it (`CobInstance.cpp:744-756`, `CobThread.cpp:251`).
+#[test]
+fn a_signal_reaches_the_threads_cob_s_signal_does() {
+    let (from_cob, from_lua, lua, pieces) = run_both(
+        r#"
+        piece base, killer, victim, raiser;
+        Killer() { sleep 100; signal 2; move killer to z-axis [1] now; }
+        Victim() { set-signal-mask 2; sleep 100; move victim to z-axis [1] now; }
+        Raiser() { set-signal-mask 4; sleep 200; signal 4; move raiser to z-axis [1] now; }
+        Create() { start-script Killer(); start-script Victim(); start-script Raiser(); }
+    "#,
+        &[event(0, "Create", &[])],
+        20,
+    );
+    let z = |piece: &str| pieces.iter().position(|p| p == piece).unwrap() * 6 + 2;
+    assert_eq!(from_cob.frames[19][z("killer")], 1.0);
+    assert_eq!(from_cob.frames[19][z("victim")], 0.0);
+    assert_eq!(from_cob.frames[19][z("raiser")], 0.0);
+    assert_eq!(
+        first_difference(&from_cob, &from_lua, &pieces, "signal", false),
+        None,
+        "{lua}"
+    );
+}
+
+/// Threads back from waits on one frame run in the order COB runs them:
+/// animation by animation, and on one animation in thread order whichever
+/// waited first (`CobInstance.cpp:526-533`). The engine's Lua resumes those on
+/// one animation last to wait first (`unit_script.lua:265-280`).
+#[test]
+fn threads_back_from_a_wait_run_in_cob_s_order() {
+    let (from_cob, from_lua, lua, pieces) = run_both(
+        r#"
+        piece base, arm, marker;
+        static-var order;
+        Older() { sleep 30; wait-for-turn arm around x-axis; order = order * 10 + 1; }
+        Younger() { wait-for-turn arm around x-axis; order = order * 10 + 2; }
+        Mark() { sleep 1000; move marker to z-axis order now; }
+        Create()
+        {
+            turn arm to x-axis <20> speed <100>;
+            start-script Older();
+            start-script Younger();
+            start-script Mark();
+        }
+    "#,
+        &[event(0, "Create", &[])],
+        40,
+    );
+    let z = pieces.iter().position(|p| p == "marker").unwrap() * 6 + 2;
+    // 12 in 65536ths: the older thread went first.
+    assert_eq!(from_cob.frames[39][z], 12.0 / 65536.0);
+    assert_eq!(from_lua.frames[39][z], from_cob.frames[39][z], "{lua}");
+    assert_eq!(
+        first_difference(&from_cob, &from_lua, &pieces, "waits", false),
         None,
         "{lua}"
     );
