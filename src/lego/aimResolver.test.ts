@@ -1,3 +1,4 @@
+import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -7,14 +8,24 @@ import {
   aimWeaponAngles,
   expandForWeapons,
   resolveScenario,
+  standInMid,
   startBuildingAngles,
   type WorldContext,
   weaponCount,
   withWorld,
   worldAt,
 } from "./aimResolver";
+import {
+  type DriveFrame,
+  type DriveMotion,
+  driveAlong,
+  headingRadians,
+  pathPoints,
+} from "./drive";
 import { type GroundShape, unitUp } from "./environment";
 import {
+  PREVIEW_FRAMES,
+  SCENARIOS,
   type Scenario,
   type ScriptEvent,
   type ScriptGround,
@@ -837,6 +848,217 @@ describe("aiming from a unit tilted on a slope", () => {
     );
     expect(args(upright, "StartBuilding", "midPos")?.[1]).toBeCloseTo(
       Math.asin(target[1] / length),
+    );
+  });
+});
+
+describe("aiming while the unit drives", () => {
+  type V3 = [number, number, number];
+  const MOTION: DriveMotion = { speed: 2, turnRate: 600 };
+  const RADIUS = 10;
+  const UNTIL = 200;
+  /** Aimed from a piece a little off the unit's origin, so that where the
+   *  unit stands and which way it faces both change the answer. */
+  const PIECE: V3 = [0, 10, 5];
+  /** Still, well off to one side of where the drive starts. */
+  const STILL: StandInTrack = { keys: [{ frame: 0, pos: [-8, 0, 6] }] };
+
+  const scenario = (standIn: StandInTrack): Scenario => ({
+    id: "t",
+    label: "t",
+    description: "t",
+    drive: true,
+    movingTarget: true,
+    events: [
+      { frame: 0, callin: "Create" },
+      {
+        frame: 10,
+        callin: "AimWeapon1",
+        aimAtStandIn: { from: "AimFromWeapon", until: UNTIL },
+      },
+    ],
+    standIn,
+  });
+
+  const context = (
+    frames: DriveFrame[] | null,
+    ground?: GroundShape,
+  ): AimContext => ({
+    radius: RADIUS,
+    mid: ORIGIN,
+    pieceRest: new Map([["flare", PIECE]]),
+    probed: () => "flare",
+    ground: ground ?? null,
+    drive: frames,
+  });
+
+  const run = (
+    path: "straight" | "bend" | "circle",
+    ground: GroundShape | null = null,
+  ) =>
+    driveAlong(pathPoints(path, MOTION, []), MOTION, {
+      start: 15,
+      frames: PREVIEW_FRAMES,
+      ground,
+      tilts: ground !== null,
+      minScriptChangeHeading: 1,
+    });
+
+  const UP = new THREE.Vector3(0, 1, 0);
+  /** What the viewport does to the unit (`poseRoot`): turned by its heading
+   *  about up, then tilted to the ground. Written here from the engine's
+   *  `UpdateDirVectors` order rather than taken from the resolver. */
+  function turn(pose: DriveFrame): THREE.Quaternion {
+    const yaw = new THREE.Quaternion().setFromAxisAngle(
+      UP,
+      headingRadians(pose.heading),
+    );
+    const tilt = new THREE.Quaternion();
+    if (pose.up) tilt.setFromUnitVectors(UP, new THREE.Vector3(...pose.up));
+    return tilt.multiply(yaw);
+  }
+
+  /** `Weapon.cpp:410-424`, from the piece's place in the world. The model's
+   *  x is the unit's left. */
+  function expected(pose: DriveFrame, target: V3) {
+    const q = turn(pose);
+    const at = new THREE.Vector3(...PIECE)
+      .applyQuaternion(q)
+      .add(new THREE.Vector3(...pose.pos));
+    const dir = new THREE.Vector3(...target).sub(at).normalize();
+    const left = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
+    const front = new THREE.Vector3(0, 0, 1).applyQuaternion(q);
+    return {
+      heading: Math.atan2(dir.dot(left), dir.dot(front)),
+      pitch: Math.asin(dir.dot(up)),
+    };
+  }
+
+  const aims = (events: ScriptEvent[]) =>
+    events.filter((e) => e.callin === "AimWeapon1");
+
+  it("works the angles out from the unit's position and heading on each frame", () => {
+    const { frames } = run("bend");
+    const { events } = resolveScenario(scenario(STILL), context(frames));
+    const target = standInMid(STILL, 0, RADIUS) as V3;
+
+    const list = aims(events);
+    expect(list.length).toBeGreaterThan(10);
+    for (const aim of list) {
+      const want = expected(frames[aim.frame], target);
+      expect(aim.args?.[0]).toBeCloseTo(want.heading, 5);
+      expect(aim.args?.[1]).toBeCloseTo(want.pitch, 5);
+    }
+    // The unit turned and moved, so the aim cannot have stayed where it began.
+    const first = list[0].args?.[0] ?? 0;
+    const last = list.at(-1)?.args?.[0] ?? 0;
+    expect(Math.abs(last - first)).toBeGreaterThan(0.3);
+  });
+
+  it("differs from the answer for a unit that stays at the origin", () => {
+    const { frames } = run("straight");
+    const driving = resolveScenario(scenario(STILL), context(frames)).events;
+    const standing = resolveScenario(scenario(STILL), context(null)).events;
+    const at = aims(driving).at(-1);
+    const was = aims(standing).find((e) => e.frame === at?.frame);
+    expect(at?.args?.[0]).not.toBeCloseTo(was?.args?.[0] ?? 0, 1);
+  });
+
+  it("turns the axes by the heading first, then the slope, on a hill", () => {
+    const hill: GroundShape = { kind: "slope", degrees: 20 };
+    const { frames } = run("bend", hill);
+    expect(frames.some((f) => f.up !== null)).toBe(true);
+    const { events } = resolveScenario(scenario(STILL), context(frames, hill));
+    const target = standInMid(STILL, 0, RADIUS, hill) as V3;
+    for (const aim of aims(events)) {
+      const want = expected(frames[aim.frame], target);
+      expect(aim.args?.[0]).toBeCloseTo(want.heading, 5);
+      expect(aim.args?.[1]).toBeCloseTo(want.pitch, 5);
+    }
+  });
+
+  /** `Weapon.cpp:376-383` compares the wanted direction in the world. A unit
+   *  turning on the spot under a far target swings the angles the script is
+   *  handed, but moves the world direction hardly at all, so it earns no
+   *  extra aims. A unit driving past a near one does. */
+  it("keeps the 15 frame cadence when only the unit's heading changes", () => {
+    const FAR: StandInTrack = { keys: [{ frame: 0, pos: [-80, 0, 60] }] };
+    const { frames } = run("bend");
+    const { events } = resolveScenario(scenario(FAR), context(frames));
+    const at = aims(events).map((e) => e.frame);
+    expect(at.slice(1).map((frame, i) => frame - at[i])).toEqual(
+      at.slice(1).map(() => 15),
+    );
+    // The unit did turn, and the angles it was handed turned with it.
+    const headings = aims(events).map((e) => e.args?.[0] ?? 0);
+    expect(Math.max(...headings) - Math.min(...headings)).toBeGreaterThan(0.3);
+  });
+
+  it("aims sooner when the unit drives past and moves the wanted direction 20 degrees", () => {
+    const NEAR: StandInTrack = { keys: [{ frame: 0, pos: [-3, 0, 12] }] };
+    const { frames } = run("straight");
+    const gaps = (events: ScriptEvent[]) => {
+      const at = aims(events).map((e) => e.frame);
+      return at.slice(1).map((frame, i) => frame - at[i]);
+    };
+    const driving = resolveScenario(scenario(NEAR), context(frames)).events;
+    const standing = resolveScenario(scenario(NEAR), context(null)).events;
+
+    expect(Math.min(...gaps(standing))).toBe(15);
+    expect(Math.min(...gaps(driving))).toBeLessThan(15);
+    expect(Math.max(...gaps(driving))).toBeLessThanOrEqual(15);
+
+    // Each early one came from a turn of 20 degrees or more in the world.
+    const list = aims(driving);
+    const world = list.map((aim) =>
+      new THREE.Vector3(...aimDirection(aim.args?.[0] ?? 0, aim.args?.[1] ?? 0))
+        .applyQuaternion(turn(frames[aim.frame]))
+        .normalize(),
+    );
+    for (let i = 1; i < list.length; i++) {
+      if (list[i].frame - list[i - 1].frame === 15) continue;
+      expect(world[i].dot(world[i - 1])).toBeLessThanOrEqual(
+        Math.cos((20 * Math.PI) / 180) + 1e-9,
+      );
+    }
+  });
+
+  it("leaves a target's track in the world, not carried with the unit", () => {
+    const { frames } = run("straight");
+    const track: StandInTrack = {
+      keys: [
+        { frame: 0, pos: [-8, 0, 6] },
+        { frame: 100, pos: [-8, 0, 30] },
+      ],
+    };
+    const { events } = resolveScenario(scenario(track), context(frames));
+    const aim = aims(events).find((e) => e.frame === 100);
+    const want = expected(frames[100], standInMid(track, 100, RADIUS) as V3);
+    expect(aim?.args?.[0]).toBeCloseTo(want.heading, 5);
+    expect(aim?.args?.[1]).toBeCloseTo(want.pitch, 5);
+  });
+
+  it("gives each flame the aim in the world, not the unit's own", () => {
+    const { frames } = run("bend");
+    const { events } = resolveScenario(scenario(STILL), context(frames));
+    const last = aims(events).at(-1) as ScriptEvent;
+    const world = aimsOf(events, frames).at(-1)?.dir as V3;
+    const local = aimsOf(events).at(-1)?.dir as V3;
+    const turned = new THREE.Vector3(...local).applyQuaternion(
+      turn(frames[last.frame]),
+    );
+    expect(world[0]).toBeCloseTo(turned.x, 5);
+    expect(world[1]).toBeCloseTo(turned.y, 5);
+    expect(world[2]).toBeCloseTo(turned.z, 5);
+  });
+
+  it("is offered as a scenario that both drives and aims at a moving target", () => {
+    const both = SCENARIOS.find((s) => s.id === "driving-firing");
+    expect(both?.drive).toBe(true);
+    expect(both?.movingTarget).toBe(true);
+    expect(both?.events.some((e) => e.aimAtStandIn?.until !== undefined)).toBe(
+      true,
     );
   });
 });
