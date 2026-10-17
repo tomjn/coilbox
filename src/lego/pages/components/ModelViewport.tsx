@@ -27,6 +27,7 @@ import {
   Eye,
   EyeOff,
   FlipHorizontal2,
+  Footprints,
   Keyboard,
   Move,
   PanelLeft,
@@ -36,6 +37,7 @@ import {
   Ruler,
   Scale,
   Scaling,
+  Scissors,
   Sparkles,
   Square,
   Target,
@@ -81,6 +83,7 @@ import {
   type GroundChoice,
   type GroundShape,
 } from "../../environment";
+import { type FootprintResult, footprintLines } from "../../footprint";
 import { addStandardLights } from "../../geometry";
 import type { PieceTransform } from "../../groupTransform";
 import {
@@ -147,6 +150,7 @@ import { drawDrivePath } from "./drivePlayback";
 import { EnvironmentPicker } from "./EnvironmentPicker";
 import type { EffectsAtlas } from "./effectsLayer";
 import { buildEffectsLayer } from "./effectsLayer";
+import { disposeFootprint } from "./footprintLayer";
 import { GuidesPopover } from "./GuidesPopover";
 import {
   commitAim,
@@ -188,6 +192,7 @@ import {
 import { type StandInPlacement, standInFor } from "./standInPlayback";
 import { useBalance } from "./useBalance";
 import { useCollisionAndAimVisibility } from "./useCollisionAndAimVisibility";
+import { useFootprint } from "./useFootprint";
 import { useGizmoMode } from "./useGizmoMode";
 import { useGuides } from "./useGuides";
 import { useMeasure } from "./useMeasure";
@@ -391,6 +396,16 @@ interface Props {
      * is not the unit's.
      */
     balance?: BalanceResult | null;
+  };
+  /**
+   * The footprint check (issue #3340). `leaveOut` is whether the base
+   * footprint leaves out a barrel, flare, aim point and build nozzle, which the
+   * game maker can turn off. Absent hides the controls.
+   */
+  footprint?: {
+    result: FootprintResult | null;
+    leaveOut: boolean;
+    onLeaveOutChange: (leaveOut: boolean) => void;
   };
   /** Which pieces are picked, and what a click, a drag or a hover does. */
   selection: {
@@ -601,6 +616,7 @@ export function ModelViewport({
   collisionEditing,
   aimPoint,
   guides,
+  footprint,
   showFreeFaces = false,
 }: Props) {
   const { pack, raw, project, balance = null } = document;
@@ -681,6 +697,7 @@ export function ModelViewport({
   const [showAim, setShowAim] = useState(false);
   const [showReach, setShowReach] = useState(false);
   const [showBalance, setShowBalance] = useState(false);
+  const [showFootprint, setShowFootprint] = useState(false);
   const [showGuides, setShowGuides] = useState(true);
   /** The axis the next click on the model puts a guide on, or null. */
   const [pickingGuide, setPickingGuide] = useState<GuidePick | null>(null);
@@ -1176,6 +1193,7 @@ export function ModelViewport({
         aimMark,
         weaponReach: null,
         balance: null,
+        footprint: null,
         guideLayer: null,
         guidePlanes: [],
         guideLines: [],
@@ -1382,6 +1400,7 @@ export function ModelViewport({
           aimMaterial.dispose();
           if (state.weaponReach) disposeWeaponReach(state.weaponReach);
           if (state.balance) disposeBalance(state.balance);
+          if (state.footprint) disposeFootprint(state.footprint);
           sceneRef.current = null;
         },
       };
@@ -1413,6 +1432,10 @@ export function ModelViewport({
   });
 
   useBalance(sceneRef, { result: balance, show: showBalance });
+  useFootprint(sceneRef, {
+    result: footprint?.result ?? null,
+    show: showFootprint,
+  });
 
   useGuides(sceneRef, { project, pack, show: showGuides }, reduceMotion);
 
@@ -1805,6 +1828,18 @@ export function ModelViewport({
                 {balanceSummary(balance)}
               </span>
             ) : null}
+            {footprint?.result &&
+            (showFootprint ||
+              (footprint.result.status === "ok" &&
+                (footprint.result.differs ||
+                  footprint.result.overhang.x > 0 ||
+                  footprint.result.overhang.z > 0))) ? (
+              <div className="flex flex-col">
+                {footprintLines(footprint.result).map((line) => (
+                  <span key={line}>{line}</span>
+                ))}
+              </div>
+            ) : null}
             {showReach && reaches.length > 0 ? (
               <div className="flex gap-3">
                 {reaches.map((reach, index) => (
@@ -1857,6 +1892,24 @@ export function ModelViewport({
               hideTitle="Hide the balance check"
               showTitle="Show the balance check: where the weight looks centred, against the ground the feet or wheels cover. An estimate from piece volumes at one density, not a mass. The engine does not simulate balance"
             />
+            {footprint ? (
+              <ViewToggle
+                icon={Footprints}
+                on={showFootprint}
+                onChange={setShowFootprint}
+                hideTitle="Hide the footprint check"
+                showTitle="Show the footprint check: the footprint the export writes, drawn on the ground under the unit"
+              />
+            ) : null}
+            {footprint && showFootprint ? (
+              <ViewToggle
+                icon={Scissors}
+                on={footprint.leaveOut}
+                onChange={footprint.onLeaveOutChange}
+                hideTitle="Count the barrel, muzzle flare, aim point and build nozzle in the base footprint"
+                showTitle="Leave the barrel, muzzle flare, aim point and build nozzle out of the base footprint"
+              />
+            ) : null}
             <ViewToggle
               icon={Crosshair}
               on={showAim}
