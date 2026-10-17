@@ -111,15 +111,27 @@ const pack = {
 
 const modules = [module("leg"), module("turret")];
 
-function Harness({ known = modules }: { known?: LegoProject[] }) {
+function Harness({
+  known = modules,
+  showGameUnits = false,
+}: {
+  known?: LegoProject[];
+  showGameUnits?: boolean;
+}) {
   const view = useInventoryView(pack, known);
   return (
     <>
-      <InventoryFilters view={view} pack={pack} compounds={known} />
+      <InventoryFilters
+        view={view}
+        pack={pack}
+        compounds={known}
+        showGameUnits={showGameUnits}
+      />
       <InventoryGrids
         view={view}
         pack={pack}
         compounds={known}
+        gameUnits={<p>units for "{view.query}"</p>}
         onDeleteModule={vi.fn()}
         onRenameModule={vi.fn()}
         onCopyModule={vi.fn()}
@@ -178,6 +190,29 @@ describe("the kind filter", () => {
     });
     expect(screen.queryByLabelText("part grid")).toBeNull();
     expect(names("module grid")).toEqual(["turret"]);
+  });
+});
+
+describe("game units", () => {
+  it("are not offered where there is no unit to take from", () => {
+    render(<Harness />);
+    expect(screen.queryByRole("button", { name: "Game units" })).toBeNull();
+  });
+
+  it("replace the parts and modules, and share the search box", () => {
+    render(<Harness showGameUnits />);
+    fireEvent.click(screen.getByRole("button", { name: "Game units" }));
+    expect(screen.queryByLabelText("part grid")).toBeNull();
+    expect(screen.queryByLabelText("module grid")).toBeNull();
+    fireEvent.change(screen.getByLabelText("Search the game's units"), {
+      target: { value: "com" },
+    });
+    expect(screen.getByText('units for "com"')).toBeTruthy();
+  });
+
+  it("are left out of All", () => {
+    render(<Harness showGameUnits />);
+    expect(screen.queryByText(/units for/)).toBeNull();
   });
 });
 

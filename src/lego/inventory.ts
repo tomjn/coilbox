@@ -30,8 +30,12 @@ export const RECENT_LIMIT = 24;
 
 export type ItemKind = "part" | "module";
 
-/** What the kind filter shows. */
-export type InventoryKind = "all" | "parts" | "modules";
+/**
+ * What the kind filter shows. "units" is the unit's own game's units (#3264),
+ * a source of parts rather than an item kind: it has no recent or favourites
+ * and no `ItemKind`, and is drawn by its own browser.
+ */
+export type InventoryKind = "all" | "parts" | "modules" | "units";
 
 /** Which items of the kind: everything, the ones used lately, or the starred. */
 export type InventoryList = "all" | "recent" | "favourites";
@@ -187,7 +191,7 @@ export function useInventoryView(
 
   const parts = useMemo(
     () =>
-      kind === "modules"
+      kind === "modules" || kind === "units"
         ? []
         : inList(
             partFilter.parts,
@@ -201,7 +205,7 @@ export function useInventoryView(
   );
   const modules = useMemo(
     () =>
-      kind === "parts"
+      kind === "parts" || kind === "units"
         ? []
         : inList(
             moduleFilter.modules,

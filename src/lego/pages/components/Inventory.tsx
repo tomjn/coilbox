@@ -35,6 +35,12 @@ const KINDS: { value: InventoryKind; label: string }[] = [
   { value: "modules", label: "Modules" },
 ];
 
+/** Only a unit has a game to take from, so the Lego Parts page leaves it out. */
+const GAME_UNITS_KIND: { value: InventoryKind; label: string } = {
+  value: "units",
+  label: "Game units",
+};
+
 const LISTS: { value: Exclude<InventoryList, "all">; label: string }[] = [
   { value: "recent", label: "Recent" },
   { value: "favourites", label: "Favourites" },
@@ -47,6 +53,8 @@ interface FiltersProps {
   compounds: LegoProject[];
   /** Absent hides the load from file button. */
   onLoadModuleFile?: () => void;
+  /** Adds the "Game units" kind, for a page that has a unit to take from. */
+  showGameUnits?: boolean;
   className?: string;
 }
 
@@ -60,6 +68,7 @@ export function InventoryFilters({
   pack,
   compounds,
   onLoadModuleFile,
+  showGameUnits = false,
   className,
 }: FiltersProps) {
   const { partFilter, moduleFilter } = view;
@@ -71,32 +80,44 @@ export function InventoryFilters({
   return (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
       <ButtonGroup aria-label="Kind">
-        {KINDS.map(({ value, label }) => (
-          <Button
-            key={value}
-            size="sm"
-            variant={view.kind === value ? "default" : "outline"}
-            onClick={() => view.setKind(value)}
-            aria-pressed={view.kind === value}
-          >
-            {label}
-          </Button>
-        ))}
+        {(showGameUnits ? [...KINDS, GAME_UNITS_KIND] : KINDS).map(
+          ({ value, label }) => (
+            <Button
+              key={value}
+              size="sm"
+              variant={view.kind === value ? "default" : "outline"}
+              onClick={() => view.setKind(value)}
+              aria-pressed={view.kind === value}
+            >
+              {label}
+            </Button>
+          ),
+        )}
       </ButtonGroup>
-      <ButtonGroup aria-label="List">
-        {LISTS.map(({ value, label }) => (
-          <Button
-            key={value}
-            size="sm"
-            variant={view.list === value ? "default" : "outline"}
-            onClick={() => view.setList(view.list === value ? "all" : value)}
-            aria-pressed={view.list === value}
-          >
-            {label}
-          </Button>
-        ))}
-      </ButtonGroup>
-      {view.kind === "parts" ? (
+      {view.kind === "units" ? null : (
+        <ButtonGroup aria-label="List">
+          {LISTS.map(({ value, label }) => (
+            <Button
+              key={value}
+              size="sm"
+              variant={view.list === value ? "default" : "outline"}
+              onClick={() => view.setList(view.list === value ? "all" : value)}
+              aria-pressed={view.list === value}
+            >
+              {label}
+            </Button>
+          ))}
+        </ButtonGroup>
+      )}
+      {view.kind === "units" ? (
+        <Input
+          value={view.query}
+          onChange={(event) => view.setQuery(event.target.value)}
+          placeholder="Search"
+          className="w-56"
+          aria-label="Search the game's units"
+        />
+      ) : view.kind === "parts" ? (
         <PartFilters
           pack={pack}
           query={view.query}
@@ -159,6 +180,8 @@ interface GridsProps {
     module: LegoProject,
     labels: { category: string | undefined; tags: string[] },
   ) => void;
+  /** Drawn instead of the grids when the kind is "Game units". */
+  gameUnits?: ReactNode;
   /** Beside the grids, such as the Lego Parts page's part detail. */
   aside?: ReactNode;
 }
@@ -183,6 +206,7 @@ export function InventoryGrids({
   onCopyModule,
   onSaveModuleFile,
   onLabelsModule,
+  gameUnits,
   aside,
 }: GridsProps) {
   const { inventory } = view;
@@ -193,6 +217,14 @@ export function InventoryGrids({
     inventory.favourites.filter((r) => r.kind === "module").map((r) => r.id),
   );
   const empty = view.parts.length === 0 && view.modules.length === 0;
+
+  if (view.kind === "units") {
+    return (
+      <div className="flex min-h-0 flex-1">
+        <div className="flex min-h-0 flex-1 flex-col">{gameUnits}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-0 flex-1">
