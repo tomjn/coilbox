@@ -110,6 +110,23 @@ describe("builderKind", () => {
     });
   });
 
+  it("calls a builder the game maker made a factory a factory, before the game has read it", () => {
+    const kind = builderKind(
+      unit(["buildarm.arm"], { builder: { factory: true } }),
+    );
+    expect(kind?.kind).toBe("factory");
+  });
+
+  it("calls a mover a mobile builder even with the factory choice left on", () => {
+    const kind = builderKind(
+      unit(["buildarm.arm"], {
+        builder: { factory: true },
+        movement: { moveClass: "KBOT2", speed: 40 },
+      }),
+    );
+    expect(kind?.kind).toBe("mobile");
+  });
+
   it("matches the yardmap key whatever its case", () => {
     expect(builderKind(unit(["buildarm.arm"]), { yardmap: "yy" })?.kind).toBe(
       "factory",

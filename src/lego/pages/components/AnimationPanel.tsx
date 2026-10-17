@@ -87,6 +87,7 @@ import {
   type LegoPieceWeapon,
   type LegoProject,
 } from "../../model";
+import { movesInGame } from "../../movement";
 import type { LoadedPack } from "../../pack";
 import { pieceRest } from "../../pieceRest";
 import type { RawGeometry } from "../../rawGeometry";
@@ -1715,6 +1716,24 @@ export function AnimationPanel({
                   </p>
                 </div>
               ))}
+
+              {movesInGame(project.movement) ? null : (
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <Label
+                    htmlFor="builder-factory"
+                    className="text-xs font-medium"
+                  >
+                    Factory
+                  </Label>
+                  <Switch
+                    id="builder-factory"
+                    checked={project.builder?.factory ?? false}
+                    onCheckedChange={(on) =>
+                      onBuilderChange({ ...project.builder, factory: on })
+                    }
+                  />
+                </div>
+              )}
 
               <div className="mt-3 flex items-center justify-between gap-3">
                 <Label htmlFor="builder-assist" className="text-xs font-medium">
