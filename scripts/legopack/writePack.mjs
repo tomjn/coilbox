@@ -23,6 +23,29 @@ export const BLOB_VERSION = 1;
 export const VERTEX_STRIDE = 32;
 /** The step most of the bundled parts sit on: 295 of 373 have all three sides on it. */
 export const PART_UNIT = 0.25;
+/**
+ * The plain rectangles of the atlas a generated shape tiles, one per colourway,
+ * in the pack's UVs with v up from the bottom. Measured in #3326: each is a 64
+ * pixel square of even surface with an 8 pixel margin of the same surface, and
+ * `tile` is 64 pixels over the pack's 41.1 atlas pixels per pack unit.
+ */
+export const SWATCHES = [
+  {
+    id: "green",
+    uv: { min: [0.168, 0.9492], max: [0.1992, 0.9805] },
+    tile: 1.56,
+  },
+  {
+    id: "tan",
+    uv: { min: [0.5796, 0.9492], max: [0.6108, 0.9805] },
+    tile: 1.56,
+  },
+  {
+    id: "grey",
+    uv: { min: [0.9639, 0.2813], max: [0.9951, 0.3125] },
+    tile: 1.56,
+  },
+];
 
 const BLOB_HEADER_SIZE = 32;
 
@@ -115,6 +138,7 @@ export function writePack({
     atlas,
     textures: { tex1: "atlas.png" },
     unit: PART_UNIT,
+    swatches: SWATCHES,
     geometry: {
       file: "parts.bin.gz",
       encoding: "gzip",
