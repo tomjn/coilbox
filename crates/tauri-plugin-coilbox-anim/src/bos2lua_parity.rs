@@ -833,3 +833,34 @@ fn only_a_script_with_weapon_one_s_call_ins_is_fired() {
         assert!(!is_weapon_one(unarmed), "{unarmed}");
     }
 }
+
+/// `<-180.038462>` is stored a hair inside a half turn, so the COB turns the
+/// piece the negative way from rest. The Lua has to go the same way, which it
+/// only does when it keeps BOS's value. Shaped like Balanced Annihilation's
+/// `cormexp.bos`.
+#[test]
+fn both_runtimes_turn_the_same_way_near_a_half_turn() {
+    let (cob, lua, pieces) = both(
+        r#"
+        piece base, shell;
+        Create() { turn shell to x-axis <-180.038462> speed <261>; }
+    "#,
+    );
+    let events = [event(0, "Create", &[])];
+    let from_cob = crate::cobrun::run(&cob, &pieces, &events, 10, &[], &HashMap::new());
+    let from_lua = run_lua(
+        &lua,
+        "shell.lua",
+        &Unit::new(&pieces),
+        &events,
+        10,
+        &HashMap::new(),
+    );
+    assert_eq!(from_cob.error, None);
+    assert_eq!(from_lua.error, None);
+    assert_eq!(
+        first_difference(&from_cob, &from_lua, &pieces, "shell", false),
+        None,
+        "{lua}"
+    );
+}

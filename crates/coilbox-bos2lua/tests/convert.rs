@@ -208,6 +208,35 @@ fn tells_the_linear_scale_from_the_cob() {
     assert_eq!(linear_scale(WALKER, &words(&[1, 2, 3])), None);
 }
 
+/// A turn goes the short way round, so an angle BOS stores on the other side
+/// of a half turn from its degrees keeps BOS's value. Shaped like Balanced
+/// Annihilation's `cormexp.bos` and `corspec.bos`.
+#[test]
+fn an_angle_stored_across_a_half_turn_keeps_bos_s_value() {
+    let source = r#"
+        piece base, shell, tong;
+        Create()
+        {
+            turn shell to x-axis <-180.038462> speed <261>;
+            turn tong to x-axis <180.043956> now;
+            turn base to x-axis <90.016484> speed <30>;
+        }
+    "#;
+    let lua = convert_with(source, &HashMap::new(), MODERN_LINEAR).lua;
+    assert!(
+        lua.contains("Turn(shell, x_axis, math.rad(-179.9945), math.rad(261))"),
+        "{lua}"
+    );
+    assert!(
+        lua.contains("Turn(tong, x_axis, math.rad(179.9945))"),
+        "{lua}"
+    );
+    assert!(
+        lua.contains("Turn(base, x_axis, math.rad(90.0165), math.rad(30))"),
+        "{lua}"
+    );
+}
+
 #[test]
 fn runs_without_a_thread_stopping_and_walks() {
     let lua = walker();
