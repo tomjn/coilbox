@@ -58,6 +58,12 @@ export interface LegoDocumentSession {
   /** Adds a piece to the selection, or takes it out again. */
   toggleSelect: (id: string) => void;
   edit: (change: (project: LegoProject) => LegoProject) => void;
+  /**
+   * Fills in what the document can work out for itself (#4354). Unlike `edit`
+   * it does not mark the document changed, so opening a unit never writes it,
+   * and it adds no undo step.
+   */
+  fill: (fill: (project: LegoProject) => LegoProject) => void;
   undo: () => void;
   redo: () => void;
   save: () => void;
@@ -125,6 +131,11 @@ export function useLegoDocument(
       at: Date.now(),
     });
   }, []);
+  const fill = useCallback(
+    (change: (project: LegoProject) => LegoProject) =>
+      dispatch({ type: "fill", fill: change }),
+    [],
+  );
   const undo = useCallback(() => dispatch({ type: "undo" }), []);
   const redo = useCallback(() => dispatch({ type: "redo" }), []);
   const select = useCallback(
@@ -268,6 +279,7 @@ export function useLegoDocument(
     selectMany,
     toggleSelect,
     edit,
+    fill,
     undo,
     redo,
     save: () => {

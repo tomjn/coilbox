@@ -90,6 +90,7 @@ import {
   liftCredit,
   liftedModuleRefusal,
   openedFrom,
+  withMeshBoxes,
 } from "../liftPiece";
 import { fitToSteps } from "../measure";
 import { canFixMesh, DEFAULT_SMOOTHING_ANGLE_DEG } from "../meshFix";
@@ -251,6 +252,15 @@ function Builder({ id }: { id: string | undefined }) {
   // alongside the document, and null for a unit built out of parts.
   const geometry = useRawGeometry(draft);
   const raw = geometry.raw;
+  // A lifted piece saved before #3269 has no box for its mesh, and so no
+  // connectors or pivot choices. The geometry has the box, so it is filled in
+  // as a unit opens, and again whenever the document changes, because a paste
+  // adds pieces after the geometry they name has arrived. It is not an edit
+  // (#4354).
+  const { fill } = doc;
+  useEffect(() => {
+    if (raw && draft) fill((project) => withMeshBoxes(project, raw));
+  }, [raw, draft, fill]);
   const effectBitmaps = useEffectBitmaps(draft);
   // A unit imported whole has no parts and no atlas, so the parts library, the
   // compound library and the atlas picker are all hidden for it. Its UVs point
