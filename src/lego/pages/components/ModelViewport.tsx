@@ -17,37 +17,15 @@
  */
 
 import { Button } from "@picoframe/frame";
-import type { LucideIcon } from "lucide-react";
 import {
   ArrowDownToLine,
-  Bone,
-  Box,
   ClipboardPaste,
-  Combine,
   Copy,
-  Crosshair,
-  Cuboid,
-  Eye,
-  EyeOff,
   FlipHorizontal2,
-  Footprints,
-  Keyboard,
-  Layers,
   Move,
-  PanelLeft,
-  PanelTop,
-  Radar,
   RotateCw,
-  Ruler,
-  Scale,
   Scaling,
-  Scissors,
-  Sparkles,
-  Square,
-  SquareDashed,
-  Target,
   Trash2,
-  Video,
 } from "lucide-react";
 import type { ReactNode, RefObject } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -64,12 +42,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  GridToggle,
-  ViewButton,
-  ViewControls,
-  ViewToggle,
-} from "@/components/ViewControls";
 import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
 import { type BalanceResult, balanceSummary } from "../../balance";
@@ -240,21 +212,8 @@ import { useProportionHandles } from "./useProportionHandles";
 import { useScriptFrameStepping } from "./useScriptFrameStepping";
 import { useSkeleton } from "./useSkeleton";
 import { useWeaponReach } from "./useWeaponReach";
+import { paintCompass, ViewportBar } from "./ViewportBar";
 import { disposeWeaponReach, reachColour } from "./weaponReachLayer";
-
-/** The face of the draw mode button, which is the mode the unit is in. */
-const DRAW_MODE_ICONS: Record<DrawMode, LucideIcon> = {
-  solid: Cuboid,
-  wireframe: SquareDashed,
-  both: Layers,
-};
-
-/** What pressing the button does from each mode, naming the mode it goes to. */
-const DRAW_MODE_TITLES: Record<DrawMode, (key: string) => string> = {
-  solid: (key) => `Draw the unit as edges (${key})`,
-  wireframe: (key) => `Draw the unit solid with edges (${key})`,
-  both: (key) => `Draw the unit solid (${key})`,
-};
 
 export type GizmoMode = "translate" | "rotate" | "scale";
 
@@ -369,13 +328,6 @@ const AIM_DOT = 13;
 
 /** The script events the effects layer draws. See `effectsPlayback.ts`. */
 const EFFECT_KINDS = new Set(["nano", "flare", "shot", "sfx"]);
-
-/** The buttons for the front, side and top views, in the order they sit. */
-const VIEW_BUTTONS: { id: StandardView; icon: LucideIcon; label: string }[] = [
-  { id: "front", icon: Square, label: "front" },
-  { id: "side", icon: PanelLeft, label: "side" },
-  { id: "top", icon: PanelTop, label: "top" },
-];
 
 /** Where the camera starts, and where Reset view puts it back. */
 export const HOME_CAMERA: [number, number, number] = [9, 7, 11];
@@ -1795,8 +1747,6 @@ export function ModelViewport({
     toggleSkeleton: () => setSkeletonChoice(!showSkeleton),
   });
 
-  const DrawModeFace = DRAW_MODE_ICONS[drawMode];
-
   // Whether the selected piece carries anchors of its own, which decides what
   // the key at the bottom of the view has to name.
   const ownAnchors = soleSelectedId
@@ -2106,120 +2056,60 @@ export function ModelViewport({
             </span>
           </div>
 
-          <ViewControls className="pointer-events-auto shrink-0">
-            {problems ? (
-              <ProblemsButton
-                problems={problems.items}
-                statuses={problems.statuses}
-                onSelect={(found) => {
-                  problems.onSelect(found.pieceIds);
-                  const state = sceneRef.current;
-                  if (state) focusSelection(state, found.pieceIds);
-                }}
-              />
-            ) : null}
-            <GridToggle
-              on={showGrid}
-              onChange={setShowGrid}
-              showTitle="Show the ground grid, marked in footprint steps and plate sizes"
-            />
-            <ViewButton
-              title={DRAW_MODE_TITLES[drawMode](shortcutLabel("draw-mode"))}
-              onClick={() => setDrawMode(nextDrawMode)}
-            >
-              <DrawModeFace className="size-4" />
-            </ViewButton>
-            <ViewToggle
-              icon={Box}
-              on={showCollision}
-              onChange={setShowCollision}
-              hideTitle="Hide the collision volume"
-              showTitle="Show the collision volume, the shape the engine hits and clicks"
-            />
-            {hasSkeleton ? (
-              <ViewToggle
-                icon={Bone}
-                on={showSkeleton}
-                onChange={setSkeletonChoice}
-                hideTitle={`Hide the skeleton (${shortcutLabel("skeleton")})`}
-                showTitle={`Show the skeleton: a line from each bone to its parent, a dot on each joint and its role (${shortcutLabel("skeleton")})`}
-              />
-            ) : null}
-            <ViewToggle
-              icon={Scale}
-              on={showBalance}
-              onChange={setShowBalance}
-              hideTitle="Hide the balance check"
-              showTitle="Show the balance check: where the weight looks centred, against the ground the feet or wheels cover. An estimate from piece volumes at one density, not a mass. The engine does not simulate balance"
-            />
-            <ViewToggle
-              icon={Combine}
-              on={showOverlap}
-              onChange={setShowOverlap}
-              hideTitle="Hide the overlap check"
-              showTitle="Show the overlap check: outlines pieces buried wholly inside another piece, which the model still draws and the export still writes"
-            />
-            {footprint ? (
-              <ViewToggle
-                icon={Footprints}
-                on={showFootprint}
-                onChange={setShowFootprint}
-                hideTitle="Hide the footprint check"
-                showTitle="Show the footprint check: the footprint the export writes, drawn on the ground under the unit"
-              />
-            ) : null}
-            {footprint && showFootprint ? (
-              <ViewToggle
-                icon={Scissors}
-                on={footprint.leaveOut}
-                onChange={footprint.onLeaveOutChange}
-                hideTitle="Count the barrel, muzzle flare, aim point and build nozzle in the base footprint"
-                showTitle="Leave the barrel, muzzle flare, aim point and build nozzle out of the base footprint"
-              />
-            ) : null}
-            <ViewToggle
-              icon={Crosshair}
-              on={showAim}
-              onChange={setShowAim}
-              hideTitle="Hide the aim point"
-              showTitle="Show the aim point, the one point another unit shoots at"
-            />
-            {reaches.length > 0 ? (
-              <ViewToggle
-                icon={Radar}
-                on={showReach}
-                onChange={setShowReach}
-                hideTitle="Hide weapon ranges"
-                showTitle="Show each weapon's stated range and firing arc"
-              />
-            ) : null}
-            {VIEW_BUTTONS.map(({ id, icon, label }) => (
-              <ViewToggle
-                key={id}
-                icon={icon}
-                on={activeView === id}
-                onChange={(on) => {
-                  const state = sceneRef.current;
-                  if (!state) return;
-                  if (on) showView(state, id, selectedIdsRef.current);
-                  else {
-                    leaveStandardView(state);
-                    state.render();
+          <ViewportBar
+            problems={
+              problems ? (
+                <ProblemsButton
+                  problems={problems.items}
+                  statuses={problems.statuses}
+                  onSelect={(found) => {
+                    problems.onSelect(found.pieceIds);
+                    const state = sceneRef.current;
+                    if (state) focusSelection(state, found.pieceIds);
+                  }}
+                />
+              ) : null
+            }
+            grid={{ on: showGrid, onChange: setShowGrid }}
+            drawMode={drawMode}
+            onNextDrawMode={() => setDrawMode(nextDrawMode)}
+            collision={{ on: showCollision, onChange: setShowCollision }}
+            skeleton={
+              hasSkeleton
+                ? { on: showSkeleton, onChange: setSkeletonChoice }
+                : undefined
+            }
+            balance={{ on: showBalance, onChange: setShowBalance }}
+            overlap={{ on: showOverlap, onChange: setShowOverlap }}
+            footprint={
+              footprint
+                ? {
+                    on: showFootprint,
+                    onChange: setShowFootprint,
+                    leaveOut: footprint.leaveOut,
+                    onLeaveOutChange: footprint.onLeaveOutChange,
                   }
-                }}
-                hideTitle={`Leave the ${label} view (${shortcutLabel(`view-${id}`)})`}
-                showTitle={`Look at the ${label} with no perspective (${shortcutLabel(`view-${id}`)})`}
-              />
-            ))}
-            <ViewToggle
-              icon={Ruler}
-              on={measure.active}
-              onChange={measure.setActive}
-              hideTitle={`Leave the measure tool (${shortcutLabel("measure")})`}
-              showTitle={`Measure between two points (${shortcutLabel("measure")})`}
-            />
-            {guides ? (
-              <>
+                : undefined
+            }
+            aim={{ on: showAim, onChange: setShowAim }}
+            reach={
+              reaches.length > 0
+                ? { on: showReach, onChange: setShowReach }
+                : undefined
+            }
+            view={activeView}
+            onView={(id, on) => {
+              const state = sceneRef.current;
+              if (!state) return;
+              if (on) showView(state, id, selectedIdsRef.current);
+              else {
+                leaveStandardView(state);
+                state.render();
+              }
+            }}
+            measure={{ on: measure.active, onChange: measure.setActive }}
+            guides={
+              guides ? (
                 <GuidesPopover
                   guides={project.guides ?? []}
                   onEdit={(edit) => {
@@ -2231,73 +2121,56 @@ export function ModelViewport({
                   onPick={setPickingGuide}
                   symmetryPlane={symmetryPlane}
                 />
-                {(project.guides ?? []).length > 0 || symmetryPlane ? (
-                  <ViewToggle
-                    icon={EyeOff}
-                    onIcon={Eye}
-                    on={showGuides}
-                    onChange={setShowGuides}
-                    hideTitle="Hide the guides"
-                    showTitle="Show the guides"
-                  />
-                ) : null}
-              </>
-            ) : null}
-            <EnvironmentPicker
-              backdrop={backdrop}
-              onBackdrop={setBackdrop}
-              ground={ground.choice}
-              onGround={ground.onChange}
-              shape={ground.shape}
-              movement={project.movement}
-            />
-            <ReferencePicker
-              unit={{ project, pack, raw }}
-              show={showReference}
-              onShowChange={setShowReference}
-              onUnit={onReferenceUnit}
-              onReference={(choice) => {
-                setGameReference(choice);
-                // Picking a unit and having nothing appear reads as a broken
-                // picker, so choosing one turns the figure on.
-                if (choice) setShowReference(true);
-              }}
-            />
-            {hasStandIn ? (
-              <ViewToggle
-                icon={Target}
-                on={showStandIn}
-                onChange={setShowStandIn}
-                hideTitle="Hide the stand-in unit"
-                showTitle="Show the stand-in unit, the thing a scenario aims at, builds or carries"
+              ) : null
+            }
+            guideVisibility={
+              guides && ((project.guides ?? []).length > 0 || symmetryPlane)
+                ? { on: showGuides, onChange: setShowGuides }
+                : undefined
+            }
+            environment={
+              <EnvironmentPicker
+                backdrop={backdrop}
+                onBackdrop={setBackdrop}
+                ground={ground.choice}
+                onGround={ground.onChange}
+                shape={ground.shape}
+                movement={project.movement}
               />
-            ) : null}
-            {standIn.drive ? (
-              <ViewToggle
-                icon={Video}
-                on={followDrive}
-                onChange={setFollowDrive}
-                hideTitle="Keep the camera still while the unit drives"
-                showTitle="Follow the driving unit with the camera"
+            }
+            reference={
+              <ReferencePicker
+                unit={{ project, pack, raw }}
+                show={showReference}
+                onShowChange={setShowReference}
+                onUnit={onReferenceUnit}
+                onReference={(choice) => {
+                  setGameReference(choice);
+                  // Picking a unit and having nothing appear reads as a broken
+                  // picker, so choosing one turns the figure on.
+                  if (choice) setShowReference(true);
+                }}
               />
-            ) : null}
-            {hasEffects ? (
-              <ViewToggle
-                icon={Sparkles}
-                on={showEffects}
-                onChange={setShowEffects}
-                hideTitle="Hide script effects"
-                showTitle="Show script effects, such as nano spray, from the unit's own script"
-              />
-            ) : null}
-            <ViewButton
-              title="Keyboard shortcuts (?)"
-              onClick={() => setShortcutsOpen(true)}
-            >
-              <Keyboard className="size-4" />
-            </ViewButton>
-            <AxisCompass svgRef={compassRef} onClick={resetView} />
-          </ViewControls>
+            }
+            standIn={
+              hasStandIn
+                ? { on: showStandIn, onChange: setShowStandIn }
+                : undefined
+            }
+            followDrive={
+              standIn.drive
+                ? { on: followDrive, onChange: setFollowDrive }
+                : undefined
+            }
+            effects={
+              hasEffects
+                ? { on: showEffects, onChange: setShowEffects }
+                : undefined
+            }
+            onShortcuts={() => setShortcutsOpen(true)}
+            compassRef={compassRef}
+            onResetView={resetView}
+          />
         </div>
       </div>
 
@@ -2368,106 +2241,6 @@ function useEffectsAtlas(
     state.effects.setAtlas(atlas ?? null);
     state.render();
   }, [sceneRef, atlas, reduceMotion]);
-}
-
-/**
- * Which way the world's axes point from where the camera is.
- *
- * Painted straight into the SVG from the render loop rather than through React
- * state: the camera moves every frame while orbiting, and re-rendering the tree
- * sixty times a second to move three lines would be absurd.
- */
-function paintCompass(svg: SVGSVGElement, camera: THREE.Camera) {
-  const basis = new THREE.Matrix3().setFromMatrix4(camera.matrixWorldInverse);
-  const point = new THREE.Vector3();
-
-  for (const [axis, x, y, z] of [
-    ["x", 1, 0, 0],
-    ["y", 0, 1, 0],
-    ["z", 0, 0, 1],
-  ] as const) {
-    point.set(x, y, z).applyMatrix3(basis);
-    const line = svg.querySelector(`[data-axis="${axis}"]`);
-    const label = svg.querySelector(`[data-label="${axis}"]`);
-    // Screen y grows downward, so the camera-space y is negated.
-    const tipX = COMPASS_MID + point.x * COMPASS_ARM;
-    const tipY = COMPASS_MID - point.y * COMPASS_ARM;
-    line?.setAttribute("x2", String(tipX));
-    line?.setAttribute("y2", String(tipY));
-    label?.setAttribute("x", String(tipX));
-    label?.setAttribute("y", String(tipY));
-    // An axis pointing away from the camera is drawn faint, so the near end of
-    // each pair is the readable one.
-    const towards = (point.z + 1) / 2;
-    line?.setAttribute("opacity", String(0.35 + towards * 0.65));
-    label?.setAttribute("opacity", String(0.35 + towards * 0.65));
-  }
-}
-
-const COMPASS_SIZE = 32;
-const COMPASS_MID = COMPASS_SIZE / 2;
-const COMPASS_ARM = 11;
-
-/**
- * The three world axes as seen from here, and a click to face front again.
- *
- * The builder's own {@link ResetViewButton}, and richer than the plain one: it
- * frames the unit like any reset, and while it waits it says which way round the
- * camera is, which is how somebody notices they are lost in the first place. It
- * is still one of the bar's buttons, so it is drawn as one.
- */
-function AxisCompass({
-  svgRef,
-  onClick,
-}: {
-  svgRef: React.RefObject<SVGSVGElement | null>;
-  onClick: () => void;
-}) {
-  return (
-    <ViewButton title="Reset the view" onClick={onClick}>
-      {/* A `size-` class of its own, or the button's own icon rule shrinks any
-          bare svg to 16px and the compass becomes a smudge. */}
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${COMPASS_SIZE} ${COMPASS_SIZE}`}
-        className="size-7"
-        aria-hidden
-        role="presentation"
-      >
-        {(
-          [
-            ["x", "#f87171"],
-            ["y", "#4ade80"],
-            ["z", "#60a5fa"],
-          ] as const
-        ).map(([axis, colour]) => (
-          <g key={axis}>
-            <line
-              data-axis={axis}
-              x1={COMPASS_MID}
-              y1={COMPASS_MID}
-              x2={COMPASS_MID}
-              y2={COMPASS_MID}
-              stroke={colour}
-              strokeWidth={1.5}
-              strokeLinecap="round"
-            />
-            <text
-              data-label={axis}
-              x={COMPASS_MID}
-              y={COMPASS_MID}
-              fill={colour}
-              fontSize={9}
-              textAnchor="middle"
-              dominantBaseline="middle"
-            >
-              {axis.toUpperCase()}
-            </text>
-          </g>
-        ))}
-      </svg>
-    </ViewButton>
-  );
 }
 
 /** A key to the dots drawn on the selected piece. */

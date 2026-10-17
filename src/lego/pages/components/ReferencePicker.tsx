@@ -21,7 +21,7 @@
  */
 
 import { Button } from "@picoframe/frame";
-import { SwatchBook } from "lucide-react";
+import { PersonStanding } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Label } from "@/components/ui/label";
@@ -182,12 +182,12 @@ export function ReferencePicker({
       <PopoverTrigger asChild>
         <Button
           size="icon"
-          variant="outline"
+          variant={show ? "default" : "outline"}
           title="A unit at its real size, for scale"
           aria-label="Reference unit"
           aria-pressed={show}
         >
-          <SwatchBook className="size-4" />
+          <PersonStanding className="size-4" />
         </Button>
       </PopoverTrigger>
       <PopoverContent side="top" align="end" className="w-72 space-y-3">
