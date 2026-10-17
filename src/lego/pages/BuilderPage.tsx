@@ -56,7 +56,11 @@ import { balanceProblem, checkBalance } from "../balance";
 import { legoTexturePrune } from "../bindings";
 import { addBuildArm, builderKind, pickArmParts } from "../buildArm";
 import { pictureIsStale } from "../buildPicture";
-import { parseClipboardPiece, serializeClipboardPiece } from "../clipboard";
+import {
+  parseClipboardPiece,
+  pastedForUnit,
+  serializeClipboardPiece,
+} from "../clipboard";
 import { reanchorCollisionVolume } from "../collisionVolume";
 import { describePresets, selectionAsCompound } from "../compounds";
 import {
@@ -85,6 +89,7 @@ import {
   holdsLiftedPieces,
   liftCredit,
   liftedModuleRefusal,
+  openedFrom,
 } from "../liftPiece";
 import { canFixMesh, DEFAULT_SMOOTHING_ANGLE_DEG } from "../meshFix";
 import {
@@ -1092,7 +1097,11 @@ function Builder({ id }: { id: string | undefined }) {
     if (!lifted) return;
     try {
       await navigator.clipboard.writeText(
-        serializeClipboardPiece(lifted, draft?.id),
+        serializeClipboardPiece(
+          lifted,
+          draft?.id,
+          draft ? openedFrom(draft) : null,
+        ),
       );
     } catch (e) {
       void notify({
@@ -1130,12 +1139,13 @@ function Builder({ id }: { id: string | undefined }) {
     }
     // Pasting is the other way pieces lifted from a game get into a unit, so it
     // meets the same refusal as adding the module from the inventory.
-    if (refuseLifted(result.piece.project, "Couldn't paste")) return;
+    const pasted = pastedForUnit(result.piece, draft.id);
+    if (refuseLifted(pasted, "Couldn't paste")) return;
     try {
       const raw = await pasteIntoUnit(
         draft.id,
         result.piece.sourceUnitId,
-        result.piece.project,
+        pasted,
       );
       if (raw) geometry.adopt(raw);
     } catch (e) {
@@ -1154,10 +1164,7 @@ function Builder({ id }: { id: string | undefined }) {
       });
     }
 
-    const inserted = doc.insert(
-      result.piece.project,
-      selectedId ?? draft.rootPieceId,
-    );
+    const inserted = doc.insert(pasted, selectedId ?? draft.rootPieceId);
     if (inserted.rootPieceIds.length === 0) return;
     doc.selectMany(inserted.rootPieceIds);
     for (const pieceId of inserted.rootPieceIds)

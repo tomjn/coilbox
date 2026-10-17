@@ -30,7 +30,7 @@ import type {
   LegoUnitGame,
 } from "./model";
 import { projectFromImport } from "./rawImport";
-import { liftRefusal } from "./unitGame";
+import { liftRefusal, unitGame } from "./unitGame";
 
 /**
  * The module a lift makes: the piece at `path` in the imported tree and
@@ -133,11 +133,51 @@ export function liftedModuleRefusal(
   module: LegoProject,
   installed: readonly GameItem[] = [],
 ): string | null {
-  const from = module.pieces.find((piece) => piece.lifted)?.lifted;
-  if (!from) return null;
+  const sources = module.pieces.flatMap((piece) =>
+    piece.lifted ? [piece.lifted] : [],
+  );
+  if (sources.length === 0) return null;
   if (project.imported)
     return "Lifted pieces go into a unit built from parts, not one opened from a model.";
-  return liftRefusal(project, from.game, installed);
+  // Every piece is checked, since a module can hold pieces from two games.
+  for (const from of sources) {
+    const refused = liftRefusal(project, from.game, installed);
+    if (refused) return refused;
+  }
+  return null;
+}
+
+/**
+ * Where the meshes of a unit opened from a game came from, or null for a unit
+ * that was not. Those meshes are the game's own, but carry no `lifted` record
+ * while they stay in their unit.
+ */
+export function openedFrom(project: LegoProject): LegoLifted | null {
+  const opened = project.imported?.game;
+  if (!opened) return null;
+  return {
+    game: unitGame(project) ?? { name: opened.name, archive: opened.archive },
+    member: opened.member,
+    ...(opened.unit ? { unit: opened.unit } : {}),
+    ...liftedTextures(project.imported),
+  };
+}
+
+/**
+ * The pieces with a mesh and no record of where it came from, marked as lifted
+ * from `source`. A copy of part of a unit opened from a game becomes game
+ * geometry in the unit it is pasted into, and is held to the same game rule.
+ */
+export function markLifted(
+  project: LegoProject,
+  source: LegoLifted,
+): LegoProject {
+  return {
+    ...project,
+    pieces: project.pieces.map((piece) =>
+      piece.meshId && !piece.lifted ? { ...piece, lifted: source } : piece,
+    ),
+  };
 }
 
 /** The two textures a lifted piece records, without a path to refresh from. */

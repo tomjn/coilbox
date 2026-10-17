@@ -18,10 +18,13 @@
  * not control.
  */
 
+import { markLifted } from "./liftPiece";
 import {
   LEGO_SCHEMA_VERSION,
+  type LegoLifted,
   type LegoProject,
   parseLegoProjectData,
+  parseLifted,
 } from "./model";
 
 /** Marks the payload as ours. Anything else on the clipboard is rejected. */
@@ -38,18 +41,26 @@ interface ClipboardEnvelope {
    * large mesh off the clipboard.
    */
   sourceUnitId?: string;
+  /**
+   * Where the source unit's meshes came from, when it was opened from a game.
+   * Paste into any other unit treats those meshes as lifted from that game
+   * (#3268).
+   */
+  openedFrom?: LegoLifted;
 }
 
 /** Wrap a lifted subtree for writing to the system clipboard. */
 export function serializeClipboardPiece(
   project: LegoProject,
   sourceUnitId?: string,
+  openedFrom?: LegoLifted | null,
 ): string {
   const envelope: ClipboardEnvelope = {
     marker: CLIPBOARD_MARKER,
     schemaVersion: LEGO_SCHEMA_VERSION,
     project,
     ...(sourceUnitId ? { sourceUnitId } : {}),
+    ...(openedFrom ? { openedFrom } : {}),
   };
   return JSON.stringify(envelope);
 }
@@ -66,6 +77,8 @@ export interface ClipboardPiece {
    * that does not happen silently.
    */
   missingParts: string[];
+  /** See {@link ClipboardEnvelope.openedFrom}. */
+  openedFrom?: LegoLifted;
 }
 
 export type ParsedClipboard =
@@ -115,8 +128,24 @@ export function parseClipboardPiece(
     typeof envelope.sourceUnitId === "string" && envelope.sourceUnitId
       ? envelope.sourceUnitId
       : undefined;
+  const from = parseLifted(envelope.openedFrom);
   return {
     ok: true,
-    piece: { project, missingParts, ...(sourceUnitId ? { sourceUnitId } : {}) },
+    piece: {
+      project,
+      missingParts,
+      ...(sourceUnitId ? { sourceUnitId } : {}),
+      ...(from ? { openedFrom: from } : {}),
+    },
   };
+}
+
+/**
+ * The pasted document as it goes into the unit `unitId`. Meshes copied out of a
+ * unit opened from a game are marked as lifted from it, unless they are pasted
+ * back into the unit they came from.
+ */
+export function pastedForUnit(piece: ClipboardPiece, unitId: string) {
+  if (!piece.openedFrom || piece.sourceUnitId === unitId) return piece.project;
+  return markLifted(piece.project, piece.openedFrom);
 }
