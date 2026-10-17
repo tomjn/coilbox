@@ -131,6 +131,11 @@ const GENERATORS: Record<string, (shape: LegoShape) => ShapeSolid> = {
   wedge,
 };
 
+/** Every kind this build can make, so a test can cover each one. */
+export function shapeKinds(): string[] {
+  return Object.keys(GENERATORS);
+}
+
 /** Whether a shape of this kind is round, so its box corners are not on it. */
 export function isRoundShapeKind(kind: string): boolean {
   return kind === "cylinder" || kind === "tube" || kind === "cone";

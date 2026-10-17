@@ -27,7 +27,7 @@ import { childrenOf, type LegoProject, pieceById } from "./model";
 import type { LoadedPack } from "./pack";
 import type { RawGeometry } from "./rawGeometry";
 import { importedVZeroAtTop } from "./rawImport";
-import { type BakedPiece, bakedPieces } from "./s3oBuild";
+import { assertShapesKnown, type BakedPiece, bakedPieces } from "./s3oBuild";
 import type { SheetUv } from "./textureSheet";
 
 /**
@@ -48,6 +48,7 @@ export function buildGlbScene(
   sheet?: SheetUv,
 ): THREE.Object3D | null {
   if (!pieceById(project, project.rootPieceId)) return null;
+  assertShapesKnown(project);
   const { pieces } = bakedPieces(project, pack, raw);
 
   const build = (pieceId: string): THREE.Object3D | null => {
