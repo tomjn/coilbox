@@ -1174,3 +1174,74 @@ export function parseShape(value: unknown): LegoShape | null {
     ...(Object.keys(options).length > 0 ? { options } : {}),
   };
 }
+
+/**
+ * What the parts strip lists for a kind (#3337): its name, the size and options
+ * a click adds it with, and the words search finds it by. Each kind added to
+ * `GENERATORS` adds a line here and appears in the strip and on the Lego Parts
+ * page with no other change. A new shape is 1 along every side, near the
+ * pack's smaller blocks. Its swatch is chosen when it is added.
+ */
+export interface ShapeKind {
+  /** Tells entries apart, as the strip, the recent list and the favourites
+   *  key them. Two entries can share a `kind`, as a sphere and a dome do. */
+  id: string;
+  /** The generator that makes it. */
+  kind: string;
+  label: string;
+  size: [number, number, number];
+  options?: Record<string, number>;
+  tags: string[];
+}
+
+export const SHAPE_KINDS: ShapeKind[] = [
+  {
+    id: "cylinder",
+    kind: "cylinder",
+    label: "Cylinder",
+    size: [1, 1, 1],
+    options: { axis: 1, sides: DEFAULT_CYLINDER_SIDES },
+    tags: ["round"],
+  },
+  {
+    id: "tube",
+    kind: "tube",
+    label: "Tube",
+    size: [1, 1, 1],
+    // The hole's radius: the tube's 0.5, less a wall of 0.25.
+    options: { axis: 1, sides: DEFAULT_CYLINDER_SIDES, inner: 0.25 },
+    tags: ["round", "tube", "hollow", "pipe"],
+  },
+  {
+    id: "cone",
+    kind: "cone",
+    label: "Cone",
+    size: [1, 1, 1],
+    options: { axis: 1, sides: DEFAULT_CYLINDER_SIDES, top: 0 },
+    tags: ["round", "point"],
+  },
+  {
+    id: "sphere",
+    kind: "sphere",
+    label: "Sphere",
+    size: [1, 1, 1],
+    options: { keep: SPHERE_WHOLE },
+    tags: ["round", "ball"],
+  },
+  {
+    id: "dome",
+    kind: "sphere",
+    label: "Dome",
+    size: [1, 0.5, 1],
+    options: { keep: SPHERE_DOME },
+    tags: ["round", "half"],
+  },
+  {
+    id: "wedge",
+    kind: "wedge",
+    label: "Wedge",
+    size: [1, 1, 1],
+    options: { low: 0, flip: 0 },
+    tags: ["slope", "ramp"],
+  },
+];

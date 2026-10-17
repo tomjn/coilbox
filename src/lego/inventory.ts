@@ -20,6 +20,7 @@ import { type PartFilter, usePartFilter } from "./filter";
 import type { LegoProject } from "./model";
 import { type ModuleFilter, useModuleFilter } from "./moduleFilter";
 import type { LegoPartInfo, LoadedPack } from "./pack";
+import type { ShapeKind } from "./shapes";
 
 /**
  * How many recent items are kept. A choice, not a measurement: 24 fills whole
@@ -29,7 +30,8 @@ import type { LegoPartInfo, LoadedPack } from "./pack";
  */
 export const RECENT_LIMIT = 24;
 
-export type ItemKind = "part" | "module";
+/** A shape's id is its kind, such as "cylinder" (#3337). */
+export type ItemKind = "part" | "module" | "shape";
 
 /**
  * What the kind filter shows. "units" is the unit's own game's units (#3264),
@@ -59,7 +61,10 @@ export function parseRefs(raw: unknown): InventoryRef[] {
   for (const item of raw) {
     if (typeof item !== "object" || item === null) continue;
     const { kind, id } = item as { kind?: unknown; id?: unknown };
-    if ((kind !== "part" && kind !== "module") || typeof id !== "string")
+    if (
+      (kind !== "part" && kind !== "module" && kind !== "shape") ||
+      typeof id !== "string"
+    )
       continue;
     const ref: InventoryRef = { kind, id };
     if (seen.has(refKey(ref))) continue;
@@ -171,6 +176,8 @@ export interface InventoryView {
   inventory: Inventory;
   /** What to draw: empty when the kind filter excludes it. */
   parts: LegoPartInfo[];
+  /** Generated shapes, which the parts grid draws beside the parts. */
+  shapes: ShapeKind[];
   modules: LegoProject[];
 }
 
@@ -204,6 +211,20 @@ export function useInventoryView(
           ),
     [kind, list, partFilter.parts, inventory.recent, inventory.favourites],
   );
+  const shapes = useMemo(
+    () =>
+      kind === "modules" || kind === "units"
+        ? []
+        : inList(
+            partFilter.shapes,
+            list,
+            "shape",
+            (info) => info.id,
+            inventory.recent,
+            inventory.favourites,
+          ),
+    [kind, list, partFilter.shapes, inventory.recent, inventory.favourites],
+  );
   const modules = useMemo(
     () =>
       kind === "parts" || kind === "units"
@@ -233,6 +254,7 @@ export function useInventoryView(
     moduleFilter,
     inventory,
     parts,
+    shapes,
     modules,
   };
 }

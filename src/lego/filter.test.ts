@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { filterParts } from "./filter";
+import { filterParts, filterShapes, SHAPES_CATEGORY } from "./filter";
 import type { LegoPartInfo } from "./pack";
+import type { ShapeKind } from "./shapes";
 
 function part(overrides: Partial<LegoPartInfo> & { id: string }): LegoPartInfo {
   return {
@@ -109,5 +110,43 @@ describe("filterParts", () => {
     ).toEqual(["beam_alien"]);
     // Every pack, which is what the picker starts on however many are loaded.
     expect(filterParts(parts, "", null, null)).toEqual(parts);
+  });
+});
+
+describe("filterShapes", () => {
+  const kinds: ShapeKind[] = [
+    {
+      id: "cylinder",
+      kind: "cylinder",
+      label: "Cylinder",
+      size: [2, 2, 2],
+      tags: ["round"],
+    },
+    {
+      id: "wedge",
+      kind: "wedge",
+      label: "Wedge",
+      size: [2, 2, 2],
+      tags: ["slope"],
+    },
+  ];
+
+  it("keeps every kind with no search and no category", () => {
+    expect(filterShapes(kinds, "", null)).toEqual(kinds);
+  });
+
+  it("finds a kind by its name and by its tags", () => {
+    expect(filterShapes(kinds, "cyl", null)).toEqual([kinds[0]]);
+    expect(filterShapes(kinds, "SLOPE", null)).toEqual([kinds[1]]);
+    expect(filterShapes(kinds, "round wedge", null)).toEqual([]);
+  });
+
+  it("keeps every kind in the Shapes category and none in a colour", () => {
+    expect(filterShapes(kinds, "", SHAPES_CATEGORY)).toEqual(kinds);
+    expect(filterShapes(kinds, "", "grey")).toEqual([]);
+  });
+
+  it("leaves every part out when the Shapes category is chosen", () => {
+    expect(filterParts(TRIO, "", SHAPES_CATEGORY)).toEqual([]);
   });
 });
