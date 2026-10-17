@@ -25,9 +25,9 @@ const FRAMES: u32 = 300;
 
 /// Scripts each looked at by hand. Expand and Exterminate's and some of
 /// Balanced Annihilation's have Lua that is right for the engine, which
-/// these two previews play a frame or a cycle apart. The rest of Balanced
-/// Annihilation's ship a `.cob` that was not compiled from the `.bos` beside
-/// it, so no conversion of the `.bos` can match it.
+/// these two previews play a frame or a cycle apart. The rest ship a `.cob`
+/// that was not compiled from the `.bos` beside it, so no conversion of the
+/// `.bos` can match it.
 const KNOWN: &[(&str, &str)] = &[
     (
         "scripts/gdadvhfact2.bos",
@@ -52,6 +52,14 @@ const KNOWN: &[(&str, &str)] = &[
     (
         "scripts/alienpenetrator.bos",
         "a sleeper wakes in the frame StartMoving arrives",
+    ),
+    (
+        "scripts/gdbhub2.bos",
+        "the .cob's Activate emits smoke every 300 ms itself, with no Smoking thread, and its Deactivate is empty",
+    ),
+    (
+        "scripts/alienadvmexamh.bos",
+        "the .cob's Activate emits from point1 and its Deactivate from point6, and the .bos's emit nothing",
     ),
     (
         "scripts/armah.bos",
