@@ -354,6 +354,99 @@ fn a_started_thread_takes_its_arguments() {
     assert_close(rot_y(&timeline, 0, "turret"), 0.25);
 }
 
+/// `StartThread` runs the new thread until it first waits before it returns,
+/// as the unit script framework does (`unit_script.lua:384-405`). So the new
+/// thread reads `moving` before the line after the `StartThread` sets it.
+#[test]
+fn a_started_thread_runs_before_the_line_after_it() {
+    let timeline = play(
+        r#"
+        local turret = piece("turret")
+        local moving = 0
+        local function thrust()
+            Turn(turret, y_axis, moving == 1 and 1.0 or 0.5)
+        end
+        function script.Create()
+            StartThread(thrust)
+            moving = 1
+        end
+        "#,
+        3,
+    );
+    assert_eq!(timeline.error, None);
+    assert_close(rot_y(&timeline, 0, "turret"), 0.5);
+}
+
+/// A thread started at once runs as itself: the mask it sets in that first
+/// run is its own, and the thread that started it keeps the mask it had. So a
+/// later signal for the child's mask stops the child and not its parent.
+#[test]
+fn a_mask_set_in_a_started_thread_s_first_run_is_its_own() {
+    let mut events = create();
+    events.push(ScriptEvent {
+        frame: 1,
+        callin: "StopMoving".to_string(),
+        args: Vec::new(),
+        ambient: false,
+        world: None,
+        engine: None,
+    });
+    let timeline = run(
+        r#"
+        local turret = piece("turret")
+        local barrel = piece("barrel")
+        local function child()
+            SetSignalMask(2)
+            Sleep(100)
+            Turn(turret, y_axis, 1.0)
+        end
+        function script.Create()
+            StartThread(function()
+                SetSignalMask(1)
+                StartThread(child)
+                Sleep(100)
+                Turn(barrel, y_axis, 1.0)
+            end)
+        end
+        function script.StopMoving() Signal(2) end
+        "#,
+        "test.lua",
+        &Unit::new(&pieces()),
+        &events,
+        10,
+        &HashMap::new(),
+    );
+    assert_eq!(timeline.error, None);
+    assert_close(rot_y(&timeline, 9, "turret"), 0.0);
+    assert_close(rot_y(&timeline, 9, "barrel"), 1.0);
+}
+
+/// A call-in the engine calls for an answer can start a thread and answer
+/// what that thread set before it waited, because the thread runs at once.
+/// That is how the converter writes a `QueryWeapon` whose BOS may sleep.
+#[test]
+fn a_query_answers_what_the_thread_it_started_set_before_waiting() {
+    let probes = probe(
+        r#"
+        local barrel = piece("barrel")
+        function script.QueryWeapon1()
+            local answer = 1
+            StartThread(function()
+                answer = barrel
+                Sleep(100)
+            end)
+            return answer
+        end
+        "#,
+        "test.lua",
+        &Unit::new(&pieces()),
+        &["QueryWeapon1".to_string()],
+    );
+    assert_eq!(probes.error, None);
+    assert_eq!(probes.probes[0].note, None);
+    assert_eq!(probes.probes[0].pieces[0], "barrel");
+}
+
 /// The mask a table stands for, which the engine allows and flove relies on: it
 /// gives each shared animation library a fresh table so that one unit's walk
 /// cycle cannot signal another's. Two tables are two masks however alike they

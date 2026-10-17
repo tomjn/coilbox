@@ -132,7 +132,7 @@ fn reads_zero_as_false() {
 fn hands_call_ins_to_the_engine_under_its_names() {
     let lua = walker();
     assert_eq!(lua.matches("function script.Create()").count(), 1, "{lua}");
-    assert!(lua.contains("\tStartThread(Create)\n"), "{lua}");
+    assert!(lua.contains("\tStartThread(runStarted, Create)\n"), "{lua}");
     assert!(
         lua.contains("StartThread(SetMaxReloadTime, math.floor("),
         "{lua}"
@@ -786,9 +786,9 @@ fn a_started_script_s_arguments_are_reversed_but_worked_out_in_order() {
     let conversion = convert_with(source, &HashMap::new(), MODERN_LINEAR);
     let lua = conversion.lua;
     assert!(lua.contains("local arg1, arg2 = "), "{lua}");
-    assert!(lua.contains("StartThread(Lift, arg2, arg1)"), "{lua}");
-    assert!(lua.contains("StartThread(Lift, 6, 5)"), "{lua}");
-    assert!(lua.contains("StartThread(Lift, 7)"), "{lua}");
+    assert!(lua.contains("startScript(Lift, arg2, arg1)"), "{lua}");
+    assert!(lua.contains("startScript(Lift, 6, 5)"), "{lua}");
+    assert!(lua.contains("startScript(Lift, 7)"), "{lua}");
     let said = conversion
         .warnings
         .iter()

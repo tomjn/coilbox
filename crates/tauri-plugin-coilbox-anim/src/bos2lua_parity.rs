@@ -746,6 +746,87 @@ fn a_started_script_gets_its_arguments_in_the_engine_s_order() {
     }
 }
 
+/// COB runs a started script once the thread that started it waits or
+/// finishes (`CobThread.cpp:372-388`), where `StartThread` runs it at once
+/// (`unit_script.lua:384-405`). So the thrust thread sees `moving` set by the
+/// line after the `start-script`. Shaped like Expand and Exterminate's
+/// `urcbanshee2.bos`.
+#[test]
+fn a_started_script_sees_what_its_starter_set_after_starting_it() {
+    let (cob, lua, pieces) = both(
+        r#"
+        piece base, thrust1;
+        static-var moving;
+        Thrust()
+        {
+            while (TRUE)
+            {
+                if (moving) { emit-sfx 1024 from thrust1; }
+                sleep 40;
+            }
+        }
+        Create() { start-script Thrust(); moving = 1; }
+    "#,
+    );
+    let events = [event(0, "Create", &[])];
+    let from_cob = crate::cobrun::run(&cob, &pieces, &events, 10, &[], &HashMap::new());
+    let from_lua = run_lua(
+        &lua,
+        "thrust.lua",
+        &Unit::new(&pieces),
+        &events,
+        10,
+        &HashMap::new(),
+    );
+    assert_eq!(from_cob.error, None);
+    assert_eq!(from_lua.error, None);
+    assert_eq!(
+        from_cob.events.first(),
+        Some(&ScriptOutput::Sfx {
+            frame: 0,
+            piece: "thrust1".into(),
+            sfx: 1024
+        })
+    );
+    assert_eq!(from_cob.events, from_lua.events, "{lua}");
+}
+
+/// The engine calls Create and then SetMaxReloadTime before anything Create
+/// started runs (`CobInstance.cpp:231-232`), so a started script reads the
+/// delay SetMaxReloadTime set, not Create's. Shaped like Balanced
+/// Annihilation's `armclaw.bos`.
+#[test]
+fn a_script_create_starts_runs_after_set_max_reload_time() {
+    let (cob, lua, pieces) = both(
+        r#"
+        piece base, barrel;
+        static-var restore_delay;
+        Restore() { sleep restore_delay; turn barrel to x-axis <10> now; }
+        Create() { restore_delay = 2000; start-script Restore(); }
+        SetMaxReloadTime(reload) { restore_delay = reload * 2; }
+    "#,
+    );
+    let events = [event(0, "Create", &[])];
+    let from_cob = crate::cobrun::run(&cob, &pieces, &events, 10, &[], &HashMap::new());
+    let from_lua = run_lua(
+        &lua,
+        "restore.lua",
+        &Unit::new(&pieces),
+        &events,
+        10,
+        &HashMap::new(),
+    );
+    assert_eq!(from_cob.error, None);
+    assert_eq!(from_lua.error, None);
+    let barrel = pieces.iter().position(|p| p == "barrel").unwrap() * 6 + 3;
+    assert!(from_cob.frames[9][barrel] != 0.0, "the COB never turned");
+    assert_eq!(
+        first_difference(&from_cob, &from_lua, &pieces, "restore", false),
+        None,
+        "{lua}"
+    );
+}
+
 /// `TransportPickup(2)`, with the stand-in parked at (30, 0, 40).
 fn pickup_at(frame: u32) -> ScriptEvent {
     ScriptEvent {
