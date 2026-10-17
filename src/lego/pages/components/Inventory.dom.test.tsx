@@ -11,6 +11,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { type LegoProject, newProject } from "../../model";
 import type { LegoPartInfo, LoadedPack } from "../../pack";
+import { SHAPE_KINDS, type ShapeKind } from "../../shapes";
+
+const ALL_SHAPES = SHAPE_KINDS.map((shape) => shape.label);
 
 const store = vi.hoisted(() => ({ values: new Map<string, unknown>() }));
 
@@ -36,21 +39,39 @@ vi.mock("./PartPicker", () => ({
     parts,
     favourites,
     onFavourite,
+    shapes,
+    favouriteShapes,
+    onFavouriteShape,
   }: {
     parts: LegoPartInfo[];
     favourites: ReadonlySet<string>;
     onFavourite: (part: LegoPartInfo) => void;
+    shapes: ShapeKind[];
+    favouriteShapes: ReadonlySet<string>;
+    onFavouriteShape: (shape: ShapeKind) => void;
   }) => (
-    <ul aria-label="part grid">
-      {parts.map((part) => (
-        <li key={part.id}>
-          {part.name}
-          <button type="button" onClick={() => onFavourite(part)}>
-            {favourites.has(part.id) ? "unstar" : "star"} {part.name}
-          </button>
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul aria-label="shape grid">
+        {shapes.map((shape) => (
+          <li key={shape.id}>
+            {shape.label}
+            <button type="button" onClick={() => onFavouriteShape(shape)}>
+              {favouriteShapes.has(shape.id) ? "unstar" : "star"} {shape.label}
+            </button>
+          </li>
+        ))}
+      </ul>
+      <ul aria-label="part grid">
+        {parts.map((part) => (
+          <li key={part.id}>
+            {part.name}
+            <button type="button" onClick={() => onFavourite(part)}>
+              {favourites.has(part.id) ? "unstar" : "star"} {part.name}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </>
   ),
 }));
 
@@ -104,7 +125,10 @@ function module(name: string): LegoProject {
 }
 
 const pack = {
-  manifest: { categories: [] },
+  manifest: {
+    categories: [{ id: "grey", label: "Grey" }],
+    swatches: [{ id: "grey" }],
+  },
   library: { packs: [], atlases: [], dir: "", problems: [] },
   parts: [part("beam"), part("block"), part("wedge")],
 } as unknown as LoadedPack;
@@ -147,6 +171,15 @@ function Harness({
         onClick={() => view.inventory.record({ kind: "module", id: "leg" })}
       >
         use leg
+      </button>
+      <button
+        type="button"
+        onClick={() => view.inventory.record({ kind: "shape", id: "cylinder" })}
+      >
+        use cylinder
+      </button>
+      <button type="button" onClick={() => view.partFilter.setPackId("other")}>
+        pick another pack
       </button>
     </>
   );
@@ -196,7 +229,9 @@ describe("the kind filter", () => {
 describe("the count", () => {
   it("uses the plural for 2 or more and the singular for 1", () => {
     render(<Harness />);
-    expect(screen.getByText("3 parts, 2 modules")).toBeTruthy();
+    expect(
+      screen.getByText(`${3 + SHAPE_KINDS.length} parts, 2 modules`),
+    ).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Search the inventory"), {
       target: { value: "tur" },
     });
@@ -205,6 +240,88 @@ describe("the count", () => {
       target: { value: "beam" },
     });
     expect(screen.getByText("1 part, 0 modules")).toBeTruthy();
+  });
+});
+
+describe("shapes", () => {
+  it("are listed beside the parts by default", () => {
+    render(<Harness />);
+    expect(names("shape grid")).toEqual(ALL_SHAPES);
+    expect(names("part grid")).toEqual(["beam", "block", "wedge"]);
+  });
+
+  it("are found by kind and by tag, and hidden by a search they do not match", () => {
+    render(<Harness />);
+    const search = screen.getByLabelText("Search the inventory");
+    fireEvent.change(search, { target: { value: "round" } });
+    expect(names("shape grid")).toEqual(
+      SHAPE_KINDS.filter((s) => s.tags.includes("round")).map((s) => s.label),
+    );
+    fireEvent.change(search, { target: { value: "slope" } });
+    expect(names("shape grid")).toEqual(["Wedge"]);
+    fireEvent.change(search, { target: { value: "round" } });
+    expect(screen.queryByLabelText("part grid")).toBeTruthy();
+    fireEvent.change(search, { target: { value: "beam" } });
+    expect(names("shape grid")).toEqual([]);
+  });
+
+  it("are the only cells under the Shapes category", () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Parts" }));
+    fireEvent.click(screen.getByRole("button", { name: "Shapes" }));
+    expect(names("shape grid")).toEqual(ALL_SHAPES);
+    expect(names("part grid")).toEqual([]);
+  });
+
+  it("are hidden by a colour", () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Parts" }));
+    fireEvent.click(screen.getByRole("button", { name: "Grey" }));
+    expect(names("shape grid")).toEqual([]);
+    expect(names("part grid")).toEqual(["beam", "block", "wedge"]);
+  });
+
+  it("stay when a pack is picked", () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "pick another pack" }));
+    expect(names("part grid")).toEqual([]);
+    expect(names("shape grid")).toEqual(ALL_SHAPES);
+  });
+
+  it("are not offered by a pack that lists no swatches", () => {
+    const bare = {
+      ...pack,
+      manifest: { ...pack.manifest, swatches: [] },
+    } as unknown as LoadedPack;
+    function Bare() {
+      const view = useInventoryView(bare, modules);
+      return <InventoryFilters view={view} pack={bare} compounds={modules} />;
+    }
+    render(<Bare />);
+    expect(screen.getByText("3 parts, 2 modules")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Parts" }));
+    expect(screen.queryByRole("button", { name: "Shapes" })).toBeNull();
+  });
+
+  it("are left out of the modules kind", () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Modules" }));
+    expect(screen.queryByLabelText("shape grid")).toBeNull();
+  });
+
+  it("join the recent list and the favourites", () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Recent" }));
+    expect(screen.getByText("Nothing used yet.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Recent" }));
+    fireEvent.click(screen.getByRole("button", { name: "use cylinder" }));
+    fireEvent.click(screen.getByRole("button", { name: "Recent" }));
+    expect(names("shape grid")).toEqual(["Cylinder"]);
+    fireEvent.click(screen.getByRole("button", { name: "Recent" }));
+    fireEvent.click(screen.getByRole("button", { name: "star Cylinder" }));
+    expect(store.values.get("lego.inventory.favourites")).toEqual([
+      { kind: "shape", id: "cylinder" },
+    ]);
   });
 });
 

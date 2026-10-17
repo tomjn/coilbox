@@ -16,7 +16,7 @@
 
 import { Button } from "@picoframe/frame";
 import { Star } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
 import { useCanvas3D } from "@/lib/useCanvas3D";
@@ -29,6 +29,7 @@ import {
   type LoadedPack,
   partSize,
 } from "../../pack";
+import { getShapeGeometry, type ShapeKind } from "../../shapes";
 
 /** Cell size in pixels. Big enough to read a small part, small enough to scan. */
 const CELL = 72;
@@ -58,6 +59,46 @@ interface Props {
   /** Ids of the favourite parts. With `onFavourite`, each cell gets a star. */
   favourites?: ReadonlySet<string>;
   onFavourite?: (part: LegoPartInfo) => void;
+  /**
+   * Generated shapes (#3337), drawn first, each at its default size, in the same
+   * canvas as the parts. A shape is its own geometry, not a slice of the pack's
+   * buffer, so a cell knows how to fetch its own.
+   */
+  shapes?: ShapeKind[];
+  /** The kind being placed, if any. */
+  selectedShape?: string;
+  onSelectShape?: (shape: ShapeKind, alt: boolean) => void;
+  /** Kinds of the favourite shapes. With `onFavouriteShape`, each gets a star. */
+  favouriteShapes?: ReadonlySet<string>;
+  onFavouriteShape?: (shape: ShapeKind) => void;
+}
+
+/** One cell of the grid: a part of the pack or a generated shape. */
+interface Cell {
+  key: string;
+  name: string;
+  title: string;
+  /** The longest side, which the cell is scaled by to fit. */
+  size: number;
+  geometry: () => THREE.BufferGeometry | null;
+  part?: LegoPartInfo;
+  shape?: ShapeKind;
+}
+
+function shapeCell(info: ShapeKind): Cell {
+  return {
+    key: `shape:${info.id}`,
+    name: info.label,
+    title: `${info.label}, ${info.size.join(" x ")}`,
+    size: Math.max(...info.size),
+    geometry: () =>
+      getShapeGeometry({
+        kind: info.kind,
+        size: info.size,
+        ...(info.options ? { options: info.options } : {}),
+      }),
+    shape: info,
+  };
 }
 
 interface Visible {
@@ -74,6 +115,11 @@ export function PartPicker({
   onSelect,
   favourites,
   onFavourite,
+  shapes,
+  selectedShape,
+  onSelectShape,
+  favouriteShapes,
+  onFavouriteShape,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
@@ -86,6 +132,22 @@ export function PartPicker({
   const [focusIndex, setFocusIndex] = useState(0);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const reduceMotion = useReduceMotion();
+  // Shapes first: there are a handful, so they are on screen without a scroll,
+  // where the pack's thousands of parts would push them out of sight.
+  const cells = useMemo<Cell[]>(
+    () => [
+      ...(shapes ?? []).map(shapeCell),
+      ...parts.map((part) => ({
+        key: part.id,
+        name: part.name,
+        title: `${part.name}, ${part.tags.join(", ")}`,
+        size: partSize(part),
+        geometry: () => getPartGeometry(pack, part.id),
+        part,
+      })),
+    ],
+    [pack, parts, shapes],
+  );
 
   useCanvas3D(
     hostRef,
@@ -106,7 +168,7 @@ export function PartPicker({
         camera,
         pool: [],
         columns: 1,
-        parts: [],
+        cells: [],
         onView: setView,
         meshByIndex: new Map(),
       };
@@ -131,18 +193,18 @@ export function PartPicker({
     [],
   );
 
-  // Filtering changes which parts are in the grid, not how it is drawn, so the
+  // Filtering changes which cells are in the grid, not how it is drawn, so the
   // renderer and its geometry cache survive.
   useEffect(() => {
     const state = stateRef.current;
     const scroller = scrollRef.current;
     if (!state || !scroller) return;
-    state.parts = parts;
+    state.cells = cells;
     state.pack = pack;
     scroller.scrollTop = 0;
     setFocusIndex(0);
     layout(state, 0, scroller.clientHeight);
-  }, [pack, parts]);
+  }, [pack, cells]);
 
   // Separate from the effect above: switching a unit's atlas changes none of
   // the parts on screen or the scroll position, only what they are drawn
@@ -201,7 +263,7 @@ export function PartPicker({
 
   const move = useCallback(
     (delta: number) => {
-      const next = Math.min(parts.length - 1, Math.max(0, focusIndex + delta));
+      const next = Math.min(cells.length - 1, Math.max(0, focusIndex + delta));
       chasingFocus.current = true;
       setFocusIndex(next);
       const scroller = scrollRef.current;
@@ -213,7 +275,7 @@ export function PartPicker({
         scroller.scrollTop = top + CELL - scroller.clientHeight;
       }
     },
-    [focusIndex, parts.length, view.columns],
+    [focusIndex, cells.length, view.columns],
   );
 
   const onKeyDown = (event: React.KeyboardEvent) => {
@@ -231,12 +293,12 @@ export function PartPicker({
     move(delta);
   };
 
-  const rows = Math.ceil(parts.length / view.columns);
+  const rows = Math.ceil(cells.length / view.columns);
   const visible: number[] = [];
   for (let row = view.firstRow; row <= view.lastRow; row++) {
     for (let column = 0; column < view.columns; column++) {
       const index = row * view.columns + column;
-      if (index < parts.length) visible.push(index);
+      if (index < cells.length) visible.push(index);
     }
   }
 
@@ -249,13 +311,22 @@ export function PartPicker({
           style={{ height: Math.max(rows * PITCH - GAP, 0) }}
         >
           {visible.map((index) => {
-            const part = parts[index];
+            const cell = cells[index];
+            const { part, shape } = cell;
             const row = Math.floor(index / view.columns);
             const column = index % view.columns;
-            const starred = favourites?.has(part.id) ?? false;
+            const selected = shape
+              ? shape.id === selectedShape
+              : part?.id === selectedId;
+            const starred = shape
+              ? (favouriteShapes?.has(shape.id) ?? false)
+              : (favourites?.has(part?.id ?? "") ?? false);
+            const onStar = shape
+              ? onFavouriteShape && (() => onFavouriteShape(shape))
+              : onFavourite && part && (() => onFavourite(part));
             return (
               <div
-                key={part.id}
+                key={cell.key}
                 className="group absolute"
                 style={{
                   left: column * PITCH,
@@ -268,8 +339,8 @@ export function PartPicker({
                   type="button"
                   data-index={index}
                   tabIndex={index === focusIndex ? 0 : -1}
-                  aria-pressed={part.id === selectedId}
-                  title={`${part.name}, ${part.tags.join(", ")}`}
+                  aria-pressed={selected}
+                  title={cell.title}
                   onMouseEnter={() => setHoverIndex(index)}
                   onMouseLeave={() =>
                     setHoverIndex((at) => (at === index ? null : at))
@@ -290,32 +361,36 @@ export function PartPicker({
                       !event.ctrlKey &&
                       !event.metaKey &&
                       !event.altKey &&
-                      onFavourite
+                      onStar
                     ) {
                       event.preventDefault();
-                      onFavourite(part);
+                      onStar();
                       return;
                     }
                     onKeyDown(event);
                   }}
-                  onClick={(event) => onSelect?.(part, event.altKey)}
+                  onClick={(event) =>
+                    shape
+                      ? onSelectShape?.(shape, event.altKey)
+                      : part && onSelect?.(part, event.altKey)
+                  }
                   className={`absolute inset-0 rounded border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                    part.id === selectedId
+                    selected
                       ? "border-primary bg-primary/10"
                       : "border-transparent hover:border-border hover:bg-muted/40"
                   }`}
                 >
-                  <span className="sr-only">{part.name}</span>
+                  <span className="sr-only">{cell.name}</span>
                 </button>
-                {onFavourite ? (
+                {onStar ? (
                   <Button
                     size="sm"
                     variant="ghost"
                     tabIndex={-1}
                     className={`absolute right-0 top-0 transition-opacity focus:opacity-100 group-hover:opacity-100 ${starred ? "opacity-100" : "opacity-0"}`}
-                    onClick={() => onFavourite(part)}
+                    onClick={onStar}
                     aria-pressed={starred}
-                    aria-label={`Favourite the ${part.name} part`}
+                    aria-label={`Favourite the ${cell.name} ${shape ? "shape" : "part"}`}
                     title={starred ? "Remove from favourites" : "Favourite"}
                   >
                     <Star size={14} fill={starred ? "currentColor" : "none"} />
@@ -336,7 +411,7 @@ interface ViewportState {
   camera: THREE.OrthographicCamera;
   pool: THREE.Mesh[];
   columns: number;
-  parts: LegoPartInfo[];
+  cells: Cell[];
   pack?: LoadedPack;
   /** Undefined draws the base pack's atlas, resolved in `layout`. */
   atlas?: LegoAtlas;
@@ -358,7 +433,7 @@ function layout(
   scrollTop: number,
   viewportHeight: number,
 ) {
-  const { renderer, scene, camera, pool, columns, parts, pack, atlas } = state;
+  const { renderer, scene, camera, pool, columns, cells, pack, atlas } = state;
   if (!pack || viewportHeight === 0) return;
   const material = partMaterial(atlas ?? baseAtlas(pack));
 
@@ -377,9 +452,9 @@ function layout(
   for (let row = firstRow; row <= lastRow; row++) {
     for (let column = 0; column < columns; column++) {
       const index = row * columns + column;
-      const part = parts[index];
-      if (!part) continue;
-      const geometry = getPartGeometry(pack, part.id);
+      const cell = cells[index];
+      if (!cell) continue;
+      const geometry = cell.geometry();
       if (!geometry) continue;
 
       let mesh = pool[used];
@@ -402,7 +477,7 @@ function layout(
 
       // Fit the part to its cell. Scaling per part means a tiny sliver and a
       // whole hull section are both legible.
-      mesh.scale.setScalar((CELL * 0.62) / Math.max(partSize(part), 0.001));
+      mesh.scale.setScalar((CELL * 0.62) / Math.max(cell.size, 0.001));
       mesh.position.set(
         column * PITCH + CELL / 2,
         -(row * PITCH + CELL / 2),

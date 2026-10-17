@@ -2,12 +2,7 @@ import { describe, expect, it } from "vitest";
 import { type LegoProject, newProject } from "./model";
 import type { LoadedPack } from "./pack";
 import type { LegoShape } from "./shapes";
-import {
-  newWedgeShape,
-  wedgeAnchors,
-  wedgeNumbers,
-  withWedgeNumber,
-} from "./wedgeShape";
+import { wedgeAnchors, wedgeNumbers, withWedgeNumber } from "./wedgeShape";
 
 const SWATCHES = ["green", "tan"].map((id) => ({
   id,
@@ -39,22 +34,6 @@ const ramp: LegoShape = {
   swatch: "green",
   options: { low: 1 },
 };
-
-describe("newWedgeShape", () => {
-  it("is a pure wedge, high at the back, in the first swatch", () => {
-    const shape = newWedgeShape(unit(), pack());
-    expect(shape?.kind).toBe("wedge");
-    expect(shape?.swatch).toBe("green");
-    expect(wedgeNumbers(shape as LegoShape)).toMatchObject({
-      low: 0,
-      flip: false,
-    });
-  });
-
-  it("is offered nowhere when the pack lists no swatches", () => {
-    expect(newWedgeShape(unit(), pack([]))).toBeNull();
-  });
-});
 
 describe("wedgeNumbers and withWedgeNumber", () => {
   it("reads width, depth, height and the low end from the size and options", () => {
