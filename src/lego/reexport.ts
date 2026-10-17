@@ -64,6 +64,23 @@ export function writtenDigest(
 }
 
 /**
+ * Whether the receipt for this folder and unit name holds no digest for
+ * `units/<unit>.lua`, so a definition already there is left whole on every
+ * export (issue #4272). The file being there is for the caller to find out.
+ */
+export function definitionUnclaimed(
+  exported: LegoExport | undefined,
+  dir: string,
+  unitName: string,
+): boolean {
+  const previous = sameTarget(exported, dir, unitName);
+  return (
+    previous !== null &&
+    writtenDigest(previous, dir, `units/${unitName}.lua`) === null
+  );
+}
+
+/**
  * The derived fields to send with an export of `def`, or null when nothing
  * records coilbox writing `units/<unit>.lua` in `dir`.
  *

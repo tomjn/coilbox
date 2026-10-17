@@ -1823,6 +1823,9 @@ function Builder({ id }: { id: string | undefined }) {
             edit((project) => ({ ...project, ...settings }))
           }
           onStale={setStaleExports}
+          onAdopt={(receipts) =>
+            edit((project) => ({ ...project, ...receipts }))
+          }
         />
 
         <BuildPictureDrawer
