@@ -92,7 +92,7 @@ function build(project: LegoProject) {
   return built;
 }
 
-function flat(root: S3oPiece): S3oPiece[] {
+function flat<T extends { children: T[] }>(root: T): T[] {
   return [root, ...root.children.flatMap(flat)];
 }
 
