@@ -2447,7 +2447,47 @@ fn sort_stale_files(
         }
         sorted.ours.push(display);
     }
+    // The weapon files are named by key as well as unit, so they are found by
+    // prefix. `coilbox_tank_` also matches `tank_big`'s files, so a weapon file
+    // counts only when its digest is on this name's receipt. One that is not
+    // is silently passed over rather than reported as kept, because it is as
+    // likely another unit's as an edited file of this one.
+    for path in stale_weapon_candidates(root, unit_name) {
+        let Ok(bytes) = std::fs::read(&path) else {
+            continue;
+        };
+        if !known.contains(hex_digest(&bytes).as_str()) {
+            continue;
+        }
+        if !dry_run {
+            std::fs::remove_file(&path)
+                .map_err(|e| format!("could not remove {}: {e}", path.display()))?;
+        }
+        sorted.ours.push(path.to_string_lossy().to_string());
+    }
     Ok(sorted)
+}
+
+/// Every `weapons/coilbox_<unit>_*.lua` in the folder, sorted by name. A prefix
+/// match only, so the caller must check ownership before removing anything.
+fn stale_weapon_candidates(root: &Path, unit_name: &str) -> Vec<PathBuf> {
+    let prefix = format!("coilbox_{unit_name}_");
+    let Ok(entries) = std::fs::read_dir(root.join("weapons")) else {
+        return Vec::new();
+    };
+    let mut found: Vec<PathBuf> = entries
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.is_file()
+                && path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name.starts_with(&prefix) && name.ends_with(".lua"))
+        })
+        .collect();
+    found.sort();
+    found
 }
 
 /// What placing a build picture did.
@@ -3822,6 +3862,67 @@ mod tests {
         assert_eq!(sorted.kept, vec![edited.to_string_lossy().to_string()]);
         assert_eq!(sorted.ours.len(), 7);
         assert!(edited.is_file());
+    }
+
+    /// Write one weapon file for `unit_name` and answer with its digest.
+    fn exported_weapon(root: &Path, unit_name: &str, key: &str) -> (PathBuf, String) {
+        let path = root
+            .join("weapons")
+            .join(format!("coilbox_{unit_name}_{key}.lua"));
+        std::fs::create_dir_all(path.parent().expect("parent")).expect("mkdir");
+        let contents = format!("return {{ unit = '{unit_name}', key = '{key}' }}");
+        std::fs::write(&path, &contents).expect("write");
+        (path, hex_digest(contents.as_bytes()))
+    }
+
+    /// Issue #4263: the weapon files an export wrote are named by key as well as
+    /// unit, so a rename has to find them by prefix.
+    #[test]
+    fn a_rename_removes_the_old_units_weapon_files() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let mut digests = exported_unit(dir.path(), "skyfort");
+        let (laser, laser_digest) = exported_weapon(dir.path(), "skyfort", "laser");
+        let (rocket, rocket_digest) = exported_weapon(dir.path(), "skyfort", "rocket_pod");
+        digests.extend([laser_digest, rocket_digest]);
+
+        let dry = sort_stale_files(dir.path(), "skyfort", &digests, true).expect("dry run");
+        assert_eq!(dry.ours.len(), 10);
+        assert!(laser.is_file() && rocket.is_file());
+
+        let done = sort_stale_files(dir.path(), "skyfort", &digests, false).expect("removal");
+        assert_eq!(done.ours.len(), 10);
+        assert!(done.kept.is_empty());
+        assert!(!laser.exists() && !rocket.exists());
+    }
+
+    /// `tank` is a prefix of `tank_big`, so `coilbox_tank_big_laser.lua` matches
+    /// `coilbox_tank_*.lua`. Only the digest keeps it safe.
+    #[test]
+    fn a_unit_whose_name_starts_the_same_way_keeps_its_weapon_files() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let (tank_laser, tank_digest) = exported_weapon(dir.path(), "tank", "laser");
+        let (big_laser, _) = exported_weapon(dir.path(), "tank_big", "laser");
+
+        let done = sort_stale_files(dir.path(), "tank", &[tank_digest], false).expect("removal");
+        assert_eq!(done.ours, vec![tank_laser.to_string_lossy().to_string()]);
+        assert!(!tank_laser.exists());
+        assert!(big_laser.is_file());
+        assert!(!done.kept.contains(&big_laser.to_string_lossy().to_string()));
+    }
+
+    /// A weapon file the old unit owns but somebody edited stays.
+    #[test]
+    fn an_edited_weapon_file_is_left_alone() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let (laser, digest) = exported_weapon(dir.path(), "skyfort", "laser");
+        std::fs::write(&laser, "-- my own changes").expect("write");
+
+        let done = sort_stale_files(dir.path(), "skyfort", &[digest], false).expect("removal");
+        assert!(done
+            .ours
+            .iter()
+            .all(|p| !p.ends_with("coilbox_skyfort_laser.lua")));
+        assert!(laser.is_file());
     }
 
     /// A receipt written before the digests were recorded knows the name and
