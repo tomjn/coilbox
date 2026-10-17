@@ -27,6 +27,7 @@ import {
   Keyboard,
   Move,
   PackagePlus,
+  Radar,
   RotateCw,
   Scaling,
   Sparkles,
@@ -142,6 +143,8 @@ import { useModelSceneSync } from "./useModelSceneSync";
 import { useModelSelection } from "./useModelSelection";
 import { useModelShortcuts } from "./useModelShortcuts";
 import { useScriptFrameStepping } from "./useScriptFrameStepping";
+import { useWeaponReach } from "./useWeaponReach";
+import { disposeWeaponReach, reachColour } from "./weaponReachLayer";
 
 export type GizmoMode = "translate" | "rotate" | "scale";
 
@@ -563,6 +566,7 @@ export function ModelViewport({
     useState<GameReferenceChoice | null>(null);
   const [showCollision, setShowCollision] = useState(false);
   const [showAim, setShowAim] = useState(false);
+  const [showReach, setShowReach] = useState(false);
   // On by default: a scenario that defines a track wants it seen, and the
   // toggle exists for getting it out of the way rather than for opting in.
   const [showStandIn, setShowStandIn] = useState(true);
@@ -959,6 +963,7 @@ export function ModelViewport({
         editAim: false,
         onAimChangeRef,
         aimMark,
+        weaponReach: null,
         sky: null,
         terrain: null,
         water: null,
@@ -1139,6 +1144,7 @@ export function ModelViewport({
           pieceEditMaterial.dispose();
           state.aimMark.geometry.dispose();
           aimMaterial.dispose();
+          if (state.weaponReach) disposeWeaponReach(state.weaponReach);
           sceneRef.current = null;
         },
       };
@@ -1160,6 +1166,13 @@ export function ModelViewport({
     showAimPoint,
     selectedIdsRef,
     placingAnchorRef,
+  });
+
+  const reaches = useWeaponReach(sceneRef, {
+    project,
+    pack,
+    raw,
+    show: showReach,
   });
 
   useModelSelection(sceneRef, selectedIds, project, placingAnchor);
@@ -1478,6 +1491,17 @@ export function ModelViewport({
                 <Dot colour="#ef4444" label="Aim point" />
               </div>
             ) : null}
+            {showReach && reaches.length > 0 ? (
+              <div className="flex gap-3">
+                {reaches.map((reach, index) => (
+                  <Dot
+                    key={reach.number}
+                    colour={reachColour(index)}
+                    label={`Weapon ${reach.number}`}
+                  />
+                ))}
+              </div>
+            ) : null}
             <span>
               {placingAnchor
                 ? "Click the model to put an anchor there. Escape to stop"
@@ -1509,6 +1533,15 @@ export function ModelViewport({
               hideTitle="Hide the aim point"
               showTitle="Show the aim point, the one point another unit shoots at"
             />
+            {reaches.length > 0 ? (
+              <ViewToggle
+                icon={Radar}
+                on={showReach}
+                onChange={setShowReach}
+                hideTitle="Hide weapon ranges"
+                showTitle="Show each weapon's stated range and firing arc"
+              />
+            ) : null}
             <EnvironmentPicker
               backdrop={backdrop}
               onBackdrop={setBackdrop}

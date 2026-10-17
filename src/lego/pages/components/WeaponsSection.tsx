@@ -46,7 +46,7 @@ interface Props {
 }
 
 /** What the picker can offer, or why it cannot offer the game's weapons. */
-interface WeaponSource {
+export interface WeaponSource {
   gameName: string | null;
   /** Null until the game is read. */
   weaponDefs: Record<string, Record<string, unknown>> | null;
@@ -55,7 +55,7 @@ interface WeaponSource {
   unavailable: string | null;
 }
 
-function useWeaponSource(project: LegoProject): WeaponSource {
+export function useWeaponSource(project: LegoProject): WeaponSource {
   const { target, targetLoading, scan } = useTestGame();
   const { projects } = useModProjects();
   const own = unitGame(project);

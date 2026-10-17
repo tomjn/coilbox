@@ -154,7 +154,18 @@ export function applySceneScale(state: SceneState) {
   // because the orbit target sits on the unit, which is built at the origin,
   // not on the middle of a scene a reference has pulled off to one side.
   const sphere = box.getBoundingSphere(new THREE.Sphere());
-  const radius = sphere.center.length() + sphere.radius;
+  // Weapon ranges reach far past the unit, so the camera has to be able to
+  // pull back far enough to see a whole ring. They do not stretch the ground,
+  // which stays a plate to build on.
+  const reach = state.weaponReach
+    ? new THREE.Box3()
+        .setFromObject(state.weaponReach)
+        .getBoundingSphere(new THREE.Sphere())
+    : null;
+  const radius = Math.max(
+    sphere.center.length() + sphere.radius,
+    reach && !reach.isEmpty() ? reach.center.length() + reach.radius : 0,
+  );
 
   const fit = radius / Math.sin(THREE.MathUtils.degToRad(state.camera.fov) / 2);
   state.controls.maxDistance = Math.max(
