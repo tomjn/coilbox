@@ -35,6 +35,7 @@
  */
 
 import type { BodyPlan, BodyPlanBone, BodyPlanProportion } from "./bodyPlans";
+import { between, rise } from "./planMeasure";
 
 function elmos(
   id: string,
@@ -132,6 +133,13 @@ export const TURRET_BUILDING: BodyPlan = {
     { presetId: "turret.track", params: {} },
     { presetId: "recoil", params: {} },
   ],
+  // The unit's origin is on the ground, so the turret joint's height is the
+  // base's.
+  measure: (joints) => ({
+    baseHeight: joints.get("turret")?.[1],
+    turretHeight: rise(joints, "turret", "barrel"),
+    barrelLength: between(joints, "barrel", "flare"),
+  }),
 };
 
 export const BUILDING: BodyPlan = {

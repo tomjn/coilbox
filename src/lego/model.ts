@@ -785,6 +785,14 @@ export interface LegoSkeleton {
   /** The size the skeleton was fitted to and is meant to stay within (#3254).
    *  Absent for a skeleton nobody gave a size. */
   target?: SkeletonTarget;
+  /**
+   * The plan was fitted to pieces the unit already had (#3261), so its bones
+   * are those pieces where the game maker placed them and the proportions were
+   * measured off them. Nothing moves a fitted skeleton's bones: a proportion
+   * that placed them would move pieces placed by hand. Absent for a skeleton
+   * the plan made.
+   */
+  fitted?: true;
 }
 
 /** A footprint in whole steps of `ELMOS_PER_FOOTPRINT`, and a height in elmos. */
@@ -1462,7 +1470,12 @@ function parseSkeleton(value: unknown): LegoSkeleton | null {
     }
   }
   const target = parseTarget(v.target);
-  return { plan: v.plan, proportions, ...(target ? { target } : {}) };
+  return {
+    plan: v.plan,
+    proportions,
+    ...(target ? { target } : {}),
+    ...(v.fitted === true ? { fitted: true as const } : {}),
+  };
 }
 
 /** A target with whole footprint steps of 1 or more and a positive height, or
