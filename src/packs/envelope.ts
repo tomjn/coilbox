@@ -12,9 +12,10 @@
  */
 
 import {
+  type ContainerCodeResult,
   decodeContainerText,
-  encodeContainerCode,
   readContainer,
+  tryEncodeContainerCode,
 } from "../container/container";
 
 /** Payload schema version for a setup-pack container. */
@@ -25,9 +26,11 @@ const LEGACY_PACK_FORMAT = "coilbox-pack";
 const LEGACY_PACK_FORMAT_VERSION = 1;
 const LEGACY_PACK_KIND = "setup-pack";
 
-/** Encode a pack's settings (its manifest) into a pasteable code. */
-export function encodePackEnvelope<S>(settings: S): string {
-  return encodeContainerCode("setup-pack", PACK_KIND_VERSION, settings);
+/** Encode a pack's settings (its manifest) into a pasteable code, or measure
+ * why not. A pack carrying blueprints has no fixed upper size (issue #1727), so
+ * it takes the checked path. */
+export function encodePackEnvelope<S>(settings: S): ContainerCodeResult {
+  return tryEncodeContainerCode("setup-pack", PACK_KIND_VERSION, settings);
 }
 
 /** Why a pasted pack code was rejected, surfaced as a friendly inline message. */

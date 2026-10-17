@@ -1,3 +1,4 @@
+import type { StoredBlueprint } from "../blueprint/library";
 import {
   gameIdentityForName,
   type InstalledGameInfo,
@@ -11,14 +12,17 @@ export interface PackDraft {
   gameNames: string[];
   mapNames: string[];
   presets: SkirmishPreset[];
+  /** Library layouts to bundle. Only the layout travels: the id and where this
+   * copy came from belong to this machine. */
+  blueprints: StoredBlueprint[];
   /** The scan's games, for filling in each pinned game's modinfo shortname. */
   installedGames: { name: string; shortname?: string }[];
 }
 
 /**
  * Turn what the drawer collected into a pack manifest, or null when the draft
- * names no content. Presets alone are not a pack: they have their own share
- * code, and a pack is a collection of things to install.
+ * names no content. Presets or blueprints alone are not a pack: they have their
+ * own share codes, and a pack is a collection of things to install.
  */
 export function buildPackManifest(draft: PackDraft): SetupPackManifest | null {
   if (draft.gameNames.length === 0 && draft.mapNames.length === 0) return null;
@@ -40,11 +44,14 @@ export function buildPackManifest(draft: PackDraft): SetupPackManifest | null {
       rest,
   );
 
+  const blueprints = draft.blueprints.map((record) => record.layout);
+
   return {
     ...(draft.title.trim() ? { title: draft.title.trim() } : {}),
     ...(games.length ? { games } : {}),
     ...(draft.mapNames.length ? { maps: draft.mapNames } : {}),
     ...(presets.length ? { presets } : {}),
+    ...(blueprints.length ? { blueprints } : {}),
   };
 }
 
