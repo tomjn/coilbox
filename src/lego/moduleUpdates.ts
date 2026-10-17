@@ -11,6 +11,7 @@
  */
 
 import type { LegoModuleRef, LegoPiece, LegoProject } from "./model";
+import { ringMembers } from "./ringSet";
 
 /** Prefix of the ids the generated weapon and build arm record. */
 const GENERATED_PREFIX = "generated:";
@@ -104,8 +105,22 @@ export interface MissingModule {
   rootPieceId: string;
 }
 
+/**
+ * One instance in a unit with no stamp, inserted before stamps were recorded
+ * (#4323). Nothing says whether its module changed since, so it is neither
+ * current nor out of date until the user says.
+ */
+export interface UntrackedModule {
+  instance: string;
+  moduleId: string;
+  moduleName: string;
+  name: string;
+  rootPieceId: string;
+}
+
 export interface ModuleUpdates {
   outdated: ModuleUpdate[];
+  untracked: UntrackedModule[];
   missing: MissingModule[];
 }
 
@@ -124,9 +139,9 @@ export function pieceFingerprint(piece: LegoPiece, isTop: boolean): string {
 
 /**
  * The instances in `project` whose module has changed, and those whose module
- * is gone. A generated weapon or build arm has no module to update from, and an
- * instance inserted before stamps were recorded has nothing to compare, so
- * neither appears in either list.
+ * is gone. A generated weapon or build arm has no module to update from, so it
+ * appears in no list. An instance inserted before stamps were recorded has
+ * nothing to compare, so it is listed as `untracked` instead.
  */
 export function moduleUpdates(
   project: LegoProject,
@@ -142,6 +157,7 @@ export function moduleUpdates(
 
   const outdated: ModuleUpdate[] = [];
   const missing: MissingModule[] = [];
+  const untracked: UntrackedModule[] = [];
   for (const [instance, pieces] of byInstance) {
     const ref = pieces[0].module as LegoModuleRef;
     if (isGeneratedModule(ref.id)) continue;
@@ -158,7 +174,17 @@ export function moduleUpdates(
       });
       continue;
     }
-    if (!ref.rev || ref.rev === moduleStamp(module)) continue;
+    if (!ref.rev) {
+      untracked.push({
+        instance,
+        moduleId: ref.id,
+        moduleName: module.name,
+        name: top.name,
+        rootPieceId: top.id,
+      });
+      continue;
+    }
+    if (ref.rev === moduleStamp(module)) continue;
     outdated.push({
       instance,
       moduleId: ref.id,
@@ -171,5 +197,58 @@ export function moduleUpdates(
       ).length,
     });
   }
-  return { outdated, missing };
+  return { outdated, untracked, missing };
+}
+
+/**
+ * The project with the instance `pieceId` is in marked as matching `module` as
+ * it is now: every piece of it gets the stamp and fingerprint a module insert
+ * writes, so it is tracked from here on (#4323). Null when the piece is in no
+ * instance. Only an instance of this module with no stamp is touched.
+ *
+ * With `symmetry`, the instance's mirror twin and ring members are marked too,
+ * as `swapModule` swaps them together.
+ */
+export function markModuleCurrent(
+  project: LegoProject,
+  pieceId: string,
+  module: LegoProject,
+  options: { symmetry?: boolean } = {},
+): LegoProject | null {
+  const start = project.pieces.find((p) => p.id === pieceId)?.module;
+  if (!start) return null;
+  const instanceOf = (id: string | undefined) =>
+    project.pieces.find((p) => p.id === id)?.module;
+  const instances = new Set([start.instance]);
+  if (options.symmetry) {
+    const own = project.pieces.filter(
+      (p) => p.module?.instance === start.instance,
+    );
+    const ids = new Set(own.map((p) => p.id));
+    for (const top of own.filter((p) => !p.parentId || !ids.has(p.parentId))) {
+      const others = [top.twin, ...(ringMembers(project.pieces, top.id) ?? [])];
+      for (const id of others) {
+        const ref = instanceOf(id);
+        if (ref && ref.id === module.id) instances.add(ref.instance);
+      }
+    }
+  }
+  const stamp = moduleStamp(module);
+  const pieces = project.pieces.map((piece) => {
+    const ref = piece.module;
+    if (!ref || !instances.has(ref.instance) || ref.id !== module.id)
+      return piece;
+    if (ref.rev) return piece;
+    const sameInstance = new Set(
+      project.pieces
+        .filter((p) => p.module?.instance === ref.instance)
+        .map((p) => p.id),
+    );
+    const isTop = !piece.parentId || !sameInstance.has(piece.parentId);
+    return {
+      ...piece,
+      module: { ...ref, rev: stamp, fp: pieceFingerprint(piece, isTop) },
+    };
+  });
+  return { ...project, pieces };
 }

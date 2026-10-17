@@ -7,7 +7,7 @@ import {
   newProject,
   parseLegoProjectJson,
 } from "./model";
-import { moduleStamp, moduleUpdates } from "./moduleUpdates";
+import { markModuleCurrent, moduleStamp, moduleUpdates } from "./moduleUpdates";
 import type { LegoPartInfo, LoadedPack } from "./pack";
 import { swapModule } from "./swapModule";
 
@@ -207,6 +207,18 @@ describe("an insert records the stamp", () => {
   });
 });
 
+/** The unit as it was saved before stamps were recorded. */
+function unstamped(project: LegoProject): LegoProject {
+  return {
+    ...project,
+    pieces: project.pieces.map((p) => {
+      if (!p.module) return p;
+      const { rev: _rev, fp: _fp, ...rest } = p.module;
+      return { ...p, module: rest };
+    }),
+  };
+}
+
 describe("which instances are out of date", () => {
   const improved = {
     ...wheel(),
@@ -284,17 +296,27 @@ describe("which instances are out of date", () => {
     expect(found.missing).toEqual([]);
   });
 
-  it("leaves an instance with no recorded stamp alone", () => {
-    const project = withWheel(wheel());
-    const old = {
-      ...project,
-      pieces: project.pieces.map((p) => {
-        if (!p.module) return p;
-        const { rev: _rev, ...rest } = p.module;
-        return { ...p, module: rest };
-      }),
-    };
-    expect(moduleUpdates(old, [improved]).outdated).toEqual([]);
+  it("lists an instance with no recorded stamp as untracked, not outdated", () => {
+    const found = moduleUpdates(unstamped(withWheel(wheel())), [improved]);
+    expect(found.outdated).toEqual([]);
+    expect(found.untracked).toHaveLength(1);
+    expect(found.untracked[0]).toMatchObject({
+      moduleId: "wheel",
+      moduleName: "Wheel",
+      name: "tyre",
+    });
+  });
+
+  it("lists an untracked instance whether or not its module changed", () => {
+    const project = unstamped(withWheel(wheel()));
+    expect(moduleUpdates(project, [wheel()]).untracked).toHaveLength(1);
+    expect(moduleUpdates(project, [improved]).untracked).toHaveLength(1);
+  });
+
+  it("leaves stamped instances as they were", () => {
+    const found = moduleUpdates(withWheel(wheel()), [wheel()]);
+    expect(found.untracked).toEqual([]);
+    expect(moduleUpdates(withWheel(wheel()), [improved]).untracked).toEqual([]);
   });
 
   it("treats a mirror twin sharing an instance as one instance", () => {
@@ -332,5 +354,160 @@ describe("updating an instance", () => {
     expect(after.outdated).toEqual([]);
     const hub = result?.project.pieces.find((p) => p.name === "hub");
     expect(hub?.position).toEqual([0, 0.7, 0]);
+  });
+});
+
+describe("marking an untracked instance as current", () => {
+  const improved = {
+    ...wheel(),
+    pieces: wheel().pieces.map((p) =>
+      p.id === "hub" ? { ...p, position: [0, 0.7, 0] as Vec3 } : p,
+    ),
+  };
+
+  function top(project: LegoProject, instance: string) {
+    return project.pieces.find(
+      (p) => p.module?.instance === instance && p.name.startsWith("tyre"),
+    ) as LegoPiece;
+  }
+
+  it("records the module's stamp and a fingerprint on every piece", () => {
+    const old = unstamped(withWheel(wheel()));
+    const [offer] = moduleUpdates(old, [wheel()]).untracked;
+    const marked = markModuleCurrent(old, offer.rootPieceId, wheel());
+    const pieces = marked?.pieces.filter((p) => p.module) ?? [];
+    expect(pieces).toHaveLength(2);
+    expect(pieces.every((p) => p.module?.rev === moduleStamp(wheel()))).toBe(
+      true,
+    );
+    expect(pieces.every((p) => p.module?.fp)).toBe(true);
+    // Same record a stamped insert writes.
+    expect(pieces.map((p) => p.module)).toEqual(
+      withWheel(wheel())
+        .pieces.filter((p) => p.module)
+        .map((p) => p.module),
+    );
+  });
+
+  it("is tracked normally afterwards, so a later module change is offered", () => {
+    const old = unstamped(withWheel(wheel()));
+    const [offer] = moduleUpdates(old, [wheel()]).untracked;
+    const marked = markModuleCurrent(
+      old,
+      offer.rootPieceId,
+      wheel(),
+    ) as LegoProject;
+    const now = moduleUpdates(marked, [wheel()]);
+    expect(now.untracked).toEqual([]);
+    expect(now.outdated).toEqual([]);
+    expect(moduleUpdates(marked, [improved]).outdated).toHaveLength(1);
+  });
+
+  it("leaves other instances and stamped instances alone", () => {
+    const stamped = withWheel(wheel(), 2);
+    const [a, b] = [
+      ...new Set(
+        stamped.pieces.flatMap((p) => (p.module ? [p.module.instance] : [])),
+      ),
+    ];
+    const half = {
+      ...stamped,
+      pieces: stamped.pieces.map((p) => {
+        if (p.module?.instance !== a) return p;
+        const { rev: _rev, fp: _fp, ...rest } = p.module;
+        return { ...p, module: rest };
+      }),
+    };
+    const marked = markModuleCurrent(half, top(half, a).id, wheel());
+    expect(marked?.pieces.filter((p) => p.module?.instance === b)).toEqual(
+      half.pieces.filter((p) => p.module?.instance === b),
+    );
+  });
+
+  it("returns null for a piece in no instance", () => {
+    const old = unstamped(withWheel(wheel()));
+    expect(markModuleCurrent(old, "hull", wheel())).toBeNull();
+  });
+
+  it("marks a mirror twin that shares the instance with it", () => {
+    const old = unstamped(withWheel(wheel(), 2));
+    const [first] = old.pieces.filter((p) => p.module);
+    const shared = {
+      ...old,
+      pieces: old.pieces.map((p) =>
+        p.module ? { ...p, module: { ...first.module } } : p,
+      ),
+    } as LegoProject;
+    const marked = markModuleCurrent(shared, first.id, wheel()) as LegoProject;
+    expect(
+      marked.pieces.filter((p) => p.module).every((p) => p.module?.rev),
+    ).toBe(true);
+    expect(moduleUpdates(marked, [wheel()]).untracked).toEqual([]);
+  });
+
+  it("marks a twin and ring copies in other instances only with symmetry", () => {
+    const old = unstamped(withWheel(wheel(), 3));
+    const instances = [
+      ...new Set(
+        old.pieces.flatMap((p) => (p.module ? [p.module.instance] : [])),
+      ),
+    ];
+    const tops = instances.map((i) => top(old, i));
+    const ringed = {
+      ...old,
+      pieces: old.pieces.map((p) => {
+        const at = tops.findIndex((t) => t.id === p.id);
+        return at < 0
+          ? p
+          : { ...p, ring: { next: tops[(at + 1) % 3].id, count: 3 } };
+      }),
+    };
+    const plain = markModuleCurrent(ringed, tops[0].id, wheel()) as LegoProject;
+    expect(moduleUpdates(plain, [wheel()]).untracked).toHaveLength(2);
+    const all = markModuleCurrent(ringed, tops[0].id, wheel(), {
+      symmetry: true,
+    }) as LegoProject;
+    expect(moduleUpdates(all, [wheel()]).untracked).toEqual([]);
+
+    const twinned = {
+      ...old,
+      pieces: old.pieces.map((p) =>
+        p.id === tops[0].id
+          ? { ...p, twin: tops[1].id }
+          : p.id === tops[1].id
+            ? { ...p, twin: tops[0].id }
+            : p,
+      ),
+    };
+    const pair = markModuleCurrent(twinned, tops[0].id, wheel(), {
+      symmetry: true,
+    }) as LegoProject;
+    expect(moduleUpdates(pair, [wheel()]).untracked).toHaveLength(1);
+  });
+});
+
+describe("updating an untracked instance", () => {
+  it("replaces it with the module and tracks it", () => {
+    const improved = {
+      ...wheel(),
+      pieces: wheel().pieces.map((p) =>
+        p.id === "hub" ? { ...p, position: [0, 0.7, 0] as Vec3 } : p,
+      ),
+    };
+    const old = unstamped(withWheel(wheel()));
+    const [offer] = moduleUpdates(old, [improved]).untracked;
+    const result = swapModule(
+      old,
+      pack(),
+      offer.rootPieceId,
+      improved,
+      counter("u"),
+    );
+    const after = moduleUpdates(result?.project as LegoProject, [improved]);
+    expect(after.untracked).toEqual([]);
+    expect(after.outdated).toEqual([]);
+    expect(
+      result?.project.pieces.find((p) => p.name === "hub")?.position,
+    ).toEqual([0, 0.7, 0]);
   });
 });
