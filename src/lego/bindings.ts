@@ -77,7 +77,10 @@ export const legoSave = defineCommand<
   Record<string, never>
 >("coilbox-lego", "lego_save");
 
-/** Delete a document, and for a project its thumbnail and export folder too. */
+/**
+ * Delete a document and its geometry file, and for a project its thumbnail and
+ * export folder too.
+ */
 export const legoDelete = defineCommand<
   { kind: LegoKind; id: string },
   Record<string, never>
