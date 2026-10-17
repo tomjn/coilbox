@@ -11,11 +11,12 @@
  * the unit is and the call-ins the engine would fire come out. The viewport
  * plays the record and the runtimes are told about it, so the two agree.
  *
- * It slows for a turn the way the engine does, so it can make one. Two things
- * the engine does are left out. Its speed changes at once, to full speed on
- * the frame it sets off, to a turn's speed and back, and to nothing when it
- * arrives, where the engine ramps up and brakes by the unit's `maxAcc` and
- * `maxDec`, which issue #4151 covers.
+ * It slows for a turn the way the engine does, so it can make one. Its speed
+ * ramps as the engine's does (issue #4288): each frame it moves towards the
+ * speed it wants by no more than the unit's `maxAcc` when speeding up and
+ * `maxDec` when slowing (`GMTDefaultPathController::GetDeltaSpeed`,
+ * `IPathController.cpp:6-38`), and the wanted speed drops to nothing once the
+ * goal is within the unit's braking distance (`GroundMoveType.cpp:1324,1333`).
  *
  * A unit with a reverse speed backs up when the engine would (issue #4156).
  * The engine reverses a unit only when its definition has `rSpeed` above 0
@@ -80,8 +81,22 @@ const GAME_SPEED = 30;
 const DEFAULT_ACCELERATION = 0.5;
 
 /** The least `accRate` and `decRate` the move type holds
- *  (`GroundMoveType.cpp:521-522`). */
+ *  (`GroundMoveType.cpp:523-524`). */
 const LEAST_RATE = 0.01;
+
+/** The unit's `accRate` and `decRate`, elmos a frame squared. A unit that
+ *  states no brake rate brakes at its acceleration (`UnitDef.cpp:459`). */
+function rates(motion: DriveMotion): { accRate: number; decRate: number } {
+  const accRate = Math.max(
+    LEAST_RATE,
+    motion.acceleration ?? DEFAULT_ACCELERATION,
+  );
+  const decRate = Math.max(
+    LEAST_RATE,
+    motion.brakeRate ?? motion.acceleration ?? DEFAULT_ACCELERATION,
+  );
+  return { accRate, decRate };
+}
 
 /** How fast the unit goes and turns, in the units the engine holds them in. */
 export interface DriveMotion {
@@ -409,11 +424,7 @@ function wantsReverse(
     reverseTurn / motion.turnRate - turnTimeMod,
   );
 
-  const accRate = Math.max(
-    LEAST_RATE,
-    motion.acceleration ?? DEFAULT_ACCELERATION,
-  );
-  const decRate = Math.max(LEAST_RATE, motion.brakeRate ?? accRate);
+  const { accRate, decRate } = rates(motion);
   const forwardSpeedAfterTurn = Math.max(
     0,
     currentSpeed - 0.125 * (forwardTurnTime * decRate),
@@ -498,6 +509,20 @@ export function driveAlong(
     };
   };
 
+  /** After the order ends the unit is not stopped dead: `StopEngine` only sets
+   *  the wanted speed to 0 (`GroundMoveType.cpp:2463-2464`, `hardStop` is
+   *  false by default, `GroundMoveType.h:170`), so it slows at its brake rate
+   *  and rolls on along the way it faces until it stops. */
+  const coast = (): DriveFrame => {
+    if (currentSpeed <= 0) return place(0);
+    const speed = Math.max(0, currentSpeed - rates(motion).decRate);
+    const way = reversing ? -1 : 1;
+    const angle = headingRadians(heading);
+    x += Math.sin(angle) * speed * way;
+    z += Math.cos(angle) * speed * way;
+    return place(speed);
+  };
+
   for (let frame = 0; frame < options.frames; frame++) {
     if (frame === options.start && points.length > 0 && arrived === null) {
       moving = true;
@@ -511,22 +536,22 @@ export function driveAlong(
       continue;
     }
     if (!moving) {
-      frames.push(place(0));
+      frames.push(coast());
       continue;
     }
 
     let [tx, tz] = points[next];
     const last = next === points.length - 1;
     const distance = Math.hypot(tx - x, tz - z);
-    const top = reversing ? (motion.reverseSpeed ?? 0) : motion.speed;
-    if (last && distance <= Math.max(GOAL_RADIUS, top)) {
+    const { accRate, decRate } = rates(motion);
+    if (last && distance <= Math.max(GOAL_RADIUS, currentSpeed * 1.05)) {
       moving = false;
       arrived = frame;
       events.push({ frame, callin: "StopMoving" });
-      frames.push(place(0));
+      frames.push(coast());
       continue;
     }
-    if (!last && distance <= Math.max(WAYPOINT_RADIUS, top * 1.05)) {
+    if (!last && distance <= Math.max(WAYPOINT_RADIUS, currentSpeed * 1.05)) {
       next++;
       [tx, tz] = points[next];
     }
@@ -534,12 +559,27 @@ export function driveAlong(
     reversing = wantReverse();
     const way = reversing ? -1 : 1;
     const wanted = headingFromVector(way * (tx - x), way * (tz - z));
-    const speed = turnSpeed(
+    const wantedSpeed = turnSpeed(
       heading,
       wanted,
       reversing ? { ...motion, speed: motion.reverseSpeed ?? 0 } : motion,
       next === points.length - 1,
       Math.hypot(tx - x, tz - z),
+    );
+    // Within its braking distance of the goal the unit wants to stop; then it
+    // moves towards the wanted speed by at most one frame's rate.
+    const braking =
+      next === points.length - 1 &&
+      Math.hypot(points[next][0] - x, points[next][1] - z) <=
+        brakingDistance(currentSpeed, decRate);
+    const targetSpeed = braking ? 0 : wantedSpeed;
+    const difference = targetSpeed - currentSpeed;
+    const speed = Math.max(
+      0,
+      currentSpeed +
+        (difference >= 0
+          ? Math.min(difference, accRate)
+          : -Math.min(-difference, decRate)),
     );
     if (wanted !== heading) {
       const delta = turnDelta(wanted, heading, motion.turnRate, turn);

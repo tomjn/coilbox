@@ -43,6 +43,14 @@ describe("JoinedTo", () => {
     expect(screen.queryByRole("button", { name: "Detach" })).toBeNull();
   });
 
+  it("says why a piece was freed, on the line that otherwise says Free", () => {
+    render(
+      <JoinedTo join={null} {...noop} notice="Detached: moved off its face." />,
+    );
+    expect(screen.getByText("Detached: moved off its face.")).toBeTruthy();
+    expect(screen.queryByText("Free")).toBeNull();
+  });
+
   it("shows a join that cannot be made as broken, and still detaches", () => {
     render(<JoinedTo join={{ ...JOIN, broken: true }} {...noop} />);
     expect(screen.getByText(/Broken/)).toBeTruthy();

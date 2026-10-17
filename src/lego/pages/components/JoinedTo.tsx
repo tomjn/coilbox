@@ -14,6 +14,7 @@ export function JoinedTo({
   join,
   onDetach,
   onPlace,
+  notice,
   showFree,
   onShowFreeChange,
 }: {
@@ -21,6 +22,8 @@ export function JoinedTo({
   onDetach: () => void;
   /** The offset along the face or the twist (radians) a field was set to. */
   onPlace: (change: { offset?: [number, number]; twist?: number }) => void;
+  /** One line on why the piece was just freed, shown while it is free. */
+  notice?: string | null;
   showFree: boolean;
   onShowFreeChange: (show: boolean) => void;
 }) {
@@ -53,7 +56,7 @@ export function JoinedTo({
             </Button>
           </>
         ) : (
-          <span>Free</span>
+          <span>{notice ?? "Free"}</span>
         )}
       </div>
 
