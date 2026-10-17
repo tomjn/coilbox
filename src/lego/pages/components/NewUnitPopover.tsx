@@ -10,6 +10,7 @@ import {
 import type { BodyPlan } from "../../bodyPlans";
 import type { SkeletonTarget } from "../../model";
 import { defaultTarget } from "../../skeletonSize";
+import { DescribeUnitForm } from "./DescribeUnitForm";
 import { SkeletonTargetFields } from "./SkeletonTargetFields";
 
 interface Props {
@@ -32,6 +33,7 @@ export function NewUnitPopover({ plans, label, busy, onChoose }: Props) {
   const [open, setOpen] = useState(false);
   const [picked, setPicked] = useState<BodyPlan | null>(null);
   const [target, setTarget] = useState<SkeletonTarget | null>(null);
+  const [describing, setDescribing] = useState(false);
 
   if (plans.length === 0) {
     return (
@@ -43,7 +45,10 @@ export function NewUnitPopover({ plans, label, busy, onChoose }: Props) {
 
   function close(next: boolean) {
     setOpen(next);
-    if (!next) setPicked(null);
+    if (!next) {
+      setPicked(null);
+      setDescribing(false);
+    }
   }
 
   function pick(plan: BodyPlan) {
@@ -70,7 +75,15 @@ export function NewUnitPopover({ plans, label, busy, onChoose }: Props) {
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72 p-1">
-        {picked ? (
+        {describing ? (
+          <DescribeUnitForm
+            onBack={() => setDescribing(false)}
+            onStart={(plan, size) => {
+              close(false);
+              onChoose(plan, size);
+            }}
+          />
+        ) : picked ? (
           <form
             className="space-y-3 p-2"
             onSubmit={(event) => {
@@ -98,21 +111,30 @@ export function NewUnitPopover({ plans, label, busy, onChoose }: Props) {
             </div>
           </form>
         ) : (
-          <ul className="space-y-0.5">
-            <Entry
-              label="Blank"
-              description="One empty piece to build from."
-              onClick={chooseBlank}
-            />
-            {plans.map((plan) => (
+          <>
+            <ul className="space-y-0.5">
               <Entry
-                key={plan.id}
-                label={plan.label}
-                description={plan.description}
-                onClick={() => pick(plan)}
+                label="Blank"
+                description="One empty piece to build from."
+                onClick={chooseBlank}
               />
-            ))}
-          </ul>
+              {plans.map((plan) => (
+                <Entry
+                  key={plan.id}
+                  label={plan.label}
+                  description={plan.description}
+                  onClick={() => pick(plan)}
+                />
+              ))}
+            </ul>
+            <button
+              type="button"
+              onClick={() => setDescribing(true)}
+              className="mt-1 w-full rounded border-t border-border px-2 py-1.5 text-left text-sm font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              Describe it instead
+            </button>
+          </>
         )}
       </PopoverContent>
     </Popover>
