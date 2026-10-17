@@ -135,7 +135,7 @@ function faceCentre(
   return centre;
 }
 
-function turnAndScale(piece: LegoPiece): THREE.Matrix4 {
+export function turnAndScale(piece: LegoPiece): THREE.Matrix4 {
   return new THREE.Matrix4().compose(
     new THREE.Vector3(),
     new THREE.Quaternion().setFromEuler(new THREE.Euler(...piece.rotation)),
