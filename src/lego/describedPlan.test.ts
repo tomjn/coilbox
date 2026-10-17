@@ -43,7 +43,13 @@ describe("describedPlan", () => {
   });
 
   it("returns the registry plan itself when there is nothing to add", () => {
-    for (const id of ["biped", "quadruped", "wheeled", "tracked"] as const) {
+    for (const id of [
+      "biped",
+      "quadruped",
+      "wheeled",
+      "tracked",
+      "hover",
+    ] as const) {
       expect(describedPlan({ move: id, weapons: 0, builds: false })).toBe(
         BODY_PLANS.find((p) => p.id === id),
       );
@@ -73,6 +79,29 @@ describe("describedPlan", () => {
       .bones(planProportions(plan))
       .find((b) => b.id === "turret");
     expect(turret?.parent).toBe("torso");
+  });
+
+  it("offers hovering, and puts a hovercraft's weapon and build arm on its deck", () => {
+    expect(MOVES.map((m) => m.id)).toContain("hover");
+    const plan = describedPlan({ move: "hover", weapons: 1, builds: true });
+    expect(plan.id).toBe("hover+gun+build");
+    expect(plan.presets.map((p) => p.presetId)).toEqual([
+      "hover.bob",
+      "turret.track",
+      "recoil",
+      "build.aim",
+      "build.nano",
+    ]);
+    const bones = plan.bones(planProportions(plan));
+    expect(bones.find((b) => b.id === "turret")?.parent).toBe("deck");
+    expect(bones.find((b) => b.id === "buildarm.base")?.parent).toBe("deck");
+    const project = projectFromPlan(plan, options);
+    expect(
+      missingPieces(
+        buildLuaScript(project),
+        project.pieces.map((p) => p.name),
+      ),
+    ).toEqual([]);
   });
 
   it("adds the four build arm bones and both build presets", () => {
@@ -149,7 +178,7 @@ describe("planById", () => {
   });
 
   it("finds nothing for an id no plan writes", () => {
-    expect(planById("hover")).toBeUndefined();
+    expect(planById("submarine")).toBeUndefined();
     expect(planById("biped+wings")).toBeUndefined();
     expect(planById("biped+build+gun")).toBeUndefined();
     expect(planById("turret.building+gun")).toBeUndefined();
