@@ -12,6 +12,7 @@ import type {
   ScriptProbes,
   ScriptTimeline,
 } from "./scriptPlayback";
+import type { SheetImage } from "./textureSheet";
 
 /**
  * Which atlas to place, where to read it from, and what to call it. The three
@@ -51,6 +52,12 @@ export interface StoredTextureRef {
   key: string;
   /** What to call it in `unittextures`, which is what the s3o names. */
   writeAs: string;
+  /**
+   * Written over whatever is there on every export and recorded as the
+   * export's own, rather than written once. Set for a mixed unit's combined
+   * sheet (#3260), which is made from the build like the model is.
+   */
+  rewrite?: boolean;
 }
 
 /** A stored document. The JSON is parsed here, not in Rust. */
@@ -744,6 +751,35 @@ export interface ComposedTexture {
   name: string;
   source: null;
 }
+
+/**
+ * The width and height of each picture a mixed unit's combined sheet is laid
+ * out from (#3260), in the order given. A `.dds` is measured off its header.
+ */
+export const legoTextureSizes = defineCommand<
+  { images: SheetImage[] },
+  { width: number; height: number }[]
+>("coilbox-lego", "lego_texture_sizes");
+
+/**
+ * Paint a mixed unit's two combined sheets (#3260) and put both in the store.
+ * Each region copies `crop`, in its source's own UVs, into `dest` on the
+ * sheet. See `src/lego/textureSheet.ts` for the layout.
+ */
+export const legoTextureSheet = defineCommand<
+  {
+    width: number;
+    height: number;
+    regions: {
+      colour: SheetImage;
+      shading: SheetImage | null;
+      crop: [number, number, number, number];
+      dest: [number, number, number, number];
+    }[];
+    names: { texture1: string; texture2: string };
+  },
+  { texture: ComposedTexture; texture2: ComposedTexture }
+>("coilbox-lego", "lego_texture_sheet");
 
 /**
  * Build an s3o's first texture from a separate colour picture and an optional
