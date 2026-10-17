@@ -9,14 +9,16 @@
 
 import {
   type BlenderTextureRef,
+  legoTexturePrune,
   legoTextureSheet,
   legoTextureSizes,
   type StoredTextureRef,
 } from "./bindings";
 import type { LegoProject } from "./model";
 import type { LoadedPack } from "./pack";
+import { savedUnitsAndModules } from "./projects";
 import type { RawGeometry } from "./rawGeometry";
-import { pngName } from "./rawImport";
+import { pngName, texturesInUse } from "./rawImport";
 import { bakedPieces } from "./s3oBuild";
 import {
   cropUv,
@@ -38,6 +40,28 @@ export interface CombinedSheet {
   blender: { colour: BlenderTextureRef; mask: BlenderTextureRef };
   /** Where each piece's UVs go. */
   uv: SheetUv;
+}
+
+/**
+ * Clear the sheets earlier builds left in the texture store (#4362).
+ *
+ * Keeps what a saved unit or module names, what the unit being built names
+ * (its document may not be autosaved yet), and the two sheets just made. A
+ * sheet is not on any document, so everything else is a sheet nothing reads
+ * any more: each export copies its sheet out and the next builds a fresh one.
+ * Does nothing before the saved units have loaded, since the keep set would be
+ * short and a lifted piece's texture would be swept.
+ */
+async function pruneOldSheets(project: LegoProject, sheetKeys: string[]) {
+  const saved = savedUnitsAndModules();
+  if (!saved) return;
+  try {
+    await legoTexturePrune({
+      keep: [...texturesInUse([project, ...saved]), ...sheetKeys],
+    });
+  } catch {
+    // Dead sheets are a disk-space question, and the export has its sheet.
+  }
 }
 
 export async function buildCombinedSheet(
@@ -71,6 +95,7 @@ export async function buildCombinedSheet(
     })),
     names,
   });
+  await pruneOldSheets(project, [stored.texture.key, stored.texture2.key]);
   return {
     ...names,
     place: [

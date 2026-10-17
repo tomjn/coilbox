@@ -207,6 +207,16 @@ export function getCachedProject(id: string): LegoProject | undefined {
   return store.getCached()?.projects.find((p) => p.id === id);
 }
 
+/**
+ * Every saved unit and saved module, or null before the list has loaded. For a
+ * caller outside React deciding which stored textures are still named: a null
+ * means it cannot tell, so it must not delete.
+ */
+export function savedUnitsAndModules(): LegoProject[] | null {
+  const cached = store.getCached();
+  return cached ? [...cached.projects, ...cached.compounds] : null;
+}
+
 /** Every saved unit, newest first. */
 export function useLegoProjects() {
   const { data, loading, error } = store.useStore();
