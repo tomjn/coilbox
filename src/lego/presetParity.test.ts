@@ -347,6 +347,23 @@ function wheelsPlan(): Plan {
   };
 }
 
+/**
+ * No drive, so the heading reads 0 throughout and the rudder holds straight.
+ * `track()` cannot say more, since the rudder follows the heading and not the
+ * time. What this checks is that the script runs under the runtime.
+ */
+function rudderPlan(): Plan {
+  const frames = CALLIN + 5 * FPS;
+  return {
+    events: [...CREATED, { frame: CALLIN, callin: "StartMoving" }],
+    frames,
+    spans: [{ from: CALLIN, to: frames - 1, t0: 0 }],
+    exceptions: [
+      "The unit is not driven, so its heading does not change and the rudder stays straight. A turning heading is checked in rudder.test.ts.",
+    ],
+  };
+}
+
 function plan(preset: AnimPreset, params: Record<string, number>): Plan {
   switch (preset.id) {
     case "walk.biped":
@@ -376,6 +393,8 @@ function plan(preset: AnimPreset, params: Record<string, number>): Plan {
       return nanoPlan();
     case "wheels.roll":
       return wheelsPlan();
+    case "rudder.follow":
+      return rudderPlan();
   }
   throw new Error(`no parity plan for ${preset.id}`);
 }
@@ -545,9 +564,9 @@ function buildCases() {
 describe("preset parity fixture", () => {
   const cases = buildCases();
 
-  it("covers all 14 presets", () => {
-    expect(new Set(cases.map((entry) => entry.preset.id)).size).toBe(14);
-    expect(PRESETS).toHaveLength(14);
+  it("covers all 15 presets", () => {
+    expect(new Set(cases.map((entry) => entry.preset.id)).size).toBe(15);
+    expect(PRESETS).toHaveLength(15);
   });
 
   it("matches what the presets generate today", () => {

@@ -292,7 +292,7 @@ describe("the ship plan", () => {
     });
   });
 
-  it("is a hull at the waterline with one gun turret and a wake at the stern", () => {
+  it("is a hull at the waterline with one gun turret, a wake and a rudder at the stern", () => {
     const project = fromPlan(SHIP);
     expect(project.pieces.map((p) => [p.bone, p.role])).toEqual([
       ["hull", "base"],
@@ -300,7 +300,11 @@ describe("the ship plan", () => {
       ["barrel", "barrel"],
       ["flare", "flare"],
       ["wake", undefined],
+      ["rudder", "rudder"],
     ]);
+    expect(project.animations?.map((a) => a.presetId)).toContain(
+      "rudder.follow",
+    );
     expect(pieceForBone(project, "hull").id).toBe(project.rootPieceId);
   });
 
@@ -317,6 +321,7 @@ describe("the ship plan", () => {
     expect(world.get("barrel")?.[1]).toBeCloseTo(trunnion, 9);
     expect(world.get("flare")?.[2]).toBeCloseTo(barrelLength as number, 9);
     expect(world.get("wake")).toEqual([0, 0, -(hullLength as number) / 2]);
+    expect(world.get("rudder")).toEqual([0, 0, -(hullLength as number) / 2]);
   });
 
   it("aims and fires in the generated script with no parts, and does not rock", () => {
