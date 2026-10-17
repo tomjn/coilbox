@@ -2710,3 +2710,59 @@ mod wait_frame {
         assert_eq!(moved(&timeline, "turret"), Some(spun + 2));
     }
 }
+
+/// The order the engine runs the threads due on one frame in: its running list
+/// first, those begun with `start-script` or back from a wait, and then the
+/// sleepers by wake time and then age (`CobEngine.h:36-41`,
+/// `CobEngine.cpp:136-200`).
+mod run_order {
+    use super::*;
+    use std::path::Path;
+
+    fn played(source: &str) -> Timeline {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../coilbox-bos2lua/tests/fixtures");
+        let timeline = run(
+            &crate::compile_bos(source, &dir).unwrap(),
+            &model_pieces(),
+            &created(),
+            20,
+            &[],
+            &HashMap::new(),
+        );
+        assert_eq!(timeline.error, None);
+        timeline
+    }
+
+    fn moved(timeline: &Timeline, piece: &str) -> Option<usize> {
+        (0..timeline.frames.len()).find(|&frame| close(pose(timeline, frame, piece)[2], 1.0))
+    }
+
+    /// Both wake on frame 5. The younger is due 10 ms sooner, so it runs first.
+    #[test]
+    fn sleepers_due_on_one_frame_wake_by_wake_time_before_age() {
+        let timeline = played(
+            "piece base, turret, barrel;\n\
+             static-var woken;\n\
+             Older() { sleep 110; if (woken) { move turret to z-axis [1] now; } }\n\
+             Younger() { sleep 100; woken = 1; }\n\
+             Create() { start-script Older(); start-script Younger(); }\n",
+        );
+        assert_eq!(moved(&timeline, "turret"), Some(5));
+    }
+
+    /// A thread back from a wait runs ahead of an older sleeper due on the
+    /// same frame, so the sleeper sees what it did that frame.
+    #[test]
+    fn a_thread_back_from_a_wait_runs_before_the_sleepers() {
+        let timeline = played(
+            "piece base, turret, barrel;\n\
+             static-var back;\n\
+             Sentry() { while (!back) { sleep 1; } move base to z-axis [1] now; }\n\
+             Waiter() { turn barrel to x-axis <10> speed <300>; wait-for-turn barrel around x-axis;\n\
+             back = 1; move turret to z-axis [1] now; }\n\
+             Create() { start-script Sentry(); start-script Waiter(); }\n",
+        );
+        let back = moved(&timeline, "turret").expect("the waiter came back");
+        assert_eq!(moved(&timeline, "base"), Some(back));
+    }
+}
