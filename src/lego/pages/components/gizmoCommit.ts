@@ -210,8 +210,9 @@ export function commitGizmo(state: SceneState) {
   if (!group || !pieceId) return;
 
   // Taken once, so a stale seat cannot leak into the next drag.
-  const seat = state.seat;
+  const { seat, slide } = state;
   state.seat = null;
+  state.slide = null;
   state.onTransformRef.current(
     pieceId,
     {
@@ -220,6 +221,7 @@ export function commitGizmo(state: SceneState) {
       scale: [group.scale.x, group.scale.y, group.scale.z],
     },
     seat,
+    slide,
   );
   state.onSnapChange(false);
 }

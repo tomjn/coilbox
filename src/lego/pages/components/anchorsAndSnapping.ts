@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { pieceConnectors } from "../../connectors";
+import { pieceConnectors, slideJoin } from "../../connectors";
 import type { LegoPiece, LegoProject } from "../../model";
 import { descendantIds, pieceById } from "../../model";
 import { type LoadedPack, partUnit } from "../../pack";
@@ -279,6 +279,7 @@ export function applySnap(state: SceneState) {
 
   // Whatever the last move of this drag seated is stale once it moves again.
   state.seat = null;
+  state.slide = null;
 
   const project = state.projectRef.current;
   const pack = state.packRef.current;
@@ -302,6 +303,25 @@ export function applySnap(state: SceneState) {
   if (state.gizmo.getMode() !== "translate") {
     state.onSnapChange(false);
     return;
+  }
+
+  // A joined piece slides along its face, which replaces the anchor snap.
+  if (piece.connection) {
+    const step = partUnit(pack);
+    const slid = slideJoin(
+      project,
+      pack,
+      pieceId,
+      group.position.toArray() as Vec3,
+      step,
+    );
+    if (slid) {
+      showSeat(state, null);
+      group.position.set(...slid.position);
+      state.slide = slid.offset;
+      state.onSnapChange(false, undefined, step, slid.offset);
+      return;
+    }
   }
 
   const targets = snapTargets(state, pack, project, pieceId);

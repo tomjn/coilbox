@@ -70,8 +70,9 @@ function twistOf(
  *
  * With a seat, the piece hangs off the piece it seated against, in the place it
  * was dropped, and carries a join to it that replaces any join it had before.
- * Without one, a piece that was moved or turned is freed from its join. A piece
- * that was only scaled keeps its join, since the join places a scaled piece
+ * Without one, a piece that slid along its face (issue #3285) keeps its join
+ * with the new offset. Any other piece that was moved or turned is freed from
+ * its join. A piece that was only scaled keeps its join, since the join places a scaled piece
  * correctly. A piece that did not move at all, as with a click on the handles
  * that goes nowhere, is left joined.
  *
@@ -83,6 +84,7 @@ export function dragPiece(
   pieceId: string,
   transform: DraggedTransform,
   seat: Seat | null,
+  slide: [number, number] | null = null,
 ): LegoProject {
   const before = pieceById(project, pieceId);
   if (!before) return project;
@@ -121,6 +123,21 @@ export function dragPiece(
               },
             }
           : p,
+      ),
+    };
+  }
+
+  // A slide along the face keeps the join and moves it, so the piece is not
+  // freed. Alt gives no slide, and the piece is freed where it is dropped.
+  if (slide && before.connection) {
+    const [along, across] = before.connection.offset ?? [0, 0];
+    if (slide[0] === along && slide[1] === across) return next;
+    return {
+      ...next,
+      pieces: next.pieces.map((piece) =>
+        piece.id === pieceId && piece.connection
+          ? { ...piece, connection: { ...piece.connection, offset: slide } }
+          : piece,
       ),
     };
   }

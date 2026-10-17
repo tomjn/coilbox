@@ -296,6 +296,62 @@ function placeJoin(
   };
 }
 
+/**
+ * Where a joined piece dragged to `position` lands when it can only slide along
+ * the face it is joined to (issue #3285).
+ *
+ * The part of the drag that goes through the face is dropped, and the rest
+ * becomes an offset along the face. That offset moves in whole `step`s from the
+ * one the join rests at, so a join that is not on the step stays off it by the
+ * same amount. A step of zero or less leaves the offset free. Nothing stops the
+ * offset running past the edge of the face, because a part overhanging a hull is
+ * legitimate.
+ *
+ * `position` is in the parent's space, the space a piece's own position is
+ * written in. Null when the piece has no join that can be made.
+ */
+export function slideJoin(
+  project: LegoProject,
+  pack: LoadedPack,
+  pieceId: string,
+  position: Vec3,
+  step: number,
+): { offset: [number, number]; position: Vec3 } | null {
+  const piece = project.pieces.find((p) => p.id === pieceId);
+  const connection = piece?.connection;
+  const parent = piece?.parentId
+    ? project.pieces.find((p) => p.id === piece.parentId)
+    : undefined;
+  if (!piece || !connection || !parent) return null;
+
+  const at = (offset: [number, number]) =>
+    placeJoin(pack, piece, parent, { ...connection, offset });
+  const origin = at([0, 0]);
+  const along = at([1, 0]);
+  const across = at([0, 1]);
+  if (!origin || !along || !across) return null;
+
+  // One offset unit moves the piece one unit along the face, so the drag read
+  // along each direction is the offset that reaches it.
+  const drag = new THREE.Vector3(...position).sub(
+    new THREE.Vector3(...origin.position),
+  );
+  const raw = [along, across].map((placed) =>
+    drag.dot(
+      new THREE.Vector3(...placed.position).sub(
+        new THREE.Vector3(...origin.position),
+      ),
+    ),
+  );
+  const from = connection.offset ?? [0, 0];
+  const offset = raw.map((value, i) =>
+    step > 0 ? from[i] + Math.round((value - from[i]) / step) * step : value,
+  ) as [number, number];
+
+  const placed = at(offset);
+  return placed ? { offset, position: placed.position } : null;
+}
+
 /** A right-handed frame with `facing` and `up` as its first two columns. */
 function frame(facing: THREE.Vector3, up: THREE.Vector3): THREE.Matrix4 {
   const third = new THREE.Vector3().crossVectors(facing, up);

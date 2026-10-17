@@ -617,6 +617,7 @@ function Builder({ id }: { id: string | undefined }) {
     pieceId: string,
     change: Partial<LegoPiece>,
     seat?: Seat | null,
+    slide?: [number, number] | null,
   ) {
     // Where a placement lands, whether it came from the gizmo or from typing a
     // number into the panel, so symmetry only has to watch this one spot.
@@ -636,6 +637,7 @@ function Builder({ id }: { id: string | undefined }) {
               scale: change.scale ?? [1, 1, 1],
             },
             seat,
+            slide ?? null,
           )
         : {
             ...project,
