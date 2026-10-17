@@ -98,7 +98,7 @@ function localAnchorsOf(
   } else if (piece.shape && connectors.length > 0) {
     anchors = shapeAnchors(box, piece.shape, connectors);
   } else {
-    anchors = pieceAnchors(box).map((anchor) =>
+    anchors = pieceAnchors(box, undefined).map((anchor) =>
       anchor.connector && ids.has(anchor.connector)
         ? anchor
         : stripConnector(anchor),
