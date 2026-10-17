@@ -166,14 +166,13 @@ export function installedGameFor(
 }
 
 /**
- * The pieces in a unit that came out of its game. Today that is every mesh of
- * a unit opened from a game. Pieces lifted onto a unit of parts (#3262) are
- * meant to join them here.
+ * The pieces in a unit that came out of its game: every mesh of a unit opened
+ * from a game, and any piece lifted off one of the game's units (#3262).
  */
 export function liftedPieces(project: LegoProject): string[] {
-  if (!project.imported?.game) return [];
+  const opened = Boolean(project.imported?.game);
   return project.pieces
-    .filter((piece) => piece.meshId)
+    .filter((piece) => piece.lifted || (opened && piece.meshId))
     .map((piece) => piece.name);
 }
 
