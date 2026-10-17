@@ -12,6 +12,8 @@
  * alone by one that does not.
  */
 
+import * as THREE from "three";
+
 import {
   type BodyPlan,
   type BodyPlanBone,
@@ -25,6 +27,7 @@ import {
   type LegoProject,
   uniquePieceName,
 } from "./model";
+import { localFromWorld, worldMatrix } from "./reparent";
 
 type Vec3 = [number, number, number];
 
@@ -78,7 +81,7 @@ const same = (a: Vec3, b: Vec3) => a.every((n, i) => n === b[i]);
  *
  * Bones the plan keeps are moved if the plan now places them elsewhere. Bones
  * it no longer has are removed, and a piece that hung on one moves up to the
- * bone's parent without moving in the unit. Bones it newly has are added as
+ * bone's parent without moving or turning in the unit. Bones it newly has are added as
  * `projectFromPlan` makes them. Nothing that is not a bone is touched, and a
  * piece keeps its own size and rotation.
  *
@@ -124,22 +127,32 @@ export function applyProportions(
         }
         return piece;
       }
-      // Walk up past removed bones, adding each one's place, so the piece
-      // stays where it is in the unit.
+      // Hang it on the nearest kept ancestor, in the same place and turn in
+      // the unit. The removed bones' own turn and scale count, not only where
+      // they sit.
       let parentId = piece.parentId;
-      let position = piece.position;
-      let moved = false;
       while (parentId !== null && removed.has(parentId)) {
-        const gone = removed.get(parentId) as LegoPiece;
-        position = [
-          position[0] + gone.position[0],
-          position[1] + gone.position[1],
-          position[2] + gone.position[2],
-        ];
-        parentId = gone.parentId;
-        moved = true;
+        parentId = (removed.get(parentId) as LegoPiece).parentId;
       }
-      return moved ? { ...piece, parentId, position } : piece;
+      if (parentId === piece.parentId) return piece;
+      const local = localFromWorld(
+        project,
+        parentId,
+        worldMatrix(project, piece.id),
+        false,
+      );
+      const position = new THREE.Vector3();
+      const rotation = new THREE.Quaternion();
+      const scale = new THREE.Vector3();
+      local.decompose(position, rotation, scale);
+      const euler = new THREE.Euler().setFromQuaternion(rotation);
+      return {
+        ...piece,
+        parentId,
+        position: [position.x, position.y, position.z],
+        rotation: [euler.x, euler.y, euler.z],
+        scale: [scale.x, scale.y, scale.z],
+      };
     });
 
   // A bone's own children that are bones are removed with it or kept by the

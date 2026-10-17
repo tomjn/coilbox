@@ -143,7 +143,7 @@ export const liveGameSweepTools: GameSweepTools = {
 export type GameSweepTarget = HubSweepTarget;
 
 /** A game that will be sent, with the two modinfo fields already read off it. */
-interface Sendable {
+export interface Sendable {
   game: GameItem;
   shortname: string;
   release: string;
@@ -294,8 +294,10 @@ export function factionKeys(
   return keys;
 }
 
-/** The factions, units and start units of one game, ready to send. */
-function factsFor(
+/** The factions, units and start units of one game, ready to send. Exported for
+ *  the picture sweep, which sends a game's facts before its faction logos (issue
+ *  #4387). */
+export function factsFor(
   { game, shortname, release }: Sendable,
   units: readonly UnitDatasetEntry[],
   sides: readonly Side[],

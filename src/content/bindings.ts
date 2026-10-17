@@ -2689,7 +2689,15 @@ export interface FactionLogoEntry {
   /** PNG `data:` URL, only when the emblem had nowhere on disk to go. */
   dataUri?: string;
   maxDim: number;
+  /** The emblem encoded as the hub's `logo` asset, present only when the call
+   *  asked for `assets` and one came out. Such an entry has no `file` or
+   *  `dataUri`. */
+  asset?: FactionLogoAsset;
 }
+
+/** A faction emblem encoded as the asset the hub takes, written to disk. Same
+ *  shape as {@link UnitBuildpicAsset}, with `variant` always `logo`. */
+export type FactionLogoAsset = UnitBuildpicAsset;
 
 export interface FactionLogosResult {
   /** One entry per side whose `Sidepics/<side>` emblem resolved. */
@@ -2701,10 +2709,14 @@ export interface FactionLogosResult {
  * Resolve a game's per-side faction emblems from its `Sidepics/<side>` folder —
  * lazy, since it mounts the game's archive set. `sides` are the side names (from
  * {@link unitsyncGameInfo}).
+ *
+ * `assets` encodes each emblem as the hub's `logo` asset and writes it where the
+ * uploader can read it (#4387). Only the picture sweep asks for that, and such a
+ * call skips the cache and returns no PNG.
  */
 export const unitsyncFactionLogos = (args: FactionLogosArgs) =>
   factionLogosCommand(withGameArchivePath(args));
-type FactionLogosArgs = GameReadArgs & { sides: string[] };
+type FactionLogosArgs = GameReadArgs & { sides: string[]; assets?: boolean };
 const factionLogosCommand = defineCommand<FactionLogosArgs, FactionLogosResult>(
   "coilbox-unitsync",
   "unitsync_faction_logos",

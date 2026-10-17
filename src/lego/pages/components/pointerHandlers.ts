@@ -11,6 +11,12 @@ import {
 import { pickGround } from "./drivePlayback";
 import { pieceIdOf } from "./gizmoCommit";
 import { groundPoint } from "./measureLayer";
+import {
+  beginPackDrag,
+  endPackDrag,
+  highlightPlate,
+  movePackDrag,
+} from "./packHandles";
 import { firstPieceHit, hoverPlaceFace, placeOnClick } from "./placeByFace";
 import type { SceneState } from "./sceneState";
 import { setHoveredAndNotify } from "./selectionAndHoverOutlines";
@@ -52,20 +58,23 @@ export function attachPointerHandlers(state: SceneState): () => void {
   const onFaceDown = (event: PointerEvent) => {
     if (event.button !== 0) return;
     aimAt(event);
-    if (!beginFaceDrag(state, raycaster)) return;
+    if (!beginFaceDrag(state, raycaster) && !beginPackDrag(state, raycaster))
+      return;
     state.dragging = true;
     setHoveredAndNotify(state, null);
     renderer.domElement.setPointerCapture(event.pointerId);
     state.render();
   };
   const onFaceMove = (event: PointerEvent) => {
-    if (!state.collisionDrag) return;
+    if (!state.collisionDrag && !state.packDrag) return;
     aimAt(event);
-    moveFaceDrag(state, raycaster);
+    if (state.packDrag) movePackDrag(state, raycaster);
+    else moveFaceDrag(state, raycaster);
   };
   const onFaceUp = (event: PointerEvent) => {
-    if (!state.collisionDrag) return;
-    endFaceDrag(state);
+    if (!state.collisionDrag && !state.packDrag) return;
+    if (state.packDrag) endPackDrag(state);
+    else endFaceDrag(state);
     state.dragging = false;
     if (renderer.domElement.hasPointerCapture(event.pointerId))
       renderer.domElement.releasePointerCapture(event.pointerId);
@@ -128,6 +137,7 @@ export function attachPointerHandlers(state: SceneState): () => void {
       state.gizmo.dragging ||
       state.gizmo.axis !== null ||
       state.collisionDrag !== null ||
+      state.packDrag !== null ||
       state.standInDrag !== null;
   };
   const onPointerUp = (event: PointerEvent) => {
@@ -208,8 +218,12 @@ export function attachPointerHandlers(state: SceneState): () => void {
     const plate = state.collisionHandles.visible
       ? raycaster.intersectObjects(state.collisionHandles.children, false)[0]
       : undefined;
-    if (highlightHandle(state, plate?.object ?? null)) state.render();
-    if (plate) {
+    const packPlate = state.packHandles.visible
+      ? raycaster.intersectObjects(state.packHandles.children, false)[0]
+      : undefined;
+    const lit = highlightHandle(state, plate?.object ?? null);
+    if (highlightPlate(state, packPlate?.object ?? null) || lit) state.render();
+    if (plate || packPlate) {
       setHoveredAndNotify(state, null);
       return;
     }

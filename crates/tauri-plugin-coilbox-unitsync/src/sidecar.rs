@@ -152,6 +152,8 @@ pub fn build_unit_buildpics_args(
 
 /// Build args for `--faction-logos` mode: the game whose `Sidepics/<side>` emblems
 /// to resolve, the comma-joined side names, and the optional on-disk cache dir.
+/// `asset_dir` additionally encodes each emblem as the hub's `logo` asset (issue
+/// #4387).
 ///
 /// The mode's fields live once in `coilbox_unitsync_worker::FactionLogosArgs`,
 /// so this function only has to add `--lib`/`--datadir`, which every mode
@@ -162,6 +164,7 @@ pub fn build_faction_logos_args(
     game: &str,
     sides: &[String],
     cache_dir: Option<&str>,
+    asset_dir: Option<&str>,
 ) -> Vec<String> {
     let mut args = build_args(lib, datadir);
     args.extend(
@@ -169,6 +172,7 @@ pub fn build_faction_logos_args(
             game: game.into(),
             sides: sides.to_vec(),
             cache_dir: cache_dir.map(String::from),
+            asset_dir: asset_dir.map(String::from),
         })
         .to_args(),
     );
@@ -1584,6 +1588,7 @@ mod tests {
             "BAR.sdd",
             &["Armada".into(), "Cortex".into()],
             Some("/cache/logos"),
+            Some("/assets"),
         );
         assert!(a.contains(&"--faction-logos".to_string()));
         let recovered = FactionLogosArgs::from_args(&a).expect("valid argv");
@@ -1593,14 +1598,17 @@ mod tests {
                 game: "BAR.sdd".into(),
                 sides: vec!["Armada".into(), "Cortex".into()],
                 cache_dir: Some("/cache/logos".into()),
+                asset_dir: Some("/assets".into()),
             }
         );
 
         let without =
-            build_faction_logos_args("/eng/libunitsync.so", "/data", "BAR.sdd", &[], None);
+            build_faction_logos_args("/eng/libunitsync.so", "/data", "BAR.sdd", &[], None, None);
         assert!(!without.iter().any(|x| x == "--cache-dir"));
+        assert!(!without.iter().any(|x| x == "--asset-dir"));
         let recovered = FactionLogosArgs::from_args(&without).expect("valid argv");
         assert_eq!(recovered.cache_dir, None);
+        assert_eq!(recovered.asset_dir, None);
     }
 
     /// What `build_unit_dataset_args` writes, the worker's own `from_args`

@@ -113,6 +113,10 @@ function watcher(
     scan: async () => ({ games, maps: [], errors: [] }) as never,
     dataset: async ({ gameArchive }) =>
       ({ units: dataset(gameArchive), errors: [] }) as never,
+    info: async () => ({ sides: [], errors: [] }) as never,
+    branding: async () => [],
+    publishFacts: async () => [],
+    factionLogos: async () => ({ logos: [], errors: [] }),
     renderKeys: async ({ units }) => {
       const keys: Record<string, unknown> = {};
       for (const unit of units) {
@@ -295,6 +299,131 @@ describe("a sweep over the installed games", () => {
    * that have a picture. The same eighty spent on renders is sixteen units with
    * five each, and three hundred and sixty three still blank.
    */
+  /** Issue #4387: the hub makes a faction's row from the game's facts and
+   *  answers a logo for a faction it has none for with a 404. */
+  describe("faction logos", () => {
+    const sides = [
+      { name: "Armada", startUnit: "armcom" },
+      { name: "Cortex", startUnit: "corcom" },
+    ];
+
+    function logoEntry(side: string) {
+      return {
+        side,
+        maxDim: 16,
+        asset: {
+          variant: "logo",
+          origin: "extracted",
+          sourceArchive: "BA V15",
+          path: `/assets/${side}.webp`,
+          hash: `hash-${side}`,
+          sourceHash: `src-${side}`,
+          sourceMember: `Sidepics/${side}.png`,
+          encodeProfile: "webp-lossless-128",
+          mime: "image/webp",
+          width: 16,
+          height: 16,
+          bytes: 100,
+        },
+      };
+    }
+
+    function withLogos(watch: Watch) {
+      const calls: string[] = [];
+      const factionsSent: (string[] | undefined)[] = [];
+      const uploaded: string[] = [];
+      watch.tools.info = async () => ({ sides, errors: [] }) as never;
+      watch.tools.publishFacts = async (_hubUrl, facts) => {
+        calls.push("facts");
+        factionsSent.push(facts.factions?.map((one) => one.key));
+        return [];
+      };
+      watch.tools.factionLogos = async () => {
+        calls.push("read logos");
+        return { logos: sides.map((one) => logoEntry(one.name)), errors: [] };
+      };
+      const ask = watch.tools.ask;
+      watch.tools.ask = async (hubUrl, keys) => {
+        if (keys.some((key) => key.keyed_on === "faction")) calls.push("ask");
+        return ask(hubUrl, keys);
+      };
+      const upload = watch.tools.upload;
+      watch.tools.upload = async (hubUrl, assets, options) => {
+        for (const asset of assets) {
+          if (asset.keyed_on === "faction") {
+            calls.push("upload");
+            uploaded.push(asset.faction_key);
+          }
+        }
+        return upload(hubUrl, assets, options);
+      };
+      return { calls, factionsSent, uploaded };
+    }
+
+    it("sends the game's facts, then asks, then sends the logos", async () => {
+      const watch = watcher();
+      const seen = withLogos(watch);
+      const report = await run(watch);
+
+      expect(seen.calls).toEqual([
+        "facts",
+        "read logos",
+        "ask",
+        "upload",
+        "upload",
+      ]);
+      expect(seen.factionsSent).toEqual([["armada", "cortex"]]);
+      expect(seen.uploaded).toEqual(["armada", "cortex"]);
+      expect(report.games[0].logos).toBe(2);
+    });
+
+    it("leaves out a faction the hub refused in the facts", async () => {
+      const watch = watcher();
+      const seen = withLogos(watch);
+      watch.tools.publishFacts = async () => [
+        { kind: "faction", name: "cortex", outcome: "refused", said: "no" },
+      ];
+      await run(watch);
+      expect(seen.uploaded).toEqual(["armada"]);
+    });
+
+    it("still sends the unit pictures when the facts are refused", async () => {
+      const watch = watcher();
+      const seen = withLogos(watch);
+      watch.tools.publishFacts = async () => {
+        throw new Error("The hub would not take this game.");
+      };
+      const report = await run(watch);
+
+      expect(seen.uploaded).toEqual([]);
+      expect(report.errors.join("\n")).toContain(
+        "The hub would not take this game.",
+      );
+      expect(watch.picsSent.length).toBeGreaterThan(0);
+      expect(report.games[0].logos).toBeUndefined();
+    });
+
+    it("sends no logos for a game the hub already has them for", async () => {
+      const watch = watcher();
+      const seen = withLogos(watch);
+      const ask = watch.tools.ask;
+      watch.tools.ask = async (hubUrl, keys) =>
+        keys[0]?.keyed_on === "faction"
+          ? keys.map((key) => ({ ...key, status: "have" }) as never)
+          : ask(hubUrl, keys);
+      const report = await run(watch);
+      expect(seen.uploaded).toEqual([]);
+      expect(report.games[0].logos).toBeUndefined();
+    });
+
+    it("counts logos in what it tells the person", async () => {
+      const watch = watcher({ hubHas: () => true, hubHasPic: () => true });
+      withLogos(watch);
+      const report = await run(watch);
+      expect(pictureSweepSummary(report)).toContain("Sent 2 faction logos.");
+    });
+  });
+
   it("sends a whole roster's build pics before it draws anything", async () => {
     const watch = watcher({ dataset: () => roster(400), writesLeft: 80 });
     await run(watch);
