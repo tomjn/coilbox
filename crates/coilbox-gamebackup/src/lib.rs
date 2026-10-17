@@ -146,6 +146,17 @@ pub struct Undone {
     pub deleted: Vec<String>,
 }
 
+/// What the workshop's edit in place route marks its writes with.
+///
+/// Here rather than in the workshop because the unit builder's export reads
+/// them as well: it leaves a unit file alone while the workshop holds an
+/// unaccepted backup of it, since undo would put the backup back over the
+/// export (issue #3245).
+pub const WORKSHOP: Markers = Markers {
+    backup: ".coilbox-workshop-backup",
+    created: ".coilbox-workshop-created",
+};
+
 /// The two suffixes one feature marks its writes with.
 #[derive(Debug, Clone, Copy)]
 pub struct Markers {

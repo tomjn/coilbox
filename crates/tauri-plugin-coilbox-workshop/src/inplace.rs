@@ -51,11 +51,9 @@ use crate::inplace_clone;
 use crate::model::{BuildMenuOp, GameEdits, ModProject, UnitClone, UnitPatch};
 
 /// What the workshop marks its in-place writes with. Distinct from the `.3do`
-/// installer's suffix, so undoing one never undoes the other.
-pub const MARKERS: Markers = Markers {
-    backup: ".coilbox-workshop-backup",
-    created: ".coilbox-workshop-created",
-};
+/// installer's suffix, so undoing one never undoes the other. Defined beside
+/// [`Markers`] because the unit builder's export reads them too (issue #3245).
+pub const MARKERS: Markers = coilbox_gamebackup::WORKSHOP;
 
 /// One change the patcher would not make, or that could not be matched to a
 /// file.
