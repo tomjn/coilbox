@@ -28,6 +28,7 @@ import { ExportDrawer } from "./ExportDrawer";
 const legoGameLanguage = vi.fn();
 const legoExport = vi.fn();
 const legoExportPicture = vi.fn();
+const legoReadTextFile = vi.fn();
 const legoAtlasPng = vi.fn();
 const legoTextureSizes = vi.fn();
 const legoTextureSheet = vi.fn();
@@ -62,6 +63,7 @@ vi.mock("../../bindings", () => ({
   }),
   legoGameLanguage: (args: { dir: string }) => legoGameLanguage(args),
   legoOpenPath: vi.fn(),
+  legoReadTextFile: (args: unknown) => legoReadTextFile(args),
   legoTexturePng: vi.fn(),
   legoTextureSizes: (args: unknown) => legoTextureSizes(args),
   legoTextureSheet: (args: unknown) => legoTextureSheet(args),
@@ -118,6 +120,7 @@ function show(
   shown = project,
   onRemember = vi.fn(),
   raw: RawGeometry | null = null,
+  onAdopt = vi.fn(),
 ) {
   return render(
     <ExportDrawer
@@ -128,6 +131,7 @@ function show(
       raw={raw}
       onRemember={onRemember}
       onStale={vi.fn()}
+      onAdopt={onAdopt}
     />,
   );
 }
@@ -136,6 +140,8 @@ beforeEach(() => {
   legoGameLanguage.mockReset();
   legoExport.mockReset();
   legoExportPicture.mockReset();
+  legoReadTextFile.mockReset();
+  legoReadTextFile.mockRejectedValue(new Error("no such file"));
   legoAtlasPng.mockReset();
   legoTextureSizes.mockReset();
   legoTextureSheet.mockReset();
@@ -706,5 +712,119 @@ describe("re-export", () => {
         screen.getByText(/the workshop has changes in it that you have not/),
       ).toBeTruthy(),
     );
+  });
+});
+
+/**
+ * A definition already in the folder with no digest in the receipt (issue
+ * #4272): the person can say it is coilbox's, which records its digest so the
+ * next export updates the builder's fields.
+ */
+describe("treating a definition as coilbox's", () => {
+  const receipt = (files: { path: string; sha256: string }[]) => ({
+    ...project,
+    exported: {
+      dir: "/games/some.sdd",
+      at: "",
+      unitName: "skyfort",
+      def: { objectname: "skyfort_old" },
+      files,
+    },
+  });
+  const noDigest = receipt([
+    { path: "/games/some.sdd/scripts/skyfort.lua", sha256: "script-digest" },
+  ]);
+  const label = "Treat this file as coilbox's";
+
+  beforeEach(() => {
+    legoGameLanguage.mockResolvedValue({ texts: {} });
+    legoReadTextFile.mockResolvedValue({ text: "return {}" });
+  });
+
+  it("is offered, with the path in a tooltip, when the receipt has no digest", async () => {
+    show(noDigest);
+    const button = await screen.findByRole("button", { name: label });
+    expect(button.getAttribute("title")).toBe(
+      "/games/some.sdd/units/skyfort.lua",
+    );
+  });
+
+  it("is not offered when the receipt holds a digest for the definition", async () => {
+    show(
+      receipt([
+        { path: "/games/some.sdd/units/skyfort.lua", sha256: "def-digest" },
+      ]),
+    );
+    await waitFor(() => expect(legoGameLanguage).toHaveBeenCalled());
+    await new Promise((done) => setTimeout(done, 20));
+    expect(screen.queryByRole("button", { name: label })).toBeNull();
+  });
+
+  it("is not offered when the definition is not in the folder", async () => {
+    legoReadTextFile.mockRejectedValue(new Error("no such file"));
+    show(noDigest);
+    await waitFor(() => expect(legoReadTextFile).toHaveBeenCalled());
+    await new Promise((done) => setTimeout(done, 20));
+    expect(screen.queryByRole("button", { name: label })).toBeNull();
+  });
+
+  it("is not offered when the folder has no receipt", async () => {
+    show(project);
+    await waitFor(() => expect(legoGameLanguage).toHaveBeenCalled());
+    await new Promise((done) => setTimeout(done, 20));
+    expect(legoReadTextFile).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: label })).toBeNull();
+  });
+
+  it("records the file's digest without writing anything", async () => {
+    const onAdopt = vi.fn();
+    show(noDigest, vi.fn(), null, onAdopt);
+    fireEvent.click(await screen.findByRole("button", { name: label }));
+    await waitFor(() => expect(onAdopt).toHaveBeenCalled());
+    const files = onAdopt.mock.calls[0][0].exported.files;
+    expect(files[0].path).toBe("/games/some.sdd/units/skyfort.lua");
+    expect(files[0].sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(files[0].sha256).toBe(
+      Array.from(
+        new Uint8Array(
+          await crypto.subtle.digest(
+            "SHA-256",
+            new TextEncoder().encode("return {}"),
+          ),
+        ),
+        (b) => b.toString(16).padStart(2, "0"),
+      ).join(""),
+    );
+    expect(files).toHaveLength(2);
+    expect(legoExport).not.toHaveBeenCalled();
+  });
+
+  it("makes the next export send the builder's fields", async () => {
+    const onAdopt = vi.fn();
+    const view = show(noDigest, vi.fn(), null, onAdopt);
+    await waitFor(() =>
+      expect(screen.getByText(/goes into the definition/)).toBeTruthy(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Export" }));
+    await waitFor(() => expect(legoExport).toHaveBeenCalled());
+    expect(legoExport.mock.calls[0][0].unitDefFields).toBeNull();
+
+    legoExport.mockReset();
+    legoExport.mockResolvedValue(exportResult());
+    fireEvent.click(await screen.findByRole("button", { name: label }));
+    await waitFor(() => expect(onAdopt).toHaveBeenCalled());
+    view.unmount();
+    show({ ...noDigest, ...onAdopt.mock.calls[0][0] });
+    await waitFor(() =>
+      expect(screen.getByText(/goes into the definition/)).toBeTruthy(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Export" }));
+    await waitFor(() => expect(legoExport).toHaveBeenCalled());
+    const sent = legoExport.mock.calls[0][0].unitDefFields;
+    expect(sent).not.toBeNull();
+    expect(
+      sent.find((f: { path: string }) => f.path === "objectname").last,
+    ).toBe("skyfort_old");
+    expect(screen.queryByRole("button", { name: label })).toBeNull();
   });
 });

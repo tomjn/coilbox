@@ -56,6 +56,7 @@ import {
   legoExportPicture,
   legoExportStale,
   legoGameLanguage,
+  legoReadTextFile,
   legoSaveGlb,
   legoTexturePng,
 } from "../../bindings";
@@ -64,6 +65,7 @@ import { buildCombinedSheet, type CombinedSheet } from "../../combinedSheet";
 import { exportGlb } from "../../exportGlb";
 import { buildObj } from "../../exportObj";
 import {
+  adoptFile,
   digestsOf,
   forgetStale,
   receiptFor,
@@ -85,6 +87,7 @@ import {
 import type { RawGeometry } from "../../rawGeometry";
 import { blenderTextures, importedTextures } from "../../rawImport";
 import {
+  definitionUnclaimed,
   derivedFields,
   type FieldChange,
   type KeptWhole,
@@ -123,6 +126,11 @@ interface Props {
   /** The leftovers alone, for when the drawer clears a name's files without
    *  exporting anything. Stable, since an effect here reads it. */
   onStale: (staleExports: StaleExport[]) => void;
+  /** The receipts after the person has said a definition is coilbox's
+   *  (issue #4272). */
+  onAdopt: (
+    receipts: Pick<LegoProject, "exported" | "exportedElsewhere">,
+  ) => void;
 }
 
 /** What is still in the game folder under one name the unit no longer uses. */
@@ -339,6 +347,7 @@ export function ExportDrawer({
   raw,
   onRemember,
   onStale,
+  onAdopt,
 }: Props) {
   const [dir, setDir] = useState(project.exportDir ?? "");
   const [withTexture, setWithTexture] = useState(
@@ -455,6 +464,52 @@ export function ExportDrawer({
       live = false;
     };
   }, [isOpen, staleExports, onStale]);
+
+  // A definition already in the folder that the receipt has no digest for: one
+  // exported before digests were recorded, or the game's own that an older
+  // export kept. Coilbox cannot tell which, so the person says (issue #4272).
+  const unclaimed = definitionUnclaimed(
+    receiptFor(project, dir),
+    dir,
+    project.unitName,
+  );
+  const definitionPath = `${dir.replace(/[\\/]+$/, "")}/units/${project.unitName}.lua`;
+  const [definitionThere, setDefinitionThere] = useState(false);
+  const [adopting, setAdopting] = useState(false);
+  useEffect(() => {
+    setDefinitionThere(false);
+    if (!isOpen || !unclaimed) return;
+    let live = true;
+    legoReadTextFile({ path: definitionPath }).then(
+      () => live && setDefinitionThere(true),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [isOpen, unclaimed, definitionPath]);
+
+  async function adoptDefinition() {
+    setAdopting(true);
+    try {
+      // Read now rather than when the drawer looked, so the digest is of the
+      // file as it is when the person chose.
+      const { text } = await legoReadTextFile({ path: definitionPath });
+      const bytes = new TextEncoder().encode(text);
+      const sha256 = Array.from(
+        new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)),
+        (byte) => byte.toString(16).padStart(2, "0"),
+      ).join("");
+      onAdopt(adoptFile(project, dir, { path: definitionPath, sha256 }));
+    } catch (error) {
+      setResult({
+        state: "failed",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setAdopting(false);
+    }
+  }
 
   async function clearStale(entry: Leftover) {
     setClearing(entry.stale.unitName);
@@ -1224,6 +1279,20 @@ export function ExportDrawer({
                 </p>
               </div>
             </div>
+
+            {unclaimed && definitionThere ? (
+              <div className="flex items-center gap-2 text-xs">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={adopting}
+                  title={definitionPath}
+                  onClick={() => void adoptDefinition()}
+                >
+                  Treat this file as coilbox's
+                </Button>
+              </div>
+            ) : null}
 
             {/* What a rename left in the game folder. Shown rather than cleared
                 on its own: two units under two names is occasionally what
