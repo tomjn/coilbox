@@ -33,9 +33,14 @@ import { type AssetPicture, fetchHubPictures } from "./pictures";
 /** One identity as a string, so it can key a map. The same fields the hub keys a
  *  row on, in a shape neither key can collide across. */
 export function identityKey(identity: AssetIdentity): string {
-  return identity.keyed_on === "map"
-    ? `map\n${identity.map_name}\n${identity.variant}`
-    : `unit\n${identity.game}\n${identity.unit_name}\n${identity.variant}`;
+  switch (identity.keyed_on) {
+    case "map":
+      return `map\n${identity.map_name}\n${identity.variant}`;
+    case "faction":
+      return `faction\n${identity.game}\n${identity.faction_key}\n${identity.variant}`;
+    case "unit":
+      return `unit\n${identity.game}\n${identity.unit_name}\n${identity.variant}`;
+  }
 }
 
 /** Answers, keyed on hub address and identity. Null is an answer. */
