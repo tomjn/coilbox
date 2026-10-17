@@ -108,10 +108,9 @@ export type LuaHook =
   | "StopMoving"
   | "Activate"
   | "Deactivate"
-  | "AimWeapon1"
-  | "AimFromWeapon1"
-  | "QueryWeapon1"
-  | "Shot1"
+  // One of each per weapon, numbered from 1 in the order of the unit
+  // definition's `weapons` table. See `WeaponHook`.
+  | WeaponHook
   // A builder is handed a heading and a pitch to point at, a factory is handed
   // nothing at all, and both arrive through this one name. See `BUILD_AIM`.
   | "StartBuilding"
@@ -119,12 +118,46 @@ export type LuaHook =
   | "QueryNanoPiece"
   | "Killed";
 
+/**
+ * The call-ins the engine asks once per weapon. The unit script gadget
+ * (`LuaGadgets/Gadgets/unit_script.lua`) dispatches the engine's one
+ * `AimWeapon(weaponNum, ...)` to `AimWeapon<weaponNum>`, and the same for the
+ * others, for every slot of the unit definition's `weapons` table.
+ */
+export type WeaponHook =
+  | `AimWeapon${number}`
+  | `AimFromWeapon${number}`
+  | `QueryWeapon${number}`
+  | `Shot${number}`;
+
+/** The roles a weapon's own pieces carry. */
+export type WeaponRole = "turret" | "aim" | "barrel" | "flare";
+
+/** One weapon of the unit, with the pieces that are its own. */
+export interface EmitWeapon {
+  /** Its slot, counted from 1, which is the n in `AimWeapon<n>`. */
+  number: number;
+  /**
+   * The weapon's own piece in a role, or undefined when it has none. Asking
+   * marks it used, as `EmitContext.pieces` does.
+   */
+  piece(role: WeaponRole): string | undefined;
+  /**
+   * A signal of this preset's own for this weapon alone. Each weapon needs its
+   * own, because aiming starts with `Signal`, which would otherwise cancel
+   * another weapon's aim still turning.
+   */
+  signal: string;
+}
+
 export interface EmitContext {
   /**
    * Names of the pieces carrying a role, in document order. Asking marks them
    * used, so the script declares a local for exactly what it references.
    */
   pieces(role: string): string[];
+  /** The unit's weapons, in slot order. */
+  weapons(): EmitWeapon[];
   params: Record<string, number>;
   /** A signal number of this preset's own, for stopping its threads. */
   signal: string;
@@ -633,34 +666,31 @@ export const TURRET_TRACK: AnimPreset = {
    * of the motion. In a game the target decides where it points.
    */
   emit(ctx) {
-    const turret = ctx.pieces("turret")[0];
-    if (!turret) return null;
-    const barrel = ctx.pieces("barrel")[0];
-    const flare = ctx.pieces("flare")[0];
     const speed = aimSpeeds(this, ctx.params);
-
-    const aim = [
-      `  Signal(${ctx.signal})`,
-      `  SetSignalMask(${ctx.signal})`,
-      ...(speed.turn
-        ? [`  Turn(${turret}, y_axis, heading, ${speed.turn})`]
-        : []),
-      ...(barrel && speed.lift
-        ? [`  Turn(${barrel}, x_axis, -pitch, ${speed.lift})`]
-        : []),
-      ...(speed.turn ? [`  WaitForTurn(${turret}, y_axis)`] : []),
-      ...(barrel && speed.lift ? [`  WaitForTurn(${barrel}, x_axis)`] : []),
-      "  return true",
-    ];
-
-    return {
-      functions: [],
-      hooks: {
-        AimWeapon1: aim,
-        AimFromWeapon1: [`  return ${turret}`],
-        QueryWeapon1: [`  return ${flare ?? barrel ?? turret}`],
-      },
-    };
+    const hooks: EmitResult["hooks"] = {};
+    for (const weapon of ctx.weapons()) {
+      const turret = weapon.piece("turret");
+      if (!turret) continue;
+      const barrel = weapon.piece("barrel");
+      const flare = weapon.piece("flare");
+      const n = weapon.number;
+      hooks[`AimWeapon${n}`] = [
+        `  Signal(${weapon.signal})`,
+        `  SetSignalMask(${weapon.signal})`,
+        ...(speed.turn
+          ? [`  Turn(${turret}, y_axis, heading, ${speed.turn})`]
+          : []),
+        ...(barrel && speed.lift
+          ? [`  Turn(${barrel}, x_axis, -pitch, ${speed.lift})`]
+          : []),
+        ...(speed.turn ? [`  WaitForTurn(${turret}, y_axis)`] : []),
+        ...(barrel && speed.lift ? [`  WaitForTurn(${barrel}, x_axis)`] : []),
+        "  return true",
+      ];
+      hooks[`AimFromWeapon${n}`] = [`  return ${turret}`];
+      hooks[`QueryWeapon${n}`] = [`  return ${flare ?? barrel ?? turret}`];
+    }
+    return Object.keys(hooks).length > 0 ? { functions: [], hooks } : null;
   },
 };
 
@@ -1217,30 +1247,29 @@ export const AIM_TRACK: AnimPreset = {
    * as turret.track does for its own pair of pieces.
    */
   emit(ctx) {
-    const aim = ctx.pieces("aim")[0];
-    if (!aim) return null;
     const speed = aimSpeeds(this, ctx.params);
-
-    return {
-      functions: [],
-      hooks: {
-        AimWeapon1: [
-          `  Signal(${ctx.signal})`,
-          `  SetSignalMask(${ctx.signal})`,
-          ...(speed.turn
-            ? [`  Turn(${aim}, y_axis, heading, ${speed.turn})`]
-            : []),
-          ...(speed.lift
-            ? [`  Turn(${aim}, x_axis, -pitch, ${speed.lift})`]
-            : []),
-          ...(speed.turn ? [`  WaitForTurn(${aim}, y_axis)`] : []),
-          ...(speed.lift ? [`  WaitForTurn(${aim}, x_axis)`] : []),
-          "  return true",
-        ],
-        AimFromWeapon1: [`  return ${aim}`],
-        QueryWeapon1: [`  return ${aim}`],
-      },
-    };
+    const hooks: EmitResult["hooks"] = {};
+    for (const weapon of ctx.weapons()) {
+      const aim = weapon.piece("aim");
+      if (!aim) continue;
+      const n = weapon.number;
+      hooks[`AimWeapon${n}`] = [
+        `  Signal(${weapon.signal})`,
+        `  SetSignalMask(${weapon.signal})`,
+        ...(speed.turn
+          ? [`  Turn(${aim}, y_axis, heading, ${speed.turn})`]
+          : []),
+        ...(speed.lift
+          ? [`  Turn(${aim}, x_axis, -pitch, ${speed.lift})`]
+          : []),
+        ...(speed.turn ? [`  WaitForTurn(${aim}, y_axis)`] : []),
+        ...(speed.lift ? [`  WaitForTurn(${aim}, x_axis)`] : []),
+        "  return true",
+      ];
+      hooks[`AimFromWeapon${n}`] = [`  return ${aim}`];
+      hooks[`QueryWeapon${n}`] = [`  return ${aim}`];
+    }
+    return Object.keys(hooks).length > 0 ? { functions: [], hooks } : null;
   },
 };
 
@@ -1317,31 +1346,30 @@ export const RECOIL: AnimPreset = {
     return { position: [0, 0, -depth] };
   },
   /**
-   * A one-shot hangs off Shot1 directly, the same as turret.track's aim hangs
-   * off AimWeapon1: no thread, because the callin is already its own thread,
+   * A one-shot hangs off each weapon's `Shot<n>` directly, the same as
+   * turret.track's aim hangs off `AimWeapon<n>`, and kicks that weapon's own
+   * barrel: no thread, because the callin is already its own thread,
    * started fresh by the engine every time the weapon fires. Signal and
    * SetSignalMask stop a kick still easing home from an earlier shot, so rapid
    * fire restarts the motion cleanly rather than piling moves on top of it.
    */
   emit(ctx) {
-    const barrel = ctx.pieces("barrel")[0];
-    if (!barrel) return null;
     const kick = value(this, ctx.params, "kick");
     const kickTime = Math.max(value(this, ctx.params, "kickTime"), 0.01);
     const returnTime = Math.max(value(this, ctx.params, "returnTime"), 0.01);
-
-    return {
-      functions: [],
-      hooks: {
-        Shot1: [
-          `  Signal(${ctx.signal})`,
-          `  SetSignalMask(${ctx.signal})`,
-          `  Move(${barrel}, z_axis, -${lua(kick)}, ${lua(kick / kickTime)})`,
-          `  WaitForMove(${barrel}, z_axis)`,
-          `  Move(${barrel}, z_axis, 0, ${lua(kick / returnTime)})`,
-        ],
-      },
-    };
+    const hooks: EmitResult["hooks"] = {};
+    for (const weapon of ctx.weapons()) {
+      const barrel = weapon.piece("barrel");
+      if (!barrel) continue;
+      hooks[`Shot${weapon.number}`] = [
+        `  Signal(${weapon.signal})`,
+        `  SetSignalMask(${weapon.signal})`,
+        `  Move(${barrel}, z_axis, -${lua(kick)}, ${lua(kick / kickTime)})`,
+        `  WaitForMove(${barrel}, z_axis)`,
+        `  Move(${barrel}, z_axis, 0, ${lua(kick / returnTime)})`,
+      ];
+    }
+    return Object.keys(hooks).length > 0 ? { functions: [], hooks } : null;
   },
 };
 
