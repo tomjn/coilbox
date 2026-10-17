@@ -18,6 +18,7 @@ import {
 } from "../../environment";
 import { importedMaterial, partMaterial } from "../../geometry";
 import type { PieceTransform } from "../../groupTransform";
+import { JoinedGroup } from "../../joinedWorld";
 import type { LegoCollisionVolume, LegoPiece, LegoProject } from "../../model";
 import { getPartGeometry, type LoadedPack } from "../../pack";
 import { seatPieceMesh } from "../../pivot";
@@ -444,13 +445,13 @@ export function syncScene(
   // later edit happened to sync again.
   for (const piece of project.pieces) {
     if (state.groups.has(piece.id)) continue;
-    const group = new THREE.Group();
+    const group = new JoinedGroup();
     group.userData.pieceId = piece.id;
     state.groups.set(piece.id, group);
   }
 
   for (const piece of project.pieces) {
-    const group = state.groups.get(piece.id) as THREE.Group;
+    const group = state.groups.get(piece.id) as JoinedGroup;
 
     // Reparent before transforming, so a piece that moved branch and position
     // in one edit ends up in the right place.
@@ -463,6 +464,7 @@ export function syncScene(
     group.position.set(...piece.position);
     group.rotation.set(...piece.rotation);
     group.scale.set(...piece.scale);
+    group.joined = piece.connection !== undefined && parent !== undefined;
     group.visible = piece.hidden !== true;
 
     const geometry = pieceGeometry(pack, raw, piece);

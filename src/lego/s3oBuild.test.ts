@@ -885,6 +885,72 @@ describe("pieceWorldRest", () => {
   });
 });
 
+describe("a joined child under a scaled parent (#3292)", () => {
+  const SCALE: [number, number, number] = [2, 3, 4];
+
+  function bakedChild(parentScale: [number, number, number], joined: boolean) {
+    const doc = project([
+      { id: "a", name: "a", parentId: "root", scale: parentScale },
+      {
+        id: "b",
+        name: "b",
+        parentId: "a",
+        position: [1, 0, 0],
+        ...(joined ? { connection: { connector: "+x", to: "+x" } } : {}),
+      },
+    ]);
+    return bakedPieces(doc, pack(), null).pieces.get("b");
+  }
+
+  it("keeps the child's own size when it is joined", () => {
+    expect(bakedChild(SCALE, true)?.vertices.map((v) => v.pos)).toEqual(
+      bakedChild([1, 1, 1], true)?.vertices.map((v) => v.pos),
+    );
+  });
+
+  it("moves the child with the parent's scaled connector", () => {
+    const plain = bakedChild([1, 1, 1], true)?.offset ?? [0, 0, 0];
+    const scaled = bakedChild(SCALE, true)?.offset ?? [0, 0, 0];
+    expect(round(scaled)).toEqual(
+      round(plain.map((n, i) => n * SCALE[i]) as number[]),
+    );
+  });
+
+  it("still stretches a child that is not joined", () => {
+    expect(bakedChild(SCALE, false)?.vertices.map((v) => v.pos)).not.toEqual(
+      bakedChild([1, 1, 1], false)?.vertices.map((v) => v.pos),
+    );
+  });
+
+  it("gives a joined grandchild the same, down the tree", () => {
+    const tree = (scale: [number, number, number]) =>
+      bakedPieces(
+        project([
+          { id: "a", name: "a", parentId: "root", scale },
+          {
+            id: "b",
+            name: "b",
+            parentId: "a",
+            connection: { connector: "+x", to: "+x" },
+          },
+          {
+            id: "c",
+            name: "c",
+            parentId: "b",
+            connection: { connector: "+x", to: "+x" },
+          },
+        ]),
+        pack(),
+        null,
+      ).pieces.get("c");
+    const flat = (tree([1, 1, 1])?.vertices ?? []).flatMap((v) => v.pos);
+    const scaled = (tree(SCALE)?.vertices ?? []).flatMap((v) => v.pos);
+    scaled.forEach((n, i) => {
+      expect(n).toBeCloseTo(flat[i]);
+    });
+  });
+});
+
 describe("bakedCounts", () => {
   it("counts the root as a piece with no triangles", () => {
     expect(bakedCounts(project([]), pack(), null)).toEqual({
