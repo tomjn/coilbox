@@ -1,4 +1,13 @@
 import {
+  type StoredBlueprint,
+  setupPackSource,
+  uniqueLayoutName,
+} from "../blueprint/library";
+import {
+  type BlueprintPayload,
+  parseBlueprintPayload,
+} from "../blueprint/payload";
+import {
   type GameIdentity,
   parseGameIdentity,
 } from "../container/gameIdentity";
@@ -9,6 +18,7 @@ import {
   engineVersionRequirement,
   exactMapRequirement,
 } from "../content/resolveContent";
+import { formatBytes } from "../lib/format";
 import { parsePresetJson, type SkirmishPreset } from "../play/presets";
 import {
   decodePackEnvelope,
@@ -21,7 +31,7 @@ import {
  * coilbox. References, not content. A collection of games (by installed
  * archive name, optionally with a rapid tag for downloading it fresh) and
  * maps, either optional but not both, plus optionally bundled skirmish
- * presets. Small enough to paste in chat. Importing resolves every reference
+ * presets and base blueprints (issue #1727). Importing resolves every reference
  * through issue #387's `ResolveContentGate` before anything is applied.
  */
 export interface SetupPackGame extends GameIdentity {
@@ -54,6 +64,10 @@ export interface SetupPackManifest {
   games?: SetupPackGame[];
   maps?: string[];
   presets?: SetupPackPreset[];
+  /** Layouts bundled with the pack, in the shape a blueprint travels in on its
+   * own. Additive, so the kind version stays at 1: an older coilbox drops the
+   * field and imports the rest. */
+  blueprints?: BlueprintPayload[];
 }
 
 /** One entry of a pack's game list, or null when the shape is wrong. */
@@ -144,18 +158,45 @@ export function parseSetupPackManifest(
     presets = parsed;
   }
 
+  let blueprints: BlueprintPayload[] | undefined;
+  if (d.blueprints !== undefined) {
+    if (!Array.isArray(d.blueprints)) return null;
+    const parsed: BlueprintPayload[] = [];
+    for (const raw of d.blueprints) {
+      const layout = parseBlueprintPayload(raw);
+      if (!layout) return null;
+      parsed.push(layout);
+    }
+    blueprints = parsed;
+  }
+
   return {
     ...(title ? { title } : {}),
     ...(engineVersion ? { engineVersion } : {}),
     ...(games.length ? { games } : {}),
     ...(maps.length ? { maps } : {}),
     ...(presets ? { presets } : {}),
+    ...(blueprints ? { blueprints } : {}),
   };
 }
 
-/** Encode a manifest into a pasteable, versioned pack code. */
-export function encodeSetupPack(manifest: SetupPackManifest): string {
-  return encodePackEnvelope(manifest);
+/** A pasteable pack code, or why this pack cannot have one. */
+export type SetupPackCode =
+  | { ok: true; code: string }
+  | { ok: false; message: string };
+
+/**
+ * Encode a manifest into a pasteable, versioned pack code, or refuse when the
+ * far end could not read it back. Blueprints are what can make a pack too big,
+ * so the refusal says to take some out.
+ */
+export function encodeSetupPack(manifest: SetupPackManifest): SetupPackCode {
+  const result = encodePackEnvelope(manifest);
+  if (result.ok) return result;
+  return {
+    ok: false,
+    message: `This pack is ${formatBytes(result.bytes)}, past the ${formatBytes(result.limit)} a share code can carry. Take some blueprints out.`,
+  };
 }
 
 /** Decode and validate a pasted pack code. */
@@ -223,4 +264,32 @@ export function namesForPackPresets(
     names.push(name);
   }
   return names;
+}
+
+/**
+ * The library records a pack's blueprints become: a fresh id each, a name
+ * counted up past the library's and the pack's own the way every other import
+ * into the library counts one up, and a note of the setup pack they came in.
+ */
+export function blueprintsFromPack(
+  taken: Iterable<string>,
+  manifest: SetupPackManifest,
+  at: Date = new Date(),
+): StoredBlueprint[] {
+  const claimed = [...taken];
+  return (manifest.blueprints ?? []).map((layout) => {
+    const name = uniqueLayoutName(layout.name, claimed);
+    claimed.push(name);
+    return {
+      id: crypto.randomUUID(),
+      createdAt: "",
+      updatedAt: "",
+      layout: { ...layout, name },
+      source: setupPackSource(
+        manifest.title,
+        name === layout.name ? undefined : layout.name,
+        at,
+      ),
+    };
+  });
 }

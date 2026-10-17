@@ -6,6 +6,7 @@ vi.mock("@picoframe/frame", () => ({
   useSetting: () => [undefined, () => {}],
 }));
 
+import type { StoredBlueprint } from "../blueprint/library";
 import type { SkirmishPreset } from "../play/presets";
 import { aiGameNameForPack, buildPackManifest } from "./build";
 
@@ -31,6 +32,7 @@ describe("buildPackManifest", () => {
       gameNames: [],
       mapNames: ["Map One", "Map Two"],
       presets: [],
+      blueprints: [],
       installedGames: [],
     });
     expect(built).toEqual({
@@ -45,6 +47,7 @@ describe("buildPackManifest", () => {
       gameNames: ["Game A"],
       mapNames: [],
       presets: [],
+      blueprints: [],
       installedGames: [{ name: "Game A", shortname: "ga" }],
     });
     expect(built?.games).toEqual([{ name: "Game A", shortname: "ga" }]);
@@ -56,6 +59,7 @@ describe("buildPackManifest", () => {
       gameNames: [],
       mapNames: ["Map One"],
       presets: [preset()],
+      blueprints: [],
       installedGames: [],
     });
     expect(built?.presets?.[0]).not.toHaveProperty("id");
@@ -70,6 +74,50 @@ describe("buildPackManifest", () => {
         gameNames: [],
         mapNames: [],
         presets: [preset()],
+        blueprints: [],
+        installedGames: [],
+      }),
+    ).toBeNull();
+  });
+
+  it("carries a blueprint's layout and leaves this machine's record behind", () => {
+    const record: StoredBlueprint = {
+      id: "b1",
+      createdAt: "2026-08-01T00:00:00.000Z",
+      updatedAt: "2026-08-02T00:00:00.000Z",
+      layout: {
+        name: "Opening solars",
+        buildings: [{ def: "armsolar", offset: { x: 0, z: 0 }, facing: 0 }],
+        footprints: { armsolar: { x: 4, z: 4 } },
+      },
+      source: { kind: "file", file: "/Users/me/opening.json", at: "" },
+    };
+    const built = buildPackManifest({
+      title: "",
+      gameNames: ["Game A"],
+      mapNames: [],
+      presets: [],
+      blueprints: [record],
+      installedGames: [],
+    });
+    expect(built?.blueprints).toEqual([record.layout]);
+  });
+
+  it("refuses a pack of blueprints alone", () => {
+    expect(
+      buildPackManifest({
+        title: "",
+        gameNames: [],
+        mapNames: [],
+        presets: [],
+        blueprints: [
+          {
+            id: "b1",
+            createdAt: "",
+            updatedAt: "",
+            layout: { name: "Wall", buildings: [], footprints: {} },
+          },
+        ],
         installedGames: [],
       }),
     ).toBeNull();
@@ -81,6 +129,7 @@ describe("buildPackManifest", () => {
       gameNames: ["Game A"],
       mapNames: ["Map One"],
       presets: [],
+      blueprints: [],
       installedGames: [{ name: "Game A" }],
     });
     expect(built).not.toHaveProperty("engineVersion");

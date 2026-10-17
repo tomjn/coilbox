@@ -170,6 +170,15 @@ export interface SetupPackContents {
   engine: string | null;
   /** Map names, once each, in the order the pack lists them. */
   maps: string[];
+  /** The layouts the pack bundles, in its order (issue #1727). */
+  blueprints: PackBlueprint[];
+}
+
+/** One layout a setup pack bundles. */
+export interface PackBlueprint {
+  name: string;
+  /** Null for a layout with no buildings, which has nothing to draw. */
+  layout: BlueprintShape | null;
 }
 
 export type HubPreview =
@@ -301,7 +310,17 @@ function setupPackPreview(payload: Record<string, unknown>): HubPreview | null {
   const engine = pinnedEngine(payload);
   if (games.length === 0 && maps.length === 0 && !engine) return null;
 
-  return { kind: "setup-pack", games, engine, maps };
+  // A damaged layout costs its own card and nothing else.
+  const blueprints = (
+    Array.isArray(payload.blueprints) ? payload.blueprints : []
+  ).flatMap((raw): PackBlueprint[] => {
+    const layout = parseBlueprintPayload(raw);
+    return layout
+      ? [{ name: layout.name, layout: blueprintShape(layout) }]
+      : [];
+  });
+
+  return { kind: "setup-pack", games, engine, maps, blueprints };
 }
 
 /** The engine build a pack pins, or null for one that pins none. ".spring" is

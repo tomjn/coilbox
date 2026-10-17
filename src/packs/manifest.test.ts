@@ -8,10 +8,12 @@ vi.mock("@picoframe/frame", () => ({
   useSetting: () => [undefined, () => {}],
 }));
 
+import type { BlueprintPayload } from "../blueprint/payload";
 import { encodeContainerCode, identify } from "../container/container";
 import type { InstalledContentSnapshot } from "../content/resolveContent";
 import type { SkirmishPreset } from "../play/presets";
 import {
+  blueprintsFromPack,
   decodeSetupPack,
   dedupePresetName,
   encodeSetupPack,
@@ -29,6 +31,26 @@ function manifest(
     maps: ["Red Comet Remake 1.8"],
     ...overrides,
   };
+}
+
+function layout(overrides: Partial<BlueprintPayload> = {}): BlueprintPayload {
+  return {
+    game: { name: "Beyond All Reason test-27000", shortname: "byar" },
+    name: "Opening solars",
+    buildings: [
+      { def: "armsolar", offset: { x: 0, z: 0 }, facing: 0 },
+      { def: "armlab", offset: { x: 96, z: 0 }, facing: 1 },
+    ],
+    footprints: { armsolar: { x: 4, z: 4 }, armlab: { x: 8, z: 6 } },
+    ...overrides,
+  };
+}
+
+/** A pack code, or a failed test naming why there is none. */
+function code(m: SetupPackManifest): string {
+  const encoded = encodeSetupPack(m);
+  if (!encoded.ok) throw new Error(encoded.message);
+  return encoded.code;
 }
 
 function preset(overrides: Partial<SkirmishPreset> = {}): SkirmishPreset {
@@ -197,13 +219,13 @@ describe("a pack as a collection", () => {
 describe("encodeSetupPack / decodeSetupPack", () => {
   it("round-trips a manifest with a pinned engine", () => {
     const m = manifest({ engineVersion: "105.1.1-2554-gabcdef" });
-    const result = decodeSetupPack(encodeSetupPack(m));
+    const result = decodeSetupPack(code(m));
     expect(result).toEqual({ ok: true, settings: m });
   });
 
   it("round-trips a manifest with no engine pinned", () => {
     const { engineVersion: _engineVersion, ...m } = manifest();
-    const result = decodeSetupPack(encodeSetupPack(m));
+    const result = decodeSetupPack(code(m));
     expect(result).toEqual({ ok: true, settings: m });
   });
 
@@ -219,7 +241,7 @@ describe("encodeSetupPack / decodeSetupPack", () => {
     const m = manifest({
       games: [{ name: "Beyond All Reason test-27000", shortname: "byar" }],
     });
-    const result = decodeSetupPack(encodeSetupPack(m));
+    const result = decodeSetupPack(code(m));
     expect(result).toEqual({ ok: true, settings: m });
   });
 
@@ -241,9 +263,44 @@ describe("encodeSetupPack / decodeSetupPack", () => {
     });
   });
 
+  it("round-trips the blueprints a pack carries", () => {
+    const m = manifest({
+      blueprints: [layout(), layout({ name: "Wall", ordered: true })],
+    });
+    expect(decodeSetupPack(code(m))).toEqual({ ok: true, settings: m });
+  });
+
+  it("still imports a pack shared before packs carried blueprints", () => {
+    const old = encodeContainerCode("setup-pack", 1, {
+      title: "Comet nights",
+      games: [{ name: "Beyond All Reason test-27000" }],
+      maps: ["Red Comet Remake 1.8"],
+      presets: [{ ...preset(), id: undefined }],
+    });
+    const result = decodeSetupPack(old);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.settings.blueprints).toBeUndefined();
+    expect(result.settings.title).toBe("Comet nights");
+    expect(result.settings.presets).toHaveLength(1);
+  });
+
+  it("refuses to make a code the far end could not read back", () => {
+    // Distinct names so the text cannot compress down to nothing, and enough
+    // of them that the container's JSON is past the inflate ceiling.
+    const many = Array.from({ length: 4000 }, (_, i) =>
+      layout({ name: `Layout ${i} ${"x".repeat(100)}` }),
+    );
+    const encoded = encodeSetupPack(manifest({ blueprints: many }));
+    expect(encoded.ok).toBe(false);
+    if (encoded.ok) return;
+    expect(encoded.message).toContain("512 KB");
+    expect(encoded.message).toContain("blueprints");
+  });
+
   it("rejects a corrupted code cleanly", () => {
-    const code = encodeSetupPack(manifest());
-    const corrupted = `${code.slice(0, -4)}xxxx`;
+    const good = code(manifest());
+    const corrupted = `${good.slice(0, -4)}xxxx`;
     const result = decodeSetupPack(corrupted);
     expect(result.ok).toBe(false);
   });
@@ -295,6 +352,84 @@ describe("requirementsForPack", () => {
       manifest({ maps: ["Map A", "Map A", "Map B"] }),
     );
     expect(reqs.filter((r) => r.kind === "map")).toHaveLength(2);
+  });
+});
+
+describe("parseSetupPackManifest, for blueprints", () => {
+  it("reads the layouts a pack carries", () => {
+    const m = manifest({ blueprints: [layout()] });
+    expect(parseSetupPackManifest(m)).toEqual(m);
+  });
+
+  it("is not a pack when blueprints are all it holds", () => {
+    expect(parseSetupPackManifest({ blueprints: [layout()] })).toBeNull();
+  });
+
+  it("rejects a pack whose blueprints are not a list", () => {
+    expect(
+      parseSetupPackManifest({ ...manifest(), blueprints: layout() }),
+    ).toBeNull();
+  });
+
+  it("rejects a pack holding a damaged blueprint", () => {
+    expect(
+      parseSetupPackManifest({
+        ...manifest(),
+        blueprints: [layout(), { name: "No buildings list" }],
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("blueprintsFromPack", () => {
+  const at = new Date("2026-10-17T09:00:00.000Z");
+
+  it("keeps each layout under a fresh id, noting the pack it came in", () => {
+    const [kept] = blueprintsFromPack(
+      [],
+      manifest({ title: "Comet nights", blueprints: [layout()] }),
+      at,
+    );
+    expect(kept.id).not.toBe("");
+    expect(kept.layout).toEqual(layout());
+    expect(kept.source).toEqual({
+      kind: "setup-pack",
+      title: "Comet nights",
+      at: "2026-10-17T09:00:00.000Z",
+    });
+  });
+
+  it("counts a name up past the library and the pack's other layouts", () => {
+    const kept = blueprintsFromPack(
+      ["opening solars"],
+      manifest({
+        blueprints: [layout(), layout(), layout({ name: "Wall" })],
+      }),
+      at,
+    );
+    expect(kept.map((k) => k.layout.name)).toEqual([
+      "Opening solars 2",
+      "Opening solars 3",
+      "Wall",
+    ]);
+    expect(kept.map((k) => k.source?.wasCalled)).toEqual([
+      "Opening solars",
+      "Opening solars",
+      undefined,
+    ]);
+  });
+
+  it("mints a different id for every layout", () => {
+    const kept = blueprintsFromPack(
+      [],
+      manifest({ blueprints: [layout(), layout()] }),
+      at,
+    );
+    expect(new Set(kept.map((k) => k.id)).size).toBe(2);
+  });
+
+  it("keeps nothing for a pack that carries no blueprints", () => {
+    expect(blueprintsFromPack([], manifest(), at)).toEqual([]);
   });
 });
 

@@ -49,6 +49,7 @@ import { blueprintFromPayload, blueprintPayload } from "./transfer";
  */
 export type BlueprintSource =
   | PackSource
+  | SetupPackSource
   | FileSource
   | CodeSource
   | HubSource
@@ -69,6 +70,15 @@ export interface PackSource extends ArrivedHere {
   kind: "pack";
   /** The file it was taken out of, as the person picked it. */
   file: string;
+}
+
+/** Bundled in a setup pack beside the games and maps it was drawn for (issue
+ *  #1727). Not a {@link PackSource}: that is somebody's file of blueprints, and
+ *  this is a code that installs content and happened to carry layouts too. */
+export interface SetupPackSource extends ArrivedHere {
+  kind: "setup-pack";
+  /** What the setup pack calls itself. Absent for one with no name. */
+  title?: string;
 }
 
 /** Out of a file holding this layout on its own. */
@@ -142,6 +152,19 @@ export function packSource(
   return { kind: "pack", file, ...arrived(wasCalled, at) };
 }
 
+/** For one bundled in a setup pack. */
+export function setupPackSource(
+  title?: string,
+  wasCalled?: string,
+  at: Date = new Date(),
+): SetupPackSource {
+  return {
+    kind: "setup-pack",
+    ...(title ? { title } : {}),
+    ...arrived(wasCalled, at),
+  };
+}
+
 /** For one read out of a file holding it on its own. */
 export function fileSource(
   file: string,
@@ -213,6 +236,10 @@ export function sourceLabel(source: BlueprintSource): string {
     case "pack":
     case "file":
       return `From ${sourceFileName(source.file)}`;
+    case "setup-pack":
+      return source.title
+        ? `From the setup pack ${source.title}`
+        : "From a setup pack";
     case "code":
       return "From a shared code";
     case "hub":
@@ -240,6 +267,10 @@ function summaryOf(source: BlueprintSource): string {
   switch (source.kind) {
     case "pack":
       return `Imported from a file of blueprints, ${source.file}.`;
+    case "setup-pack":
+      return source.title
+        ? `Imported with the setup pack "${source.title}".`
+        : "Imported with a setup pack.";
     case "file":
       return `Imported from the file ${source.file}.`;
     case "code":
@@ -283,6 +314,10 @@ function parseBlueprintSource(value: unknown): BlueprintSource | undefined {
       return file ? { kind: "pack", file, ...rest } : undefined;
     case "file":
       return file ? { kind: "file", file, ...rest } : undefined;
+    case "setup-pack": {
+      const title = text("title");
+      return { kind: "setup-pack", ...(title ? { title } : {}), ...rest };
+    }
     case "code":
       return { kind: "code", ...rest };
     case "hub": {
