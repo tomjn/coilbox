@@ -167,7 +167,7 @@ import type {
   StandInTrack,
 } from "../scriptPlayback";
 import { dragPiece, freeMoved, type Seat, typedTransform } from "../seat";
-import { isRoundShapeKind, type LegoShape } from "../shapes";
+import { isKnownShapeKind, type LegoShape } from "../shapes";
 import { isShortcut, shortcutLabel } from "../shortcuts";
 import { skeletonProblems } from "../skeletonChecks";
 import { applyProportions } from "../skeletonEdit";
@@ -181,6 +181,7 @@ import { useShareModule } from "../useModuleShare";
 import { useRawGeometry } from "../useRawGeometry";
 import { useSymmetry } from "../useSymmetry";
 import { addWeaponModule, pickWeaponParts } from "../weaponModule";
+import { newWedgeShape } from "../wedgeShape";
 import {
   addShapePiece,
   setPieceRole,
@@ -637,13 +638,16 @@ function Builder({ id }: { id: string | undefined }) {
   }
 
   /**
-   * Add a cylinder or a tube at the selected piece's origin, as a part added
+   * Add a cylinder, tube or wedge at the selected piece's origin, as a part added
    * with Alt is. It is sized in the piece panel. #3337 moves shapes into the
    * strip beside the parts.
    */
-  function addShape(kind: RoundKind) {
+  function addShape(kind: RoundKind | "wedge") {
     if (!draft || !pack) return;
-    const shape = newRoundShape(kind, draft, pack);
+    const shape =
+      kind === "wedge"
+        ? newWedgeShape(draft, pack)
+        : newRoundShape(kind, draft, pack);
     if (!shape) return;
     const pieceId = crypto.randomUUID();
     edit((project) =>
@@ -2321,6 +2325,13 @@ function Builder({ id }: { id: string | undefined }) {
                     >
                       Tube
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => addShape("wedge")}
+                    >
+                      Wedge
+                    </Button>
                   </ButtonGroup>
                 ) : null}
 
@@ -2744,7 +2755,7 @@ function Builder({ id }: { id: string | undefined }) {
                             pieceId={selected.id}
                           />
                           {selected.shape &&
-                          isRoundShapeKind(selected.shape.kind) ? (
+                          isKnownShapeKind(selected.shape.kind) ? (
                             <ShapeFields
                               key={selected.id}
                               shape={selected.shape}
