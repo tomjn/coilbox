@@ -485,6 +485,14 @@ export interface LegoPiece {
    * `ringSet.ts`.
    */
   ring?: LegoPieceRing;
+  /**
+   * The bone of the unit's body plan this piece is (#3246), by the bone's id in
+   * the plan, such as `thigh.l1`. Only a unit with a `skeleton` has these, and
+   * no two pieces share one. A piece without it is free, and a proportion never
+   * moves it. A copy and a piece moved to another parent lose it, because the
+   * plan places a bone against its own parent bone. See `bodyPlans.ts`.
+   */
+  bone?: string;
 }
 
 /** A piece's place in a ring of copies. See `LegoPiece.ring`. */
@@ -753,6 +761,27 @@ export interface LegoProject {
    * none.
    */
   guides?: LegoGuide[];
+  /**
+   * The body plan this unit was started from and its proportions now (#3246).
+   * The pieces the plan made say which bone they are in `LegoPiece.bone`.
+   * Absent means a unit with no skeleton, which is every unit made before this
+   * existed. Removing it and every `bone` leaves plain pieces: see
+   * `releaseSkeleton`.
+   */
+  skeleton?: LegoSkeleton;
+}
+
+/**
+ * Which body plan a unit was made from, and the value of each of its named
+ * proportions, such as `legLength`. The plan itself is code in `bodyPlans.ts`,
+ * so a plan id this version does not know is kept as it is and only means no
+ * proportion can be changed. A proportion missing from `proportions` is one
+ * nobody has a value for, such as one that could not be measured off a unit
+ * the plan was fitted to.
+ */
+export interface LegoSkeleton {
+  plan: string;
+  proportions: Record<string, number>;
 }
 
 /** The three axes a guide can be aligned to. */
@@ -1304,7 +1333,12 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
     parsed.push(name === piece.name ? piece : { ...piece, name });
   }
   if (parsed.length === 0) return null;
-  const { imported, pieces } = sheetFromTop(parseImported(d.imported), parsed);
+  const { imported, pieces: sheeted } = sheetFromTop(
+    parseImported(d.imported),
+    parsed,
+  );
+  const skeleton = parseSkeleton(d.skeleton);
+  const pieces = withOwnedBones(sheeted, skeleton !== null);
 
   const mid = parseVec3(d.mid);
   const collisionVolume = parseCollisionVolume(d.collisionVolume);
@@ -1396,11 +1430,50 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
       const guides = parseGuides(d.guides);
       return guides ? { guides } : {};
     })(),
+    ...(skeleton ? { skeleton } : {}),
   };
   // A document saved before pieces were written in save order, or hand-edited,
   // may not have its parents first. Normalise here so the invariant holds the
   // moment a project is in memory, not only after its next save.
   return { ...project, pieces: orderedPieces(project) };
+}
+
+/** A skeleton record, or null without a plan. Proportions that are not finite
+ *  numbers are dropped. */
+function parseSkeleton(value: unknown): LegoSkeleton | null {
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  if (typeof v.plan !== "string" || v.plan === "") return null;
+  const proportions: Record<string, number> = {};
+  if (typeof v.proportions === "object" && v.proportions !== null) {
+    for (const [id, amount] of Object.entries(v.proportions)) {
+      if (typeof amount === "number" && Number.isFinite(amount)) {
+        proportions[id] = amount;
+      }
+    }
+  }
+  return { plan: v.plan, proportions };
+}
+
+/**
+ * The pieces with every bone kept only where it means something: on a unit
+ * with a skeleton, and on the first piece to claim it. A second piece claiming
+ * the same bone would be moved to the same place by a proportion.
+ */
+function withOwnedBones(
+  pieces: LegoPiece[],
+  hasSkeleton: boolean,
+): LegoPiece[] {
+  const claimed = new Set<string>();
+  return pieces.map((piece) => {
+    if (piece.bone === undefined) return piece;
+    if (hasSkeleton && !claimed.has(piece.bone)) {
+      claimed.add(piece.bone);
+      return piece;
+    }
+    const { bone: _unowned, ...rest } = piece;
+    return rest;
+  });
 }
 
 /** A module's tags, trimmed. Blank and non-text entries are dropped. */
@@ -1498,6 +1571,7 @@ function parsePiece(raw: unknown): LegoPiece | null {
       const ring = parsePieceRing(p.ring);
       return ring ? { ring } : {};
     })(),
+    ...(typeof p.bone === "string" && p.bone !== "" ? { bone: p.bone } : {}),
   };
 }
 
