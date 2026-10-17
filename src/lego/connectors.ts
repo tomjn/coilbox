@@ -232,6 +232,35 @@ export function pieceConnectors(
   return part.connectors ?? boxConnectors(part.bbox);
 }
 
+/**
+ * A connector's facing and up as a joined child sees them under a parent of
+ * world scale `scale`. A face's direction goes through the inverse scale, which
+ * turns a mirrored parent's "+x" face round to the side it is now on. An up
+ * along the face goes through the scale itself.
+ */
+function scaledFrame(
+  connector: Pick<LegoConnector, "facing" | "up">,
+  scale: THREE.Vector3,
+): { facing: THREE.Vector3; up: THREE.Vector3 } {
+  const facing = new THREE.Vector3(...connector.facing)
+    .divide(scale)
+    .normalize();
+  const up = new THREE.Vector3(...connector.up).multiply(scale);
+  up.addScaledVector(facing, -up.dot(facing)).normalize();
+  return { facing, up };
+}
+
+/** A parent's scale in the world, which is the scale a joined child leaves out. */
+function parentScaleOf(project: LegoProject, parentId: string): THREE.Vector3 {
+  const scale = new THREE.Vector3();
+  worldMatrix(project, parentId).decompose(
+    new THREE.Vector3(),
+    new THREE.Quaternion(),
+    scale,
+  );
+  return scale;
+}
+
 /** Where a joined piece goes, against its parent. */
 interface Placement {
   position: Vec3;
@@ -247,6 +276,7 @@ function placeJoin(
   piece: LegoPiece,
   parent: LegoPiece,
   connection: LegoConnection,
+  parentScale: THREE.Vector3,
 ): Placement | null {
   const own = pieceConnectors(pack, piece).find(
     (c) => c.id === connection.connector,
@@ -260,14 +290,19 @@ function placeJoin(
   // The parent's connector, in the space its children are written in: its
   // part's space less its pivot.
   const parentPivot = new THREE.Vector3(...(parent.pivot ?? [0, 0, 0]));
-  const facing = new THREE.Vector3(...theirs.facing).normalize();
-  const up = new THREE.Vector3(...theirs.up).normalize();
-  const side = new THREE.Vector3().crossVectors(facing, up);
+  const faceOut = new THREE.Vector3(...theirs.facing).normalize();
+  const faceUp = new THREE.Vector3(...theirs.up).normalize();
+  const side = new THREE.Vector3().crossVectors(faceOut, faceUp);
   const [along, across] = connection.offset ?? [0, 0];
   const target = new THREE.Vector3(...theirs.position)
     .sub(parentPivot)
     .addScaledVector(side, along)
-    .addScaledVector(up, across);
+    .addScaledVector(faceUp, across);
+
+  // The point is carried out by the parent's full matrix, but the piece's turn
+  // is only the parent's turn. So the face the piece meets is the parent's face
+  // as it sits in the world, scale and mirror included.
+  const { facing, up } = scaledFrame(theirs, parentScale);
   const twistedUp = up
     .clone()
     .applyAxisAngle(facing, connection.twist ?? 0)
@@ -290,7 +325,9 @@ function placeJoin(
   const turn = to.multiply(from.transpose());
   const rotation = new THREE.Euler().setFromRotationMatrix(turn);
 
-  const position = target.sub(point.applyMatrix4(turn));
+  // The piece's own offset from its connector is not carried by the parent's
+  // scale, so it is divided by it to land the connector on the target.
+  const position = target.sub(point.applyMatrix4(turn).divide(parentScale));
   return {
     position: [position.x, position.y, position.z],
     rotation: [rotation.x, rotation.y, rotation.z],
@@ -325,8 +362,9 @@ export function slideJoin(
     : undefined;
   if (!piece || !connection || !parent) return null;
 
+  const parentScale = parentScaleOf(project, parent.id);
   const at = (offset: [number, number]) =>
-    placeJoin(pack, piece, parent, { ...connection, offset });
+    placeJoin(pack, piece, parent, { ...connection, offset }, parentScale);
   const origin = at([0, 0]);
   const along = at([1, 0]);
   const across = at([0, 1]);
@@ -375,18 +413,18 @@ export function twistOf(
 
   // The piece will be joined, so it takes the parent's turn and not its scale.
   const parentTurn = new THREE.Quaternion();
+  const parentScale = new THREE.Vector3();
   worldMatrix(project, parent.id).decompose(
     new THREE.Vector3(),
     parentTurn,
-    new THREE.Vector3(),
+    parentScale,
   );
   const up = new THREE.Vector3(...own.up)
     .transformDirection(pieceWorld)
     .applyQuaternion(parentTurn.invert());
-  const facing = new THREE.Vector3(...theirs.facing).normalize();
+  const { facing, up: from } = scaledFrame(theirs, parentScale);
   up.addScaledVector(facing, -up.dot(facing)).normalize();
 
-  const from = new THREE.Vector3(...theirs.up).normalize();
   const twist = Math.atan2(
     facing.dot(new THREE.Vector3().crossVectors(from, up)),
     from.dot(up),
@@ -427,6 +465,7 @@ export function joinAt(
   // A joined piece keeps its own size, so its transform is written that way
   // before any join is measured from it.
   const local = transformOf(localFromWorld(project, parent.id, world, true));
+  const parentScale = parentScaleOf(project, parent.id);
   const withPiece = (next: LegoPiece): LegoProject => ({
     ...project,
     pieces: project.pieces.map((p) => (p.id === pieceId ? next : p)),
@@ -462,7 +501,7 @@ export function joinAt(
       ...(twisted.connection as LegoConnection),
       ...(offset[0] || offset[1] ? { offset } : {}),
     };
-    const placed = placeJoin(pack, twisted, parent, connection);
+    const placed = placeJoin(pack, twisted, parent, connection, parentScale);
     if (!placed) continue;
     const joined = withPiece({ ...twisted, ...placed, connection });
     if (framesAgree(worldMatrix(joined, pieceId), world)) return joined;
@@ -502,7 +541,13 @@ export function resolveConnections(
     if (!piece.connection) return piece;
     const parent = piece.parentId ? byId.get(piece.parentId) : undefined;
     const placed = parent
-      ? placeJoin(pack, piece, parent, piece.connection)
+      ? placeJoin(
+          pack,
+          piece,
+          parent,
+          piece.connection,
+          parentScaleOf(project, parent.id),
+        )
       : null;
     if (!placed) {
       broken.push(piece.id);
@@ -580,7 +625,15 @@ export function describeJoin(
     toName: faceName(pack, parent, connection.to),
     offset: connection.offset ?? [0, 0],
     twist: connection.twist ?? 0,
-    broken: !parent || !placeJoin(pack, piece, parent, connection),
+    broken:
+      !parent ||
+      !placeJoin(
+        pack,
+        piece,
+        parent,
+        connection,
+        parentScaleOf(project, parent.id),
+      ),
   };
 }
 

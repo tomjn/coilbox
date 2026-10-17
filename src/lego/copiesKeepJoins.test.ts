@@ -253,6 +253,29 @@ describe("symmetry twin", () => {
     expect(holds(twinned.project, "twin")).toBe(true);
   });
 
+  it("is joined to the side face of a mirrored parent (#4301)", () => {
+    // The twin goes under the hull itself: mirrorTwin would look for a piece
+    // whose frame is the hull's reflection, and a mirrored hull has none.
+    for (const to of ["+x", "-x"]) {
+      const doc = legOn(to, SLID, { scale: [-1, 1, 1] });
+      const out = mirrorCopy(doc, "leg", () => "twin", "hull", pack());
+      if (!out) throw new Error("no twin");
+      const twin = pieceOf(out.project, "twin");
+      expect(twin.connection?.to).toBe(MIRRORED_FACE[to]);
+      expect(round(worldMatrix(out.project, "twin"))).toEqual(
+        reflected(doc, "leg"),
+      );
+      expect(holds(out.project, "twin")).toBe(true);
+      // The twin's joining face is on the hull's face, which is at x = -1 for
+      // the mirrored hull's "+x" and x = 1 for its "-x".
+      const edge = twin.connection?.connector === "-x" ? -0.25 : 0.5;
+      const at = new THREE.Vector3(edge, 0, 0).applyMatrix4(
+        worldMatrix(out.project, "twin"),
+      );
+      expect(Number(at.x.toFixed(5))).toBe(to === "+x" ? 1 : -1);
+    }
+  });
+
   it("joins a child's twin to the mirrored parent", () => {
     // A left thigh with its twin, then a shin under the left thigh.
     const thigh = legOn("+x", SLID);
