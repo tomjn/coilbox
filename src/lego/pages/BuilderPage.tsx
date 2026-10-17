@@ -122,6 +122,8 @@ import {
 import { rawGeometryProblems } from "../rawGeometry";
 import { texturesInUse } from "../rawImport";
 import { parentOptions, reparentPiece } from "../reparent";
+import { unringPiece } from "../ring";
+import { ringMembers } from "../ringSet";
 import { bakedPieces, sitOnGround, unitBounds } from "../s3oBuild";
 import type {
   NanoStyle,
@@ -1673,7 +1675,16 @@ function Builder({ id }: { id: string | undefined }) {
                   onDelete: removeSelected,
                   canDelete: transformRoots(draft, selectedIds).length > 0,
                 }}
-                symmetry={{ on: symmetry.on, onChange: symmetry.setOn }}
+                symmetry={{
+                  on: symmetry.on,
+                  onChange: symmetry.setOn,
+                  mode: symmetry.mode,
+                  onModeChange: symmetry.setMode,
+                  count: symmetry.count,
+                  // A selected piece that is in a ring has the ring resized too.
+                  onCountChange: (count) =>
+                    symmetry.setCount(count, selectedId ?? undefined),
+                }}
                 anchorPlacement={{
                   placingAnchor,
                   onPlaceAnchor: placeAnchor,
@@ -2408,6 +2419,29 @@ function Builder({ id }: { id: string | undefined }) {
                                 onClick={() =>
                                   edit((project) =>
                                     unpairPiece(project, selected.id),
+                                  )
+                                }
+                              >
+                                Break
+                              </Button>
+                            </div>
+                          ) : null}
+                          {selected.ring &&
+                          ringMembers(draft.pieces, selected.id) ? (
+                            <div className="mt-2 flex items-center gap-2 text-xs">
+                              <span className="text-muted-foreground">
+                                Ring
+                              </span>
+                              <span className="min-w-0 flex-1 truncate">
+                                {selected.ring.count} copies
+                              </span>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 px-2 text-xs"
+                                onClick={() =>
+                                  edit((project) =>
+                                    unringPiece(project, selected.id),
                                   )
                                 }
                               >

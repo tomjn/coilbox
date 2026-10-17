@@ -34,6 +34,7 @@ import {
   projectProblems,
 } from "./model";
 import { worldMatrix } from "./reparent";
+import { ringMembers } from "./ringSet";
 import { type SymmetrySession, useSymmetry } from "./useSymmetry";
 
 afterEach(() => {
@@ -617,5 +618,163 @@ describe("letting a pair go", () => {
     expect(bench.session().on).toBe(true);
     bench.run(() => bench.session().setOn(false));
     expect(bench.session().on).toBe(false);
+  });
+});
+
+describe("symmetry round the vertical axis (issue #3317)", () => {
+  function ringed(count = 3): Bench {
+    const bench = open(unit([{ id: "leg" }, { id: "mast" }]));
+    bench.run(() => bench.session().setMode("ring"));
+    bench.run(() => bench.session().setCount(count));
+    bench.run(() => bench.session().setOn(true));
+    bench.run(() => bench.session().queueTwin("leg"));
+    return bench;
+  }
+
+  function radius(bench: Bench, id: string): number {
+    const [x, , z] = origin(bench.project(), id);
+    return Math.hypot(x, z);
+  }
+
+  it("starts as a mirror with a count of three", () => {
+    const bench = open(unit([]));
+    expect(bench.session().mode).toBe("mirror");
+    expect(bench.session().count).toBe(3);
+  });
+
+  it("gives a placed piece count - 1 copies in one edit", () => {
+    const bench = ringed(4);
+    bench.run(() =>
+      bench.session().place(["leg"], (p) => moveTo(p, "leg", [3, 0, 0])),
+    );
+    expect(bench.extras()).toHaveLength(3);
+    expect(bench.edits()).toBe(1);
+    for (const piece of bench.extras()) {
+      expect(radius(bench, piece.id)).toBeCloseTo(3, 5);
+    }
+  });
+
+  it("waits while the piece is on the axis, at any height", () => {
+    const bench = ringed();
+    bench.run(() =>
+      bench.session().place(["leg"], (p) => moveTo(p, "leg", [0, 4, 0])),
+    );
+    expect(bench.extras()).toHaveLength(0);
+    bench.run(() =>
+      bench.session().place(["leg"], (p) => moveTo(p, "leg", [0, 4, 2])),
+    );
+    expect(bench.extras()).toHaveLength(2);
+  });
+
+  it("moves the whole ring when one member moves, from any member", () => {
+    const bench = ringed();
+    bench.run(() =>
+      bench.session().place(["leg"], (p) => moveTo(p, "leg", [3, 0, 0])),
+    );
+    const members = ringMembers(bench.project().pieces, "leg") as string[];
+    bench.run(() =>
+      bench
+        .session()
+        .place([members[1]], (p) => moveTo(p, members[1], [0, 1, 5])),
+    );
+    for (const id of members) expect(radius(bench, id)).toBeCloseTo(5, 5);
+    expect(
+      new Set(members.map((id) => origin(bench.project(), id).join(","))).size,
+    ).toBe(3);
+  });
+
+  it("follows after the unit is saved and reopened", () => {
+    const bench = ringed();
+    bench.run(() =>
+      bench.session().place(["leg"], (p) => moveTo(p, "leg", [3, 0, 0])),
+    );
+    const parsed = parseLegoProjectJson(JSON.stringify(bench.project()));
+    if (!parsed) throw new Error("did not reload");
+    const again = open(parsed);
+    again.run(() => again.session().setOn(true));
+    again.run(() =>
+      again.session().place(["leg"], (p) => moveTo(p, "leg", [6, 0, 0])),
+    );
+    for (const id of ringMembers(again.project().pieces, "leg") as string[]) {
+      expect(radius(again, id)).toBeCloseTo(6, 5);
+    }
+  });
+
+  it("does not follow while symmetry is off", () => {
+    const bench = ringed();
+    bench.run(() =>
+      bench.session().place(["leg"], (p) => moveTo(p, "leg", [3, 0, 0])),
+    );
+    const other = bench.extras()[0].id;
+    bench.run(() => bench.session().setOn(false));
+    bench.run(() =>
+      bench.session().place(["leg"], (p) => moveTo(p, "leg", [8, 0, 0])),
+    );
+    expect(radius(bench, other)).toBeCloseTo(3, 5);
+  });
+
+  it("leaves every member alone when several are moved in one go", () => {
+    const bench = ringed();
+    bench.run(() =>
+      bench.session().place(["leg"], (p) => moveTo(p, "leg", [3, 0, 0])),
+    );
+    const [a] = bench.extras();
+    bench.run(() =>
+      bench
+        .session()
+        .place(["leg", a.id], (p) =>
+          moveTo(moveTo(p, "leg", [4, 0, 0]), a.id, [0, 0, 9]),
+        ),
+    );
+    expect(origin(bench.project(), "leg")).toEqual([4, 0, 0]);
+    expect(origin(bench.project(), a.id)).toEqual([0, 0, 9]);
+  });
+
+  it("changes the count of the ring around a piece in one edit", () => {
+    const bench = ringed();
+    bench.run(() =>
+      bench.session().place(["leg"], (p) => moveTo(p, "leg", [3, 0, 0])),
+    );
+    const edits = bench.edits();
+    bench.run(() => bench.session().setCount(5, "leg"));
+    expect(bench.edits()).toBe(edits + 1);
+    expect(ringMembers(bench.project().pieces, "leg")).toHaveLength(5);
+    bench.run(() => bench.session().setCount(2, "leg"));
+    expect(ringMembers(bench.project().pieces, "leg")).toHaveLength(2);
+    expect(bench.extras()).toHaveLength(1);
+  });
+
+  it("changes only the count for new rings when no ring is named", () => {
+    const bench = ringed();
+    bench.run(() =>
+      bench.session().place(["leg"], (p) => moveTo(p, "leg", [3, 0, 0])),
+    );
+    const edits = bench.edits();
+    bench.run(() => bench.session().setCount(6));
+    expect(bench.edits()).toBe(edits);
+    expect(bench.session().count).toBe(6);
+  });
+
+  it("ignores a count a ring cannot have", () => {
+    const bench = ringed();
+    bench.run(() => bench.session().setCount(1));
+    bench.run(() => bench.session().setCount(500));
+    bench.run(() => bench.session().setCount(2.5));
+    expect(bench.session().count).toBe(3);
+  });
+
+  it("still mirrors in mirror mode, and leaves a saved mirror pair alone in ring mode", () => {
+    const bench = open(unit([{ id: "leg" }]));
+    bench.run(() => bench.session().setOn(true));
+    bench.run(() => bench.session().queueTwin("leg"));
+    bench.run(() =>
+      bench.session().place(["leg"], (p) => moveTo(p, "leg", [3, 0, 0])),
+    );
+    const twin = bench.extras()[0].id;
+    bench.run(() => bench.session().setMode("ring"));
+    bench.run(() =>
+      bench.session().place(["leg"], (p) => moveTo(p, "leg", [5, 0, 0])),
+    );
+    expect(origin(bench.project(), twin)).toEqual([-5, 0, 0]);
   });
 });

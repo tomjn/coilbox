@@ -36,6 +36,7 @@ import {
 } from "./model";
 import { moduleStamp, pieceFingerprint } from "./moduleUpdates";
 import { worldMatrix } from "./reparent";
+import { withoutBrokenRings, withRingRemapped } from "./ringSet";
 
 /**
  * The pieces of a selection a cutting is actually taken from.
@@ -121,7 +122,7 @@ export function selectionAsCompound(
   }
 
   const presets = carryPresets ? presetsFor(project, pieces) : [];
-  const copied = pieces.map((piece) => withTwinRemapped(piece, remap));
+  const copied = withLinksRemapped(pieces, remap);
   // The builder block describes a module only when a build preset came with it.
   const builder =
     project.builder && presets.some((entry) => isBuildPreset(entry.presetId))
@@ -333,6 +334,21 @@ export function validateCompoundName(
 }
 
 /**
+ * Copied pieces with their twins (#3315) and rings (#3317) renamed to the
+ * copies. A ring needs all of its members copied to still be one.
+ */
+function withLinksRemapped(
+  pieces: LegoPiece[],
+  remap: Map<string, string>,
+): LegoPiece[] {
+  return withoutBrokenRings(
+    pieces.map((piece) =>
+      withRingRemapped(withTwinRemapped(piece, remap), remap),
+    ),
+  );
+}
+
+/**
  * A copied piece with its twin (#3315) renamed to the copy of that twin, or with
  * the pairing dropped when the twin was not copied too. Left alone it would name
  * the original's partner, so moving the copy would move a stranger.
@@ -446,10 +462,7 @@ export function insertCompound(
   const merged = mergePresets(
     {
       ...project,
-      pieces: [
-        ...project.pieces,
-        ...added.map((piece) => withTwinRemapped(piece, remap)),
-      ],
+      pieces: [...project.pieces, ...withLinksRemapped(added, remap)],
     },
     compound,
   );

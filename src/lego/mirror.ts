@@ -35,6 +35,7 @@ import {
   SAME_PLACE,
   worldMatrix,
 } from "./reparent";
+import { withoutBrokenRings } from "./ringSet";
 
 /** Reflection across x = 0, the plane the unit's centre line runs down. */
 const REFLECT_X = new THREE.Matrix4().makeScale(-1, 1, 1);
@@ -53,7 +54,7 @@ function reflection(project: LegoProject): THREE.Matrix4 {
 }
 
 /** A local matrix as the three fields the document stores. */
-function asTransform(
+export function asTransform(
   local: THREE.Matrix4,
 ): Pick<LegoPiece, "position" | "rotation" | "scale"> {
   const position = new THREE.Vector3();
@@ -113,7 +114,7 @@ function mirroredWorld(project: LegoProject, sourceId: string): THREE.Matrix4 {
  * where the reflection stands. The twist and the offset along the face come out
  * reflected too.
  */
-function rejoined(
+export function rejoined(
   project: LegoProject,
   pack: LoadedPack | null,
   pieceId: string,
@@ -470,15 +471,20 @@ export function unpairPiece(
 
 /**
  * Drop every pairing that names a piece the unit no longer has, so deleting
- * either piece of a pair leaves the other as an ordinary piece.
+ * either piece of a pair leaves the other as an ordinary piece. A ring that
+ * lost a member (#3317) is let go the same way.
  */
 export function withoutDanglingTwins(project: LegoProject): LegoProject {
   const present = new Set(project.pieces.map((piece) => piece.id));
-  if (!project.pieces.some((p) => p.twin !== undefined && !present.has(p.twin)))
+  const ringed = withoutBrokenRings(project.pieces);
+  if (
+    ringed === project.pieces &&
+    !project.pieces.some((p) => p.twin !== undefined && !present.has(p.twin))
+  )
     return project;
   return {
     ...project,
-    pieces: project.pieces.map((piece) => {
+    pieces: ringed.map((piece) => {
       if (piece.twin === undefined || present.has(piece.twin)) return piece;
       const { twin: _gone, ...rest } = piece;
       return rest;
