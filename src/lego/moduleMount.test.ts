@@ -328,6 +328,19 @@ describe("placeModule", () => {
     ).toEqual([0, 0, 3]);
   });
 
+  it("records the module and its instance on the pieces it adds (#3302)", () => {
+    const out = placeModule(
+      UNIT,
+      mounted,
+      pack(),
+      { parentId: "hull", to: "+z" },
+      none,
+      counter("n"),
+    );
+    expect(root(out)?.module?.id).toBe(mounted.id);
+    expect(root(out)?.module?.instance).toBeTruthy();
+  });
+
   it("steps through the connectors of the mount's piece", () => {
     const own = pieceConnectors(pack(), MODULE.pieces[0]);
     const from = own.findIndex((c) => c.id === "-y");
