@@ -36,4 +36,6 @@ permissions = [
   "allow-lego-scratch-game",
   "allow-lego-run-script",
   "allow-lego-probe-script",
+  "allow-lego-write-text-file",
+  "allow-lego-read-text-file",
 ]
