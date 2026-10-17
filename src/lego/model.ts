@@ -31,6 +31,16 @@ export interface LegoAnchor {
   id: string;
   name: string;
   position: [number, number, number];
+  /**
+   * The way out of the part at this anchor, which makes the anchor a connector
+   * (issue #3290): a join through it points the joined part along this. Unit
+   * length. Absent on an anchor saved before connectors, which then faces out
+   * of the nearest face of its part's bounding box (`customConnectors`).
+   */
+  facing?: [number, number, number];
+  /** Along the face and at right angles to `facing`, fixing the twist. Unit
+   *  length. Absent means the default for the facing. */
+  up?: [number, number, number];
 }
 
 /**
@@ -1473,7 +1483,24 @@ function parseAnchor(raw: unknown): LegoAnchor | null {
   const position = parseVec3(a.position);
   if (typeof a.id !== "string" || typeof a.name !== "string" || !position)
     return null;
-  return { id: a.id, name: a.name, position };
+  const facing = parseDirection(a.facing);
+  const up = facing ? parseDirection(a.up) : null;
+  return {
+    id: a.id,
+    name: a.name,
+    position,
+    ...(facing ? { facing } : {}),
+    ...(up ? { up } : {}),
+  };
+}
+
+/** A direction, scaled to unit length. A zero or malformed one is no direction. */
+function parseDirection(value: unknown): [number, number, number] | null {
+  const v = parseVec3(value);
+  if (!v) return null;
+  const length = Math.hypot(...v);
+  if (length === 0) return null;
+  return [v[0] / length, v[1] / length, v[2] / length];
 }
 
 function parseVec3(value: unknown): [number, number, number] | null {

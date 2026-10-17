@@ -21,7 +21,12 @@
 
 import * as THREE from "three";
 
-import type { LegoConnection, LegoPiece, LegoProject } from "./model";
+import type {
+  LegoAnchor,
+  LegoConnection,
+  LegoPiece,
+  LegoProject,
+} from "./model";
 import type { LoadedPack } from "./pack";
 import type { Bounds, Vec3 } from "./snapping";
 
@@ -137,17 +142,91 @@ export function readPartConnectors(
   return { connectors: raw as LegoConnector[] };
 }
 
+/** Up for a facing: +y, or +z when the facing is too close to +y for it, which
+ *  is the rule `boxConnectors` follows on the top and bottom. */
+function defaultUp(facing: Vec3): Vec3 {
+  const alongY = Math.abs(facing[1]) > 0.9;
+  const base = new THREE.Vector3(0, alongY ? 0 : 1, alongY ? 1 : 0);
+  const f = new THREE.Vector3(...facing);
+  base.addScaledVector(f, -base.dot(f)).normalize();
+  return [base.x, base.y, base.z];
+}
+
+/** The unit step out of the nearest face of a box from a point, or null with
+ *  no box to measure. A point in the middle falls to +x, a tie to the first
+ *  axis. */
+function nearestFacing(
+  position: Vec3,
+  bounds: Bounds | undefined,
+): Vec3 | null {
+  if (!bounds) return null;
+  let best: { distance: number; axis: number; sign: number } | null = null;
+  for (let axis = 0; axis < 3; axis++) {
+    for (const sign of [1, -1]) {
+      const edge = sign > 0 ? bounds.max[axis] : bounds.min[axis];
+      const distance = Math.abs(edge - position[axis]);
+      if (!best || distance < best.distance) best = { distance, axis, sign };
+    }
+  }
+  if (!best) return null;
+  const facing: Vec3 = [0, 0, 0];
+  facing[best.axis] = best.sign;
+  return facing;
+}
+
 /**
- * The connectors a piece can be joined by, or none for a piece with no part in
- * the pack. A part's own list is used as it is and the box's are not added to
- * it, the way a piece's custom anchors replace the derived ones: the box is a
- * guess, and the parts that state their own are the ones it gets wrong.
+ * A piece's custom anchors as connectors (issue #3290). An anchor with a
+ * facing uses it. One without, saved before anchors had a facing, points out
+ * of the nearest face of the part's box, so an old unit opens unchanged and its
+ * anchors still seat parts. With neither a facing nor a box to take one from, an
+ * anchor stays a position only and is left out.
+ *
+ * The id is the anchor's own, so a join to it survives a rename.
+ */
+export function customConnectors(
+  anchors: readonly LegoAnchor[],
+  bounds: Bounds | undefined,
+): LegoConnector[] {
+  const connectors: LegoConnector[] = [];
+  for (const anchor of anchors) {
+    const facing = anchor.facing ?? nearestFacing(anchor.position, bounds);
+    if (!facing) continue;
+    const f = new THREE.Vector3(...facing).normalize();
+    const stated = anchor.up && new THREE.Vector3(...anchor.up);
+    let up = defaultUp([f.x, f.y, f.z]);
+    if (stated) {
+      // Taken at right angles to the facing, because a stated up that leans on
+      // it would not be a direction along the face.
+      stated.addScaledVector(f, -stated.dot(f));
+      if (stated.lengthSq() > 0) {
+        stated.normalize();
+        up = [stated.x, stated.y, stated.z];
+      }
+    }
+    connectors.push({
+      id: anchor.id,
+      position: anchor.position,
+      facing: [f.x, f.y, f.z],
+      up,
+    });
+  }
+  return connectors;
+}
+
+/**
+ * The connectors a piece can be joined by, or none for a piece with nothing to
+ * join by. A piece's own custom anchors come first and stand in for the
+ * part's, as they do for snapping. Otherwise a part's own list is used as it is
+ * and the box's are not added to it: the box is a guess, and the parts that
+ * state their own are the ones it gets wrong.
  */
 export function pieceConnectors(
   pack: LoadedPack,
   piece: LegoPiece,
 ): LegoConnector[] {
   const part = piece.partId ? pack.byId.get(piece.partId) : undefined;
+  const own = customConnectors(piece.customAnchors ?? [], part?.bbox);
+  if (own.length > 0) return own;
   if (!part) return [];
   return part.connectors ?? boxConnectors(part.bbox);
 }
@@ -226,7 +305,7 @@ function frame(facing: THREE.Vector3, up: THREE.Vector3): THREE.Matrix4 {
 /** Close enough that writing the new value would be rounding, not a move. */
 const SAME = 1e-9;
 
-function same(a: Vec3, b: Vec3): boolean {
+export function same(a: Vec3, b: Vec3): boolean {
   return a.every((n, i) => Math.abs(n - b[i]) < SAME);
 }
 

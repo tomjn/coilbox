@@ -1,10 +1,13 @@
 import * as THREE from "three";
+import { pieceConnectors } from "../../connectors";
 import type { LegoPiece, LegoProject } from "../../model";
 import { descendantIds, pieceById } from "../../model";
 import { type LoadedPack, partUnit } from "../../pack";
 import { pieceMesh, type RawGeometry } from "../../rawGeometry";
+import type { Seat } from "../../seat";
 import {
   type Anchor,
+  facesOppose,
   moveStep,
   nearestSnap,
   pieceAnchors,
@@ -43,6 +46,12 @@ const SNAP_PIXELS = 24;
  *
  * Anchors are in the part's own space, so the pivot comes off them exactly as
  * it comes off the geometry and they sit on the part however the origin moves.
+ *
+ * A face or a custom anchor is a connector, and carries the id and facing a
+ * join will use. Where the piece's connectors are not the box's, because a
+ * part states its own, they stand in for the box's anchors, so every face
+ * offered here is one a join can name. A corner and the middle stay position
+ * only.
  */
 function localAnchorsOf(
   pack: LoadedPack,
@@ -50,10 +59,40 @@ function localAnchorsOf(
   piece: LegoPiece,
 ): { anchor: Anchor; position: Vec3 }[] {
   const pivot = piece.pivot ?? [0, 0, 0];
-  return pieceAnchors(
-    pieceBox(pack, raw, piece) ?? null,
-    piece.customAnchors,
-  ).map((anchor) => ({
+  const box = pieceBox(pack, raw, piece) ?? null;
+  const connectors = pieceConnectors(pack, piece);
+  const ids = new Map(connectors.map((c) => [c.id, c]));
+
+  let anchors: Anchor[];
+  if (piece.customAnchors && piece.customAnchors.length > 0) {
+    anchors = pieceAnchors(box, piece.customAnchors).map((anchor, index) => {
+      const own = piece.customAnchors?.[index];
+      const connector = own ? ids.get(own.id) : undefined;
+      return connector && own
+        ? {
+            ...anchor,
+            connector: connector.id,
+            facing: connector.facing,
+          }
+        : anchor;
+    });
+  } else if (piece.partId && pack.byId.get(piece.partId)?.connectors) {
+    anchors = connectors.map((c) => ({
+      position: c.position,
+      kind: "face",
+      out: c.facing,
+      connector: c.id,
+      facing: c.facing,
+    }));
+  } else {
+    anchors = pieceAnchors(box, undefined).map((anchor) =>
+      anchor.connector && ids.has(anchor.connector)
+        ? anchor
+        : stripConnector(anchor),
+    );
+  }
+
+  return anchors.map((anchor) => ({
     anchor,
     position: [
       anchor.position[0] - pivot[0],
@@ -61,6 +100,13 @@ function localAnchorsOf(
       anchor.position[2] - pivot[2],
     ],
   }));
+}
+
+/** The same anchor with nothing to join by: a face of a piece that has no part
+ *  to state connectors for it still snaps, it just saves no join. */
+function stripConnector(anchor: Anchor): Anchor {
+  const { connector: _id, facing: _facing, ...rest } = anchor;
+  return rest;
 }
 
 /** A part carries its box in the pack manifest and an imported mesh carries
@@ -88,10 +134,23 @@ function worldAnchors(
   group.updateWorldMatrix(true, false);
 
   const point = new THREE.Vector3();
+  // A facing is a direction out of a surface, so it turns with the normal
+  // matrix: a mirrored piece's face points the other way.
+  const normal = new THREE.Matrix3().getNormalMatrix(group.matrixWorld);
   return localAnchorsOf(pack, state.rawRef.current, piece).map(
     ({ anchor, position }) => {
       point.set(...position).applyMatrix4(group.matrixWorld);
-      return { ...anchor, position: [point.x, point.y, point.z] as Vec3 };
+      const world: Anchor = {
+        ...anchor,
+        position: [point.x, point.y, point.z] as Vec3,
+      };
+      if (anchor.facing) {
+        const f = new THREE.Vector3(...anchor.facing)
+          .applyMatrix3(normal)
+          .normalize();
+        world.facing = [f.x, f.y, f.z];
+      }
+      return world;
     },
   );
 }
@@ -123,11 +182,39 @@ export function placeAnchor(
     .clone()
     .applyMatrix4(new THREE.Matrix4().copy(group.matrixWorld).invert());
   const pivot = piece.pivot ?? [0, 0, 0];
-  state.onPlaceAnchorRef.current?.(pieceId, [
-    local.x + pivot[0],
-    local.y + pivot[1],
-    local.z + pivot[2],
-  ]);
+  state.onPlaceAnchorRef.current?.(
+    pieceId,
+    [local.x + pivot[0], local.y + pivot[1], local.z + pivot[2]],
+    clickedFacing(hit, group),
+  );
+}
+
+/**
+ * Which way the surface that was clicked points, in the piece's part space, so
+ * a connector placed there faces out of the model rather than into it. A hit on
+ * something with no face, such as a point, gives no facing and the connector
+ * takes the one its nearest box face gives.
+ */
+function clickedFacing(
+  hit: THREE.Intersection,
+  group: THREE.Object3D,
+): Vec3 | undefined {
+  if (!hit.face) return undefined;
+  const world = hit.face.normal
+    .clone()
+    .applyMatrix3(new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld))
+    .normalize();
+  // Back from the world into the part: a normal goes through the transpose of
+  // the matrix that took the part into the world.
+  const local = world
+    .applyMatrix3(
+      new THREE.Matrix3().setFromMatrix4(group.matrixWorld).transpose(),
+    )
+    .normalize();
+  if (!Number.isFinite(local.x + local.y + local.z) || local.lengthSq() === 0) {
+    return undefined;
+  }
+  return [local.x, local.y, local.z];
 }
 
 /**
@@ -172,6 +259,9 @@ export function applySnap(state: SceneState) {
   const pieceId = group ? pieceIdOf(group) : null;
   if (!group || !pieceId) return;
 
+  // Whatever the last move of this drag seated is stale once it moves again.
+  state.seat = null;
+
   const project = state.projectRef.current;
   const pack = state.packRef.current;
   const piece = project.pieces.find((p) => p.id === pieceId);
@@ -198,9 +288,8 @@ export function applySnap(state: SceneState) {
 
   const targets = snapTargets(state, pack, project, pieceId);
   const targetPoints = targets.map((target) => target.position);
-  const mine = worldAnchors(state, pack, piece).map(
-    (anchor) => anchor.position,
-  );
+  const own = worldAnchors(state, pack, piece);
+  const mine = own.map((anchor) => anchor.position);
 
   // Screen-scaled, so the snap reaches the same number of pixels whether the
   // camera is zoomed in tight or pulled right back. Measured to the dragged
@@ -235,6 +324,24 @@ export function applySnap(state: SceneState) {
   }
   state.onSnapChange(true, seated?.name);
 
+  // Two faces that point at each other are a join. Faces that do not, a corner
+  // and the middle are a position only: the piece is moved, as it always was,
+  // and nothing is saved. Turning the piece to make the faces meet would change
+  // what a drag does to its rotation, which a snap has never done.
+  const moving = own[snap.movingIndex];
+  state.seat =
+    seated?.connector &&
+    seated.facing &&
+    moving?.connector &&
+    moving.facing &&
+    facesOppose(moving.facing, seated.facing)
+      ? {
+          parentId: seated.owner,
+          connector: moving.connector,
+          to: seated.connector,
+        }
+      : null;
+
   // The delta is in world space and the group's position is relative to its
   // parent, so it has to be rotated into the parent's frame before it is added.
   const delta = new THREE.Vector3(...snap.delta);
@@ -255,6 +362,10 @@ interface SnapTarget {
   owner: string;
   /** A custom anchor's name, so the seat can say which one it took. */
   name?: string;
+  /** The connector at this anchor and which way it points in the world, for a
+   *  face or a custom anchor. */
+  connector?: string;
+  facing?: Vec3;
 }
 
 /**
@@ -278,6 +389,9 @@ function snapTargets(
         position: anchor.position,
         owner: other.id,
         ...(anchor.name ? { name: anchor.name } : {}),
+        ...(anchor.connector && anchor.facing
+          ? { connector: anchor.connector, facing: anchor.facing }
+          : {}),
       });
     }
   }

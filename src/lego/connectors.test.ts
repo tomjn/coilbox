@@ -5,6 +5,7 @@ import { insertCompound, selectionAsCompound } from "./compounds";
 import {
   boxConnectors,
   connectPiece,
+  customConnectors,
   disconnectPiece,
   type LegoConnector,
   pieceConnectors,
@@ -697,5 +698,121 @@ describe("readPartConnectors", () => {
       { ...good, id: "b", facing: [0, 2, 0] },
     ]);
     expect((result as { problem: string }).problem).toMatch(/"b"/);
+  });
+});
+
+describe("customConnectors", () => {
+  const box = { min: [-1, -0.5, -2] as Vec3, max: [1, 0.5, 2] as Vec3 };
+
+  it("keeps a stated facing and up", () => {
+    const [c] = customConnectors(
+      [
+        {
+          id: "a",
+          name: "mouth",
+          position: [0, 0, 2],
+          facing: [0, 0, 1],
+          up: [1, 0, 0],
+        },
+      ],
+      box,
+    );
+
+    expect(c).toEqual({
+      id: "a",
+      position: [0, 0, 2],
+      facing: [0, 0, 1],
+      up: [1, 0, 0],
+    });
+  });
+
+  it("points an anchor saved before facings out of the nearest face", () => {
+    const connectors = customConnectors(
+      [
+        { id: "front", name: "front", position: [0, 0, 1.9] },
+        { id: "top", name: "top", position: [0.2, 0.4, 0] },
+        { id: "left", name: "left", position: [-0.9, 0, 0.5] },
+      ],
+      box,
+    );
+
+    expect(connectors.map((c) => c.facing)).toEqual([
+      [0, 0, 1],
+      [0, 1, 0],
+      [-1, 0, 0],
+    ]);
+  });
+
+  it("gives the default up of the box connectors when none is stated", () => {
+    const [side, top] = customConnectors(
+      [
+        { id: "s", name: "s", position: [1, 0, 0] },
+        { id: "t", name: "t", position: [0, 0.5, 0] },
+      ],
+      box,
+    );
+
+    expect(side.up).toEqual([0, 1, 0]);
+    expect(top.up).toEqual([0, 0, 1]);
+  });
+
+  it("squares a stated up to the facing", () => {
+    const [c] = customConnectors(
+      [
+        {
+          id: "a",
+          name: "a",
+          position: [0, 0, 2],
+          facing: [0, 0, 1],
+          up: [1, 0, 1],
+        },
+      ],
+      box,
+    );
+
+    expect(c.up.map((n) => Number(n.toFixed(6)) + 0)).toEqual([1, 0, 0]);
+  });
+
+  it("leaves out an anchor with neither a facing nor a box", () => {
+    expect(
+      customConnectors(
+        [{ id: "a", name: "a", position: [0, 0, 1] }],
+        undefined,
+      ),
+    ).toEqual([]);
+  });
+});
+
+describe("pieceConnectors with custom anchors", () => {
+  it("uses the piece's anchors in place of the part's", () => {
+    const piece = {
+      ...pieceOf(hullAndLeg({}), "hull"),
+      customAnchors: [{ id: "a", name: "a", position: [0, 0, 2] as Vec3 }],
+    };
+
+    expect(pieceConnectors(pack(), piece).map((c) => c.id)).toEqual(["a"]);
+  });
+
+  it("joins a part through a custom anchor, facing out of its nearest face", () => {
+    const doc = hullAndLeg({});
+    const hull = {
+      ...pieceOf(doc, "hull"),
+      customAnchors: [
+        { id: "nose", name: "nose", position: [0, 0, 2] as Vec3 },
+      ],
+    };
+    const withNose = {
+      ...doc,
+      pieces: doc.pieces.map((p) => (p.id === "hull" ? hull : p)),
+    };
+    const joined = connectPiece(withNose, pack(), "leg", {
+      connector: "-y",
+      to: "nose",
+    });
+
+    // The leg's bottom faces down and the nose faces +z, so the leg turns to
+    // point its bottom back along -z and lands on the nose.
+    expect(worldPoint(joined, "leg", [0, -1, 0])).toEqual([0, 0, 2]);
+    expect(worldNormal(joined, "leg", [0, -1, 0])).toEqual([0, 0, -1]);
   });
 });

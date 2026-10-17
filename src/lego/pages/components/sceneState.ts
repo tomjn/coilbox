@@ -22,6 +22,7 @@ import type { LegoCollisionVolume, LegoPiece, LegoProject } from "../../model";
 import { getPartGeometry, type LoadedPack } from "../../pack";
 import { seatPieceMesh } from "../../pivot";
 import { getFixedPieceGeometry, type RawGeometry } from "../../rawGeometry";
+import type { Seat } from "../../seat";
 import type { Vec3 } from "../../snapping";
 import { onGround } from "../../standIn";
 import type { CollisionFaceDrag } from "./collisionHandles";
@@ -248,12 +249,23 @@ export interface SceneState {
    *  registered once and would otherwise only ever see the first values. */
   placingAnchorRef: { current: boolean };
   onPlaceAnchorRef: {
-    current: ((pieceId: string, position: Vec3) => void) | undefined;
+    current:
+      | ((pieceId: string, position: Vec3, facing?: Vec3) => void)
+      | undefined;
   };
   onCancelAnchorRef: { current: (() => void) | undefined };
+  /** Told a finished drag with the join it ended on, or null for a drag that
+   *  seated nothing. */
   onTransformRef: {
-    current: (pieceId: string, change: Partial<LegoPiece>) => void;
+    current: (
+      pieceId: string,
+      change: Partial<LegoPiece>,
+      seat: Seat | null,
+    ) => void;
   };
+  /** What the current drag is snapped to, if it is two faces that point at each
+   *  other. Set on every move of a drag and read when it is let go. */
+  seat: Seat | null;
   onTransformManyRef: {
     current: (changes: Map<string, PieceTransform>) => void;
   };

@@ -1,5 +1,5 @@
 /**
- * A piece's own snap anchors.
+ * A piece's own snap anchors, which are also its connectors (issue #3290).
  *
  * An anchor marks a seat the part's bounding box does not describe: the mouth
  * of a curved intake, the tip of a rounded nose. `snapping.ts` decides what a
@@ -19,16 +19,22 @@
 import type { LegoAnchor, LegoPiece, LegoProject } from "./model";
 import type { Vec3 } from "./snapping";
 
-/** Add an anchor to a piece, at a point in the part's own space. */
+/**
+ * Add a connector to a piece, at a point in the part's own space. Placed by
+ * clicking the model it also takes the facing of the face that was clicked;
+ * placed any other way it has none, and gets the one its nearest box face gives
+ * (`customConnectors`).
+ */
 export function addAnchor(
   project: LegoProject,
   pieceId: string,
   position: Vec3,
   id: string,
+  facing?: Vec3,
 ): LegoProject {
   return withAnchors(project, pieceId, (anchors) => [
     ...anchors,
-    { id, name: nextName(anchors), position },
+    { id, name: nextName(anchors), position, ...(facing ? { facing } : {}) },
   ]);
 }
 

@@ -57,6 +57,7 @@ import { pictureIsStale } from "../buildPicture";
 import { parseClipboardPiece, serializeClipboardPiece } from "../clipboard";
 import { reanchorCollisionVolume } from "../collisionVolume";
 import { selectionAsCompound } from "../compounds";
+import { pieceConnectors } from "../connectors";
 import {
   DEFAULT_GROUND,
   footprintWidth,
@@ -109,6 +110,7 @@ import type {
   ScriptTimeline,
   StandInTrack,
 } from "../scriptPlayback";
+import { dragPiece, freeMoved, type Seat } from "../seat";
 import { shortcutLabel } from "../shortcuts";
 import { useEditShortcuts } from "../useEditShortcuts";
 import { useLegoDocument } from "../useLegoDocument";
@@ -513,21 +515,45 @@ function Builder({ id }: { id: string | undefined }) {
     for (const pieceId of inserted) queueTwin(pieceId);
   }
 
-  function transformPiece(pieceId: string, change: Partial<LegoPiece>) {
+  function transformPiece(
+    pieceId: string,
+    change: Partial<LegoPiece>,
+    seat?: Seat | null,
+  ) {
     // Where a placement lands, whether it came from the gizmo or from typing a
     // number into the panel, so symmetry only has to watch this one spot.
-    place([pieceId], (project) => ({
-      ...project,
-      pieces: project.pieces.map((piece) =>
-        piece.id === pieceId ? { ...piece, ...change } : piece,
-      ),
-    }));
+    //
+    // A `seat` (or null for a drag that seated nothing) says this is a drag,
+    // which saves the join it ended on and frees a piece it moved off its join.
+    // Typing a number is not a drag and goes through as it always did.
+    place([pieceId], (project) =>
+      seat !== undefined && pack && change.position && change.rotation
+        ? dragPiece(
+            project,
+            pack,
+            pieceId,
+            {
+              position: change.position,
+              rotation: change.rotation,
+              scale: change.scale ?? [1, 1, 1],
+            },
+            seat,
+          )
+        : {
+            ...project,
+            pieces: project.pieces.map((piece) =>
+              piece.id === pieceId ? { ...piece, ...change } : piece,
+            ),
+          },
+    );
   }
 
   /** A whole set moved at once, so it is one edit and one undo step. */
   function transformPieces(changes: Map<string, PieceTransform>) {
+    // A set that is dragged leaves any join its pieces had, as a single piece
+    // does, or the next edit would put them back.
     place([...changes.keys()], (project) =>
-      applyGroupTransform(project, changes),
+      freeMoved(project, applyGroupTransform(project, changes)),
     );
   }
 
@@ -607,9 +633,13 @@ function Builder({ id }: { id: string | undefined }) {
 
   // Placing is one anchor at a time: the click is aimed at a spot, and staying
   // armed afterwards would put a second anchor wherever the next click landed.
-  function placeAnchor(pieceId: string, position: [number, number, number]) {
+  function placeAnchor(
+    pieceId: string,
+    position: [number, number, number],
+    facing?: [number, number, number],
+  ) {
     edit((project) =>
-      addAnchor(project, pieceId, position, crypto.randomUUID()),
+      addAnchor(project, pieceId, position, crypto.randomUUID(), facing),
     );
     setPlacingAnchor(false);
     // The panel follows the piece the anchor landed on, which is not
@@ -2042,6 +2072,9 @@ function Builder({ id }: { id: string | undefined }) {
 
                           <AnchorList
                             piece={selected}
+                            connectors={
+                              pack ? pieceConnectors(pack, selected) : []
+                            }
                             placing={placingAnchor}
                             onPlacingChange={setPlacingAnchor}
                             onAddAtOrigin={() =>

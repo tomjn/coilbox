@@ -209,11 +209,18 @@ export function commitGizmo(state: SceneState) {
   const pieceId = group ? pieceIdOf(group) : null;
   if (!group || !pieceId) return;
 
-  state.onTransformRef.current(pieceId, {
-    position: [group.position.x, group.position.y, group.position.z],
-    rotation: [group.rotation.x, group.rotation.y, group.rotation.z],
-    scale: [group.scale.x, group.scale.y, group.scale.z],
-  });
+  // Taken once, so a stale seat cannot leak into the next drag.
+  const seat = state.seat;
+  state.seat = null;
+  state.onTransformRef.current(
+    pieceId,
+    {
+      position: [group.position.x, group.position.y, group.position.z],
+      rotation: [group.rotation.x, group.rotation.y, group.rotation.z],
+      scale: [group.scale.x, group.scale.y, group.scale.z],
+    },
+    seat,
+  );
   state.onSnapChange(false);
 }
 
