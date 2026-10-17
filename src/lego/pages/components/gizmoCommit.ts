@@ -15,6 +15,7 @@ import {
 } from "../../snapping";
 import { handleBox } from "./collisionHandles";
 import { type GizmoMode, ROTATION_STEP } from "./ModelViewport";
+import { packSubject, showPackHandles } from "./packHandles";
 import type { SceneState } from "./sceneState";
 
 /**
@@ -43,6 +44,16 @@ export function gizmoMode(
  * hidden piece is not on screen to drag.
  */
 export function attachGizmo(
+  state: SceneState,
+  project: LegoProject,
+  selectedIds: string[],
+  placingAnchor: boolean,
+) {
+  attachToSelection(state, project, selectedIds, placingAnchor);
+  showPackHandles(state);
+}
+
+function attachToSelection(
   state: SceneState,
   project: LegoProject,
   selectedIds: string[],
@@ -82,6 +93,11 @@ export function attachGizmo(
     return;
   }
   if (roots.length === 1) {
+    // A pack block's size is its face plates in scale mode, not a stretch.
+    if (state.gizmo.getMode() === "scale" && packSubject(state)) {
+      state.gizmo.detach();
+      return;
+    }
     const group = state.groups.get(roots[0]);
     if (group) state.gizmo.attach(group);
     else state.gizmo.detach();
