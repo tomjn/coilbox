@@ -162,7 +162,7 @@ export function recoverProject(
   if (unmatched.length > 0) {
     return {
       ok: false,
-      problem: `${unmatched.length} of ${geometry.length} pieces are not made of parts from the installed packs, starting with "${unmatched[0]}". Only a model coilbox exported can be turned back into a project.`,
+      problem: `${unmatched.length} of ${geometry.length} pieces are not made of parts from the installed packs, starting with "${unmatched[0]}". A model can only be turned back into a project when every piece is a part from the installed packs. A generated shape or a mesh made elsewhere cannot.`,
     };
   }
 
