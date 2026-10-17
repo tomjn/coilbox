@@ -1345,3 +1345,85 @@ describe("playing one preset on its own", () => {
     });
   });
 });
+
+describe("settings for one copy of a module (#4315)", () => {
+  const arm = (id: string, instance: string, name: string) => ({
+    id,
+    name,
+    parentId: null,
+    partId: null,
+    position: [0, 0, 0] as [number, number, number],
+    rotation: [0, 0, 0] as [number, number, number],
+    scale: [1, 1, 1] as [number, number, number],
+    role: "buildarm.arm" as const,
+    module: { id: "arm", instance },
+  });
+  const two = (over: Partial<LegoProject> = {}) =>
+    project({
+      pieces: [arm("a1", "i1", "arm"), arm("a2", "i2", "arm2")],
+      animations: [{ presetId: "buildarm", params: {} }],
+      ...over,
+    });
+  const picker = () =>
+    screen.queryByRole("combobox", { name: "Build arm: copy" });
+  const period = () =>
+    within(screen.getByLabelText("Build arm: Cycle time")).getByRole("slider");
+
+  it("offers no picker for a preset with one copy", () => {
+    show(
+      project({
+        pieces: [arm("a1", "i1", "arm")],
+        animations: [{ presetId: "buildarm", params: {} }],
+      }),
+    );
+    expect(picker()).toBeNull();
+  });
+
+  it("offers one for two copies, on All copies to begin with", () => {
+    show(two());
+    expect(picker()?.textContent).toContain("All copies");
+  });
+
+  it("writes a slider moved on All copies to the shared settings", () => {
+    const onChange = vi.fn();
+    show(two(), { onChange });
+    fireEvent.keyDown(period(), { key: "ArrowRight" });
+    const [applied] = onChange.mock.calls[0];
+    expect(applied[0].params.period).toBeDefined();
+    expect(applied[0].instances).toBeUndefined();
+  });
+
+  it("writes a slider moved on one copy to that copy alone", async () => {
+    const onChange = vi.fn();
+    show(two(), { onChange });
+    fireEvent.keyDown(picker() as HTMLElement, { key: "ArrowDown" });
+    fireEvent.click(await screen.findByRole("option", { name: "Copy 2" }));
+    fireEvent.keyDown(period(), { key: "ArrowRight" });
+    const [applied] = onChange.mock.calls[0];
+    expect(applied[0].params).toEqual({});
+    expect(Object.keys(applied[0].instances)).toEqual(["i2"]);
+  });
+
+  it("shows a copy's own value on its slider, and the shared one on All copies", async () => {
+    show(
+      two({
+        animations: [
+          {
+            presetId: "buildarm",
+            params: {},
+            instances: { i2: { period: 9 } },
+          },
+        ],
+      }),
+    );
+    expect(period().getAttribute("aria-valuenow")).toBe("3");
+    fireEvent.keyDown(picker() as HTMLElement, { key: "ArrowDown" });
+    expect(
+      await screen.findByRole("option", { name: "Copy 2, own settings" }),
+    ).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole("option", { name: "Copy 2, own settings" }),
+    );
+    expect(period().getAttribute("aria-valuenow")).toBe("9");
+  });
+});

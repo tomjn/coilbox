@@ -24,6 +24,7 @@ import {
   unmetRequirements,
 } from "./animPresets";
 import { freePiece } from "./connectors";
+import { copyInstanceSettings, moduleOwnSettings } from "./instanceSettings";
 import {
   descendantIds,
   LEGO_SCHEMA_VERSION,
@@ -201,6 +202,7 @@ export interface PresetOutcome {
 function mergePresets(
   project: LegoProject,
   module: LegoProject,
+  newInstance?: string,
 ): { project: LegoProject; outcome: PresetOutcome } {
   const outcome: PresetOutcome = {
     added: [],
@@ -213,8 +215,21 @@ function mergePresets(
   for (const entry of module.animations ?? []) {
     const preset = presetById(entry.presetId);
     if (!preset) continue;
-    if (applied.some((have) => have.presetId === entry.presetId)) {
+    const haveAt = applied.findIndex(
+      (have) => have.presetId === entry.presetId,
+    );
+    if (haveAt >= 0) {
       outcome.present.push(entry.presetId);
+      // The unit's settings stand for the unit, and the module's own go to the
+      // copy it brought, so they are not thrown away (#4315).
+      const own = newInstance ? moduleOwnSettings(applied[haveAt], entry) : {};
+      if (newInstance && Object.keys(own).length > 0) {
+        const have = applied[haveAt];
+        applied[haveAt] = {
+          ...have,
+          instances: { ...have.instances, [newInstance]: own },
+        };
+      }
       continue;
     }
     const missing = unmetRequirements(preset, roles);
@@ -469,9 +484,25 @@ export function insertCompound(
       pieces: [...project.pieces, ...withLinksRemapped(added, remap)],
     },
     compound,
+    (moduleRef as LegoModuleRef | undefined)?.instance,
+  );
+  // A copy of an instance starts with the settings of the one it was copied
+  // from (#4315). A module dropped from the library has none to copy.
+  const copied = asModule
+    ? new Map<string, string>()
+    : new Map(
+        ids.flatMap(([piece], i) => {
+          const was = piece.module?.instance;
+          const now = added[i].module?.instance;
+          return was && now && was !== now ? [[was, now] as const] : [];
+        }),
+      );
+  const carried = [...copied].reduce(
+    (current, [was, now]) => copyInstanceSettings(current, was, now),
+    merged.project,
   );
   return {
-    project: merged.project,
+    project: carried,
     rootPieceIds,
     idMap: remap,
     presets: merged.outcome,
