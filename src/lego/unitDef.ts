@@ -256,7 +256,17 @@ export function legoUnitDef(
     // which otherwise prices any unit with no `factionname` at 518181518
     // metal and energy so that a builder never finishes it (issue #4143). The
     // game reads only whether it is set. Other games ignore the table.
-    customparams: { unitdefbuildtime: totals?.buildTime ?? DEFAULT_BUILD_TIME },
+    //
+    // `corpse` is empty so the wreck is only the engine's, from `corpse`
+    // below (issue #4283). Splinter Faction's `unit_deathContainerSpawn.lua`
+    // drops `customparams.corpse` itself when a ship dies or heat kills a
+    // unit, and `alldefs_post.lua` defaults it to the name of our wreck, so a
+    // heat kill would leave two. With an empty name its `CreateFeature` finds
+    // no feature and it spawns nothing.
+    customparams: {
+      unitdefbuildtime: totals?.buildTime ?? DEFAULT_BUILD_TIME,
+      corpse: "",
+    },
     buildtime: totals?.buildTime ?? DEFAULT_BUILD_TIME,
     buildcostmetal: totals?.metal ?? DEFAULT_BUILD_COST_METAL,
     buildcostenergy: totals?.energy ?? 0,
@@ -328,6 +338,7 @@ export const DERIVED_FIELDS: readonly string[] = [
   "description",
   "unitname",
   "customparams.unitdefbuildtime",
+  "customparams.corpse",
   "buildtime",
   "buildcostmetal",
   "buildcostenergy",
