@@ -363,6 +363,99 @@ describe("a unit whose game compiled its animation", () => {
   });
 });
 
+describe("a unit whose script was converted from BOS", () => {
+  const HEADER = "-- scripts/walker.bos converted from BOS by coilbox.";
+  const OLD = `${HEADER}\nfunction QueryNanoPiece(piecenum)\n  return piecenum + 1\nend\n`;
+  const FRESH = `${HEADER}\nPIECES = {}\nfunction QueryNanoPiece(piecenum)\n  return PIECES[piecenum + 1]\nend\n`;
+
+  function converted(script: string, withGame = true): LegoProject {
+    const base = unit({ script });
+    if (!withGame) return base;
+    return {
+      ...base,
+      imported: {
+        ...(base.imported ?? {}),
+        game: {
+          name: "Walkers",
+          archive: "walkers.sdd",
+          member: "objects3d/walker.s3o",
+          unit: "walker",
+        },
+      } as LegoProject["imported"],
+    };
+  }
+
+  it("points out the old piece numbering", () => {
+    show(converted(OLD));
+    expect(screen.getByText(/Converted before piece numbers/)).toBeTruthy();
+  });
+
+  it("says nothing about a conversion that is current", () => {
+    show(converted(FRESH));
+    expect(screen.queryByText(/Converted before piece numbers/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Convert again" })).toBeTruthy();
+  });
+
+  it("offers no conversion for a script that is not one", () => {
+    show(converted("local x = 1"));
+    expect(screen.queryByRole("button", { name: "Convert again" })).toBeNull();
+  });
+
+  it("offers no conversion for a unit with no game behind it", () => {
+    show(converted(OLD, false));
+    expect(screen.queryByRole("button", { name: "Convert again" })).toBeNull();
+  });
+
+  it("asks first, and replaces nothing until confirmed", () => {
+    show(converted(OLD));
+    fireEvent.click(screen.getByRole("button", { name: "Convert again" }));
+
+    expect(screen.getByText(/Edits you made since are lost/)).toBeTruthy();
+    expect(adopt).not.toHaveBeenCalled();
+    expect(onScriptChange).not.toHaveBeenCalled();
+  });
+
+  it("replaces nothing when cancelled", () => {
+    show(converted(OLD));
+    fireEvent.click(screen.getByRole("button", { name: "Convert again" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(adopt).not.toHaveBeenCalled();
+    expect(onScriptChange).not.toHaveBeenCalled();
+  });
+
+  it("stores the new conversion once confirmed", async () => {
+    adopt.mockResolvedValue({
+      script: FRESH,
+      converted: { member: "scripts/walker.bos" },
+      notes: [],
+    });
+    show(converted(OLD));
+    fireEvent.click(screen.getByRole("button", { name: "Convert again" }));
+    fireEvent.click(screen.getByRole("button", { name: "Replace" }));
+
+    await waitFor(() => expect(onScriptChange).toHaveBeenCalledWith(FRESH));
+  });
+
+  it("keeps the stored script and says why when the game has no BOS", async () => {
+    adopt.mockResolvedValue({
+      script: null,
+      converted: null,
+      notes: ["walker has no animation script in Walkers."],
+    });
+    show(converted(OLD));
+    fireEvent.click(screen.getByRole("button", { name: "Convert again" }));
+    fireEvent.click(screen.getByRole("button", { name: "Replace" }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("walker has no animation script in Walkers."),
+      ).toBeTruthy(),
+    );
+    expect(onScriptChange).not.toHaveBeenCalled();
+  });
+});
+
 describe("coverage dimming", () => {
   /** A script with a line that ran and a line that did not, so the dimming
    *  can be told apart from "everything is dimmed" or "nothing is". */
