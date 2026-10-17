@@ -120,6 +120,7 @@ import {
 } from "../../targetMotion";
 import { isBuilder } from "../../unitDef";
 import { controlFor } from "../../unitValueControls";
+import { GameFitSection } from "./GameFitSection";
 import { MovementSection } from "./MovementSection";
 import { ScrubberMarks } from "./ScrubberMarks";
 import type { DrivePlacement } from "./standInPlayback";
@@ -1644,6 +1645,8 @@ export function AnimationPanel({
             bounds={bounds}
             onMovementChange={onMovementChange}
           />
+
+          <GameFitSection project={project} bounds={bounds} />
 
           {PRESETS.map((preset) => {
             const entry = applied.find((a) => a.presetId === preset.id);
