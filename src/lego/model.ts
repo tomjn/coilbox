@@ -334,6 +334,33 @@ export interface LegoPiece {
    * imported normals, unmodified. See `meshFix.ts`.
    */
   normalsAngle?: number;
+  /**
+   * What a turret or aim point fires, and over what arc (issue #3274). Kept on
+   * the piece so the weapon goes wherever the module goes: a copy, a mirrored
+   * twin or a compound carries it, and deleting the turret deletes it. See
+   * `weaponModule.ts`.
+   */
+  weapon?: LegoPieceWeapon;
+}
+
+/**
+ * The weapon a module fires. A game weapon is named as the game's weapon table
+ * keys it. A library weapon is a reference into a workshop project, read again
+ * on every export, so the workshop stays the one place it is edited (#3313).
+ */
+export type LegoWeaponRef =
+  | { from: "game"; name: string }
+  | { from: "library"; projectId: string; key: string };
+
+export interface LegoPieceWeapon {
+  /** Absent until a weapon is picked. */
+  fires?: LegoWeaponRef;
+  /** Full width of the firing arc in degrees, written as `maxAngleDif`.
+   *  Absent means the engine's default of 360. */
+  arc?: number;
+  /** Where the arc points, in degrees to the right of the unit's front,
+   *  written as `mainDir`. Absent means straight ahead. */
+  heading?: number;
 }
 
 /** A game's own compiled animation script: where it sits in the archive, and
@@ -1026,7 +1053,42 @@ function parsePiece(raw: unknown): LegoPiece | null {
     ...(typeof p.normalsAngle === "number" && Number.isFinite(p.normalsAngle)
       ? { normalsAngle: p.normalsAngle }
       : {}),
+    ...(() => {
+      const weapon = parsePieceWeapon(p.weapon);
+      return weapon ? { weapon } : {};
+    })(),
   };
+}
+
+/** A piece's weapon, or null when there is nothing usable in it. */
+function parsePieceWeapon(value: unknown): LegoPieceWeapon | null {
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  const fires = parseWeaponRef(v.fires);
+  const number = (x: unknown): x is number =>
+    typeof x === "number" && Number.isFinite(x);
+  return {
+    ...(fires ? { fires } : {}),
+    ...(number(v.arc) ? { arc: v.arc } : {}),
+    ...(number(v.heading) ? { heading: v.heading } : {}),
+  };
+}
+
+function parseWeaponRef(value: unknown): LegoWeaponRef | null {
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  if (v.from === "game" && typeof v.name === "string" && v.name !== "") {
+    return { from: "game", name: v.name };
+  }
+  if (
+    v.from === "library" &&
+    typeof v.projectId === "string" &&
+    typeof v.key === "string" &&
+    v.key !== ""
+  ) {
+    return { from: "library", projectId: v.projectId, key: v.key };
+  }
+  return null;
 }
 
 /**
