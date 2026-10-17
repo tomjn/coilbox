@@ -92,6 +92,7 @@ import {
   type StaleExport,
   uniquePieceName,
 } from "../model";
+import { useModuleFilter, withLabels } from "../moduleFilter";
 import {
   type LegoPartInfo,
   type LoadedPack,
@@ -135,6 +136,7 @@ import { CompoundPicker } from "./components/CompoundPicker";
 import { ExportDrawer } from "./components/ExportDrawer";
 import { JoinedTo } from "./components/JoinedTo";
 import { ModelViewport } from "./components/ModelViewport";
+import { ModuleFilters, NoModuleMatches } from "./components/ModuleFilters";
 import { NameInput } from "./components/NameInput";
 import { NoMatches, PartFilters } from "./components/PartFilters";
 import { PartPicker } from "./components/PartPicker";
@@ -198,6 +200,7 @@ function Builder({ id }: { id: string | undefined }) {
     [edit],
   );
   const { compounds } = useLegoCompounds();
+  const moduleFilter = useModuleFilter(compounds);
   // Only for the keep-set when a texture changes: the store is shared, so
   // nothing can decide a key is dead by looking at one unit.
   const { projects } = useLegoProjects();
@@ -1652,6 +1655,18 @@ function Builder({ id }: { id: string | undefined }) {
                   />
                 ) : null}
 
+                {stripOpen && effectiveStrip === "compounds" ? (
+                  <ModuleFilters
+                    compounds={compounds}
+                    query={moduleFilter.query}
+                    onQuery={moduleFilter.setQuery}
+                    category={moduleFilter.category}
+                    onCategory={moduleFilter.setCategory}
+                    shown={moduleFilter.modules.length}
+                    className="flex-1"
+                  />
+                ) : null}
+
                 {stripOpen ? (
                   <Button
                     size="icon"
@@ -1687,15 +1702,23 @@ function Builder({ id }: { id: string | undefined }) {
                       onCompiledReload={reloadCompiled}
                       lastRun={lastScriptRun}
                     />
+                  ) : effectiveStrip === "compounds" &&
+                    compounds.length > 0 &&
+                    moduleFilter.modules.length === 0 ? (
+                    <NoModuleMatches />
                   ) : effectiveStrip === "compounds" ? (
                     <CompoundPicker
                       pack={pack}
-                      compounds={compounds}
+                      compounds={moduleFilter.modules}
+                      known={compounds}
                       atlas={drawAtlas}
                       onInsert={addCompound}
                       onDelete={(compoundId) => void deleteCompound(compoundId)}
                       onRename={(compound, name) =>
                         void saveCompound({ ...compound, name })
+                      }
+                      onLabels={(compound, labels) =>
+                        void saveCompound(withLabels(compound, labels))
                       }
                     />
                   ) : filter.parts.length === 0 ? (
