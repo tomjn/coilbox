@@ -23,6 +23,7 @@ import {
   buildUnitScriptGadget,
 } from "./scratchGame";
 import { buildUnitDef } from "./unitDef";
+import { worthTotals } from "./worth";
 
 export interface ScratchGameArgs {
   target: PlayTarget;
@@ -147,7 +148,12 @@ export async function writeScratchUnit({
     // the bounding box.
     // A definition home, always. The scratch game is coilbox's own, built
     // fresh here, and it has no localisation file to read a name out of.
-    unitDef: buildUnitDef(project, unitBounds(project, pack, raw), "def"),
+    unitDef: buildUnitDef(
+      project,
+      unitBounds(project, pack, raw),
+      "def",
+      worthTotals(project, pack),
+    ),
     text: null,
     model,
   });

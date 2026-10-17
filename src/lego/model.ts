@@ -21,6 +21,7 @@
  */
 
 import type { RawGeometry } from "./rawGeometry";
+import { type LegoWorth, parseWorth } from "./worth";
 
 export const LEGO_SCHEMA_VERSION = 1;
 
@@ -415,6 +416,14 @@ export interface LegoProject {
   builder?: LegoBuilder;
   /** The movement class, speed and turn rate, when the unit moves. */
   movement?: LegoMovement;
+  /**
+   * What each kind of part is worth, which sets the unit's health, cost and
+   * mass (issue #3280). Absent means the placeholder table in `worth.ts`.
+   * Stored on the unit rather than per game, because a unit built from parts
+   * does not record a game yet (#3257), and an export then needs nothing from
+   * outside the document.
+   */
+  worth?: LegoWorth;
   unitDef?: Record<string, string | number | boolean>;
   notes?: string;
   /** Canned animations applied to this unit, from `animPresets.ts`. */
@@ -913,6 +922,7 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
   const collisionVolume = parseCollisionVolume(d.collisionVolume);
   const builder = parseBuilder(d.builder);
   const movement = parseMovement(d.movement);
+  const worth = parseWorth(d.worth);
   const project: LegoProject = {
     schemaVersion: LEGO_SCHEMA_VERSION,
     id: d.id,
@@ -937,6 +947,7 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
     ...(d.pieceSelection === true ? { pieceSelection: true } : {}),
     ...(builder ? { builder } : {}),
     ...(movement ? { movement } : {}),
+    ...(worth ? { worth } : {}),
     ...(typeof d.unitDef === "object" && d.unitDef !== null
       ? { unitDef: d.unitDef as Record<string, string | number | boolean> }
       : {}),
