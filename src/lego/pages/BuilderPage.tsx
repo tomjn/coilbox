@@ -129,6 +129,7 @@ import { NoMatches, PartFilters } from "./components/PartFilters";
 import { PartPicker } from "./components/PartPicker";
 import { collisionHandlePieceId } from "./components/PieceCollisionFields";
 import { PieceTree } from "./components/PieceTree";
+import type { ReferenceUnit } from "./components/ReferencePicker";
 import { SaveModelPopover } from "./components/SaveModelPopover";
 import { ScriptTab } from "./components/ScriptTab";
 import { SetPanel } from "./components/SetPanel";
@@ -216,6 +217,10 @@ function Builder({ id }: { id: string | undefined }) {
   const [aside, setAside] = useState<
     "pieces" | "animation" | "collision" | "aim" | "texture"
   >("pieces");
+  /** The game unit standing beside the build, which the stats compare with. */
+  const [referenceUnit, setReferenceUnit] = useState<ReferenceUnit | null>(
+    null,
+  );
   const [exporting, setExporting] = useState(false);
   const [testing, setTesting] = useState(false);
   const [picturing, setPicturing] = useState(false);
@@ -1016,6 +1021,7 @@ function Builder({ id }: { id: string | undefined }) {
               )}
             >
               <ModelViewport
+                onReferenceUnit={setReferenceUnit}
                 ground={ground}
                 chrome={
                   <>
@@ -1619,6 +1625,7 @@ function Builder({ id }: { id: string | undefined }) {
               ) : aside === "animation" ? (
                 <AnimationPanel
                   project={draft}
+                  referenceUnit={referenceUnit}
                   playing={playing}
                   onPlayingChange={setPlaying}
                   onChange={(animations) =>

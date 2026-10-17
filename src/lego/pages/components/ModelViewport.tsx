@@ -125,7 +125,11 @@ import {
   pieceIdOf,
 } from "./gizmoCommit";
 import { attachPointerHandlers } from "./pointerHandlers";
-import { type GameReferenceChoice, ReferencePicker } from "./ReferencePicker";
+import {
+  type GameReferenceChoice,
+  ReferencePicker,
+  type ReferenceUnit,
+} from "./ReferencePicker";
 import { ShortcutSheet } from "./ShortcutSheet";
 import type { SceneState } from "./sceneState";
 import {
@@ -300,6 +304,8 @@ interface Props {
    * same place.
    */
   chrome?: ReactNode;
+  /** The game unit picked as the reference figure, or null when none is. */
+  onReferenceUnit?: (unit: ReferenceUnit | null) => void;
   /**
    * What the unit stands on. Held by the page rather than here, because the
    * script preview has to be told the same ground the view draws.
@@ -488,6 +494,7 @@ interface Props {
 
 export function ModelViewport({
   chrome,
+  onReferenceUnit,
   ground,
   document,
   selection,
@@ -1554,6 +1561,7 @@ export function ModelViewport({
               unit={{ project, pack, raw }}
               show={showReference}
               onShowChange={setShowReference}
+              onUnit={onReferenceUnit}
               onReference={(choice) => {
                 setGameReference(choice);
                 // Picking a unit and having nothing appear reads as a broken

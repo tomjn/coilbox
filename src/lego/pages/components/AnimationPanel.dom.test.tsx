@@ -65,6 +65,7 @@ vi.mock("./MovementSection", () => ({ MovementSection: () => null }));
 vi.mock("./BuilderReport", () => ({ BuilderReport: () => null }));
 vi.mock("./GameFitSection", () => ({ GameFitSection: () => null }));
 vi.mock("./WorthSection", () => ({ WorthSection: () => null }));
+vi.mock("./StatsSection", () => ({ StatsSection: () => null }));
 
 function timeline(over: Partial<ScriptTimeline> = {}): ScriptTimeline {
   return {

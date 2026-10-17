@@ -66,6 +66,20 @@ export interface GameReferenceChoice {
 }
 
 /**
+ * The game unit chosen to stand beside the build, which the stats panel
+ * compares the build with (issue #3293). Reported as soon as it is chosen,
+ * whether or not its model can be drawn.
+ */
+export interface ReferenceUnit {
+  gameName: string;
+  /** The game's primary archive name, which is how its definitions are read. */
+  archive: string;
+  /** The unit's key in the game's unit table. */
+  unit: string;
+  label: string;
+}
+
+/**
  * The built-in figure, as the game list's own option. A value rather than the
  * empty string, because a select reading empty has nothing selected and shows
  * its placeholder, which would say no game is installed while the list it
@@ -85,6 +99,7 @@ export function ReferencePicker({
   show,
   onShowChange,
   onReference,
+  onUnit,
 }: {
   unit: UnitSource;
   /** Whether the figure is in the scene at all. */
@@ -93,6 +108,8 @@ export function ReferencePicker({
   /** Called with the unit to stand in the scene, or `null` to go back to the
    *  built-in solar collector. */
   onReference: (choice: GameReferenceChoice | null) => void;
+  /** Called with the chosen game unit, or `null` when none is chosen. */
+  onUnit?: (unit: ReferenceUnit | null) => void;
 }) {
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
@@ -135,6 +152,24 @@ export function ReferencePicker({
         : null,
     );
   }, [model, drawable, unit]);
+
+  const onUnitRef = useRef(onUnit);
+  onUnitRef.current = onUnit;
+  const gameLabel = game?.name;
+  const unitKey = unit?.name;
+  const unitText = unit ? unitLabel(unit) : undefined;
+  useEffect(() => {
+    onUnitRef.current?.(
+      gameLabel && archive && unitKey && unitText
+        ? {
+            gameName: gameLabel,
+            archive,
+            unit: unitKey.toLowerCase(),
+            label: unitText,
+          }
+        : null,
+    );
+  }, [gameLabel, archive, unitKey, unitText]);
 
   return (
     <Popover>
