@@ -715,7 +715,9 @@ The header's mid is the only lever a model file has. `CUnit::PreInit` sets both 
 
 Pick a game to build on and a map. Coilbox writes a scratch game of its own, `coilbox-lego-test.sdd`, into the content root's `games/` folder. It depends on the game you picked, which supplies the sides, the rules and everything else, and the scratch archive adds only your unit. Your install is not touched, and deleting that one folder undoes everything the flow has ever written.
 
-Coilbox then rescans, so the engine picks the scratch game up, and launches a one-player skirmish on the map you chose.
+Coilbox then rescans, so the engine picks the scratch game up, and **Launch with it as start unit** starts a one-player skirmish on the map you chose.
+
+A unit with legs, wheels or tracks, or a walk or roll preset, that has no movement class of its own is given one from the game you test in. It gets the first class the Movement section would offer it, with the speed and turn rate taken from that game's units, so a walker built with no game still walks. A class you picked is kept. The real export is not changed, and the builder's problems list warns that a unit like this exports as a building.
 
 Once you are on the map, press Enter and type:
 
@@ -732,7 +734,7 @@ After an edit you quit and test again. [What the engine reloads in a running gam
 
 ### Check it loads
 
-**Check it loads**, under Launch in the same drawer, plays the same scratch game with no window. It spawns the unit, runs it for 15 seconds of game time, the same stretch the animation preview plays, and lists what the engine said about it: a script that threw or did not compile, a piece the script names and the model lacks, a model file that is missing, a definition that did not parse, and a texture the model names that is not there. When the game itself fails to start with the unit in it, the drawer shows the engine's reason. A unit with a movement class is also ordered to drive towards a corner of the map, and the drawer says how far it got and on which class. One that does not move at all is listed as a problem.
+**Check it loads**, in the same drawer, plays the same scratch game with no window. It spawns the unit, runs it for 15 seconds of game time, the same stretch the animation preview plays, and lists what the engine said about it: a script that threw or did not compile, a piece the script names and the model lacks, a model file that is missing, a definition that did not parse, and a texture the model names that is not there. When the game itself fails to start with the unit in it, the drawer shows the engine's reason. A unit with a movement class is also ordered to drive towards a corner of the map, and the drawer says how far it got and on which class. One that does not move at all is listed as a problem.
 
 It proves the unit loads and runs. It does not show how it looks.
 
@@ -740,9 +742,9 @@ Most errors in a headless log are not about your unit. A healthy Splinter Factio
 
 The check needs `spring-headless` and the engine's base content, and the drawer says which is missing. It runs in a folder of its own under coilbox's cache, so nothing is written to your engine or your settings. The first check takes longer than the rest: on a Mac it took 42 seconds and then 11, because the engine scans every archive once and Splinter Faction builds files of its own on a first run.
 
-### Play with this unit
+### Launch sandbox with targets
 
-**Play with this unit**, under Launch, starts a skirmish that is set up for trying the unit out. No cheats are needed.
+**Launch sandbox with targets** starts a skirmish that is set up for trying the unit out. No cheats are needed.
 
 - Your unit is at your start position, on the map's first start spot.
 - Beside it is the game's own builder, the start unit of the game's first side. Your unit is on its build menu.
@@ -758,9 +760,9 @@ A map with no start positions has nowhere to put the targets, and the drawer say
 
 The scratch game does not carry your unit's weapons yet, so it cannot fire at the targets ([issue #4264](https://github.com/tomjn/coilbox/issues/4264)).
 
-### Reload in the sandbox
+### Reload into the sandbox
 
-**Reload in the sandbox** puts your latest change into the sandbox that is already running, so you keep the map, the targets and the time you spent getting there. It works while a game started with Play with this unit is running.
+**Reload into the sandbox** puts your latest change into the sandbox that is already running, so you keep the map, the targets and the time you spent getting there. It shows only while a game started with Launch sandbox with targets is running, and says it is waiting until the engine has started.
 
 - A changed script reloads. Every copy of your unit in the game, yours and the targets, starts running the new script straight away. Nothing has to be respawned.
 - A texture that changed but kept its file name reloads, and every copy of your unit shows it straight away. A texture under a file name the game did not start with needs a relaunch.
