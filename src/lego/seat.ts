@@ -43,6 +43,7 @@ function twistOf(
   project: LegoProject,
   pack: LoadedPack,
   piece: LegoPiece,
+  pieceWorld: THREE.Matrix4,
   parent: LegoPiece,
   seat: Seat,
 ): number {
@@ -50,10 +51,16 @@ function twistOf(
   const theirs = pieceConnectors(pack, parent).find((c) => c.id === seat.to);
   if (!own || !theirs) return 0;
 
-  const intoParent = worldMatrix(project, parent.id).invert();
+  // The piece will be joined, so it takes the parent's turn and not its scale.
+  const parentTurn = new THREE.Quaternion();
+  worldMatrix(project, parent.id).decompose(
+    new THREE.Vector3(),
+    parentTurn,
+    new THREE.Vector3(),
+  );
   const up = new THREE.Vector3(...own.up)
-    .transformDirection(worldMatrix(project, piece.id))
-    .transformDirection(intoParent);
+    .transformDirection(pieceWorld)
+    .applyQuaternion(parentTurn.invert());
   const facing = new THREE.Vector3(...theirs.facing).normalize();
   up.addScaledVector(facing, -up.dot(facing)).normalize();
 
@@ -100,8 +107,10 @@ export function dragPiece(
   };
 
   if (seat) {
+    // Where the piece was dropped, read before a reparent rewrites its transform.
+    const droppedWorld = worldMatrix(next, pieceId);
     if (before.parentId !== seat.parentId) {
-      const reparented = reparentPiece(next, pieceId, seat.parentId);
+      const reparented = reparentPiece(next, pieceId, seat.parentId, true);
       // A parent the piece cannot hang off leaves it free where it was dropped.
       if (reparented === next) return freeAt(next, pieceId);
       next = reparented;
@@ -109,7 +118,7 @@ export function dragPiece(
     const piece = pieceById(next, pieceId);
     const parent = pieceById(next, seat.parentId);
     if (!piece || !parent) return freeAt(next, pieceId);
-    const twist = twistOf(next, pack, piece, parent, seat);
+    const twist = twistOf(next, pack, piece, droppedWorld, parent, seat);
     return {
       ...next,
       pieces: next.pieces.map((p) =>
