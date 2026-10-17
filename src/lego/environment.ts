@@ -462,6 +462,14 @@ function terrainTexture(): THREE.CanvasTexture | null {
 const SEGMENTS_PER_BUMP = 16;
 
 /**
+ * Most rows the shaped ground's mesh gets along a side. Ground drawn out to a
+ * long drive wants 16 rows per bump over a huge area, which is millions of
+ * points and over a second to build (#4160), so a large ground is drawn with
+ * fewer rows per bump instead. 512 rows is 263169 points.
+ */
+const MAX_SEGMENTS = 512;
+
+/**
  * A ground with height in it, in its own mesh: the terrain's mottle and fade
  * over a displaced plane.
  *
@@ -506,7 +514,10 @@ function shapedGeometry(
   const segments =
     shape.kind === "slope"
       ? 1
-      : Math.ceil((size / shape.width) * SEGMENTS_PER_BUMP);
+      : Math.min(
+          MAX_SEGMENTS,
+          Math.ceil((size / shape.width) * SEGMENTS_PER_BUMP),
+        );
   const geometry = new THREE.PlaneGeometry(size, size, segments, segments);
   geometry.rotateX(-Math.PI / 2);
   const position = geometry.getAttribute("position");
