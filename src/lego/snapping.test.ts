@@ -48,6 +48,14 @@ describe("pieceAnchors", () => {
     expect(pieceAnchors(UNIT, [])).toHaveLength(15);
   });
 
+  it("gives a round piece no corners, which are not on it", () => {
+    const anchors = pieceAnchors(UNIT, undefined, true);
+    expect(anchors.map((a) => a.kind)).toEqual([
+      ...Array(6).fill("face"),
+      "centre",
+    ]);
+  });
+
   it("uses the piece's own anchors instead of the box, not as well as", () => {
     const anchors = pieceAnchors(UNIT, [
       { name: "mouth", position: [0, 0.5, 1] },

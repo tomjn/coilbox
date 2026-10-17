@@ -7,6 +7,7 @@ import { descendantIds, pieceById } from "../../model";
 import { type LoadedPack, partUnit } from "../../pack";
 import { pieceMesh, type RawGeometry } from "../../rawGeometry";
 import type { Seat } from "../../seat";
+import { isRoundShapeKind } from "../../shapes";
 import {
   type Anchor,
   facesOppose,
@@ -88,7 +89,11 @@ function localAnchorsOf(
       facing: c.facing,
     }));
   } else {
-    anchors = pieceAnchors(box, undefined).map((anchor) =>
+    anchors = pieceAnchors(
+      box,
+      undefined,
+      piece.shape !== undefined && isRoundShapeKind(piece.shape.kind),
+    ).map((anchor) =>
       anchor.connector && ids.has(anchor.connector)
         ? anchor
         : stripConnector(anchor),
