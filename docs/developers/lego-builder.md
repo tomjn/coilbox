@@ -168,6 +168,12 @@ The **ground** is marked in elmos: fine lines every elmo near the origin, heavie
 
 The **reference unit**, the sun button in the bottom right, stands a real unit beside yours at its real size: Beyond All Reason's Armada solar collector, 43 elmos across and 29 tall. Anyone who plays these games has built hundreds of them. Its geometry is baked into coilbox rather than read out of an installed game, so it is there whatever you have installed. The same button can stand one of an installed game's units there instead, and that is the unit [the stats panel](#the-stats-panel) compares yours with. Attribution and licence are in `src/lego/reference/LICENCE.txt`.
 
+The **measure tool**, the ruler button in the bottom right or `L`, reads a distance out. Click one point on the model or the ground and then another. The viewport draws the line and lists the distance and the offset along x, y and z. A point snaps to the same anchors and guides a drag does, and holding Alt places it freely. Measurements stay until you press Clear. They are not saved with the unit or exported. `Escape` leaves the tool.
+
+While you drag a piece, a readout shows how far it has moved on each axis and its size. The Pieces panel shows the selected piece's size under its position, rotation and scale.
+
+Every figure is in elmos and in steps. A scene unit is an elmo, because the exporter writes each vertex's world position into the `.s3o` with no scale in between. A step is the pack's part unit, 0.25 elmo unless the pack states another, so 4 elmos reads as 16 steps. A pack with no unit shows elmos only. Distances are along the world axes, and a piece's size includes everything under it.
+
 ## Which way it faces
 
 A blue arrow on the ground, labelled **front**, marks model `+z`: the direction `Spring.GetUnitVectors` calls `frontdir`, pinned by the headless engine run on [issue #565](https://github.com/tomjn/coilbox/issues/565). Model `+y` is up, and model `+x` is the unit's left, being the negative of `rightdir`, not its right.

@@ -153,6 +153,7 @@ import { ExportDrawer } from "./components/ExportDrawer";
 import { GameUnitBrowser } from "./components/GameUnitBrowser";
 import { InventoryFilters, InventoryGrids } from "./components/Inventory";
 import { JoinedTo } from "./components/JoinedTo";
+import { PieceSize } from "./components/MeasureReadout";
 import { ModelViewport } from "./components/ModelViewport";
 import { ModuleUpdateBanner } from "./components/ModuleUpdateBanner";
 import { NameInput } from "./components/NameInput";
@@ -2265,6 +2266,12 @@ function Builder({ id }: { id: string | undefined }) {
                             }
                             uniformScale={uniformScale}
                             onUniformScaleChange={setUniformScale}
+                          />
+                          <PieceSize
+                            project={draft}
+                            pack={pack}
+                            raw={raw}
+                            pieceId={selected.id}
                           />
                           {canMirror(draft, selected.id) ? (
                             <div className="mt-2">

@@ -30,6 +30,7 @@ import type { Vec3 } from "../../snapping";
 import { onGround } from "../../standIn";
 import type { CollisionFaceDrag } from "./collisionHandles";
 import type { EffectsLayer } from "./effectsLayer";
+import type { MeasureScene } from "./measureLayer";
 import type { Placing } from "./placeByFace";
 
 export interface SceneState {
@@ -195,6 +196,8 @@ export interface SceneState {
    *  point in the world, or null for a click that missed, which is how you
    *  change your mind. */
   onPickGuideRef: { current: ((at: Vec3 | null) => void) | undefined };
+  /** The measure tool and the drag readout. See `measureLayer.ts`. */
+  measure: MeasureScene;
   /** The sky now drawn, and which backdrop built it, so going back to one
    *  already seen does not draw its gradient again. Null while the plain
    *  backdrop shows, which is what the canvas does with no background at all. */

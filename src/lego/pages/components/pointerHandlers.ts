@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { isEffectivelyHidden } from "../../model";
 import type { Vec3 } from "../../snapping";
-import { placeAnchor } from "./anchorsAndSnapping";
+import { measurePoint, placeAnchor } from "./anchorsAndSnapping";
 import {
   beginFaceDrag,
   endFaceDrag,
@@ -10,6 +10,7 @@ import {
 } from "./collisionHandles";
 import { pickGround } from "./drivePlayback";
 import { pieceIdOf } from "./gizmoCommit";
+import { groundPoint } from "./measureLayer";
 import { firstPieceHit, hoverPlaceFace, placeOnClick } from "./placeByFace";
 import type { SceneState } from "./sceneState";
 import { setHoveredAndNotify } from "./selectionAndHoverOutlines";
@@ -101,6 +102,15 @@ export function attachPointerHandlers(state: SceneState): () => void {
   renderer.domElement.addEventListener("pointerup", onStandInUp);
   renderer.domElement.addEventListener("pointercancel", onStandInUp);
 
+  // Where the pointer is for the measure tool: on the model where the ray hit
+  // it, else on the ground, then snapped as a drag is.
+  const measureAt = (hit: THREE.Intersection | undefined) => {
+    const raw = hit
+      ? ([hit.point.x, hit.point.y, hit.point.z] as Vec3)
+      : groundPoint(state, raycaster);
+    return raw ? measurePoint(state, raw) : null;
+  };
+
   // Selection happens on release, not on press, and only when the pointer
   // barely moved. Selecting on press meant a click that missed a gizmo handle
   // by a pixel cleared the selection and detached the gizmo before the drag
@@ -134,6 +144,11 @@ export function attachPointerHandlers(state: SceneState): () => void {
     pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
     raycaster.setFromCamera(pointer, camera);
     const hit = raycaster.intersectObject(root, true)[0];
+    if (state.measure.active) {
+      const at = measureAt(hit);
+      if (at) state.measure.onPick?.(at);
+      return;
+    }
     const pickGuide = state.onPickGuideRef.current;
     if (pickGuide) {
       pickGuide(hit ? ([hit.point.x, hit.point.y, hit.point.z] as Vec3) : null);
@@ -176,6 +191,12 @@ export function attachPointerHandlers(state: SceneState): () => void {
     pointer.x = hoverAt.x;
     pointer.y = hoverAt.y;
     raycaster.setFromCamera(pointer, camera);
+    if (state.measure.active) {
+      state.measure.onHover?.(
+        measureAt(raycaster.intersectObject(root, true)[0]),
+      );
+      return;
+    }
     // Placing a part: the face under the pointer is what matters, not the piece.
     if (state.placingPartRef.current) {
       setHoveredAndNotify(state, null);
@@ -213,6 +234,7 @@ export function attachPointerHandlers(state: SceneState): () => void {
   };
   const onPointerLeave = () => {
     hoverAt = null;
+    if (state.measure.active) state.measure.onHover?.(null);
     if (!state.dragging) setHoveredAndNotify(state, null);
   };
   renderer.domElement.addEventListener("pointermove", onPointerMove);
