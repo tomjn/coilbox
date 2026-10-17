@@ -22,8 +22,9 @@ import {
   buildStartUnitGadget,
   buildUnitScriptGadget,
 } from "./scratchGame";
-import { buildUnitDef } from "./unitDef";
+import { buildUnitDef, legoUnitDef } from "./unitDef";
 import { worthTotals } from "./worth";
+import { buildWreck } from "./wreck";
 
 export interface ScratchGameArgs {
   target: PlayTarget;
@@ -130,6 +131,19 @@ export async function writeScratchUnit({
         : null,
     stored: imported?.place ?? [],
   };
+  const def = legoUnitDef(
+    project,
+    unitBounds(project, pack, raw),
+    "def",
+    worthTotals(project, pack),
+  );
+  const wreck = buildWreck(
+    project,
+    pack,
+    raw,
+    { texture1: model.texture1, texture2: model.texture2 },
+    def,
+  );
   const { owned } = await legoExport({
     dir,
     unitName: project.unitName,
@@ -160,6 +174,16 @@ export async function writeScratchUnit({
     unitDefFields: null,
     text: null,
     model,
+    // So a test match drops the same wreck a real game will (issue #3310).
+    ...(wreck
+      ? {
+          wreck: {
+            model: wreck.model,
+            feature: wreck.feature,
+            featureWritten: null,
+          },
+        }
+      : {}),
   });
 
   const textureFiles = [
