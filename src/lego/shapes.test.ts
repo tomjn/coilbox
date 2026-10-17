@@ -13,6 +13,7 @@ import {
   shapeMesh,
   shapeSwatches,
   tubeInnerRadius,
+  wedgeProfile,
 } from "./shapes";
 
 beforeAll(() => {
@@ -281,6 +282,147 @@ describe("tube mesh", () => {
   });
 });
 
+function wedge(
+  size: Vec3,
+  options?: Record<string, number>,
+  swatch = "green",
+): LegoShape {
+  return { kind: "wedge", size, swatch, ...(options ? { options } : {}) };
+}
+
+describe("wedge mesh (#3328)", () => {
+  it("has the box its size says, for a wedge, a ramp and a flipped one", () => {
+    for (const options of [
+      {},
+      { low: 1 },
+      { flip: 1 },
+      { low: 3, flip: 1 },
+    ] as Record<string, number>[]) {
+      const shape = wedge([2, 4, 3], options);
+      const bounds = meshBounds(positionsOf(shape));
+      const box = shapeBox(shape);
+      for (let a = 0; a < 3; a++) {
+        expect(bounds.min[a]).toBeCloseTo(box?.min[a] ?? NaN, 6);
+        expect(bounds.max[a]).toBeCloseTo(box?.max[a] ?? NaN, 6);
+      }
+    }
+  });
+
+  it("is closed and holds the volume of a prism with a trapezoid end", () => {
+    for (const [low, flip] of [
+      [0, 0],
+      [1, 0],
+      [3.5, 1],
+      [4, 0],
+    ]) {
+      const shape = wedge([2, 4, 3], { low, flip });
+      const mesh = shapeMesh(shape);
+      if (!mesh) throw new Error("no mesh");
+      const measured = meshVolume(positionsOf(shape), [...mesh.indices]);
+      expect(measured.closed).toBe(true);
+      expect(measured.volume).toBeCloseTo((2 * 3 * (4 + low)) / 2, 5);
+    }
+  });
+
+  it("is high at the back (-z) and low at the front, and flips on request", () => {
+    const heightAt = (shape: LegoShape, z: number) =>
+      Math.max(
+        ...positionsOf(shape)
+          .filter((p) => Math.abs(p[2] - z) < 1e-6)
+          .map((p) => p[1]),
+      );
+    const plain = wedge([2, 4, 3], { low: 1 });
+    expect(heightAt(plain, -1.5)).toBeCloseTo(2, 6);
+    expect(heightAt(plain, 1.5)).toBeCloseTo(-1, 6);
+    const flipped = wedge([2, 4, 3], { low: 1, flip: 1 });
+    expect(heightAt(flipped, 1.5)).toBeCloseTo(2, 6);
+    expect(heightAt(flipped, -1.5)).toBeCloseTo(-1, 6);
+  });
+
+  it("makes the sides of a pure wedge triangles and of a ramp four sided", () => {
+    // Small enough to sit inside one tile, so nothing is cut and each side face
+    // is the triangles it was made of: one for a triangle, two for a quad.
+    const sideTriangles = (shape: LegoShape) => {
+      const mesh = shapeMesh(shape);
+      if (!mesh) throw new Error("no mesh");
+      return triangles(mesh).filter(({ n }) => n[0][0] === -1).length;
+    };
+    expect(sideTriangles(wedge([0.5, 0.8, 1]))).toBe(1);
+    expect(sideTriangles(wedge([0.5, 0.8, 1], { low: 0.3 }))).toBe(2);
+  });
+
+  it("gives every flat face one normal and the slope one for the whole face", () => {
+    const mesh = shapeMesh(wedge([2, 4, 3], { low: 1 }));
+    if (!mesh) throw new Error("no mesh");
+    const normals = new Set<string>();
+    for (let i = 0; i < mesh.vCount; i++) {
+      normals.add(
+        [3, 4, 5].map((k) => mesh.vertices[i * 8 + k].toFixed(5)).join(","),
+      );
+    }
+    const slope = Math.hypot(3, 3);
+    expect([...normals].sort()).toEqual(
+      [
+        "-1.00000,0.00000,0.00000",
+        "1.00000,0.00000,0.00000",
+        "0.00000,-1.00000,0.00000",
+        "0.00000,0.00000,-1.00000",
+        "0.00000,0.00000,1.00000",
+        `0.00000,${(3 / slope).toFixed(5)},${(3 / slope).toFixed(5)}`,
+      ].sort(),
+    );
+  });
+
+  it("winds every triangle counter clockwise seen from outside, with its normal", () => {
+    for (const options of [
+      {},
+      { low: 1 },
+      { flip: 1 },
+      { low: 2, flip: 1 },
+    ] as Record<string, number>[]) {
+      const mesh = shapeMesh(wedge([2, 4, 3], options));
+      if (!mesh) throw new Error("no mesh");
+      for (const { p, n } of triangles(mesh)) {
+        const face = faceOf(p);
+        for (const normal of n) {
+          expect(
+            face[0] * normal[0] + face[1] * normal[1] + face[2] * normal[2],
+          ).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
+  it("is made once for the same numbers and again for another", () => {
+    expect(shapeMesh(wedge([1, 1, 1]))).toBe(shapeMesh(wedge([1, 1, 1])));
+    expect(shapeMesh(wedge([1, 1, 1]))).not.toBe(
+      shapeMesh(wedge([1, 1, 1], { low: 0.5 })),
+    );
+  });
+
+  it("reads a low end it cannot use as a pure wedge", () => {
+    expect(wedgeProfile(wedge([1, 2, 1], { low: -1 })).low).toBe(0);
+    expect(wedgeProfile(wedge([1, 2, 1], { low: 3 })).low).toBe(0);
+    expect(wedgeProfile(wedge([1, 2, 1], { low: Number.NaN })).low).toBe(0);
+    expect(wedgeProfile(wedge([1, 2, 1], { low: 2 })).low).toBe(2);
+    expect(wedgeProfile(wedge([1, 2, 1], { flip: 1 })).flip).toBe(true);
+    expect(wedgeProfile(wedge([1, 2, 1])).flip).toBe(false);
+  });
+
+  it("unwraps the slope in its own plane, measured from the back", () => {
+    // Rise 3 over run 4 is a 5 long slope. Before tiling its v runs 0 to 5, so
+    // after tiling no triangle on it is squashed (the density test below).
+    const shape = wedge([2, 3, 4]);
+    const mesh = shapeMesh(shape);
+    if (!mesh) throw new Error("no mesh");
+    let area = 0;
+    for (const { p, n } of triangles(mesh)) {
+      if (n[0][1] > 0.1 && n[0][2] > 0.1) area += Math.hypot(...faceOf(p)) / 2;
+    }
+    expect(area).toBeCloseTo(2 * 5, 5);
+  });
+});
+
 /**
  * The pack's own texel density, the area weighted median over every triangle
  * of every part, measured in #3326.
@@ -315,6 +457,19 @@ describe("shape UVs (#3326)", () => {
             swatch.id,
           ),
         ]),
+      ),
+    ).concat(
+      SIZES.flatMap((size) =>
+        shapeSwatches().flatMap((swatch) =>
+          (
+            [
+              {},
+              { low: size[1] / 2 },
+              { flip: 1 },
+              { low: size[1], flip: 1 },
+            ] as Record<string, number>[]
+          ).map((options) => wedge(size, options, swatch.id)),
+        ),
       ),
     );
 

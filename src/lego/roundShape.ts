@@ -59,7 +59,7 @@ export function newRoundShape(
   };
 }
 
-function mostUsedSwatch(
+export function mostUsedSwatch(
   project: LegoProject,
   pack: Pick<LoadedPack, "byId">,
   swatches: ShapeSwatch[],
