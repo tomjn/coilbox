@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { TextHome } from "@/workshop/unitText";
 import { type LegoProject, newProject } from "./model";
+import { type GameMovementData, scratchMovement } from "./movement";
 import type { UnitBounds } from "./s3oBuild";
 import {
   buildUnitDef as buildUnitDefWithHome,
@@ -1037,5 +1038,65 @@ describe("DERIVED_FIELDS", () => {
           defValue(factory, path),
         path,
       ).toBeDefined();
+  });
+});
+
+/**
+ * Cakebot, tested in Metal Factions with legs, a walk cycle and no game of its
+ * own, came out as a building with only a Repeat toggle (issue #4472).
+ */
+describe("a walker tested with no movement of its own", () => {
+  const METAL_FACTIONS: GameMovementData = {
+    moveDefs: [
+      { name: "kbot2", footprintx: 2 },
+      { name: "tank3", footprintx: 3 },
+    ],
+    units: {
+      aven_runner: { canmove: true, movementclass: "kbot2", speed: 60 },
+    },
+  };
+  const base = project("Cakebot", "cakebot_test");
+  const cakebot: LegoProject = {
+    ...base,
+    pieces: [
+      ...base.pieces,
+      ...["leg.l1.thigh", "leg.l1.foot", "leg.r1.thigh", "leg.r1.foot"].map(
+        (role, i) => ({
+          ...base.pieces[0],
+          id: `leg${i}`,
+          name: `leg${i}`,
+          parentId: base.rootPieceId,
+          role,
+        }),
+      ),
+    ],
+    animations: [{ presetId: "walk.biped", params: {} }],
+  };
+
+  it("is written as a walker on the test game's class", () => {
+    const def = legoUnitDef(
+      {
+        ...cakebot,
+        movement: scratchMovement(cakebot, METAL_FACTIONS, "Metal Factions", 2),
+      },
+      bounds({ x: 32, z: 32 }),
+    );
+    expect(def.canmove).toBe(true);
+    expect(def.movementclass).toBe("kbot2");
+    expect(def.speed).toBe(60);
+    expect(def).not.toHaveProperty("maxslope");
+  });
+
+  it("has no on and off of its own", () => {
+    const def = legoUnitDef(
+      {
+        ...cakebot,
+        movement: scratchMovement(cakebot, METAL_FACTIONS, "Metal Factions", 2),
+      },
+      bounds({ x: 32, z: 32 }),
+    );
+    expect(def).not.toHaveProperty("onoffable");
+    expect(def).not.toHaveProperty("activatewhenbuilt");
+    expect(def).not.toHaveProperty("activateWhenBuilt");
   });
 });

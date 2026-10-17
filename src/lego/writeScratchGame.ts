@@ -15,6 +15,7 @@ import { legoExport, legoScratchGame, type ScratchSandbox } from "./bindings";
 import { buildCombinedSheet } from "./combinedSheet";
 import { unitScript } from "./luaScript";
 import type { ExportedFile, LegoProject } from "./model";
+import { type GameMovementData, scratchMovement } from "./movement";
 import type { LoadedPack } from "./pack";
 import { buildPieceCollisionScript } from "./pieceCollisionScript";
 import type { RawGeometry } from "./rawGeometry";
@@ -30,7 +31,7 @@ import {
   missingLuaRulesEntries,
 } from "./scratchGame";
 import { sheetSources } from "./textureSheet";
-import { buildUnitDef, legoUnitDef } from "./unitDef";
+import { buildUnitDef, footprintSteps, legoUnitDef } from "./unitDef";
 import { scratchWeapons } from "./weaponModule";
 import { worthTotals } from "./worth";
 import { buildWreck } from "./wreck";
@@ -51,6 +52,11 @@ export interface ScratchGameArgs {
    * unit names that is not in it is left out of the scratch unit.
    */
   gameWeapons: Record<string, Record<string, unknown>> | null;
+  /**
+   * The test game's units and move definitions, null until they are read. A
+   * unit built to move with no movement of its own takes a class from them.
+   */
+  gameMovement: GameMovementData | null;
   /** The sandbox's files, for "Play with this unit". Absent for a plain test. */
   sandbox?: ScratchSandbox;
   /** Told when the write is done and the rescan starts. */
@@ -145,6 +151,7 @@ export async function writeScratchUnit({
   raw,
   workshopProjects,
   gameWeapons,
+  gameMovement,
   sandbox,
   onWritten,
 }: ScratchGameArgs): Promise<WrittenScratchUnit> {
@@ -157,7 +164,18 @@ export async function writeScratchUnit({
     gameWeapons,
     (made) => workshopCompile({ project: made }),
   );
-  const project = weapons.project;
+  // A unit with legs and no game would go in as a building, so it walks on
+  // the test game's class instead (issue #4472).
+  const bounds = unitBounds(weapons.project, pack, raw);
+  const project = {
+    ...weapons.project,
+    movement: scratchMovement(
+      weapons.project,
+      gameMovement,
+      baseGame,
+      Math.max(footprintSteps(bounds.sizeX), footprintSteps(bounds.sizeZ)),
+    ),
+  };
   // An imported unit draws with its own two textures out of the store. A
   // built one samples one atlas, and only its own: an s3o names one texture.
   // A unit whose atlas is not installed still tests, untextured, rather than
@@ -209,7 +227,7 @@ export async function writeScratchUnit({
   };
   const def = legoUnitDef(
     project,
-    unitBounds(project, pack, raw),
+    bounds,
     "def",
     worthTotals(project, pack),
     weapons.slots,
@@ -245,7 +263,7 @@ export async function writeScratchUnit({
     // fresh here, and it has no localisation file to read a name out of.
     unitDef: buildUnitDef(
       project,
-      unitBounds(project, pack, raw),
+      bounds,
       "def",
       worthTotals(project, pack),
       weapons.slots,

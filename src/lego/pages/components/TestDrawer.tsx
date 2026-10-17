@@ -141,8 +141,13 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
     target?.dataDir,
     game?.primaryArchive.name,
   );
-  const gameWeapons =
-    defs && defsFor === game?.primaryArchive.name ? defs.weaponDefs : null;
+  const gameDefs = defs && defsFor === game?.primaryArchive.name ? defs : null;
+  const gameWeapons = gameDefs ? gameDefs.weaponDefs : null;
+  // A unit built to move with no movement of its own walks on one of the test
+  // game's classes (issue #4472).
+  const gameMovement = gameDefs
+    ? { units: gameDefs.units, moveDefs: gameDefs.moveDefs }
+    : null;
 
   const [mapName, setMapName] = useSetting<string>("lego.testMap", "");
 
@@ -205,6 +210,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
       raw,
       workshopProjects,
       gameWeapons,
+      gameMovement,
       sandbox,
       onWritten: setScratchDir,
       onScanning: () => setPhase({ state: "scanning" }),
@@ -309,7 +315,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
     }));
   }
 
-  /** "Play with this unit": the sandbox mission (issue #3341). */
+  /** "Launch sandbox with targets": the sandbox mission (issue #3341). */
   function playSandbox() {
     return play("play", async () => {
       if (!target || !game || !map) throw new Error("Nothing to play on.");
@@ -348,6 +354,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
         raw,
         workshopProjects,
         gameWeapons,
+        gameMovement,
         sandbox: run.sandbox,
       });
       setWeaponsLeftOut(written.weaponsLeftOut);
@@ -543,7 +550,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
                   <Rocket className="size-4" />
                   {busy && action === "launch"
                     ? BUSY_LABEL[phase.state]
-                    : "Launch"}
+                    : "Launch with it as start unit"}
                 </Button>
                 <Button
                   variant="outline"
@@ -553,22 +560,22 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
                   <Crosshair className="size-4" />
                   {busy && action === "play"
                     ? BUSY_LABEL[phase.state]
-                    : "Play with this unit"}
+                    : "Launch sandbox with targets"}
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => void reloadSandbox()}
-                  disabled={
-                    !running ||
-                    !sandboxRun?.runId ||
-                    reload.state === "reloading"
-                  }
-                >
-                  <RefreshCw className="size-4" />
-                  {reload.state === "reloading"
-                    ? "Reloading"
-                    : "Reload in the sandbox"}
-                </Button>
+                {running && sandboxRun ? (
+                  <Button
+                    variant="outline"
+                    onClick={() => void reloadSandbox()}
+                    disabled={!sandboxRun.runId || reload.state === "reloading"}
+                  >
+                    <RefreshCw className="size-4" />
+                    {!sandboxRun.runId
+                      ? "Waiting for the engine to start"
+                      : reload.state === "reloading"
+                        ? "Reloading"
+                        : "Reload into the sandbox"}
+                  </Button>
+                ) : null}
                 {reload.state === "done" ? (
                   <div className="flex flex-col gap-2 text-xs text-muted-foreground">
                     <p>{reload.message}</p>

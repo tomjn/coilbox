@@ -98,8 +98,11 @@ describe("TestDrawer when the content scan failed", () => {
 
     expect(screen.getByText(`The content scan failed: ${REASON}`)).toBeTruthy();
     expect(
-      (screen.getByRole("button", { name: /Launch/ }) as HTMLButtonElement)
-        .disabled,
+      (
+        screen.getByRole("button", {
+          name: /^Launch with it as start unit$/,
+        }) as HTMLButtonElement
+      ).disabled,
     ).toBe(true);
     expect(document.body.textContent).not.toMatch(
       /No game is installed|No map is installed|not installed|No game installed|No map installed|Download/,
