@@ -5,6 +5,7 @@ import {
   ChevronRight,
   ChevronUp,
   Copy,
+  Crosshair,
   FlipHorizontal2,
   FlipVertical2,
   ImageIcon,
@@ -113,6 +114,7 @@ import { useEditShortcuts } from "../useEditShortcuts";
 import { useLegoDocument } from "../useLegoDocument";
 import { useRawGeometry } from "../useRawGeometry";
 import { useSymmetry } from "../useSymmetry";
+import { addWeaponModule, pickWeaponParts } from "../weaponModule";
 import { AimPointPanel } from "./components/AimPointPanel";
 import { AnchorList } from "./components/AnchorList";
 import { AnimationPanel } from "./components/AnimationPanel";
@@ -402,6 +404,29 @@ function Builder({ id }: { id: string | undefined }) {
     const added = addBuildArm(draft, parts, {
       parentId: selectedId ?? draft.rootPieceId,
       factory: builderKind(draft, builtDef)?.kind === "factory",
+      newId: () => crypto.randomUUID(),
+      now: new Date().toISOString(),
+    });
+    // One edit, so the pieces and their presets undo together.
+    edit(() => added.project);
+    doc.selectMany(added.rootPieceIds);
+    for (const pieceId of added.rootPieceIds) queueTwin(pieceId);
+  }
+
+  /** The weapon module: turret, barrel and flare with their presets. */
+  function addWeapon() {
+    if (!draft || !pack) return;
+    const parts = pickWeaponParts(pack.parts);
+    if (!parts) {
+      void notify({
+        title: "Could not add a weapon",
+        body: "This parts library has no block and beam to make one from.",
+        level: "error",
+      });
+      return;
+    }
+    const added = addWeaponModule(draft, parts, {
+      parentId: selectedId ?? draft.rootPieceId,
       newId: () => crypto.randomUUID(),
       now: new Date().toISOString(),
     });
@@ -1621,6 +1646,14 @@ function Builder({ id }: { id: string | undefined }) {
                       movement ? { ...project, movement } : project,
                     )
                   }
+                  onWeaponChange={(pieceId, weapon) =>
+                    edit((project) => ({
+                      ...project,
+                      pieces: project.pieces.map((piece) =>
+                        piece.id === pieceId ? { ...piece, weapon } : piece,
+                      ),
+                    }))
+                  }
                   effectsNote={effectBitmaps.note}
                 />
               ) : (
@@ -1639,6 +1672,17 @@ function Builder({ id }: { id: string | undefined }) {
                         title="Add a build arm with its nozzle and nano point, and the build presets"
                       >
                         <Wrench size={14} />
+                      </Button>
+                    ) : null}
+                    {pack && !draft.imported ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={addWeapon}
+                        aria-label="Add a weapon"
+                        title="Add a turret with its barrel and muzzle flare, and the aiming and recoil presets"
+                      >
+                        <Crosshair size={14} />
                       </Button>
                     ) : null}
                     <Button

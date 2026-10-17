@@ -78,6 +78,7 @@ import {
   DEFAULT_BUILDER,
   type LegoBuilder,
   type LegoMovement,
+  type LegoPieceWeapon,
   type LegoProject,
 } from "../../model";
 import type { LoadedPack } from "../../pack";
@@ -125,6 +126,7 @@ import { GameFitSection } from "./GameFitSection";
 import { MovementSection } from "./MovementSection";
 import { ScrubberMarks } from "./ScrubberMarks";
 import type { DrivePlacement } from "./standInPlayback";
+import { WeaponsSection } from "./WeaponsSection";
 
 /** The scenario Select's own entry for firing an arbitrary function by name,
  *  rather than one of the canned scenarios above it. Not a real scenario id:
@@ -325,6 +327,9 @@ interface Props {
   /** The movement class, speed and turn rate, or nothing for a unit that
    *  does not move (issue #3255). */
   onMovementChange: (movement: LegoMovement | undefined) => void;
+  /** What a turret or aim point fires, and over what arc (issue #3274). The
+   *  Weapons section is shown only when this is given. */
+  onWeaponChange?: (pieceId: string, weapon: LegoPieceWeapon) => void;
   /**
    * The poses a run of the unit's own script produced, for the viewport to
    * play. Null whenever the presets are what is playing, or nothing is.
@@ -386,6 +391,7 @@ export function AnimationPanel({
   onShowScript,
   onBuilderChange,
   onMovementChange,
+  onWeaponChange,
   onScriptTimeline,
   onScriptRun,
   scriptPaused,
@@ -1647,6 +1653,10 @@ export function AnimationPanel({
             bounds={bounds}
             onMovementChange={onMovementChange}
           />
+
+          {onWeaponChange ? (
+            <WeaponsSection project={project} onWeaponChange={onWeaponChange} />
+          ) : null}
 
           <GameFitSection project={project} bounds={bounds} />
 
