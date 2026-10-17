@@ -171,6 +171,23 @@ export default function ProjectsPage() {
     };
   }, []);
 
+  /** The Game field of the New model popover. Only when a game is installed,
+   *  since "No game" alone is no choice. */
+  const gameChoice =
+    games.length > 0
+      ? {
+          value: newGame,
+          onChange: setNewGame,
+          options: [
+            { value: NO_GAME, label: "No game" },
+            ...games.map((g) => ({
+              value: g.primaryArchive.name,
+              label: g.name,
+            })),
+          ],
+        }
+      : undefined;
+
   /** Starts a unit blank, or from a body plan with its skeleton in place,
    *  fitted to the size given. */
   async function create(plan: BodyPlan | null, target?: SkeletonTarget) {
@@ -416,28 +433,6 @@ export default function ProjectsPage() {
                 </SelectContent>
               </Select>
             ) : null}
-            {games.length > 0 ? (
-              <Select value={newGame} onValueChange={setNewGame}>
-                <SelectTrigger
-                  size="sm"
-                  className="w-52"
-                  aria-label="Game for a new model"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_GAME}>No game</SelectItem>
-                  {games.map((g) => (
-                    <SelectItem
-                      key={g.primaryArchive.name}
-                      value={g.primaryArchive.name}
-                    >
-                      {g.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : null}
             <Button variant="outline" onClick={() => setPicking(true)}>
               <Package size={16} /> Open from a game
             </Button>
@@ -448,6 +443,7 @@ export default function ProjectsPage() {
               plans={BODY_PLANS}
               label="New model"
               busy={busy}
+              game={gameChoice}
               onChoose={(plan, target) => void create(plan, target)}
             />
           </>
@@ -497,6 +493,7 @@ export default function ProjectsPage() {
             plans={BODY_PLANS}
             label="New unit"
             busy={busy}
+            game={gameChoice}
             onChoose={(plan, target) => void create(plan, target)}
           />
         </div>
