@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { ImportedPiece, S3oImport } from "./bindings";
 import {
   holdsLiftedPieces,
+  liftCredit,
+  liftCredits,
   liftedModuleRefusal,
   liftFromImport,
   moduleForUnit,
@@ -294,5 +296,48 @@ describe("textureSheetRefusal", () => {
       ],
     });
     expect(textureSheetRefusal(mixed)).toMatch(/one texture/);
+  });
+});
+
+describe("the credit a lifted piece shows", () => {
+  const from = {
+    game: sf,
+    member: "objects3d/armcom.s3o",
+    unit: "armcom",
+  };
+
+  it("names the game and the unit", () => {
+    expect(liftCredit(from)).toBe("From Splinter Faction 0.1.86, unit armcom");
+  });
+
+  it("names the model when no unitdef points at it", () => {
+    expect(liftCredit({ game: sf, member: "objects3d/wreck.s3o" })).toBe(
+      "From Splinter Faction 0.1.86, model objects3d/wreck.s3o",
+    );
+  });
+
+  it("lists each game and unit once for a whole unit", () => {
+    const pieces = lift("0.0")?.pieces ?? [];
+    const other = {
+      ...pieces[0],
+      id: "other",
+      lifted: { game: sf, member: "objects3d/armsolar.s3o", unit: "armsolar" },
+    };
+    const own = { ...pieces[0], id: "own", lifted: undefined };
+    expect(liftCredits(unit({ pieces: [...pieces, other, own] }))).toEqual([
+      "From Splinter Faction 0.1.86, unit armcom",
+      "From Splinter Faction 0.1.86, unit armsolar",
+    ]);
+  });
+
+  it("lists nothing for a unit built from the pack", () => {
+    expect(liftCredits(unit())).toEqual([]);
+  });
+
+  it("survives a save and a load", () => {
+    const lifted = lift("0.0");
+    if (!lifted) throw new Error("no lift");
+    const back = parseLegoProjectJson(JSON.stringify(lifted));
+    expect(back && liftCredits(back)).toEqual(liftCredits(lifted));
   });
 });

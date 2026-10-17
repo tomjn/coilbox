@@ -31,7 +31,7 @@ import {
   importedMaterial,
   partMaterial,
 } from "../../geometry";
-import { holdsLiftedPieces } from "../../liftPiece";
+import { holdsLiftedPieces, liftCredits } from "../../liftPiece";
 import type { LegoProject } from "../../model";
 import { getPartGeometry, type LoadedPack } from "../../pack";
 import {
@@ -385,7 +385,7 @@ export function CompoundPicker({
                       onInsert
                         ? `Place ${compound.name} on a connector. Alt adds it to the selected piece`
                         : `${compound.name}, ${compound.pieces.length} pieces`,
-                      liftedFrom ? `From ${liftedFrom}` : null,
+                      ...(liftedFrom ? liftCredits(compound) : []),
                     ]
                       .filter(Boolean)
                       .join(". ")}
