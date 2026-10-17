@@ -20,7 +20,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EMPTY_EDITS, type ModProject } from "@/workshop/project";
-import { type LegoProject, newProject } from "../../model";
+import { newProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import { ExportDrawer } from "./ExportDrawer";
 
@@ -216,7 +216,7 @@ describe("where the unit's name is going", () => {
  * the workshop and written as its own file (issue #3274).
  */
 describe("weapons", () => {
-  const armed: LegoProject = {
+  const armed: typeof project = {
     ...project,
     pieces: [
       project.pieces[0],

@@ -121,12 +121,14 @@ import {
 } from "../../targetMotion";
 import { isBuilder } from "../../unitDef";
 import { controlFor } from "../../unitValueControls";
+import type { LegoWorth } from "../../worth";
 import { BuilderReport } from "./BuilderReport";
 import { GameFitSection } from "./GameFitSection";
 import { MovementSection } from "./MovementSection";
 import { ScrubberMarks } from "./ScrubberMarks";
 import type { DrivePlacement } from "./standInPlayback";
 import { WeaponsSection } from "./WeaponsSection";
+import { WorthSection } from "./WorthSection";
 
 /** The scenario Select's own entry for firing an arbitrary function by name,
  *  rather than one of the canned scenarios above it. Not a real scenario id:
@@ -327,6 +329,8 @@ interface Props {
   /** The movement class, speed and turn rate, or nothing for a unit that
    *  does not move (issue #3255). */
   onMovementChange: (movement: LegoMovement | undefined) => void;
+  /** The table that sets the unit's health, cost and mass (issue #3280). */
+  onWorthChange: (worth: LegoWorth) => void;
   /** What a turret or aim point fires, and over what arc (issue #3274). The
    *  Weapons section is shown only when this is given. */
   onWeaponChange?: (pieceId: string, weapon: LegoPieceWeapon) => void;
@@ -391,6 +395,7 @@ export function AnimationPanel({
   onShowScript,
   onBuilderChange,
   onMovementChange,
+  onWorthChange,
   onWeaponChange,
   onScriptTimeline,
   onScriptRun,
@@ -1652,6 +1657,12 @@ export function AnimationPanel({
             project={project}
             bounds={bounds}
             onMovementChange={onMovementChange}
+          />
+
+          <WorthSection
+            project={project}
+            pack={pack}
+            onWorthChange={onWorthChange}
           />
 
           {onWeaponChange ? (

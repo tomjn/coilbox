@@ -21,13 +21,13 @@ const legoUnitDef = (
   project: LegoProject,
   bounds: UnitBounds,
   home: TextHome = "def",
-) => legoUnitDefWithHome(project, bounds, home);
+) => legoUnitDefWithHome(project, bounds, home, null);
 
 const buildUnitDef = (
   project: LegoProject,
   bounds: UnitBounds,
   home: TextHome = "def",
-) => buildUnitDefWithHome(project, bounds, home);
+) => buildUnitDefWithHome(project, bounds, home, null);
 
 /** A measured model. Most of these only care about the two ground axes, so y
  *  and the middle carry stand-in values unless a test says otherwise. */
@@ -94,6 +94,50 @@ describe("legoUnitDef", () => {
   // built, and its default of 0 allows no height difference at all (issue
   // #4142). 20 is a value BA, Metal Factions and Complete Annihilation all use
   // on buildings.
+  // Issue #3280: health, cost, build time and mass come from the worth table.
+  it("writes the worth totals in place of the stand-ins", () => {
+    const totals = {
+      health: 640,
+      metal: 55,
+      energy: 12,
+      buildTime: 70,
+      mass: 33,
+    };
+    const def = legoUnitDefWithHome(
+      project("Sky Fortress", "skyfort"),
+      bounds({ x: 32, z: 48 }),
+      "def",
+      totals,
+    );
+    expect(def).toMatchObject({
+      maxdamage: 640,
+      buildcostmetal: 55,
+      buildcostenergy: 12,
+      buildtime: 70,
+      mass: 33,
+    });
+    expect(def.customparams).toEqual({ unitdefbuildtime: 70 });
+  });
+
+  it("leaves mass out when it is zero, so the engine uses the metal cost", () => {
+    const def = legoUnitDefWithHome(
+      project("Sky Fortress", "skyfort"),
+      bounds({ x: 32, z: 48 }),
+      "def",
+      { health: 1, metal: 5, energy: 0, buildTime: 1, mass: 0 },
+    );
+    expect(def).not.toHaveProperty("mass");
+  });
+
+  it("keeps the stand-ins for a unit with no totals", () => {
+    const def = legoUnitDef(
+      project("Sky Fortress", "skyfort"),
+      bounds({ x: 32, z: 48 }),
+    );
+    expect(def.maxdamage).toBe(1000);
+    expect(def).not.toHaveProperty("mass");
+  });
+
   it("lets a builder place the unit on sloped ground", () => {
     const p = project("Sky Fortress", "skyfort");
     const b = bounds({ x: 32, z: 48 });
@@ -342,6 +386,7 @@ describe("weapons (#3274)", () => {
       project("Rover", "rover"),
       bounds({ x: 16, z: 16 }),
       "def",
+      null,
       slots,
     );
     expect(def.weapons).toEqual(slots);
@@ -349,6 +394,7 @@ describe("weapons (#3274)", () => {
       project("Rover", "rover"),
       bounds({ x: 16, z: 16 }),
       "def",
+      null,
       slots,
     );
     expect(lua).toContain(

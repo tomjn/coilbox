@@ -27,7 +27,7 @@ pub use atlas::{
     pack, palette_tile_name, Packed, Placement, Rect, Tile, BORDER, MAX_SIDE, PALETTE_GREY,
     PALETTE_TILE, PALETTE_TILE_SIDE,
 };
-pub use convert::{is_dead_duplicate, to_s3o, Converted, Rects};
+pub use convert::{corner_uv, is_dead_duplicate, to_s3o, Converted, Rects};
 pub use sheet::{Sheet, SheetTile, FIRST_TOP_ROWS_VERSION, SHEET_DIR, SHEET_KIND, SHEET_VERSION};
 
 /// The tiles a model's flat-colour faces need: a fallback grey always, plus one

@@ -218,7 +218,9 @@ describe("the build arm button", () => {
   it("adds a turret, barrel and flare with the aim and recoil presets", async () => {
     packLoad = loadedPack([part("blk", "block", 0.5), part("bm", "beam", 2)]);
     show(unit());
-    fireEvent.click(await screen.findByRole("button", { name: "Add a weapon" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Add a weapon" }),
+    );
 
     const edit = doc.current.edit as ReturnType<typeof vi.fn>;
     expect(edit).toHaveBeenCalledTimes(1);

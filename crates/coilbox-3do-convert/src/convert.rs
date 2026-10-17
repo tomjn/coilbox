@@ -116,9 +116,22 @@ pub fn to_s3o(
 /// The corners a `.3do` face takes on its tile.
 ///
 /// The format stores no texture coordinates at all: a face is stretched over
-/// the whole of the tile it names. Faces with more than four corners wrap,
-/// which is what the engine's own quad-oriented mapping does.
+/// the whole of the tile it names. A triangle takes the first three corners.
 const CORNER_UV: [[f32; 2]; 4] = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]];
+
+/// Where corner `corner` of a face with `corners` corners sits on its tile, from
+/// 0 to 1 with the tile's top left at 0, 0.
+///
+/// A face with more than four corners puts every corner on the tile's top
+/// left, so the whole face is that one texel. The engine does the same in
+/// `S3DOPiece::PostProcessGeometry` (`rts/Rendering/Models/3DOParser.cpp`).
+pub fn corner_uv(corner: usize, corners: usize) -> [f32; 2] {
+    if corners > 4 {
+        CORNER_UV[0]
+    } else {
+        CORNER_UV[corner % 4]
+    }
+}
 
 struct Walk<'a> {
     rects: &'a Rects,
@@ -156,7 +169,7 @@ fn piece(source: &coilbox_3do::Piece, state: &mut Walk) -> coilbox_s3o::Piece {
                 .get(corner)
                 .copied()
                 .unwrap_or(prim.normal);
-            let [u, v] = CORNER_UV[corner % 4];
+            let [u, v] = corner_uv(corner, corners.len());
             vertices.push(coilbox_s3o::Vertex {
                 pos: *pos,
                 normal,
@@ -451,6 +464,26 @@ mod tests {
 
         let uvs: Vec<[f32; 2]> = out.model.root.vertices.iter().map(|v| v.uv).collect();
         assert_eq!(uvs, vec![[0.0, 0.0], [0.5, 0.0], [0.5, 0.5], [0.0, 0.5]]);
+    }
+
+    /// The engine gives every vertex of a face with more than four corners the
+    /// tile's top left, so the whole face is one colour in game (issue #4240).
+    #[test]
+    fn a_face_with_more_than_four_corners_is_all_the_tiles_top_left() {
+        let mut root = piece3("body", vec![textured(vec![0, 1, 2, 3, 4])]);
+        root.vertices.push([0.5, 0.0, 1.5]);
+        let out = convert(root);
+
+        let uvs: Vec<[f32; 2]> = out.model.root.vertices.iter().map(|v| v.uv).collect();
+        assert_eq!(uvs, vec![[0.0, 0.0]; 5]);
+    }
+
+    #[test]
+    fn a_triangle_takes_the_first_three_corners_of_its_tile() {
+        let out = convert(piece3("body", vec![textured(vec![0, 1, 2])]));
+
+        let uvs: Vec<[f32; 2]> = out.model.root.vertices.iter().map(|v| v.uv).collect();
+        assert_eq!(uvs, vec![[0.0, 0.0], [0.5, 0.0], [0.5, 0.5]]);
     }
 
     /// The header the engine reads for the collision sphere comes from the

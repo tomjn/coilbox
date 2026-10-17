@@ -77,6 +77,7 @@ import { blenderTextures, importedTextures } from "../../rawImport";
 import { bakedPieces, buildS3o, unitBounds } from "../../s3oBuild";
 import { buildUnitDef, legoUnitDef, unitWords } from "../../unitDef";
 import { exportWeapons } from "../../weaponModule";
+import { worthTotals } from "../../worth";
 import { ShowMe } from "./ShowMe";
 
 interface Props {
@@ -448,13 +449,14 @@ export function ExportDrawer({
     // box. Derived once here because two things read it: the Lua file the engine
     // loads, and the receipt the workshop turns into a unit (issue #2651).
     const bounds = unitBounds(project, pack, raw);
+    const totals = worthTotals(project, pack);
     try {
       // Read again from the workshop every time, so the weapon it writes is
       // the one the workshop holds now (issue #3274).
       const weapons = await exportWeapons(project, workshopProjects, (made) =>
         workshopCompile({ project: made }),
       );
-      const def = legoUnitDef(project, bounds, home, weapons.slots);
+      const def = legoUnitDef(project, bounds, home, totals, weapons.slots);
       const exported = await legoExport({
         dir,
         unitName: project.unitName,
@@ -479,7 +481,7 @@ export function ExportDrawer({
         // Unlike the atlas and the script, there is no scenario where a
         // built unit should export without one: with no unit definition the
         // engine has nothing to spawn.
-        unitDef: buildUnitDef(project, bounds, home, weapons.slots),
+        unitDef: buildUnitDef(project, bounds, home, totals, weapons.slots),
         // Where the name goes for a game that will not read one in the
         // definition. Coilbox's own file beside the game's, never the game's
         // (issue #2683).

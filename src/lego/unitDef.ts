@@ -37,6 +37,7 @@ import { effectiveCollisionVolume } from "./collisionVolume";
 import { DEFAULT_BUILDER, type LegoProject } from "./model";
 import { movesInGame } from "./movement";
 import type { UnitBounds } from "./s3oBuild";
+import type { WorthTotals } from "./worth";
 
 /**
  * Whether this unit builds, which is decided by the model rather than a flag.
@@ -73,7 +74,11 @@ function builderFields(project: LegoProject): Record<string, unknown> {
  */
 export const ELMOS_PER_FOOTPRINT = 16;
 
-/** A conservative stand-in health value, easy to find and retune by hand. */
+/**
+ * A conservative stand-in health value for a unit with no parts to total, such
+ * as one imported whole from a model. A unit built from parts takes its health
+ * from the worth table (issue #3280).
+ */
 const DEFAULT_MAX_DAMAGE = 1000;
 
 /**
@@ -87,8 +92,8 @@ const DEFAULT_MAX_DAMAGE = 1000;
 const DEFAULT_MAX_SLOPE = 20;
 
 /**
- * A stand-in build time and cost, easy to find and retune by hand until the
- * cost comes from the unit's parts (issue #3280). The time is the engine's own
+ * A stand-in build time and cost for a unit with no parts to total (issue
+ * #3280). The time is the engine's own
  * default (`UnitDef.cpp:345`). The metal is the same number because Splinter
  * Faction derives a build time of metal plus energy over ten, and with no
  * energy that lands on the engine default.
@@ -183,6 +188,9 @@ export function luaString(value: string): string {
  * and so is the aim point: the volume's offsets are the distance between the
  * two, and a build has already collapsed them into one number.
  *
+ * `totals` is what `worthTotals` gives the unit, or null for a unit with no
+ * parts to total, which keeps the stand-in health and cost.
+ *
  * Each footprint axis gets its own step rather than one step shared from a
  * collision radius, so a unit longer than it is wide claims a rectangle of
  * ground rather than the square that would fit its longest axis.
@@ -223,6 +231,7 @@ export function legoUnitDef(
   project: LegoProject,
   bounds: UnitBounds,
   home: TextHome,
+  totals: WorthTotals | null,
   weapons: Record<string, unknown>[] = [],
 ): Record<string, unknown> {
   const volume = effectiveCollisionVolume(project, bounds);
@@ -247,10 +256,12 @@ export function legoUnitDef(
     // which otherwise prices any unit with no `factionname` at 518181518
     // metal and energy so that a builder never finishes it (issue #4143). The
     // game reads only whether it is set. Other games ignore the table.
-    customparams: { unitdefbuildtime: DEFAULT_BUILD_TIME },
-    buildtime: DEFAULT_BUILD_TIME,
-    buildcostmetal: DEFAULT_BUILD_COST_METAL,
-    buildcostenergy: 0,
+    customparams: { unitdefbuildtime: totals?.buildTime ?? DEFAULT_BUILD_TIME },
+    buildtime: totals?.buildTime ?? DEFAULT_BUILD_TIME,
+    buildcostmetal: totals?.metal ?? DEFAULT_BUILD_COST_METAL,
+    buildcostenergy: totals?.energy ?? 0,
+    // Left out at zero, where the engine's own default is the metal cost.
+    ...(totals && totals.mass > 0 ? { mass: totals.mass } : {}),
     objectname: project.unitName,
     script: `${project.unitName}.lua`,
     footprintx: footprintSteps(bounds.sizeX),
@@ -266,7 +277,7 @@ export function legoUnitDef(
     // `ParseSelectionVolume`. Written on its own, because neither implies the
     // other in the engine and neither should here.
     ...(project.pieceSelection ? { usepieceselectionvolumes: true } : {}),
-    maxdamage: DEFAULT_MAX_DAMAGE,
+    maxdamage: totals?.health ?? DEFAULT_MAX_DAMAGE,
     ...movementFields(project),
     // Written together or not at all. `UnitDef::IsBuilderUnit` is `builder &&
     // buildSpeed > 0 && buildDistance > 0`, and `builder` is `&=`'d against
@@ -328,6 +339,7 @@ export function buildUnitDef(
   project: LegoProject,
   bounds: UnitBounds,
   home: TextHome,
+  totals: WorthTotals | null,
   weapons: Record<string, unknown>[] = [],
 ): string {
   const lines = [
@@ -336,7 +348,7 @@ export function buildUnitDef(
     "",
     "return {",
     `  ["${project.unitName}"] = {`,
-    ...Object.entries(legoUnitDef(project, bounds, home, weapons)).map(
+    ...Object.entries(legoUnitDef(project, bounds, home, totals, weapons)).map(
       ([key, value]) => `    ${key} = ${luaValue(value)},`,
     ),
     "  },",

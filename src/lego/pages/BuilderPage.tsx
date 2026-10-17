@@ -1646,6 +1646,9 @@ function Builder({ id }: { id: string | undefined }) {
                       movement ? { ...project, movement } : project,
                     )
                   }
+                  onWorthChange={(worth) =>
+                    edit((project) => ({ ...project, worth }))
+                  }
                   onWeaponChange={(pieceId, weapon) =>
                     edit((project) => ({
                       ...project,

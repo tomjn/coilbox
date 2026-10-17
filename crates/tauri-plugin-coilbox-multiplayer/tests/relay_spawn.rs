@@ -60,6 +60,34 @@ fn a_battle() -> Battle {
     }
 }
 
+/// A temp dir that also ends whatever sidecar is still running in it.
+///
+/// `RelayAgent` lets go of its child on purpose, so a test that panics or times
+/// out, or one that ends with a sidecar still carrying a game, would leave the
+/// process running after the tests finish (issue #4252). This is declared first
+/// in each test, so it drops last among the test's own values and after the
+/// panic unwinds, and it ends the sidecar before the folder goes.
+struct Scratch(tempfile::TempDir);
+
+impl Scratch {
+    fn new() -> Scratch {
+        Scratch(tempfile::tempdir().expect("a temp dir"))
+    }
+
+    fn path(&self) -> &std::path::Path {
+        self.0.path()
+    }
+}
+
+impl Drop for Scratch {
+    fn drop(&mut self) {
+        let run_file = self.0.path().join("relay").join("agent.json");
+        if let Some(pid) = relay_sidecar::already_relaying(&run_file) {
+            end_the_sidecar(pid);
+        }
+    }
+}
+
 fn start(run_file: &std::path::Path) -> (RelayAgent, Receiver<Event>) {
     let (saw, seen) = mpsc::channel();
     let agent = RelayAgent::spawn(&agent_binary(), &a_battle(), run_file, move |event| {
@@ -81,7 +109,7 @@ fn hears(seen: &Receiver<Event>) -> Event {
 /// working over the pipes of a real process rather than over a pair in a test.
 #[test]
 fn coilbox_starts_the_sidecar_and_can_talk_to_it() {
-    let dir = tempfile::tempdir().expect("a temp dir");
+    let dir = Scratch::new();
     let run_file = dir.path().join("relay").join("agent.json");
 
     let (agent, seen) = start(&run_file);
@@ -108,7 +136,7 @@ fn coilbox_starts_the_sidecar_and_can_talk_to_it() {
 /// the players carry on through the first.
 #[test]
 fn a_reopened_coilbox_finds_the_running_sidecar_rather_than_starting_a_second() {
-    let dir = tempfile::tempdir().expect("a temp dir");
+    let dir = Scratch::new();
     let run_file = dir.path().join("relay").join("agent.json");
 
     let (first, seen) = start(&run_file);
@@ -161,7 +189,7 @@ fn goes_within_the_budget(run_file: &std::path::Path) -> bool {
 /// goes, and the run file that was refusing the host's next battle goes with it.
 #[test]
 fn coilbox_can_ask_a_sidecar_it_has_no_pipe_to_to_stop() {
-    let dir = tempfile::tempdir().expect("a temp dir");
+    let dir = Scratch::new();
     let run_file = dir.path().join("relay").join("agent.json");
 
     let (agent, seen) = start(&run_file);
@@ -194,7 +222,7 @@ fn coilbox_can_ask_a_sidecar_it_has_no_pipe_to_to_stop() {
 /// have ended everybody else's game.
 #[test]
 fn asking_a_sidecar_that_is_carrying_a_game_does_not_end_it() {
-    let dir = tempfile::tempdir().expect("a temp dir");
+    let dir = Scratch::new();
     let run_file = dir.path().join("relay").join("agent.json");
 
     let (agent, seen) = start(&run_file);
@@ -252,7 +280,7 @@ fn asking_a_sidecar_that_is_carrying_a_game_does_not_end_it() {
 /// could relay anything.
 #[test]
 fn a_running_sidecar_holds_the_lock_beside_its_run_file_and_says_it_does() {
-    let dir = tempfile::tempdir().expect("a temp dir");
+    let dir = Scratch::new();
     let run_file = dir.path().join("relay").join("agent.json");
 
     let (agent, seen) = start(&run_file);
@@ -320,7 +348,7 @@ fn end_the_sidecar(pid: u32) {
 /// reader thread this test started is still holding the other end of it.
 #[test]
 fn a_coilbox_with_no_pipe_can_read_what_a_running_sidecar_is_carrying() {
-    let dir = tempfile::tempdir().expect("a temp dir");
+    let dir = Scratch::new();
     let run_file = dir.path().join("relay").join("agent.json");
 
     let (agent, seen) = start(&run_file);
@@ -375,7 +403,7 @@ fn a_coilbox_with_no_pipe_can_read_what_a_running_sidecar_is_carrying() {
 /// a relay instead of being told one is already running.
 #[test]
 fn a_battle_that_ended_leaves_nothing_for_the_next_one_to_trip_over() {
-    let dir = tempfile::tempdir().expect("a temp dir");
+    let dir = Scratch::new();
     let run_file = dir.path().join("relay").join("agent.json");
 
     let (agent, seen) = start(&run_file);

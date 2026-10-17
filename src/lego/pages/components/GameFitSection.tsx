@@ -62,7 +62,9 @@ export function GameFitSection({ project, bounds }: Props) {
         ? current.units[key]
         : undefined;
     fromFile = !!entry;
-    rows = gameFit(entry ?? legoUnitDef(project, bounds, "def"), key, {
+    // No totals: the rows read armour, categories and movement, and a unit with
+    // a game is an import, which has no parts to total.
+    rows = gameFit(entry ?? legoUnitDef(project, bounds, "def", null), key, {
       units: current.units,
       moveDefs: current.moveDefs,
       armorDefs: normaliseArmorDefs(current.armorDefs),
