@@ -36,7 +36,10 @@ export interface MoveClass {
 }
 
 /** A def's value for `key`, whatever case the game wrote the key in. */
-function field(def: Record<string, unknown> | undefined, key: string): unknown {
+export function field(
+  def: Record<string, unknown> | undefined,
+  key: string,
+): unknown {
   if (!def) return undefined;
   for (const [k, value] of Object.entries(def)) {
     if (k.toLowerCase() === key) return value;
@@ -51,7 +54,7 @@ function field(def: Record<string, unknown> | undefined, key: string): unknown {
  * files and the numbers it inherited from a `.fbi` in others, and the engine's
  * own `GetBool` takes either.
  */
-function flag(value: unknown): boolean {
+export function flag(value: unknown): boolean {
   if (typeof value === "boolean") return value;
   if (typeof value === "number") return value !== 0;
   if (typeof value === "string") {

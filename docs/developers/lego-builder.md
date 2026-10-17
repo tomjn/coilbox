@@ -358,6 +358,16 @@ Picking a class fills in the speed and the turn rate with the median of the game
 
 When the game's `movedefs.lua` cannot be read, the picker falls back on the classes the game's units use, and says it has not narrowed them.
 
+### Fit to the game
+
+Below Movement, **Fit to the game** compares the unit with the game it belongs to and changes nothing. It has three rows:
+
+- **Armour class.** The engine puts a unit in the class whose list in `armordefs.lua` names it, and in `default` otherwise. A built unit is in no list, so the row warns when the game has classes and this unit is in none.
+- **Category.** A unit with no category cannot be targeted by any weapon, because the engine drops a target whose category does not overlap the weapon's `onlyTargetCategory`. The row warns on none, and on a category no unit in the game uses. It lists the categories of the game's similar units, meaning those on the same movement class, or the static ones for a unit that does not move.
+- **Movement class.** The row warns when the unit moves and names no class, or names one the game does not declare. A flier is not checked.
+
+Before the first export the rows read the definition the builder would write. After the unit is exported into the game and read back, they read the game's own entry, because that file is where a built unit's stats live. A warning on armour class or category then links to the unit in Unit tweaks, where both are changed. Like Movement, it needs the unit to have a game.
+
 The decisions the builder cannot make are made in **Unit tweaks**, under **workshop** in the sidebar. Pick the game you exported into and your unit is in the list, alongside the game's own:
 
 - **Change its movement class.** The field is a picker, and what it offers is the classes this game's units already move on. Turn **Can move** on beside it. The page says so if only one of the two is set, because either half on its own is wrong.

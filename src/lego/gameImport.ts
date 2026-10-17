@@ -19,7 +19,11 @@
 import { join, tempDir } from "@tauri-apps/api/path";
 
 import type { ArchiveFileEntry } from "../content/bindings";
-import { unitsyncArchiveExtract } from "../content/bindings";
+import {
+  unitsyncArchiveExtract,
+  unitsyncArchiveTree,
+} from "../content/bindings";
+import { primeScan } from "../content/config";
 import { isAssimpModel } from "./archiveOpen";
 import { isLooseArchive } from "./model";
 
@@ -116,6 +120,72 @@ export function textureMember(
     }
   }
   return null;
+}
+
+/** The engine's base content, mounted under every game and searched last. */
+const BASE_CONTENT_ARCHIVE = "springcontent.sdz";
+
+/** An archive a texture or palette can come from, and what it holds. */
+interface MemberSource {
+  archive: string;
+  files: ArchiveFileEntry[];
+}
+
+/**
+ * The first archive that holds `find`'s answer, searched in the order the
+ * engine mounts them: the game, then its dependencies, then base content (issue
+ * #4239). The game's own copy of a file wins over a dependency's.
+ *
+ * Dependencies are listed only when the game does not hold the member, so a
+ * model whose textures are all in its own archive costs no extra reads.
+ */
+async function firstSource(
+  game: MemberSource,
+  later: () => Promise<MemberSource[]>,
+  find: (files: ArchiveFileEntry[]) => string | null,
+): Promise<{ archive: string; member: string } | null> {
+  const own = find(game.files);
+  if (own) return { archive: game.archive, member: own };
+  for (const source of await later()) {
+    const member = find(source.files);
+    if (member) return { archive: source.archive, member };
+  }
+  return null;
+}
+
+/**
+ * A game's dependencies and then base content, each with its member listing.
+ *
+ * An archive that will not list is left out rather than failing the import,
+ * since the game's own archive may already hold everything the model names.
+ */
+async function laterSources(
+  target: UnitsyncTarget,
+  game: string,
+): Promise<MemberSource[]> {
+  const scan = await primeScan(target.enginePath, target.dataDir);
+  const item = scan.games.find((g) => g.primaryArchive.name === game);
+  const names = [
+    ...(item?.dependencyArchives.map((a) => a.name) ?? []),
+    BASE_CONTENT_ARCHIVE,
+  ].filter(
+    (name, i, all) =>
+      name !== game &&
+      all.findIndex((other) => other.toLowerCase() === name.toLowerCase()) ===
+        i,
+  );
+  const sources: MemberSource[] = [];
+  for (const archive of names) {
+    try {
+      const tree = await unitsyncArchiveTree({ ...target, archive });
+      if (tree.errors.length === 0) {
+        sources.push({ archive, files: tree.files });
+      }
+    } catch {
+      // Not installed, or unreadable: the next archive may still hold it.
+    }
+  }
+  return sources;
 }
 
 /**
@@ -235,7 +305,11 @@ export function paletteMember(files: ArchiveFileEntry[]): string | null {
  * this is what makes the import's own walk up to `unittextures/` find anything,
  * so a model opened out of a `.sdz` arrives painted rather than grey.
  *
- * A texture the archive does not hold is not an error. The import already
+ * A texture the game does not hold is taken from its dependencies, then base
+ * content, the way the engine finds it (issue #4239). A loose game still reads
+ * only what its own folder holds.
+ *
+ * A texture no archive holds is not an error. The import already
  * reports a named-but-missing texture and offers to point at one, which is the
  * same answer a loose game with a missing file gives.
  *
@@ -252,21 +326,31 @@ export async function stageTextures(
   names: string[],
 ): Promise<void> {
   if (!staged.staged) return;
+  const game: MemberSource = { archive: picked.archive, files };
+  let later: Promise<MemberSource[]> | null = null;
+  const dependencies = () => {
+    later ??= laterSources(target, picked.archive);
+    return later;
+  };
   const done = new Set<string>();
   for (const name of names) {
-    const member = textureMember(files, name, picked.member);
-    if (!member || done.has(member)) continue;
-    done.add(member);
+    const found = await firstSource(game, dependencies, (list) =>
+      textureMember(list, name, picked.member),
+    );
+    if (!found) continue;
+    const key = `${found.archive}\0${found.member}`;
+    if (done.has(key)) continue;
+    done.add(key);
     const dest = await join(
       staged.staged,
       "unittextures",
-      member.split("/").at(-1) ?? member,
+      found.member.split("/").at(-1) ?? found.member,
     );
-    await extract(target, picked.archive, member, dest);
+    await extract(target, found.archive, found.member, dest);
   }
 
   if (!picked.member.toLowerCase().endsWith(".3do")) return;
-  const palette = paletteMember(files);
+  const palette = await firstSource(game, dependencies, paletteMember);
   if (!palette) return;
   const dest = await join(
     staged.staged,
@@ -274,7 +358,7 @@ export async function stageTextures(
     "tatex",
     "palette.pal",
   );
-  await extract(target, picked.archive, palette, dest);
+  await extract(target, palette.archive, palette.member, dest);
 }
 
 /** The file name to unpack a member under, keeping its own name so the imported

@@ -63,6 +63,7 @@ vi.mock("../../../general/display", () => ({
 // rendered on its own has no app for. `MovementSection.dom.test.tsx` covers it.
 vi.mock("./MovementSection", () => ({ MovementSection: () => null }));
 vi.mock("./BuilderReport", () => ({ BuilderReport: () => null }));
+vi.mock("./GameFitSection", () => ({ GameFitSection: () => null }));
 
 function timeline(over: Partial<ScriptTimeline> = {}): ScriptTimeline {
   return {
