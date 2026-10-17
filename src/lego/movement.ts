@@ -17,6 +17,8 @@
 import {
   climbableDegrees,
   DEFAULT_MAX_SLOPE,
+  field,
+  flag,
   type MoveKind,
   moveClassesOf,
   moveClassOf,
@@ -28,7 +30,7 @@ import {
   unitSpeedOf,
   unitTurnRateOf,
 } from "@/workshop/moveClasses";
-import type { LegoMovement, LegoProject } from "./model";
+import type { FlightStyle, LegoMovement, LegoProject } from "./model";
 
 /**
  * The kinds of mover the build is. Empty for a unit with neither wheels nor legs,
@@ -248,6 +250,88 @@ export function suggestMotion(
   return movement;
 }
 
+/** Whether the engine hovers this def when it flies (`UnitDef.h:77`): a
+ *  builder, a transport or `hoverAttack`. */
+function hoversInAir(def: Record<string, unknown>): boolean {
+  return (
+    flag(field(def, "hoverattack")) ||
+    flag(field(def, "builder")) ||
+    Number(field(def, "transportcapacity")) > 0
+  );
+}
+
+/** A flier's cruise height, read as `UnitDef.cpp:520` does. */
+function cruiseAltitudeOf(def: Record<string, unknown>): number | undefined {
+  const value = Number(field(def, "cruisealtitude") ?? field(def, "cruisealt"));
+  return Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
+/**
+ * Starting numbers for a flier of this style, as the median of the game's own
+ * fliers of that style, or failing that of all its fliers. Absent where no
+ * flier in the game states the number.
+ */
+export function suggestFlight(
+  game: GameMovementData,
+  gameName: string,
+  style: FlightStyle,
+): LegoMovement {
+  const fliers = Object.values(game.units).filter((def) =>
+    flag(field(def, "canfly")),
+  );
+  const pools = [
+    {
+      units: fliers.filter((def) => hoversInAir(def) === (style === "gunship")),
+      label: style === "gunship" ? "gunships" : "planes",
+    },
+    { units: fliers, label: "fliers" },
+  ];
+  const movement: LegoMovement = { moveClass: "", flies: style };
+  const set = (
+    read: (def: Record<string, unknown>) => number | undefined,
+    round: (value: number) => number,
+    apply: (value: number, from: string) => void,
+  ) => {
+    for (const pool of pools) {
+      const values = pool.units
+        .map(read)
+        .filter((value): value is number => value !== undefined);
+      const value = median(values, round);
+      if (value === undefined) continue;
+      apply(value, `Median of ${values.length} ${gameName} ${pool.label}`);
+      return;
+    }
+  };
+  set(
+    (def) => {
+      const speed = unitSpeedOf(def);
+      return speed > 0 ? speed : undefined;
+    },
+    tenth,
+    (value, from) => {
+      movement.speed = value;
+      movement.speedFrom = from;
+    },
+  );
+  set(unitTurnRateOf, tenth, (value, from) => {
+    movement.turnRate = value;
+    movement.turnRateFrom = from;
+  });
+  set(cruiseAltitudeOf, tenth, (value, from) => {
+    movement.cruiseAltitude = value;
+    movement.cruiseAltitudeFrom = from;
+  });
+  set(unitAccelerationOf, significant, (value, from) => {
+    movement.acceleration = value;
+    movement.accelerationFrom = from;
+  });
+  set(unitBrakeRateOf, significant, (value, from) => {
+    movement.brakeRate = value;
+    movement.brakeRateFrom = from;
+  });
+  return movement;
+}
+
 /** The kinds in words, for the picker and for where a number came from. */
 export const KIND_LABEL: Record<MoveKind, string> = {
   tank: "vehicle",
@@ -266,7 +350,7 @@ export function movesInGame(
 ): movement is LegoMovement & { speed: number } {
   return (
     !!movement &&
-    movement.moveClass.trim() !== "" &&
+    (!!movement.flies || movement.moveClass.trim() !== "") &&
     typeof movement.speed === "number" &&
     movement.speed > 0
   );

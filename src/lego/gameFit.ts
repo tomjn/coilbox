@@ -85,8 +85,13 @@ function similarCategories(
 ): string[] {
   const moveClass = moveClassOf(def).toLowerCase();
   const moves = flag(field(def, "canmove")) && moveClass !== "";
+  const flies = flag(field(def, "canfly"));
   const counts = new Map<string, number>();
   for (const other of Object.values(game.units)) {
+    // An aircraft has no movement class, so it is matched on flying instead.
+    if (flies) {
+      if (!flag(field(other, "canfly"))) continue;
+    } else if (flag(field(other, "canfly"))) continue;
     const otherClass = moveClassOf(other).toLowerCase();
     const otherMoves = flag(field(other, "canmove")) && otherClass !== "";
     if (moves ? otherClass !== moveClass : otherMoves) continue;
