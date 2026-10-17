@@ -782,6 +782,15 @@ export interface LegoProject {
 export interface LegoSkeleton {
   plan: string;
   proportions: Record<string, number>;
+  /** The size the skeleton was fitted to and is meant to stay within (#3254).
+   *  Absent for a skeleton nobody gave a size. */
+  target?: SkeletonTarget;
+}
+
+/** A footprint in whole steps of `ELMOS_PER_FOOTPRINT`, and a height in elmos. */
+export interface SkeletonTarget {
+  footprint: { x: number; z: number };
+  height: number;
 }
 
 /** The three axes a guide can be aligned to. */
@@ -1452,7 +1461,33 @@ function parseSkeleton(value: unknown): LegoSkeleton | null {
       }
     }
   }
-  return { plan: v.plan, proportions };
+  const target = parseTarget(v.target);
+  return { plan: v.plan, proportions, ...(target ? { target } : {}) };
+}
+
+/** A target with whole footprint steps of 1 or more and a positive height, or
+ *  null for anything else. */
+function parseTarget(value: unknown): SkeletonTarget | null {
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  const f = v.footprint;
+  if (typeof f !== "object" || f === null) return null;
+  const { x, z } = f as Record<string, unknown>;
+  const { height } = v;
+  if (
+    typeof x !== "number" ||
+    typeof z !== "number" ||
+    typeof height !== "number" ||
+    !Number.isInteger(x) ||
+    !Number.isInteger(z) ||
+    x < 1 ||
+    z < 1 ||
+    !Number.isFinite(height) ||
+    height <= 0
+  ) {
+    return null;
+  }
+  return { footprint: { x, z }, height };
 }
 
 /**

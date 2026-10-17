@@ -121,6 +121,7 @@ import {
   pieceById,
   pieceKind,
   projectProblems,
+  type SkeletonTarget,
   type StaleExport,
   uniquePieceName,
 } from "../model";
@@ -163,6 +164,7 @@ import { dragPiece, freeMoved, type Seat, typedTransform } from "../seat";
 import { isShortcut, shortcutLabel } from "../shortcuts";
 import { skeletonProblems } from "../skeletonChecks";
 import { applyProportions } from "../skeletonEdit";
+import { applyTarget } from "../skeletonSize";
 import { swapModule } from "../swapModule";
 import { swapPart } from "../swapPart";
 import { useEditShortcuts } from "../useEditShortcuts";
@@ -276,6 +278,17 @@ function Builder({ id }: { id: string | undefined }) {
           applyProportions(project, skeletonPlan, values, () =>
             crypto.randomUUID(),
           ).project,
+      );
+    },
+    [edit, skeletonPlan],
+  );
+  // Fits the skeleton to a footprint and height and keeps them as its target.
+  const changeTarget = useCallback(
+    (target: SkeletonTarget) => {
+      setProportionPreview(null);
+      if (!skeletonPlan) return;
+      edit((project) =>
+        applyTarget(project, skeletonPlan, target, () => crypto.randomUUID()),
       );
     },
     [edit, skeletonPlan],
@@ -2329,6 +2342,7 @@ function Builder({ id }: { id: string | undefined }) {
                   project={draft}
                   plan={skeletonPlan}
                   onChange={changeProportions}
+                  onTarget={changeTarget}
                   onPreview={setProportionPreview}
                   preview={proportionPreview}
                 />
