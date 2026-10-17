@@ -17,6 +17,7 @@
 
 import type { LegoConnector } from "./connectors";
 import {
+  coneTopRadius,
   type LegoShape,
   shapeAxis,
   shapeBox,
@@ -89,6 +90,24 @@ function roundConnectors(shape: LegoShape): LegoConnector[] {
   );
 }
 
+/**
+ * A cone: the middle of the flat bottom, at the low end of the axis, and for a
+ * cut cone the middle of the flat top. A cone's tip is a point with no face to
+ * join, so it has none. There is none on the slanted side either: a join there
+ * could not sit flush against a surface that leans.
+ */
+function coneConnectors(shape: LegoShape): LegoConnector[] {
+  const axis = shapeAxis(shape);
+  const ends = coneTopRadius(shape) > 0 ? [1, -1] : [-1];
+  return ends.map((sign) => {
+    const position: Vec3 = [0, 0, 0];
+    position[axis] = (sign * shape.size[axis]) / 2;
+    const facing: Vec3 = [0, 0, 0];
+    facing[axis] = sign;
+    return connector(idOf(axis, sign), position, facing);
+  });
+}
+
 /** The centre of a flat polygon, from the area it covers. */
 function centroid(points: [number, number][]): [number, number] {
   let area = 0;
@@ -149,6 +168,7 @@ function wedgeConnectors(shape: LegoShape): LegoConnector[] {
 const CONNECTORS: Record<string, (shape: LegoShape) => LegoConnector[]> = {
   cylinder: roundConnectors,
   tube: roundConnectors,
+  cone: coneConnectors,
   wedge: wedgeConnectors,
 };
 

@@ -44,6 +44,13 @@ function examples(kind: string): LegoShape[] {
         { kind, size, options: { low: 1, flip: 1 } },
         { kind, size, options: { low: 3 } },
       ];
+    case "cone":
+      return [
+        { kind, size },
+        { kind, size, options: { top: 0.5 } },
+        { kind, size, options: { axis: 0, top: 0.5 } },
+        { kind, size, options: { axis: 2, sides: 7 } },
+      ];
     case "cylinder":
     case "tube":
       return [
@@ -87,7 +94,7 @@ function distanceToSurface(shape: LegoShape, point: Vec3): number {
 describe("every shape kind", () => {
   it("lists at least the kinds with a generator", () => {
     expect(shapeKinds()).toEqual(
-      expect.arrayContaining(["cylinder", "tube", "wedge"]),
+      expect.arrayContaining(["cylinder", "tube", "cone", "wedge"]),
     );
   });
 
@@ -201,6 +208,32 @@ describe("cylinder and tube connectors", () => {
     for (const c of shapeConnectors(shape)) {
       expect(distanceToSurface(shape, c.position)).toBeLessThan(1e-6);
     }
+  });
+});
+
+describe("cone connectors", () => {
+  it("has one at the flat bottom and none at the tip", () => {
+    const c = byId({ kind: "cone", size: [2, 4, 2] });
+    expect(Object.keys(c)).toEqual(["-y"]);
+    expect(c["-y"].position).toEqual([0, -2, 0]);
+    expect(c["-y"].facing).toEqual([0, -1, 0]);
+  });
+
+  it("has one at each end of a cut cone", () => {
+    const c = byId({ kind: "cone", size: [2, 4, 2], options: { top: 0.5 } });
+    expect(Object.keys(c).sort()).toEqual(["+y", "-y"]);
+    expect(c["+y"].position).toEqual([0, 2, 0]);
+    expect(c["+y"].facing).toEqual([0, 1, 0]);
+  });
+
+  it("follows the axis option", () => {
+    const c = byId({
+      kind: "cone",
+      size: [4, 2, 2],
+      options: { axis: 0, top: 0.5 },
+    });
+    expect(c["+x"].position).toEqual([2, 0, 0]);
+    expect(c["-x"].position).toEqual([-2, 0, 0]);
   });
 });
 
