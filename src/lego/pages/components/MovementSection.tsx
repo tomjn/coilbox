@@ -21,6 +21,7 @@ import type { UnitBounds } from "../../s3oBuild";
 import { footprintSteps } from "../../unitDef";
 import { installedGameFor, unitGame } from "../../unitGame";
 import { useTestGame } from "./useTestGame";
+import { useWorkshopChanges, WorkshopChangeMarks } from "./WorkshopChangeMarks";
 
 /** The option that leaves the unit static. Radix's select has no empty value. */
 const STATIC = "__static";
@@ -41,6 +42,13 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
   // The Test drawer's game is only read here for the engine and the scan. The
   // classes come from the unit's own game, never from the drawer's pick.
   const { target, targetLoading, scan } = useTestGame();
+  const workshop = useWorkshopChanges(project);
+  const marks = (path: string) => (
+    <WorkshopChangeMarks
+      unitKey={workshop.key}
+      changes={workshop.changesFor([path])}
+    />
+  );
   const own = unitGame(project);
   const game = installedGameFor(own, scan.data?.games ?? []);
   const { defs, defsFor, status, error } = useUnitDefs(
@@ -233,6 +241,7 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
         <>
           <Field
             label="Speed, elmos a second"
+            help={marks("speed")}
             hint={
               movement.speedFrom ?? (movement.speed ? undefined : "Not set")
             }
@@ -246,6 +255,7 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
           </Field>
           <Field
             label="Turn rate"
+            help={marks("turnrate")}
             hint={
               movement.turnRateFrom ??
               (movement.turnRate !== undefined ? undefined : "Not set")
@@ -261,6 +271,7 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
           {movement.flies ? (
             <Field
               label="Cruise altitude, elmos"
+              help={marks("cruisealtitude")}
               hint={
                 movement.cruiseAltitudeFrom ??
                 (movement.cruiseAltitude ? undefined : "Not set")
@@ -278,6 +289,7 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
           ) : (
             <Field
               label="Reverse speed, elmos a second"
+              help={marks("rspeed")}
               hint={
                 movement.reverseSpeedFrom ??
                 (movement.reverseSpeed
@@ -297,6 +309,7 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
           )}
           <Field
             label="Acceleration, elmos a frame squared"
+            help={marks("acceleration")}
             hint={
               movement.accelerationFrom ??
               (movement.acceleration !== undefined
@@ -316,6 +329,7 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
           </Field>
           <Field
             label="Brake rate, elmos a frame squared"
+            help={marks("brakerate")}
             hint={
               movement.brakeRateFrom ??
               (movement.brakeRate !== undefined

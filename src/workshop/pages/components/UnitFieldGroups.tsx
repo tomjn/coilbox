@@ -52,6 +52,7 @@ import type { CheckMarker } from "../../checkMarkers";
 import { consumerNote } from "../../customParamConsumers";
 import type { FieldRow, UnitFieldView } from "../../unitSections";
 import {
+  type BuilderMark,
   type FieldChoices,
   type InPlaceField,
   UnitFieldRow,
@@ -94,6 +95,7 @@ export function UnitFieldGroups({
   choices,
   warnings,
   checkMarkers,
+  builderMark,
   inheritedLabel,
   inPlace,
   post,
@@ -115,6 +117,9 @@ export function UnitFieldGroups({
   /** What a compatibility check found about a field, keyed the same way
    *  (issue #3116). */
   checkMarkers?: Record<string, CheckMarker>;
+  /** Whether the unit builder keeps a row's field up to date, on a unit built
+   *  in it (issue #4242). */
+  builderMark?: (row: FieldRow) => BuilderMark | undefined;
   /** The game's archive, for the fields that name a file in it (issue #2648). */
   assets?: AssetBrowsing;
   /** The game's custom parameter consumer index, or `null` while it is still
@@ -218,6 +223,7 @@ export function UnitFieldGroups({
                     choices={choices?.[row.path.toLowerCase()]}
                     warning={warnings?.[row.path.toLowerCase()]}
                     checkMarker={checkMarkers?.[row.path.toLowerCase()]}
+                    builderMark={builderMark?.(row)}
                     inheritedLabel={inheritedLabel}
                     readOnly={group.readOnly}
                     inPlace={group.readOnly ? undefined : inPlace?.(row)}
