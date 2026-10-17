@@ -45,6 +45,7 @@ describe("what more than one of a kind is called", () => {
       "keymaps",
       "base blueprints",
       "unit tweak projects",
+      "unit builder modules",
     ]);
   });
 
@@ -60,7 +61,7 @@ describe("what more than one of a kind is called", () => {
 describe("the kinds, as a sentence", () => {
   it("reads as a list of what a box takes", () => {
     expect(containerKindsSentence()).toBe(
-      "a campaign, a singleplayer preset, a challenge, a setup pack, a scenario, a keymap, a base blueprint or a unit tweak project",
+      "a campaign, a singleplayer preset, a challenge, a setup pack, a scenario, a keymap, a base blueprint, a unit tweak project or a unit builder module",
     );
   });
 
