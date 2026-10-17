@@ -12,8 +12,10 @@ import { buildObj } from "./exportObj";
 import {
   addGuide,
   guideFrame,
+  guideLines,
   guideOffsetAt,
   guidePlanes,
+  guidePointAt,
   removeGuide,
   snapToGuides,
   updateGuide,
@@ -97,6 +99,7 @@ function project(pieces: Partial<LegoPiece>[] = []): LegoProject {
 const GUIDES: LegoGuide[] = [
   { id: "g1", name: "wheel line", axis: "x", offset: 12 },
   { id: "g2", name: "deck", axis: "y", offset: 4, hidden: true },
+  { id: "g3", name: "axle", kind: "line", axis: "z", point: [3, 2, 0] },
 ];
 
 function withGuides(doc: LegoProject, guides = GUIDES): LegoProject {
@@ -169,6 +172,40 @@ describe("saving guides", () => {
   });
 });
 
+describe("saving guide lines", () => {
+  it("reads a line back with its point, and a plane without a kind", () => {
+    const read = parseLegoProjectJson(JSON.stringify(withGuides(project())));
+
+    expect(read?.guides?.[2]).toEqual(GUIDES[2]);
+    expect(read?.guides?.[0]).not.toHaveProperty("kind");
+  });
+
+  it("zeroes the coordinate along the line, which a line does not have", () => {
+    const saved = JSON.parse(JSON.stringify(project()));
+    saved.guides = [
+      { id: "l", name: "l", kind: "line", axis: "x", point: [9, 1, 2] },
+    ];
+
+    expect(parseLegoProjectData(saved)?.guides?.[0].point).toEqual([0, 1, 2]);
+  });
+
+  it("drops a line with no point and a guide of a kind it does not know", () => {
+    const saved = JSON.parse(JSON.stringify(project()));
+    saved.guides = [
+      { id: "a", name: "a", kind: "line", axis: "x" },
+      { id: "b", name: "b", kind: "line", axis: "x", point: [1, 2] },
+      { id: "c", name: "c", kind: "sphere", axis: "x", offset: 1 },
+      { id: "d", name: "d", kind: "plane", axis: "x", offset: 1 },
+    ];
+
+    const read = parseLegoProjectData(saved);
+
+    expect(read?.guides).toEqual([
+      { id: "d", name: "d", axis: "x", offset: 1 },
+    ]);
+  });
+});
+
 describe("editing guides", () => {
   it("adds, renames, moves, hides and removes", () => {
     let doc = addGuide(project(), {
@@ -188,6 +225,12 @@ describe("editing guides", () => {
 
     doc = removeGuide(doc, "a");
     expect("guides" in doc).toBe(false);
+  });
+
+  it("moves a line by its point", () => {
+    const doc = updateGuide(withGuides(project()), "g3", { point: [5, 6, 0] });
+
+    expect(doc.guides?.[2].point).toEqual([5, 6, 0]);
   });
 
   it("leaves the unit alone when the guide is not there", () => {
@@ -244,6 +287,7 @@ describe("where a guide is", () => {
 
   it("leaves a hidden guide out", () => {
     expect(guidePlanes(withGuides(project())).map((p) => p.id)).toEqual(["g1"]);
+    expect(guideLines(withGuides(project())).map((l) => l.id)).toEqual(["g3"]);
   });
 
   it("reads a clicked point back as an offset on the guide's axis", () => {
@@ -251,6 +295,105 @@ describe("where a guide is", () => {
     expect(guideOffsetAt(doc, "x", [13, 2, 2])).toBeCloseTo(3);
     expect(guideOffsetAt(doc, "y", [13, 2, 2])).toBeCloseTo(2);
     expect(guideOffsetAt(doc, "z", [13, 2, 2])).toBeCloseTo(2);
+  });
+});
+
+describe("where a guide line is", () => {
+  const line = (axis: "x" | "y" | "z", point: Vec3): LegoGuide => ({
+    id: "l",
+    name: "axle",
+    kind: "line",
+    axis,
+    point,
+  });
+
+  it("runs along its axis through its point in the unit's space", () => {
+    const [found] = guideLines(withGuides(project(), [line("z", [3, 2, 0])]));
+
+    expect(found.direction).toEqual([0, 0, 1]);
+    expect(found.point).toEqual([3, 2, 0]);
+  });
+
+  it("goes with the root", () => {
+    const doc = rootAt(withGuides(project(), [line("z", [3, 2, 0])]), {
+      position: [10, 0, 0],
+    });
+
+    expect(guideLines(doc)[0].point).toEqual([13, 2, 0]);
+  });
+
+  it("reads a clicked point back as a point in the unit's space", () => {
+    const doc = rootAt(project(), { position: [10, 0, 0] });
+
+    expect(guidePointAt(doc, "y", [13, 2, 5])).toEqual([3, 0, 5]);
+  });
+});
+
+describe("snapping to guide lines", () => {
+  const xLine = {
+    id: "l",
+    name: "rail",
+    axis: "x" as const,
+    direction: [1, 0, 0] as Vec3,
+    point: [0, 1, 2] as Vec3,
+  };
+
+  it("fixes the two coordinates across it and leaves the one along it", () => {
+    const snap = snapToGuides([[7, 1.2, 1.9]], [], 0.45, [xLine]);
+
+    expect(snap.delta[0]).toBe(0);
+    expect(snap.delta[1]).toBeCloseTo(-0.2);
+    expect(snap.delta[2]).toBeCloseTo(0.1);
+    expect(snap.guides.map((g) => g.id)).toEqual(["l"]);
+  });
+
+  it("does nothing when no anchor is within reach of the line", () => {
+    const snap = snapToGuides([[7, 3, 2]], [], 0.45, [xLine]);
+
+    expect(snap.delta).toEqual([0, 0, 0]);
+    expect(snap.guides).toEqual([]);
+  });
+
+  it("measures reach across the line, not as far as its point", () => {
+    expect(
+      snapToGuides([[900, 1.1, 2]], [], 0.45, [xLine]).guides,
+    ).toHaveLength(1);
+  });
+
+  it("takes the nearest of two lines", () => {
+    const far = { ...xLine, id: "far", point: [0, 1.3, 2] as Vec3 };
+    const snap = snapToGuides([[0, 1.2, 2]], [], 0.45, [xLine, far]);
+
+    expect(snap.guides.map((g) => g.id)).toEqual(["far"]);
+  });
+
+  it("lets a plane across the line settle the coordinate along it", () => {
+    const along = {
+      id: "p",
+      name: "end",
+      axis: "x" as const,
+      normal: [1, 0, 0] as Vec3,
+      point: [6, 0, 0] as Vec3,
+    };
+    const snap = snapToGuides([[5.9, 1.2, 2]], [along], 0.45, [xLine]);
+
+    expect(snap.delta[0]).toBeCloseTo(0.1);
+    expect(snap.delta[1]).toBeCloseTo(-0.2);
+    expect(snap.guides.map((g) => g.id)).toEqual(["l", "p"]);
+  });
+
+  it("keeps a plane from undoing a coordinate the line has fixed", () => {
+    const across = {
+      id: "p",
+      name: "deck",
+      axis: "y" as const,
+      normal: [0, 1, 0] as Vec3,
+      point: [0, 1.4, 0] as Vec3,
+    };
+    const snap = snapToGuides([[7, 1.2, 2]], [across], 0.45, [xLine]);
+
+    expect(snap.delta[1]).toBeCloseTo(-0.2);
+    expect(snap.guides.map((g) => g.id)).toEqual(["l"]);
   });
 });
 

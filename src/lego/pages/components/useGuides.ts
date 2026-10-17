@@ -1,6 +1,6 @@
 import { type RefObject, useEffect } from "react";
 import * as THREE from "three";
-import { guidePlanes } from "../../guides";
+import { guideLines, guidePlanes } from "../../guides";
 import type { LegoProject } from "../../model";
 import { type LoadedPack, partUnit } from "../../pack";
 import { buildGuides, disposeGuides } from "./guideLayer";
@@ -34,12 +34,15 @@ export function useGuides(
     state.guideLayer = null;
 
     const planes = show ? guidePlanes(project) : [];
+    const lines = show ? guideLines(project) : [];
     state.guidePlanes = planes;
-    if (planes.length > 0) {
+    state.guideLines = lines;
+    if (planes.length > 0 || lines.length > 0) {
       state.guideLayer = buildGuides(
         planes,
         new THREE.Box3().setFromObject(state.root),
         partUnit(pack) * EMPTY_UNIT_PARTS,
+        lines,
       );
       state.overlay.add(state.guideLayer);
     }

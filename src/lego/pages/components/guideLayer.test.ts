@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
-import type { GuidePlane } from "../../guides";
+import type { GuideLine, GuidePlane } from "../../guides";
 import { buildGuides, disposeGuides, guideCentre } from "./guideLayer";
 
 const plane: GuidePlane = {
@@ -10,6 +10,14 @@ const plane: GuidePlane = {
   axis: "x",
   normal: [1, 0, 0],
   point: [12, 0, 0],
+};
+
+const line: GuideLine = {
+  id: "l",
+  name: "l",
+  axis: "z",
+  direction: [0, 0, 1],
+  point: [3, 1, 0],
 };
 
 describe("buildGuides", () => {
@@ -51,5 +59,36 @@ describe("buildGuides", () => {
     disposeGuides(group);
 
     expect(scene.children).toEqual([]);
+  });
+
+  it("draws a line along its direction through its point, level with the unit", () => {
+    const group = buildGuides([], around, 1, [line]);
+    const drawn = group.getObjectByName("guide-l") as THREE.LineSegments;
+    drawn.updateMatrixWorld(true);
+    const ends = drawn.geometry.getAttribute("position");
+    const [a, b] = [0, 1].map((i) =>
+      new THREE.Vector3()
+        .fromBufferAttribute(ends, i)
+        .applyMatrix4(drawn.matrixWorld),
+    );
+
+    expect(a.x).toBeCloseTo(3);
+    expect(a.y).toBeCloseTo(1);
+    expect(b.x).toBeCloseTo(3);
+    expect(b.y).toBeCloseTo(1);
+    expect(a.z).not.toBeCloseTo(b.z);
+    expect((a.z + b.z) / 2).toBeCloseTo(0);
+  });
+
+  it("never takes a click meant for a piece, for a line either", () => {
+    const group = buildGuides([], around, 1, [line]);
+    const raycaster = new THREE.Raycaster(
+      new THREE.Vector3(3, 1, 20),
+      new THREE.Vector3(0, 0, -1),
+    );
+    raycaster.params.Line = { threshold: 5 };
+    group.updateMatrixWorld(true);
+
+    expect(raycaster.intersectObject(group, true)).toEqual([]);
   });
 });

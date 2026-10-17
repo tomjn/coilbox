@@ -76,9 +76,14 @@ import {
 } from "../../environment";
 import { addStandardLights } from "../../geometry";
 import type { PieceTransform } from "../../groupTransform";
-import { addGuide, guideOffsetAt } from "../../guides";
 import {
-  type GuideAxis,
+  addGuide,
+  type GuidePick,
+  guideName,
+  guideOffsetAt,
+  guidePointAt,
+} from "../../guides";
+import {
   type LegoCollisionVolume,
   type LegoMount,
   type LegoPiece,
@@ -637,7 +642,7 @@ export function ModelViewport({
   const [showReach, setShowReach] = useState(false);
   const [showGuides, setShowGuides] = useState(true);
   /** The axis the next click on the model puts a guide on, or null. */
-  const [pickingGuide, setPickingGuide] = useState<GuideAxis | null>(null);
+  const [pickingGuide, setPickingGuide] = useState<GuidePick | null>(null);
   // On by default: a scenario that defines a track wants it seen, and the
   // toggle exists for getting it out of the way rather than for opting in.
   const [showStandIn, setShowStandIn] = useState(true);
@@ -755,13 +760,23 @@ export function ModelViewport({
       ? (at) => {
           setPickingGuide(null);
           if (!at) return;
-          const axis = pickingGuide;
+          const { kind, axis } = pickingGuide;
           setShowGuides(true);
           onGuidesEdit((current) => {
+            if (kind === "line") {
+              const point = guidePointAt(current, axis, at);
+              return addGuide(current, {
+                id: crypto.randomUUID(),
+                name: guideName({ kind, axis, point }),
+                kind,
+                axis,
+                point,
+              });
+            }
             const offset = Number(guideOffsetAt(current, axis, at).toFixed(3));
             return addGuide(current, {
               id: crypto.randomUUID(),
-              name: `${axis} = ${offset}`,
+              name: guideName({ axis, offset }),
               axis,
               offset,
             });
@@ -1098,6 +1113,7 @@ export function ModelViewport({
         weaponReach: null,
         guideLayer: null,
         guidePlanes: [],
+        guideLines: [],
         onPickGuideRef,
         sky: null,
         terrain: null,
@@ -1689,7 +1705,7 @@ export function ModelViewport({
             ) : null}
             <span>
               {pickingGuide
-                ? `Click the model to put a ${pickingGuide.toUpperCase()} guide there. Escape to stop`
+                ? `Click the model to put a ${pickingGuide.axis.toUpperCase()} ${pickingGuide.kind === "line" ? "line" : "plane"} there. Escape to stop`
                 : placingAnchor
                   ? "Click the model to put an anchor there. Escape to stop"
                   : placingPart

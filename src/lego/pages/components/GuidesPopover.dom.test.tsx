@@ -101,7 +101,52 @@ describe("GuidesPopover", () => {
       screen.getByRole("button", { name: "Click the model to place it" }),
     );
 
-    expect(onPick).toHaveBeenCalledWith("y");
+    expect(onPick).toHaveBeenCalledWith({ kind: "plane", axis: "y" });
     expect(screen.queryByLabelText("Offset")).toBeNull();
+  });
+
+  it("adds a line along the chosen axis through the typed point", () => {
+    const { applied } = open();
+    fireEvent.click(screen.getByRole("button", { name: "line" }));
+    fireEvent.click(screen.getByRole("button", { name: "Z axis" }));
+    fireEvent.change(screen.getByLabelText("X position"), {
+      target: { value: "3" },
+    });
+    fireEvent.change(screen.getByLabelText("Y position"), {
+      target: { value: "-2" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(applied().guides).toMatchObject([
+      { kind: "line", axis: "z", point: [3, -2, 0] },
+    ]);
+  });
+
+  it("arms a click on the model for a line", () => {
+    const { onPick } = open();
+    fireEvent.click(screen.getByRole("button", { name: "line" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Click the model to place it" }),
+    );
+
+    expect(onPick).toHaveBeenCalledWith({ kind: "line", axis: "x" });
+  });
+
+  it("moves a line by editing a coordinate", () => {
+    const line: LegoGuide = {
+      id: "l",
+      name: "axle",
+      kind: "line",
+      axis: "z",
+      point: [3, 2, 0],
+    };
+    const { applied } = open([line]);
+    const field = screen.getByLabelText("Y of axle");
+    fireEvent.change(field, { target: { value: "7" } });
+    fireEvent.blur(field);
+
+    expect(applied({ ...BASE, guides: [line] }).guides?.[0].point).toEqual([
+      3, 7, 0,
+    ]);
   });
 });

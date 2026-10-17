@@ -18,7 +18,7 @@ import {
 } from "../../environment";
 import { importedMaterial, partMaterial } from "../../geometry";
 import type { PieceTransform } from "../../groupTransform";
-import type { GuidePlane } from "../../guides";
+import type { GuideLine, GuidePlane } from "../../guides";
 import { JoinedGroup } from "../../joinedWorld";
 import type { LegoCollisionVolume, LegoPiece, LegoProject } from "../../model";
 import { getPartGeometry, type LoadedPack } from "../../pack";
@@ -189,6 +189,8 @@ export interface SceneState {
   /** The planes a drag snaps to: the guides that are drawn, in the world. Empty
    *  while the guides are hidden, so a plane that cannot be seen never pulls. */
   guidePlanes: GuidePlane[];
+  /** The same for the guide lines. */
+  guideLines: GuideLine[];
   /** Set while the next click on the model puts a guide there. Handed the hit
    *  point in the world, or null for a click that missed, which is how you
    *  change your mind. */

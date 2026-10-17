@@ -274,8 +274,8 @@ export function forceUniformScale(state: SceneState) {
  * for the same reason.
  *
  * A move snaps in this order: another piece's anchor, which fixes all three
- * coordinates, then a guide plane, which fixes the one it stands across, then
- * the move step for whatever is left. See `guides.ts`.
+ * coordinates, then a guide line, which fixes the two across it, and guide
+ * planes for what a line leaves, then the move step for whatever is left. See `guides.ts`.
  */
 export function applySnap(state: SceneState) {
   const group = state.gizmo.object;
@@ -362,13 +362,14 @@ export function applySnap(state: SceneState) {
     if (step !== null) {
       group.position.set(...snapPosition(group.position.toArray(), step));
     }
-    // A guide plane then settles the one coordinate it stands across, over the
-    // step. It is measured from where the step left the piece, so the other
-    // two coordinates keep their step.
+    // A guide line then settles the two coordinates across it and a guide plane
+    // the one it stands across, over the step. They are measured from where the
+    // step left the piece, so any coordinate they leave keeps its step.
     const guides = snapToGuides(
       worldAnchors(state, pack, piece).map((anchor) => anchor.position),
       state.guidePlanes,
       threshold,
+      state.guideLines,
     );
     if (guides.guides.length > 0) moveByWorldDelta(group, guides.delta);
     state.onSnapChange(

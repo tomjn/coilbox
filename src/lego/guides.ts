@@ -9,9 +9,14 @@
  * Guides are a view aid saved with the unit. Nothing here touches a piece, and
  * no exporter reads `project.guides`, so none of them can reach a file.
  *
+ * A guide is a plane (one coordinate fixed) or a line along an axis through a
+ * point (two coordinates fixed).
+ *
  * Snap priority while a piece is moved, highest first:
  *   1. an anchor of another piece (a point, so it fixes all three coordinates)
- *   2. a guide plane (fixes the one coordinate across its normal)
+ *   2. a guide line, then guide planes, for the coordinates a line leaves
+ *      free (a line fixes two, so only a plane across the line can add the
+ *      third)
  *   3. the move step in part units (rounds whatever is left)
  * Alt turns all three off.
  */
@@ -34,6 +39,39 @@ export interface GuidePlane {
   axis: GuideAxis;
   normal: Vec3;
   /** Any point on the plane. */
+  point: Vec3;
+}
+
+const round = (n: number) => String(Number(n.toFixed(3)));
+
+/** A name to start a guide with, which the game maker can change. */
+export function guideName(
+  guide: Pick<LegoGuide, "axis" | "kind" | "offset" | "point">,
+): string {
+  if (guide.kind !== "line")
+    return `${guide.axis} = ${round(guide.offset ?? 0)}`;
+  const [a, b] = crossAxes(guide.axis);
+  const point = guide.point ?? [0, 0, 0];
+  return `${guide.axis} line (${a} ${round(point[GUIDE_AXES.indexOf(a)])}, ${b} ${round(point[GUIDE_AXES.indexOf(b)])})`;
+}
+
+/** What the next click on the model places: a plane or a line along an axis. */
+export interface GuidePick {
+  kind: "plane" | "line";
+  axis: GuideAxis;
+}
+
+/** The other two axes, which a line along `axis` is placed by. */
+export function crossAxes(axis: GuideAxis): [GuideAxis, GuideAxis] {
+  return GUIDE_AXES.filter((a) => a !== axis) as [GuideAxis, GuideAxis];
+}
+
+/** A line guide placed in the world: along `direction`, through `point`. */
+export interface GuideLine {
+  id: string;
+  name: string;
+  axis: GuideAxis;
+  direction: Vec3;
   point: Vec3;
 }
 
@@ -67,7 +105,9 @@ function tidy(v: THREE.Vector3): Vec3 {
 /** Every guide that is shown, as a plane in the world. A hidden guide is not
  *  here, so it neither draws nor snaps. */
 export function guidePlanes(project: LegoProject): GuidePlane[] {
-  const guides = (project.guides ?? []).filter((guide) => !guide.hidden);
+  const guides = (project.guides ?? []).filter(
+    (guide) => !guide.hidden && guide.kind !== "line",
+  );
   if (guides.length === 0) return [];
   const frame = guideFrame(project);
   const turn = new THREE.Matrix3().setFromMatrix4(frame);
@@ -79,7 +119,10 @@ export function guidePlanes(project: LegoProject): GuidePlane[] {
       axis: guide.axis,
       normal: tidy(axis.clone().applyMatrix3(turn).normalize()),
       point: tidy(
-        axis.clone().multiplyScalar(guide.offset).applyMatrix4(frame),
+        axis
+          .clone()
+          .multiplyScalar(guide.offset ?? 0)
+          .applyMatrix4(frame),
       ),
     };
   });
@@ -97,25 +140,86 @@ export function guideOffsetAt(
   return local.getComponent(GUIDE_AXES.indexOf(axis));
 }
 
+/** Every line guide that is shown, as a line in the world. */
+export function guideLines(project: LegoProject): GuideLine[] {
+  const guides = (project.guides ?? []).filter(
+    (guide) => !guide.hidden && guide.kind === "line" && guide.point,
+  );
+  if (guides.length === 0) return [];
+  const frame = guideFrame(project);
+  const turn = new THREE.Matrix3().setFromMatrix4(frame);
+  return guides.map((guide) => ({
+    id: guide.id,
+    name: guide.name,
+    axis: guide.axis,
+    direction: tidy(
+      new THREE.Vector3(...AXIS_VECTORS[guide.axis])
+        .applyMatrix3(turn)
+        .normalize(),
+    ),
+    point: tidy(
+      new THREE.Vector3(...(guide.point as Vec3)).applyMatrix4(frame),
+    ),
+  }));
+}
+
+/** A point in the world as a line guide's point: in the unit's own space, with
+ *  the coordinate along `axis` left at 0. */
+export function guidePointAt(
+  project: LegoProject,
+  axis: GuideAxis,
+  world: Vec3,
+): Vec3 {
+  const local = new THREE.Vector3(...world).applyMatrix4(
+    guideFrame(project).invert(),
+  );
+  local.setComponent(GUIDE_AXES.indexOf(axis), 0);
+  return tidy(local);
+}
+
 /**
- * How far the given points are to move so the nearest one to each axis's
- * nearest guide lands on it.
+ * How far the given points are to move so the nearest one to a guide lands on
+ * it.
  *
- * Each axis is settled on its own: the guides of one axis are parallel, so the
- * nearest one wins, and guides of different axes are at right angles, so what
- * one moves does not change the distance to another. A guide never pulls a
- * point along its plane, so two guides on different axes fix two coordinates
- * and leave the third alone.
+ * The nearest line in reach settles the two coordinates across it. Each axis's
+ * planes are then settled on their own: the planes of one axis are parallel,
+ * so the nearest wins, and planes of different axes are at right angles, so
+ * what one moves does not change the distance to another. With a line applied,
+ * only the planes across the line's own axis still count, since the line has
+ * already fixed the other two coordinates. A guide never pulls a point along
+ * itself.
  */
 export function snapToGuides(
   points: Vec3[],
   planes: GuidePlane[],
   threshold: number,
-): { delta: Vec3; guides: GuidePlane[] } {
+  lines: GuideLine[] = [],
+): { delta: Vec3; guides: (GuidePlane | GuideLine)[] } {
   const delta = new THREE.Vector3();
-  const guides: GuidePlane[] = [];
+  const guides: (GuidePlane | GuideLine)[] = [];
+
+  let nearest: { line: GuideLine; across: THREE.Vector3 } | null = null;
+  for (const line of lines) {
+    const along = new THREE.Vector3(...line.direction);
+    for (const point of points) {
+      const across = new THREE.Vector3(...point)
+        .sub(new THREE.Vector3(...line.point))
+        .projectOnPlane(along);
+      if (
+        across.length() <= threshold &&
+        (!nearest || across.length() < nearest.across.length())
+      ) {
+        nearest = { line, across };
+      }
+    }
+  }
+  if (nearest) {
+    delta.sub(nearest.across);
+    guides.push(nearest.line);
+  }
 
   for (const axis of GUIDE_AXES) {
+    if (nearest && axis !== nearest.line.axis) continue;
     let best: { plane: GuidePlane; distance: number } | null = null;
     for (const plane of planes) {
       if (plane.axis !== axis) continue;

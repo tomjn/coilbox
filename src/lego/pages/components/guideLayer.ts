@@ -1,14 +1,15 @@
 /**
- * The guide planes, drawn in the viewport (issue #3318).
+ * The guide planes and lines, drawn in the viewport (issue #3318).
  *
  * Each plane is a thin translucent square with an outline, centred on the unit
- * and sized to reach past it. Drawn over the model so a plane through a part
+ * and sized to reach past it. Each line is a single stroke through its point,
+ * as long as a square is wide. Drawn over the model so a plane through a part
  * never hides behind it, and never picked: a click goes through to the piece.
  * A view aid like the grid, never exported.
  */
 
 import * as THREE from "three";
-import type { GuidePlane } from "../../guides";
+import type { GuideLine, GuidePlane } from "../../guides";
 import type { Vec3 } from "../../snapping";
 
 /** Indigo. No other helper draws in it: anchors are sky blue, amber, pink and
@@ -21,15 +22,16 @@ const LINE_OPACITY = 0.7;
 const REACH = 1.5;
 
 /**
- * One group holding a square per plane.
+ * One group holding a square per plane and a stroke per line.
  *
- * `around` is the box of what the squares should surround, in the world. They
- * are centred on its middle, moved onto their plane.
+ * `around` is the box of what they should surround, in the world. They are
+ * centred on its middle, moved onto their plane or line.
  */
 export function buildGuides(
   planes: GuidePlane[],
   around: THREE.Box3,
   minimumSize: number,
+  lines: GuideLine[] = [],
 ): THREE.Group {
   const group = new THREE.Group();
   group.name = "guides";
@@ -82,6 +84,35 @@ export function buildGuides(
     plate.position.copy(centre);
     plate.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
     group.add(plate);
+  }
+
+  for (const line of lines) {
+    const direction = new THREE.Vector3(...line.direction);
+    const point = new THREE.Vector3(...line.point);
+    // The middle of the unit, dropped onto the line.
+    const centre = point
+      .clone()
+      .addScaledVector(direction, middle.clone().sub(point).dot(direction));
+
+    const stroke = new THREE.LineSegments(
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, -size / 2),
+        new THREE.Vector3(0, 0, size / 2),
+      ]),
+      new THREE.LineBasicMaterial({
+        color: GUIDE_COLOUR,
+        transparent: true,
+        opacity: LINE_OPACITY,
+        depthTest: false,
+      }),
+    );
+    stroke.renderOrder = 3;
+    stroke.raycast = () => {};
+    stroke.userData.guideId = line.id;
+    stroke.name = `guide-${line.id}`;
+    stroke.position.copy(centre);
+    stroke.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction);
+    group.add(stroke);
   }
   return group;
 }

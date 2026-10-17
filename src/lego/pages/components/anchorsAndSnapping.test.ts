@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
-import type { GuidePlane } from "../../guides";
+import type { GuideLine, GuidePlane } from "../../guides";
 import { type LegoPiece, type LegoProject, newProject } from "../../model";
 import type { LegoPartInfo, LoadedPack } from "../../pack";
 import { applySnap } from "./anchorsAndSnapping";
@@ -60,6 +60,7 @@ function drag(
   leg: Partial<LegoPiece>,
   customHull?: LegoPiece["customAnchors"],
   guidePlanes: GuidePlane[] = [],
+  guideLines: GuideLine[] = [],
 ) {
   const base = newProject({
     id: "p",
@@ -101,6 +102,7 @@ function drag(
     rawRef: { current: null },
     snapping: true,
     guidePlanes,
+    guideLines,
     seat: null,
     slide: null,
     targetAnchors: null,
@@ -250,6 +252,59 @@ describe("applySnap against guide planes", () => {
     applySnap(state);
 
     expect(dragged.position.y).toBe(6.3);
+  });
+});
+
+describe("applySnap against guide lines", () => {
+  const rail: GuideLine = {
+    id: "rail",
+    name: "rail",
+    axis: "z",
+    direction: [0, 0, 1],
+    point: [0, 6, 0],
+  };
+
+  it("fixes the two coordinates across the line and steps the third", () => {
+    const { state, dragged, changes } = drag(
+      { position: [0.1, 6.3, 3.1] },
+      undefined,
+      [],
+      [rail],
+    );
+
+    applySnap(state);
+
+    expect(dragged.position.x).toBeCloseTo(0);
+    expect(dragged.position.y).toBeCloseTo(6);
+    expect(dragged.position.z).toBeCloseTo(3);
+    expect(changes.at(-1)?.slice(0, 2)).toEqual([true, "rail"]);
+  });
+
+  it("gives way to an anchor in reach", () => {
+    const { state, dragged } = drag(
+      { position: [0, 1.52, 0] },
+      undefined,
+      [],
+      [{ ...rail, point: [0, 1.7, 0] }],
+    );
+
+    applySnap(state);
+
+    expect(dragged.position.y).toBeCloseTo(1.5);
+  });
+
+  it("is off while Alt is held", () => {
+    const { state, dragged } = drag(
+      { position: [0.2, 6.3, 3.1] },
+      undefined,
+      [],
+      [rail],
+    );
+    state.snapping = false;
+
+    applySnap(state);
+
+    expect(dragged.position.x).toBe(0.2);
   });
 });
 

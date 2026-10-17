@@ -716,20 +716,27 @@ export interface LegoProject {
   guides?: LegoGuide[];
 }
 
-/** The three axes a guide plane can stand across. */
+/** The three axes a guide can be aligned to. */
 export const GUIDE_AXES = ["x", "y", "z"] as const;
 export type GuideAxis = (typeof GUIDE_AXES)[number];
 
 /**
- * A plane at a fixed offset along one axis, in the unit's own space: the
- * root piece's frame, so moving or turning the root carries the guide with it.
+ * A guide in the unit's own space: the root piece's frame, so moving or
+ * turning the root carries the guide with it.
+ *
+ * A plane (no `kind`, as every guide saved before lines) stands across `axis`
+ * at `offset`. A line (`kind: "line"`) runs along `axis` through `point`, whose
+ * coordinate along `axis` is always 0 since a line does not have one.
  */
 export interface LegoGuide {
   id: string;
   name: string;
   axis: GuideAxis;
-  /** Distance along `axis` from the root's origin, in model units. */
-  offset: number;
+  kind?: "line";
+  /** A plane's distance along `axis` from the root's origin. */
+  offset?: number;
+  /** A line's place in the unit's space. */
+  point?: [number, number, number];
   hidden?: boolean;
 }
 
@@ -743,18 +750,35 @@ function parseGuides(value: unknown): LegoGuide[] | null {
     const g = raw as Record<string, unknown>;
     if (typeof g.id !== "string" || g.id === "" || seen.has(g.id)) continue;
     const axis = GUIDE_AXES.find((a) => a === g.axis);
-    if (!axis || typeof g.offset !== "number" || !Number.isFinite(g.offset))
+    if (!axis) continue;
+    const named = (fallback: string) =>
+      typeof g.name === "string" && g.name !== "" ? g.name : fallback;
+    const hidden = g.hidden === true ? { hidden: true as const } : {};
+
+    if (g.kind === "line") {
+      const point = parseVec3(g.point);
+      if (!point) continue;
+      point[GUIDE_AXES.indexOf(axis)] = 0;
+      seen.add(g.id);
+      guides.push({
+        id: g.id,
+        name: named(`${axis} line`),
+        kind: "line",
+        axis,
+        point,
+        ...hidden,
+      });
       continue;
+    }
+    if (g.kind !== undefined && g.kind !== "plane") continue;
+    if (typeof g.offset !== "number" || !Number.isFinite(g.offset)) continue;
     seen.add(g.id);
     guides.push({
       id: g.id,
-      name:
-        typeof g.name === "string" && g.name !== ""
-          ? g.name
-          : `${axis} = ${g.offset}`,
+      name: named(`${axis} = ${g.offset}`),
       axis,
       offset: g.offset,
-      ...(g.hidden === true ? { hidden: true } : {}),
+      ...hidden,
     });
   }
   return guides.length > 0 ? guides : null;
