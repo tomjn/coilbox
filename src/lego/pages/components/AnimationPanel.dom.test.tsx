@@ -62,6 +62,7 @@ vi.mock("../../../general/display", () => ({
 // Reads the test game and its unit definitions through unitsync, which a panel
 // rendered on its own has no app for. `MovementSection.dom.test.tsx` covers it.
 vi.mock("./MovementSection", () => ({ MovementSection: () => null }));
+vi.mock("./BuilderReport", () => ({ BuilderReport: () => null }));
 
 function timeline(over: Partial<ScriptTimeline> = {}): ScriptTimeline {
   return {

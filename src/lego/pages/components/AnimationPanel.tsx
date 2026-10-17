@@ -120,6 +120,7 @@ import {
 } from "../../targetMotion";
 import { isBuilder } from "../../unitDef";
 import { controlFor } from "../../unitValueControls";
+import { BuilderReport } from "./BuilderReport";
 import { MovementSection } from "./MovementSection";
 import { ScrubberMarks } from "./ScrubberMarks";
 import type { DrivePlacement } from "./standInPlayback";
@@ -1593,6 +1594,7 @@ export function AnimationPanel({
                 builder. All three go together: the engine reads a builder with
                 no work rate as not a builder at all.
               </p>
+              <BuilderReport project={project} />
 
               {BUILDER_FIELDS.map((field) => (
                 <div key={field.id} className="mt-2">
