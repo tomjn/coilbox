@@ -24,6 +24,11 @@ const mocks = vi.hoisted(() => ({
   datasetArchives: [] as (string | undefined)[],
   readS3o: vi.fn(),
   importS3o: vi.fn(),
+  read3do: vi.fn(),
+  import3do: vi.fn(),
+  readDae: vi.fn(),
+  importDae: vi.fn(),
+  trim: vi.fn(),
   stageTextures: vi.fn(),
   adopt: vi.fn(),
 }));
@@ -49,6 +54,7 @@ vi.mock("@/content/config", () => ({
             { path: "objects3d/armcom_dead.s3o" },
             { path: "objects3d/armllt.s3o" },
             { path: "objects3d/armfus.3do" },
+            { path: "objects3d/armsolar.dae" },
           ],
         }
       : null,
@@ -68,6 +74,7 @@ vi.mock("@/content/config", () => ({
               },
               { name: "armllt", fullName: "LLT", objectName: "armllt" },
               { name: "armfus", fullName: "Fusion", objectName: "armfus" },
+              { name: "armsolar", fullName: "Solar", objectName: "armsolar" },
             ],
           }
         : null,
@@ -93,6 +100,14 @@ vi.mock("../../adoptGameScript", () => ({
 vi.mock("../../bindings", () => ({
   legoReadS3o: (args: unknown) => mocks.readS3o(args),
   legoImportS3o: (args: unknown) => mocks.importS3o(args),
+  legoRead3do: (args: unknown) => mocks.read3do(args),
+  legoImport3do: (args: unknown) => mocks.import3do(args),
+  legoReadDae: (args: unknown) => mocks.readDae(args),
+  legoImportDae: (args: unknown) => mocks.importDae(args),
+}));
+
+vi.mock("../../liftIntoUnit", () => ({
+  trimLiftedMeshes: (module: unknown) => mocks.trim(module),
 }));
 
 import { GameUnitBrowser } from "./GameUnitBrowser";
@@ -128,11 +143,37 @@ const piece = (name: string, children: unknown[] = []) => ({
   children,
 });
 
+const imported = (
+  name: string,
+  meshId: string | null,
+  children: unknown[] = [],
+) => ({ name, offset: [0, 0, 0], meshId, children });
+
+const importResult = (root: unknown) => ({
+  radius: 1,
+  height: 1,
+  mid: [0, 0, 0],
+  root,
+  texture: { key: "aa.png", name: "sheet.png", source: null },
+  texture2: { key: null, name: "", source: null },
+  meshes: 3,
+  vertices: 9,
+  triangles: 3,
+  converted: 0,
+  bytes: 10,
+});
+
 beforeEach(() => {
   mocks.games = [sf, xta];
   mocks.datasetArchives = [];
   mocks.readS3o.mockReset();
   mocks.importS3o.mockReset();
+  mocks.read3do.mockReset();
+  mocks.import3do.mockReset();
+  mocks.readDae.mockReset();
+  mocks.importDae.mockReset();
+  mocks.trim.mockReset();
+  mocks.trim.mockResolvedValue(null);
   mocks.stageTextures.mockReset();
   mocks.adopt.mockReset();
   mocks.adopt.mockResolvedValue({ findings: null });
@@ -200,21 +241,49 @@ describe("GameUnitBrowser", () => {
     await waitFor(() => expect(screen.getByText(/bad header/)).toBeTruthy());
   });
 
-  it("does not try to list the pieces of a model that is not an .s3o", () => {
+  it("lists the pieces of a .3do from its import, after staging its tiles", async () => {
+    mocks.read3do.mockResolvedValue({ textures: ["tile1", "tile100"] });
+    mocks.import3do.mockResolvedValue(
+      importResult(imported("base", "m0", [imported("lamp", "m1")])),
+    );
     const project = unit({ game: gameRecordFor(sf, [sf, xta]) });
     render(<GameUnitBrowser project={project} query="" />);
     fireEvent.click(screen.getByRole("button", { name: /Fusion/ }));
-    expect(screen.getByText(/only for .s3o models/)).toBeTruthy();
+    await waitFor(() => expect(screen.getByText("lamp")).toBeTruthy());
+    expect(mocks.read3do).toHaveBeenCalledWith({
+      path: "/tmp/objects3d/armfus.3do",
+    });
+    expect(mocks.stageTextures.mock.calls[0][4]).toEqual(["tile1", "tile100"]);
     expect(mocks.readS3o).not.toHaveBeenCalled();
   });
 
-  describe("lifting a piece", () => {
-    const imported = (
-      name: string,
-      meshId: string | null,
-      children: unknown[] = [],
-    ) => ({ name, offset: [0, 0, 0], meshId, children });
+  it("lists the pieces of a .dae from its import", async () => {
+    mocks.readDae.mockResolvedValue({ textures: ["solar.png"] });
+    mocks.importDae.mockResolvedValue(
+      importResult(imported("base", "m0", [imported("panel", "m1")])),
+    );
+    const project = unit({ game: gameRecordFor(sf, [sf, xta]) });
+    render(<GameUnitBrowser project={project} query="" />);
+    fireEvent.click(screen.getByRole("button", { name: /Solar/ }));
+    await waitFor(() => expect(screen.getByText("panel")).toBeTruthy());
+    expect(mocks.readS3o).not.toHaveBeenCalled();
+  });
 
+  it("offers a .3do piece the import dropped no line for", async () => {
+    mocks.read3do.mockResolvedValue({ textures: [] });
+    // The import left out a duplicate "arm" under "base".
+    mocks.import3do.mockResolvedValue({
+      ...importResult(imported("base", "m0", [imported("arm", "m1")])),
+      droppedPieces: 1,
+    });
+    const project = unit({ game: gameRecordFor(sf, [sf, xta]) });
+    render(<GameUnitBrowser project={project} query="" />);
+    fireEvent.click(screen.getByRole("button", { name: /Fusion/ }));
+    await screen.findByText("arm");
+    expect(screen.getAllByText("arm")).toHaveLength(1);
+  });
+
+  describe("lifting a piece", () => {
     function openCommander(onLift: (compound: LegoProject) => Promise<void>) {
       mocks.readS3o.mockResolvedValue({
         texture1: "arm_1.dds",
@@ -263,6 +332,62 @@ describe("GameUnitBrowser", () => {
       });
       expect(mocks.stageTextures).toHaveBeenCalled();
       expect(await screen.findByText(/^Lifted\./)).toBeTruthy();
+    });
+
+    it.each([
+      ["Fusion", "read3do", "import3do", "/tmp/objects3d/armfus.3do", "armfus"],
+      [
+        "Solar",
+        "readDae",
+        "importDae",
+        "/tmp/objects3d/armsolar.dae",
+        "armsolar",
+      ],
+    ] as const)("lifts a piece off %s with its subtree, textures and trimmed geometry", async (label, read, imp, path, unitName) => {
+      mocks[read].mockResolvedValue({ textures: ["tileA"] });
+      mocks[imp].mockResolvedValue(
+        importResult(
+          imported("base", "m0", [
+            imported("turret", "m1", [imported("barrel", "m2")]),
+          ]),
+        ),
+      );
+      const onLift = vi.fn(async (_compound: LegoProject) => {});
+      const project = unit({ game: gameRecordFor(sf, [sf, xta]) });
+      render(<GameUnitBrowser project={project} query="" onLift={onLift} />);
+      fireEvent.click(screen.getByRole("button", { name: new RegExp(label) }));
+      fireEvent.click(
+        await screen.findByRole("button", {
+          name: "Lift turret into the inventory",
+        }),
+      );
+      await waitFor(() => expect(onLift).toHaveBeenCalledTimes(1));
+
+      const compound = onLift.mock.calls[0][0];
+      expect(compound.pieces.map((p) => p.name)).toEqual(["turret", "barrel"]);
+      expect(
+        compound.pieces.every((p) => p.lifted?.game.shortname === "SF"),
+      ).toBe(true);
+      expect(compound.pieces[0].lifted?.unit).toBe(unitName);
+      expect(compound.pieces[0].lifted?.texture?.key).toBe("aa.png");
+      // The lift imports under the module's own id, then trims to its meshes.
+      expect(mocks[imp]).toHaveBeenLastCalledWith({ path, id: compound.id });
+      expect(mocks.trim).toHaveBeenCalledWith(
+        expect.objectContaining({ id: compound.id }),
+      );
+      expect(mocks.stageTextures.mock.calls.at(-1)?.[4]).toEqual(["tileA"]);
+    });
+
+    it("trims an .s3o lift the same way", async () => {
+      const onLift = vi.fn(async (_compound: LegoProject) => {});
+      openCommander(onLift);
+      fireEvent.click(
+        await screen.findByRole("button", {
+          name: "Lift turret into the inventory",
+        }),
+      );
+      await waitFor(() => expect(onLift).toHaveBeenCalledTimes(1));
+      expect(mocks.trim).toHaveBeenCalledTimes(1);
     });
 
     it("brings the roles the unit's script gives the lifted pieces", async () => {

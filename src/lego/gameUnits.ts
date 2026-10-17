@@ -74,7 +74,7 @@ export interface PieceLine {
 }
 
 /** A piece and the ones under it, as either model reader gives them. */
-interface PieceNode {
+export interface PieceNode {
   name: string;
   children: readonly PieceNode[];
 }
