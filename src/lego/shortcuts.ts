@@ -106,19 +106,20 @@ export const SHORTCUTS: Shortcut[] = [
   {
     id: "place-face",
     group: "Transform",
-    description: "While placing a part, join by its next face",
+    description: "While placing a part or module, join by its next face",
     combos: [{ key: "n", mod: false, shift: false }],
   },
   {
     id: "place-twist",
     group: "Transform",
-    description: "While placing a part, turn it a quarter about the face",
+    description:
+      "While placing a part or module, turn it a quarter about the face",
     combos: [{ key: "t", mod: false, shift: false }],
   },
   {
     id: "place-stop",
     group: "Transform",
-    description: "Stop placing a part or a connector",
+    description: "Stop placing a part, a module or a connector",
     combos: [{ key: "Escape" }],
   },
   {

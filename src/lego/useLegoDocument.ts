@@ -238,6 +238,7 @@ export function useLegoDocument(
       parentId,
       () => crypto.randomUUID(),
       packRef.current,
+      undefined,
       asModule,
     );
     // One edit however many roots the cutting has, so a paste of several pieces

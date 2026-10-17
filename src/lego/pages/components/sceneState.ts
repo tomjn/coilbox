@@ -29,7 +29,7 @@ import type { Vec3 } from "../../snapping";
 import { onGround } from "../../standIn";
 import type { CollisionFaceDrag } from "./collisionHandles";
 import type { EffectsLayer } from "./effectsLayer";
-import type { PlacingPart } from "./placeByFace";
+import type { Placing } from "./placeByFace";
 
 export interface SceneState {
   renderer: THREE.WebGLRenderer;
@@ -260,8 +260,8 @@ export interface SceneState {
       | undefined;
   };
   onCancelAnchorRef: { current: (() => void) | undefined };
-  /** The part being placed on a face, or null when no part is. */
-  placingPartRef: { current: PlacingPart | null };
+  /** The part or module being placed on a face, or null when none is. */
+  placingPartRef: { current: Placing | null };
   /** Told the face a click chose, or null for a click that hit nothing. */
   onPlacePartRef: {
     current: ((target: FaceTarget | null) => void) | undefined;
@@ -270,6 +270,8 @@ export interface SceneState {
    *  the dot that show it. */
   placeTarget: FaceTarget | null;
   placeGhost: THREE.Mesh;
+  /** The same for a module: one translucent mesh per piece of it. */
+  placeModuleGhost: THREE.Group;
   placeMark: THREE.Points;
   /** Told a finished drag with the join it ended on, or null for a drag that
    *  seated nothing. */
