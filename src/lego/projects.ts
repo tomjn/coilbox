@@ -6,6 +6,7 @@
  * covers both and the builder never has to ask twice.
  */
 
+import { useMemo } from "react";
 import { legoThumbUrl } from "../lib/assetUrl";
 import { createDocumentStore } from "../lib/documentStore";
 import {
@@ -15,7 +16,15 @@ import {
   legoSave,
   legoThumbSave,
 } from "./bindings";
+
 import { type LegoProject, orderedPieces, parseLegoProjectJson } from "./model";
+import type { LoadedPack } from "./pack";
+import {
+  isBuiltInModule,
+  ownCopy,
+  starterModules,
+  withStarters,
+} from "./starterModules";
 
 interface LegoStore {
   projects: LegoProject[];
@@ -75,12 +84,24 @@ export async function deleteProject(id: string): Promise<void> {
   await refreshProjects();
 }
 
-/** Save a reusable sub-assembly. Stored beside units, in its own folder. */
+/**
+ * Save a reusable sub-assembly. Stored beside units, in its own folder.
+ *
+ * A built in module is never written. Saving a change to one saves the user's
+ * own copy of it instead, under a new id, and that copy is what comes back.
+ */
 export async function saveCompound(
   compound: LegoProject,
 ): Promise<LegoProject> {
+  const own = isBuiltInModule(compound)
+    ? ownCopy(
+        compound,
+        (store.getCached()?.compounds ?? []).map((saved) => saved.name),
+        { id: crypto.randomUUID(), now: new Date().toISOString() },
+      )
+    : compound;
   const stamped = {
-    ...compound,
+    ...own,
     pieces: orderedPieces(compound),
     updatedAt: new Date().toISOString(),
   };
@@ -94,6 +115,9 @@ export async function saveCompound(
 }
 
 export async function deleteCompound(id: string): Promise<void> {
+  if (isBuiltInModule({ id })) {
+    throw new Error("A built in module cannot be deleted.");
+  }
   await legoDelete({ kind: "compound", id });
   await refreshProjects();
 }
@@ -193,4 +217,16 @@ export function useLegoProjects() {
 export function useLegoCompounds() {
   const { data, loading, error } = store.useStore();
   return { compounds: data.compounds, loading, error };
+}
+
+/**
+ * The module list: the built in modules this parts library can make, then
+ * every saved one, newest first. Only the saved ones until the pack loads.
+ */
+export function useModules(pack: LoadedPack | null): LegoProject[] {
+  const { compounds } = useLegoCompounds();
+  return useMemo(
+    () => withStarters(pack ? starterModules(pack) : [], compounds),
+    [pack, compounds],
+  );
 }
