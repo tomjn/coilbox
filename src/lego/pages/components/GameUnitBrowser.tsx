@@ -20,13 +20,13 @@ import {
 import { UnitIcon } from "@/content/pages/components/UnitIcon";
 import { usePreferredTarget } from "@/play/config";
 import { adoptGameScript } from "../../adoptGameScript";
-import { legoImportS3o, legoReadS3o } from "../../bindings";
 import {
   modelSource,
   type StagedModel,
   stageModel,
   stageTextures,
 } from "../../gameImport";
+import { canLift, importModel, readPieces } from "../../gameModelRead";
 import { type GameModelRow, gameModelRows } from "../../gameModels";
 import {
   browseSource,
@@ -35,7 +35,6 @@ import {
   pieceLines,
   searchUnitRows,
 } from "../../gameUnits";
-import type { S3oModel } from "../../importS3o";
 import type { RoleProposal } from "../../inferRoles";
 import { trimLiftedMeshes } from "../../liftIntoUnit";
 import {
@@ -58,9 +57,10 @@ type Pieces =
   | {
       state: "ready";
       lines: PieceLine[];
-      /** What the lift reads again: the model on disk and its header. */
+      /** What the lift reads again: the model on disk and the textures it
+       *  names. */
       staged: StagedModel;
-      model: S3oModel;
+      textures: string[];
       row: GameModelRow;
     };
 
@@ -148,10 +148,10 @@ export function GameUnitBrowser({ project, query, onLift }: Props) {
     const thisRead = ++reads.current;
     setOpenMember(row.member);
     setLift(null);
-    if (!/\.s3o$/i.test(row.member)) {
+    if (!canLift(row.member)) {
       setPieces({
         state: "failed",
-        message: "Pieces are listed only for .s3o models.",
+        message: "Pieces cannot be listed for this kind of model.",
       });
       return;
     }
@@ -163,13 +163,20 @@ export function GameUnitBrowser({ project, query, onLift }: Props) {
         { archive, archivePath: tree.archivePath, member: row.member },
         tree.files,
       );
-      const model = await legoReadS3o({ path: staged.path });
+      const picked = {
+        archive,
+        archivePath: tree.archivePath,
+        member: row.member,
+      };
+      const { root, textures } = await readPieces(staged.path, (names) =>
+        stageTextures(target, picked, staged, tree.files, names),
+      );
       if (thisRead !== reads.current) return;
       setPieces({
         state: "ready",
-        lines: pieceLines(model.root),
+        lines: pieceLines(root),
         staged,
-        model,
+        textures,
         row,
       });
     } catch (error) {
@@ -189,7 +196,7 @@ export function GameUnitBrowser({ project, query, onLift }: Props) {
   async function liftPiece(line: PieceLine) {
     if (!onLift || pieces?.state !== "ready") return;
     if (!target || !archive || !tree || source.state !== "ready") return;
-    const { staged, model, row } = pieces;
+    const { staged, textures, row } = pieces;
     const picked = {
       archive,
       archivePath: tree.archivePath,
@@ -197,12 +204,9 @@ export function GameUnitBrowser({ project, query, onLift }: Props) {
     };
     setLift({ path: line.path, state: "lifting" });
     try {
-      await stageTextures(target, picked, staged, tree.files, [
-        model.texture1,
-        model.texture2,
-      ]);
+      await stageTextures(target, picked, staged, tree.files, textures);
       const id = crypto.randomUUID();
-      const result = await legoImportS3o({ path: staged.path, id });
+      const result = await importModel(staged.path, id);
       const options = {
         id,
         from: {
