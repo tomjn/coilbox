@@ -95,7 +95,7 @@ import {
 import { usePanelHeight, usePanelOpen } from "../panels";
 import { buildPieceCollisionScript } from "../pieceCollisionScript";
 import { currentPivot, pivotChoices, setPivot } from "../pivot";
-import { type FaceTarget, placePart } from "../placePart";
+import { attachToFreeFace, type FaceTarget, placePart } from "../placePart";
 import {
   deleteCompound,
   saveCompound,
@@ -375,9 +375,28 @@ function Builder({ id }: { id: string | undefined }) {
     queueTwin(pieceId);
   }
 
-  /** Choosing a part starts placing it, and choosing it again stops. */
+  /**
+   * Choosing a part joins it to a free face of the selected piece when that
+   * piece has faces, in one edit with its twin when symmetry is on. Otherwise
+   * it starts placing the part by hovering a face, and choosing it again stops.
+   */
   function startPlacing(part: LegoPartInfo) {
     setPlacingAnchor(false);
+    const parentId = selectedId;
+    if (parentId && draft && pack) {
+      const pieceId = crypto.randomUUID();
+      if (attachToFreeFace(draft, pack, part, parentId, pieceId)) {
+        queueTwin(pieceId);
+        place([pieceId], (project) => {
+          return (
+            attachToFreeFace(project, pack, part, parentId, pieceId)?.project ??
+            project
+          );
+        });
+        setPlacingPart(null);
+        return;
+      }
+    }
     setPlacingPart((was) =>
       was?.part.id === part.id ? null : { part, cycle: 0, twist: 0 },
     );

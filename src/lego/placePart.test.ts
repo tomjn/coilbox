@@ -5,7 +5,13 @@ import { boxConnectors } from "./connectors";
 import { mirrorTwin } from "./mirror";
 import { type LegoPiece, type LegoProject, newProject } from "./model";
 import type { LegoPartInfo, LoadedPack } from "./pack";
-import { faceUnder, ownFace, placePart } from "./placePart";
+import {
+  attachToFreeFace,
+  faceUnder,
+  freeFace,
+  ownFace,
+  placePart,
+} from "./placePart";
 import { worldMatrix } from "./reparent";
 
 type Vec3 = [number, number, number];
@@ -270,5 +276,99 @@ describe("a part placed on a side face", () => {
     ) as LegoProject;
 
     expect(mirrorTwin(placed, "new", () => "twin")).toBeNull();
+  });
+});
+
+describe("freeFace", () => {
+  const legPart = () => pack().byId.get("leg") as LegoPartInfo;
+
+  function withChildren(...faces: string[]): LegoProject {
+    let doc = unit();
+    faces.forEach((to, i) => {
+      doc = placePart(
+        doc,
+        pack(),
+        legPart(),
+        { parentId: "hull", to },
+        { cycle: 0, twist: 0 },
+        `c${i}`,
+      ) as LegoProject;
+    });
+    return doc;
+  }
+
+  it("takes the top first, then front, back, left, right and bottom", () => {
+    const order = ["+y", "+z", "-z", "+x", "-x", "-y"];
+    for (let taken = 0; taken < order.length; taken++) {
+      const found = freeFace(
+        withChildren(...order.slice(0, taken)),
+        pack(),
+        "hull",
+      );
+      expect(found).toEqual({ to: order[taken], crowded: false });
+    }
+  });
+
+  it("skips a face a child is joined to, whatever the order they were added in", () => {
+    expect(freeFace(withChildren("+z", "+y"), pack(), "hull")?.to).toBe("-z");
+  });
+
+  it("ignores a child that is not joined to the parent by a connection", () => {
+    const doc = unit();
+    const free = {
+      ...doc,
+      pieces: [
+        ...doc.pieces,
+        {
+          id: "loose",
+          name: "loose",
+          parentId: "hull",
+          partId: "leg",
+          position: [0, 1, 0],
+          rotation: [0, 0, 0],
+          scale: [1, 1, 1],
+        } as LegoPiece,
+      ],
+    };
+    expect(freeFace(free, pack(), "hull")?.to).toBe("+y");
+  });
+
+  it("uses the face with fewest children once every face is taken", () => {
+    const all = ["+y", "+z", "-z", "+x", "-x", "-y"];
+    const full = withChildren(...all, "+y", "+z", "-z", "+x", "-x");
+    expect(freeFace(full, pack(), "hull")).toEqual({ to: "-y", crowded: true });
+  });
+
+  it("answers nothing for a piece with no part or no connectors", () => {
+    expect(freeFace(unit(), pack(), "root")).toBeNull();
+    expect(freeFace(unit(), pack(), "gone")).toBeNull();
+  });
+});
+
+describe("attachToFreeFace", () => {
+  const legPart = () => pack().byId.get("leg") as LegoPartInfo;
+
+  it("puts successive parts on different faces of the selected piece", () => {
+    const first = attachToFreeFace(unit(), pack(), legPart(), "hull", "a");
+    const second = attachToFreeFace(
+      first?.project as LegoProject,
+      pack(),
+      legPart(),
+      "hull",
+      "b",
+    );
+    const faces = second?.project.pieces
+      .filter((p) => p.id === "a" || p.id === "b")
+      .map((p) => p.connection?.to);
+    expect(faces).toEqual(["+y", "+z"]);
+    expect(second?.project.pieces.find((p) => p.id === "a")?.parentId).toBe(
+      "hull",
+    );
+  });
+
+  it("answers null where there is no face to join", () => {
+    const blank = pack().byId.get("blank") as LegoPartInfo;
+    expect(attachToFreeFace(unit(), pack(), legPart(), "root", "a")).toBeNull();
+    expect(attachToFreeFace(unit(), pack(), blank, "hull", "a")).toBeNull();
   });
 });
