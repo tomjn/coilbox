@@ -17,7 +17,6 @@ import {
   type SphereKeep,
   sphereProfile,
 } from "./shapes";
-import { type Anchor, type Bounds, localAnchors } from "./snapping";
 
 export interface SphereNumbers {
   radiusX: number;
@@ -89,19 +88,4 @@ export function withSphereNumber(
       },
     },
   };
-}
-
-/**
- * A sphere's anchors in its part's own space: a round shape's, which has no
- * corners, the middle of each face of the box being on a whole sphere. A dome
- * or a bowl keeps only the middle of its flat base and of its apex, the two
- * faces of the box it touches in the middle. The sides of its box are not on it
- * at mid height, so they go.
- */
-export function sphereAnchors(bounds: Bounds, shape: LegoShape): Anchor[] {
-  const anchors = localAnchors(bounds, true);
-  if (sphereProfile(shape).keep === SPHERE_WHOLE) return anchors;
-  return anchors.filter(
-    (anchor) => !anchor.out || (anchor.out[0] === 0 && anchor.out[2] === 0),
-  );
 }

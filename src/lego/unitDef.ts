@@ -124,9 +124,23 @@ function movementFields(project: LegoProject): Record<string, unknown> {
   if (!movesInGame(movement)) {
     return { canmove: false, maxslope: DEFAULT_MAX_SLOPE };
   }
+  // An aircraft has `canfly` and no movement class: `IsAirUnit` is `canfly` with
+  // no path type, and `RequireMoveDef` is false for it (`UnitDef.h:75,82`). A
+  // gunship hovers because `hoverAttack` is set, a plane strafes without it
+  // (`UnitDef.h:76-77`). The height is `cruiseAltitude` (`UnitDef.cpp:520`).
+  // `maxslope` is left out as for any mover.
+  const flight = movement.flies
+    ? {
+        canfly: true,
+        ...(movement.flies === "gunship" ? { hoverattack: true } : {}),
+        ...(typeof movement.cruiseAltitude === "number"
+          ? { cruisealtitude: movement.cruiseAltitude }
+          : {}),
+      }
+    : { movementclass: movement.moveClass };
   return {
     canmove: true,
-    movementclass: movement.moveClass,
+    ...flight,
     speed: movement.speed,
     ...(typeof movement.turnRate === "number"
       ? { turnrate: movement.turnRate }
@@ -356,6 +370,9 @@ export const DERIVED_FIELDS: readonly string[] = [
   "canmove",
   "maxslope",
   "movementclass",
+  "canfly",
+  "hoverattack",
+  "cruisealtitude",
   "speed",
   "turnrate",
   "rSpeed",

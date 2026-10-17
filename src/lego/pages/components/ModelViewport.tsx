@@ -1639,7 +1639,13 @@ export function ModelViewport({
 
   useOverlap(sceneRef, { result: overlap, show: showOverlap });
 
-  useGuides(sceneRef, { project, pack, show: showGuides }, reduceMotion);
+  // Ring mode turns copies round the vertical axis, so only a mirror has a plane.
+  const symmetryPlane = symmetryOn && symmetryMode === "mirror";
+  useGuides(
+    sceneRef,
+    { project, pack, show: showGuides, symmetry: symmetryPlane },
+    reduceMotion,
+  );
 
   const measure = useMeasure(sceneRef, reduceMotion);
   // Asked for once a drag has begun rather than on every edit, since it bakes
@@ -2023,7 +2029,8 @@ export function ModelViewport({
                 <Dot colour="#ef4444" label="Aim point" />
               </div>
             ) : null}
-            {showGuides && (project.guides ?? []).some((g) => !g.hidden) ? (
+            {showGuides &&
+            (symmetryPlane || (project.guides ?? []).some((g) => !g.hidden)) ? (
               <div className="flex gap-3">
                 <Dot colour={`#${GUIDE_COLOUR.toString(16)}`} label="Guides" />
               </div>
@@ -2209,8 +2216,9 @@ export function ModelViewport({
                   }}
                   picking={pickingGuide}
                   onPick={setPickingGuide}
+                  symmetryPlane={symmetryPlane}
                 />
-                {(project.guides ?? []).length > 0 ? (
+                {(project.guides ?? []).length > 0 || symmetryPlane ? (
                   <ViewToggle
                     icon={EyeOff}
                     onIcon={Eye}
