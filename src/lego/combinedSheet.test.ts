@@ -8,9 +8,16 @@ import { sheetSources } from "./textureSheet";
 
 const legoTextureSizes = vi.fn();
 const legoTextureSheet = vi.fn();
+const legoTexturePrune = vi.fn();
 vi.mock("./bindings", () => ({
   legoTextureSizes: (args: unknown) => legoTextureSizes(args),
   legoTextureSheet: (args: unknown) => legoTextureSheet(args),
+  legoTexturePrune: (args: unknown) => legoTexturePrune(args),
+}));
+
+const savedUnitsAndModules = vi.fn();
+vi.mock("./projects", () => ({
+  savedUnitsAndModules: () => savedUnitsAndModules(),
 }));
 
 function pack(): LoadedPack {
@@ -103,6 +110,10 @@ function mixed(): LegoProject {
 beforeEach(() => {
   legoTextureSizes.mockReset();
   legoTextureSheet.mockReset();
+  legoTexturePrune.mockReset();
+  legoTexturePrune.mockResolvedValue({ removed: 0 });
+  savedUnitsAndModules.mockReset();
+  savedUnitsAndModules.mockReturnValue([]);
   legoTextureSizes.mockResolvedValue([
     { width: 64, height: 64 },
     { width: 128, height: 128 },
@@ -174,5 +185,94 @@ describe("buildCombinedSheet", () => {
       buildCombinedSheet(mixed(), pack(), raw, found.sources),
     ).rejects.toThrow(/measure/);
     expect(legoTextureSheet).not.toHaveBeenCalled();
+  });
+});
+
+/** The texture store as a folder of keys: sheets are added, prune removes. */
+function fakeStore(initial: string[]) {
+  const disk = new Set(initial);
+  let built = 0;
+  legoTextureSheet.mockImplementation(async () => {
+    built += 1;
+    disk.add(`sheet${built}a.png`);
+    disk.add(`sheet${built}b.png`);
+    return {
+      texture: { key: `sheet${built}a.png`, name: "a", source: null },
+      texture2: { key: `sheet${built}b.png`, name: "b", source: null },
+    };
+  });
+  legoTexturePrune.mockImplementation(async ({ keep }: { keep: string[] }) => {
+    for (const key of [...disk]) if (!keep.includes(key)) disk.delete(key);
+    return { removed: 0 };
+  });
+  return disk;
+}
+
+describe("buildCombinedSheet and the texture store (#4362)", () => {
+  async function exportOnce(project: LegoProject) {
+    const found = sheetSources(project, pack(), raw);
+    if (!found || "refused" in found) throw new Error("no sources");
+    return buildCombinedSheet(project, pack(), raw, found.sources);
+  }
+
+  it("leaves the latest sheets and whatever is still referenced, after two exports", async () => {
+    // A saved unit and a saved module each lift a texture, and an old sheet
+    // from before this fix is lying about.
+    const saved = (key: string): LegoProject => ({
+      ...mixed(),
+      id: key,
+      pieces: mixed().pieces.map((piece) =>
+        piece.lifted
+          ? {
+              ...piece,
+              lifted: { ...piece.lifted, texture: { key, name: key } },
+            }
+          : piece,
+      ),
+    });
+    savedUnitsAndModules.mockReturnValue([saved("unit.dds"), saved("mod.dds")]);
+    const disk = fakeStore([
+      "unit.dds",
+      "mod.dds",
+      "arm.dds",
+      "arm2.dds",
+      "old.png",
+    ]);
+
+    await exportOnce(mixed());
+    const moved = mixed();
+    moved.pieces = moved.pieces.map((piece) =>
+      piece.id === "hull" ? { ...piece, position: [1, 0, 0] } : piece,
+    );
+    await exportOnce(moved);
+
+    expect([...disk].sort()).toEqual(
+      [
+        "arm.dds",
+        "arm2.dds",
+        "mod.dds",
+        "sheet2a.png",
+        "sheet2b.png",
+        "unit.dds",
+      ].sort(),
+    );
+  });
+
+  it("deletes nothing while the saved units have not loaded", async () => {
+    savedUnitsAndModules.mockReturnValue(null);
+    const disk = fakeStore(["unit.dds"]);
+    await exportOnce(mixed());
+    expect(legoTexturePrune).not.toHaveBeenCalled();
+    expect(disk.has("unit.dds")).toBe(true);
+  });
+
+  it("still hands the sheet back when the prune fails", async () => {
+    fakeStore([]);
+    legoTexturePrune.mockRejectedValue(new Error("disk"));
+    const sheet = await exportOnce(mixed());
+    expect(sheet.place.map((p) => p.key)).toEqual([
+      "sheet1a.png",
+      "sheet1b.png",
+    ]);
   });
 });
