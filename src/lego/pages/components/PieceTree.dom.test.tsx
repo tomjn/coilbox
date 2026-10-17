@@ -22,7 +22,7 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
+import type { JoinSummary } from "../../connectors";
 import { type LegoPiece, type LegoProject, newProject } from "../../model";
 import { PieceTree } from "./PieceTree";
 
@@ -79,10 +79,15 @@ const handlers = {
 /** Nothing folded, which is how the tree opens. */
 const NONE = new Set<string>();
 
-function show(project: LegoProject, selectedIds: string[] = []) {
+function show(
+  project: LegoProject,
+  selectedIds: string[] = [],
+  joins?: ReadonlyMap<string, JoinSummary>,
+) {
   return render(
     <PieceTree
       project={project}
+      joins={joins}
       selectedIds={selectedIds}
       {...handlers}
       collapsedIds={NONE}
@@ -391,5 +396,39 @@ describe("folding a branch", () => {
     }
     const toggle = screen.getByLabelText("Expand hull");
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
+  });
+});
+
+describe("PieceTree joins", () => {
+  it("marks a joined piece with a named icon and leaves a free one bare", () => {
+    show(
+      walker(),
+      [],
+      new Map([
+        [
+          "skirt",
+          { parentName: "hull", connector: "+y", to: "-y", broken: false },
+        ],
+      ]),
+    );
+    const mark = screen.getByRole("img", { name: "Joined to hull" });
+    expect(row("skirt").contains(mark)).toBe(true);
+    expect(screen.getAllByRole("img", { name: /^Joined to/ })).toHaveLength(1);
+  });
+
+  it("marks a join that cannot be made as broken", () => {
+    show(
+      walker(),
+      [],
+      new Map([
+        [
+          "skirt",
+          { parentName: "hull", connector: "+y", to: "x", broken: true },
+        ],
+      ]),
+    );
+    expect(
+      screen.getByRole("img", { name: "Broken join to hull" }),
+    ).toBeTruthy();
   });
 });

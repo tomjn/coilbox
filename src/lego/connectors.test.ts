@@ -6,6 +6,7 @@ import {
   boxConnectors,
   connectPiece,
   customConnectors,
+  describeJoin,
   disconnectPiece,
   type LegoConnector,
   pieceConnectors,
@@ -369,6 +370,42 @@ describe("connectPiece and disconnectPiece", () => {
     expect(leg.position).toEqual(pieceOf(joined, "leg").position);
     expect(leg.rotation).toEqual(pieceOf(joined, "leg").rotation);
     expect(disconnectPiece(out, "leg")).toBe(out);
+  });
+});
+
+describe("describeJoin", () => {
+  it("names the parent and both faces of a join", () => {
+    const joined = connectPiece(hullAndLeg({}), pack(), "leg", {
+      connector: "+y",
+      to: "-y",
+    });
+    expect(describeJoin(joined, pack(), pieceOf(joined, "leg"))).toEqual({
+      parentName: pieceOf(joined, "hull").name,
+      connector: "+y",
+      to: "-y",
+      broken: false,
+    });
+  });
+
+  it("says nothing about a free piece", () => {
+    const doc = hullAndLeg({});
+    expect(describeJoin(doc, pack(), pieceOf(doc, "leg"))).toBeNull();
+  });
+
+  it("marks a join to a face the parent's part does not have as broken", () => {
+    const joined = connectPiece(hullAndLeg({}), pack(), "leg", {
+      connector: "+y",
+      to: "-y",
+    });
+    const bad = {
+      ...joined,
+      pieces: joined.pieces.map((p) =>
+        p.id === "leg"
+          ? { ...p, connection: { connector: "+y", to: "nope" } }
+          : p,
+      ),
+    };
+    expect(describeJoin(bad, pack(), pieceOf(bad, "leg"))?.broken).toBe(true);
   });
 });
 

@@ -403,6 +403,33 @@ export function resolveConnections(
   return { project: moved ? { ...project, pieces } : project, broken };
 }
 
+export interface JoinSummary {
+  parentName: string;
+  /** The face on the piece's own part. */
+  connector: string;
+  /** The face on the parent's part. */
+  to: string;
+  /** The join cannot be made, so the piece is where it last was. */
+  broken: boolean;
+}
+
+/** What a piece is joined to, for showing, or null for a free piece. */
+export function describeJoin(
+  project: LegoProject,
+  pack: LoadedPack,
+  piece: LegoPiece,
+): JoinSummary | null {
+  const { connection } = piece;
+  if (!connection) return null;
+  const parent = project.pieces.find((p) => p.id === piece.parentId);
+  return {
+    parentName: parent?.name ?? "",
+    connector: connection.connector,
+    to: connection.to,
+    broken: !parent || !placeJoin(pack, piece, parent, connection),
+  };
+}
+
 /**
  * A builder edit followed by resolving every join, so the edit and the moves it
  * causes are one document and one undo step. With no pack loaded yet there is
