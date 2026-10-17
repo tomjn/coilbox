@@ -13,6 +13,7 @@ export interface ModelShortcutsDeps {
   selectedIdsRef: RefObject<string[]>;
   setSnapped: Dispatch<SetStateAction<boolean>>;
   setSnappedTo: Dispatch<SetStateAction<string | null>>;
+  setSteppedBy: Dispatch<SetStateAction<number | null>>;
   setMode: Dispatch<SetStateAction<GizmoMode>>;
   setShortcutsOpen: Dispatch<SetStateAction<boolean>>;
 }
@@ -30,6 +31,7 @@ export function useModelShortcuts(
     selectedIdsRef,
     setSnapped,
     setSnappedTo,
+    setSteppedBy,
     setMode,
     setShortcutsOpen,
   }: ModelShortcutsDeps,
@@ -37,11 +39,12 @@ export function useModelShortcuts(
   useEffect(() => {
     const state = sceneRef.current;
     if (!state) return;
-    state.onSnapChange = (on, anchorName) => {
+    state.onSnapChange = (on, anchorName, step) => {
       setSnapped(on);
       setSnappedTo(anchorName ?? null);
+      setSteppedBy(step ?? null);
     };
-  }, [sceneRef, setSnapped, setSnappedTo]);
+  }, [sceneRef, setSnapped, setSnappedTo, setSteppedBy]);
 
   // Held rather than toggled: snapping is on, and letting go of it is a
   // deliberate act for the one piece that has to sit off the grid.

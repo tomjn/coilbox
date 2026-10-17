@@ -570,6 +570,8 @@ export function ModelViewport({
   const [snapped, setSnapped] = useState(false);
   /** The name of the anchor a drag seated against, when it had one. */
   const [snappedTo, setSnappedTo] = useState<string | null>(null);
+  /** The part unit a move is stepping in, while one is. */
+  const [steppedBy, setSteppedBy] = useState<number | null>(null);
   const [showGrid, setShowGrid] = useState(true);
   const [showReference, setShowReference] = useState(false);
   /** A unit read out of an installed game to stand instead of the built-in
@@ -1268,6 +1270,7 @@ export function ModelViewport({
     selectedIdsRef,
     setSnapped,
     setSnappedTo,
+    setSteppedBy,
     setMode,
     setShortcutsOpen,
   });
@@ -1523,7 +1526,9 @@ export function ModelViewport({
                   ? snappedTo
                     ? `Snapped to "${snappedTo}". Hold Alt to place freely`
                     : "Snapped. Hold Alt to place freely"
-                  : "Hold Alt to place freely"}
+                  : steppedBy !== null
+                    ? `Moving in steps of ${steppedBy}. Hold Alt to place freely`
+                    : "Hold Alt to place freely"}
             </span>
           </div>
 

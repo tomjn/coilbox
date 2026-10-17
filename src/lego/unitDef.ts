@@ -256,7 +256,17 @@ export function legoUnitDef(
     // which otherwise prices any unit with no `factionname` at 518181518
     // metal and energy so that a builder never finishes it (issue #4143). The
     // game reads only whether it is set. Other games ignore the table.
-    customparams: { unitdefbuildtime: totals?.buildTime ?? DEFAULT_BUILD_TIME },
+    //
+    // `corpse` is empty so the wreck is only the engine's, from `corpse`
+    // below (issue #4283). Splinter Faction's `unit_deathContainerSpawn.lua`
+    // drops `customparams.corpse` itself when a ship dies or heat kills a
+    // unit, and `alldefs_post.lua` defaults it to the name of our wreck, so a
+    // heat kill would leave two. With an empty name its `CreateFeature` finds
+    // no feature and it spawns nothing.
+    customparams: {
+      unitdefbuildtime: totals?.buildTime ?? DEFAULT_BUILD_TIME,
+      corpse: "",
+    },
     buildtime: totals?.buildTime ?? DEFAULT_BUILD_TIME,
     buildcostmetal: totals?.metal ?? DEFAULT_BUILD_COST_METAL,
     buildcostenergy: totals?.energy ?? 0,
@@ -288,7 +298,23 @@ export function legoUnitDef(
     // `luaScript.ts`.
     ...builderFields(project),
     ...(weapons.length > 0 ? { weapons } : {}),
+    // The wreck the export writes beside the unit, `wreck.ts` (issue #3310).
+    // The engine makes it when the unit dies, looking it up by this name
+    // (`UnitDef.cpp`, `CUnit::PreInit`). Balanced Annihilation's
+    // `featuredefs_post.lua` would prefix a short name with the unit's, and
+    // leaves this one alone because no feature has the longer name.
+    corpse: wreckName(project.unitName),
   };
+}
+
+/**
+ * The name of a unit's wreck. Splinter Faction's own spelling: its
+ * `alldefs_post.lua` defaults `customparams.corpse` to it, which is the wreck
+ * its death gadget drops, and Balanced Annihilation's wrecks end up called the
+ * same once its `featuredefs_post.lua` has prefixed them.
+ */
+export function wreckName(unitName: string): string {
+  return `${unitName}_dead`;
 }
 
 /**
@@ -312,6 +338,7 @@ export const DERIVED_FIELDS: readonly string[] = [
   "description",
   "unitname",
   "customparams.unitdefbuildtime",
+  "customparams.corpse",
   "buildtime",
   "buildcostmetal",
   "buildcostenergy",
@@ -339,6 +366,7 @@ export const DERIVED_FIELDS: readonly string[] = [
   "builddistance",
   "canassist",
   "weapons",
+  "corpse",
 ];
 
 /** The value at a dotted `path` in a definition, or undefined. */

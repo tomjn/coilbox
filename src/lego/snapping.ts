@@ -196,6 +196,31 @@ export function snapRotation(rotation: Vec3, stepRadians: number): Vec3 {
   ) as Vec3;
 }
 
+/**
+ * Round each axis to the nearest multiple of the step, for move snapping.
+ * The axes are the ones the position is stored in, which is the parent's.
+ */
+export function snapPosition(position: Vec3, step: number): Vec3 {
+  if (step <= 0) return position;
+  // `+ 0` turns a negative zero into a plain one.
+  return position.map((v) => Math.round(v / step) * step + 0) as Vec3;
+}
+
+/**
+ * The step a move of these pieces lands on, or null when it has none.
+ *
+ * A piece with a saved connection is placed by the connection, so a step would
+ * fight it. A piece that is not a pack part (an imported mesh, or an empty) has
+ * no part unit to step in.
+ */
+export function moveStep(
+  pieces: { partId: string | null; connection?: unknown }[],
+  unit: number,
+): number | null {
+  if (pieces.length === 0) return null;
+  return pieces.every((p) => p.partId && !p.connection) ? unit : null;
+}
+
 /** A piece this close to the camera cannot shrink the threshold to zero. */
 const MIN_CAMERA_DISTANCE = 0.5;
 /**

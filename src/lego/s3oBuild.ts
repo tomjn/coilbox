@@ -12,6 +12,7 @@
 
 import * as THREE from "three";
 
+import { ENGINE_ROTATION_ORDER, type TrackDelta } from "./animPresets";
 import { resolveConnections } from "./connectors";
 import { computeSmoothedNormals, fixUv, hasMeshFix } from "./meshFix";
 import {
@@ -234,14 +235,26 @@ export function buildS3o(
      * `LegoPiece.originalName` (#2613).
      */
     useOriginalNames?: boolean;
+    /**
+     * A script pose to bake into the model, by piece id, as `TrackDelta`s from
+     * rest. The wreck's model is the unit posed this way (issue #3310). A
+     * posed model is measured afresh, since a header pinned for the unit does
+     * not describe it any more.
+     */
+    pose?: Map<string, TrackDelta>;
   },
 ): S3oBuild | null {
   if (!pieceById(project, project.rootPieceId)) return null;
-  const { pieces, world } = bakedPieces(project, pack, raw);
+  const rest = bakedPieces(project, pack, raw);
+  const pose = options?.pose;
+  const { pieces, world } =
+    pose && pose.size > 0 ? posePieces(project, rest.pieces, pose) : rest;
   // The radius is the collision sphere's, and that sphere is centred on the
   // header's mid, so it is measured from the aim point the unit will ship with
   // rather than from the middle of its box.
   const measured = header(world, project.mid);
+  const pinned: Pick<LegoProject, "radius" | "height" | "mid"> =
+    pose && pose.size > 0 ? {} : project;
 
   return {
     ...measured,
@@ -250,9 +263,9 @@ export function buildS3o(
     // unit did before this. A unit imported from somebody else's model carries
     // the header that model shipped, and re-exporting it must not quietly give
     // the unit a different collision sphere from the one its author set.
-    radius: project.radius ?? measured.radius,
-    height: project.height ?? measured.height,
-    mid: project.mid ?? measured.mid,
+    radius: pinned.radius ?? measured.radius,
+    height: pinned.height ?? measured.height,
+    mid: pinned.mid ?? measured.mid,
     texture1: textures.texture1,
     texture2: textures.texture2 ?? "",
     root: assemble(
@@ -263,6 +276,67 @@ export function buildS3o(
       options?.useOriginalNames ?? false,
     ),
   };
+}
+
+/**
+ * Baked pieces with a script pose baked in as well, the way the engine would
+ * draw them with those `Move` and `Turn` values set.
+ *
+ * The engine places a piece at its parent's transform times its offset plus
+ * the script's move, then turns it by the script's rotation
+ * (`S3DModelPiece::ComposeTransform`), so a turned piece takes everything under
+ * it with it. A baked piece has no rotation of its own, so the turn goes into
+ * its vertices and its normals, and its offset becomes the distance from where
+ * its parent now is.
+ */
+function posePieces(
+  project: LegoProject,
+  rest: Map<string, BakedPiece>,
+  pose: Map<string, TrackDelta>,
+): { pieces: Map<string, BakedPiece>; world: THREE.Vector3[] } {
+  const pieces = new Map<string, BakedPiece>();
+  const world: THREE.Vector3[] = [];
+  const walk = (
+    pieceId: string,
+    parentAt: THREE.Vector3,
+    parentTurn: THREE.Quaternion,
+  ) => {
+    const baked = rest.get(pieceId);
+    if (!baked) return;
+    const delta = pose.get(pieceId);
+    const move = new THREE.Vector3(...baked.offset).add(
+      new THREE.Vector3(...(delta?.position ?? [0, 0, 0])),
+    );
+    const at = move.applyQuaternion(parentTurn).add(parentAt);
+    const turn = parentTurn
+      .clone()
+      .multiply(
+        new THREE.Quaternion().setFromEuler(
+          new THREE.Euler(
+            ...(delta?.rotation ?? [0, 0, 0]),
+            ENGINE_ROTATION_ORDER,
+          ),
+        ),
+      );
+    const vertices = baked.vertices.map((vertex) => {
+      const pos = new THREE.Vector3(...vertex.pos).applyQuaternion(turn);
+      const normal = new THREE.Vector3(...vertex.normal).applyQuaternion(turn);
+      world.push(pos.clone().add(at));
+      return {
+        ...vertex,
+        pos: [pos.x, pos.y, pos.z] as [number, number, number],
+        normal: [normal.x, normal.y, normal.z] as [number, number, number],
+      };
+    });
+    pieces.set(pieceId, {
+      ...baked,
+      offset: [at.x - parentAt.x, at.y - parentAt.y, at.z - parentAt.z],
+      vertices,
+    });
+    for (const child of childrenOf(project, pieceId)) walk(child.id, at, turn);
+  };
+  walk(project.rootPieceId, new THREE.Vector3(), new THREE.Quaternion());
+  return { pieces, world };
 }
 
 /**

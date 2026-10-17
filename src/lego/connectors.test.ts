@@ -28,7 +28,7 @@ import {
   projectPackProblems,
 } from "./pack";
 import { reparentPiece, worldMatrix } from "./reparent";
-import { bakedPieces } from "./s3oBuild";
+import { bakedPieces, buildS3o } from "./s3oBuild";
 
 type Vec3 = [number, number, number];
 
@@ -495,6 +495,25 @@ describe("the export", () => {
     });
     const baked = bakedPieces(doc, pack(), null).pieces;
     expect(round(baked.get("leg")?.offset as number[])).toEqual([0, -1.5, 0]);
+  });
+
+  it("poses the wreck from where the joins put each piece (#3310)", () => {
+    const doc = hullAndLeg({
+      position: [7, 7, 7],
+      connection: { connector: "+y", to: "-y" },
+    });
+    const wreck = buildS3o(
+      doc,
+      pack(),
+      null,
+      { texture1: "a.png" },
+      {
+        pose: new Map([["hull", { position: [0, -1, 0] as Vec3 }]]),
+      },
+    );
+    const hull = wreck?.root.children.find((piece) => piece.name === "hull");
+    expect(round(hull?.offset as number[])).toEqual([0, -1, 0]);
+    expect(round(hull?.children[0].offset as number[])).toEqual([0, -1.5, 0]);
   });
 });
 
