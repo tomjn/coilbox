@@ -702,7 +702,11 @@ function Builder({ id }: { id: string | undefined }) {
 
   function addCompound(compound: LegoProject) {
     if (!draft) return;
-    const inserted = doc.insert(compound, selectedId ?? draft.rootPieceId);
+    const inserted = doc.insert(
+      compound,
+      selectedId ?? draft.rootPieceId,
+      true,
+    );
     if (inserted.length === 0) return;
     doc.selectMany(inserted);
     for (const pieceId of inserted) queueTwin(pieceId);

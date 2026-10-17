@@ -193,7 +193,7 @@ function moved(piece: LegoPiece, matrix: THREE.Matrix4): LegoPiece {
  *
  * When the parent has no face to offer, the module is moved so its mount is at
  * the parent's origin. With no pack loaded, no mount, or a mount that does not
- * resolve, this is `insertCompound`.
+ * resolve, this is `insertCompound`. `asModule` is passed to it.
  *
  * With a `placement`, the module joins that face of the parent instead of the
  * first free one, by the connector `chooseMount` picks, turned by the twist. A
@@ -206,8 +206,9 @@ export function insertModule(
   newId: () => string,
   pack: LoadedPack | null,
   placement?: ModulePlacement,
+  asModule = false,
 ): ReturnType<typeof insertCompound> {
-  const inserted = insertCompound(project, module, parentId, newId);
+  const inserted = insertCompound(project, module, parentId, newId, asModule);
   const parentKey = pieceById(project, parentId)
     ? parentId
     : project.rootPieceId;
@@ -285,7 +286,8 @@ export function insertModule(
 /**
  * A module added under the target's piece, joined to the face by its mount (or
  * the pick `chooseMount` makes without one). Null when the piece or its face is
- * missing, or the module has no connector to join by.
+ * missing, or the module has no connector to join by. Only a module from the
+ * library is placed this way, so its pieces record the instance.
  */
 export function placeModule(
   project: LegoProject,
@@ -299,8 +301,13 @@ export function placeModule(
   if (!parent) return null;
   const theirs = pieceConnectors(pack, parent).find((c) => c.id === target.to);
   if (!theirs || !chooseMount(module, pack, theirs, options.cycle)) return null;
-  return insertModule(project, module, parent.id, newId, pack, {
-    ...options,
-    to: target.to,
-  });
+  return insertModule(
+    project,
+    module,
+    parent.id,
+    newId,
+    pack,
+    { ...options, to: target.to },
+    true,
+  );
 }

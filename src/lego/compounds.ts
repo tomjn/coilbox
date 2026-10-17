@@ -27,6 +27,7 @@ import { freePiece } from "./connectors";
 import {
   descendantIds,
   LEGO_SCHEMA_VERSION,
+  type LegoModuleRef,
   type LegoPiece,
   type LegoProject,
   orderedPieces,
@@ -306,12 +307,20 @@ export function validateCompoundName(
  * already has is left as it is, parameters and all, and one whose roles the unit
  * still lacks after the insert is held back and reported in `presets`. The
  * compound's `builder` block is taken only by a unit with none.
+ *
+ * `asModule` is for a module dropped in from the library: every piece it adds
+ * records the module and one new instance shared by all of them. Otherwise the
+ * compound is a copy, and its pieces keep the module they came from with a new
+ * instance each instance, so a duplicated build arm is a second build arm. A
+ * copy landing inside the instance it was copied from, such as a second barrel
+ * pasted onto the same turret, stays in that instance. See `LegoModuleRef`.
  */
 export function insertCompound(
   project: LegoProject,
   compound: LegoProject,
   parentId: string,
   newId: () => string,
+  asModule = false,
 ): {
   project: LegoProject;
   rootPieceIds: string[];
@@ -322,12 +331,23 @@ export function insertCompound(
   const taken = project.pieces.map((piece) => piece.name);
   const remap = new Map<string, string>();
   const rootPieceIds: string[] = [];
+  const instanceOf = moduleInstances(
+    pieceById(project, parent)?.module?.instance,
+    newId,
+  );
+  // Made once the piece ids are, so a module insert hands out the same piece
+  // ids as any other insert.
+  let moduleRef: LegoModuleRef | undefined;
+  const ownModule = () => {
+    moduleRef ??= { id: compound.id, instance: newId() };
+    return moduleRef;
+  };
 
   // Depth first from the compound's root, then anything the walk did not reach,
   // which is how a compound made from a set carries its other roots. Either way
   // a piece's parent is remapped before the piece itself.
-  const added = orderedPieces(compound).map((piece): LegoPiece => {
-    const id = newId();
+  const ids = orderedPieces(compound).map((piece) => [piece, newId()] as const);
+  const added = ids.map(([piece, id]): LegoPiece => {
     remap.set(piece.id, id);
     const name = uniquePieceName(piece.name, taken);
     taken.push(name);
@@ -342,9 +362,23 @@ export function insertCompound(
     // `LegoPiece.originalName` (#2613).
     // A piece landing on the new parent was joined, if at all, to something
     // else, so it lands free. Joins inside the compound come along.
-    const { originalName: _dropped, ...rest } =
-      under === parent ? freePiece(piece) : piece;
-    return { ...rest, id, name, parentId: under };
+    const {
+      originalName: _dropped,
+      module: from,
+      ...rest
+    } = under === parent ? freePiece(piece) : piece;
+    const module = asModule
+      ? ownModule()
+      : from
+        ? { id: from.id, instance: instanceOf(from.instance) }
+        : undefined;
+    return {
+      ...rest,
+      id,
+      name,
+      parentId: under,
+      ...(module ? { module } : {}),
+    };
   });
 
   // Presets are judged against the unit as it is after the insert, so a module
@@ -358,6 +392,26 @@ export function insertCompound(
     rootPieceIds,
     idMap: remap,
     presets: merged.outcome,
+  };
+}
+
+/**
+ * The instance a copied piece takes, given the one it was copied from: a new
+ * one for each instance copied, or the same one when the copy lands on a piece
+ * of that instance.
+ */
+function moduleInstances(
+  parentInstance: string | undefined,
+  newId: () => string,
+): (instance: string) => string {
+  const fresh = new Map<string, string>();
+  return (instance) => {
+    if (instance === parentInstance) return instance;
+    const known = fresh.get(instance);
+    if (known) return known;
+    const made = newId();
+    fresh.set(instance, made);
+    return made;
   };
 }
 

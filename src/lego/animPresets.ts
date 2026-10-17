@@ -150,6 +150,31 @@ export interface EmitWeapon {
   signal: string;
 }
 
+/**
+ * One module instance's share of a preset's pieces (#3302).
+ *
+ * A unit holding the same module twice has two of each of its roles, and a
+ * preset written for one build arm or one set of legs works on each instance
+ * in turn rather than on the first piece it finds.
+ */
+export interface EmitInstance {
+  /** Counted from 1, in the order the instances' pieces appear in the unit. */
+  number: number;
+  /** This instance's pieces carrying a role, in document order. Asking marks
+   *  them used, as `EmitContext.pieces` does. */
+  pieces(role: string): string[];
+  /**
+   * A signal of this preset's own for this instance alone, so one instance's
+   * `Signal` does not stop another's thread. The first instance's is the
+   * preset's own `signal`, which keeps a unit with one instance's script as it
+   * was.
+   */
+  signal: string;
+  /** A Lua name for one of this instance's functions: `base` for the first
+   *  instance and `base<n>` for the others, so no two clash. */
+  name(base: string): string;
+}
+
 export interface EmitContext {
   /**
    * Names of the pieces carrying a role, in document order. Asking marks them
@@ -158,6 +183,13 @@ export interface EmitContext {
   pieces(role: string): string[];
   /** The unit's weapons, in slot order. */
   weapons(): EmitWeapon[];
+  /**
+   * The module instances carrying the roles this preset animates or needs, in
+   * the order their pieces appear. Pieces that came from no module are one
+   * instance between them, so a unit with no modules, or with one, has a
+   * single instance and the script it always had.
+   */
+  instances(): EmitInstance[];
   params: Record<string, number>;
   /** A signal number of this preset's own, for stopping its threads. */
   signal: string;
@@ -169,10 +201,23 @@ export interface EmitResult {
   hooks: Partial<Record<LuaHook, string[]>>;
 }
 
+/** What a preset is written once for, when that can be more than once. */
+export interface PresetCopies {
+  /** Each of the unit's weapons, or each module instance. */
+  per: "weapon" | "instance";
+  /** The role one copy cannot do without. Absent means any role the preset
+   *  animates. */
+  role?: string;
+  /** What the Animation panel calls them, plural, as in "2 turrets". */
+  noun: string;
+}
+
 export interface AnimPreset {
   id: string;
   label: string;
   description: string;
+  /** Absent for a preset written once whatever the unit holds. */
+  copies?: PresetCopies;
   /** Roles that must be filled, with how many pieces each needs at least. */
   requires: { role: string; count: number }[];
   /** Every role this preset may move. */
@@ -321,15 +366,16 @@ interface CyclePose {
  */
 function cycleThread(
   preset: AnimPreset,
-  ctx: EmitContext,
+  params: Record<string, number>,
+  instance: EmitInstance,
   options: { name: string; period: number },
-): EmitResult | null {
+): string[] | null {
   const targets = preset.animates.flatMap((role) =>
-    ctx.pieces(role).map((piece) => ({ role, piece })),
+    instance.pieces(role).map((piece) => ({ role, piece })),
   );
   if (targets.length === 0) return null;
 
-  const bounds = cycleSteps(preset, ctx.params, options.period);
+  const bounds = cycleSteps(preset, params, options.period);
   const count = bounds.length - 1;
 
   // Sample the whole cycle before writing any of it. A step's move is measured
@@ -340,7 +386,7 @@ function cycleThread(
     const t = bounds[step] / ENGINE_FPS;
     const pose = new Map<string, CyclePose>();
     for (const { role, piece } of targets) {
-      const delta = preset.track(t, ctx.params, role);
+      const delta = preset.track(t, params, role);
       if (!delta) continue;
       // Rounded before anything is compared, or floating point dust reads as
       // movement and emits a turn or move of nothing at a speed of nothing.
@@ -411,20 +457,51 @@ function cycleThread(
     ),
   ];
 
+  return [
+    `local function ${options.name}()`,
+    `  SetSignalMask(${instance.signal})`,
+    "  while true do",
+    ...body,
+    "  end",
+    "end",
+    "",
+    `local function ${options.name}Stop()`,
+    ...rest,
+    "end",
+  ];
+}
+
+/**
+ * One `cycleThread` per module instance, each started from `start` and, when
+ * given, stood down from `stop`. Every instance's thread has its own name and
+ * signal, so the threads run side by side and stopping one stops only that one.
+ * A unit with one instance gets one thread called `name`, as it always did.
+ */
+function cycleThreads(
+  preset: AnimPreset,
+  ctx: EmitContext,
+  options: { name: string; start: LuaHook; stop?: LuaHook },
+): EmitResult | null {
+  const period = Math.max(value(preset, ctx.params, "period"), 0.05);
+  const functions: string[] = [];
+  const started: string[] = [];
+  const stopped: string[] = [];
+  for (const instance of ctx.instances()) {
+    const name = instance.name(options.name);
+    const thread = cycleThread(preset, ctx.params, instance, { name, period });
+    if (!thread) continue;
+    if (functions.length > 0) functions.push("");
+    functions.push(...thread);
+    started.push(`  Signal(${instance.signal})`, `  StartThread(${name})`);
+    stopped.push(`  Signal(${instance.signal})`, `  ${name}Stop()`);
+  }
+  if (functions.length === 0) return null;
   return {
-    functions: [
-      `local function ${options.name}()`,
-      `  SetSignalMask(${ctx.signal})`,
-      "  while true do",
-      ...body,
-      "  end",
-      "end",
-      "",
-      `local function ${options.name}Stop()`,
-      ...rest,
-      "end",
-    ],
-    hooks: {},
+    functions,
+    hooks: {
+      [options.start]: started,
+      ...(options.stop ? { [options.stop]: stopped } : {}),
+    },
   };
 }
 
@@ -540,6 +617,7 @@ export const WALK_BIPED: AnimPreset = {
     { role: "leg.r1.thigh", count: 1 },
     { role: "leg.r1.shin", count: 1 },
   ],
+  copies: { per: "instance", noun: "sets of legs" },
   animates: legRoles([1]),
   params: WALK_PARAMS,
   track(t, params, role) {
@@ -561,6 +639,7 @@ export const WALK_QUAD: AnimPreset = {
     { role: "leg.l2.thigh", count: 1 },
     { role: "leg.r2.thigh", count: 1 },
   ],
+  copies: { per: "instance", noun: "sets of legs" },
   animates: legRoles([1, 2]),
   params: WALK_PARAMS,
   track(t, params, role) {
@@ -571,20 +650,17 @@ export const WALK_QUAD: AnimPreset = {
   },
 };
 
-/** Walking starts and stops with the unit, so it hangs off the move callins. */
+/**
+ * Walking starts and stops with the unit, so it hangs off the move callins.
+ * Each module instance of legs walks in a thread of its own, all started by
+ * the same `StartMoving`, so a leg's phase still comes from its role alone.
+ */
 function walkEmit(preset: AnimPreset, ctx: EmitContext): EmitResult | null {
-  const thread = cycleThread(preset, ctx, {
+  return cycleThreads(preset, ctx, {
     name: "walk",
-    period: Math.max(value(preset, ctx.params, "period"), 0.05),
+    start: "StartMoving",
+    stop: "StopMoving",
   });
-  if (!thread) return null;
-  return {
-    functions: thread.functions,
-    hooks: {
-      StartMoving: [`  Signal(${ctx.signal})`, "  StartThread(walk)"],
-      StopMoving: [`  Signal(${ctx.signal})`, "  walkStop()"],
-    },
-  };
 }
 
 /**
@@ -615,6 +691,7 @@ export const TURRET_TRACK: AnimPreset = {
   description:
     "Turns the turret and lifts the barrel, the motion a turret makes tracking a target.",
   requires: [{ role: "turret", count: 1 }],
+  copies: { per: "weapon", role: "turret", noun: "turrets" },
   animates: ["turret", "barrel"],
   params: [
     {
@@ -738,6 +815,7 @@ export const BUILDARM: AnimPreset = {
   description:
     "Sweeps the arm and keeps the nozzle level, the idle motion of a builder at work.",
   requires: [{ role: "buildarm.arm", count: 1 }],
+  copies: { per: "instance", noun: "build arms" },
   animates: ["buildarm.base", "buildarm.arm", "buildarm.nozzle"],
   params: [
     {
@@ -784,22 +862,15 @@ export const BUILDARM: AnimPreset = {
     return null;
   },
   emit(ctx) {
-    const thread = cycleThread(this, ctx, {
+    // Working, not merely switched on. This used to hang off Activate, which
+    // is the engine's "on" and for a builder is nearly always true, so the arm
+    // swept the whole time and stopped for nothing. A build is what
+    // StartBuilding and StopBuilding bracket.
+    return cycleThreads(this, ctx, {
       name: "buildArm",
-      period: Math.max(value(this, ctx.params, "period"), 0.05),
+      start: "StartBuilding",
+      stop: "StopBuilding",
     });
-    if (!thread) return null;
-    return {
-      functions: thread.functions,
-      hooks: {
-        // Working, not merely switched on. This used to hang off Activate,
-        // which is the engine's "on" and for a builder is nearly always true,
-        // so the arm swept the whole time and stopped for nothing. A build is
-        // what StartBuilding and StopBuilding bracket.
-        StartBuilding: [`  Signal(${ctx.signal})`, "  StartThread(buildArm)"],
-        StopBuilding: [`  Signal(${ctx.signal})`, "  buildArmStop()"],
-      },
-    };
   },
 };
 
@@ -841,6 +912,7 @@ export const BUILD_AIM: AnimPreset = {
   description:
     "Points the build arm at whatever the unit is building and holds it there until the job stops. A builder only.",
   requires: [{ role: "buildarm.arm", count: 1 }],
+  copies: { per: "instance", role: "buildarm.arm", noun: "build arms" },
   animates: ["buildarm.base", "buildarm.arm"],
   params: [
     {
@@ -913,29 +985,37 @@ export const BUILD_AIM: AnimPreset = {
    * Waiting for both turns before returning is what lets the build stance line
    * the generator appends mean something: the unit says it is in stance once
    * the arm is actually pointing, rather than while it is still swinging.
+   *
+   * Each module instance's arm aims, the first arm of its own instance with
+   * that instance's base. Every arm is set turning before any is waited for,
+   * so two arms swing together rather than one after the other.
    */
   emit(ctx) {
-    const arm = ctx.pieces("buildarm.arm")[0];
-    if (!arm) return null;
-    const base = ctx.pieces("buildarm.base")[0];
     const turn = lua(deg(value(this, ctx.params, "turnSpeed")));
     const lift = lua(deg(value(this, ctx.params, "liftSpeed")));
 
-    const aim: string[] = [];
+    const turns: string[] = [];
+    const waits: string[] = [];
     const rest: string[] = [];
-    if (base) {
-      aim.push(`    Turn(${base}, y_axis, heading, ${turn})`);
-      rest.push(`  Turn(${base}, y_axis, 0, ${turn})`);
+    for (const instance of ctx.instances()) {
+      const arm = instance.pieces("buildarm.arm")[0];
+      if (!arm) continue;
+      const base = instance.pieces("buildarm.base")[0];
+      if (base) {
+        turns.push(`    Turn(${base}, y_axis, heading, ${turn})`);
+        rest.push(`  Turn(${base}, y_axis, 0, ${turn})`);
+      }
+      turns.push(`    Turn(${arm}, x_axis, -pitch, ${lift})`);
+      rest.push(`  Turn(${arm}, x_axis, 0, ${lift})`);
+      if (base) waits.push(`    WaitForTurn(${base}, y_axis)`);
+      waits.push(`    WaitForTurn(${arm}, x_axis)`);
     }
-    aim.push(`    Turn(${arm}, x_axis, -pitch, ${lift})`);
-    rest.push(`  Turn(${arm}, x_axis, 0, ${lift})`);
-    if (base) aim.push(`    WaitForTurn(${base}, y_axis)`);
-    aim.push(`    WaitForTurn(${arm}, x_axis)`);
+    if (turns.length === 0) return null;
 
     return {
       functions: [],
       hooks: {
-        StartBuilding: ["  if heading then", ...aim, "  end"],
+        StartBuilding: ["  if heading then", ...turns, ...waits, "  end"],
         StopBuilding: rest,
       },
     };
@@ -1081,6 +1161,7 @@ export const OPEN_CLOSE: AnimPreset = {
   description:
     "Swings every door open and shut again, for hangars and silo covers.",
   requires: [{ role: "door", count: 1 }],
+  copies: { per: "instance", noun: "sets of doors" },
   animates: ["door"],
   params: [
     {
@@ -1110,19 +1191,13 @@ export const OPEN_CLOSE: AnimPreset = {
     return { rotation: [0, deg(value(this, params, "open")) * openness, 0] };
   },
   emit(ctx) {
-    const thread = cycleThread(this, ctx, {
+    // Shutting on Deactivate is not optional: a door left open is a hole in
+    // the model.
+    return cycleThreads(this, ctx, {
       name: "doors",
-      period: Math.max(value(this, ctx.params, "period"), 0.05),
+      start: "Activate",
+      stop: "Deactivate",
     });
-    if (!thread) return null;
-    return {
-      functions: thread.functions,
-      hooks: {
-        Activate: [`  Signal(${ctx.signal})`, "  StartThread(doors)"],
-        // Shutting is not optional: a door left open is a hole in the model.
-        Deactivate: [`  Signal(${ctx.signal})`, "  doorsStop()"],
-      },
-    };
   },
 };
 
@@ -1132,6 +1207,7 @@ export const HOVER_BOB: AnimPreset = {
   description:
     "Bobs the body up and down and rocks it gently side to side, the way an aircraft or hovercraft sits while holding position.",
   requires: [{ role: "base", count: 1 }],
+  copies: { per: "instance", noun: "bodies" },
   animates: ["base"],
   params: [
     {
@@ -1174,20 +1250,10 @@ export const HOVER_BOB: AnimPreset = {
     };
   },
   emit(ctx) {
-    const thread = cycleThread(this, ctx, {
-      name: "hover",
-      period: Math.max(value(this, ctx.params, "period"), 0.05),
-    });
-    if (!thread) return null;
-    return {
-      functions: thread.functions,
-      // Holding position is what the unit does for its whole life, not
-      // something it starts and stops, so this starts once on Create and is
-      // never told to stand down.
-      hooks: {
-        Create: [`  Signal(${ctx.signal})`, "  StartThread(hover)"],
-      },
-    };
+    // Holding position is what the unit does for its whole life, not something
+    // it starts and stops, so this starts once on Create and is never told to
+    // stand down.
+    return cycleThreads(this, ctx, { name: "hover", start: "Create" });
   },
 };
 
@@ -1197,6 +1263,7 @@ export const AIM_TRACK: AnimPreset = {
   description:
     "Turns and lifts a single piece to face a target, for a unit with no separate turret and barrel.",
   requires: [{ role: "aim", count: 1 }],
+  copies: { per: "weapon", role: "aim", noun: "aim points" },
   animates: ["aim"],
   params: [
     {
@@ -1288,6 +1355,7 @@ export const RECOIL: AnimPreset = {
   description:
     "Kicks the barrel back along its own bore when the weapon fires, and eases it home. A one-shot, not a loop: the preview repeats it on a timer so there is something to watch.",
   requires: [{ role: "barrel", count: 1 }],
+  copies: { per: "weapon", role: "barrel", noun: "barrels" },
   animates: ["barrel"],
   params: [
     {
@@ -1379,6 +1447,7 @@ export const IDLE_SWAY: AnimPreset = {
   description:
     "A slow turn back and forth while the unit stands still: a gentle body sway, or a scanning dish if that is what the piece is.",
   requires: [{ role: "base", count: 1 }],
+  copies: { per: "instance", noun: "bodies" },
   animates: ["base"],
   params: [
     {
@@ -1409,20 +1478,13 @@ export const IDLE_SWAY: AnimPreset = {
     };
   },
   emit(ctx) {
-    const thread = cycleThread(this, ctx, {
+    // The opposite of walking: idle motion picks up once the unit stops, and
+    // stands down the moment it moves again.
+    return cycleThreads(this, ctx, {
       name: "idleSway",
-      period: Math.max(value(this, ctx.params, "period"), 0.05),
+      start: "StopMoving",
+      stop: "StartMoving",
     });
-    if (!thread) return null;
-    return {
-      functions: thread.functions,
-      hooks: {
-        // The opposite of walking: idle motion picks up once the unit stops,
-        // and stands down the moment it moves again.
-        StopMoving: [`  Signal(${ctx.signal})`, "  StartThread(idleSway)"],
-        StartMoving: [`  Signal(${ctx.signal})`, "  idleSwayStop()"],
-      },
-    };
   },
 };
 
