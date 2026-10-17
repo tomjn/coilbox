@@ -461,10 +461,7 @@ fn convert_group(
 
     // A sheet an earlier run left, if it still holds everything this one needs.
     // Reusing it is what keeps the models that run already wrote correct.
-    let reused = std::fs::read(&record_path)
-        .ok()
-        .and_then(|bytes| coilbox_3do_convert::Sheet::read(&bytes).ok())
-        .filter(|sheet| sheet.covers(held.iter().copied()) && sheet_path.is_file());
+    let reused = reusable_sheet(&record_path, &sheet_path, &held)?;
 
     let (rects, side) = match reused {
         Some(sheet) => {
@@ -737,6 +734,31 @@ fn least_wanted(
         .map(|(at, _)| at)
 }
 
+/// The sheet an earlier run left at `record_path`, if it holds every tile in
+/// `held` and its picture is still there.
+///
+/// A record from before #4174 is rewritten at the current version. Its tiles
+/// have not moved, but the models this run writes count rows from the top, so
+/// the record must stop saying they do not (#4196).
+fn reusable_sheet(
+    record_path: &Path,
+    sheet_path: &Path,
+    held: &[&str],
+) -> Result<Option<coilbox_3do_convert::Sheet>, String> {
+    let Some(mut sheet) = std::fs::read(record_path)
+        .ok()
+        .and_then(|bytes| coilbox_3do_convert::Sheet::read(&bytes).ok())
+        .filter(|sheet| sheet.covers(held.iter().copied()) && sheet_path.is_file())
+    else {
+        return Ok(None);
+    };
+    if sheet.is_pre_top_rows() {
+        sheet.version = coilbox_3do_convert::SHEET_VERSION;
+        write_file(record_path, &sheet.write()?)?;
+    }
+    Ok(Some(sheet))
+}
+
 fn write_file(path: &Path, bytes: &[u8]) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
@@ -914,5 +936,34 @@ mod tests {
             .expect("the fallback still packs")
             .rects
             .contains_key(coilbox_3do_convert::PALETTE_TILE));
+    }
+
+    #[test]
+    fn reusing_a_sheet_from_before_the_row_fix_stamps_it_current() {
+        let dir = std::env::temp_dir().join(format!("cbx-reuse-sheet-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let sheet_path = dir.join("objects3d.png");
+        let record_path = dir.join("objects3d.json");
+        std::fs::write(&sheet_path, b"png").unwrap();
+
+        let packed = coilbox_3do_convert::pack(&[tile("a", 32)]).unwrap();
+        let mut old = coilbox_3do_convert::Sheet::of(&packed, "objects3d.png");
+        old.version = 1;
+        std::fs::write(&record_path, old.write().unwrap()).unwrap();
+
+        let reused = reusable_sheet(&record_path, &sheet_path, &["a"])
+            .unwrap()
+            .expect("covers every tile");
+        assert_eq!(reused.version, coilbox_3do_convert::SHEET_VERSION);
+
+        let on_disk =
+            coilbox_3do_convert::Sheet::read(&std::fs::read(&record_path).unwrap()).unwrap();
+        assert!(!on_disk.is_pre_top_rows());
+
+        assert!(reusable_sheet(&record_path, &sheet_path, &["missing"])
+            .unwrap()
+            .is_none());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

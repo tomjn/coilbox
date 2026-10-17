@@ -13,6 +13,7 @@ import {
   unitsyncArchiveExtract,
 } from "../bindings";
 import {
+  invalidateArchiveTree,
   useArchives,
   useScanTargetSelection,
   useUnitsyncArchiveFile,
@@ -26,6 +27,7 @@ import { Convert3doDrawer } from "./components/Convert3doDrawer";
 import { DeleteArchiveButton } from "./components/DeleteArchiveButton";
 import { FilePreview } from "./components/FilePreview";
 import { LuaConsoleDrawer } from "./components/LuaConsoleDrawer";
+import { OldConversionNotice } from "./components/OldConversionNotice";
 import { SddBadge } from "./components/SddBadge";
 import { DetailLoading, NotFound } from "./components/states";
 
@@ -102,6 +104,25 @@ export default function ArchiveDetailPage() {
           }
         : null;
 
+  const openConvert = () => {
+    if (!selected?.enginePath || !selected?.rootPath) return;
+    drawer.open({
+      title: "Convert .3do models",
+      description: `Turn ${archive.name}'s ${legacyModels} legacy models into .s3o, one shared texture per folder.`,
+      width: "44rem",
+      content: (
+        <Convert3doDrawer
+          key={nextDrawerKey()}
+          enginePath={selected.enginePath}
+          dataDir={selected.rootPath}
+          archive={archive.name}
+          models={legacyModels}
+          gameDir={isSdd(archive) ? onDiskPath : null}
+        />
+      ),
+    });
+  };
+
   const openFolder = () => {
     if (!onDiskPath) return;
     // A .sdd path is the folder itself; otherwise reveal its containing folder.
@@ -162,23 +183,7 @@ export default function ArchiveDetailPage() {
                 size="sm"
                 variant="outline"
                 className="gap-1.5"
-                onClick={() =>
-                  drawer.open({
-                    title: "Convert .3do models",
-                    description: `Turn ${archive.name}'s ${legacyModels} legacy models into .s3o, one shared texture per folder.`,
-                    width: "44rem",
-                    content: (
-                      <Convert3doDrawer
-                        key={nextDrawerKey()}
-                        enginePath={selected.enginePath}
-                        dataDir={selected.rootPath}
-                        archive={archive.name}
-                        models={legacyModels}
-                        gameDir={isSdd(archive) ? onDiskPath : null}
-                      />
-                    ),
-                  })
-                }
+                onClick={openConvert}
               >
                 <Boxes className="size-4" /> Convert models
               </Button>
@@ -245,6 +250,19 @@ export default function ArchiveDetailPage() {
             </span>
           )}
         </div>
+        <OldConversionNotice
+          gameDir={isSdd(archive) ? (onDiskPath ?? null) : null}
+          hasOriginals={legacyModels > 0}
+          onConvert={openConvert}
+          onRestored={() => {
+            if (selected?.enginePath && selected?.rootPath)
+              invalidateArchiveTree(
+                selected.enginePath,
+                selected.rootPath,
+                archive.name,
+              );
+          }}
+        />
       </header>
 
       <section className="flex shrink-0 flex-col gap-2">

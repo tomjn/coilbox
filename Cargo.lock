@@ -6374,6 +6374,7 @@ name = "tauri-plugin-coilbox-content"
 version = "0.0.0"
 dependencies = [
  "base64 0.22.1",
+ "coilbox-3do-convert",
  "coilbox-gamebackup",
  "coilbox-portable",
  "coilbox-proc",

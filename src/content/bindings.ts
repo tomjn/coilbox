@@ -2372,7 +2372,7 @@ export const contentUndo3doInstall = defineCommand<
  */
 export const content3doInstallStatus = defineCommand<
   { gameDir: string },
-  { backups: number }
+  { backups: number; oldSheets: number }
 >("coilbox-content", "content_3do_install_status");
 
 /**
