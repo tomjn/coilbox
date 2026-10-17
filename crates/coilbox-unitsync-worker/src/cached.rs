@@ -361,6 +361,7 @@ pub fn push_logo(out: &mut Vec<FactionLogoEntry>, side: &str, cached: CachedLogo
         file: cached.file,
         data_uri: cached.data_uri,
         max_dim: cached.max_dim,
+        asset: None,
     });
 }
 

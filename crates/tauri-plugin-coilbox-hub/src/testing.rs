@@ -200,6 +200,11 @@ fn identity_key(identity: &AssetIdentity) -> String {
             variant,
         } => format!("unit\u{0}{game}\u{0}{unit_name}\u{0}{variant}"),
         AssetIdentity::Map { map_name, variant } => format!("map\u{0}{map_name}\u{0}{variant}"),
+        AssetIdentity::Faction {
+            game,
+            faction_key,
+            variant,
+        } => format!("faction\u{0}{game}\u{0}{faction_key}\u{0}{variant}"),
     }
 }
 

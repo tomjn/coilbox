@@ -1,14 +1,20 @@
 import type { GameItem, UnitDatasetEntry } from "@/content/bindings";
 import {
+  unitsyncFactionLogos,
+  unitsyncGameInfo,
   unitsyncScan,
   unitsyncUnitBuildpics,
   unitsyncUnitDataset,
   unitsyncUnitRenderKeys,
 } from "@/content/bindings";
+import { loadBrandingCatalog } from "@/content/branding";
 import { dlRapidReleaseArchives } from "@/downloads/bindings";
+import { publishGameFacts } from "../games/facts";
 import {
+  factsFor,
   type GameSkipReason,
   gamesToSend,
+  type Sendable,
   type SkippedGame,
 } from "../games/factsSweep";
 import {
@@ -31,6 +37,7 @@ import {
   unitsAffordableNow,
   writesLeftNow,
 } from "./budget";
+import { sendFactionLogos } from "./factionLogos";
 import { type AssetKey, assetsTheHubWants } from "./have";
 import { type AssetUpload, uploadAssetsToHub } from "./upload";
 import { RENDER_VERSION } from "./vocabulary";
@@ -106,6 +113,15 @@ import { RENDER_VERSION } from "./vocabulary";
  * maintaining a seed has heard of. So: both, eventually, and the client is the
  * one that does not need anybody to remember to run it.
  *
+ * ## Faction logos (issue #4387)
+ *
+ * Each game's facts go to the hub first, then its faction logos. The hub makes a
+ * faction's row from the facts and answers a logo for a faction it has no row
+ * for with a 404, so the order is not a courtesy. Sending the facts here costs
+ * one request that the hub answers `unchanged` when the Game facts button has
+ * already run, and it means this button works on a machine that never pressed
+ * that one.
+ *
  * ## Which games
  *
  * `gamesToSend` decides, which is the same rule the game facts sweep uses:
@@ -159,6 +175,10 @@ export interface GamePictures {
   covered: number;
   /** Pictures the hub took. */
   written: number;
+  /** Faction logos the hub took. Left off when there were none, and kept apart
+   *  from {@link written} because the hub counts them against their own hourly
+   *  allowance. */
+  logos?: number;
   /** Why the run did less than the whole game, when it did. */
   stopped?: string;
 }
@@ -178,6 +198,14 @@ export interface PictureSweepReport extends HubSweepReport<SkippedGame> {
 export interface PictureSweepTools {
   scan: typeof unitsyncScan;
   dataset: typeof unitsyncUnitDataset;
+  /** A game's sides, which its faction keys are made from. */
+  info: typeof unitsyncGameInfo;
+  /** The branding catalog the game facts' links are matched against. */
+  branding: typeof loadBrandingCatalog;
+  /** Send a game's facts, which the hub needs before it takes a faction logo. */
+  publishFacts: typeof publishGameFacts;
+  /** Every faction logo in a game, extracted and encoded ready to offer. */
+  factionLogos: typeof unitsyncFactionLogos;
   renderKeys: typeof unitsyncUnitRenderKeys;
   ask: typeof assetsTheHubWants;
   releases: typeof dlRapidReleaseArchives;
@@ -202,6 +230,10 @@ export interface PictureSweepTools {
 export const livePictureSweepTools: PictureSweepTools = {
   scan: unitsyncScan,
   dataset: unitsyncUnitDataset,
+  info: unitsyncGameInfo,
+  branding: loadBrandingCatalog,
+  publishFacts: publishGameFacts,
+  factionLogos: unitsyncFactionLogos,
   renderKeys: unitsyncUnitRenderKeys,
   ask: assetsTheHubWants,
   releases: dlRapidReleaseArchives,
@@ -326,18 +358,19 @@ export async function sweepGamePictures(
   };
   if (sendable.length === 0) return report;
 
+  const brandingEntries = await tools.branding();
   for (const [at, entry] of sendable.entries()) {
     const name = entry.game.name;
     try {
       const one = await sweepOneGame(
         { hubUrl, enginePath, dataDir },
-        entry.game,
-        entry.shortname,
+        entry,
         at,
         sendable.length,
         onProgress,
         tools,
         report.errors,
+        brandingEntries,
       );
       report.games.push(one);
     } catch (e) {
@@ -362,17 +395,33 @@ export async function sweepGamePictures(
 /** One game, surveyed and then filled as far as the hour allows. */
 async function sweepOneGame(
   target: PictureSweepTarget,
-  game: GameItem,
-  shortname: string,
+  entry: Sendable,
   at: number,
   total: number,
   onProgress: (progress: PictureSweepProgress) => void,
   tools: PictureSweepTools,
   errors: string[],
+  brandingEntries: Awaited<ReturnType<typeof loadBrandingCatalog>>,
 ): Promise<GamePictures> {
   const { hubUrl, enginePath, dataDir } = target;
+  const { game, shortname } = entry;
   const archive = game.primaryArchive.name;
   const mount = { enginePath, dataDir, gameArchive: archive };
+
+  onProgress({ phase: "reading", done: at, total, game: game.name });
+
+  const dataset = await tools.dataset(mount);
+  errors.push(...dataset.errors);
+
+  // The game's facts, then its faction logos (issue #4387).
+  const logos = await sendLogos(
+    target,
+    entry,
+    dataset.units,
+    brandingEntries,
+    tools,
+    errors,
+  );
   const blank: GamePictures = {
     game: game.name,
     shortname,
@@ -380,12 +429,9 @@ async function sweepOneGame(
     wanted: 0,
     covered: 0,
     written: 0,
+    ...(logos > 0 ? { logos } : {}),
   };
 
-  onProgress({ phase: "reading", done: at, total, game: game.name });
-
-  const dataset = await tools.dataset(mount);
-  errors.push(...dataset.errors);
   const units = rosterUnits(dataset.units);
   if (units.length === 0) return blank;
 
@@ -469,6 +515,62 @@ async function sweepOneGame(
     written: surveyed.written + filled.written,
     ...(filled.stopped ? { stopped: filled.stopped } : {}),
   };
+}
+
+/**
+ * Send a game's facts and then its faction logos, and say how many logos the hub
+ * took (issue #4387).
+ *
+ * The facts go first because the hub makes a faction's row from them and refuses
+ * a logo for one it has none for. A faction the hub refused inside the facts is
+ * left out of the logos for the same reason.
+ *
+ * Nothing here stops the unit pictures. If the facts or the logos fail, the
+ * reason goes into `errors` and the game carries on to its units, since the hub
+ * does not need the logos for those.
+ */
+async function sendLogos(
+  target: PictureSweepTarget,
+  entry: Sendable,
+  dataset: readonly UnitDatasetEntry[],
+  brandingEntries: Awaited<ReturnType<typeof loadBrandingCatalog>>,
+  tools: PictureSweepTools,
+  errors: string[],
+): Promise<number> {
+  // A game with no units is not a game the hub could hold facts for, and the
+  // facts sweep skips it for the same reason.
+  if (dataset.length === 0) return 0;
+  const { hubUrl, enginePath, dataDir } = target;
+  const gameArchive = entry.game.primaryArchive.name;
+  try {
+    const info = await tools.info({ enginePath, dataDir, gameArchive });
+    errors.push(...info.errors);
+    const facts = factsFor(entry, dataset, info.sides, brandingEntries);
+    const results = await tools.publishFacts(hubUrl, facts);
+    const refused = new Set(
+      results
+        .filter((one) => one.kind === "faction" && one.outcome === "refused")
+        .map((one) => one.name),
+    );
+    const factions = (facts.factions ?? []).filter(
+      (one) => !refused.has(one.key) && !refused.has(one.name),
+    );
+    const pass = await sendFactionLogos(
+      { hubUrl, enginePath, dataDir, gameArchive },
+      entry.shortname,
+      factions,
+      { logos: tools.factionLogos, ask: tools.ask, upload: tools.upload },
+    );
+    errors.push(...pass.errors);
+    return pass.written;
+  } catch (e) {
+    errors.push(
+      `${entry.game.name}: faction logos were not sent. ${
+        e instanceof Error ? e.message : String(e)
+      }`,
+    );
+    return 0;
+  }
 }
 
 /** What the build pic pass came to. */
@@ -565,20 +667,31 @@ async function sendBuildpics(
 
 /** The have check's question for one ready upload. */
 function keyOf(asset: AssetUpload): AssetKey {
-  return asset.keyed_on === "unit"
-    ? {
+  switch (asset.keyed_on) {
+    case "unit":
+      return {
         keyed_on: "unit",
         game: asset.game,
         unit_name: asset.unit_name,
         variant: asset.variant,
         source_hash: asset.source_hash,
-      }
-    : {
+      };
+    case "faction":
+      return {
+        keyed_on: "faction",
+        game: asset.game,
+        faction_key: asset.faction_key,
+        variant: asset.variant,
+        source_hash: asset.source_hash,
+      };
+    case "map":
+      return {
         keyed_on: "map",
         map_name: asset.map_name,
         variant: asset.variant,
         source_hash: asset.source_hash,
       };
+  }
 }
 
 /** The same name `picturesWanted` answers in, so the two sets can be compared. */
@@ -618,13 +731,22 @@ export function pictureSweepSummary(report: PictureSweepReport): string {
     (sum, one) => sum + Math.max(0, one.wanted - one.covered),
     0,
   );
+  const logos = report.games.reduce((sum, one) => sum + (one.logos ?? 0), 0);
+  const logoNote =
+    logos === 0
+      ? ""
+      : logos === 1
+        ? " Sent one faction logo."
+        : ` Sent ${logos} faction logos.`;
 
   if (written === 0 && left === 0) {
-    return "The hub already has a picture of every unit in your games.";
+    return `The hub already has a picture of every unit in your games.${logoNote}`;
   }
   const sent =
     written === 1 ? "Sent one picture." : `Sent ${written} pictures.`;
-  if (left === 0) return `${sent} The hub now has every unit in your games.`;
+  if (left === 0) {
+    return `${sent}${logoNote} The hub now has every unit in your games.`;
+  }
   const units = left === 1 ? "unit is" : "units are";
-  return `${sent} ${left} more ${units} still waiting. Press it again later to carry on.`;
+  return `${sent}${logoNote} ${left} more ${units} still waiting. Press it again later to carry on.`;
 }

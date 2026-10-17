@@ -7,6 +7,7 @@ import {
   ChevronUp,
   Copy,
   Crosshair,
+  Cylinder,
   FlipHorizontal2,
   FlipVertical2,
   ImageIcon,
@@ -158,6 +159,7 @@ import { parentOptions, reparentPiece } from "../reparent";
 import { type Axis, resizePackBlock } from "../resizePackBlock";
 import { unringPiece } from "../ring";
 import { ringMembers } from "../ringSet";
+import { newRoundShape, type RoundKind } from "../roundShape";
 import { bakedPieces, sitOnGround, unitBounds } from "../s3oBuild";
 import type {
   NanoStyle,
@@ -165,6 +167,7 @@ import type {
   StandInTrack,
 } from "../scriptPlayback";
 import { dragPiece, freeMoved, type Seat, typedTransform } from "../seat";
+import { isRoundShapeKind, type LegoShape } from "../shapes";
 import { isShortcut, shortcutLabel } from "../shortcuts";
 import { skeletonProblems } from "../skeletonChecks";
 import { applyProportions } from "../skeletonEdit";
@@ -208,6 +211,7 @@ import type {
 import { SaveModelPopover } from "./components/SaveModelPopover";
 import { ScriptTab } from "./components/ScriptTab";
 import { SetPanel } from "./components/SetPanel";
+import { ShapeFields } from "./components/ShapeFields";
 import { StripResizer } from "./components/StripResizer";
 import { SwapModuleDrawer } from "./components/SwapModuleDrawer";
 import { SwapPartDrawer } from "./components/SwapPartDrawer";
@@ -622,6 +626,51 @@ function Builder({ id }: { id: string | undefined }) {
       };
     });
     queueTwin(pieceId);
+  }
+
+  /**
+   * Add a cylinder or a tube at the selected piece's origin, as a part added
+   * with Alt is. It is sized in the piece panel. #3337 moves shapes into the
+   * strip beside the parts.
+   */
+  function addShape(kind: RoundKind) {
+    if (!draft || !pack) return;
+    const shape = newRoundShape(kind, draft, pack);
+    if (!shape) return;
+    const pieceId = crypto.randomUUID();
+    edit((project) => ({
+      ...project,
+      pieces: [
+        ...project.pieces,
+        {
+          id: pieceId,
+          name: uniquePieceName(
+            kind,
+            project.pieces.map((piece) => piece.name),
+          ),
+          parentId: selectedId ?? project.rootPieceId,
+          partId: null,
+          shape,
+          position: [0, 0, 0],
+          rotation: [0, 0, 0],
+          scale: [1, 1, 1],
+        },
+      ],
+    }));
+    queueTwin(pieceId);
+    setSelectedId(pieceId);
+  }
+
+  /** Resize the selected cylinder or tube from the piece panel. */
+  function reshapeSelected(shape: LegoShape) {
+    if (!selectedId) return;
+    const pieceId = selectedId;
+    place([pieceId], (project) => ({
+      ...project,
+      pieces: project.pieces.map((piece) =>
+        piece.id === pieceId ? { ...piece, shape } : piece,
+      ),
+    }));
   }
 
   /**
@@ -2255,6 +2304,27 @@ function Builder({ id }: { id: string | undefined }) {
                   />
                 ) : null}
 
+                {stripOpen &&
+                effectiveStrip === "inventory" &&
+                (pack?.manifest.swatches?.length ?? 0) > 0 ? (
+                  <ButtonGroup aria-label="Add a shape">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => addShape("cylinder")}
+                    >
+                      <Cylinder size={14} /> Cylinder
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => addShape("tube")}
+                    >
+                      Tube
+                    </Button>
+                  </ButtonGroup>
+                ) : null}
+
                 {stripOpen ? (
                   <Button
                     size="icon"
@@ -2674,6 +2744,14 @@ function Builder({ id }: { id: string | undefined }) {
                             raw={raw}
                             pieceId={selected.id}
                           />
+                          {selected.shape &&
+                          isRoundShapeKind(selected.shape.kind) ? (
+                            <ShapeFields
+                              key={selected.id}
+                              shape={selected.shape}
+                              onChange={reshapeSelected}
+                            />
+                          ) : null}
                           {selected.meshBox ? (
                             <Button
                               size="sm"

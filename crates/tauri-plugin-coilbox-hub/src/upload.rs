@@ -227,12 +227,19 @@ impl AssetUpload {
                 variant,
             } => format!("{game}'s {unit_name} {variant}"),
             AssetIdentity::Map { map_name, variant } => format!("{map_name}'s {variant}"),
+            AssetIdentity::Faction {
+                game,
+                faction_key,
+                variant,
+            } => format!("{game}'s {faction_key} {variant}"),
         }
     }
 
     fn variant(&self) -> &str {
         match &self.identity {
-            AssetIdentity::Unit { variant, .. } | AssetIdentity::Map { variant, .. } => variant,
+            AssetIdentity::Unit { variant, .. }
+            | AssetIdentity::Map { variant, .. }
+            | AssetIdentity::Faction { variant, .. } => variant,
         }
     }
 
@@ -455,6 +462,7 @@ fn check(asset: &AssetUpload, bytes: u64) -> Result<(), String> {
     let keyed_on = match asset.identity {
         AssetIdentity::Unit { .. } => KeyedOn::Unit,
         AssetIdentity::Map { .. } => KeyedOn::Map,
+        AssetIdentity::Faction { .. } => KeyedOn::Faction,
     };
     if class.keyed_on != keyed_on {
         return Err(format!(
@@ -507,7 +515,9 @@ fn check(asset: &AssetUpload, bytes: u64) -> Result<(), String> {
         ));
     }
     if !is_map && extent {
-        return Err(format!("{what} is a unit picture carrying a map's size."));
+        return Err(format!(
+            "{what} is not a map picture and carries a map's size."
+        ));
     }
 
     let range = (asset.world_height_min, asset.world_height_max);
@@ -1324,6 +1334,36 @@ mod tests {
         );
     }
 
+    /// The faction logo declaration carries the issue's fields and no others:
+    /// the hub refuses `width`, `height`, `hash`, `map_*` and `unit_name` with a
+    /// 400 (issue #4387).
+    #[test]
+    fn a_faction_logo_declaration_has_exactly_the_fields_the_hub_takes() {
+        let logo = AssetUpload {
+            identity: AssetIdentity::Faction {
+                game: "bar".into(),
+                faction_key: "armada".into(),
+                variant: "logo".into(),
+            },
+            source_hash: "src-f".into(),
+            encode_profile: "webp-lossless-128".into(),
+            origin: AssetOrigin::Extracted,
+            mime: "image/webp".into(),
+            source_archive: "Beyond All Reason test-1.sdd".into(),
+            map_width: None,
+            map_height: None,
+            world_height_min: None,
+            world_height_max: None,
+            path: PathBuf::from("/tmp/never-sent.webp"),
+        };
+        assert_eq!(
+            declaration_json(&logo, 321).unwrap(),
+            r#"{"keyed_on":"faction","game":"bar","faction_key":"armada","variant":"logo","source_hash":"src-f","encode_profile":"webp-lossless-128","origin":"extracted","mime":"image/webp","source_archive":"Beyond All Reason test-1.sdd","bytes":321}"#
+        );
+        check(&logo, 321).expect("a logo within the class is sendable");
+        assert!(check(&logo, 65537).unwrap_err().contains("at most 65536"));
+    }
+
     #[test]
     fn the_route_is_built_off_the_configured_base() {
         assert_eq!(
@@ -1471,7 +1511,39 @@ mod tests {
         asset.map_width = Some(8192);
         asset.map_height = Some(8192);
         let refused = check(&asset, 9).unwrap_err();
-        assert!(refused.contains("carrying a map's size"), "{refused}");
+        assert!(refused.contains("carries a map's size"), "{refused}");
+    }
+
+    fn faction_logo(path: PathBuf) -> AssetUpload {
+        AssetUpload {
+            identity: AssetIdentity::Faction {
+                game: "bar".into(),
+                faction_key: "armada".into(),
+                variant: "logo".into(),
+            },
+            source_hash: "src-f".into(),
+            encode_profile: "webp-lossless-128".into(),
+            origin: AssetOrigin::Extracted,
+            mime: "image/webp".into(),
+            source_archive: "Beyond All Reason test-1.sdd".into(),
+            map_width: None,
+            map_height: None,
+            world_height_min: None,
+            world_height_max: None,
+            path,
+        }
+    }
+
+    /// A faction logo is accepted with no size and refused with a map's size.
+    #[test]
+    fn a_faction_logo_carries_no_map_size() {
+        let dir = asset_dir("logoextent");
+        let mut asset = faction_logo(file(&dir, "a.webp", 9));
+        check(&asset, 9).unwrap();
+        asset.map_width = Some(8192);
+        asset.map_height = Some(8192);
+        let refused = check(&asset, 9).unwrap_err();
+        assert!(refused.contains("carries a map's size"), "{refused}");
     }
 
     // -------------------------------------------------------------- uploading

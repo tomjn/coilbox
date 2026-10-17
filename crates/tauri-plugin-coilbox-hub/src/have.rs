@@ -67,7 +67,7 @@ const CONNECT_TIMEOUT: Duration = HTTP_TIMEOUT;
 /// is still far under anything that could be a picture rather than an answer.
 const ANSWER_LIMIT: usize = 1024 * 1024;
 
-/// Which of the hub's two key shapes addresses this picture. They are different
+/// Which of the hub's three key shapes addresses this picture. They are different
 /// shapes on purpose and do not unify, so a caller says which one it means rather
 /// than filling in whichever fields it happens to have.
 ///
@@ -78,6 +78,10 @@ const ANSWER_LIMIT: usize = 1024 * 1024;
 /// `map_name` is the full name unitsync reports from `GetMapName`, version string
 /// and all, and is never split. A map is not scoped to a game, because the same
 /// map archive is used across all of them.
+///
+/// `faction_key` is the key the game's facts gave the faction (issue #4387): the
+/// side name, trimmed and lowercased. The hub creates a faction's row from those
+/// facts and refuses a logo for a faction it has no row for.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "keyed_on", rename_all = "snake_case")]
 pub enum AssetIdentity {
@@ -90,12 +94,19 @@ pub enum AssetIdentity {
         map_name: String,
         variant: String,
     },
+    Faction {
+        game: String,
+        faction_key: String,
+        variant: String,
+    },
 }
 
 impl AssetIdentity {
     fn variant(&self) -> &str {
         match self {
-            Self::Unit { variant, .. } | Self::Map { variant, .. } => variant,
+            Self::Unit { variant, .. }
+            | Self::Map { variant, .. }
+            | Self::Faction { variant, .. } => variant,
         }
     }
 }
@@ -228,6 +239,16 @@ fn check_keys(keys: &[AssetKey]) -> Result<(), String> {
                     return Err(format!("{at} has no map name."));
                 }
             }
+            AssetIdentity::Faction {
+                game, faction_key, ..
+            } => {
+                if game.trim().is_empty() {
+                    return Err(format!("{at} has no game shortname."));
+                }
+                if faction_key.trim().is_empty() {
+                    return Err(format!("{at} has no faction key."));
+                }
+            }
         }
         if key.source_hash.trim().is_empty() {
             return Err(format!(
@@ -243,6 +264,7 @@ fn check_keys(keys: &[AssetKey]) -> Result<(), String> {
         let keyed_on = match key.identity {
             AssetIdentity::Unit { .. } => KeyedOn::Unit,
             AssetIdentity::Map { .. } => KeyedOn::Map,
+            AssetIdentity::Faction { .. } => KeyedOn::Faction,
         };
         if wants != keyed_on {
             return Err(format!(
@@ -407,6 +429,17 @@ mod tests {
         }
     }
 
+    fn faction(game: &str, faction_key: &str, source_hash: &str) -> AssetKey {
+        AssetKey {
+            identity: AssetIdentity::Faction {
+                game: game.into(),
+                faction_key: faction_key.into(),
+                variant: "logo".into(),
+            },
+            source_hash: source_hash.into(),
+        }
+    }
+
     // ------------------------------------------------------------------ shape
 
     /// The body the hub is sent, by the names it insists on. `parseAssetHaveBody`
@@ -556,6 +589,42 @@ mod tests {
         let refused = check_keys(&[unit("", "armsolar", "src-a")]).unwrap_err();
         assert!(refused.contains("shortname"), "{refused}");
         assert!(refused.contains("flag it"), "{refused}");
+    }
+
+    /// The hub's `parseAssetHaveBody` refuses a field it does not know, so a
+    /// faction key is exactly these five and nothing else (issue #4387).
+    #[test]
+    fn a_faction_key_is_the_hubs_own_shape() {
+        let sent = serde_json::to_value(faction("bar", "armada", "src-f")).unwrap();
+        assert_eq!(
+            sent,
+            serde_json::json!({
+                "keyed_on": "faction",
+                "game": "bar",
+                "faction_key": "armada",
+                "variant": "logo",
+                "source_hash": "src-f",
+            })
+        );
+        check_keys(&[faction("bar", "armada", "src-f")]).expect("askable");
+    }
+
+    #[test]
+    fn a_faction_key_needs_a_game_and_a_faction() {
+        let refused = check_keys(&[faction("", "armada", "src-f")]).unwrap_err();
+        assert!(refused.contains("game"), "{refused}");
+        let refused = check_keys(&[faction("bar", " ", "src-f")]).unwrap_err();
+        assert!(refused.contains("faction key"), "{refused}");
+    }
+
+    #[test]
+    fn a_unit_variant_on_a_faction_key_is_refused() {
+        let mut key = faction("bar", "armada", "src-f");
+        if let AssetIdentity::Faction { variant, .. } = &mut key.identity {
+            *variant = "buildpic".into();
+        }
+        let refused = check_keys(&[key]).unwrap_err();
+        assert!(refused.contains("buildpic"), "{refused}");
     }
 
     #[test]
