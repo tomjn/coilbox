@@ -83,7 +83,11 @@ pub const INFO_CACHE_VERSION: u32 = 24;
 /// 4: a model's textures are looked for across the game, its dependencies and
 /// base content rather than in one archive (#4239), and a model cached before
 /// that holds plain faces for every texture a dependency supplies.
-pub const MODEL_CACHE_VERSION: u32 = 4;
+///
+/// 5: a `.3do` face with five or more corners takes its texture's top left at
+/// every corner, as the engine does (#4240), and a model cached before that
+/// holds those faces with the texture stretched over them.
+pub const MODEL_CACHE_VERSION: u32 = 5;
 
 /// Salts the buildpic cache key, independent of the header cache so this cache can
 /// be invalidated on its own. Bump when the icon encoding, cache format, or the
