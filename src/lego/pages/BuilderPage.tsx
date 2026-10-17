@@ -178,6 +178,7 @@ import { useShareModule } from "../useModuleShare";
 import { useRawGeometry } from "../useRawGeometry";
 import { useSymmetry } from "../useSymmetry";
 import { addWeaponModule, pickWeaponParts } from "../weaponModule";
+import { setPieceRole } from "../wheelAxle";
 import { AimPointPanel } from "./components/AimPointPanel";
 import { AnchorList } from "./components/AnchorList";
 import { AnimationPanel } from "./components/AnimationPanel";
@@ -1452,14 +1453,7 @@ function Builder({ id }: { id: string | undefined }) {
   });
 
   function setRole(pieceId: string, role: string | undefined) {
-    edit((project) => ({
-      ...project,
-      pieces: project.pieces.map((piece) => {
-        if (piece.id !== pieceId) return piece;
-        const { role: _dropped, ...rest } = piece;
-        return role ? { ...rest, role } : rest;
-      }),
-    }));
+    edit((project) => setPieceRole(project, pieceId, role));
   }
 
   function renameSelected(name: string) {
