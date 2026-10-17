@@ -7,6 +7,7 @@ import {
   classForVariant,
   ELMOS_PER_BUILD_SQUARE,
   ELMOS_PER_METAL_SAMPLE,
+  FACTION_LOGO_VARIANT,
   fittingBleed,
   MAP_VARIANTS,
   MINIMAP_VARIANT,
@@ -100,6 +101,11 @@ describe("the variant names", () => {
     }
   });
 
+  it("names the one variant a faction has", () => {
+    expect(FACTION_LOGO_VARIANT).toBe("logo");
+    expect(classForVariant(FACTION_LOGO_VARIANT)).toBe(ASSET_CLASSES.logo);
+  });
+
   it("names how the bytes were produced", () => {
     expect([...ASSET_ORIGINS]).toEqual(["extracted", "rendered", "uploaded"]);
   });
@@ -119,6 +125,7 @@ describe("the encode profiles", () => {
     expect(ASSET_CLASSES["overlay:height"].encodeProfile).toBe(
       "webp-lossless-512",
     );
+    expect(ASSET_CLASSES.logo.encodeProfile).toBe("webp-lossless-128");
   });
 
   it("fits the 64 characters the hub's `encode_profile` column takes", () => {
@@ -139,6 +146,14 @@ describe("the dimension caps", () => {
     expect(ASSET_CLASSES.buildpic.maxEdgePx).toBe(256);
     expect(ASSET_CLASSES.render.maxEdgePx).toBe(256);
     expect(ASSET_CLASSES.minimap.maxEdgePx).toBe(512);
+  });
+
+  // 128 is the worker's `ICON_MAX` for a faction emblem. Every Sidepic measured
+  // in Splinter Faction, Balanced Annihilation, Complete Annihilation, Metal
+  // Factions and Spring 1944 is 16px, and the hub draws the logo at 24px.
+  it("caps a faction logo at 128px, which is above the 24px the hub draws it at", () => {
+    expect(ASSET_CLASSES.logo.maxEdgePx).toBe(128);
+    expect(ASSET_CLASSES.logo.maxBytes).toBe(65536);
   });
 
   // 512 is where the terrain mesh stops being able to show more detail, which
@@ -185,6 +200,9 @@ describe("the dimension caps", () => {
 
   it("requires lossless of every class that carries data rather than a picture", () => {
     expect(ASSET_CLASSES.buildpic.lossless).toBe(true);
+    // A logo is a few pixels of flat colour, where lossy compression smears the
+    // edges, so it is lossless although it is a picture.
+    expect(ASSET_CLASSES.logo.lossless).toBe(true);
     expect(ASSET_CLASSES["overlay:metal"].lossless).toBe(true);
     expect(ASSET_CLASSES["overlay:type"].lossless).toBe(true);
     expect(ASSET_CLASSES["overlay:height"].lossless).toBe(true);
@@ -211,6 +229,10 @@ describe("classForVariant", () => {
     for (const variant of MAP_VARIANTS) {
       expect(classForVariant(variant)?.keyedOn).toBe("map");
     }
+  });
+
+  it("keys a faction logo on the game and the faction", () => {
+    expect(classForVariant("logo")?.keyedOn).toBe("faction");
   });
 
   it("has nothing for a variant the hub would refuse", () => {

@@ -9,7 +9,6 @@ import {
   ImageOff,
   Package,
   Pencil,
-  Plus,
   Search,
   Trash2,
 } from "lucide-react";
@@ -25,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { legoThumbUrl } from "../../lib/assetUrl";
 import type { LegoAtlas } from "../atlas";
+import { BODY_PLANS, type BodyPlan, projectFromPlan } from "../bodyPlans";
 import { type LegoProject, newProject } from "../model";
 import { loadPack } from "../pack";
 import { filterGrouped, groupProjects } from "../projectGroups";
@@ -33,6 +33,7 @@ import { deleteProject, saveProject, useLegoProjects } from "../projects";
 import { gameRecordFor, unitGame } from "../unitGame";
 import { GameModelDrawer } from "./components/GameModelDrawer";
 import { ImportDrawer } from "./components/ImportDrawer";
+import { NewUnitPopover } from "./components/NewUnitPopover";
 import { useTestGame } from "./components/useTestGame";
 
 /** Radix's select has no empty value, so "No game" needs one of its own. */
@@ -147,13 +148,14 @@ export default function ProjectsPage() {
     };
   }, []);
 
-  async function create() {
+  /** Starts a unit blank, or from a body plan with its skeleton in place. */
+  async function create(plan: BodyPlan | null) {
     setBusy(true);
     setProblem(null);
     try {
       const pack = await loadPack();
       const picked = games.find((g) => g.primaryArchive.name === newGame);
-      const project = newProject({
+      const options = {
         id: crypto.randomUUID(),
         rootPieceId: crypto.randomUUID(),
         name: `Model ${projects.length + 1}`,
@@ -164,7 +166,13 @@ export default function ProjectsPage() {
         ...(atlas ? { atlas } : {}),
         game: picked ? gameRecordFor(picked, scan.data?.games ?? []) : null,
         now: new Date().toISOString(),
-      });
+      };
+      const project = plan
+        ? projectFromPlan(plan, {
+            ...options,
+            newId: () => crypto.randomUUID(),
+          })
+        : newProject(options);
       await saveProject(project);
       navigate(`/lego/${project.id}`);
     } catch (e) {
@@ -414,9 +422,12 @@ export default function ProjectsPage() {
             <Button variant="outline" onClick={() => setOpening(true)}>
               <FileUp size={16} /> Open a model
             </Button>
-            <Button onClick={create} disabled={busy}>
-              <Plus size={16} /> New model
-            </Button>
+            <NewUnitPopover
+              plans={BODY_PLANS}
+              label="New model"
+              busy={busy}
+              onChoose={(plan) => void create(plan)}
+            />
           </>
         }
       />
@@ -460,9 +471,12 @@ export default function ProjectsPage() {
             Start one, then drop parts into it. Browse what is available under
             Lego Parts.
           </p>
-          <Button onClick={create} disabled={busy}>
-            <Plus size={16} /> New unit
-          </Button>
+          <NewUnitPopover
+            plans={BODY_PLANS}
+            label="New unit"
+            busy={busy}
+            onChoose={(plan) => void create(plan)}
+          />
         </div>
       ) : (
         <div className="flex-1 space-y-6 overflow-y-auto p-6">

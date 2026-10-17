@@ -462,6 +462,7 @@ fn check(asset: &AssetUpload, bytes: u64) -> Result<(), String> {
             match class.keyed_on {
                 KeyedOn::Unit => "unit",
                 KeyedOn::Map => "map",
+                KeyedOn::Faction => "faction",
             }
         ));
     }

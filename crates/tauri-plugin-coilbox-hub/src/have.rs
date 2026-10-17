@@ -263,6 +263,7 @@ fn name_of(keyed_on: KeyedOn) -> &'static str {
     match keyed_on {
         KeyedOn::Unit => "unit",
         KeyedOn::Map => "map",
+        KeyedOn::Faction => "faction",
     }
 }
 
