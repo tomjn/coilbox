@@ -470,13 +470,115 @@ const SEGMENTS_PER_BUMP = 16;
 const MAX_SEGMENTS = 512;
 
 /**
+ * How uneven ground is shaded, as the shader's uniforms: `k` is the bumps'
+ * wavenumber, `2π / width`, and `tan` is how steep they are at their steepest.
+ * Both are 0 for a slope, which the shader then leaves as it was.
+ */
+export interface GroundShading {
+  k: number;
+  tan: number;
+}
+
+export function groundShading(shape: GroundShape): GroundShading {
+  if (shape.kind !== "uneven") return { k: 0, tan: 0 };
+  return {
+    k: (2 * Math.PI) / shape.width,
+    tan: Math.tan((shape.degrees * Math.PI) / 180),
+  };
+}
+
+/**
+ * Contour lines from level ground up to a crest, and the same down to a dip.
+ * 2 puts one ring half way up each bump and one along the level ground
+ * between, which are straight lines crossing between the bumps.
+ */
+const CONTOUR_STEPS = 2;
+
+/** How much darker a dip is drawn, and how much lighter a crest, as a
+ *  multiple of the ground's colour. */
+const GROUND_DIP = 0.55;
+const GROUND_CREST = 1.45;
+/** How much of the ground's colour a contour line takes away. */
+const CONTOUR_DARKEN = 0.45;
+
+/**
+ * Uneven ground's height, slope and contours, worked out per pixel from
+ * `groundHeight`'s formula rather than read off the mesh. The mesh is coarse
+ * far from the origin (#4160), down to a couple of rows a bump, and
+ * its normals smear a bump into a wave there. The formula does not.
+ *
+ * Three things show the shape. The light falls on the formula's own normal,
+ * so each bump's sunward side is bright and its far side in shade. The colour
+ * runs from dark in a dip to light on a crest. And a dark line marks each
+ * contour. Where a bump is smaller than a pixel all three fade back to the
+ * mesh's own shading, which would otherwise shimmer.
+ */
+function shadeUnevenGround(
+  material: THREE.MeshLambertMaterial,
+  shading: GroundShading,
+): void {
+  const uniforms = {
+    groundK: { value: shading.k },
+    groundTan: { value: shading.tan },
+  };
+  material.userData.groundShading = uniforms;
+  material.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, uniforms);
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        "#include <common>",
+        "#include <common>\nvarying vec2 vGroundXZ;",
+      )
+      .replace(
+        "#include <begin_vertex>",
+        "#include <begin_vertex>\nvGroundXZ = position.xz;",
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        `#include <common>
+uniform float groundK;
+uniform float groundTan;
+varying vec2 vGroundXZ;`,
+      )
+      .replace(
+        "#include <normal_fragment_maps>",
+        `#include <normal_fragment_maps>
+if (groundTan > 0.0) {
+  vec2 p = vGroundXZ * groundK;
+  // Radians of bump per pixel. A bump is 2 pi, so past 1 there are too few
+  // pixels to draw one and the detail fades out.
+  float detail = 1.0 - smoothstep(0.5, 1.0, length(fwidth(p)));
+  float h = sin(p.x) * cos(p.y);
+  vec3 up = normalize(vec3(
+    -groundTan * cos(p.x) * cos(p.y),
+    1.0,
+    groundTan * sin(p.x) * sin(p.y)
+  ));
+  normal = normalize(mix(normal, normalize(mat3(viewMatrix) * up), detail));
+  float lift = mix(1.0, mix(${GROUND_DIP.toFixed(2)}, ${GROUND_CREST.toFixed(2)}, h * 0.5 + 0.5), detail);
+  float level = h * ${CONTOUR_STEPS.toFixed(1)};
+  float width = fwidth(level);
+  float onLine = 1.0 - smoothstep(0.5, 1.5, abs(fract(level + 0.5) - 0.5) / max(width, 1e-4));
+  // A line wider than a third of the gap to the next one is mush, so fade it.
+  onLine *= 1.0 - smoothstep(0.15, 0.35, width);
+  // The top step is the crest or the dip itself, a point rather than a ring.
+  onLine *= 1.0 - step(${CONTOUR_STEPS.toFixed(1)} - 0.5, abs(level));
+  diffuseColor.rgb *= lift * (1.0 - ${CONTOUR_DARKEN.toFixed(2)} * onLine * detail);
+}`,
+      );
+  };
+}
+
+/**
  * A ground with height in it, in its own mesh: the terrain's mottle and fade
  * over a displaced plane.
  *
  * Lit, unlike the flat terrain, because an unlit surface with height in it
  * shows no height: the mottle is all there is to see. And it writes depth, so
  * a foot that reaches into a hill disappears into it, which is the point of
- * standing a unit on one.
+ * standing a unit on one. Uneven ground is shaded by its height too, see
+ * `shadeUnevenGround`.
  */
 export function buildShapedTerrain(
   shape: GroundShape,
@@ -486,6 +588,7 @@ export function buildShapedTerrain(
     map: terrainTexture(),
     transparent: true,
   });
+  shadeUnevenGround(material, groundShading(shape));
   const mesh = new THREE.Mesh(shapedGeometry(shape, reachElmos), material);
   mesh.renderOrder = -1;
   mesh.raycast = () => {};
@@ -501,6 +604,11 @@ export function reshapeTerrain(
 ): void {
   mesh.geometry.dispose();
   mesh.geometry = shapedGeometry(shape, reachElmos);
+  const shading = groundShading(shape);
+  const uniforms = (mesh.material as THREE.MeshLambertMaterial).userData
+    .groundShading;
+  uniforms.groundK.value = shading.k;
+  uniforms.groundTan.value = shading.tan;
 }
 
 /** The surface is built at its drawn size rather than scaled, because its

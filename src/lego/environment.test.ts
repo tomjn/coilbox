@@ -15,6 +15,7 @@ import {
   groundById,
   groundHeight,
   groundNormal,
+  groundShading,
   groundShape,
   reshapeTerrain,
   skyTexture,
@@ -265,6 +266,68 @@ describe("buildShapedTerrain", () => {
     mesh.raycast(new THREE.Raycaster(), hits);
     expect(hits).toEqual([]);
     expect(mesh.renderOrder).toBeLessThan(0);
+  });
+});
+
+// Issue #4171: the uneven ground did not show where its bumps rise and fall.
+describe("uneven ground's shading", () => {
+  type Uniforms = Record<string, { value: number }>;
+  const uniforms = (mesh: THREE.Mesh) =>
+    (mesh.material as THREE.MeshLambertMaterial).userData
+      .groundShading as Uniforms;
+
+  it("shades by the same bumps groundHeight draws", () => {
+    const shape = { kind: "uneven", degrees: 20, width: 64 } as const;
+    const { k, tan } = groundShading(shape);
+    // The shader's height, scaled back to elmos, is groundHeight's.
+    for (const [x, z] of [
+      [5, 9],
+      [-30, 17],
+      [100, -41],
+    ])
+      expect((tan / k) * Math.sin(k * x) * Math.cos(k * z)).toBeCloseTo(
+        groundHeight(shape, x, z),
+        9,
+      );
+    expect(uniforms(buildShapedTerrain(shape)).groundK.value).toBe(k);
+    expect(uniforms(buildShapedTerrain(shape)).groundTan.value).toBe(tan);
+  });
+
+  it("leaves a slope as it was", () => {
+    expect(groundShading({ kind: "slope", degrees: 30 })).toEqual({
+      k: 0,
+      tan: 0,
+    });
+  });
+
+  it("follows the shape it is reshaped to", () => {
+    const mesh = buildShapedTerrain({ kind: "slope", degrees: 10 });
+    const uneven = { kind: "uneven", degrees: 30, width: 16 } as const;
+    reshapeTerrain(mesh, uneven);
+    expect(uniforms(mesh).groundK.value).toBe(groundShading(uneven).k);
+    expect(uniforms(mesh).groundTan.value).toBe(groundShading(uneven).tan);
+    reshapeTerrain(mesh, { kind: "slope", degrees: 10 });
+    expect(uniforms(mesh).groundTan.value).toBe(0);
+  });
+
+  it("finds every place it hooks into three's shader", () => {
+    const material = buildShapedTerrain({
+      kind: "uneven",
+      degrees: 20,
+      width: 32,
+    }).material as THREE.MeshLambertMaterial;
+    const { vertexShader, fragmentShader } = THREE.ShaderLib.lambert;
+    const shader = {
+      uniforms: {},
+      vertexShader,
+      fragmentShader,
+    } as unknown as THREE.WebGLProgramParametersWithUniforms;
+    // The hook never reads the renderer, and the tests have no GL to make one.
+    material.onBeforeCompile(shader, null as unknown as THREE.WebGLRenderer);
+    expect(shader.vertexShader).toContain("vGroundXZ = position.xz");
+    expect(shader.fragmentShader).toContain("uniform float groundTan");
+    expect(shader.fragmentShader).toContain("if (groundTan > 0.0)");
+    expect(shader.uniforms).toHaveProperty("groundK");
   });
 });
 
