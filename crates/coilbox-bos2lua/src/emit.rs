@@ -529,6 +529,9 @@ struct FuncInfo {
     /// first. It is written as a function of its own, which the call-in runs
     /// as a thread.
     waits: bool,
+    /// Whether it begins a script with `start-script`, itself or in a function
+    /// it calls. Whatever runs it has to start those once it waits or finishes.
+    starts: bool,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -606,6 +609,9 @@ struct Program<'a> {
     has_reload: bool,
     /// The functions left out because nothing can reach them, lower-cased.
     dropped: HashSet<String>,
+    /// Whether anything begins a script with `start-script`, whose start the
+    /// Lua holds back until the thread that began it waits or finishes.
+    defers: bool,
     /// The constants something that is written uses, when leaving out the rest.
     live_consts: Option<HashSet<String>>,
     /// The constants declared in radians or elmos.
@@ -893,6 +899,7 @@ impl<'a> Program<'a> {
             taken: HashSet::new(),
             warnings: pre.warnings.clone(),
             has_reload: false,
+            defers: false,
             dropped: HashSet::new(),
             live_consts: None,
             units: HashMap::new(),
@@ -1008,6 +1015,7 @@ impl<'a> Program<'a> {
                     min_args: None,
                     direct: false,
                     waits: false,
+                    starts: false,
                 },
             );
         }
@@ -1026,6 +1034,7 @@ impl<'a> Program<'a> {
 
         // Who calls whom, and with how many arguments.
         let mut blocks_directly: HashMap<String, bool> = HashMap::new();
+        let mut starting: HashSet<String> = HashSet::new();
         let mut calls: HashMap<String, Vec<String>> = HashMap::new();
         for (f, _) in &funcs {
             let lower = f.name.to_lowercase();
@@ -1033,6 +1042,7 @@ impl<'a> Program<'a> {
                 continue;
             }
             let mut blocks = false;
+            let mut starts = false;
             let mut callees = Vec::new();
             walk(&f.body, &mut |k| match k {
                 StmtKind::Sleep(_)
@@ -1040,6 +1050,7 @@ impl<'a> Program<'a> {
                 | StmtKind::WaitMove(..)
                 | StmtKind::WaitScale(_) => blocks = true,
                 StmtKind::Call(name, args) | StmtKind::Start(name, args) => {
+                    starts |= matches!(k, StmtKind::Start(..));
                     let callee = name.to_lowercase();
                     if let Some(info) = p.funcs.get_mut(&callee) {
                         info.called = true;
@@ -1053,6 +1064,9 @@ impl<'a> Program<'a> {
                 _ => {}
             });
             blocks_directly.insert(lower.clone(), blocks);
+            if starts {
+                starting.insert(lower.clone());
+            }
             calls.insert(lower, callees);
         }
         let mut blocking: HashSet<String> = blocks_directly
@@ -1060,15 +1074,18 @@ impl<'a> Program<'a> {
             .filter(|(_, b)| **b)
             .map(|(n, _)| n.clone())
             .collect();
-        loop {
-            let before = blocking.len();
-            for (name, callees) in &calls {
-                if callees.iter().any(|c| blocking.contains(c)) {
-                    blocking.insert(name.clone());
+        p.defers = !starting.is_empty();
+        for set in [&mut blocking, &mut starting] {
+            loop {
+                let before = set.len();
+                for (name, callees) in &calls {
+                    if callees.iter().any(|c| set.contains(c)) {
+                        set.insert(name.clone());
+                    }
                 }
-            }
-            if blocking.len() == before {
-                break;
+                if set.len() == before {
+                    break;
+                }
             }
         }
         let has_reload = p
@@ -1078,6 +1095,7 @@ impl<'a> Program<'a> {
         p.has_reload = has_reload;
         for (name, info) in p.funcs.iter_mut() {
             info.blocks = blocking.contains(name);
+            info.starts = starting.contains(name);
             if let Some(Role::Callin(s)) = &info.role {
                 if s.ret != Ret::Nothing && info.blocks && !s.threaded {
                     info.waits = unfinished(s).is_some();
@@ -1212,6 +1230,73 @@ impl<'a> Program<'a> {
 }
 
 /// The Lua that keeps the shared unit values the engine stopped keeping.
+/// The helpers that hold a `start-script` back, any one of which needs the
+/// queue and the functions that empty it.
+const STARTING_HELPERS: &[&str] = &[
+    "startScript",
+    "thenStart",
+    "Sleep",
+    "WaitForTurn",
+    "WaitForMove",
+    "WaitForScale",
+    "startsHeld",
+];
+
+const STARTING: &str = "
+-- COB runs a script begun with start-script once the thread that began it
+-- waits or finishes (CobThread.cpp:372-388), where StartThread runs it at once.
+-- So each one waits here until then, and starts in the order it was begun.
+local starting = {}
+local startsHeld = false
+local startScripts
+local function runStarted(fn, ...)
+\tfn(...)
+\tstartScripts()
+end
+function startScripts()
+\twhile #starting > 0 and not startsHeld do
+\t\tStartThread(runStarted, unpack(table.remove(starting, 1)))
+\tend
+end
+";
+
+const START_SCRIPT: &str = "local function startScript(...)
+\tstarting[#starting + 1] = {...}
+end
+";
+
+const THEN_START: &str =
+    "-- Hands back what a call-in answered once the scripts it began have started.
+local function thenStart(...)
+\tstartScripts()
+\treturn ...
+end
+";
+
+const WAIT_SLEEP: &str = "local function Sleep(ms)
+\tstartScripts()
+\tUnitScript.Sleep(ms)
+end
+";
+
+const WAIT_TURN: &str = "local function WaitForTurn(piece, axis)
+\tif UnitScript.IsInTurn(piece, axis) then startScripts() end
+\tUnitScript.WaitForTurn(piece, axis)
+end
+";
+
+const WAIT_MOVE: &str = "local function WaitForMove(piece, axis)
+\tif UnitScript.IsInMove(piece, axis) then startScripts() end
+\tUnitScript.WaitForMove(piece, axis)
+end
+";
+
+const WAIT_SCALE: &str = "local function WaitForScale(piece)
+\tif UnitScript.IsInScale(piece) then startScripts() end
+\tUnitScript.WaitForScale(piece)
+end
+";
+
 const SHARED_VALUES: &str = include_str!("shared_values.lua");
 
 struct Writer<'p, 'a> {
@@ -1259,7 +1344,7 @@ struct Writer<'p, 'a> {
 }
 
 impl<'p, 'a> Writer<'p, 'a> {
-    const HELPER_NAMES: [&'static str; 9] = [
+    const HELPER_NAMES: [&'static str; 16] = [
         PIECES,
         "COB_ANGLE",
         "COB_LINEAR",
@@ -1269,6 +1354,13 @@ impl<'p, 'a> Writer<'p, 'a> {
         "cobAllied",
         "cobGet",
         "cobSet",
+        "starting",
+        "startScripts",
+        "runStarted",
+        "startScript",
+        "thenStart",
+        "WaitForScale",
+        "startsHeld",
     ];
 
     fn new(p: &'p Program<'a>, mode: Mode) -> Self {
@@ -1361,6 +1453,21 @@ impl<'p, 'a> Writer<'p, 'a> {
         }
         if helpers.contains("cobAllied") {
             lua.push_str(SHARED_VALUES);
+        }
+        if helpers.contains("starting") {
+            lua.push_str(STARTING);
+            for (name, text) in [
+                ("startScript", START_SCRIPT),
+                ("thenStart", THEN_START),
+                ("Sleep", WAIT_SLEEP),
+                ("WaitForTurn", WAIT_TURN),
+                ("WaitForMove", WAIT_MOVE),
+                ("WaitForScale", WAIT_SCALE),
+            ] {
+                if helpers.contains(name) {
+                    lua.push_str(text);
+                }
+            }
         }
         if (!helpers.is_empty() || self.sleeps) && !out.starts_with('\n') {
             lua.push('\n');
@@ -1514,6 +1621,10 @@ impl<'p, 'a> Writer<'p, 'a> {
         }
         if name == "cobGet" || name == "cobSet" {
             self.helpers.extend(["cobAllied", "cobGet", "cobSet"]);
+        }
+        if STARTING_HELPERS.contains(&name) {
+            self.helpers
+                .extend(["starting", "startsHeld", "startScripts", "runStarted"]);
         }
         self.refs.insert(name.to_string());
         name.to_string()
@@ -2259,12 +2370,13 @@ impl<'p, 'a> Writer<'p, 'a> {
 
     fn func(&mut self, f: &Func, trailing: &Option<Comment>) {
         let info = &self.p.funcs[&f.name.to_lowercase()];
-        let (lua_name, role, direct, min_args, waits) = (
+        let (lua_name, role, direct, min_args, waits, starts) = (
             info.lua.clone(),
             info.role.clone(),
             info.direct,
             info.min_args,
             info.waits,
+            info.starts,
         );
         self.refs.clear();
         self.locals.clear();
@@ -2435,7 +2547,11 @@ impl<'p, 'a> Writer<'p, 'a> {
                     };
                     prologue.extend(line);
                 }
-                let name = if waits { &lua_name } else { &spec.lua };
+                let name = if waits || starts {
+                    &lua_name
+                } else {
+                    &spec.lua
+                };
                 signature = format!("function {name}({})", args.join(", "));
                 self.ret = Some((spec.ret.clone(), params.clone(), args));
             }
@@ -2484,6 +2600,10 @@ impl<'p, 'a> Writer<'p, 'a> {
         if waits {
             if let Some(Role::Callin(spec)) = &role {
                 self.waiting_adapter(spec, &lua_name);
+            }
+        } else if direct && starts {
+            if let Some(Role::Callin(spec)) = &role {
+                self.starting_adapter(spec, &lua_name);
             }
         }
         if !direct {
@@ -2560,8 +2680,36 @@ impl<'p, 'a> Writer<'p, 'a> {
             Unfinished::Piece(n) => format!("script piece {n}"),
             Unfinished::Expr(_, what) => what.to_string(),
         };
+        let then = if self.starts(target) {
+            format!("\n\t\t{}()", self.helper("startScripts"))
+        } else {
+            String::new()
+        };
         self.adapters.push(format!(
-            "-- {target} may wait before it finishes, and then the engine answers {what}.\nfunction {}({})\n\tlocal answer = {fallback}\n\t{start}(function()\n\t\tanswer = {call}\n\tend)\n\treturn answer\nend\n",
+            "-- {target} may wait before it finishes, and then the engine answers {what}.\nfunction {}({})\n\tlocal answer = {fallback}\n\t{start}(function()\n\t\tanswer = {call}{then}\n\tend)\n\treturn answer\nend\n",
+            spec.lua,
+            args.join(", ")
+        ));
+        self.worst_refs = self.worst_refs.max(self.refs.len());
+        self.refs = saved;
+    }
+
+    /// A call-in handing on to `target`, on a thread of its own or not. A
+    /// target that begins scripts starts them once it finishes, if it has not
+    /// waited first.
+    /// `script.X` for a call-in written straight out but for the scripts it
+    /// begins, which start once it has finished, as COB starts them.
+    fn starting_adapter(&mut self, spec: &Spec, target: &str) {
+        let saved = std::mem::take(&mut self.refs);
+        let args: Vec<String> = spec.args.iter().map(|a| a.to_string()).collect();
+        let call = format!("{target}({})", args.join(", "));
+        let body = if spec.ret == Ret::Nothing {
+            format!("{call}\n\t{}()", self.helper("startScripts"))
+        } else {
+            format!("return {}({call})", self.helper("thenStart"))
+        };
+        self.adapters.push(format!(
+            "function {}({})\n\t{body}\nend\n",
             spec.lua,
             args.join(", ")
         ));
@@ -2570,14 +2718,45 @@ impl<'p, 'a> Writer<'p, 'a> {
     }
 
     fn call_line(&mut self, target: &str, values: &[String], thread: bool) -> String {
+        let starts = self.starts(target);
         if thread {
             let start = self.header("StartThread");
             let mut all = vec![target.to_string()];
+            if starts {
+                all.insert(0, self.helper("runStarted"));
+            }
             all.extend(values.iter().cloned());
             format!("{start}({})", all.join(", "))
+        } else if starts {
+            let then = self.helper("thenStart");
+            format!("{then}({target}({}))", values.join(", "))
         } else {
             format!("{target}({})", values.join(", "))
         }
+    }
+
+    /// `start-script`, which COB runs once the thread that began it waits or
+    /// finishes (`CobThread.cpp:372-388`), where `StartThread` runs it at once.
+    fn start_line(&mut self, target: &str, values: &[String]) -> String {
+        let start = self.helper("startScript");
+        let mut all = vec![target.to_string()];
+        all.extend(values.iter().cloned());
+        format!("{start}({})", all.join(", "))
+    }
+
+    /// A call that may wait. When a script begun with `start-script` may be
+    /// held back, this is the Lua's own, which starts it first.
+    fn waiting(&mut self, name: &'static str) -> String {
+        if self.p.defers {
+            self.helper(name)
+        } else {
+            self.header(name)
+        }
+    }
+
+    /// Whether the function written as `lua` begins scripts.
+    fn starts(&self, lua: &str) -> bool {
+        self.p.funcs.values().any(|f| f.lua == lua && f.starts)
     }
 
     /// The call-ins made of more than one BOS function, or of one the engine
@@ -2654,9 +2833,20 @@ impl<'p, 'a> Writer<'p, 'a> {
             .cloned();
         if let Some((reload, blocks)) = reload {
             let mut text = "function script.Create()\n".to_string();
+            // The engine runs Create and then SetMaxReloadTime before any
+            // script Create began (`CobInstance.cpp:231-232`), so those are
+            // held back until both have run.
+            let hold = create.as_ref().is_some_and(|(lua, _)| self.starts(lua));
             if let Some((lua, _)) = &create {
-                let start = self.header("StartThread");
-                text.push_str(&format!("\t{start}({lua})\n"));
+                let call = self.call_line(lua, &[], true);
+                if hold {
+                    let held = self.helper("startsHeld");
+                    text.push_str(&format!(
+                        "\t-- The engine runs SetMaxReloadTime before anything Create starts.\n\t{held} = true\n\t{call}\n\t{held} = false\n"
+                    ));
+                } else {
+                    text.push_str(&format!("\t{call}\n"));
+                }
             }
             let id = self.header("unitID");
             // Its own thread, as the engine runs it for a COB script: started
@@ -2671,8 +2861,12 @@ impl<'p, 'a> Writer<'p, 'a> {
                 true,
             );
             text.push_str(&format!(
-                "\t-- The engine tells a COB script its longest reload once it is created, and\n\t-- does not tell a Lua one, so this asks.\n\t{call}\nend\n"
+                "\t-- The engine tells a COB script its longest reload once it is created, and\n\t-- does not tell a Lua one, so this asks.\n\t{call}\n"
             ));
+            if hold {
+                text.push_str(&format!("\t{}()\n", self.helper("startScripts")));
+            }
+            text.push_str("end\n");
             self.adapters.push(text);
         }
         self.worst_refs = self.worst_refs.max(self.refs.len());
@@ -2942,7 +3136,7 @@ impl<'p, 'a> Writer<'p, 'a> {
                         values.join(", ")
                     ));
                     names.reverse();
-                    let text = self.call_line(&target, &names, true);
+                    let text = self.start_line(&target, &names);
                     self.line(&text);
                     self.indent -= 1;
                     self.code("end", t);
@@ -2950,7 +3144,11 @@ impl<'p, 'a> Writer<'p, 'a> {
                     if reversed {
                         values.reverse();
                     }
-                    let text = self.call_line(&target, &values, start);
+                    let text = if start {
+                        self.start_line(&target, &values)
+                    } else {
+                        format!("{target}({})", values.join(", "))
+                    };
                     self.code(&text, t);
                 }
             }
@@ -3023,9 +3221,13 @@ impl<'p, 'a> Writer<'p, 'a> {
                 self.code(&text, t);
             }
             StmtKind::WaitScale(piece) => {
-                let f = self.header("UnitScript");
+                let f = if self.p.defers {
+                    self.helper("WaitForScale")
+                } else {
+                    format!("{}.WaitForScale", self.header("UnitScript"))
+                };
                 let p = self.piece(piece);
-                self.code(&format!("{f}.WaitForScale({p})"), t);
+                self.code(&format!("{f}({p})"), t);
             }
             StmtKind::Break => {
                 let text = if last { "break" } else { "do break end" };
@@ -3058,11 +3260,12 @@ impl<'p, 'a> Writer<'p, 'a> {
                 }
             }
             StmtKind::WaitTurn(piece, axis) | StmtKind::WaitMove(piece, axis) => {
-                let f = self.header(if matches!(s.kind, StmtKind::WaitTurn(..)) {
+                let name = if matches!(s.kind, StmtKind::WaitTurn(..)) {
                     "WaitForTurn"
                 } else {
                     "WaitForMove"
-                });
+                };
+                let f = self.waiting(name);
                 let p = self.piece(piece);
                 let a = self.axis(*axis);
                 self.code(&format!("{f}({p}, {a})"), t);
@@ -3075,7 +3278,7 @@ impl<'p, 'a> Writer<'p, 'a> {
             }
             StmtKind::Sleep(e) => {
                 self.sleeps = true;
-                let f = self.header("Sleep");
+                let f = self.waiting("Sleep");
                 let v = self.num(e).wrap(P_ADD);
                 self.code(&format!("{f}({v} + {SLEEP_FRAME})"), t);
             }
@@ -3242,7 +3445,9 @@ impl<'p, 'a> Writer<'p, 'a> {
     fn callee(&mut self, name: &str) -> String {
         match self.p.funcs.get(&name.to_lowercase()) {
             Some(info) => match &info.role {
-                Some(Role::Callin(spec)) if info.direct && !info.waits => spec.lua.clone(),
+                Some(Role::Callin(spec)) if info.direct && !info.waits && !info.starts => {
+                    spec.lua.clone()
+                }
                 _ => info.lua.clone(),
             },
             None => {

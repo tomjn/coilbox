@@ -29,7 +29,8 @@ use std::collections::{BTreeSet, HashMap};
 use std::rc::Rc;
 
 use mlua::{
-    Function, Lua, LuaOptions, LuaSerdeExt, MultiValue, StdLib, Table, Thread, ThreadStatus, Value,
+    FromLuaMulti, Function, Lua, LuaOptions, LuaSerdeExt, MultiValue, StdLib, Table, Thread,
+    ThreadStatus, Value,
 };
 use serde::Serialize;
 
@@ -202,7 +203,7 @@ impl RuleValue {
 struct Sim {
     model: Model,
     /// Threads a running thread asked for, with the signal mask each is born
-    /// with. Started before the frame ends.
+    /// with. Started as soon as the thread that asked yields.
     spawned: Vec<(Thread, Vec<Value>, Mask)>,
     /// The mask of the thread running now, as it stands at this moment. A
     /// thread started with `StartThread` is born carrying it, as the unit
@@ -254,6 +255,14 @@ struct Runner {
     origin: String,
 }
 
+/// Why a thread stopped running before it waited or finished.
+enum Stop {
+    /// Its own Lua threw.
+    Lua(mlua::Error),
+    /// The scheduler could not carry on with it, already put into words.
+    Run(String),
+}
+
 enum State {
     /// Resume as soon as the scheduler gets to it.
     Ready,
@@ -265,6 +274,8 @@ enum State {
         axis: usize,
         kind: Wait,
     },
+    /// On the stack: resumed, or waiting for a thread it started to wait.
+    Running,
     Dead,
 }
 
@@ -481,7 +492,7 @@ impl Run {
             }
             _ => (callin.to_string(), Vec::new()),
         };
-        let Ok(Some(function)) = self.script.get::<Option<Function>>(target) else {
+        let Ok(Some(function)) = self.script.get::<Option<Function>>(target.as_str()) else {
             return Probe {
                 callin: callin.to_string(),
                 pieces: Vec::new(),
@@ -493,7 +504,10 @@ impl Run {
         let mut note = None;
         for _ in 0..PROBE_CALLS {
             self.budget.set(FRAME_INSTRUCTIONS);
-            match function.call::<Option<i64>>(MultiValue::from_iter(args.clone())) {
+            match self
+                .call_now(function.clone(), args.clone(), &target)
+                .and_then(|values| Option::<i64>::from_lua_multi(values, &self.lua))
+            {
                 Ok(Some(index)) => {
                     match piece_index(&self.sim.borrow(), index) {
                         Ok(at) => pieces.push(self.sim.borrow().model.pieces[at].name.clone()),
@@ -792,7 +806,14 @@ impl Run {
             );
             return -1;
         };
-        match function.call::<Option<f64>>(passenger) {
+        match self
+            .call_now(
+                function,
+                vec![Value::Number(f64::from(passenger))],
+                "QueryTransport",
+            )
+            .and_then(|values| Option::<f64>::from_lua_multi(values, &self.lua))
+        {
             Ok(Some(piece)) => piece as i64 - 1,
             Ok(None) => {
                 self.sim.borrow_mut().model.note(
@@ -884,7 +905,10 @@ impl Run {
     fn ask_piece(&mut self, callin: &str, args: Vec<Value>) -> i64 {
         let function: Option<Function> = self.script.get(callin).ok().flatten();
         let Some(function) = function else { return -1 };
-        match function.call::<Option<f64>>(MultiValue::from_iter(args)) {
+        match self
+            .call_now(function, args, callin)
+            .and_then(|values| Option::<f64>::from_lua_multi(values, &self.lua))
+        {
             Ok(Some(piece)) => piece as i64 - 1,
             Ok(None) => -1,
             Err(error) => {
@@ -909,7 +933,10 @@ impl Run {
             );
             return -1;
         };
-        match function.call::<Option<f64>>(()) {
+        match self
+            .call_now(function, Vec::new(), "QueryNanoPiece")
+            .and_then(|values| Option::<f64>::from_lua_multi(values, &self.lua))
+        {
             Ok(Some(piece)) => piece as i64 - 1,
             Ok(None) => {
                 self.sim.borrow_mut().model.note(
@@ -1030,24 +1057,86 @@ impl Run {
     }
 
     fn step_thread(&mut self, index: usize) -> Result<(), String> {
-        let args = std::mem::take(&mut self.runners[index].args);
-        // Dead before the resume, so a thread that finishes without yielding is
-        // not left looking runnable.
-        self.runners[index].state = State::Dead;
+        self.drive(index).map(|_| ()).map_err(|stop| match stop {
+            Stop::Lua(error) => format!("{}: {}", self.runners[index].origin, describe(&error)),
+            Stop::Run(error) => error,
+        })
+    }
 
-        self.sim.borrow_mut().current_mask = self.runners[index].mask;
-        let yielded: MultiValue = self.runners[index]
-            .thread
-            .resume(MultiValue::from_iter(args))
-            .map_err(|error| format!("{}: {}", self.runners[index].origin, describe(&error)))?;
+    /// Run one thread until it waits or finishes, and hand back what it
+    /// returned if it finished.
+    ///
+    /// A `StartThread` yields to here, and the new thread runs at once, until
+    /// it first waits, before this one carries on. That is what the engine
+    /// does (`unit_script.lua:384-405`). Signals, a mask and threads the new
+    /// thread starts in that first run are its own, because each resume takes
+    /// up only what happened while it ran.
+    fn drive(&mut self, index: usize) -> Result<Option<MultiValue>, Stop> {
+        let mut args = std::mem::take(&mut self.runners[index].args);
+        // Running rather than ready, so nothing resumes it again while it is
+        // still on the stack, and it still counts against the thread ceiling
+        // while the threads it starts run.
+        self.runners[index].state = State::Running;
+        let thread = self.runners[index].thread.clone();
+        loop {
+            self.sim.borrow_mut().current_mask = self.runners[index].mask;
+            let yielded: MultiValue = thread
+                .resume(MultiValue::from_iter(std::mem::take(&mut args)))
+                .map_err(Stop::Lua)?;
 
-        self.apply_side_effects(index)?;
+            let first_started = self.runners.len();
+            self.apply_side_effects(index).map_err(Stop::Run)?;
+            for started in first_started..self.runners.len() {
+                self.resume(started).map_err(Stop::Run)?;
+            }
 
-        if self.runners[index].thread.status() != ThreadStatus::Resumable {
-            return Ok(());
+            if thread.status() != ThreadStatus::Resumable {
+                self.runners[index].state = State::Dead;
+                return Ok(Some(yielded));
+            }
+            if matches!(yielded.front(), Some(Value::String(kind)) if kind == "start") {
+                continue;
+            }
+            self.runners[index].state = self.read_yield(index, yielded).map_err(Stop::Run)?;
+            return Ok(None);
         }
-        self.runners[index].state = self.read_yield(index, yielded)?;
-        Ok(())
+    }
+
+    /// Call a call-in the engine wants an answer from, straight through as the
+    /// engine does, and return what it returned.
+    ///
+    /// It runs as a thread here only so that a `StartThread` in it can start
+    /// the new thread at once, as it does in the engine. A converted call-in
+    /// whose BOS may wait does exactly that and answers what the thread
+    /// returned before it first waited. The call-in itself may not wait: the
+    /// engine calls it outside any thread, where `Sleep` and the waits raise
+    /// an error (`unit_script.lua:372-373`).
+    fn call_now(
+        &mut self,
+        function: Function,
+        args: Vec<Value>,
+        origin: &str,
+    ) -> mlua::Result<MultiValue> {
+        let thread = self.lua.create_thread(function)?;
+        self.add_runner(thread, args, origin.to_string(), Mask::default())
+            .map_err(mlua::Error::RuntimeError)?;
+        let index = self.runners.len() - 1;
+        match self.drive(index) {
+            Ok(Some(values)) => Ok(values),
+            Ok(None) => {
+                self.runners[index].state = State::Dead;
+                Err(mlua::Error::RuntimeError(format!(
+                    "{origin} waited, and only a thread may wait"
+                )))
+            }
+            Err(stop) => {
+                self.runners[index].state = State::Dead;
+                Err(match stop {
+                    Stop::Lua(error) => error,
+                    Stop::Run(error) => mlua::Error::RuntimeError(error),
+                })
+            }
+        }
     }
 
     /// Take up what the resumed thread asked for while it was running: threads
@@ -1068,7 +1157,13 @@ impl Run {
         };
         for signal in signalled {
             for (other, runner) in self.runners.iter_mut().enumerate() {
-                if other != index && runner.mask.hit_by(signal) {
+                // A thread still on the stack is running, and the engine's
+                // `Signal` only stops threads that are waiting
+                // (`unit_script.lua:421-440`).
+                if other != index
+                    && !matches!(runner.state, State::Running)
+                    && runner.mask.hit_by(signal)
+                {
                     runner.state = State::Dead;
                 }
             }
@@ -1309,6 +1404,9 @@ fn install_unit_script_table(lua: &Lua) -> mlua::Result<()> {
         "WaitForMove",
         "Scale",
         "WaitForScale",
+        "IsInTurn",
+        "IsInMove",
+        "IsInScale",
         "StartThread",
         "Signal",
         "SetSignalMask",
@@ -2391,8 +2489,9 @@ fn install_motion(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
 fn install_threading(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
     let globals = lua.globals();
 
-    // The scheduler starts the thread, so this only records it. `StartThread`
-    // itself is Lua, because only Lua can make the coroutine.
+    // The scheduler starts the thread, so this only records it with the mask it
+    // is born with. `StartThread` itself is Lua, because only Lua can make the
+    // coroutine and yield to the scheduler.
     let state = Rc::clone(sim);
     globals.set(
         "__spawn",
@@ -2896,7 +2995,16 @@ fn bootstrap(lua: &Lua) -> mlua::Result<()> {
         end
         -- Nothing scales in the preview, so there is never a scale to wait for.
         function WaitForScale(piece) return false end
-        function StartThread(fn, ...) __spawn(coroutine.create(fn), ...) end
+        function IsInTurn(piece, axis) return __needswait(piece, axis, "turn") end
+        function IsInMove(piece, axis) return __needswait(piece, axis, "move") end
+        function IsInScale(piece) return false end
+        -- The engine runs the new thread at once, until it first waits, and
+        -- only then returns (`unit_script.lua:384-405`). Yielding hands the
+        -- scheduler the new thread to run before this one carries on.
+        function StartThread(fn, ...)
+            __spawn(coroutine.create(fn), ...)
+            if coroutine.running() then coroutine.yield("start") end
+        end
         "#,
     )
     .set_name("unitscript:bootstrap")
