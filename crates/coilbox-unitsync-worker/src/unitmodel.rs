@@ -639,8 +639,15 @@ fn source_digest_with(
     cache: &mut TextureCache,
     object_name: &str,
 ) -> Result<(String, String), String> {
-    // The game's own archive, which the model is read from.
-    let TextureSource { handle, list } = sources[0];
+    // The archive the model is read from: the game's own, or the first
+    // dependency or base content that has it, the lookup `read_model` makes.
+    let at = fallback_with_model(
+        sources[0].list,
+        sources[1..].iter().map(|source| source.list),
+        object_name,
+    )
+    .map_or(0, |i| i + 1);
+    let TextureSource { handle, list } = sources[at];
     let path = find_model(list, object_name)
         .ok_or_else(|| format!("no model for {object_name:?} under {MODEL_DIR}/"))?;
     let (_, model_bytes) = us
@@ -1949,6 +1956,25 @@ mod tests {
             .expect("digest");
         assert_eq!(without.1, with.1, "the model is the game's either way");
         assert_ne!(without.0, with.0, "the dependency's texture was left out");
+        let _ = std::fs::remove_dir_all(cache.parent().unwrap());
+    }
+
+    /// Issue #4260: a unit whose model only a dependency holds got no digest,
+    /// so it was skipped as having no model and never got a picture.
+    #[test]
+    fn a_model_only_a_dependency_holds_has_a_digest() {
+        let (us, cache) = stub_session("dep-model-digest");
+        let game = listing(&["unittextures/other.png"]);
+        let dependency = ModelArchive {
+            name: "dependency.sdz".into(),
+            handle: 7,
+            list: listing(&["objects3d/armcom.s3o"]),
+            teamtex: Vec::new(),
+        };
+        assert!(source_digest(&us, 1, &game, "ArmCom", &[]).is_err());
+        let fallbacks = std::slice::from_ref(&dependency);
+        let (_, member) = source_digest(&us, 1, &game, "ArmCom", fallbacks).expect("digest");
+        assert_eq!(member, "objects3d/armcom.s3o");
         let _ = std::fs::remove_dir_all(cache.parent().unwrap());
     }
 
