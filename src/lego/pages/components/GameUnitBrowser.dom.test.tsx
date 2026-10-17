@@ -23,6 +23,8 @@ const mocks = vi.hoisted(() => ({
   games: [] as unknown[],
   datasetArchives: [] as (string | undefined)[],
   readS3o: vi.fn(),
+  importS3o: vi.fn(),
+  stageTextures: vi.fn(),
 }));
 
 vi.mock("@/play/config", () => ({
@@ -76,12 +78,16 @@ vi.mock("@/content/config", () => ({
 vi.mock("../../gameImport", () => ({
   stageModel: async (_t: unknown, picked: { member: string }) => ({
     path: `/tmp/${picked.member}`,
-    staged: null,
+    staged: "/tmp",
   }),
+  stageTextures: (...args: unknown[]) => mocks.stageTextures(...args),
+  modelSource: (picked: { archive: string; member: string }) =>
+    `${picked.archive}/${picked.member}`,
 }));
 
 vi.mock("../../bindings", () => ({
   legoReadS3o: (args: unknown) => mocks.readS3o(args),
+  legoImportS3o: (args: unknown) => mocks.importS3o(args),
 }));
 
 import { GameUnitBrowser } from "./GameUnitBrowser";
@@ -121,6 +127,9 @@ beforeEach(() => {
   mocks.games = [sf, xta];
   mocks.datasetArchives = [];
   mocks.readS3o.mockReset();
+  mocks.importS3o.mockReset();
+  mocks.stageTextures.mockReset();
+  mocks.stageTextures.mockResolvedValue(undefined);
 });
 afterEach(cleanup);
 
@@ -190,5 +199,85 @@ describe("GameUnitBrowser", () => {
     fireEvent.click(screen.getByRole("button", { name: /Fusion/ }));
     expect(screen.getByText(/only for .s3o models/)).toBeTruthy();
     expect(mocks.readS3o).not.toHaveBeenCalled();
+  });
+
+  describe("lifting a piece", () => {
+    const imported = (
+      name: string,
+      meshId: string | null,
+      children: unknown[] = [],
+    ) => ({ name, offset: [0, 0, 0], meshId, children });
+
+    function openCommander(onLift: (compound: LegoProject) => Promise<void>) {
+      mocks.readS3o.mockResolvedValue({
+        texture1: "arm_1.dds",
+        texture2: "arm_2.dds",
+        root: piece("base", [piece("turret", [piece("barrel")])]),
+      });
+      mocks.importS3o.mockResolvedValue({
+        radius: 1,
+        height: 1,
+        mid: [0, 0, 0],
+        root: imported("base", "m0", [
+          imported("turret", "m1", [imported("barrel", "m2")]),
+        ]),
+        texture: { key: "aa.dds", name: "arm_1.dds", source: null },
+        texture2: { key: null, name: "", source: null },
+        meshes: 3,
+        vertices: 9,
+        triangles: 3,
+        converted: 0,
+        bytes: 10,
+      });
+      const project = unit({ game: gameRecordFor(sf, [sf, xta]) });
+      render(<GameUnitBrowser project={project} query="" onLift={onLift} />);
+      fireEvent.click(screen.getByRole("button", { name: /Commander/ }));
+    }
+
+    it("lifts the piece and everything under it into the inventory", async () => {
+      const onLift = vi.fn(async (_compound: LegoProject) => {});
+      openCommander(onLift);
+      const lift = await screen.findByRole("button", {
+        name: "Lift turret into the inventory",
+      });
+      fireEvent.click(lift);
+      await waitFor(() => expect(onLift).toHaveBeenCalledTimes(1));
+
+      const compound = onLift.mock.calls[0][0];
+      expect(compound.pieces.map((p) => p.name)).toEqual(["turret", "barrel"]);
+      expect(
+        compound.pieces.every((p) => p.lifted?.game.shortname === "SF"),
+      ).toBe(true);
+      expect(compound.pieces[0].lifted?.unit).toBe("armcom");
+      // The geometry is stored under the module's own id.
+      expect(mocks.importS3o).toHaveBeenCalledWith({
+        path: "/tmp/objects3d/armcom.s3o",
+        id: compound.id,
+      });
+      expect(mocks.stageTextures).toHaveBeenCalled();
+      expect(await screen.findByText("Lifted.")).toBeTruthy();
+    });
+
+    it("says why when the lift fails", async () => {
+      const onLift = vi.fn(async () => {
+        throw new Error("disk full");
+      });
+      openCommander(onLift);
+      fireEvent.click(
+        await screen.findByRole("button", {
+          name: "Lift barrel into the inventory",
+        }),
+      );
+      expect(await screen.findByText(/disk full/)).toBeTruthy();
+    });
+
+    it("offers no lift where the page cannot keep one", async () => {
+      mocks.readS3o.mockResolvedValue({ root: piece("base") });
+      const project = unit({ game: gameRecordFor(sf, [sf, xta]) });
+      render(<GameUnitBrowser project={project} query="" />);
+      fireEvent.click(screen.getByRole("button", { name: /Commander/ }));
+      await screen.findByText("base");
+      expect(screen.queryByRole("button", { name: /^Lift / })).toBeNull();
+    });
   });
 });

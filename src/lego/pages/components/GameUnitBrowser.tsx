@@ -3,11 +3,13 @@
  *
  * Lives in the Inventory as the "Game units" kind. It reads the game the open
  * unit is for and no other (`browseSource`). Rows use the names and build pics
- * of the model picker, and opening one lists its pieces. Lifting a piece into
- * the inventory is #3262 and plugs in where the pieces are listed.
+ * of the model picker, and opening one lists its pieces. Each piece can be
+ * lifted, with everything under it, into the inventory (#3262): see
+ * `liftPiece.ts`.
  */
 
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { Button } from "@picoframe/frame";
+import { ArrowUpFromLine, ChevronDown, ChevronRight } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   useUnitsyncArchiveTree,
@@ -17,8 +19,13 @@ import {
 } from "@/content/config";
 import { UnitIcon } from "@/content/pages/components/UnitIcon";
 import { usePreferredTarget } from "@/play/config";
-import { legoReadS3o } from "../../bindings";
-import { stageModel } from "../../gameImport";
+import { legoImportS3o, legoReadS3o } from "../../bindings";
+import {
+  modelSource,
+  type StagedModel,
+  stageModel,
+  stageTextures,
+} from "../../gameImport";
 import { type GameModelRow, gameModelRows } from "../../gameModels";
 import {
   browseSource,
@@ -27,7 +34,10 @@ import {
   pieceLines,
   searchUnitRows,
 } from "../../gameUnits";
+import type { S3oModel } from "../../importS3o";
+import { liftFromImport } from "../../liftPiece";
 import type { LegoProject } from "../../model";
+import { gameRecordFor } from "../../unitGame";
 
 /** How many rows are drawn at once. A big game has thousands of units, so the
  *  search narrows the list rather than the list growing. */
@@ -36,15 +46,30 @@ const ROW_CAP = 200;
 type Pieces =
   | { state: "loading" }
   | { state: "failed"; message: string }
-  | { state: "ready"; lines: PieceLine[] };
+  | {
+      state: "ready";
+      lines: PieceLine[];
+      /** What the lift reads again: the model on disk and its header. */
+      staged: StagedModel;
+      model: S3oModel;
+      row: GameModelRow;
+    };
+
+/** One piece's lift, shown on its line. */
+type Lift =
+  | { path: string; state: "lifting" }
+  | { path: string; state: "done" }
+  | { path: string; state: "failed"; message: string };
 
 interface Props {
   /** The unit being built. Its game decides which units are listed. */
   project: LegoProject;
   query: string;
+  /** Keeps a lifted piece in the inventory. Absent offers no lift. */
+  onLift?: (module: LegoProject) => Promise<void>;
 }
 
-export function GameUnitBrowser({ project, query }: Props) {
+export function GameUnitBrowser({ project, query, onLift }: Props) {
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const installed = useMemo(() => scan.data?.games ?? [], [scan.data]);
@@ -92,6 +117,7 @@ export function GameUnitBrowser({ project, query }: Props) {
 
   const [openMember, setOpenMember] = useState<string | null>(null);
   const [pieces, setPieces] = useState<Pieces | null>(null);
+  const [lift, setLift] = useState<Lift | null>(null);
   const reads = useRef(0);
 
   // A different game is a different list, so nothing stays open across it.
@@ -100,6 +126,7 @@ export function GameUnitBrowser({ project, query }: Props) {
     reads.current += 1;
     setOpenMember(null);
     setPieces(null);
+    setLift(null);
   }, [archive]);
 
   async function toggle(row: GameModelRow) {
@@ -111,6 +138,7 @@ export function GameUnitBrowser({ project, query }: Props) {
     }
     const thisRead = ++reads.current;
     setOpenMember(row.member);
+    setLift(null);
     if (!/\.s3o$/i.test(row.member)) {
       setPieces({
         state: "failed",
@@ -128,10 +156,66 @@ export function GameUnitBrowser({ project, query }: Props) {
       );
       const model = await legoReadS3o({ path: staged.path });
       if (thisRead !== reads.current) return;
-      setPieces({ state: "ready", lines: pieceLines(model.root) });
+      setPieces({
+        state: "ready",
+        lines: pieceLines(model.root),
+        staged,
+        model,
+        row,
+      });
     } catch (error) {
       if (thisRead !== reads.current) return;
       setPieces({
+        state: "failed",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
+   * Import the open model again under a new module's id, which stores its
+   * geometry and textures, and keep the piece and everything under it. Reading
+   * the game is all this does: nothing in it is written.
+   */
+  async function liftPiece(line: PieceLine) {
+    if (!onLift || pieces?.state !== "ready") return;
+    if (!target || !archive || !tree || source.state !== "ready") return;
+    const { staged, model, row } = pieces;
+    const picked = {
+      archive,
+      archivePath: tree.archivePath,
+      member: row.member,
+    };
+    setLift({ path: line.path, state: "lifting" });
+    try {
+      await stageTextures(target, picked, staged, tree.files, [
+        model.texture1,
+        model.texture2,
+      ]);
+      const id = crypto.randomUUID();
+      const result = await legoImportS3o({ path: staged.path, id });
+      const module = liftFromImport(result, line.path, {
+        id,
+        game: gameRecordFor(source.game, installed),
+        from: {
+          name: source.game.name,
+          archive,
+          member: row.member,
+          ...(row.unit ? { unit: row.unit } : {}),
+        },
+        source: modelSource(picked),
+        unpacked: staged.staged !== null,
+        packId: project.packId,
+        packVersion: project.packVersion,
+        now: new Date().toISOString(),
+        newId: () => crypto.randomUUID(),
+      });
+      if (!module) throw new Error(`${line.name} is not in this model.`);
+      await onLift(module);
+      setLift({ path: line.path, state: "done" });
+    } catch (error) {
+      setLift({
+        path: line.path,
         state: "failed",
         message: error instanceof Error ? error.message : String(error),
       });
@@ -182,7 +266,13 @@ export function GameUnitBrowser({ project, query }: Props) {
                 {row.unit}
               </span>
             </button>
-            {isOpen ? <PieceList pieces={pieces} /> : null}
+            {isOpen ? (
+              <PieceList
+                pieces={pieces}
+                lift={lift}
+                onLift={onLift ? (line) => void liftPiece(line) : undefined}
+              />
+            ) : null}
           </li>
         );
       })}
@@ -203,7 +293,15 @@ function Note({ children }: { children: ReactNode }) {
   );
 }
 
-function PieceList({ pieces }: { pieces: Pieces }) {
+function PieceList({
+  pieces,
+  lift,
+  onLift,
+}: {
+  pieces: Pieces;
+  lift: Lift | null;
+  onLift?: (line: PieceLine) => void;
+}) {
   if (pieces.state === "loading") {
     return <p className="py-1 pl-12 text-xs text-muted-foreground">Reading.</p>;
   }
@@ -216,15 +314,40 @@ function PieceList({ pieces }: { pieces: Pieces }) {
   }
   return (
     <ul className="py-1 pl-12 text-sm">
-      {pieces.lines.map((line) => (
-        <li
-          key={line.path}
-          className="truncate"
-          style={{ paddingLeft: `${line.depth * 0.75}rem` }}
-        >
-          {line.name}
-        </li>
-      ))}
+      {pieces.lines.map((line) => {
+        const here = lift?.path === line.path ? lift : null;
+        return (
+          <li
+            key={line.path}
+            className="group flex items-center gap-2"
+            style={{ paddingLeft: `${line.depth * 0.75}rem` }}
+          >
+            <span className="truncate">{line.name}</span>
+            {onLift ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-1 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
+                disabled={lift?.state === "lifting"}
+                onClick={() => onLift(line)}
+                aria-label={`Lift ${line.name} into the inventory`}
+                title="Lift this piece and the pieces under it into the inventory"
+              >
+                <ArrowUpFromLine size={14} />
+              </Button>
+            ) : null}
+            {here ? (
+              <span className="truncate text-xs text-muted-foreground">
+                {here.state === "lifting"
+                  ? "Lifting."
+                  : here.state === "done"
+                    ? "Lifted."
+                    : here.message}
+              </span>
+            ) : null}
+          </li>
+        );
+      })}
     </ul>
   );
 }
