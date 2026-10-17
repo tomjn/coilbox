@@ -77,7 +77,8 @@ function pieceOrigins(
  *
  * A foot with no geometry is judged by its origin, the ankle, which the body
  * plans put on the ground. A wheel with no geometry is not judged: its origin
- * is the axle, and the tread is what touches the ground.
+ * is the axle, and the tread is what touches the ground. A track with none is
+ * the middle of the track, not its underside.
  */
 function feetOffGround(
   project: LegoProject,
@@ -94,7 +95,7 @@ function feetOffGround(
       for (let i = range[0]; i < range[1]; i++) {
         lowest = Math.min(lowest, baked.world[i].y);
       }
-    } else if (piece.role !== "wheel") {
+    } else if (piece.role !== "wheel" && piece.role !== "track") {
       lowest = origins.get(piece.id)?.[1];
     }
     if (lowest === undefined || Math.abs(lowest) <= SAME_POSITION) continue;
