@@ -529,6 +529,119 @@ export function joinAt(
   return null;
 }
 
+/** How close a typed position or turn has to be to the one the join gives. */
+const AGREE = 1e-6;
+
+/**
+ * A joined piece's transform after position or rotation is typed or turned
+ * (issue #4281), and why it was freed when it was.
+ *
+ * A turn about the face normal becomes the twist, and a position along the face
+ * becomes the offset. The join is kept only when placing it from the new twist
+ * and offset gives back what was asked for. Anything else, which the join cannot
+ * express, frees the piece where it was put, as `freePiece` does, and `detached`
+ * says which. A change to scale alone, or none, leaves the join for
+ * `resolveConnections` to place. A free piece just takes the change.
+ */
+export function editJoined(
+  project: LegoProject,
+  pack: LoadedPack,
+  pieceId: string,
+  change: Partial<Pick<LegoPiece, "position" | "rotation" | "scale">>,
+): { project: LegoProject; detached: string | null } {
+  const piece = project.pieces.find((p) => p.id === pieceId);
+  const withPiece = (next: LegoPiece): LegoProject => ({
+    ...project,
+    pieces: project.pieces.map((p) => (p.id === pieceId ? next : p)),
+  });
+  if (!piece) return { project, detached: null };
+  const next: LegoPiece = { ...piece, ...change };
+  const { connection } = piece;
+  const parent = piece.parentId
+    ? project.pieces.find((p) => p.id === piece.parentId)
+    : undefined;
+  const moved = change.position && !same(change.position, piece.position);
+  const turned = change.rotation && !same(change.rotation, piece.rotation);
+  if (!connection || (!moved && !turned)) {
+    return { project: withPiece(next), detached: null };
+  }
+
+  const freed = (what: string) => ({
+    project: withPiece(freePiece(next)),
+    detached: `Detached: ${what} off its face.`,
+  });
+  if (!parent) return freed("moved");
+
+  const turnedProject = withPiece(next);
+  const twist = turned
+    ? twistOf(
+        turnedProject,
+        pack,
+        next,
+        worldMatrix(turnedProject, pieceId),
+        parent,
+        connection,
+      )
+    : (connection.twist ?? 0);
+  const { offset: _offset, twist: _twist, ...base } = connection;
+  let offset: [number, number] = connection.offset ?? [0, 0];
+  const joinWith = (): LegoConnection => ({
+    ...base,
+    ...(offset[0] || offset[1] ? { offset } : {}),
+    ...(Math.abs(twist) > NONE ? { twist } : {}),
+  });
+
+  if (moved && change.position) {
+    const slid = slideJoin(
+      withPiece({ ...next, connection: joinWith() }),
+      pack,
+      pieceId,
+      change.position,
+      0,
+    );
+    if (!slid) return freed("moved");
+    offset = slid.offset.map((n) => (Math.abs(n) > NONE ? n : 0)) as [
+      number,
+      number,
+    ];
+  }
+
+  const placed = placeJoin(
+    pack,
+    next,
+    parent,
+    joinWith(),
+    parentScaleOf(project, parent.id),
+  );
+  if (!placed) return freed("moved");
+  const turnOk =
+    !turned ||
+    (change.rotation !== undefined &&
+      sameTurn(placed.rotation, change.rotation));
+  const moveOk =
+    !moved ||
+    (change.position !== undefined &&
+      placed.position.every(
+        (n, i) => Math.abs(n - (change.position as Vec3)[i]) < AGREE,
+      ));
+  if (!turnOk || !moveOk) {
+    return freed(
+      !moveOk && !turnOk ? "moved and turned" : moveOk ? "turned" : "moved",
+    );
+  }
+  return {
+    project: withPiece({ ...next, ...placed, connection: joinWith() }),
+    detached: null,
+  };
+}
+
+/** Whether two sets of Euler angles are the same orientation. */
+function sameTurn(a: Vec3, b: Vec3): boolean {
+  const x = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(...a));
+  const y = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(...b));
+  return x.elements.every((n, i) => Math.abs(n - y.elements[i]) < AGREE);
+}
+
 /** A right-handed frame with `facing` and `up` as its first two columns. */
 function frame(facing: THREE.Vector3, up: THREE.Vector3): THREE.Matrix4 {
   const third = new THREE.Vector3().crossVectors(facing, up);
