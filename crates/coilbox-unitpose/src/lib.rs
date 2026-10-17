@@ -175,6 +175,12 @@ pub struct Drive {
     pub speed: f64,
     /// Elmos a frame, the move type's `maxSpeed`.
     pub max_speed: f64,
+    /// Whether it is backing up, which is what `REVERSING` answers
+    /// (`CGroundMoveType::IsReversing`). The speed stays the size of the
+    /// velocity, as the engine's `speed.w` does, and the unit moves against
+    /// its heading.
+    #[serde(default)]
+    pub reversing: bool,
 }
 
 impl World {
@@ -1022,6 +1028,7 @@ mod tests {
             heading: 16384,
             speed: 1.0,
             max_speed: 1.0,
+            reversing: false,
         });
         assert!(close3(world.place([0.0, 2.0, 10.0]), [110.0, 2.0, 50.0]));
         // The model's +x is the unit's left, which has turned to face -z.
@@ -1044,6 +1051,7 @@ mod tests {
             heading: 16384,
             speed: 1.0,
             max_speed: 1.0,
+            reversing: false,
         });
         // The nose points along +x, across the slope, so it stays level.
         assert!(close3(world.place([0.0, 0.0, 10.0]), [10.0, 0.0, 0.0]));

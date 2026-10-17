@@ -252,6 +252,21 @@ export function requiresMoveDef(
   );
 }
 
+/**
+ * A def's reverse speed in elmos a second, read as `UnitDef.cpp:447-448` does:
+ * `rSpeed`, else the older `maxReverseVelocity`, which is per frame. 0 for a
+ * unit that states neither, and the engine will not reverse it.
+ */
+export function unitReverseSpeedOf(
+  def: Record<string, unknown> | undefined,
+): number {
+  const speed = Number(field(def, "rspeed"));
+  if (field(def, "rspeed") !== undefined && Number.isFinite(speed))
+    return speed;
+  const legacy = Number(field(def, "maxreversevelocity"));
+  return Number.isFinite(legacy) ? Math.abs(legacy) * 30 : 0;
+}
+
 /** A def's `turnrate`, or nothing when it states none. */
 export function unitTurnRateOf(
   def: Record<string, unknown> | undefined,

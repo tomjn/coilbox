@@ -22,6 +22,7 @@ import {
   moveClassOf,
   moveDefsOf,
   requiresMoveDef,
+  unitReverseSpeedOf,
   unitSpeedOf,
   unitTurnRateOf,
 } from "@/workshop/moveClasses";
@@ -172,6 +173,14 @@ export function suggestMotion(
     if (turnRate === undefined) continue;
     movement.turnRate = turnRate;
     movement.turnRateFrom = `Median of ${rates.length} ${gameName} units ${pool.label}`;
+    break;
+  }
+  for (const pool of pools) {
+    const speeds = pool.units.map(unitReverseSpeedOf).filter((s) => s > 0);
+    const reverseSpeed = median(speeds);
+    if (reverseSpeed === undefined) continue;
+    movement.reverseSpeed = reverseSpeed;
+    movement.reverseSpeedFrom = `Median of ${speeds.length} ${gameName} units ${pool.label}`;
     break;
   }
   return movement;

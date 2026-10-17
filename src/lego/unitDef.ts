@@ -108,6 +108,8 @@ const DEFAULT_BUILD_COST_METAL = DEFAULT_BUILD_TIME;
  *
  * `turnrate` is written only when there is one, since the engine's default of 0
  * is a unit that cannot turn and is better left visibly unset than written.
+ * `rSpeed` is likewise written only when above 0, since 0 is the engine's
+ * default and a unit with it never reverses.
  */
 function movementFields(project: LegoProject): Record<string, unknown> {
   const movement = project.movement;
@@ -120,6 +122,9 @@ function movementFields(project: LegoProject): Record<string, unknown> {
     speed: movement.speed,
     ...(typeof movement.turnRate === "number"
       ? { turnrate: movement.turnRate }
+      : {}),
+    ...(typeof movement.reverseSpeed === "number" && movement.reverseSpeed > 0
+      ? { rSpeed: movement.reverseSpeed }
       : {}),
   };
 }

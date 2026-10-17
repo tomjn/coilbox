@@ -1758,7 +1758,10 @@ fn install_spring(
                 Some(drive) => {
                     let angle = f64::from(drive.heading) * std::f64::consts::PI / 32768.0;
                     let (sin, cos) = angle.sin_cos();
-                    (drive.speed * sin, 0.0, drive.speed * cos, drive.speed)
+                    // A reversing unit moves against its heading, but the
+                    // fourth is still the size of the velocity.
+                    let along = if drive.reversing { -drive.speed } else { drive.speed };
+                    (along * sin, 0.0, along * cos, drive.speed)
                 }
                 None => (0.0, 0.0, speed, speed),
             })

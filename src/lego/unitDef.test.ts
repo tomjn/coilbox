@@ -143,6 +143,21 @@ describe("legoUnitDef", () => {
     );
   });
 
+  it("writes rSpeed only when a reverse speed is set", () => {
+    const b = bounds({ x: 32, z: 32 });
+    const reverses = {
+      ...project("Rover", "rover"),
+      movement: { moveClass: "WHEELEDTANK2", speed: 90, reverseSpeed: 45 },
+    };
+    expect(legoUnitDef(reverses, b)).toMatchObject({ rSpeed: 45 });
+    expect(buildUnitDef(reverses, b)).toContain("rSpeed = 45,");
+    const forwardsOnly = {
+      ...project("Rover", "rover"),
+      movement: { moveClass: "WHEELEDTANK2", speed: 90 },
+    };
+    expect(legoUnitDef(forwardsOnly, b)).not.toHaveProperty("rSpeed");
+  });
+
   it("writes customparams as a Lua table with its keys in the file", () => {
     const text = buildUnitDef(
       project("Sky Fortress", "skyfort"),

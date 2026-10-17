@@ -112,6 +112,8 @@ export interface ScriptDrive {
   speed: number;
   /** Elmos a frame. */
   maxSpeed: number;
+  /** Whether the unit backs up. */
+  reversing: boolean;
 }
 
 /** A shaped ground, and which way is up for the unit standing on it. */

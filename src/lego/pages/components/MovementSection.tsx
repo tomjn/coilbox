@@ -119,9 +119,9 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
     onMovementChange(suggestMotion(current, game.name, value));
   }
 
-  function setNumber(key: "speed" | "turnRate", text: string) {
+  function setNumber(key: "speed" | "turnRate" | "reverseSpeed", text: string) {
     if (!movement) return;
-    const fromKey = key === "speed" ? "speedFrom" : "turnRateFrom";
+    const fromKey = `${key}From` as const;
     const { [key]: _value, [fromKey]: _from, ...rest } = movement;
     const value = Number(text);
     onMovementChange(
@@ -206,6 +206,24 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
               min={0}
               value={movement.turnRate ?? ""}
               onChange={(event) => setNumber("turnRate", event.target.value)}
+            />
+          </Field>
+          <Field
+            label="Reverse speed, elmos a second"
+            hint={
+              movement.reverseSpeedFrom ??
+              (movement.reverseSpeed
+                ? undefined
+                : "Not set, the unit never backs up")
+            }
+          >
+            <Input
+              type="number"
+              min={0}
+              value={movement.reverseSpeed ?? ""}
+              onChange={(event) =>
+                setNumber("reverseSpeed", event.target.value)
+              }
             />
           </Field>
           {!movement.speed ? (

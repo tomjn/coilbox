@@ -201,11 +201,16 @@ export interface LegoMovement {
   speed?: number;
   /** Written as `turnRate`, in the engine's angular units a second. */
   turnRate?: number;
+  /** Written as `rSpeed`, in elmos a second. Absent means the unit never
+   *  backs up, which is the engine's default of 0. */
+  reverseSpeed?: number;
   /** Where `speed` came from, when the game suggested it. Gone once it is set
    *  by hand. */
   speedFrom?: string;
   /** Where `turnRate` came from, the same way. */
   turnRateFrom?: string;
+  /** Where `reverseSpeed` came from, the same way. */
+  reverseSpeedFrom?: string;
 }
 
 export interface LegoImported {
@@ -1238,9 +1243,15 @@ function parseMovement(value: unknown): LegoMovement | null {
     moveClass: v.moveClass,
     ...(number(v.speed) ? { speed: v.speed as number } : {}),
     ...(number(v.turnRate) ? { turnRate: v.turnRate as number } : {}),
+    ...(number(v.reverseSpeed)
+      ? { reverseSpeed: v.reverseSpeed as number }
+      : {}),
     ...(typeof v.speedFrom === "string" ? { speedFrom: v.speedFrom } : {}),
     ...(typeof v.turnRateFrom === "string"
       ? { turnRateFrom: v.turnRateFrom }
+      : {}),
+    ...(typeof v.reverseSpeedFrom === "string"
+      ? { reverseSpeedFrom: v.reverseSpeedFrom }
       : {}),
   };
 }

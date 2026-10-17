@@ -204,6 +204,40 @@ describe("suggestMotion", () => {
   });
 });
 
+describe("suggestMotion reverse speed", () => {
+  const game: GameMovementData = {
+    moveDefs: [{ name: "TANK2" }],
+    units: {
+      a: { canmove: true, movementclass: "TANK2", speed: 60, rspeed: 30 },
+      b: {
+        canmove: true,
+        movementclass: "TANK2",
+        speed: 60,
+        maxreversevelocity: -1,
+      },
+      c: { canmove: true, movementclass: "TANK2", speed: 60 },
+    },
+  };
+
+  it("takes the median of the units that can reverse", () => {
+    const movement = suggestMotion(game, "BA", "TANK2");
+    expect(movement.reverseSpeed).toBe(30);
+    expect(movement.reverseSpeedFrom).toBe("Median of 2 BA units on TANK2");
+  });
+
+  it("leaves it out when no unit reverses", () => {
+    const movement = suggestMotion(
+      {
+        moveDefs: [{ name: "TANK2" }],
+        units: { a: { canmove: true, movementclass: "TANK2", speed: 60 } },
+      },
+      "BA",
+      "TANK2",
+    );
+    expect(movement).not.toHaveProperty("reverseSpeed");
+  });
+});
+
 describe("a project's movement", () => {
   it("survives a save and a load", () => {
     const saved = {
@@ -212,6 +246,8 @@ describe("a project's movement", () => {
         moveClass: "WHEELEDTANK2",
         speed: 120,
         turnRate: 600,
+        reverseSpeed: 45,
+        reverseSpeedFrom: "Median of 2 Splinter Faction units on WHEELEDTANK2",
         speedFrom: "Median of 3 Splinter Faction units on WHEELEDTANK2",
       },
     };
