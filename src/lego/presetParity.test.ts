@@ -364,6 +364,23 @@ function rudderPlan(): Plan {
   };
 }
 
+/**
+ * The wake emits a particle and moves no piece, so what is checked is that the
+ * script runs under the runtime, with a reversing unit's flag, and leaves the
+ * wake point where it was.
+ */
+function wakePlan(): Plan {
+  const frames = CALLIN + 5 * FPS;
+  return {
+    events: [...CREATED, { frame: CALLIN, callin: "StartMoving", args: [1] }],
+    frames,
+    spans: [{ from: CALLIN, to: frames - 1, t0: 0 }],
+    exceptions: [
+      "The wake is a particle, so nothing moves. The emitted types are checked in wake.test.ts.",
+    ],
+  };
+}
+
 function plan(preset: AnimPreset, params: Record<string, number>): Plan {
   switch (preset.id) {
     case "walk.biped":
@@ -395,6 +412,8 @@ function plan(preset: AnimPreset, params: Record<string, number>): Plan {
       return wheelsPlan();
     case "rudder.follow":
       return rudderPlan();
+    case "wake.moving":
+      return wakePlan();
   }
   throw new Error(`no parity plan for ${preset.id}`);
 }
@@ -564,9 +583,9 @@ function buildCases() {
 describe("preset parity fixture", () => {
   const cases = buildCases();
 
-  it("covers all 15 presets", () => {
-    expect(new Set(cases.map((entry) => entry.preset.id)).size).toBe(15);
-    expect(PRESETS).toHaveLength(15);
+  it("covers all 16 presets", () => {
+    expect(new Set(cases.map((entry) => entry.preset.id)).size).toBe(16);
+    expect(PRESETS).toHaveLength(16);
   });
 
   it("matches what the presets generate today", () => {
