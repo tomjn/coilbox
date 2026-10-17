@@ -168,6 +168,76 @@ describe("legoUnitDef", () => {
     );
   });
 
+  // Issue #4370. An aircraft is `canfly` with no movement class, and the
+  // engine reads a class only when `canfly` is off.
+  it("writes a gunship that hovers, with no movement class", () => {
+    const p = {
+      ...project("Hornet", "hornet"),
+      movement: {
+        moveClass: "",
+        flies: "gunship" as const,
+        speed: 150,
+        turnRate: 700,
+        cruiseAltitude: 90,
+      },
+    };
+    const def = legoUnitDef(p, bounds({ x: 32, z: 32 }));
+    expect(def).toMatchObject({
+      canmove: true,
+      canfly: true,
+      hoverattack: true,
+      cruisealtitude: 90,
+      speed: 150,
+      turnrate: 700,
+    });
+    expect(def).not.toHaveProperty("movementclass");
+    expect(def).not.toHaveProperty("maxslope");
+    expect(buildUnitDef(p, bounds({ x: 32, z: 32 }))).toContain(
+      "canfly = true,",
+    );
+  });
+
+  it("writes a plane that strafes, with no hoverattack", () => {
+    const p = {
+      ...project("Dart", "dart"),
+      movement: {
+        moveClass: "",
+        flies: "plane" as const,
+        speed: 280,
+        cruiseAltitude: 120,
+      },
+    };
+    const def = legoUnitDef(p, bounds({ x: 32, z: 32 }));
+    expect(def).toMatchObject({
+      canmove: true,
+      canfly: true,
+      cruisealtitude: 120,
+      speed: 280,
+    });
+    expect(def).not.toHaveProperty("hoverattack");
+    expect(def).not.toHaveProperty("movementclass");
+  });
+
+  it("leaves cruisealtitude out of a flier that has none", () => {
+    const p = {
+      ...project("Dart", "dart"),
+      movement: { moveClass: "", flies: "plane" as const, speed: 280 },
+    };
+    expect(legoUnitDef(p, bounds({ x: 32, z: 32 }))).not.toHaveProperty(
+      "cruisealtitude",
+    );
+  });
+
+  it("stays static for a flier with no speed", () => {
+    const p = {
+      ...project("Dart", "dart"),
+      movement: { moveClass: "", flies: "plane" as const },
+    };
+    const def = legoUnitDef(p, bounds({ x: 32, z: 32 }));
+    expect(def.canmove).toBe(false);
+    expect(def).not.toHaveProperty("canfly");
+  });
+
   it("stays static while the picked class has no speed", () => {
     const p = {
       ...project("Rover", "rover"),
@@ -840,8 +910,28 @@ describe("DERIVED_FIELDS", () => {
     slots,
   );
 
+  const gunship = legoUnitDefWithHome(
+    {
+      ...everything,
+      movement: {
+        moveClass: "",
+        flies: "gunship",
+        speed: 150,
+        cruiseAltitude: 90,
+      },
+    },
+    b,
+    "def",
+    totals,
+    slots,
+  );
+
   it("names every field the builder writes, or says why it is not there", () => {
-    const written = new Set([...Object.keys(mobile), ...Object.keys(still)]);
+    const written = new Set([
+      ...Object.keys(mobile),
+      ...Object.keys(still),
+      ...Object.keys(gunship),
+    ]);
     // `customparams` is a table the game reads whole, so only the keys inside
     // it that the build decides are on the list.
     const firstExportOnly = [...written].filter(
@@ -869,7 +959,9 @@ describe("DERIVED_FIELDS", () => {
   it("lists only fields the builder can write", () => {
     for (const path of DERIVED_FIELDS)
       expect(
-        defValue(mobile, path) ?? defValue(still, path),
+        defValue(mobile, path) ??
+          defValue(still, path) ??
+          defValue(gunship, path),
         path,
       ).toBeDefined();
   });
