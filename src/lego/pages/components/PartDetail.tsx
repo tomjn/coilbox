@@ -17,6 +17,7 @@ import { useReduceMotion } from "../../../general/display";
 import { baseAtlas } from "../../atlas";
 import { addStandardLights, partMaterial } from "../../geometry";
 import {
+  colourwayLabel,
   getPartGeometry,
   type LegoPartInfo,
   type LoadedPack,
@@ -75,7 +76,7 @@ export function PartDetail({ pack, part, onSelect, onClose }: Props) {
                   variant={variant.id === part.id ? "default" : "outline"}
                   onClick={() => onSelect(variant)}
                 >
-                  {variant.colourway}
+                  {colourwayLabel(pack, variant.colourway)}
                 </Button>
               ))}
             </dd>

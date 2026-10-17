@@ -8,7 +8,7 @@
  * The signals, in the order they carry information:
  *
  * 1. Colourway. The atlas is three vertical columns of the same panel layout in
- *    green, tan and grey. A part's u coordinate says which it samples, and a
+ *    team colour red, tan and grey. A part's u coordinate says which it samples, and a
  *    unit generally wants one colourway throughout, so this is the filter that
  *    matters most.
  * 2. Material. The only artist-authored label in the file.
@@ -23,9 +23,13 @@
  * throughout, so it is the cut people browse by, and the counts come out
  * roughly even. Shape does not work as the primary axis: two thirds of the
  * parts are chunky enough to land in one bucket however the thresholds are set.
+ *
+ * The first column is KaiserJ's team colour set, painted red to mark where a
+ * modder puts the team colour mask (#4466). It was first named green by
+ * mistake, and keeps that id because a saved unit names a shape's swatch by it.
  */
 export const COLOURWAYS = [
-  { id: "green", label: "Green" },
+  { id: "green", label: "Team colour" },
   { id: "tan", label: "Tan" },
   { id: "grey", label: "Grey" },
   { id: "mixed", label: "Mixed" },
@@ -119,8 +123,9 @@ export function categorise(entries, overrides = {}) {
 }
 
 /**
- * Something like "green plate 4x2x0.5". The dimensions are what an assembler
+ * Something like "tan plate 4x2x0.5". The dimensions are what an assembler
  * actually looks for, so they belong in the name rather than only in a tooltip.
+ * The colourway reads as its label, since its id is not always its name.
  */
 function autoName(colourway, shape, bbox) {
   const dims = bbox.max
@@ -128,7 +133,8 @@ function autoName(colourway, shape, bbox) {
     .sort((a, b) => b - a)
     .map((n) => round(n))
     .join("x");
-  return `${colourway} ${shape} ${dims}`;
+  const label = COLOURWAYS.find((c) => c.id === colourway).label;
+  return `${label.toLowerCase()} ${shape} ${dims}`;
 }
 
 function round(n) {

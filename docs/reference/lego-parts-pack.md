@@ -113,11 +113,11 @@ The manifest is the index. Search and filtering run entirely against it, so a pi
     "file": "parts.bin.gz", "encoding": "gzip", "bytes": 24438000,
     "sha256": "...", "vertexStride": 32
   },
-  "categories": [{ "id": "green", "label": "Green" }],
+  "categories": [{ "id": "green", "label": "Team colour" }],
   "parts": [
     {
       "id": "c7a55d17c378",
-      "name": "green block 1x0.5x0.5",
+      "name": "team colour block 1x0.5x0.5",
       "category": "green",
       "colourway": "green",
       "shape": "block",
@@ -201,7 +201,7 @@ Choose a `unit` for your own pack by the same count: the step that most of its p
 
 ### Sizes in the bundled pack
 
-The builder resizes a pack part by swapping it for another part of the same pack, colourway, shape and material whose other two sides match. A pack with more sizes gives a drag more to land on. The bundled pack has gaps. Counted on its green colourway, which the other two repeat:
+The builder resizes a pack part by swapping it for another part of the same pack, colourway, shape and material whose other two sides match. A pack with more sizes gives a drag more to land on. The bundled pack has gaps. Counted on its team colour colourway, which the other two repeat:
 
 - 36 of its 82 blocks have no other size along their longest side, and 110 of their 246 sides have no other size at all.
 - 49 of the 84 sides of its beams have no other size.
@@ -227,7 +227,7 @@ A swatch is a rectangle of plain surface on the atlas that the unit builder's ge
 
 A shape is cut on a grid one `tile` wide, and each piece samples the swatch with every other copy mirrored, so there is no seam and nothing stretches as the shape is resized. A shape's UVs never leave its swatch.
 
-The bundled pack has three swatches, green, tan and grey, each 64 pixels square. The green one is plain red, as the whole green column of the atlas is. Tan is grainy concrete. Grey is a flat light grey.
+The bundled pack has three swatches, team colour, tan and grey, each 64 pixels square. The team colour one is plain red, as the whole team colour column of the atlas is. Tan is grainy concrete. Grey is a flat light grey.
 
 Only the base pack's swatches count. Extension packs and atlas packs use them. A base pack that lists none offers no shapes. A swatch with no id, an id another swatch has, a rectangle outside the atlas or a `tile` that is not a positive number is skipped, and the Lego Parts screen reports how many.
 
@@ -306,11 +306,13 @@ The build reports everything it changed or could not do: faces it could not ear 
 
 The part names in the source file are `Object1848_copy5182` and carry no meaning, so the converter derives everything:
 
-- **Colourway**, the category. The atlas is three vertical columns of the same panel layout in green, tan and grey, and a part's `u` says which it samples. A unit generally wants one colourway throughout, which makes this the cut worth browsing by. Parts spanning a boundary are "mixed".
+- **Colourway**, the category. The atlas is three vertical columns of the same panel layout in team colour red, tan and grey, and a part's `u` says which it samples. A unit generally wants one colourway throughout, which makes this the cut worth browsing by. Parts spanning a boundary are "mixed".
+
+  The first column is the original kit's team colour set. KaiserJ painted it red to mark where a modder adds the team colour mask, and the atlas ships with no mask, so these parts draw red in the builder and in a game ([issue #4364](https://github.com/tomjn/coilbox/issues/4364)). Its id is `green`, the name the converter first gave it by mistake. It keeps that id because a saved unit names a shape's swatch by it.
 - **Shape**: sheet, beam, plate or block, from the bounding box aspect ratio.
 - **Size**: a quintile of the longest side.
 - **Row**: which eighth of the atlas the part sits in vertically, which groups parts the artist drew near each other.
 
-The generated name carries the dimensions, as in `green block 2.5x1.5x0.5`, because that is what someone assembling a unit actually looks for.
+The generated name carries the dimensions, as in `tan block 2.5x1.5x0.5`, because that is what someone assembling a unit actually looks for.
 
 `scripts/legopack/overrides.json` overrides any of this by part id. It ships near empty on purpose: the pack is searchable without it, so curating is an improvement rather than a prerequisite. Part ids are content hashes, so they survive a rebuild and saved projects keep resolving.
