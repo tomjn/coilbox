@@ -13,11 +13,12 @@
  * A piece lifted from a game (#3262) has meshes rather than parts. Its cell
  * waits for the module's own geometry file and draws with the game's texture,
  * and it is marked with the game's name. It has no save to file, because a
- * file would carry the game's geometry off the machine.
+ * file would carry the game's geometry off the machine. Its share drawer says
+ * why it cannot go on the hub (#3272).
  */
 
 import { Button, Input } from "@picoframe/frame";
-import { Copy, FileDown, Pencil, Star, Trash2 } from "lucide-react";
+import { Copy, FileDown, Pencil, Share2, Star, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
@@ -84,6 +85,8 @@ interface Props {
   onCopy: (compound: LegoProject) => void;
   /** Absent hides the save to file button. */
   onSaveFile?: (compound: LegoProject) => void;
+  /** Absent hides the share button. */
+  onShare?: (compound: LegoProject) => void;
   /** Ids of the favourite modules. With `onFavourite`, each cell gets a star. */
   favourites?: ReadonlySet<string>;
   onFavourite?: (compound: LegoProject) => void;
@@ -112,6 +115,7 @@ export function CompoundPicker({
   onRename,
   onCopy,
   onSaveFile,
+  onShare,
   favourites,
   onFavourite,
   onLabels,
@@ -468,6 +472,18 @@ export function CompoundPicker({
                       title="Save to file"
                     >
                       <FileDown size={14} />
+                    </Button>
+                  ) : null}
+                  {onShare && !builtIn ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="absolute bottom-6 left-8 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
+                      onClick={() => onShare(compound)}
+                      aria-label={`Share the ${compound.name} module`}
+                      title="Share"
+                    >
+                      <Share2 size={14} />
                     </Button>
                   ) : null}
                   {onFavourite ? (

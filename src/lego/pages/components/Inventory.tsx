@@ -178,6 +178,8 @@ interface GridsProps {
   onCopyModule: (module: LegoProject) => void;
   /** Absent hides each cell's save to file button. */
   onSaveModuleFile?: (module: LegoProject) => void;
+  /** Absent hides each cell's share button. */
+  onShareModule?: (module: LegoProject) => void;
   onLabelsModule?: (
     module: LegoProject,
     labels: { category: string | undefined; tags: string[] },
@@ -207,6 +209,7 @@ export function InventoryGrids({
   onRenameModule,
   onCopyModule,
   onSaveModuleFile,
+  onShareModule,
   onLabelsModule,
   gameUnits,
   aside,
@@ -267,6 +270,7 @@ export function InventoryGrids({
               onRename={onRenameModule}
               onCopy={onCopyModule}
               onSaveFile={onSaveModuleFile}
+              onShare={onShareModule}
               favourites={favouriteModules}
               onFavourite={(module) =>
                 inventory.toggleFavourite({ kind: "module", id: module.id })
