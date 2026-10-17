@@ -212,8 +212,12 @@ export function reparentPiece(
       const moved: LegoPiece =
         piece.id === pieceId
           ? {
-              // Its join was to the old parent's part, so it lands free.
-              ...freePiece(piece),
+              // Its join was to the old parent's part, so it lands free. A body
+              // plan places a bone against its own parent bone, so it leaves
+              // the plan too (#3246).
+              ...(piece.parentId === parentId
+                ? freePiece(piece)
+                : withoutBone(freePiece(piece))),
               parentId,
               position: [position.x, position.y, position.z],
               rotation: [euler.x, euler.y, euler.z],
@@ -225,6 +229,11 @@ export function reparentPiece(
       return rest;
     }),
   };
+}
+
+function withoutBone(piece: LegoPiece): LegoPiece {
+  const { bone: _left, ...rest } = piece;
+  return rest;
 }
 
 /**
