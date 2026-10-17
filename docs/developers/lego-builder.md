@@ -6,10 +6,11 @@ The builder is a modding tool, so it is hidden until you turn on **Advanced mode
 
 ![The unit builder: a unit on a marked ground plane, tool buttons down the left, the piece tree and the selected piece's settings on the right, and the parts strip along the bottom.](/screenshots/lego-builder.png)
 
-Two things to know before you spend an evening on this:
+Three things to know before you spend an evening on this:
 
-- A unit you export arrives in the game unbuildable, and static unless you picked a movement class for it in the Animation panel. Putting it on a builder's menu happens in the workshop afterwards. See [making the game use the unit](#making-the-game-use-the-unit).
-- An exported unit has the right shape in the engine, but not the right texture yet. The engine draws the whole unit in the player's colour, and each face samples the wrong part of the atlas. See [the engine load checklist](#the-engine-load-checklist).
+- A unit you export is on no builder's menu, so nothing in the game can build it until you add it in the workshop. See [making the game use the unit](#making-the-game-use-the-unit).
+- A unit built from parts does not belong to a game yet, so the builder has no movement classes to offer it and exports it static. A unit opened from a game can be given one. See [movement](#movement).
+- The engine draws a built unit much paler than the builder does. Nobody knows why yet ([issue #4175](https://github.com/tomjn/coilbox/issues/4175)).
 
 ## Build a unit
 
@@ -62,7 +63,7 @@ A unit built from small parts can look substantial and be a fraction of a real o
 
 The **ground** is marked in elmos: fine lines every elmo near the origin, heavier lines every footprint step, which is the 16 elmos the engine reserves ground in. Translucent plates at the origin mark the 1x1, 2x2, 3x3 and 5x5 footprints, each with its size written on it, so "does this fit a 3 by 3" is something you can see.
 
-The **reference unit**, the sun button in the bottom right, stands a real unit beside yours at its real size: Beyond All Reason's Armada solar collector, 43 elmos across and 29 tall. Anyone who plays these games has built hundreds of them. Its geometry is baked into coilbox rather than read out of an installed game, so it is there whatever you have installed. Attribution and licence are in `src/lego/reference/LICENCE.txt`.
+The **reference unit**, the sun button in the bottom right, stands a real unit beside yours at its real size: Beyond All Reason's Armada solar collector, 43 elmos across and 29 tall. Anyone who plays these games has built hundreds of them. Its geometry is baked into coilbox rather than read out of an installed game, so it is there whatever you have installed. The same button can stand one of an installed game's units there instead, and that is the unit [the stats panel](#the-stats-panel) compares yours with. Attribution and licence are in `src/lego/reference/LICENCE.txt`.
 
 ## Which way it faces
 
@@ -101,7 +102,9 @@ Applying one gives you sliders for its own parameters: stride time, thigh swing,
 
 **What happens to the unit**, under **Preview**, picks what the script is put through: moving, starting and stopping, standing still, switched on, building, hit and destroyed, aiming and firing, or being loaded into a transport. A scenario with something to aim at, build or carry puts a stand-in in the scene, a plain shape the script is told about, so an aim has a target you can check it against.
 
-**Driving along a path** moves the whole unit. It drives straight ahead, round a right turn, round a circle, or through points you click on the ground after picking **Your own path**. It goes at the speed and turn rate under **Movement**, or one elmo a frame when the unit has none, and steers the way the engine steers a ground unit: it cuts corners and slows for tight turns. The script is told `StartMoving` when it sets off and `StopMoving` when it arrives, and `HEADING` and `CURRENT_SPEED` follow it on every frame. The engine sends `ChangeHeading` only to a Lua script, and only once a game lowers `minScriptChangeHeading`, so it is off unless you switch it on. The unit reaches full speed at once rather than speeding up, and it never reverses. The camera button in the viewport stops the view following the unit. Aircraft are not covered.
+A weapon stops aiming when a moving target leaves its range or its arc, as it does in the engine. It checks on the first frame and every 15th frame after. A line in the Animation panel names the first weapon to stop, the frame and the reason, such as `Gun (weapon 1) stopped aiming on frame 30: the target is out of range.`
+
+**Driving along a path** moves the whole unit. It drives straight ahead, round a right turn, round a circle, or through points you click on the ground after picking **Your own path**. It goes at the speed and turn rate under **Movement**, or one elmo a frame when the unit has none, and steers the way the engine steers a ground unit: it cuts corners and slows for tight turns. The script is told `StartMoving` when it sets off and `StopMoving` when it arrives, and `HEADING` and `CURRENT_SPEED` follow it on every frame. The engine sends `ChangeHeading` only to a Lua script, and only once a game lowers `minScriptChangeHeading`, so it is off unless you switch it on. A unit with a reverse speed backs up when the engine would, and the **Behind the unit** path shows it. The unit still reaches full speed at once rather than speeding up. The camera button in the viewport stops the view following the unit. Aircraft are not covered.
 
 A scenario the unit has nothing to do in is marked **Nothing to do** in the list. The line under the picker names the presets that would give it something, or says presets do not cover it. You can still pick it.
 
@@ -147,7 +150,9 @@ The generated script numbers its weapons the same way, so `AimWeapon2`, `AimFrom
 
 A weapon from a workshop project is a reference, not a copy. Each export reads it from the project again, so the weapon you edit in the workshop is the one the game gets, and writes it to `weapons/coilbox_<unit>_<key>.lua`. That is the file and the full name `<unit>_<key>` the workshop's own compile writes for an equipped weapon. If the project or the weapon is gone, export leaves that slot out and says so.
 
-Splinter Faction, Balanced Annihilation 15.9.8 and Beyond All Reason all read `weapons/*.lua` through the engine's `gamedata/weapondefs.lua`, and all three also copy a unit's own `weapondefs` into the weapon table from their `gamedata/weapondefs_post.lua`. The builder uses the file, so the weapon stays out of the unit definition, which is yours to edit after the first export.
+Splinter Faction, Balanced Annihilation 15.9.8 and Beyond All Reason all read `weapons/*.lua` through the engine's `gamedata/weapondefs.lua`, and all three also copy a unit's own `weapondefs` into the weapon table from their `gamedata/weapondefs_post.lua`. The builder uses the file rather than the unit definition, so a change you make to the weapon in the workshop reaches the game on the next export.
+
+The weapon range button in the viewport's camera group, beside the collision and aim point buttons, draws each weapon on the ground. It is off until you turn it on. A turret that turns all the way round gets a ring at its range, and one with a narrower arc gets a wedge covering only that arc. A line drops from the piece the range is measured from to the middle of the ring. Each weapon has its own colour and a label such as `1 lightlaser, stated range 180`. The drawing follows the engine's own range and arc tests. A cannon's range in the engine depends on its shell speed and the map's gravity, so for a cannon the ring is its stated range ([issue #4274](https://github.com/tomjn/coilbox/issues/4274)).
 
 The `weapons` table is one of the fields the build decides, so a re-export brings it up to date while nobody has edited it. Once you change the table in the file, export leaves it as you wrote it. See [What export writes](#what-export-writes) for the rule.
 
@@ -157,6 +162,8 @@ The **Script** tab, in the strip along the bottom, shows the Lua the presets gen
 
 The engine calls this the unit script, and it is written on export to `scripts/<unit>.lua`. Animation is most of what it does, which is why the builder puts it behind the Animation panel, but the same file is where a game's own `Create`, `Killed` and `AimWeapon` hooks would go. It is loaded by the unit script framework that games ship in `LuaGadgets/Gadgets/unit_script.lua`, which reads the file named by the unit definition's `script` key.
 
+A unit with weapons gets one set of `AimWeapon`, `AimFromWeapon`, `QueryWeapon` and `Shot` for each weapon, numbered like the definition's weapon slots. See [Units that fight](#units-that-fight).
+
 **Take ownership of this script** hands it to you, so you can edit it. From then on the Script tab is an editor, the text is stored on the unit, and an export writes exactly what you wrote. The presets stop generating it at that point. The Animation panel drops the preset list and plays your text in the same player.
 
 You do not need to take ownership to see the unit run. The preview already plays the generated script, so ownership is only for changing it by hand.
@@ -164,6 +171,30 @@ You do not need to take ownership to see the unit run. The preview already plays
 A unit opened out of a game brings its own script with it. See [Opening a unit from a game](#opening-a-unit-from-a-game).
 
 **Discard this script and use the presets** gives it back. The stored text goes and the unit is generated from its presets again. Undo brings the text back if that was a mistake, so copy it first if you want to keep it past this session. The case worth knowing about: a unit whose script was taken over and then emptied animates nothing and no preset can reach it, and this is the only way out short of editing files on disk.
+
+## Health, cost and stats
+
+A built unit's health, metal cost, energy cost, build time and mass come from the **Worth** table in the Animation panel. There is no field for one unit's health or cost. The table works them out from what the unit is made of, so a bigger unit is worth more.
+
+The table has a column for each of the five, and these rows:
+
+- **Per unit** is what every unit gets, so a unit with hardly any parts is not free.
+- **Per volume** is what each unit of a part's volume adds. A part's volume is its bounding box times its scale and the scale of every piece above it. A long beam is worth more than a short one, and moving a part changes nothing.
+- One row for each shape of part the unit uses. A number in a shape's row replaces the per volume amount for parts of that shape. A blank one leaves it to the per volume row.
+
+The totals sit above the table. Export writes them as `maxdamage`, `buildcostmetal`, `buildcostenergy`, `buildtime` and `mass`, the spellings Splinter Faction and Balanced Annihilation both use. A mass of 0 is left out, so the engine uses the metal cost instead.
+
+A new unit starts on placeholder amounts that load in the engine and say nothing about any game's economy, and the section says so. The table is stored on each unit. **Save table** keeps it so other units can use it, and **Use saved table** replaces this unit's table with the saved one. A unit opened whole from a game has no parts to total, so it has no table.
+
+### The stats panel
+
+**Stats**, below Weapons, shows the unit's cost, health, speed, longest weapon range and damage per second. Beside them are the same numbers for the reference unit: pick one of a game's units with the reference button in the bottom right of the view. A number the unit does not have reads **None**.
+
+The numbers are the ones the next export would write. A field changed by hand in the game's file shows the file's value instead, because that is the one export keeps. The panel changes nothing. Once the unit is exported into a game, each number links to its field in Unit tweaks.
+
+### Where to change a number
+
+The unit's file in the game, `units/<unit>.lua`, is the only place a built unit's stats are kept. The builder writes the fields the build decides: the worth table's totals, movement, the builder keys, the weapon slots and the rest listed under [What export writes](#what-export-writes). Unit tweaks can change any field, including those. Once a change from Unit tweaks is written into the file, export treats that field as set by hand and stops updating it.
 
 ## Opening a unit from a game
 
@@ -194,6 +225,7 @@ It always writes:
 - `units/<unit>.lua`, a unit definition. Without one the engine has nothing to spawn.
 - `language/en/coilbox.json`, but only for a game that names its units in a localisation file rather than in their definitions. See [Where the unit's name goes](#where-the-unit-s-name-goes).
 - `weapons/coilbox_<unit>_<key>.lua` for each workshop weapon the unit fires, rewritten every export. See [Units that fight](#units-that-fight).
+- `objects3d/coilbox/<unit>_dead.s3o` and `features/coilbox/<unit>_dead.lua`, the wreck. See [The wreck](#the-wreck).
 
 It writes, if you leave the boxes ticked:
 
@@ -206,14 +238,28 @@ It can also write a `.glb`, or an `.obj` with its `.mtl` and a copy of the atlas
 
 **A re-export keeps your edits.** The script and the unit definition are meant to be edited, so export never overwrites a change you made to either, whether you made it in a text editor or through the workshop.
 
-- The unit definition is updated field by field. Some fields come from the build: the footprint, the collision volume, health and cost, movement, the builder keys and the weapon slots. Export rewrites one of those only while the file still holds the value the last export wrote. A field holding anything else was changed by hand and stays, and a field you deleted stays deleted. A field the build has started writing is added, and one it has stopped writing is taken out. Every other field is written on the first export and then left alone. Comments and the order of the file are kept. The export drawer lists each field it changed and each one it kept.
+- The unit definition is updated field by field. Some fields come from the build: the name and description, the footprint, the collision volume, the worth table's totals, movement, the builder keys, the weapon slots and the wreck's name. Export rewrites one of those only while the file still holds the value the last export wrote. A field holding anything else was changed by hand and stays, and a field you deleted stays deleted. A change written in from Unit tweaks counts as a change by hand. A field the build has started writing is added, and one it has stopped writing is taken out. Every other field is written on the first export and then left alone. Comments and the order of the file are kept. The export drawer lists each field it changed and each one it kept.
 - While the workshop has an edit in place on the unit that you have not accepted or undone, export leaves the unit definition alone and says so. Undo puts the workshop's backup back over the file, which would throw the export away.
 - The script is replaced while it is still exactly the script the last export wrote. Once you change it, export leaves it alone.
 - The texture is written once and then left alone, unless you tick **Replace textures already there**.
 
-Export only updates a unit definition it has a record of writing into that folder. A file of the same name that coilbox did not write, such as one of the game's own units, is left alone. Only the model is overwritten every time, because it is the one file the builder alone owns.
+Export only updates a unit definition it has a record of writing into that folder. Each folder keeps its own record, so a unit exported into two games stays up to date in both. A file of the same name that coilbox did not write, such as one of the game's own units, is left alone. Only the models are overwritten every time, because they are the files the builder alone owns.
 
 The one exception is coilbox's own scratch game, below, which is a throwaway and is always rewritten in full.
+
+Export writes nothing about the game around the unit. It adds the unit to no other unit's `buildoptions`, and writes no side, category, armour class or yardmap. A weapon's own definition belongs to the game or to the workshop project it came from. [Making the game use the unit](#making-the-game-use-the-unit) covers those, in the workshop.
+
+### The wreck
+
+A built unit leaves a wreck when it dies. The definition names it as `corpse = "<unit>_dead"`, and export writes its model and its feature definition.
+
+The wreck is shaped like the **Wreck pose** preset when that is applied, and like the unit at rest when it is not. A wreck runs no script, so the pose is baked into its model. It holds half the unit's metal cost and half its health, rounded down, which is what Splinter Faction gives its own wrecks. It blocks the ground where a building stood, but not where a unit drove.
+
+Splinter Faction's death gadget drops a second wreck of its own when heat kills a unit, named by `customparams.corpse`. The builder writes that as an empty name, so a built unit there leaves only the one wreck. A heat kill's wreck then holds the feature file's half of the metal, not the gadget's full amount.
+
+The wreck's model is rewritten every export. Its feature file follows the script's rule: it is replaced while it is still what the last export wrote, and left alone once you edit it. The export drawer lists both, and says when it kept the feature file.
+
+The engine's own `gamedata/featuredefs.lua` reads every file under `features/`, folders included. A game that replaces that file, or never reads `features/`, will not load the wreck. None of the six installed games checked when this was built does that. **Test in game** writes the wreck too, so a test match drops the same one.
 
 ### The build picture
 
@@ -248,8 +294,6 @@ The button only offers files coilbox can prove it wrote, by checking each one ag
 In the workshop, a unit left behind this way is marked `stale` in the unit list, so a game with hundreds of units still shows you which one you did not mean to keep.
 
 Its name in `language/<code>/coilbox.json` is not removed. That unit is still in the game until you clear it, and a leftover with a name reads better than a leftover called `units.names.mytank`. Exporting under the new name adds a key beside it rather than replacing one.
-
-**What it deliberately does not write:** anything about the game around the unit. No definition of a game weapon, no cost, no build picture, no side or category, and no edit to any other unit's `buildoptions`. Export puts a unit in a game folder. [Making the game use it](#making-the-game-use-the-unit) happens in the workshop, against the game itself.
 
 ## The collision volume
 
@@ -306,7 +350,7 @@ Two other numbers are measured from this point rather than from the model's orig
 - **The collision sphere.** The s3o header's radius is that sphere's radius and it is centred on the header's mid, so the radius is re-measured from wherever you put the point. Without that a unit gets a sphere that no longer covers it.
 - **The collision volume's offsets.** `CollisionVolume::GetWorldSpacePos` adds them to the unit's `midPos`, which is this point. Move the point and the volume would slide off the geometry with it, so the offsets absorb the move: the shape in the viewport stays where you put it and only the numbers in the Collision tab change.
 
-One thing this is not: which piece a weapon fires from. That is `AimFromWeapon` and `QueryWeapon` in the unit's script, and the builder has no weapon definitions to fire.
+This is not which piece a weapon fires from. That is `AimFromWeapon` and `QueryWeapon` in the unit's script, which the builder writes for each weapon. See [Units that fight](#units-that-fight).
 
 The header's mid is the only lever a model file has. `CUnit::PreInit` sets both the middle and the aim point from it with `SetMidAndAimPos(model->relMidPos, model->relMidPos, true)`, so setting one sets the other. Prising them apart needs `Spring.SetUnitMidAndAimPos` from a game's own Lua, which an exported unit cannot carry.
 
@@ -355,7 +399,9 @@ It runs on coilbox's mission runtime, the way the workshop's "Start with this un
 
 Splinter Faction 0.1.89 has not taken the runtime's start guard ([the adoption contract](mission-runtime.md)), so a minute into the match it adds a commander to each team as well. The targets' one holds fire like the rest.
 
-A map with no start positions has nowhere to put the targets, and the drawer says so. The builder can only place your unit where its definition allows. A unit that cannot move has no slope limit unless you give it a `maxslope`, so it can only be built on perfectly flat ground. Splinter Faction 0.1.89 also gives any unit without a `customparams.factionname` a cost of 518,181,518 metal and energy, so its builder starts your unit and never finishes it.
+A map with no start positions has nowhere to put the targets, and the drawer says so. The builder can only place your unit where its definition allows. A unit that cannot move is written with a `maxslope` of 20, so it cannot be built on steeper ground than that.
+
+The scratch game does not carry your unit's weapons yet, so it cannot fire at the targets ([issue #4264](https://github.com/tomjn/coilbox/issues/4264)).
 
 ### Reload in the sandbox
 
@@ -376,11 +422,15 @@ Straight out of export, nothing lists the unit in any unit's `buildoptions`, so 
 
 ### Movement
 
-A movement class names an entry in the game's own move definitions, and the engine drops a unit that can move but names a class that does not resolve. So the builder never writes a class it made up. **Movement**, in the Animation panel, offers the classes of the game the Test drawer builds on, read out of that game's `gamedata/movedefs.lua`.
+A movement class names an entry in the game's own move definitions, and the engine drops a unit that can move but names a class that does not resolve. So the builder never writes a class it made up. **Movement**, in the Animation panel, offers the classes of the unit's own game, read out of that game's `gamedata/movedefs.lua`.
 
-The build decides which classes fit. A piece in the Wheel role makes a vehicle, and a piece in a leg role makes a walker. The engine decides which kind a class is, from its `speedModClass` or else from its name, and the picker uses the same rule. That rule can surprise you. Splinter Faction calls its walker classes `WALKERTANK`, so to the engine they are vehicles and the game has no walker class at all. A unit with neither wheels nor legs is offered every class and starts as **Does not move**.
+For now a unit belongs to a game only when it was opened from one. A unit built from parts has none, so Movement says so, offers nothing and the unit is exported static ([issue #3257](https://github.com/tomjn/coilbox/issues/3257)). Give it a movement class in Unit tweaks after export instead, as described below.
 
-Picking a class fills in the speed and the turn rate with the median of the game's own units on that class, and says so under each field. Type over either to set your own. With a class and a speed the definition is written with `canmove = true`, `movementclass`, `speed` and `turnrate`, and without one it is written static, as `canmove = false`.
+The build decides which classes fit. A piece in the Wheel role makes a vehicle, and a piece in a leg role makes a walker. The engine decides which kind a class is, from its `speedModClass` or else from its name, and the picker uses the same rule. When the game has no class of the build's kind, the picker offers the nearest kind it does have and labels each class with the kind it stands in for. Splinter Faction calls its walker classes `WALKERTANK`, so to the engine they are vehicles, and a walker there is offered the vehicle classes marked "no walker class". A unit with neither wheels nor legs is offered every class and starts as **Does not move**.
+
+Picking a class fills in the speed, turn rate, reverse speed, acceleration and brake rate with the median of the game's own units on that class, or on classes of the same kind when none of its units use that one. Each field says where its number came from. Type over any of them to set your own. A reverse speed is only suggested from units that can reverse, and a brake rate only from units that state one, because the engine brakes a unit that states none at its acceleration.
+
+With a class and a speed the definition is written with `canmove = true`, `movementclass` and `speed`, plus `turnrate`, `rSpeed`, `acceleration` and `brakeRate` when they are set. Without one it is written static, as `canmove = false`.
 
 When the game's `movedefs.lua` cannot be read, the picker falls back on the classes the game's units use, and says it has not narrowed them.
 
@@ -392,21 +442,19 @@ Below Movement, **Fit to the game** compares the unit with the game it belongs t
 - **Category.** A unit with no category cannot be targeted by any weapon, because the engine drops a target whose category does not overlap the weapon's `onlyTargetCategory`. The row warns on none, and on a category no unit in the game uses. It lists the categories of the game's similar units, meaning those on the same movement class, or the static ones for a unit that does not move.
 - **Movement class.** The row warns when the unit moves and names no class, or names one the game does not declare. A flier is not checked.
 
-Before the first export the rows read the definition the builder would write. After the unit is exported into the game and read back, they read the game's own entry, because that file is where a built unit's stats live. A warning on armour class or category then links to the unit in Unit tweaks, where both are changed. Like Movement, it needs the unit to have a game.
+Before the first export the rows read the definition the builder would write. After the unit is exported into the game and read back, they read the game's own entry, because that file is where a built unit's stats live. A warning on armour class or category then links to the unit in Unit tweaks, where both are changed. Like Movement, it needs the unit to have a game, so for now it checks only a unit opened from one.
 
 The decisions the builder cannot make are made in **Unit tweaks**, under **workshop** in the sidebar. Pick the game you exported into and your unit is in the list, alongside the game's own:
 
-- **Change its movement class.** The field is a picker, and what it offers is the classes this game's units already move on. Turn **Can move** on beside it. The page says so if only one of the two is set, because either half on its own is wrong.
+- **Give it a movement class**, for a unit built from parts. The field is a picker, and what it offers is the classes this game's units already move on. Turn **Can move** on beside it. The page says so if only one of the two is set, because either half on its own is wrong.
 - **Put it on a builder's menu.** Open the factory or the commander that should build it and add it to the roster. That is the answer to "which builder gains it as an option", and it is the same editor you would use to change any of the game's own build menus.
-- **Change any other number.** Health, cost, categories, weapons: the unit edits exactly like a unit the game shipped.
+- **Change any other number.** Categories, armour class, and any number the builder set, such as health or cost. The unit edits exactly like a unit the game shipped.
 
-The unit is in that list because `units/<unit>.lua` is a file in the game and the engine reads it like any other. What export adds is a note of where it wrote, so the workshop can mark the unit as yours and say which model it came out of, rather than leaving you to spot it among the game's own. Export the same unit again and it is still one unit, not two. Nothing is imported and there is no button to press.
+The unit is in that list because `units/<unit>.lua` is a file in the game and the engine reads it like any other. What export adds is a note of where it wrote, so the workshop can mark the unit as yours and say which model it came out of, rather than leaving you to spot it among the game's own. A unit exported into several games is marked in each of them. Export the same unit again and it is still one unit, not two. Nothing is imported and there is no button to press.
 
 If the unit is not in the list, unitsync has not re-read the game yet. The workshop shows the definition export wrote until it does.
 
-Renaming the unit in the builder and exporting again leaves the old `units/<name>.lua` behind in the game folder. Delete it by hand.
-
-One thing this does not yet do is save. Workshop edits live on the page for as long as it is open ([issue #1282](https://github.com/tomjn/coilbox/issues/1282)). The exported unit itself is a real file and is not going anywhere.
+A change in Unit tweaks stays in the workshop project until you write it into the game with **Write changes into the game**. See [Edit the game's own files](unit-tweaks.md#edit-the-game-s-own-files). From then on export treats each field it changed as set by hand and stops updating it. Until you accept or undo that write, export leaves the unit definition alone.
 
 ## The engine load checklist
 
