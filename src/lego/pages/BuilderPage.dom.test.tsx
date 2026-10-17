@@ -134,7 +134,7 @@ function session(project: LegoProject): LegoDocumentSession {
     save: vi.fn(),
     lift: () => null,
     selectMany: vi.fn(),
-    insert: () => [],
+    insert: () => ({ rootPieceIds: [], held: [] }),
     duplicate: () => [],
     onCapture: vi.fn(),
     capture: vi.fn(() => null),

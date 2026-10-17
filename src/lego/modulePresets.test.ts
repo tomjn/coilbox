@@ -179,6 +179,7 @@ describe("insertCompound presets", () => {
     expect(result.presets.held).toEqual([
       {
         presetId: "walk.biped",
+        params: { stride: 3 },
         missing: ["leg.r1.thigh", "leg.r1.shin"],
       },
     ]);

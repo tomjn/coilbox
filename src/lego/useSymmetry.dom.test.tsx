@@ -20,6 +20,9 @@ import { act, useState } from "react";
 import * as THREE from "three";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { type AnimPreset, presetById } from "./animPresets";
+import { insertCompound } from "./compounds";
+import { presetCopies } from "./luaScript";
 import { type LegoPiece, type LegoProject, newProject } from "./model";
 import { worldMatrix } from "./reparent";
 import { type SymmetrySession, useSymmetry } from "./useSymmetry";
@@ -254,6 +257,90 @@ describe("giving a piece a twin", () => {
       session?.place(["leg"], (p) => p);
     });
     expect(edit).not.toHaveBeenCalled();
+  });
+});
+
+describe("a leg module dropped in with symmetry on (issue #4316)", () => {
+  /** One leg of a biped: a thigh with a shin, and the walk that needs both
+   *  sides. */
+  function legModule(): LegoProject {
+    const piece = (id: string, parentId: string | null, role: string) => ({
+      id,
+      name: id,
+      parentId,
+      partId: null,
+      role,
+      position: [0, 0, 0] as [number, number, number],
+      rotation: [0, 0, 0] as [number, number, number],
+      scale: [1, 1, 1] as [number, number, number],
+    });
+    return {
+      ...newProject({
+        id: "leg-module",
+        rootPieceId: "thigh",
+        name: "Leg",
+        packId: "lego",
+        packVersion: "1",
+        now: "2026-08-21T00:00:00Z",
+      }),
+      pieces: [
+        piece("thigh", null, "leg.l1.thigh"),
+        piece("shin", "thigh", "leg.l1.shin"),
+      ],
+      animations: [{ presetId: "walk.biped", params: {} }],
+    };
+  }
+
+  function dropped() {
+    let count = 0;
+    const inserted = insertCompound(
+      unit([]),
+      legModule(),
+      "root",
+      () => `n${++count}`,
+      true,
+    );
+    const legId = inserted.rootPieceIds[0];
+    const bench = open(inserted.project, [legId]);
+    bench.run(() => bench.session().setOn(true));
+    bench.run(() => bench.session().queueTwin(legId, inserted.presets.held));
+    return { bench, legId, inserted };
+  }
+
+  it("holds the walk back while only one leg is there", () => {
+    const { inserted } = dropped();
+    expect(inserted.project.animations ?? []).toEqual([]);
+    expect(inserted.presets.held.map((held) => held.presetId)).toEqual([
+      "walk.biped",
+    ]);
+  });
+
+  it("gives the unit the walk once the twin supplies the other leg", () => {
+    const { bench, legId } = dropped();
+    bench.run(() =>
+      bench.session().place([legId], (p) => moveTo(p, legId, [3, 0, 0])),
+    );
+    expect(bench.project().animations).toEqual([
+      { presetId: "walk.biped", params: {} },
+    ]);
+  });
+
+  it("makes the two legs one set of legs", () => {
+    const { bench, legId } = dropped();
+    bench.run(() =>
+      bench.session().place([legId], (p) => moveTo(p, legId, [3, 0, 0])),
+    );
+    const walk = presetById("walk.biped") as AnimPreset;
+    expect(presetCopies(bench.project(), walk)).toBe(1);
+  });
+
+  it("leaves the walk off when symmetry is off", () => {
+    const { bench, legId } = dropped();
+    bench.run(() => bench.session().setOn(false));
+    bench.run(() =>
+      bench.session().place([legId], (p) => moveTo(p, legId, [3, 0, 0])),
+    );
+    expect(bench.project().animations ?? []).toEqual([]);
   });
 });
 

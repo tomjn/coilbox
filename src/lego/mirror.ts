@@ -270,7 +270,12 @@ export function mirrorCopy(
   // had been dropped back at the hull's origin would not be the other leg.
   const inserted = insertCompoundAt(project, cutting, target, at, newId);
 
-  const mirrored = mirrorPiece(inserted.project, inserted.rootPieceId);
+  const mirrored = joinsInstance(
+    mirrorPiece(inserted.project, inserted.rootPieceId),
+    inserted.rootPieceId,
+    project,
+    pieceId,
+  );
   return {
     project: rejoined(
       mirrored,
@@ -280,6 +285,38 @@ export function mirrorCopy(
       mirroredWorld(project, pieceId),
     ),
     pieceId: inserted.rootPieceId,
+  };
+}
+
+/**
+ * A mirrored copy of a sided piece, such as a leg, is the other half of the set
+ * it was copied from, so it joins the original's module instance instead of
+ * starting one. Otherwise a pair of legs counts as two sets of legs, each with
+ * one side, and a preset that needs both sides finds neither complete (issue
+ * #4316). A piece with no sided role is a second copy of itself, such as a
+ * second build arm, and keeps the instance of its own that the copy was given.
+ */
+function joinsInstance(
+  mirrored: LegoProject,
+  copyId: string,
+  original: LegoProject,
+  sourceId: string,
+): LegoProject {
+  const instance = pieceById(original, sourceId)?.module;
+  if (!instance) return mirrored;
+  const sided = descendantIds(original, sourceId).some((id) => {
+    const role = pieceById(original, id)?.role;
+    return role !== undefined && mirrorRole(role) !== role;
+  });
+  if (!sided) return mirrored;
+  const copied = new Set(descendantIds(mirrored, copyId));
+  return {
+    ...mirrored,
+    pieces: mirrored.pieces.map((piece) =>
+      copied.has(piece.id) && piece.module
+        ? { ...piece, module: { ...instance } }
+        : piece,
+    ),
   };
 }
 

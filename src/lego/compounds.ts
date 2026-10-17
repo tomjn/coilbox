@@ -173,6 +173,14 @@ function presetsFor(
   });
 }
 
+/** A preset a module carried that the unit could not take yet. */
+export interface HeldPreset {
+  presetId: string;
+  params: Record<string, number>;
+  /** The roles the unit still lacked. */
+  missing: string[];
+}
+
 /** What inserting a module did about the presets it carried. */
 export interface PresetOutcome {
   /** Added to the unit's animations. */
@@ -180,7 +188,7 @@ export interface PresetOutcome {
   /** The unit already had these, so its own parameters stand. */
   present: string[];
   /** Not added, because the unit still lacks these roles after the insert. */
-  held: { presetId: string; missing: string[] }[];
+  held: HeldPreset[];
   /** The unit had no builder block and took the module's. */
   builderTaken: boolean;
 }
@@ -207,7 +215,11 @@ function mergePresets(
     }
     const missing = unmetRequirements(preset, roles);
     if (missing.length > 0) {
-      outcome.held.push({ presetId: entry.presetId, missing });
+      outcome.held.push({
+        presetId: entry.presetId,
+        params: { ...entry.params },
+        missing,
+      });
       continue;
     }
     applied.push({ presetId: entry.presetId, params: { ...entry.params } });
@@ -224,6 +236,30 @@ function mergePresets(
         : {}),
     },
   };
+}
+
+/**
+ * Held presets the unit can take now. A symmetry twin adds the other side's
+ * roles after the insert, so the presets the insert held back are judged again
+ * once the twin is there (issue #4316). Ones the unit still lacks roles for, or
+ * already has, are left alone.
+ */
+export function adoptHeldPresets(
+  project: LegoProject,
+  held: HeldPreset[],
+): LegoProject {
+  const roles = countRoles(project.pieces);
+  const applied = [...(project.animations ?? [])];
+  for (const entry of held) {
+    const preset = presetById(entry.presetId);
+    if (!preset || applied.some((have) => have.presetId === entry.presetId))
+      continue;
+    if (unmetRequirements(preset, roles).length > 0) continue;
+    applied.push({ presetId: entry.presetId, params: { ...entry.params } });
+  }
+  return applied.length === (project.animations ?? []).length
+    ? project
+    : { ...project, animations: applied };
 }
 
 /** One line for the user about what a module insert did with its presets. */
