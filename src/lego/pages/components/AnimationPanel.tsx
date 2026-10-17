@@ -121,6 +121,7 @@ import {
 import { isBuilder } from "../../unitDef";
 import { controlFor } from "../../unitValueControls";
 import type { LegoWorth } from "../../worth";
+import { BuilderReport } from "./BuilderReport";
 import { GameFitSection } from "./GameFitSection";
 import { MovementSection } from "./MovementSection";
 import { ScrubberMarks } from "./ScrubberMarks";
@@ -1599,6 +1600,7 @@ export function AnimationPanel({
                 builder. All three go together: the engine reads a builder with
                 no work rate as not a builder at all.
               </p>
+              <BuilderReport project={project} />
 
               {BUILDER_FIELDS.map((field) => (
                 <div key={field.id} className="mt-2">

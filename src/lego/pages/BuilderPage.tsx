@@ -19,6 +19,7 @@ import {
   Sparkles,
   Undo,
   Upload,
+  Wrench,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -50,6 +51,7 @@ import { addAnchor, removeAnchor, updateAnchor } from "../anchors";
 import { ROLES, restAngleWarnings } from "../animPresets";
 import { unitAtlas } from "../atlas";
 import { legoTexturePrune } from "../bindings";
+import { addBuildArm, builderKind, pickArmParts } from "../buildArm";
 import { pictureIsStale } from "../buildPicture";
 import { parseClipboardPiece, serializeClipboardPiece } from "../clipboard";
 import { reanchorCollisionVolume } from "../collisionVolume";
@@ -133,6 +135,7 @@ import { TestDrawer } from "./components/TestDrawer";
 import { TextureBuilderPanel } from "./components/TextureBuilderPanel";
 import { TexturePicker } from "./components/TexturePicker";
 import { TransformFields } from "./components/TransformFields";
+import { useBuiltUnitDef } from "./components/useBuiltUnitDef";
 import { useEffectBitmaps } from "./components/useEffectBitmaps";
 import { useMoreBelow } from "./components/useMoreBelow";
 
@@ -161,6 +164,8 @@ function Builder({ id }: { id: string | undefined }) {
   const doc = useLegoDocument(id);
   const { edit, selectedId, selectedIds, select: setSelectedId } = doc;
   const draft = doc.project;
+  // The unit's file in its game, which is where a factory's yardmap would be.
+  const { def: builtDef } = useBuiltUnitDef(draft);
   // The names this unit has stopped exporting under, whose files are still in
   // the game folder (issue #2680). Held steady, because the export drawer reads
   // it in an effect and a fresh function each render would loop.
@@ -380,6 +385,30 @@ function Builder({ id }: { id: string | undefined }) {
       };
     });
     queueTwin(pieceId);
+  }
+
+  /** The build arm module: arm, nozzle and nano point with their presets. */
+  function addArm() {
+    if (!draft || !pack) return;
+    const parts = pickArmParts(pack.parts);
+    if (!parts) {
+      void notify({
+        title: "Could not add a build arm",
+        body: "This parts library has no block and beam to make one from.",
+        level: "error",
+      });
+      return;
+    }
+    const added = addBuildArm(draft, parts, {
+      parentId: selectedId ?? draft.rootPieceId,
+      factory: builderKind(draft, builtDef)?.kind === "factory",
+      newId: () => crypto.randomUUID(),
+      now: new Date().toISOString(),
+    });
+    // One edit, so the pieces and their presets undo together.
+    edit(() => added.project);
+    doc.selectMany(added.rootPieceIds);
+    for (const pieceId of added.rootPieceIds) queueTwin(pieceId);
   }
 
   function removeSelected() {
@@ -1603,10 +1632,24 @@ function Builder({ id }: { id: string | undefined }) {
                     <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Pieces
                     </h2>
+                    {pack && !draft.imported ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="ml-auto"
+                        onClick={addArm}
+                        aria-label="Add a build arm"
+                        title="Add a build arm with its nozzle and nano point, and the build presets"
+                      >
+                        <Wrench size={14} />
+                      </Button>
+                    ) : null}
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="ml-auto"
+                      className={
+                        pack && !draft.imported ? undefined : "ml-auto"
+                      }
                       onClick={addEmpty}
                       title="Add an empty piece, which is how flares and aim points are made"
                     >

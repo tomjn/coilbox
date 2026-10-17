@@ -123,6 +123,10 @@ A builder is handed a heading and a pitch worked out from whatever it is buildin
 
 **Build arm** used to sweep whenever the unit was switched on, which for a builder is nearly always. It now runs while the unit is actually building. If you applied it before this change, that is what altered.
 
+The **Build arm** button above the piece list (the wrench) adds the whole arm in one step: a base, an arm on it, a nozzle on the arm and an empty nano point at the nozzle's end, each with its role set. It also applies **Aim while building** and **Nano from the nozzle**, and it is one undo step. It hangs off the selected piece, or the root when nothing is selected.
+
+At the top of the Animation panel, under **What it builds with**, two lines say what the unit has become. The first names the kind and why. A builder that moves, with a movement class and a speed above zero, is a mobile builder. One that does not is a static builder. A static builder is a factory when the game's file for the unit has a yardmap, and the engine needs nothing else (`IsFactoryUnit` is a builder that cannot move and has a yardmap). The builder writes no yardmap, so a unit is a factory only after the workshop adds one to the exported file. The second line says what it builds, read from that file's `buildoptions`. The build list belongs to the workshop, so the line links to **Unit tweaks** rather than offering an editor.
+
 Two things happen automatically for a unit with any build role on it.
 
 Its definition is written as a builder, with `builder`, `workerTime`, `builddistance` and `canassist`. The three numbers go together because the engine reads a builder with no work rate as not a builder, so `builder = true` on its own clears itself. **What it builds with** at the top of the Animation panel sets the work rate and the reach.

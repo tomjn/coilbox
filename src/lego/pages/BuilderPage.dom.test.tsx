@@ -51,7 +51,7 @@ vi.mock("../pack", async () => {
 /** What the parts library read answers with, swapped per test: the wait, the
  *  failure and the success all take different paths through the guard. */
 let packLoad: Promise<unknown>;
-const loadedPack = () =>
+const loadedPack = (parts: unknown[] = []) =>
   Promise.resolve({
     manifest: { categories: [] } as never,
     library: {
@@ -60,7 +60,7 @@ const loadedPack = () =>
       dir: "",
       problems: [],
     },
-    parts: [],
+    parts,
     byId: new Map(),
     vertices: new Float32Array(0),
     indices: new Uint16Array(0),
@@ -85,6 +85,12 @@ vi.mock("./components/ModelViewport", () => ({
 // same store, for the button that takes a game's compiled script again.
 vi.mock("./components/TestDrawer", () => ({
   TestDrawer: () => null,
+}));
+// Reads a display setting from the app frame, which nothing here provides.
+vi.mock("./components/PartPicker", () => ({ PartPicker: () => null }));
+// Reads the unit's file in its game through unitsync, for a factory's yardmap.
+vi.mock("./components/useBuiltUnitDef", () => ({
+  useBuiltUnitDef: () => ({ game: undefined, key: null, def: undefined }),
 }));
 vi.mock("@/play/config", () => ({
   usePreferredTarget: () => ({ target: undefined }),
@@ -155,6 +161,51 @@ describe("a unit built out of parts", () => {
     await screen.findByRole("button", { name: "Script" });
     expect(screen.getByRole("button", { name: "Parts" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Compounds" })).toBeTruthy();
+  });
+});
+
+describe("the build arm button", () => {
+  const part = (id: string, shape: string, long: number) => ({
+    id,
+    name: id,
+    shape,
+    shapeId: id,
+    category: "grey",
+    colourway: "grey",
+    material: "",
+    tags: [],
+    packId: "lego",
+    bbox: { min: [-0.25, -long / 2, -0.25], max: [0.25, long / 2, 0.25] },
+  });
+
+  it("adds the arm and its presets in one edit", async () => {
+    packLoad = loadedPack([part("blk", "block", 0.5), part("bm", "beam", 2)]);
+    show(unit());
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Add a build arm" }),
+    );
+
+    const edit = doc.current.edit as ReturnType<typeof vi.fn>;
+    expect(edit).toHaveBeenCalledTimes(1);
+    const next = edit.mock.calls[0][0](unit());
+    expect(next.pieces.map((p: { role?: string }) => p.role).sort()).toEqual([
+      "buildarm.arm",
+      "buildarm.base",
+      "buildarm.nano",
+      "buildarm.nozzle",
+      undefined,
+    ]);
+    expect(
+      next.animations.map((a: { presetId: string }) => a.presetId),
+    ).toEqual(["build.aim", "build.nano"]);
+  });
+
+  it("is not offered for a unit imported whole", async () => {
+    show(unit({ imported: { source: "/tmp/unit.s3o" } }));
+    await screen.findByRole("button", { name: "Script" });
+    expect(
+      screen.queryByRole("button", { name: "Add a build arm" }),
+    ).toBeNull();
   });
 });
 
