@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { GuideLine, GuidePlane } from "../../guides";
 import { type LegoPiece, type LegoProject, newProject } from "../../model";
 import type { LegoPartInfo, LoadedPack } from "../../pack";
-import { applySnap } from "./anchorsAndSnapping";
+import { applySnap, PLACE_CONNECTOR_HINT } from "./anchorsAndSnapping";
 import type { SceneState } from "./sceneState";
 
 type Vec3 = [number, number, number];
@@ -366,5 +366,13 @@ describe("applySnap on a joined piece", () => {
     applySnap(state);
 
     expect(state.slide).toBeNull();
+  });
+});
+
+describe("PLACE_CONNECTOR_HINT", () => {
+  it("calls what is being put on the model a connector", () => {
+    expect(PLACE_CONNECTOR_HINT).toBe(
+      "Click the model to put a connector there. Escape to stop",
+    );
   });
 });

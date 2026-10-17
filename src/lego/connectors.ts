@@ -412,6 +412,51 @@ export function slideJoin(
 }
 
 /**
+ * The turn of the face a joined piece slides on (issue #4295), in the space the
+ * piece's own position is written in.
+ *
+ * Its x axis runs along the face, its y axis across it and its z axis goes
+ * through it, which is the axis a slide drops. A face is not always aligned to
+ * the world or to the piece's own axes, so a handle set to these shows the two
+ * directions the piece can move in whatever way the face is turned. Null when
+ * the piece has no join that can be made.
+ */
+export function slideFrame(
+  project: LegoProject,
+  pack: LoadedPack,
+  pieceId: string,
+): THREE.Quaternion | null {
+  const piece = project.pieces.find((p) => p.id === pieceId);
+  const connection = piece?.connection;
+  const parent = piece?.parentId
+    ? project.pieces.find((p) => p.id === piece.parentId)
+    : undefined;
+  if (!piece || !connection || !parent) return null;
+
+  const parentScale = parentScaleOf(project, parent.id);
+  const at = (offset: [number, number]) =>
+    placeJoin(pack, piece, parent, { ...connection, offset }, parentScale);
+  const origin = at([0, 0]);
+  const along = at([1, 0]);
+  const across = at([0, 1]);
+  if (!origin || !along || !across) return null;
+
+  const from = new THREE.Vector3(...origin.position);
+  const x = new THREE.Vector3(...along.position).sub(from);
+  const y = new THREE.Vector3(...across.position).sub(from);
+  if (x.lengthSq() < 1e-12 || y.lengthSq() < 1e-12) return null;
+  x.normalize();
+  // A scaled parent can skew the two directions, so y is made square to x.
+  y.addScaledVector(x, -y.dot(x));
+  if (y.lengthSq() < 1e-12) return null;
+  y.normalize();
+  const z = new THREE.Vector3().crossVectors(x, y);
+  return new THREE.Quaternion().setFromRotationMatrix(
+    new THREE.Matrix4().makeBasis(x, y, z),
+  );
+}
+
+/**
  * The angle about the parent's connector that leaves the piece turned as it is.
  *
  * The piece's up direction is carried into the parent's child space, which is

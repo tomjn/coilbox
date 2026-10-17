@@ -136,6 +136,7 @@ import {
   applySnap,
   clearAnchors,
   forceUniformScale,
+  PLACE_CONNECTOR_HINT,
   showSeat,
   showTargetAnchors,
 } from "./anchorsAndSnapping";
@@ -220,6 +221,7 @@ import {
   setHoveredAndNotify,
 } from "./selectionAndHoverOutlines";
 import { disposeSkeleton } from "./skeletonLayer";
+import { followSlideFrame, settleSlideFrame } from "./slideHandle";
 import { type StandInPlacement, standInFor } from "./standInPlayback";
 import { useBalance } from "./useBalance";
 import { useCollisionAndAimVisibility } from "./useCollisionAndAimVisibility";
@@ -1280,6 +1282,7 @@ export function ModelViewport({
         root,
         overlay,
         groupPivot,
+        slideFrame: new THREE.Object3D(),
         groupPivotAt: [0, 0, 0],
         groupIds: [],
         groupChanges: new Map(),
@@ -1435,8 +1438,10 @@ export function ModelViewport({
         if (gizmo.object === groupPivot) {
           dragGroup(state);
         } else {
+          followSlideFrame(state);
           forceUniformScale(state);
           applySnap(state);
+          settleSlideFrame(state);
           moveDragReadout(state);
         }
         refreshSelectionOutlines(state);
@@ -2064,7 +2069,7 @@ export function ModelViewport({
                 : pickingGuide
                   ? `Click the model to put a ${pickingGuide.axis.toUpperCase()} ${pickingGuide.kind === "line" ? "line" : "plane"} there. Escape to stop`
                   : placingAnchor
-                    ? "Click the model to put an anchor there. Escape to stop"
+                    ? PLACE_CONNECTOR_HINT
                     : placingPart
                       ? `Click a face to place the ${"module" in placingPart ? (placingPart.module.mount ? "module" : "module, which has no mount so joins by its first piece") : "part"}. ${shortcutLabel("place-face")} next face, ${shortcutLabel("place-twist")} twist, Escape to stop`
                       : resizeNote !== null
