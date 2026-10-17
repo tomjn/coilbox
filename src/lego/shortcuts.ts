@@ -129,6 +129,24 @@ export const SHORTCUTS: Shortcut[] = [
     combos: [{ key: "f", mod: false, shift: false }],
   },
   {
+    id: "view-front",
+    group: "View",
+    description: "Front view, with no perspective",
+    combos: [{ key: "1", mod: false, shift: false }],
+  },
+  {
+    id: "view-side",
+    group: "View",
+    description: "Side view, with no perspective",
+    combos: [{ key: "2", mod: false, shift: false }],
+  },
+  {
+    id: "view-top",
+    group: "View",
+    description: "Top view, with no perspective",
+    combos: [{ key: "3", mod: false, shift: false }],
+  },
+  {
     id: "measure",
     group: "View",
     description: "Measure between two points",

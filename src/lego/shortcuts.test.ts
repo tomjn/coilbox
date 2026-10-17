@@ -61,6 +61,14 @@ describe("isShortcut", () => {
     expect(isShortcut("frame", key("f", { ctrlKey: true }))).toBe(false);
   });
 
+  it("shows the front, side and top views on 1, 2 and 3, clear of Cmd", () => {
+    expect(isShortcut("view-front", key("1"))).toBe(true);
+    expect(isShortcut("view-side", key("2"))).toBe(true);
+    expect(isShortcut("view-top", key("3"))).toBe(true);
+    expect(isShortcut("view-top", key("3", { metaKey: true }))).toBe(false);
+    expect(isShortcut("view-front", key("2"))).toBe(false);
+  });
+
   it("measures on L, clear of Cmd L, and leaves on Escape", () => {
     expect(isShortcut("measure", key("l"))).toBe(true);
     expect(isShortcut("measure", key("l", { metaKey: true }))).toBe(false);
