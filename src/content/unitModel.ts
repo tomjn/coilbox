@@ -217,6 +217,9 @@ async function buildTextureAtlas(
   loaded.forEach((texture, index) => {
     const image = texture.image as AtlasSource | undefined;
     if (springTextureFailed(texture) || !image?.width || !image.height) return;
+    // A texture decoded by `restoreFullyTransparent` is pixels, which a canvas
+    // cannot draw, so it keeps a material of its own.
+    if (typeof ImageData !== "undefined" && image instanceof ImageData) return;
     packable.push({ file: files[index], source: image });
   });
   if (packable.length < 2) return null;

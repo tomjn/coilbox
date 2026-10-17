@@ -12,6 +12,7 @@
 import * as THREE from "three";
 import { DDSLoader } from "three/addons/loaders/DDSLoader.js";
 
+import { fullyTransparent, fullyTransparentPngPixels } from "./pngDecode";
 import { onTextureArrived, textureArrived } from "./textureArrival";
 
 /**
@@ -73,7 +74,13 @@ export function springTexture(url: string): THREE.Texture {
   const texture: THREE.Texture =
     ext === "dds"
       ? new DDSLoader().load(url, textureArrived, undefined, gaveUp)
-      : new THREE.TextureLoader().load(url, textureArrived, undefined, gaveUp);
+      : new THREE.TextureLoader().load(
+          url,
+          (loaded) =>
+            void restoreFullyTransparent(loaded, url).then(textureArrived),
+          undefined,
+          gaveUp,
+        );
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 4;
   // three flips a picture it decodes itself so that v = 0 is the bottom row,
@@ -87,6 +94,46 @@ export function springTexture(url: string): THREE.Texture {
   }
   textures.set(url, texture);
   return texture;
+}
+
+/** How small the webview's decode is drawn to check it for alpha. */
+const PROBE_SIZE = 64;
+
+/**
+ * Put back the colour macOS's decoder drops from a PNG whose alpha is 0 in
+ * every pixel (see `pngDecode.ts`), by decoding the file again here.
+ *
+ * Checked on a small copy of the webview's decode, so a texture with any alpha
+ * at all costs one small draw. Shrinking can only lose alpha, never invent it,
+ * so a texture with a little team colour may get decoded again for nothing, and
+ * a broken one never slips past.
+ */
+export async function restoreFullyTransparent(
+  texture: THREE.Texture,
+  url: string,
+): Promise<void> {
+  const image = texture.image as CanvasImageSource & {
+    width: number;
+    height: number;
+  };
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.min(image.width, PROBE_SIZE));
+  canvas.height = Math.max(1, Math.min(image.height, PROBE_SIZE));
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) return;
+  try {
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const probe = context.getImageData(0, 0, canvas.width, canvas.height);
+    if (!fullyTransparent(probe.data)) return;
+  } catch {
+    // A picture the canvas cannot read is drawn as the webview decoded it.
+    return;
+  }
+
+  const pixels = await fullyTransparentPngPixels(url);
+  if (!pixels) return;
+  texture.image = new ImageData(pixels.data, pixels.width, pixels.height);
+  texture.needsUpdate = true;
 }
 
 /**

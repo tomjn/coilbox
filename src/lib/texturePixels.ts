@@ -15,6 +15,8 @@
  * exactly the bytes the file stored.
  */
 
+import { fullyTransparent, fullyTransparentPngPixels } from "./pngDecode";
+
 /** What `readTexturePixels` hands back: one RGBA byte per channel per pixel,
  *  row major from the top left. */
 export interface TexturePixels {
@@ -139,6 +141,11 @@ export async function readTexturePixels(url: string): Promise<TexturePixels> {
   const { width, height } = sourceSize(source);
   try {
     const data = readPixelsFromSource(source, width, height);
+    // macOS's decoder zeroes the colour of a PNG with no alpha anywhere.
+    if (fullyTransparent(data)) {
+      const own = await fullyTransparentPngPixels(url);
+      if (own) return own;
+    }
     return { width, height, data };
   } finally {
     if (source instanceof ImageBitmap) source.close();
