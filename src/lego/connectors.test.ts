@@ -14,6 +14,7 @@ import {
   readPartConnectors,
   resolveConnections,
   setJoinPlace,
+  slideFrame,
   slideJoin,
   withConnections,
 } from "./connectors";
@@ -1031,6 +1032,53 @@ describe("pieceConnectors with custom anchors", () => {
     // point its bottom back along -z and lands on the nose.
     expect(worldPoint(joined, "leg", [0, -1, 0])).toEqual([0, 0, 2]);
     expect(worldNormal(joined, "leg", [0, -1, 0])).toEqual([0, 0, -1]);
+  });
+});
+
+describe("slideFrame", () => {
+  const axes = (doc: LegoProject) => {
+    const turn = slideFrame(doc, pack(), "leg");
+    return turn
+      ? (
+          [
+            [1, 0, 0],
+            [0, 1, 0],
+            [0, 0, 1],
+          ] as Vec3[]
+        ).map((v) =>
+          round(new THREE.Vector3(...v).applyQuaternion(turn).toArray()),
+        )
+      : null;
+  };
+
+  it("runs along and across the top face, with the through axis down it", () => {
+    const [x, y, z] = axes(
+      hullAndLeg({
+        connection: { connector: "-y", to: "+y" },
+        position: [0, 1.5, 0],
+      }),
+    ) ?? [[], [], []];
+
+    expect(x).toEqual([1, 0, 0]);
+    expect(y).toEqual([0, 0, 1]);
+    expect(Math.abs(z[1])).toBe(1);
+  });
+
+  it("puts the through axis along the normal of a face that is turned from the top", () => {
+    const [x, y, z] = axes(
+      hullAndLeg({
+        connection: { connector: "-y", to: "+x" },
+        position: [1.5, 0, 0],
+      }),
+    ) ?? [[], [], []];
+
+    expect(Math.abs(z[0])).toBe(1);
+    expect(x[0]).toBe(0);
+    expect(y[0]).toBe(0);
+  });
+
+  it("is null for a piece that is not joined", () => {
+    expect(slideFrame(hullAndLeg({}), pack(), "leg")).toBeNull();
   });
 });
 

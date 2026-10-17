@@ -1,43 +1,42 @@
 /**
- * Sorting saved units into what you built and what you opened out of somebody
- * else's game (#1819).
+ * Sorting saved units by the game each is for (#1819, #4328).
  *
- * One flat list stops telling you anything once you are working on two games at
- * once, because a unit you assembled out of parts and a unit you opened out of a
- * game look exactly alike in it. `LegoProject.imported` already says which is
- * which, and the picker records the game each opened unit came from, so the only
- * work here is grouping on that.
- *
- * Grouping is on the archive rather than on the game's name, because the name is
- * what a game chooses to call itself and can carry a `$VERSION` placeholder,
- * while the archive is the thing on disk that was read. The name is still what
- * the group is labelled with, since that is what somebody recognises.
+ * A unit belongs to the game it is for, whether it was built from parts or
+ * opened out of somebody else's game, so one game's units sit together.
+ * Two versions of a game, or a game and its mutator, are one game by the rule
+ * in `unitGame.ts`, so they share a section. A unit for no game keeps a section
+ * of its own, and a unit opened from a model file that names no game keeps
+ * another.
  *
  * Pure, so the grouping rules are testable without a webview.
  */
 
+import type { GameItem } from "@/content/bindings";
 import type { LegoProject } from "./model";
-import { unitGame } from "./unitGame";
+import { gameKey, unitGame } from "./unitGame";
 
 /** The archive extensions a game's models can arrive from. */
 const ARCHIVE_EXT = /\.(sdd|sdz|sd7|sdp)$/i;
 
-/** The units opened out of one game. */
+/** The units for one game, across its versions and mutators. */
 export interface LegoGameGroup {
-  /** The archive's file name, lower case. Stable across the two ways a unit can
-   *  say where it came from, so both land in one group. */
+  /** The game's `gameKey`. What a folded section is remembered by. */
   key: string;
-  /** What the group is called: the game's own name where one was recorded, and
-   *  the archive's file name where it was only read back out of a path. */
+  /** What the group is called: the newest game name recorded on its units, or
+   *  an archive's file name where that is all a unit's path gave. */
   label: string;
-  /** In the order they were given, which is newest first. */
+  /** Every archive a unit in the group is for, lower case. Lets a fold saved
+   *  under an archive name be carried to this group's key. */
+  archives: string[];
+  /** Built units first, then opened ones, each in the order they were given
+   *  (newest first). */
   projects: LegoProject[];
 }
 
 export interface GroupedProjects {
-  /** Units built out of the parts pack. */
+  /** Units built from parts that are for no game. */
   own: LegoProject[];
-  /** Units opened out of a game, one group per game, by label. */
+  /** Units for a game, one group per game, by label. */
   games: LegoGameGroup[];
   /** Units opened out of a model file that names no game: one exported from
    *  Blender, or downloaded, or sitting on a desktop. Kept apart rather than
@@ -63,48 +62,67 @@ export function archiveFromSource(source: string): string | null {
   return null;
 }
 
-/** Split saved units by where each one came from. */
-export function groupProjects(projects: LegoProject[]): GroupedProjects {
+/** Split saved units by the game each is for. `installed` lets a unit saved
+ *  before short names were recorded find its game's key. */
+export function groupProjects(
+  projects: LegoProject[],
+  installed: readonly GameItem[] = [],
+): GroupedProjects {
   const own: LegoProject[] = [];
   const files: LegoProject[] = [];
-  const games = new Map<string, LegoGameGroup>();
-  /** Groups whose label is only an archive name, so a recorded name can still
-   *  replace it however the two are ordered. */
-  const guessed = new Set<string>();
+  interface Building {
+    key: string;
+    archives: Set<string>;
+    names: { name: string; guessed: boolean }[];
+    built: LegoProject[];
+    opened: LegoProject[];
+  }
+  const games = new Map<string, Building>();
 
   for (const project of projects) {
-    const imported = project.imported;
-    if (!imported) {
-      own.push(project);
+    let game = unitGame(project);
+    let guessed = false;
+    if (!game && project.imported && project.game === undefined) {
+      // Opened before the picker recorded a game: all that is left is the path.
+      const archive = archiveFromSource(project.imported.source);
+      if (archive) {
+        game = { name: archive, archive };
+        guessed = true;
+      }
+    }
+    if (!game) {
+      (project.imported ? files : own).push(project);
       continue;
     }
-    const recorded = imported.game;
-    const archive = recorded?.archive ?? archiveFromSource(imported.source);
-    if (!archive) {
-      files.push(project);
-      continue;
-    }
-    const key = archive.toLowerCase();
-    const group = games.get(key);
+    const key = gameKey(game, installed);
+    let group = games.get(key);
     if (!group) {
-      games.set(key, {
-        key,
-        label: recorded?.name ?? archive,
-        projects: [project],
-      });
-      if (!recorded) guessed.add(key);
-      continue;
+      group = { key, archives: new Set(), names: [], built: [], opened: [] };
+      games.set(key, group);
     }
-    group.projects.push(project);
-    if (recorded && guessed.has(key)) {
-      group.label = recorded.name;
-      guessed.delete(key);
-    }
+    group.archives.add(game.archive.toLowerCase());
+    group.names.push({ name: (game.base ?? game).name, guessed });
+    (project.imported ? group.opened : group.built).push(project);
   }
+
+  const newest = (a: string, b: string) =>
+    b.localeCompare(a, undefined, { numeric: true });
+  const groups = [...games.values()].map((group): LegoGameGroup => {
+    const named = group.names.filter((n) => !n.guessed);
+    const label = (named.length > 0 ? named : group.names)
+      .map((n) => n.name)
+      .sort(newest)[0];
+    return {
+      key: group.key,
+      label,
+      archives: [...group.archives],
+      projects: [...group.built, ...group.opened],
+    };
+  });
 
   return {
     own,
-    games: [...games.values()].sort((a, b) =>
+    games: groups.sort((a, b) =>
       a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
     ),
     files,
@@ -141,4 +159,25 @@ export function filterGrouped(
       .filter((game) => game.projects.length > 0),
     files: grouped.files.filter(matches),
   };
+}
+
+/**
+ * Carry folded sections saved under an archive name over to the game key that
+ * now stands for that archive. A saved key that no group's archive matches is
+ * left alone, so a fold survives a visit when its units are not loaded.
+ */
+export function carryFoldedKeys(
+  saved: ReadonlySet<string>,
+  groups: readonly LegoGameGroup[],
+): ReadonlySet<string> {
+  const next = new Set(saved);
+  for (const group of groups) {
+    const old = group.archives.filter((archive) => next.has(archive));
+    if (old.length === 0) continue;
+    for (const archive of old) next.delete(archive);
+    next.add(group.key);
+  }
+  return next.size === saved.size && [...next].every((k) => saved.has(k))
+    ? saved
+    : next;
 }

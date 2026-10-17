@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { LegoImported, LegoProject } from "./model";
 import {
   archiveFromSource,
+  carryFoldedKeys,
   filterGrouped,
   groupProjects,
 } from "./projectGroups";
@@ -209,7 +210,8 @@ describe("filterGrouped", () => {
       groupProjects([adder, rover, cakebot]),
       "splinter",
     );
-    expect(found.own).toEqual([rover]);
+    expect(found.games[0].projects).toEqual([rover]);
+    expect(found.own).toEqual([]);
   });
 
   it("keeps the units whose name or unit name matches, in any case", () => {
@@ -229,5 +231,131 @@ describe("filterGrouped", () => {
 
   it("drops a game with nothing left in it", () => {
     expect(filterGrouped(all, "cakebot").games).toEqual([]);
+  });
+});
+
+describe("one section per game (#4328)", () => {
+  const sf88 = {
+    name: "Splinter Faction 0.1.88",
+    archive: "SplinterFaction_0.1.88.sdz",
+    shortname: "SF",
+  };
+  const sf89 = {
+    name: "Splinter Faction 0.1.89",
+    archive: "SplinterFaction_0.1.89.sdz",
+    shortname: "SF",
+  };
+  const mutator = {
+    name: "SF Hardmode",
+    archive: "SFHard_1.sdz",
+    shortname: "SFHard",
+    base: sf89,
+  };
+  const forGame = (name: string, game: object | null) =>
+    ({ ...project(name), game }) as unknown as LegoProject;
+  const openedFrom = (name: string, game: typeof sf88) =>
+    project(name, {
+      source: "",
+      game: { name: game.name, archive: game.archive, member: "x" },
+    });
+
+  it("puts two versions of one game in one section, labelled with the newest", () => {
+    const a = forGame("Old build", sf88);
+    const b = forGame("New build", sf89);
+
+    const grouped = groupProjects([a, b]);
+
+    expect(grouped.own).toEqual([]);
+    expect(grouped.games).toHaveLength(1);
+    expect(grouped.games[0].label).toBe("Splinter Faction 0.1.89");
+    expect(grouped.games[0].projects).toEqual([a, b]);
+    expect(grouped.games[0].archives.sort()).toEqual([
+      "splinterfaction_0.1.88.sdz",
+      "splinterfaction_0.1.89.sdz",
+    ]);
+  });
+
+  it("shares a section between a mutator and the game it builds on", () => {
+    const base = forGame("Base", sf88);
+    const mod = forGame("Mod", mutator);
+
+    const grouped = groupProjects([mod, base]);
+
+    expect(grouped.games).toHaveLength(1);
+    expect(grouped.games[0].label).toBe("Splinter Faction 0.1.89");
+    expect(grouped.games[0].projects).toEqual([mod, base]);
+  });
+
+  it("lists built units before opened ones, with no split inside", () => {
+    const opened = openedFrom("Opened", sf88);
+    const built = forGame("Built", sf89);
+    const opened2 = openedFrom("Opened 2", sf89);
+
+    // Opened units carry no `shortname` on their import, so the installed
+    // games supply it the way an old record's would.
+    const installed = [
+      {
+        name: sf88.name,
+        primaryArchive: { name: sf88.archive },
+        info: { shortname: "SF" },
+      },
+      {
+        name: sf89.name,
+        primaryArchive: { name: sf89.archive },
+        info: { shortname: "SF" },
+      },
+    ] as never;
+    const grouped = groupProjects([opened, built, opened2], installed);
+
+    expect(grouped.games).toHaveLength(1);
+    expect(grouped.games[0].projects).toEqual([built, opened, opened2]);
+  });
+
+  it("keeps units for no game in a section of their own", () => {
+    const none = forGame("Parts only", null);
+    const unset = project("Never chose");
+    const sf = forGame("Mine", sf89);
+    const loose = project("Loose", { source: "/Desktop/x.s3o" });
+
+    const grouped = groupProjects([none, sf, unset, loose]);
+
+    expect(grouped.own).toEqual([none, unset]);
+    expect(grouped.files).toEqual([loose]);
+    expect(grouped.games[0].projects).toEqual([sf]);
+  });
+
+  it("keeps different games apart", () => {
+    const other = forGame("Other", {
+      name: "Other Game",
+      archive: "other.sdz",
+      shortname: "OG",
+    });
+    const grouped = groupProjects([forGame("Mine", sf89), other]);
+    expect(grouped.games.map((g) => g.label)).toEqual([
+      "Other Game",
+      "Splinter Faction 0.1.89",
+    ]);
+  });
+});
+
+describe("carryFoldedKeys (#4328)", () => {
+  const group = {
+    key: "short:sf",
+    label: "Splinter Faction",
+    archives: ["splinterfaction_0.1.88.sdz", "splinterfaction_0.1.89.sdz"],
+    projects: [],
+  };
+
+  it("replaces a folded archive key with the game's key", () => {
+    const saved = new Set(["splinterfaction_0.1.88.sdz", "other.sdz"]);
+    expect([...carryFoldedKeys(saved, [group])].sort()).toEqual([
+      "other.sdz",
+      "short:sf",
+    ]);
+  });
+
+  it("returns the same set when nothing needs carrying", () => {
+    const saved = new Set(["short:sf", "other.sdz"]);
+    expect(carryFoldedKeys(saved, [group])).toBe(saved);
   });
 });
