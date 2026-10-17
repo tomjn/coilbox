@@ -83,7 +83,11 @@ pub const INFO_CACHE_VERSION: u32 = 24;
 /// 4: a model's textures are looked for across the game, its dependencies and
 /// base content rather than in one archive (#4239), and a model cached before
 /// that holds plain faces for every texture a dependency supplies.
-pub const MODEL_CACHE_VERSION: u32 = 4;
+///
+/// 5: a `.3do` face with five or more corners takes its texture's top left at
+/// every corner, as the engine does (#4240), and a model cached before that
+/// holds those faces with the texture stretched over them.
+pub const MODEL_CACHE_VERSION: u32 = 5;
 
 /// Salts the buildpic cache key, independent of the header cache so this cache can
 /// be invalidated on its own. Bump when the icon encoding, cache format, or the
@@ -398,7 +402,7 @@ mod tests {
         assert_eq!(game_key(&game()), "d3845a01c0d1a1f8");
         assert_eq!(dataset_key(&game()), "133c5e5e864d370b");
         assert_eq!(archive_hash_key(&game()), "99882e00c06a3b89");
-        assert_eq!(model_key(&game()), "be4f25e10807c273");
+        assert_eq!(model_key(&game()), "d74c5de2934710cb");
         assert_eq!(buildpic_key(&game()), "cfd53b8ab59cbad7");
         assert_eq!(faction_logo_key(&game()), "3424bfae2fdee0a1");
         assert_eq!(header_key(&game()), "7628cfa0c7249680");
