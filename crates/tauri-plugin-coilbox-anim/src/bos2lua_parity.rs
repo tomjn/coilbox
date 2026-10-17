@@ -160,6 +160,13 @@ fn converted_scripts_move_pieces_as_their_cobs_do() {
         };
         let source = text(path);
         let bytes = std::fs::read(cob).unwrap();
+        let armed = crate::cob::decode(&bytes)
+            .is_ok_and(|d| d.scripts.iter().any(|(n, _)| is_weapon_one(n)));
+        let events: Vec<ScriptEvent> = events
+            .iter()
+            .filter(|e| armed || e.engine != Some(EngineAction::Fire))
+            .cloned()
+            .collect();
         let linear_scale = coilbox_bos2lua::linear_scale(&source, &bytes)
             .unwrap_or(coilbox_bos2lua::MODERN_LINEAR);
         let conversion = match coilbox_bos2lua::convert(
@@ -245,8 +252,18 @@ fn converted_scripts_move_pieces_as_their_cobs_do() {
                 })
                 .collect()
         };
-        if heard(&from_cob) != heard(&from_lua) && !known {
-            differ.push(format!("{name}: the two announce different events"));
+        let (cob_heard, lua_heard) = (heard(&from_cob), heard(&from_lua));
+        if cob_heard != lua_heard && !known {
+            let at = cob_heard
+                .iter()
+                .zip(&lua_heard)
+                .position(|(a, b)| a != b)
+                .unwrap_or(cob_heard.len().min(lua_heard.len()));
+            differ.push(format!(
+                "{name}: the two announce different events, first apart at {at}: COB {:?}, Lua {:?}",
+                cob_heard.get(at),
+                lua_heard.get(at)
+            ));
         }
     }
     eprintln!(
@@ -258,6 +275,33 @@ fn converted_scripts_move_pieces_as_their_cobs_do() {
         eprintln!("  {line}");
     }
     assert!(differ.is_empty(), "\n{}", differ.join("\n"));
+}
+
+/// Whether a COB function is one of weapon 1's call-ins, by the names
+/// `CobScriptNames.cpp` maps. The engine only fires a weapon the unit has, and
+/// a script with none of these is a unit with no weapon, so the sweep does not
+/// fire one.
+fn is_weapon_one(name: &str) -> bool {
+    const STEMS: [&str; 8] = [
+        "QueryWeapon",
+        "AimWeapon",
+        "AimFromWeapon",
+        "FireWeapon",
+        "EndBurst",
+        "Shot",
+        "BlockShot",
+        "TargetWeight",
+    ];
+    const PRIMARY: [&str; 4] = [
+        "QueryPrimary",
+        "AimPrimary",
+        "AimFromPrimary",
+        "FirePrimary",
+    ];
+    STEMS
+        .iter()
+        .any(|stem| name.eq_ignore_ascii_case(&format!("{stem}1")))
+        || PRIMARY.iter().any(|p| name.eq_ignore_ascii_case(p))
 }
 
 /// Where two runs of the same unit first disagree, if they do. `dump` prints
@@ -763,5 +807,29 @@ TransportPickup(unitid)
             (at("mark", 2) - 1.0).abs() < TOLERANCE,
             "{runtime}: the passenger moved when it was dropped"
         );
+    }
+}
+
+/// The sweep fires weapon 1 only at a script that has one of its call-ins,
+/// under either name.
+#[test]
+fn only_a_script_with_weapon_one_s_call_ins_is_fired() {
+    for armed in [
+        "QueryPrimary",
+        "aimprimary",
+        "AimWeapon1",
+        "Shot1",
+        "BlockShot1",
+    ] {
+        assert!(is_weapon_one(armed), "{armed}");
+    }
+    for unarmed in [
+        "Create",
+        "QueryNanoPiece",
+        "AimWeapon2",
+        "AimWeapon10",
+        "AimSecondary",
+    ] {
+        assert!(!is_weapon_one(unarmed), "{unarmed}");
     }
 }
