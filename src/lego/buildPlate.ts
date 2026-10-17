@@ -86,9 +86,13 @@ const LARGEST_PLATE_ELMOS = Math.max(...PLATE_FOOTPRINTS) * ELMOS_PER_FOOTPRINT;
  * Takes the figure's width because the figure can be a unit read out of an
  * installed game, which is any size at all. A wide one parks further left so
  * its near edge lands in the same place the solar collector's does.
+ *
+ * Takes the unit's width too, for a unit sized to a footprint wider than the
+ * largest plate: the figure then parks beside that instead.
  */
-export function referenceParkX(widthElmos: number): number {
-  return -(LARGEST_PLATE_ELMOS / 2 + ELMOS_PER_FOOTPRINT / 2 + widthElmos / 2);
+export function referenceParkX(widthElmos: number, unitWidthElmos = 0): number {
+  const clear = Math.max(LARGEST_PLATE_ELMOS, unitWidthElmos);
+  return -(clear / 2 + ELMOS_PER_FOOTPRINT / 2 + widthElmos / 2);
 }
 
 /** Where the built-in reference unit parks. */

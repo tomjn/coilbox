@@ -324,6 +324,19 @@ The plain building is the base alone, with no proportions and nothing to animate
 
 Neither plan has a width or a depth, because no bone sits at the edge of the base for them to move. A building's width and depth are its footprint, which comes from the parts hung on it. A building with no parts yet exports with a 1 by 1 footprint.
 
+### Sizing a skeleton
+
+A unit made from a plan is sized to a target: a footprint in steps of 16 elmos (`ELMOS_PER_FOOTPRINT`) and a height in elmos. **New unit** asks for it after a plan is chosen, starting from the plan's own size, and the Skeleton panel can fit it again. The target is stored as `skeleton.target`, and the panel says when the skeleton passes it. The rules are in `src/lego/skeletonSize.ts`, and the size they measure is the box the proportions describe, from joint to joint. The footprint check measures the finished unit.
+
+- Two legs: stance is the width and the length, since the plan has no body length. Leg length and body height share the height in the proportion they already have. A footprint that is not square gives the stance of the smaller side.
+- Four legs: stance is the width and body length is the length. The height is shared as for two legs.
+- Wheels: track width is the width, the axles' span (axle spacing times the axles less one) is the length, and wheel height is the height. The number of axles is kept.
+- Tracks: track width, track length and track height.
+- Turret building: base height and turret height share the height. No joint places the base's width and depth, so the target is the footprint.
+- Building: no proportions, so the target is the whole size. Its default is 9 by 9 steps, the median of Splinter Faction's 23 buildings with no weapon, and 29.1 elmos tall, which is the reference solar collector's height because no building height has been measured.
+
+A value that passes a proportion's range is held to it, so the size read out can differ from the target. Where a height is shared and one part is held, the other takes what is left.
+
 ## Health, cost and stats
 
 A built unit's health, metal cost, energy cost, build time and mass come from the **Worth** table in the Animation panel. There is no field for one unit's health or cost. The table works them out from what the unit is made of, so a bigger unit is worth more.

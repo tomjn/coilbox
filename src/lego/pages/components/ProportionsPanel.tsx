@@ -19,8 +19,15 @@ import {
   bonesLostWithParts,
   planProportions,
 } from "../../bodyPlans";
-import type { LegoPiece, LegoProject } from "../../model";
+import type { LegoPiece, LegoProject, SkeletonTarget } from "../../model";
 import { clampProportion } from "../../skeletonEdit";
+import {
+  currentTarget,
+  describeSize,
+  overTarget,
+  skeletonSize,
+} from "../../skeletonSize";
+import { SkeletonTargetFields } from "./SkeletonTargetFields";
 
 interface Props {
   project: LegoProject;
@@ -29,6 +36,9 @@ interface Props {
   onChange: (values: Record<string, number>) => void;
   /** Shows a value on screen without editing, or null to stop showing it. */
   onPreview: (preview: { id: string; value: number } | null) => void;
+  /** Fits the skeleton to a footprint and height and keeps them as its target,
+   *  as one edit. */
+  onTarget: (target: SkeletonTarget) => void;
   /** The value being dragged by a viewport handle, if one is. */
   preview: { id: string; value: number } | null;
 }
@@ -38,9 +48,14 @@ export function ProportionsPanel({
   plan,
   onChange,
   onPreview,
+  onTarget,
   preview,
 }: Props) {
   const values = planProportions(plan, project.skeleton?.proportions);
+  const shownValues =
+    preview && preview.id in values
+      ? { ...values, [preview.id]: preview.value }
+      : values;
   const [held, setHeld] = useState<string | null>(null);
   const [asking, setAsking] = useState<{
     id: string;
@@ -62,19 +77,19 @@ export function ProportionsPanel({
     onChange({ [proportion.id]: value });
   }
 
-  if (plan.proportions.length === 0) {
-    return (
-      <p className="px-3 py-3 text-xs text-muted-foreground">
-        This plan has nothing to size.
-      </p>
-    );
-  }
-
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-3">
       <p className="text-xs text-muted-foreground">
-        {plan.label}. Drag a handle in the view or set a number.
+        {plan.proportions.length > 0
+          ? `${plan.label}. Drag a handle in the view or set a number.`
+          : plan.label}
       </p>
+      <SizeSection
+        plan={plan}
+        values={shownValues}
+        target={project.skeleton?.target}
+        onTarget={onTarget}
+      />
       {plan.proportions.map((proportion) => {
         const shown =
           preview?.id === proportion.id ? preview.value : values[proportion.id];
@@ -125,6 +140,67 @@ export function ProportionsPanel({
         places it changes.
       </p>
     </div>
+  );
+}
+
+const AXIS_NAMES = { x: "width", z: "length", height: "height" } as const;
+
+/** The skeleton's size, the target it is meant to stay within, and the fields
+ *  to fit it to a new one. */
+function SizeSection({
+  plan,
+  values,
+  target,
+  onTarget,
+}: {
+  plan: BodyPlan;
+  values: Record<string, number>;
+  target: SkeletonTarget | undefined;
+  onTarget: (target: SkeletonTarget) => void;
+}) {
+  const size = skeletonSize(plan, values, target);
+  const over = target ? overTarget(size, target) : [];
+  const initial = target ?? currentTarget(plan, values);
+  const where = over.map((axis) => AXIS_NAMES[axis]).join(" and ");
+  return (
+    <div className="space-y-2">
+      <p className="text-xs">Size {describeSize(size)}</p>
+      {over.length > 0 ? (
+        <p className="text-xs text-destructive">Past the target in {where}.</p>
+      ) : null}
+      <FitFields
+        key={JSON.stringify(initial)}
+        initial={initial}
+        onTarget={onTarget}
+      />
+    </div>
+  );
+}
+
+/** The target fields and the button that fits to what is typed. Keyed by the
+ *  target they start from, so a new one starts them over. */
+function FitFields({
+  initial,
+  onTarget,
+}: {
+  initial: SkeletonTarget;
+  onTarget: (target: SkeletonTarget) => void;
+}) {
+  const [typed, setTyped] = useState<SkeletonTarget | null>(initial);
+  return (
+    <>
+      <SkeletonTargetFields initial={initial} onChange={setTyped} />
+      <div className="flex justify-end">
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!typed}
+          onClick={() => typed && onTarget(typed)}
+        >
+          Fit
+        </Button>
+      </div>
+    </>
   );
 }
 

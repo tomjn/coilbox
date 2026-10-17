@@ -445,6 +445,34 @@ describe("parseLegoProjectJson", () => {
     expect(parseLegoProjectJson(JSON.stringify(doc))).toEqual(doc);
   });
 
+  it("round-trips a skeleton's target (#3254)", () => {
+    const doc: LegoProject = {
+      ...project([{ ...piece("root", null), bone: "base" }]),
+      skeleton: {
+        plan: "biped",
+        proportions: { legLength: 12 },
+        target: { footprint: { x: 3, z: 5 }, height: 40 },
+      },
+    };
+    expect(parseLegoProjectJson(JSON.stringify(doc))).toEqual(doc);
+  });
+
+  it.each([
+    ["a fractional footprint", { footprint: { x: 2.5, z: 3 }, height: 40 }],
+    ["a footprint of nothing", { footprint: { x: 0, z: 3 }, height: 40 }],
+    ["a missing footprint", { height: 40 }],
+    ["a height of nothing", { footprint: { x: 3, z: 3 }, height: 0 }],
+    ["a height that is text", { footprint: { x: 3, z: 3 }, height: "tall" }],
+  ])("drops a target with %s and keeps the skeleton", (_name, target) => {
+    const parsed = parseLegoProjectJson(
+      JSON.stringify({
+        ...project([{ ...piece("root", null), bone: "base" }]),
+        skeleton: { plan: "biped", proportions: {}, target },
+      }),
+    );
+    expect(parsed?.skeleton).toEqual({ plan: "biped", proportions: {} });
+  });
+
   it("opens a unit saved before skeletons with neither field", () => {
     const parsed = parseLegoProjectJson(
       JSON.stringify(project([piece("root", null), piece("a", "root")])),

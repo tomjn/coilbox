@@ -44,6 +44,20 @@ describe("buildGround", () => {
     }
   });
 
+  it("parks clear of a unit wider than the largest plate", () => {
+    const wide = 9 * ELMOS_PER_FOOTPRINT;
+    for (const width of [4, REFERENCE_WIDTH_ELMOS, 120]) {
+      const nearEdge = referenceParkX(width, wide) + width / 2;
+      expect(nearEdge).toBeCloseTo(-wide / 2 - ELMOS_PER_FOOTPRINT / 2, 5);
+    }
+  });
+
+  it("parks where it always did for a unit inside the largest plate", () => {
+    expect(referenceParkX(60, 2 * ELMOS_PER_FOOTPRINT)).toBe(
+      referenceParkX(60),
+    );
+  });
+
   it("marks a plate per common footprint, at footprint size", () => {
     const plates = named("plate-").filter(
       (child) => !child.name.startsWith("plate-label-"),

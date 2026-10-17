@@ -1,11 +1,12 @@
 import { type RefObject, useEffect, useRef } from "react";
 import * as THREE from "three";
-import { REFERENCE_PARK_X, referenceParkX } from "../../buildPlate";
+import { referenceParkX } from "../../buildPlate";
 import type { BackdropId, GroundId, GroundShape } from "../../environment";
 import {
   buildGameReferenceUnit,
   buildReferenceUnit,
   disposeReferenceUnit,
+  REFERENCE_WIDTH_ELMOS,
 } from "../../referenceObject";
 import { applySceneScale } from "./cameraFraming";
 import { syncOverlay } from "./drivePlayback";
@@ -21,6 +22,9 @@ export interface ModelEnvironmentDeps {
   showGrid: boolean;
   showReference: boolean;
   gameReference: GameReferenceChoice | null;
+  /** How wide the unit is meant to be, in elmos, or 0 when nothing says. The
+   *  figure parks clear of it. */
+  unitWidth: number;
   backdrop: BackdropId;
   ground: GroundId;
   /** What `groundShape` made of the choice, null for a flat ground. Held by
@@ -52,6 +56,7 @@ export function useModelEnvironment(
     showGrid,
     showReference,
     gameReference,
+    unitWidth,
     backdrop,
     ground,
     shape,
@@ -82,6 +87,11 @@ export function useModelEnvironment(
   const showReferenceRef = useRef(showReference);
   showReferenceRef.current = showReference;
 
+  // Where the figure parks depends on how wide it is, and on the unit.
+  const figureWidthRef = useRef(REFERENCE_WIDTH_ELMOS);
+  const unitWidthRef = useRef(unitWidth);
+  unitWidthRef.current = unitWidth;
+
   // Swapping the figure for a game's unit, and back. The old one is freed
   // rather than kept: a real unit can be tens of thousands of triangles and
   // several textures, and the built-in one is cheap to rebuild.
@@ -93,12 +103,22 @@ export function useModelEnvironment(
 
     if (gameReference) {
       const built = buildGameReferenceUnit(gameReference.model);
-      built.group.position.set(referenceParkX(built.widthElmos), 0, 0);
+      figureWidthRef.current = built.widthElmos;
+      built.group.position.set(
+        referenceParkX(built.widthElmos, unitWidthRef.current),
+        0,
+        0,
+      );
       state.reference = built.group;
       state.disposeReference = built.dispose;
     } else {
       const group = buildReferenceUnit();
-      group.position.set(REFERENCE_PARK_X, 0, 0);
+      figureWidthRef.current = REFERENCE_WIDTH_ELMOS;
+      group.position.set(
+        referenceParkX(REFERENCE_WIDTH_ELMOS, unitWidthRef.current),
+        0,
+        0,
+      );
       state.reference = group;
       state.disposeReference = () => disposeReferenceUnit(group);
     }
@@ -109,6 +129,19 @@ export function useModelEnvironment(
     applySceneScale(state);
     state.render();
   }, [sceneRef, gameReference]);
+
+  // A unit sized wider or narrower moves the figure to stand beside it.
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (!state) return;
+    state.reference.position.x = referenceParkX(
+      figureWidthRef.current,
+      unitWidth,
+    );
+    standReferenceOnGround(state);
+    applySceneScale(state);
+    state.render();
+  }, [sceneRef, unitWidth]);
 
   useEffect(() => {
     const state = sceneRef.current;
