@@ -1,6 +1,12 @@
 // @vitest-environment happy-dom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { BODY_PLANS } from "../../bodyPlans";
@@ -130,6 +136,89 @@ describe("NewUnitPopover", () => {
 
   it("goes back to the list from the size", () => {
     const onChoose = openOn(BODY_PLANS[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+
+    expect(screen.getByText(BODY_PLANS[1].description)).toBeTruthy();
+    expect(onChoose).not.toHaveBeenCalled();
+  });
+
+  function describe_(onChoose = vi.fn()) {
+    render(
+      <NewUnitPopover
+        plans={BODY_PLANS}
+        label="New unit"
+        onChoose={onChoose}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /New unit/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Describe it instead" }),
+    );
+    return onChoose;
+  }
+
+  const choose = (name: string) =>
+    fireEvent.click(screen.getByRole("radio", { name }));
+
+  it("describes a unit with four questions and starts the plan they pick", () => {
+    const onChoose = describe_();
+    choose("Four legs");
+    fireEvent.click(
+      within(screen.getByLabelText("How many weapons?")).getByRole("radio", {
+        name: "1",
+      }),
+    );
+    fireEvent.click(
+      within(screen.getByLabelText("Does it build?")).getByRole("radio", {
+        name: "Yes",
+      }),
+    );
+    type(/Footprint across/, "3");
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+
+    expect(onChoose).toHaveBeenCalledTimes(1);
+    const [plan, target] = onChoose.mock.calls[0];
+    expect(plan.id).toBe("quadruped+gun+build");
+    expect(target.footprint.x).toBe(3);
+  });
+
+  it("starts a two legged plan at its measured size when nothing is changed", () => {
+    const onChoose = describe_();
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+
+    const [plan, target] = onChoose.mock.calls[0];
+    expect(plan.id).toBe("biped");
+    expect(target).toEqual(defaultTarget(plan));
+  });
+
+  it("keeps a typed size through a weapon but not through another movement", () => {
+    describe_();
+    type(/Height/, "99");
+    fireEvent.click(
+      within(screen.getByLabelText("How many weapons?")).getByRole("radio", {
+        name: "1",
+      }),
+    );
+    expect((screen.getByLabelText("Height") as HTMLInputElement).value).toBe(
+      "99",
+    );
+    choose("Wheels");
+    expect(
+      (screen.getByLabelText("Height") as HTMLInputElement).value,
+    ).not.toBe("99");
+  });
+
+  it("offers no more than one weapon", () => {
+    describe_();
+    const group = within(screen.getByLabelText("How many weapons?"));
+    expect(group.getAllByRole("radio").map((r) => r.textContent)).toEqual([
+      "0",
+      "1",
+    ]);
+  });
+
+  it("goes back to the list from the questions", () => {
+    const onChoose = describe_();
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
 
     expect(screen.getByText(BODY_PLANS[1].description)).toBeTruthy();
