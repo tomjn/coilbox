@@ -54,7 +54,7 @@ interface Props {
    *  nothing else to match. */
   atlas?: LegoAtlas;
   selectedId?: string;
-  onSelect?: (part: LegoPartInfo) => void;
+  onSelect?: (part: LegoPartInfo, alt: boolean) => void;
   /** Ids of the favourite parts. With `onFavourite`, each cell gets a star. */
   favourites?: ReadonlySet<string>;
   onFavourite?: (part: LegoPartInfo) => void;
@@ -298,7 +298,7 @@ export function PartPicker({
                     }
                     onKeyDown(event);
                   }}
-                  onClick={() => onSelect?.(part)}
+                  onClick={(event) => onSelect?.(part, event.altKey)}
                   className={`absolute inset-0 rounded border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                     part.id === selectedId
                       ? "border-primary bg-primary/10"

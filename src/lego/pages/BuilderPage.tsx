@@ -135,6 +135,7 @@ import {
   projectPackProblems,
 } from "../pack";
 import { usePanelHeight, usePanelOpen } from "../panels";
+import { attachToBone } from "../partOnBone";
 import { buildPieceCollisionScript } from "../pieceCollisionScript";
 import { currentPivot, pivotChoices, setPivot } from "../pivot";
 import { attachToFreeFace, type FaceTarget, placePart } from "../placePart";
@@ -548,13 +549,29 @@ function Builder({ id }: { id: string | undefined }) {
   }
 
   /**
-   * Choosing a part joins it to a free face of the selected piece when that
-   * piece has faces, in one edit with its twin when symmetry is on. Otherwise
-   * it starts placing the part by hovering a face, and choosing it again stops.
+   * Choosing a part under a bone lays it along the bone from the joint. Under
+   * another piece it joins a free face of that piece when it has faces. Either
+   * way it is one edit, with its twin when symmetry is on. Otherwise it starts
+   * placing the part by hovering a face, and choosing it again stops. Alt adds
+   * the part at the selected piece's origin, as it was before.
    */
-  function startPlacing(part: LegoPartInfo) {
+  function startPlacing(part: LegoPartInfo, now = false) {
     setPlacingAnchor(false);
     const parentId = selectedId;
+    if (parentId && draft && pieceById(draft, parentId)?.bone !== undefined) {
+      setPlacingPart(null);
+      if (now) {
+        addPart(part);
+        return;
+      }
+      const pieceId = crypto.randomUUID();
+      queueTwin(pieceId);
+      place([pieceId], (project) => {
+        return attachToBone(project, part, parentId, pieceId) ?? project;
+      });
+      inventoryView.inventory.record({ kind: "part", id: part.id });
+      return;
+    }
     if (parentId && draft && pack) {
       const pieceId = crypto.randomUUID();
       if (attachToFreeFace(draft, pack, part, parentId, pieceId)) {
