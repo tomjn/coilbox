@@ -145,9 +145,9 @@ On export, slot 1 of the definition's `weapons` table is the first turret or aim
 
 A weapon from a workshop project is a reference, not a copy. Each export reads it from the project again, so the weapon you edit in the workshop is the one the game gets, and writes it to `weapons/coilbox_<unit>_<key>.lua`. That is the file and the full name `<unit>_<key>` the workshop's own compile writes for an equipped weapon. If the project or the weapon is gone, export leaves that slot out and says so.
 
-Splinter Faction, Balanced Annihilation 15.9.8 and Beyond All Reason all read `weapons/*.lua` through the engine's `gamedata/weapondefs.lua`, and all three also copy a unit's own `weapondefs` into the weapon table from their `gamedata/weapondefs_post.lua`. The builder uses the file, so the weapon stays out of the unit definition, which is written once.
+Splinter Faction, Balanced Annihilation 15.9.8 and Beyond All Reason all read `weapons/*.lua` through the engine's `gamedata/weapondefs.lua`, and all three also copy a unit's own `weapondefs` into the weapon table from their `gamedata/weapondefs_post.lua`. The builder uses the file, so the weapon stays out of the unit definition, which is yours to edit after the first export.
 
-The `weapons` table is part of that definition, so it has the same rule: a weapon picked after the first export does not reach a definition already in the game folder. Export says so. Issue #3245 is the re-export that updates it.
+The `weapons` table is one of the fields the build decides, so a re-export brings it up to date while nobody has edited it. Once you change the table in the file, export leaves it as you wrote it. See [What export writes](#what-export-writes) for the rule.
 
 ### The script behind the presets
 
@@ -204,7 +204,7 @@ It can also write a `.glb`, or an `.obj` with its `.mtl` and a copy of the atlas
 
 **A re-export keeps your edits.** The script and the unit definition are meant to be edited, so export never overwrites a change you made to either, whether you made it in a text editor or through the workshop.
 
-- The unit definition is updated field by field. Some fields come from the build: the footprint, the collision volume, health and cost, movement and the builder keys. Export rewrites one of those only while the file still holds the value the last export wrote. A field holding anything else was changed by hand and stays, and a field you deleted stays deleted. A field the build has started writing is added, and one it has stopped writing is taken out. Every other field is written on the first export and then left alone. Comments and the order of the file are kept. The export drawer lists each field it changed and each one it kept.
+- The unit definition is updated field by field. Some fields come from the build: the footprint, the collision volume, health and cost, movement, the builder keys and the weapon slots. Export rewrites one of those only while the file still holds the value the last export wrote. A field holding anything else was changed by hand and stays, and a field you deleted stays deleted. A field the build has started writing is added, and one it has stopped writing is taken out. Every other field is written on the first export and then left alone. Comments and the order of the file are kept. The export drawer lists each field it changed and each one it kept.
 - While the workshop has an edit in place on the unit that you have not accepted or undone, export leaves the unit definition alone and says so. Undo puts the workshop's backup back over the file, which would throw the export away.
 - The script is replaced while it is still exactly the script the last export wrote. Once you change it, export leaves it alone.
 - The texture is written once and then left alone, unless you tick **Replace textures already there**.
