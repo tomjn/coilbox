@@ -468,6 +468,41 @@ fn role(name: &str) -> Option<Role> {
     }
 }
 
+/// What the engine answers for a call-in whose COB waits before it finishes.
+/// The engine runs a call-in until it first waits, and if it has not finished
+/// by then `RealCall` leaves the arguments it handed over as they were
+/// (`CobInstance.cpp:592-617`). The call-in reads its answer from those.
+enum Unfinished {
+    /// Script piece n. `QueryWeapon` hands over 1, the count of arguments, in
+    /// the slot it reads the piece from (`CobInstance.cpp:437-446`), and
+    /// `QueryTransport` hands over 2 (`CobInstance.cpp:363-373`).
+    Piece(usize),
+    /// A template over the Lua call-in's arguments, and what it means.
+    Expr(&'static str, &'static str),
+}
+
+/// `None` for `QueryLandingPad`, which reads its pieces from slots the engine
+/// never sets (`CobInstance.cpp:327-352`), so no Lua can give the same answer.
+fn unfinished(spec: &Spec) -> Option<Unfinished> {
+    match &spec.ret {
+        Ret::Piece(_) if spec.lua == "script.QueryTransport" => Some(Unfinished::Piece(2)),
+        Ret::Piece(_) => Some(Unfinished::Piece(1)),
+        // BlockShot and TargetWeight read the target's ID back
+        // (`CobInstance.cpp:496-523`).
+        Ret::ParamTruthy(_) => Some(Unfinished::Expr(
+            "({0} or 0) ~= 0",
+            "a blocked shot when there is a target",
+        )),
+        Ret::ParamWeight(_) => Some(Unfinished::Expr(
+            "({0} or 0) / 65536",
+            "the target's ID as the weight",
+        )),
+        // HitByWeaponId's percentage starts at 1 (`CobInstance.cpp:309-313`).
+        Ret::Damage(_) => Some(Unfinished::Expr("{3} / 100", "1% of the damage")),
+        Ret::Param(_) | Ret::Pieces | Ret::Truthy | Ret::Nothing => None,
+    }
+}
+
 /// A template with `{}` or `{0}`, `{1}` filled in.
 fn fill(template: &str, args: &[String]) -> String {
     let mut out = template.to_string();
@@ -490,6 +525,10 @@ struct FuncInfo {
     /// Written straight out as `script.X` rather than as a function of its own
     /// with a call-in handing on to it.
     direct: bool,
+    /// A call-in the engine wants an answer from at once, whose BOS waits
+    /// first. It is written as a function of its own, which the call-in runs
+    /// as a thread.
+    waits: bool,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -968,6 +1007,7 @@ impl<'a> Program<'a> {
                     called: false,
                     min_args: None,
                     direct: false,
+                    waits: false,
                 },
             );
         }
@@ -1038,9 +1078,20 @@ impl<'a> Program<'a> {
         p.has_reload = has_reload;
         for (name, info) in p.funcs.iter_mut() {
             info.blocks = blocking.contains(name);
+            if let Some(Role::Callin(s)) = &info.role {
+                if s.ret != Ret::Nothing && info.blocks && !s.threaded {
+                    info.waits = unfinished(s).is_some();
+                    if !info.waits {
+                        p.warnings.push(Warning::unlocated(format!(
+                            "{} waits, but the engine wants its answer at once, so it will stop with an error the first time it waits.",
+                            info.lua
+                        )));
+                    }
+                }
+            }
             info.direct = match &info.role {
                 Some(Role::Callin(s)) if s.ret != Ret::Nothing => {
-                    if info.called {
+                    if info.called && !info.waits {
                         p.warnings.push(Warning::unlocated(format!(
                             "The script calls {} itself. The Lua calls the engine's {} instead, which gets the same answer.",
                             info.lua, s.lua
@@ -1052,14 +1103,6 @@ impl<'a> Program<'a> {
                 Some(Role::Callin(s)) => !info.called && (s.threaded || !info.blocks),
                 _ => false,
             };
-            if let Some(Role::Callin(s)) = &info.role {
-                if s.ret != Ret::Nothing && info.blocks && !s.threaded {
-                    p.warnings.push(Warning::unlocated(format!(
-                        "{} waits, but the engine wants its answer at once, so it will stop with an error the first time it waits.",
-                        info.lua
-                    )));
-                }
-            }
         }
         p
     }
@@ -2216,11 +2259,12 @@ impl<'p, 'a> Writer<'p, 'a> {
 
     fn func(&mut self, f: &Func, trailing: &Option<Comment>) {
         let info = &self.p.funcs[&f.name.to_lowercase()];
-        let (lua_name, role, direct, min_args) = (
+        let (lua_name, role, direct, min_args, waits) = (
             info.lua.clone(),
             info.role.clone(),
             info.direct,
             info.min_args,
+            info.waits,
         );
         self.refs.clear();
         self.locals.clear();
@@ -2391,7 +2435,8 @@ impl<'p, 'a> Writer<'p, 'a> {
                     };
                     prologue.extend(line);
                 }
-                signature = format!("function {}({})", spec.lua, args.join(", "));
+                let name = if waits { &lua_name } else { &spec.lua };
+                signature = format!("function {name}({})", args.join(", "));
                 self.ret = Some((spec.ret.clone(), params.clone(), args));
             }
             _ => {
@@ -2436,6 +2481,11 @@ impl<'p, 'a> Writer<'p, 'a> {
         self.ret = None;
         self.fire = false;
 
+        if waits {
+            if let Some(Role::Callin(spec)) = &role {
+                self.waiting_adapter(spec, &lua_name);
+            }
+        }
         if !direct {
             if let Some(Role::Callin(spec)) = &role {
                 // Create with a SetMaxReloadTime beside it gets the call-in
@@ -2477,6 +2527,41 @@ impl<'p, 'a> Writer<'p, 'a> {
         let call = self.call_line(target, &values, blocks && !spec.threaded);
         self.adapters.push(format!(
             "function {}({})\n\t{call}\nend\n",
+            spec.lua,
+            args.join(", ")
+        ));
+        self.worst_refs = self.worst_refs.max(self.refs.len());
+        self.refs = saved;
+    }
+
+    /// `script.X` for a call-in the engine wants an answer from at once, whose
+    /// BOS waits. A Lua call-in may not sleep (`unit_script.lua:373`), so it
+    /// runs the BOS as a thread, which starts at once, and answers what it
+    /// returned if it finished before it first waited, as the engine does.
+    fn waiting_adapter(&mut self, spec: &Spec, target: &str) {
+        let Some(answer) = unfinished(spec) else {
+            return;
+        };
+        let saved = std::mem::take(&mut self.refs);
+        let args: Vec<String> = spec.args.iter().map(|a| a.to_string()).collect();
+        let fallback = match answer {
+            Unfinished::Piece(n) => match self.p.declared.get(n).cloned() {
+                Some((bos, _)) if self.p.pieces.iter().any(|(b, _, _)| *b == bos) => {
+                    self.piece(&bos)
+                }
+                Some((_, Some(model))) => format!("piece(\"{model}\")"),
+                _ => "nil".into(),
+            },
+            Unfinished::Expr(template, _) => self.template(template, &args),
+        };
+        let start = self.header("StartThread");
+        let call = format!("{target}({})", args.join(", "));
+        let what = match answer {
+            Unfinished::Piece(n) => format!("script piece {n}"),
+            Unfinished::Expr(_, what) => what.to_string(),
+        };
+        self.adapters.push(format!(
+            "-- {target} may wait before it finishes, and then the engine answers {what}.\nfunction {}({})\n\tlocal answer = {fallback}\n\t{start}(function()\n\t\tanswer = {call}\n\tend)\n\treturn answer\nend\n",
             spec.lua,
             args.join(", ")
         ));
@@ -3157,7 +3242,7 @@ impl<'p, 'a> Writer<'p, 'a> {
     fn callee(&mut self, name: &str) -> String {
         match self.p.funcs.get(&name.to_lowercase()) {
             Some(info) => match &info.role {
-                Some(Role::Callin(spec)) if info.direct => spec.lua.clone(),
+                Some(Role::Callin(spec)) if info.direct && !info.waits => spec.lua.clone(),
                 _ => info.lua.clone(),
             },
             None => {

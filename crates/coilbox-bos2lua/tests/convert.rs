@@ -158,6 +158,45 @@ fn hands_call_ins_to_the_engine_under_its_names() {
     );
 }
 
+/// A call-in the engine wants an answer from at once may not sleep in Lua, so
+/// one whose BOS waits runs as a thread and answers what the engine answers
+/// for a COB that has not finished: what it handed over
+/// (`CobInstance.cpp:496-523,592-617`).
+#[test]
+fn a_call_in_that_waits_for_its_answer_runs_as_a_thread() {
+    let c = convert_with(
+        r#"
+        piece base, turret, flare;
+        AimWeapon1(heading, pitch) { return (1); }
+        QueryWeapon1(piecenum) { sleep 100; piecenum = flare; }
+        BlockShot1(target, block) { sleep 100; block = 1; }
+        TargetWeight1(target, weight) { sleep 100; weight = 2; }
+        HitByWeaponId(z, x, id, damage) { sleep 100; return (50); }
+        "#,
+        &HashMap::new(),
+        65536,
+    );
+    let lua = &c.lua;
+    for (callin, args, fallback) in [
+        ("QueryWeapon1", "", "turret"),
+        ("BlockShot1", "targetID, userTarget", "(targetID or 0) ~= 0"),
+        ("TargetWeight1", "targetID", "(targetID or 0) / 65536"),
+        ("HitByWeapon", "x, z, weaponDefID, damage", "damage / 100"),
+    ] {
+        let adapter = format!("function script.{callin}({args})\n\tlocal answer = {fallback}\n\tStartThread(function()\n\t\tanswer = ");
+        assert!(lua.contains(&adapter), "{adapter}\n{lua}");
+    }
+    assert!(
+        !lua.contains("function script.QueryWeapon1()\n\tlocal piecenum"),
+        "{lua}"
+    );
+    assert!(
+        !c.warnings.iter().any(|w| w.to_string().contains("waits")),
+        "{:?}",
+        c.warnings
+    );
+}
+
 #[test]
 fn holds_a_piece_used_as_a_number_as_bos_numbers_it() {
     let lua = walker();

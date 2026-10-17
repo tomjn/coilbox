@@ -594,6 +594,62 @@ fn both_runtimes_fire_and_spray_alike() {
     }
 }
 
+/// Fire weapon 1 at frame 10 through both runtimes and return the pieces each
+/// shot came from.
+fn shots_from(source: &str) -> (Vec<Option<String>>, Vec<Option<String>>, String) {
+    let (cob, lua, pieces) = both(source);
+    let events = [
+        event(0, "Create", &[]),
+        ScriptEvent {
+            frame: 10,
+            callin: String::new(),
+            args: vec![1.0],
+            ambient: false,
+            world: None,
+            engine: Some(EngineAction::Fire),
+        },
+    ];
+    let from_cob = crate::cobrun::run(&cob, &pieces, &events, 20, &[], &HashMap::new());
+    let from_lua = run_lua(
+        &lua,
+        "gun.lua",
+        &Unit::new(&pieces),
+        &events,
+        20,
+        &HashMap::new(),
+    );
+    assert_eq!(from_cob.error, None);
+    assert_eq!(from_lua.error, None, "{lua}");
+    let shots = |t: &coilbox_unitpose::Timeline| -> Vec<Option<String>> {
+        t.events
+            .iter()
+            .filter_map(|e| match e {
+                ScriptOutput::Shot { piece, .. } => Some(piece.clone()),
+                _ => None,
+            })
+            .collect()
+    };
+    (shots(&from_cob), shots(&from_lua), lua)
+}
+
+/// The engine runs a call-in until it first waits, and a `QueryPrimary` that
+/// sleeps before it names a piece answers script piece 1, the argument count
+/// the engine handed over (`CobInstance.cpp:437-446`, `592-617`). A Lua
+/// call-in may not sleep at all, so the Lua runs the BOS as a thread and
+/// answers the same.
+#[test]
+fn both_runtimes_answer_script_piece_one_for_a_query_that_sleeps() {
+    let source = r#"
+        piece base, turret, flare;
+        AimWeapon1(heading, pitch) { return (1); }
+        AimFromWeapon1(piecenum) { piecenum = base; }
+        QueryWeapon1(piecenum) { sleep 100; piecenum = flare; }
+    "#;
+    let (cob, lua, text) = shots_from(source);
+    assert_eq!(cob, vec![Some("turret".to_string())]);
+    assert_eq!(lua, cob, "{text}");
+}
+
 /// A script with no `QueryNanoPiece` or `QueryWeapon1` answers script piece 1
 /// in the COB runtime, and the converter writes the same answer into the Lua.
 #[test]
