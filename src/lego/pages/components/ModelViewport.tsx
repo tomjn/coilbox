@@ -1122,6 +1122,7 @@ export function ModelViewport({
         groups: new Map(),
         baked: [],
         imported: null,
+        lifted: new Map(),
         rest: new Map(),
         uniformScale: false,
         anchors: null,
@@ -1279,6 +1280,7 @@ export function ModelViewport({
           state.originDot.dispose();
           disposeBaked(state);
           state.imported?.dispose();
+          for (const held of state.lifted.values()) held.dispose();
           // Not `grid`: the ground is laid again whenever it has to reach
           // further, so the one in the scene may not be the one built here.
           disposeGround(state.grid);

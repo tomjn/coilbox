@@ -16,10 +16,11 @@
  */
 
 import * as THREE from "three";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { type LegoPiece, type LegoProject, newProject } from "../../model";
 import type { LegoPartInfo, LoadedPack } from "../../pack";
+import type { RawGeometry } from "../../rawGeometry";
 import type { ScriptOutput, ScriptTimeline } from "../../scriptPlayback";
 import { applyTimelineFrame } from "./animationPlayback";
 import { buildEffectsLayer, type EffectsLayer } from "./effectsLayer";
@@ -29,6 +30,24 @@ import {
   placeEffects,
 } from "./effectsPlayback";
 import { type SceneGraph, type SceneState, syncScene } from "./sceneState";
+
+// The textures a lifted piece's material was made from, and how many were
+// freed. Made without loading anything, since there is no store to load from.
+let madeFor: unknown[] = [];
+let freed = 0;
+vi.mock("../../geometry", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../geometry")>()),
+  importedMaterial: (textures: { texture?: unknown }) => {
+    madeFor.push(textures.texture);
+    return {
+      material: new THREE.MeshStandardMaterial(),
+      dispose: () => {
+        freed += 1;
+      },
+    };
+  },
+}));
+
 import {
   placeStandIn,
   type StandInPlacement,
@@ -111,6 +130,7 @@ function graph(): SceneGraph & { detached: number } {
     root: new THREE.Group(),
     groups: new Map<string, THREE.Group>(),
     imported: null,
+    lifted: new Map(),
     detached: 0,
     gizmo: {
       object: undefined as THREE.Object3D | undefined,
@@ -127,6 +147,8 @@ let scene: ReturnType<typeof graph>;
 
 beforeEach(() => {
   scene = graph();
+  madeFor = [];
+  freed = 0;
 });
 
 /** The group standing for a piece, or a failure saying which piece is missing. */
@@ -365,6 +387,81 @@ describe("what a group carries", () => {
 
     expect(scene.groups.get("hull")?.visible).toBe(false);
     expect(scene.groups.get("skirt")?.visible).toBe(true);
+  });
+});
+
+describe("a unit of parts holding pieces lifted from a game (#3259)", () => {
+  /** One mesh, `mod/m0`, as a unit's sidecar holds it after a lift. */
+  const raw: RawGeometry = {
+    byId: new Map([
+      [
+        "mod/m0",
+        {
+          id: "mod/m0",
+          vFirst: 0,
+          vCount: 3,
+          iFirst: 0,
+          iCount: 3,
+          bbox: { min: [0, 0, 0], max: [1, 0, 1] },
+        },
+      ],
+    ]),
+    vertices: loaded.vertices,
+    indices: new Uint32Array([0, 1, 2]),
+  };
+  const lifted = (id: string, key = "aa.dds"): LegoPiece => ({
+    ...piece(id, "base"),
+    meshId: "mod/m0",
+    lifted: {
+      game: { name: "SF", archive: "sf.sdz" },
+      member: "objects3d/armcom.s3o",
+      texture: { key, name: "arm_1.dds" },
+    },
+  });
+  const material = (pieceId: string) =>
+    (
+      scene.groups
+        .get(pieceId)
+        ?.children.find((child) => child instanceof THREE.Mesh) as
+        | THREE.Mesh
+        | undefined
+    )?.material;
+
+  it("draws a part from the atlas and a lifted piece with its game's texture", () => {
+    syncScene(
+      scene,
+      loaded,
+      raw,
+      project({ ...piece("hull", "base"), partId: "tri" }, lifted("turret")),
+    );
+
+    expect(material("hull")).toBeDefined();
+    expect(material("turret")).toBeDefined();
+    expect(material("turret")).not.toBe(material("hull"));
+    expect(madeFor).toEqual([{ key: "aa.dds", name: "arm_1.dds" }]);
+  });
+
+  it("shares one material between lifted pieces with the same textures", () => {
+    syncScene(
+      scene,
+      loaded,
+      raw,
+      project(lifted("turret"), lifted("barrel"), lifted("dish", "bb.dds")),
+    );
+
+    expect(material("barrel")).toBe(material("turret"));
+    expect(material("dish")).not.toBe(material("turret"));
+    expect(scene.lifted.size).toBe(2);
+  });
+
+  it("frees a lifted material once no piece draws with it", () => {
+    const before = project(lifted("turret"));
+    syncScene(scene, loaded, raw, before);
+
+    syncScene(scene, loaded, raw, project());
+
+    expect(scene.lifted.size).toBe(0);
+    expect(freed).toBe(1);
   });
 });
 

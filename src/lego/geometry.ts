@@ -88,7 +88,9 @@ export function partMaterial(atlas: LegoAtlas): THREE.MeshStandardMaterial {
  * back. Waiting a frame is the same deal the textures themselves already make,
  * so `textureArrived` is what asks for the redraw.
  */
-export function importedMaterial(imported: LegoImported): {
+export function importedMaterial(
+  imported: Pick<LegoImported, "texture" | "texture2">,
+): {
   material: THREE.MeshStandardMaterial;
   dispose: () => void;
 } {
