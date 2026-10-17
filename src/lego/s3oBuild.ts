@@ -24,7 +24,7 @@ import {
 } from "./model";
 import type { LoadedPack } from "./pack";
 import { pieceMesh, type RawGeometry } from "./rawGeometry";
-import { shapeMesh } from "./shapes";
+import { isKnownShapeKind, shapeMesh } from "./shapes";
 import type { SheetUv } from "./textureSheet";
 
 /** x, y, z, nx, ny, nz, u, v, the s3o vertex record the pack also uses. */
@@ -127,6 +127,22 @@ export function bakedPieces(
     );
   }
   return { pieces, world, ranges };
+}
+
+/**
+ * Stop an export that would leave a shape out. A kind this build cannot make
+ * has no geometry, and the viewport shows it as nothing, but a file written
+ * without it would arrive in the game with a hole where the piece was.
+ */
+export function assertShapesKnown(project: LegoProject): void {
+  const piece = project.pieces.find(
+    (p) => p.shape && !isKnownShapeKind(p.shape.kind),
+  );
+  if (piece?.shape) {
+    throw new Error(
+      `"${piece.name}" is a "${piece.shape.kind}" shape, which this version of coilbox cannot make, so it cannot be exported. Delete the piece or update coilbox.`,
+    );
+  }
 }
 
 /** An axis-aligned box in the unit's space. */
@@ -298,6 +314,7 @@ export function buildS3o(
   },
 ): S3oBuild | null {
   if (!pieceById(project, project.rootPieceId)) return null;
+  assertShapesKnown(project);
   const rest = bakedPieces(project, pack, raw);
   const pose = options?.pose;
   const { pieces, world } =
