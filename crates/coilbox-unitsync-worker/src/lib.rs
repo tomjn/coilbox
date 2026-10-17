@@ -1165,21 +1165,21 @@ impl UnitBuildpicsArgs {
 }
 
 /// `--faction-logos`: resolve `Sidepics/<side>` emblems for `game`, named by
-/// `sides`, disk-cached under `cache_dir` like `--unit-buildpics`. Unlike
-/// that mode, `run()` has never given this one an `--asset-dir`, since
-/// `factionlogo::render` has no asset-encoding path, so there is no such
-/// field here.
+/// `sides`, disk-cached under `cache_dir` like `--unit-buildpics`. With
+/// `asset_dir` also encodes each emblem as the hub's `logo` asset (issue
+/// #4387), and such a run skips the cache.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FactionLogosArgs {
     pub game: String,
     pub sides: Vec<String>,
     pub cache_dir: Option<String>,
+    pub asset_dir: Option<String>,
 }
 
 impl FactionLogosArgs {
     /// Build the flags for `--faction-logos` mode: the flag itself, the game
     /// whose sides these are, the comma-joined side names, and the optional
-    /// on-disk cache directory.
+    /// on-disk cache and asset directories.
     pub fn to_args(&self) -> Vec<String> {
         let mut args = vec![
             "--faction-logos".to_string(),
@@ -1190,6 +1190,10 @@ impl FactionLogosArgs {
         ];
         if let Some(dir) = &self.cache_dir {
             args.push("--cache-dir".to_string());
+            args.push(dir.clone());
+        }
+        if let Some(dir) = &self.asset_dir {
+            args.push("--asset-dir".to_string());
             args.push(dir.clone());
         }
         args
@@ -1203,6 +1207,7 @@ impl FactionLogosArgs {
         let mut game = None;
         let mut sides: Vec<String> = Vec::new();
         let mut cache_dir = None;
+        let mut asset_dir = None;
         let mut it = args.iter();
         while let Some(a) = it.next() {
             match a.as_str() {
@@ -1220,6 +1225,7 @@ impl FactionLogosArgs {
                         .unwrap_or_default()
                 }
                 "--cache-dir" => cache_dir = it.next().cloned(),
+                "--asset-dir" => asset_dir = it.next().cloned(),
                 _ => {}
             }
         }
@@ -1227,6 +1233,7 @@ impl FactionLogosArgs {
             game: game.unwrap_or_default(),
             sides,
             cache_dir,
+            asset_dir,
         })
     }
 }
@@ -2582,6 +2589,7 @@ mod tests {
             game: "BAR.sdd".into(),
             sides: vec!["Armada".into(), "Cortex".into()],
             cache_dir: Some("/cache/logos".into()),
+            asset_dir: Some("/assets".into()),
         }
     }
 

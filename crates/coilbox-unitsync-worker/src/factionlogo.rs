@@ -9,13 +9,17 @@
 //! a small icon. Each entry also reports the source image's longest pixel side so
 //! the frontend can prefer a crisper curated image over a 16px upscale.
 //!
+//! With an asset directory, each emblem is also encoded as the hub's `logo` asset
+//! (issue #4387). That run reads and writes no cache, because the file it makes
+//! is the thing it is asked for.
+//!
 //! Disk-cached per (game-identity, side) like the build-pic cache, so re-runs skip
 //! the archive mount. The PNG is written beside its JSON record and named in it,
 //! so what crosses the bridge is a file name the webview fetches over
 //! `coilbox://unitsyncfactionlogo/` rather than base64.
 
 use crate::ffi::Unitsync;
-use crate::model::{FactionLogoEntry, FactionLogosOutput};
+use crate::model::{FactionLogoAsset, FactionLogoEntry, FactionLogosOutput};
 use coilbox_unitsync_worker::cached::{
     logo_file_name, logo_file_present, push_logo as push_entry, read_logo_record as read_cache,
     side_stem, CachedLogo,
@@ -47,16 +51,27 @@ pub fn emit_error(msg: String) {
 struct ResolvedLogo {
     png: Vec<u8>,
     max_dim: u32,
+    /// The archive member exactly as read, which the asset's `source_hash` is over.
+    raw: Vec<u8>,
+    /// The member's path as the archive stores it.
+    member: String,
+    /// The decoded emblem after any keying, before it is scaled to an icon.
+    image: image::RgbaImage,
 }
 
 /// Resolve faction emblems for `sides` in `game_archive`. Cache hits/negatives skip
 /// the unitsync session; otherwise mount the archive once and resolve the misses.
 /// `cache_dir` `None` disables caching.
+///
+/// `asset_dir` `Some` encodes each emblem as the hub's `logo` asset and writes it
+/// there, and the entries carry that asset instead of a PNG. Such a run never
+/// touches the cache, so it always mounts the archive.
 pub fn render(
     lib: &str,
     game_archive: &str,
     sides: &[String],
     cache_dir: Option<&Path>,
+    asset_dir: Option<&Path>,
 ) -> FactionLogosOutput {
     let mut logos: Vec<FactionLogoEntry> = Vec::new();
     let mut errors = Vec::new();
@@ -74,7 +89,14 @@ pub fn render(
     errors.extend(us.drain_errors());
 
     let key_base = cache_key_base(&us, game_archive);
-    let cache = cache_dir.zip(key_base.as_ref());
+    let cache = if asset_dir.is_some() {
+        None
+    } else {
+        cache_dir.zip(key_base.as_ref())
+    };
+    // Resolved before the mount, the way build pics do, so the asset names the
+    // archive the bytes were read out of.
+    let source_archive = crate::archive::archive_name_for_game(&us, game_archive);
 
     // Partition into cache hits (done) and misses (need the archive mounted).
     let mut misses: Vec<String> = Vec::new();
@@ -113,7 +135,23 @@ pub fn render(
                 .map(|(path, _)| (path.to_lowercase(), path))
                 .collect();
             for side in &misses {
-                let cached = store_logo(cache, side, resolve_side(&us, handle, &list, side));
+                let resolved = resolve_side(&us, handle, &list, side);
+                if let Some(dir) = asset_dir {
+                    if let Some(resolved) = resolved {
+                        match encode_logo_asset(dir, &resolved, &source_archive) {
+                            Ok(asset) => logos.push(FactionLogoEntry {
+                                side: side.clone(),
+                                file: None,
+                                data_uri: None,
+                                max_dim: resolved.max_dim,
+                                asset: Some(asset),
+                            }),
+                            Err(why) => errors.push(format!("faction logo {side}: {why}")),
+                        }
+                    }
+                    continue;
+                }
+                let cached = store_logo(cache, side, resolved);
                 if let Some((dir, base)) = cache {
                     write_cache(dir, base, side, &cached);
                 }
@@ -160,8 +198,14 @@ fn resolve_side(
         if WHITE_FIELD_EXTS.contains(ext) {
             chroma_key_white(&mut img);
         }
-        let png = crate::texture::encode_icon_png(img)?;
-        return Some(ResolvedLogo { png, max_dim });
+        let png = crate::texture::encode_icon_png(img.clone())?;
+        return Some(ResolvedLogo {
+            png,
+            max_dim,
+            raw: bytes,
+            member: actual,
+            image: img,
+        });
     }
     None
 }
@@ -175,7 +219,7 @@ fn store_logo(
     side: &str,
     resolved: Option<ResolvedLogo>,
 ) -> CachedLogo {
-    let Some(ResolvedLogo { png, max_dim }) = resolved else {
+    let Some(ResolvedLogo { png, max_dim, .. }) = resolved else {
         return CachedLogo::default();
     };
     if let Some((dir, base)) = cache {
@@ -194,6 +238,50 @@ fn store_logo(
         data_uri: Some(crate::texture::png_data_url(&png)),
         max_dim,
     }
+}
+
+/// Encode one emblem to the hub's `logo` profile and write it into `asset_dir`,
+/// named after the hash of its own bytes like the hub's object path.
+///
+/// `source_hash` is over the archive member as read, so it does not move when the
+/// decoder, the keying or libwebp does. The emblem goes in at its own size up to
+/// the class's longest edge, and a larger one is scaled down to it.
+fn encode_logo_asset(
+    asset_dir: &Path,
+    logo: &ResolvedLogo,
+    source_archive: &str,
+) -> Result<FactionLogoAsset, String> {
+    use crate::assetencode::{encode_variant, ext_for_mime, sha256_hex, EXTRACTED_ORIGIN};
+
+    let variant = &coilbox_assets::vocabulary().faction.logo_variant;
+    let encoded = encode_variant(
+        variant,
+        &image::DynamicImage::ImageRgba8(logo.image.clone()),
+    )
+    .map_err(|e| e.to_string())?;
+
+    let hash = sha256_hex(&encoded.bytes);
+    let path = asset_dir.join(format!("{hash}.{}", ext_for_mime(&encoded.mime)));
+    std::fs::create_dir_all(asset_dir).map_err(|e| format!("could not write: {e}"))?;
+    // Same content, same name, so a file already there is already this asset.
+    if !path.exists() {
+        std::fs::write(&path, &encoded.bytes).map_err(|e| format!("could not write: {e}"))?;
+    }
+
+    Ok(FactionLogoAsset {
+        variant: variant.clone(),
+        origin: EXTRACTED_ORIGIN.to_string(),
+        source_archive: source_archive.to_string(),
+        path: path.to_string_lossy().into_owned(),
+        hash,
+        source_hash: sha256_hex(&logo.raw),
+        source_member: logo.member.clone(),
+        encode_profile: encoded.encode_profile,
+        mime: encoded.mime,
+        width: encoded.width,
+        height: encoded.height,
+        bytes: encoded.bytes.len() as u64,
+    })
 }
 
 /// Set pure-white pixels fully transparent (the `Sidepics` BMP convention).
@@ -284,8 +372,11 @@ mod tests {
     fn emblem() -> ResolvedLogo {
         let img = image::RgbaImage::from_pixel(16, 16, image::Rgba([10, 20, 30, 255]));
         ResolvedLogo {
-            png: crate::texture::encode_icon_png(img).unwrap(),
+            png: crate::texture::encode_icon_png(img.clone()).unwrap(),
             max_dim: 16,
+            raw: b"Sidepics/Aven.png as stored".to_vec(),
+            member: "Sidepics/Aven.png".into(),
+            image: img,
         }
     }
 
@@ -394,6 +485,50 @@ mod tests {
         assert!(!logo_file_present(&cached, &dir));
         // A record naming no file has nothing to miss.
         assert!(logo_file_present(&CachedLogo::default(), &dir));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The asset is a lossless WebP the hub's `logo` class accepts, written under
+    /// its own hash, and its `source_hash` is over the member as read.
+    #[test]
+    fn an_emblem_is_encoded_as_the_hub_s_logo_asset() {
+        let dir = temp_dir("asset");
+        let logo = emblem();
+
+        let asset = encode_logo_asset(&dir, &logo, "Aven Game 1.0").unwrap();
+        assert_eq!(asset.variant, "logo");
+        assert_eq!(asset.origin, "extracted");
+        assert_eq!(asset.mime, "image/webp");
+        assert_eq!(asset.encode_profile, "webp-lossless-128");
+        assert_eq!(asset.source_archive, "Aven Game 1.0");
+        assert_eq!(asset.source_member, "Sidepics/Aven.png");
+        assert_eq!((asset.width, asset.height), (16, 16));
+        assert_eq!(
+            asset.source_hash,
+            crate::assetencode::sha256_hex(b"Sidepics/Aven.png as stored")
+        );
+        assert_eq!(
+            asset.path,
+            dir.join(format!("{}.webp", asset.hash)).to_string_lossy()
+        );
+        let written = std::fs::read(&asset.path).unwrap();
+        assert_eq!(written.len() as u64, asset.bytes);
+        assert_eq!(crate::assetencode::sha256_hex(&written), asset.hash);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A wide emblem is not refused: the logo class is not square. One over the
+    /// longest edge comes down to it.
+    #[test]
+    fn a_large_or_wide_emblem_is_scaled_to_the_class_edge() {
+        let dir = temp_dir("scale");
+        let mut logo = emblem();
+        logo.image = image::RgbaImage::from_pixel(256, 64, image::Rgba([10, 20, 30, 255]));
+
+        let asset = encode_logo_asset(&dir, &logo, "Aven Game 1.0").unwrap();
+        assert_eq!((asset.width, asset.height), (128, 32));
 
         let _ = std::fs::remove_dir_all(&dir);
     }
