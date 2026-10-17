@@ -25,11 +25,12 @@ import {
 import { legoThumbUrl } from "../../lib/assetUrl";
 import type { LegoAtlas } from "../atlas";
 import { BODY_PLANS, type BodyPlan, projectFromPlan } from "../bodyPlans";
-import { type LegoProject, newProject } from "../model";
+import { type LegoProject, newProject, type SkeletonTarget } from "../model";
 import { loadPack } from "../pack";
 import { filterGrouped, groupProjects } from "../projectGroups";
 import { validateProjectName } from "../projectNames";
 import { deleteProject, saveProject, useLegoProjects } from "../projects";
+import { projectFromTarget } from "../skeletonSize";
 import { gameRecordFor, unitGame } from "../unitGame";
 import { GameModelDrawer } from "./components/GameModelDrawer";
 import { ImportDrawer } from "./components/ImportDrawer";
@@ -148,8 +149,9 @@ export default function ProjectsPage() {
     };
   }, []);
 
-  /** Starts a unit blank, or from a body plan with its skeleton in place. */
-  async function create(plan: BodyPlan | null) {
+  /** Starts a unit blank, or from a body plan with its skeleton in place,
+   *  fitted to the size given. */
+  async function create(plan: BodyPlan | null, target?: SkeletonTarget) {
     setBusy(true);
     setProblem(null);
     try {
@@ -168,10 +170,15 @@ export default function ProjectsPage() {
         now: new Date().toISOString(),
       };
       const project = plan
-        ? projectFromPlan(plan, {
-            ...options,
-            newId: () => crypto.randomUUID(),
-          })
+        ? target
+          ? projectFromTarget(plan, target, {
+              ...options,
+              newId: () => crypto.randomUUID(),
+            })
+          : projectFromPlan(plan, {
+              ...options,
+              newId: () => crypto.randomUUID(),
+            })
         : newProject(options);
       await saveProject(project);
       navigate(`/lego/${project.id}`);
@@ -426,7 +433,7 @@ export default function ProjectsPage() {
               plans={BODY_PLANS}
               label="New model"
               busy={busy}
-              onChoose={(plan) => void create(plan)}
+              onChoose={(plan, target) => void create(plan, target)}
             />
           </>
         }
@@ -475,7 +482,7 @@ export default function ProjectsPage() {
             plans={BODY_PLANS}
             label="New unit"
             busy={busy}
-            onChoose={(plan) => void create(plan)}
+            onChoose={(plan, target) => void create(plan, target)}
           />
         </div>
       ) : (
