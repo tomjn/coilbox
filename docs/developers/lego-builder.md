@@ -87,6 +87,8 @@ Compounds are the answer to "where do I get a leg from". The alternative is copy
 
 Select the top piece of the assembly and press the compound button in the left-hand toolbar. It appears under the **Compounds** tab of the parts strip, where you can rename it, delete it, and click it to drop a copy into the unit you are working on. A compound keeps how its pieces sit against each other and the joins between them. Its top piece has no join, so the compound lands free at the selected piece's origin, and you drag it onto a face to join it. Names are made unique as it lands, because two pieces called `barrel` would be one piece too few for a script.
 
+The compound button opens a small panel that asks which connector mounts the compound on a unit. It opens on the connector at the lowest point of the first piece, which is the bottom face of a leg or a turret. Choose another connector, or "No mount", and press Save. When you click a compound that has a mount, it joins to a free face of the selected piece by that connector, the way a part from the strip does. If the mount is on a piece deeper in the compound, the whole compound is placed with that connector on the face but no join is saved. If the selected piece has no face to join, the compound is placed with its mount connector on the selected piece's origin. A compound saved with no mount drops its first piece on the selected piece's origin, as before.
+
 ## Judging size
 
 A unit built from small parts can look substantial and be a fraction of a real one, so the builder gives you two readings.

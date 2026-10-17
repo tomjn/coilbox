@@ -179,14 +179,19 @@ export function validateCompoundName(
  * Names are made unique as they land, because a script addresses pieces by
  * name and two `barrel`s would be one piece too few. Every root of the compound
  * hangs off the same parent, keeping the spacing between them, and they come
- * back as `rootPieceIds` so the selection can land on all of them.
+ * back as `rootPieceIds` so the selection can land on all of them. `idMap` says
+ * which new piece each of the compound's pieces became.
  */
 export function insertCompound(
   project: LegoProject,
   compound: LegoProject,
   parentId: string,
   newId: () => string,
-): { project: LegoProject; rootPieceIds: string[] } {
+): {
+  project: LegoProject;
+  rootPieceIds: string[];
+  idMap: Map<string, string>;
+} {
   const parent = pieceById(project, parentId) ? parentId : project.rootPieceId;
   const taken = project.pieces.map((piece) => piece.name);
   const remap = new Map<string, string>();
@@ -219,6 +224,7 @@ export function insertCompound(
   return {
     project: { ...project, pieces: [...project.pieces, ...added] },
     rootPieceIds,
+    idMap: remap,
   };
 }
 
