@@ -34,6 +34,7 @@ import {
 } from "./connectors";
 import type { LegoProject } from "./model";
 import { type Problem, problem } from "./problems";
+import { isKnownShapeKind } from "./shapes";
 
 const BLOB_MAGIC = "CBLEGO\0\0";
 const SUPPORTED_SCHEMA = 1;
@@ -471,6 +472,24 @@ export function projectPackProblems(
           ? "1 piece names a part no installed pack has, so it shows no geometry."
           : `${missing} pieces name parts no installed pack has, so they show no geometry.`,
         lost.map((piece) => piece.id),
+      ),
+    );
+  }
+
+  // A shape kind from a newer build is kept, so saving does not lose it, but
+  // this build cannot make it.
+  const unknown = project.pieces.filter(
+    (piece) => piece.shape && !isKnownShapeKind(piece.shape.kind),
+  );
+  if (unknown.length > 0) {
+    problems.push(
+      problem(
+        "pack",
+        "warning",
+        unknown.length === 1
+          ? "1 piece is a shape this version of coilbox cannot make, so it shows no geometry."
+          : `${unknown.length} pieces are shapes this version of coilbox cannot make, so they show no geometry.`,
+        unknown.map((piece) => piece.id),
       ),
     );
   }

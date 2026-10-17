@@ -160,7 +160,7 @@ export function showCollisionHandles(state: SceneState) {
 /** How big a grab plate is, given the face it sits on. A quarter of the face's
  *  shorter side, but never so small that a thin volume cannot be grabbed nor so
  *  large that a volume is hidden under its own handles. */
-function plateSize(acrossA: number, acrossB: number): number {
+export function plateSize(acrossA: number, acrossB: number): number {
   return Math.min(1.5, Math.max(0.4, 0.25 * Math.min(acrossA, acrossB)));
 }
 

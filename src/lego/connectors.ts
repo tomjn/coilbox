@@ -29,6 +29,7 @@ import type {
 } from "./model";
 import type { LoadedPack } from "./pack";
 import { framesAgree, isJoined, localFromWorld, worldMatrix } from "./reparent";
+import { shapeBox } from "./shapes";
 import type { Bounds, Vec3 } from "./snapping";
 
 export interface LegoConnector {
@@ -226,12 +227,26 @@ export function pieceConnectors(
   piece: LegoPiece,
 ): LegoConnector[] {
   const part = piece.partId ? pack.byId.get(piece.partId) : undefined;
-  const bounds = part?.bbox ?? piece.meshBox;
+  const bounds = pieceOwnBox(pack, piece);
   const own = customConnectors(piece.customAnchors ?? [], bounds);
   if (own.length > 0) return own;
   if (part) return part.connectors ?? boxConnectors(part.bbox);
-  // A lifted piece has no part, so its mesh's box stands in for the part's.
-  return piece.meshBox ? boxConnectors(piece.meshBox) : [];
+  // A shape or a lifted piece has no part, so its own box stands in.
+  return bounds ? boxConnectors(bounds) : [];
+}
+
+/**
+ * The box a piece is measured on, in its own space before the pivot: its
+ * part's, its generated shape's, or the box of its lifted mesh. Undefined for a
+ * piece with none of them, or a part or shape this build cannot find.
+ */
+export function pieceOwnBox(
+  pack: LoadedPack,
+  piece: LegoPiece,
+): Bounds | undefined {
+  if (piece.partId) return pack.byId.get(piece.partId)?.bbox;
+  if (piece.shape) return shapeBox(piece.shape) ?? undefined;
+  return piece.meshBox;
 }
 
 /**
@@ -609,8 +624,9 @@ export function faceName(
 ): string {
   const part = piece?.partId ? pack.byId.get(piece.partId) : undefined;
   const boxed =
-    (part ? !part.connectors : piece?.meshBox !== undefined) &&
-    !(piece?.customAnchors?.length ?? 0);
+    piece !== undefined &&
+    (part ? !part.connectors : pieceOwnBox(pack, piece) !== undefined) &&
+    !(piece.customAnchors?.length ?? 0);
   return (boxed && BOX_FACE_NAMES[id]) || id;
 }
 
@@ -665,9 +681,7 @@ function outlineOf(
   const facing = new THREE.Vector3(...connector.facing).normalize();
   const up = new THREE.Vector3(...connector.up).normalize();
   const side = new THREE.Vector3().crossVectors(facing, up);
-  const bbox =
-    (piece.partId ? pack.byId.get(piece.partId)?.bbox : undefined) ??
-    piece.meshBox;
+  const bbox = pieceOwnBox(pack, piece);
   const half = (axis: THREE.Vector3) =>
     bbox
       ? 0.5 *

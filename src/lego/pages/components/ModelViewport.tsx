@@ -117,6 +117,7 @@ import {
   buildReferenceUnit,
   disposeReferenceUnit,
 } from "../../referenceObject";
+import type { Axis } from "../../resizePackBlock";
 import { unitBounds } from "../../s3oBuild";
 import type { ScriptTimeline } from "../../scriptPlayback";
 import type { Seat } from "../../seat";
@@ -197,6 +198,7 @@ import {
 } from "./measureLayer";
 import { disposeOverlap } from "./overlapLayer";
 import { type CheckStatus, ProblemsButton } from "./ProblemsButton";
+import { buildPackPreview } from "./packHandles";
 import { clearPlaceGhost, type Placing, showPlaceGhost } from "./placeByFace";
 import { attachPointerHandlers } from "./pointerHandlers";
 import {
@@ -341,6 +343,9 @@ export const COLLISION_DIM_OPACITY = 0.3;
  * enough round the wheel to be told apart at a glance in a wireframe.
  */
 const PIECE_COLLISION_COLOUR = 0xfacc15;
+/** The plates and outline for sizing a pack block. Teal, which nothing else on
+ *  screen is, so they are not mistaken for either collision box. */
+const PACK_HANDLE_COLOUR = 0x14b8a6;
 
 /**
  * How wide the box on the piece being edited is drawn, in pixels.
@@ -664,6 +669,16 @@ interface Props {
     /** One edit of the unit, so a change is one step of undo. */
     onEdit: (edit: (project: LegoProject) => LegoProject) => void;
   };
+  /**
+   * Sizing a pack block by dragging a face, with the size tool active (#3332).
+   * Absent leaves the scale gizmo on pack blocks.
+   */
+  packResize?: {
+    /** A face was let go on a size the pack has. `axis` is the part's own axis,
+     *  `sign` the end dragged and `size` the size of the part to swap to. One
+     *  edit, so one step of undo. */
+    onResize: (pieceId: string, axis: Axis, sign: 1 | -1, size: number) => void;
+  };
 }
 
 export function ModelViewport({
@@ -686,6 +701,7 @@ export function ModelViewport({
   aimPoint,
   proportions,
   guides,
+  packResize,
   footprint,
   problems,
   showFreeFaces = false,
@@ -739,6 +755,7 @@ export function ModelViewport({
   } = collisionEditing;
   const { showAimPoint = false, onAimChange } = aimPoint;
   const onGuidesEdit = guides?.onEdit;
+  const onPackResize = packResize?.onResize;
   // The one selected piece, when there is exactly one. Anchors, the key at the
   // bottom of the view and the pivot dot are all about a single piece: a set
   // is dragged about its midpoint and seats against nothing.
@@ -757,6 +774,8 @@ export function ModelViewport({
   /** The part unit a move is stepping in, while one is. */
   const [steppedBy, setSteppedBy] = useState<number | null>(null);
   const [slidBy, setSlidBy] = useState<string | null>(null);
+  /** What a pack block face drag says about the size it is on. */
+  const [resizeNote, setResizeNote] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(true);
   const [showReference, setShowReference] = useState(false);
   /** A unit read out of an installed game to stand instead of the built-in
@@ -881,6 +900,9 @@ export function ModelViewport({
   onPieceVolumeChangeRef.current = onPieceCollisionVolumeChange;
   const onAimChangeRef = useRef(onAimChange);
   onAimChangeRef.current = onAimChange;
+  const onPackResizeRef = useRef(onPackResize);
+  onPackResizeRef.current = onPackResize;
+  const onPackReadoutRef = useRef(setResizeNote);
   // The frame comes from the ref when the stand-in is let go rather than when
   // the scenario started, since the run has played on since then.
   const onStandInDragRef = useRef<((at: [number, number]) => void) | undefined>(
@@ -1018,6 +1040,32 @@ export function ModelViewport({
       });
       const collisionHandles = buildCollisionHandles(collisionHandleMaterial);
       overlay.add(collisionHandles);
+
+      // A pack block's face plates and the outline of the part a drag would
+      // swap to. In the scene rather than the overlay: they are placed from the
+      // piece's world matrix.
+      const packHandleMaterial = new THREE.MeshBasicMaterial({
+        color: PACK_HANDLE_COLOUR,
+        transparent: true,
+        opacity: 0.35,
+        depthTest: false,
+        side: THREE.DoubleSide,
+      });
+      const packHandleHotMaterial = new THREE.MeshBasicMaterial({
+        color: PACK_HANDLE_COLOUR,
+        transparent: true,
+        opacity: 0.8,
+        depthTest: false,
+        side: THREE.DoubleSide,
+      });
+      const packHandles = buildCollisionHandles(packHandleMaterial);
+      scene.add(packHandles);
+      const packPreviewMaterial = new THREE.LineBasicMaterial({
+        color: PACK_HANDLE_COLOUR,
+        depthTest: false,
+      });
+      const packPreview = buildPackPreview(packPreviewMaterial);
+      scene.add(packPreview);
 
       // The same plates go on a piece's box, in that box's own colour, so the
       // handles say which of the two shapes they are about to size.
@@ -1262,6 +1310,13 @@ export function ModelViewport({
         pieceHandleHotMaterial,
         collisionDrag: null,
         onCollisionChangeRef,
+        packHandles,
+        packHandleMaterial,
+        packHandleHotMaterial,
+        packPreview,
+        packDrag: null,
+        onPackResizeRef,
+        onPackReadoutRef,
         pieceCollision: null,
         pieceCollisionMaterial,
         pieceEditMaterial,
@@ -1482,6 +1537,11 @@ export function ModelViewport({
           collisionHandleHotMaterial.dispose();
           pieceHandleMaterial.dispose();
           pieceHandleHotMaterial.dispose();
+          (packHandles.children[0] as THREE.Mesh).geometry.dispose();
+          packHandleMaterial.dispose();
+          packHandleHotMaterial.dispose();
+          packPreview.geometry.dispose();
+          packPreviewMaterial.dispose();
           disposePieceCollision(state);
           pieceCollisionMaterial.dispose();
           pieceEditMaterial.dispose();
@@ -1995,15 +2055,17 @@ export function ModelViewport({
                     ? "Click the model to put an anchor there. Escape to stop"
                     : placingPart
                       ? `Click a face to place the ${"module" in placingPart ? (placingPart.module.mount ? "module" : "module, which has no mount so joins by its first piece") : "part"}. ${shortcutLabel("place-face")} next face, ${shortcutLabel("place-twist")} twist, Escape to stop`
-                      : snapped
-                        ? snappedTo
-                          ? `Snapped to "${snappedTo}". Hold Alt to place freely`
-                          : "Snapped. Hold Alt to place freely"
-                        : slidBy !== null
-                          ? `Sliding on the face, offset ${slidBy}, in steps of ${steppedBy}. Hold Alt to place freely and detach`
-                          : steppedBy !== null
-                            ? `Moving in steps of ${steppedBy}. Hold Alt to place freely`
-                            : "Hold Alt to place freely"}
+                      : resizeNote !== null
+                        ? resizeNote
+                        : snapped
+                          ? snappedTo
+                            ? `Snapped to "${snappedTo}". Hold Alt to place freely`
+                            : "Snapped. Hold Alt to place freely"
+                          : slidBy !== null
+                            ? `Sliding on the face, offset ${slidBy}, in steps of ${steppedBy}. Hold Alt to place freely and detach`
+                            : steppedBy !== null
+                              ? `Moving in steps of ${steppedBy}. Hold Alt to place freely`
+                              : "Hold Alt to place freely"}
             </span>
           </div>
 

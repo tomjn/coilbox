@@ -225,6 +225,22 @@ describe("sheetSources", () => {
     });
   });
 
+  it("puts a generated shape on the atlas with the parts (#3325)", () => {
+    const doc = mixed();
+    const shaped = project([
+      {},
+      {
+        id: "wheel",
+        partId: null,
+        shape: { kind: "cylinder", size: [1, 1, 1], swatch: "grey" },
+      },
+      doc.pieces[2],
+    ]);
+    const found = sheetSources(shaped, pack(), raw());
+    if (!found || "refused" in found) throw new Error("no sources");
+    expect(found.sources[0].pieceIds).toEqual(["piece0", "wheel"]);
+  });
+
   it("reads the second texture of a lifted piece, turned by its own format", () => {
     const found = sheetSources(mixed("bbbb.png"), pack(), raw());
     if (!found || "refused" in found) throw new Error("no sources");

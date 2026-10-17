@@ -76,6 +76,7 @@ import {
   disconnectPiece,
   type JoinSummary,
   pieceConnectors,
+  pieceOwnBox,
   setJoinPlace,
 } from "../connectors";
 import { planById } from "../describedPlan";
@@ -154,6 +155,7 @@ import {
 import { rawGeometryProblems } from "../rawGeometry";
 import { texturesInUse } from "../rawImport";
 import { parentOptions, reparentPiece } from "../reparent";
+import { type Axis, resizePackBlock } from "../resizePackBlock";
 import { unringPiece } from "../ring";
 import { ringMembers } from "../ringSet";
 import { bakedPieces, sitOnGround, unitBounds } from "../s3oBuild";
@@ -691,7 +693,9 @@ function Builder({ id }: { id: string | undefined }) {
     const current = docRef.current.project;
     if (
       now ||
-      !current?.pieces.some((piece) => piece.partId || piece.meshBox)
+      !current?.pieces.some(
+        (piece) => piece.partId || piece.shape || piece.meshBox,
+      )
     ) {
       addCompound(module, docRef.current);
       setPlacingPart(null);
@@ -733,7 +737,7 @@ function Builder({ id }: { id: string | undefined }) {
       return;
     }
     if (!target) {
-      if (draft.pieces.some((piece) => piece.partId)) return;
+      if (draft.pieces.some((piece) => piece.partId || piece.shape)) return;
       addPart(placingPart.part);
       setPlacingPart(null);
       return;
@@ -1157,6 +1161,35 @@ function Builder({ id }: { id: string | undefined }) {
     edit(
       (project) =>
         swapPart(project, pack, pieceId, part.id)?.project ?? project,
+    );
+    const notes = [
+      result.droppedAnchors.length > 0
+        ? `Dropped ${result.droppedAnchors.length === 1 ? "an anchor" : `${result.droppedAnchors.length} anchors`} outside the new part: ${result.droppedAnchors.join(", ")}.`
+        : null,
+      result.broken.length > 0
+        ? "A join lost its connector. See the problems list."
+        : null,
+    ].filter(Boolean);
+    setSwapNote(notes.length > 0 ? notes.join(" ") : null);
+  }
+
+  /**
+   * A pack block's face was dragged to a size the pack has (#3332). One edit,
+   * so one undo. The notes are the ones a part swap gives.
+   */
+  function resizeBlock(
+    pieceId: string,
+    axis: Axis,
+    sign: 1 | -1,
+    size: number,
+  ) {
+    if (!draft || !pack) return;
+    const result = resizePackBlock(draft, pack, pieceId, axis, sign, size);
+    if (!result) return;
+    edit(
+      (project) =>
+        resizePackBlock(project, pack, pieceId, axis, sign, size)?.project ??
+        project,
     );
     const notes = [
       result.droppedAnchors.length > 0
@@ -1636,10 +1669,10 @@ function Builder({ id }: { id: string | undefined }) {
   const selectedPart = selected?.partId
     ? (pack.byId.get(selected.partId) ?? null)
     : null;
-  // What the pivot choices are measured from: the part's box, or for a lifted
-  // piece the box of its mesh.
-  const pivotBox =
-    selectedPart ?? (selected?.meshBox ? { bbox: selected.meshBox } : null);
+  // What the pivot choices are measured from: the part's box, a shape's, or for
+  // a lifted piece the box of its mesh.
+  const selectedBox = selected ? pieceOwnBox(pack, selected) : undefined;
+  const pivotBox = selectedBox ? { bbox: selectedBox } : null;
   // Whether "whole model" flip, mirror and recalculate normals have anything
   // to reach: an imported unit with every geometry piece deleted has none,
   // same as a unit built out of parts.
@@ -2124,6 +2157,7 @@ function Builder({ id }: { id: string | undefined }) {
                   onAimChange: setAimPoint,
                 }}
                 guides={{ onEdit: edit }}
+                packResize={imported ? undefined : { onResize: resizeBlock }}
               />
             </div>
 

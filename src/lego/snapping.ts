@@ -210,15 +210,17 @@ export function snapPosition(position: Vec3, step: number): Vec3 {
  * The step a move of these pieces lands on, or null when it has none.
  *
  * A piece with a saved connection is placed by the connection, so a step would
- * fight it. A piece that is not a pack part (an imported mesh, or an empty) has
- * no part unit to step in.
+ * fight it. A pack part and a generated shape are sized in part units, so they
+ * step. An imported mesh or an empty has no part unit to step in.
  */
 export function moveStep(
-  pieces: { partId: string | null; connection?: unknown }[],
+  pieces: { partId: string | null; shape?: unknown; connection?: unknown }[],
   unit: number,
 ): number | null {
   if (pieces.length === 0) return null;
-  return pieces.every((p) => p.partId && !p.connection) ? unit : null;
+  return pieces.every((p) => (p.partId || p.shape) && !p.connection)
+    ? unit
+    : null;
 }
 
 /** A piece this close to the camera cannot shrink the threshold to zero. */
