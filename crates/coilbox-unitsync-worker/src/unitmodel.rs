@@ -420,12 +420,7 @@ pub(crate) fn read_model(
     // one file system, so a texture is found wherever any of them holds it, and
     // the game's own copy wins (issue #4239). That holds whichever archive the
     // model came out of.
-    let sources: Vec<TextureSource> = std::iter::once(game_source)
-        .chain(fallbacks.iter().map(|a| TextureSource {
-            handle: a.handle,
-            list: &a.list,
-        }))
-        .collect();
+    let sources = texture_sources(game_source, fallbacks);
     for tex in out.textures.iter_mut().chain(out.texture2.iter_mut()) {
         resolve_texture(us, &sources, &format, teamtex, cache, tex);
     }
@@ -439,6 +434,20 @@ pub(crate) fn read_model(
 pub(crate) struct TextureSource<'a> {
     pub handle: i32,
     pub list: &'a [(String, String)],
+}
+
+/// The archives a model's textures are looked for in, in the order the engine
+/// searches them: the game's own, then its dependencies and base content.
+fn texture_sources<'a>(
+    game: TextureSource<'a>,
+    fallbacks: &'a [ModelArchive],
+) -> Vec<TextureSource<'a>> {
+    std::iter::once(game)
+        .chain(fallbacks.iter().map(|a| TextureSource {
+            handle: a.handle,
+            list: &a.list,
+        }))
+        .collect()
 }
 
 /// Rewrite an empty `.3do` texture name to `coilbox_3do::EMPTY_TEXTURE_NAME`
@@ -486,21 +495,27 @@ fn rename_empty_group_textures(piece: &mut ModelPiece) {
 ///
 /// Takes a session the caller has already mounted, so a render pays for one
 /// archive mount rather than two.
+///
+/// `fallbacks` are the game's dependencies and base content, from
+/// [`fallback_archives`]. A texture is hashed from whichever archive the engine
+/// would find it in, so a change to a dependency's texture moves the digest
+/// (issue #4249).
 pub(crate) fn source_digest(
     us: &Unitsync,
     handle: i32,
     list: &[(String, String)],
     object_name: &str,
+    fallbacks: &[ModelArchive],
 ) -> Result<(String, String), String> {
     let teamtex = read_teamtex(us, handle, list);
     let palette = read_palette(us);
     // One model, so nothing is shared with a next one and the cache is thrown
     // away with the call.
     let mut cache = TextureCache::new(TEXTURE_CACHE_BUDGET);
+    let sources = texture_sources(TextureSource { handle, list }, fallbacks);
     source_digest_with(
         us,
-        handle,
-        list,
+        &sources,
         &teamtex,
         palette.as_ref(),
         &mut cache,
@@ -590,15 +605,16 @@ pub(crate) fn digest_reader<'a>(
     us: &'a Unitsync,
     handle: i32,
     list: &'a [(String, String)],
+    fallbacks: &'a [ModelArchive],
 ) -> impl Fn(&str) -> Result<(String, String), String> + 'a {
     let teamtex = read_teamtex(us, handle, list);
     let palette = read_palette(us);
     let cache = RefCell::new(TextureCache::new(TEXTURE_CACHE_BUDGET));
+    let sources = texture_sources(TextureSource { handle, list }, fallbacks);
     move |object_name| {
         source_digest_with(
             us,
-            handle,
-            list,
+            &sources,
             &teamtex,
             palette.as_ref(),
             &mut cache.borrow_mut(),
@@ -607,18 +623,24 @@ pub(crate) fn digest_reader<'a>(
     }
 }
 
+/// The [`TextureCache`] key of `member` read through `handle`.
+fn texture_key(handle: i32, member: &str) -> String {
+    format!("{handle}:{member}")
+}
+
 /// [`source_digest`] against a `teamtex.txt` and palette the caller has already
 /// read, and a texture cache the caller decides the lifetime of.
 #[allow(clippy::too_many_arguments)]
 fn source_digest_with(
     us: &Unitsync,
-    handle: i32,
-    list: &[(String, String)],
+    sources: &[TextureSource],
     teamtex: &[String],
     palette: Option<&coilbox_3do::Palette>,
     cache: &mut TextureCache,
     object_name: &str,
 ) -> Result<(String, String), String> {
+    // The game's own archive, which the model is read from.
+    let TextureSource { handle, list } = sources[0];
     let path = find_model(list, object_name)
         .ok_or_else(|| format!("no model for {object_name:?} under {MODEL_DIR}/"))?;
     let (_, model_bytes) = us
@@ -630,8 +652,9 @@ fn source_digest_with(
 
     // Ordered by member path so the digest does not depend on the order the
     // model file happened to name its textures, and deduped so a model naming
-    // one texture twice does not hash it twice.
-    let mut members: Vec<String> = flattened
+    // one texture twice does not hash it twice. Each is paired with the archive
+    // it is found in, which is the first of `sources` that holds it.
+    let mut members: Vec<(String, usize)> = flattened
         .textures
         .iter()
         .chain(flattened.texture2.iter())
@@ -643,15 +666,20 @@ fn source_digest_with(
             tex.palette_colour.is_none()
                 && !(format == "3do" && teamtex.contains(&tex.name.trim().to_lowercase()))
         })
-        .filter_map(|tex| locate_texture(list, &format, teamtex, &tex.name))
+        .filter_map(|tex| {
+            sources.iter().enumerate().find_map(|(at, source)| {
+                locate_texture(source.list, &format, teamtex, &tex.name).map(|m| (m, at))
+            })
+        })
         .collect();
     members.sort();
     members.dedup();
 
     let textures: Vec<Rc<Vec<u8>>> = members
         .iter()
-        .filter_map(|member| {
-            cache.get(member, || {
+        .filter_map(|(member, at)| {
+            let handle = sources[*at].handle;
+            cache.get(&texture_key(handle, member), || {
                 us.read_archive_member(handle, member, TEXTURE_READ_CAP)
                     .map(|(_, bytes)| bytes)
             })
@@ -1901,6 +1929,26 @@ mod tests {
         let tex = out.textures.first().expect("a texture");
         assert_eq!(tex.source, "unittextures/arm.png");
         assert!(!tex.file.is_empty(), "the texture was not copied out");
+        let _ = std::fs::remove_dir_all(cache.parent().unwrap());
+    }
+
+    /// Issue #4249: the digest is the identity of a cached unit picture, so a
+    /// texture only a dependency holds has to be part of it.
+    #[test]
+    fn a_texture_only_a_dependency_holds_is_part_of_the_digest() {
+        let (us, cache) = stub_session("dep-digest");
+        let game = listing(&["objects3d/armcom.s3o"]);
+        let dependency = ModelArchive {
+            name: "dependency.sdz".into(),
+            handle: 7,
+            list: listing(&["unittextures/arm.png"]),
+            teamtex: Vec::new(),
+        };
+        let without = source_digest(&us, 1, &game, "ArmCom", &[]).expect("digest");
+        let with = source_digest(&us, 1, &game, "ArmCom", std::slice::from_ref(&dependency))
+            .expect("digest");
+        assert_eq!(without.1, with.1, "the model is the game's either way");
+        assert_ne!(without.0, with.0, "the dependency's texture was left out");
         let _ = std::fs::remove_dir_all(cache.parent().unwrap());
     }
 
