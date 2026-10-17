@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { meshVolume } from "./balance";
 import { bundledSwatches } from "./fixtures/bundledSwatches";
 import {
+  coneTopRadius,
   cutAndTile,
   DEFAULT_CYLINDER_SIDES,
   isKnownShapeKind,
@@ -12,6 +13,7 @@ import {
   type ShapeSwatch,
   setShapeSwatches,
   shapeBox,
+  shapeKey,
   shapeMesh,
   shapeSwatches,
   tubeInnerRadius,
@@ -305,6 +307,163 @@ function wedge(
   return { kind: "wedge", size, swatch, ...(options ? { options } : {}) };
 }
 
+function cone(
+  size: Vec3,
+  options?: Record<string, number>,
+  swatch = "green",
+): LegoShape {
+  return { kind: "cone", size, swatch, ...(options ? { options } : {}) };
+}
+
+describe("cone mesh (#3329)", () => {
+  const TOPS = [0, 0.3, 0.9];
+
+  it("has the box its size says, whatever the axis, top and side count", () => {
+    for (const axis of [0, 1, 2]) {
+      for (const top of TOPS) {
+        for (const sides of [3, 5, 12, 24]) {
+          const shape = cone([2, 3, 2], { axis, top, sides });
+          const bounds = meshBounds(positionsOf(shape));
+          const box = shapeBox(shape);
+          for (let a = 0; a < 3; a++) {
+            expect(bounds.min[a]).toBeCloseTo(box?.min[a] ?? NaN, 6);
+            expect(bounds.max[a]).toBeCloseTo(box?.max[a] ?? NaN, 6);
+          }
+        }
+      }
+    }
+  });
+
+  it("is a closed solid with the volume of a frustum of its polygon", () => {
+    const radius = 1.5;
+    const height = 4;
+    for (const top of [0, 0.6, 1.2]) {
+      const shape = cone([3, height, 3], { top, sides: 12 });
+      const mesh = shapeMesh(shape);
+      if (!mesh) throw new Error("no mesh");
+      const volume = meshVolume(positionsOf(shape), [...mesh.indices]);
+      const base = 0.5 * 12 * radius * radius * Math.sin((2 * Math.PI) / 12);
+      const t = top / radius;
+      expect(volume.closed).toBe(true);
+      expect(volume.volume).toBeCloseTo(
+        (height / 3) * base * (1 + t + t * t),
+        4,
+      );
+    }
+  });
+
+  it("narrows from the bottom (-axis) to the top, and to a point with no top", () => {
+    const tall = positionsOf(cone([2, 4, 2], { top: 0.5 }));
+    const widthAt = (y: number) =>
+      Math.max(
+        ...tall.filter((p) => Math.abs(p[1] - y) < 1e-6).map((p) => p[0]),
+      );
+    expect(widthAt(-2)).toBeCloseTo(1, 6);
+    expect(widthAt(2)).toBeCloseTo(0.5, 6);
+    const pointed = positionsOf(cone([2, 4, 2]));
+    expect(
+      pointed
+        .filter((p) => p[1] > 1.999)
+        .every((p) => Math.hypot(p[0], p[2]) < 1e-9),
+    ).toBe(true);
+  });
+
+  it("gives the tip one normal for each side", () => {
+    const sides = 12;
+    const mesh = shapeMesh(cone([2, 4, 2], { sides }));
+    if (!mesh) throw new Error("no mesh");
+    const normals = new Set<string>();
+    for (let i = 0; i < mesh.vCount; i++) {
+      if (mesh.vertices[i * 8 + 1] < 1.999) continue;
+      normals.add(
+        [3, 4, 5].map((k) => mesh.vertices[i * 8 + k].toFixed(4)).join(","),
+      );
+    }
+    expect(normals.size).toBe(sides);
+  });
+
+  it("leans its side normals out and up by the slope", () => {
+    const radius = 1;
+    const height = 4;
+    for (const top of [0, 0.5]) {
+      const mesh = shapeMesh(cone([2, height, 2], { top, sides: 12 }));
+      if (!mesh) throw new Error("no mesh");
+      // The slope's normal is perpendicular to the way the side runs.
+      const lean = radius - top;
+      const length = Math.hypot(height, lean);
+      let checked = 0;
+      for (let i = 0; i < mesh.vCount; i++) {
+        const [x, y, z, nx, ny, nz] = Array.from(
+          mesh.vertices.slice(i * 8, i * 8 + 6),
+        );
+        // A vertex of the bottom ring that belongs to the side, not the cap.
+        if (Math.abs(y + height / 2) > 1e-6 || ny < -0.5) continue;
+        if (Math.hypot(x, z) < radius - 1e-6) continue;
+        expect(ny).toBeCloseTo(lean / length, 5);
+        expect(Math.hypot(nx, nz)).toBeCloseTo(height / length, 5);
+        // Pointing the way the vertex is from the axis.
+        expect(nx * x + nz * z).toBeGreaterThan(0);
+        checked++;
+      }
+      expect(checked).toBe(13);
+    }
+  });
+
+  it("winds every triangle counter clockwise seen from outside", () => {
+    for (const top of TOPS) {
+      for (const axis of [0, 1, 2]) {
+        const mesh = shapeMesh(cone([2, 3, 2], { axis, top, sides: 10 }));
+        if (!mesh) throw new Error("no mesh");
+        for (const { p, n } of triangles(mesh)) {
+          const face = faceOf(p);
+          if (Math.hypot(...face) < 1e-9) continue;
+          for (const vertex of n) {
+            expect(
+              face[0] * vertex[0] + face[1] * vertex[1] + face[2] * vertex[2],
+            ).toBeGreaterThan(0);
+          }
+        }
+      }
+    }
+  });
+
+  it("has unit normals", () => {
+    const mesh = shapeMesh(cone([2, 3, 2], { top: 0.4 }));
+    if (!mesh) throw new Error("no mesh");
+    for (let i = 0; i < mesh.vCount; i++) {
+      expect(
+        Math.hypot(...Array.from(mesh.vertices.slice(i * 8 + 3, i * 8 + 6))),
+      ).toBeCloseTo(1, 5);
+    }
+  });
+
+  it("reads a top it cannot use as a point", () => {
+    for (const top of [-1, 1, 5]) {
+      expect(coneTopRadius(cone([2, 3, 2], { top }))).toBe(0);
+    }
+    expect(coneTopRadius(cone([2, 3, 2]))).toBe(0);
+    expect(coneTopRadius(cone([2, 3, 2], { top: 0.4 }))).toBe(0.4);
+    expect(coneTopRadius(cone([2, 3, 6], { top: 0.4, axis: 1 }))).toBe(0.4);
+  });
+
+  it("keeps a cut cone's top flat and its bottom flat, each with its own normals", () => {
+    const mesh = shapeMesh(cone([2, 4, 2], { top: 0.5, sides: 12 }));
+    if (!mesh) throw new Error("no mesh");
+    for (const [y, ny] of [
+      [2, 1],
+      [-2, -1],
+    ]) {
+      const cap = triangles(mesh).filter(({ n }) =>
+        n.every((v) => Math.abs(v[1] - ny) < 1e-6),
+      );
+      expect(cap.length).toBeGreaterThan(0);
+      for (const { p } of cap) {
+        for (const point of p) expect(point[1]).toBeCloseTo(y, 6);
+      }
+    }
+  });
+});
+
 describe("wedge mesh (#3328)", () => {
   it("has the box its size says, for a wedge, a ramp and a flipped one", () => {
     for (const options of [
@@ -473,26 +632,51 @@ describe("shape UVs (#3326)", () => {
           ),
         ]),
       ),
-    ).concat(
-      SIZES.flatMap((size) =>
-        shapeSwatches().flatMap((swatch) =>
-          (
-            [
-              {},
-              { low: size[1] / 2 },
-              { flip: 1 },
-              { low: size[1], flip: 1 },
-            ] as Record<string, number>[]
-          ).map((options) => wedge(size, options, swatch.id)),
+    )
+      .concat(
+        SIZES.flatMap((size) =>
+          [0, 1, 2].flatMap((axis) =>
+            shapeSwatches().flatMap((swatch) =>
+              [0, 0.3, 0.95].map((share) =>
+                cone(
+                  size,
+                  {
+                    axis,
+                    top:
+                      (share *
+                        Math.min(size[(axis + 1) % 3], size[(axis + 2) % 3])) /
+                      2,
+                  },
+                  swatch.id,
+                ),
+              ),
+            ),
+          ),
         ),
-      ),
-    );
+      )
+      .concat(
+        SIZES.flatMap((size) =>
+          shapeSwatches().flatMap((swatch) =>
+            (
+              [
+                {},
+                { low: size[1] / 2 },
+                { flip: 1 },
+                { low: size[1], flip: 1 },
+              ] as Record<string, number>[]
+            ).map((options) => wedge(size, options, swatch.id)),
+          ),
+        ),
+      );
 
   it("has three swatches from the bundled pack", () => {
     expect(shapeSwatches().map((s) => s.id)).toEqual(["green", "tan", "grey"]);
   });
 
   it("puts every UV inside the shape's swatch, at any size", () => {
+    // Collected rather than expected one by one: there are a few hundred
+    // thousand values, and an expect each is slow enough to time out under load.
+    const outside: string[] = [];
     for (const shape of shapes()) {
       const mesh = shapeMesh(shape);
       if (!mesh) throw new Error("no mesh");
@@ -501,13 +685,16 @@ describe("shape UVs (#3326)", () => {
       for (let i = 0; i < mesh.vCount; i++) {
         for (const k of [0, 1]) {
           const uv = mesh.vertices[i * 8 + 6 + k];
-          expect(uv).toBeGreaterThanOrEqual(
-            Math.fround(swatch.uv.min[k]) - 1e-7,
-          );
-          expect(uv).toBeLessThanOrEqual(Math.fround(swatch.uv.max[k]) + 1e-7);
+          if (
+            uv < Math.fround(swatch.uv.min[k]) - 1e-7 ||
+            uv > Math.fround(swatch.uv.max[k]) + 1e-7
+          ) {
+            outside.push(`${shapeKey(shape)} vertex ${i} uv ${k}: ${uv}`);
+          }
         }
       }
     }
+    expect(outside).toEqual([]);
   });
 
   it("draws every triangle at the pack's density, at any size", () => {

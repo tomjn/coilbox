@@ -105,6 +105,16 @@ describe("addShape", () => {
     });
   });
 
+  it("makes a cone that starts as a point", () => {
+    const cone = added("cone")?.shape;
+    expect(cone && roundNumbers(cone)).toMatchObject({
+      axis: 1,
+      radius: 0.5,
+      length: 1,
+      top: 0,
+    });
+  });
+
   it("takes the colourway most of the unit's parts use", () => {
     expect(added("cylinder", unit(["t", "g", "t"]))?.shape?.swatch).toBe("tan");
   });
