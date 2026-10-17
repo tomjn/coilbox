@@ -271,7 +271,7 @@ interface Placement {
  * Where a piece's join puts it, or null when the join cannot be made: either
  * connector is missing, the piece has no parent, or its scale has a zero in it.
  */
-function placeJoin(
+export function placeJoin(
   pack: LoadedPack,
   piece: LegoPiece,
   parent: LegoPiece,
@@ -823,7 +823,7 @@ export function disconnectPiece(
 }
 
 /** A local matrix as the three fields the document stores. */
-function transformOf(
+export function transformOf(
   local: THREE.Matrix4,
 ): Pick<LegoPiece, "position" | "rotation" | "scale"> {
   const position = new THREE.Vector3();

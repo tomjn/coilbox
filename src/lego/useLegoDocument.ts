@@ -12,14 +12,11 @@
 
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 
-import {
-  duplicatePiece,
-  insertCompound,
-  selectionAsCompound,
-} from "./compounds";
+import { duplicatePiece, selectionAsCompound } from "./compounds";
 import { withConnections } from "./connectors";
 import { emptyDocument, primarySelection, reduceDocument } from "./document";
 import type { LegoProject } from "./model";
+import { insertModule } from "./moduleMount";
 import type { LoadedPack } from "./pack";
 import {
   hasThumbnail,
@@ -221,8 +218,12 @@ export function useLegoDocument(
 
   function insert(cutting: LegoProject, parentId: string): string[] {
     if (!project) return [];
-    const inserted = insertCompound(project, cutting, parentId, () =>
-      crypto.randomUUID(),
+    const inserted = insertModule(
+      project,
+      cutting,
+      parentId,
+      () => crypto.randomUUID(),
+      packRef.current,
     );
     // One edit however many roots the cutting has, so a paste of several pieces
     // takes one undo step.

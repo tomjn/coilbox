@@ -83,6 +83,7 @@ import {
   descendantIds,
   type LegoCompiledScript,
   type LegoImported,
+  type LegoMount,
   type LegoPiece,
   type LegoProject,
   normalisePieceName,
@@ -93,6 +94,7 @@ import {
   uniquePieceName,
 } from "../model";
 import { useModuleFilter, withLabels } from "../moduleFilter";
+import { defaultMount, moduleConnectors } from "../moduleMount";
 import {
   type LegoPartInfo,
   type LoadedPack,
@@ -144,6 +146,10 @@ import { collisionHandlePieceId } from "./components/PieceCollisionFields";
 import { PieceTree } from "./components/PieceTree";
 import type { PlacingPart } from "./components/placeByFace";
 import type { ReferenceUnit } from "./components/ReferencePicker";
+import type {
+  ModuleLabels,
+  MountOptions,
+} from "./components/SaveCompoundPopover";
 import { SaveModelPopover } from "./components/SaveModelPopover";
 import { ScriptTab } from "./components/ScriptTab";
 import { SetPanel } from "./components/SetPanel";
@@ -231,6 +237,9 @@ function Builder({ id }: { id: string | undefined }) {
   // The model view and the drawer share this, and it is what a drag is
   // measured against.
   const columnRef = useRef<HTMLDivElement | null>(null);
+  // The module is made once, when the step opens, because its pieces get new
+  // ids each time and the mount names one of them.
+  const liftedRef = useRef<LegoProject | null>(null);
   const [asideOpen, setAsideOpen] = usePanelOpen("aside");
   const [aside, setAside] = useState<
     "pieces" | "animation" | "collision" | "aim" | "texture"
@@ -617,15 +626,38 @@ function Builder({ id }: { id: string | undefined }) {
     edit((project) => setJoinPlace(project, pack, pieceId, change));
   }
 
-  async function saveSelectionAsCompound() {
-    if (!draft) return;
-    const compound = selectionAsCompound(draft, selectedIds, {
+  function liftSelection(): LegoProject | null {
+    if (!draft) return null;
+    return selectionAsCompound(draft, selectedIds, {
       id: crypto.randomUUID(),
       now: new Date().toISOString(),
       newId: () => crypto.randomUUID(),
     });
+  }
+
+  // What the save step offers as the mount: the connectors of the module the
+  // selection would become, opening on the default.
+  function compoundMounts(): MountOptions | null {
+    const compound = liftSelection();
+    liftedRef.current = compound;
+    if (!compound || !pack) return null;
+    return {
+      choices: moduleConnectors(compound, pack),
+      initial: defaultMount(compound, pack),
+      known: compounds,
+    };
+  }
+
+  async function saveSelectionAsCompound(
+    mount: LegoMount | null,
+    labels: ModuleLabels,
+  ) {
+    const compound = liftedRef.current ?? liftSelection();
+    liftedRef.current = null;
     if (!compound) return;
-    await saveCompound(compound);
+    await saveCompound(
+      withLabels(mount ? { ...compound, mount } : compound, labels),
+    );
     // Showing where it went is the only confirmation the save needs.
     setStrip("compounds");
   }
@@ -1482,7 +1514,9 @@ function Builder({ id }: { id: string | undefined }) {
                   // came from. It can never have one, so the button goes.
                   onSaveAsCompound: imported
                     ? undefined
-                    : () => void saveSelectionAsCompound(),
+                    : (mount, labels) =>
+                        void saveSelectionAsCompound(mount, labels),
+                  compoundMounts,
                   canSaveAsCompound: selectedIds.length > 0,
                   onDelete: removeSelected,
                   canDelete: transformRoots(draft, selectedIds).length > 0,

@@ -70,6 +70,17 @@ export interface LegoConnection {
 }
 
 /**
+ * Which of a module's connectors joins the unit it is dropped onto (#3297).
+ *
+ * Names a piece of the module by id and one of that piece's connectors by id,
+ * the same connector ids a `LegoConnection` uses. Only a module carries one.
+ */
+export interface LegoMount {
+  piece: string;
+  connector: string;
+}
+
+/**
  * The shapes the engine will build a collision volume out of.
  *
  * These exact strings because of how the engine reads them: `CollisionVolume`
@@ -443,6 +454,12 @@ export interface LegoProject {
   updatedAt: string;
   rootPieceId: string;
   pieces: LegoPiece[];
+  /**
+   * On a module: the connector that joins it to the piece it is dropped onto.
+   * Absent means no mount, so the module's first piece lands on the target's
+   * origin, which is every module saved before this existed.
+   */
+  mount?: LegoMount;
   /** s3o header values. Computed on export unless pinned here. */
   radius?: number;
   height?: number;
@@ -1032,6 +1049,7 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
   const builder = parseBuilder(d.builder);
   const movement = parseMovement(d.movement);
   const worth = parseWorth(d.worth);
+  const mount = parseMount(d.mount, pieces);
   const project: LegoProject = {
     schemaVersion: LEGO_SCHEMA_VERSION,
     id: d.id,
@@ -1048,6 +1066,7 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
     updatedAt: typeof d.updatedAt === "string" ? d.updatedAt : "",
     rootPieceId: d.rootPieceId,
     pieces,
+    ...(mount ? { mount } : {}),
     ...(typeof d.radius === "number" ? { radius: d.radius } : {}),
     ...(typeof d.height === "number" ? { height: d.height } : {}),
     ...(mid ? { mid } : {}),
@@ -1120,6 +1139,19 @@ function parseTagList(value: unknown): { tags: string[] } | null {
     .map((tag) => tag.trim())
     .filter(Boolean);
   return tags.length > 0 ? { tags } : null;
+}
+
+/** A module's mount, or null when it is not a piece of the module and a
+ *  connector. A mount on a piece that is gone is dropped, so the module falls
+ *  back to having none. */
+function parseMount(value: unknown, pieces: LegoPiece[]): LegoMount | null {
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  if (typeof v.piece !== "string" || typeof v.connector !== "string") {
+    return null;
+  }
+  if (v.connector === "" || !pieces.some((p) => p.id === v.piece)) return null;
+  return { piece: v.piece, connector: v.connector };
 }
 
 function parsePiece(raw: unknown): LegoPiece | null {

@@ -26,7 +26,6 @@ import {
   FlipHorizontal2,
   Keyboard,
   Move,
-  PackagePlus,
   Radar,
   RotateCw,
   Scaling,
@@ -77,6 +76,7 @@ import { addStandardLights } from "../../geometry";
 import type { PieceTransform } from "../../groupTransform";
 import {
   type LegoCollisionVolume,
+  type LegoMount,
   type LegoPiece,
   type LegoProject,
   pieceById,
@@ -139,6 +139,11 @@ import {
   ReferencePicker,
   type ReferenceUnit,
 } from "./ReferencePicker";
+import {
+  type ModuleLabels,
+  type MountOptions,
+  SaveCompoundPopover,
+} from "./SaveCompoundPopover";
 import { ShortcutSheet } from "./ShortcutSheet";
 import type { SceneState } from "./sceneState";
 import {
@@ -437,7 +442,9 @@ interface Props {
     onPaste: () => void;
     /** Save the selected piece and everything under it, to reuse in another
      *  unit. Absent hides the button, for a unit whose pieces are not parts. */
-    onSaveAsCompound?: () => void;
+    onSaveAsCompound?: (mount: LegoMount | null, labels: ModuleLabels) => void;
+    /** The connectors the save step offers as the mount, for the selection. */
+    compoundMounts?: () => MountOptions | null;
     canSaveAsCompound: boolean;
     /** Delete every selected piece (Backspace). */
     onDelete: () => void;
@@ -558,6 +565,7 @@ export function ModelViewport({
     canDuplicate,
     onPaste,
     onSaveAsCompound,
+    compoundMounts,
     canSaveAsCompound,
     onDelete,
     canDelete,
@@ -1518,22 +1526,11 @@ export function ModelViewport({
                   <TooltipContent side="right">Paste (Cmd V)</TooltipContent>
                 </Tooltip>
                 {onSaveAsCompound ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <TipButton
-                        size="icon"
-                        variant="outline"
-                        onClick={onSaveAsCompound}
-                        disabled={!canSaveAsCompound}
-                        aria-label="Save the selection as a compound"
-                      >
-                        <PackagePlus className="size-4" />
-                      </TipButton>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                      Save as a compound
-                    </TooltipContent>
-                  </Tooltip>
+                  <SaveCompoundPopover
+                    disabled={!canSaveAsCompound}
+                    options={compoundMounts ?? (() => null)}
+                    onSave={onSaveAsCompound}
+                  />
                 ) : null}
                 <Tooltip>
                   <TooltipTrigger asChild>
