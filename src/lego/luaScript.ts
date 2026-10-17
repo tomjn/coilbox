@@ -12,6 +12,7 @@
 
 import {
   type AnimPreset,
+  type EmitInstance,
   type EmitResult,
   type LuaHook,
   presetById,
@@ -148,6 +149,55 @@ export function unitScript(project: LegoProject): string {
   return project.script ?? buildLuaScript(project);
 }
 
+/** The roles a preset animates or needs, which its instances are made of. */
+function presetRoles(preset: AnimPreset): string[] {
+  return [...preset.animates, ...preset.requires.map((need) => need.role)];
+}
+
+/**
+ * The pieces carrying any of `roles`, grouped by the module instance they came
+ * in (#3302), each group in document order and the groups in the order their
+ * first piece appears. Pieces from no module share one group, so a unit with
+ * no modules gets one group holding every piece, which is what the presets
+ * were handed before instances existed.
+ */
+export function roleInstances(
+  pieces: LegoPiece[],
+  roles: string[],
+): LegoPiece[][] {
+  const wanted = new Set(roles);
+  const groups = new Map<string, LegoPiece[]>();
+  for (const piece of pieces) {
+    if (!piece.role || !wanted.has(piece.role)) continue;
+    const key = piece.module?.instance ?? "";
+    groups.set(key, [...(groups.get(key) ?? []), piece]);
+  }
+  return [...groups.values()];
+}
+
+/**
+ * How many times a preset is written into this unit's script: once per weapon
+ * or once per module instance, for a preset that can be (`copies`), and once
+ * otherwise. For the Animation panel, which names them.
+ */
+export function presetCopies(project: LegoProject, preset: AnimPreset): number {
+  const copies = preset.copies;
+  if (!copies) return 1;
+  const role = copies.role;
+  if (copies.per === "weapon") {
+    return scriptWeapons(project).filter((weapon) =>
+      role === "barrel" || role === "flare"
+        ? weapon[role] !== null
+        : weapon.carrier?.role === role,
+    ).length;
+  }
+  return roleInstances(project.pieces, presetRoles(preset)).filter((group) =>
+    group.some((piece) =>
+      role ? piece.role === role : preset.animates.includes(piece.role ?? ""),
+    ),
+  ).length;
+}
+
 export function buildLuaScript(project: LegoProject): string {
   const used = new Set<string>();
   const byRole = new Map<string, string[]>();
@@ -182,7 +232,13 @@ export function buildLuaScript(project: LegoProject): string {
   applied.forEach(({ preset, params }, index) => {
     const signal = `SIG_${preset.id.replace(/[^a-z0-9]+/gi, "_").toUpperCase()}`;
     let presetSignal = false;
-    const weaponSignals = new Set<string>();
+    // The signals named after the preset's, one per weapon or per instance.
+    const namedSignals = new Set<string>();
+    const named = (n: number) => {
+      const name = `${signal}_${n}`;
+      namedSignals.add(name);
+      return name;
+    };
     const result: EmitResult | null = preset.emit({
       params,
       get signal() {
@@ -204,11 +260,28 @@ export function buildLuaScript(project: LegoProject): string {
               : undefined;
           },
           get signal() {
-            const name = `${signal}_${slot + 1}`;
-            weaponSignals.add(name);
-            return name;
+            return named(slot + 1);
           },
         })),
+      instances: () =>
+        roleInstances(project.pieces, presetRoles(preset)).map(
+          (group, index): EmitInstance => ({
+            number: index + 1,
+            pieces(role) {
+              const names = group
+                .filter((piece) => piece.role === role)
+                .map((piece) => piece.name);
+              for (const name of names) used.add(name);
+              return names.map(localName);
+            },
+            get signal() {
+              if (index > 0) return named(index + 1);
+              presetSignal = true;
+              return signal;
+            },
+            name: (base) => (index === 0 ? base : `${base}${index + 1}`),
+          }),
+        ),
     });
     if (!result) return;
 
@@ -217,7 +290,7 @@ export function buildLuaScript(project: LegoProject): string {
     // (`EXACT_INTEGER_MASK` in `rts/Lua/LuaMathExtra.cpp`), too few for a bit
     // per weapon per preset on a unit with many weapons. The gadget's `Signal`
     // matches a mask that is not a number by equality (`unit_script.lua`).
-    for (const name of weaponSignals) {
+    for (const name of namedSignals) {
       signals.push(`local ${name} = ${luaString(name)}`);
     }
     if (result.functions.length > 0) {
