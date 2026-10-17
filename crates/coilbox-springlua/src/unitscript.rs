@@ -209,6 +209,10 @@ struct Sim {
     /// thread started with `StartThread` is born carrying it, as the unit
     /// script framework hands it on, so a later `Signal` reaches the child too.
     current_mask: Mask,
+    /// The thread the scheduler resumed last. A `StartThread` from any other
+    /// is from a coroutine the script runs itself, which cannot hand the
+    /// scheduler anything.
+    driving: Option<Thread>,
     /// Signal masks the running thread raised while it was running.
     signalled: Vec<Mask>,
     /// The mask the running thread set for itself, if it did.
@@ -1126,7 +1130,11 @@ impl Run {
         self.runners[index].state = State::Running;
         let thread = self.runners[index].thread.clone();
         loop {
-            self.sim.borrow_mut().current_mask = self.runners[index].mask;
+            {
+                let mut sim = self.sim.borrow_mut();
+                sim.current_mask = self.runners[index].mask;
+                sim.driving = Some(thread.clone());
+            }
             let yielded: MultiValue = thread
                 .resume(MultiValue::from_iter(std::mem::take(&mut args)))
                 .map_err(Stop::Lua)?;
@@ -2540,15 +2548,18 @@ fn install_threading(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
 
     // The scheduler starts the thread, so this only records it with the mask it
     // is born with. `StartThread` itself is Lua, because only Lua can make the
-    // coroutine and yield to the scheduler.
+    // coroutine and yield to the scheduler. The answer is whether it may yield:
+    // from a coroutine the script resumes itself, a yield would go to the
+    // script, so the new thread starts once the scheduler's thread next yields,
+    // later in the same frame.
     let state = Rc::clone(sim);
     globals.set(
         "__spawn",
-        lua.create_function(move |_, (thread, args): (Thread, MultiValue)| {
+        lua.create_function(move |lua, (thread, args): (Thread, MultiValue)| {
             let mut sim = state.borrow_mut();
             let mask = sim.current_mask;
             sim.spawned.push((thread, args.into_iter().collect(), mask));
-            Ok(())
+            Ok(sim.driving.as_ref() == Some(&lua.current_thread()))
         })?,
     )?;
 
@@ -3051,8 +3062,7 @@ fn bootstrap(lua: &Lua) -> mlua::Result<()> {
         -- only then returns (`unit_script.lua:384-405`). Yielding hands the
         -- scheduler the new thread to run before this one carries on.
         function StartThread(fn, ...)
-            __spawn(coroutine.create(fn), ...)
-            if coroutine.running() then coroutine.yield("start") end
+            if __spawn(coroutine.create(fn), ...) then coroutine.yield("start") end
         end
         "#,
     )
