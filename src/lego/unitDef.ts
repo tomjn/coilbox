@@ -51,8 +51,29 @@ export function isBuilder(project: LegoProject): boolean {
   return project.pieces.some((piece) => piece.role?.startsWith("buildarm."));
 }
 
+/**
+ * A factory's yardmap, one letter per footprint step, a row per `footprintZ`.
+ *
+ * The engine reads `footprintX * footprintZ` letters at half the blocking map's
+ * resolution and treats whitespace as nothing (`UnitDef::CreateYardMap`). The
+ * pattern is Balanced Annihilation's land labs (`armlab`, `corlab`, `armalab`,
+ * `armhp`): `o` down the two outer columns, which stay blocked, and `c` between
+ * them, which is blocked until the factory opens its yard and passable after.
+ * A footprint under three wide has no room for walls and is all `c`.
+ */
+export function factoryYardmap(footprintX: number, footprintZ: number): string {
+  const walls = footprintX >= 3;
+  const row = Array.from({ length: footprintX }, (_, x) =>
+    walls && (x === 0 || x === footprintX - 1) ? "o" : "c",
+  ).join("");
+  return Array.from({ length: footprintZ }, () => row).join("");
+}
+
 /** The builder keys, or nothing for a unit with no build arm on it. */
-function builderFields(project: LegoProject): Record<string, unknown> {
+function builderFields(
+  project: LegoProject,
+  footprint: { x: number; z: number },
+): Record<string, unknown> {
   if (!isBuilder(project)) return {};
   const { workerTime, buildDistance, canAssist } = {
     ...DEFAULT_BUILDER,
@@ -63,6 +84,10 @@ function builderFields(project: LegoProject): Record<string, unknown> {
     workertime: workerTime,
     builddistance: buildDistance,
     canassist: canAssist,
+    // An immobile builder with a yardmap is a factory (`UnitDef.h:68,72`).
+    ...(project.builder?.factory && !movesInGame(project.movement)
+      ? { yardMap: factoryYardmap(footprint.x, footprint.z) }
+      : {}),
   };
 }
 
@@ -310,7 +335,10 @@ export function legoUnitDef(
     // builder. The generated script's build stance line is the other half:
     // without it a builder with these keys still never starts. See
     // `luaScript.ts`.
-    ...builderFields(project),
+    ...builderFields(project, {
+      x: footprintSteps(bounds.sizeX),
+      z: footprintSteps(bounds.sizeZ),
+    }),
     ...(weapons.length > 0 ? { weapons } : {}),
     // The wreck the export writes beside the unit, `wreck.ts` (issue #3310).
     // The engine makes it when the unit dies, looking it up by this name
@@ -382,6 +410,7 @@ export const DERIVED_FIELDS: readonly string[] = [
   "workertime",
   "builddistance",
   "canassist",
+  "yardMap",
   "weapons",
   "corpse",
 ];

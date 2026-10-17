@@ -284,11 +284,15 @@ export interface LegoBuilder {
   /** Whether it can help another unit's build. The engine defaults this to
    *  whatever `builder` is, so absent means true for a builder. */
   canAssist?: boolean;
+  /** Whether an immobile builder is a factory. Written as a `yardMap` sized to
+   *  the footprint, which is what makes the engine call it one. Ignored for a
+   *  unit that moves. */
+  factory?: boolean;
 }
 
 /** What a unit with no `builder` block of its own is worth. `workerTime` has to
  *  be above zero or the engine discards the whole thing: see `LegoBuilder`. */
-export const DEFAULT_BUILDER: Required<LegoBuilder> = {
+export const DEFAULT_BUILDER: Required<Omit<LegoBuilder, "factory">> = {
   workerTime: 100,
   buildDistance: 128,
   canAssist: true,
@@ -2012,6 +2016,7 @@ function parseBuilder(value: unknown): LegoBuilder | null {
       ? { buildDistance: v.buildDistance }
       : {}),
     ...(typeof v.canAssist === "boolean" ? { canAssist: v.canAssist } : {}),
+    ...(v.factory === true ? { factory: true } : {}),
   };
   return Object.keys(builder).length > 0 ? builder : null;
 }

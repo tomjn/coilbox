@@ -92,6 +92,26 @@ export function receiptFor(
   );
 }
 
+/**
+ * The project's receipts with `file` added to the one for `dir`, for a file
+ * somebody has said is coilbox's (issue #4272). Nothing changes when there is
+ * no receipt for the folder.
+ */
+export function adoptFile(
+  project: Pick<LegoProject, "exported" | "exportedElsewhere">,
+  dir: string,
+  file: ExportedFile,
+): Pick<LegoProject, "exported" | "exportedElsewhere"> {
+  const adopt = (receipt: LegoExport): LegoExport =>
+    samePath(receipt.dir, dir)
+      ? { ...receipt, files: mergeFiles(receipt.files, [file]) }
+      : receipt;
+  return {
+    exported: project.exported ? adopt(project.exported) : undefined,
+    exportedElsewhere: project.exportedElsewhere?.map(adopt),
+  };
+}
+
 /** What one export does to a project's record of where it has been. */
 export interface ExportRecord {
   exported: LegoExport;

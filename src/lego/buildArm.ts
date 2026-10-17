@@ -12,8 +12,8 @@
  * immobile builder is a factory when it also has a yardmap (`IsBuildingUnit` is
  * `IsImmobileUnit() && !yardmap.empty()`, `IsFactoryUnit` is that and
  * `IsBuilderUnit`). The yardmap is the only extra key a factory needs. The
- * builder writes none, so a built unit is a factory only once the game's file
- * for it has one.
+ * builder writes one when the game maker chooses "Factory" (issue #4254), and
+ * the game's own file may have one the game maker wrote by hand.
  */
 
 import { insertCompound } from "./compounds";
@@ -63,7 +63,10 @@ export function builderKind(
     };
   }
   const yardmap = entryNamed(gameDef, "yardmap");
-  if (typeof yardmap === "string" && yardmap !== "") {
+  if (
+    project.builder?.factory ||
+    (typeof yardmap === "string" && yardmap !== "")
+  ) {
     return { kind: "factory", reason: "it cannot move and has a yardmap" };
   }
   return {

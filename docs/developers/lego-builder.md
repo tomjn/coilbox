@@ -147,6 +147,8 @@ On the bundled atlas the green colourway is plain red, the same red the green pa
 
 A shape takes the colourway most of the unit's parts and shapes use when it is added, or the pack's first one when the unit has none. It keeps that colourway. The piece panel has no control to change it, and **Change part** is not offered for a shape.
 
+A cylinder, a tube or a cone can show a wheel hub on its flat ends instead. Tick **Hub on ends** in the piece panel. The hub is the [round panel](../reference/lego-parts-pack.md#round-panels) the pack draws for the shape's colourway, fitted to each end, so it stretches with the radius. On the bundled pack it is drawn at the parts' own density at a radius of 1.6 units, and it starts to look soft past 3.2 units. A tube's end ring shows the outer part of the hub. The choice is off for a new shape, and the side keeps its swatch either way.
+
 A shape takes team colour only where the atlas's alpha channel says so, as a part does. The bundled atlas has no alpha channel, so neither parts nor shapes from it show team colour in a game. An atlas pack can paint alpha into a swatch to give shapes team colour. See [swatches](../reference/lego-parts-pack.md#swatches).
 
 ### Connectors on a shape
@@ -162,7 +164,7 @@ A connector on a round side sits where the side is met going straight out from t
 
 ### Exporting a shape
 
-A shape is written into the `.s3o`, `.glb` and `.obj` with its UVs inside its swatch on the atlas. It counts in the footprint, the collision volume and the model's radius and height. A shape whose kind this version of coilbox cannot make, for example one saved by a newer version, stops the export, and the message names the piece.
+A shape is written into the `.s3o`, `.glb` and `.obj` with its UVs inside its swatch on the atlas, and the ends of one with **Hub on ends** inside its round panel. It counts in the footprint, the collision volume and the model's radius and height. A shape whose kind this version of coilbox cannot make, for example one saved by a newer version, stops the export, and the message names the piece.
 
 A model with a shape cannot be turned back into a project. Opening an exported `.s3o` as a project matches each piece to a part from the installed packs. A shape is not a pack part, so the model is refused, and the message names the first piece that did not match. Keep the unit's project if you might want to change it.
 

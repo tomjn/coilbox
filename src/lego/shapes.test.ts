@@ -1,6 +1,9 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { meshVolume } from "./balance";
-import { bundledSwatches } from "./fixtures/bundledSwatches";
+import {
+  bundledRoundPanels,
+  bundledSwatches,
+} from "./fixtures/bundledSwatches";
 import {
   coneTopRadius,
   cutAndTile,
@@ -11,10 +14,12 @@ import {
   SHAPE_KINDS,
   type ShapeMesh,
   type ShapeSwatch,
+  setShapeRoundPanels,
   setShapeSwatches,
   shapeBox,
   shapeKey,
   shapeMesh,
+  shapeRoundPanels,
   shapeSwatches,
   tubeInnerRadius,
   wedgeProfile,
@@ -746,6 +751,179 @@ describe("shape UVs (#3326)", () => {
       }
     } finally {
       setShapeSwatches(before);
+    }
+  });
+});
+
+describe("a round panel on the ends (#4398)", () => {
+  beforeAll(() => {
+    setShapeRoundPanels(bundledRoundPanels());
+  });
+  afterAll(() => {
+    setShapeRoundPanels([]);
+  });
+
+  const HUB = { hub: 1 };
+  const SIZES: Vec3[] = [
+    [2, 0.5, 2],
+    [0.3, 4, 0.3],
+    [10, 1, 10],
+    [3, 1.7, 1.2],
+  ];
+  const shapes = () =>
+    SIZES.flatMap((size) =>
+      [0, 1, 2].flatMap((axis) =>
+        [3, 5, 12].flatMap((sides) =>
+          shapeSwatches().flatMap((swatch) => [
+            cylinder(size, { ...HUB, axis, sides }, swatch.id),
+            tube(size, { ...HUB, axis, sides }, swatch.id),
+            cone(size, { ...HUB, axis, sides, top: 0 }, swatch.id),
+            cone(
+              size,
+              {
+                ...HUB,
+                axis,
+                sides,
+                top: Math.min(size[(axis + 1) % 3], size[(axis + 2) % 3]) / 4,
+              },
+              swatch.id,
+            ),
+          ]),
+        ),
+      ),
+    );
+
+  /** Each vertex on a flat end, by its distance from the panel's centre. */
+  function ends(shape: LegoShape) {
+    const mesh = shapeMesh(shape);
+    if (!mesh) throw new Error("no mesh");
+    const axis = shape.options?.axis ?? 1;
+    const panel = shapeRoundPanels().find((p) => p.id === shape.swatch);
+    if (!panel) throw new Error("no panel");
+    const out: { distance: number; side: number }[] = [];
+    for (let i = 0; i < mesh.vCount; i++) {
+      const n = mesh.vertices[i * 8 + 3 + axis];
+      if (Math.abs(Math.abs(n) - 1) > 1e-6) continue;
+      const u = mesh.vertices[i * 8 + 6];
+      const v = mesh.vertices[i * 8 + 7];
+      out.push({
+        distance: Math.hypot(u - panel.centre[0], v - panel.centre[1]),
+        side: Math.sign(n),
+      });
+    }
+    return { out, panel };
+  }
+
+  it("has a panel for each colourway from the bundled pack", () => {
+    expect(shapeRoundPanels().map((p) => p.id)).toEqual([
+      "green",
+      "tan",
+      "grey",
+    ]);
+  });
+
+  it("puts every UV of an end inside the panel's circle", () => {
+    const outside: string[] = [];
+    for (const shape of shapes()) {
+      const { out, panel } = ends(shape);
+      if (out.length === 0) outside.push(`${shapeKey(shape)} has no ends`);
+      for (const { distance } of out) {
+        if (distance > panel.radius + 1e-6) {
+          outside.push(`${shapeKey(shape)}: ${distance}`);
+        }
+      }
+    }
+    expect(outside).toEqual([]);
+  });
+
+  it("keeps the side on the swatch", () => {
+    const outside: string[] = [];
+    for (const shape of shapes()) {
+      const mesh = shapeMesh(shape);
+      if (!mesh) throw new Error("no mesh");
+      const swatch = shapeSwatches().find((s) => s.id === shape.swatch);
+      if (!swatch) throw new Error("no swatch");
+      const axis = shape.options?.axis ?? 1;
+      for (let i = 0; i < mesh.vCount; i++) {
+        if (Math.abs(Math.abs(mesh.vertices[i * 8 + 3 + axis]) - 1) < 1e-6) {
+          continue;
+        }
+        for (const k of [0, 1]) {
+          const uv = mesh.vertices[i * 8 + 6 + k];
+          if (
+            uv < Math.fround(swatch.uv.min[k]) - 1e-7 ||
+            uv > Math.fround(swatch.uv.max[k]) + 1e-7
+          ) {
+            outside.push(`${shapeKey(shape)} vertex ${i} uv ${k}: ${uv}`);
+          }
+        }
+      }
+    }
+    expect(outside).toEqual([]);
+  });
+
+  it("fits the panel to the end, so it scales with the radius", () => {
+    for (const size of [0.5, 2, 9]) {
+      const { out, panel } = ends(cylinder([size, 1, size], HUB, "tan"));
+      const reach = Math.max(...out.map((e) => e.distance));
+      expect(reach).toBeCloseTo(panel.radius, 5);
+      expect(Math.min(...out.map((e) => e.distance))).toBeCloseTo(0, 5);
+    }
+  });
+
+  it("samples the panel's ring on a tube's ends", () => {
+    const shape = tube([4, 2, 4], { ...HUB, inner: 1 }, "grey");
+    const { out, panel } = ends(shape);
+    const distances = out.map((e) => e.distance);
+    // The hole is half the radius, so the ring is the outer half of the panel.
+    // The hole is a polygon, so a point along one of its edges is a little
+    // nearer the middle than its corners.
+    const hole = panel.radius / 2;
+    expect(Math.min(...distances)).toBeGreaterThan(
+      hole * Math.cos(Math.PI / 12) - 1e-6,
+    );
+    expect(Math.min(...distances)).toBeLessThan(hole + 1e-6);
+    expect(Math.max(...distances)).toBeCloseTo(panel.radius, 5);
+  });
+
+  it("fits a cut cone's top to its own radius", () => {
+    const { out, panel } = ends(cone([4, 2, 4], { ...HUB, top: 1 }));
+    for (const side of [1, -1]) {
+      const reach = Math.max(
+        ...out.filter((e) => e.side === side).map((e) => e.distance),
+      );
+      expect(reach).toBeCloseTo(panel.radius, 5);
+    }
+  });
+
+  it("keeps the mesh closed", () => {
+    for (const shape of shapes()) {
+      const mesh = shapeMesh(shape);
+      if (!mesh) throw new Error("no mesh");
+      expect(meshVolume(positionsOf(shape), [...mesh.indices]).closed).toBe(
+        true,
+      );
+    }
+  });
+
+  it("is off by default, and tiles the swatch when it is", () => {
+    const uvs = (shape: LegoShape) => [...(shapeMesh(shape)?.vertices ?? [])];
+    expect(uvs(cylinder([3, 1, 3], { hub: 0 }))).toEqual(
+      uvs(cylinder([3, 1, 3])),
+    );
+    expect(uvs(cylinder([3, 1, 3], HUB))).not.toEqual(uvs(cylinder([3, 1, 3])));
+  });
+
+  it("tiles the swatch for a colourway with no panel", () => {
+    const before = shapeRoundPanels();
+    setShapeRoundPanels(before.filter((p) => p.id !== "tan"));
+    try {
+      const uvs = (shape: LegoShape) => [...(shapeMesh(shape)?.vertices ?? [])];
+      expect(uvs(cylinder([3, 1, 3], HUB, "tan"))).toEqual(
+        uvs(cylinder([3, 1, 3], undefined, "tan")),
+      );
+    } finally {
+      setShapeRoundPanels(before);
     }
   });
 });

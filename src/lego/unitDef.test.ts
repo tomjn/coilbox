@@ -7,6 +7,7 @@ import {
   buildUnitDef as buildUnitDefWithHome,
   DERIVED_FIELDS,
   defValue,
+  factoryYardmap,
   legoUnitDef as legoUnitDefWithHome,
   luaString,
   luaValue,
@@ -857,6 +858,42 @@ describe("buildUnitDef", () => {
       expect(lua).toContain("workertime = 250");
       expect(lua).toContain("builddistance = 128");
     });
+
+    describe("factory (#4254)", () => {
+      const factory = (over: Partial<LegoProject> = {}) => ({
+        ...withArm(),
+        builder: { factory: true },
+        ...over,
+      });
+
+      it("writes a yardMap sized to the footprint", () => {
+        const def = legoUnitDef(factory(), bounds({ x: 96, z: 64 }));
+        const x = def.footprintx as number;
+        const z = def.footprintz as number;
+        expect((def.yardMap as string).length).toBe(x * z);
+      });
+
+      it("writes nothing unless the choice is made", () => {
+        const def = legoUnitDef(
+          { ...withArm(), builder: {} },
+          bounds({ x: 96, z: 64 }),
+        );
+        expect(def).not.toHaveProperty("yardMap");
+      });
+
+      it("writes nothing for a unit that moves", () => {
+        const def = legoUnitDef(
+          factory({ movement: { moveClass: "KBOT2", speed: 40 } }),
+          bounds({ x: 96, z: 64 }),
+        );
+        expect(def).not.toHaveProperty("yardMap");
+      });
+
+      it("writes it in Lua beside the other builder keys", () => {
+        const lua = buildUnitDef(factory(), bounds({ x: 32, z: 32 }));
+        expect(lua).toMatch(/yardMap = "[oc]+"/);
+      });
+    });
   });
 });
 
@@ -865,6 +902,28 @@ describe("buildUnitDef", () => {
  * either one the build decides, and so on the list, or one written on the
  * first export only and named here, so a new field cannot slip in unclassified.
  */
+describe("factoryYardmap", () => {
+  it("walls the outer columns and opens the rest, as Balanced Annihilation's labs do", () => {
+    expect(factoryYardmap(6, 6)).toBe("occcco".repeat(6));
+    expect(factoryYardmap(8, 7)).toBe("occcccco".repeat(7));
+  });
+
+  it("is one letter per footprint step", () => {
+    for (const [x, z] of [
+      [1, 1],
+      [2, 5],
+      [3, 3],
+      [12, 12],
+    ])
+      expect(factoryYardmap(x, z)).toHaveLength(x * z);
+  });
+
+  it("is all open when there is no room for walls", () => {
+    expect(factoryYardmap(2, 3)).toBe("cccccc");
+    expect(factoryYardmap(3, 1)).toBe("oco");
+  });
+});
+
 describe("DERIVED_FIELDS", () => {
   const everything: LegoProject = {
     ...project("Con Bot", "conbot"),
@@ -910,6 +969,18 @@ describe("DERIVED_FIELDS", () => {
     slots,
   );
 
+  const factory = legoUnitDefWithHome(
+    {
+      ...everything,
+      movement: undefined,
+      builder: { factory: true },
+    },
+    b,
+    "def",
+    totals,
+    slots,
+  );
+
   const gunship = legoUnitDefWithHome(
     {
       ...everything,
@@ -931,6 +1002,7 @@ describe("DERIVED_FIELDS", () => {
       ...Object.keys(mobile),
       ...Object.keys(still),
       ...Object.keys(gunship),
+      ...Object.keys(factory),
     ]);
     // `customparams` is a table the game reads whole, so only the keys inside
     // it that the build decides are on the list.
@@ -961,7 +1033,8 @@ describe("DERIVED_FIELDS", () => {
       expect(
         defValue(mobile, path) ??
           defValue(still, path) ??
-          defValue(gunship, path),
+          defValue(gunship, path) ??
+          defValue(factory, path),
         path,
       ).toBeDefined();
   });
