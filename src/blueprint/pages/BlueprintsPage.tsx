@@ -25,6 +25,7 @@ import {
   Layers,
   Link2,
   ListOrdered,
+  Package,
   Plus,
 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -305,6 +306,8 @@ function BlueprintCard({
  *  without reading the line (issue #1473). */
 const SOURCE_ICONS = {
   pack: Layers,
+  // The mark the setup pack's own export button wears.
+  "setup-pack": Package,
   file: FileDown,
   code: Link2,
   hub: Globe,
