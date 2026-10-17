@@ -852,6 +852,112 @@ pub fn rename(source: &str, unit: &str, new_unit: &str) -> Result<Plan, Refusal>
     })
 }
 
+/// The splice that takes the field at `path` out of `unit`'s table, or `None`
+/// when the file's own table does not write it (issue #3245). The location is
+/// the field's when there is one, otherwise the unit's.
+///
+/// Only a path of keys through tables written out in the unit file. A unit
+/// whose table is in a file it includes is refused rather than followed, since
+/// the one caller removes fields from files coilbox wrote, which never include
+/// anything.
+pub fn removal_plan(
+    source: &str,
+    unit: &str,
+    path: &[Segment],
+) -> Result<(Option<Plan>, Location), Refusal> {
+    let ast = parse(source)?;
+    let block = ast.nodes();
+    let scope = Scope::of(block.stmts());
+    let units = returned_table(returned(block)?, &scope, source)?;
+    let entry = find_unit(units, unit, &scope, source)?;
+    let (start, end) = entry.span();
+    let entry_location = Location::of(source, start, end);
+    let mut chain = Chain::default();
+    follow(entry, &scope, source, &mut chain, 0)?;
+    if chain.unset.is_some() || chain.tables.is_empty() {
+        return Err(Refusal::new(
+            RefusalKind::UnitComputed,
+            format!("`{unit}`'s table is not written out in this file, so there is nothing here to remove a field from."),
+        )
+        .at(entry_location));
+    }
+
+    let mut candidates = chain.tables;
+    let Some((last, through)) = path.split_last() else {
+        return Err(Refusal::new(
+            RefusalKind::InvalidValue,
+            "The edit names no field.",
+        ));
+    };
+    for segment in through {
+        let mut next = Vec::new();
+        for table in &candidates {
+            match find_field(table, segment, source)? {
+                Some(Expression::TableConstructor(inner)) => next.push(inner),
+                Some(other) => {
+                    let (start, end) = other.span();
+                    return Err(Refusal::new(
+                        RefusalKind::FieldComputed,
+                        format!("`{segment}` is not a table written out in the file, so coilbox will not remove anything inside it."),
+                    )
+                    .at(Location::of(source, start, end)));
+                }
+                None => {}
+            }
+        }
+        if next.is_empty() {
+            return Ok((None, entry_location));
+        }
+        candidates = next;
+    }
+
+    let Segment::Key(key) = last else {
+        return Err(Refusal::new(
+            RefusalKind::InvalidValue,
+            "Only a named field can be removed, not a list entry.",
+        ));
+    };
+    let mut found = Vec::new();
+    for table in &candidates {
+        for pair in table.fields().pairs() {
+            let hit = match pair.value() {
+                Field::NameKey { key: name, .. } => identifier(name).eq_ignore_ascii_case(key),
+                Field::ExpressionKey { key: name, .. } => {
+                    string_value(name).is_some_and(|name| name.eq_ignore_ascii_case(key))
+                }
+                _ => false,
+            };
+            if hit {
+                found.push(pair);
+            }
+        }
+    }
+    match found.as_slice() {
+        [] => Ok((None, entry_location)),
+        [pair] => {
+            let (start, end) = pair.value().span();
+            let location = Location::of(source, start, end);
+            Ok((
+                Some(Plan {
+                    splices: vec![removal(source, pair)],
+                    location,
+                    file: None,
+                    linked: Vec::new(),
+                }),
+                location,
+            ))
+        }
+        [_, second, ..] => {
+            let (start, end) = second.value().span();
+            Err(Refusal::new(
+                RefusalKind::FieldAmbiguous,
+                format!("`{key}` is written more than once in the unit's table."),
+            )
+            .at(Location::of(source, start, end)))
+        }
+    }
+}
+
 /// The splice that takes one entry out of a table, with its separator, and
 /// with its whole line when the entry had the line to itself.
 fn removal(source: &str, pair: &Pair<Field>) -> (usize, usize, String) {

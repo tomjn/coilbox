@@ -493,6 +493,67 @@ pub fn patch_pending(
     })
 }
 
+/// Take the field at `path` out of `unit`'s table in `source`, the way a
+/// re-export drops a field the build no longer writes (issue #3245). The
+/// field's line goes with it when it had one to itself. A field the table does
+/// not write is no change.
+///
+/// The same post-check as [`patch`]: the file is evaluated before and after,
+/// and the removal is only returned when the field is gone and nothing else
+/// moved. A field a parent class or a later line also sets is refused that way.
+pub fn remove(
+    source: &str,
+    unit: &str,
+    path: &[Segment],
+    game_root: &Path,
+) -> Result<Patched, Refusal> {
+    let game = Game {
+        root: game_root,
+        pending: &BTreeMap::new(),
+    };
+    let (plan, location) = locate::removal_plan(source, unit, path)?;
+    let Some(plan) = plan else {
+        return Ok(Patched {
+            text: source.to_string(),
+            changed: false,
+            location,
+            file: None,
+        });
+    };
+    let before = evaluate_original(source, &game)?;
+    let text = plan.apply(source);
+    let refuse = |message: String| Refusal::new(RefusalKind::PostCheckFailed, message).at(location);
+    let after = check::evaluate(&text, game.root, "patched", game.files(None))
+        .map_err(|e| refuse(format!("The file does not run without the field: {e}")))?;
+    let mut expected = vec![unit.to_lowercase()];
+    expected.extend(path.iter().map(Segment::canonical));
+    check::confirm_removed(&before, &after, &expected).map_err(refuse)?;
+    Ok(Patched {
+        text,
+        changed: true,
+        location,
+        file: None,
+    })
+}
+
+/// The value `evaluated`, what [`evaluate`] returned for a file, holds for the
+/// field at `path` of `unit`. `None` when the file does not set it.
+pub fn field_value<'a>(
+    evaluated: &'a serde_json::Value,
+    unit: &str,
+    path: &[Segment],
+) -> Option<&'a serde_json::Value> {
+    let mut expected = vec![unit.to_lowercase()];
+    expected.extend(path.iter().map(Segment::canonical));
+    check::at(evaluated, &expected)
+}
+
+/// Whether `found`, a value [`field_value`] read, is `value`, compared the way
+/// the post-check compares them: numbers by value and tables key by key.
+pub fn same_value(found: &serde_json::Value, value: &Value) -> bool {
+    check::matches(found, value)
+}
+
 /// Where `edit` would go in `source`, worked out without evaluating
 /// anything, so this is cheap. It only refuses what the text of the unit file
 /// and any file it includes for its table decides. A refusal only the

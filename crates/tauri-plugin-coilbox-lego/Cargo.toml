@@ -65,5 +65,12 @@ base64 = { workspace = true }
 # one copy of the rules for which files make up the runtime (issue #3341).
 tauri-plugin-coilbox-scenario = { path = "../tauri-plugin-coilbox-scenario" }
 
+# A re-export brings the fields the build decides up to date in a unit file
+# that already exists, one field at a time, and leaves the rest of the file as
+# the game maker wrote it (issue #3245).
+coilbox-unitpatch = { path = "../coilbox-unitpatch" }
+# The workshop's in place backup markers, which hold a re-export back.
+coilbox-gamebackup = { path = "../coilbox-gamebackup" }
+
 [dev-dependencies]
 tempfile = { workspace = true }

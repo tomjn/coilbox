@@ -5,6 +5,7 @@ import type { LanguageTexts } from "@/workshop/unitText";
 import type { S3oModel } from "./importS3o";
 import type { ExportedFile } from "./model";
 import type { PieceRest } from "./pieceRest";
+import type { DerivedField, FieldChange, KeptWhole } from "./reexport";
 import type { S3oBuild } from "./s3oBuild";
 import type {
   ScriptEvent,
@@ -106,11 +107,16 @@ export const legoExport = defineCommand<
     /**
      * Replace a texture already at that name rather than leaving it alone.
      * Off by default. Has no bearing on the script or the unit definition,
-     * which are always write-once.
+     * which keep their own rule (issue #3245).
      */
     overwriteTexture: boolean;
-    /** Written only when the game has no script for this unit yet. */
+    /**
+     * Written when the game has no script for this unit yet, or replaces one
+     * still exactly as the last export wrote it.
+     */
     script: string | null;
+    /** The digest the receipt holds for the script the last export wrote. */
+    scriptWritten: string | null;
     /**
      * The per-piece collision volumes, for `scripts/coilbox/<unit>_collision.lua`.
      *
@@ -121,8 +127,16 @@ export const legoExport = defineCommand<
      * `pieceCollisionScript.ts`.
      */
     pieceCollision: string;
-    /** Written only when the game has no unit definition for it yet. */
+    /**
+     * Written whole when the game has no unit definition for it yet. After
+     * that only the fields in `unitDefFields` are brought up to date.
+     */
     unitDef: string | null;
+    /**
+     * The fields the build decides, from `derivedFields`. Null when nothing
+     * records coilbox writing the file already there, which keeps it whole.
+     */
+    unitDefFields: DerivedField[] | null;
     /**
      * The unit's name and description, for a game that reads neither from the
      * definition (issue #2683). Goes into `language/<code>/coilbox.json`, which
@@ -146,7 +160,8 @@ export const legoExport = defineCommand<
     /** `language/<code>/coilbox.json`, when `text` was sent. */
     language: string | null;
     script: string | null;
-    /** True when a script was already there and was left as it was. */
+    /** True when a script was already there that the last export did not
+     *  write, and it was left as it was. */
     scriptKept: boolean;
     /**
      * `lualibs/cob_vars.lua`, written because the script keeps shared COB unit
@@ -156,9 +171,15 @@ export const legoExport = defineCommand<
     /** True when `lualibs/cob_vars.lua` was already there and was left alone. */
     cobVarsKept: boolean;
     pieceCollision: string | null;
+    /** The definition's path, when this export wrote to it. */
     unitDef: string | null;
-    /** True when a unit definition was already there and was left as it was. */
-    unitDefKept: boolean;
+    /** Why the definition already there was left exactly as it was, if it was. */
+    unitDefKept: KeptWhole | null;
+    /**
+     * The derived fields a re-export changed, or kept because they had been
+     * edited. A field already holding this build's value is not listed.
+     */
+    unitDefFields: FieldChange[];
     /** True when a texture of that name was already there and was left alone. */
     textureKept: boolean;
     /** Stored textures written, for an imported unit. */
