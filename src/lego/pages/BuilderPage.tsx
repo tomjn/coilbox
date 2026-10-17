@@ -73,6 +73,7 @@ import {
   groundShape,
   unitUp,
 } from "../environment";
+import { checkFootprint, footprintProblems } from "../footprint";
 import {
   applyGroupTransform,
   type PieceTransform,
@@ -432,6 +433,18 @@ function Builder({ id }: { id: string | undefined }) {
     [draft, pack, raw, playing, scriptTimeline],
   );
   const balanceNote = balance ? balanceProblem(balance) : null;
+
+  // Whether the base footprint leaves out a barrel, flare, aim point and build
+  // nozzle. The problems below do not depend on it: they judge the whole unit.
+  const [footprintLeaveOut, setFootprintLeaveOut] = useState(true);
+  const footprint = useMemo(
+    () =>
+      draft && pack
+        ? checkFootprint(draft, pack, raw, footprintLeaveOut)
+        : null,
+    [draft, pack, raw, footprintLeaveOut],
+  );
+  const footprintNotes = footprint ? footprintProblems(footprint) : [];
 
   function addPart(part: LegoPartInfo) {
     inventoryView.inventory.record({ kind: "part", id: part.id });
@@ -1763,11 +1776,14 @@ function Builder({ id }: { id: string | undefined }) {
                       />
                     ) : null}
 
-                    {problems.length > 0 || balanceNote ? (
+                    {problems.length > 0 ||
+                    balanceNote ||
+                    footprintNotes.length > 0 ? (
                       <ul className="pointer-events-none mx-auto w-fit max-w-[80%] rounded-md border border-amber-500/40 bg-background/90 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur">
                         {[
                           ...problems,
                           ...(balanceNote ? [balanceNote] : []),
+                          ...footprintNotes,
                         ].map((problem) => (
                           <li key={problem}>{problem}</li>
                         ))}
@@ -1776,6 +1792,11 @@ function Builder({ id }: { id: string | undefined }) {
                   </>
                 }
                 document={{ pack, raw, project: draft, balance }}
+                footprint={{
+                  result: footprint,
+                  leaveOut: footprintLeaveOut,
+                  onLeaveOutChange: setFootprintLeaveOut,
+                }}
                 selection={{
                   selectedIds,
                   onSelect: selectPiece,
