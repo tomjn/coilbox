@@ -57,7 +57,13 @@ import { pictureIsStale } from "../buildPicture";
 import { parseClipboardPiece, serializeClipboardPiece } from "../clipboard";
 import { reanchorCollisionVolume } from "../collisionVolume";
 import { selectionAsCompound } from "../compounds";
-import { pieceConnectors } from "../connectors";
+import {
+  describeJoin,
+  disconnectPiece,
+  type JoinSummary,
+  pieceConnectors,
+  setJoinPlace,
+} from "../connectors";
 import {
   DEFAULT_GROUND,
   footprintWidth,
@@ -127,6 +133,7 @@ import { BuildPictureDrawer } from "./components/BuildPictureDrawer";
 import { CollisionPanel } from "./components/CollisionPanel";
 import { CompoundPicker } from "./components/CompoundPicker";
 import { ExportDrawer } from "./components/ExportDrawer";
+import { JoinedTo } from "./components/JoinedTo";
 import { ModelViewport } from "./components/ModelViewport";
 import { NameInput } from "./components/NameInput";
 import { NoMatches, PartFilters } from "./components/PartFilters";
@@ -235,6 +242,7 @@ function Builder({ id }: { id: string | undefined }) {
   /** Whether the part picker for "Change part" is open, and what the last
    *  swap left behind. */
   const [swapping, setSwapping] = useState(false);
+  const [showFreeFaces, setShowFreeFaces] = useState(false);
   const [swapNote, setSwapNote] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   /**
@@ -590,6 +598,20 @@ function Builder({ id }: { id: string | undefined }) {
         : [pieceId],
       parentId,
     );
+  }
+
+  // One edit, so one undo step. The piece stays where it is.
+  function detach(pieceId: string) {
+    edit((project) => disconnectPiece(project, pieceId));
+  }
+
+  // Typing an offset or twist is one edit, resolved through the join.
+  function placeJoin(
+    pieceId: string,
+    change: { offset?: [number, number]; twist?: number },
+  ) {
+    if (!pack) return;
+    edit((project) => setJoinPlace(project, pack, pieceId, change));
   }
 
   async function saveSelectionAsCompound() {
@@ -954,6 +976,16 @@ function Builder({ id }: { id: string | undefined }) {
   // unit. Only worked out while that panel is open, so a keystroke anywhere
   // else in the builder does not pay for them.
   const collisionOpen = asideOpen && aside === "collision";
+  const joins = useMemo(() => {
+    const found = new Map<string, JoinSummary>();
+    if (!draft || !pack) return found;
+    for (const piece of draft.pieces) {
+      const join = describeJoin(draft, pack, piece);
+      if (join) found.set(piece.id, join);
+    }
+    return found;
+  }, [draft, pack]);
+
   const pieceCollisionLua = useMemo(
     () =>
       draft && pack && collisionOpen
@@ -1184,6 +1216,7 @@ function Builder({ id }: { id: string | undefined }) {
               )}
             >
               <ModelViewport
+                showFreeFaces={showFreeFaces}
                 onReferenceUnit={setReferenceUnit}
                 ground={ground}
                 chrome={
@@ -1887,6 +1920,7 @@ function Builder({ id }: { id: string | undefined }) {
                         selectedIds={selectedIds}
                         onSelect={selectPiece}
                         onReparent={reparent}
+                        joins={joins}
                         onToggleHidden={toggleHidden}
                         hoveredId={hoveredId}
                         onHoverChange={setHoveredId}
@@ -2160,6 +2194,18 @@ function Builder({ id }: { id: string | undefined }) {
                                 </SelectContent>
                               </Select>
                             </div>
+                          )}
+
+                          {selected.id === draft.rootPieceId ? null : (
+                            <JoinedTo
+                              join={joins.get(selected.id) ?? null}
+                              onDetach={() => detach(selected.id)}
+                              onPlace={(change) =>
+                                placeJoin(selected.id, change)
+                              }
+                              showFree={showFreeFaces}
+                              onShowFreeChange={setShowFreeFaces}
+                            />
                           )}
 
                           {selectedPart ? (

@@ -403,6 +403,184 @@ export function resolveConnections(
   return { project: moved ? { ...project, pieces } : project, broken };
 }
 
+export interface JoinSummary {
+  parentName: string;
+  /** The face on the piece's own part. */
+  connector: string;
+  /** The face on the parent's part. */
+  to: string;
+  /** `connector` as it is shown: "top" on a box, the id otherwise. */
+  connectorName: string;
+  /** `to` as it is shown. */
+  toName: string;
+  offset: [number, number];
+  /** Radians. */
+  twist: number;
+  /** The join cannot be made, so the piece is where it last was. */
+  broken: boolean;
+}
+
+/** The unit faces +z and its right is -x, so +x is its left. */
+const BOX_FACE_NAMES: Record<string, string> = {
+  "+y": "top",
+  "-y": "bottom",
+  "+z": "front",
+  "-z": "back",
+  "+x": "left",
+  "-x": "right",
+};
+
+/**
+ * A connector's name for showing. A box's six faces have the names of the
+ * unit's own directions. A connector a pack or an anchor states keeps its id,
+ * because its id may mean something other than a direction.
+ */
+export function faceName(
+  pack: LoadedPack,
+  piece: LegoPiece | undefined,
+  id: string,
+): string {
+  const part = piece?.partId ? pack.byId.get(piece.partId) : undefined;
+  const boxed =
+    part && !part.connectors && !(piece?.customAnchors?.length ?? 0);
+  return (boxed && BOX_FACE_NAMES[id]) || id;
+}
+
+/** What a piece is joined to, for showing, or null for a free piece. */
+export function describeJoin(
+  project: LegoProject,
+  pack: LoadedPack,
+  piece: LegoPiece,
+): JoinSummary | null {
+  const { connection } = piece;
+  if (!connection) return null;
+  const parent = project.pieces.find((p) => p.id === piece.parentId);
+  return {
+    parentName: parent?.name ?? "",
+    connector: connection.connector,
+    to: connection.to,
+    connectorName: faceName(pack, piece, connection.connector),
+    toName: faceName(pack, parent, connection.to),
+    offset: connection.offset ?? [0, 0],
+    twist: connection.twist ?? 0,
+    broken: !parent || !placeJoin(pack, piece, parent, connection),
+  };
+}
+
+export interface FaceOutline {
+  /** The piece whose group the outline is drawn in. */
+  owner: string;
+  kind: "joined" | "free";
+  /** Four corners in the owner's group space, in order round the face. */
+  corners: Vec3[];
+}
+
+/** How much of a face the outline covers, so its edge stays in view. */
+const OUTLINE_FILL = 0.8;
+/** Used for a connector on a piece with no part to measure a face by. */
+const OUTLINE_FALLBACK = 0.25;
+
+function outlineOf(
+  pack: LoadedPack,
+  piece: LegoPiece,
+  connector: LegoConnector,
+  kind: FaceOutline["kind"],
+): FaceOutline {
+  const facing = new THREE.Vector3(...connector.facing).normalize();
+  const up = new THREE.Vector3(...connector.up).normalize();
+  const side = new THREE.Vector3().crossVectors(facing, up);
+  const bbox = piece.partId ? pack.byId.get(piece.partId)?.bbox : undefined;
+  const half = (axis: THREE.Vector3) =>
+    bbox
+      ? 0.5 *
+        OUTLINE_FILL *
+        (Math.abs(axis.x) * (bbox.max[0] - bbox.min[0]) +
+          Math.abs(axis.y) * (bbox.max[1] - bbox.min[1]) +
+          Math.abs(axis.z) * (bbox.max[2] - bbox.min[2]))
+      : OUTLINE_FALLBACK;
+  const [h, v] = [half(side), half(up)];
+  const pivot = piece.pivot ?? [0, 0, 0];
+  const middle = new THREE.Vector3(
+    connector.position[0] - pivot[0],
+    connector.position[1] - pivot[1],
+    connector.position[2] - pivot[2],
+  );
+  const corners = (
+    [
+      [-1, -1],
+      [1, -1],
+      [1, 1],
+      [-1, 1],
+    ] as const
+  ).map(([a, b]) => {
+    const corner = middle
+      .clone()
+      .addScaledVector(side, a * h)
+      .addScaledVector(up, b * v);
+    return [corner.x, corner.y, corner.z] as Vec3;
+  });
+  return { owner: piece.id, kind, corners };
+}
+
+/**
+ * The face outlines to draw for a selected piece: the face it is joined by and
+ * the parent face it is joined to, and with `showFree` the piece's other faces.
+ * A join whose parent face is missing draws only the piece's own.
+ */
+export function joinFaceOutlines(
+  project: LegoProject,
+  pack: LoadedPack,
+  pieceId: string,
+  showFree: boolean,
+): FaceOutline[] {
+  const piece = project.pieces.find((p) => p.id === pieceId);
+  if (!piece) return [];
+  const own = pieceConnectors(pack, piece);
+  const outlines: FaceOutline[] = [];
+  const { connection } = piece;
+  if (connection) {
+    const mine = own.find((c) => c.id === connection.connector);
+    if (mine) outlines.push(outlineOf(pack, piece, mine, "joined"));
+    const parent = project.pieces.find((p) => p.id === piece.parentId);
+    const theirs = parent
+      ? pieceConnectors(pack, parent).find((c) => c.id === connection.to)
+      : undefined;
+    if (parent && theirs)
+      outlines.push(outlineOf(pack, parent, theirs, "joined"));
+  }
+  if (showFree) {
+    for (const connector of own) {
+      if (connector.id !== connection?.connector) {
+        outlines.push(outlineOf(pack, piece, connector, "free"));
+      }
+    }
+  }
+  return outlines;
+}
+
+/**
+ * Set where a joined piece rests on its face, and place it there. An offset of
+ * nothing and a twist of nothing are stored as absent, as a fresh join has
+ * them. A free piece is returned as it is.
+ */
+export function setJoinPlace(
+  project: LegoProject,
+  pack: LoadedPack,
+  pieceId: string,
+  change: { offset?: [number, number]; twist?: number },
+): LegoProject {
+  const connection = project.pieces.find((p) => p.id === pieceId)?.connection;
+  if (!connection) return project;
+  const { offset: _offset, twist: _twist, ...base } = connection;
+  const offset = change.offset ?? connection.offset;
+  const twist = change.twist ?? connection.twist;
+  return connectPiece(project, pack, pieceId, {
+    ...base,
+    ...(offset && (offset[0] !== 0 || offset[1] !== 0) ? { offset } : {}),
+    ...(twist ? { twist } : {}),
+  });
+}
+
 /**
  * A builder edit followed by resolving every join, so the edit and the moves it
  * causes are one document and one undo step. With no pack loaded yet there is

@@ -11,10 +11,20 @@
  */
 
 import { Button } from "@picoframe/frame";
-import { Box, ChevronDown, ChevronRight, Dot, Eye, EyeOff } from "lucide-react";
+import {
+  Box,
+  ChevronDown,
+  ChevronRight,
+  Dot,
+  Eye,
+  EyeOff,
+  Link2,
+  Link2Off,
+} from "lucide-react";
 import { useRef, useState } from "react";
 
 import { roleLabel } from "../../animPresets";
+import type { JoinSummary } from "../../connectors";
 import {
   childrenOf,
   isEffectivelyHidden,
@@ -49,6 +59,8 @@ interface Props {
    *  here, so they stay folded when the sidebar changes tab and back. */
   collapsedIds: ReadonlySet<string>;
   onToggleCollapsed: (pieceId: string) => void;
+  /** What each joined piece is joined to, by piece id. */
+  joins?: ReadonlyMap<string, JoinSummary>;
 }
 
 interface Drag {
@@ -70,6 +82,7 @@ export function PieceTree({
   onHoverChange,
   collapsedIds,
   onToggleCollapsed,
+  joins,
 }: Props) {
   const [drag, setDrag] = useState<Drag | null>(null);
   const pressed = useRef<{ pieceId: string; x: number; y: number } | null>(
@@ -143,6 +156,7 @@ export function PieceTree({
         onHoverChange={onHoverChange}
         collapsedIds={collapsedIds}
         onToggleCollapsed={onToggleCollapsed}
+        joins={joins}
       />
 
       {drag && carried ? (
@@ -176,6 +190,7 @@ function Rows({
   onHoverChange,
   collapsedIds,
   onToggleCollapsed,
+  joins,
   depth = 0,
 }: {
   project: LegoProject;
@@ -190,6 +205,7 @@ function Rows({
   onHoverChange?: (pieceId: string | null) => void;
   collapsedIds: ReadonlySet<string>;
   onToggleCollapsed: (pieceId: string) => void;
+  joins?: ReadonlyMap<string, JoinSummary>;
   depth?: number;
 }) {
   const siblings = childrenOf(project, parentId);
@@ -205,6 +221,7 @@ function Rows({
         const dimmed = isEffectivelyHidden(project, piece.id);
         const hasChildren = childrenOf(project, piece.id).length > 0;
         const collapsed = hasChildren && collapsedIds.has(piece.id);
+        const join = joins?.get(piece.id);
         return (
           <li
             key={piece.id}
@@ -293,6 +310,26 @@ function Rows({
                   )}
                 </span>
                 <span className="truncate">{piece.name}</span>
+                {join ? (
+                  <span
+                    role="img"
+                    aria-label={
+                      join.broken
+                        ? `Broken join to ${join.parentName}`
+                        : `Joined to ${join.parentName}`
+                    }
+                    title={
+                      join.broken
+                        ? `Broken join to ${join.parentName}`
+                        : `Joined to ${join.parentName}: its ${join.connectorName} to the ${join.toName}`
+                    }
+                    className={`shrink-0 ${
+                      join.broken ? "text-destructive" : "text-muted-foreground"
+                    }`}
+                  >
+                    {join.broken ? <Link2Off size={12} /> : <Link2 size={12} />}
+                  </span>
+                ) : null}
                 {piece.role ? (
                   <span className="ml-auto shrink-0 rounded bg-muted px-1 text-[10px] text-muted-foreground">
                     {roleLabel(piece.role)}
@@ -330,6 +367,7 @@ function Rows({
                 onHoverChange={onHoverChange}
                 collapsedIds={collapsedIds}
                 onToggleCollapsed={onToggleCollapsed}
+                joins={joins}
                 depth={depth + 1}
               />
             )}

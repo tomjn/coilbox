@@ -2,10 +2,12 @@ import { type RefObject, useEffect } from "react";
 import type { LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import { showAnchors } from "./anchorsAndSnapping";
+import { showJoinFaces } from "./joinFaceMarks";
 import type { SceneState } from "./sceneState";
 
 /**
- * Draw the origin, seat and snap anchors for the one selected piece.
+ * Draw the origin, seat and snap anchors, and the join faces, for the one
+ * selected piece.
  *
  * Declared after the scene sync, so the group a new piece needs already
  * exists by the time this looks for it. Playback clears them: the baked scene
@@ -18,11 +20,19 @@ export function useModelAnchors(
   project: LegoProject,
   soleSelectedId: string | null,
   playing: boolean,
+  showFreeFaces = false,
 ) {
   useEffect(() => {
     const state = sceneRef.current;
     if (!state) return;
     showAnchors(state, pack, project, playing ? null : soleSelectedId);
+    showJoinFaces(
+      state,
+      pack,
+      project,
+      playing ? null : soleSelectedId,
+      showFreeFaces,
+    );
     state.render();
-  }, [sceneRef, pack, project, soleSelectedId, playing]);
+  }, [sceneRef, pack, project, soleSelectedId, playing, showFreeFaces]);
 }
