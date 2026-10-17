@@ -74,17 +74,18 @@ async function copyMeshes(
 }
 
 /**
- * Write the geometry file of a module saved out of the unit `unitId` (#4344).
- *
- * The file is named after the module and holds exactly the meshes its pieces
- * name, copied out of the unit's own file under the keys they already have, so
- * the pieces need no rewriting. A module of parts needs none: null. Throws,
- * saying why, when either file cannot be read or written, and then the module
- * has not been saved.
+ * Write the geometry file `toId` holding exactly the meshes `module`'s pieces
+ * name, copied out of the geometry file of `fromId` under the keys they already
+ * have, so the pieces need no rewriting. `toId` may be `fromId`, which trims a
+ * file down in place. A module of parts needs none: null. Throws, saying why,
+ * when either file cannot be read or written, or `fromId` lacks a named mesh.
+ * Nothing is written then.
  */
-export async function saveModuleMeshes(
-  unitId: string,
+async function writeNamedMeshes(
+  fromId: string,
+  toId: string,
   module: LegoProject,
+  where: string,
 ): Promise<RawGeometry | null> {
   const keys = new Map<string, string>();
   for (const piece of module.pieces) {
@@ -92,7 +93,7 @@ export async function saveModuleMeshes(
   }
   if (keys.size === 0) return null;
 
-  const from = await loadRawGeometry(unitId).catch((error: unknown) => {
+  const from = await loadRawGeometry(fromId).catch((error: unknown) => {
     throw new Error(
       `The meshes of ${module.name} could not be read: ${error instanceof Error ? error.message : String(error)}`,
     );
@@ -100,14 +101,38 @@ export async function saveModuleMeshes(
   const raw = mergeRawGeometry(null, from, keys);
   if (raw.byId.size < keys.size) {
     throw new Error(
-      `${module.name} names meshes this unit's geometry file does not hold.`,
+      `${module.name} names meshes ${where} geometry file does not hold.`,
     );
   }
   await legoGeometrySave({
-    id: module.id,
+    id: toId,
     bytes: Array.from(gzipSync(encodeRawGeometry(raw))),
   });
   return raw;
+}
+
+/**
+ * Write the geometry file of a module saved out of the unit `unitId` (#4344).
+ * The file is named after the module and holds exactly the meshes its pieces
+ * name.
+ */
+export function saveModuleMeshes(
+  unitId: string,
+  module: LegoProject,
+): Promise<RawGeometry | null> {
+  return writeNamedMeshes(unitId, module.id, module, "this unit's");
+}
+
+/**
+ * Cut a freshly lifted module's geometry file down to the meshes its pieces
+ * name (#4337). The import that lifts a piece writes every mesh of the model
+ * under the module's id. Returns what is left, or null for a module with no
+ * meshes, which leaves the file as it is.
+ */
+export function trimLiftedMeshes(
+  module: LegoProject,
+): Promise<RawGeometry | null> {
+  return writeNamedMeshes(module.id, module.id, module, "the lifted model's");
 }
 
 /**

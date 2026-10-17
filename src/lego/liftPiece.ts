@@ -10,9 +10,10 @@
  * (`LegoPiece.lifted`), which is what keeps it in units for that game and off
  * the hub.
  *
- * The sidecar holds the whole model's meshes, not only the lifted ones,
- * because it is written by the existing import. The module's pieces name only
- * their own.
+ * The import writes the whole model's meshes, so the lift then cuts the file
+ * down to the lifted ones (`trimLiftedMeshes`, #4337). A module lifted before
+ * that still has the whole model in its file, which loads the same way: the
+ * pieces name only their own meshes.
  *
  * Pure, so it can be tested without Tauri.
  */
