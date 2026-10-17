@@ -202,6 +202,9 @@ export interface SceneState {
   /** The footprint check's rectangles on the ground, in `overlay`.
    *  Rebuilt whenever the result changes. */
   footprint: THREE.Group | null;
+  /** The overlap check's outlines round buried pieces, in `overlay`.
+   *  Rebuilt whenever the result changes. */
+  overlap: THREE.Group | null;
   /** Whether the unit is drawn solid, as edges, or both, and what that holds. */
   draw: DrawLayer;
   /** The guide planes, drawn in `overlay` while they are shown. Rebuilt

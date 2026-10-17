@@ -254,7 +254,7 @@ export type BalanceResult =
       basis: BalanceBasis;
     };
 
-interface Geometry {
+export interface Geometry {
   id: string;
   /** World positions of the piece's own vertices. */
   points: [number, number, number][];
@@ -262,7 +262,7 @@ interface Geometry {
 }
 
 /** Each piece's own vertices at their rest position in the unit's space. */
-function worldGeometry(
+export function worldGeometry(
   project: LegoProject,
   baked: Map<string, BakedPiece>,
 ): Geometry[] {

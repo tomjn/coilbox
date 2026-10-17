@@ -22,6 +22,7 @@ import {
   ArrowDownToLine,
   Box,
   ClipboardPaste,
+  Combine,
   Copy,
   Crosshair,
   Cuboid,
@@ -105,6 +106,7 @@ import {
   pieceById,
 } from "../../model";
 import type { StandardView } from "../../orthoViews";
+import { type OverlapResult, overlapSummary } from "../../overlap";
 import { type LoadedPack, partUnit } from "../../pack";
 import type { FaceTarget } from "../../placePart";
 import type { RawGeometry } from "../../rawGeometry";
@@ -182,6 +184,7 @@ import {
   moveDragReadout,
   newMeasureScene,
 } from "./measureLayer";
+import { disposeOverlap } from "./overlapLayer";
 import { clearPlaceGhost, type Placing, showPlaceGhost } from "./placeByFace";
 import { attachPointerHandlers } from "./pointerHandlers";
 import {
@@ -215,6 +218,7 @@ import { useModelHover } from "./useModelHover";
 import { useModelSceneSync } from "./useModelSceneSync";
 import { useModelSelection } from "./useModelSelection";
 import { useModelShortcuts } from "./useModelShortcuts";
+import { useOverlap } from "./useOverlap";
 import { useScriptFrameStepping } from "./useScriptFrameStepping";
 import { useWeaponReach } from "./useWeaponReach";
 import { disposeWeaponReach, reachColour } from "./weaponReachLayer";
@@ -423,6 +427,11 @@ interface Props {
      * is not the unit's.
      */
     balance?: BalanceResult | null;
+    /**
+     * The overlap check on the unit as it rests, or null while a script
+     * preview is moving the pieces (issue #3343).
+     */
+    overlap?: OverlapResult | null;
   };
   /**
    * The footprint check (issue #3340). `leaveOut` is whether the base
@@ -646,7 +655,7 @@ export function ModelViewport({
   footprint,
   showFreeFaces = false,
 }: Props) {
-  const { pack, raw, project, balance = null } = document;
+  const { pack, raw, project, balance = null, overlap = null } = document;
   const {
     selectedIds,
     onSelect,
@@ -727,6 +736,7 @@ export function ModelViewport({
   // Held for the session rather than the viewport, so switching unit keeps it.
   const [drawMode, setDrawMode] = useState<DrawMode>(rememberedDrawMode);
   const [showFootprint, setShowFootprint] = useState(false);
+  const [showOverlap, setShowOverlap] = useState(false);
   const [showGuides, setShowGuides] = useState(true);
   /** The axis the next click on the model puts a guide on, or null. */
   const [pickingGuide, setPickingGuide] = useState<GuidePick | null>(null);
@@ -1224,6 +1234,7 @@ export function ModelViewport({
         weaponReach: null,
         balance: null,
         footprint: null,
+        overlap: null,
         draw: newDrawLayer(),
         guideLayer: null,
         guidePlanes: [],
@@ -1438,6 +1449,7 @@ export function ModelViewport({
           if (state.weaponReach) disposeWeaponReach(state.weaponReach);
           if (state.balance) disposeBalance(state.balance);
           if (state.footprint) disposeFootprint(state.footprint);
+          if (state.overlap) disposeOverlap(state.overlap);
           disposeDrawLayer(state.draw, state.groups.values());
           sceneRef.current = null;
         },
@@ -1482,6 +1494,8 @@ export function ModelViewport({
     result: footprint?.result ?? null,
     show: showFootprint,
   });
+
+  useOverlap(sceneRef, { result: overlap, show: showOverlap });
 
   useGuides(sceneRef, { project, pack, show: showGuides }, reduceMotion);
 
@@ -1889,6 +1903,9 @@ export function ModelViewport({
                 ))}
               </div>
             ) : null}
+            {overlap && showOverlap ? (
+              <span>{overlapSummary(overlap)}</span>
+            ) : null}
             {showReach && reaches.length > 0 ? (
               <div className="flex gap-3">
                 {reaches.map((reach, index) => (
@@ -1946,6 +1963,13 @@ export function ModelViewport({
               onChange={setShowBalance}
               hideTitle="Hide the balance check"
               showTitle="Show the balance check: where the weight looks centred, against the ground the feet or wheels cover. An estimate from piece volumes at one density, not a mass. The engine does not simulate balance"
+            />
+            <ViewToggle
+              icon={Combine}
+              on={showOverlap}
+              onChange={setShowOverlap}
+              hideTitle="Hide the overlap check"
+              showTitle="Show the overlap check: outlines pieces buried wholly inside another piece, which the model still draws and the export still writes"
             />
             {footprint ? (
               <ViewToggle
