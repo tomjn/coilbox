@@ -237,6 +237,33 @@ describe("projectProblems", () => {
     expect(projectProblems(doc).join(" ")).toMatch(/not usable as a name/);
   });
 
+  it("catches a lifted piece in a unit for another game, naming it", () => {
+    const lifted = {
+      game: { name: "Splinter Faction", archive: "sf.sdz", shortname: "SF" },
+      member: "objects3d/armcom.s3o",
+    };
+    const turret = { ...piece("a", "root", "turret"), meshId: "x/m2", lifted };
+    const xta = { name: "XTA", archive: "xta.sdz", shortname: "XTA" };
+    expect(
+      projectProblems({
+        ...project([piece("root", null), turret]),
+        game: xta,
+      }),
+    ).toEqual([
+      "This piece is from Splinter Faction. This unit is for XTA. Pieces from a game: turret.",
+    ]);
+    expect(
+      projectProblems({
+        ...project([piece("root", null), turret]),
+        game: {
+          ...lifted.game,
+          name: "Splinter Faction 2",
+          archive: "sf2.sdz",
+        },
+      }),
+    ).toEqual([]);
+  });
+
   it("catches a cycle rather than recursing forever", () => {
     const doc = project([
       piece("root", null),

@@ -22,9 +22,11 @@ import type { S3oImport } from "./bindings";
 import { selectionAsCompound } from "./compounds";
 import { pieceLines } from "./gameUnits";
 import type {
+  LegoImported,
   LegoImportedGame,
   LegoLifted,
   LegoProject,
+  LegoTexture,
   LegoUnitGame,
 } from "./model";
 import { projectFromImport } from "./rawImport";
@@ -85,6 +87,7 @@ export function liftFromImport(
     game: options.game,
     member: options.from.member,
     ...(options.from.unit ? { unit: options.from.unit } : {}),
+    ...liftedTextures(whole.imported),
   };
   return {
     ...cut,
@@ -106,9 +109,9 @@ export function holdsLiftedPieces(project: LegoProject): boolean {
 /**
  * Why a module cannot go into this unit, or null when it can.
  *
- * A module of parts always can. A lifted one is refused in a unit for another
- * game or for no game. In a unit for its own game it is held back too, until a
- * unit can draw lifted meshes beside parts (#3259).
+ * A module of parts always can. A lifted one goes only into a unit for its own
+ * game, and never into a unit imported whole, which draws every piece with its
+ * one texture.
  */
 export function liftedModuleRefusal(
   project: LegoProject,
@@ -117,8 +120,74 @@ export function liftedModuleRefusal(
 ): string | null {
   const from = module.pieces.find((piece) => piece.lifted)?.lifted;
   if (!from) return null;
-  return (
-    liftRefusal(project, from.game, installed) ??
-    "Lifted pieces cannot go into a unit yet."
-  );
+  if (project.imported)
+    return "Lifted pieces go into a unit built from parts, not one opened from a model.";
+  return liftRefusal(project, from.game, installed);
+}
+
+/** The two textures a lifted piece records, without a path to refresh from. */
+function liftedTextures(
+  imported: Pick<LegoImported, "texture" | "texture2"> | undefined,
+): Pick<LegoLifted, "texture" | "texture2"> {
+  const bare = (texture: LegoTexture | undefined) =>
+    texture ? { key: texture.key, name: texture.name } : undefined;
+  const texture = bare(imported?.texture);
+  const texture2 = bare(imported?.texture2);
+  return {
+    ...(texture ? { texture } : {}),
+    ...(texture2 ? { texture2 } : {}),
+  };
+}
+
+/**
+ * The key a lifted module's mesh is kept under in a unit's own sidecar.
+ *
+ * Every import keys its meshes `m0`, `m1` and on, so two modules lifted from
+ * two models share keys. Prefixing the module's id keeps them apart, and the
+ * same module going in twice lands on the same keys.
+ */
+export function liftedMeshKey(moduleId: string, meshId: string): string {
+  return `${moduleId}/${meshId}`;
+}
+
+/**
+ * A lifted module as it goes into a unit (#3259), and which of its sidecar's
+ * meshes to copy into the unit's under which key.
+ *
+ * Each piece names its mesh by the unit's key and records the textures it draws
+ * with. A module lifted before pieces recorded them takes them from the module.
+ * A mesh key that already carries the prefix is left alone.
+ */
+export function moduleForUnit(module: LegoProject): {
+  module: LegoProject;
+  keys: Map<string, string>;
+} {
+  const keys = new Map<string, string>();
+  const prefix = liftedMeshKey(module.id, "");
+  const own = liftedTextures(module.imported);
+  const pieces = module.pieces.map((piece) => {
+    if (!piece.meshId || piece.meshId.startsWith(prefix)) return piece;
+    const meshId = liftedMeshKey(module.id, piece.meshId);
+    keys.set(piece.meshId, meshId);
+    const lifted = piece.lifted && {
+      ...(piece.lifted.texture || piece.lifted.texture2 ? {} : own),
+      ...piece.lifted,
+    };
+    return { ...piece, meshId, ...(lifted ? { lifted } : {}) };
+  });
+  return { module: { ...module, pieces }, keys };
+}
+
+/**
+ * Why a unit cannot be written out as a model yet, or null when it can.
+ *
+ * A model names one colour texture for all its pieces. A unit of parts samples
+ * the pack's atlas, and a lifted piece's UVs point onto its game's texture, so
+ * a unit holding both has no one texture to name until the two are combined
+ * into one sheet (#3260).
+ */
+export function textureSheetRefusal(project: LegoProject): string | null {
+  if (project.imported) return null;
+  if (!project.pieces.some((piece) => piece.meshId)) return null;
+  return "This unit holds pieces lifted from a game, which draw with the game's texture rather than the pack's atlas. A model has one texture, and combining the two into one sheet is not built yet, so this unit cannot be exported or tested in a game yet.";
 }

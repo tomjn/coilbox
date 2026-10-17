@@ -54,13 +54,22 @@ function hash(text: string): string {
 /**
  * A stamp of what a module is made of: its root, pieces, presets, builder block
  * and mount. A rename, category, tags, picture and dates are left out, and so is
- * each piece's `module`, which is bookkeeping about where the piece came from.
+ * each piece's `module` and `lifted`, which are bookkeeping about where the
+ * piece came from. A lifted mesh's key counts without the module's id in front,
+ * which is all a unit adds to it (`liftedMeshKey`), so a lifted module stamps
+ * the same in the inventory and in a unit.
  */
 export function moduleStamp(module: LegoProject): string {
+  const prefix = `${module.id}/`;
   return hash(
     canonical({
       root: module.rootPieceId,
-      pieces: module.pieces.map(({ module: _from, ...piece }) => piece),
+      pieces: module.pieces.map(
+        ({ module: _from, lifted: _lifted, ...piece }) =>
+          piece.meshId?.startsWith(prefix)
+            ? { ...piece, meshId: piece.meshId.slice(prefix.length) }
+            : piece,
+      ),
       animations: module.animations,
       builder: module.builder,
       mount: module.mount,

@@ -339,6 +339,24 @@ describe("texturesInUse", () => {
     // A unit built out of parts names none.
     expect(texturesInUse([{ ...one, imported: undefined }])).toEqual([]);
   });
+
+  it("keeps the textures a lifted piece in a unit of parts draws with", () => {
+    const one = build().project;
+    const parts: LegoProject = {
+      ...one,
+      imported: undefined,
+      pieces: one.pieces.map((p) => ({
+        ...p,
+        lifted: {
+          game: { name: "SF", archive: "sf.sdz" },
+          member: "objects3d/armcom.s3o",
+          texture: { key: "cc33.dds", name: "arm_1.dds" },
+          texture2: { key: "dd44.dds", name: "arm_2.dds" },
+        },
+      })),
+    };
+    expect(texturesInUse([parts]).sort()).toEqual(["cc33.dds", "dd44.dds"]);
+  });
 });
 
 describe("writableSource", () => {
