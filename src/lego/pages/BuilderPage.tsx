@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/tooltip";
 import { notify } from "@/notify/notify";
 import { aimPoint } from "../aimPoint";
+import { type ArrangeAction, arrange } from "../align";
 import { addAnchor, removeAnchor, updateAnchor } from "../anchors";
 import { presetById, ROLES, restAngleWarnings } from "../animPresets";
 import { unitAtlas } from "../atlas";
@@ -807,6 +808,21 @@ function Builder({ id }: { id: string | undefined }) {
     place([...changes.keys()], (project) =>
       freeMoved(project, applyGroupTransform(project, changes)),
     );
+  }
+
+  /** Align or distribute the selection as one edit. Answers who was freed. */
+  function arrangeSet(action: ArrangeAction): string[] {
+    if (!draft || !pack) return [];
+    const { changes, detached } = arrange(
+      draft,
+      pack,
+      raw,
+      selectedIds,
+      action,
+    );
+    if (changes.size === 0) return [];
+    transformPieces(changes);
+    return detached;
   }
 
   function renameUnit(name: string) {
@@ -2183,6 +2199,12 @@ function Builder({ id }: { id: string | undefined }) {
                       onSelect={setSelectedId}
                       onReparent={(parentId, pieceIds) =>
                         reparentAll(pieceIds, parentId)
+                      }
+                      onAlign={(axis, edge) =>
+                        arrangeSet({ kind: "align", axis, edge })
+                      }
+                      onDistribute={(axis) =>
+                        arrangeSet({ kind: "distribute", axis })
                       }
                     />
                   ) : selected ? (

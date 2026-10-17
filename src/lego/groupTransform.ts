@@ -146,24 +146,63 @@ export function groupTransform(
     const piece = pieceIn(project, id);
     if (!piece) continue;
 
-    const local = localFromWorld(
-      project,
-      piece.parentId,
-      move.clone().multiply(worldMatrix(project, id)),
-      isJoined(project, piece),
+    out.set(
+      id,
+      transformAt(
+        project,
+        piece,
+        move.clone().multiply(worldMatrix(project, id)),
+      ),
     );
+  }
+  return out;
+}
 
-    const position = new THREE.Vector3();
-    const rotation = new THREE.Quaternion();
-    const scale = new THREE.Vector3();
-    local.decompose(position, rotation, scale);
-    const euler = new THREE.Euler().setFromQuaternion(rotation);
+/**
+ * A piece's own transform for a new place in the unit, written against its
+ * parent, which has not moved.
+ */
+function transformAt(
+  project: LegoProject,
+  piece: LegoPiece,
+  world: THREE.Matrix4,
+): PieceTransform {
+  const local = localFromWorld(
+    project,
+    piece.parentId,
+    world,
+    isJoined(project, piece),
+  );
+  const position = new THREE.Vector3();
+  const rotation = new THREE.Quaternion();
+  const scale = new THREE.Vector3();
+  local.decompose(position, rotation, scale);
+  const euler = new THREE.Euler().setFromQuaternion(rotation);
+  return {
+    position: [position.x, position.y, position.z],
+    rotation: [euler.x, euler.y, euler.z],
+    scale: [scale.x, scale.y, scale.z],
+  };
+}
 
-    out.set(id, {
-      position: [position.x, position.y, position.z],
-      rotation: [euler.x, euler.y, euler.z],
-      scale: [scale.x, scale.y, scale.z],
-    });
+/**
+ * Every piece's new transform after each is moved by its own world-space
+ * offset, with no turn or scale. What align and distribute need: the offsets
+ * differ per piece, so one `GroupDelta` cannot say it.
+ */
+export function moveEach(
+  project: LegoProject,
+  offsets: Map<string, Vec3>,
+): Map<string, PieceTransform> {
+  const out = new Map<string, PieceTransform>();
+  for (const [id, offset] of offsets) {
+    const piece = pieceIn(project, id);
+    if (!piece) continue;
+    const move = new THREE.Matrix4().makeTranslation(...offset);
+    out.set(
+      id,
+      transformAt(project, piece, move.multiply(worldMatrix(project, id))),
+    );
   }
   return out;
 }
