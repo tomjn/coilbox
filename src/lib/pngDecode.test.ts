@@ -30,7 +30,7 @@ function encodePng(
   pixels: number[],
   colourType: number,
   { depth = 8, interlace = 0 } = {},
-): Uint8Array {
+): Uint8Array<ArrayBuffer> {
   const channels = colourType === 6 ? 4 : colourType === 4 ? 2 : 3;
   const stride = width * channels;
   const raw = new Uint8Array((stride + 1) * height);
@@ -123,7 +123,7 @@ describe("fullyTransparent", () => {
 describe("fullyTransparentPngPixels", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  const serve = (bytes: Uint8Array) =>
+  const serve = (bytes: Uint8Array<ArrayBuffer>) =>
     vi.stubGlobal("fetch", async () => new Response(bytes));
 
   it("decodes a PNG with no alpha anywhere", async () => {
