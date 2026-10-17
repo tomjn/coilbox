@@ -106,6 +106,28 @@ describe("offerMoveClasses", () => {
     expect(offer.classes.find((c) => c.name === "WHEELEDTANK2")?.units).toBe(3);
   });
 
+  it("offers a legged build the tank classes, marked, when the game has no walker class", () => {
+    const offer = offerMoveClasses(SPLINTER, ["kbot"], 3);
+    expect(offer.source).toBe("movedefs");
+    expect(offer.classes.map((c) => c.name)).toEqual([
+      "WALKERTANK3",
+      "WHEELEDTANK2",
+      "WHEELEDTANK5",
+    ]);
+    expect(offer.classes.every((c) => c.kind === "tank")).toBe(true);
+    expect(offer.classes.every((c) => c.standsInFor === "kbot")).toBe(true);
+  });
+
+  it("does not mark a class of the build's own kind, and prefers it", () => {
+    const game = {
+      ...SPLINTER,
+      moveDefs: [...SPLINTER.moveDefs, { name: "KBOT2", footprintx: 2 }],
+    };
+    const offer = offerMoveClasses(game, ["kbot"], 2);
+    expect(offer.classes.map((c) => c.name)).toEqual(["KBOT2"]);
+    expect(offer.classes[0].standsInFor).toBeUndefined();
+  });
+
   it("offers a build of no kind every class the game declares", () => {
     expect(offerMoveClasses(SPLINTER, [], 1).classes).toHaveLength(4);
   });
@@ -142,11 +164,19 @@ describe("movementState", () => {
   // Splinter Faction names its walkers WALKERTANK, so the engine reads every
   // one of them as a tank and the game has no walker class at all.
   it("says when none of the game's classes fit the build", () => {
-    expect(movementState({ ...ready, kinds: ["kbot"] })).toEqual({
+    const shipsOnly = { ...SPLINTER, moveDefs: [{ name: "SHIP3" }] };
+    expect(
+      movementState({ ...ready, game: shipsOnly, kinds: ["kbot"] }),
+    ).toEqual({
       state: "none-fit",
       gameName: "Splinter Faction",
       kinds: ["kbot"],
     });
+  });
+
+  it("offers a legged build in Splinter Faction its WALKERTANK classes", () => {
+    const state = movementState({ ...ready, kinds: ["kbot"] });
+    expect(state.state).toBe("offer");
   });
 
   it("waits while the game is read and says when the read failed", () => {

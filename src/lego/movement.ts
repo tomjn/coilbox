@@ -50,7 +50,20 @@ export interface OfferedClass {
   footprint?: number;
   /** How many of the game's units use it. */
   units: number;
+  /** The build's kind this class stands in for, when the game has none of it. */
+  standsInFor?: MoveKind;
 }
+
+/**
+ * The kinds to offer, in order, when the game has no class of the build's kind.
+ * Ground movers fall back on each other, then hover. A ship has no near kind.
+ */
+const NEAREST_KINDS: Record<MoveKind, MoveKind[]> = {
+  kbot: ["tank", "hover"],
+  tank: ["kbot", "hover"],
+  hover: ["tank", "kbot"],
+  ship: [],
+};
 
 /**
  * What the picker has to offer. `movedefs` means the game's own
@@ -98,11 +111,25 @@ export function offerMoveClasses(
     const key = entry.name.toLowerCase();
     counts.set(key, (counts.get(key) ?? 0) + entry.units);
   }
+  // A build kind the game has no class of is stood in for by the nearest kind
+  // the game does have. Which kind a class is stays the engine's answer.
+  const wanted = new Map<MoveKind, MoveKind | undefined>();
+  for (const kind of kinds) {
+    if (declared.some((entry) => entry.kind === kind)) {
+      wanted.set(kind, undefined);
+      continue;
+    }
+    const near = NEAREST_KINDS[kind].find((other) =>
+      declared.some((entry) => entry.kind === other),
+    );
+    if (near && !wanted.has(near)) wanted.set(near, kind);
+  }
   const classes = declared
-    .filter((entry) => kinds.length === 0 || kinds.includes(entry.kind))
+    .filter((entry) => kinds.length === 0 || wanted.has(entry.kind))
     .map((entry) => ({
       ...entry,
       units: counts.get(entry.name.toLowerCase()) ?? 0,
+      standsInFor: wanted.get(entry.kind),
     }))
     .sort(
       (a, b) =>
