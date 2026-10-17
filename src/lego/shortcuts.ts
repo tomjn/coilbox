@@ -153,6 +153,12 @@ export const SHORTCUTS: Shortcut[] = [
     combos: [{ key: "w", mod: false, shift: false }],
   },
   {
+    id: "skeleton",
+    group: "View",
+    description: "Show or hide the skeleton",
+    combos: [{ key: "k", mod: false, shift: false }],
+  },
+  {
     id: "measure",
     group: "View",
     description: "Measure between two points",

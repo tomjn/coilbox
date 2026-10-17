@@ -93,7 +93,7 @@ function sector(
   return mesh;
 }
 
-function label(text: string, colour: string): THREE.Sprite {
+export function label(text: string, colour: string): THREE.Sprite {
   const canvas = document.createElement("canvas");
   const font = 28;
   const context = canvas.getContext("2d");

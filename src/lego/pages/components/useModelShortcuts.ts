@@ -19,6 +19,8 @@ export interface ModelShortcutsDeps {
   setMode: Dispatch<SetStateAction<GizmoMode>>;
   setShortcutsOpen: Dispatch<SetStateAction<boolean>>;
   setDrawMode: Dispatch<SetStateAction<DrawMode>>;
+  /** Flips the skeleton overlay from whatever it is showing now. */
+  toggleSkeleton: () => void;
 }
 
 /**
@@ -39,6 +41,7 @@ export function useModelShortcuts(
     setMode,
     setShortcutsOpen,
     setDrawMode,
+    toggleSkeleton,
   }: ModelShortcutsDeps,
 ) {
   useEffect(() => {
@@ -78,6 +81,7 @@ export function useModelShortcuts(
         if (state) showView(state, view, selectedIdsRef.current);
       }
       if (isShortcut("draw-mode", event)) setDrawMode(nextDrawMode);
+      if (isShortcut("skeleton", event)) toggleSkeleton();
       if (isShortcut("shortcuts", event)) setShortcutsOpen(true);
     };
     const up = (event: KeyboardEvent) => {
@@ -89,5 +93,12 @@ export function useModelShortcuts(
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
     };
-  }, [sceneRef, selectedIdsRef, setMode, setShortcutsOpen, setDrawMode]);
+  }, [
+    sceneRef,
+    selectedIdsRef,
+    setMode,
+    setShortcutsOpen,
+    setDrawMode,
+    toggleSkeleton,
+  ]);
 }

@@ -75,6 +75,12 @@ describe("isShortcut", () => {
     expect(isShortcut("draw-mode", key("W", { shiftKey: true }))).toBe(false);
   });
 
+  it("matches K to the skeleton toggle, unmodified only", () => {
+    expect(isShortcut("skeleton", key("k"))).toBe(true);
+    expect(isShortcut("skeleton", key("k", { metaKey: true }))).toBe(false);
+    expect(isShortcut("skeleton", key("K", { shiftKey: true }))).toBe(false);
+  });
+
   it("measures on L, clear of Cmd L, and leaves on Escape", () => {
     expect(isShortcut("measure", key("l"))).toBe(true);
     expect(isShortcut("measure", key("l", { metaKey: true }))).toBe(false);
