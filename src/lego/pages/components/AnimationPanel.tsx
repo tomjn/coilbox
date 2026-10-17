@@ -140,6 +140,7 @@ import { ScrubberMarks } from "./ScrubberMarks";
 import { StatsSection } from "./StatsSection";
 import type { DrivePlacement } from "./standInPlayback";
 import { useWeaponSource, WeaponsSection } from "./WeaponsSection";
+import { ProjectWorkshopMarks } from "./WorkshopChangeMarks";
 import { WorthSection } from "./WorthSection";
 
 /** The scenario Select's own entry for firing an arbitrary function by name,
@@ -1692,7 +1693,13 @@ export function AnimationPanel({
               {BUILDER_FIELDS.map((field) => (
                 <div key={field.id} className="mt-2">
                   <div className="flex items-center justify-between text-xs">
-                    <span>{field.label}</span>
+                    <span className="flex items-center gap-1.5">
+                      {field.label}
+                      <ProjectWorkshopMarks
+                        project={project}
+                        paths={[field.id]}
+                      />
+                    </span>
                     <span className="text-muted-foreground">
                       {project.builder?.[field.id] ?? DEFAULT_BUILDER[field.id]}
                       {field.suffix}

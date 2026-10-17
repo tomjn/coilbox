@@ -6,6 +6,7 @@
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type LegoProject, newProject } from "../../model";
 import { MovementSection } from "./MovementSection";
@@ -16,6 +17,10 @@ const unitDefs = vi.fn();
 vi.mock("./useTestGame", () => ({ useTestGame: () => testGame() }));
 vi.mock("../../../workshop/config", () => ({
   useUnitDefs: () => unitDefs(),
+}));
+let tweakProjects: unknown[] = [];
+vi.mock("../../../workshop/project", () => ({
+  useModProjects: () => ({ projects: tweakProjects }),
 }));
 
 const GAME = {
@@ -91,6 +96,7 @@ const BOUNDS = {
 };
 
 beforeEach(() => {
+  tweakProjects = [];
   haveGame();
   haveDefs([{ name: "WHEELEDTANK2", footprintx: 2 }, { name: "SHIP3" }]);
 });
@@ -414,5 +420,63 @@ describe("MovementSection", () => {
       moveClass: "WHEELEDTANK2",
       speed: 80,
     });
+  });
+
+  it("marks a speed a workshop project changes and the file lacks", () => {
+    const path = "/games/SplinterFaction.sdd";
+    testGame.mockReturnValue({
+      target: { enginePath: "/e", dataDir: "/d" },
+      targetLoading: false,
+      scan: {
+        data: {
+          games: [
+            { ...GAME, primaryArchive: { ...GAME.primaryArchive, path } },
+          ],
+        },
+      },
+    });
+    tweakProjects = [
+      {
+        id: "tune-1",
+        name: "Tuning pass",
+        gameName: GAME.name,
+        edits: { overrides: { rover: { speed: 150, turnrate: 600 } } },
+      },
+    ];
+    unitDefs.mockReturnValue({
+      defs: {
+        moveDefs: [],
+        units: { rover: { speed: 120, turnrate: 600 } },
+      },
+      defsFor: GAME.primaryArchive.name,
+      status: "ready",
+      error: null,
+    });
+    render(
+      <MemoryRouter>
+        <MovementSection
+          project={project("wheel", {
+            exported: {
+              dir: path,
+              at: "2026-10-16T00:00:00Z",
+              unitName: "rover",
+              def: {},
+              files: [],
+            },
+            movement: { moveClass: "WHEELEDTANK2", speed: 120, turnRate: 600 },
+          })}
+          bounds={BOUNDS}
+          onMovementChange={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    const marks = document.querySelectorAll("a[aria-label^='Changed to']");
+    expect(marks).toHaveLength(1);
+    expect(marks[0].getAttribute("aria-label")).toBe(
+      "Changed to 150 in the workshop project Tuning pass, not written into the game yet.",
+    );
+    expect(marks[0].getAttribute("href")).toBe(
+      "/workshop/tune-1?unit=rover&field=speed",
+    );
   });
 });

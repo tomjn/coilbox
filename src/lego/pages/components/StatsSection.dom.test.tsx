@@ -32,8 +32,9 @@ vi.mock("../../../workshop/config", () => ({
   useUnitDefs: (_engine: string, _data: string, archive: string) =>
     unitDefs(archive),
 }));
+let tweakProjects: unknown[] = [];
 vi.mock("../../../workshop/project", () => ({
-  useModProjects: () => ({ projects: [] }),
+  useModProjects: () => ({ projects: tweakProjects }),
 }));
 
 const GAME = {
@@ -131,6 +132,7 @@ function show(p: LegoProject, reference: ReferenceUnit | null = null) {
 }
 
 beforeEach(() => {
+  tweakProjects = [];
   testGame.mockReturnValue({
     target: { enginePath: "/e", dataDir: "/d" },
     targetLoading: false,
@@ -199,5 +201,84 @@ describe("StatsSection", () => {
     expect(screen.getByLabelText("Cost").textContent).toBe(
       String(WRITTEN().buildcostmetal),
     );
+  });
+
+  describe("a workshop change not in the unit's file", () => {
+    /** A workshop project for the game, changing Rover's fields. */
+    function tuning(
+      overrides: Record<string, unknown>,
+      mutatorOnly?: Record<string, string[]>,
+      over: Record<string, unknown> = {},
+    ) {
+      return {
+        id: "tune-1",
+        name: "Tuning pass",
+        gameName: GAME.name,
+        edits: { overrides: { rover: overrides } },
+        ...(mutatorOnly ? { mutatorOnly } : {}),
+        ...over,
+      };
+    }
+
+    const marks = (label: string) =>
+      screen
+        .getByLabelText(label)
+        .parentElement?.querySelectorAll("a[aria-label^='Changed to']") ?? [];
+
+    it("marks a number a project changes, naming the project and value", () => {
+      haveDefs({ rover: { ...WRITTEN() } });
+      tweakProjects = [tuning({ maxdamage: 1400 })];
+      show(exportedProject());
+      const [mark] = marks("Health");
+      expect(mark?.getAttribute("aria-label")).toBe(
+        "Changed to 1400 in the workshop project Tuning pass, not written into the game yet.",
+      );
+      expect(mark?.getAttribute("href")).toBe(
+        "/workshop/tune-1?unit=rover&field=maxdamage",
+      );
+      expect(marks("Cost")).toHaveLength(0);
+    });
+
+    it("marks nothing once the file holds the project's value", () => {
+      haveDefs({ rover: { ...WRITTEN(), maxdamage: 1400 } });
+      tweakProjects = [tuning({ maxdamage: 1400 })];
+      show(exportedProject());
+      expect(marks("Health")).toHaveLength(0);
+    });
+
+    it("marks a change sent through the mutator as one that stays out of the file", () => {
+      haveDefs({ rover: { ...WRITTEN() } });
+      tweakProjects = [tuning({ maxdamage: 1400 }, { rover: ["maxdamage"] })];
+      show(exportedProject());
+      const [mark] = marks("Health");
+      expect(mark?.getAttribute("aria-label")).toContain(
+        "sent through the mutator, so it is not written into the game",
+      );
+    });
+
+    it("marks each project that changes the field", () => {
+      haveDefs({ rover: { ...WRITTEN() } });
+      tweakProjects = [
+        tuning({ maxdamage: 1400 }),
+        tuning({ maxdamage: 1800 }, undefined, { id: "tune-2", name: "Bulk" }),
+      ];
+      show(exportedProject());
+      expect(marks("Health")).toHaveLength(2);
+    });
+
+    it("ignores a project for another game", () => {
+      haveDefs({ rover: { ...WRITTEN() } });
+      tweakProjects = [
+        tuning({ maxdamage: 1400 }, undefined, { gameName: "BA" }),
+      ];
+      show(exportedProject());
+      expect(marks("Health")).toHaveLength(0);
+    });
+
+    it("shows nothing for a unit that was never exported", () => {
+      tweakProjects = [tuning({ maxdamage: 1400 })];
+      show(project());
+      expect(marks("Health")).toHaveLength(0);
+    });
   });
 });

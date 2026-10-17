@@ -4518,6 +4518,95 @@ describe("UnitPage", () => {
       expect(screen.queryByText(/in place of the game's own/)).toBeNull();
     });
 
+    /**
+     * Issue #4242. The builder keeps some fields of a built unit up to date,
+     * and the page says which, so changing one there is not a surprise.
+     */
+    describe("the fields the builder keeps up to date", () => {
+      const written = legoProject({
+        exported: {
+          dir: GAME.primaryArchive.path,
+          at: "2026-09-07T12:00:00.000Z",
+          unitName: "skyfort",
+          files: [
+            {
+              path: `${GAME.primaryArchive.path}/units/skyfort.lua`,
+              sha256: "abc",
+            },
+          ],
+          def: SKYFORT,
+        },
+      });
+
+      /** The row for a field, found whatever case the page spells its path. */
+      const rowOf = (path: string): HTMLElement => {
+        const row = [
+          ...document.querySelectorAll<HTMLElement>("[id^=field-]"),
+        ].find((el) => el.id.toLowerCase() === `field-${path}`);
+        if (!row) throw new Error(`no row for ${path}`);
+        return row;
+      };
+
+      const openFile = (file: Record<string, unknown>) => {
+        mockLegoProjects = [written];
+        show(
+          { armcom: ARMCOM, skyfort: file },
+          `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=skyfort`,
+          [{ name: "armcom", fullName: "Commander" }],
+        );
+      };
+
+      it("marks a field the file still holds as the last export wrote it", () => {
+        openFile({ ...SKYFORT, sightdistance: 400 });
+        expect(
+          within(rowOf("maxdamage")).getByText("Set by the unit builder"),
+        ).toBeTruthy();
+      });
+
+      it("marks a field the file holds differently as kept by hand", () => {
+        openFile({ ...SKYFORT, maxdamage: 9000, sightdistance: 400 });
+        const row = rowOf("maxdamage");
+        expect(within(row).getByText("Kept by hand")).toBeTruthy();
+        expect(within(row).queryByText("Set by the unit builder")).toBeNull();
+      });
+
+      it("leaves a field the builder does not write unmarked", () => {
+        openFile({ ...SKYFORT, sightdistance: 400 });
+        const row = rowOf("sightdistance");
+        expect(within(row).queryByText("Set by the unit builder")).toBeNull();
+        expect(within(row).queryByText("Kept by hand")).toBeNull();
+      });
+
+      it("links the mark to the unit in the builder", () => {
+        openFile({ ...SKYFORT, sightdistance: 400 });
+        const link = within(rowOf("maxdamage")).getByRole("link", {
+          name: /Open Sky Fortress in the unit builder/,
+        });
+        expect(link.getAttribute("href")).toBe("/lego/proj-1");
+      });
+
+      it("marks nothing when no export is recorded as writing the file", () => {
+        mockLegoProjects = [legoProject()];
+        show(
+          { armcom: ARMCOM, skyfort: SKYFORT },
+          `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=skyfort`,
+          [{ name: "armcom", fullName: "Commander" }],
+        );
+        expect(screen.queryByText("Set by the unit builder")).toBeNull();
+        expect(screen.queryByText("Kept by hand")).toBeNull();
+      });
+
+      it("marks nothing on a unit the game owns", () => {
+        mockLegoProjects = [written];
+        show(
+          { armcom: ARMCOM },
+          `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=armcom`,
+          [{ name: "armcom", fullName: "Commander" }],
+        );
+        expect(screen.queryByText("Set by the unit builder")).toBeNull();
+      });
+    });
+
     it("goes on a factory's build menu like any other unit", async () => {
       mockLegoProjects = [legoProject()];
       mockSides = [{ name: "Arm", startUnit: "armcom" }];
