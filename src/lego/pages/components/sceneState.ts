@@ -195,6 +195,9 @@ export interface SceneState {
   /** Each weapon's range and arc while their toggle is on, in `overlay`.
    *  Rebuilt whenever a weapon or a piece changes. */
   weaponReach: THREE.Group | null;
+  /** The balance check's dot and outline on the ground, in `overlay`.
+   *  Rebuilt whenever the result changes. */
+  balance: THREE.Group | null;
   /** The guide planes, drawn in `overlay` while they are shown. Rebuilt
    *  whenever a guide or the root changes. */
   guideLayer: THREE.Group | null;

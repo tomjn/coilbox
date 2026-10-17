@@ -34,6 +34,7 @@ import {
   Radar,
   RotateCw,
   Ruler,
+  Scale,
   Scaling,
   Sparkles,
   Square,
@@ -64,6 +65,7 @@ import {
 } from "@/components/ViewControls";
 import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
+import { type BalanceResult, balanceSummary } from "../../balance";
 import {
   buildFrontMarker,
   buildGround,
@@ -124,6 +126,7 @@ import {
   showTargetAnchors,
 } from "./anchorsAndSnapping";
 import { disposeBaked } from "./bakedPlayback";
+import { disposeBalance } from "./balanceLayer";
 import { boundsBox, frameBounds, homeView, showView } from "./cameraFraming";
 import {
   leaveStandardView,
@@ -183,6 +186,7 @@ import {
   setHoveredAndNotify,
 } from "./selectionAndHoverOutlines";
 import { type StandInPlacement, standInFor } from "./standInPlayback";
+import { useBalance } from "./useBalance";
 import { useCollisionAndAimVisibility } from "./useCollisionAndAimVisibility";
 import { useGizmoMode } from "./useGizmoMode";
 import { useGuides } from "./useGuides";
@@ -381,6 +385,12 @@ interface Props {
     /** The meshes of a unit imported from somebody else's model, if it is one. */
     raw: RawGeometry | null;
     project: LegoProject;
+    /**
+     * The balance check on the unit as it rests, or null while a script
+     * preview is moving the pieces and the check would be about a pose that
+     * is not the unit's.
+     */
+    balance?: BalanceResult | null;
   };
   /** Which pieces are picked, and what a click, a drag or a hover does. */
   selection: {
@@ -593,7 +603,7 @@ export function ModelViewport({
   guides,
   showFreeFaces = false,
 }: Props) {
-  const { pack, raw, project } = document;
+  const { pack, raw, project, balance = null } = document;
   const {
     selectedIds,
     onSelect,
@@ -670,6 +680,7 @@ export function ModelViewport({
   const [showCollision, setShowCollision] = useState(false);
   const [showAim, setShowAim] = useState(false);
   const [showReach, setShowReach] = useState(false);
+  const [showBalance, setShowBalance] = useState(false);
   const [showGuides, setShowGuides] = useState(true);
   /** The axis the next click on the model puts a guide on, or null. */
   const [pickingGuide, setPickingGuide] = useState<GuidePick | null>(null);
@@ -1164,6 +1175,7 @@ export function ModelViewport({
         onAimChangeRef,
         aimMark,
         weaponReach: null,
+        balance: null,
         guideLayer: null,
         guidePlanes: [],
         guideLines: [],
@@ -1369,6 +1381,7 @@ export function ModelViewport({
           state.aimMark.geometry.dispose();
           aimMaterial.dispose();
           if (state.weaponReach) disposeWeaponReach(state.weaponReach);
+          if (state.balance) disposeBalance(state.balance);
           sceneRef.current = null;
         },
       };
@@ -1398,6 +1411,8 @@ export function ModelViewport({
     raw,
     show: showReach,
   });
+
+  useBalance(sceneRef, { result: balance, show: showBalance });
 
   useGuides(sceneRef, { project, pack, show: showGuides }, reduceMotion);
 
@@ -1781,6 +1796,15 @@ export function ModelViewport({
                 <Dot colour={`#${GUIDE_COLOUR.toString(16)}`} label="Guides" />
               </div>
             ) : null}
+            {balance && (showBalance || balance.status === "outside") ? (
+              <span
+                className={
+                  balance.status === "outside" ? "text-orange-400" : undefined
+                }
+              >
+                {balanceSummary(balance)}
+              </span>
+            ) : null}
             {showReach && reaches.length > 0 ? (
               <div className="flex gap-3">
                 {reaches.map((reach, index) => (
@@ -1825,6 +1849,13 @@ export function ModelViewport({
               onChange={setShowCollision}
               hideTitle="Hide the collision volume"
               showTitle="Show the collision volume, the shape the engine hits and clicks"
+            />
+            <ViewToggle
+              icon={Scale}
+              on={showBalance}
+              onChange={setShowBalance}
+              hideTitle="Hide the balance check"
+              showTitle="Show the balance check: where the weight looks centred, against the ground the feet or wheels cover. An estimate from piece volumes at one density, not a mass. The engine does not simulate balance"
             />
             <ViewToggle
               icon={Crosshair}
