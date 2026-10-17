@@ -12,10 +12,16 @@
  * The pack picker only appears once there is more than one pack installed.
  * With the bundled pack on its own there is nothing to choose between, and a
  * control with one option is noise.
+ *
+ * The row stays one line (#4464). It is a container, and below a width it
+ * offers the categories as a menu in place of the buttons. The search box
+ * shrinks to a floor before that. The row's own floor is about what the menu
+ * form needs, so a row around it wraps it whole rather than overflowing.
  */
 
 import { Button, cn, Input } from "@picoframe/frame";
 
+import { OptionSelect } from "@/components/OptionSelect";
 import { ButtonGroup } from "@/components/ui/button-group";
 import {
   Select,
@@ -30,6 +36,9 @@ import type { LoadedPack } from "../../pack";
 
 /** Radix needs a non-empty value, so "every pack" gets one of its own. */
 const EVERY_PACK = "all";
+/** The same for "every category", in the form `SHAPES_CATEGORY` takes, which
+ *  no pack's category id has. */
+const EVERY_CATEGORY = "@all";
 
 interface Props {
   pack: LoadedPack;
@@ -61,13 +70,26 @@ export function PartFilters({
   className,
 }: Props) {
   const packs = pack.library.packs;
+  const choices = [
+    { value: EVERY_CATEGORY, label: "All" },
+    ...pack.manifest.categories.map((c) => ({ value: c.id, label: c.label })),
+    ...(showShapes ? [{ value: SHAPES_CATEGORY, label: "Shapes" }] : []),
+  ];
+  // The pack menu takes room of its own, so the buttons wait for more.
+  const many = packs.length > 1;
   return (
-    <div className={cn("flex flex-wrap items-center gap-2", className)}>
+    <div
+      className={cn(
+        "@container flex flex-nowrap items-center gap-2",
+        many ? "min-w-lg" : "min-w-88",
+        className,
+      )}
+    >
       <Input
         value={query}
         onChange={(event) => onQuery(event.target.value)}
         placeholder="Search parts"
-        className="w-56"
+        className="w-56 min-w-32"
         aria-label="Search parts"
       />
       {packs.length > 1 ? (
@@ -77,7 +99,11 @@ export function PartFilters({
             onPackId(value === EVERY_PACK ? null : value)
           }
         >
-          <SelectTrigger size="sm" className="w-44" aria-label="Parts pack">
+          <SelectTrigger
+            size="sm"
+            className="w-44 min-w-32"
+            aria-label="Parts pack"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -90,38 +116,38 @@ export function PartFilters({
           </SelectContent>
         </Select>
       ) : null}
-      <ButtonGroup>
-        <Button
-          size="sm"
-          variant={category === null ? "default" : "outline"}
-          onClick={() => onCategory(null)}
-          aria-pressed={category === null}
-        >
-          All
-        </Button>
-        {pack.manifest.categories.map((c) => (
-          <Button
-            key={c.id}
-            size="sm"
-            variant={category === c.id ? "default" : "outline"}
-            onClick={() => onCategory(c.id)}
-            aria-pressed={category === c.id}
-          >
-            {c.label}
-          </Button>
-        ))}
-        {showShapes ? (
-          <Button
-            size="sm"
-            variant={category === SHAPES_CATEGORY ? "default" : "outline"}
-            onClick={() => onCategory(SHAPES_CATEGORY)}
-            aria-pressed={category === SHAPES_CATEGORY}
-          >
-            Shapes
-          </Button>
-        ) : null}
+      <ButtonGroup
+        aria-label="Part category"
+        className={many ? "hidden @4xl:flex" : "hidden @2xl:flex"}
+      >
+        {choices.map(({ value, label }) => {
+          const chosen = value === (category ?? EVERY_CATEGORY);
+          return (
+            <Button
+              key={value}
+              size="sm"
+              variant={chosen ? "default" : "outline"}
+              onClick={() =>
+                onCategory(value === EVERY_CATEGORY ? null : value)
+              }
+              aria-pressed={chosen}
+            >
+              {label}
+            </Button>
+          );
+        })}
       </ButtonGroup>
-      <span className="ml-auto text-sm text-muted-foreground">
+      <OptionSelect
+        value={category ?? EVERY_CATEGORY}
+        onValueChange={(value) =>
+          onCategory(value === EVERY_CATEGORY ? null : value)
+        }
+        options={choices}
+        size="sm"
+        ariaLabel="Part category"
+        className={cn("w-auto shrink-0", many ? "@4xl:hidden" : "@2xl:hidden")}
+      />
+      <span className="ml-auto shrink-0 whitespace-nowrap text-sm text-muted-foreground">
         {shown} {shown === 1 ? "part" : "parts"}
       </span>
     </div>
