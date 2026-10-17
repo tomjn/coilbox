@@ -1234,7 +1234,7 @@ impl<'a> Program<'a> {
 /// queue and the functions that empty it.
 const STARTING_HELPERS: &[&str] = &[
     "startScript",
-    "thenStart",
+    "callStarting",
     "Sleep",
     "WaitForTurn",
     "WaitForMove",
@@ -1244,19 +1244,29 @@ const STARTING_HELPERS: &[&str] = &[
 
 const STARTING: &str = "
 -- COB runs a script begun with start-script once the thread that began it
--- waits or finishes (CobThread.cpp:372-388), where StartThread runs it at once.
--- So each one waits here until then, and starts in the order it was begun.
+-- waits or finishes (CobThread.cpp:372-388), and not before the next frame, or
+-- the one after if that thread woke from a sleep to begin it (CobEngine.cpp:
+-- 92-105,173-200). StartThread runs it at once. So each one waits here until
+-- then, sleeps those frames, and starts in the order it was begun.
 local starting = {}
 local startsHeld = false
+local woke = false
 local startScripts
 local function runStarted(fn, ...)
+\twoke = false
 \tfn(...)
 \tstartScripts()
 end
 function startScripts()
-\twhile #starting > 0 and not startsHeld do
-\t\tStartThread(runStarted, unpack(table.remove(starting, 1)))
-\tend
+\tif #starting == 0 or startsHeld then return end
+\tlocal batch = starting
+\tstarting = {}
+\tStartThread(function(frames)
+\t\tUnitScript.Sleep(frames * 33)
+\t\tfor i = 1, #batch do
+\t\t\tStartThread(runStarted, unpack(batch[i]))
+\t\tend
+\tend, woke and 2 or 1)
 end
 ";
 
@@ -1265,35 +1275,51 @@ const START_SCRIPT: &str = "local function startScript(...)
 end
 ";
 
-const THEN_START: &str =
-    "-- Hands back what a call-in answered once the scripts it began have started.
-local function thenStart(...)
-\tstartScripts()
-\treturn ...
+const CALL_STARTING: &str =
+    "-- Runs a call-in's BOS, then starts the scripts it began, and hands back what
+-- it answered.
+local function callStarting(fn, ...)
+\tlocal outer = woke
+\twoke = false
+\treturn (function(...)
+\t\tstartScripts()
+\t\twoke = outer
+\t\treturn ...
+\tend)(fn(...))
 end
 ";
 
 const WAIT_SLEEP: &str = "local function Sleep(ms)
 \tstartScripts()
 \tUnitScript.Sleep(ms)
+\twoke = true
 end
 ";
 
 const WAIT_TURN: &str = "local function WaitForTurn(piece, axis)
-\tif UnitScript.IsInTurn(piece, axis) then startScripts() end
-\tUnitScript.WaitForTurn(piece, axis)
+\tif UnitScript.IsInTurn(piece, axis) then
+\t\tstartScripts()
+\t\tUnitScript.WaitForTurn(piece, axis)
+\t\twoke = false
+\tend
 end
 ";
 
 const WAIT_MOVE: &str = "local function WaitForMove(piece, axis)
-\tif UnitScript.IsInMove(piece, axis) then startScripts() end
-\tUnitScript.WaitForMove(piece, axis)
+\tif UnitScript.IsInMove(piece, axis) then
+\t\tstartScripts()
+\t\tUnitScript.WaitForMove(piece, axis)
+\t\twoke = false
+\tend
 end
 ";
 
 const WAIT_SCALE: &str = "local function WaitForScale(piece)
-\tif UnitScript.IsInScale(piece) then startScripts() end
-\tUnitScript.WaitForScale(piece)
+\tif UnitScript.IsInScale(piece) then
+\t\tstartScripts()
+\t\tUnitScript.WaitForScale(piece)
+\t\twoke = false
+\tend
 end
 ";
 
@@ -1344,7 +1370,7 @@ struct Writer<'p, 'a> {
 }
 
 impl<'p, 'a> Writer<'p, 'a> {
-    const HELPER_NAMES: [&'static str; 16] = [
+    const HELPER_NAMES: [&'static str; 17] = [
         PIECES,
         "COB_ANGLE",
         "COB_LINEAR",
@@ -1358,9 +1384,10 @@ impl<'p, 'a> Writer<'p, 'a> {
         "startScripts",
         "runStarted",
         "startScript",
-        "thenStart",
+        "callStarting",
         "WaitForScale",
         "startsHeld",
+        "woke",
     ];
 
     fn new(p: &'p Program<'a>, mode: Mode) -> Self {
@@ -1458,7 +1485,7 @@ impl<'p, 'a> Writer<'p, 'a> {
             lua.push_str(STARTING);
             for (name, text) in [
                 ("startScript", START_SCRIPT),
-                ("thenStart", THEN_START),
+                ("callStarting", CALL_STARTING),
                 ("Sleep", WAIT_SLEEP),
                 ("WaitForTurn", WAIT_TURN),
                 ("WaitForMove", WAIT_MOVE),
@@ -1623,8 +1650,13 @@ impl<'p, 'a> Writer<'p, 'a> {
             self.helpers.extend(["cobAllied", "cobGet", "cobSet"]);
         }
         if STARTING_HELPERS.contains(&name) {
-            self.helpers
-                .extend(["starting", "startsHeld", "startScripts", "runStarted"]);
+            self.helpers.extend([
+                "starting",
+                "startsHeld",
+                "woke",
+                "startScripts",
+                "runStarted",
+            ]);
         }
         self.refs.insert(name.to_string());
         name.to_string()
@@ -2680,13 +2712,25 @@ impl<'p, 'a> Writer<'p, 'a> {
             Unfinished::Piece(n) => format!("script piece {n}"),
             Unfinished::Expr(_, what) => what.to_string(),
         };
-        let then = if self.starts(target) {
-            format!("\n\t\t{}()", self.helper("startScripts"))
+        // A target that begins scripts starts them as from a call-in, and the
+        // thread that was running, if any, carries on as it was.
+        let (enter, then, leave) = if self.starts(target) {
+            let woke = self.helper("woke");
+            (
+                format!("\tlocal outer = {woke}\n"),
+                format!("\n\t\t{}()", self.helper("startScripts")),
+                format!("\t{woke} = outer\n"),
+            )
         } else {
+            (String::new(), String::new(), String::new())
+        };
+        let reset = if then.is_empty() {
             String::new()
+        } else {
+            "\t\twoke = false\n".to_string()
         };
         self.adapters.push(format!(
-            "-- {target} may wait before it finishes, and then the engine answers {what}.\nfunction {}({})\n\tlocal answer = {fallback}\n\t{start}(function()\n\t\tanswer = {call}{then}\n\tend)\n\treturn answer\nend\n",
+            "-- {target} may wait before it finishes, and then the engine answers {what}.\nfunction {}({})\n\tlocal answer = {fallback}\n{enter}\t{start}(function()\n{reset}\t\tanswer = {call}{then}\n\tend)\n{leave}\treturn answer\nend\n",
             spec.lua,
             args.join(", ")
         ));
@@ -2702,11 +2746,13 @@ impl<'p, 'a> Writer<'p, 'a> {
     fn starting_adapter(&mut self, spec: &Spec, target: &str) {
         let saved = std::mem::take(&mut self.refs);
         let args: Vec<String> = spec.args.iter().map(|a| a.to_string()).collect();
-        let call = format!("{target}({})", args.join(", "));
+        let mut all = vec![target.to_string()];
+        all.extend(args.iter().cloned());
+        let call = format!("{}({})", self.helper("callStarting"), all.join(", "));
         let body = if spec.ret == Ret::Nothing {
-            format!("{call}\n\t{}()", self.helper("startScripts"))
+            call
         } else {
-            format!("return {}({call})", self.helper("thenStart"))
+            format!("return {call}")
         };
         self.adapters.push(format!(
             "function {}({})\n\t{body}\nend\n",
@@ -2728,8 +2774,10 @@ impl<'p, 'a> Writer<'p, 'a> {
             all.extend(values.iter().cloned());
             format!("{start}({})", all.join(", "))
         } else if starts {
-            let then = self.helper("thenStart");
-            format!("{then}({target}({}))", values.join(", "))
+            let call = self.helper("callStarting");
+            let mut all = vec![target.to_string()];
+            all.extend(values.iter().cloned());
+            format!("{call}({})", all.join(", "))
         } else {
             format!("{target}({})", values.join(", "))
         }
