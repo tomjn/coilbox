@@ -34,6 +34,9 @@ import { TRACKED, WHEELED } from "./vehiclePlans";
  */
 export interface BodyPlanProportion extends Omit<PresetParam, "unit"> {
   unit: "elmo" | "count";
+  /** The joint a drag handle for this length sits on, and the axis it moves
+   *  along. Absent for a count, which has no place to drag. */
+  handle?: { bone: string; axis: 0 | 1 | 2 };
 }
 
 /** One joint of a skeleton, which becomes one empty piece. */
@@ -95,14 +98,36 @@ function elmos(
   min: number,
   max: number,
   fallback: number,
+  handle?: BodyPlanProportion["handle"],
 ): BodyPlanProportion {
-  return { id, label, unit: "elmo", min, max, step: 0.1, fallback };
+  return {
+    id,
+    label,
+    unit: "elmo",
+    min,
+    max,
+    step: 0.1,
+    fallback,
+    ...(handle ? { handle } : {}),
+  };
 }
 
-const LEG_LENGTH = elmos("legLength", "Leg length", 5, 40, 18.8);
-const STANCE = elmos("stance", "Stance width", 10, 60, 29.8);
-const BODY_HEIGHT = elmos("bodyHeight", "Body height", 0, 25, 5.4);
-const BODY_LENGTH = elmos("bodyLength", "Body length", 5, 70, 27.7);
+const LEG_LENGTH = elmos("legLength", "Leg length", 5, 40, 18.8, {
+  bone: "thigh.l1",
+  axis: 1,
+});
+const STANCE = elmos("stance", "Stance width", 10, 60, 29.8, {
+  bone: "foot.l1",
+  axis: 0,
+});
+const BODY_HEIGHT = elmos("bodyHeight", "Body height", 0, 25, 5.4, {
+  bone: "torso",
+  axis: 1,
+});
+const BODY_LENGTH = elmos("bodyLength", "Body length", 5, 70, 27.7, {
+  bone: "thigh.l1",
+  axis: 2,
+});
 
 /**
  * One leg pair's bones, hanging from `parent`: a thigh at each hip joint, a

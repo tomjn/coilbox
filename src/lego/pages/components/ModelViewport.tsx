@@ -73,6 +73,7 @@ import {
 import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
 import { type BalanceResult, balanceSummary } from "../../balance";
+import type { BodyPlan } from "../../bodyPlans";
 import {
   buildFrontMarker,
   buildGround,
@@ -120,6 +121,7 @@ import { unitBounds } from "../../s3oBuild";
 import type { ScriptTimeline } from "../../scriptPlayback";
 import type { Seat } from "../../seat";
 import { shortcutLabel } from "../../shortcuts";
+import { proportionHandles as proportionHandlesOf } from "../../skeletonEdit";
 import type { Vec3 } from "../../snapping";
 import { buildStandIn, disposeStandIn, standInRadius } from "../../standIn";
 import {
@@ -229,6 +231,7 @@ import { useModelSceneSync } from "./useModelSceneSync";
 import { useModelSelection } from "./useModelSelection";
 import { useModelShortcuts } from "./useModelShortcuts";
 import { useOverlap } from "./useOverlap";
+import { useProportionHandles } from "./useProportionHandles";
 import { useScriptFrameStepping } from "./useScriptFrameStepping";
 import { useSkeleton } from "./useSkeleton";
 import { useWeaponReach } from "./useWeaponReach";
@@ -646,6 +649,15 @@ interface Props {
      */
     onAimChange?: (mid: [number, number, number]) => void;
   };
+  /** The skeleton's proportions, while their panel is open (issue #3253).
+   *  Absent leaves the handles off. */
+  proportions?: {
+    plan: BodyPlan;
+    /** A handle is being dragged: show the value without making an edit. */
+    onDrag: (id: string, value: number) => void;
+    /** A handle was let go: make the edit. */
+    onDragEnd: (id: string, value: number) => void;
+  };
   /** The guide planes (issue #3318). Absent hides their controls. */
   guides?: {
     /** One edit of the unit, so a change is one step of undo. */
@@ -671,6 +683,7 @@ export function ModelViewport({
   partPlacement,
   collisionEditing,
   aimPoint,
+  proportions,
   guides,
   footprint,
   problems,
@@ -1526,6 +1539,21 @@ export function ModelViewport({
     pack,
     raw,
     show: showSkeleton && hasSkeleton && !playing && scriptTimeline === null,
+  });
+  const proportionHandles = useMemo(
+    () => (proportions ? proportionHandlesOf(project, proportions.plan) : []),
+    [project, proportions],
+  );
+  useProportionHandles(sceneRef, {
+    handles: proportionHandles,
+    show:
+      proportions !== undefined &&
+      showSkeleton &&
+      hasSkeleton &&
+      !playing &&
+      scriptTimeline === null,
+    onDrag: (id, value) => proportions?.onDrag(id, value),
+    onDragEnd: (id, value) => proportions?.onDragEnd(id, value),
   });
   useFootprint(sceneRef, {
     result: footprint?.result ?? null,

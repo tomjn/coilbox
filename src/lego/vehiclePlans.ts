@@ -53,6 +53,7 @@ function proportion(
   min: number,
   max: number,
   fallback: number,
+  handle?: BodyPlanProportion["handle"],
 ): BodyPlanProportion {
   return {
     id,
@@ -62,6 +63,7 @@ function proportion(
     max,
     step: unit === "count" ? 1 : 0.1,
     fallback,
+    ...(handle ? { handle } : {}),
   };
 }
 
@@ -105,9 +107,18 @@ export const WHEELED: BodyPlan = {
   description: "A body on axles of wheels that turn while it moves.",
   proportions: [
     proportion("axles", "Axles", "count", 2, 5, 2),
-    proportion("axleSpacing", "Axle spacing", "elmo", 3, 75, 19.6),
-    proportion("trackWidth", "Track width", "elmo", 5, 100, 28),
-    proportion("wheelHeight", "Wheel height", "elmo", 1, 20, 4.7),
+    proportion("axleSpacing", "Axle spacing", "elmo", 3, 75, 19.6, {
+      bone: "wheel.l1",
+      axis: 2,
+    }),
+    proportion("trackWidth", "Track width", "elmo", 5, 100, 28, {
+      bone: "wheel.l1",
+      axis: 0,
+    }),
+    proportion("wheelHeight", "Wheel height", "elmo", 1, 20, 4.7, {
+      bone: "body",
+      axis: 1,
+    }),
   ],
   bones({ axles, axleSpacing, trackWidth, wheelHeight }) {
     const count = axles as number;
@@ -141,9 +152,18 @@ export const TRACKED: BodyPlan = {
   description:
     "A body on two tracks, with road wheels that turn while it moves.",
   proportions: [
-    proportion("trackLength", "Track length", "elmo", 25, 65, 47.4),
-    proportion("trackWidth", "Track width", "elmo", 10, 25, 18.3),
-    proportion("trackHeight", "Track height", "elmo", 5, 15, 8.8),
+    proportion("trackLength", "Track length", "elmo", 25, 65, 47.4, {
+      bone: "wheel.l1",
+      axis: 2,
+    }),
+    proportion("trackWidth", "Track width", "elmo", 10, 25, 18.3, {
+      bone: "track.l",
+      axis: 0,
+    }),
+    proportion("trackHeight", "Track height", "elmo", 5, 15, 8.8, {
+      bone: "body",
+      axis: 1,
+    }),
     proportion("roadWheels", "Road wheels a side", "count", 3, 11, 6),
   ],
   bones({ trackLength, trackWidth, trackHeight, roadWheels }) {
