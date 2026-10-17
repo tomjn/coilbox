@@ -20,6 +20,7 @@ import {
   rangeAt,
   type WeaponReach,
 } from "../../weaponReach";
+import { keepLabelSize, LABEL_SHARE } from "./labelSize";
 
 /** One colour per weapon, in slot order, chosen apart from the scene's
  *  orange collision box, red aim point and violet selection. */
@@ -40,8 +41,6 @@ const LIFT = 0.05;
 const RING_SEGMENTS = 128;
 /** Where a full ring's label sits: towards the home camera, front left. */
 const LABEL_HEADING = Math.PI / 4;
-/** A label's height as a share of the view's height. */
-const LABEL_HEIGHT = 0.035;
 
 /** The point at `heading` (radians from +z towards +x) and `radius` from
  *  `centre`, on the ground. */
@@ -125,13 +124,14 @@ export function label(text: string, colour: string): THREE.Sprite {
     }),
   );
   sprite.scale.set(
-    (LABEL_HEIGHT * canvas.width) / canvas.height,
-    LABEL_HEIGHT,
+    (LABEL_SHARE * canvas.width) / canvas.height,
+    LABEL_SHARE,
     1,
   );
   sprite.center.set(0.5, 0);
   sprite.renderOrder = 6;
   sprite.raycast = () => {};
+  keepLabelSize(sprite);
   return sprite;
 }
 

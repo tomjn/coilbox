@@ -16,37 +16,11 @@ import { label } from "./weaponReachLayer";
  *  selection and the weapon ring colours. */
 export const SKELETON_COLOUR = 0xe879f9;
 
-/** A label's height as a share of the view's height, as in the weapon rings. */
-const LABEL_SHARE = 0.035;
-/**
- * The same share in an orthographic view. Sprites that hold a screen size only
- * do it in perspective: an orthographic camera has no depth to scale by, so
- * they would be 0.035 elmos tall at any zoom. This is `LABEL_SHARE` over the
- * height a perspective view of 40 degrees shows at distance 1, which is what
- * the weapon rings' labels measure against.
- */
-const ORTHO_LABEL_SHARE = LABEL_SHARE / (2 * Math.tan((40 * Math.PI) / 360));
-
-/** The height a label is drawn at for `camera`, in world units. */
-export function labelHeight(camera: THREE.Camera): number {
-  if (camera instanceof THREE.OrthographicCamera) {
-    return (ORTHO_LABEL_SHARE * (camera.top - camera.bottom)) / camera.zoom;
-  }
-  return LABEL_SHARE;
-}
-
 /** A label that keeps its size on screen in either kind of camera. */
 function skeletonLabel(text: string): THREE.Sprite {
   const sprite = label(text, "#f5d0fe");
-  const aspect = sprite.scale.x / sprite.scale.y;
   // To the right of the marker, not on it.
   sprite.center.set(-0.15, 0.5);
-  sprite.onBeforeRender = (_renderer, _scene, camera) => {
-    const height = labelHeight(camera);
-    sprite.scale.set(height * aspect, height, 1);
-    // three reads the world matrix straight after this returns.
-    sprite.updateMatrixWorld(true);
-  };
   return sprite;
 }
 

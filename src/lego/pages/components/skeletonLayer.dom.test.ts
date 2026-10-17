@@ -6,7 +6,6 @@ import type { SkeletonJoint } from "../../skeletonJoints";
 import {
   buildSkeleton,
   disposeSkeleton,
-  labelHeight,
   SKELETON_COLOUR,
 } from "./skeletonLayer";
 
@@ -113,24 +112,5 @@ describe("buildSkeleton", () => {
       SKELETON_COLOUR,
     );
     disposeSkeleton(group);
-  });
-});
-
-describe("labelHeight", () => {
-  it("is a fixed share of the view in perspective", () => {
-    const persp = new THREE.PerspectiveCamera(40);
-
-    expect(labelHeight(persp)).toBe(
-      labelHeight(new THREE.PerspectiveCamera(60)),
-    );
-  });
-
-  it("follows the visible height in orthographic views, which zoom changes", () => {
-    const ortho = new THREE.OrthographicCamera(-50, 50, 50, -50);
-    const wide = labelHeight(ortho);
-    ortho.zoom = 4;
-
-    expect(wide).toBeGreaterThan(0);
-    expect(labelHeight(ortho)).toBeCloseTo(wide / 4, 10);
   });
 });
