@@ -2594,3 +2594,119 @@ mod start_frame {
         assert_eq!(moved(&timeline, "base"), Some(woke + 1));
     }
 }
+
+/// The frame a thread whose wait has ended runs on again. The engine finishes
+/// animations after the frame's threads have run (`UnitScriptEngine.cpp:
+/// 131-163`) and puts the waiting thread on the waiting list
+/// (`CobThread.cpp:838-852`), which only becomes the running list at the next
+/// frame's swap (`CobEngine.cpp:173-189`). So it runs two frames after the
+/// frame its turn landed on.
+mod wait_frame {
+    use super::*;
+    use std::path::Path;
+
+    fn compile(source: &str) -> Vec<u8> {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../coilbox-bos2lua/tests/fixtures");
+        crate::compile_bos(source, &dir).unwrap()
+    }
+
+    fn played(source: &str) -> Timeline {
+        let timeline = run(
+            &compile(source),
+            &model_pieces(),
+            &created(),
+            12,
+            &[],
+            &HashMap::new(),
+        );
+        assert_eq!(timeline.error, None);
+        timeline
+    }
+
+    /// The first frame `piece` stands 1 elmo up the z axis.
+    fn moved(timeline: &Timeline, piece: &str) -> Option<usize> {
+        (0..timeline.frames.len()).find(|&frame| close(pose(timeline, frame, piece)[2], 1.0))
+    }
+
+    /// The first frame the barrel shows its turn about x.
+    fn landed(timeline: &Timeline) -> Option<usize> {
+        (0..timeline.frames.len()).find(|&frame| pose(timeline, frame, "barrel")[3].abs() > 0.1)
+    }
+
+    /// The turn takes one frame, so the frame it shows is the frame it landed.
+    #[test]
+    fn a_thread_back_from_a_wait_for_turn_runs_a_frame_after_the_turn_shows() {
+        let timeline = played(
+            "piece base, turret, barrel;\n\
+             Create() { turn barrel to x-axis <10> speed <300>; wait-for-turn barrel around x-axis;\n\
+             move turret to z-axis [1] now; }\n",
+        );
+
+        let landed = landed(&timeline).expect("the barrel turned");
+        assert_eq!(moved(&timeline, "turret"), Some(landed + 1));
+    }
+
+    #[test]
+    fn a_thread_back_from_a_wait_for_move_runs_a_frame_after_the_move_shows() {
+        let timeline = played(
+            "piece base, turret, barrel;\n\
+             Create() { move barrel to y-axis [1] speed [30]; wait-for-move barrel along y-axis;\n\
+             move turret to z-axis [1] now; }\n",
+        );
+
+        let landed = (0..timeline.frames.len())
+            .find(|&frame| close(pose(&timeline, frame, "barrel")[1], 1.0))
+            .expect("the barrel moved");
+        assert_eq!(moved(&timeline, "turret"), Some(landed + 1));
+    }
+
+    /// A spin replacing the turn ends the wait while threads run
+    /// (`UnitScript.cpp:351-363,428-430`), so the waiter goes on the waiting
+    /// list from there. Begun by a call-in, which runs before the frame's
+    /// threads (`Game.cpp:1784-1800`), it runs on the next frame.
+    #[test]
+    fn a_thread_whose_turn_a_call_in_spin_replaced_runs_on_the_next_frame() {
+        let mut events = created();
+        events.push(ScriptEvent {
+            frame: 3,
+            callin: "Activate".to_string(),
+            args: Vec::new(),
+            ambient: false,
+            world: None,
+            engine: None,
+        });
+        let timeline = run(
+            &compile(
+                "piece base, turret, barrel;\n\
+                 Create() { turn barrel to x-axis <90> speed <30>; wait-for-turn barrel around x-axis;\n\
+                 move turret to z-axis [1] now; }\n\
+                 Activate() { move base to z-axis [1] now; spin barrel around x-axis speed <30>; }\n",
+            ),
+            &model_pieces(),
+            &events,
+            12,
+            &[],
+            &HashMap::new(),
+        );
+        assert_eq!(timeline.error, None);
+
+        assert_eq!(moved(&timeline, "base"), Some(3));
+        assert_eq!(moved(&timeline, "turret"), Some(4));
+    }
+
+    /// A thread woken from a sleep runs after the swap, so a wait its spin ends
+    /// misses the next frame's run too.
+    #[test]
+    fn a_thread_whose_turn_a_woken_sleeper_spin_replaced_runs_two_frames_later() {
+        let timeline = played(
+            "piece base, turret, barrel;\n\
+             Create() { start-script Waiter(); start-script Spinner(); }\n\
+             Waiter() { turn barrel to x-axis <90> speed <30>; wait-for-turn barrel around x-axis;\n\
+             move turret to z-axis [1] now; }\n\
+             Spinner() { sleep 100; move base to z-axis [1] now; spin barrel around x-axis speed <30>; }\n",
+        );
+
+        let spun = moved(&timeline, "base").expect("the spinner ran");
+        assert_eq!(moved(&timeline, "turret"), Some(spun + 2));
+    }
+}

@@ -132,7 +132,10 @@ fn reads_zero_as_false() {
 fn hands_call_ins_to_the_engine_under_its_names() {
     let lua = walker();
     assert_eq!(lua.matches("function script.Create()").count(), 1, "{lua}");
-    assert!(lua.contains("\tStartThread(runStarted, Create)\n"), "{lua}");
+    assert!(
+        lua.contains("\tStartThread(runStarted, 0, Create)\n"),
+        "{lua}"
+    );
     assert!(
         lua.contains("StartThread(SetMaxReloadTime, math.floor("),
         "{lua}"

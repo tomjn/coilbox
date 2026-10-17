@@ -27,7 +27,8 @@ const FRAMES: u32 = 300;
 /// Balanced Annihilation's have Lua that is right for the engine, which
 /// these two previews play a frame or a cycle apart. The rest ship a `.cob`
 /// that was not compiled from the `.bos` beside it, so no conversion of the
-/// `.bos` can match it.
+/// `.bos` can match it, apart from the `WAKE_ORDER` ones, which are a converter
+/// bug still to fix.
 const KNOWN: &[(&str, &str)] = &[
     (
         "scripts/gdadvhfact2.bos",
@@ -125,7 +126,34 @@ const KNOWN: &[(&str, &str)] = &[
         "scripts/corcrw.bos",
         "the .cob has no StartMoving or StopMoving and the .bos has both",
     ),
+    ("scripts/alienanni.bos", WAKE_ORDER),
+    ("scripts/aliencom.bos", WAKE_ORDER),
+    ("scripts/aliencon.bos", WAKE_ORDER),
+    ("scripts/alienhamh.bos", WAKE_ORDER),
+    ("scripts/alienhcon.bos", WAKE_ORDER),
+    ("scripts/alienmamh.bos", WAKE_ORDER),
+    ("scripts/alienmcon.bos", WAKE_ORDER),
+    ("scripts/alienscout.bos", WAKE_ORDER),
+    ("scripts/alienwstrider.bos", WAKE_ORDER),
+    ("scripts/armack.bos", WAKE_ORDER),
+    ("scripts/armcs.bos", WAKE_ORDER),
+    ("scripts/armham.bos", WAKE_ORDER),
+    ("scripts/armss.bos", WAKE_ORDER),
+    ("scripts/armzeus.bos", WAKE_ORDER),
+    ("scripts/corss.bos", WAKE_ORDER),
+    ("scripts/gdadvmex2.bos", WAKE_ORDER),
+    ("scripts/gdgeo2.bos", WAKE_ORDER),
+    ("scripts/gdmex2.bos", WAKE_ORDER),
+    ("scripts/gduniquemex2.bos", WAKE_ORDER),
+    ("scripts/packo.bos", WAKE_ORDER),
+    ("scripts/urcadvmex2.bos", WAKE_ORDER),
+    ("scripts/urcgeo2.bos", WAKE_ORDER),
 ];
+
+/// Every one of these matches when the Lua preview wakes threads due on one
+/// frame in creation order instead of the engine's Lua order. Measured on
+/// Expand and Exterminate 0.46 and Balanced Annihilation 15.9.8.
+const WAKE_ORDER: &str = "two threads due on one frame, which COB wakes in thread order (CobEngine.h:36-41) and the engine's Lua last asleep first (unit_script.lua:812-836): #4456";
 
 fn files(dir: &Path, out: &mut Vec<PathBuf>) {
     for entry in std::fs::read_dir(dir).unwrap().flatten() {
@@ -877,6 +905,160 @@ fn a_started_script_first_runs_on_the_frame_cob_runs_it() {
     }
     assert_eq!(
         first_difference(&from_cob, &from_lua, &pieces, "started", false),
+        None,
+        "{lua}"
+    );
+}
+
+/// COB carries on two frames after the turn or move it waited on ends, where
+/// the engine's Lua framework resumes in that frame (`CobThread.cpp:838-852`,
+/// `CobEngine.cpp:173-189`, `unit_script.lua:265-299`). The converted Lua
+/// sleeps the difference, with and without a `start-script` in the script,
+/// and a walk that waits each step stays in step frame by frame.
+#[test]
+fn a_thread_back_from_a_wait_carries_on_on_the_frame_cob_does() {
+    for start in ["", "start-script Lift();"] {
+        let source = format!(
+            r#"
+            piece base, leg, foot;
+            Lift() {{ move base to z-axis [1] now; }}
+            Walk()
+            {{
+                while (TRUE)
+                {{
+                    turn leg to x-axis <25> speed <200>;
+                    wait-for-turn leg around x-axis;
+                    move foot to y-axis [1] speed [20];
+                    wait-for-move foot along y-axis;
+                    turn leg to x-axis <0> speed <200>;
+                    wait-for-turn leg around x-axis;
+                    sleep 50;
+                    move foot to y-axis [0] now;
+                }}
+            }}
+            Create() {{ {start} start-script Walk(); }}
+        "#
+        );
+        let (cob, lua, pieces) = both(&source);
+        let events = [event(0, "Create", &[])];
+        let from_cob = crate::cobrun::run(&cob, &pieces, &events, 90, &[], &HashMap::new());
+        let from_lua = run_lua(
+            &lua,
+            "walk.lua",
+            &Unit::new(&pieces),
+            &events,
+            90,
+            &HashMap::new(),
+        );
+        assert_eq!(from_cob.error, None);
+        assert_eq!(from_lua.error, None);
+        assert_eq!(
+            first_difference(&from_cob, &from_lua, &pieces, "walk", false),
+            None,
+            "{lua}"
+        );
+    }
+}
+
+/// A started script takes the signal mask its thread had at the
+/// `start-script` (`CobThread.cpp:372-388`), not the one it has when it next
+/// waits, so a signal by the new mask passes it by. One a call-in began under
+/// a mask, and not yet run, is still reached by a signal under that mask,
+/// because the engine adds it to the unit's threads as the call-in returns
+/// (`CobInstance.cpp:584-625,744-756`).
+#[test]
+fn a_started_script_takes_the_signal_mask_its_thread_had_when_it_began_it() {
+    let (cob, lua, pieces) = both(
+        r#"
+        piece base, kept, killed;
+        Keep() { sleep 200; move kept to z-axis [1] now; }
+        Kill() { move killed to z-axis [1] now; }
+        Create()
+        {
+            start-script Keep();
+            set-signal-mask 2;
+            sleep 100;
+            signal 2;
+        }
+        Deactivate()
+        {
+            set-signal-mask 4;
+            start-script Kill();
+            sleep 300;
+        }
+        StartMoving()
+        {
+            signal 4;
+        }
+    "#,
+    );
+    // `StartMoving` arrives on the frame after `Deactivate`, before `Kill`
+    // first runs.
+    let events = [
+        event(0, "Create", &[]),
+        event(20, "Deactivate", &[]),
+        event(20, "StartMoving", &[]),
+    ];
+    let from_cob = crate::cobrun::run(&cob, &pieces, &events, 30, &[], &HashMap::new());
+    let from_lua = run_lua(
+        &lua,
+        "masks.lua",
+        &Unit::new(&pieces),
+        &events,
+        30,
+        &HashMap::new(),
+    );
+    assert_eq!(from_cob.error, None);
+    assert_eq!(from_lua.error, None);
+    let z = |piece: &str| pieces.iter().position(|p| p == piece).unwrap() * 6 + 2;
+    assert_eq!(
+        from_cob.frames[29][z("kept")],
+        1.0,
+        "the COB never kept Keep"
+    );
+    assert_eq!(
+        from_cob.frames[29][z("killed")],
+        0.0,
+        "the COB never killed Kill"
+    );
+    assert_eq!(
+        first_difference(&from_cob, &from_lua, &pieces, "masks", false),
+        None,
+        "{lua}"
+    );
+}
+
+/// Scripts two threads begin on one frame start in the order they were begun,
+/// as COB's waiting list keeps them (`CobEngine.cpp:92-105`), though the
+/// engine's Lua wakes threads due together last asleep first
+/// (`unit_script.lua:812-836`).
+#[test]
+fn scripts_two_threads_begin_together_start_in_the_order_they_were_begun() {
+    let (cob, lua, pieces) = both(
+        r#"
+        piece base;
+        One() { move base to z-axis [1] now; }
+        Two() { move base to z-axis [2] now; }
+        First() { start-script One(); }
+        Second() { start-script Two(); }
+        Create() { start-script First(); start-script Second(); }
+    "#,
+    );
+    let events = [event(0, "Create", &[])];
+    let from_cob = crate::cobrun::run(&cob, &pieces, &events, 6, &[], &HashMap::new());
+    let from_lua = run_lua(
+        &lua,
+        "order.lua",
+        &Unit::new(&pieces),
+        &events,
+        6,
+        &HashMap::new(),
+    );
+    assert_eq!(from_cob.error, None);
+    assert_eq!(from_lua.error, None);
+    assert_eq!(from_cob.frames[5][2], 2.0);
+    assert_eq!(
+        first_difference(&from_cob, &from_lua, &pieces, "order", false),
         None,
         "{lua}"
     );

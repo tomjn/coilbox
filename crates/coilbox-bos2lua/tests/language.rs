@@ -177,7 +177,7 @@ fn scales_a_piece() {
     let source = "piece base;\nCreate() {\n scale base to x-axis [2] speed [1];\n wait-for-scale base along x-axis;\n scale base to y-axis [1] now;\n}\n";
     let lua = lua(source, Precedence::Modern);
     assert!(lua.contains("Scale(base, 2, 1)"), "{lua}");
-    assert!(lua.contains("UnitScript.WaitForScale(base)"), "{lua}");
+    assert!(lua.contains("\tWaitForScale(base)"), "{lua}");
     assert!(lua.contains("Scale(base, 1)"), "{lua}");
     let pieces = vec!["base".to_string()];
     let events = [ScriptEvent {
