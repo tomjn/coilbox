@@ -17,6 +17,7 @@ import { handleBox } from "./collisionHandles";
 import { type GizmoMode, ROTATION_STEP } from "./ModelViewport";
 import { packSubject, showPackHandles } from "./packHandles";
 import type { SceneState } from "./sceneState";
+import { attachPiece, draggedGroup } from "./slideHandle";
 
 /**
  * Which handles the gizmo shows, given what is being edited.
@@ -99,7 +100,7 @@ function attachToSelection(
       return;
     }
     const group = state.groups.get(roots[0]);
-    if (group) state.gizmo.attach(group);
+    if (group) attachPiece(state, project, roots[0], group);
     else state.gizmo.detach();
     return;
   }
@@ -221,7 +222,7 @@ export function commitAim(state: SceneState) {
 
 /** Write the dragged transform back to the document, once the drag is over. */
 export function commitGizmo(state: SceneState) {
-  const group = state.gizmo.object;
+  const group = draggedGroup(state);
   const pieceId = group ? pieceIdOf(group) : null;
   if (!group || !pieceId) return;
 

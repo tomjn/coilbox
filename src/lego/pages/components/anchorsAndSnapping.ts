@@ -37,6 +37,11 @@ import {
   SEAT_COLOUR,
 } from "./ModelViewport";
 import type { SceneState } from "./sceneState";
+import { draggedGroup } from "./slideHandle";
+
+/** What the viewport says while the next click puts a connector on the model. */
+export const PLACE_CONNECTOR_HINT =
+  "Click the model to put a connector there. Escape to stop";
 
 /** A target anchor nothing is near. Warms towards `SEAT_COLOUR` on approach. */
 const TARGET_COLD = 0x64748b;
@@ -368,7 +373,7 @@ export function measurePoint(state: SceneState, at: Vec3): Vec3 {
  * planes for what a line leaves, then the move step for whatever is left. See `guides.ts`.
  */
 export function applySnap(state: SceneState) {
-  const group = state.gizmo.object;
+  const group = draggedGroup(state);
   const pieceId = group ? pieceIdOf(group) : null;
   if (!group || !pieceId) return;
 

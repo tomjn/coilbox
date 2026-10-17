@@ -62,6 +62,9 @@ export interface SceneState {
   /** What the gizmo drags for a set: an empty object at the set's midpoint.
    *  Never in the document, never exported. */
   groupPivot: THREE.Object3D;
+  /** What the gizmo holds in place of a joined piece, turned to the face it
+   *  slides on. See `slideHandle.ts`. */
+  slideFrame: THREE.Object3D;
   /** Where that pivot was put when the set was selected, which is the point a
    *  group drag is measured from and turns about. */
   groupPivotAt: Vec3;
@@ -573,7 +576,8 @@ export function syncScene(
     // TransformControls warns on the next render that its object is gone.
     // This is the only place a group's removal is decided, so it is the only
     // place that can know to detach.
-    if (state.gizmo.object === group) state.gizmo.detach();
+    // The slide frame of a joined piece carries the piece's id too.
+    if (state.gizmo.object?.userData.pieceId === id) state.gizmo.detach();
     group.removeFromParent();
     state.groups.delete(id);
   }

@@ -1879,28 +1879,30 @@ mod tests {
         let world = World::new(Script::UntilReleased);
 
         world.ask(ID);
+        // The snapshot shows the frame before the worker has announced it, so
+        // wait for the listener as well.
         let playing = world.until("a frame", |s| {
             s.running.as_ref().is_some_and(|r| r.frame == 90)
+                && world
+                    .heard
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .any(|s| s.running.as_ref().is_some_and(|r| r.frame == 90))
         });
 
         let running = playing.running.unwrap();
         assert_eq!(running.phase, RunPhase::Playing);
         assert_eq!((running.frame, running.last_frame), (90, 1500));
         assert_eq!(running.match_seconds, 50);
-        assert!(world
-            .heard
-            .lock()
-            .unwrap()
-            .iter()
-            .any(|s| s.running.as_ref().is_some_and(|r| r.frame == 90)));
-
         world.engine.release.store(true, Ordering::SeqCst);
-        world.until_idle();
-        // The last thing every window heard is an empty queue.
-        let heard = world.heard.lock().unwrap();
-        let last = heard.last().unwrap();
-        assert!(last.running.is_none() && last.queued.is_empty());
-        assert_eq!(last.stored, 1);
+        // The queue is idle when its state says so, which is before the
+        // worker has announced that to the listener. Wait for the listener.
+        world.until("the listener to hear an empty queue", |_| {
+            world.heard.lock().unwrap().last().is_some_and(|last| {
+                last.running.is_none() && last.queued.is_empty() && last.stored == 1
+            })
+        });
     }
 
     #[test]
