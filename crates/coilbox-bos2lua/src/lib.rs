@@ -98,9 +98,9 @@ pub struct Options<'a> {
     /// of case and Lua does not, so the Lua asks for each piece by the model's
     /// own spelling.
     pub pieces: Option<&'a [String]>,
-    /// What `[1]` means in 65536ths of an elmo: [`MODERN_LINEAR`] or
-    /// [`SCRIPTOR_LINEAR`]. The BOS alone cannot say, the `.cob` it was
-    /// compiled to can: see [`linear_scale`].
+    /// What `[1]` means in 65536ths of an elmo: [`MODERN_LINEAR`],
+    /// [`SCRIPTOR_LINEAR`] or [`FIVE_QUARTERS_LINEAR`]. The BOS alone cannot
+    /// say, the `.cob` it was compiled to can: see [`linear_scale`].
     pub linear_scale: i64,
     /// How tightly each operator binds, which also depends on the compiler.
     /// The `.cob` can say: see [`precedence`].
@@ -130,6 +130,10 @@ pub const MODERN_LINEAR: i64 = 65536;
 /// Older Spring games, Expand and Exterminate among them, were built with it.
 pub const SCRIPTOR_LINEAR: i64 = 163840;
 
+/// `[1]` as one and a quarter elmos. Balanced Annihilation's commanders and its
+/// two crawling bombs were compiled with it, by a compiler nobody has named.
+pub const FIVE_QUARTERS_LINEAR: i64 = 81920;
+
 /// `lualibs/cob_vars.lua`, which lets a game's synced gadgets set, and its
 /// gadgets and widgets read, the shared unit values a converted script keeps
 /// as rules params. A game includes it from its own `LuaRules/main.lua`,
@@ -143,9 +147,9 @@ pub fn shares_values(lua: &str) -> bool {
     lua.contains("local cobAllied = { allied = true }")
 }
 
-/// Which of the two linear scales a `.cob` was compiled with, judged by which
-/// one turns more of the BOS's `[x]` constants into numbers the `.cob` holds.
-/// `None` when the BOS has no such constant or neither scale finds one.
+/// Which of the linear scales a `.cob` was compiled with, judged by which one
+/// turns the most of the BOS's `[x]` constants into numbers the `.cob` holds.
+/// `None` when the BOS has no such constant or no one scale finds the most.
 pub fn linear_scale(source: &str, cob: &[u8]) -> Option<i64> {
     let tokens = lex::lex(source, 0);
     let mut brackets = Vec::new();
@@ -179,11 +183,15 @@ pub fn linear_scale(source: &str, cob: &[u8]) -> Option<i64> {
             .filter(|v| words.contains(&(pp::scale_constant(false, **v, scale) as i32)))
             .count()
     };
-    let (modern, scriptor) = (hits(MODERN_LINEAR), hits(SCRIPTOR_LINEAR));
-    match modern.cmp(&scriptor) {
-        std::cmp::Ordering::Greater => Some(MODERN_LINEAR),
-        std::cmp::Ordering::Less => Some(SCRIPTOR_LINEAR),
-        std::cmp::Ordering::Equal => None,
+    let counts = [MODERN_LINEAR, SCRIPTOR_LINEAR, FIVE_QUARTERS_LINEAR].map(|s| (hits(s), s));
+    let most = counts.iter().map(|(n, _)| *n).max()?;
+    match counts
+        .iter()
+        .filter(|(n, _)| *n == most)
+        .collect::<Vec<_>>()[..]
+    {
+        [(_, scale)] if most > 0 => Some(*scale),
+        _ => None,
     }
 }
 

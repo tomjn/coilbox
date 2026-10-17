@@ -1879,10 +1879,12 @@ impl<'p, 'a> Writer<'p, 'a> {
         }
     }
 
-    /// Where a `Turn` goes. An exact half turn is the one place writing the
-    /// degrees changes what happens: BOS stores `<180>` as a hair under a half
-    /// turn, which fixes the way the piece goes, and an exact half turn is a
-    /// tie the engine may settle the other way. So that one keeps BOS's value.
+    /// Where a `Turn` goes. Near a half turn is the one place writing the
+    /// degrees changes what happens. A turn goes the short way round
+    /// (`TurnToward`, `UnitScript.cpp:138-151`), and BOS stores an angle a hair
+    /// short of its degrees. So `<180>` and `<-180.04>` land just inside a
+    /// half turn where the degrees are on it or past it, and a turn from rest
+    /// would go the other way. Those keep BOS's value.
     fn turn_to(&mut self, e: &Expr, negate: bool) -> String {
         let (deg, v) = match e {
             Expr::Angle(deg, v) => (*deg, *v),
@@ -1892,13 +1894,19 @@ impl<'p, 'a> Writer<'p, 'a> {
             },
             _ => return self.angle(e, negate),
         };
-        if deg.rem_euclid(360.0) != 180.0 {
+        let (written, stored) = (
+            deg.rem_euclid(360.0),
+            (v as f64 * 360.0 / 65536.0).rem_euclid(360.0),
+        );
+        let across = (written < 180.0) != (stored < 180.0) && (written - stored).abs() < 180.0;
+        if written != 180.0 && !across {
             return self.angle(e, negate);
         }
         let sign = if negate { -1.0 } else { 1.0 };
         self.note = Some(format!(
-            "BOS stores <{}> a hair under a half turn, which settles which way the piece goes",
-            decimal(deg)
+            "BOS stores <{}> as <{}>, which settles which way the piece goes",
+            decimal(deg),
+            decimal(v as f64 * 360.0 / 65536.0)
         ));
         format!("math.rad({})", decimal(sign * v as f64 * 360.0 / 65536.0))
     }
@@ -1995,7 +2003,8 @@ impl<'p, 'a> Writer<'p, 'a> {
     }
 
     /// How many elmos `[1]` is: one for scripts compiled today, two and a half
-    /// for Scriptor's.
+    /// for Scriptor's, and one and a quarter for a few of Balanced
+    /// Annihilation's.
     fn elmos_per_bracket(&self) -> f64 {
         self.p.options.linear_scale as f64 / 65536.0
     }
@@ -3168,6 +3177,11 @@ fn decimal(v: f64) -> String {
     }
     let text = format!("{v:.4}");
     let text = text.trim_end_matches('0').trim_end_matches('.');
+    // A speed of 0 moves a piece at once in Lua (`LuaUnitScript.cpp:1627-1633`)
+    // where a slow one creeps, so a small number keeps all its digits.
+    if text == "0" || text == "-0" {
+        return format!("{v}");
+    }
     text.to_string()
 }
 

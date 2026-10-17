@@ -5,7 +5,8 @@
 //! is the failure this crate exists to end.
 
 use coilbox_bos2lua::{
-    convert, linear_scale, Conversion, Options, Precedence, MODERN_LINEAR, SCRIPTOR_LINEAR,
+    convert, linear_scale, Conversion, Options, Precedence, FIVE_QUARTERS_LINEAR, MODERN_LINEAR,
+    SCRIPTOR_LINEAR,
 };
 use coilbox_springlua::unitscript::{run, ScriptEvent, Unit};
 use std::collections::HashMap;
@@ -203,9 +204,59 @@ fn tells_the_linear_scale_from_the_cob() {
     // The fixture's distances are [-2.5], [-1] and [2].
     let scriptor = words(&[7, -409_600, -163_840, 327_680]);
     let modern = words(&[7, -163_840, -65_536, 131_072]);
+    // Balanced Annihilation's armcom.cob holds [8] as 655360.
+    let five_quarters = words(&[7, -204_800, -81_920, 163_840]);
     assert_eq!(linear_scale(WALKER, &scriptor), Some(SCRIPTOR_LINEAR));
     assert_eq!(linear_scale(WALKER, &modern), Some(MODERN_LINEAR));
+    assert_eq!(
+        linear_scale(WALKER, &five_quarters),
+        Some(FIVE_QUARTERS_LINEAR)
+    );
     assert_eq!(linear_scale(WALKER, &words(&[1, 2, 3])), None);
+}
+
+/// A turn goes the short way round, so an angle BOS stores on the other side
+/// of a half turn from its degrees keeps BOS's value. Shaped like Balanced
+/// Annihilation's `cormexp.bos` and `corspec.bos`.
+#[test]
+fn an_angle_stored_across_a_half_turn_keeps_bos_s_value() {
+    let source = r#"
+        piece base, shell, tong;
+        Create()
+        {
+            turn shell to x-axis <-180.038462> speed <261>;
+            turn tong to x-axis <180.043956> now;
+            turn base to x-axis <90.016484> speed <30>;
+        }
+    "#;
+    let lua = convert_with(source, &HashMap::new(), MODERN_LINEAR).lua;
+    assert!(
+        lua.contains("Turn(shell, x_axis, math.rad(-179.9945), math.rad(261))"),
+        "{lua}"
+    );
+    assert!(
+        lua.contains("Turn(tong, x_axis, math.rad(179.9945))"),
+        "{lua}"
+    );
+    assert!(
+        lua.contains("Turn(base, x_axis, math.rad(90.0165), math.rad(30))"),
+        "{lua}"
+    );
+}
+
+/// A speed too small for four decimal places stays a speed, because 0 in Lua
+/// moves the piece at once. Shaped like Balanced Annihilation's `corsy.bos`.
+#[test]
+fn a_tiny_speed_is_not_written_as_zero() {
+    let source = r#"
+        piece base, turret;
+        Create() { move turret to y-axis [6.95] speed [0.000018]; }
+    "#;
+    let lua = convert_with(source, &HashMap::new(), MODERN_LINEAR).lua;
+    assert!(
+        lua.contains("Move(turret, y_axis, 6.95, 0.000018)"),
+        "{lua}"
+    );
 }
 
 #[test]

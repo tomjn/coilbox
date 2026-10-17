@@ -23,8 +23,11 @@ const TOLERANCE: f64 = 0.01;
 const ANGLE_DRIFT: f64 = 0.0005;
 const FRAMES: u32 = 300;
 
-/// Expand and Exterminate scripts whose Lua is right for the engine but which
-/// these two previews play a frame or a cycle apart, each looked at by hand.
+/// Scripts each looked at by hand. Expand and Exterminate's and some of
+/// Balanced Annihilation's have Lua that is right for the engine, which
+/// these two previews play a frame or a cycle apart. The rest of Balanced
+/// Annihilation's ship a `.cob` that was not compiled from the `.bos` beside
+/// it, so no conversion of the `.bos` can match it.
 const KNOWN: &[(&str, &str)] = &[
     (
         "scripts/gdadvhfact2.bos",
@@ -49,6 +52,70 @@ const KNOWN: &[(&str, &str)] = &[
     (
         "scripts/alienpenetrator.bos",
         "a sleeper wakes in the frame StartMoving arrives",
+    ),
+    (
+        "scripts/armah.bos",
+        "a move lasting a whole number of frames ends a frame apart",
+    ),
+    (
+        "scripts/armraz.bos",
+        "a turn lasting a whole number of frames ends a frame apart",
+    ),
+    (
+        "scripts/armarad.bos",
+        "a spin's speed is off by the angle drift, so it stops either side of a half turn and the turn back goes the other way",
+    ),
+    (
+        "scripts/corspec.bos",
+        "a spin's speed is off by the angle drift, so the turn back after it ends a frame apart",
+    ),
+    (
+        "scripts/armasye.bos",
+        "the .cob turns slip in Create and the .bos does not",
+    ),
+    (
+        "scripts/armasyn.bos",
+        "the .cob turns slip in Create and the .bos does not",
+    ),
+    (
+        "scripts/armasyw.bos",
+        "the .cob turns slip in Create and the .bos does not",
+    ),
+    (
+        "scripts/armbrtha.bos",
+        "the .cob's QueryPrimary answers sleeve and the .bos answers flare",
+    ),
+    (
+        "scripts/corint.bos",
+        "the .cob's QueryPrimary answers gun and the .bos answers flare",
+    ),
+    (
+        "scripts/armcom.bos",
+        "the .cob moves lfirept and rbigflash in Create and the .bos does not",
+    ),
+    (
+        "scripts/armdecom.bos",
+        "the .cob moves lfirept and rbigflash in Create and the .bos does not",
+    ),
+    (
+        "scripts/corcom.bos",
+        "the .cob moves mlasflsh and bigflsh in Create and the .bos does not",
+    ),
+    (
+        "scripts/cordecom.bos",
+        "the .cob moves mlasflsh and bigflsh in Create and the .bos does not",
+    ),
+    (
+        "scripts/corack.bos",
+        "the .cob's Killed adds NOHEATCLOUD and never explodes lnanocase or rnanocase",
+    ),
+    (
+        "scripts/corvipe.bos",
+        "the .cob's Killed explodes pieces where the .bos returns before any explode",
+    ),
+    (
+        "scripts/corcrw.bos",
+        "the .cob has no StartMoving or StopMoving and the .bos has both",
     ),
 ];
 
@@ -160,6 +227,13 @@ fn converted_scripts_move_pieces_as_their_cobs_do() {
         };
         let source = text(path);
         let bytes = std::fs::read(cob).unwrap();
+        let armed = crate::cob::decode(&bytes)
+            .is_ok_and(|d| d.scripts.iter().any(|(n, _)| is_weapon_one(n)));
+        let events: Vec<ScriptEvent> = events
+            .iter()
+            .filter(|e| armed || e.engine != Some(EngineAction::Fire))
+            .cloned()
+            .collect();
         let linear_scale = coilbox_bos2lua::linear_scale(&source, &bytes)
             .unwrap_or(coilbox_bos2lua::MODERN_LINEAR);
         let conversion = match coilbox_bos2lua::convert(
@@ -245,8 +319,18 @@ fn converted_scripts_move_pieces_as_their_cobs_do() {
                 })
                 .collect()
         };
-        if heard(&from_cob) != heard(&from_lua) && !known {
-            differ.push(format!("{name}: the two announce different events"));
+        let (cob_heard, lua_heard) = (heard(&from_cob), heard(&from_lua));
+        if cob_heard != lua_heard && !known {
+            let at = cob_heard
+                .iter()
+                .zip(&lua_heard)
+                .position(|(a, b)| a != b)
+                .unwrap_or(cob_heard.len().min(lua_heard.len()));
+            differ.push(format!(
+                "{name}: the two announce different events, first apart at {at}: COB {:?}, Lua {:?}",
+                cob_heard.get(at),
+                lua_heard.get(at)
+            ));
         }
     }
     eprintln!(
@@ -258,6 +342,33 @@ fn converted_scripts_move_pieces_as_their_cobs_do() {
         eprintln!("  {line}");
     }
     assert!(differ.is_empty(), "\n{}", differ.join("\n"));
+}
+
+/// Whether a COB function is one of weapon 1's call-ins, by the names
+/// `CobScriptNames.cpp` maps. The engine only fires a weapon the unit has, and
+/// a script with none of these is a unit with no weapon, so the sweep does not
+/// fire one.
+fn is_weapon_one(name: &str) -> bool {
+    const STEMS: [&str; 8] = [
+        "QueryWeapon",
+        "AimWeapon",
+        "AimFromWeapon",
+        "FireWeapon",
+        "EndBurst",
+        "Shot",
+        "BlockShot",
+        "TargetWeight",
+    ];
+    const PRIMARY: [&str; 4] = [
+        "QueryPrimary",
+        "AimPrimary",
+        "AimFromPrimary",
+        "FirePrimary",
+    ];
+    STEMS
+        .iter()
+        .any(|stem| name.eq_ignore_ascii_case(&format!("{stem}1")))
+        || PRIMARY.iter().any(|p| name.eq_ignore_ascii_case(p))
 }
 
 /// Where two runs of the same unit first disagree, if they do. `dump` prints
@@ -764,4 +875,59 @@ TransportPickup(unitid)
             "{runtime}: the passenger moved when it was dropped"
         );
     }
+}
+
+/// The sweep fires weapon 1 only at a script that has one of its call-ins,
+/// under either name.
+#[test]
+fn only_a_script_with_weapon_one_s_call_ins_is_fired() {
+    for armed in [
+        "QueryPrimary",
+        "aimprimary",
+        "AimWeapon1",
+        "Shot1",
+        "BlockShot1",
+    ] {
+        assert!(is_weapon_one(armed), "{armed}");
+    }
+    for unarmed in [
+        "Create",
+        "QueryNanoPiece",
+        "AimWeapon2",
+        "AimWeapon10",
+        "AimSecondary",
+    ] {
+        assert!(!is_weapon_one(unarmed), "{unarmed}");
+    }
+}
+
+/// `<-180.038462>` is stored a hair inside a half turn, so the COB turns the
+/// piece the negative way from rest. The Lua has to go the same way, which it
+/// only does when it keeps BOS's value. Shaped like Balanced Annihilation's
+/// `cormexp.bos`.
+#[test]
+fn both_runtimes_turn_the_same_way_near_a_half_turn() {
+    let (cob, lua, pieces) = both(
+        r#"
+        piece base, shell;
+        Create() { turn shell to x-axis <-180.038462> speed <261>; }
+    "#,
+    );
+    let events = [event(0, "Create", &[])];
+    let from_cob = crate::cobrun::run(&cob, &pieces, &events, 10, &[], &HashMap::new());
+    let from_lua = run_lua(
+        &lua,
+        "shell.lua",
+        &Unit::new(&pieces),
+        &events,
+        10,
+        &HashMap::new(),
+    );
+    assert_eq!(from_cob.error, None);
+    assert_eq!(from_lua.error, None);
+    assert_eq!(
+        first_difference(&from_cob, &from_lua, &pieces, "shell", false),
+        None,
+        "{lua}"
+    );
 }
