@@ -11,6 +11,7 @@ import {
   pieceConnectors,
   readPartConnectors,
   resolveConnections,
+  slideJoin,
   withConnections,
 } from "./connectors";
 import { emptyDocument, reduceDocument } from "./document";
@@ -814,5 +815,78 @@ describe("pieceConnectors with custom anchors", () => {
     // point its bottom back along -z and lands on the nose.
     expect(worldPoint(joined, "leg", [0, -1, 0])).toEqual([0, 0, 2]);
     expect(worldNormal(joined, "leg", [0, -1, 0])).toEqual([0, 0, -1]);
+  });
+});
+
+describe("slideJoin", () => {
+  // A leg standing on the hull's top face. The face's side direction is +x and
+  // its up direction is +z, so the offset is [along x, along z].
+  const standing = (offset?: [number, number]) =>
+    hullAndLeg({
+      connection: { connector: "-y", to: "+y", ...(offset ? { offset } : {}) },
+      position: [0, 1.5, 0],
+    });
+
+  it("steps the offset along the face from where it rests", () => {
+    const slid = slideJoin(standing(), pack(), "leg", [0.7, 1.5, 0.3], 0.5);
+
+    expect(slid?.offset).toEqual([0.5, 0.5]);
+    expect(round(slid?.position ?? [])).toEqual([0.5, 1.5, 0.5]);
+  });
+
+  it("steps from the connection's resting place, not from the face's middle", () => {
+    // Resting 0.2 along x, which is not on the step. A drag of 0.3 is one step
+    // of 0.25 from there, not a snap to a multiple of 0.25 from the middle.
+    const slid = slideJoin(
+      standing([0.2, 0]),
+      pack(),
+      "leg",
+      [0.5, 1.5, 0],
+      0.25,
+    );
+
+    expect(slid?.offset[0]).toBeCloseTo(0.45);
+  });
+
+  it("drops the part of a drag that goes through the face", () => {
+    const slid = slideJoin(standing(), pack(), "leg", [0, 4, 0], 0.5);
+
+    expect(slid?.offset).toEqual([0, 0]);
+    expect(round(slid?.position ?? [])).toEqual([0, 1.5, 0]);
+  });
+
+  it("does not stop a part sliding off the edge of the face", () => {
+    const slid = slideJoin(standing(), pack(), "leg", [3, 1.5, 0], 0.5);
+
+    expect(slid?.offset).toEqual([3, 0]);
+  });
+
+  it("moves freely along the face when there is no step", () => {
+    const slid = slideJoin(standing(), pack(), "leg", [0.123, 1.5, 0], 0);
+
+    expect(slid?.offset[0]).toBeCloseTo(0.123);
+  });
+
+  it("slides along a face the parent has turned", () => {
+    const doc = project([
+      { id: "hull", partId: "hull", rotation: [0, Math.PI / 2, 0] },
+      {
+        id: "leg",
+        parentId: "hull",
+        partId: "leg",
+        connection: { connector: "-y", to: "+y" },
+        position: [0, 1.5, 0],
+      },
+    ]);
+    // The position is in the parent's frame, so the parent's turn changes nothing.
+    const slid = slideJoin(doc, pack(), "leg", [1, 1.5, 0], 0.5);
+
+    expect(slid?.offset).toEqual([1, 0]);
+  });
+
+  it("answers null for a piece with no join", () => {
+    const doc = hullAndLeg({ position: [0, 1.5, 0] });
+
+    expect(slideJoin(doc, pack(), "leg", [1, 1.5, 0], 0.5)).toBeNull();
   });
 });

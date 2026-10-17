@@ -216,6 +216,65 @@ describe("dragPiece without a seat", () => {
   });
 });
 
+describe("dragPiece with a slide", () => {
+  const joined = () =>
+    dragPiece(scene(), pack(), "leg", dropped([0, 1.5, 0]), SEAT);
+
+  it("keeps the join and saves the new offset", () => {
+    const doc = dragPiece(
+      joined(),
+      pack(),
+      "leg",
+      dropped([0.5, 1.5, 0.25]),
+      null,
+      [0.5, 0.25],
+    );
+
+    expect(pieceOf(doc, "leg").connection).toEqual({
+      connector: "-y",
+      to: "+y",
+      offset: [0.5, 0.25],
+    });
+    expect(pieceOf(doc, "leg").position).toEqual([0.5, 1.5, 0.25]);
+    expect(resolveConnections(doc, pack()).project).toBe(doc);
+  });
+
+  it("keeps a twist the join already had", () => {
+    const start = joined();
+    const twisted = {
+      ...start,
+      pieces: start.pieces.map((p) =>
+        p.id === "leg" && p.connection
+          ? { ...p, connection: { ...p.connection, twist: 0.5 } }
+          : p,
+      ),
+    };
+    const doc = dragPiece(
+      twisted,
+      pack(),
+      "leg",
+      dropped([0.5, 1.5, 0]),
+      null,
+      [0.5, 0],
+    );
+
+    expect(pieceOf(doc, "leg").connection?.twist).toBe(0.5);
+  });
+
+  it("is ignored for a drag that seats against another piece", () => {
+    const doc = dragPiece(
+      joined(),
+      pack(),
+      "leg",
+      dropped([5, 1.5, 0]),
+      { parentId: "other", connector: "-y", to: "+y" },
+      [9, 9],
+    );
+
+    expect(pieceOf(doc, "leg").connection?.offset).toBeUndefined();
+  });
+});
+
 describe("freeMoved", () => {
   it("frees only the joined pieces a group drag moved", () => {
     const start = dragPiece(scene(), pack(), "leg", dropped([0, 1.5, 0]), SEAT);
