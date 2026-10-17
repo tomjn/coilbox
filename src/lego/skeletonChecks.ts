@@ -11,6 +11,7 @@
 import * as THREE from "three";
 
 import { isSupportRole, SAME_POSITION, worldGeometry } from "./balance";
+import { pieceOwnBox } from "./connectors";
 import { mirrorRole, reflection } from "./mirror";
 import { childrenOf, type LegoPiece, type LegoProject } from "./model";
 import type { LoadedPack } from "./pack";
@@ -110,9 +111,9 @@ function feetOffGround(
 }
 
 /**
- * A leg segment or build arm with a part whose pivot is the middle of the
- * part, which is the propeller problem `pivot.ts` describes. A piece with no
- * part has its origin as its joint, so there is nothing to say about it.
+ * A leg segment or build arm with a part or a shape whose pivot is its middle,
+ * which is the propeller problem `pivot.ts` describes. A piece with neither
+ * has its origin as its joint, so there is nothing to say about it.
  * `currentPivot` is what says where the pivot is.
  */
 function pivotsAwayFromJoints(
@@ -122,8 +123,10 @@ function pivotsAwayFromJoints(
   const out: Problem[] = [];
   for (const piece of project.pieces) {
     if (!piece.role || !SWINGS_ABOUT_AN_END.test(piece.role)) continue;
-    const part = piece.partId ? pack.byId.get(piece.partId) : undefined;
-    if (!part || currentPivot(part, piece.pivot) !== "middle") continue;
+    // A part or a shape starts at its middle. A mesh starts where its model
+    // put the origin, so it is left out.
+    const bbox = piece.meshId ? undefined : pieceOwnBox(pack, piece);
+    if (!bbox || currentPivot({ bbox }, piece.pivot) !== "middle") continue;
     out.push(
       problem(
         "skeleton",

@@ -154,6 +154,11 @@ describe("moveStep", () => {
     expect(moveStep([free, free], 0.25)).toBe(0.25);
   });
 
+  it("is the part unit for a free generated shape (#3325)", () => {
+    const shape = { partId: null, shape: { kind: "cylinder" } };
+    expect(moveStep([free, shape], 0.25)).toBe(0.25);
+  });
+
   it("is none when any piece is joined by a saved connection", () => {
     expect(moveStep([free, joined], 0.25)).toBeNull();
   });

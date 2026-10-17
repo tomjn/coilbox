@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { pieceConnectors, slideJoin } from "../../connectors";
+import { pieceConnectors, pieceOwnBox, slideJoin } from "../../connectors";
 import { snapToGuides } from "../../guides";
 import { snapMeasurePoint } from "../../measure";
 import type { LegoPiece, LegoProject } from "../../model";
@@ -112,13 +112,11 @@ function stripConnector(anchor: Anchor): Anchor {
   return rest;
 }
 
-/** A part carries its box in the pack manifest and an imported mesh carries
- *  its own, computed once on import, so both answer this the same way. */
+/** A part carries its box in the pack manifest, a shape's is its size and an
+ *  imported mesh carries its own, computed once on import, so all three answer
+ *  this the same way. */
 function pieceBox(pack: LoadedPack, raw: RawGeometry | null, piece: LegoPiece) {
-  return (
-    pieceMesh(raw, piece)?.bbox ??
-    (piece.partId ? pack.byId.get(piece.partId)?.bbox : undefined)
-  );
+  return pieceMesh(raw, piece)?.bbox ?? pieceOwnBox(pack, piece);
 }
 
 /**

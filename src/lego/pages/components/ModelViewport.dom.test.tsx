@@ -22,6 +22,7 @@ import { type LegoPiece, type LegoProject, newProject } from "../../model";
 import type { LegoPartInfo, LoadedPack } from "../../pack";
 import type { RawGeometry } from "../../rawGeometry";
 import type { ScriptOutput, ScriptTimeline } from "../../scriptPlayback";
+import { getShapeGeometry } from "../../shapes";
 import { applyTimelineFrame } from "./animationPlayback";
 import { buildEffectsLayer, type EffectsLayer } from "./effectsLayer";
 import {
@@ -230,6 +231,41 @@ describe("mirroring the piece hierarchy", () => {
   it("puts a piece with no parent on the scene root", () => {
     syncScene(scene, loaded, null, project(piece("stray", null)));
     expect(carrierOf("stray")).toBe("root");
+  });
+});
+
+describe("drawing a generated shape (#3325)", () => {
+  const meshOf = (pieceId: string) =>
+    groupOf(pieceId).children.find(
+      (child): child is THREE.Mesh => child instanceof THREE.Mesh,
+    );
+
+  it("draws a shape's own mesh, seated by its pivot", () => {
+    const shape = {
+      kind: "cylinder",
+      size: [2, 1, 2] as [number, number, number],
+      swatch: "tan",
+    };
+    syncScene(
+      scene,
+      loaded,
+      null,
+      project({ ...piece("wheel", "base"), shape, pivot: [0, -0.5, 0] }),
+    );
+    const mesh = meshOf("wheel");
+    expect(mesh?.geometry).toBe(getShapeGeometry(shape));
+    // `+ 0` turns the negative zeros of the other two axes into plain ones.
+    expect(mesh?.position.toArray().map((v) => v + 0)).toEqual([0, 0.5, 0]);
+  });
+
+  it("draws nothing for a kind this build does not know", () => {
+    const shape = {
+      kind: "torus",
+      size: [1, 1, 1] as [number, number, number],
+      swatch: "tan",
+    };
+    syncScene(scene, loaded, null, project({ ...piece("odd", "base"), shape }));
+    expect(meshOf("odd")).toBeUndefined();
   });
 });
 

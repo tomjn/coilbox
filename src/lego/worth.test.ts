@@ -6,6 +6,7 @@ import {
   type LegoWorth,
   PLACEHOLDER_WORTH,
   parseWorth,
+  usedShapes,
   worthTotals,
 } from "./worth";
 
@@ -86,6 +87,21 @@ describe("worthTotals", () => {
       buildTime: 44,
       mass: 5,
     });
+  });
+
+  it("counts a generated shape by its box, and lists its kind (#3325)", () => {
+    const project = unit(
+      [
+        piece({
+          id: "a",
+          shape: { kind: "cylinder", size: [2, 2, 2], swatch: "green" },
+        }),
+      ],
+      table,
+    );
+    // The same 8 as the block above, as a part is counted by its box too.
+    expect(worthTotals(project, pack)?.health).toBe(180);
+    expect(usedShapes(project, pack)).toEqual(["cylinder"]);
   });
 
   it("does not change when a part moves or turns", () => {

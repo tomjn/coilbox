@@ -24,6 +24,7 @@ import {
 } from "./model";
 import type { LoadedPack } from "./pack";
 import { pieceMesh, type RawGeometry } from "./rawGeometry";
+import { shapeMesh } from "./shapes";
 import type { SheetUv } from "./textureSheet";
 
 /** x, y, z, nx, ny, nz, u, v, the s3o vertex record the pack also uses. */
@@ -515,9 +516,10 @@ function bakePiece(
  * inside out, so the winding is reversed to match: without that the piece is
  * drawn back to front and lit from inside.
  *
- * A piece draws either a part out of the pack or a mesh out of an imported
- * model, and both are the same 32-byte vertex record in an interleaved buffer
- * with its own index run, so the bake is the same arithmetic either way.
+ * A piece draws a part out of the pack, a mesh out of an imported model or a
+ * generated shape, and all three are the same 32-byte vertex record in an
+ * interleaved buffer with its own index run, so the bake is the same
+ * arithmetic for each.
  */
 /** The 3x3 identity, column-major, as `THREE.Matrix3.elements` stores one. */
 const IDENTITY_ELEMENTS = [1, 0, 0, 0, 1, 0, 0, 0, 1];
@@ -658,7 +660,7 @@ function bakeGeometry(
   return { vertices, indices };
 }
 
-/** Where a piece's vertices are, whichever of the two kinds of unit it is in. */
+/** Where a piece's vertices are: a mesh, a generated shape or a part. */
 function geometrySource(
   pack: LoadedPack,
   raw: RawGeometry | null,
@@ -674,6 +676,10 @@ function geometrySource(
   const mesh = pieceMesh(raw, piece);
   if (mesh && raw) {
     return { ...mesh, vertices: raw.vertices, indices: raw.indices };
+  }
+  if (piece.shape) {
+    const shape = shapeMesh(piece.shape);
+    return shape ? { ...shape, vFirst: 0, iFirst: 0 } : null;
   }
   const part = piece.partId ? pack.byId.get(piece.partId) : undefined;
   if (!part) return null;
