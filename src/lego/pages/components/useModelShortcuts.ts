@@ -5,7 +5,7 @@ import {
   useEffect,
 } from "react";
 import { isShortcut } from "../../shortcuts";
-import { focusSelection } from "./cameraFraming";
+import { focusSelection, showView } from "./cameraFraming";
 import type { GizmoMode } from "./ModelViewport";
 import type { SceneState } from "./sceneState";
 
@@ -68,6 +68,11 @@ export function useModelShortcuts(
       if (isShortcut("frame", event)) {
         const state = sceneRef.current;
         if (state) focusSelection(state, selectedIdsRef.current);
+      }
+      for (const view of ["front", "side", "top"] as const) {
+        if (!isShortcut(`view-${view}`, event)) continue;
+        const state = sceneRef.current;
+        if (state) showView(state, view, selectedIdsRef.current);
       }
       if (isShortcut("shortcuts", event)) setShortcutsOpen(true);
     };

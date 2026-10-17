@@ -17,6 +17,7 @@
  */
 
 import { Button } from "@picoframe/frame";
+import type { LucideIcon } from "lucide-react";
 import {
   ArrowDownToLine,
   Box,
@@ -28,11 +29,14 @@ import {
   FlipHorizontal2,
   Keyboard,
   Move,
+  PanelLeft,
+  PanelTop,
   Radar,
   RotateCw,
   Ruler,
   Scaling,
   Sparkles,
+  Square,
   Target,
   Trash2,
   Video,
@@ -92,6 +96,7 @@ import {
   type LegoProject,
   pieceById,
 } from "../../model";
+import type { StandardView } from "../../orthoViews";
 import { type LoadedPack, partUnit } from "../../pack";
 import type { FaceTarget } from "../../placePart";
 import type { RawGeometry } from "../../rawGeometry";
@@ -119,7 +124,14 @@ import {
   showTargetAnchors,
 } from "./anchorsAndSnapping";
 import { disposeBaked } from "./bakedPlayback";
-import { boundsBox, frameBounds, homeView } from "./cameraFraming";
+import { boundsBox, frameBounds, homeView, showView } from "./cameraFraming";
+import {
+  leaveStandardView,
+  ORBIT_MAX_POLAR,
+  sizeCameras,
+  syncOrthographicLimits,
+  turnedFromStandardView,
+} from "./cameraViews";
 import {
   buildCollisionHandles,
   commitCollision,
@@ -295,6 +307,13 @@ const AIM_DOT = 13;
 
 /** The script events the effects layer draws. See `effectsPlayback.ts`. */
 const EFFECT_KINDS = new Set(["nano", "flare", "shot", "sfx"]);
+
+/** The buttons for the front, side and top views, in the order they sit. */
+const VIEW_BUTTONS: { id: StandardView; icon: LucideIcon; label: string }[] = [
+  { id: "front", icon: Square, label: "front" },
+  { id: "side", icon: PanelLeft, label: "side" },
+  { id: "top", icon: PanelTop, label: "top" },
+];
 
 /** Where the camera starts, and where Reset view puts it back. */
 export const HOME_CAMERA: [number, number, number] = [9, 7, 11];
@@ -673,6 +692,8 @@ export function ModelViewport({
   // shown, so nothing about opening a project changes.
   const [backdrop, setBackdrop] = useState<BackdropId>("studio");
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  // Which of the front, side and top views is showing, if any.
+  const [activeView, setActiveView] = useState<StandardView | null>(null);
 
   // The compass is the button people press when they are lost, so it frames
   // the whole unit rather than dropping the camera on a fixed point that a
@@ -691,6 +712,7 @@ export function ModelViewport({
     const bounds = unitBounds(project, pack, raw);
     const box = boundsBox(bounds);
     if (box) {
+      // Frames from the home direction, which also leaves a standard view.
       frameBounds(state, box, HOME_CAMERA);
     } else {
       homeView(state);
@@ -1039,9 +1061,19 @@ export function ModelViewport({
 
       const camera = new THREE.PerspectiveCamera(40, 1, 0.05, MIN_FAR);
       camera.position.set(...HOME_CAMERA);
+      // Used by the front, side and top views. It takes over the controls and
+      // the gizmo while one is showing, and gives them back to `camera`.
+      const orthographicCamera = new THREE.OrthographicCamera(
+        -1,
+        1,
+        1,
+        -1,
+        0.05,
+        MIN_FAR,
+      );
 
       const controls = new OrbitControls(camera, renderer.domElement);
-      controls.maxPolarAngle = Math.PI * 0.495;
+      controls.maxPolarAngle = ORBIT_MAX_POLAR;
       controls.minDistance = 1;
       controls.maxDistance = MIN_MAX_DISTANCE;
       // The point under the pointer stays under it as the wheel dollies,
@@ -1052,11 +1084,17 @@ export function ModelViewport({
       controls.zoomToCursor = true;
 
       const render = () => {
-        renderer.render(scene, camera);
+        renderer.render(scene, state.camera);
         // After the render, so the camera's inverse matrix is the one just used.
-        if (compassRef.current) paintCompass(compassRef.current, camera);
+        if (compassRef.current) paintCompass(compassRef.current, state.camera);
       };
-      controls.addEventListener("change", render);
+      // Turning the view is what takes it out of a standard view. Panning and
+      // zooming keep its direction, so they stay in it.
+      const onControlsChange = () => {
+        if (turnedFromStandardView(state)) leaveStandardView(state);
+        render();
+      };
+      controls.addEventListener("change", onControlsChange);
 
       const gizmo = new TransformControls(camera, renderer.domElement);
       gizmo.setSpace("local");
@@ -1066,6 +1104,10 @@ export function ModelViewport({
         renderer,
         scene,
         camera,
+        perspectiveCamera: camera,
+        orthographicCamera,
+        standardView: null,
+        onViewChange: setActiveView,
         controls,
         gizmo,
         root,
@@ -1236,6 +1278,7 @@ export function ModelViewport({
       // with its own lifetime, so they live apart from the scene this effect
       // builds. See pointerHandlers.ts for the registration order this
       // depends on.
+      syncOrthographicLimits(state);
       const detachPointerHandlers = attachPointerHandlers(state);
 
       // A thumbnail is the unit alone, drawn from a fixed camera: see
@@ -1259,8 +1302,7 @@ export function ModelViewport({
       return {
         render,
         resize: (width, height) => {
-          camera.aspect = width / height;
-          camera.updateProjectionMatrix();
+          sizeCameras(state, width, height);
           // The wide line shader works in screen space, so it has to be told
           // how big the screen is or the box comes out the wrong width.
           pieceEditMaterial.resolution.set(width, height);
@@ -1268,7 +1310,7 @@ export function ModelViewport({
         dispose: () => {
           cancelAnimationFrame(frame);
           detachPointerHandlers();
-          controls.removeEventListener("change", render);
+          controls.removeEventListener("change", onControlsChange);
           controls.dispose();
           gizmo.detach();
           gizmo.getHelper().removeFromParent();
@@ -1800,6 +1842,24 @@ export function ModelViewport({
                 showTitle="Show each weapon's stated range and firing arc"
               />
             ) : null}
+            {VIEW_BUTTONS.map(({ id, icon, label }) => (
+              <ViewToggle
+                key={id}
+                icon={icon}
+                on={activeView === id}
+                onChange={(on) => {
+                  const state = sceneRef.current;
+                  if (!state) return;
+                  if (on) showView(state, id, selectedIdsRef.current);
+                  else {
+                    leaveStandardView(state);
+                    state.render();
+                  }
+                }}
+                hideTitle={`Leave the ${label} view (${shortcutLabel(`view-${id}`)})`}
+                showTitle={`Look at the ${label} with no perspective (${shortcutLabel(`view-${id}`)})`}
+              />
+            ))}
             <ViewToggle
               icon={Ruler}
               on={measure.active}

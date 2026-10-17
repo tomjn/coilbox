@@ -2,8 +2,14 @@ import * as THREE from "three";
 
 import { buildGround, disposeGround, groundSteps } from "../../buildPlate";
 import { frameBox } from "../../framing";
+import type { StandardView } from "../../orthoViews";
 import { type UnitBounds, unitBounds } from "../../s3oBuild";
 import type { Vec3 } from "../../snapping";
+import {
+  leaveStandardView,
+  showStandardView,
+  syncOrthographicLimits,
+} from "./cameraViews";
 import {
   HOME_CAMERA,
   MIN_FAR,
@@ -30,30 +36,62 @@ import type { SceneState } from "./sceneState";
  * figure stands beside the unit for scale and is not the work being framed.
  */
 export function focusSelection(state: SceneState, pieceIds: string[]) {
-  const unit = boundsBox(
-    unitBounds(
-      state.projectRef.current,
-      state.packRef.current,
-      state.rawRef.current,
-    ),
-  );
+  const unit = unitBox(state);
   if (!unit) {
     homeView(state);
     state.render();
     return;
   }
 
+  const box = selectionBox(state, pieceIds) ?? unit;
+  if (frameBounds(state, box)) state.render();
+}
+
+/**
+ * Look at the selection, or the whole unit with nothing selected, along one
+ * axis through the orthographic camera. A unit with no geometry has nothing to
+ * look at, so the view frames a small box at the origin instead.
+ */
+export function showView(
+  state: SceneState,
+  view: StandardView,
+  pieceIds: string[],
+) {
+  const box =
+    selectionBox(state, pieceIds) ??
+    unitBox(state) ??
+    new THREE.Box3().setFromCenterAndSize(
+      new THREE.Vector3(),
+      new THREE.Vector3(10, 10, 10),
+    );
+  showStandardView(state, view, box);
+  state.render();
+}
+
+function unitBox(state: SceneState): THREE.Box3 | null {
+  return boundsBox(
+    unitBounds(
+      state.projectRef.current,
+      state.packRef.current,
+      state.rawRef.current,
+    ),
+  );
+}
+
+/** The box round the selected pieces, or null when none of them is in the
+ *  scene. */
+function selectionBox(
+  state: SceneState,
+  pieceIds: string[],
+): THREE.Box3 | null {
   const groups = pieceIds
     .map((id) => state.groups.get(id))
     .filter((group): group is THREE.Group => group !== undefined);
-  if (groups.length === 0) {
-    if (frameBounds(state, unit)) state.render();
-    return;
-  }
+  if (groups.length === 0) return null;
 
   const box = new THREE.Box3();
   for (const group of groups) box.union(new THREE.Box3().setFromObject(group));
-  if (frameBounds(state, box)) state.render();
+  return box;
 }
 
 /**
@@ -75,6 +113,7 @@ export function frameObject(
 /** The view the builder opens on: the home camera, looking at the origin.
  *  Where the camera lands when there is nothing to frame. */
 export function homeView(state: SceneState) {
+  leaveStandardView(state);
   state.camera.position.set(...HOME_CAMERA);
   state.controls.target.set(0, 0, 0);
   state.controls.update();
@@ -103,6 +142,14 @@ export function frameBounds(
 ): boolean {
   if (box.isEmpty()) return false;
 
+  // Framing from a set direction is going somewhere new, which the standard
+  // views are not for. Without one, they keep their axis and fit the box.
+  if (from) leaveStandardView(state);
+  else if (state.standardView) {
+    showStandardView(state, state.standardView.id, box);
+    return true;
+  }
+
   // The direction from the target to the camera, not the camera to the
   // target: keeping this fixed and only moving the target and the distance
   // along it is what stops framing from spinning the view to a new angle.
@@ -117,7 +164,7 @@ export function frameBounds(
       max: [box.max.x, box.max.y, box.max.z],
     },
     from ?? [offset.x, offset.y, offset.z],
-    THREE.MathUtils.degToRad(state.camera.fov),
+    THREE.MathUtils.degToRad(state.perspectiveCamera.fov),
   );
 
   state.controls.target.set(...target);
@@ -167,7 +214,9 @@ export function applySceneScale(state: SceneState) {
     reach && !reach.isEmpty() ? reach.center.length() + reach.radius : 0,
   );
 
-  const fit = radius / Math.sin(THREE.MathUtils.degToRad(state.camera.fov) / 2);
+  const fit =
+    radius /
+    Math.sin(THREE.MathUtils.degToRad(state.perspectiveCamera.fov) / 2);
   state.controls.maxDistance = Math.max(
     MIN_MAX_DISTANCE,
     fit * ZOOM_OUT_PADDING * ZOOM_OUT_REACH,
@@ -184,11 +233,12 @@ export function applySceneScale(state: SceneState) {
   const ground = new THREE.Box3()
     .setFromObject(state.grid)
     .getBoundingSphere(new THREE.Sphere()).radius;
-  state.camera.far = Math.max(
+  state.perspectiveCamera.far = Math.max(
     MIN_FAR,
     state.controls.maxDistance + Math.max(radius, ground),
   );
-  state.camera.updateProjectionMatrix();
+  state.perspectiveCamera.updateProjectionMatrix();
+  syncOrthographicLimits(state);
 }
 
 /** Lay the ground again when it has to reach further than it does. Skipped

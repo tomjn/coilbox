@@ -132,13 +132,19 @@ function screenSized(
   place: (half: THREE.Vector3) => void,
 ) {
   mesh.onBeforeRender = (renderer, _scene, camera) => {
-    if (!(camera instanceof THREE.PerspectiveCamera)) return;
-    markWorld.setFromMatrixPosition(mesh.matrixWorld);
-    const distance = camera.position.distanceTo(markWorld);
     const height = Math.max(renderer.getSize(markViewport).y, 1);
-    const world =
-      (pixels * (2 * distance * Math.tan((camera.fov * Math.PI) / 360))) /
-      height;
+    let world: number;
+    if (camera instanceof THREE.OrthographicCamera) {
+      world = (pixels * (camera.top - camera.bottom)) / camera.zoom / height;
+    } else if (camera instanceof THREE.PerspectiveCamera) {
+      markWorld.setFromMatrixPosition(mesh.matrixWorld);
+      const distance = camera.position.distanceTo(markWorld);
+      world =
+        (pixels * (2 * distance * Math.tan((camera.fov * Math.PI) / 360))) /
+        height;
+    } else {
+      return;
+    }
 
     mesh.parent?.getWorldScale(markParentScale);
     markLocal.set(

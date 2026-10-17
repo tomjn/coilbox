@@ -208,7 +208,12 @@ export function beginFaceDrag(
 
   const { axis, sign } = hit.object.userData as CollisionFace;
   const along = new THREE.Vector3().setComponent(axis, 1);
-  const eye = state.camera.position.clone().sub(hit.point);
+  // An orthographic camera looks the same way everywhere, so the way to it is
+  // not the way from the handle to where the camera sits.
+  const eye =
+    state.camera instanceof THREE.OrthographicCamera
+      ? state.camera.getWorldDirection(new THREE.Vector3()).negate()
+      : state.camera.position.clone().sub(hit.point);
   const normal = eye.sub(along.clone().multiplyScalar(eye.dot(along)));
   if (normal.lengthSq() < 1e-6) return false;
 

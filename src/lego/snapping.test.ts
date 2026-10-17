@@ -7,6 +7,7 @@ import {
   nearestSnap,
   pieceAnchors,
   screenPixelsToWorld,
+  screenPixelsToWorldOrtho,
   snapPosition,
   snapRotation,
   type Vec3,
@@ -291,5 +292,23 @@ describe("facesOppose", () => {
     expect(facesOppose([0, 1, 0], [Math.sin(tilt), -Math.cos(tilt), 0])).toBe(
       false,
     );
+  });
+});
+
+describe("screenPixelsToWorldOrtho", () => {
+  it("is the visible height over the viewport height, times the pixels", () => {
+    expect(screenPixelsToWorldOrtho(20, 400, 10)).toBeCloseTo(0.5);
+  });
+
+  it("agrees with a perspective camera showing the same height", () => {
+    // A 90 degree FOV at distance 10 shows 20 units of height.
+    expect(screenPixelsToWorldOrtho(20, 400, 10)).toBeCloseTo(
+      screenPixelsToWorld(Math.PI / 2, 400, 10, 10),
+    );
+  });
+
+  it("clamps like the perspective version", () => {
+    expect(screenPixelsToWorldOrtho(0.001, 1000, 1)).toBe(0.05);
+    expect(screenPixelsToWorldOrtho(10000, 100, 10)).toBe(3);
   });
 });
