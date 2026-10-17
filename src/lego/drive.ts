@@ -15,13 +15,22 @@
  * the engine does are left out. Its speed changes at once, to full speed on
  * the frame it sets off, to a turn's speed and back, and to nothing when it
  * arrives, where the engine ramps up and brakes by the unit's `maxAcc` and
- * `maxDec`, which issue #4151 covers. And it only drives forwards: the engine
- * reverses a unit only when its definition has `rSpeed` above 0
- * (`GroundMoveType.cpp:501`), which the builder never writes, so
- * `StartMoving` is always told it is not reversing.
+ * `maxDec`, which issue #4151 covers.
+ *
+ * A unit with a reverse speed backs up when the engine would (issue #4156).
+ * The engine reverses a unit only when its definition has `rSpeed` above 0
+ * (`GroundMoveType.cpp:501`), and then only when `WantReverse` finds backing up
+ * to the goal quicker than turning round, which `wantsReverse` ports. `StartMoving`
+ * is told which way the unit sets off.
  */
 
-import { unitSpeedOf, unitTurnRateOf } from "@/workshop/moveClasses";
+import {
+  unitAccelerationOf,
+  unitBrakeRateOf,
+  unitReverseSpeedOf,
+  unitSpeedOf,
+  unitTurnRateOf,
+} from "@/workshop/moveClasses";
 import { type GroundShape, groundHeight, groundNormal } from "./environment";
 import type { LegoProject } from "./model";
 import type { ScriptDrive, ScriptEvent } from "./scriptPlayback";
@@ -66,12 +75,28 @@ const LEAST_TURN_SPEED = 0.1;
 /** The frames a second, `GAME_SPEED`. */
 const GAME_SPEED = 30;
 
+/** `maxAcc` for a unit that states none, `UnitDef.cpp:455`. The brake rate
+ *  defaults to the acceleration (`UnitDef.cpp:459`). */
+const DEFAULT_ACCELERATION = 0.5;
+
+/** The least `accRate` and `decRate` the move type holds
+ *  (`GroundMoveType.cpp:521-522`). */
+const LEAST_RATE = 0.01;
+
 /** How fast the unit goes and turns, in the units the engine holds them in. */
 export interface DriveMotion {
   /** Elmos a frame. */
   speed: number;
   /** Heading units a frame, already clamped as `GroundMoveType.cpp:518` does. */
   turnRate: number;
+  /** Elmos a frame it backs up at, the engine's `maxReverseSpeed`. Absent or 0
+   *  for a unit that cannot reverse. */
+  reverseSpeed?: number;
+  /** Elmos a frame squared it speeds up by, only used to decide whether to
+   *  reverse. Absent means the engine's 0.5. */
+  acceleration?: number;
+  /** Elmos a frame squared it slows by. Absent means the acceleration. */
+  brakeRate?: number;
 }
 
 /** Where `DriveMotion`'s two numbers came from, for the panel to say. */
@@ -79,6 +104,7 @@ export interface DriveSource {
   motion: DriveMotion;
   speed: "movement" | "definition" | "preview";
   turnRate: "movement" | "definition" | "none";
+  reverseSpeed: "movement" | "definition" | "none";
 }
 
 /**
@@ -111,22 +137,42 @@ export function driveMotion(project: LegoProject): DriveSource {
         ? { value: defTurn, from: "definition" as const }
         : { value: 0, from: "none" as const };
 
+  const ownReverse = project.movement?.reverseSpeed;
+  const defReverse = def ? unitReverseSpeedOf(def) : 0;
+  const reverse =
+    typeof ownReverse === "number" && ownReverse > 0
+      ? { value: ownReverse / GAME_SPEED, from: "movement" as const }
+      : defReverse > 0
+        ? { value: defReverse / GAME_SPEED, from: "definition" as const }
+        : { value: 0, from: "none" as const };
+
+  const acceleration =
+    project.movement?.acceleration ??
+    (def ? unitAccelerationOf(def) : undefined);
+  const brakeRate =
+    project.movement?.brakeRate ?? (def ? unitBrakeRateOf(def) : undefined);
+
   return {
     motion: {
       speed: speed.value,
+      ...(acceleration !== undefined ? { acceleration } : {}),
+      ...(brakeRate !== undefined ? { brakeRate } : {}),
       turnRate: Math.min(Math.max(turn.value, 1), MAX_HEADING - 1),
+      ...(reverse.value > 0 ? { reverseSpeed: reverse.value } : {}),
     },
     speed: speed.from,
     turnRate: turn.from,
+    reverseSpeed: reverse.from,
   };
 }
 
-export type DrivePath = "straight" | "bend" | "circle" | "own";
+export type DrivePath = "straight" | "bend" | "circle" | "behind" | "own";
 
 export const DRIVE_PATHS: { value: DrivePath; label: string }[] = [
   { value: "straight", label: "Straight ahead" },
   { value: "bend", label: "Turning right" },
   { value: "circle", label: "A circle to the left" },
+  { value: "behind", label: "Behind the unit" },
   { value: "own", label: "Your own path" },
 ];
 
@@ -143,7 +189,9 @@ const CIRCLE_POINTS = 128;
  * unit takes the same time over them and finishes inside the preview's 15
  * seconds: 8 seconds straight on, 4 and 4 either side of a right turn, and a
  * circle about 12.6 seconds round, with its middle to the unit's left so it
- * sets off along it. `own` is the points the game maker clicked, as they are.
+ * sets off along it. `behind` is one second's travel straight back, near
+ * enough that a unit with a reverse speed finds backing up quicker than
+ * turning round. `own` is the points the game maker clicked, as they are.
  */
 export function pathPoints(
   path: DrivePath,
@@ -153,6 +201,7 @@ export function pathPoints(
   const second = motion.speed * GAME_SPEED;
   if (path === "own") return own;
   if (path === "straight") return [[0, 8 * second]];
+  if (path === "behind") return [[0, -second]];
   if (path === "bend") {
     // The unit's right is -x.
     return [
@@ -189,6 +238,9 @@ export interface DriveFrame {
   heading: number;
   /** Elmos a frame it moved on this frame, 0 when it did not move. */
   speed: number;
+  /** Whether it backs up, which stays as the engine's `reversing` does once it
+   *  has stopped. */
+  reversing: boolean;
   /** Which way is up for it, or null for a unit that stays upright. */
   up: Vec3 | null;
 }
@@ -311,6 +363,81 @@ function turnDelta(
 }
 
 /**
+ * `CGroundMoveType::WantReverse`, `GroundMoveType.cpp:3616-3669`: whether
+ * backing up to the goal would get a unit there sooner than turning round. It
+ * compares how long each takes, the turn, the speeding up or slowing down it
+ * needs and the run itself. A unit whose waypoint is ahead of it never reverses.
+ *
+ * The two per unit tunables `maxReverseDist` and `minReverseAngle` are left
+ * out, since the builder writes neither and the engine ignores both at 0.
+ */
+function wantsReverse(
+  waypointDir: Vec2,
+  heading: number,
+  goalDistance: number,
+  currentSpeed: number,
+  reversing: boolean,
+  motion: DriveMotion,
+): boolean {
+  const maxReverseSpeed = motion.reverseSpeed ?? 0;
+  if (maxReverseSpeed <= 0) return false;
+  if (motion.speed <= 0) return true;
+  if (motion.turnRate <= 0) return false;
+
+  const angle = headingRadians(heading);
+  const dot =
+    waypointDir[0] * Math.sin(angle) + waypointDir[1] * Math.cos(angle);
+  if (dot >= 0) return false;
+
+  const goalForwardETA = goalDistance / motion.speed;
+  const goalReverseETA = goalDistance / maxReverseSpeed;
+
+  const turnDegrees =
+    Math.acos(Math.min(Math.max(dot, -1), 0)) * (180 / Math.PI);
+  const forwardTurn = (turnDegrees / 360) * CIRCLE_DIVS;
+  const reverseTurn = MAX_HEADING - forwardTurn;
+
+  // Units start accelerating before finishing the turn, so the engine takes
+  // some off.
+  const turnTimeMod = 5;
+  const forwardTurnTime = Math.max(
+    0,
+    forwardTurn / motion.turnRate - turnTimeMod,
+  );
+  const reverseTurnTime = Math.max(
+    0,
+    reverseTurn / motion.turnRate - turnTimeMod,
+  );
+
+  const accRate = Math.max(
+    LEAST_RATE,
+    motion.acceleration ?? DEFAULT_ACCELERATION,
+  );
+  const decRate = Math.max(LEAST_RATE, motion.brakeRate ?? accRate);
+  const forwardSpeedAfterTurn = Math.max(
+    0,
+    currentSpeed - 0.125 * (forwardTurnTime * decRate),
+  );
+  const reverseSpeedAfterTurn = Math.max(
+    0,
+    currentSpeed - 0.125 * (reverseTurnTime * decRate),
+  );
+
+  const forwardBrake = (reversing ? forwardSpeedAfterTurn : 0) / decRate;
+  const reverseBrake = (reversing ? 0 : reverseSpeedAfterTurn) / decRate;
+  const forwardAccelerate =
+    (motion.speed - (reversing ? 0 : forwardSpeedAfterTurn)) / accRate;
+  const reverseAccelerate =
+    (maxReverseSpeed - (reversing ? reverseSpeedAfterTurn : 0)) / accRate;
+
+  const forwardETA =
+    goalForwardETA + forwardTurnTime + forwardAccelerate + forwardBrake;
+  const reverseETA =
+    goalReverseETA + reverseTurnTime + reverseBrake + reverseAccelerate;
+  return forwardETA > reverseETA;
+}
+
+/**
  * Drive the unit through `points`, starting at the origin facing +z.
  *
  * The order on each frame is the engine's: the speed is set for the turn the
@@ -320,6 +447,11 @@ function turnDelta(
  * faces. `StartMoving` is the frame the order is given and the unit moves
  * from the frame after. `StopMoving` is the frame it arrives, inside the goal
  * radius, and it does not move on that frame (`GroundMoveType.cpp:2436,2455`).
+ *
+ * A reversing unit turns to put its back to the waypoint, `UpdateObstacleAvoidance`
+ * flipping the direction it wants (`GroundMoveType.cpp:1095-1096`), and moves
+ * against its heading at its reverse speed, which sets how fast it turns too
+ * (`GroundMoveType.cpp:1341`).
  */
 export function driveAlong(
   points: Vec2[],
@@ -335,13 +467,33 @@ export function driveAlong(
   let next = 0;
   let moving = false;
   let arrived: number | null = null;
+  let reversing = false;
+  let currentSpeed = 0;
+
+  /** Whether the unit would back up to head for `points[next]` from here. */
+  const wantReverse = (): boolean => {
+    const [tx, tz] = points[next];
+    const length = Math.hypot(tx - x, tz - z);
+    if (length === 0) return false;
+    const [gx, gz] = points[points.length - 1];
+    return wantsReverse(
+      [(tx - x) / length, (tz - z) / length],
+      heading,
+      Math.hypot(gx - x, gz - z),
+      currentSpeed,
+      reversing,
+      motion,
+    );
+  };
 
   const place = (speed: number): DriveFrame => {
     const shape = options.ground;
+    currentSpeed = speed;
     return {
       pos: [x, shape ? groundHeight(shape, x, z) : 0, z],
       heading,
       speed,
+      reversing,
       up: shape && options.tilts ? groundNormal(shape, x, z) : null,
     };
   };
@@ -349,7 +501,12 @@ export function driveAlong(
   for (let frame = 0; frame < options.frames; frame++) {
     if (frame === options.start && points.length > 0 && arrived === null) {
       moving = true;
-      events.push({ frame, callin: "StartMoving", args: [0] });
+      reversing = wantReverse();
+      events.push({
+        frame,
+        callin: "StartMoving",
+        args: [reversing ? 1 : 0],
+      });
       frames.push(place(0));
       continue;
     }
@@ -361,23 +518,26 @@ export function driveAlong(
     let [tx, tz] = points[next];
     const last = next === points.length - 1;
     const distance = Math.hypot(tx - x, tz - z);
-    if (last && distance <= Math.max(GOAL_RADIUS, motion.speed)) {
+    const top = reversing ? (motion.reverseSpeed ?? 0) : motion.speed;
+    if (last && distance <= Math.max(GOAL_RADIUS, top)) {
       moving = false;
       arrived = frame;
       events.push({ frame, callin: "StopMoving" });
       frames.push(place(0));
       continue;
     }
-    if (!last && distance <= Math.max(WAYPOINT_RADIUS, motion.speed * 1.05)) {
+    if (!last && distance <= Math.max(WAYPOINT_RADIUS, top * 1.05)) {
       next++;
       [tx, tz] = points[next];
     }
 
-    const wanted = headingFromVector(tx - x, tz - z);
+    reversing = wantReverse();
+    const way = reversing ? -1 : 1;
+    const wanted = headingFromVector(way * (tx - x), way * (tz - z));
     const speed = turnSpeed(
       heading,
       wanted,
-      motion,
+      reversing ? { ...motion, speed: motion.reverseSpeed ?? 0 } : motion,
       next === points.length - 1,
       Math.hypot(tx - x, tz - z),
     );
@@ -390,8 +550,8 @@ export function driveAlong(
     }
 
     const angle = headingRadians(heading);
-    x += Math.sin(angle) * speed;
-    z += Math.cos(angle) * speed;
+    x += Math.sin(angle) * speed * way;
+    z += Math.cos(angle) * speed * way;
     frames.push(place(speed));
   }
   return { frames, events, arrived };
@@ -405,5 +565,6 @@ export function scriptDrive(frame: DriveFrame, maxSpeed: number): ScriptDrive {
     heading: frame.heading,
     speed: frame.speed,
     maxSpeed,
+    reversing: frame.reversing,
   };
 }

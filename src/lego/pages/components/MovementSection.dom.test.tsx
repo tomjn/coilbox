@@ -290,6 +290,39 @@ describe("MovementSection", () => {
     });
   });
 
+  it("edits the reverse speed, and clearing it drops its note", () => {
+    const onMovementChange = vi.fn();
+    render(
+      <MovementSection
+        project={project("wheel", {
+          movement: {
+            moveClass: "WHEELEDTANK2",
+            speed: 120,
+            reverseSpeed: 30,
+            reverseSpeedFrom: "Median of 2 SF units on WHEELEDTANK2",
+          },
+        })}
+        bounds={BOUNDS}
+        onMovementChange={onMovementChange}
+      />,
+    );
+    expect(
+      screen.getByText("Median of 2 SF units on WHEELEDTANK2"),
+    ).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/^Reverse speed/), {
+      target: { value: "45" },
+    });
+    expect(onMovementChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ reverseSpeed: 45, speed: 120 }),
+    );
+    fireEvent.change(screen.getByLabelText(/^Reverse speed/), {
+      target: { value: "" },
+    });
+    const cleared = onMovementChange.mock.calls.at(-1)?.[0];
+    expect(cleared).not.toHaveProperty("reverseSpeed");
+    expect(cleared).not.toHaveProperty("reverseSpeedFrom");
+  });
+
   it("edits acceleration and brake rate, and clearing one drops its note", () => {
     const onMovementChange = vi.fn();
     render(

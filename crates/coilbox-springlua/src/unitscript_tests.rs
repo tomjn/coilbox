@@ -3762,6 +3762,7 @@ mod drive {
             heading: -100 * frame as i32,
             speed: 0.5 * f64::from(frame),
             max_speed: 2.0,
+            reversing: false,
         }
     }
 
@@ -3798,6 +3799,46 @@ mod drive {
         assert_eq!(pose(&timeline, 4, "turret")[0], -400.0);
         assert!((pose(&timeline, 4, "barrel")[0] - 2.0).abs() < 1e-4);
         assert!((pose(&timeline, 4, "flare")[0] - 2.0).abs() < 1e-4);
+    }
+
+    /// `REVERSING` follows the drive, and a unit backing up has a velocity
+    /// against its heading with the same speed (`UnitScript.cpp:1151-1153`).
+    #[test]
+    fn a_reversing_unit_is_told_so_and_moves_against_its_heading() {
+        let timeline = run(
+            r#"
+            local turret = piece("turret")
+            local barrel = piece("barrel")
+            function script.Create()
+                StartThread(function()
+                    while true do
+                        Move(turret, x_axis, GetUnitValue(COB.REVERSING))
+                        local _, _, vz, speed = Spring.GetUnitVelocity(unitID)
+                        Move(barrel, z_axis, vz)
+                        Move(barrel, y_axis, speed)
+                        Sleep(1)
+                    end
+                end)
+            end
+            "#,
+            "test.lua",
+            &Unit::new(&pieces()),
+            &driven(4, |frame| coilbox_unitpose::Drive {
+                heading: 0,
+                speed: 2.0,
+                reversing: frame >= 2,
+                ..drive(frame)
+            }),
+            4,
+            &HashMap::new(),
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(pose(&timeline, 1, "turret")[0], 0.0);
+        assert_eq!(pose(&timeline, 3, "turret")[0], 1.0);
+        assert!((pose(&timeline, 1, "barrel")[2] - 2.0).abs() < 1e-4);
+        assert!((pose(&timeline, 3, "barrel")[2] + 2.0).abs() < 1e-4);
+        assert!((pose(&timeline, 3, "barrel")[1] - 2.0).abs() < 1e-4);
     }
 
     /// Where the unit is and how fast it goes, through the Lua calls a unit

@@ -199,6 +199,7 @@ const MY_ID: i32 = 71;
 const HEADING: i32 = 82;
 const IN_WATER: i32 = 28;
 const MAX_SPEED: i32 = 75;
+const REVERSING: i32 = 109;
 const XZ_ATAN: i32 = 12;
 const XZ_HYPOT: i32 = 13;
 
@@ -276,7 +277,8 @@ pub fn known(id: i32) -> Option<i32> {
 /// `HEADING` is the unit's own heading when it asks about itself
 /// (`UnitScript.cpp:1175-1177`), `CURRENT_SPEED` its `speed.w` and `MAX_SPEED`
 /// the move type's top speed, both in 65536ths of an elmo a frame
-/// (`UnitScript.cpp:1117-1118,1148-1149`). `None` when nothing drives the unit,
+/// (`UnitScript.cpp:1117-1118,1148-1149`), and `REVERSING` whether the move
+/// type is backing up (`UnitScript.cpp:1151-1153`). `None` when nothing drives the unit,
 /// which leaves [`known`] to answer as it always has.
 pub fn driven(id: i32, p1: i32, world: Option<&crate::World>) -> Option<i32> {
     let drive = world?.drive?;
@@ -284,6 +286,7 @@ pub fn driven(id: i32, p1: i32, world: Option<&crate::World>) -> Option<i32> {
         HEADING if p1 <= 0 || p1 == UNIT_ID => Some(drive.heading),
         CURRENT_SPEED => Some((drive.speed * f64::from(COBSCALE)) as i32),
         MAX_SPEED => Some((drive.max_speed * f64::from(COBSCALE)) as i32),
+        REVERSING => Some(i32::from(drive.reversing)),
         _ => None,
     }
 }
@@ -950,6 +953,7 @@ mod tests {
                 heading,
                 speed,
                 max_speed: 2.0,
+                reversing: false,
             }),
             ..scene(None)
         }
@@ -969,6 +973,20 @@ mod tests {
         // Another unit's heading is not the driven unit's.
         assert_eq!(driven(HEADING, 2, Some(&w)), None);
         assert_eq!(driven(HEALTH, 0, Some(&w)), None);
+    }
+
+    /// `REVERSING` is the move type's own, so a unit backing up answers 1 and
+    /// one driving forwards answers 0 (`UnitScript.cpp:1151-1153`).
+    #[test]
+    fn a_driven_unit_answers_whether_it_is_reversing() {
+        let forwards = driving([0.0; 3], 0, 1.0);
+        assert_eq!(driven(REVERSING, 0, Some(&forwards)), Some(0));
+        let mut backwards = driving([0.0; 3], 0, 1.0);
+        if let Some(drive) = backwards.drive.as_mut() {
+            drive.reversing = true;
+        }
+        assert_eq!(driven(REVERSING, 0, Some(&backwards)), Some(1));
+        assert_eq!(driven(REVERSING, 0, None), None);
     }
 
     /// Nothing driving it leaves the answers to `known`, which is what every

@@ -36,6 +36,7 @@ const frame = (over: Partial<DriveFrame>): DriveFrame => ({
   pos: [0, 0, 0],
   heading: 0,
   speed: 0,
+  reversing: false,
   up: null,
   ...over,
 });
