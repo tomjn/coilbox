@@ -17,6 +17,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { BIPED, projectFromPlan } from "../bodyPlans";
 import { type LegoProject, newProject } from "../model";
 import type { RawGeometry } from "../rawGeometry";
 import type { ShapeKind } from "../shapes";
@@ -419,6 +420,38 @@ describe("the fit a body plan action (#3261)", () => {
       fitted: true,
     });
     expect(next.pieces[0]).toMatchObject({ bone: "base", role: "base" });
+  });
+});
+
+describe("removing a skeleton (#4401)", () => {
+  it("is one edit that keeps pieces, roles and presets", async () => {
+    let n = 0;
+    const walker = projectFromPlan(BIPED, {
+      id: "p",
+      rootPieceId: "base",
+      name: "walker",
+      packId: "lego",
+      packVersion: "1",
+      now: "2026-09-22T00:00:00Z",
+      newId: () => `piece-${++n}`,
+    });
+    show(walker);
+    fireEvent.click(await screen.findByRole("button", { name: "Skeleton" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove skeleton" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+
+    const edit = doc.current.edit as ReturnType<typeof vi.fn>;
+    expect(edit).toHaveBeenCalledTimes(1);
+    const next: LegoProject = edit.mock.calls[0][0](walker);
+    expect(next.skeleton).toBeUndefined();
+    expect(next.pieces.every((p) => p.bone === undefined)).toBe(true);
+    expect(next.pieces.map((p) => p.id)).toEqual(
+      walker.pieces.map((p) => p.id),
+    );
+    expect(next.pieces.map((p) => p.role)).toEqual(
+      walker.pieces.map((p) => p.role),
+    );
+    expect(next.animations).toEqual(walker.animations);
   });
 });
 
