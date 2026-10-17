@@ -36,7 +36,7 @@ export type RangeKind =
   | "starburst"
   /** `CCannon::GetRange2D` works the range out from the shell's speed and
    *  the map's gravity, which the builder does not have. The stated range
-   *  is used, so treat it as an estimate. */
+   *  is used, so treat it as an estimate (#4274). */
   | "ballistic";
 
 /** Which directions a weapon can fire in. */
