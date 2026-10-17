@@ -16,8 +16,8 @@ const JOINT_DOT = 9;
 
 /**
  * Draw the unit's skeleton while `show` is on, and free it when it is off.
- * `show` is false while the pieces are being played, since the drawing is of
- * the rest pose and would sit where the bones are not.
+ * The drawing is of the rest pose.
+ * While a script plays, `applyTimelineFrame` moves it onto the pieces.
  */
 export function useSkeleton(
   sceneRef: RefObject<SceneState | null>,

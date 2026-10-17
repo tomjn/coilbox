@@ -10,14 +10,27 @@ import {
 } from "./skeletonLayer";
 
 const joints: SkeletonJoint[] = [
-  { pieceId: "a", label: "Body", at: [0, 10, 0], parentAt: null },
+  {
+    pieceId: "a",
+    label: "Body",
+    at: [0, 10, 0],
+    parentAt: null,
+    parentId: null,
+  },
   {
     pieceId: "b",
     label: "Front left thigh",
     at: [3, 8, 1],
     parentAt: [0, 10, 0],
+    parentId: "a",
   },
-  { pieceId: "c", label: "tag", at: [3, 3, 1], parentAt: [3, 8, 1] },
+  {
+    pieceId: "c",
+    label: "tag",
+    at: [3, 3, 1],
+    parentAt: [3, 8, 1],
+    parentId: "b",
+  },
 ];
 
 function build(): THREE.Group {
