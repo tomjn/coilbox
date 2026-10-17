@@ -276,6 +276,23 @@ describe("symmetry twin", () => {
     }
   });
 
+  it("goes under a mirrored parent on the centre line (#4306)", () => {
+    // The hull's reflected frame is the root's, so matching frames alone would
+    // put the twin free under the root.
+    for (const to of ["+x", "-x"]) {
+      const doc = legOn(to, SLID, { scale: [-1, 1, 1] });
+      const out = mirrorTwin(doc, "leg", () => "twin", pack());
+      if (!out) throw new Error("no twin");
+      const twin = pieceOf(out.project, "twin");
+      expect(twin.parentId).toBe("hull");
+      expect(twin.connection?.to).toBe(MIRRORED_FACE[to]);
+      expect(round(worldMatrix(out.project, "twin"))).toEqual(
+        reflected(doc, "leg"),
+      );
+      expect(holds(out.project, "twin")).toBe(true);
+    }
+  });
+
   it("joins a child's twin to the mirrored parent", () => {
     // A left thigh with its twin, then a shin under the left thigh.
     const thigh = legOn("+x", SLID);
