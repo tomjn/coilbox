@@ -321,7 +321,7 @@ function Rows({
                     title={
                       join.broken
                         ? `Broken join to ${join.parentName}`
-                        : `Joined to ${join.parentName}: its ${join.connector} to the ${join.to}`
+                        : `Joined to ${join.parentName}: its ${join.connectorName} to the ${join.toName}`
                     }
                     className={`shrink-0 ${
                       join.broken ? "text-destructive" : "text-muted-foreground"

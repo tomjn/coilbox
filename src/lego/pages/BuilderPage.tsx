@@ -62,6 +62,7 @@ import {
   disconnectPiece,
   type JoinSummary,
   pieceConnectors,
+  setJoinPlace,
 } from "../connectors";
 import {
   DEFAULT_GROUND,
@@ -241,6 +242,7 @@ function Builder({ id }: { id: string | undefined }) {
   /** Whether the part picker for "Change part" is open, and what the last
    *  swap left behind. */
   const [swapping, setSwapping] = useState(false);
+  const [showFreeFaces, setShowFreeFaces] = useState(false);
   const [swapNote, setSwapNote] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   /**
@@ -601,6 +603,15 @@ function Builder({ id }: { id: string | undefined }) {
   // One edit, so one undo step. The piece stays where it is.
   function detach(pieceId: string) {
     edit((project) => disconnectPiece(project, pieceId));
+  }
+
+  // Typing an offset or twist is one edit, resolved through the join.
+  function placeJoin(
+    pieceId: string,
+    change: { offset?: [number, number]; twist?: number },
+  ) {
+    if (!pack) return;
+    edit((project) => setJoinPlace(project, pack, pieceId, change));
   }
 
   async function saveSelectionAsCompound() {
@@ -1205,6 +1216,7 @@ function Builder({ id }: { id: string | undefined }) {
               )}
             >
               <ModelViewport
+                showFreeFaces={showFreeFaces}
                 onReferenceUnit={setReferenceUnit}
                 ground={ground}
                 chrome={
@@ -2188,6 +2200,11 @@ function Builder({ id }: { id: string | undefined }) {
                             <JoinedTo
                               join={joins.get(selected.id) ?? null}
                               onDetach={() => detach(selected.id)}
+                              onPlace={(change) =>
+                                placeJoin(selected.id, change)
+                              }
+                              showFree={showFreeFaces}
+                              onShowFreeChange={setShowFreeFaces}
                             />
                           )}
 

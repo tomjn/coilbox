@@ -399,34 +399,26 @@ describe("folding a branch", () => {
   });
 });
 
+const JOIN = {
+  parentName: "hull",
+  connector: "+y",
+  to: "-y",
+  connectorName: "top",
+  toName: "bottom",
+  offset: [0, 0] as [number, number],
+  twist: 0,
+};
+
 describe("PieceTree joins", () => {
   it("marks a joined piece with a named icon and leaves a free one bare", () => {
-    show(
-      walker(),
-      [],
-      new Map([
-        [
-          "skirt",
-          { parentName: "hull", connector: "+y", to: "-y", broken: false },
-        ],
-      ]),
-    );
+    show(walker(), [], new Map([["skirt", { ...JOIN, broken: false }]]));
     const mark = screen.getByRole("img", { name: "Joined to hull" });
     expect(row("skirt").contains(mark)).toBe(true);
     expect(screen.getAllByRole("img", { name: /^Joined to/ })).toHaveLength(1);
   });
 
   it("marks a join that cannot be made as broken", () => {
-    show(
-      walker(),
-      [],
-      new Map([
-        [
-          "skirt",
-          { parentName: "hull", connector: "+y", to: "x", broken: true },
-        ],
-      ]),
-    );
+    show(walker(), [], new Map([["skirt", { ...JOIN, broken: true }]]));
     expect(
       screen.getByRole("img", { name: "Broken join to hull" }),
     ).toBeTruthy();

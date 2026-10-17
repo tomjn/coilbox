@@ -8,10 +8,12 @@ import {
   customConnectors,
   describeJoin,
   disconnectPiece,
+  joinFaceOutlines,
   type LegoConnector,
   pieceConnectors,
   readPartConnectors,
   resolveConnections,
+  setJoinPlace,
   slideJoin,
   withConnections,
 } from "./connectors";
@@ -383,8 +385,46 @@ describe("describeJoin", () => {
       parentName: pieceOf(joined, "hull").name,
       connector: "+y",
       to: "-y",
+      connectorName: "top",
+      toName: "bottom",
+      offset: [0, 0],
+      twist: 0,
       broken: false,
     });
+  });
+
+  it("names a box's six faces by the unit's own directions", () => {
+    const names = ["+y", "-y", "+z", "-z", "+x", "-x"].map((to) => {
+      const doc = connectPiece(hullAndLeg({}), pack(), "leg", {
+        connector: "+y",
+        to,
+      });
+      return describeJoin(doc, pack(), pieceOf(doc, "leg"))?.toName;
+    });
+    expect(names).toEqual(["top", "bottom", "front", "back", "left", "right"]);
+  });
+
+  it("shows a connector the pack states by its id", () => {
+    const stated = pack();
+    (stated.byId.get("hull") as LegoPartInfo).connectors = [
+      { id: "+y", position: [0, 0.5, 0], facing: [0, 1, 0], up: [0, 0, 1] },
+    ];
+    const doc = connectPiece(hullAndLeg({}), stated, "leg", {
+      connector: "+y",
+      to: "+y",
+    });
+    const join = describeJoin(doc, stated, pieceOf(doc, "leg"));
+    expect(join?.toName).toBe("+y");
+    expect(join?.connectorName).toBe("top");
+  });
+
+  it("reports the offset and twist the join rests at", () => {
+    const doc = hullAndLeg({
+      connection: { connector: "+y", to: "-y", offset: [0.5, 0.25], twist: 1 },
+    });
+    const join = describeJoin(doc, pack(), pieceOf(doc, "leg"));
+    expect(join?.offset).toEqual([0.5, 0.25]);
+    expect(join?.twist).toBe(1);
   });
 
   it("says nothing about a free piece", () => {
@@ -406,6 +446,93 @@ describe("describeJoin", () => {
       ),
     };
     expect(describeJoin(bad, pack(), pieceOf(bad, "leg"))?.broken).toBe(true);
+  });
+});
+
+describe("joinFaceOutlines", () => {
+  const joined = () =>
+    connectPiece(hullAndLeg({}), pack(), "leg", { connector: "+y", to: "-y" });
+
+  it("outlines the joined face on the piece and on its parent", () => {
+    const out = joinFaceOutlines(joined(), pack(), "leg", false);
+    expect(out.map((o) => [o.owner, o.kind])).toEqual([
+      ["leg", "joined"],
+      ["hull", "joined"],
+    ]);
+  });
+
+  it("draws each outline as four corners lying on the face", () => {
+    const [own] = joinFaceOutlines(joined(), pack(), "leg", false);
+    expect(own.corners).toHaveLength(4);
+    // The leg's top face is at y = 1 in its part space, pivot 0.
+    for (const corner of own.corners) expect(corner[1]).toBeCloseTo(1);
+    // Smaller than the 0.5 by 0.5 face, so the edge stays visible.
+    const xs = own.corners.map((c) => c[0]);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(0.5);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(0);
+  });
+
+  it("adds the piece's other faces as free when asked", () => {
+    const out = joinFaceOutlines(joined(), pack(), "leg", true);
+    const free = out.filter((o) => o.kind === "free");
+    expect(free).toHaveLength(5);
+    expect(free.every((o) => o.owner === "leg")).toBe(true);
+  });
+
+  it("shows every face of a free piece as free, and none unless asked", () => {
+    const doc = hullAndLeg({});
+    expect(joinFaceOutlines(doc, pack(), "leg", false)).toEqual([]);
+    expect(joinFaceOutlines(doc, pack(), "leg", true)).toHaveLength(6);
+  });
+
+  it("draws nothing for a join that cannot be made", () => {
+    const bad = hullAndLeg({ connection: { connector: "+y", to: "nope" } });
+    const out = joinFaceOutlines(bad, pack(), "leg", false);
+    expect(out.map((o) => o.owner)).toEqual(["leg"]);
+  });
+});
+
+describe("setJoinPlace", () => {
+  const joined = () =>
+    connectPiece(hullAndLeg({}), pack(), "leg", { connector: "+y", to: "-y" });
+
+  it("moves the piece along the face when the offset is set", () => {
+    const out = setJoinPlace(joined(), pack(), "leg", { offset: [0.5, 0] });
+    expect(pieceOf(out, "leg").connection?.offset).toEqual([0.5, 0]);
+    expect(round(pieceOf(out, "leg").position)).not.toEqual(
+      round(pieceOf(joined(), "leg").position),
+    );
+  });
+
+  it("turns the piece on the face when the twist is set", () => {
+    const out = setJoinPlace(joined(), pack(), "leg", { twist: Math.PI / 2 });
+    expect(pieceOf(out, "leg").connection?.twist).toBe(Math.PI / 2);
+    expect(round(pieceOf(out, "leg").rotation)).not.toEqual(
+      round(pieceOf(joined(), "leg").rotation),
+    );
+  });
+
+  it("stores no offset or twist for the rest position", () => {
+    const moved = setJoinPlace(joined(), pack(), "leg", {
+      offset: [0.5, 0],
+      twist: 1,
+    });
+    const back = setJoinPlace(moved, pack(), "leg", {
+      offset: [0, 0],
+      twist: 0,
+    });
+    expect(pieceOf(back, "leg").connection).toEqual({
+      connector: "+y",
+      to: "-y",
+    });
+    expect(round(pieceOf(back, "leg").position)).toEqual(
+      round(pieceOf(joined(), "leg").position),
+    );
+  });
+
+  it("leaves a free piece alone", () => {
+    const doc = hullAndLeg({});
+    expect(setJoinPlace(doc, pack(), "leg", { offset: [1, 0] })).toBe(doc);
   });
 });
 

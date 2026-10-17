@@ -150,7 +150,7 @@ export function Vec3Row({
   );
 }
 
-function NumberField({
+export function NumberField({
   value,
   axis,
   colour,

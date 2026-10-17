@@ -127,6 +127,7 @@ import {
   dragGroup,
   pieceIdOf,
 } from "./gizmoCommit";
+import { clearJoinFaces } from "./joinFaceMarks";
 import {
   clearPlaceGhost,
   type PlacingPart,
@@ -301,6 +302,8 @@ const NO_STAND_IN: StandInPlacement = {
 };
 
 interface Props {
+  /** Also outline the selected piece's faces that nothing is joined to. */
+  showFreeFaces?: boolean;
   /**
    * The unit's own chrome, drawn along the top of the view.
    *
@@ -531,6 +534,7 @@ export function ModelViewport({
   partPlacement,
   collisionEditing,
   aimPoint,
+  showFreeFaces = false,
 }: Props) {
   const { pack, raw, project } = document;
   const {
@@ -1041,6 +1045,7 @@ export function ModelViewport({
         rest: new Map(),
         uniformScale: false,
         anchors: null,
+        joinMarks: [],
         targetAnchors: null,
         seatMark,
         seatOutline,
@@ -1172,6 +1177,7 @@ export function ModelViewport({
           gizmo.getHelper().removeFromParent();
           gizmo.dispose();
           clearAnchors(state);
+          clearJoinFaces(state);
           for (const helper of state.selectOutlines) helper.dispose();
           state.targetAnchors?.geometry.dispose();
           state.seatMark.geometry.dispose();
@@ -1272,7 +1278,14 @@ export function ModelViewport({
 
   useModelHover(sceneRef, hoveredId, project);
 
-  useModelAnchors(sceneRef, pack, project, soleSelectedId, playing);
+  useModelAnchors(
+    sceneRef,
+    pack,
+    project,
+    soleSelectedId,
+    playing,
+    showFreeFaces,
+  );
 
   useGizmoMode(sceneRef, mode, editingVolume, showAimPoint, uniformScale);
 
