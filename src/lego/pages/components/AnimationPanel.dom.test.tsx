@@ -735,7 +735,9 @@ describe("a unit driven along a path", () => {
     const moving = events.find((e) => e.frame === 100)?.world?.drive;
     expect(moving?.speed).toBe(2);
     expect(moving?.heading).toBe(0);
-    expect(moving?.pos[2]).toBeCloseTo(2 * (100 - 15));
+    // Three elmos short of two a frame all the way, from speeding up at the
+    // default 0.5 a frame squared: 0.5, 1, 1.5, then 2.
+    expect(moving?.pos[2]).toBeCloseTo(2 * (100 - 15) - 3);
 
     const placement = lastPlacement(onStandIn);
     expect(placement.drive.frames).toHaveLength(450);
