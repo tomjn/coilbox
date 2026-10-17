@@ -585,6 +585,8 @@ It writes, if you leave the boxes ticked:
 
 It can also write a `.glb`, or an `.obj` with its `.mtl` and a copy of the atlas beside them. Neither is read by the engine. Both go into a `blender` folder alongside the game's own, for taking the unit into Blender to check it against the `.s3o` or finish it by hand.
 
+To open the unit in Blender, use the `.glb` or `.obj`, not the `.s3o`. The builder writes no second texture, and the S3O Kit add-on skips its material setup when the second texture name is empty, so an `.s3o` opened with it shows no texture. S3O Kit also draws a PNG atlas mirrored vertically, even though the file is right for the engine. See [the engine load checklist](#the-engine-load-checklist).
+
 Generated shapes are written like parts. See [Exporting a shape](#exporting-a-shape).
 
 **A re-export keeps your edits.** The script and the unit definition are meant to be edited, so export never overwrites a change you made to either, whether you made it in a text editor or through the workshop.
