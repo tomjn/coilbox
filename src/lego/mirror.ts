@@ -365,6 +365,10 @@ export function mirrorParent(project: LegoProject, parentId: string): string {
   // not its own frame when it is mirrored, and can be another piece's, such as
   // the root's, so frames are only compared for a parent off the line.
   if (onCentreLine(project, parentId)) return parentId;
+  // A bone of a skeleton names its twin outright (#3315), and the two frames
+  // differ in handedness, so a frame match cannot find it (#3256).
+  const saved = pieceById(project, parentId)?.twin;
+  if (saved !== undefined && pieceById(project, saved)) return saved;
   const reflected = reflection(project).multiply(
     worldMatrix(project, parentId),
   );
