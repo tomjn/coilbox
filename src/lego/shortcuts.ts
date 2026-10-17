@@ -147,6 +147,12 @@ export const SHORTCUTS: Shortcut[] = [
     combos: [{ key: "3", mod: false, shift: false }],
   },
   {
+    id: "draw-mode",
+    group: "View",
+    description: "Draw the unit solid, as edges, or solid with edges",
+    combos: [{ key: "w", mod: false, shift: false }],
+  },
+  {
     id: "measure",
     group: "View",
     description: "Measure between two points",
