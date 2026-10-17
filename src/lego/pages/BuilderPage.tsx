@@ -172,6 +172,7 @@ import { isShortcut, shortcutLabel } from "../shortcuts";
 import { skeletonProblems } from "../skeletonChecks";
 import { applyProportions } from "../skeletonEdit";
 import { applyTarget } from "../skeletonSize";
+import { newSphereShape } from "../sphereShape";
 import { swapModule } from "../swapModule";
 import { swapPart } from "../swapPart";
 import { useEditShortcuts } from "../useEditShortcuts";
@@ -638,16 +639,18 @@ function Builder({ id }: { id: string | undefined }) {
   }
 
   /**
-   * Add a cylinder, tube, cone or wedge at the selected piece's origin, as a part added
+   * Add a cylinder, tube, cone, sphere, dome or wedge at the selected piece's origin, as a part added
    * with Alt is. It is sized in the piece panel. #3337 moves shapes into the
    * strip beside the parts.
    */
-  function addShape(kind: RoundKind | "wedge") {
+  function addShape(kind: RoundKind | "wedge" | "sphere" | "dome") {
     if (!draft || !pack) return;
     const shape =
       kind === "wedge"
         ? newWedgeShape(draft, pack)
-        : newRoundShape(kind, draft, pack);
+        : kind === "sphere" || kind === "dome"
+          ? newSphereShape(kind === "dome", draft, pack)
+          : newRoundShape(kind, draft, pack);
     if (!shape) return;
     const pieceId = crypto.randomUUID();
     edit((project) =>
@@ -2331,6 +2334,20 @@ function Builder({ id }: { id: string | undefined }) {
                       onClick={() => addShape("cone")}
                     >
                       Cone
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => addShape("sphere")}
+                    >
+                      Sphere
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => addShape("dome")}
+                    >
+                      Dome
                     </Button>
                     <Button
                       size="sm"

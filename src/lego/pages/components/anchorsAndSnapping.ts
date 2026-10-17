@@ -21,6 +21,7 @@ import {
   snapRotation,
   type Vec3,
 } from "../../snapping";
+import { sphereAnchors } from "../../sphereShape";
 import { wedgeAnchors } from "../../wedgeShape";
 import { cornerMark, faceMark, points } from "./dotsAndPoints";
 import { pieceIdOf } from "./gizmoCommit";
@@ -96,11 +97,13 @@ function localAnchorsOf(
         ? wedgeAnchors(box, piece.shape)
         : piece.shape?.kind === "cone" && box
           ? coneAnchors(box, piece.shape)
-          : pieceAnchors(
-              box,
-              undefined,
-              piece.shape !== undefined && isRoundShapeKind(piece.shape.kind),
-            )
+          : piece.shape?.kind === "sphere" && box
+            ? sphereAnchors(box, piece.shape)
+            : pieceAnchors(
+                box,
+                undefined,
+                piece.shape !== undefined && isRoundShapeKind(piece.shape.kind),
+              )
     ).map((anchor) =>
       anchor.connector && ids.has(anchor.connector)
         ? anchor
