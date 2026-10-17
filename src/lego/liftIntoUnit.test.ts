@@ -2,7 +2,7 @@ import { gunzipSync, gzipSync } from "fflate";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { legoGeometryUrl } from "../lib/assetUrl";
-import { liftIntoUnit } from "./liftIntoUnit";
+import { liftIntoUnit, pasteIntoUnit } from "./liftIntoUnit";
 import { type LegoProject, newProject } from "./model";
 import {
   encodeRawGeometry,
@@ -132,6 +132,64 @@ describe("liftIntoUnit", () => {
 
   it("says which module's meshes are missing, and writes nothing", async () => {
     await expect(liftIntoUnit("unit", turret())).rejects.toThrow(
+      /The meshes of mod could not be read/,
+    );
+    expect(save).not.toHaveBeenCalled();
+  });
+});
+
+/** A pasted piece naming mesh `mod/m0`, as a lifted module's piece does once in a unit. */
+function placed(): LegoProject {
+  const module = turret();
+  return {
+    ...module,
+    pieces: module.pieces.map((piece) => ({ ...piece, meshId: "mod/m0" })),
+  };
+}
+
+describe("pasteIntoUnit", () => {
+  it("copies the pasted pieces' meshes out of the unit they were copied from", async () => {
+    files.set("source", geometry("mod/m0", 5));
+
+    const raw = await pasteIntoUnit("unit", "source", placed());
+
+    expect([...(raw?.byId.keys() ?? [])]).toEqual(["mod/m0"]);
+    expect((save.mock.calls[0][0] as { id: string }).id).toBe("unit");
+    expect(written().byId.get("mod/m0")?.bbox.min).toEqual([5, 0, 0]);
+  });
+
+  it("keeps what the unit's file already holds", async () => {
+    files.set("source", geometry("mod/m0", 5));
+    files.set("unit", geometry("other/m0", 9));
+
+    await pasteIntoUnit("unit", "source", placed());
+
+    expect([...written().byId.keys()]).toEqual(["other/m0", "mod/m0"]);
+  });
+
+  it("reads nothing when pasting into the unit it was copied from", async () => {
+    const raw = await pasteIntoUnit("unit", "unit", placed());
+    expect(raw).toBeNull();
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("writes nothing when the unit already holds the meshes", async () => {
+    files.set("source", geometry("mod/m0", 5));
+    files.set("unit", geometry("mod/m0", 5));
+
+    await pasteIntoUnit("unit", "source", placed());
+
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("needs no file for pieces of parts", async () => {
+    const raw = await pasteIntoUnit("unit", "source", base("parts"));
+    expect(raw).toBeNull();
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("says whose meshes are missing, and writes nothing", async () => {
+    await expect(pasteIntoUnit("unit", "source", placed())).rejects.toThrow(
       /The meshes of mod could not be read/,
     );
     expect(save).not.toHaveBeenCalled();

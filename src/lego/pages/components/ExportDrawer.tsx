@@ -68,7 +68,7 @@ import {
   receiptFor,
   recordExport,
 } from "../../exportRecord";
-import { textureSheetRefusal } from "../../liftPiece";
+import { liftCredits, textureSheetRefusal } from "../../liftPiece";
 import { unitScript } from "../../luaScript";
 import type {
   ExportedFile,
@@ -495,6 +495,7 @@ export function ExportDrawer({
   // A unit of parts holding a lifted piece has two textures and a model can
   // name one, so nothing is written out until they share a sheet (#3260).
   const heldBack = textureSheetRefusal(project);
+  const credits = liftCredits(project);
   // The same two textures again, named as the PNGs a Blender file can carry.
   const blender = project.imported ? blenderTextures(project.imported) : null;
   const unit = unitAtlas(project, pack.library.atlases);
@@ -1233,6 +1234,13 @@ export function ExportDrawer({
             ) : null}
 
             <div className="flex flex-col gap-2 border-t border-border/60 pt-4">
+              {credits.length > 0 ? (
+                <ul className="text-xs text-muted-foreground">
+                  {credits.map((credit) => (
+                    <li key={credit}>{credit}</li>
+                  ))}
+                </ul>
+              ) : null}
               {heldBack ? (
                 <p className="text-xs text-muted-foreground">{heldBack}</p>
               ) : null}

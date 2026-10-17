@@ -34,23 +34,60 @@ export async function liftIntoUnit(
   const placed = moduleForUnit(module);
   if (placed.keys.size === 0) return { module: placed.module, raw: null };
 
+  const raw = await copyMeshes(unitId, module.id, module.name, placed.keys);
+  return { module: placed.module, raw };
+}
+
+/**
+ * Copy the meshes `keys` names out of the geometry file of `fromId` into the
+ * unit `unitId`'s, and return the unit's geometry. Writes nothing when the unit
+ * already holds them.
+ */
+async function copyMeshes(
+  unitId: string,
+  fromId: string,
+  name: string,
+  keys: ReadonlyMap<string, string>,
+): Promise<RawGeometry | null> {
   // Read off the disk rather than taken from the view, so meshes that only
   // undone pieces still name are kept.
   const [own, from] = await Promise.all([
     loadRawGeometryIfAny(unitId),
-    loadRawGeometry(module.id).catch((error: unknown) => {
+    loadRawGeometry(fromId).catch((error: unknown) => {
       throw new Error(
-        `The meshes of ${module.name} could not be read: ${error instanceof Error ? error.message : String(error)}`,
+        `The meshes of ${name} could not be read: ${error instanceof Error ? error.message : String(error)}`,
       );
     }),
   ]);
-  const merged = mergeRawGeometry(own, from, placed.keys);
-  if (own && merged.byId.size === own.byId.size) {
-    return { module: placed.module, raw: own };
-  }
+  const merged = mergeRawGeometry(own, from, keys);
+  if (own && merged.byId.size === own.byId.size) return own;
   await legoGeometrySave({
     id: unitId,
     bytes: Array.from(gzipSync(encodeRawGeometry(merged))),
   });
-  return { module: placed.module, raw: merged };
+  return merged;
+}
+
+/**
+ * Give the unit `unitId` the meshes of pieces pasted into it (#4343).
+ *
+ * The pieces keep the mesh keys they had in the unit `sourceId` they were
+ * copied from, so those meshes are copied across under the same keys. Null when
+ * there is nothing to copy: the pieces draw no mesh, or they were copied from
+ * this unit (or by a build that did not say), where the keys already resolve.
+ * Throws, saying why, when a file cannot be read or written, and then nothing
+ * has changed.
+ */
+export async function pasteIntoUnit(
+  unitId: string,
+  sourceId: string | undefined,
+  pasted: LegoProject,
+): Promise<RawGeometry | null> {
+  if (!sourceId || sourceId === unitId) return null;
+  const keys = new Map<string, string>();
+  for (const piece of pasted.pieces) {
+    if (piece.meshId) keys.set(piece.meshId, piece.meshId);
+  }
+  if (keys.size === 0) return null;
+  return copyMeshes(unitId, sourceId, pasted.name, keys);
 }

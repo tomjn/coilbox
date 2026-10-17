@@ -80,8 +80,12 @@ import {
   transformRoots,
 } from "../groupTransform";
 import { useInventoryView } from "../inventory";
-import { liftIntoUnit } from "../liftIntoUnit";
-import { holdsLiftedPieces, liftedModuleRefusal } from "../liftPiece";
+import { liftIntoUnit, pasteIntoUnit } from "../liftIntoUnit";
+import {
+  holdsLiftedPieces,
+  liftCredit,
+  liftedModuleRefusal,
+} from "../liftPiece";
 import { canFixMesh, DEFAULT_SMOOTHING_ANGLE_DEG } from "../meshFix";
 import {
   canMirror,
@@ -1087,7 +1091,9 @@ function Builder({ id }: { id: string | undefined }) {
     const lifted = doc.lift(selectedIds);
     if (!lifted) return;
     try {
-      await navigator.clipboard.writeText(serializeClipboardPiece(lifted));
+      await navigator.clipboard.writeText(
+        serializeClipboardPiece(lifted, draft?.id),
+      );
     } catch (e) {
       void notify({
         title: "Couldn't copy to the clipboard",
@@ -1118,6 +1124,24 @@ function Builder({ id }: { id: string | undefined }) {
       void notify({
         title: "Couldn't paste",
         body: result.reason,
+        level: "error",
+      });
+      return;
+    }
+    // Pasting is the other way pieces lifted from a game get into a unit, so it
+    // meets the same refusal as adding the module from the inventory.
+    if (refuseLifted(result.piece.project, "Couldn't paste")) return;
+    try {
+      const raw = await pasteIntoUnit(
+        draft.id,
+        result.piece.sourceUnitId,
+        result.piece.project,
+      );
+      if (raw) geometry.adopt(raw);
+    } catch (e) {
+      void notify({
+        title: "Couldn't paste",
+        body: e instanceof Error ? e.message : String(e),
         level: "error",
       });
       return;
@@ -2362,6 +2386,11 @@ function Builder({ id }: { id: string | undefined }) {
                             onCommit={renameSelected}
                             className="mt-1"
                           />
+                          {selected.lifted ? (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {liftCredit(selected.lifted)}
+                            </p>
+                          ) : null}
 
                           <TransformFields
                             piece={selected}

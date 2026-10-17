@@ -106,6 +106,21 @@ export function holdsLiftedPieces(project: LegoProject): boolean {
   return project.pieces.some((piece) => piece.lifted);
 }
 
+/** The credit for one lifted piece: "From Beyond All Reason, unit armcom". */
+export function liftCredit(lifted: LegoLifted): string {
+  const what = lifted.unit ? `unit ${lifted.unit}` : `model ${lifted.member}`;
+  return `From ${lifted.game.name}, ${what}`;
+}
+
+/** Every game and unit the pieces of this document were lifted from, once each. */
+export function liftCredits(project: LegoProject): string[] {
+  const seen = new Set<string>();
+  for (const piece of project.pieces) {
+    if (piece.lifted) seen.add(liftCredit(piece.lifted));
+  }
+  return [...seen];
+}
+
 /**
  * Why a module cannot go into this unit, or null when it can.
  *
