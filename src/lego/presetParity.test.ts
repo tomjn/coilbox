@@ -381,6 +381,27 @@ function wakePlan(): Plan {
   };
 }
 
+/**
+ * `Activate` at the start of the loop `track()` plays and `Deactivate` when it
+ * has held stowed. The loop ends on a held second at rest, so the last frames
+ * check the gear stays down.
+ */
+function gearPlan(preset: AnimPreset, params: Record<string, number>): Plan {
+  const time = param(preset, params, "stowTime");
+  const down = CALLIN + Math.round((time + 1) * FPS);
+  const frames = CALLIN + Math.round(2 * (time + 1) * FPS);
+  return {
+    events: [
+      ...CREATED,
+      { frame: CALLIN, callin: "Activate" },
+      { frame: down, callin: "Deactivate" },
+    ],
+    frames,
+    spans: [{ from: CALLIN, to: frames - 1, t0: 0 }],
+    exceptions: [],
+  };
+}
+
 function plan(preset: AnimPreset, params: Record<string, number>): Plan {
   switch (preset.id) {
     case "walk.biped":
@@ -414,6 +435,8 @@ function plan(preset: AnimPreset, params: Record<string, number>): Plan {
       return rudderPlan();
     case "wake.moving":
       return wakePlan();
+    case "gear.stow":
+      return gearPlan(preset, params);
   }
   throw new Error(`no parity plan for ${preset.id}`);
 }
@@ -583,9 +606,9 @@ function buildCases() {
 describe("preset parity fixture", () => {
   const cases = buildCases();
 
-  it("covers all 16 presets", () => {
-    expect(new Set(cases.map((entry) => entry.preset.id)).size).toBe(16);
-    expect(PRESETS).toHaveLength(16);
+  it("covers all 17 presets", () => {
+    expect(new Set(cases.map((entry) => entry.preset.id)).size).toBe(17);
+    expect(PRESETS).toHaveLength(17);
   });
 
   it("matches what the presets generate today", () => {

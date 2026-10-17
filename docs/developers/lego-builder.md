@@ -269,7 +269,7 @@ Unlike the grid and the axes helper, this one has no toggle. Get a unit's facing
 
 An animation preset is a canned motion. It does not ask you to key anything: it asks which piece is the turret, which is the barrel, which is the front left thigh. That is what a **role** is, and it is why roles are a fixed list rather than free text.
 
-Set a role on the selected piece in the Pieces panel. The roles are grouped: Body and Door under Structure, Turret, Barrel, Muzzle flare and Aim point under Weapon, Wheel, Track, Rudder and Wake point under Movement, three segments for each of four legs, and three parts of a build arm.
+Set a role on the selected piece in the Pieces panel. The roles are grouped: Body and Door under Structure, Turret, Barrel, Muzzle flare and Aim point under Weapon, Wheel, Track, Rudder, Wake point and Landing gear under Movement, three segments for each of four legs, and three parts of a build arm.
 
 Then open the **Animation** tab. Each preset says what it does and what it needs, and one it cannot use yet names the missing role rather than sitting greyed out with no explanation:
 
@@ -281,6 +281,7 @@ Then open the **Animation** tab. Each preset says what it does and what it needs
 | Wheels turning | At least one wheel |
 | Rudder follows turns | At least one rudder |
 | Wake while moving | At least one wake point |
+| Landing gear | At least one landing gear piece |
 | Build arm | A build arm |
 | Doors | At least one door |
 | Hover and bob | A body |
@@ -799,9 +800,9 @@ A hovercraft:
 
 An aircraft:
 
-- Works today. **Hover and bob** suits a gunship holding position, but it keeps running after the aircraft lands. Turrets and weapons work. The engine sends `StartMoving` when the aircraft's speed rises from zero and `StopMoving` when it falls to zero.
-- Does not work. Movement offers only ground classes, so export writes a static unit or a ground unit ([issue #4370](https://github.com/tomjn/coilbox/issues/4370)). There is no rotor role or spin ([issue #3359](https://github.com/tomjn/coilbox/issues/3359)). Driving along a path is for ground units only. The engine switches an aircraft on as it takes off and off once it has landed, so **Doors** swings open and shut for the whole flight and is no use as landing gear ([issue #4369](https://github.com/tomjn/coilbox/issues/4369)).
-- By hand. In Unit tweaks, set `canFly`, `canMove`, `speed` and `cruiseAltitude`, and clear `movementClass`. Add `hoverAttack` for a gunship rather than a plane that makes strafing runs. The engine banks and pitches the whole aircraft itself, so the script should not. Take ownership of the script for rotors: `Spin` on `StartMoving` and `StopSpin` on `StopMoving`. Stow landing gear in `Activate` and lower it in `Deactivate`. A gunship is also sent `MoveRate` with 0, 1 or 2 as it speeds up, which a script can use to tilt rotors or wings. `Falling` and `Landed` are not for aircraft: they are for a unit dropped from a transport.
+- Works today. **Hover and bob** suits a gunship holding position, but it keeps running after the aircraft lands. **Landing gear** stows on take off and lowers on landing, and the **Take off and land** scenario plays both. Give the gear pieces the Landing gear role, with each joint at the hinge. They turn about x, up to **Stowed angle** over **Stowing time**, which start at 105 degrees and 2.3 seconds, the legs of Balanced Annihilation's Dragonfly. The aircraft plan has no gear bones, so add them. Turrets and weapons work. The engine sends `StartMoving` when the aircraft's speed rises from zero and `StopMoving` when it falls to zero.
+- Does not work. Movement offers only ground classes, so export writes a static unit or a ground unit ([issue #4370](https://github.com/tomjn/coilbox/issues/4370)). There is no rotor role or spin ([issue #3359](https://github.com/tomjn/coilbox/issues/3359)). Driving along a path is for ground units only. **Doors** swings open and shut for the whole flight, because the engine switches an aircraft on as it takes off and off once it has landed. Use **Landing gear** instead.
+- By hand. In Unit tweaks, set `canFly`, `canMove`, `speed` and `cruiseAltitude`, and clear `movementClass`. Add `hoverAttack` for a gunship rather than a plane that makes strafing runs. The engine banks and pitches the whole aircraft itself, so the script should not. Take ownership of the script for rotors: `Spin` on `StartMoving` and `StopSpin` on `StopMoving`. A gunship is also sent `MoveRate` with 0, 1 or 2 as it speeds up, which a script can use to tilt rotors or wings. `Falling` and `Landed` are not for aircraft: they are for a unit dropped from a transport.
 
 A ship:
 

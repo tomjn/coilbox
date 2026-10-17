@@ -41,6 +41,9 @@ export const ROLES: LegoRole[] = [
   // the stern on the waterline. Nothing moves it. `WAKE_WHILE_MOVING` emits a
   // wake from it while the unit moves.
   { id: "wake", label: "Wake point", group: "Movement" },
+  // An aircraft's landing gear, each piece's joint at the hinge. `LANDING_GEAR`
+  // turns it up on take off and down on landing.
+  { id: "gear", label: "Landing gear", group: "Movement" },
   { id: "leg.l1.thigh", label: "Front left thigh", group: "Legs" },
   { id: "leg.l1.shin", label: "Front left shin", group: "Legs" },
   { id: "leg.l1.foot", label: "Front left foot", group: "Legs" },
@@ -1002,6 +1005,95 @@ export const WAKE_WHILE_MOVING: AnimPreset = {
   },
 };
 
+/** Seconds the gear sits at each end of the preview's loop. */
+const GEAR_PREVIEW_HOLD = 1;
+
+/**
+ * Landing gear that stows on take off and lowers on landing.
+ *
+ * Both air move types call `Activate` on take off and `Deactivate` once landed
+ * (`HoverAirMoveType.cpp:206,211`, `StrafeAirMoveType.cpp:1227,1235`), so the
+ * gear turns once on each. It turns about x, so a left and a right leg fold the
+ * same way, and the piece's joint is the hinge. A call that finds the gear
+ * already where it is going does nothing.
+ *
+ * The defaults are Balanced Annihilation's Dragonfly (`armdfly.bos`), the one
+ * aircraft script there that folds anything on `Activate`: its legs turn from
+ * 30 to 135 degrees, 105, at 45 degrees a second, which is 2.3 seconds.
+ */
+export const LANDING_GEAR: AnimPreset = {
+  id: "gear.stow",
+  label: "Landing gear",
+  description:
+    "Stows the landing gear on take off and lowers it on landing, once each.",
+  requires: [{ role: "gear", count: 1 }],
+  animates: ["gear"],
+  params: [
+    {
+      id: "stow",
+      label: "Stowed angle",
+      unit: "deg",
+      min: 10,
+      max: 170,
+      step: 5,
+      fallback: 105,
+    },
+    {
+      id: "stowTime",
+      label: "Stowing time",
+      unit: "s",
+      min: 0.2,
+      max: 8,
+      step: 0.1,
+      fallback: 2.3,
+    },
+  ],
+  /** Up, held, down, held: the take off and land scenario in a loop that does
+   *  not depend on the preview's length. */
+  track(t, params, role) {
+    if (role !== "gear") return null;
+    const time = Math.max(value(this, params, "stowTime"), 0.05);
+    const cycle = 2 * (time + GEAR_PREVIEW_HOLD);
+    const at = t - Math.floor(t / cycle) * cycle;
+    const stowed =
+      at < time
+        ? at / time
+        : at < time + GEAR_PREVIEW_HOLD
+          ? 1
+          : Math.max(0, 1 - (at - time - GEAR_PREVIEW_HOLD) / time);
+    return { rotation: [deg(value(this, params, "stow")) * stowed, 0, 0] };
+  },
+  emit(ctx) {
+    const gear = ctx.pieces("gear");
+    if (gear.length === 0) return null;
+    const stow = value(this, ctx.params, "stow");
+    const angle = lua(deg(stow));
+    const speed = lua(
+      deg(stow) / Math.max(value(this, ctx.params, "stowTime"), 0.05),
+    );
+    const turn = (to: string) =>
+      gear.map((piece) => `    Turn(${piece}, x_axis, ${to}, ${speed})`);
+    return {
+      functions: ["local gearStowed = false"],
+      hooks: {
+        Activate: [
+          "  if not gearStowed then",
+          "    gearStowed = true",
+          ...turn(angle),
+          "  end",
+        ],
+        // Lowering is not optional: gear left up is a landing on the belly.
+        Deactivate: [
+          "  if gearStowed then",
+          "    gearStowed = false",
+          ...turn("0"),
+          "  end",
+        ],
+      },
+    };
+  },
+};
+
 export const BUILDARM: AnimPreset = {
   id: "buildarm",
   label: "Build arm",
@@ -1765,6 +1857,7 @@ export const PRESETS: AnimPreset[] = [
   WHEELS_ROLL,
   RUDDER_FOLLOWS,
   WAKE_WHILE_MOVING,
+  LANDING_GEAR,
   BUILDARM,
   BUILD_AIM,
   BUILD_FACTORY,
