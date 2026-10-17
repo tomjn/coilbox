@@ -148,6 +148,7 @@ import { AtlasPicker } from "./components/AtlasPicker";
 import { BuildPictureDrawer } from "./components/BuildPictureDrawer";
 import { CollisionPanel } from "./components/CollisionPanel";
 import { ExportDrawer } from "./components/ExportDrawer";
+import { GameUnitBrowser } from "./components/GameUnitBrowser";
 import { InventoryFilters, InventoryGrids } from "./components/Inventory";
 import { JoinedTo } from "./components/JoinedTo";
 import { ModelViewport } from "./components/ModelViewport";
@@ -1842,6 +1843,7 @@ function Builder({ id }: { id: string | undefined }) {
                     view={inventoryView}
                     pack={pack}
                     compounds={compounds}
+                    showGameUnits
                     className="flex-1"
                   />
                 ) : null}
@@ -1909,6 +1911,12 @@ function Builder({ id }: { id: string | undefined }) {
                       onSaveModuleFile={moduleFiles.saveFile}
                       onLabelsModule={(compound, labels) =>
                         void saveCompound(withLabels(compound, labels))
+                      }
+                      gameUnits={
+                        <GameUnitBrowser
+                          project={draft}
+                          query={inventoryView.query}
+                        />
                       }
                     />
                   ) : null}
