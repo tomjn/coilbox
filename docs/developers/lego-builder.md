@@ -30,6 +30,10 @@ Go to **Units** and press **New unit**. **Blank** gives you an empty unit with o
 
 The part unit is set by the pack, and is 0.25 for the bundled one. See [part unit](../reference/lego-parts-pack.md#part-unit). Turning steps by 15 degrees, and `Alt` turns that off too. A part from an imported model has no move step. The view names what a drag has snapped to, or the step it is moving in, while you do it.
 
+**Resize a part.** Press `S` with one pack part selected and a plate appears on each face of its box, in place of the scale gizmo. Drag a plate and the part is swapped for the pack part of that size, in the same colourway, shape and material, as one undo step. A part is a fixed mesh, so the drag snaps to the nearest size the pack has with the same other two sides. The readout gives the size in elmos and part units, and says when it snapped. When the pack has nothing longer, nothing shorter or no other size on that axis, it says that instead. Many parts in the bundled pack have no other size along some axis. See [sizes in the bundled pack](../reference/lego-parts-pack.md#sizes-in-the-bundled-pack). `Alt` does nothing here. The uniform scale lock keeps the scale gizmo, which stretches the part instead.
+
+The opposite face stays where it is, unless the part is joined, in which case it stays on its join. Parts joined to it follow their connectors, and other pieces hanging off it stay where they are. A [generated shape](#generated-shapes) resizes the same way, without the swap.
+
 **Say what each piece is.** With a piece selected, the panel on the right sets:
 
 - **Name.** Lower case and unique, because a unit script addresses pieces by name.
@@ -63,7 +67,7 @@ A join holds a part to a face of the piece it hangs off. Move, turn or resize th
 
 A part is joined when you add it from the strip with a part selected, place it on a face, or drag one of its faces onto a face that points back at it. Units built before joins existed open unchanged, with every part free, until you do one of those.
 
-Every part has six faces, named for the unit's directions: top, bottom, front, back, left and right, as in [Which way it faces](#which-way-it-faces). A pack can state a part's connectors instead, and those keep the names the pack gives them. See [connectors](../reference/lego-parts-pack.md#connectors) in the pack guide. **Connectors** in the piece panel gives one piece connectors of its own, clicked onto the model or added at its origin, each with a facing and an up direction. A piece with its own connectors joins only through those, not through its part's faces. A generated shape has connectors worked out from its kind and size, so they move when it is resized. A cylinder or tube has one at the middle of each end and four round the side, a cone one at each flat end and none at its tip, a dome or bowl one at its base and one at its apex, a whole sphere the same two and four round its equator, and a wedge one on each flat face and one on the slope facing along its normal. A cylinder's side connector sits at the point where the side is met going straight out from the middle, so a part slid along it by grid steps leaves the curve.
+Every part has six faces, named for the unit's directions: top, bottom, front, back, left and right, as in [Which way it faces](#which-way-it-faces). A pack can state a part's connectors instead, and those keep the names the pack gives them. See [connectors](../reference/lego-parts-pack.md#connectors) in the pack guide. **Connectors** in the piece panel gives one piece connectors of its own, clicked onto the model or added at its origin, each with a facing and an up direction. A piece with its own connectors joins only through those, not through its part's faces. A generated shape has connectors of its own, as [Connectors on a shape](#connectors-on-a-shape) describes.
 
 **See a join.** A joined piece has a link mark on its row in the piece tree, and hovering the mark names both faces. With the piece selected, the view outlines the face it is joined by and the face it is joined to. **Show free faces**, in the piece panel, outlines the rest of its faces too. The outlines are drawn only in the builder and are never exported.
 
@@ -80,6 +84,87 @@ Every part has six faces, named for the unit's directions: top, bottom, front, b
 **Copies.** Duplicate keeps the original's join. Mirroring a part, in place or as a copy, joins the copy to the face where its reflection sits, and so does a twin made in symmetry mode. When no face is there, the copy is free. A twin follows its partner: slide the partner along its face and the twin stays joined, drag the partner free and the twin goes free too. A pasted part lands free, keeping the joins inside what you copied.
 
 **Symmetry round the axis.** The symmetry options next to the button switch a new piece from one mirrored twin to a ring of copies round the vertical axis of the root piece, from 2 to 12 of them. Place a leg and the others follow it at equal angles. Each copy keeps the original's role and is a module instance of its own, so a ring of legs is not a walker by itself. A piece on the axis waits until it is moved off it. Change the count and the selected ring gains or loses copies in one undo step. Break in the piece panel lets the ring go and leaves the pieces where they are.
+
+## Generated shapes
+
+A generated shape is a piece coilbox makes from a kind and a few numbers, rather than a part from the pack. It takes any size you type, so it gives you wheels, barrels, pipes and sloped noses at sizes the pack does not have.
+
+### The kinds
+
+There are six. Each has its numbers in the piece panel, in elmos.
+
+| Kind | Numbers |
+| --- | --- |
+| Cylinder | Axis, Radius, Length, Sides |
+| Tube | Axis, Radius, Length, Wall, Sides |
+| Cone | Axis, Bottom radius, Top radius, Height, Sides |
+| Sphere | Whole, Dome or Bowl, Radius X, Radius Y, Radius Z, Rings, Sides |
+| Dome | A sphere set to Dome, so Radius Y reads Height |
+| Wedge | High at back or High at front, Width, Depth, Height, Low end |
+
+- Sides start at 12 and rings at 4. Fewer of either makes a lighter mesh.
+- A cone with a top radius of 0 comes to a point, and one above 0 is a cut cone. A top as wide as the bottom is refused, with a line saying to add a cylinder.
+- A tube keeps its wall when its radius changes, and the wall must stay below the radius.
+- A sphere's three radii can differ, so it can be an oval. Bowl keeps the lower half.
+- A wedge slopes from its full height at one end to Low end at the other. A low end of 0 is a pure wedge, and one equal to the height is a box.
+
+A number the shape cannot take is refused with a line saying why, and the shape keeps what it had.
+
+### Add a shape
+
+Shapes are listed first in the inventory, before the pack's parts. **Shapes** among the category buttons lists them alone, and choosing a colourway hides them, since a shape has no panel of its own. The search matches a shape's name and its tags, so "round" finds the cylinder, tube, cone, sphere and dome, "pipe" finds the tube and "ramp" finds the wedge. Shapes go into **Recent** and **Favourites** like parts.
+
+Click a shape to add it at its default size. It hangs off the selected piece, or the root when nothing is selected, at that piece's origin, and is selected. It does not join a face or lie along a bone the way a part does, so move it into place afterwards.
+
+The Lego Parts page shows a shape's kind, size, numbers and tags beside a preview you can turn.
+
+A pack with no [swatches](../reference/lego-parts-pack.md#swatches) offers no shapes.
+
+### Wheels
+
+There is no Wheel entry among the shapes. Use a cylinder, a tube or a cone. When one has the Wheel role, or hangs anywhere under a piece that has it, coilbox turns it so its axle lies along x, which is the axis **Wheels turning** spins about. Its origin moves onto the axle without moving the shape. The same happens when you add one there, give a piece the Wheel role, or change its Axis. The bones of the **Wheels** and **Tracks** body plans carry the role, so a cylinder added to a wheel bone spins straight away.
+
+If a wheel is later turned by hand so its axle is off x, the problems list warns under Skeleton, as in `"lwheel1" turns about x but "cylinder" has its axle along y.` A sphere is not turned, because it has no axle.
+
+The built in Wheel module is a pack part, not a shape.
+
+### Resize a shape
+
+Press `S` with one shape selected and a plate appears on each face of its box, in place of the scale gizmo. Drag a plate to resize the shape. It steps by the pack's part unit, 0.25 elmo on the bundled pack, and the readout gives the size in elmos and units. Hold `Alt` to resize freely, down to 0.05 elmo.
+
+- Dragging a round side sets the radius, so both sides across the axis change.
+- A tube's radius stays above its wall, a cone's bottom radius above its top radius, and a wedge's height at or above its low end.
+- The opposite face stays where it is, as when [resizing a part](#build-a-unit). A joined shape stays on its join.
+- A symmetry twin follows, and a wheel stays on its axle.
+
+The shape changes its numbers, not its scale, so its texture does not stretch.
+
+### How a shape looks
+
+A shape has no panel detail. It tiles a small swatch of plain surface from its colourway, mirrored at each edge, at the same texture density as the pack's parts. A bigger shape shows more tiles rather than a stretched one.
+
+On the bundled atlas the green colourway is plain red, the same red the green parts are drawn in. Tan is a grainy concrete, where the mirrored tiles show a repeating pattern. Grey is a flat light grey.
+
+A shape takes the colourway most of the unit's parts and shapes use when it is added, or the pack's first one when the unit has none. It keeps that colourway. The piece panel has no control to change it, and **Change part** is not offered for a shape.
+
+A shape takes team colour only where the atlas's alpha channel says so, as a part does. The bundled atlas has no alpha channel, so neither parts nor shapes from it show team colour in a game. An atlas pack can paint alpha into a swatch to give shapes team colour. See [swatches](../reference/lego-parts-pack.md#swatches).
+
+### Connectors on a shape
+
+A shape's connectors are worked out from its kind and size, so they move when it is resized. They join like a part's: you can place a part or a module on them and save joins to them.
+
+- A cylinder or tube has one at the middle of each end and four round the side.
+- A cone has one on its flat bottom, one on its top when it is cut, and none at a point.
+- A dome or bowl has one at its base and one at its apex. A whole sphere has the same two, and four round its middle.
+- A wedge has one on each flat face and one on the slope, facing out from it. A pure wedge has no low end face, so it has no connector there.
+
+A connector on a round side sits where the side is met going straight out from the middle. A part slid along it by grid steps moves along the flat, so it leaves the curve. A join to a connector the shape no longer has, such as a wedge's low end once Low end is 0, is broken, as in [Joins](#joins).
+
+### Exporting a shape
+
+A shape is written into the `.s3o`, `.glb` and `.obj` with its UVs inside its swatch on the atlas. It counts in the footprint, the collision volume and the model's radius and height. A shape whose kind this version of coilbox cannot make, for example one saved by a newer version, stops the export, and the message names the piece.
+
+A model with a shape cannot be turned back into a project. Opening an exported `.s3o` as a project matches each piece to a part from the installed packs. A shape is not a pack part, so the model is refused, and the message names the first piece that did not match. Keep the unit's project if you might want to change it.
 
 ## Modules
 
@@ -497,9 +582,7 @@ It writes, if you leave the boxes ticked:
 
 It can also write a `.glb`, or an `.obj` with its `.mtl` and a copy of the atlas beside them. Neither is read by the engine. Both go into a `blender` folder alongside the game's own, for taking the unit into Blender to check it against the `.s3o` or finish it by hand.
 
-**Generated shapes are exported as they are drawn.** A cylinder, tube or other generated shape is written into the `.s3o`, `.glb` and `.obj` with its own UVs inside its swatch on the atlas, and counts in the footprint, the collision volume and the model's radius and height. A shape whose kind this version of coilbox cannot make, for example one saved by a newer version, stops the export and the message names the piece. The export does not leave it out.
-
-**A model with a generated shape cannot be turned back into a project.** Opening an exported `.s3o` as a project matches each piece to a part from the installed packs. A generated shape is not a pack part, so the model is refused and the message names the first piece that did not match. The same happens to a mesh made somewhere else.
+Generated shapes are written like parts. See [Exporting a shape](#exporting-a-shape).
 
 **A re-export keeps your edits.** The script and the unit definition are meant to be edited, so export never overwrites a change you made to either, whether you made it in a text editor or through the workshop.
 
