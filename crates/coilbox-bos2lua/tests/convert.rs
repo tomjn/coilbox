@@ -244,6 +244,21 @@ fn an_angle_stored_across_a_half_turn_keeps_bos_s_value() {
     );
 }
 
+/// A speed too small for four decimal places stays a speed, because 0 in Lua
+/// moves the piece at once. Shaped like Balanced Annihilation's `corsy.bos`.
+#[test]
+fn a_tiny_speed_is_not_written_as_zero() {
+    let source = r#"
+        piece base, turret;
+        Create() { move turret to y-axis [6.95] speed [0.000018]; }
+    "#;
+    let lua = convert_with(source, &HashMap::new(), MODERN_LINEAR).lua;
+    assert!(
+        lua.contains("Move(turret, y_axis, 6.95, 0.000018)"),
+        "{lua}"
+    );
+}
+
 #[test]
 fn runs_without_a_thread_stopping_and_walks() {
     let lua = walker();

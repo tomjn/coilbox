@@ -3177,6 +3177,11 @@ fn decimal(v: f64) -> String {
     }
     let text = format!("{v:.4}");
     let text = text.trim_end_matches('0').trim_end_matches('.');
+    // A speed of 0 moves a piece at once in Lua (`LuaUnitScript.cpp:1627-1633`)
+    // where a slow one creeps, so a small number keeps all its digits.
+    if text == "0" || text == "-0" {
+        return format!("{v}");
+    }
     text.to_string()
 }
 
