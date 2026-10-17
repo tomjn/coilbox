@@ -19,8 +19,10 @@ import type { LegoConnector } from "./connectors";
 import {
   coneTopRadius,
   type LegoShape,
+  SPHERE_WHOLE,
   shapeAxis,
   shapeBox,
+  sphereProfile,
   wallReach,
   wedgeProfile,
 } from "./shapes";
@@ -108,6 +110,23 @@ function coneConnectors(shape: LegoShape): LegoConnector[] {
   });
 }
 
+/**
+ * A sphere, dome or bowl. A dome or a bowl has its flat base and its apex, one
+ * at each end of its height and facing along y. Its sides are a curve that
+ * leaves the box at mid height, so it has none there. A whole sphere has those
+ * two as its poles and the four points of its equator as well, as a cylinder
+ * has round its side.
+ */
+function sphereConnectors(shape: LegoShape): LegoConnector[] {
+  const all = roundConnectors({
+    ...shape,
+    options: { ...shape.options, axis: 1 },
+  });
+  return sphereProfile(shape).keep === SPHERE_WHOLE
+    ? all
+    : all.filter((c) => c.id === "+y" || c.id === "-y");
+}
+
 /** The centre of a flat polygon, from the area it covers. */
 function centroid(points: [number, number][]): [number, number] {
   let area = 0;
@@ -169,6 +188,7 @@ const CONNECTORS: Record<string, (shape: LegoShape) => LegoConnector[]> = {
   cylinder: roundConnectors,
   tube: roundConnectors,
   cone: coneConnectors,
+  sphere: sphereConnectors,
   wedge: wedgeConnectors,
 };
 

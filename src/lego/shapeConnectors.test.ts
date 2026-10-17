@@ -51,6 +51,13 @@ function examples(kind: string): LegoShape[] {
         { kind, size, options: { axis: 0, top: 0.5 } },
         { kind, size, options: { axis: 2, sides: 7 } },
       ];
+    case "sphere":
+      return [
+        { kind, size },
+        { kind, size, options: { keep: 1 } },
+        { kind, size, options: { keep: 2, sides: 7 } },
+        { kind, size, options: { sides: 5 } },
+      ];
     case "cylinder":
     case "tube":
       return [
@@ -94,7 +101,7 @@ function distanceToSurface(shape: LegoShape, point: Vec3): number {
 describe("every shape kind", () => {
   it("lists at least the kinds with a generator", () => {
     expect(shapeKinds()).toEqual(
-      expect.arrayContaining(["cylinder", "tube", "cone", "wedge"]),
+      expect.arrayContaining(["cylinder", "tube", "cone", "sphere", "wedge"]),
     );
   });
 
@@ -234,6 +241,29 @@ describe("cone connectors", () => {
     });
     expect(c["+x"].position).toEqual([2, 0, 0]);
     expect(c["-x"].position).toEqual([-2, 0, 0]);
+  });
+});
+
+describe("sphere connectors", () => {
+  it("gives a whole sphere its two poles and four points round the equator", () => {
+    const c = byId({ kind: "sphere", size: [2, 4, 6] });
+    expect(Object.keys(c).sort()).toEqual(["+x", "+y", "+z", "-x", "-y", "-z"]);
+    expect(c["+y"].position).toEqual([0, 2, 0]);
+    expect(c["+x"].position).toEqual([1, 0, 0]);
+    expect(c["-z"].position).toEqual([0, 0, -3]);
+  });
+
+  it("gives a dome its base and its apex and nothing at the sides", () => {
+    const c = byId({ kind: "sphere", size: [2, 1, 2], options: { keep: 1 } });
+    expect(Object.keys(c).sort()).toEqual(["+y", "-y"]);
+    expect(c["-y"].position).toEqual([0, -0.5, 0]);
+    expect(c["-y"].facing).toEqual([0, -1, 0]);
+    expect(c["+y"].position).toEqual([0, 0.5, 0]);
+  });
+
+  it("gives a bowl the same two, with its flat base on top", () => {
+    const c = byId({ kind: "sphere", size: [2, 1, 2], options: { keep: 2 } });
+    expect(Object.keys(c).sort()).toEqual(["+y", "-y"]);
   });
 });
 

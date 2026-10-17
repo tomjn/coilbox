@@ -128,9 +128,10 @@ function shapeAnchors(
   const rest = box
     ? shape.kind === "wedge"
       ? wedgeAnchors(box, shape)
-      : localAnchors(box, isRoundShapeKind(shape.kind)).filter(
-          (anchor) => anchor.kind !== "face",
-        )
+      : localAnchors(
+          box,
+          isRoundShapeKind(shape.kind) || shape.kind === "sphere",
+        ).filter((anchor) => anchor.kind !== "face")
     : [];
   const faces: Anchor[] = connectors.map((c) => ({
     position: c.position,
