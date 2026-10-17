@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
+import type { GuideLine, GuidePlane } from "../../guides";
 import { type LegoPiece, type LegoProject, newProject } from "../../model";
 import type { LegoPartInfo, LoadedPack } from "../../pack";
 import { applySnap } from "./anchorsAndSnapping";
@@ -58,6 +59,8 @@ function piece(id: string, partId: string | null, extra: Partial<LegoPiece>) {
 function drag(
   leg: Partial<LegoPiece>,
   customHull?: LegoPiece["customAnchors"],
+  guidePlanes: GuidePlane[] = [],
+  guideLines: GuideLine[] = [],
 ) {
   const base = newProject({
     id: "p",
@@ -98,6 +101,8 @@ function drag(
     packRef: { current: pack },
     rawRef: { current: null },
     snapping: true,
+    guidePlanes,
+    guideLines,
     seat: null,
     slide: null,
     targetAnchors: null,
@@ -178,6 +183,128 @@ describe("applySnap", () => {
 
     expect(state.seat?.to).toBe("nose");
     expect(state.seat?.parentId).toBe("hull");
+  });
+});
+
+function plane(axis: "x" | "y" | "z", at: number, name = "guide"): GuidePlane {
+  const normal: Vec3 = [
+    axis === "x" ? 1 : 0,
+    axis === "y" ? 1 : 0,
+    axis === "z" ? 1 : 0,
+  ];
+  return {
+    id: name,
+    name,
+    axis,
+    normal,
+    point: [normal[0] * at, normal[1] * at, normal[2] * at],
+  };
+}
+
+describe("applySnap against guide planes", () => {
+  it("lands an anchor exactly on the plane, over the move step", () => {
+    const { state, dragged, changes } = drag(
+      { position: [0.3, 6.3, 0] },
+      undefined,
+      [plane("y", 6, "deck")],
+    );
+
+    applySnap(state);
+
+    expect(dragged.position.y).toBeCloseTo(6);
+    // Across the plane it is the guide, along it the step: 0.3 steps to 0.25.
+    expect(dragged.position.x).toBeCloseTo(0.25);
+    expect(state.seat).toBeNull();
+    expect(changes.at(-1)?.slice(0, 2)).toEqual([true, "deck"]);
+  });
+
+  it("leaves the step alone when the plane is out of reach", () => {
+    const { state, dragged, changes } = drag(
+      { position: [0, 6.3, 0] },
+      undefined,
+      [plane("y", 9)],
+    );
+
+    applySnap(state);
+
+    expect(dragged.position.y).toBeCloseTo(6.25);
+    expect(changes.at(-1)?.[0]).toBe(false);
+  });
+
+  it("gives way to an anchor in reach", () => {
+    // The leg is 0.02 off seating on the hull's top at y = 1.5, and a plane at
+    // 1.7 is within reach of the leg's middle too.
+    const { state, dragged } = drag({ position: [0, 1.52, 0] }, undefined, [
+      plane("y", 1.7),
+    ]);
+
+    applySnap(state);
+
+    expect(dragged.position.y).toBeCloseTo(1.5);
+  });
+
+  it("is off while Alt is held", () => {
+    const { state, dragged } = drag({ position: [0, 6.3, 0] }, undefined, [
+      plane("y", 6),
+    ]);
+    state.snapping = false;
+
+    applySnap(state);
+
+    expect(dragged.position.y).toBe(6.3);
+  });
+});
+
+describe("applySnap against guide lines", () => {
+  const rail: GuideLine = {
+    id: "rail",
+    name: "rail",
+    axis: "z",
+    direction: [0, 0, 1],
+    point: [0, 6, 0],
+  };
+
+  it("fixes the two coordinates across the line and steps the third", () => {
+    const { state, dragged, changes } = drag(
+      { position: [0.1, 6.3, 3.1] },
+      undefined,
+      [],
+      [rail],
+    );
+
+    applySnap(state);
+
+    expect(dragged.position.x).toBeCloseTo(0);
+    expect(dragged.position.y).toBeCloseTo(6);
+    expect(dragged.position.z).toBeCloseTo(3);
+    expect(changes.at(-1)?.slice(0, 2)).toEqual([true, "rail"]);
+  });
+
+  it("gives way to an anchor in reach", () => {
+    const { state, dragged } = drag(
+      { position: [0, 1.52, 0] },
+      undefined,
+      [],
+      [{ ...rail, point: [0, 1.7, 0] }],
+    );
+
+    applySnap(state);
+
+    expect(dragged.position.y).toBeCloseTo(1.5);
+  });
+
+  it("is off while Alt is held", () => {
+    const { state, dragged } = drag(
+      { position: [0.2, 6.3, 3.1] },
+      undefined,
+      [],
+      [rail],
+    );
+    state.snapping = false;
+
+    applySnap(state);
+
+    expect(dragged.position.x).toBe(0.2);
   });
 });
 

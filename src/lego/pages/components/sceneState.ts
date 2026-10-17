@@ -18,6 +18,7 @@ import {
 } from "../../environment";
 import { importedMaterial, partMaterial } from "../../geometry";
 import type { PieceTransform } from "../../groupTransform";
+import type { GuideLine, GuidePlane } from "../../guides";
 import { JoinedGroup } from "../../joinedWorld";
 import type { LegoCollisionVolume, LegoPiece, LegoProject } from "../../model";
 import { getPartGeometry, type LoadedPack } from "../../pack";
@@ -182,6 +183,18 @@ export interface SceneState {
   /** Each weapon's range and arc while their toggle is on, in `overlay`.
    *  Rebuilt whenever a weapon or a piece changes. */
   weaponReach: THREE.Group | null;
+  /** The guide planes, drawn in `overlay` while they are shown. Rebuilt
+   *  whenever a guide or the root changes. */
+  guideLayer: THREE.Group | null;
+  /** The planes a drag snaps to: the guides that are drawn, in the world. Empty
+   *  while the guides are hidden, so a plane that cannot be seen never pulls. */
+  guidePlanes: GuidePlane[];
+  /** The same for the guide lines. */
+  guideLines: GuideLine[];
+  /** Set while the next click on the model puts a guide there. Handed the hit
+   *  point in the world, or null for a click that missed, which is how you
+   *  change your mind. */
+  onPickGuideRef: { current: ((at: Vec3 | null) => void) | undefined };
   /** The sky now drawn, and which backdrop built it, so going back to one
    *  already seen does not draw its gradient again. Null while the plain
    *  backdrop shows, which is what the canvas does with no background at all. */

@@ -34,7 +34,7 @@ interface Props {
  * the same hues at a lighter tone: the field and the arrow you dragged are
  * recognisably the same axis.
  */
-const AXES = [
+export const AXES = [
   { label: "X", colour: "#f87171" },
   { label: "Y", colour: "#4ade80" },
   { label: "Z", colour: "#60a5fa" },
