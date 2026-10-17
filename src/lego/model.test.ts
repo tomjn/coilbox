@@ -183,6 +183,15 @@ describe("pieceKind", () => {
     expect(pieceKind({ ...piece("a", null), partId: "leg" })).toBe("geometry");
   });
 
+  it("is geometry when a piece is a generated shape (#3325)", () => {
+    const shape = {
+      kind: "cylinder",
+      size: [1, 2, 1] as [number, number, number],
+      swatch: "green",
+    };
+    expect(pieceKind({ ...piece("a", null), shape })).toBe("geometry");
+  });
+
   it("is geometry when a piece references an imported mesh", () => {
     expect(pieceKind({ ...piece("a", null), meshId: "m3" })).toBe("geometry");
   });
@@ -425,6 +434,52 @@ describe("parseLegoProjectJson on a .3do imported before #4174", () => {
 });
 
 describe("parseLegoProjectJson", () => {
+  it("round-trips a generated shape (#3325)", () => {
+    const doc = project([
+      piece("root", null),
+      {
+        ...piece("a", "root"),
+        shape: {
+          kind: "cylinder",
+          size: [1, 2, 3],
+          swatch: "tan",
+          options: { axis: 0, sides: 16 },
+        },
+      },
+    ]);
+    expect(parseLegoProjectJson(JSON.stringify(doc))).toEqual(doc);
+  });
+
+  it("keeps a shape kind it does not know (#3325)", () => {
+    const shape = {
+      kind: "torus",
+      size: [1, 1, 1] as [number, number, number],
+      swatch: "grey",
+    };
+    const doc = project([
+      piece("root", null),
+      { ...piece("a", "root"), shape },
+    ]);
+    const parsed = parseLegoProjectJson(JSON.stringify(doc));
+    expect(parsed?.pieces[1].shape).toEqual(shape);
+  });
+
+  it("drops a shape with no usable size, and a shape on a piece with a part", () => {
+    const doc = project([
+      piece("root", null),
+      { ...piece("a", "root"), shape: { kind: "cylinder", size: [1, 0, 1] } },
+      {
+        ...piece("b", "root"),
+        partId: "abc",
+        shape: { kind: "cylinder", size: [1, 1, 1] },
+      },
+    ] as LegoPiece[]);
+    const parsed = parseLegoProjectJson(JSON.stringify(doc));
+    expect(parsed?.pieces[1].shape).toBeUndefined();
+    expect(parsed?.pieces[2].shape).toBeUndefined();
+    expect(parsed?.pieces[2].partId).toBe("abc");
+  });
+
   it("round-trips a project it wrote", () => {
     const doc = project([
       piece("root", null),

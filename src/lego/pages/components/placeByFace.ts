@@ -12,6 +12,7 @@ import { getPartGeometry, type LegoPartInfo } from "../../pack";
 import { type FaceTarget, faceUnder, placePart } from "../../placePart";
 import { getMeshGeometry } from "../../rawGeometry";
 import { worldMatrix } from "../../reparent";
+import { getShapeGeometry } from "../../shapes";
 import { hitInPart } from "./anchorsAndSnapping";
 import { pieceIdOf } from "./gizmoCommit";
 import type { SceneState } from "./sceneState";
@@ -124,9 +125,11 @@ function showModuleGhost(
     // A lifted piece draws its mesh out of the unit's own geometry.
     const geometry = piece.partId
       ? getPartGeometry(pack, piece.partId)
-      : raw && piece.meshId
-        ? getMeshGeometry(raw, piece.meshId)
-        : null;
+      : piece.shape
+        ? getShapeGeometry(piece.shape)
+        : raw && piece.meshId
+          ? getMeshGeometry(raw, piece.meshId)
+          : null;
     if (!placed || !geometry) continue;
     const pivot = piece.pivot ?? [0, 0, 0];
     const mesh = new THREE.Mesh(geometry, state.placeGhost.material);

@@ -5,7 +5,8 @@
  * seam campaigns use. Everything here is pure, so the rules can be tested
  * without a renderer or a filesystem.
  *
- * A piece is either geometry, when it has a `partId` or a `meshId`, or empty.
+ * A piece is either geometry, when it has a `partId`, a `meshId` or a `shape`,
+ * or empty.
  * Empty pieces are not a coilbox invention: an s3o piece with no vertices is
  * how the format carries hierarchy, and how flares, aim points and build
  * emitters are expressed. They survive export. Anchors derived from a part's
@@ -28,6 +29,7 @@ import { comparablePath } from "./exportRecord";
 import { type Problem, type ProblemSeverity, problem } from "./problems";
 import type { RawGeometry } from "./rawGeometry";
 import { ringMembers, validRingCount } from "./ringSet";
+import { type LegoShape, parseShape } from "./shapes";
 import { liftRefusal } from "./unitGame";
 import { type LegoWorth, parseWorth } from "./worth";
 
@@ -401,6 +403,11 @@ export interface LegoPiece {
    * has not been measured, which then has no connectors.
    */
   meshBox?: { min: [number, number, number]; max: [number, number, number] };
+  /**
+   * A shape made in code from a kind and its numbers (#3325), in place of a
+   * part or a mesh. `partId` is then null and `meshId` absent. See `shapes.ts`.
+   */
+  shape?: LegoShape;
   /** Relative to the parent piece. */
   position: [number, number, number];
   /**
@@ -1119,7 +1126,7 @@ export function pieceKind(
   piece: LegoPiece,
   raw: RawGeometry | null = null,
 ): PieceKind {
-  if (piece.partId) return "geometry";
+  if (piece.partId || piece.shape) return "geometry";
   if (!piece.meshId) return "empty";
   return raw?.byId.get(piece.meshId)?.iCount === 0 ? "empty" : "geometry";
 }
@@ -1569,6 +1576,14 @@ function parsePiece(raw: unknown): LegoPiece | null {
       const min = parseVec3(box?.min);
       const max = parseVec3(box?.max);
       return min && max ? { meshBox: { min, max } } : {};
+    })(),
+    ...(() => {
+      // A piece has one source of geometry. A part or a mesh wins, because
+      // either is what an older build would have drawn.
+      if (typeof p.partId === "string") return {};
+      if (typeof p.meshId === "string" && p.meshId !== "") return {};
+      const shape = parseShape(p.shape);
+      return shape ? { shape } : {};
     })(),
     position: parseVec3(p.position) ?? [0, 0, 0],
     rotation: parseVec3(p.rotation) ?? [0, 0, 0],
