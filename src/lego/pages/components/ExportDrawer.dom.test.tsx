@@ -76,7 +76,8 @@ function exportResult(over: Record<string, unknown> = {}) {
     cobVarsKept: false,
     pieceCollision: "/game/scripts/coilbox/skyfort_collision.lua",
     unitDef: "/game/units/skyfort.lua",
-    unitDefKept: false,
+    unitDefKept: null,
+    unitDefFields: [],
     textureKept: false,
     textures: [],
     texturesKept: [],
@@ -476,5 +477,89 @@ describe("the .glb of a unit built from parts", () => {
       },
     });
     expect(exportGlb.mock.calls[0][3]).toBe("data:image/png;base64,ENGINE");
+  });
+});
+
+/**
+ * A re-export into a folder the receipt says the unit's files went into
+ * (issue #3245): the drawer sends the fields the build decides beside the
+ * last export's values, and lists what the export changed and kept.
+ */
+describe("re-export", () => {
+  const exportedBefore = {
+    ...project,
+    exported: {
+      dir: "/games/some.sdd",
+      at: "",
+      unitName: "skyfort",
+      def: { objectname: "skyfort_old", sightdistance: 0 },
+      files: [
+        { path: "/games/some.sdd/units/skyfort.lua", sha256: "def-digest" },
+        {
+          path: "/games/some.sdd/scripts/skyfort.lua",
+          sha256: "script-digest",
+        },
+      ],
+    },
+  };
+
+  async function exportIt(over: Record<string, unknown>, onRemember = vi.fn()) {
+    legoGameLanguage.mockResolvedValue({ texts: {} });
+    legoExport.mockResolvedValue(exportResult(over));
+    show(exportedBefore, onRemember);
+    await waitFor(() =>
+      expect(screen.getByText(/goes into the definition/)).toBeTruthy(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Export" }));
+  }
+
+  it("sends the last export's values and the script's digest", async () => {
+    await exportIt({});
+    await waitFor(() => expect(legoExport).toHaveBeenCalled());
+    const sent = legoExport.mock.calls[0][0];
+    expect(sent.scriptWritten).toBe("script-digest");
+    const objectname = sent.unitDefFields.find(
+      (field: { path: string }) => field.path === "objectname",
+    );
+    expect(objectname).toEqual({
+      path: "objectname",
+      now: "skyfort",
+      last: "skyfort_old",
+    });
+  });
+
+  it("lists the fields brought up to date and the ones kept", async () => {
+    const onRemember = vi.fn();
+    await exportIt(
+      {
+        unitDefFields: [
+          { path: "footprintx", change: "updated", was: 1, message: null },
+          { path: "objectname", change: "kept", was: "mine", message: null },
+        ],
+      },
+      onRemember,
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Brought up to date in the unit definition/),
+      ).toBeTruthy(),
+    );
+    expect(screen.getByText(/is mine, the build gives skyfort/)).toBeTruthy();
+    // The kept field keeps the value the builder last wrote in the receipt.
+    expect(onRemember.mock.calls[0][0].exported.def.objectname).toBe(
+      "skyfort_old",
+    );
+  });
+
+  it("says why the file was left alone while the workshop holds a backup", async () => {
+    await exportIt({
+      unitDef: null,
+      unitDefKept: { reason: "workshopBackup" },
+    });
+    await waitFor(() =>
+      expect(
+        screen.getByText(/the workshop has changes in it that you have not/),
+      ).toBeTruthy(),
+    );
   });
 });

@@ -828,12 +828,14 @@ describe("DERIVED_FIELDS", () => {
     mass: 33,
   };
   const b = bounds({ x: 32, z: 48 });
-  const mobile = legoUnitDefWithHome(everything, b, "def", totals);
+  const slots = [{ name: "gun", maxangledif: 90, maindir: "0 0 1" }];
+  const mobile = legoUnitDefWithHome(everything, b, "def", totals, slots);
   const still = legoUnitDefWithHome(
     { ...everything, movement: undefined },
     b,
     "def",
     totals,
+    slots,
   );
 
   it("names every field the builder writes, or says why it is not there", () => {

@@ -448,6 +448,24 @@ mod tests {
     }
 
     #[test]
+    fn the_weapons_list_is_one_field() {
+        let game = game();
+        let source = exported(&[("weapons", r#"{ { name = "gun", maindir = "0 0 1" } }"#)]);
+        let last = json!([{ "name": "gun", "mainDir": "0 0 1" }]);
+        let now = json!([{ "name": "gun", "mainDir": "0 0 1" }, { "name": "cannon" }]);
+        let fields = [field("weapons", Some(now.clone()), Some(last.clone()))];
+        let refreshed = refresh(&source, "tank", &fields, game.path()).expect("runs");
+        assert_eq!(refreshed.fields[0].change, Change::Updated);
+        assert!(refreshed.text.contains("cannon"), "{}", refreshed.text);
+
+        let edited = source.replace("0 0 1", "1 0 0");
+        let fields = [field("weapons", Some(now), Some(last))];
+        let refreshed = refresh(&edited, "tank", &fields, game.path()).expect("runs");
+        assert_eq!(refreshed.fields[0].change, Change::Kept);
+        assert_eq!(refreshed.text, edited);
+    }
+
+    #[test]
     fn a_workshop_backup_holds_the_file_back() {
         let game = game();
         let units = game.path().join("units");

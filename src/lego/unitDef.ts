@@ -303,8 +303,9 @@ export function legoUnitDef(
  *
  * Kept as one list because the workshop's unit page reads it too, to mark the
  * fields the builder keeps up to date (#4242). A field `legoUnitDef` gains has
- * to be added here or named in the test that guards this list, and a table
- * value such as a weapons list is fine as one entry.
+ * to be added here or named in the test that guards this list. `weapons` is
+ * one entry, the whole list of slots, so a slot added, dropped or re-aimed
+ * replaces the list while nobody has edited it.
  */
 export const DERIVED_FIELDS: readonly string[] = [
   "name",
@@ -337,6 +338,7 @@ export const DERIVED_FIELDS: readonly string[] = [
   "workertime",
   "builddistance",
   "canassist",
+  "weapons",
 ];
 
 /** The value at a dotted `path` in a definition, or undefined. */
