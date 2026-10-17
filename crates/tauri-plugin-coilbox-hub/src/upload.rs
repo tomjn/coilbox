@@ -1511,7 +1511,39 @@ mod tests {
         asset.map_width = Some(8192);
         asset.map_height = Some(8192);
         let refused = check(&asset, 9).unwrap_err();
-        assert!(refused.contains("carrying a map's size"), "{refused}");
+        assert!(refused.contains("carries a map's size"), "{refused}");
+    }
+
+    fn faction_logo(path: PathBuf) -> AssetUpload {
+        AssetUpload {
+            identity: AssetIdentity::Faction {
+                game: "bar".into(),
+                faction_key: "armada".into(),
+                variant: "logo".into(),
+            },
+            source_hash: "src-f".into(),
+            encode_profile: "webp-lossless-128".into(),
+            origin: AssetOrigin::Extracted,
+            mime: "image/webp".into(),
+            source_archive: "Beyond All Reason test-1.sdd".into(),
+            map_width: None,
+            map_height: None,
+            world_height_min: None,
+            world_height_max: None,
+            path,
+        }
+    }
+
+    /// A faction logo is accepted with no size and refused with a map's size.
+    #[test]
+    fn a_faction_logo_carries_no_map_size() {
+        let dir = asset_dir("logoextent");
+        let mut asset = faction_logo(file(&dir, "a.webp", 9));
+        check(&asset, 9).unwrap();
+        asset.map_width = Some(8192);
+        asset.map_height = Some(8192);
+        let refused = check(&asset, 9).unwrap_err();
+        assert!(refused.contains("carries a map's size"), "{refused}");
     }
 
     // -------------------------------------------------------------- uploading
