@@ -523,6 +523,16 @@ export const legoImportS3o = defineCommand<
   S3oImport
 >("coilbox-lego", "lego_import_s3o");
 
+/**
+ * Write `lego/geometry/<id>.bin.gz` from a gzipped blob packed here, replacing
+ * the one before it. How a unit of parts keeps the meshes of a piece lifted
+ * from a game (#3259).
+ */
+export const legoGeometrySave = defineCommand<
+  { id: string; bytes: number[] },
+  { bytes: number }
+>("coilbox-lego", "lego_geometry_save");
+
 /** What one import of a `.3do` produced, on top of what any import produces. */
 export interface ThreeDoImport extends S3oImport {
   /** Faces named no texture at all and whose Total Annihilation palette entry

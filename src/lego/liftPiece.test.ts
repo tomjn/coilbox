@@ -5,6 +5,8 @@ import {
   holdsLiftedPieces,
   liftedModuleRefusal,
   liftFromImport,
+  moduleForUnit,
+  textureSheetRefusal,
 } from "./liftPiece";
 import {
   type LegoProject,
@@ -12,6 +14,7 @@ import {
   newProject,
   parseLegoProjectJson,
 } from "./model";
+import { moduleStamp } from "./moduleUpdates";
 
 function piece(
   name: string,
@@ -134,6 +137,9 @@ describe("liftFromImport", () => {
         game: sf,
         member: "objects3d/armcom.s3o",
         unit: "armcom",
+        // The textures its UVs point onto, with no path to refresh from.
+        texture: { key: "aa11.dds", name: "arm_1.dds" },
+        texture2: { key: "bb22.dds", name: "arm_2.dds" },
       });
     }
     expect(lifted?.game).toEqual(sf);
@@ -193,14 +199,100 @@ describe("liftedModuleRefusal", () => {
     );
   });
 
-  it("holds a lifted piece back from a unit of its own game until it can be drawn there", () => {
+  it("lets a lifted piece into a unit of parts for its own game, in any version", () => {
     const later = {
       ...sf,
       name: "Splinter Faction 0.1.89",
       archive: "sf2.sdz",
     };
-    expect(liftedModuleRefusal(unit({ game: later }), lifted())).toBe(
-      "Lifted pieces cannot go into a unit yet.",
+    expect(liftedModuleRefusal(unit({ game: later }), lifted())).toBeNull();
+  });
+
+  it("refuses a lifted piece in a unit opened whole from a model", () => {
+    const opened = unit({
+      game: sf,
+      imported: { source: "/games/sf.sdz/objects3d/armcom.s3o" },
+    });
+    expect(liftedModuleRefusal(opened, lifted())).toBe(
+      "Lifted pieces go into a unit built from parts, not one opened from a model.",
     );
+  });
+});
+
+describe("moduleForUnit", () => {
+  const lifted = () => lift("0.0.0") as LegoProject;
+
+  it("keys each mesh under the module, so two models' m2 never meet in a unit", () => {
+    const { module, keys } = moduleForUnit(lifted());
+    expect(module.pieces.map((p) => p.meshId)).toEqual([
+      "lifted-1/m2",
+      "lifted-1/m3",
+    ]);
+    expect([...keys]).toEqual([
+      ["m2", "lifted-1/m2"],
+      ["m3", "lifted-1/m3"],
+    ]);
+  });
+
+  it("gives every piece the textures it draws with", () => {
+    const { module } = moduleForUnit(lifted());
+    for (const piece of module.pieces) {
+      expect(piece.lifted?.texture).toEqual({
+        key: "aa11.dds",
+        name: "arm_1.dds",
+      });
+      expect(piece.lifted?.texture2).toEqual({
+        key: "bb22.dds",
+        name: "arm_2.dds",
+      });
+    }
+  });
+
+  it("takes the textures off the module for one lifted before pieces kept them", () => {
+    const old = lifted();
+    const bare = {
+      ...old,
+      pieces: old.pieces.map((p) => ({
+        ...p,
+        lifted: p.lifted && {
+          game: p.lifted.game,
+          member: p.lifted.member,
+        },
+      })),
+    };
+    const { module } = moduleForUnit(bare);
+    expect(module.pieces[0].lifted?.texture?.key).toBe("aa11.dds");
+  });
+
+  it("stamps the same as the module in the inventory, so the unit does not call it out of date", () => {
+    const module = lifted();
+    expect(moduleStamp(moduleForUnit(module).module)).toBe(moduleStamp(module));
+  });
+
+  it("leaves a module of parts as it is", () => {
+    const { module, keys } = moduleForUnit(unit());
+    expect(module.pieces).toEqual(unit().pieces);
+    expect(keys.size).toBe(0);
+  });
+});
+
+describe("textureSheetRefusal", () => {
+  it("lets a unit of parts and a unit opened from a model out", () => {
+    expect(textureSheetRefusal(unit())).toBeNull();
+    const opened = unit({
+      imported: { source: "/x.s3o" },
+      pieces: [{ ...unit().pieces[0], meshId: "m0" }],
+    });
+    expect(textureSheetRefusal(opened)).toBeNull();
+  });
+
+  it("holds back a unit of parts that holds a lifted mesh, saying why", () => {
+    const mixed = unit({
+      pieces: [
+        ...unit().pieces,
+        ...moduleForUnit(lift("0.0.0") as LegoProject).module.pieces,
+      ],
+    });
+    expect(textureSheetRefusal(mixed)).toMatch(/one texture/);
   });
 });

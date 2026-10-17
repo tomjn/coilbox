@@ -28,6 +28,32 @@ use std::path::Path;
 /// What every sidecar's file name ends in.
 const SIDECAR: &str = ".bin.gz";
 
+/// The first two bytes of any gzip stream.
+const GZIP_MAGIC: &[u8] = &[0x1f, 0x8b];
+
+/// Write `packed` as the sidecar of the document `id`.
+///
+/// The builder writes one when a piece lifted off a game's unit goes into a unit
+/// of parts (#3259): the lifted meshes are copied into the unit's own sidecar,
+/// so the unit owns them the way an imported unit owns its meshes. The frontend
+/// packs the blob, since it already reads the format, so all this checks is that
+/// the bytes are gzip. Written beside the old file and renamed over it, so a
+/// write that fails part way leaves the old meshes whole.
+pub fn store(lego: &Path, id: &str, packed: &[u8]) -> Result<(), String> {
+    if !packed.starts_with(GZIP_MAGIC) {
+        return Err("the geometry is not gzip".to_string());
+    }
+    let geometry = lego.join("geometry");
+    std::fs::create_dir_all(&geometry)
+        .map_err(|e| format!("could not create the geometry folder: {e}"))?;
+    let partial = geometry.join(format!("{id}.partial"));
+    std::fs::write(&partial, packed).map_err(|e| format!("could not store the geometry: {e}"))?;
+    std::fs::rename(&partial, geometry.join(format!("{id}{SIDECAR}"))).map_err(|e| {
+        let _ = std::fs::remove_file(&partial);
+        format!("could not store the geometry: {e}")
+    })
+}
+
 /// The ids the store holds a unit document for, or `None` when the folder could
 /// not be read and the question therefore has no answer.
 ///
@@ -109,6 +135,7 @@ pub fn sweep(lego: &Path) -> usize {
 
 #[cfg(test)]
 mod tests {
+    use super::store as store_sidecar;
     use super::*;
 
     /// A store with the given documents and sidecars in it.
@@ -195,6 +222,36 @@ mod tests {
 
         assert_eq!(sweep(dir.path()), 0);
         assert!(dir.path().join("geometry/unit.bin.gz").is_file());
+    }
+
+    #[test]
+    fn a_stored_sidecar_replaces_the_one_before_it() {
+        let dir = store(&["unit"], &["unit.bin.gz"]);
+
+        store_sidecar(dir.path(), "unit", &[0x1f, 0x8b, 1, 2]).expect("stored");
+
+        let written = std::fs::read(dir.path().join("geometry/unit.bin.gz")).expect("read");
+        assert_eq!(written, vec![0x1f, 0x8b, 1, 2]);
+        assert!(!dir.path().join("geometry/unit.partial").exists());
+    }
+
+    #[test]
+    fn storing_makes_the_geometry_folder_for_a_unit_of_parts() {
+        let dir = tempfile::tempdir().expect("tempdir");
+
+        store_sidecar(dir.path(), "unit", &[0x1f, 0x8b]).expect("stored");
+
+        assert!(dir.path().join("geometry/unit.bin.gz").is_file());
+    }
+
+    #[test]
+    fn bytes_that_are_not_gzip_are_refused_and_nothing_is_written() {
+        let dir = store(&["unit"], &["unit.bin.gz"]);
+
+        assert!(store_sidecar(dir.path(), "unit", b"CBLEGO").is_err());
+
+        let kept = std::fs::read(dir.path().join("geometry/unit.bin.gz")).expect("read");
+        assert_eq!(kept, b"x");
     }
 
     #[test]

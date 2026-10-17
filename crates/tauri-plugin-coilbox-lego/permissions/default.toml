@@ -13,6 +13,7 @@ permissions = [
   "allow-lego-save-s3o",
   "allow-lego-save-glb",
   "allow-lego-import-s3o",
+  "allow-lego-geometry-save",
   "allow-lego-read-3do",
   "allow-lego-import-3do",
   "allow-lego-import-glb",

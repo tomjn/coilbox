@@ -9,6 +9,7 @@ import type { PlayTarget } from "@/play/config";
 
 import { exportTextureName, unitAtlas } from "./atlas";
 import { legoExport, legoScratchGame, type ScratchSandbox } from "./bindings";
+import { textureSheetRefusal } from "./liftPiece";
 import { unitScript } from "./luaScript";
 import type { ExportedFile, LegoProject } from "./model";
 import type { LoadedPack } from "./pack";
@@ -101,6 +102,8 @@ export async function writeScratchUnit({
   // built one samples one atlas, and only its own: an s3o names one texture.
   // A unit whose atlas is not installed still tests, untextured, rather than
   // failing on a file that cannot be copied.
+  const heldBack = textureSheetRefusal(project);
+  if (heldBack) throw new Error(heldBack);
   const atlas = unitAtlas(project, pack.library.atlases);
   const written = exportTextureName(atlas.texture);
   const imported = project.imported ? importedTextures(project.imported) : null;

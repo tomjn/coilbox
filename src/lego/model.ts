@@ -11,18 +11,23 @@
  * emitters are expressed. They survive export. Anchors derived from a part's
  * bounding box do not, and exist only to snap against.
  *
- * The two ways to be geometry are not two halves of one unit. A unit is either
- * built out of the parts pack, where every piece names a part and the whole
- * unit samples one atlas, or imported whole from somebody else's `.s3o`, where
- * every piece names a mesh and the unit draws with its own texture. The two
- * cannot mix: an imported model's UVs point onto its own texture, so a lego
- * part dropped into it would sample the wrong image and nothing could fix that.
- * `project.imported` is what says which kind a unit is.
+ * A unit is either built out of the parts pack, where pieces name parts that
+ * sample one atlas, or imported whole from somebody else's `.s3o`, where every
+ * piece names a mesh and the unit draws with its own texture.
+ * `project.imported` is what says which kind a unit is. A part cannot go into
+ * an imported unit: its UVs point onto the atlas, and the unit has one texture.
+ *
+ * A unit of parts can also hold pieces lifted off its own game's units (#3259).
+ * Each of those names a mesh and carries the texture its UVs point onto in
+ * `lifted`, so it draws with that rather than the atlas. Its mesh is copied into
+ * the unit's own sidecar when it goes in. The lifted pieces have to be from the
+ * unit's game, which `projectProblems` checks.
  */
 
 import { comparablePath } from "./exportRecord";
 import type { RawGeometry } from "./rawGeometry";
 import { ringMembers, validRingCount } from "./ringSet";
+import { liftRefusal } from "./unitGame";
 import { type LegoWorth, parseWorth } from "./worth";
 
 export const LEGO_SCHEMA_VERSION = 1;
@@ -252,6 +257,11 @@ export interface LegoLifted {
   member: string;
   /** The unitdef that names the model. */
   unit?: string;
+  /** The model's colour texture, which the piece's UVs point onto. Kept on the
+   *  piece so it still draws with it inside a unit of parts (#3259). */
+  texture?: LegoTexture;
+  /** The model's second texture, whose alpha hides pixels. */
+  texture2?: LegoTexture;
 }
 
 /**
@@ -1124,6 +1134,19 @@ export function projectProblems(project: LegoProject): string[] {
     if (count > 1) problems.push(`${count} pieces are called "${name}".`);
   }
 
+  // A lifted piece belongs only in a unit for its own game (#3259). Said once
+  // per reason, naming the pieces, so a whole turret is one line.
+  const misplaced = new Map<string, string[]>();
+  for (const piece of project.pieces) {
+    if (!piece.lifted) continue;
+    const refused = liftRefusal(project, piece.lifted.game);
+    if (refused)
+      misplaced.set(refused, [...(misplaced.get(refused) ?? []), piece.name]);
+  }
+  for (const [refused, pieces] of misplaced) {
+    problems.push(`${refused} Pieces from a game: ${pieces.join(", ")}.`);
+  }
+
   const roots = project.pieces.filter((piece) => piece.parentId === null);
   if (roots.length > 1) {
     problems.push(
@@ -1439,10 +1462,15 @@ function parseLifted(value: unknown): LegoLifted | null {
   const v = value as Record<string, unknown>;
   const game = parseUnitGame(v.game);
   if (!game || typeof v.member !== "string" || v.member === "") return null;
+  // Read out of a game, so never a path to refresh from: see `parseImported`.
+  const texture = parseTexture(v.texture, true);
+  const texture2 = parseTexture(v.texture2, true);
   return {
     game,
     member: v.member,
     ...(typeof v.unit === "string" && v.unit !== "" ? { unit: v.unit } : {}),
+    ...(texture ? { texture } : {}),
+    ...(texture2 ? { texture2 } : {}),
   };
 }
 

@@ -1203,6 +1203,28 @@ async fn lego_import_s3o<R: Runtime>(app: AppHandle<R>, path: String, id: String
     }
 }
 
+/// `lego_geometry_save` writes a document's geometry sidecar from bytes the
+/// frontend packed: a unit of parts taking in a lifted piece's meshes (#3259).
+/// See [`geometry::store`].
+#[tauri::command]
+async fn lego_geometry_save<R: Runtime>(
+    app: AppHandle<R>,
+    id: String,
+    bytes: Vec<u8>,
+) -> CliResult {
+    if !valid_id(&id) {
+        return CliResult::err(format!("invalid id: {id}"));
+    }
+    let base = match lego_dir(&app) {
+        Ok(dir) => dir,
+        Err(e) => return CliResult::err(e),
+    };
+    match geometry::store(&base, &id, &bytes) {
+        Ok(()) => CliResult::ok(json!({ "bytes": bytes.len() })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
 /// `lego_read_3do` names the tiles a `.3do` asks for, before anything imports it.
 ///
 /// The pair to `lego_read_s3o`, and it exists for the same reason: a model
@@ -3226,6 +3248,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_save_s3o,
             lego_save_glb,
             lego_import_s3o,
+            lego_geometry_save,
             lego_read_3do,
             lego_import_3do,
             lego_import_glb,

@@ -238,6 +238,13 @@ export interface SceneState {
     material: THREE.MeshStandardMaterial;
     dispose: () => void;
   } | null;
+  /** The materials pieces lifted from a game draw with in a unit of parts
+   *  (#3259), one per pair of textures, by the same kind of key, owned here for
+   *  the same reason. */
+  lifted: Map<
+    string,
+    { material: THREE.MeshStandardMaterial; dispose: () => void }
+  >;
   /** Read during a drag, so the lock can be toggled mid-session. */
   uniformScale: boolean;
   /** The selected piece's origin and anchors, or nothing when none is. */
@@ -439,6 +446,45 @@ export function unitMaterial(
   return state.imported.material;
 }
 
+/**
+ * The material each piece draws with.
+ *
+ * The unit's own material, except for a piece lifted from a game into a unit of
+ * parts (#3259). Its UVs point onto its game's texture rather than the atlas,
+ * so it draws with a material made from the textures it records. One is made
+ * per pair of textures and freed once no piece names that pair.
+ */
+export function pieceMaterials(
+  state: Pick<SceneState, "imported" | "lifted">,
+  pack: LoadedPack,
+  project: LegoProject,
+): (piece: LegoPiece) => THREE.MeshStandardMaterial {
+  const unit = unitMaterial(state, pack, project);
+  const keyOf = (piece: LegoPiece) => {
+    const lifted = piece.lifted;
+    if (project.imported || !lifted || !piece.meshId) return null;
+    if (!lifted.texture && !lifted.texture2) return null;
+    return `${lifted.texture?.key ?? ""}|${lifted.texture2?.key ?? ""}`;
+  };
+  const used = new Set<string>();
+  for (const piece of project.pieces) {
+    const key = keyOf(piece);
+    if (!key || used.has(key)) continue;
+    used.add(key);
+    if (!state.lifted.has(key))
+      state.lifted.set(key, importedMaterial(piece.lifted ?? {}));
+  }
+  for (const [key, held] of state.lifted) {
+    if (used.has(key)) continue;
+    held.dispose();
+    state.lifted.delete(key);
+  }
+  return (piece) => {
+    const key = keyOf(piece);
+    return (key && state.lifted.get(key)?.material) || unit;
+  };
+}
+
 /** The geometry a piece draws, out of the pack or out of an imported model. */
 function pieceGeometry(
   pack: LoadedPack,
@@ -458,7 +504,7 @@ function pieceGeometry(
  */
 export type SceneGraph = Pick<
   SceneState,
-  "root" | "groups" | "gizmo" | "imported"
+  "root" | "groups" | "gizmo" | "imported" | "lifted"
 >;
 
 /**
@@ -474,7 +520,7 @@ export function syncScene(
   project: LegoProject,
 ) {
   const wanted = new Set(project.pieces.map((piece) => piece.id));
-  const material = unitMaterial(state, pack, project);
+  const materialFor = pieceMaterials(state, pack, project);
 
   for (const [id, group] of state.groups) {
     if (wanted.has(id)) continue;
@@ -527,6 +573,7 @@ export function syncScene(
       mesh?.removeFromParent();
       continue;
     }
+    const material = materialFor(piece);
     if (mesh) {
       mesh.geometry = geometry;
       // Reassigned rather than left as it was, because the unit's atlas can

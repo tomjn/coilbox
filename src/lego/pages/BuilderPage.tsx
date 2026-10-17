@@ -78,7 +78,8 @@ import {
   transformRoots,
 } from "../groupTransform";
 import { useInventoryView } from "../inventory";
-import { liftedModuleRefusal } from "../liftPiece";
+import { liftIntoUnit } from "../liftIntoUnit";
+import { holdsLiftedPieces, liftedModuleRefusal } from "../liftPiece";
 import { canFixMesh, DEFAULT_SMOOTHING_ANGLE_DEG } from "../meshFix";
 import {
   canMirror,
@@ -212,6 +213,9 @@ function Builder({ id }: { id: string | undefined }) {
   const doc = useLegoDocument(id, pack);
   const { edit, selectedId, selectedIds, select: setSelectedId } = doc;
   const draft = doc.project;
+  // The document as it is now, for an edit made after waiting on a file.
+  const docRef = useRef(doc);
+  docRef.current = doc;
   // The unit's file in its game, which is where a factory's yardmap would be.
   const { def: builtDef } = useBuiltUnitDef(draft);
   // The names this unit has stopped exporting under, whose files are still in
@@ -395,16 +399,18 @@ function Builder({ id }: { id: string | undefined }) {
         ? [
             ...projectProblems(draft),
             // A unit imported whole names no parts and no atlas, so the pack
-            // has nothing to say about it. Its own geometry does.
-            ...(draft.imported
+            // has nothing to say about it. Its own geometry does, and so does
+            // a unit of parts holding pieces lifted from a game.
+            ...(!draft.imported && pack
+              ? projectPackProblems(draft, pack)
+              : []),
+            ...(draft.imported || draft.pieces.some((piece) => piece.meshId)
               ? [
                   ...(geometry.error ? [geometry.error] : []),
                   ...geometry.missingTextures,
                   ...rawGeometryProblems(draft.pieces, geometry.raw),
                 ]
-              : pack
-                ? projectPackProblems(draft, pack)
-                : []),
+              : []),
           ]
         : [],
     [draft, pack, geometry.error, geometry.raw, geometry.missingTextures],
@@ -476,6 +482,13 @@ function Builder({ id }: { id: string | undefined }) {
   function startPlacingModule(module: LegoProject, now: boolean) {
     if (refuseLifted(module)) return;
     setPlacingAnchor(false);
+    // A lifted piece has no connectors yet (#3269), so it goes on the selected
+    // piece straight away.
+    if (holdsLiftedPieces(module)) {
+      setPlacingPart(null);
+      void addLifted(module);
+      return;
+    }
     if (now || !draft?.pieces.some((piece) => piece.partId)) {
       addCompound(module);
       setPlacingPart(null);
@@ -757,18 +770,49 @@ function Builder({ id }: { id: string | undefined }) {
     return refused !== null;
   }
 
-  function addCompound(compound: LegoProject) {
-    if (!draft) return;
-    const inserted = doc.insert(
+  function addCompound(compound: LegoProject, into = doc) {
+    const project = into.project;
+    if (!project) return;
+    const inserted = into.insert(
       compound,
-      selectedId ?? draft.rootPieceId,
+      into.selectedId ?? project.rootPieceId,
       true,
     );
     if (inserted.rootPieceIds.length === 0) return;
     inventoryView.inventory.record({ kind: "module", id: compound.id });
-    doc.selectMany(inserted.rootPieceIds);
+    into.selectMany(inserted.rootPieceIds);
     for (const pieceId of inserted.rootPieceIds)
       queueTwin(pieceId, inserted.held);
+  }
+
+  /**
+   * Copy a lifted module's meshes into this unit's geometry file, then hand
+   * back the module as it goes in. Null, having said why, when the files could
+   * not be read or written, and then nothing has changed. See `liftIntoUnit`.
+   */
+  async function takeInLifted(
+    module: LegoProject,
+    title: string,
+  ): Promise<LegoProject | null> {
+    const unitId = docRef.current.project?.id;
+    if (!unitId) return null;
+    try {
+      const taken = await liftIntoUnit(unitId, module);
+      if (taken.raw) geometry.adopt(taken.raw);
+      return taken.module;
+    } catch (error) {
+      void notify({
+        title,
+        body: error instanceof Error ? error.message : String(error),
+        level: "error",
+      });
+      return null;
+    }
+  }
+
+  async function addLifted(module: LegoProject) {
+    const placed = await takeInLifted(module, "Add module");
+    if (placed) addCompound(placed, docRef.current);
   }
 
   function transformPiece(
@@ -934,12 +978,29 @@ function Builder({ id }: { id: string | undefined }) {
   ) {
     setSwappingModule(false);
     if (!draft || !pack || refuseLifted(module, title)) return;
-    const result = swapModule(draft, pack, pieceId, module, () =>
+    if (holdsLiftedPieces(module)) {
+      void takeInLifted(module, title).then((placed) => {
+        const now = docRef.current.project;
+        if (placed && now) applyModuleSwap(now, pieceId, placed, title);
+      });
+      return;
+    }
+    applyModuleSwap(draft, pieceId, module, title);
+  }
+
+  function applyModuleSwap(
+    project: LegoProject,
+    pieceId: string,
+    module: LegoProject,
+    title: string,
+  ) {
+    if (!pack) return;
+    const result = swapModule(project, pack, pieceId, module, () =>
       crypto.randomUUID(),
     );
     if (!result) return;
-    edit(() => result.project);
-    doc.selectMany(result.rootPieceIds);
+    docRef.current.edit(() => result.project);
+    docRef.current.selectMany(result.rootPieceIds);
     const said = [
       result.moved.length > 0
         ? `Moved ${result.moved.join(", ")} to the new root.`
@@ -1711,7 +1772,13 @@ function Builder({ id }: { id: string | undefined }) {
                     : (mount, labels) =>
                         void saveSelectionAsCompound(mount, labels),
                   compoundMounts,
-                  canSaveAsCompound: selectedIds.length > 0,
+                  // Nor a selection holding a lifted piece: a module keeps its
+                  // meshes in a file of its own, and these are in the unit's.
+                  canSaveAsCompound:
+                    selectedIds.length > 0 &&
+                    !selectedIds
+                      .flatMap((pieceId) => descendantIds(draft, pieceId))
+                      .some((pieceId) => pieceById(draft, pieceId)?.meshId),
                   onDelete: removeSelected,
                   canDelete: transformRoots(draft, selectedIds).length > 0,
                 }}

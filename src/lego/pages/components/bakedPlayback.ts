@@ -4,7 +4,7 @@ import type { LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import type { RawGeometry } from "../../rawGeometry";
 import { type BakedPiece, bakedPieces } from "../../s3oBuild";
-import { type SceneState, unitMaterial } from "./sceneState";
+import { pieceMaterials, type SceneState } from "./sceneState";
 
 /**
  * Rebuild the scene as the format stores it: rigid geometry at a translation.
@@ -28,11 +28,13 @@ export function showBaked(
   // bake built belongs here rather than only at the end of playback.
   disposeBaked(state);
   const { pieces } = bakedPieces(project, pack, raw);
-  const material = unitMaterial(state, pack, project);
+  const materialFor = pieceMaterials(state, pack, project);
+  const byId = new Map(project.pieces.map((piece) => [piece.id, piece]));
 
   for (const [pieceId, baked] of pieces) {
     const group = state.groups.get(pieceId);
-    if (!group) continue;
+    const piece = byId.get(pieceId);
+    if (!group || !piece) continue;
 
     group.position.set(...baked.offset);
     group.rotation.set(0, 0, 0);
@@ -49,6 +51,7 @@ export function showBaked(
 
     const geometry = bakedGeometry(baked);
     state.baked.push(geometry);
+    const material = materialFor(piece);
     if (mesh) {
       mesh.geometry = geometry;
       // Reassigned rather than left as it was, because the unit's atlas can
