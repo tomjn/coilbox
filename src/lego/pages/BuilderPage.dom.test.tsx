@@ -3,8 +3,8 @@
 /**
  * The builder's bottom strip: which tabs an imported unit gets.
  *
- * Parts and Compounds have nothing for a unit imported whole (issue #712), so
- * they are hidden for it, but the strip itself used to disappear too, which
+ * The inventory has nothing for a unit imported whole (issue #712), so it is
+ * hidden for it, but the strip itself used to disappear too, which
  * took Script with it. An imported unit is usually the one carrying its
  * game's own script, so Script is the one tab that has to survive.
  *
@@ -26,6 +26,9 @@ const doc: { current: LegoDocumentSession } = { current: null as never };
 vi.mock("@picoframe/frame", async () => ({
   ...(await vi.importActual<Record<string, unknown>>("@picoframe/frame")),
   useHideSidebar: () => {},
+  // The recent and favourite lists are app settings, which need the frame's
+  // store. This test is not about them.
+  useSetting: (_key: string, fallback: unknown) => [fallback, () => {}],
 }));
 
 vi.mock("../useLegoDocument", () => ({
@@ -163,11 +166,11 @@ afterEach(() => {
 });
 
 describe("a unit built out of parts", () => {
-  it("offers Parts, Compounds and Script", async () => {
+  it("offers the Inventory and Script", async () => {
     show(unit());
     await screen.findByRole("button", { name: "Script" });
-    expect(screen.getByRole("button", { name: "Parts" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Compounds" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Inventory" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Compounds" })).toBeNull();
   });
 });
 
@@ -239,11 +242,10 @@ describe("the build arm button", () => {
 });
 
 describe("a unit imported whole", () => {
-  it("offers only Script, not Parts or Compounds", async () => {
+  it("offers only Script, not the Inventory", async () => {
     show(unit({ imported: { source: "/tmp/unit.s3o" } }));
     await screen.findByRole("button", { name: "Script" });
-    expect(screen.queryByRole("button", { name: "Parts" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Compounds" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Inventory" })).toBeNull();
   });
 
   it("names the script in the collapse button's label", async () => {
