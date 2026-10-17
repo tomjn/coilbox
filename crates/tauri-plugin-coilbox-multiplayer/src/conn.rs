@@ -1671,6 +1671,14 @@ mod tests {
             Box::pin(async move {
                 let mut framed = Framed::new(sock, LinesCodec::new());
                 let _ = framed.send("TASSERVER 0.38 * 8201 0".to_string()).await;
+                // Close the way a server does once it has finished: send a FIN, then
+                // read what the client sent until the client closes too. Dropping the
+                // socket with the client's login unread makes the operating system
+                // answer with a reset, which can discard the greeting and reaches
+                // the client as an error instead of the end of the stream.
+                let mut sock = framed.into_inner();
+                let _ = tokio::io::AsyncWriteExt::shutdown(&mut sock).await;
+                let _ = tokio::io::copy(&mut sock, &mut tokio::io::sink()).await;
             })
         })
         .await;
