@@ -706,6 +706,82 @@ export interface LegoProject {
    * gone, so an empty list means the rename left nothing behind.
    */
   staleExports?: StaleExport[];
+  /**
+   * Guide planes the game maker has placed (issue #3318): flat planes drawn in
+   * the viewport that a moved piece's anchors snap to. A view aid like the
+   * grid. They are saved with the unit and read by nothing that exports: no
+   * exporter walks this list, because a guide is not a piece. Absent means
+   * none.
+   */
+  guides?: LegoGuide[];
+}
+
+/** The three axes a guide can be aligned to. */
+export const GUIDE_AXES = ["x", "y", "z"] as const;
+export type GuideAxis = (typeof GUIDE_AXES)[number];
+
+/**
+ * A guide in the unit's own space: the root piece's frame, so moving or
+ * turning the root carries the guide with it.
+ *
+ * A plane (no `kind`, as every guide saved before lines) stands across `axis`
+ * at `offset`. A line (`kind: "line"`) runs along `axis` through `point`, whose
+ * coordinate along `axis` is always 0 since a line does not have one.
+ */
+export interface LegoGuide {
+  id: string;
+  name: string;
+  axis: GuideAxis;
+  kind?: "line";
+  /** A plane's distance along `axis` from the root's origin. */
+  offset?: number;
+  /** A line's place in the unit's space. */
+  point?: [number, number, number];
+  hidden?: boolean;
+}
+
+/** The guides that can be read, or null when there are none. */
+function parseGuides(value: unknown): LegoGuide[] | null {
+  if (!Array.isArray(value)) return null;
+  const seen = new Set<string>();
+  const guides: LegoGuide[] = [];
+  for (const raw of value) {
+    if (typeof raw !== "object" || raw === null) continue;
+    const g = raw as Record<string, unknown>;
+    if (typeof g.id !== "string" || g.id === "" || seen.has(g.id)) continue;
+    const axis = GUIDE_AXES.find((a) => a === g.axis);
+    if (!axis) continue;
+    const named = (fallback: string) =>
+      typeof g.name === "string" && g.name !== "" ? g.name : fallback;
+    const hidden = g.hidden === true ? { hidden: true as const } : {};
+
+    if (g.kind === "line") {
+      const point = parseVec3(g.point);
+      if (!point) continue;
+      point[GUIDE_AXES.indexOf(axis)] = 0;
+      seen.add(g.id);
+      guides.push({
+        id: g.id,
+        name: named(`${axis} line`),
+        kind: "line",
+        axis,
+        point,
+        ...hidden,
+      });
+      continue;
+    }
+    if (g.kind !== undefined && g.kind !== "plane") continue;
+    if (typeof g.offset !== "number" || !Number.isFinite(g.offset)) continue;
+    seen.add(g.id);
+    guides.push({
+      id: g.id,
+      name: named(`${axis} = ${g.offset}`),
+      axis,
+      offset: g.offset,
+      ...hidden,
+    });
+  }
+  return guides.length > 0 ? guides : null;
 }
 
 /** The camera directions the build picture can be taken from. */
@@ -1233,6 +1309,10 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
     ...(() => {
       const stale = parseStaleExports(d.staleExports);
       return stale.length > 0 ? { staleExports: stale } : {};
+    })(),
+    ...(() => {
+      const guides = parseGuides(d.guides);
+      return guides ? { guides } : {};
     })(),
   };
   // A document saved before pieces were written in save order, or hand-edited,
