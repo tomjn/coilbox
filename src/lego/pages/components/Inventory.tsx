@@ -169,7 +169,7 @@ interface GridsProps {
   atlas?: LegoAtlas;
   selectedPartId?: string;
   /** Absent on the Lego Parts page, which has no unit to take a part. */
-  onSelectPart?: (part: LegoPartInfo) => void;
+  onSelectPart?: (part: LegoPartInfo, alt: boolean) => void;
   /** Absent on the Lego Parts page, as `CompoundPicker` allows. */
   onInsertModule?: (module: LegoProject, now: boolean) => void;
   placingModuleId?: string;
