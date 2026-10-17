@@ -159,3 +159,71 @@ export function placePart(
     },
   );
 }
+
+/**
+ * The order a part added from the strip takes a parent's faces in: the top
+ * first, since most builds grow upward from a hull, then the front, the back,
+ * the left, the right and the bottom. A connector with another id comes after
+ * these, in the order its part lists them.
+ */
+const FACE_ORDER = ["+y", "+z", "-z", "+x", "-x", "-y"];
+
+function rank(id: string): number {
+  const at = FACE_ORDER.indexOf(id);
+  return at < 0 ? FACE_ORDER.length : at;
+}
+
+/**
+ * The face of a piece the next part from the strip joins: the first in
+ * `FACE_ORDER` that no child is connected to. Judged from saved connections
+ * alone, so a child placed freely beside the piece does not take a face. When
+ * every face has a child, the one with the fewest, and `crowded` says so. Null
+ * for a piece with no part or no faces.
+ */
+export function freeFace(
+  project: LegoProject,
+  pack: LoadedPack,
+  parentId: string,
+): { to: string; crowded: boolean } | null {
+  const parent = pieceById(project, parentId);
+  if (!parent) return null;
+  const faces = pieceConnectors(pack, parent)
+    .map((connector, index) => ({ id: connector.id, index }))
+    .sort((a, b) => rank(a.id) - rank(b.id) || a.index - b.index);
+  if (faces.length === 0) return null;
+  const used = new Map<string, number>();
+  for (const piece of project.pieces) {
+    if (piece.parentId !== parentId || !piece.connection) continue;
+    used.set(piece.connection.to, (used.get(piece.connection.to) ?? 0) + 1);
+  }
+  let best = faces[0];
+  for (const face of faces) {
+    if ((used.get(face.id) ?? 0) < (used.get(best.id) ?? 0)) best = face;
+  }
+  return { to: best.id, crowded: (used.get(best.id) ?? 0) > 0 };
+}
+
+/**
+ * The document with `part` added to a free face of the piece, as `pieceId`, and
+ * whether every face already had a child. Null when the piece has no face to
+ * join, so the caller can add the part at the piece's origin instead.
+ */
+export function attachToFreeFace(
+  project: LegoProject,
+  pack: LoadedPack,
+  part: LegoPartInfo,
+  parentId: string,
+  pieceId: string,
+): { project: LegoProject; crowded: boolean } | null {
+  const face = freeFace(project, pack, parentId);
+  if (!face) return null;
+  const next = placePart(
+    project,
+    pack,
+    part,
+    { parentId, to: face.to },
+    { cycle: 0, twist: 0 },
+    pieceId,
+  );
+  return next && { project: next, crowded: face.crowded };
+}
