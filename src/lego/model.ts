@@ -539,8 +539,9 @@ export interface LegoModuleRef {
   /**
    * The module's content stamp when it was inserted (`moduleStamp`, #3304).
    * Compared with the module's stamp now to tell the instance is out of date.
-   * Absent on a piece inserted before this existed, which is never offered an
-   * update because nothing says what it was inserted at.
+   * Absent on a piece inserted before this existed. The builder lists such an
+   * instance as untracked and lets the user mark it current or update it
+   * (#4323), because nothing says what it was inserted at.
    */
   rev?: string;
   /**
