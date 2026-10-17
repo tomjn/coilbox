@@ -75,7 +75,7 @@ export function ModuleLabelsPopover({
           size="sm"
           variant="ghost"
           className={className}
-          aria-label={`Category and tags of the ${compound.name} compound`}
+          aria-label={`Category and tags of the ${compound.name} module`}
         >
           <Tag size={14} />
         </Button>

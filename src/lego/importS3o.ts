@@ -93,7 +93,7 @@ export const NOT_IN_AN_EXPORT: string[] = [
   "Roles, tags, hidden pieces and custom anchors.",
   "Animation presets and the unit script. An export writes the script as its own file, and this reads only the model.",
   "The unit definition, the collision volume, notes, and where the unit was last exported to.",
-  "Which pieces were dropped in as a compound. A compound is copied into the unit when it is used, so the copy is all there ever was in the model.",
+  "Which pieces were dropped in as a module. A module is copied into the unit when it is used, so the copy is all there ever was in the model.",
   "A rotation or scale on a piece with no geometry, which the format cannot store. It comes back on the pieces below it instead, so the unit is the same shape.",
   "The axis a mirrored piece was mirrored on. It comes back as a negative scale on x, which is what the builder writes for any reflection.",
   "Exact numbers. A model stores 32-bit floats where the document stores 64, so positions, rotations and scales come back correct to about the seventh digit.",

@@ -97,8 +97,8 @@ export function SaveCompoundPopover({ disabled, options, onSave }: Props) {
           size="icon"
           variant="outline"
           disabled={disabled}
-          aria-label="Save the selection as a compound"
-          title="Save as a compound"
+          aria-label="Save the selection as a module"
+          title="Save as a module"
         >
           <PackagePlus className="size-4" />
         </TipButton>

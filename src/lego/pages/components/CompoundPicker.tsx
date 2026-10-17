@@ -257,8 +257,8 @@ export function CompoundPicker({
       <div ref={scrollRef} className="absolute inset-0 overflow-y-auto">
         {compounds.length === 0 ? (
           <p className="px-6 py-10 text-center text-sm text-muted-foreground">
-            Nothing saved yet. In a unit, select a piece and choose Save as
-            compound to keep the assembly under it for reuse.
+            Nothing saved yet. In a unit, select a piece and choose Save as a
+            module to keep the assembly under it for reuse.
           </p>
         ) : (
           <div className="relative" style={{ height: grid.height }}>
@@ -341,7 +341,7 @@ export function CompoundPicker({
                             cancelRename();
                           }
                         }}
-                        aria-label={`Rename the ${compound.name} compound`}
+                        aria-label={`Rename the ${compound.name} module`}
                         aria-invalid={renaming.error ? true : undefined}
                         className="h-5 bg-background px-1 text-xs"
                       />
@@ -371,7 +371,7 @@ export function CompoundPicker({
                       variant="ghost"
                       className="absolute left-0 top-0 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
                       onClick={() => startRename(compound)}
-                      aria-label={`Rename the ${compound.name} compound`}
+                      aria-label={`Rename the ${compound.name} module`}
                     >
                       <Pencil size={14} />
                     </Button>
@@ -418,7 +418,7 @@ export function CompoundPicker({
                       variant="ghost"
                       className="absolute right-0 top-0 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
                       onClick={() => onDelete(compound.id)}
-                      aria-label={`Delete the ${compound.name} compound`}
+                      aria-label={`Delete the ${compound.name} module`}
                     >
                       <Trash2 size={14} />
                     </Button>

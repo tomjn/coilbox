@@ -327,7 +327,7 @@ export function validateCompoundName(
       compound.id !== id &&
       compound.name.trim().toLowerCase() === trimmed.toLowerCase(),
   );
-  if (clash) return "Another compound already has this name";
+  if (clash) return "Another module already has this name";
   return null;
 }
 

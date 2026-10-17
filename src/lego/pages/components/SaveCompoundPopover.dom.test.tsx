@@ -22,7 +22,7 @@ function open(initial: { piece: string; connector: string } | null) {
     />,
   );
   fireEvent.click(
-    screen.getByRole("button", { name: "Save the selection as a compound" }),
+    screen.getByRole("button", { name: "Save the selection as a module" }),
   );
   return onSave;
 }
@@ -64,7 +64,7 @@ describe("SaveCompoundPopover", () => {
       <SaveCompoundPopover disabled options={() => null} onSave={vi.fn()} />,
     );
     fireEvent.click(
-      screen.getByRole("button", { name: "Save the selection as a compound" }),
+      screen.getByRole("button", { name: "Save the selection as a module" }),
     );
     expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
   });

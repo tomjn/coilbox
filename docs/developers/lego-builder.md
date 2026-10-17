@@ -53,7 +53,7 @@ The ones worth learning first are `G`, `R` and `S` for the three gizmo modes, `F
 
 ### The piece actions
 
-The buttons down the left of the 3D view act on the selected piece: duplicate, paste, save as a compound, delete. They are in the view rather than the sidebar because that is where the piece is.
+The buttons down the left of the 3D view act on the selected piece: duplicate, paste, [save as a module](#save-a-module), delete. They are in the view rather than the sidebar because that is where the piece is.
 
 Copy and paste go through the system clipboard, so they cross windows. Copy a leg in one unit, paste it into another. Anything on the clipboard that is not a piece is rejected with a reason. A pasted piece whose part is not in any installed pack still pastes: the names, the hierarchy and the transforms are real work, so they are kept and the missing geometry is reported rather than dropped.
 
@@ -79,23 +79,62 @@ Every part has six faces, named for the unit's directions: top, bottom, front, b
 
 **Copies.** Duplicate keeps the original's join. Mirroring a part, in place or as a copy, joins the copy to the face where its reflection sits, and so does a twin made in symmetry mode. When no face is there, the copy is free. A twin follows its partner: slide the partner along its face and the twin stays joined, drag the partner free and the twin goes free too. A pasted part lands free, keeping the joins inside what you copied.
 
-## Compounds
+## Modules
 
-A compound is an assembly you saved to use again: a leg, a turret, a cab. Build it once out of parts, save it, and drop it into the next unit.
+A module is an assembly you saved to use again, such as a leg, a turret or a cab. Build it once out of parts, save it, and drop it into the next unit. Earlier versions of coilbox called modules compounds. Modules saved under that name load unchanged.
 
-Compounds are the answer to "where do I get a leg from". The alternative is copying pieces out of somebody else's game, which is somebody else's work and somebody else's licence. A compound is yours.
+Modules are the answer to "where do I get a leg from". The alternative is copying pieces out of somebody else's game, which is somebody else's work and somebody else's licence. A module is yours.
 
-Select the top piece of the assembly and press the compound button in the left-hand toolbar. It appears in the **Inventory** tab of the strip, where you can rename it, delete it, and click it to drop a copy into the unit you are working on. A compound keeps how its pieces sit against each other and the joins between them. Its top piece has no join, so the compound lands free at the selected piece's origin, and you drag it onto a face to join it. Names are made unique as it lands, because two pieces called `barrel` would be one piece too few for a script.
+### Save a module
 
-The compound button opens a small panel that asks which connector mounts the compound on a unit. It opens on the connector at the lowest point of the first piece, which is the bottom face of a leg or a turret. Choose another connector, or "No mount", and press Save. When you click a compound that has a mount, it joins to a free face of the selected piece by that connector, the way a part from the strip does. If the mount is on a piece deeper in the compound, the whole compound is placed with that connector on the face but no join is saved. If the selected piece has no face to join, the compound is placed with its mount connector on the selected piece's origin. A compound saved with no mount drops its first piece on the selected piece's origin, as before.
+Select the top piece of the assembly and press **Save as a module** in the left-hand toolbar. Select several pieces to save them as one module, and they keep their places against each other. A small panel asks for three things:
 
-A module can have a category and tags. The compound button's panel has fields for both, and the tag button on a module's cell in the strip edits them later. A category is one typed word or two, picked from the starter list (Chassis, Wheel, Leg, Turret, Arm, Detail) and the categories already in use. A module with no category is "Uncategorised". With the Modules kind chosen, the Inventory tab of the strip and the Lego Parts page both have a search box and a category menu. Search needs every term to appear in the name, the category or the tags.
+- **Mounts on the unit by** is the connector that joins the module to a unit. It opens on the connector at the lowest point of the first piece, which is the bottom face of a leg or a turret. Choose another, or **No mount**.
+- **Category** is one word or two. The list offers Chassis, Wheel, Leg, Turret, Arm and Detail, plus the categories you already use. A module with no category is Uncategorised.
+- **Tags** are extra words to search by, separated by commas.
 
-A unit can hold the same module more than once, and each copy animates on its own. Every piece of one drop remembers the module it came from and which drop it was, so two build arms are two arms rather than one arm and a spare. A preset written for one build arm or one set of legs is then written for each copy: each arm aims at the build target, and each set of legs walks in a thread of its own with its own signal. The Animation panel says how many it found, as in "Aim while building, 2 build arms". A duplicate or a pasted copy of a whole module is another copy of it. A piece duplicated inside a module, such as a second barrel on the same turret, stays part of that copy, and a piece dragged out of a module to hang off something else stops being part of it. Pieces that came from no module count as one copy between them, so a unit built without modules gets the script it always had.
+Press **Save** and the strip opens on your modules. The module takes the name of its top piece. It keeps every piece under the selection, their roles, how they sit against each other and the joins between them. It also keeps the animation presets that move its pieces, such as **Turret sweep** for a turret. The unit's [builder settings](#units-that-build) go with it only when a build preset does.
+
+### Add a module to a unit
+
+Click a module in the inventory to start placing it, the same way you [place a part on a face](#build-a-unit). Hover a connector of any part and a translucent copy of the whole module shows where it will go, with its mount on that connector. `N` moves the mount to the next connector of its piece, and `T` turns the module a quarter turn. `Escape`, or clicking the module again, stops. Click to add it. That is one undo step, and with symmetry on it adds the twin too.
+
+Hold `Alt` and click a module to add it to the selected piece at once. It joins a free face by its mount, choosing the face the way a part from the strip does. If the selected piece has no free face, the mount lands on the piece's origin. In a unit with no parts yet there is nothing to hover, so a plain click adds the module at once too.
+
+A module with no mount joins by whichever connector of its first piece faces back at the face you hover, and the view says it has no mount. With `Alt`, its first piece lands on the selected piece's origin. When the mount is on a piece deeper in the module, the module is placed with that connector on the face, but no join is saved.
+
+Piece names are made unique as the module lands, because two pieces called `barrel` would be one piece too few for a script.
+
+The module's presets are added to the unit's. A preset the unit already has keeps its settings. A notice says what was added, what the unit already had, and what was held back because a role is missing. A single leg's walk, for example, waits for a leg on the other side. With symmetry on, the twin is that leg, and the walk is added with it.
+
+### Two of the same module
+
+A unit can hold the same module more than once, and each copy animates on its own. Every piece remembers the module it came from and which copy it belongs to, so two build arms are two arms rather than one arm and a spare. A preset written for one build arm or one set of legs is written for each copy: each arm aims at the build target, and each set of legs walks in a thread of its own. The Animation panel says how many it found, as in "Aim while building, 2 build arms". All the copies share one set of preset settings ([issue #4315](https://github.com/tomjn/coilbox/issues/4315)).
+
+A duplicate or a pasted copy of a whole module is another copy of it. A piece duplicated inside a module, such as a second barrel on the same turret, stays part of that copy. A piece dragged out of a module to hang off something else stops being part of it. Pieces that came from no module count as one copy between them, so a unit built without modules gets the script it always had.
+
+### Swap a module
+
+A piece that came from a module has a **Swap module** button under **Change part** in the piece panel. It lists the other modules, with those in the same category first, and has a search box. Pick one and it replaces the whole copy the piece belongs to, in one undo step.
+
+- If the old module was joined to a face, the new one joins the same face by its own mount, with the same twist. If it was free, the new one takes its place.
+- Pieces you hung on the old module move to the new piece with the same role. Any with no match go under the new module's top piece, and a notice names them.
+- The new module's presets are added the same way as when you add a module. A preset that only the old module's pieces needed is removed, and the notice names it.
+- Only the selected copy changes. Its mirror twin is a copy of its own and stays as it was.
+
+### When a module changes
+
+When a module you used has changed, coilbox offers to update the unit. It never updates a unit by itself. Open a unit, or save a module while a unit is open, and a banner above the view lists each copy made from an older version of its module, as in "turret uses an older Turret". **Update** replaces that copy with the current module the way Swap module does, in one undo step. If you have edited pieces of that copy, the row says how many the update resets. **Dismiss** hides the banner until a module changes again or you open another unit.
+
+Only a change to a module's pieces, presets, mount or builder settings counts. A new name, category or tags does not. A built in module counts as changed when an app update changes it. A copy added before coilbox began recording module versions is never offered an update.
+
+Delete a module and its copies stay in your units as they are. The piece panel then shows "Module missing" above Swap module. Pieces added by the **Weapon** and **Build arm** buttons are never offered an update.
 
 ### The inventory
 
 The Inventory tab lists parts and modules in one place. The **All**, **Parts** and **Modules** buttons choose which kinds show, and one search box covers both. **Recent** lists what you last added to any unit, newest first, and keeps the last 24. **Favourites** lists the items you starred. Point at a cell and click its star, or focus a part and press `F`, to mark it. Click the button again to see everything. Both lists belong to you, not to a unit, and an item that is no longer installed drops out of them. The Lego Parts page has the same inventory without the add-to-unit step.
+
+With **Modules** chosen there is a category menu beside the search box. Search needs every term to appear in a module's name, category or tags. The built in modules come first, then your own under "Saved". Point at one of yours to rename it, delete it, or change its category and tags with the tag button.
 
 ### Built in modules
 
@@ -103,9 +142,21 @@ The Inventory lists a set of modules that come with the app, under a "Built in" 
 
 A single leg is the front left one. Its walk needs a right leg too, so it is held back until the unit has one. The pair of legs brings the walk with it.
 
-You cannot rename, relabel or delete a built in module. Its cell has one button instead, "Make my own copy", which saves a copy under your own compounds with a new id and a name like "Wheel copy". The copy is yours to change.
+You cannot rename, relabel or delete a built in module. Its cell has a **Make my own copy** button instead, which saves a copy among your own modules with a new id and a name like "Wheel copy". The copy is yours to change.
 
 Built in modules are not files. The app builds them each time it loads the parts pack, from parts in the bundled pack, so they work with any atlas. Each has a fixed id starting `builtin.`, which stays the same between versions. If you replace the bundled pack with one that lacks a part a built in module uses, that module does not appear.
+
+### Share a module as a file
+
+Point at a module and press **Save to file** to write it to a `.coilbox-module.json` file, which you can send to someone else. Built in modules can be saved too. **Load from file**, beside the module list in the strip and on the Lego Parts page, adds a module from a file to your own.
+
+- A module that uses parts no installed pack has still loads, and a warning lists the parts that are missing.
+- If you already have a module with the same id, coilbox asks whether to **Replace** it or **Keep both**. Closing the question keeps both.
+- A name you already use gets a number, as in "Turret 2".
+- A saved built in module loads as a copy of your own.
+- A file from a newer version of coilbox is refused.
+
+The file holds the same text a copied piece puts on the clipboard, so you can also paste a file's contents into a unit.
 
 ## Judging size
 
