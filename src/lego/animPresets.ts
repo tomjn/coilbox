@@ -172,6 +172,12 @@ export interface EmitWeapon {
  * in turn rather than on the first piece it finds.
  */
 export interface EmitInstance {
+  /** The module instance's id, or "" for pieces that came from no module. */
+  id: string;
+  /** The preset's params for this instance: the shared ones with the
+   *  instance's own laid over them. The same values as `EmitContext.params`
+   *  for an instance with none of its own. */
+  params: Record<string, number>;
   /** Counted from 1, in the order the instances' pieces appear in the unit. */
   number: number;
   /** This instance's pieces carrying a role, in document order. Asking marks
@@ -255,6 +261,13 @@ export interface AnimPreset {
 export interface AppliedPreset {
   presetId: string;
   params: Record<string, number>;
+  /**
+   * Settings for single module instances (#4315), keyed by instance id, each
+   * holding only the params that differ from `params`. An instance with no
+   * entry uses `params`. Absent on a unit that has none, so a saved unit
+   * reads and writes as it did before.
+   */
+  instances?: Record<string, Record<string, number>>;
 }
 
 const TAU = Math.PI * 2;
@@ -496,13 +509,16 @@ function cycleThreads(
   ctx: EmitContext,
   options: { name: string; start: LuaHook; stop?: LuaHook },
 ): EmitResult | null {
-  const period = Math.max(value(preset, ctx.params, "period"), 0.05);
   const functions: string[] = [];
   const started: string[] = [];
   const stopped: string[] = [];
   for (const instance of ctx.instances()) {
     const name = instance.name(options.name);
-    const thread = cycleThread(preset, ctx.params, instance, { name, period });
+    const period = Math.max(value(preset, instance.params, "period"), 0.05);
+    const thread = cycleThread(preset, instance.params, instance, {
+      name,
+      period,
+    });
     if (!thread) continue;
     if (functions.length > 0) functions.push("");
     functions.push(...thread);
@@ -1276,15 +1292,14 @@ export const BUILD_AIM: AnimPreset = {
    * so two arms swing together rather than one after the other.
    */
   emit(ctx) {
-    const turn = lua(deg(value(this, ctx.params, "turnSpeed")));
-    const lift = lua(deg(value(this, ctx.params, "liftSpeed")));
-
     const turns: string[] = [];
     const waits: string[] = [];
     const rest: string[] = [];
     for (const instance of ctx.instances()) {
       const arm = instance.pieces("buildarm.arm")[0];
       if (!arm) continue;
+      const turn = lua(deg(value(this, instance.params, "turnSpeed")));
+      const lift = lua(deg(value(this, instance.params, "liftSpeed")));
       const base = instance.pieces("buildarm.base")[0];
       if (base) {
         turns.push(`    Turn(${base}, y_axis, heading, ${turn})`);

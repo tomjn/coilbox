@@ -25,15 +25,23 @@ describe("the scenario for each preset", () => {
    *  starts on `Create`, which every scenario fires. */
   it("fires a call-in the preset fills", () => {
     for (const preset of PRESETS) {
+      const params = Object.fromEntries(
+        preset.params.map((param) => [param.id, param.fallback]),
+      );
       const result = preset.emit({
-        params: Object.fromEntries(
-          preset.params.map((param) => [param.id, param.fallback]),
-        ),
+        params,
         signal: "SIG",
         pieces: () => ["piece"],
         weapons: () => [{ number: 1, piece: () => "piece", signal: "SIG" }],
         instances: () => [
-          { number: 1, pieces: () => ["piece"], signal: "SIG", name: (n) => n },
+          {
+            id: "",
+            params,
+            number: 1,
+            pieces: () => ["piece"],
+            signal: "SIG",
+            name: (n) => n,
+          },
         ],
       });
       const filled = Object.entries(result?.hooks ?? {})

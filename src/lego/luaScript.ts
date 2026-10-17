@@ -150,7 +150,7 @@ export function unitScript(project: LegoProject): string {
 }
 
 /** The roles a preset animates or needs, which its instances are made of. */
-function presetRoles(preset: AnimPreset): string[] {
+export function presetRoles(preset: AnimPreset): string[] {
   return [...preset.animates, ...preset.requires.map((need) => need.role)];
 }
 
@@ -165,6 +165,15 @@ export function roleInstances(
   pieces: LegoPiece[],
   roles: string[],
 ): LegoPiece[][] {
+  return roleInstanceGroups(pieces, roles).map((group) => group.pieces);
+}
+
+/** `roleInstances` with each group's instance id, "" for the group of pieces
+ *  that came from no module. */
+export function roleInstanceGroups(
+  pieces: LegoPiece[],
+  roles: string[],
+): { id: string; pieces: LegoPiece[] }[] {
   const wanted = new Set(roles);
   const groups = new Map<string, LegoPiece[]>();
   for (const piece of pieces) {
@@ -172,7 +181,31 @@ export function roleInstances(
     const key = piece.module?.instance ?? "";
     groups.set(key, [...(groups.get(key) ?? []), piece]);
   }
-  return [...groups.values()];
+  return [...groups].map(([id, group]) => ({ id, pieces: group }));
+}
+
+/** Whether a group of pieces is one copy of the preset: it holds the role one
+ *  copy cannot do without, or any role the preset animates. */
+function isCopy(preset: AnimPreset, group: LegoPiece[]): boolean {
+  const role = preset.copies?.role;
+  return group.some((piece) =>
+    role ? piece.role === role : preset.animates.includes(piece.role ?? ""),
+  );
+}
+
+/**
+ * The module instances a preset is written once for, by id and in the order
+ * the script numbers them. Empty for a preset that is not written per instance.
+ * For the Animation panel's instance picker (#4315).
+ */
+export function presetInstanceIds(
+  project: LegoProject,
+  preset: AnimPreset,
+): string[] {
+  if (preset.copies?.per !== "instance") return [];
+  return roleInstanceGroups(project.pieces, presetRoles(preset))
+    .filter((group) => isCopy(preset, group.pieces))
+    .map((group) => group.id);
 }
 
 /**
@@ -192,9 +225,7 @@ export function presetCopies(project: LegoProject, preset: AnimPreset): number {
     ).length;
   }
   return roleInstances(project.pieces, presetRoles(preset)).filter((group) =>
-    group.some((piece) =>
-      role ? piece.role === role : preset.animates.includes(piece.role ?? ""),
-    ),
+    isCopy(preset, group),
   ).length;
 }
 
@@ -214,12 +245,16 @@ export function buildLuaScript(project: LegoProject): string {
     .map((entry) => ({
       preset: presetById(entry.presetId),
       params: entry.params,
+      instances: entry.instances,
     }))
     .filter(
       (
         entry,
-      ): entry is { preset: AnimPreset; params: Record<string, number> } =>
-        entry.preset !== undefined,
+      ): entry is {
+        preset: AnimPreset;
+        params: Record<string, number>;
+        instances: Record<string, Record<string, number>> | undefined;
+      } => entry.preset !== undefined,
     );
 
   const weapons = scriptWeapons(project);
@@ -229,7 +264,7 @@ export function buildLuaScript(project: LegoProject): string {
     return localName(piece.name);
   };
 
-  applied.forEach(({ preset, params }, index) => {
+  applied.forEach(({ preset, params, instances: own }, index) => {
     const signal = `SIG_${preset.id.replace(/[^a-z0-9]+/gi, "_").toUpperCase()}`;
     let presetSignal = false;
     // The signals named after the preset's, one per weapon or per instance.
@@ -264,11 +299,13 @@ export function buildLuaScript(project: LegoProject): string {
           },
         })),
       instances: () =>
-        roleInstances(project.pieces, presetRoles(preset)).map(
+        roleInstanceGroups(project.pieces, presetRoles(preset)).map(
           (group, index): EmitInstance => ({
+            id: group.id,
+            params: own?.[group.id] ? { ...params, ...own[group.id] } : params,
             number: index + 1,
             pieces(role) {
-              const names = group
+              const names = group.pieces
                 .filter((piece) => piece.role === role)
                 .map((piece) => piece.name);
               for (const name of names) used.add(name);

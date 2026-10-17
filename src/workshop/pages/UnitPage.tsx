@@ -127,6 +127,8 @@ import {
 } from "@/content/pages/components/states";
 import { UnitIcon } from "@/content/pages/components/UnitIcon";
 import { buildTechForest } from "@/content/techForest";
+import { builderFieldMark } from "@/lego/builderFields";
+import { receiptFor } from "@/lego/exportRecord";
 import { useLegoProjects } from "@/lego/projects";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import {
@@ -329,6 +331,7 @@ import { ProjectSectionBar } from "./components/ProjectSectionBar";
 import { RegenerateRandomModDrawer } from "./components/RandomModDrawer";
 import { UnitFieldGroups } from "./components/UnitFieldGroups";
 import {
+  type BuilderMark,
   controlKind,
   type FieldChoices,
   type InPlaceField,
@@ -824,6 +827,22 @@ export default function UnitPage() {
   const clone = clones[unitKey];
   /** The lego project this unit came out of, when it came out of one. */
   const builtBy = built.builtBy[unitKey];
+  // Which fields the unit builder keeps up to date on a unit built in it
+  // (issue #4242). Read against the unit's file as the game has it and what the
+  // last export wrote there.
+  const builderMarkOf = useMemo(() => {
+    const folder = game?.primaryArchive.path;
+    if (!builtBy?.projectId || builtBy.stale || !folder) return undefined;
+    const lego = legoProjects.find((p) => p.id === builtBy.projectId);
+    const receipt = lego && receiptFor(lego, folder);
+    if (!lego || !receipt) return undefined;
+    return (row: FieldRow): BuilderMark | undefined => {
+      const kind = builderFieldMark(row.path, unit, receipt);
+      return kind
+        ? { kind, projectId: lego.id, projectName: lego.name }
+        : undefined;
+    };
+  }, [builtBy, game, legoProjects, unit]);
   // The unit as the page has it, edits and all. The movement fields need it
   // because they are about each other, and both are usually the two somebody
   // has just changed.
@@ -1184,9 +1203,13 @@ export default function UnitPage() {
   // Whether the copy on screen could be written into the game as a unit file
   // of its own (issue #3035), asked while it is being edited the same way a
   // game unit's fields are. Only a copy made from a unit in the game, under a
-  // name the game did not use: one that replaces a game unit or was built in
-  // the lego builder has no in-place form to check at all, and the write
-  // already reports it under "still needs a mutator" (`inplace.rs`).
+  // name the game did not use: one that replaces a game unit has no in-place
+  // form to check, and the write already reports it under "still needs a
+  // mutator" (`inplace.rs`). A unit built in the lego builder is not one of
+  // the project's copies either, since `withLegoUnits` adds its definition to
+  // the page's merged list and never to `edits.clones`. Its field changes are
+  // ordinary overrides, and `prepare` in `inplace.rs` patches them into
+  // `units/<unit>.lua` like any game unit's.
   const ownClone = ownClones[unitKey];
   const cloneInPlaceDir =
     game &&
@@ -3240,6 +3263,7 @@ export default function UnitPage() {
                     choices={choices}
                     warnings={warnings}
                     checkMarkers={unitFieldMarkers}
+                    builderMark={builderMarkOf}
                     inheritedLabel={inheritedLabel}
                     post={unitPostOf}
                     relative={relativeOf}

@@ -40,6 +40,7 @@ import { worthTotals } from "../../worth";
 import type { ReferenceUnit } from "./ReferencePicker";
 import { useTestGame } from "./useTestGame";
 import { useWeaponSource } from "./WeaponsSection";
+import { useWorkshopChanges, WorkshopChangeMarks } from "./WorkshopChangeMarks";
 
 interface Props {
   project: LegoProject;
@@ -49,6 +50,16 @@ interface Props {
   reference: ReferenceUnit | null;
 }
 
+/**
+ * The unit fields each stat is read from, for marking a workshop change to
+ * one. Range and damage come from the weapons, which the marks do not follow.
+ */
+const STAT_FIELDS: Partial<Record<StatId, string[]>> = {
+  cost: ["metalCost", "buildCostMetal"],
+  health: ["health", "maxDamage"],
+  speed: ["speed"],
+};
+
 function figure(value: number): string {
   return Number(value.toFixed(1)).toLocaleString();
 }
@@ -57,6 +68,7 @@ export function StatsSection({ project, pack, bounds, reference }: Props) {
   const { target, scan } = useTestGame();
   const { projects: tweakProjects } = useModProjects();
   const source = useWeaponSource(project);
+  const workshop = useWorkshopChanges(project);
 
   // The game the unit was exported into, which is where its file is.
   const own = unitGame(project);
@@ -183,7 +195,15 @@ export function StatsSection({ project, pack, bounds, reference }: Props) {
             key={id}
             label={label}
             title={id === "dps" ? DPS_HELP : undefined}
-            own={<output aria-label={label}>{cell(id)}</output>}
+            own={
+              <span className="flex flex-wrap items-center gap-1.5">
+                <output aria-label={label}>{cell(id)}</output>
+                <WorkshopChangeMarks
+                  unitKey={workshop.key}
+                  changes={workshop.changesFor(STAT_FIELDS[id] ?? [])}
+                />
+              </span>
+            }
             reference={
               referenceStats ? (
                 <output aria-label={`${label}, ${reference?.label}`}>
