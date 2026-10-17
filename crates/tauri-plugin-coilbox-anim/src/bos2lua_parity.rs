@@ -791,6 +791,42 @@ fn a_started_script_sees_what_its_starter_set_after_starting_it() {
     assert_eq!(from_cob.events, from_lua.events, "{lua}");
 }
 
+/// The engine calls Create and then SetMaxReloadTime before anything Create
+/// started runs (`CobInstance.cpp:231-232`), so a started script reads the
+/// delay SetMaxReloadTime set, not Create's. Shaped like Balanced
+/// Annihilation's `armclaw.bos`.
+#[test]
+fn a_script_create_starts_runs_after_set_max_reload_time() {
+    let (cob, lua, pieces) = both(
+        r#"
+        piece base, barrel;
+        static-var restore_delay;
+        Restore() { sleep restore_delay; turn barrel to x-axis <10> now; }
+        Create() { restore_delay = 2000; start-script Restore(); }
+        SetMaxReloadTime(reload) { restore_delay = reload * 2; }
+    "#,
+    );
+    let events = [event(0, "Create", &[])];
+    let from_cob = crate::cobrun::run(&cob, &pieces, &events, 10, &[], &HashMap::new());
+    let from_lua = run_lua(
+        &lua,
+        "restore.lua",
+        &Unit::new(&pieces),
+        &events,
+        10,
+        &HashMap::new(),
+    );
+    assert_eq!(from_cob.error, None);
+    assert_eq!(from_lua.error, None);
+    let barrel = pieces.iter().position(|p| p == "barrel").unwrap() * 6 + 3;
+    assert!(from_cob.frames[9][barrel] != 0.0, "the COB never turned");
+    assert_eq!(
+        first_difference(&from_cob, &from_lua, &pieces, "restore", false),
+        None,
+        "{lua}"
+    );
+}
+
 /// `TransportPickup(2)`, with the stand-in parked at (30, 0, 40).
 fn pickup_at(frame: u32) -> ScriptEvent {
     ScriptEvent {

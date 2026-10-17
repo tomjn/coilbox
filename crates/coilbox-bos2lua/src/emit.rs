@@ -1239,6 +1239,7 @@ const STARTING_HELPERS: &[&str] = &[
     "WaitForTurn",
     "WaitForMove",
     "WaitForScale",
+    "startsHeld",
 ];
 
 const STARTING: &str = "
@@ -1246,13 +1247,14 @@ const STARTING: &str = "
 -- waits or finishes (CobThread.cpp:372-388), where StartThread runs it at once.
 -- So each one waits here until then, and starts in the order it was begun.
 local starting = {}
+local startsHeld = false
 local startScripts
 local function runStarted(fn, ...)
 \tfn(...)
 \tstartScripts()
 end
 function startScripts()
-\twhile #starting > 0 do
+\twhile #starting > 0 and not startsHeld do
 \t\tStartThread(runStarted, unpack(table.remove(starting, 1)))
 \tend
 end
@@ -1342,7 +1344,7 @@ struct Writer<'p, 'a> {
 }
 
 impl<'p, 'a> Writer<'p, 'a> {
-    const HELPER_NAMES: [&'static str; 15] = [
+    const HELPER_NAMES: [&'static str; 16] = [
         PIECES,
         "COB_ANGLE",
         "COB_LINEAR",
@@ -1358,6 +1360,7 @@ impl<'p, 'a> Writer<'p, 'a> {
         "startScript",
         "thenStart",
         "WaitForScale",
+        "startsHeld",
     ];
 
     fn new(p: &'p Program<'a>, mode: Mode) -> Self {
@@ -1621,7 +1624,7 @@ impl<'p, 'a> Writer<'p, 'a> {
         }
         if STARTING_HELPERS.contains(&name) {
             self.helpers
-                .extend(["starting", "startScripts", "runStarted"]);
+                .extend(["starting", "startsHeld", "startScripts", "runStarted"]);
         }
         self.refs.insert(name.to_string());
         name.to_string()
@@ -2830,9 +2833,20 @@ impl<'p, 'a> Writer<'p, 'a> {
             .cloned();
         if let Some((reload, blocks)) = reload {
             let mut text = "function script.Create()\n".to_string();
+            // The engine runs Create and then SetMaxReloadTime before any
+            // script Create began (`CobInstance.cpp:231-232`), so those are
+            // held back until both have run.
+            let hold = create.as_ref().is_some_and(|(lua, _)| self.starts(lua));
             if let Some((lua, _)) = &create {
                 let call = self.call_line(lua, &[], true);
-                text.push_str(&format!("\t{call}\n"));
+                if hold {
+                    let held = self.helper("startsHeld");
+                    text.push_str(&format!(
+                        "\t-- The engine runs SetMaxReloadTime before anything Create starts.\n\t{held} = true\n\t{call}\n\t{held} = false\n"
+                    ));
+                } else {
+                    text.push_str(&format!("\t{call}\n"));
+                }
             }
             let id = self.header("unitID");
             // Its own thread, as the engine runs it for a COB script: started
@@ -2849,6 +2863,9 @@ impl<'p, 'a> Writer<'p, 'a> {
             text.push_str(&format!(
                 "\t-- The engine tells a COB script its longest reload once it is created, and\n\t-- does not tell a Lua one, so this asks.\n\t{call}\n"
             ));
+            if hold {
+                text.push_str(&format!("\t{}()\n", self.helper("startScripts")));
+            }
             text.push_str("end\n");
             self.adapters.push(text);
         }
