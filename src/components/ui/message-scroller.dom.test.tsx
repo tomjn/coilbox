@@ -9,7 +9,7 @@
  * stubbed from the number of messages: each is ITEM_HEIGHT tall.
  */
 
-import { act, render } from "@testing-library/react";
+import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   MessageScroller,
@@ -46,7 +46,10 @@ function Thread({ count }: { count: number }) {
 }
 
 beforeEach(installMessageScrollerLayout);
-afterEach(restoreMessageScrollerLayout);
+afterEach(() => {
+  cleanup();
+  restoreMessageScrollerLayout();
+});
 
 async function mountAtBottom() {
   const view = render(<Thread count={8} />);
