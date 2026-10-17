@@ -63,6 +63,7 @@ vi.mock("../../../general/display", () => ({
 // rendered on its own has no app for. `MovementSection.dom.test.tsx` covers it.
 vi.mock("./MovementSection", () => ({ MovementSection: () => null }));
 vi.mock("./GameFitSection", () => ({ GameFitSection: () => null }));
+vi.mock("./WorthSection", () => ({ WorthSection: () => null }));
 
 function timeline(over: Partial<ScriptTimeline> = {}): ScriptTimeline {
   return {
@@ -120,6 +121,7 @@ function show(
       onShowScript={vi.fn()}
       onBuilderChange={vi.fn()}
       onMovementChange={vi.fn()}
+      onWorthChange={vi.fn()}
       onScriptTimeline={vi.fn()}
       onScriptRun={vi.fn()}
       scriptPaused={false}
@@ -1008,6 +1010,7 @@ describe("a unit on the presets, edited while it plays", () => {
           onShowScript={vi.fn()}
           onBuilderChange={vi.fn()}
           onMovementChange={vi.fn()}
+          onWorthChange={vi.fn()}
           onScriptTimeline={vi.fn()}
           onScriptRun={vi.fn()}
           scriptPaused={false}
@@ -1066,6 +1069,7 @@ describe("a unit on the presets, edited while it plays", () => {
         onShowScript={vi.fn()}
         onBuilderChange={vi.fn()}
         onMovementChange={vi.fn()}
+        onWorthChange={vi.fn()}
         onScriptTimeline={vi.fn()}
         onScriptRun={vi.fn()}
         scriptPaused={false}
@@ -1187,6 +1191,7 @@ describe("playing one preset on its own", () => {
       onShowScript={vi.fn()}
       onBuilderChange={vi.fn()}
       onMovementChange={vi.fn()}
+      onWorthChange={vi.fn()}
       onScriptTimeline={vi.fn()}
       onScriptRun={vi.fn()}
       scriptPaused={false}

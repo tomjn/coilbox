@@ -120,10 +120,12 @@ import {
 } from "../../targetMotion";
 import { isBuilder } from "../../unitDef";
 import { controlFor } from "../../unitValueControls";
+import type { LegoWorth } from "../../worth";
 import { GameFitSection } from "./GameFitSection";
 import { MovementSection } from "./MovementSection";
 import { ScrubberMarks } from "./ScrubberMarks";
 import type { DrivePlacement } from "./standInPlayback";
+import { WorthSection } from "./WorthSection";
 
 /** The scenario Select's own entry for firing an arbitrary function by name,
  *  rather than one of the canned scenarios above it. Not a real scenario id:
@@ -324,6 +326,8 @@ interface Props {
   /** The movement class, speed and turn rate, or nothing for a unit that
    *  does not move (issue #3255). */
   onMovementChange: (movement: LegoMovement | undefined) => void;
+  /** The table that sets the unit's health, cost and mass (issue #3280). */
+  onWorthChange: (worth: LegoWorth) => void;
   /**
    * The poses a run of the unit's own script produced, for the viewport to
    * play. Null whenever the presets are what is playing, or nothing is.
@@ -385,6 +389,7 @@ export function AnimationPanel({
   onShowScript,
   onBuilderChange,
   onMovementChange,
+  onWorthChange,
   onScriptTimeline,
   onScriptRun,
   scriptPaused,
@@ -1644,6 +1649,12 @@ export function AnimationPanel({
             project={project}
             bounds={bounds}
             onMovementChange={onMovementChange}
+          />
+
+          <WorthSection
+            project={project}
+            pack={pack}
+            onWorthChange={onWorthChange}
           />
 
           <GameFitSection project={project} bounds={bounds} />
