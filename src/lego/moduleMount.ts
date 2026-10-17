@@ -146,7 +146,7 @@ function moved(piece: LegoPiece, matrix: THREE.Matrix4): LegoPiece {
  *
  * When the parent has no face to offer, the module is moved so its mount is at
  * the parent's origin. With no pack loaded, no mount, or a mount that does not
- * resolve, this is `insertCompound`.
+ * resolve, this is `insertCompound`, and `asModule` is passed to it.
  */
 export function insertModule(
   project: LegoProject,
@@ -154,8 +154,9 @@ export function insertModule(
   parentId: string,
   newId: () => string,
   pack: LoadedPack | null,
+  asModule = false,
 ): ReturnType<typeof insertCompound> {
-  const inserted = insertCompound(project, module, parentId, newId);
+  const inserted = insertCompound(project, module, parentId, newId, asModule);
   const mount = pack && resolveMount(module, pack);
   if (!pack || !mount) return inserted;
 

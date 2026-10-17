@@ -196,6 +196,13 @@ export function buildArmModule(
 }
 
 /**
+ * The module id the pieces of a generated build arm record (#3302). Fixed,
+ * because the arm is made here rather than saved, so there is no document id
+ * to name.
+ */
+export const BUILD_ARM_ID = "generated:build-arm";
+
+/**
  * Put the module on a unit and apply the presets that go with it, as one
  * change.
  *
@@ -218,9 +225,10 @@ export function addBuildArm(
     : project.rootPieceId;
   const inserted = insertCompound(
     project,
-    buildArmModule(parts, options.newId, options.now),
+    { ...buildArmModule(parts, options.newId, options.now), id: BUILD_ARM_ID },
     parentId,
     options.newId,
+    true,
   );
   const wanted = options.factory ? ["build.nano"] : ["build.aim", "build.nano"];
   const applied = inserted.project.animations ?? [];

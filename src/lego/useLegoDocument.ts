@@ -67,7 +67,11 @@ export interface LegoDocumentSession {
   /** Replaces the selection with a whole set at once. */
   selectMany: (ids: string[]) => void;
   /** Puts a cutting under `parentId`, answering with its new root pieces. */
-  insert: (cutting: LegoProject, parentId: string) => string[];
+  insert: (
+    cutting: LegoProject,
+    parentId: string,
+    asModule?: boolean,
+  ) => string[];
   /** Copies each piece and its subtree alongside itself, in one edit, and
    *  answers the copies so the selection can move onto them. */
   duplicate: (pieceIds: string[]) => string[];
@@ -220,7 +224,13 @@ export function useLegoDocument(
     });
   }
 
-  function insert(cutting: LegoProject, parentId: string): string[] {
+  /** `asModule` for a module from the library rather than a copy, see
+   *  `insertCompound`. */
+  function insert(
+    cutting: LegoProject,
+    parentId: string,
+    asModule = false,
+  ): string[] {
     if (!project) return [];
     const inserted = insertModule(
       project,
@@ -228,6 +238,7 @@ export function useLegoDocument(
       parentId,
       () => crypto.randomUUID(),
       packRef.current,
+      asModule,
     );
     // One edit however many roots the cutting has, so a paste of several pieces
     // takes one undo step.
