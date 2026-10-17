@@ -641,7 +641,7 @@ function Builder({ id }: { id: string | undefined }) {
     const pieceId = crypto.randomUUID();
     const parentId = selectedId ?? draft.rootPieceId;
     if (!addShape(draft, info, pack, parentId, pieceId)) return;
-    inventoryView.inventory.record({ kind: "shape", id: info.kind });
+    inventoryView.inventory.record({ kind: "shape", id: info.id });
     edit(
       (project) => addShape(project, info, pack, parentId, pieceId) ?? project,
     );

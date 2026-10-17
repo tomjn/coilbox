@@ -89,7 +89,7 @@ export default function PartsPage() {
               setSelectedShape(null);
               setSelected(part);
             }}
-            selectedShape={selectedShape?.kind}
+            selectedShape={selectedShape?.id}
             onSelectShape={(shape) => {
               setSelected(null);
               setSelectedShape(shape);

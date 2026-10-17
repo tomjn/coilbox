@@ -87,7 +87,7 @@ interface Cell {
 
 function shapeCell(info: ShapeKind): Cell {
   return {
-    key: `shape:${info.kind}`,
+    key: `shape:${info.id}`,
     name: info.label,
     title: `${info.label}, ${info.size.join(" x ")}`,
     size: Math.max(...info.size),
@@ -316,10 +316,10 @@ export function PartPicker({
             const row = Math.floor(index / view.columns);
             const column = index % view.columns;
             const selected = shape
-              ? shape.kind === selectedShape
+              ? shape.id === selectedShape
               : part?.id === selectedId;
             const starred = shape
-              ? (favouriteShapes?.has(shape.kind) ?? false)
+              ? (favouriteShapes?.has(shape.id) ?? false)
               : (favourites?.has(part?.id ?? "") ?? false);
             const onStar = shape
               ? onFavouriteShape && (() => onFavouriteShape(shape))

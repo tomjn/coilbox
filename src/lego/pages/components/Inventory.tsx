@@ -261,7 +261,7 @@ export function InventoryGrids({
             onSelectShape={onSelectShape}
             favouriteShapes={favouriteShapes}
             onFavouriteShape={(shape) =>
-              inventory.toggleFavourite({ kind: "shape", id: shape.kind })
+              inventory.toggleFavourite({ kind: "shape", id: shape.id })
             }
             atlas={atlas}
             selectedId={selectedPartId}

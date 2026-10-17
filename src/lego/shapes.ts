@@ -123,57 +123,11 @@ const DEFAULT_CYLINDER_AXIS = 1;
  */
 const DEFAULT_TUBE_HOLE = 0.5;
 
-/**
- * What the parts strip lists for a kind (#3337): its name, the size and options
- * a click adds it with, and the words search finds it by. Each kind added to
- * `GENERATORS` adds a line here and appears in the strip and on the Lego Parts
- * page with no other change. A new shape is 1 along every side, near the
- * pack's smaller blocks. Its swatch is chosen when it is added.
- */
-export interface ShapeKind {
-  kind: string;
-  label: string;
-  size: [number, number, number];
-  options?: Record<string, number>;
-  tags: string[];
-}
-
-export const SHAPE_KINDS: ShapeKind[] = [
-  {
-    kind: "cylinder",
-    label: "Cylinder",
-    size: [1, 1, 1],
-    options: { axis: 1, sides: DEFAULT_CYLINDER_SIDES },
-    tags: ["round"],
-  },
-  {
-    kind: "tube",
-    label: "Tube",
-    size: [1, 1, 1],
-    // The hole's radius: the tube's 0.5, less a wall of 0.25.
-    options: { axis: 1, sides: DEFAULT_CYLINDER_SIDES, inner: 0.25 },
-    tags: ["round", "tube", "hollow", "pipe"],
-  },
-  {
-    kind: "cone",
-    label: "Cone",
-    size: [1, 1, 1],
-    options: { axis: 1, sides: DEFAULT_CYLINDER_SIDES, top: 0 },
-    tags: ["round", "point"],
-  },
-  {
-    kind: "wedge",
-    label: "Wedge",
-    size: [1, 1, 1],
-    options: { low: 0, flip: 0 },
-    tags: ["slope", "ramp"],
-  },
-];
-
 const GENERATORS: Record<string, (shape: LegoShape) => ShapeSolid> = {
   cylinder,
   tube,
   cone,
+  sphere,
   wedge,
 };
 
@@ -913,6 +867,145 @@ function cone(shape: LegoShape): ShapeSolid {
   return out.solid;
 }
 
+/** What a sphere keeps: all of it, the upper half (a dome) or the lower half
+ *  (a bowl). The `keep` option holds one of these. */
+export const SPHERE_WHOLE = 0;
+export const SPHERE_DOME = 1;
+export const SPHERE_BOWL = 2;
+export type SphereKeep = 0 | 1 | 2;
+
+/**
+ * Rings from a pole to the equator, and sides round, when a sphere does not
+ * say. Counted after cutting and box projection (#3330). See `sphereProfile`.
+ */
+export const DEFAULT_SPHERE_RINGS = 4;
+export const DEFAULT_SPHERE_SIDES = 12;
+
+/**
+ * A sphere's numbers as it is drawn, defaults filled in. `rings` counts the
+ * bands from a pole to the equator, so a whole sphere has twice as many and a
+ * dome has exactly that many. A `keep` that is not 0, 1 or 2 keeps it all.
+ * `rings` below 2 and `sides` below 3 take the defaults.
+ */
+export function sphereProfile(shape: LegoShape): {
+  keep: SphereKeep;
+  rings: number;
+  sides: number;
+} {
+  const keep = shape.options?.keep;
+  const rings = Math.round(shape.options?.rings ?? Number.NaN);
+  const sides = Math.round(shape.options?.sides ?? Number.NaN);
+  return {
+    keep: keep === SPHERE_DOME || keep === SPHERE_BOWL ? keep : SPHERE_WHOLE,
+    rings: rings >= 2 ? rings : DEFAULT_SPHERE_RINGS,
+    sides: sides >= 3 ? sides : DEFAULT_SPHERE_SIDES,
+  };
+}
+
+/**
+ * A sphere, a dome or a bowl filling its box: `size` is the box, so the three
+ * radii can differ and make an ellipsoid. A whole sphere's radii are half the
+ * size. A dome or a bowl keeps half, so its vertical radius is the whole of the
+ * height: the flat base is at the bottom of the box for a dome and the top for
+ * a bowl. Options: `keep`, `rings` and `sides` (see `sphereProfile`).
+ *
+ * The surface is smooth, its normals the ellipsoid's. The poles are single
+ * points with a normal along y. A dome's flat base disc has its own vertices
+ * and a flat normal. Every triangle has its own vertices, because each is
+ * unwrapped by box projection (#3326): onto the plane of the axis its face
+ * leans on most, measured from the box's minimum corner. That leaves no poles
+ * to pinch the texture, at the cost of a seam where the axis changes.
+ */
+function sphere(shape: LegoShape): ShapeSolid {
+  const { keep, rings, sides } = sphereProfile(shape);
+  const s = section({
+    ...shape,
+    options: { axis: 1, sides },
+  });
+  const [hx, hy, hz] = s.half;
+  const whole = keep === SPHERE_WHOLE;
+  const ry = whole ? hy : 2 * hy;
+  const centre = keep === SPHERE_DOME ? -hy : keep === SPHERE_BOWL ? hy : 0;
+  const bands = whole ? 2 * rings : rings;
+  const first = keep === SPHERE_BOWL ? rings : 0;
+  const quarter = Math.PI / 2 / rings;
+
+  // Section's ring runs z then x about y, so the point at ring k and polar
+  // angle t is the ring scaled by the sine, and the pole is where that is 0.
+  const point = (band: number, k: number): { p: Vec3; n: Vec3 } => {
+    const t = (first + band) * quarter;
+    const ring = s.ring[k % sides];
+    const sin = Math.sin(t);
+    const cos = Math.abs(Math.cos(t)) < 1e-12 ? 0 : Math.cos(t);
+    const p: Vec3 = [ring.c * sin, centre + ry * cos, ring.b * sin];
+    return {
+      p,
+      n: [p[0] / (hx * hx), (p[1] - centre) / (ry * ry), p[2] / (hz * hz)],
+    };
+  };
+
+  const solid: ShapeSolid = {
+    positions: [],
+    normals: [],
+    indices: [],
+    unwrapped: [],
+  };
+  const unit = (n: Vec3): Vec3 => {
+    const length = Math.hypot(...n);
+    return [n[0] / length, n[1] / length, n[2] / length];
+  };
+  const triangle = (corners: { p: Vec3; n: Vec3 }[]) => {
+    const [a, b, c] = corners.map((corner) => corner.p);
+    const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    const ac = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    const face = [
+      ab[1] * ac[2] - ab[2] * ac[1],
+      ab[2] * ac[0] - ab[0] * ac[2],
+      ab[0] * ac[1] - ab[1] * ac[0],
+    ].map(Math.abs);
+    if (Math.max(...face) < 1e-12) return;
+    // The axis the face leans on most, and the other two to project onto.
+    const lean = face.indexOf(Math.max(...face));
+    const across = [0, 1, 2].filter((axis) => axis !== lean);
+    const base = solid.positions.length / 3;
+    for (const corner of corners) {
+      solid.positions.push(...corner.p);
+      solid.normals.push(...unit(corner.n));
+      solid.unwrapped.push(
+        corner.p[across[0]] + s.half[across[0]],
+        corner.p[across[1]] + s.half[across[1]],
+      );
+    }
+    solid.indices.push(base, base + 1, base + 2);
+  };
+
+  for (let band = 0; band < bands; band++) {
+    for (let k = 0; k < sides; k++) {
+      const a = point(band, k);
+      const b = point(band, k + 1);
+      const c = point(band + 1, k);
+      const d = point(band + 1, k + 1);
+      triangle([a, c, b]);
+      triangle([b, c, d]);
+    }
+  }
+  if (!whole) {
+    // The flat base, on the equator: facing down for a dome, up for a bowl.
+    const side = keep === SPHERE_DOME ? -1 : 1;
+    const middle = { p: [0, centre, 0] as Vec3, n: [0, side, 0] as Vec3 };
+    for (let k = 0; k < sides; k++) {
+      const rim = (j: number) => ({
+        p: point(keep === SPHERE_DOME ? bands : 0, j).p,
+        n: [0, side, 0] as Vec3,
+      });
+      triangle(
+        side < 0 ? [middle, rim(k + 1), rim(k)] : [middle, rim(k), rim(k + 1)],
+      );
+    }
+  }
+  return solid;
+}
+
 /**
  * A wedge's slope as it is drawn: `low`, the height of the low end from the
  * bottom (0 comes to an edge, the full height is a box), and whether the
@@ -1081,3 +1174,74 @@ export function parseShape(value: unknown): LegoShape | null {
     ...(Object.keys(options).length > 0 ? { options } : {}),
   };
 }
+
+/**
+ * What the parts strip lists for a kind (#3337): its name, the size and options
+ * a click adds it with, and the words search finds it by. Each kind added to
+ * `GENERATORS` adds a line here and appears in the strip and on the Lego Parts
+ * page with no other change. A new shape is 1 along every side, near the
+ * pack's smaller blocks. Its swatch is chosen when it is added.
+ */
+export interface ShapeKind {
+  /** Tells entries apart, as the strip, the recent list and the favourites
+   *  key them. Two entries can share a `kind`, as a sphere and a dome do. */
+  id: string;
+  /** The generator that makes it. */
+  kind: string;
+  label: string;
+  size: [number, number, number];
+  options?: Record<string, number>;
+  tags: string[];
+}
+
+export const SHAPE_KINDS: ShapeKind[] = [
+  {
+    id: "cylinder",
+    kind: "cylinder",
+    label: "Cylinder",
+    size: [1, 1, 1],
+    options: { axis: 1, sides: DEFAULT_CYLINDER_SIDES },
+    tags: ["round"],
+  },
+  {
+    id: "tube",
+    kind: "tube",
+    label: "Tube",
+    size: [1, 1, 1],
+    // The hole's radius: the tube's 0.5, less a wall of 0.25.
+    options: { axis: 1, sides: DEFAULT_CYLINDER_SIDES, inner: 0.25 },
+    tags: ["round", "tube", "hollow", "pipe"],
+  },
+  {
+    id: "cone",
+    kind: "cone",
+    label: "Cone",
+    size: [1, 1, 1],
+    options: { axis: 1, sides: DEFAULT_CYLINDER_SIDES, top: 0 },
+    tags: ["round", "point"],
+  },
+  {
+    id: "sphere",
+    kind: "sphere",
+    label: "Sphere",
+    size: [1, 1, 1],
+    options: { keep: SPHERE_WHOLE },
+    tags: ["round", "ball"],
+  },
+  {
+    id: "dome",
+    kind: "sphere",
+    label: "Dome",
+    size: [1, 0.5, 1],
+    options: { keep: SPHERE_DOME },
+    tags: ["round", "half"],
+  },
+  {
+    id: "wedge",
+    kind: "wedge",
+    label: "Wedge",
+    size: [1, 1, 1],
+    options: { low: 0, flip: 0 },
+    tags: ["slope", "ramp"],
+  },
+];

@@ -28,8 +28,8 @@ type Vec3 = [number, number, number];
 
 describe("SHAPE_KINDS", () => {
   it("lists only kinds this build can make, once each, with a name and a size", () => {
-    const kinds = SHAPE_KINDS.map((info) => info.kind);
-    expect(new Set(kinds).size).toBe(kinds.length);
+    const ids = SHAPE_KINDS.map((info) => info.id);
+    expect(new Set(ids).size).toBe(ids.length);
     for (const info of SHAPE_KINDS) {
       expect(isKnownShapeKind(info.kind)).toBe(true);
       expect(info.label).not.toBe("");

@@ -115,8 +115,20 @@ describe("filterParts", () => {
 
 describe("filterShapes", () => {
   const kinds: ShapeKind[] = [
-    { kind: "cylinder", label: "Cylinder", size: [2, 2, 2], tags: ["round"] },
-    { kind: "wedge", label: "Wedge", size: [2, 2, 2], tags: ["slope"] },
+    {
+      id: "cylinder",
+      kind: "cylinder",
+      label: "Cylinder",
+      size: [2, 2, 2],
+      tags: ["round"],
+    },
+    {
+      id: "wedge",
+      kind: "wedge",
+      label: "Wedge",
+      size: [2, 2, 2],
+      tags: ["slope"],
+    },
   ];
 
   it("keeps every kind with no search and no category", () => {

@@ -31,7 +31,7 @@ export function addShape(
   return addShapePiece(project, {
     id: pieceId,
     name: uniquePieceName(
-      info.kind,
+      info.id,
       project.pieces.map((piece) => piece.name),
     ),
     parentId,

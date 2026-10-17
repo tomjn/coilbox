@@ -219,7 +219,7 @@ export function useInventoryView(
             partFilter.shapes,
             list,
             "shape",
-            (info) => info.kind,
+            (info) => info.id,
             inventory.recent,
             inventory.favourites,
           ),

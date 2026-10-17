@@ -50,9 +50,9 @@ function unit(partIds: string[] = []): LegoProject {
   };
 }
 
-const kindOf = (kind: string): ShapeKind => {
-  const info = SHAPE_KINDS.find((candidate) => candidate.kind === kind);
-  if (!info) throw new Error(`no ${kind}`);
+const kindOf = (id: string): ShapeKind => {
+  const info = SHAPE_KINDS.find((candidate) => candidate.id === id);
+  if (!info) throw new Error(`no ${id}`);
   return info;
 };
 
@@ -113,6 +113,25 @@ describe("addShape", () => {
       length: 1,
       top: 0,
     });
+  });
+
+  it("makes a sphere whole and a dome half as tall, both of the sphere kind", () => {
+    const ball = added("sphere")?.shape;
+    const half = added("dome")?.shape;
+    expect([ball?.kind, ball?.size, ball?.options?.keep]).toEqual([
+      "sphere",
+      [1, 1, 1],
+      0,
+    ]);
+    expect([half?.kind, half?.size, half?.options?.keep]).toEqual([
+      "sphere",
+      [1, 0.5, 1],
+      1,
+    ]);
+  });
+
+  it("names a dome after its entry, not its kind", () => {
+    expect(added("dome")?.name).toBe("dome");
   });
 
   it("takes the colourway most of the unit's parts use", () => {

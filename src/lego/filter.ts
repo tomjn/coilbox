@@ -40,7 +40,7 @@ export function filterShapes(
   const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
   return kinds.filter((info) => {
     const haystack =
-      `${info.label} ${info.kind} ${info.tags.join(" ")}`.toLowerCase();
+      `${info.label} ${info.id} ${info.tags.join(" ")}`.toLowerCase();
     return terms.every((term) => haystack.includes(term));
   });
 }

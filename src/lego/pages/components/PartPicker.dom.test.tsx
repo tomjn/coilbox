@@ -74,6 +74,7 @@ const pack = {
 } as unknown as LoadedPack;
 
 const cylinder: ShapeKind = {
+  id: "cylinder",
   kind: "cylinder",
   label: "Cylinder",
   size: [2, 2, 2],

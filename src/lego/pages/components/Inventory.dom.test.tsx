@@ -53,11 +53,10 @@ vi.mock("./PartPicker", () => ({
     <>
       <ul aria-label="shape grid">
         {shapes.map((shape) => (
-          <li key={shape.kind}>
+          <li key={shape.id}>
             {shape.label}
             <button type="button" onClick={() => onFavouriteShape(shape)}>
-              {favouriteShapes.has(shape.kind) ? "unstar" : "star"}{" "}
-              {shape.label}
+              {favouriteShapes.has(shape.id) ? "unstar" : "star"} {shape.label}
             </button>
           </li>
         ))}
