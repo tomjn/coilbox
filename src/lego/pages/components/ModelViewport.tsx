@@ -24,11 +24,13 @@ import {
   ClipboardPaste,
   Copy,
   Crosshair,
+  Cuboid,
   Eye,
   EyeOff,
   FlipHorizontal2,
   Footprints,
   Keyboard,
+  Layers,
   Move,
   PanelLeft,
   PanelTop,
@@ -40,6 +42,7 @@ import {
   Scissors,
   Sparkles,
   Square,
+  SquareDashed,
   Target,
   Trash2,
   Video,
@@ -146,6 +149,16 @@ import {
 } from "./collisionHandles";
 import { disposePieceCollision } from "./collisionVolumes";
 import { dotMaterial, points } from "./dotsAndPoints";
+import {
+  type DrawMode,
+  disposeDrawLayer,
+  newDrawLayer,
+  nextDrawMode,
+  refreshDrawMode,
+  rememberDrawMode,
+  rememberedDrawMode,
+  showSolid,
+} from "./drawMode";
 import { drawDrivePath } from "./drivePlayback";
 import { EnvironmentPicker } from "./EnvironmentPicker";
 import type { EffectsAtlas } from "./effectsLayer";
@@ -205,6 +218,20 @@ import { useModelShortcuts } from "./useModelShortcuts";
 import { useScriptFrameStepping } from "./useScriptFrameStepping";
 import { useWeaponReach } from "./useWeaponReach";
 import { disposeWeaponReach, reachColour } from "./weaponReachLayer";
+
+/** The face of the draw mode button, which is the mode the unit is in. */
+const DRAW_MODE_ICONS: Record<DrawMode, LucideIcon> = {
+  solid: Cuboid,
+  wireframe: SquareDashed,
+  both: Layers,
+};
+
+/** What pressing the button does from each mode, naming the mode it goes to. */
+const DRAW_MODE_TITLES: Record<DrawMode, (key: string) => string> = {
+  solid: (key) => `Draw the unit as edges (${key})`,
+  wireframe: (key) => `Draw the unit solid with edges (${key})`,
+  both: (key) => `Draw the unit solid (${key})`,
+};
 
 export type GizmoMode = "translate" | "rotate" | "scale";
 
@@ -697,6 +724,8 @@ export function ModelViewport({
   const [showAim, setShowAim] = useState(false);
   const [showReach, setShowReach] = useState(false);
   const [showBalance, setShowBalance] = useState(false);
+  // Held for the session rather than the viewport, so switching unit keeps it.
+  const [drawMode, setDrawMode] = useState<DrawMode>(rememberedDrawMode);
   const [showFootprint, setShowFootprint] = useState(false);
   const [showGuides, setShowGuides] = useState(true);
   /** The axis the next click on the model puts a guide on, or null. */
@@ -1112,6 +1141,7 @@ export function ModelViewport({
       controls.zoomToCursor = true;
 
       const render = () => {
+        refreshDrawMode(state.draw, state.groups.values());
         renderer.render(scene, state.camera);
         // After the render, so the camera's inverse matrix is the one just used.
         if (compassRef.current) paintCompass(compassRef.current, state.camera);
@@ -1194,6 +1224,7 @@ export function ModelViewport({
         weaponReach: null,
         balance: null,
         footprint: null,
+        draw: newDrawLayer(),
         guideLayer: null,
         guidePlanes: [],
         guideLines: [],
@@ -1317,7 +1348,12 @@ export function ModelViewport({
       onReadyRef.current?.((shot) => {
         // Nothing worth photographing yet: a unit with no pieces in it, or one
         // whose textures have not arrived and would draw black.
-        if (!readyToCapture(root)) return null;
+        // The unit solid, whatever mode the view is in.
+        const restoreMode = showSolid(state.groups.values());
+        if (!readyToCapture(root)) {
+          restoreMode();
+          return null;
+        }
         const thumb = captureThumbnail(
           renderer,
           scene,
@@ -1325,6 +1361,7 @@ export function ModelViewport({
           [state.hoverOverlay, state.anchors, ...state.selectOverlays],
           shot,
         );
+        restoreMode();
         render();
         return thumb;
       });
@@ -1401,6 +1438,7 @@ export function ModelViewport({
           if (state.weaponReach) disposeWeaponReach(state.weaponReach);
           if (state.balance) disposeBalance(state.balance);
           if (state.footprint) disposeFootprint(state.footprint);
+          disposeDrawLayer(state.draw, state.groups.values());
           sceneRef.current = null;
         },
       };
@@ -1430,6 +1468,14 @@ export function ModelViewport({
     raw,
     show: showReach,
   });
+
+  useEffect(() => {
+    rememberDrawMode(drawMode);
+    const state = sceneRef.current;
+    if (!state) return;
+    state.draw.mode = drawMode;
+    state.render();
+  }, [drawMode]);
 
   useBalance(sceneRef, { result: balance, show: showBalance });
   useFootprint(sceneRef, {
@@ -1567,7 +1613,10 @@ export function ModelViewport({
     setSlidBy,
     setMode,
     setShortcutsOpen,
+    setDrawMode,
   });
+
+  const DrawModeFace = DRAW_MODE_ICONS[drawMode];
 
   // Whether the selected piece carries anchors of its own, which decides what
   // the key at the bottom of the view has to name.
@@ -1878,6 +1927,12 @@ export function ModelViewport({
               onChange={setShowGrid}
               showTitle="Show the ground grid, marked in footprint steps and plate sizes"
             />
+            <ViewButton
+              title={DRAW_MODE_TITLES[drawMode](shortcutLabel("draw-mode"))}
+              onClick={() => setDrawMode(nextDrawMode)}
+            >
+              <DrawModeFace className="size-4" />
+            </ViewButton>
             <ViewToggle
               icon={Box}
               on={showCollision}

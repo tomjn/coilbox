@@ -69,6 +69,12 @@ describe("isShortcut", () => {
     expect(isShortcut("view-front", key("2"))).toBe(false);
   });
 
+  it("cycles the draw mode on W, clear of Cmd W", () => {
+    expect(isShortcut("draw-mode", key("w"))).toBe(true);
+    expect(isShortcut("draw-mode", key("w", { metaKey: true }))).toBe(false);
+    expect(isShortcut("draw-mode", key("W", { shiftKey: true }))).toBe(false);
+  });
+
   it("measures on L, clear of Cmd L, and leaves on Escape", () => {
     expect(isShortcut("measure", key("l"))).toBe(true);
     expect(isShortcut("measure", key("l", { metaKey: true }))).toBe(false);

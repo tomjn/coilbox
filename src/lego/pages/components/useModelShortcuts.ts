@@ -6,6 +6,7 @@ import {
 } from "react";
 import { isShortcut } from "../../shortcuts";
 import { focusSelection, showView } from "./cameraFraming";
+import { type DrawMode, nextDrawMode } from "./drawMode";
 import type { GizmoMode } from "./ModelViewport";
 import type { SceneState } from "./sceneState";
 
@@ -17,6 +18,7 @@ export interface ModelShortcutsDeps {
   setSlidBy: Dispatch<SetStateAction<string | null>>;
   setMode: Dispatch<SetStateAction<GizmoMode>>;
   setShortcutsOpen: Dispatch<SetStateAction<boolean>>;
+  setDrawMode: Dispatch<SetStateAction<DrawMode>>;
 }
 
 /**
@@ -36,6 +38,7 @@ export function useModelShortcuts(
     setSlidBy,
     setMode,
     setShortcutsOpen,
+    setDrawMode,
   }: ModelShortcutsDeps,
 ) {
   useEffect(() => {
@@ -74,6 +77,7 @@ export function useModelShortcuts(
         const state = sceneRef.current;
         if (state) showView(state, view, selectedIdsRef.current);
       }
+      if (isShortcut("draw-mode", event)) setDrawMode(nextDrawMode);
       if (isShortcut("shortcuts", event)) setShortcutsOpen(true);
     };
     const up = (event: KeyboardEvent) => {
@@ -85,5 +89,5 @@ export function useModelShortcuts(
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
     };
-  }, [sceneRef, selectedIdsRef, setMode, setShortcutsOpen]);
+  }, [sceneRef, selectedIdsRef, setMode, setShortcutsOpen, setDrawMode]);
 }

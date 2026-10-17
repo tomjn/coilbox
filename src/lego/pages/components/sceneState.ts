@@ -30,6 +30,7 @@ import type { Seat } from "../../seat";
 import type { Vec3 } from "../../snapping";
 import { onGround } from "../../standIn";
 import type { CollisionFaceDrag } from "./collisionHandles";
+import type { DrawLayer } from "./drawMode";
 import type { EffectsLayer } from "./effectsLayer";
 import type { MeasureScene } from "./measureLayer";
 import type { Placing } from "./placeByFace";
@@ -201,6 +202,8 @@ export interface SceneState {
   /** The footprint check's rectangles on the ground, in `overlay`.
    *  Rebuilt whenever the result changes. */
   footprint: THREE.Group | null;
+  /** Whether the unit is drawn solid, as edges, or both, and what that holds. */
+  draw: DrawLayer;
   /** The guide planes, drawn in `overlay` while they are shown. Rebuilt
    *  whenever a guide or the root changes. */
   guideLayer: THREE.Group | null;
