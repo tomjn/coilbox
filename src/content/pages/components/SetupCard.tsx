@@ -3,6 +3,7 @@ import { Download, FolderPlus, Loader2, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { Card } from "@/components/ui/card";
+import { errorText } from "@/lib/helpers";
 import {
   useDefaultWriteRoot,
   useWriteRootPath,
@@ -10,7 +11,6 @@ import {
 import { useDownloadQueue } from "../../../downloads/DownloadQueueProvider";
 import { fetchNewestRecoil } from "../../../downloads/engineInstall";
 import { QueueProgress } from "../../../downloads/pages/components/ProgressBar";
-import { errMessage } from "../../../downloads/pages/components/states";
 import { useQueuedDownload } from "../../../downloads/useQueuedDownload";
 import { useBundledEngine } from "../../BundledEngineSetup";
 import { contentCreateStandardRoot, contentRecreateRoot } from "../../bindings";
@@ -81,7 +81,7 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
       ensureWriteRoot(state);
       await refresh();
     } catch (e) {
-      setError(errMessage(e));
+      setError(errorText(e));
     } finally {
       setBusy(null);
     }
@@ -96,7 +96,7 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
       ensureWriteRoot(state);
       await refresh();
     } catch (e) {
-      setError(errMessage(e));
+      setError(errorText(e));
     } finally {
       setBusy(null);
     }
@@ -129,7 +129,7 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
       if (settled?.error) setError(settled.error);
       else if (settled?.status === "done") await refresh();
     } catch (e) {
-      setError(errMessage(e));
+      setError(errorText(e));
     } finally {
       setBusy(null);
     }

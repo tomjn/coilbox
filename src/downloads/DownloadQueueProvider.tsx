@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { errorText } from "@/lib/helpers";
 import {
   contentBundleCancel,
   contentBundleInstallEngine,
@@ -35,7 +36,6 @@ import {
 } from "./downloadRate";
 import { attemptsToRecord, failureText } from "./downloadRecording";
 import { indexTick } from "./mirrorIndex";
-import { errMessage } from "./pages/components/states";
 import { type ProgressSink, progressChannel } from "./progressChannel";
 import { laneOf, type QueueLane, startable } from "./queueLanes";
 import { type SourceStep, SourceWalkError } from "./sourceWalk";
@@ -575,7 +575,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
         setCompletions((c) => ({ ...c, [item.identity]: true }));
         for (const fn of completeListeners.current) fn(settled);
       } catch (e) {
-        const raw = errMessage(e);
+        const raw = errorText(e);
         const canceled = /cancel/i.test(raw);
         const msg = canceled ? raw : failureText(item, raw);
         const next = e instanceof SourceWalkError ? e.next : null;

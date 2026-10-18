@@ -11,7 +11,7 @@ import {
   QueueProgress,
   StartingBar,
 } from "@/downloads/pages/components/ProgressBar";
-import { errMessage } from "@/downloads/pages/components/states";
+import { errorText } from "@/lib/helpers";
 import { AUTO_DOWNLOAD_ON_JOIN_KEY, useAutoDownload } from "./autoDownload";
 import { isCompatContentName } from "./compatBattle";
 import type { ContentPresence } from "./useBattleRoom";
@@ -98,7 +98,7 @@ export function MissingContentCard({
           .then((found) => {
             if (found.failure) setError(found.failure);
           })
-          .catch((e) => setError(errMessage(e)))
+          .catch((e) => setError(errorText(e)))
           .finally(() => setRescanning(false));
       }),
     [onComplete, identity, onRescan],
@@ -112,7 +112,7 @@ export function MissingContentCard({
       if (found.failure) setError(found.failure);
       return found;
     } catch (e) {
-      setError(errMessage(e));
+      setError(errorText(e));
       return null;
     } finally {
       setRescanning(false);

@@ -8,6 +8,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
@@ -29,6 +30,7 @@ const hoisted = vi.hoisted(() => ({
   hubOn: true,
   enqueue: vi.fn(),
   cancel: vi.fn(),
+  openDrawer: vi.fn(),
 }));
 
 vi.mock("../config", () => ({
@@ -79,6 +81,12 @@ vi.mock("../../downloads/DownloadQueueProvider", () => ({
     itemFor: () => null,
   }),
 }));
+// Importing a setup pack from a deep link is the page's, not these tests'.
+vi.mock("../../hub/imports", () => ({ useRecordHubImport: () => vi.fn() }));
+vi.mock("@picoframe/frame", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@picoframe/frame")>()),
+  useDrawer: () => ({ open: hoisted.openDrawer, close: vi.fn() }),
+}));
 vi.mock("../../downloads/pages/components/MapPacksBanner", () => ({
   MapPacksBanner: () => null,
 }));
@@ -107,12 +115,13 @@ beforeEach(() => {
   ]);
   hoisted.enqueue.mockReset();
   hoisted.cancel.mockReset();
+  hoisted.openDrawer.mockReset();
 });
 afterEach(cleanup);
 
-function renderPage() {
+function renderPage(url = "/library/maps") {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[url]}>
       <MapsPage />
     </MemoryRouter>,
   );
@@ -210,5 +219,21 @@ describe("Maps page", () => {
   it("names a mirror index that could not be read", () => {
     renderPage();
     expect(screen.getByText("evolutionrts: HTTP 503")).toBeTruthy();
+  });
+});
+
+describe("a setup pack deep link", () => {
+  // `/downloads/maps?import=` redirects here with its query (issue #4584).
+  it("opens the import drawer for the code in the query string", async () => {
+    renderPage("/library/maps?import=ABC123");
+    await waitFor(() => expect(hoisted.openDrawer).toHaveBeenCalledTimes(1));
+    expect(hoisted.openDrawer.mock.calls[0][0]).toMatchObject({
+      title: "Import a setup pack",
+    });
+  });
+
+  it("opens nothing without a code", () => {
+    renderPage();
+    expect(hoisted.openDrawer).not.toHaveBeenCalled();
   });
 });
