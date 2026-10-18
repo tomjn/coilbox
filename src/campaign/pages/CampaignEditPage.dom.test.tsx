@@ -109,6 +109,11 @@ vi.mock("./components/CampaignImage", () => ({
 vi.mock("./components/PanoramaScroller", () => ({
   PanoramaScroller: () => null,
 }));
+// Reads the unit builder's library and the workshop's settings, neither of
+// which these tests are about. `CampaignUnits.dom.test.tsx` covers it.
+vi.mock("./components/CampaignUnits", () => ({
+  CampaignUnits: () => null,
+}));
 
 import { newScenario } from "@/scenario/create";
 import type { Scenario } from "@/scenario/model";

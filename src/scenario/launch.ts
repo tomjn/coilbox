@@ -355,6 +355,13 @@ export interface ScenarioLaunchInput {
    * nothing about the mission is a picker worth leaving out.
    */
   difficulty?: Difficulty;
+  /**
+   * A generated game carrying units from the unit builder, which depends on
+   * the scenario's game (issue #4516). The scenario plays on top of it: an
+   * adopted game launches as this one, and the test mutator depends on it
+   * rather than on the game directly.
+   */
+  unitsGame?: string;
 }
 
 export type ScenarioLaunchResult =
@@ -597,6 +604,7 @@ export async function launchScenario(
     units,
     origin,
     difficulty,
+    unitsGame,
   } = input;
   const wanted = scenario.setup.gameName;
   const game = games.find((g) => g.name === wanted);
@@ -667,6 +675,7 @@ export async function launchScenario(
       map,
       units,
       source,
+      unitsGame,
     );
     dir = mutator.dir;
     written = { mission: missionPath(scenario.id), issues: mutator.issues };
@@ -689,7 +698,7 @@ export async function launchScenario(
   // first: the engine reads its game list from the archive cache unitsync
   // writes, so a forced rescan both registers the generated game and tells us
   // the name a start script has to ask for.
-  let gameType = game.name;
+  let gameType = unitsGame ?? game.name;
   if (!adopted && !shipped) {
     const found = (await rescan()).find((g) =>
       isMutatorArchive(g.primaryArchive.name),

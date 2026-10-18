@@ -30,6 +30,7 @@ import {
   runDifficulty,
 } from "./results";
 import { ensureCampaignScenarioMedia } from "./scenarioMedia";
+import { composeCampaignUnits } from "./units";
 
 /* -------------------------------------------------------------------------- *
  * The mission run hook — install check, launch, automatic result detection from
@@ -119,6 +120,10 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
   // Set only when the just-shown victory/defeat was auto-detected from the
   // replay, so the page can show a small "detected, not reported" note.
   const [autoDetected, setAutoDetected] = useState(false);
+  // What the last launch left out of the campaign's builder units: weapons it
+  // could not carry and builders the base game lacks or never reads a build
+  // list for. Kept after the game closes, the way the Test drawer keeps them.
+  const [leftOut, setLeftOut] = useState<string[]>([]);
 
   const snapshot = mission.snapshot;
   const games = scan.data?.games ?? [];
@@ -231,7 +236,21 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
         executable: target.executable,
         dataDir: target.dataDir,
       });
+    setLeftOut([]);
     try {
+      // The campaign's builder units go in a mutator over whichever game this
+      // mission plays, written now because its `depend` names that game
+      // exactly (issue #4516). A scenario plays the game its own setup names.
+      const unitsBase = mission.scenario
+        ? games.find((g) => g.name === mission.scenario?.setup.gameName)
+        : game;
+      const units = unitsBase
+        ? await composeCampaignUnits(campaign, target, {
+            name: unitsBase.name,
+            archive: unitsBase.primaryArchive.name,
+          })
+        : null;
+      if (units) setLeftOut(units.leftOut);
       let exitCode: number | null;
       // The start script the engine was actually given. Detection reads the
       // local player's name off it, because that is the name the replay records
@@ -259,6 +278,7 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
           // a run nobody has chosen a level for, so both produce the start
           // script they always did.
           difficulty: variesByDifficulty ? difficulty : undefined,
+          unitsGame: units?.name,
           launch: startEngine,
         });
         if (!result.ok) {
@@ -271,11 +291,12 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
         // Build the engine config exactly as the skirmish launcher does, from
         // the snapshot's five draft fields, plus the mission's disabled-unit
         // list. The snapshot holds only the options the author set, and the
-        // game's own defaults fill the rest in `toBattleConfig`.
+        // game's own defaults fill the rest in `toBattleConfig`. A mutator
+        // declares no options of its own, so the base game's apply either way.
         launched = toBattleConfig({
           participants: snapshot.participants,
           mapName: map.name,
-          gameType: game.name,
+          gameType: units?.name ?? game.name,
           startPosType: snapshot.startPosType,
           modOptions: snapshot.modOptionValues,
           optionSchema: await gameOptionSchema(
@@ -351,7 +372,7 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
     mission.scenario,
     launch,
     applyResult,
-    campaign.id,
+    campaign,
     mission.id,
     setProvenance,
     variesByDifficulty,
@@ -421,6 +442,8 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
     running,
     saving,
     autoDetected,
+    /** What the campaign's builder units lost on the last launch, as lines. */
+    leftOut,
     nextMission,
     /** Whether this mission plays differently at different difficulties. */
     variesByDifficulty,

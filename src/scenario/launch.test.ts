@@ -446,6 +446,30 @@ describe("launchScenario", () => {
     );
   });
 
+  // Issue #4516. A campaign's builder units are a mutator over the game, so the
+  // scenario plays on top of that mutator rather than the game alone.
+  it("plays an adopted game as the campaign's units mutator", async () => {
+    const result = await run(build(), [LOOSE], {
+      unitsGame: "Coilbox campaign c1",
+    });
+
+    expect(result.ok && result.config.gameType).toBe("Coilbox campaign c1");
+  });
+
+  it("has the test mutator depend on the campaign's units mutator", async () => {
+    const result = await run(build(), [PACKAGED], {
+      unitsGame: "Coilbox campaign c1",
+    });
+
+    const { modinfo } = testMutatorMock.mock.calls[0][0] as {
+      modinfo: string;
+    };
+    expect(modinfo).toContain('"Coilbox campaign c1"');
+    expect(result.ok && result.config.gameType).toBe(
+      "Coilbox mission test test",
+    );
+  });
+
   /**
    * Issue #2160. The game brought the mission with it, so there is nothing to
    * write and nowhere to write it. The archive is read and the game plays as

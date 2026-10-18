@@ -174,6 +174,29 @@ export interface CampaignMission {
   skippable: boolean;
 }
 
+/**
+ * A unit made in the unit builder and attached to the campaign (issue #4516).
+ *
+ * Attaching takes a copy, the way a mission snapshots its preset, so editing
+ * the unit in the builder never changes the campaign. The copy itself (the
+ * built model, unit definition, script and source document) is stored on disk
+ * under `units/<campaignId>/<unitName>/`. This entry is what the document says
+ * about it, which is enough to list it and to restrict it without reading the
+ * copy.
+ */
+export interface CampaignUnit {
+  /** The unit's internal name, which restrictions and build lists use. */
+  unitName: string;
+  /** The builder document it was copied from, for an update from the library. */
+  projectId: string;
+  /** The unit's name when it was copied. */
+  name: string;
+  /** The base game units that build it, as the copy has them. */
+  builtBy: string[];
+  /** When the copy was taken. */
+  copiedAt: string;
+}
+
 export interface Campaign {
   schemaVersion: 1;
   id: string;
@@ -191,6 +214,11 @@ export interface Campaign {
   backgroundPlayback?: MediaPlayback;
   /** Array order IS the linear play order. */
   missions: CampaignMission[];
+  /**
+   * Units from the unit builder every mission launches with, through a mutator
+   * generated at launch. Absent on a campaign with none.
+   */
+  units?: CampaignUnit[];
   createdAt: string;
   updatedAt: string;
 }
@@ -305,6 +333,33 @@ export function parseMapDownload(value: unknown): MapDownloadHint | undefined {
   const searchUrl = typeof p.searchUrl === "string" ? p.searchUrl : undefined;
   if (!springName && !searchUrl) return undefined;
   return { springName, searchUrl };
+}
+
+/**
+ * Narrow an unknown to the campaign's attached units, or undefined when there
+ * are none. An entry without a unit name or a source is dropped, and so is a
+ * second entry with a name already seen, since one unit name is one unit in
+ * the game.
+ */
+function parseUnits(value: unknown): CampaignUnit[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const units: CampaignUnit[] = [];
+  for (const raw of value) {
+    if (typeof raw !== "object" || raw === null) continue;
+    const u = raw as Record<string, unknown>;
+    if (typeof u.unitName !== "string" || !/^[a-z0-9_]{1,64}$/.test(u.unitName))
+      continue;
+    if (typeof u.projectId !== "string" || u.projectId === "") continue;
+    if (units.some((seen) => seen.unitName === u.unitName)) continue;
+    units.push({
+      unitName: u.unitName,
+      projectId: u.projectId,
+      name: typeof u.name === "string" ? u.name : u.unitName,
+      builtBy: stringArray(u.builtBy),
+      copiedAt: typeof u.copiedAt === "string" ? u.copiedAt : "",
+    });
+  }
+  return units.length > 0 ? units : undefined;
 }
 
 /** Coerce an unknown into a string array, dropping non-string members. */
@@ -446,6 +501,7 @@ export function parseCampaignJson(json: string): Campaign | null {
     background: parseImageRef(d.background),
     backgroundPlayback: parsePlayback(d.backgroundPlayback),
     missions,
+    units: parseUnits(d.units),
     createdAt: typeof d.createdAt === "string" ? d.createdAt : "",
     updatedAt: typeof d.updatedAt === "string" ? d.updatedAt : "",
   };

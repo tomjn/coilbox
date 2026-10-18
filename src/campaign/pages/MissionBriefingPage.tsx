@@ -305,6 +305,12 @@ function Briefing({
           </Alert>
         )}
 
+        {run.leftOut.map((line) => (
+          <p key={line} className="text-xs text-muted-foreground">
+            Left out: {line}
+          </p>
+        ))}
+
         <StartArea run={run} />
       </div>
 

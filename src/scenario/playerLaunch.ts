@@ -33,12 +33,22 @@ export interface PlayerScenarioLaunch {
   disabledUnits?: string[];
   /** How hard to play it, for a scenario that varies by difficulty. */
   difficulty?: Difficulty;
+  /** A generated game carrying a campaign's builder units. See `launchScenario`. */
+  unitsGame?: string;
 }
 
 export async function launchScenarioForPlayer(
   opts: PlayerScenarioLaunch,
 ): Promise<ScenarioLaunchResult> {
-  const { scenario, target, games, launch, disabledUnits, difficulty } = opts;
+  const {
+    scenario,
+    target,
+    games,
+    launch,
+    disabledUnits,
+    difficulty,
+    unitsGame,
+  } = opts;
   // A scenario runs as itself or as a mutator over its game, so the options
   // are that game's either way. A game that is not installed has none to read,
   // and `launchScenario` refuses before they would be used.
@@ -53,6 +63,7 @@ export async function launchScenarioForPlayer(
     mapOptionSchema: await mapOptionSchema(target, scenario.setup.mapName),
     disabledUnits,
     difficulty,
+    unitsGame,
     // A rescan whose unitsync `Init` failed throws the engine's reason. It is
     // worded as a scan failure here so the briefing's error does not read as a
     // bare engine message.

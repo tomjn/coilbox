@@ -25,7 +25,7 @@
 
 import { campaignMediaUrl, mediaKind } from "../lib/assetUrl";
 import { fetchAsDataUrl } from "../lib/dataUrl";
-import { campaignMediaImportData } from "./bindings";
+import { campaignMediaImportData, campaignUnitsCopy } from "./bindings";
 import { inlineCampaignImages, materializeCampaignImages } from "./images";
 import type { Campaign, ImageRef } from "./model";
 import { ensureCampaignScenarioMedia } from "./scenarioMedia";
@@ -180,6 +180,12 @@ export async function duplicateCampaign(
     id,
   );
   const copied = await copyCampaignMedia(withImages, source.id, id);
+  // The copies of builder units are files, not media refs, so they go across
+  // whole. A failure stops the duplicate, since a copy naming units it does not
+  // hold would refuse every mission (issue #4516).
+  if (source.units?.length) {
+    await campaignUnitsCopy({ fromId: source.id, toId: id });
+  }
 
   return {
     campaign: { ...copied, id, title, createdAt: now, updatedAt: now },

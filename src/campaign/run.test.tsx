@@ -20,8 +20,17 @@ import { useCallback, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SkirmishDraft } from "../play/drafts";
 
-const { launchScenario, progressState, saved, scanState } = vi.hoisted(() => ({
+const {
+  composeCampaignUnits,
+  launchScenario,
+  playLaunch,
+  progressState,
+  saved,
+  scanState,
+} = vi.hoisted(() => ({
+  composeCampaignUnits: vi.fn(),
   launchScenario: vi.fn(),
+  playLaunch: vi.fn(),
   // Dependency archives the scanned game lacks, set per test.
   scanState: { missingDependencies: undefined as string[] | undefined },
   // The stored progress document each render starts from, set per test.
@@ -30,6 +39,7 @@ const { launchScenario, progressState, saved, scanState } = vi.hoisted(() => ({
 }));
 
 vi.mock("../scenario/launch", () => ({ launchScenario }));
+vi.mock("./units", () => ({ composeCampaignUnits }));
 
 // The progress store, with the plugin taken out of it. Real React state, so a
 // save re-renders the hook under test exactly as the app's own store does.
@@ -90,10 +100,11 @@ vi.mock("../play/config", () => ({
 }));
 
 vi.mock("../play/PlayProvider", () => ({
-  usePlay: () => ({ running: false, launch: vi.fn() }),
+  usePlay: () => ({ running: false, launch: playLaunch }),
 }));
 
 import { primeScan } from "../content/config";
+import { toBattleConfig } from "../play/config";
 import { newScenario } from "../scenario/create";
 import type { Difficulty, Scenario } from "../scenario/model";
 import type { Campaign, CampaignMission, ProgressFile } from "./model";
@@ -197,6 +208,10 @@ beforeEach(() => {
   progressState.file = { schemaVersion: 1, campaigns: {} };
   saved.length = 0;
   scanState.missingDependencies = undefined;
+  composeCampaignUnits.mockReset();
+  composeCampaignUnits.mockResolvedValue(null);
+  playLaunch.mockReset();
+  playLaunch.mockResolvedValue({ exitCode: null });
 });
 
 afterEach(() => {
@@ -306,5 +321,97 @@ describe("a mission on a game with a missing dependency archive (issue #3489)", 
 
     expect(result.current.canStart).toBe(true);
     expect(result.current.dependencyBlock).toBeNull();
+  });
+});
+
+// Issue #4516. The campaign's builder units reach the engine through a mutator
+// written at launch against the game the install gate resolved.
+describe("a campaign with units from the unit builder", () => {
+  const tank = {
+    unitName: "tank",
+    projectId: "p-tank",
+    name: "Tank",
+    builtBy: ["armlab"],
+    copiedAt: "",
+  };
+
+  function withUnits(scenario?: Scenario) {
+    const { campaign, mission } = campaignWith(flat());
+    const played = scenario ? mission : { ...mission, scenario: undefined };
+    return {
+      campaign: { ...campaign, units: [tank], missions: [played] },
+      mission: played,
+    };
+  }
+
+  it("launches a preset mission as the mutator over the resolved game", async () => {
+    composeCampaignUnits.mockResolvedValue({
+      name: "Coilbox campaign c1",
+      leftOut: ["armlab is not in BA, so it does not build tank."],
+    });
+    const { campaign, mission } = withUnits();
+    const { result } = renderHook(() => useMissionRun(campaign, mission));
+
+    await act(async () => {
+      await result.current.start();
+    });
+
+    expect(composeCampaignUnits).toHaveBeenCalledWith(
+      campaign,
+      { enginePath: "/engine", dataDir: "/data", executable: "/engine/spring" },
+      { name: "BA", archive: "ba.sdz" },
+    );
+    expect(vi.mocked(toBattleConfig).mock.calls[0][0].gameType).toBe(
+      "Coilbox campaign c1",
+    );
+    expect(playLaunch).toHaveBeenCalledTimes(1);
+    expect(result.current.leftOut).toEqual([
+      "armlab is not in BA, so it does not build tank.",
+    ]);
+  });
+
+  it("plays a scenario mission on top of the mutator", async () => {
+    composeCampaignUnits.mockResolvedValue({
+      name: "Coilbox campaign c1",
+      leftOut: [],
+    });
+    const { campaign, mission } = withUnits(flat());
+    const { result } = renderHook(() => useMissionRun(campaign, mission));
+
+    await act(async () => {
+      await result.current.start();
+    });
+
+    expect(launchScenario.mock.calls[0][0].unitsGame).toBe(
+      "Coilbox campaign c1",
+    );
+  });
+
+  it("shows why the mutator could not be written and launches nothing", async () => {
+    composeCampaignUnits.mockRejectedValue(
+      new Error("This campaign's copy of Tank is missing."),
+    );
+    const { campaign, mission } = withUnits();
+    const { result } = renderHook(() => useMissionRun(campaign, mission));
+
+    await act(async () => {
+      await result.current.start();
+    });
+
+    expect(result.current.error).toBe(
+      "This campaign's copy of Tank is missing.",
+    );
+    expect(playLaunch).not.toHaveBeenCalled();
+  });
+
+  it("launches as the game itself when no unit came back", async () => {
+    const { campaign, mission } = withUnits();
+    const { result } = renderHook(() => useMissionRun(campaign, mission));
+
+    await act(async () => {
+      await result.current.start();
+    });
+
+    expect(vi.mocked(toBattleConfig).mock.calls[0][0].gameType).toBe("BA");
   });
 });

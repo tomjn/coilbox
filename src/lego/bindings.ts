@@ -40,6 +40,11 @@ export interface AtlasRef {
 export interface ExportTextures {
   atlas: AtlasRef | null;
   stored: StoredTextureRef[];
+  /**
+   * A folder to read every texture from instead of its pack or the store, by
+   * the same file names: a campaign's copy of the unit (issue #4516).
+   */
+  sourceDir?: string;
 }
 
 /**

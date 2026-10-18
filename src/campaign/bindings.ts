@@ -129,3 +129,48 @@ export const campaignProgressSave = defineCommand<
   { json: string },
   Record<string, never>
 >("coilbox-campaign", "campaign_progress_save");
+
+/** One stored copy of a builder unit, as `campaign_unit_list` answers it. */
+export interface StoredCampaignUnit {
+  unitName: string;
+  /** The copy itself, parsed by `units.ts`. */
+  json: string;
+  /** The copy's folder, which its textures are read from at launch. */
+  dir: string;
+}
+
+/**
+ * Store a campaign's copy of one builder unit under
+ * `units/<campaignId>/<unitName>/`, replacing an earlier copy whole (issue
+ * #4516). `atlas` is an extension pack's atlas to carry, and `stored` the
+ * texture store keys to carry. The base pack's atlas ships with coilbox and is
+ * never carried. Answers the copy's folder.
+ */
+export const campaignUnitSave = defineCommand<
+  {
+    campaignId: string;
+    unitName: string;
+    json: string;
+    atlas: { pack: string; name: string } | null;
+    stored: string[];
+  },
+  { dir: string }
+>("coilbox-campaign", "campaign_unit_save");
+
+/** Every builder unit copy a campaign holds. */
+export const campaignUnitList = defineCommand<
+  { campaignId: string },
+  { units: StoredCampaignUnit[] }
+>("coilbox-campaign", "campaign_unit_list");
+
+/** Remove a campaign's copy of one builder unit. */
+export const campaignUnitDelete = defineCommand<
+  { campaignId: string; unitName: string },
+  { deleted: boolean }
+>("coilbox-campaign", "campaign_unit_delete");
+
+/** Copy every builder unit copy from one campaign to another. */
+export const campaignUnitsCopy = defineCommand<
+  { fromId: string; toId: string },
+  { copied: number }
+>("coilbox-campaign", "campaign_units_copy");
