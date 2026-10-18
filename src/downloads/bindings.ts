@@ -27,7 +27,15 @@ export interface Repo {
 /** A downloadable content version within a repository. */
 export interface Version {
   tag: string;
+  /** The package md5, which the pool names its `.sdp` after. Empty if the index gave none. */
+  md5: string;
   name: string;
+  /** Tags or package names this version pulls in. */
+  depends: string[];
+  /** A `:git:` tag is a per-commit snapshot, any other tag a named release. */
+  kind: "release" | "snapshot";
+  /** True when `dataDir`'s pool holds a `.sdp` named after `md5`. */
+  installed: boolean;
 }
 
 /**
@@ -51,14 +59,18 @@ export const dlCancel = defineCommand<{ opId: string }, Record<string, never>>(
   "dl_cancel",
 );
 
-export const dlRepos = defineCommand<{ masterUrl?: string }, { repos: Repo[] }>(
-  "coilbox-downloads",
-  "dl_repos",
-);
+/**
+ * Both rapid index commands answer from a disk copy when one exists and report
+ * `ageSecs`, the time since it was fetched. `refresh` forces a fetch.
+ */
+export const dlRepos = defineCommand<
+  { masterUrl?: string; refresh?: boolean },
+  { repos: Repo[]; ageSecs: number }
+>("coilbox-downloads", "dl_repos");
 
 export const dlVersions = defineCommand<
-  { repoUrl: string },
-  { versions: Version[] }
+  { repoUrl: string; dataDir?: string; refresh?: boolean },
+  { versions: Version[]; ageSecs: number }
 >("coilbox-downloads", "dl_versions");
 
 /**

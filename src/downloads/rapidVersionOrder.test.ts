@@ -2,7 +2,14 @@ import { describe, expect, it } from "vitest";
 import type { Version } from "./bindings";
 import { orderRapidVersions } from "./rapidVersionOrder";
 
-const v = (tag: string, name = tag): Version => ({ tag, name });
+const v = (tag: string, name = tag): Version => ({
+  tag,
+  md5: "",
+  name,
+  depends: [],
+  kind: tag.includes(":git:") ? "snapshot" : "release",
+  installed: false,
+});
 
 describe("orderRapidVersions", () => {
   it("lifts named tags above the commit snapshots they are buried under", () => {
