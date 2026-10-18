@@ -10,7 +10,7 @@
  */
 
 import { Button } from "@picoframe/frame";
-import { X } from "lucide-react";
+import { Lock, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useState } from "react";
 
@@ -43,6 +43,8 @@ interface Props {
   /** A picture of each loadout by id, as a data URL. */
   pictures: Record<string, string>;
   onSwitch: (id: string) => void;
+  /** A module's name by its id, for saying which module locks a loadout. */
+  moduleName?: (id: string) => string;
 }
 
 /**
@@ -101,11 +103,20 @@ export function LoadoutFamilyDrawer(props: Props) {
   );
 }
 
-function FamilyTable({ project, pack, raw, pictures, onSwitch }: Props) {
+function FamilyTable({
+  project,
+  pack,
+  raw,
+  pictures,
+  onSwitch,
+  moduleName,
+}: Props) {
   const source = useWeaponSource(project);
   const [showSame, setShowSame] = useState(false);
-  const family = loadoutFamily(project, (unit) =>
-    pack ? statsOf(unit, pack, raw, source) : null,
+  const family = loadoutFamily(
+    project,
+    (unit) => (pack ? statsOf(unit, pack, raw, source) : null),
+    moduleName,
   );
   if (!family) return null;
 
@@ -170,6 +181,14 @@ function FamilyTable({ project, pack, raw, pictures, onSwitch }: Props) {
                     <span className="max-w-full truncate text-muted-foreground">
                       {column.exportName}
                     </span>
+                    {column.locked ? (
+                      <span className="flex max-w-full items-center gap-1 text-amber-300">
+                        <Lock className="size-3 shrink-0" />
+                        <span className="min-w-0 truncate">
+                          {column.locked}
+                        </span>
+                      </span>
+                    ) : null}
                   </button>
                 </th>
               ))}
