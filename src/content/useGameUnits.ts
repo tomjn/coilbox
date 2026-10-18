@@ -28,6 +28,9 @@ export interface GameUnits {
   /** The archive the units came out of, which is also what a model read of one
    *  of them has to be made against. Undefined until the game is found. */
   archive?: string;
+  /** The folder or file the archive is at, which is where a lego export of a
+   *  unit into this game is recorded against. Undefined until the game is found. */
+  folder?: string;
   /** The installed game the name resolved to. The name asked for when that
    *  build is here, and another build of the same game when it is not, so a
    *  caller can say which one it is really looking at. */
@@ -97,6 +100,7 @@ export function useGameUnits(gameName: string, shortname?: string): GameUnits {
     loading: scan.loading || status === "loading",
     gameMissing: !!gameName && !!scan.data && !game,
     archive: game?.primaryArchive.name,
+    folder: game?.primaryArchive.path,
     resolved: game?.name,
   };
 }

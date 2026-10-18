@@ -28,6 +28,7 @@ import {
   renameVar,
   setBuildableMode,
   setVar,
+  withLockedUnits,
 } from "./registries";
 
 /** A document with one of each, and a trigger naming all three. */
@@ -509,5 +510,45 @@ describe("restrictions", () => {
     expect(buildableWarning(allow)).toContain("can build anything");
     const deny = setBuildableMode(newScenario("t"), "deny");
     expect(buildableWarning(deny)).toContain("does nothing");
+  });
+});
+
+describe("locked units from the lego builder", () => {
+  const locked = [
+    { name: "armpw_heavy", label: "Heavy of Pawn" },
+    { name: "armpw_sniper", label: "Sniper of Pawn" },
+  ];
+
+  it("adds a locked unit the game's read does not have yet", () => {
+    const out = withLockedUnits([{ name: "armcom" }], locked);
+    expect(out.map((u) => u.name)).toEqual([
+      "armcom",
+      "armpw_heavy",
+      "armpw_sniper",
+    ]);
+    expect(out[1].fullName).toBe("Heavy of Pawn (locked)");
+  });
+
+  it("marks one the game already has, keeping its own name", () => {
+    const out = withLockedUnits(
+      [{ name: "armpw_heavy", fullName: "Pawn Heavy" }],
+      locked,
+    );
+    expect(out.filter((u) => u.name === "armpw_heavy")).toHaveLength(1);
+    expect(out[0].fullName).toBe("Pawn Heavy (locked)");
+  });
+
+  it("returns the same list when nothing is locked", () => {
+    const units = [{ name: "armcom" }];
+    expect(withLockedUnits(units, [])).toBe(units);
+  });
+
+  it("can be put on the buildable list and lifted by unlock_unit as it is", () => {
+    const [unit] = withLockedUnits([], locked);
+    const scenario = addBuildableUnit(
+      setBuildableMode(newScenario("t"), "deny"),
+      unit.name,
+    );
+    expect(scenario.restrictions.buildable?.units).toEqual(["armpw_heavy"]);
   });
 });

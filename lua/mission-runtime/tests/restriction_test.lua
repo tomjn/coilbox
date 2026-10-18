@@ -166,6 +166,28 @@ engine.env:GameFrame(15)
 check("unlock_unit adds a def to an allow list too", mayBuild(engine, "nuke", 0) == true)
 check("without adding it for anyone else", mayBuild(engine, "nuke", 1) == false)
 
+-- A unit the lego builder exports as a locked loadout is an ordinary def with a
+-- joined name such as armpw_heavy (issue #3289). The list a game maker puts on
+-- the buildable list and the name unlock_unit grants are that exported name,
+-- with nothing coilbox specific in the runtime.
+engine = playing({
+	restrictions = { buildable = { mode = "deny", units = { "armpw_heavy", "armpw_sniper2" } } },
+	triggers = { once("grant", { unlocks({ unitDef = "armpw_heavy", team = "player" }) }) },
+}, {
+	defList = {
+		{ name = "marker", speed = 0, weapons = {} },
+		{ name = "armpw_light" },
+		{ name = "armpw_heavy" },
+		{ name = "armpw_sniper2" },
+	},
+})
+
+check("a locked loadout is refused until the campaign grants it", mayBuild(engine, "armpw_heavy", 0) == false)
+check("and its unlocked sibling is built", mayBuild(engine, "armpw_light", 0) == true)
+engine.env:GameFrame(15)
+check("unlock_unit grants the locked loadout by its exported name", mayBuild(engine, "armpw_heavy", 0) == true)
+check("without granting the other locked one", mayBuild(engine, "armpw_sniper2", 0) == false)
+
 --------------------------------------------------------------------------------
 -- Unlocks that do nothing, each said out loud once.
 --------------------------------------------------------------------------------
