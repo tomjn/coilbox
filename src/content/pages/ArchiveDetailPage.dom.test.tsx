@@ -38,11 +38,17 @@ const SELECTED = {
 
 const TREES: Record<string, ArchiveTreeResult> = {
   "alpha.sdz": {
-    files: [{ path: "docs/readme.txt", size: 10 }],
+    files: [
+      { path: "docs/readme.txt", size: 10 },
+      { path: "objects3d/armcom.3do", size: 10 },
+    ],
     errors: [],
   },
   "beta.sdz": {
-    files: [{ path: "docs/other.txt", size: 5 }],
+    files: [
+      { path: "docs/other.txt", size: 5 },
+      { path: "objects3d/rock.3do", size: 5 },
+    ],
     errors: [],
   },
 };
@@ -139,5 +145,26 @@ describe("ArchiveDetailPage across a direct archive-to-archive navigation", () =
     // start collapsed rather than inherit alpha's expanded state.
     await screen.findByText("docs");
     expect(screen.queryByText("other.txt")).toBeNull();
+  });
+});
+
+describe("ArchiveDetailPage's Convert models", () => {
+  it("links a game to its compatibility report", async () => {
+    renderAtAlpha();
+    const convert = await screen.findByText("Convert models");
+    expect(convert.closest("a")?.getAttribute("href")).toBe(
+      "/library/games/Alpha?section=compat",
+    );
+  });
+
+  it("stays a drawer button for an archive that is not a game", async () => {
+    renderAtAlpha();
+    await act(async () => {
+      fireEvent.click(await screen.findByText("beta.sdz"));
+    });
+    await screen.findByText("docs");
+    const convert = screen.getByText("Convert models");
+    expect(convert.closest("a")).toBeNull();
+    expect(convert.closest("button")).not.toBeNull();
   });
 });
