@@ -242,6 +242,8 @@ export interface SceneState {
   /** Each weapon's range and arc while their toggle is on, in `overlay`.
    *  Rebuilt whenever a weapon or a piece changes. */
   weaponReach: THREE.Group | null;
+  /** The selected piece's turn range, in `overlay` (#3353). */
+  jointLimits: THREE.Group | null;
   /** The skeleton's bone lines, joint dots and role labels, in `overlay`.
    *  Rebuilt whenever a piece changes. */
   skeleton: THREE.Group | null;

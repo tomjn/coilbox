@@ -7,7 +7,7 @@ import {
 } from "../../groupTransform";
 import { isEffectivelyHidden, type LegoProject, pieceById } from "../../model";
 import { partUnit } from "../../pack";
-import { offsetFromTransform } from "../../pose";
+import { clampTurn, offsetFromTransform } from "../../pose";
 import {
   moveStep,
   snapPosition,
@@ -278,22 +278,26 @@ export function commitPose(state: SceneState) {
 }
 
 /**
- * Keep a pose turn on the same 15 degree steps a piece's turn lands on. A move
- * is free: a pose has no anchors to seat against.
+ * Keep a pose turn on the same 15 degree steps a piece's turn lands on, and
+ * inside the piece's joint range. A move is free: a pose has no anchors to seat
+ * against.
  */
 export function snapPoseDrag(state: SceneState) {
   const group = state.gizmo.object;
-  if (!group || state.gizmo.getMode() !== "rotate" || !state.snapping) {
+  if (!group || state.gizmo.getMode() !== "rotate") {
     state.onSnapChange(false);
     return;
   }
-  group.rotation.set(
-    ...snapRotation(
-      [group.rotation.x, group.rotation.y, group.rotation.z],
-      ROTATION_STEP,
-    ),
-  );
-  state.onSnapChange(true);
+  const turn: Vec3 = [group.rotation.x, group.rotation.y, group.rotation.z];
+  const snapped = state.snapping ? snapRotation(turn, ROTATION_STEP) : turn;
+  // A turret, barrel, aim point or build arm stops at the range it was given,
+  // so a pose cannot hold it somewhere its script would never put it.
+  const pieceId = pieceIdOf(group);
+  const limits = pieceId
+    ? pieceById(state.projectRef.current, pieceId)?.limits
+    : undefined;
+  group.rotation.set(...clampTurn(limits, snapped));
+  state.onSnapChange(state.snapping);
 }
 
 /** Write the dragged transform back to the document, once the drag is over. */

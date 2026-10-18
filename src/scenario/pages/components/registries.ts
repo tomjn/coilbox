@@ -24,6 +24,8 @@
  * parameters are rewritten, which is what a caller with no game to read has.
  */
 
+import type { UnitDatasetEntry } from "@/content/bindings";
+import type { LockedUnit } from "@/lego/locks";
 import type { ExtensionTypes } from "../../extensions";
 import { NO_EXTENSIONS } from "../../extensions";
 import type {
@@ -325,6 +327,30 @@ export function removeVar(scenario: Scenario, name: string): Scenario {
  * the data names no team: an author who wants a rule for the player alone writes
  * the restriction and unlocks the def for everyone else.
  * -------------------------------------------------------------------------- */
+
+/**
+ * The game's units with the locked ones from the lego builder marked (#3289).
+ * A locked unit the game's read has not come back with is added, because
+ * unitsync caches an archive and a file newly exported into a loose game folder
+ * does not always show. Its name is exactly what `unlock_unit` takes.
+ */
+export function withLockedUnits(
+  units: UnitDatasetEntry[],
+  locked: readonly LockedUnit[],
+): UnitDatasetEntry[] {
+  if (locked.length === 0) return units;
+  const lockedNames = new Set(locked.map((l) => l.name));
+  const marked = units.map((unit) =>
+    lockedNames.has(unit.name.toLowerCase())
+      ? { ...unit, fullName: `${unit.fullName?.trim() || unit.name} (locked)` }
+      : unit,
+  );
+  const have = new Set(units.map((u) => u.name.toLowerCase()));
+  const added = locked
+    .filter((l) => !have.has(l.name))
+    .map((l) => ({ name: l.name, fullName: `${l.label} (locked)` }));
+  return [...marked, ...added];
+}
 
 /** What the buildable list means, plus the "no rule at all" the panel offers as
  *  a third choice so clearing it is one pick rather than emptying a list. */

@@ -14,10 +14,12 @@ import {
   type AnimPreset,
   type EmitInstance,
   type EmitResult,
+  type EmitWheel,
   type LuaHook,
   presetById,
   presetMovesRole,
 } from "./animPresets";
+import { driveMotion, rates } from "./drive";
 import type { LegoPiece, LegoProject } from "./model";
 import {
   hasPieceCollision,
@@ -26,6 +28,7 @@ import {
 import { luaString } from "./unitDef";
 import { fittedParams } from "./walkFit";
 import { scriptWeapons } from "./weaponModule";
+import { frontWheels, wheelRadius } from "./wheelFit";
 
 /**
  * Lua's reserved words. A piece called `end` is a legal piece name and an
@@ -276,6 +279,13 @@ export function buildLuaScript(project: LegoProject): string {
     );
 
   const weapons = scriptWeapons(project);
+  // Keyed by the Lua name a preset is handed, which is what it asks with.
+  const limitsByLocal = new Map(
+    project.pieces.flatMap((piece) =>
+      piece.limits ? [[localName(piece.name), piece.limits] as const] : [],
+    ),
+  );
+  const motion = rates(driveMotion(project).motion);
   const use = (piece: LegoPiece | null | undefined) => {
     if (!piece) return undefined;
     used.add(piece.name);
@@ -297,6 +307,7 @@ export function buildLuaScript(project: LegoProject): string {
     };
     const result: EmitResult | null = preset.emit({
       params,
+      limits: (piece) => limitsByLocal.get(piece),
       get signal() {
         presetSignal = true;
         return signal;
@@ -305,6 +316,22 @@ export function buildLuaScript(project: LegoProject): string {
         const names = byRole.get(role) ?? [];
         for (const name of names) used.add(name);
         return names.map(localName);
+      },
+      motion,
+      wheels: (): EmitWheel[] => {
+        const front = new Set(frontWheels(project));
+        return project.pieces
+          .filter((piece) => piece.role === "wheel")
+          .map((piece) => ({
+            // Named only when a preset uses it, so a rear wheel the steering
+            // leaves alone does not get a local of its own.
+            get piece() {
+              used.add(piece.name);
+              return localName(piece.name);
+            },
+            radius: wheelRadius(project, piece.name),
+            front: front.has(piece.name),
+          }));
       },
       weapons: () =>
         weapons.map((weapon, slot) => ({

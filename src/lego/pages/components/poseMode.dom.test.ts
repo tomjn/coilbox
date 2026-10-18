@@ -7,7 +7,7 @@ import type { LegoPoseOffset, LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import { bakedPieces } from "../../s3oBuild";
 import { skeletonJoints } from "../../skeletonJoints";
-import { commitGizmo, gizmoMode } from "./gizmoCommit";
+import { commitGizmo, gizmoMode, snapPoseDrag } from "./gizmoCommit";
 import { applyPoseOffsets } from "./poseMode";
 import type { SceneState } from "./sceneState";
 import { buildSkeleton } from "./skeletonLayer";
@@ -203,5 +203,33 @@ describe("the gizmo while posing", () => {
     expect(gizmoMode("scale", false, false, true)).toBe("translate");
     expect(gizmoMode("scale", false, false)).toBe("scale");
     expect(gizmoMode("rotate", false, false, true)).toBe("rotate");
+  });
+});
+
+describe("a pose drag on a limited piece", () => {
+  it("stops the turn at the range", () => {
+    const project = bareUnit();
+    const thigh = idOf(project, "thigh");
+    const limited = {
+      ...project,
+      pieces: project.pieces.map((piece) =>
+        piece.id === thigh
+          ? { ...piece, limits: { pitch: { min: 0, max: 30 } } }
+          : piece,
+      ),
+    } as LegoProject;
+    const { state } = scene(limited);
+    const group = state.groups.get(thigh) as THREE.Group;
+    group.rotation.order = "YXZ";
+    group.rotation.set(-Math.PI / 2, 0, 0);
+    (state as { gizmo: unknown }).gizmo = {
+      object: group,
+      getMode: () => "rotate",
+    };
+    (state as { snapping: boolean }).snapping = false;
+
+    snapPoseDrag(state);
+
+    expect(group.rotation.x).toBeCloseTo((-30 * Math.PI) / 180);
   });
 });

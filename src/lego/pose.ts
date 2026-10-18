@@ -12,7 +12,14 @@
  * builder can make each function one edit of the document.
  */
 
-import type { LegoPose, LegoPoseOffset, LegoProject } from "./model";
+import { pitchRange, yawRange } from "./jointLimits";
+import type {
+  LegoAngleRange,
+  LegoPieceLimits,
+  LegoPose,
+  LegoPoseOffset,
+  LegoProject,
+} from "./model";
 
 /** The working pose while posing: the offsets of the pieces it changes. */
 export type PoseOffsets = Record<string, LegoPoseOffset>;
@@ -62,6 +69,45 @@ export function offsetFromTransform(
     turn,
     move: [position[0] - rest[0], position[1] - rest[1], position[2] - rest[2]],
   };
+}
+
+/**
+ * `angle`, held to the destinations a range allows a `Turn`. A range is
+ * degrees of heading to the right, or of elevation up, and the script turns by
+ * the negative of each (`Turn(piece, y_axis, heading)` with the heading a right
+ * turn makes negative, and `Turn(piece, x_axis, -pitch)`), so the allowed turns
+ * run from minus the high end to minus the low end.
+ *
+ * Measured round the middle of the range, so a range that runs through the back
+ * is held to its nearer edge and the angle's own turns of a full circle do not
+ * matter.
+ */
+function holdTo(angle: number, range: LegoAngleRange): number {
+  const low = (-range.max * Math.PI) / 180;
+  const high = (-range.min * Math.PI) / 180;
+  const centre = (low + high) / 2;
+  const half = (high - low) / 2;
+  const turn = Math.PI * 2;
+  const away = angle - centre;
+  const wrapped = away - turn * Math.round(away / turn);
+  return Math.abs(wrapped) <= half ? angle : centre + Math.sign(wrapped) * half;
+}
+
+/**
+ * A pose turn held to a piece's joint range (#3353): yaw on the y turn, pitch
+ * on the x turn. A piece with no range turns freely.
+ */
+export function clampTurn(
+  limits: LegoPieceLimits | undefined,
+  turn: Triple,
+): Triple {
+  const yaw = yawRange(limits);
+  const pitch = pitchRange(limits);
+  return [
+    pitch ? holdTo(turn[0], pitch) : turn[0],
+    yaw ? holdTo(turn[1], yaw) : turn[1],
+    turn[2],
+  ];
 }
 
 /** The ids of the pieces a pose names that the unit no longer has. */

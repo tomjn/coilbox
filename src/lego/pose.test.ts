@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { type LegoProject, newProject, parseLegoProjectJson } from "./model";
 import {
+  clampTurn,
   deletePose,
   duplicatePose,
   emptyDraft,
@@ -223,6 +224,41 @@ describe("poses in a saved project", () => {
       { id: "ok", name: "Fine", pieces: { arm: { turn: [1, 2, 3] } } },
       { id: "bad", name: "Bad", pieces: {} },
     ]);
+  });
+});
+
+describe("a turn held to a joint range", () => {
+  const deg = (n: number) => (n * Math.PI) / 180;
+
+  it("leaves a piece with no range free", () => {
+    expect(clampTurn(undefined, [1, 2, 3])).toEqual([1, 2, 3]);
+  });
+
+  it("holds yaw to the right of front on the y turn, which a Turn gives as minus the yaw", () => {
+    const limits = { yaw: { min: -30, max: 90 } };
+    // 90 degrees right is a Turn of -90 degrees about y.
+    expect(clampTurn(limits, [0, deg(-90), 0])[1]).toBeCloseTo(deg(-90));
+    expect(clampTurn(limits, [0, deg(-120), 0])[1]).toBeCloseTo(deg(-90));
+    expect(clampTurn(limits, [0, deg(60), 0])[1]).toBeCloseTo(deg(30));
+    expect(clampTurn(limits, [0, deg(10), 0])[1]).toBeCloseTo(deg(10));
+  });
+
+  it("holds pitch on the x turn, which a Turn gives as minus the pitch", () => {
+    const limits = { pitch: { min: -5, max: 40 } };
+    expect(clampTurn(limits, [deg(-60), 0, 0])[0]).toBeCloseTo(deg(-40));
+    expect(clampTurn(limits, [deg(20), 0, 0])[0]).toBeCloseTo(deg(5));
+    expect(clampTurn(limits, [deg(-10), 0, 3])).toEqual([deg(-10), 0, 3]);
+  });
+
+  it("holds a range through the back to its nearer edge", () => {
+    const limits = { yaw: { min: 90, max: 270 } };
+    // Turns of -90 to -270 degrees, which a group shows as the angles from 90
+    // round through 180 to -90.
+    expect(clampTurn(limits, [0, deg(170), 0])[1]).toBeCloseTo(deg(170));
+    // 20 degrees is 70 from the edge at -270 (the same direction as 90) and
+    // 110 from the one at -90, so it is held to -270.
+    const held = clampTurn(limits, [0, deg(20), 0])[1];
+    expect(held).toBeCloseTo(deg(-270));
   });
 });
 

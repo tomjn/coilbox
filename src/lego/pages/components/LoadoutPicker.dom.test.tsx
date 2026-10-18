@@ -70,4 +70,55 @@ describe("LoadoutPicker", () => {
     fireEvent.click(screen.getByRole("button", { name: "Only Rockets" }));
     expect(applied().pieces.find((p) => p.id === "gun")?.inLoadout).toBe(true);
   });
+
+  it("locks a loadout from its row", () => {
+    const { applied } = open(TWO);
+    const lock = screen.getByRole("button", { name: "Lock Rockets" });
+    expect(lock.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(lock);
+    expect(applied().loadouts?.find((l) => l.name === "Rockets")?.locked).toBe(
+      true,
+    );
+  });
+
+  it("says a loadout is locked, and by which module", () => {
+    const held = {
+      ...TWO,
+      pieces: TWO.pieces.map((p) =>
+        p.id === "gun" ? { ...p, module: { id: "m1", instance: "i" } } : p,
+      ),
+      lockedModules: ["m1"],
+    };
+    const onEdit = vi.fn();
+    render(
+      <LoadoutPicker
+        project={held}
+        selectedId={null}
+        onEdit={onEdit}
+        moduleNames={new Map([["m1", "Rocket pod"]])}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Loadouts" }));
+    expect(screen.getAllByText("Locked by Rocket pod")).toHaveLength(2);
+    expect(
+      screen.getByRole("combobox", { name: "Loadout" }).textContent,
+    ).toContain("(locked)");
+    expect(
+      screen
+        .getByRole("button", { name: "Lock module Rocket pod" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+  });
+
+  it("locks and frees a module", () => {
+    const held = {
+      ...TWO,
+      pieces: TWO.pieces.map((p) =>
+        p.id === "gun" ? { ...p, module: { id: "m1", instance: "i" } } : p,
+      ),
+    };
+    const { applied } = open(held);
+    fireEvent.click(screen.getByRole("button", { name: "Lock module m1" }));
+    expect(applied().lockedModules).toEqual(["m1"]);
+  });
 });

@@ -528,6 +528,28 @@ export interface LegoPiece {
    * module copy and a loadout switch. See `mountPoints.ts`.
    */
   mountPoints?: LegoMountPoint[];
+  /**
+   * How far this piece may turn (#3353). Absent means it turns as far as it is
+   * told, which is every piece made before this existed, so no schema version
+   * moves for it. See `jointLimits.ts` for what each range means.
+   */
+  limits?: LegoPieceLimits;
+}
+
+/** A lowest and highest angle in degrees, `min` below `max`. */
+export interface LegoAngleRange {
+  min: number;
+  max: number;
+}
+
+/**
+ * The turn a piece is held to. `yaw` is degrees to the right of the unit's
+ * front, the way a weapon's `heading` is. `pitch` is elevation in degrees,
+ * positive up, the way an aim function is handed it.
+ */
+export interface LegoPieceLimits {
+  yaw?: LegoAngleRange;
+  pitch?: LegoAngleRange;
 }
 
 /** A connector marked as a place a module goes, and which modules fit. */
@@ -837,6 +859,14 @@ export interface LegoProject {
    */
   budget?: number;
   /**
+   * The ids of the modules a campaign hands the player later (#3289). A loadout
+   * holding one is locked, and so is a unit without loadouts that holds one. Data
+   * for a mission to read: it changes no model and no definition. A list for the
+   * unit, not for the module, so the same module is free in another unit. Absent
+   * means none. See `locks.ts`.
+   */
+  lockedModules?: string[];
+  /**
    * Named stances of the unit (#3355), in the order the pose list shows them.
    * A pose is a set of changes from the built shape and never changes it.
    * Absent means none, which is every unit saved before this existed. See
@@ -908,6 +938,12 @@ export interface LegoLoadout {
    * start of a chain. See `upgradeChain.ts`.
    */
   upgradesFrom?: string;
+  /**
+   * Locked until a campaign grants it (#3289). Absent means free. A loadout can
+   * also be locked by a module it holds, which is not stored here. See
+   * `locks.ts`.
+   */
+  locked?: true;
   /**
    * This loadout's own receipts, one per game folder (#3282), read the way the
    * project's are. They stay on the entry whichever loadout is active, so
@@ -1007,6 +1043,15 @@ function parsePoses(value: unknown): LegoPose[] | null {
     poses.push({ id: e.id, name: e.name.trim(), pieces });
   }
   return poses.length > 0 ? poses : null;
+}
+
+/** The module ids a stored lock list holds: non-empty strings, once each. */
+function parseLockedModules(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const ids = value.filter(
+    (id): id is string => typeof id === "string" && id !== "",
+  );
+  return [...new Set(ids)];
 }
 
 /** The guides that can be read, or null when there are none. */
@@ -1550,6 +1595,7 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
   const movement = parseMovement(d.movement);
   const worth = parseWorth(d.worth);
   const budget = parseBudget(d.budget);
+  const lockedModules = parseLockedModules(d.lockedModules);
   const mount = parseMount(d.mount, pieces);
   const { pieces: flagged, ...loadouts } = parseLoadouts(d, pieces);
   const project: LegoProject = {
@@ -1639,6 +1685,7 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
     ...(skeleton ? { skeleton } : {}),
     ...loadouts,
     ...(budget !== null ? { budget } : {}),
+    ...(lockedModules.length > 0 ? { lockedModules } : {}),
     ...(() => {
       const poses = parsePoses(d.poses);
       return poses ? { poses } : {};
@@ -1858,7 +1905,35 @@ function parsePiece(raw: unknown): LegoPiece | null {
       const mountPoints = parseMountPoints(p.mountPoints);
       return mountPoints.length > 0 ? { mountPoints } : {};
     })(),
+    ...(() => {
+      const limits = parsePieceLimits(p.limits);
+      return limits ? { limits } : {};
+    })(),
   };
+}
+
+function parseAngleRange(value: unknown): LegoAngleRange | null {
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  const { min, max } = v;
+  return typeof min === "number" &&
+    typeof max === "number" &&
+    Number.isFinite(min) &&
+    Number.isFinite(max) &&
+    min < max
+    ? { min, max }
+    : null;
+}
+
+/** A piece's limits, or null when there is no usable range in them. */
+function parsePieceLimits(value: unknown): LegoPieceLimits | null {
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  const yaw = parseAngleRange(v.yaw);
+  const pitch = parseAngleRange(v.pitch);
+  return yaw || pitch
+    ? { ...(yaw ? { yaw } : {}), ...(pitch ? { pitch } : {}) }
+    : null;
 }
 
 function parseMountPoints(raw: unknown): LegoMountPoint[] {
@@ -1945,6 +2020,7 @@ function parseLoadout(raw: unknown): LegoLoadout | null {
     ...(typeof v.upgradesFrom === "string" && v.upgradesFrom !== ""
       ? { upgradesFrom: v.upgradesFrom }
       : {}),
+    ...(v.locked === true ? { locked: true as const } : {}),
     ...(exported ? { exported } : {}),
     ...(elsewhere.length > 0 ? { exportedElsewhere: elsewhere } : {}),
   };

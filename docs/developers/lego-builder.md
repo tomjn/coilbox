@@ -329,6 +329,8 @@ Then open the **Animation** tab. Each preset says what it does and what it needs
 | Turret sweep | A turret, and a barrel if there is one |
 | Wheels turning | At least one wheel |
 | Rudder follows turns | At least one rudder |
+| Front wheels steer | At least one wheel |
+| Body rocks on starting and stopping | A body |
 | Wake while moving | At least one wake point |
 | Landing gear | At least one landing gear piece |
 | Build arm | A build arm |
@@ -343,6 +345,12 @@ Then open the **Animation** tab. Each preset says what it does and what it needs
 | Nano from the nozzle | A nano emit point |
 
 Applying one gives you sliders for its own parameters: stride time, thigh swing, sweep angle, kick distance and so on.
+
+Three presets follow how the unit is moving, and play best under **Driving along a path**. They read the unit's speed, heading and direction while it runs, every 3 frames for the wheels and the body and every 6 for the steering.
+
+- **Wheels turning** turns each wheel at the unit's speed divided by the wheel's radius, so a wheel rolls without slipping at every speed, slows as the unit brakes, and turns backwards when it backs up. The radius is half the width of the wheel's cylinder, tube or cone across its axle, times the scale it has in the unit. It takes the biggest such shape at or under the wheel piece. A wheel made from a part of the pack has no shape to measure, so it turns at the **Turns per second** rate unless you type a **Wheel radius**, which then applies to every wheel. The wheels read the speed while it runs rather than baking it in as the walks do, because the unit brakes after the engine's `StopMoving` and its wheels should slow with it.
+- **Front wheels steer** swings the wheels ahead of the middle of the wheels with the unit's turning, up to the **Largest angle** slider, and straightens them when the turn ends. A unit with three axles steers the first, and a unit with one axle steers none. The two front wheels of a mirrored pair swing the same way, and the wheels swing the other way when the unit backs up.
+- **Body rocks on starting and stopping** pitches the body back as the unit speeds up and forward as it brakes, then eases it level. **Lean at full power** is the angle for a unit speeding up at its whole acceleration, or braking at its whole brake rate, both from **Movement**, so a gentle unit rocks less than a sharp one. The lean follows the acceleration with a lag of about a third of a second.
 
 **Play** runs the script the presets generate, the same Lua an export writes, and shows what it does in the viewport. A mistake in the script shows up here rather than after export. Each run lasts 15 seconds and loops. Change a preset, one of its sliders or a role while a run is on screen, and the new script runs as soon as you stop editing.
 

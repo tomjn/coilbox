@@ -40,6 +40,7 @@ import {
   copyInstanceSettings,
   pruneInstanceSettings,
 } from "./instanceSettings";
+import { mirrorLimits } from "./jointLimits";
 import { liftedModuleRefusal } from "./liftPiece";
 import {
   followMirror,
@@ -101,12 +102,16 @@ function mirroredModule(module: LegoProject): LegoProject {
       const roled = piece.role
         ? { ...piece, role: mirrorRole(piece.role) }
         : piece;
-      return roled.weapon?.heading !== undefined
-        ? {
-            ...roled,
-            weapon: { ...roled.weapon, heading: -roled.weapon.heading || 0 },
-          }
-        : roled;
+      const aimed =
+        roled.weapon?.heading !== undefined
+          ? {
+              ...roled,
+              weapon: { ...roled.weapon, heading: -roled.weapon.heading || 0 },
+            }
+          : roled;
+      return aimed.limits
+        ? { ...aimed, limits: mirrorLimits(aimed.limits) }
+        : aimed;
     }),
   };
 }
