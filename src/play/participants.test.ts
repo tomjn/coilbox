@@ -221,6 +221,30 @@ describe("toBattleConfig AI blocks", () => {
  * radius 100. Its own `gui_dualfog_gadget.lua` tests `== "1"`, so without the
  * block the map plays with fog off against its author's wishes.
  */
+describe("toBattleConfig compatibility mode", () => {
+  const build = (compatBase?: string) =>
+    toBattleConfig({
+      participants: [you(PALETTE[0]), ai("bot1", PALETTE[1])],
+      mapName: "BlockFort v1",
+      gameType: "XTA 9.65 (compat 2)",
+      startPosType: 0,
+      modOptions: {},
+      optionSchema: [],
+      mapOptionSchema: [],
+      compatBase,
+    });
+
+  it("tells the mutator which game it wraps", () => {
+    expect(build("XTA 9.65").modOptions).toEqual({
+      coilbox_compat_base: "XTA 9.65",
+    });
+  });
+
+  it("writes no mod option when compatibility mode is off", () => {
+    expect(build().modOptions).toBeUndefined();
+  });
+});
+
 describe("toBattleConfig map options", () => {
   const mapOptionSchema: ConfigOption[] = [
     { key: "atmosphere", name: "Atmosphere Settings", type: "section" },

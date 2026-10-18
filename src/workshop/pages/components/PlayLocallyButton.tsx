@@ -21,6 +21,7 @@ import { Button, Drawer, useSetting } from "@picoframe/frame";
 import { Rocket } from "lucide-react";
 import { useEffect, useState } from "react";
 import { CheckField } from "@/components/Field";
+import { useCompatSettings } from "@/content/compatSettings";
 import {
   primeScan,
   useUnitsyncGameInfo,
@@ -31,6 +32,7 @@ import {
   isWorkshopMutatorArchive,
   WORKSHOP_MUTATOR_FOLDER,
 } from "@/lib/generatedGames";
+import { resolveCompatTarget } from "@/play/compatTarget";
 import {
   gameOptionSchema,
   initialParticipants,
@@ -137,6 +139,7 @@ export function PlayLocallyButton({
   const { target, loading: targetLoading } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const { running, launch } = usePlay();
+  const [compatSettings] = useCompatSettings();
   const compiled = useCompiledProject(project, open);
 
   const games = scan.data?.games ?? [];
@@ -247,7 +250,20 @@ export function PlayLocallyButton({
         return;
       }
 
-      let gameType = game.name;
+      // With the game's compatibility switch on, everything below is built
+      // over its mutator in place of the game (issue #4562). Off, this is the
+      // game itself and nothing about the mutator is read.
+      const compat = await resolveCompatTarget({
+        target,
+        game,
+        settings: compatSettings,
+      });
+      if (compat.kind === "blocked") {
+        setPhase({ state: "failed", message: compat.message });
+        return;
+      }
+      const baseGame = compat.kind === "use" ? compat.gameType : game.name;
+      let gameType = baseGame;
       let modOptions: Record<string, string> = {};
       let dir: string | null = null;
       // The game's own version goes on the map beside the edited unit, so it is
@@ -297,7 +313,7 @@ export function PlayLocallyButton({
               mapName: map.name,
               participants,
             }),
-            modinfo: buildTestGameModInfo(game.name, unit.label),
+            modinfo: buildTestGameModInfo(baseGame, unit.label),
           });
           dir = generated.dir;
           modOptions = { ...modOptions, ...testMissionModOptions() };
@@ -328,7 +344,7 @@ export function PlayLocallyButton({
         setPhase({ state: "writing" });
         const written = await workshopTestMutator({
           dataDir: target.dataDir,
-          project,
+          project: { ...project, gameName: baseGame },
           written: settled.ok ? settled.settled.written : undefined,
           ...copyArg,
         });
@@ -365,6 +381,7 @@ export function PlayLocallyButton({
           mapName: map.name,
           gameType,
           startPosType: START_POS_RANDOM,
+          compatBase: compat.kind === "use" ? compat.baseName : undefined,
           modOptions,
           optionSchema: await gameOptionSchema(
             target,
