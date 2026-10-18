@@ -7,6 +7,7 @@
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { createRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { type LegoProject, newProject } from "../../model";
@@ -42,7 +43,9 @@ vi.mock("./PartPicker", () => ({
     shapes,
     favouriteShapes,
     onFavouriteShape,
+    scrollRoot,
   }: {
+    scrollRoot?: unknown;
     parts: LegoPartInfo[];
     favourites: ReadonlySet<string>;
     onFavourite: (part: LegoPartInfo) => void;
@@ -61,7 +64,7 @@ vi.mock("./PartPicker", () => ({
           </li>
         ))}
       </ul>
-      <ul aria-label="part grid">
+      <ul aria-label="part grid" data-scroll={scrollRoot ? "page" : "own"}>
         {parts.map((part) => (
           <li key={part.id}>
             {part.name}
@@ -80,12 +83,14 @@ vi.mock("./CompoundPicker", () => ({
     compounds,
     favourites,
     onFavourite,
+    scrollRoot,
   }: {
+    scrollRoot?: unknown;
     compounds: LegoProject[];
     favourites: ReadonlySet<string>;
     onFavourite: (module: LegoProject) => void;
   }) => (
-    <ul aria-label="module grid">
+    <ul aria-label="module grid" data-scroll={scrollRoot ? "page" : "own"}>
       {compounds.map((module) => (
         <li key={module.id}>
           {module.name}
@@ -421,5 +426,112 @@ describe("favourites", () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "Favourites" }));
     expect(screen.getByText("No favourites yet. Click a star.")).toBeTruthy();
+  });
+});
+
+/**
+ * The filter row stays one line in the builder's drawer and on the Lego Parts
+ * page (#4464, #4467). happy-dom lays nothing out, so these check the classes
+ * the layout rests on, not the layout itself.
+ */
+describe("the filter row in a narrow space", () => {
+  function Filters() {
+    const view = useInventoryView(pack, modules);
+    return (
+      <InventoryFilters
+        view={view}
+        pack={pack}
+        compounds={modules}
+        onLoadModuleFile={() => {}}
+      />
+    );
+  }
+
+  it("keeps All's search, count and load button on one line that can shrink", () => {
+    render(<Filters />);
+    const search = screen.getByLabelText("Search the inventory");
+    const block = search.parentElement as HTMLElement;
+    expect(block.className).toContain("@container");
+    expect(block.className).toContain("flex-nowrap");
+    expect(block.className).not.toContain("flex-wrap");
+    expect(search.className).toContain("min-w-32");
+    expect(
+      screen.getByText(`${3 + SHAPE_KINDS.length} parts, 2 modules`).className,
+    ).toContain("whitespace-nowrap");
+  });
+
+  it("keeps Load from file's name, and shows its words only with room", () => {
+    render(<Filters />);
+    const load = screen.getByRole("button", { name: "Load from file" });
+    const words = [...load.querySelectorAll("span")].find(
+      (span) => span.textContent === "Load from file",
+    );
+    expect(words?.className).toContain("hidden");
+    expect(words?.className).toContain("@xl:inline");
+  });
+
+  it("does the same for the modules' search, menu and count", () => {
+    render(<Filters />);
+    fireEvent.click(screen.getByRole("button", { name: "Modules" }));
+    const search = screen.getByLabelText("Search modules");
+    const block = search.parentElement as HTMLElement;
+    expect(block.className).toContain("@container");
+    expect(block.className).toContain("flex-nowrap");
+    expect(search.className).toContain("min-w-32");
+    expect(
+      screen.getByRole("combobox", { name: "Module category" }).className,
+    ).toContain("min-w-32");
+    expect(screen.getByRole("button", { name: "Load from file" })).toBeTruthy();
+  });
+});
+
+/**
+ * The Lego Parts page scrolls as one, parts then modules (#4468). The builder's
+ * drawer keeps a scroller in each grid.
+ */
+describe("one scroll for the page", () => {
+  function Grids({ page }: { page: boolean }) {
+    const view = useInventoryView(pack, modules);
+    return (
+      <InventoryGrids
+        view={view}
+        pack={pack}
+        compounds={modules}
+        scrollRoot={page ? createRef<HTMLElement>() : undefined}
+        onDeleteModule={vi.fn()}
+        onRenameModule={vi.fn()}
+        onCopyModule={vi.fn()}
+        aside={<aside aria-label="detail" />}
+      />
+    );
+  }
+
+  it("hands the page's scroller to both grids", () => {
+    render(<Grids page />);
+    expect(screen.getByLabelText("part grid").getAttribute("data-scroll")).toBe(
+      "page",
+    );
+    expect(
+      screen.getByLabelText("module grid").getAttribute("data-scroll"),
+    ).toBe("page");
+  });
+
+  it("keeps the detail beside the grids in view as the page scrolls", () => {
+    render(<Grids page />);
+    const holder = screen.getByLabelText("detail").parentElement as HTMLElement;
+    expect(holder.className).toContain("sticky");
+    expect(holder.className).toContain("top-0");
+  });
+
+  it("leaves each grid its own scroller where no page scroller is given", () => {
+    render(<Grids page={false} />);
+    expect(screen.getByLabelText("part grid").getAttribute("data-scroll")).toBe(
+      "own",
+    );
+    expect(
+      screen.getByLabelText("module grid").getAttribute("data-scroll"),
+    ).toBe("own");
+    const holder = screen.getByLabelText("detail").parentElement as HTMLElement;
+    expect(holder.className).not.toContain("sticky");
   });
 });

@@ -19,7 +19,13 @@
 
 import { Button, Input } from "@picoframe/frame";
 import { Copy, FileDown, Pencil, Share2, Star, Trash2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import {
+  type RefObject,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import * as THREE from "three";
 
 import { useCanvas3D } from "@/lib/useCanvas3D";
@@ -43,6 +49,7 @@ import {
 } from "../../rawGeometry";
 import { getShapeGeometry } from "../../shapes";
 import { isBuiltInModule } from "../../starterModules";
+import { type GridWindow, gridScroll, useRootHeight } from "./gridScroll";
 import { ModuleLabelsPopover } from "./ModuleLabelsPopover";
 import { gridLayout } from "./moduleGrid";
 
@@ -96,6 +103,11 @@ interface Props {
     compound: LegoProject,
     labels: { category: string | undefined; tags: string[] },
   ) => void;
+  /**
+   * A scroller further out to scroll with, in place of one of the grid's own,
+   * as `./gridScroll` describes. Given or not for the life of the grid.
+   */
+  scrollRoot?: RefObject<HTMLElement | null>;
 }
 
 /** The name field being edited, and why it cannot be saved yet, if at all. */
@@ -120,9 +132,14 @@ export function CompoundPicker({
   favourites,
   onFavourite,
   onLabels,
+  scrollRoot,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const rootHeight = useRootHeight(scrollRoot);
+  // On a page, the canvas waits for the page's scroller to be measured.
+  const ready = !scrollRoot || rootHeight > 0;
   const stateRef = useRef<GridState | null>(null);
   const [columns, setColumns] = useState(1);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -159,11 +176,24 @@ export function CompoundPicker({
     });
   }
 
+  const scrolling = useCallback(
+    () =>
+      contentRef.current && hostRef.current
+        ? gridScroll(
+            contentRef.current,
+            hostRef.current,
+            scrollRef.current,
+            scrollRoot ? scrollRoot.current : undefined,
+          )
+        : null,
+    [scrollRoot],
+  );
+
   useCanvas3D(
     hostRef,
     ({ renderer }) => {
-      const scroller = scrollRef.current;
-      if (!scroller) return;
+      const scroll = scrolling();
+      if (!scroll) return;
 
       const scene = new THREE.Scene();
       addStandardLights(scene);
@@ -185,9 +215,8 @@ export function CompoundPicker({
       };
       stateRef.current = state;
 
-      const render = () =>
-        layout(state, scroller.scrollTop, scroller.clientHeight);
-      scroller.addEventListener("scroll", render, { passive: true });
+      const render = () => layout(state, scroll.window());
+      const unwatch = scroll.watch(render);
 
       return {
         render,
@@ -199,7 +228,7 @@ export function CompoundPicker({
           }
         },
         dispose: () => {
-          scroller.removeEventListener("scroll", render);
+          unwatch();
           for (const holder of state.holders.values()) scene.remove(holder);
           for (const dispose of state.ownMaterials.values()) dispose();
           stateRef.current = null;
@@ -207,6 +236,7 @@ export function CompoundPicker({
       };
     },
     [],
+    ready,
   );
 
   // A lifted module's meshes are in a file of its own, read once per module.
@@ -239,10 +269,11 @@ export function CompoundPicker({
   // reassigned on every holder regardless, not only a freshly built one,
   // because the unit's atlas can change under a compound that already exists.
   // A lifted module keeps the game's texture it was built with.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a change of ready builds a new canvas with an empty state, which needs filling again
   useEffect(() => {
     const state = stateRef.current;
-    const scroller = scrollRef.current;
-    if (!state || !scroller) return;
+    const scroll = scrolling();
+    if (!state || !scroll) return;
 
     const material = partMaterial(atlas ?? baseAtlas(pack));
     const wanted = new Set(compounds.map((compound) => compound.id));
@@ -327,8 +358,8 @@ export function CompoundPicker({
     }
     state.order = compounds.map((compound) => compound.id);
     state.builtIn = compounds.map(isBuiltInModule);
-    layout(state, scroller.scrollTop, scroller.clientHeight);
-  }, [pack, compounds, atlas, raws]);
+    layout(state, scroll.window());
+  }, [pack, compounds, atlas, raws, scrolling, ready]);
 
   // Turn the compound under the pointer, so its far side can be seen without
   // inserting it. Runs only while one is hovered.
@@ -364,210 +395,228 @@ export function CompoundPicker({
 
   const grid = gridLayout(compounds.map(isBuiltInModule), columns, METRICS);
 
-  // The host and scroller stay in the tree even with nothing saved yet, so the
-  // canvas the mount effect builds always has somewhere to attach. Returning
-  // early here instead would mean the first compound ever saved has no canvas
-  // to draw into, and the mount effect only runs once.
-  return (
-    <div className="relative min-h-0 flex-1">
-      <div ref={hostRef} className="pointer-events-none absolute inset-0" />
-      <div ref={scrollRef} className="absolute inset-0 overflow-y-auto">
-        {compounds.length === 0 ? (
-          <p className="px-6 py-10 text-center text-sm text-muted-foreground">
-            Nothing saved yet. In a unit, select a piece and choose Save as a
-            module to keep the assembly under it for reuse.
-          </p>
-        ) : (
-          <div className="relative" style={{ height: grid.height }}>
-            {grid.headings.map((heading) => (
-              <h3
-                key={heading.label}
-                className="absolute left-1 text-xs font-medium text-muted-foreground"
-                style={{ top: heading.top }}
-              >
-                {heading.label}
-              </h3>
-            ))}
-            {compounds.map((compound, index) => {
-              const isRenaming = renaming?.id === compound.id;
-              const builtIn = isBuiltInModule(compound);
-              const at = grid.cells[index];
-              const starred = favourites?.has(compound.id) ?? false;
-              const liftedFrom = holdsLiftedPieces(compound)
-                ? compound.game?.name
-                : undefined;
-              return (
-                <div
-                  key={compound.id}
-                  className="group absolute"
-                  style={{
-                    left: at?.left,
-                    top: at?.top,
-                    width: CELL,
-                    height: CELL + LABEL,
-                  }}
-                >
-                  {/* A button whether or not it inserts: pointing at a cell or
+  const height = compounds.length === 0 ? undefined : grid.height;
+  const cellsOrEmpty =
+    compounds.length === 0 ? (
+      <p className="px-6 py-10 text-center text-sm text-muted-foreground">
+        Nothing saved yet. In a unit, select a piece and choose Save as a module
+        to keep the assembly under it for reuse.
+      </p>
+    ) : (
+      // Laid over the content box rather than in its flow, which on a page has
+      // the sticky canvas in it first.
+      <div className="absolute inset-x-0 top-0" style={{ height: grid.height }}>
+        {grid.headings.map((heading) => (
+          <h3
+            key={heading.label}
+            className="absolute left-1 text-xs font-medium text-muted-foreground"
+            style={{ top: heading.top }}
+          >
+            {heading.label}
+          </h3>
+        ))}
+        {compounds.map((compound, index) => {
+          const isRenaming = renaming?.id === compound.id;
+          const builtIn = isBuiltInModule(compound);
+          const at = grid.cells[index];
+          const starred = favourites?.has(compound.id) ?? false;
+          const liftedFrom = holdsLiftedPieces(compound)
+            ? compound.game?.name
+            : undefined;
+          return (
+            <div
+              key={compound.id}
+              className="group absolute"
+              style={{
+                left: at?.left,
+                top: at?.top,
+                width: CELL,
+                height: CELL + LABEL,
+              }}
+            >
+              {/* A button whether or not it inserts: pointing at a cell or
                       tabbing to it turns the compound, which is how its far side
                       gets seen. The parts browser has no unit to insert into, so
                       there it only turns. Renaming covers its label with a field
                       but leaves it in place, so hover and spin still work. */}
-                  <button
-                    type="button"
-                    onClick={
-                      onInsert
-                        ? (event) => onInsert(compound, event.altKey)
-                        : undefined
+              <button
+                type="button"
+                onClick={
+                  onInsert
+                    ? (event) => onInsert(compound, event.altKey)
+                    : undefined
+                }
+                onMouseEnter={() => setHovered(compound.id)}
+                onMouseLeave={() =>
+                  setHovered((at) => (at === compound.id ? null : at))
+                }
+                onFocus={() => setHovered(compound.id)}
+                onBlur={() =>
+                  setHovered((at) => (at === compound.id ? null : at))
+                }
+                title={[
+                  onInsert
+                    ? `Place ${compound.name} on a connector. Alt adds it to the selected piece`
+                    : `${compound.name}, ${compound.pieces.length} pieces`,
+                  ...(liftedFrom ? liftCredits(compound) : []),
+                ]
+                  .filter(Boolean)
+                  .join(". ")}
+                className={`flex h-full w-full flex-col justify-end rounded border pb-1 text-center hover:border-border ${placingId === compound.id ? "border-ring bg-muted/40" : "border-transparent"} hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
+              >
+                <span className="truncate px-1 text-xs">
+                  {isRenaming ? "" : compound.name}
+                </span>
+              </button>
+              {liftedFrom ? (
+                <span className="pointer-events-none absolute inset-x-6 top-1 truncate text-center text-[10px] text-muted-foreground">
+                  {liftedFrom}
+                </span>
+              ) : null}
+              {isRenaming ? (
+                <div className="absolute inset-x-1 bottom-1">
+                  <Input
+                    autoFocus
+                    value={renaming.draft}
+                    onChange={(event) =>
+                      setRenaming({
+                        id: compound.id,
+                        draft: event.target.value,
+                        error: null,
+                      })
                     }
-                    onMouseEnter={() => setHovered(compound.id)}
-                    onMouseLeave={() =>
-                      setHovered((at) => (at === compound.id ? null : at))
-                    }
-                    onFocus={() => setHovered(compound.id)}
-                    onBlur={() =>
-                      setHovered((at) => (at === compound.id ? null : at))
-                    }
-                    title={[
-                      onInsert
-                        ? `Place ${compound.name} on a connector. Alt adds it to the selected piece`
-                        : `${compound.name}, ${compound.pieces.length} pieces`,
-                      ...(liftedFrom ? liftCredits(compound) : []),
-                    ]
-                      .filter(Boolean)
-                      .join(". ")}
-                    className={`flex h-full w-full flex-col justify-end rounded border pb-1 text-center hover:border-border ${placingId === compound.id ? "border-ring bg-muted/40" : "border-transparent"} hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
-                  >
-                    <span className="truncate px-1 text-xs">
-                      {isRenaming ? "" : compound.name}
-                    </span>
-                  </button>
-                  {liftedFrom ? (
-                    <span className="pointer-events-none absolute inset-x-6 top-1 truncate text-center text-[10px] text-muted-foreground">
-                      {liftedFrom}
-                    </span>
+                    onFocus={(event) => event.target.select()}
+                    onBlur={commitRename}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        commitRename();
+                      } else if (event.key === "Escape") {
+                        event.preventDefault();
+                        cancelRename();
+                      }
+                    }}
+                    aria-label={`Rename the ${compound.name} module`}
+                    aria-invalid={renaming.error ? true : undefined}
+                    className="h-5 bg-background px-1 text-xs"
+                  />
+                  {renaming.error ? (
+                    <p className="truncate text-[10px] text-destructive">
+                      {renaming.error}
+                    </p>
                   ) : null}
-                  {isRenaming ? (
-                    <div className="absolute inset-x-1 bottom-1">
-                      <Input
-                        autoFocus
-                        value={renaming.draft}
-                        onChange={(event) =>
-                          setRenaming({
-                            id: compound.id,
-                            draft: event.target.value,
-                            error: null,
-                          })
-                        }
-                        onFocus={(event) => event.target.select()}
-                        onBlur={commitRename}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") {
-                            event.preventDefault();
-                            commitRename();
-                          } else if (event.key === "Escape") {
-                            event.preventDefault();
-                            cancelRename();
-                          }
-                        }}
-                        aria-label={`Rename the ${compound.name} module`}
-                        aria-invalid={renaming.error ? true : undefined}
-                        className="h-5 bg-background px-1 text-xs"
-                      />
-                      {renaming.error ? (
-                        <p className="truncate text-[10px] text-destructive">
-                          {renaming.error}
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : null}
-                  {/* A built in module cannot be renamed, relabelled or deleted,
-                      so its one action is to become the user's own. */}
-                  {builtIn ? (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="absolute right-0 top-0 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
-                      onClick={() => onCopy(compound)}
-                      aria-label={`Make my own copy of the ${compound.name} module`}
-                      title="Make my own copy"
-                    >
-                      <Copy size={14} />
-                    </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="absolute left-0 top-0 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
-                      onClick={() => startRename(compound)}
-                      aria-label={`Rename the ${compound.name} module`}
-                    >
-                      <Pencil size={14} />
-                    </Button>
-                  )}
-                  {onSaveFile && !liftedFrom ? (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="absolute bottom-6 left-0 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
-                      onClick={() => onSaveFile(compound)}
-                      aria-label={`Save the ${compound.name} module to a file`}
-                      title="Save to file"
-                    >
-                      <FileDown size={14} />
-                    </Button>
-                  ) : null}
-                  {onShare && !builtIn ? (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="absolute bottom-6 left-8 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
-                      onClick={() => onShare(compound)}
-                      aria-label={`Share the ${compound.name} module`}
-                      title="Share"
-                    >
-                      <Share2 size={14} />
-                    </Button>
-                  ) : null}
-                  {onFavourite ? (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className={`absolute bottom-6 right-0 transition-opacity focus:opacity-100 group-hover:opacity-100 ${starred ? "opacity-100" : "opacity-0"}`}
-                      onClick={() => onFavourite(compound)}
-                      aria-pressed={starred}
-                      aria-label={`Favourite the ${compound.name} module`}
-                      title={starred ? "Remove from favourites" : "Favourite"}
-                    >
-                      <Star
-                        size={14}
-                        fill={starred ? "currentColor" : "none"}
-                      />
-                    </Button>
-                  ) : null}
-                  {onLabels && !builtIn ? (
-                    <ModuleLabelsPopover
-                      compound={compound}
-                      known={known}
-                      onSave={onLabels}
-                      className="absolute left-8 top-0 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
-                    />
-                  ) : null}
-                  {builtIn ? null : (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="absolute right-0 top-0 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
-                      onClick={() => onDelete(compound.id)}
-                      aria-label={`Delete the ${compound.name} module`}
-                    >
-                      <Trash2 size={14} />
-                    </Button>
-                  )}
                 </div>
-              );
-            })}
-          </div>
-        )}
+              ) : null}
+              {/* A built in module cannot be renamed, relabelled or deleted,
+                      so its one action is to become the user's own. */}
+              {builtIn ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="absolute right-0 top-0 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
+                  onClick={() => onCopy(compound)}
+                  aria-label={`Make my own copy of the ${compound.name} module`}
+                  title="Make my own copy"
+                >
+                  <Copy size={14} />
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="absolute left-0 top-0 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
+                  onClick={() => startRename(compound)}
+                  aria-label={`Rename the ${compound.name} module`}
+                >
+                  <Pencil size={14} />
+                </Button>
+              )}
+              {onSaveFile && !liftedFrom ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="absolute bottom-6 left-0 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
+                  onClick={() => onSaveFile(compound)}
+                  aria-label={`Save the ${compound.name} module to a file`}
+                  title="Save to file"
+                >
+                  <FileDown size={14} />
+                </Button>
+              ) : null}
+              {onShare && !builtIn ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="absolute bottom-6 left-8 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
+                  onClick={() => onShare(compound)}
+                  aria-label={`Share the ${compound.name} module`}
+                  title="Share"
+                >
+                  <Share2 size={14} />
+                </Button>
+              ) : null}
+              {onFavourite ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className={`absolute bottom-6 right-0 transition-opacity focus:opacity-100 group-hover:opacity-100 ${starred ? "opacity-100" : "opacity-0"}`}
+                  onClick={() => onFavourite(compound)}
+                  aria-pressed={starred}
+                  aria-label={`Favourite the ${compound.name} module`}
+                  title={starred ? "Remove from favourites" : "Favourite"}
+                >
+                  <Star size={14} fill={starred ? "currentColor" : "none"} />
+                </Button>
+              ) : null}
+              {onLabels && !builtIn ? (
+                <ModuleLabelsPopover
+                  compound={compound}
+                  known={known}
+                  onSave={onLabels}
+                  className="absolute left-8 top-0 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
+                />
+              ) : null}
+              {builtIn ? null : (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="absolute right-0 top-0 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
+                  onClick={() => onDelete(compound.id)}
+                  aria-label={`Delete the ${compound.name} module`}
+                >
+                  <Trash2 size={14} />
+                </Button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+
+  // The host and content stay in the tree even with nothing saved yet, so the
+  // canvas the mount effect builds always has somewhere to attach. Returning
+  // early here instead would mean the first compound ever saved has no canvas
+  // to draw into, and the mount effect only runs once.
+  if (scrollRoot) {
+    return (
+      <div ref={contentRef} className="relative shrink-0" style={{ height }}>
+        <div
+          ref={hostRef}
+          className="pointer-events-none sticky top-0"
+          style={{ height: Math.min(height ?? 0, rootHeight) }}
+        />
+        {cellsOrEmpty}
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative min-h-0 flex-1">
+      <div ref={hostRef} className="pointer-events-none absolute inset-0" />
+      <div ref={scrollRef} className="absolute inset-0 overflow-y-auto">
+        <div ref={contentRef} className="relative" style={{ height }}>
+          {cellsOrEmpty}
+        </div>
       </div>
     </div>
   );
@@ -606,7 +655,8 @@ function buildHolder(
 }
 
 /** Put every compound in its cell and draw once. World units are pixels. */
-function layout(state: GridState, scrollTop: number, viewportHeight: number) {
+function layout(state: GridState, slice: GridWindow) {
+  const { top: scrollTop, height: viewportHeight } = slice;
   const { renderer, camera, columns, order, holders } = state;
   const { cells } = gridLayout(state.builtIn, columns, METRICS);
   if (viewportHeight === 0) return;

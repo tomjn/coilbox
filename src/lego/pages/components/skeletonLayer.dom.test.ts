@@ -6,6 +6,7 @@ import type { SkeletonJoint } from "../../skeletonJoints";
 import {
   buildSkeleton,
   disposeSkeleton,
+  layoutSkeletonLabels,
   SKELETON_COLOUR,
 } from "./skeletonLayer";
 
@@ -113,6 +114,53 @@ describe("buildSkeleton", () => {
       ]),
     );
     expect(group.parent).toBeNull();
+  });
+
+  it("hides a label that would cover a nearer one, but never the selected or hovered", () => {
+    const stacked: SkeletonJoint[] = [
+      {
+        pieceId: "near",
+        label: "Near",
+        at: [0, 0, 5],
+        parentAt: null,
+        parentId: null,
+      },
+      {
+        pieceId: "far",
+        label: "Far",
+        at: [0, 0, 0],
+        parentAt: null,
+        parentId: null,
+      },
+      {
+        pieceId: "apart",
+        label: "Apart",
+        at: [0, 8, 0],
+        parentAt: null,
+        parentId: null,
+      },
+    ];
+    const group = buildSkeleton(
+      stacked,
+      new THREE.PointsMaterial(),
+    ) as THREE.Group;
+    const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 1000);
+    camera.position.set(0, 0, 40);
+    camera.lookAt(0, 0, 0);
+    camera.updateProjectionMatrix();
+    const visible = () =>
+      group.children
+        .filter((c) => c instanceof THREE.Sprite && c.visible)
+        .map((c) => c.userData.pieceId)
+        .sort();
+    const size = { width: 800, height: 600 };
+
+    layoutSkeletonLabels(group, camera, size, new Set());
+    expect(visible()).toEqual(["apart", "near"]);
+
+    layoutSkeletonLabels(group, camera, size, new Set(["far"]));
+    expect(visible()).toEqual(["apart", "far"]);
+    disposeSkeleton(group);
   });
 
   it("uses the colour the legend names", () => {

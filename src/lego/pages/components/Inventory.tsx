@@ -13,7 +13,7 @@
 
 import { Button, cn, Input } from "@picoframe/frame";
 import { FileUp } from "lucide-react";
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 
 import { ButtonGroup } from "@/components/ui/button-group";
 import type { LegoAtlas } from "../../atlas";
@@ -76,8 +76,17 @@ export function InventoryFilters({
   // A shape is listed with the parts, so it counts as one.
   const partCount = view.parts.length + view.shapes.length;
   const loadButton = onLoadModuleFile ? (
-    <Button size="sm" variant="outline" onClick={onLoadModuleFile}>
-      <FileUp size={14} /> Load from file
+    // Its words go when the row is short of room, and its name stays.
+    <Button
+      size="sm"
+      variant="outline"
+      onClick={onLoadModuleFile}
+      aria-label="Load from file"
+      title="Load from file"
+      className="shrink-0"
+    >
+      <FileUp size={14} />
+      <span className="hidden @xl:inline">Load from file</span>
     </Button>
   ) : null;
   return (
@@ -145,15 +154,15 @@ export function InventoryFilters({
           trailing={loadButton}
         />
       ) : (
-        <div className="flex flex-1 flex-wrap items-center gap-2">
+        <div className="@container flex min-w-88 flex-1 flex-nowrap items-center gap-2">
           <Input
             value={view.query}
             onChange={(event) => view.setQuery(event.target.value)}
             placeholder="Search"
-            className="w-56"
+            className="w-56 min-w-32"
             aria-label="Search the inventory"
           />
-          <span className="ml-auto text-sm text-muted-foreground">
+          <span className="ml-auto shrink-0 whitespace-nowrap text-sm text-muted-foreground">
             {partCount} {partCount === 1 ? "part" : "parts"},{" "}
             {view.modules.length}{" "}
             {view.modules.length === 1 ? "module" : "modules"}
@@ -195,6 +204,11 @@ interface GridsProps {
   gameUnits?: ReactNode;
   /** Beside the grids, such as the Lego Parts page's part detail. */
   aside?: ReactNode;
+  /**
+   * The page's scroller, for a page that scrolls the parts and the modules as
+   * one (#4468). Absent, each grid scrolls in its own share of the height.
+   */
+  scrollRoot?: RefObject<HTMLElement | null>;
 }
 
 function emptyText(list: InventoryList): string {
@@ -222,6 +236,7 @@ export function InventoryGrids({
   onLabelsModule,
   gameUnits,
   aside,
+  scrollRoot,
 }: GridsProps) {
   const { inventory } = view;
   const favouriteParts = new Set(
@@ -263,6 +278,7 @@ export function InventoryGrids({
             onFavouriteShape={(shape) =>
               inventory.toggleFavourite({ kind: "shape", id: shape.id })
             }
+            scrollRoot={scrollRoot}
             atlas={atlas}
             selectedId={selectedPartId}
             onSelect={onSelectPart}
@@ -296,11 +312,16 @@ export function InventoryGrids({
                 inventory.toggleFavourite({ kind: "module", id: module.id })
               }
               onLabels={onLabelsModule}
+              scrollRoot={scrollRoot}
             />
           </div>
         ) : null}
       </div>
-      {aside}
+      {scrollRoot && aside ? (
+        <div className="sticky top-0 self-start">{aside}</div>
+      ) : (
+        aside
+      )}
     </div>
   );
 }

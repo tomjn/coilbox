@@ -63,19 +63,32 @@ export function ModuleFilters({
   const used = categoriesInUse(compounds);
   const hasUncategorised = compounds.some((c) => !c.category);
   return (
-    <div className={cn("flex flex-wrap items-center gap-2", className)}>
+    // One line that gives up width before it wraps (#4467): a container, so a
+    // trailing load button can drop its words, with the search box and the menu
+    // shrinking to a floor. Its own floor is about what that leaves, so the row
+    // around it wraps it whole before it would overflow.
+    <div
+      className={cn(
+        "@container flex min-w-100 flex-nowrap items-center gap-2",
+        className,
+      )}
+    >
       <Input
         value={query}
         onChange={(event) => onQuery(event.target.value)}
         placeholder="Search modules"
-        className="w-56"
+        className="w-56 min-w-32"
         aria-label="Search modules"
       />
       <Select
         value={toValue(category)}
         onValueChange={(value) => onCategory(fromValue(value))}
       >
-        <SelectTrigger size="sm" className="w-44" aria-label="Module category">
+        <SelectTrigger
+          size="sm"
+          className="w-44 min-w-32"
+          aria-label="Module category"
+        >
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -90,7 +103,7 @@ export function ModuleFilters({
           ) : null}
         </SelectContent>
       </Select>
-      <span className="ml-auto text-sm text-muted-foreground">
+      <span className="ml-auto shrink-0 whitespace-nowrap text-sm text-muted-foreground">
         {shown} {shown === 1 ? "module" : "modules"}
       </span>
       {trailing}

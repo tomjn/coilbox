@@ -1,5 +1,5 @@
 import { ToyBrick, TriangleAlert } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useInventoryView } from "../inventory";
 import { withLabels } from "../moduleFilter";
@@ -52,77 +52,85 @@ export default function PartsPage() {
   const shareModule = useShareModule();
   useSharedModuleImport(pack, status.state !== "loading", compounds);
   const view = useInventoryView(pack, compounds);
+  // The whole page scrolls as one, parts then modules (#4468), so the grids
+  // scroll with this rather than in boxes of their own.
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div className="flex h-full flex-col">
-      <header className="border-b border-border px-6 py-4">
-        <h1 className="flex items-center gap-2 text-lg font-semibold leading-none">
-          <ToyBrick size={18} /> Lego Parts
-        </h1>
-        <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-          The pieces a model can be assembled from. Every one is already mapped
-          to the same texture, so a model built entirely from them needs no UV
-          work.
-        </p>
-      </header>
+    <div ref={scrollRef} className="h-full overflow-y-auto">
+      <div className="flex min-h-full flex-col">
+        <header className="border-b border-border px-6 py-4">
+          <h1 className="flex items-center gap-2 text-lg font-semibold leading-none">
+            <ToyBrick size={18} /> Lego Parts
+          </h1>
+          <p className="mt-1 max-w-prose text-sm text-muted-foreground">
+            The pieces a model can be assembled from. Every one is already
+            mapped to the same texture, so a model built entirely from them
+            needs no UV work.
+          </p>
+        </header>
 
-      {status.state === "loading" ? <Loading /> : null}
-      {status.state === "missing" ? <Missing message={status.message} /> : null}
+        {status.state === "loading" ? <Loading /> : null}
+        {status.state === "missing" ? (
+          <Missing message={status.message} />
+        ) : null}
 
-      {pack ? (
-        <>
-          <PackProblems pack={pack} />
-          <PackAtlases pack={pack} />
-          <InventoryFilters
-            onLoadModuleFile={moduleFiles.loadFile}
-            view={view}
-            pack={pack}
-            compounds={compounds}
-            className="border-b border-border px-6 py-3"
-          />
-          <InventoryGrids
-            view={view}
-            pack={pack}
-            compounds={compounds}
-            selectedPartId={selected?.id}
-            onSelectPart={(part) => {
-              setSelectedShape(null);
-              setSelected(part);
-            }}
-            selectedShape={selectedShape?.id}
-            onSelectShape={(shape) => {
-              setSelected(null);
-              setSelectedShape(shape);
-            }}
-            onDeleteModule={(id) => void deleteCompound(id)}
-            onRenameModule={(compound, name) =>
-              void saveCompound({ ...compound, name })
-            }
-            onCopyModule={(compound) => void saveCompound(compound)}
-            onSaveModuleFile={moduleFiles.saveFile}
-            onShareModule={shareModule}
-            onLabelsModule={(compound, labels) =>
-              void saveCompound(withLabels(compound, labels))
-            }
-            aside={
-              selectedShape ? (
-                <ShapeDetail
-                  pack={pack}
-                  shape={selectedShape}
-                  onClose={() => setSelectedShape(null)}
-                />
-              ) : selected ? (
-                <PartDetail
-                  pack={pack}
-                  part={selected}
-                  onSelect={setSelected}
-                  onClose={() => setSelected(null)}
-                />
-              ) : null
-            }
-          />
-        </>
-      ) : null}
+        {pack ? (
+          <>
+            <PackProblems pack={pack} />
+            <PackAtlases pack={pack} />
+            <InventoryFilters
+              onLoadModuleFile={moduleFiles.loadFile}
+              view={view}
+              pack={pack}
+              compounds={compounds}
+              className="border-b border-border px-6 py-3"
+            />
+            <InventoryGrids
+              view={view}
+              pack={pack}
+              compounds={compounds}
+              selectedPartId={selected?.id}
+              onSelectPart={(part) => {
+                setSelectedShape(null);
+                setSelected(part);
+              }}
+              selectedShape={selectedShape?.id}
+              onSelectShape={(shape) => {
+                setSelected(null);
+                setSelectedShape(shape);
+              }}
+              onDeleteModule={(id) => void deleteCompound(id)}
+              onRenameModule={(compound, name) =>
+                void saveCompound({ ...compound, name })
+              }
+              onCopyModule={(compound) => void saveCompound(compound)}
+              onSaveModuleFile={moduleFiles.saveFile}
+              onShareModule={shareModule}
+              onLabelsModule={(compound, labels) =>
+                void saveCompound(withLabels(compound, labels))
+              }
+              aside={
+                selectedShape ? (
+                  <ShapeDetail
+                    pack={pack}
+                    shape={selectedShape}
+                    onClose={() => setSelectedShape(null)}
+                  />
+                ) : selected ? (
+                  <PartDetail
+                    pack={pack}
+                    part={selected}
+                    onSelect={setSelected}
+                    onClose={() => setSelected(null)}
+                  />
+                ) : null
+              }
+              scrollRoot={scrollRef}
+            />
+          </>
+        ) : null}
+      </div>
     </div>
   );
 }
