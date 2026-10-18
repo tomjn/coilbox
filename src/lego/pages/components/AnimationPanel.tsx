@@ -27,6 +27,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { TipButton } from "@/components/TipButton";
 import {
   Collapsible,
   CollapsibleContent,
@@ -103,6 +104,11 @@ import { movesInGame } from "../../movement";
 import type { LoadedPack } from "../../pack";
 import { pieceRest } from "../../pieceRest";
 import { type PlantedFeet, plantedFeet } from "../../plantedFeet";
+import {
+  conversionProblem,
+  convertedActionId,
+  convertPresetToAction,
+} from "../../presetToAction";
 import type { RawGeometry } from "../../rawGeometry";
 import { pieceWorldRest, unitBounds, unitSize } from "../../s3oBuild";
 import { scenarioMark } from "../../scenarioMarks";
@@ -526,6 +532,18 @@ export function AnimationPanel({
   const latestRun = useRef(0);
   const isCallMode = scenarioId === CALL_FUNCTION;
   const applied = project.animations ?? [];
+  // Memoised: working one out samples the preset's whole cycle, and playback
+  // renders the panel on every frame it shows.
+  const conversionProblems = useMemo(
+    () =>
+      new Map(
+        (project.animations ?? []).map((entry) => [
+          entry.presetId,
+          conversionProblem(project, entry.presetId),
+        ]),
+      ),
+    [project],
+  );
   const actions = project.actions ?? [];
   /** Whether there is anything to play: a preset or an action. */
   const hasAnimation = applied.length > 0 || actions.length > 0;
@@ -2025,6 +2043,9 @@ export function AnimationPanel({
             const copies = entry ? presetCopies(project, preset) : 1;
             const copyIds = entry ? presetInstanceIds(project, preset) : [];
             const copy = copyOf(preset);
+            const blocked = entry
+              ? (conversionProblems.get(preset.id) ?? null)
+              : null;
 
             return (
               <div
@@ -2057,6 +2078,27 @@ export function AnimationPanel({
                     >
                       <Play size={14} />
                     </Button>
+                  ) : null}
+                  {entry && onActionsEdit ? (
+                    <TipButton
+                      size="sm"
+                      variant="outline"
+                      disabled={blocked !== null}
+                      aria-label={`Convert ${preset.label} to an action`}
+                      title={
+                        blocked ??
+                        "Replace with an action you can edit key by key"
+                      }
+                      onClick={() => {
+                        const base = crypto.randomUUID();
+                        onActionsEdit((p) =>
+                          convertPresetToAction(p, preset.id, base),
+                        );
+                        setTimelineId(convertedActionId(base, 1));
+                      }}
+                    >
+                      To action
+                    </TipButton>
                   ) : null}
                   <Button
                     size="sm"

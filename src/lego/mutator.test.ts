@@ -11,6 +11,30 @@ vi.mock("@/content/config", () => ({
 vi.mock("@/workshop/compile", () => ({
   workshopCompile: vi.fn(),
 }));
+// What a unit fires and whether it leaves a wreck are read off the workshop and
+// the pack, so a test sets them per unit here. By default a unit has neither.
+const weaponFiles = new Map<string, { name: string; contents: string }[]>();
+const wrecked = new Set<string>();
+vi.mock("./weaponModule", async (original) => {
+  const actual = await original<typeof import("./weaponModule")>();
+  return {
+    ...actual,
+    scratchWeapons: async (
+      ...call: Parameters<typeof actual.scratchWeapons>
+    ) => {
+      const made = await actual.scratchWeapons(...call);
+      return { ...made, files: weaponFiles.get(call[0].unitName) ?? [] };
+    },
+  };
+});
+vi.mock("./wreck", async (original) => {
+  const actual = await original<typeof import("./wreck")>();
+  return {
+    ...actual,
+    buildWreck: (...call: Parameters<typeof actual.buildWreck>) =>
+      wrecked.has(call[0].unitName) ? actual.buildWreck(...call) : null,
+  };
+});
 vi.mock("./bindings", () => ({
   legoExport: vi.fn(),
   legoScratchGame: vi.fn(),
@@ -185,6 +209,8 @@ function args(overrides: Partial<MutatorArgs> = {}): MutatorArgs {
 beforeEach(() => {
   vi.resetAllMocks();
   fs.clear();
+  weaponFiles.clear();
+  wrecked.clear();
   answers('"LuaRules/main.lua;LuaRules/draw.lua"');
   vi.mocked(legoReadTextFile).mockImplementation(async ({ path }) => {
     const text = fs.get(path);
@@ -202,10 +228,26 @@ beforeEach(() => {
   });
   vi.mocked(legoScratchPrune).mockResolvedValue({ removed: [], kept: [] });
   vi.mocked(legoExport).mockImplementation(
-    async ({ dir, unitName }) =>
+    async ({ dir, unitName, weapons, wreck }) =>
       ({
         owned: [
           { path: `${dir}/units/${unitName}.lua`, sha256: `sha-${unitName}` },
+          ...(weapons ?? []).map((file) => ({
+            path: `${dir}/weapons/${file.name}`,
+            sha256: `sha-${file.name}`,
+          })),
+          ...(wreck
+            ? [
+                {
+                  path: `${dir}/objects3d/coilbox/${unitName}_dead.s3o`,
+                  sha256: `sha-${unitName}_dead.s3o`,
+                },
+                {
+                  path: `${dir}/features/coilbox/${unitName}_dead.lua`,
+                  sha256: `sha-${unitName}_dead.lua`,
+                },
+              ]
+            : []),
         ],
       }) as never,
   );
@@ -648,5 +690,116 @@ describe("writeMutator's build list", () => {
     );
     expect(second.skipped).toBe(false);
     expect(legoScratchGame).toHaveBeenCalledTimes(2);
+  });
+});
+
+// Issue #4528. A unit that stays in the set but loses a weapon or its wreck
+// must not leave the files for them behind.
+describe("writeMutator pruning a unit that stays", () => {
+  const gun = { name: "coilbox_alpha_gun.lua", contents: "gun" };
+  const rocket = { name: "coilbox_alpha_rocket.lua", contents: "rocket" };
+
+  function armed(files: { name: string; contents: string }[]) {
+    weaponFiles.set("alpha", files);
+  }
+
+  it("removes the weapon files of a unit that dropped a weapon", async () => {
+    armed([gun, rocket]);
+    await writeMutator(args());
+    armed([gun]);
+    await writeMutator(args({ units: [unit("alpha", { name: "hull2" })] }));
+
+    expect(legoScratchPrune).toHaveBeenCalledTimes(1);
+    expect(legoScratchPrune).toHaveBeenCalledWith({
+      dataDir: "/data",
+      folder: "coilbox-lego-campaign.sdd",
+      units: [
+        {
+          unitName: "alpha",
+          digests: [
+            "sha-alpha",
+            "sha-coilbox_alpha_gun.lua",
+            "sha-coilbox_alpha_rocket.lua",
+          ],
+          only: ["weapons"],
+        },
+      ],
+      textures: [],
+    });
+  });
+
+  it("removes the weapon files of a unit that dropped every weapon", async () => {
+    armed([gun]);
+    await writeMutator(args());
+    armed([]);
+    await writeMutator(args({ units: [unit("alpha", { name: "hull2" })] }));
+
+    expect(legoScratchPrune).toHaveBeenCalledWith(
+      expect.objectContaining({
+        units: [expect.objectContaining({ only: ["weapons"] })],
+      }),
+    );
+  });
+
+  it("removes the wreck model and feature of a unit that dropped its wreck", async () => {
+    wrecked.add("alpha");
+    await writeMutator(args());
+    wrecked.clear();
+    await writeMutator(args({ units: [unit("alpha", { name: "hull2" })] }));
+
+    expect(legoScratchPrune).toHaveBeenCalledWith({
+      dataDir: "/data",
+      folder: "coilbox-lego-campaign.sdd",
+      units: [
+        {
+          unitName: "alpha",
+          digests: ["sha-alpha", "sha-alpha_dead.s3o", "sha-alpha_dead.lua"],
+          only: ["wreck"],
+        },
+      ],
+      textures: [],
+    });
+  });
+
+  it("names both when a unit dropped a weapon and its wreck", async () => {
+    armed([gun]);
+    wrecked.add("alpha");
+    await writeMutator(args());
+    armed([]);
+    wrecked.clear();
+    await writeMutator(args({ units: [unit("alpha", { name: "hull2" })] }));
+
+    expect(legoScratchPrune).toHaveBeenCalledWith(
+      expect.objectContaining({
+        units: [expect.objectContaining({ only: ["weapons", "wreck"] })],
+      }),
+    );
+  });
+
+  it("prunes nothing from a unit that keeps its weapons and wreck, or gains them", async () => {
+    armed([gun]);
+    wrecked.add("alpha");
+    await writeMutator(args());
+    await writeMutator(args({ units: [unit("alpha", { name: "hull2" })] }));
+    armed([gun, rocket]);
+    await writeMutator(args({ units: [unit("alpha", { name: "hull3" })] }));
+
+    expect(legoScratchPrune).not.toHaveBeenCalled();
+  });
+
+  it("prunes a dropped weapon of a staying unit beside a unit that left", async () => {
+    armed([gun, rocket]);
+    await writeMutator(args({ units: [unit("alpha"), unit("beta")] }));
+    armed([gun]);
+    await writeMutator(args({ units: [unit("alpha", { name: "hull2" })] }));
+
+    expect(legoScratchPrune).toHaveBeenCalledWith(
+      expect.objectContaining({
+        units: [
+          { unitName: "beta", digests: ["sha-beta"] },
+          expect.objectContaining({ unitName: "alpha", only: ["weapons"] }),
+        ],
+      }),
+    );
   });
 });

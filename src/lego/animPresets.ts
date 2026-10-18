@@ -393,6 +393,23 @@ export interface AnimPreset {
    * empty, for a cycle whose poses can fall anywhere.
    */
   poses?(params: Record<string, number>, frames: number): number[];
+  /**
+   * The preset as fixed poses in time, one motion per copy, which is what
+   * converting it into an action writes (#4512). A string says why it cannot
+   * be, for the Animation panel to show.
+   */
+  motions: ((ctx: EmitContext) => PresetMotion[]) | string;
+}
+
+/** Where a preset has each piece it moves at one key, in the units `Turn` and
+ *  `Move` take. Keyed by the piece's Lua name. */
+export type PresetKeyPieces = Map<string, { turn?: number[]; move?: number[] }>;
+
+/** A preset's motion as an action's keys (#4512). */
+export interface PresetMotion {
+  trigger: LuaHook;
+  loop: boolean;
+  keys: { seconds: number; pieces: PresetKeyPieces }[];
 }
 
 /** A preset as applied to a unit, which is what the document stores. */
@@ -538,35 +555,10 @@ function cycleThread(
   instance: EmitInstance,
   options: { name: string; period: number; roles?: string[] },
 ): string[] | null {
-  const roles = options.roles ?? preset.animates;
-  const targets = roles.flatMap((role) =>
-    instance.pieces(role).map((piece) => ({ role, piece })),
-  );
-  if (targets.length === 0) return null;
-
-  const bounds = cycleSteps(preset, params, options.period, roles);
-  const count = bounds.length - 1;
-
-  // Sample the whole cycle before writing any of it. A step's move is measured
-  // against the step before it, and the first step follows the last, because
-  // the thread loops. Measuring the first against a rest pose would be right
-  // once and wrong on every lap after that.
-  const poses = Array.from({ length: count }, (_, step) => {
-    const t = bounds[step] / ENGINE_FPS;
-    const pose = new Map<string, CyclePose>();
-    for (const { role, piece } of targets) {
-      const delta = preset.track(t, params, role);
-      if (!delta) continue;
-      // Rounded before anything is compared, or floating point dust reads as
-      // movement and emits a turn or move of nothing at a speed of nothing.
-      const entry: CyclePose = {
-        rotation: delta.rotation?.map((r) => Number(r.toFixed(4))),
-        position: delta.position?.map((p) => Number(p.toFixed(4))),
-      };
-      if (entry.rotation || entry.position) pose.set(piece, entry);
-    }
-    return pose;
-  });
+  const sampled = cycleSamples(preset, params, instance, options);
+  if (!sampled) return null;
+  const { bounds, poses } = sampled;
+  const count = poses.length;
 
   const body: string[] = [];
   const movedRotation = new Map<string, Set<number>>();
@@ -641,6 +633,50 @@ function cycleThread(
 }
 
 /**
+ * The poses a `cycleThread` heads for, one per step of the cycle, keyed by the
+ * piece's Lua name, and the frames they fall on. Null when the instance has
+ * none of the roles.
+ */
+function cycleSamples(
+  preset: AnimPreset,
+  params: Record<string, number>,
+  instance: EmitInstance,
+  options: { period: number; roles?: string[] },
+): { bounds: number[]; poses: Map<string, CyclePose>[] } | null {
+  const roles = options.roles ?? preset.animates;
+  const targets = roles.flatMap((role) =>
+    instance.pieces(role).map((piece) => ({ role, piece })),
+  );
+  if (targets.length === 0) return null;
+
+  const bounds = cycleSteps(preset, params, options.period, roles);
+  const count = bounds.length - 1;
+
+  // Sample the whole cycle before writing any of it. A step's move is measured
+  // against the step before it, and the first step follows the last, because
+  // the thread loops. Measuring the first against a rest pose would be right
+  // once and wrong on every lap after that.
+  const poses = Array.from({ length: count }, (_, step) => {
+    const t = bounds[step] / ENGINE_FPS;
+    const pose = new Map<string, CyclePose>();
+    for (const { role, piece } of targets) {
+      const delta = preset.track(t, params, role);
+      if (!delta) continue;
+      // Rounded before anything is compared, or floating point dust reads as
+      // movement and emits a turn or move of nothing at a speed of nothing.
+      const entry: CyclePose = {
+        rotation: delta.rotation?.map((r) => Number(r.toFixed(4))),
+        position: delta.position?.map((p) => Number(p.toFixed(4))),
+      };
+      if (entry.rotation || entry.position) pose.set(piece, entry);
+    }
+    return pose;
+  });
+
+  return { bounds, poses };
+}
+
+/**
  * One `cycleThread` per module instance, each started from `start` and, when
  * given, stood down from `stop`. Every instance's thread has its own name and
  * signal, so the threads run side by side and stopping one stops only that one.
@@ -691,6 +727,89 @@ function cycleThreads(
       ...(options.stop ? { [options.stop]: stopped } : {}),
     },
   };
+}
+
+/**
+ * `cycleThreads` as an action's keys, one motion per module instance, for
+ * converting the preset into actions (#4512).
+ *
+ * The keys are where the thread's `Turn` and `Move` calls send each piece on a
+ * lap after the first, in the order it sends them: the second pose first and
+ * the first pose last. An action goes from rest to its first key and then
+ * loops from its last key back round, so that order puts it on the thread's
+ * own lap one lap after the call-in, with the same destinations, speeds and
+ * sleeps. An axis the thread never turns stays at rest, as it does in the
+ * thread.
+ */
+function cycleMotions(
+  preset: AnimPreset,
+  ctx: EmitContext,
+  options: {
+    start: LuaHook;
+    roles?: string[];
+    params?: (instance: EmitInstance) => Record<string, number>;
+  },
+): PresetMotion[] {
+  const motions: PresetMotion[] = [];
+  for (const instance of ctx.instances()) {
+    const params = options.params?.(instance) ?? instance.params;
+    const period = Math.max(value(preset, params, "period"), 0.05);
+    const sampled = cycleSamples(preset, params, instance, {
+      period,
+      ...(options.roles ? { roles: options.roles } : {}),
+    });
+    if (!sampled) continue;
+    const { bounds, poses } = sampled;
+    const count = poses.length;
+
+    // Where each piece has been sent, run as the thread runs it. The second
+    // lap's are the keys, because an axis sent only late in a lap is still
+    // where it was sent at the start of the next.
+    const sent = new Map<string, { turn: number[]; move: number[] }>();
+    const moved = new Map<string, { turn: boolean; move: boolean }>();
+    const keys: PresetMotion["keys"] = [];
+    for (let lap = 0; lap < 2; lap++) {
+      for (let step = 1; step <= count; step++) {
+        const before = poses[step - 1];
+        for (const [piece, pose] of poses[step % count]) {
+          const was = before.get(piece);
+          const at = sent.get(piece) ?? { turn: [0, 0, 0], move: [0, 0, 0] };
+          const marks = moved.get(piece) ?? { turn: false, move: false };
+          for (const [kind, key] of [
+            ["turn", "rotation"],
+            ["move", "position"],
+          ] as const) {
+            const to = pose[key];
+            if (!to) continue;
+            const from = was?.[key] ?? [0, 0, 0];
+            for (let axis = 0; axis < 3; axis++) {
+              if (to[axis] === from[axis]) continue;
+              at[kind][axis] = to[axis];
+              marks[kind] = true;
+            }
+          }
+          sent.set(piece, at);
+          moved.set(piece, marks);
+        }
+        if (lap === 0) continue;
+        const pieces: PresetKeyPieces = new Map();
+        for (const [piece, at] of sent) {
+          const marks = moved.get(piece);
+          if (!marks?.turn && !marks?.move) continue;
+          pieces.set(piece, {
+            ...(marks.turn ? { turn: [...at.turn] } : {}),
+            ...(marks.move ? { move: [...at.move] } : {}),
+          });
+        }
+        keys.push({
+          seconds: (bounds[step] - bounds[step - 1]) / ENGINE_FPS,
+          pieces,
+        });
+      }
+    }
+    motions.push({ trigger: options.start, loop: true, keys });
+  }
+  return motions;
 }
 
 const LEG_SEGMENTS = ["thigh", "shin", "foot"] as const;
@@ -1089,6 +1208,9 @@ export const WALK_BIPED: AnimPreset = {
   poses(params, frames) {
     return walkPoses(this, params, frames, "biped");
   },
+  motions(ctx) {
+    return walkMotions(this, ctx);
+  },
   emit(ctx) {
     return walkEmit(this, ctx);
   },
@@ -1113,6 +1235,9 @@ export const WALK_QUAD: AnimPreset = {
   },
   poses(params, frames) {
     return walkPoses(this, params, frames, "quad");
+  },
+  motions(ctx) {
+    return walkMotions(this, ctx);
   },
   emit(ctx) {
     return walkEmit(this, ctx);
@@ -1190,6 +1315,13 @@ export const WALK_LEGS: AnimPreset = {
   poses(params, frames) {
     return walkPoses(this, params, frames, "wave");
   },
+  motions(ctx) {
+    return walkMotions(
+      this,
+      ctx,
+      legRoleIds(Math.round(value(this, ctx.params, WALK_PAIRS))),
+    );
+  },
   emit(ctx) {
     return walkEmit(
       this,
@@ -1212,24 +1344,13 @@ function walkEmit(
   ctx: EmitContext,
   roles?: string[],
 ): EmitResult | null {
-  const fitted = value(preset, ctx.params, WALK_FITTED) === 1;
-  // One body, so one drop. Every set of legs is solved to the ground the
-  // shared walk lowers the body to, even one with a swing of its own.
-  const drop =
-    fitted && solvesLegs(ctx.params) ? value(preset, ctx.params, WALK_DROP) : 0;
+  const { fitted, drop, params } = walkDrop(preset, ctx);
   const result = cycleThreads(preset, ctx, {
     name: "walk",
     start: "StartMoving",
     stop: "StopMoving",
     ...(roles ? { roles } : {}),
-    ...(drop > 0
-      ? {
-          params: (instance: EmitInstance) =>
-            solvesLegs(instance.params)
-              ? { ...instance.params, [WALK_DROP]: drop }
-              : instance.params,
-        }
-      : {}),
+    ...params,
   });
   if (!result || !fitted) return result;
   const period = Math.max(value(preset, ctx.params, "period"), 0.05);
@@ -1263,6 +1384,73 @@ function walkEmit(
     ],
     hooks: { ...result.hooks, ...lower },
   };
+}
+
+/**
+ * How far a fitted walk lowers the body, and the params each set of legs is
+ * then solved with. One body, so one drop. Every set of legs is solved to the
+ * ground the shared walk lowers the body to, even one with a swing of its own.
+ */
+function walkDrop(
+  preset: AnimPreset,
+  ctx: EmitContext,
+): {
+  fitted: boolean;
+  drop: number;
+  params: {
+    params?: (instance: EmitInstance) => Record<string, number>;
+  };
+} {
+  const fitted = value(preset, ctx.params, WALK_FITTED) === 1;
+  const drop =
+    fitted && solvesLegs(ctx.params) ? value(preset, ctx.params, WALK_DROP) : 0;
+  return {
+    fitted,
+    drop,
+    params:
+      drop > 0
+        ? {
+            params: (instance: EmitInstance) =>
+              solvesLegs(instance.params)
+                ? { ...instance.params, [WALK_DROP]: drop }
+                : instance.params,
+          }
+        : {},
+  };
+}
+
+/**
+ * A walk as actions (#4512). A fitted walk that lowers the body holds it the
+ * drop lower on every key of the first set of legs, which is where the walk's
+ * own `StartMoving` sends it. The action reaches it over its first key rather
+ * than over one foot's time on the ground, and takes it back up at the speed
+ * every action stands down at.
+ */
+function walkMotions(
+  preset: AnimPreset,
+  ctx: EmitContext,
+  roles?: string[],
+): PresetMotion[] {
+  const { drop, params } = walkDrop(preset, ctx);
+  const motions = cycleMotions(preset, ctx, {
+    start: "StartMoving",
+    ...(roles ? { roles } : {}),
+    ...params,
+  });
+  const [body] = drop > 0 && motions.length > 0 ? ctx.pieces("base") : [];
+  if (!body) return motions;
+  const lowered = Number((-drop).toFixed(4));
+  const [first, ...rest] = motions;
+  return [
+    {
+      ...first,
+      keys: first.keys.map((key) => ({
+        ...key,
+        pieces: new Map([...key.pieces, [body, { move: [0, lowered, 0] }]]),
+      })),
+    },
+    ...rest,
+  ];
 }
 
 /**
@@ -1367,6 +1555,8 @@ export const TURRET_TRACK: AnimPreset = {
    * callins instead of a thread. The sweep in the viewport is a demonstration
    * of the motion. In a game the target decides where it points.
    */
+  motions:
+    "Follows the target the weapon aims at, which no fixed pose can hold.",
   emit(ctx) {
     const speed = aimSpeeds(this, ctx.params);
     const hooks: EmitResult["hooks"] = {};
@@ -1485,6 +1675,7 @@ export const WHEELS_ROLL: AnimPreset = {
     return { rotation: [rate * t, 0, 0] };
   },
   /** Continuous, so `Spin` rather than a thread of `Turn` calls. */
+  motions: "Turns with the unit's speed, which no fixed pose can hold.",
   emit(ctx) {
     const typed = value(this, ctx.params, "radius");
     const wheels = ctx.wheels().map((wheel) => ({
@@ -1606,6 +1797,7 @@ export const RUDDER_FOLLOWS: AnimPreset = {
   track() {
     return null;
   },
+  motions: "Follows the unit's turning, which no fixed pose can hold.",
   emit(ctx) {
     const rudders = ctx.pieces("rudder");
     if (rudders.length === 0) return null;
@@ -1694,6 +1886,7 @@ export const HOVER_LEAN: AnimPreset = {
   track() {
     return null;
   },
+  motions: "Follows the unit's turning, which no fixed pose can hold.",
   emit(ctx) {
     const hulls = ctx.pieces("base");
     if (hulls.length === 0) return null;
@@ -1782,6 +1975,7 @@ export const WHEELS_STEER: AnimPreset = {
   track() {
     return null;
   },
+  motions: "Follows the unit's turning, which no fixed pose can hold.",
   emit(ctx) {
     const front = ctx.wheels().filter((wheel) => wheel.front);
     if (front.length === 0) return null;
@@ -1872,6 +2066,8 @@ export const BODY_ROCK: AnimPreset = {
   track() {
     return null;
   },
+  motions:
+    "Follows how hard the unit speeds up and brakes, which no fixed pose can hold.",
   emit(ctx) {
     const bodies = ctx.pieces("base");
     if (bodies.length === 0) return null;
@@ -1966,6 +2162,7 @@ export const WAKE_WHILE_MOVING: AnimPreset = {
   track() {
     return null;
   },
+  motions: "Emits a wake and moves no piece.",
   emit(ctx) {
     const points = ctx.pieces("wake");
     if (points.length === 0) return null;
@@ -2057,6 +2254,8 @@ export const LANDING_GEAR: AnimPreset = {
           : Math.max(0, 1 - (at - time - GEAR_PREVIEW_HOLD) / time);
     return { rotation: [deg(value(this, params, "stow")) * stowed, 0, 0] };
   },
+  motions:
+    "Lowers the gear on landing, and an action that plays once never goes back to rest.",
   emit(ctx) {
     const gear = ctx.pieces("gear");
     if (gear.length === 0) return null;
@@ -2138,6 +2337,7 @@ export const ROTOR_SPIN: AnimPreset = {
     const angle = t < ramp ? (top * t * t) / (2 * ramp) : top * (t - ramp / 2);
     return { rotation: [0, angle, 0] };
   },
+  motions: "Spins without end, which fixed poses cannot do.",
   emit(ctx) {
     const rotors = ctx.pieces("rotor");
     if (rotors.length === 0) return null;
@@ -2210,6 +2410,9 @@ export const BUILDARM: AnimPreset = {
     // The nozzle undoes the arm's lift, so it keeps pointing where it was.
     if (role === "buildarm.nozzle") return { rotation: [-lift, 0, 0] };
     return null;
+  },
+  motions(ctx) {
+    return cycleMotions(this, ctx, { start: "StartBuilding" });
   },
   emit(ctx) {
     // Working, not merely switched on. This used to hang off Activate, which
@@ -2340,6 +2543,8 @@ export const BUILD_AIM: AnimPreset = {
    * that instance's base. Every arm is set turning before any is waited for,
    * so two arms swing together rather than one after the other.
    */
+  motions:
+    "Points at whatever the unit is building, which no fixed pose can hold.",
   emit(ctx) {
     const turns: string[] = [];
     const waits: string[] = [];
@@ -2444,6 +2649,8 @@ export const BUILD_FACTORY: AnimPreset = {
       : Math.max(0, reached - phase / openTime);
     return { rotation: [0, deg(factoryOpening(this, params)) * towards, 0] };
   },
+  motions:
+    "Shuts the doors when the build stops, and an action that plays once never goes back to rest.",
   emit(ctx) {
     const doors = ctx.pieces("door");
     if (doors.length === 0) return null;
@@ -2494,6 +2701,7 @@ export const BUILD_NANO: AnimPreset = {
    * is a file-scope local, which is per unit rather than shared: the framework
    * compiles the chunk once and re-runs it in each unit's own environment.
    */
+  motions: "Picks where the build spray comes from and moves no piece.",
   emit(ctx) {
     const nano = ctx.pieces("buildarm.nano");
     if (nano.length === 0) return null;
@@ -2546,6 +2754,9 @@ export const OPEN_CLOSE: AnimPreset = {
     // Shut at rest, so a unit that is not playing looks closed.
     const openness = (1 - Math.cos((t / period) * TAU)) * 0.5;
     return { rotation: [0, deg(value(this, params, "open")) * openness, 0] };
+  },
+  motions(ctx) {
+    return cycleMotions(this, ctx, { start: "Activate" });
   },
   emit(ctx) {
     // Shutting on Deactivate is not optional: a door left open is a hole in
@@ -2605,6 +2816,9 @@ export const HOVER_BOB: AnimPreset = {
       // furthest to one side exactly as it reaches the top of the bob.
       rotation: [0, 0, deg(value(this, params, "sway")) * Math.sin(phase)],
     };
+  },
+  motions(ctx) {
+    return cycleMotions(this, ctx, { start: "Create" });
   },
   emit(ctx) {
     // Holding position is what the unit does for its whole life, not something
@@ -2670,6 +2884,8 @@ export const AIM_TRACK: AnimPreset = {
    * Aims rather than loops, so this emits callins instead of a thread, exactly
    * as turret.track does for its own pair of pieces.
    */
+  motions:
+    "Follows the target the weapon aims at, which no fixed pose can hold.",
   emit(ctx) {
     const speed = aimSpeeds(this, ctx.params);
     const hooks: EmitResult["hooks"] = {};
@@ -2779,6 +2995,9 @@ export const RECOIL: AnimPreset = {
    * SetSignalMask stop a kick still easing home from an earlier shot, so rapid
    * fire restarts the motion cleanly rather than piling moves on top of it.
    */
+  motions(ctx) {
+    return recoilMotions(this, ctx);
+  },
   emit(ctx) {
     const kick = value(this, ctx.params, "kick");
     const kickTime = Math.max(value(this, ctx.params, "kickTime"), 0.01);
@@ -2807,6 +3026,40 @@ export const RECOIL: AnimPreset = {
     return Object.keys(hooks).length > 0 ? { functions: [], hooks } : null;
   },
 };
+
+/**
+ * Recoil as one action per weapon (#4512): the kick over its time, then home
+ * over the return time, started by that weapon's `Shot`. The script's kick
+ * waits for the barrel to arrive, where an action waits whole frames, so the
+ * two can be a frame apart.
+ */
+function recoilMotions(preset: AnimPreset, ctx: EmitContext): PresetMotion[] {
+  const kick = Number(value(preset, ctx.params, "kick").toFixed(4));
+  const kickTime = Math.max(value(preset, ctx.params, "kickTime"), 0.01);
+  const returnTime = Math.max(value(preset, ctx.params, "returnTime"), 0.01);
+  return ctx.weapons().flatMap((weapon): PresetMotion[] => {
+    const barrel = weapon.piece("barrel");
+    if (!barrel) return [];
+    const flare = weapon.looseFlare();
+    const at = (z: number): PresetKeyPieces =>
+      new Map(
+        [barrel, ...(flare ? [flare] : [])].map((piece) => [
+          piece,
+          { move: [0, 0, z] },
+        ]),
+      );
+    return [
+      {
+        trigger: `Shot${weapon.number}`,
+        loop: false,
+        keys: [
+          { seconds: kickTime, pieces: at(-kick) },
+          { seconds: returnTime, pieces: at(0) },
+        ],
+      },
+    ];
+  });
+}
 
 export const IDLE_SWAY: AnimPreset = {
   id: "idle.sway",
@@ -2844,6 +3097,8 @@ export const IDLE_SWAY: AnimPreset = {
       rotation: [0, deg(value(this, params, "turn")) * Math.sin(phase), 0],
     };
   },
+  motions:
+    "Starts on Create and whenever the unit stops, and an action has one trigger.",
   emit(ctx) {
     // The opposite of walking: idle motion picks up once the unit stops, and
     // stands down the moment it moves again. It also starts from `Create`,
@@ -2924,6 +3179,7 @@ export const BODY_SETTLE: AnimPreset = {
   track() {
     return null;
   },
+  motions: "Leans away from each shot, which no fixed pose can hold.",
   emit(ctx) {
     const bodies = ctx.pieces("base");
     if (bodies.length === 0) return null;
@@ -3046,6 +3302,8 @@ export const IDLE_LOOK: AnimPreset = {
   track() {
     return null;
   },
+  motions:
+    "Waits until the unit has stood still without aiming for a while, which no action trigger does.",
   emit(ctx) {
     const turrets = ctx.pieces("turret");
     if (turrets.length === 0) return null;
@@ -3183,6 +3441,7 @@ export const WRECK_POSE: AnimPreset = {
    * because a wreck does not ease into place: it is simply what the unit
    * looks like once it stops being alive.
    */
+  motions: "Plays on Killed, which no action can start from.",
   emit(ctx) {
     const base = ctx.pieces("base")[0];
     if (!base) return null;
@@ -3314,6 +3573,7 @@ export const BREAK_APART: AnimPreset = {
    * edit it. Every `if` returns, so `buildLuaScript` leaves out the
    * `Explode` and `return 1` it writes for a unit with nothing in `Killed`.
    */
+  motions: "Throws pieces off when the unit dies, which no action can do.",
   emit(ctx) {
     const root = ctx.root;
     if (!root) return null;

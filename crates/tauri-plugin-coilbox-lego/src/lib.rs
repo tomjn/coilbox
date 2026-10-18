@@ -2825,13 +2825,25 @@ fn sort_stale_files(
     digests: &[String],
     dry_run: bool,
 ) -> Result<StaleFiles, String> {
-    let known: std::collections::HashSet<&str> = digests.iter().map(String::as_str).collect();
     let mut sorted = StaleFiles {
         ours: Vec::new(),
         kept: Vec::new(),
         missing: Vec::new(),
     };
-    for path in export_paths(root, unit_name) {
+    sort_named_files(export_paths(root, unit_name), digests, dry_run, &mut sorted)?;
+    sort_weapon_files(root, unit_name, digests, dry_run, &mut sorted)?;
+    Ok(sorted)
+}
+
+/// Sort the files at these exact paths. See [`sort_stale_files`].
+fn sort_named_files(
+    paths: Vec<PathBuf>,
+    digests: &[String],
+    dry_run: bool,
+    sorted: &mut StaleFiles,
+) -> Result<(), String> {
+    let known: std::collections::HashSet<&str> = digests.iter().map(String::as_str).collect();
+    for path in paths {
         let display = path.to_string_lossy().to_string();
         if !path.is_file() {
             sorted.missing.push(display);
@@ -2853,11 +2865,22 @@ fn sort_stale_files(
         }
         sorted.ours.push(display);
     }
-    // The weapon files are named by key as well as unit, so they are found by
-    // prefix. `coilbox_tank_` also matches `tank_big`'s files, so a weapon file
-    // counts only when its digest is on this name's receipt. One that is not
-    // is silently passed over rather than reported as kept, because it is as
-    // likely another unit's as an edited file of this one.
+    Ok(())
+}
+
+/// Sort the unit's weapon files, which are named by key as well as unit, so they
+/// are found by prefix. `coilbox_tank_` also matches `tank_big`'s files, so a
+/// weapon file counts only when its digest is on this name's receipt. One that
+/// is not is silently passed over rather than reported as kept, because it is
+/// as likely another unit's as an edited file of this one.
+fn sort_weapon_files(
+    root: &Path,
+    unit_name: &str,
+    digests: &[String],
+    dry_run: bool,
+    sorted: &mut StaleFiles,
+) -> Result<(), String> {
+    let known: std::collections::HashSet<&str> = digests.iter().map(String::as_str).collect();
     for path in stale_weapon_candidates(root, unit_name) {
         let Ok(bytes) = std::fs::read(&path) else {
             continue;
@@ -2870,6 +2893,32 @@ fn sort_stale_files(
                 .map_err(|e| format!("could not remove {}: {e}", path.display()))?;
         }
         sorted.ours.push(path.to_string_lossy().to_string());
+    }
+    Ok(())
+}
+
+/// Remove the named parts of a unit that stays in the set, under the same digest
+/// rule as [`sort_stale_files`].
+fn sort_unit_parts(
+    root: &Path,
+    unit_name: &str,
+    digests: &[String],
+    parts: &[PrunePart],
+) -> Result<StaleFiles, String> {
+    let mut sorted = StaleFiles {
+        ours: Vec::new(),
+        kept: Vec::new(),
+        missing: Vec::new(),
+    };
+    if parts.contains(&PrunePart::Wreck) {
+        let paths = vec![
+            wreck_model_path(root, unit_name),
+            reexport::feature_path(root, unit_name),
+        ];
+        sort_named_files(paths, digests, false, &mut sorted)?;
+    }
+    if parts.contains(&PrunePart::Weapons) {
+        sort_weapon_files(root, unit_name, digests, false, &mut sorted)?;
     }
     Ok(sorted)
 }
@@ -3431,13 +3480,26 @@ async fn lego_scratch_game<R: Runtime>(
     CliResult::ok(json!({ "dir": dir.to_string_lossy() }))
 }
 
-/// One unit taken out of a scratch game's set, with the digests of the files
-/// the export that wrote it recorded.
+/// A part of a unit that can go while the unit stays (issue #4528).
+#[derive(Deserialize, Clone, Copy, PartialEq)]
+#[serde(rename_all = "camelCase")]
+enum PrunePart {
+    /// Its `weapons/coilbox_<unit>_*.lua` files.
+    Weapons,
+    /// Its wreck model and feature file.
+    Wreck,
+}
+
+/// One unit in a scratch game's set, with the digests of the files the export
+/// that wrote it recorded. With no `only`, the unit left the set and all of its
+/// files go. With `only`, it stays and just those parts go.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PruneUnit {
     unit_name: String,
     digests: Vec<String>,
+    #[serde(default)]
+    only: Option<Vec<PrunePart>>,
 }
 
 /// What pruning a scratch game removed, and what it left because it could not
@@ -3483,7 +3545,10 @@ fn prune_scratch_game(
         kept: Vec::new(),
     };
     for unit in units {
-        let sorted = sort_stale_files(&game, &unit.unit_name, &unit.digests, false)?;
+        let sorted = match &unit.only {
+            None => sort_stale_files(&game, &unit.unit_name, &unit.digests, false)?,
+            Some(parts) => sort_unit_parts(&game, &unit.unit_name, &unit.digests, parts)?,
+        };
         pruned.removed.extend(sorted.ours);
         pruned.kept.extend(sorted.kept);
     }
@@ -4439,7 +4504,32 @@ mod tests {
         PruneUnit {
             unit_name: unit_name.to_string(),
             digests,
+            only: None,
         }
+    }
+
+    fn prune_parts(unit_name: &str, digests: Vec<String>, only: Vec<PrunePart>) -> PruneUnit {
+        PruneUnit {
+            unit_name: unit_name.to_string(),
+            digests,
+            only: Some(only),
+        }
+    }
+
+    /// A unit's weapon file and wreck, as an export leaves them, and the digests.
+    fn armed_unit(game: &Path, unit_name: &str, keys: &[&str]) -> Vec<String> {
+        let mut digests = exported_unit(game, unit_name);
+        std::fs::create_dir_all(game.join("weapons")).expect("mkdir");
+        for key in keys {
+            let contents = format!("{unit_name} {key}");
+            std::fs::write(
+                game.join(format!("weapons/coilbox_{unit_name}_{key}.lua")),
+                &contents,
+            )
+            .expect("weapon");
+            digests.push(hex_digest(contents.as_bytes()));
+        }
+        digests
     }
 
     // Issue #4521. A unit taken out of a mutator's set must leave nothing behind.
@@ -4515,6 +4605,96 @@ mod tests {
         assert!(!textures.join("old.png").exists());
         assert!(textures.join("current.png").is_file());
         assert!(game.join("modinfo.lua").is_file());
+    }
+
+    // Issue #4528. A unit that stays but drops its weapons loses those files only.
+    #[test]
+    fn pruning_a_staying_units_weapons_leaves_the_rest_of_the_unit() {
+        let (data, game) = scratch_root("coilbox-lego-campaign.sdd");
+        let digests = armed_unit(&game, "tank", &["gun", "rocket"]);
+        armed_unit(&game, "tank_big", &["gun"]);
+
+        let pruned = prune_scratch_game(
+            data.path(),
+            "coilbox-lego-campaign.sdd",
+            &[prune_parts("tank", digests, vec![PrunePart::Weapons])],
+            &[],
+        )
+        .expect("prune");
+
+        assert!(!game.join("weapons/coilbox_tank_gun.lua").exists());
+        assert!(!game.join("weapons/coilbox_tank_rocket.lua").exists());
+        assert!(game.join("weapons/coilbox_tank_big_gun.lua").is_file());
+        assert!(game.join("units/tank.lua").is_file());
+        assert!(wreck_model_path(&game, "tank").is_file());
+        assert!(reexport::feature_path(&game, "tank").is_file());
+        assert_eq!(pruned.removed.len(), 2);
+    }
+
+    #[test]
+    fn pruning_a_staying_units_wreck_leaves_its_weapons_and_definition() {
+        let (data, game) = scratch_root("coilbox-lego-campaign.sdd");
+        let digests = armed_unit(&game, "tank", &["gun"]);
+
+        let pruned = prune_scratch_game(
+            data.path(),
+            "coilbox-lego-campaign.sdd",
+            &[prune_parts("tank", digests, vec![PrunePart::Wreck])],
+            &[],
+        )
+        .expect("prune");
+
+        assert!(!wreck_model_path(&game, "tank").exists());
+        assert!(!reexport::feature_path(&game, "tank").exists());
+        assert!(game.join("weapons/coilbox_tank_gun.lua").is_file());
+        assert!(game.join("units/tank.lua").is_file());
+        assert!(game.join("objects3d/tank.s3o").is_file());
+        assert_eq!(pruned.removed.len(), 2);
+    }
+
+    #[test]
+    fn pruning_a_staying_unit_keeps_a_weapon_or_wreck_file_edited_by_hand() {
+        let (data, game) = scratch_root("coilbox-lego-campaign.sdd");
+        let digests = armed_unit(&game, "tank", &["gun", "rocket"]);
+        std::fs::write(game.join("weapons/coilbox_tank_gun.lua"), "my gun").expect("edit");
+        std::fs::write(reexport::feature_path(&game, "tank"), "my wreck").expect("edit");
+
+        let pruned = prune_scratch_game(
+            data.path(),
+            "coilbox-lego-campaign.sdd",
+            &[prune_parts(
+                "tank",
+                digests,
+                vec![PrunePart::Weapons, PrunePart::Wreck],
+            )],
+            &[],
+        )
+        .expect("prune");
+
+        assert!(game.join("weapons/coilbox_tank_gun.lua").is_file());
+        assert!(reexport::feature_path(&game, "tank").is_file());
+        assert!(!game.join("weapons/coilbox_tank_rocket.lua").exists());
+        assert!(!wreck_model_path(&game, "tank").exists());
+        assert_eq!(
+            pruned.kept,
+            vec![reexport::feature_path(&game, "tank").to_string_lossy()]
+        );
+    }
+
+    #[test]
+    fn pruning_a_staying_unit_still_refuses_a_folder_that_is_not_a_scratch_game() {
+        let (data, game) = scratch_root("ba1211.sdd");
+        let digests = armed_unit(&game, "tank", &["gun"]);
+
+        let refused = prune_scratch_game(
+            data.path(),
+            "ba1211.sdd",
+            &[prune_parts("tank", digests, vec![PrunePart::Weapons])],
+            &[],
+        );
+
+        assert!(refused.is_err());
+        assert!(game.join("weapons/coilbox_tank_gun.lua").is_file());
     }
 
     #[test]
