@@ -92,18 +92,25 @@ fn modinfo(game_name: &str, n: u32) -> String {
 /// Every file of the mutator for `game_name` built from `manifest`, sorted by
 /// path, with the marker last so a write that stops part way leaves none.
 ///
-/// The fixes and converted models a manifest selects are written by issues
-/// #4557 to #4560. Until they are, a manifest that lists a fix is refused
+/// The Lua prelude's fixes (#4558) are written with the base game's entry files
+/// wrapped to load it, which `read` returns by path, `None` for one the game
+/// does not have. The other fixes and the converted models are written by
+/// #4557, #4559 and #4560. Until they are, a manifest that lists one is refused
 /// rather than built without it.
 pub fn files(
     manifest: &coilbox_compat::Manifest,
     game_name: &str,
     marker: &Marker,
+    read: impl FnMut(&str) -> Result<Option<String>, String>,
 ) -> Result<Vec<CompiledFile>, String> {
     if game_name.trim().is_empty() {
         return Err("the base game has no name to depend on".into());
     }
-    if !manifest.fixes.is_empty() {
+    if manifest
+        .fixes
+        .iter()
+        .any(|id| !coilbox_compat::is_prelude_fix(id))
+    {
         return Err(format!(
             "compat {} lists fixes this coilbox cannot write yet",
             manifest.version
@@ -113,6 +120,9 @@ pub fn files(
         path: "modinfo.lua".into(),
         contents: modinfo(game_name, manifest.version),
     }];
+    for (path, contents) in coilbox_compat::prelude_files(manifest, read)? {
+        files.push(CompiledFile { path, contents });
+    }
     files.sort_by(|a, b| a.path.cmp(&b.path));
     let marker = serde_json::to_string_pretty(marker).map_err(|e| e.to_string())? + "\n";
     files.push(CompiledFile {
@@ -203,6 +213,10 @@ pub fn newest_built(games: &Path, archive_name: &str) -> Result<Option<(String, 
 mod tests {
     use super::*;
 
+    fn no_file(_: &str) -> Result<Option<String>, String> {
+        Ok(None)
+    }
+
     fn marker(n: u32, checksum: &str) -> Marker {
         Marker {
             manifest_version: n,
@@ -250,7 +264,7 @@ mod tests {
     #[test]
     fn the_modinfo_depends_on_the_base_game_and_names_the_version() {
         let m = coilbox_compat::manifest(1).unwrap();
-        let files = files(&m, "XTA \"v\" 9.65", &marker(1, "abc")).unwrap();
+        let files = files(&m, "XTA \"v\" 9.65", &marker(1, "abc"), no_file).unwrap();
         let modinfo = &files[0];
         assert_eq!(modinfo.path, "modinfo.lua");
         assert!(modinfo
@@ -270,7 +284,7 @@ mod tests {
     #[test]
     fn the_files_are_sorted_with_lf_endings_and_the_marker_last() {
         let m = coilbox_compat::manifest(1).unwrap();
-        let files = files(&m, "XTA 9.65", &marker(1, "abc")).unwrap();
+        let files = files(&m, "XTA 9.65", &marker(1, "abc"), no_file).unwrap();
         let paths: Vec<_> = files.iter().map(|f| f.path.as_str()).collect();
         assert_eq!(paths, ["modinfo.lua", MARKER]);
         for f in &files {
@@ -284,8 +298,8 @@ mod tests {
     #[test]
     fn two_builds_of_the_same_manifest_are_the_same_bytes() {
         let m = coilbox_compat::manifest(1).unwrap();
-        let a = files(&m, "XTA 9.65", &marker(1, "abc")).unwrap();
-        let b = files(&m, "XTA 9.65", &marker(1, "abc")).unwrap();
+        let a = files(&m, "XTA 9.65", &marker(1, "abc"), no_file).unwrap();
+        let b = files(&m, "XTA 9.65", &marker(1, "abc"), no_file).unwrap();
         let bytes = |fs: &[CompiledFile]| -> Vec<(String, String)> {
             fs.iter()
                 .map(|f| (f.path.clone(), f.contents.clone()))
@@ -295,10 +309,47 @@ mod tests {
     }
 
     #[test]
-    fn a_manifest_that_lists_a_fix_is_refused_until_fixes_are_written() {
+    fn a_manifest_that_lists_a_fix_outside_the_prelude_is_refused() {
         let mut m = coilbox_compat::manifest(1).unwrap();
-        m.fixes.push("spring-set-unit-to-feature".into());
-        assert!(files(&m, "XTA 9.65", &marker(1, "abc")).is_err());
+        m.fixes.push("not-a-prelude-fix".into());
+        assert!(files(&m, "XTA 9.65", &marker(1, "abc"), no_file).is_err());
+    }
+
+    #[test]
+    fn the_prelude_is_written_with_the_entry_files_the_game_has() {
+        let m = coilbox_compat::manifest(2).unwrap();
+        let read = |path: &str| -> Result<Option<String>, String> {
+            Ok((path == "LuaRules/main.lua").then(|| "-- the game's rules\n".to_string()))
+        };
+        let files = files(&m, "XTA 9.65", &marker(2, "abc"), read).unwrap();
+        let paths: Vec<_> = files.iter().map(|f| f.path.as_str()).collect();
+        assert_eq!(
+            paths,
+            [
+                "LuaRules/main.lua",
+                "compat/prelude-synced.lua",
+                "modinfo.lua",
+                MARKER
+            ]
+        );
+        assert_eq!(
+            files[0].contents,
+            "VFS.Include(\"compat/prelude-synced.lua\") -- the game's rules\n"
+        );
+        for f in &files {
+            assert!(!f.contents.contains('\r'), "{}", f.path);
+            assert!(f.contents.ends_with('\n'), "{}", f.path);
+        }
+    }
+
+    #[test]
+    fn a_failed_read_of_the_base_game_fails_the_build() {
+        let m = coilbox_compat::manifest(2).unwrap();
+        let read = |_: &str| -> Result<Option<String>, String> { Err("no worker".into()) };
+        assert_eq!(
+            files(&m, "XTA 9.65", &marker(2, "abc"), read).err(),
+            Some("no worker".to_string())
+        );
     }
 
     #[test]

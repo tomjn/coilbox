@@ -34,14 +34,44 @@ pub struct Built {
 /// Write the compat mutator for the game in `archive_name` under `data_dir`'s
 /// `games/`, from manifest `manifest_version`. Replaces whatever the folder
 /// held. `game_name` and `base_checksum` are the game's name and its archive's
-/// checksum as unitsync reports them.
+/// checksum as unitsync reports them. The game's Lua entry files are read
+/// through the unitsync worker of the engine at `engine_path`.
 pub fn build(
+    data_dir: &str,
+    engine_path: &str,
+    archive_name: &str,
+    game_name: &str,
+    base_checksum: &str,
+    manifest_version: u32,
+    coilbox_version: &str,
+) -> Result<Built, String> {
+    build_reading(
+        data_dir,
+        archive_name,
+        game_name,
+        base_checksum,
+        manifest_version,
+        coilbox_version,
+        |file| {
+            tauri_plugin_coilbox_unitsync::archive_text_blocking(
+                engine_path,
+                data_dir,
+                archive_name,
+                file,
+            )
+        },
+    )
+}
+
+/// [`build`], with `read` returning a file of the base game by path.
+fn build_reading(
     data_dir: &str,
     archive_name: &str,
     game_name: &str,
     base_checksum: &str,
     manifest_version: u32,
     coilbox_version: &str,
+    read: impl FnMut(&str) -> Result<Option<String>, String>,
 ) -> Result<Built, String> {
     let manifest = coilbox_compat::manifest(manifest_version)
         .ok_or_else(|| format!("there is no compat manifest {manifest_version}"))?;
@@ -59,7 +89,7 @@ pub fn build(
         base_checksum: base_checksum.to_string(),
         coilbox_version: coilbox_version.to_string(),
     };
-    let files = mutator::files(&manifest, game_name, &marker)?;
+    let files = mutator::files(&manifest, game_name, &marker, read)?;
     tauri_plugin_coilbox_workshop::write_mutator(&dir, &files)?;
     Ok(Built {
         dir: dir.to_string_lossy().into_owned(),
@@ -112,6 +142,7 @@ fn envelope<T: Serialize>(result: Result<T, String>) -> CliResult {
 async fn compat_build<R: Runtime>(
     app: AppHandle<R>,
     data_dir: String,
+    engine_path: String,
     archive_name: String,
     game_name: String,
     base_checksum: String,
@@ -120,6 +151,7 @@ async fn compat_build<R: Runtime>(
     let version = app.package_info().version.to_string();
     envelope(build(
         &data_dir,
+        &engine_path,
         &archive_name,
         &game_name,
         &base_checksum,
@@ -146,6 +178,10 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
 mod tests {
     use super::*;
 
+    fn no_file(_: &str) -> Result<Option<String>, String> {
+        Ok(None)
+    }
+
     fn root() -> (tempfile::TempDir, String) {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().to_string_lossy().into_owned();
@@ -155,15 +191,25 @@ mod tests {
     #[test]
     fn a_build_writes_the_folder_and_status_finds_it_current() {
         let (_keep, data) = root();
-        let built = build(&data, "xta-9.65.sd7", "XTA 9.65", "1234abcd", 1, "1.2.3").unwrap();
-        assert_eq!(built.folder, "coilbox-compat-xta-9.65-1.sdd");
+        let n = coilbox_compat::latest();
+        let built = build_reading(
+            &data,
+            "xta-9.65.sd7",
+            "XTA 9.65",
+            "1234abcd",
+            n,
+            "1.2.3",
+            no_file,
+        )
+        .unwrap();
+        assert_eq!(built.folder, format!("coilbox-compat-xta-9.65-{n}.sdd"));
         assert_eq!(built.files, ["modinfo.lua", mutator::MARKER]);
         let dir = std::path::Path::new(&built.dir);
         assert!(dir.join("modinfo.lua").is_file());
         assert_eq!(
             mutator::read_marker(dir).unwrap(),
             Marker {
-                manifest_version: 1,
+                manifest_version: n,
                 base_checksum: "1234abcd".into(),
                 coilbox_version: "1.2.3".into(),
             }
@@ -181,7 +227,16 @@ mod tests {
     #[test]
     fn status_reports_a_changed_base_archive() {
         let (_keep, data) = root();
-        build(&data, "xta-9.65.sd7", "XTA 9.65", "1234abcd", 1, "1.2.3").unwrap();
+        build_reading(
+            &data,
+            "xta-9.65.sd7",
+            "XTA 9.65",
+            "1234abcd",
+            coilbox_compat::latest(),
+            "1.2.3",
+            no_file,
+        )
+        .unwrap();
         let s = status(&data, "xta-9.65.sd7", "99999999").unwrap();
         assert_eq!(
             s.stale,
@@ -195,9 +250,18 @@ mod tests {
     #[test]
     fn status_reports_a_folder_built_from_another_manifest() {
         let (_keep, data) = root();
-        let built = build(&data, "xta-9.65.sd7", "XTA 9.65", "1234abcd", 1, "1.2.3").unwrap();
-        // There is only one manifest so far, so a folder from a manifest this
-        // build does not know stands in for one built before the manifest moved.
+        let built = build_reading(
+            &data,
+            "xta-9.65.sd7",
+            "XTA 9.65",
+            "1234abcd",
+            1,
+            "1.2.3",
+            no_file,
+        )
+        .unwrap();
+        // A folder from a manifest this build does not know stands in for one
+        // built before the manifest moved.
         let other = coilbox_compat::latest() + 1;
         let games = std::path::Path::new(&data).join("games");
         let moved = games.join(format!("coilbox-compat-xta-9.65-{other}.sdd"));
@@ -220,6 +284,31 @@ mod tests {
     }
 
     #[test]
+    fn a_build_from_manifest_2_writes_the_prelude_and_the_wrapped_entry_file() {
+        let (_keep, data) = root();
+        let read = |file: &str| -> Result<Option<String>, String> {
+            Ok((file == "LuaRules/main.lua").then(|| "-- rules\n".to_string()))
+        };
+        let built = build_reading(
+            &data,
+            "xta-9.65.sd7",
+            "XTA 9.65",
+            "1234abcd",
+            2,
+            "1.2.3",
+            read,
+        )
+        .unwrap();
+        let dir = std::path::Path::new(&built.dir);
+        assert_eq!(
+            std::fs::read_to_string(dir.join("LuaRules/main.lua")).unwrap(),
+            "VFS.Include(\"compat/prelude-synced.lua\") -- rules\n"
+        );
+        assert!(dir.join("compat/prelude-synced.lua").is_file());
+        assert!(!dir.join("compat/prelude-unsynced.lua").exists());
+    }
+
+    #[test]
     fn nothing_built_is_not_stale() {
         let (_keep, data) = root();
         let s = status(&data, "xta-9.65.sd7", "1234abcd").unwrap();
@@ -230,10 +319,28 @@ mod tests {
     #[test]
     fn a_rebuild_replaces_what_the_folder_held() {
         let (_keep, data) = root();
-        let built = build(&data, "xta-9.65.sd7", "XTA 9.65", "1234abcd", 1, "1.2.3").unwrap();
+        let built = build_reading(
+            &data,
+            "xta-9.65.sd7",
+            "XTA 9.65",
+            "1234abcd",
+            coilbox_compat::latest(),
+            "1.2.3",
+            no_file,
+        )
+        .unwrap();
         let leftover = std::path::Path::new(&built.dir).join("leftover.lua");
         std::fs::write(&leftover, "return {}").unwrap();
-        build(&data, "xta-9.65.sd7", "XTA 9.65", "5678", 1, "1.2.3").unwrap();
+        build_reading(
+            &data,
+            "xta-9.65.sd7",
+            "XTA 9.65",
+            "5678",
+            coilbox_compat::latest(),
+            "1.2.3",
+            no_file,
+        )
+        .unwrap();
         assert!(!leftover.exists());
         assert!(status(&data, "xta-9.65.sd7", "5678")
             .unwrap()
@@ -244,9 +351,9 @@ mod tests {
     #[test]
     fn a_build_is_refused_without_a_checksum_a_manifest_or_a_content_root() {
         let (_keep, data) = root();
-        assert!(build(&data, "xta.sd7", "XTA", "", 1, "1").is_err());
-        assert!(build(&data, "xta.sd7", "XTA", "1", 9999, "1").is_err());
-        assert!(build("relative", "xta.sd7", "XTA", "1", 1, "1").is_err());
-        assert!(build(&data, "../xta.sd7", "XTA", "1", 1, "1").is_err());
+        assert!(build_reading(&data, "xta.sd7", "XTA", "", 1, "1", no_file).is_err());
+        assert!(build_reading(&data, "xta.sd7", "XTA", "1", 9999, "1", no_file).is_err());
+        assert!(build_reading("relative", "xta.sd7", "XTA", "1", 1, "1", no_file).is_err());
+        assert!(build_reading(&data, "../xta.sd7", "XTA", "1", 1, "1", no_file).is_err());
     }
 }

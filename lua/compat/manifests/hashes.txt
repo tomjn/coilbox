@@ -1,2 +1,11 @@
 # SHA-256 of every fix file that appears in a manifest, one "<hash>  <id>" per line.
 # A fix is immutable once listed here. Change one by adding a new fix with a new id.
+cfb58ac2e5f9c28907b9a853642546dfb1d1988c37279339f1ca73d8c0c11146  compat-callin-hooks
+881debe0ea96d607f7842c2cac5176f2c17637abb5821eac3f9dac3da21ca23a  spring-unit-travel
+76fa1e3320749af5b7c0da83922254b5ddb523cff53302dc101d32328a255182  spring-set-unit-to-feature
+a1191b0adc13a0b4976a5af90ea8d5fdaf2c0d077d475fe050660ff14b8ec0bd  gl-smoothing
+470bc3d7e404156a267aebf639282c4e2dcb6bb5f16be278ef2c9f6617782603  spring-make-font
+377e4a7ca128b04d10b92ade5e4a2f9f3359a45991dd2e1fbe32bf68ba874fec  spring-update-info-texture
+0401169ebc9e6d15553de716e7cd8a56369094617f5573e1a7bc34ba2c2a10ff  spring-sun-parameters
+723eb786817d507c5d8b4ccc1ff69036559a01682f8aec4cba73b2622210a82f  callin-unit-damaged-95
+63ffc940d3b1ec2915f056c71dbd2b440ed61a93b26162d9da0a7f4682d99c18  callin-allow-command-105
