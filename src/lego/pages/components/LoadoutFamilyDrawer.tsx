@@ -161,6 +161,11 @@ function FamilyTable({ project, pack, raw, pictures, onSwitch }: Props) {
                     <span className="max-w-full truncate text-sm font-medium">
                       {column.name}
                     </span>
+                    {column.upgradesFrom ? (
+                      <span className="max-w-full truncate text-muted-foreground">
+                        from {column.upgradesFrom}
+                      </span>
+                    ) : null}
                     <span className="max-w-full truncate text-muted-foreground">
                       {column.exportName}
                     </span>
@@ -213,6 +218,11 @@ function Row({ row }: { row: FamilyRow }) {
           >
             {cell ?? <span className="text-muted-foreground">None</span>}
           </span>
+          {row.changes?.[index] ? (
+            <span className="ml-1 text-muted-foreground">
+              {row.changes[index]}
+            </span>
+          ) : null}
           {row.highest?.includes(index) ? (
             <span className="ml-1 text-muted-foreground">highest</span>
           ) : null}

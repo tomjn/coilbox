@@ -275,6 +275,14 @@ Rename a loadout and export again, or delete one, and the old name goes into the
 
 Switching, adding, duplicating, renaming and deleting are each one undo step. Undo past a switch and you are back on the loadout you were editing, as it was.
 
+### Upgrade chains
+
+A loadout can be an upgrade of another ([issue #3286](https://github.com/tomjn/coilbox/issues/3286)). In the Loadouts popover, pick **From** a loadout under its name. The chain is saved with the project as `upgradesFrom` on the loadout entry, holding the id of the loadout before it.
+
+A chain is a line. The popover greys out a loadout that would make a loop, and one that another loadout already upgrades from. A saved file that holds a loop or a branch still opens, and the problems list reports it. Deleting a loadout in the middle of a chain links the next one to the one before it.
+
+The switch and the Compare loadouts drawer list loadouts in chain order, and a column says which loadout it is from. In the drawer, each cell also shows what changed from the loadout before: a stat's difference (`+50`), or a mount marked `added`, `removed` or `was <module>`. The chain is stored and shown only. Writing it into a game as morph or upgrade data is decided in [issue #3287](https://github.com/tomjn/coilbox/issues/3287), so an export does not carry it yet.
+
 A loadout you are not looking at keeps its pieces as they were. If you deleted the chassis piece one of them hung off, it goes on the root piece when you switch back. If the chassis took its name meanwhile, it gets a number on the end.
 
 ### Mount points

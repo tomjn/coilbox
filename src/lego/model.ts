@@ -871,6 +871,11 @@ export interface LegoLoadout {
    */
   unitName?: string;
   /**
+   * The id of the loadout this one is an upgrade of (#3286). Absent for the
+   * start of a chain. See `upgradeChain.ts`.
+   */
+  upgradesFrom?: string;
+  /**
    * This loadout's own receipts, one per game folder (#3282), read the way the
    * project's are. They stay on the entry whichever loadout is active, so
    * switching never moves them. The names a loadout has stopped exporting under
@@ -1843,7 +1848,15 @@ function parseLoadouts(
     };
   }
   const activeId = loadouts.find((loadout) => !loadout.content)?.id as string;
-  return { pieces, loadouts, activeLoadout: activeId };
+  const known = new Set(loadouts.map((loadout) => loadout.id));
+  const linked = loadouts.map((loadout) => {
+    if (!loadout.upgradesFrom) return loadout;
+    if (loadout.upgradesFrom !== loadout.id && known.has(loadout.upgradesFrom))
+      return loadout;
+    const { upgradesFrom: _gone, ...rest } = loadout;
+    return rest;
+  });
+  return { pieces, loadouts: linked, activeLoadout: activeId };
 }
 
 function parseLoadout(raw: unknown): LegoLoadout | null {
@@ -1861,6 +1874,9 @@ function parseLoadout(raw: unknown): LegoLoadout | null {
     name: v.name,
     ...(typeof v.unitName === "string" && v.unitName !== ""
       ? { unitName: v.unitName }
+      : {}),
+    ...(typeof v.upgradesFrom === "string" && v.upgradesFrom !== ""
+      ? { upgradesFrom: v.upgradesFrom }
       : {}),
     ...(exported ? { exported } : {}),
     ...(elsewhere.length > 0 ? { exportedElsewhere: elsewhere } : {}),
