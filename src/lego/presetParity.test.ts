@@ -340,6 +340,24 @@ function wreckPlan(): Plan {
   };
 }
 
+/**
+ * The unit is a root and nothing else, so the death only explodes the root.
+ * What this checks is that the script runs under the runtime, with `Killed`
+ * given a heavy hit. Which pieces go with what damage is checked in
+ * breakApart.test.ts, under luajit.
+ */
+function breakApartPlan(): Plan {
+  const frames = CALLIN + FPS + 1;
+  return {
+    events: [...CREATED, { frame: CALLIN, callin: "Killed", args: [150, 100] }],
+    frames,
+    spans: [{ from: CALLIN, to: frames - 1, t0: 0 }],
+    exceptions: [
+      "Nothing moves. The pieces are thrown and hidden, which breakApart.test.ts checks.",
+    ],
+  };
+}
+
 function nanoPlan(): Plan {
   const stop = CALLIN + Math.round(BUILD_PREVIEW_LEG * FPS);
   const frames = stop + FPS;
@@ -487,6 +505,8 @@ function plan(preset: AnimPreset, params: Record<string, number>): Plan {
       return factoryPlan();
     case "wreck.pose":
       return wreckPlan();
+    case "wreck.breakApart":
+      return breakApartPlan();
     case "build.nano":
       return nanoPlan();
     case "wheels.roll":
@@ -710,9 +730,9 @@ function buildCases() {
 describe("preset parity fixture", () => {
   const cases = buildCases();
 
-  it("covers all 22 presets", () => {
-    expect(new Set(cases.map((entry) => entry.preset.id)).size).toBe(22);
-    expect(PRESETS).toHaveLength(22);
+  it("covers all 23 presets", () => {
+    expect(new Set(cases.map((entry) => entry.preset.id)).size).toBe(23);
+    expect(PRESETS).toHaveLength(23);
   });
 
   it("matches what the presets generate today", () => {

@@ -43,6 +43,7 @@ export const SOLO_SCENARIOS: Record<string, string> = {
   "idle.look": "idle",
   "body.settle": "firing",
   "wreck.pose": "destroyed",
+  "wreck.breakApart": "destroyed",
 };
 
 /** Presets that change no piece, so a solo run only shows where something comes

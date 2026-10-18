@@ -650,6 +650,28 @@ export const SCENARIOS: Scenario[] = [
     ],
   },
   {
+    id: "destroyed-light",
+    label: "Lightly hit and destroyed",
+    description:
+      "Dies with a fifth of its health taken in the last few seconds, the lightest grade of death a script has.",
+    events: [
+      ...CREATED,
+      { frame: at(1), callin: "HitByWeapon", args: [0, 1, 0, 20] },
+      { frame: at(2), callin: "Killed", args: [20, 100] },
+    ],
+  },
+  {
+    id: "destroyed-heavy",
+    label: "Hit hard and destroyed",
+    description:
+      "Dies with one and a half times its health taken in the last few seconds, the heaviest grade of death a script has.",
+    events: [
+      ...CREATED,
+      { frame: at(1), callin: "HitByWeapon", args: [0, 1, 0, 150] },
+      { frame: at(2), callin: "Killed", args: [150, 100] },
+    ],
+  },
+  {
     id: "firing",
     label: "Aiming and firing",
     description:
