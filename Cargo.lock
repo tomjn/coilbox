@@ -748,6 +748,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-coilbox-anim",
  "tauri-plugin-coilbox-campaign",
+ "tauri-plugin-coilbox-compat",
  "tauri-plugin-coilbox-conquest",
  "tauri-plugin-coilbox-content",
  "tauri-plugin-coilbox-direct",
@@ -6363,6 +6364,24 @@ dependencies = [
  "tauri-plugin",
  "tempfile",
  "uuid",
+]
+
+[[package]]
+name = "tauri-plugin-coilbox-compat"
+version = "0.0.0"
+dependencies = [
+ "coilbox-3do-convert",
+ "coilbox-compat",
+ "coilbox-portable",
+ "coilbox-springlua",
+ "picoframe-core",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "tauri-plugin-coilbox-unitsync",
+ "tauri-plugin-coilbox-workshop",
+ "tempfile",
 ]
 
 [[package]]
