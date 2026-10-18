@@ -137,6 +137,10 @@ export default defineConfig({
             },
             { text: "Settings and keybinds", link: "/players/settings" },
             { text: "Portable mode", link: "/players/portable-mode" },
+            {
+              text: "Compatibility mode",
+              link: "/players/compatibility-mode",
+            },
           ],
         },
         {
@@ -219,6 +223,15 @@ export default defineConfig({
             {
               text: "Replay rewind for your game",
               link: "/developers/replay-rewind",
+            },
+          ],
+        },
+        {
+          text: "Old games",
+          items: [
+            {
+              text: "Compatibility mode fixes",
+              link: "/developers/compatibility-mode",
             },
           ],
         },

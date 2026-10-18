@@ -85,7 +85,9 @@ describe("resolveCompatTarget", () => {
     if (result.kind !== "blocked") return;
     expect(result.message).toContain("out of date");
     expect(result.message).toContain("compatibility version 2, now 3");
-    expect(result.message).toContain("Rebuild");
+    expect(result.message).toContain(
+      "under Library > Games and choose Rebuild",
+    );
   });
 
   it("blocks when the mutator was never built", async () => {

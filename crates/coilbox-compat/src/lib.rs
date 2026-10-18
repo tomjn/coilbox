@@ -49,6 +49,7 @@ const MANIFESTS: &[(u32, &str)] = &[
     (4, include_str!("../../../lua/compat/manifests/4.json")),
     (5, include_str!("../../../lua/compat/manifests/5.json")),
     (6, include_str!("../../../lua/compat/manifests/6.json")),
+    (7, include_str!("../../../lua/compat/manifests/7.json")),
 ];
 
 /// Every fix file, by id.
@@ -92,6 +93,10 @@ const FIXES: &[(&str, &str)] = &[
     (
         "gadget-aircraft-crash-83-v2",
         include_str!("../../../lua/compat/gadgets/gadget-aircraft-crash-83-v2.lua"),
+    ),
+    (
+        "gadget-aircraft-crash-83-v3",
+        include_str!("../../../lua/compat/gadgets/gadget-aircraft-crash-83-v3.lua"),
     ),
     (
         "gadget-messages-tdf-95",
@@ -992,6 +997,31 @@ mod tests {
             assert!(p.contains("-- fix: game-identity\n"), "{}", state.name());
             assert!(!prelude(&five, state).unwrap().contains("game-identity"));
         }
+    }
+
+    #[test]
+    fn manifest_7_is_manifest_6_with_the_aircraft_gadget_that_reads_the_engine() {
+        let (six, seven) = (manifest(6).unwrap(), manifest(7).unwrap());
+        let swapped: Vec<String> = six
+            .fixes
+            .iter()
+            .map(|id| match id.as_str() {
+                "gadget-aircraft-crash-83-v2" => "gadget-aircraft-crash-83-v3".to_string(),
+                _ => id.clone(),
+            })
+            .collect();
+        assert_eq!(seven.fixes, swapped);
+        assert!(seven.fixes.iter().any(|id| id == GAME_IDENTITY_FIX));
+        assert_eq!(seven.converter, six.converter);
+        assert_eq!(seven.writer, six.writer);
+        let paths =
+            |m: &Manifest| -> Vec<String> { gadget_files(m).into_iter().map(|(p, _)| p).collect() };
+        assert_eq!(paths(&seven), paths(&six));
+        let (_, src) = gadget_files(&seven)
+            .into_iter()
+            .find(|(p, _)| p.ends_with("coilbox_compat_aircraft_crash.lua"))
+            .unwrap();
+        assert_eq!(src, fix_source("gadget-aircraft-crash-83-v3").unwrap());
     }
 
     #[test]

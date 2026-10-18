@@ -38,6 +38,10 @@ Most of the tools here are hidden until you turn on Advanced mode in Settings > 
 
 - [Replay rewind for your game](replay-rewind.md). Write an adapter that switches off what fights a recording, bundle it in your archive, and read what the player logs.
 
+## Old games
+
+- [Compatibility mode fixes](compatibility-mode.md). What the generated game does to an old game, why a fix never changes once it ships, and how to add one.
+
 ## Tools
 
 - [Browse archives and run Lua](archives.md). Look inside any game or map archive, save a file out of it, and run Lua with the archive loaded.
