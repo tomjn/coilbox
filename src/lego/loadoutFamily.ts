@@ -10,6 +10,7 @@
 
 import { budgetStanding } from "./budget";
 import { loadoutUnit, loadoutUnitNames } from "./loadouts";
+import { lockReason, unitLocks } from "./locks";
 import type { LegoProject } from "./model";
 import { mountContents } from "./mountPoints";
 import { STATS, type UnitStats } from "./unitStats";
@@ -23,6 +24,9 @@ export interface FamilyColumn {
   active: boolean;
   /** The name of the loadout this one upgrades from, when the project has it. */
   upgradesFrom?: string;
+  /** Why this loadout is locked (#3289), such as "Locked by Cannon". Absent
+   *  when it is free. */
+  locked?: string;
 }
 
 export interface FamilyRow {
@@ -83,6 +87,7 @@ function budgetRow(budget: number, costs: (number | null)[]): FamilyRow {
 export function loadoutFamily(
   project: LegoProject,
   statsFor: (unit: LegoProject) => UnitStats | null,
+  moduleName: (id: string) => string = (id) => id,
 ): Family | null {
   const loadouts = project.loadouts;
   if (!loadouts || loadouts.length < 2) return null;
@@ -93,14 +98,18 @@ export function loadoutFamily(
     unit: loadoutUnit(project, loadout.id),
   }));
 
+  const locks = unitLocks(project);
   const columns: FamilyColumn[] = ordered.map((loadout) => {
     const from = predecessorOf(project, loadout);
+    const lock = locks.find((l) => l.loadoutId === loadout.id);
+    const locked = lock ? lockReason(lock, moduleName) : null;
     return {
       id: loadout.id,
       name: loadout.name,
       exportName: names.get(loadout.id) ?? project.unitName,
       active: loadout.id === project.activeLoadout,
       ...(from ? { upgradesFrom: from.name } : {}),
+      ...(locked ? { locked } : {}),
     };
   });
   // For each column, the column it upgrades from, or -1.

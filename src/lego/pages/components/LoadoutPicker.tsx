@@ -7,7 +7,15 @@
  */
 
 import { Button, Input } from "@picoframe/frame";
-import { Columns3, Copy, Layers, Plus, Trash2 } from "lucide-react";
+import {
+  Columns3,
+  Copy,
+  Layers,
+  Lock,
+  LockOpen,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { OptionSelect } from "@/components/OptionSelect";
@@ -25,6 +33,14 @@ import {
   setInLoadout,
   switchLoadout,
 } from "../../loadouts";
+import {
+  heldModules,
+  lockReason,
+  setLoadoutLocked,
+  setModuleLocked,
+  type UnitLock,
+  unitLocks,
+} from "../../locks";
 import { type LegoLoadout, type LegoProject, pieceById } from "../../model";
 import type { LoadedPack } from "../../pack";
 import type { RawGeometry } from "../../rawGeometry";
@@ -50,6 +66,9 @@ interface Props {
   pack?: LoadedPack | null;
   raw?: RawGeometry | null;
   capture?: Capture;
+  /** The names of the modules by id, for saying which one locks a loadout. A
+   *  module without one shows as its id. */
+  moduleNames?: ReadonlyMap<string, string>;
 }
 
 /** The side of the square each loadout is photographed at, in pixels. */
@@ -66,8 +85,12 @@ export function LoadoutPicker({
   pack = null,
   raw = null,
   capture,
+  moduleNames,
 }: Props) {
   const loadouts = project.loadouts;
+  const moduleName = (id: string) => moduleNames?.get(id) ?? id;
+  const locks = unitLocks(project);
+  const lockOf = (id: string | null) => locks.find((l) => l.loadoutId === id);
   const edit = (change: (project: LegoProject) => LegoProject) =>
     onEdit(change, { alone: true });
   const [comparing, setComparing] = useState(false);
@@ -105,7 +128,9 @@ export function LoadoutPicker({
               const from = predecessorOf(project, l);
               return {
                 value: l.id,
-                label: from ? `${l.name} (from ${from.name})` : l.name,
+                label: `${from ? `${l.name} (from ${from.name})` : l.name}${
+                  lockOf(l.id)?.locked ? " (locked)" : ""
+                }`,
               };
             })}
             ariaLabel="Loadout"
@@ -136,6 +161,11 @@ export function LoadoutPicker({
                   key={loadout.id}
                   loadout={loadout}
                   active={loadout.id === project.activeLoadout}
+                  lock={lockOf(loadout.id)}
+                  moduleName={moduleName}
+                  onLock={(locked) =>
+                    edit((p) => setLoadoutLocked(p, loadout.id, locked))
+                  }
                   fromOptions={[
                     { value: NO_PREDECESSOR, label: "Not an upgrade" },
                     ...loadouts
@@ -187,6 +217,12 @@ export function LoadoutPicker({
             </Button>
           </div>
           <PieceSharing project={project} pieceId={selectedId} onEdit={edit} />
+          <ModuleLocks
+            project={project}
+            lock={loadouts ? undefined : lockOf(null)}
+            moduleName={moduleName}
+            onEdit={edit}
+          />
         </PopoverContent>
       </Popover>
       {loadouts && loadouts.length > 1 ? (
@@ -212,6 +248,7 @@ export function LoadoutPicker({
             raw={raw}
             pictures={pictures}
             onSwitch={switchTo}
+            moduleName={moduleName}
           />
         </>
       ) : null}
@@ -222,6 +259,9 @@ export function LoadoutPicker({
 function LoadoutRow({
   loadout,
   active,
+  lock,
+  moduleName,
+  onLock,
   fromOptions,
   onUpgradesFrom,
   onRename,
@@ -229,6 +269,9 @@ function LoadoutRow({
 }: {
   loadout: LegoLoadout;
   active: boolean;
+  lock: UnitLock | undefined;
+  moduleName: (id: string) => string;
+  onLock: (locked: boolean) => void;
   fromOptions: { value: string; label: string; disabled?: boolean }[];
   onUpgradesFrom: (from: string) => void;
   onRename: (name: string) => void;
@@ -261,6 +304,21 @@ function LoadoutRow({
           size="icon"
           variant="ghost"
           className="size-7"
+          title="Locked until a campaign grants it"
+          aria-label={`Lock ${loadout.name}`}
+          aria-pressed={loadout.locked === true}
+          onClick={() => onLock(loadout.locked !== true)}
+        >
+          {loadout.locked ? (
+            <Lock className="size-3.5" />
+          ) : (
+            <LockOpen className="size-3.5" />
+          )}
+        </Button>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-7"
           title="Delete"
           aria-label={`Delete ${loadout.name}`}
           onClick={onDelete}
@@ -268,6 +326,11 @@ function LoadoutRow({
           <Trash2 className="size-3.5" />
         </Button>
       </div>
+      {lock?.locked ? (
+        <p className="truncate text-xs text-amber-300">
+          {lockReason(lock, moduleName)}
+        </p>
+      ) : null}
       {fromOptions.length > 2 ? (
         <OptionSelect
           size="sm"
@@ -324,6 +387,63 @@ function PieceSharing({
           </Button>
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * A lock for each module the unit holds. A locked module locks every loadout
+ * that holds it. For a unit without loadouts it locks the unit, and `lock` says
+ * so.
+ */
+function ModuleLocks({
+  project,
+  lock,
+  moduleName,
+  onEdit,
+}: {
+  project: LegoProject;
+  lock: UnitLock | undefined;
+  moduleName: (id: string) => string;
+  onEdit: (change: (project: LegoProject) => LegoProject) => void;
+}) {
+  const held = heldModules(project);
+  if (held.length === 0) return null;
+  const locked = new Set(project.lockedModules ?? []);
+  return (
+    <div className="space-y-1">
+      <p className="text-xs text-muted-foreground">
+        Modules locked until a campaign grants them
+      </p>
+      <ul className="space-y-0.5">
+        {held.map((id) => (
+          <li key={id} className="flex items-center gap-1 text-xs">
+            <span className="min-w-0 flex-1 truncate">{moduleName(id)}</span>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-6"
+              title="Locks every loadout that holds it"
+              aria-label={`Lock module ${moduleName(id)}`}
+              aria-pressed={locked.has(id)}
+              onClick={() =>
+                onEdit((p) => setModuleLocked(p, id, !locked.has(id)))
+              }
+            >
+              {locked.has(id) ? (
+                <Lock className="size-3.5" />
+              ) : (
+                <LockOpen className="size-3.5" />
+              )}
+            </Button>
+          </li>
+        ))}
+      </ul>
+      {lock?.locked ? (
+        <p className="text-xs text-amber-300">
+          {project.unitName} is {lockReason(lock, moduleName)?.toLowerCase()}
+        </p>
+      ) : null}
     </div>
   );
 }

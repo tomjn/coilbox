@@ -32,6 +32,8 @@ import { useUnitsyncScan } from "@/content/config";
 import { UnitGameProvider } from "@/content/pages/components/UnitPicker";
 import { useGameUnits } from "@/content/useGameUnits";
 import { ErrorBoundary } from "@/general/ErrorBoundary";
+import { lockedExportedUnits } from "@/lego/locks";
+import { useLegoProjects } from "@/lego/projects";
 import {
   type EditHistory,
   emptyHistory,
@@ -73,6 +75,7 @@ import {
   CommandRestrictionPanel,
   UnitRestrictionPanel,
 } from "./components/RestrictionPanel";
+import { withLockedUnits } from "./components/registries";
 import {
   ScenarioMapScene,
   type ScenarioMapSceneHandle,
@@ -149,6 +152,18 @@ export default function ScenarioEditPage() {
   // the panel that asked, because the map that answers it is a sibling.
   const [pick, setPick] = useState<PointTarget | null>(null);
   const gameUnits = useGameUnits(scenario?.setup.gameName ?? "");
+  // The units the lego builder locked and exported into this game, so the
+  // restriction picker offers them for the buildable list and `unlock_unit`
+  // (issue #3289).
+  const { projects: legoProjects } = useLegoProjects();
+  const restrictableUnits = useMemo(
+    () =>
+      withLockedUnits(
+        gameUnits.units,
+        lockedExportedUnits(legoProjects, gameUnits.folder),
+      ),
+    [gameUnits.units, gameUnits.folder, legoProjects],
+  );
   // Read once for the page rather than in the trigger panel, because every
   // panel that renames a reference needs the game's own declared types to carry
   // that reference over (issue #913).
@@ -811,7 +826,7 @@ export default function ScenarioEditPage() {
         <UnitRestrictionPanel
           scenario={scenario}
           onChange={(next) => apply(next)}
-          units={gameUnits.units}
+          units={restrictableUnits}
           unitsLoading={gameUnits.loading}
           onUndo={undo}
         />

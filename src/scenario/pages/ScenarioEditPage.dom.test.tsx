@@ -63,6 +63,9 @@ vi.mock("@/content/config", () => ({
   useUnitsyncScan: () => ({ data: { games: [], maps: [] } }),
 }));
 vi.mock("@/play/config", () => ({ usePreferredTarget: () => ({}) }));
+vi.mock("@/lego/projects", () => ({
+  useLegoProjects: () => ({ projects: [] }),
+}));
 const { useGameUnits } = vi.hoisted(() => ({
   useGameUnits: vi.fn(() => ({ units: [], loading: false })),
 }));
