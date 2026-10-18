@@ -1,5 +1,5 @@
-import type { MapDownloadHint } from "../campaign/model";
-import { parseMapDownload } from "../campaign/model";
+import type { CampaignUnit, MapDownloadHint } from "../campaign/model";
+import { parseMapDownload, parseUnits } from "../campaign/model";
 import { type HandmadeMapRef, parseHandmadeMapRef } from "../challenge/mapRef";
 import { type GameRef, type MapSkin, readMapSkin } from "../conquest/model";
 import { sectorNameForSeed } from "../conquest/names";
@@ -288,6 +288,13 @@ export interface RogueliteRun {
    * is not offered again (issue #3465). Kept on the run, not its settings,
    * which a shared challenge code carries. */
   declinedGameUpdate?: string;
+  /**
+   * Units from the unit builder this run carries, each a copy taken when the
+   * run began (issue #4518). They are in the build graph its rewards were drawn
+   * from, so each is locked and unlocked like the game's own units. Kept on the
+   * run, not its settings, so a shared challenge never carries them.
+   */
+  units?: CampaignUnit[];
 }
 
 /**
@@ -767,6 +774,7 @@ export function parseRunJson(json: string): RogueliteRun | null {
       data.declinedGameUpdate !== ""
         ? data.declinedGameUpdate
         : undefined,
+    units: parseUnits(data.units),
   };
 }
 

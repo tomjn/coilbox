@@ -65,6 +65,31 @@ describe("warpath challenge codec", () => {
     );
   });
 
+  // Issue #4518. A run's builder units stay with the run, so somebody without
+  // them plays the shared code on the game's own units.
+  it("never carries the units from the unit builder a run carries", () => {
+    const run = {
+      ...generateRun(opts()),
+      units: [
+        {
+          unitName: "skyfort",
+          projectId: "p-skyfort",
+          name: "Skyfort",
+          builtBy: ["vplant"],
+          copiedAt: "2026-10-18T00:00:00.000Z",
+        },
+      ],
+    };
+    const result = decodeWarpathChallenge(encodeWarpathChallenge(run));
+    if (!result.ok) throw new Error("expected a successful decode");
+    expect(JSON.stringify(result.settings)).not.toContain("skyfort");
+    const rebuilt = runFromChallenge(result.settings, {
+      maps: MAPS,
+      build: BUILD,
+    });
+    expect(rebuilt.units).toBeUndefined();
+  });
+
   it("rebuilds the same maps on an install with a different map pool", () => {
     const run = generateRun(opts());
     const result = decodeWarpathChallenge(encodeWarpathChallenge(run));
