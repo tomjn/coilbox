@@ -1,0 +1,29 @@
+{
+  "version": 7,
+  "fixes": [
+    "compat-callin-hooks",
+    "spring-unit-travel",
+    "spring-set-unit-to-feature",
+    "gl-smoothing",
+    "spring-make-font",
+    "spring-update-info-texture",
+    "spring-sun-parameters",
+    "callin-unit-damaged-95",
+    "callin-allow-command-105",
+    "gadget-aircraft-crash-83-v3",
+    "gadget-only-forward-aim-105",
+    "gadget-messages-tdf-95",
+    "gadget-model-center-offset-89",
+    "defs-helpers",
+    "defs-commander-85",
+    "defs-model-center-offset-89",
+    "defs-weapon-consts-87",
+    "defs-manual-bomb-settings-92",
+    "game-identity"
+  ],
+  "converter": {
+    "crate": "coilbox-3do-convert",
+    "version": "0.1.0"
+  },
+  "writer": 1
+}
