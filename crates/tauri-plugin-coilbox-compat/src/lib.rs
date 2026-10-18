@@ -22,6 +22,7 @@ use tauri::{
 };
 
 pub use mutator::{Marker, Stale};
+pub use tauri_plugin_coilbox_unitsync::DeclaredGame;
 
 /// What a build wrote.
 #[derive(Debug, Serialize)]
@@ -74,16 +75,13 @@ pub fn build(
     let handlers = handlers::handlers_in(&scan, archive_name)?;
     let staging = tempfile::tempdir()
         .map_err(|e| format!("could not make a folder to convert the models into: {e}"))?;
-    let short_name = tauri_plugin_coilbox_unitsync::game_declared_short_name_blocking(
-        engine_path,
-        data_dir,
-        game_name,
-    )?;
+    let declared =
+        tauri_plugin_coilbox_unitsync::game_declared_blocking(engine_path, data_dir, game_name)?;
     build_reading(
         data_dir,
         archive_name,
         game_name,
-        short_name.as_deref(),
+        &declared,
         base_checksum,
         manifest_version,
         coilbox_version,
@@ -112,7 +110,7 @@ fn build_reading(
     data_dir: &str,
     archive_name: &str,
     game_name: &str,
-    short_name: Option<&str>,
+    declared: &DeclaredGame,
     base_checksum: &str,
     manifest_version: u32,
     coilbox_version: &str,
@@ -139,7 +137,7 @@ fn build_reading(
         base_checksum: base_checksum.to_string(),
         coilbox_version: coilbox_version.to_string(),
     };
-    let mut files = mutator::files(&manifest, game_name, short_name, &marker, &mut read)?;
+    let mut files = mutator::files(&manifest, game_name, declared, &marker, &mut read)?;
     let defs = defs::plan(&manifest, &mut read)?;
     let models = convert()?;
     let prelude_fixes = manifest
@@ -367,7 +365,7 @@ mod tests {
             &data,
             "xta-9.65.sd7",
             "XTA 9.65",
-            None,
+            &DeclaredGame::default(),
             "1234abcd",
             n,
             "1.2.3",
@@ -438,7 +436,7 @@ mod tests {
             &data,
             "xta-9.65.sd7",
             "XTA 9.65",
-            None,
+            &DeclaredGame::default(),
             "1234abcd",
             coilbox_compat::latest(),
             "1.2.3",
@@ -465,7 +463,7 @@ mod tests {
             &data,
             "xta-9.65.sd7",
             "XTA 9.65",
-            None,
+            &DeclaredGame::default(),
             "1234abcd",
             1,
             "1.2.3",
@@ -508,7 +506,7 @@ mod tests {
             &data,
             "xta-9.65.sd7",
             "XTA 9.65",
-            None,
+            &DeclaredGame::default(),
             "1234abcd",
             2,
             "1.2.3",
@@ -553,7 +551,7 @@ mod tests {
                 &data,
                 "xta-9.65.sd7",
                 "XTA 9.65",
-                None,
+                &DeclaredGame::default(),
                 "1234abcd",
                 2,
                 "1.2.3",
@@ -584,7 +582,7 @@ mod tests {
                 &data,
                 archive,
                 "XTA 9.65",
-                None,
+                &DeclaredGame::default(),
                 "1234abcd",
                 n,
                 "1.2.3",
@@ -626,7 +624,7 @@ mod tests {
             &data,
             "xta-9.65.sd7",
             "XTA 9.65",
-            None,
+            &DeclaredGame::default(),
             "1234abcd",
             coilbox_compat::latest(),
             "1.2.3",
@@ -642,7 +640,7 @@ mod tests {
             &data,
             "xta-9.65.sd7",
             "XTA 9.65",
-            None,
+            &DeclaredGame::default(),
             "5678",
             coilbox_compat::latest(),
             "1.2.3",
@@ -666,7 +664,7 @@ mod tests {
             &data,
             "xta.sd7",
             "XTA",
-            None,
+            &DeclaredGame::default(),
             "",
             1,
             "1",
@@ -680,7 +678,7 @@ mod tests {
             &data,
             "xta.sd7",
             "XTA",
-            None,
+            &DeclaredGame::default(),
             "1",
             9999,
             "1",
@@ -694,7 +692,7 @@ mod tests {
             "relative",
             "xta.sd7",
             "XTA",
-            None,
+            &DeclaredGame::default(),
             "1",
             1,
             "1",
@@ -708,7 +706,7 @@ mod tests {
             &data,
             "../xta.sd7",
             "XTA",
-            None,
+            &DeclaredGame::default(),
             "1",
             1,
             "1",
@@ -727,6 +725,9 @@ mod tests {
         archive: &'static str,
         game: &'static str,
         short_name: Option<&'static str>,
+        /// The modinfo `name` as written and the `version`, which differ from
+        /// `game` for a game that lists its version apart from its name.
+        declared: (Option<&'static str>, Option<&'static str>),
         files: &'static [(&'static str, &'static str)],
         lua: &'static [(&'static str, &'static str)],
     }
@@ -748,6 +749,7 @@ mod tests {
             archive: "xta-9.65.sd7",
             game: "XTA 9.65",
             short_name: Some("XTA"),
+            declared: (Some("XTA"), Some("9.65")),
             files: &[
                 ("LuaRules/main.lua", "-- rules\r\nreturn include('x')\n"),
                 ("LuaRules/draw.lua", "-- draw, caf\u{e9}\n"),
@@ -768,6 +770,7 @@ mod tests {
             archive: "BA-V9.79.SDZ",
             game: "Balanced \"Annihilation\" \\ V9.79",
             short_name: Some("BA\\\""),
+            declared: (Some("Balanced \"Annihilation\" \\"), Some("V9.79")),
             files: &[
                 ("LuaRules/main.lua", "-- rules\n"),
                 ("gamedata/defs.lua", "LoadDefs('defs_post')\n"),
@@ -783,6 +786,7 @@ mod tests {
             archive: "SplinterFaction.sdd",
             game: "Splinter Faction 0.1.86",
             short_name: None,
+            declared: (Some("Splinter Faction"), None),
             files: &[
                 ("LuaUI/main.lua", "-- ui\n"),
                 ("gamedata/defs_post.lua", "return {}\n"),
@@ -846,7 +850,11 @@ mod tests {
             &data,
             fixture.archive,
             fixture.game,
-            fixture.short_name,
+            &DeclaredGame {
+                short_name: fixture.short_name.map(String::from),
+                name: fixture.declared.0.map(String::from),
+                version: fixture.declared.1.map(String::from),
+            },
             "1234abcd",
             n,
             "1.2.3",
@@ -928,6 +936,10 @@ mod tests {
         assert!(text(&with_defs, weapons).unwrap().contains(bombs));
         assert!(!text(&full, models::DEFS_POST).unwrap().contains(commander));
         assert!(text(&full, weapons).is_none());
+        let modinfo = |files: &[(String, Vec<u8>)]| text(files, "modinfo.lua").unwrap();
+        assert!(modinfo(&golden_build(6, &FIXTURES[0])).contains("compatbasename = \"XTA\","));
+        assert!(modinfo(&golden_build(6, &FIXTURES[2])).contains("compatbaseversion = \"\","));
+        assert!(!modinfo(&with_defs).contains("compatbase"));
         let defs_only = golden_build(5, &FIXTURES[2]);
         assert!(text(&defs_only, models::DEFS_POST).is_none());
         assert!(text(&defs_only, weapons).unwrap().contains(bombs));
@@ -976,6 +988,10 @@ mod tests {
             5,
             "8a678ce14a48f4bff3503d89b553486e337779101ac2730effc825439648a7d5",
         ),
+        (
+            6,
+            "76862d9aef98748f9106276e25025c72e84fd8599c4614757af78ddd23054283",
+        ),
     ];
 
     #[test]
@@ -1022,7 +1038,7 @@ mod tests {
             &data,
             "xta-9.65.sd7",
             "XTA 9.65",
-            None,
+            &DeclaredGame::default(),
             "1234abcd",
             coilbox_compat::latest(),
             "1.2.3",
@@ -1071,7 +1087,7 @@ mod tests {
             &data,
             "xta-9.65.sd7",
             "XTA 9.65",
-            None,
+            &DeclaredGame::default(),
             "1234abcd",
             coilbox_compat::latest(),
             "1.2.3",
@@ -1098,7 +1114,7 @@ mod tests {
             &data,
             "xta-9.65.sd7",
             "XTA 9.65",
-            None,
+            &DeclaredGame::default(),
             "1234abcd",
             coilbox_compat::latest(),
             "1.2.3",
@@ -1120,7 +1136,7 @@ mod tests {
             &data,
             "xta-9.65.sd7",
             "XTA 9.65",
-            None,
+            &DeclaredGame::default(),
             "1234abcd",
             4,
             "1.2.3",
@@ -1140,7 +1156,7 @@ mod tests {
             &data,
             "xta.sd7",
             "XTA",
-            None,
+            &DeclaredGame::default(),
             "",
             1,
             "1",
@@ -1159,7 +1175,7 @@ mod tests {
             &data,
             "xta.sd7",
             "XTA",
-            None,
+            &DeclaredGame::default(),
             "1",
             1,
             "1",

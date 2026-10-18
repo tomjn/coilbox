@@ -260,4 +260,53 @@ do
 	check("other globals are set as normal", rawget(engine.env, "NOT_A_CALLIN") == 1)
 end
 
+--------------------------------------------------------------------------------
+-- Game identity (manifest 6)
+--------------------------------------------------------------------------------
+
+-- The mutator's own values, as the engine reads them from its modinfo.lua, and
+-- the base game's, which the mutator's modinfo.lua carries.
+local function identity(synced)
+	return newEngine({
+		synced = synced,
+		manifest = 6,
+		game = { gameName = "XTA 9.65 (compat 6)", gameVersion = "6", gameShortName = "XTA" },
+		modinfo = { name = "XTA 9.65 (compat 6)", version = "6", compatbasename = "XTA", compatbaseversion = "9.65" },
+	})
+end
+
+for _, synced in ipairs({ true, false }) do
+	local state = synced and "synced" or "unsynced"
+	local engine = identity(synced)
+	prelude(engine)
+	local Game = engine.env.Game
+	check(state .. ": Game.gameName is the base game's", Game.gameName == "XTA", tostring(Game.gameName))
+	check(state .. ": Game.gameVersion is the base game's", Game.gameVersion == "9.65", tostring(Game.gameVersion))
+	check(state .. ": Game.gameShortName is left alone", Game.gameShortName == "XTA")
+	check(state .. ": no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
+end
+
+do
+	-- A base game with no version reads as the empty string, as it does unwrapped.
+	local engine = newEngine({
+		manifest = 6,
+		game = { gameName = "Bare (compat 6)", gameVersion = "6" },
+		modinfo = { compatbasename = "Bare", compatbaseversion = "" },
+	})
+	prelude(engine)
+	check("a base game with no version reads as empty", engine.env.Game.gameVersion == "" and engine.env.Game.gameName == "Bare")
+end
+
+do
+	-- A modinfo that does not carry the base game's values changes nothing.
+	local engine = newEngine({
+		manifest = 6,
+		game = { gameName = "Own (compat 6)", gameVersion = "6" },
+		modinfo = { name = "Own (compat 6)", version = "6" },
+	})
+	prelude(engine)
+	check("without the base values Game is left alone", engine.env.Game.gameName == "Own (compat 6)" and engine.env.Game.gameVersion == "6")
+	check("without the base values no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
+end
+
 support.report()
