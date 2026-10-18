@@ -173,6 +173,7 @@ import { disposeOverlap } from "./overlapLayer";
 import { type CheckStatus, ProblemsButton } from "./ProblemsButton";
 import { buildPackPreview } from "./packHandles";
 import { clearPlaceGhost, type Placing, showPlaceGhost } from "./placeByFace";
+import { disposePlanted } from "./plantedLayer";
 import { attachPointerHandlers } from "./pointerHandlers";
 import {
   type GameReferenceChoice,
@@ -1308,6 +1309,7 @@ export function ModelViewport({
         aimMark,
         weaponReach: null,
         balance: null,
+        planted: null,
         skeleton: null,
         footprint: null,
         overlap: null,
@@ -1531,6 +1533,7 @@ export function ModelViewport({
           aimMaterial.dispose();
           if (state.weaponReach) disposeWeaponReach(state.weaponReach);
           if (state.balance) disposeBalance(state.balance);
+          disposePlanted(state);
           if (state.skeleton) disposeSkeleton(state.skeleton);
           if (state.footprint) disposeFootprint(state.footprint);
           if (state.overlap) disposeOverlap(state.overlap);
