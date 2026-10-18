@@ -180,8 +180,8 @@ export function LayoutPlacer({
 
       {options.length === 0 && (
         <p className="w-full text-[11px] text-muted-foreground">
-          There is nothing to place. Draw a base with Bases, or keep one in your
-          library under Library &gt; Blueprints.
+          There is nothing to place. Draw a base with Bases, or keep one in
+          Library &gt; Blueprints.
         </p>
       )}
 
