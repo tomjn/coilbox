@@ -38,6 +38,7 @@ permissions = [
   "allow-lego-picture-survey",
   "allow-lego-scratch-game",
   "allow-lego-scratch-prune",
+  "allow-lego-scratch-remove",
   "allow-lego-run-script",
   "allow-lego-probe-script",
   "allow-lego-write-text-file",

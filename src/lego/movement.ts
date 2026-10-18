@@ -95,6 +95,11 @@ export function scratchMovement(
   return pick ? suggestMotion(game, gameName, pick.name) : undefined;
 }
 
+/** Whether a unit is built to move but has no movement class chosen. */
+export function builtToMove(project: LegoProject): boolean {
+  return !project.movement && builtAs(project).length > 0;
+}
+
 /** A warning for a unit built to move that has no movement (issue #4472). */
 export function movementProblems(project: LegoProject): Problem[] {
   if (project.movement) return [];
