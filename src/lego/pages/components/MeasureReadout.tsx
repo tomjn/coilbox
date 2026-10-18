@@ -1,19 +1,20 @@
 /**
  * What the measure tool and a drag read out, in elmos and in steps.
  *
- * Plain text beside the model rather than labels on the lines: a label that
- * follows a line has to be drawn again every frame the camera moves, and a
- * list does not.
+ * Each line also carries its length at its middle (`measureLayer.ts`). The
+ * list beside the model keeps the length on each axis, which would crowd the
+ * line.
  */
 
 import { Button } from "@picoframe/frame";
 import { X } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 
 import {
   axesText,
   figure,
-  type Measurement,
+  lineLabel,
+  type MeasuredLine,
   measureBetween,
   pieceSize,
 } from "../../measure";
@@ -21,6 +22,7 @@ import type { LegoProject } from "../../model";
 import { type LoadedPack, partUnit } from "../../pack";
 import type { RawGeometry } from "../../rawGeometry";
 import type { Vec3 } from "../../snapping";
+import type { MeasureLinesStore } from "./useMeasure";
 
 /** Three lengths on one axis each, as two short lines. */
 export function AxisFigures({
@@ -42,6 +44,28 @@ export function AxisFigures({
 const card =
   "pointer-events-auto self-start rounded-md bg-black/60 px-2 py-1.5 text-xs text-white";
 
+/** The readout for the lines where the scene last drew them. */
+export function LiveMeasureReadout({
+  store,
+  step,
+  onClear,
+}: {
+  store: MeasureLinesStore;
+  step: number | null;
+  onClear: () => void;
+}) {
+  const { lines, pending } = useSyncExternalStore(store.subscribe, store.get);
+  return (
+    <MeasureReadout
+      measurements={lines}
+      start={pending?.from ?? null}
+      hover={pending?.to ?? null}
+      step={step}
+      onClear={onClear}
+    />
+  );
+}
+
 /** The lines drawn, one block each, and the one being made. */
 export function MeasureReadout({
   measurements,
@@ -50,7 +74,8 @@ export function MeasureReadout({
   step,
   onClear,
 }: {
-  measurements: Measurement[];
+  /** Each measurement with its ends where they are now. */
+  measurements: MeasuredLine[];
   /** The first point of a measurement waiting for its second. */
   start: Vec3 | null;
   /** Where the pointer is while it waits. */
@@ -75,11 +100,11 @@ export function MeasureReadout({
         ) : null}
       </div>
       {measurements.map((m, index) => {
-        const { delta, length } = measureBetween(m.from, m.to);
+        const { delta } = measureBetween(m.from, m.to);
         return (
           <div key={m.id} className="mt-1 border-t border-white/20 pt-1">
             <div>
-              {index + 1}. {figure(length, step)}
+              {index + 1}. {lineLabel(m.from, m.to, step)}
             </div>
             <AxisFigures values={delta} step={step} />
           </div>

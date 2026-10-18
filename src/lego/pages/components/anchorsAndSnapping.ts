@@ -6,7 +6,7 @@ import {
   slideJoin,
 } from "../../connectors";
 import { snapToGuides } from "../../guides";
-import { snapMeasurePoint } from "../../measure";
+import { type MeasureEnd, snapMeasurePoint } from "../../measure";
 import type { LegoPiece, LegoProject } from "../../model";
 import { descendantIds, pieceById } from "../../model";
 import { type LoadedPack, partUnit } from "../../pack";
@@ -36,6 +36,7 @@ import {
   ROTATION_STEP,
   SEAT_COLOUR,
 } from "./ModelViewport";
+import { placeEnd } from "./measureLayer";
 import type { SceneState } from "./sceneState";
 import { draggedGroup } from "./slideHandle";
 
@@ -343,22 +344,42 @@ export function snapReach(state: SceneState, at: THREE.Vector3): number {
  *
  * The reach is the drag's own, in screen pixels, so a point snaps from as far
  * away on screen as a piece does.
+ *
+ * The end is held on a piece when it lands on that piece's anchor, or on
+ * `hitPieceId`, the piece the ray met, when it does not snap. One that snaps
+ * to a guide, or lands on the ground, is a world point.
  */
-export function measurePoint(state: SceneState, at: Vec3): Vec3 {
-  if (!state.snapping) return at;
+export function measurePoint(
+  state: SceneState,
+  at: Vec3,
+  hitPieceId: string | null,
+): MeasureEnd {
+  if (!state.snapping) return placeEnd(state, at, hitPieceId);
   const project = state.projectRef.current;
   const pack = state.packRef.current;
-  const anchors = project.pieces.flatMap((piece) =>
-    worldAnchors(state, pack, piece).map((anchor) => anchor.position),
-  );
+  const anchors: Vec3[] = [];
+  const owners: string[] = [];
+  for (const piece of project.pieces) {
+    for (const anchor of worldAnchors(state, pack, piece)) {
+      anchors.push(anchor.position);
+      owners.push(piece.id);
+    }
+  }
   const threshold = snapReach(state, new THREE.Vector3(...at));
-  return snapMeasurePoint(
+  const snapped = snapMeasurePoint(
     at,
     anchors,
     state.guidePlanes,
     state.guideLines,
     threshold,
-  ).point;
+  );
+  const on =
+    snapped.anchorIndex !== null
+      ? owners[snapped.anchorIndex]
+      : snapped.to === "guide"
+        ? null
+        : hitPieceId;
+  return placeEnd(state, snapped.point, on);
 }
 
 /**

@@ -16,11 +16,56 @@ import type { RawGeometry } from "./rawGeometry";
 import { pieceBoxes } from "./s3oBuild";
 import { nearestSnap, type Vec3 } from "./snapping";
 
-/** Two points in the world that someone measured between. Never saved. */
+/**
+ * One end of a measurement. An end placed on a piece names the piece and the
+ * point in that piece's own space, so it moves, turns and animates with the
+ * piece. One on the ground or a guide has `on` null and stays at `at`, which
+ * is also where an end placed on a piece was put.
+ */
+export interface MeasureEnd {
+  at: Vec3;
+  on: { pieceId: string; local: Vec3 } | null;
+}
+
+/** Two ends someone measured between. Never saved. */
 export interface Measurement {
+  id: string;
+  from: MeasureEnd;
+  to: MeasureEnd;
+}
+
+/** A measurement with both ends where they are now. */
+export interface MeasuredLine {
   id: string;
   from: Vec3;
   to: Vec3;
+}
+
+/**
+ * Where an end is now. An end on a piece is its local point carried through
+ * `matrix`, the piece's world matrix in three.js's column-major order. With no
+ * matrix, because the piece is gone, it is `last`, the last place it was
+ * drawn, else the point it was put at.
+ */
+export function endPosition(
+  end: MeasureEnd,
+  matrix: ArrayLike<number> | null,
+  last?: Vec3,
+): Vec3 {
+  if (!end.on) return end.at;
+  if (!matrix) return last ?? end.at;
+  const [x, y, z] = end.on.local;
+  const e = matrix;
+  return [
+    e[0] * x + e[4] * y + e[8] * z + e[12],
+    e[1] * x + e[5] * y + e[9] * z + e[13],
+    e[2] * x + e[6] * y + e[10] * z + e[14],
+  ];
+}
+
+/** The text on a line and in the readout: its length. */
+export function lineLabel(from: Vec3, to: Vec3, step: number | null): string {
+  return figure(measureBetween(from, to).length, step);
 }
 
 /** The offset from `from` to `to` on each axis, and the straight distance. */
@@ -81,11 +126,17 @@ export function snapMeasurePoint(
   planes: GuidePlane[],
   lines: GuideLine[],
   threshold: number,
-): { point: Vec3; to: "anchor" | "guide" | null } {
+): {
+  point: Vec3;
+  to: "anchor" | "guide" | null;
+  /** Which of `anchors` it landed on, when it landed on one. */
+  anchorIndex: number | null;
+} {
   const anchor = nearestSnap([point], anchors, threshold);
-  if (anchor) return { point: anchor.at, to: "anchor" };
+  if (anchor)
+    return { point: anchor.at, to: "anchor", anchorIndex: anchor.targetIndex };
   const guides = snapToGuides([point], planes, threshold, lines);
-  if (guides.guides.length === 0) return { point, to: null };
+  if (guides.guides.length === 0) return { point, to: null, anchorIndex: null };
   return {
     point: [
       point[0] + guides.delta[0],
@@ -93,6 +144,7 @@ export function snapMeasurePoint(
       point[2] + guides.delta[2],
     ],
     to: "guide",
+    anchorIndex: null,
   };
 }
 

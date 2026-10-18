@@ -165,11 +165,12 @@ import {
 import { GUIDE_COLOUR } from "./guideLayer";
 import { clearJoinFaces } from "./joinFaceMarks";
 import { disposeJointLimits } from "./jointLimitsLayer";
-import { DragReadout, MeasureReadout } from "./MeasureReadout";
+import { DragReadout, LiveMeasureReadout } from "./MeasureReadout";
 import {
   beginDragReadout,
   disposeMeasure,
   endDragReadout,
+  layoutMeasurements,
   moveDragReadout,
   newMeasureScene,
 } from "./measureLayer";
@@ -1249,6 +1250,7 @@ export function ModelViewport({
             ),
           );
         }
+        layoutMeasurements(state);
         renderer.render(scene, state.camera);
         // After the render, so the camera's inverse matrix is the one just used.
         if (compassRef.current) paintCompass(compassRef.current, state.camera);
@@ -2005,10 +2007,8 @@ export function ModelViewport({
             buttons. Stacked within their group, so the compass keeps the
             corner and the buttons do not push it inward. */}
         {measure.active || measure.measurements.length > 0 ? (
-          <MeasureReadout
-            measurements={measure.measurements}
-            start={measure.active ? measure.start : null}
-            hover={measure.hover}
+          <LiveMeasureReadout
+            store={measure.lines}
             step={partUnit(pack)}
             onClear={measure.clear}
           />
@@ -2102,7 +2102,7 @@ export function ModelViewport({
             ) : null}
             <span>
               {measure.active
-                ? `Click two points to measure. ${shortcutLabel("measure-stop")} to leave`
+                ? `Click two points to measure, or drag an end to move it. ${shortcutLabel("measure-stop")} to leave`
                 : pickingGuide
                   ? `Click the model to put a ${pickingGuide.axis.toUpperCase()} ${pickingGuide.kind === "line" ? "line" : "plane"} there. Escape to stop`
                   : placingAnchor
