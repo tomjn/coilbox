@@ -23,6 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatFixed } from "@/lib/format";
 import {
   type Report,
   type ReportSummary,
@@ -107,19 +108,19 @@ function CommandTable({ report }: { report: Report }) {
               {c.error_count ?? 0}
             </TableCell>
             <TableCell className="py-1.5 pr-4 text-right">
-              {c.p50_ms.toFixed(2)}
+              {formatFixed(c.p50_ms, 2)}
             </TableCell>
             <TableCell className="py-1.5 pr-4 text-right">
-              {c.p95_ms.toFixed(2)}
+              {formatFixed(c.p95_ms, 2)}
             </TableCell>
             <TableCell className="py-1.5 pr-4 text-right">
-              {c.p99_ms.toFixed(2)}
+              {formatFixed(c.p99_ms, 2)}
             </TableCell>
             <TableCell className="py-1.5 pr-4 text-right">
-              {c.max_ms.toFixed(2)}
+              {formatFixed(c.max_ms, 2)}
             </TableCell>
             <TableCell className="py-1.5 text-right">
-              {c.per_second.toFixed(1)}
+              {formatFixed(c.per_second, 1)}
             </TableCell>
           </TableRow>
         ))}

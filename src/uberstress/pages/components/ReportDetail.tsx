@@ -1,7 +1,7 @@
 import { cn } from "@picoframe/frame";
 import { AlertTriangle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { formatDateTime, formatNumber } from "@/lib/format";
+import { formatDateTime, formatFixed, formatNumber } from "@/lib/format";
 import type { Report } from "../../bindings";
 import {
   detectEarlyTermination,
@@ -44,7 +44,7 @@ export function ReportHeader({ report }: { report: Report }) {
         </span>
       </h2>
       <p className="text-sm text-muted-foreground">
-        {fmtWhen(report.started_at)} · {report.duration_sec.toFixed(1)}s
+        {fmtWhen(report.started_at)} · {formatFixed(report.duration_sec, 1)}s
       </p>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
         {report.ref && (
@@ -102,7 +102,7 @@ export function SummaryBand({ report }: { report: Report }) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       <Stat label="Requests" value={formatNumber(s.totalRequests)} />
-      <Stat label="Throughput" value={`${s.throughput.toFixed(1)}/s`} />
+      <Stat label="Throughput" value={`${formatFixed(s.throughput, 1)}/s`} />
       <Stat
         label="Errors"
         value={formatNumber(s.totalErrors)}
@@ -111,10 +111,12 @@ export function SummaryBand({ report }: { report: Report }) {
       <Stat
         label="Success"
         value={
-          s.successRate === null ? "—" : `${(s.successRate * 100).toFixed(1)}%`
+          s.successRate === null
+            ? "—"
+            : `${formatFixed(s.successRate * 100, 1)}%`
         }
       />
-      <Stat label="Elapsed" value={`${s.durationSec.toFixed(1)}s`} />
+      <Stat label="Elapsed" value={`${formatFixed(s.durationSec, 1)}s`} />
     </div>
   );
 }
@@ -132,8 +134,8 @@ export function EarlyTerminationNotice({ report }: { report: Report }) {
     <Alert variant="warning">
       <AlertTriangle size={15} />
       <AlertTitle className="line-clamp-none">
-        Run ended early — {early.actualSec.toFixed(1)}s of the requested ~
-        {early.expectedSec.toFixed(0)}s window.
+        Run ended early — {formatFixed(early.actualSec, 1)}s of the requested ~
+        {formatFixed(early.expectedSec, 0)}s window.
       </AlertTitle>
       <AlertDescription>
         {top

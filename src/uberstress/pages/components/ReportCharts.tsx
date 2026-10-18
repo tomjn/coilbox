@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatFixed } from "@/lib/format";
 import type { Report, ReportSummary } from "../../bindings";
 
 // recharts renders to SVG and can't read CSS custom properties via `fill`, so the
@@ -70,7 +70,7 @@ export function LatencyBars({ report }: { report: Report }) {
         />
         <Tooltip
           formatter={(v) =>
-            typeof v === "number" ? `${v.toFixed(2)} ms` : String(v ?? "")
+            typeof v === "number" ? `${formatFixed(v, 2)} ms` : String(v ?? "")
           }
           contentStyle={{ fontSize: 12, borderRadius: 6 }}
         />
@@ -130,7 +130,7 @@ export function CompareBars({
         />
         <Tooltip
           formatter={(v) =>
-            typeof v === "number" ? `${v.toFixed(2)} ms` : String(v ?? "")
+            typeof v === "number" ? `${formatFixed(v, 2)} ms` : String(v ?? "")
           }
           contentStyle={{ fontSize: 12, borderRadius: 6 }}
         />
@@ -187,7 +187,7 @@ export function TrendChart({ runs }: { runs: ReportSummary[] }) {
         />
         <Tooltip
           formatter={(v) =>
-            typeof v === "number" ? `${v.toFixed(2)} ms` : String(v ?? "")
+            typeof v === "number" ? `${formatFixed(v, 2)} ms` : String(v ?? "")
           }
           contentStyle={{ fontSize: 12, borderRadius: 6 }}
         />

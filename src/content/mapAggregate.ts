@@ -12,7 +12,7 @@
  * matches.
  */
 
-import { formatNumber } from "@/lib/format";
+import { formatFixed, formatNumber } from "@/lib/format";
 import {
   buildHeatFieldFromCounts,
   DEFAULT_RESOLUTION,
@@ -689,7 +689,7 @@ export function layerEvents(layer: HeatLayerId, events: number): string {
 /** A fraction as a percentage a person can read: one decimal under ten. */
 function percent(fraction: number): string {
   const p = fraction * 100;
-  return `${p < 10 ? p.toFixed(1) : Math.round(p)}%`;
+  return `${p < 10 ? formatFixed(p, 1) : Math.round(p)}%`;
 }
 
 /**
@@ -712,7 +712,8 @@ export function layerLegend(
     return `on average ${percent(aggregate.atPeak ?? 0)} of a match's ${many}${during} within ${reach} of one spot, ${over}`;
   if (normalise === "rate") {
     const rate = aggregate.atPeak ?? 0;
-    const shown = rate < 10 ? rate.toFixed(1) : formatNumber(Math.round(rate));
+    const shown =
+      rate < 10 ? formatFixed(rate, 1) : formatNumber(Math.round(rate));
     return `on average ${shown} ${rate === 1 ? one : many} a minute${during} within ${reach} of one spot, ${over}`;
   }
   return `where the most matches were at their own busiest${during}, ${over}. Each match is scaled to its busiest spot, so this is not a count`;
