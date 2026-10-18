@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  COMPAT_PREFIX,
+  compatBaseName,
   generatedGameNote,
+  isCompatArchive,
   isGeneratedGame,
   isMutatorArchive,
   isPlaybackArchive,
@@ -59,6 +62,52 @@ describe("unitsFolder", () => {
       expect(isScratchArchive(folder)).toBe(false);
     }
     expect(isUnitsArchive(SCRATCH_FOLDER)).toBe(false);
+  });
+});
+
+// Issue #4556. The folder names are the ones `compat_build` writes for an .sd7
+// and an .sdd game.
+describe("isCompatArchive", () => {
+  const packed = "coilbox-compat-xta-9.65-1.sdd";
+  const loose = "coilbox-compat-splinterfaction-12.sdd";
+
+  it("recognises a compat mutator built from a packed or a loose game", () => {
+    expect(packed.startsWith(COMPAT_PREFIX)).toBe(true);
+    expect(isCompatArchive(packed)).toBe(true);
+    expect(isCompatArchive(loose)).toBe(true);
+    expect(isCompatArchive("Coilbox-Compat-XTA-9.65-1.sdd")).toBe(true);
+  });
+
+  it("is a generated game, so the pickers hide it", () => {
+    expect(isGeneratedGame(packed)).toBe(true);
+    expect(generatedGameNote(packed)).toContain("old game");
+    expect(
+      withoutGeneratedGames([game("xta-9.65.sd7"), game(packed)]).map(
+        (g) => g.name,
+      ),
+    ).toEqual(["xta-9.65.sd7"]);
+  });
+
+  it("never mistakes another archive for it", () => {
+    for (const name of [
+      "xta-9.65.sd7",
+      "coilbox-compat-xta.sdd",
+      "coilbox-compat-xta-1.sdz",
+      "coilbox-compat-xta-01.sdd",
+      "coilbox-compat--1.sdd",
+      WORKSHOP_MUTATOR_FOLDER,
+    ]) {
+      expect(isCompatArchive(name)).toBe(false);
+    }
+  });
+
+  it("names the base archive's stem it wraps", () => {
+    expect(compatBaseName(packed)).toBe("xta-9.65");
+    expect(compatBaseName(loose)).toBe("splinterfaction");
+    expect(compatBaseName("coilbox-compat-ca-stable-8405-1.sdd")).toBe(
+      "ca-stable-8405",
+    );
+    expect(compatBaseName("xta-9.65.sd7")).toBeNull();
   });
 });
 

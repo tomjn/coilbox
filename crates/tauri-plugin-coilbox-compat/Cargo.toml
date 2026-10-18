@@ -1,0 +1,33 @@
+[package]
+name = "tauri-plugin-coilbox-compat"
+version = "0.0.0"
+description = "Writes the compatibility mode mutator that wraps an old game for a current engine, and says when it is stale. ACL identifier: coilbox-compat"
+edition = "2021"
+license = "MIT"
+# Tauri requires `links` to equal `package.name`. The ACL identifier is this
+# name with the `tauri-plugin-` prefix stripped -> `coilbox-compat`.
+links = "tauri-plugin-coilbox-compat"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }
+
+[dependencies]
+tauri = { version = "2" }
+picoframe-core = "0.0.4"
+serde = { workspace = true }
+serde_json = { workspace = true }
+# The manifests that say what each compat version holds.
+coilbox-compat = { path = "../coilbox-compat" }
+# Its version, which a manifest pins.
+coilbox-3do-convert = { path = "../coilbox-3do-convert" }
+# `refuse_in_bundle`, so a distribution's bundled content is never written into.
+coilbox-portable = { path = "../coilbox-portable" }
+# `write_mutator` and `lua_string`, the writers the workshop test mutator uses.
+tauri-plugin-coilbox-workshop = { path = "../tauri-plugin-coilbox-workshop" }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+# Evaluates the written modinfo.lua the way the engine reads it.
+coilbox-springlua = { path = "../coilbox-springlua" }
+# The worker scan the app lists games from, for the test that the mutator is listed.
+tauri-plugin-coilbox-unitsync = { path = "../tauri-plugin-coilbox-unitsync" }

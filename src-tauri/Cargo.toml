@@ -24,6 +24,7 @@ tauri-plugin-coilbox-campaign = { path = "../crates/tauri-plugin-coilbox-campaig
 tauri-plugin-coilbox-scenario = { path = "../crates/tauri-plugin-coilbox-scenario" }
 tauri-plugin-coilbox-lego = { path = "../crates/tauri-plugin-coilbox-lego" }
 tauri-plugin-coilbox-workshop = { path = "../crates/tauri-plugin-coilbox-workshop" }
+tauri-plugin-coilbox-compat = { path = "../crates/tauri-plugin-coilbox-compat" }
 tauri-plugin-coilbox-conquest = { path = "../crates/tauri-plugin-coilbox-conquest" }
 tauri-plugin-coilbox-runlite = { path = "../crates/tauri-plugin-coilbox-runlite" }
 tauri-plugin-coilbox-profile = { path = "../crates/tauri-plugin-coilbox-profile" }

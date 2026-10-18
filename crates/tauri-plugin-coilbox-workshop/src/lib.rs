@@ -91,7 +91,9 @@ pub use inplace::{
 pub use ledger::{
     build_ledger, ChangeLedger, LedgerChange, TweakSlotMiss, TweakSlotRef, UnitLedger,
 };
+pub use lua::lua_string;
 pub use model::{GameEdits, ModProject, ReadOnlyLuaBlock};
+pub use mutator::write_mutator;
 pub use preflight::{preflight, PreflightReport};
 pub use tweak_pack::{pack as pack_tweak_slots, TweakSlotPack};
 
