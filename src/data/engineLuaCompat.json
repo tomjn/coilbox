@@ -1,0 +1,1975 @@
+{
+  "generatedBy": "scripts/build-engine-lua-compat.mjs",
+  "engine": {
+    "old": "0.81.2.1",
+    "new": "2026.09.01",
+    "releasesRead": 134
+  },
+  "entries": [
+    {
+      "id": "defTag:FeatureDefs.deathFeature",
+      "kind": "defTag",
+      "name": "FeatureDefs.deathFeature",
+      "replacement": "FeatureDefs.deathFeatureID",
+      "since": "92.0",
+      "note": "replace LuaFeatureDefs.deathFeature(string) by LuaFeatureDefs.deathFeatureID(number)"
+    },
+    {
+      "id": "defTag:FeatureDefs.modelname",
+      "kind": "defTag",
+      "name": "FeatureDefs.modelname",
+      "since": "104.0",
+      "note": "Undeprecate {unit,feature}def.modelname and add .modeltype and .modelpath to allow reading these without loading the model. Removed def.model.{name,type,path} so they aren't used accidentally."
+    },
+    {
+      "id": "defTag:UnitDefs.attackSafetyDistance",
+      "kind": "defTag",
+      "name": "UnitDefs.attackSafetyDistance",
+      "since": "100.0",
+      "note": "convert UnitDef::attackSafetyDistance to a key recognized by Spring.SetMoveTypeData"
+    },
+    {
+      "id": "defTag:UnitDefs.canCapture",
+      "kind": "defTag",
+      "name": "UnitDefs.canCapture",
+      "since": "92.0",
+      "note": "UnitDef::can{Restore, Repair, Reclaim, Capture, Resurrect} now default to true only if the unit is a builder and has the corresponding {Terraform, Repair, Reclaim, Capture, Resurrect}Speed property set to a non-zero value"
+    },
+    {
+      "id": "defTag:UnitDefs.canReclaim",
+      "kind": "defTag",
+      "name": "UnitDefs.canReclaim",
+      "since": "92.0",
+      "note": "UnitDef::can{Restore, Repair, Reclaim, Capture, Resurrect} now default to true only if the unit is a builder and has the corresponding {Terraform, Repair, Reclaim, Capture, Resurrect}Speed property set to a non-zero value"
+    },
+    {
+      "id": "defTag:UnitDefs.canRepair",
+      "kind": "defTag",
+      "name": "UnitDefs.canRepair",
+      "since": "92.0",
+      "note": "UnitDef::can{Restore, Repair, Reclaim, Capture, Resurrect} now default to true only if the unit is a builder and has the corresponding {Terraform, Repair, Reclaim, Capture, Resurrect}Speed property set to a non-zero value"
+    },
+    {
+      "id": "defTag:UnitDefs.canRestore",
+      "kind": "defTag",
+      "name": "UnitDefs.canRestore",
+      "since": "92.0",
+      "note": "UnitDef::can{Restore, Repair, Reclaim, Capture, Resurrect} now default to true only if the unit is a builder and has the corresponding {Terraform, Repair, Reclaim, Capture, Resurrect}Speed property set to a non-zero value"
+    },
+    {
+      "id": "defTag:UnitDefs.canResurrect",
+      "kind": "defTag",
+      "name": "UnitDefs.canResurrect",
+      "since": "92.0",
+      "note": "UnitDef::can{Restore, Repair, Reclaim, Capture, Resurrect} now default to true only if the unit is a builder and has the corresponding {Terraform, Repair, Reclaim, Capture, Resurrect}Speed property set to a non-zero value"
+    },
+    {
+      "id": "defTag:UnitDefs.extractSquare",
+      "kind": "defTag",
+      "name": "UnitDefs.extractSquare",
+      "since": "92.0",
+      "note": "deprecate LuaUnitDefs.extractSquare"
+    },
+    {
+      "id": "defTag:UnitDefs.isCommander",
+      "kind": "defTag",
+      "name": "UnitDefs.isCommander",
+      "since": "85.0",
+      "note": "UnitDef[].isCommander returns now false"
+    },
+    {
+      "id": "defTag:UnitDefs.modelname",
+      "kind": "defTag",
+      "name": "UnitDefs.modelname",
+      "since": "104.0",
+      "note": "Undeprecate {unit,feature}def.modelname and add .modeltype and .modelpath to allow reading these without loading the model. Removed def.model.{name,type,path} so they aren't used accidentally."
+    },
+    {
+      "id": "defTag:UnitDefs.moveDef.family",
+      "kind": "defTag",
+      "name": "UnitDefs.moveDef.family",
+      "since": "105.0",
+      "note": "remove UnitDefs[i].moveDef.{family,type}"
+    },
+    {
+      "id": "defTag:UnitDefs.moveDef.type",
+      "kind": "defTag",
+      "name": "UnitDefs.moveDef.type",
+      "since": "105.0",
+      "note": "remove UnitDefs[i].moveDef.{family,type}"
+    },
+    {
+      "id": "defTag:WeaponDefs.firestarter",
+      "kind": "defTag",
+      "name": "WeaponDefs.firestarter",
+      "since": "BAR105 1544",
+      "note": "the `firestarter` weapon tag no longer capped at 10000 in defs (which becomes 100 in Lua WeaponDefs after rescale), now uncapped. To get back previous behaviour, put the following in weapon defs post-processing:"
+    },
+    {
+      "id": "file:gamedata/messages.tdf",
+      "kind": "file",
+      "name": "gamedata/messages.tdf",
+      "since": "95.0",
+      "note": "remove engine support for gamedata/messages.tdf, see examples/Widgets/game_messages.lua for a possible replacement"
+    },
+    {
+      "id": "file:lockluaui.txt",
+      "kind": "file",
+      "name": "lockluaui.txt",
+      "since": "105.0",
+      "note": "Made lockluaui.txt obsolete: no longer necessary for it to exists in order to enable VFS for LuaUI"
+    },
+    {
+      "id": "file:selectionkeys.txt",
+      "kind": "file",
+      "name": "selectionkeys.txt",
+      "since": "86.0",
+      "note": "remove support for selectionkeys.txt"
+    },
+    {
+      "id": "file:selectkeys.txt",
+      "kind": "file",
+      "name": "selectkeys.txt",
+      "since": "89.0",
+      "note": "remove selectkeys.txt support (use uikeys.txt instead)"
+    },
+    {
+      "id": "removed:Game.fogColor",
+      "kind": "removed",
+      "name": "Game.fogColor",
+      "since": "101.0",
+      "note": "Game.fogColor constant is no longer available, use gl.GetAtmosphere(\"fogColor\")"
+    },
+    {
+      "id": "removed:Game.groundAmbientColor",
+      "kind": "removed",
+      "name": "Game.groundAmbientColor",
+      "since": "101.0",
+      "note": "Game.groundAmbientColor, Game.groundSpecularColor and Game.groundSunColor are no longer available, use gl.GetSun() instead with appropriate parameters - add unsynced callout Spring.SetSunLighting(table params) -> nil It can be used to modify the following sun lighting parameters: {ground,unit}{Ambient,Diffuse,Specular}Color and specularExponent example usage: Spring.SetSunLighting({ groundAmbientColor = {1, 0.1, 1}, groundDiffuseColor = {1, 0.1, 1}, })"
+    },
+    {
+      "id": "removed:Game.groundSpecularColor",
+      "kind": "removed",
+      "name": "Game.groundSpecularColor",
+      "since": "101.0",
+      "note": "Game.groundAmbientColor, Game.groundSpecularColor and Game.groundSunColor are no longer available, use gl.GetSun() instead with appropriate parameters - add unsynced callout Spring.SetSunLighting(table params) -> nil It can be used to modify the following sun lighting parameters: {ground,unit}{Ambient,Diffuse,Specular}Color and specularExponent example usage: Spring.SetSunLighting({ groundAmbientColor = {1, 0.1, 1}, groundDiffuseColor = {1, 0.1, 1}, })"
+    },
+    {
+      "id": "removed:Game.groundSunColor",
+      "kind": "removed",
+      "name": "Game.groundSunColor",
+      "since": "101.0",
+      "note": "Game.groundAmbientColor, Game.groundSpecularColor and Game.groundSunColor are no longer available, use gl.GetSun() instead with appropriate parameters - add unsynced callout Spring.SetSunLighting(table params) -> nil It can be used to modify the following sun lighting parameters: {ground,unit}{Ambient,Diffuse,Specular}Color and specularExponent example usage: Spring.SetSunLighting({ groundAmbientColor = {1, 0.1, 1}, groundDiffuseColor = {1, 0.1, 1}, })"
+    },
+    {
+      "id": "removed:Game.mapHumanName",
+      "kind": "removed",
+      "name": "Game.mapHumanName",
+      "since": "105.0",
+      "note": "remove Game.mapHumanName"
+    },
+    {
+      "id": "removed:Platform.glSupport16bitDepthBuffer",
+      "kind": "removed",
+      "name": "Platform.glSupport16bitDepthBuffer",
+      "since": "BAR105 1544",
+      "note": "removed the following constants: Platform.glSupport16bitDepthBuffer Platform.glSupport24bitDepthBuffer Platform.glSupport32bitDepthBuffer"
+    },
+    {
+      "id": "removed:Platform.glSupport24bitDepthBuffer",
+      "kind": "removed",
+      "name": "Platform.glSupport24bitDepthBuffer",
+      "since": "BAR105 1544",
+      "note": "removed the following constants: Platform.glSupport16bitDepthBuffer Platform.glSupport24bitDepthBuffer Platform.glSupport32bitDepthBuffer"
+    },
+    {
+      "id": "removed:Platform.glSupport32bitDepthBuffer",
+      "kind": "removed",
+      "name": "Platform.glSupport32bitDepthBuffer",
+      "since": "BAR105 1544",
+      "note": "removed the following constants: Platform.glSupport16bitDepthBuffer Platform.glSupport24bitDepthBuffer Platform.glSupport32bitDepthBuffer"
+    },
+    {
+      "id": "removed:Script.CreateLobby",
+      "kind": "removed",
+      "name": "Script.CreateLobby",
+      "since": "92.0",
+      "note": "Last registered in 91.0.1 (rts/Lua/LuaLobby.cpp)."
+    },
+    {
+      "id": "removed:Script.GetConfigString",
+      "kind": "removed",
+      "name": "Script.GetConfigString",
+      "since": "0.82.0",
+      "note": "Last registered in 0.81.2.1 (rts/Lua/LuaGaia.cpp, rts/Lua/LuaRules.cpp)."
+    },
+    {
+      "id": "removed:Spring.CreateDecal",
+      "kind": "removed",
+      "name": "Spring.CreateDecal",
+      "since": "2025.01.1",
+      "note": "Last registered in 105.1.1 (rts/Lua/LuaUnsyncedCtrl.cpp)."
+    },
+    {
+      "id": "removed:Spring.CreateGameRulesParams",
+      "kind": "removed",
+      "name": "Spring.CreateGameRulesParams",
+      "since": "0.82.0",
+      "note": "Last registered in 0.81.2.1 (rts/Lua/LuaRules.cpp)."
+    },
+    {
+      "id": "removed:Spring.CreateTeamRulesParams",
+      "kind": "removed",
+      "name": "Spring.CreateTeamRulesParams",
+      "since": "0.82.0",
+      "note": "Last registered in 0.81.2.1 (rts/Lua/LuaRules.cpp)."
+    },
+    {
+      "id": "removed:Spring.CreateUnitRulesParams",
+      "kind": "removed",
+      "name": "Spring.CreateUnitRulesParams",
+      "since": "0.82.0",
+      "note": "Last registered in 0.81.2.1 (rts/Lua/LuaRules.cpp)."
+    },
+    {
+      "id": "removed:Spring.DestroyDecal",
+      "kind": "removed",
+      "name": "Spring.DestroyDecal",
+      "since": "2025.01.1",
+      "note": "Last registered in 105.1.1 (rts/Lua/LuaUnsyncedCtrl.cpp)."
+    },
+    {
+      "id": "removed:Spring.GetAllDecals",
+      "kind": "removed",
+      "name": "Spring.GetAllDecals",
+      "since": "2025.01.1",
+      "note": "Last registered in 105.1.1 (rts/Lua/LuaUnsyncedRead.cpp)."
+    },
+    {
+      "id": "removed:Spring.GetCOBAllyTeamVar",
+      "kind": "removed",
+      "name": "Spring.GetCOBAllyTeamVar",
+      "since": "102.0",
+      "note": "Last registered in 101.0.1 (rts/Lua/LuaSyncedRead.cpp)."
+    },
+    {
+      "id": "removed:Spring.GetCOBGlobalVar",
+      "kind": "removed",
+      "name": "Spring.GetCOBGlobalVar",
+      "since": "102.0",
+      "note": "Last registered in 101.0.1 (rts/Lua/LuaSyncedRead.cpp)."
+    },
+    {
+      "id": "removed:Spring.GetCOBTeamVar",
+      "kind": "removed",
+      "name": "Spring.GetCOBTeamVar",
+      "since": "102.0",
+      "note": "Last registered in 101.0.1 (rts/Lua/LuaSyncedRead.cpp)."
+    },
+    {
+      "id": "removed:Spring.GetCOBUnitVar",
+      "kind": "removed",
+      "name": "Spring.GetCOBUnitVar",
+      "since": "102.0",
+      "note": "Last registered in 101.0.1 (rts/Lua/LuaSyncedRead.cpp)."
+    },
+    {
+      "id": "removed:Spring.GetDecalAlpha",
+      "kind": "removed",
+      "name": "Spring.GetDecalAlpha",
+      "since": "2025.01.1",
+      "note": "Last registered in 105.1.1 (rts/Lua/LuaUnsyncedRead.cpp)."
+    },
+    {
+      "id": "removed:Spring.GetDecalOwner",
+      "kind": "removed",
+      "name": "Spring.GetDecalOwner",
+      "since": "2025.01.1",
+      "note": "Last registered in 105.1.1 (rts/Lua/LuaUnsyncedRead.cpp)."
+    },
+    {
+      "id": "removed:Spring.GetDecalPos",
+      "kind": "removed",
+      "name": "Spring.GetDecalPos",
+      "since": "2025.01.1",
+      "note": "Last registered in 105.1.1 (rts/Lua/LuaUnsyncedRead.cpp)."
+    },
+    {
+      "id": "removed:Spring.GetDecalRotation",
+      "kind": "removed",
+      "name": "Spring.GetDecalRotation",
+      "since": "2025.01.1",
+      "note": "Last registered in 105.1.1 (rts/Lua/LuaUnsyncedRead.cpp)."
+    },
+    {
+      "id": "removed:Spring.GetDecalSize",
+      "kind": "removed",
+      "name": "Spring.GetDecalSize",
+      "since": "2025.01.1",
+      "note": "Last registered in 105.1.1 (rts/Lua/LuaUnsyncedRead.cpp)."
+    },
+    {
+      "id": "removed:Spring.GetDecalTexture",
+      "kind": "removed",
+      "name": "Spring.GetDecalTexture",
+      "since": "2025.01.1",
+      "note": "Last registered in 105.1.1 (rts/Lua/LuaUnsyncedRead.cpp)."
+    },
+    {
+      "id": "removed:Spring.GetDecalType",
+      "kind": "removed",
+      "name": "Spring.GetDecalType",
+      "since": "2025.01.1",
+      "note": "Last registered in 105.1.1 (rts/Lua/LuaUnsyncedRead.cpp)."
+    },
+    {
+      "id": "removed:Spring.GetFeaturePieceTransformMatrices",
+      "kind": "removed",
+      "name": "Spring.GetFeaturePieceTransformMatrices",
+      "since": "105.1.1",
+      "note": "Last registered in 105.0.1 (rts/Lua/LuaUnsyncedRead.cpp)."
+    },
+    {
+      "id": "removed:Spring.GetHasLag",
+      "kind": "removed",
+      "name": "Spring.GetHasLag",
+      "since": "105.0",
+      "note": "Last registered in 104.0.1 (rts/Lua/LuaUnsyncedRead.cpp)."
+    },
+    {
+      "id": "removed:Spring.GetModUICtrl",
+      "kind": "removed",
+      "name": "Spring.GetModUICtrl",
+      "since": "104.0",
+      "note": "Last registered in 103.0.1 (rts/Lua/LuaUnsyncedRead.cpp)."
+    },
+    {
+      "id": "removed:Spring.GetProjectileName",
+      "kind": "removed",
+      "name": "Spring.GetProjectileName",
+      "since": "2025.01.1",
+      "note": "Last registered in 105.1.1 (rts/Lua/LuaSyncedRead.cpp)."
+    },
+    {
+      "id": "removed:Spring.GetProjectileSpinAngle",
+      "kind": "removed",
+      "name": "Spring.GetProjectileSpinAngle",
+      "since": "95.0",
+      "note": "Last registered in 94.1.1 (rts/Lua/LuaSyncedRead.cpp)."
+    },
+    {
+      "id": "removed:Spring.GetProjectileSpinSpeed",
+      "kind": "removed",
+      "name": "Spring.GetProjectileSpinSpeed",
+      "since": "95.0",
+      "note": "Last registered in 94.1.1 (rts/Lua/LuaSyncedRead.cpp)."
+    },
+    {
+      "id": "removed:Spring.GetProjectileSpinVec",
+      "kind": "removed",
+      "name": "Spring.GetProjectileSpinVec",
+      "since": "95.0",
+      "note": "Last registered in 94.1.1 (rts/Lua/LuaSyncedRead.cpp)."
+    },
+    {
+      "id": "removed:Spring.GetRulesInfoMap",
+      "kind": "removed",
+      "name": "Spring.GetRulesInfoMap",
+      "since": "0.82.0",
+      "note": "Last registered in 0.81.2.1 (rts/Lua/LuaSyncedRead.cpp)."
+    },
+    {
+      "id": "removed:Spring.GetUnitFuel",
+      "kind": "removed",
+      "name": "Spring.GetUnitFuel",
+      "since": "101.0",
+      "note": "Still registered, but from 101.0 only as a stub that does nothing or returns fixed values. Last working in 100.0.1 (rts/Lua/LuaSyncedRead.cpp)."
+    },
+    {
+      "id": "removed:Spring.GetUnitLineage",
+      "kind": "removed",
+      "name": "Spring.GetUnitLineage",
+      "since": "83.0",
+      "note": "Last registered in 0.82.7.1 (rts/Lua/LuaSyncedRead.cpp)."
+    },
+    {
+      "id": "removed:Spring.GetUnitPieceTransformMatrices",
+      "kind": "removed",
+      "name": "Spring.GetUnitPieceTransformMatrices",
+      "since": "105.1.1",
+      "note": "Last registered in 105.0.1 (rts/Lua/LuaUnsyncedRead.cpp)."
+    },
+    {
+      "id": "removed:Spring.GetUnitTravel",
+      "kind": "removed",
+      "name": "Spring.GetUnitTravel",
+      "since": "105.0",
+      "note": "remove Spring.{Set,Get}UnitTravel. Still registered, but from 105.0 only as a stub that does nothing or returns fixed values. Last working in 104.0.1 (rts/Lua/LuaSyncedRead.cpp)."
+    },
+    {
+      "id": "removed:Spring.MakeFont",
+      "kind": "removed",
+      "name": "Spring.MakeFont",
+      "since": "0.82.0",
+      "note": "Last registered in 0.81.2.1 (rts/Lua/LuaUnsyncedCtrl.cpp)."
+    },
+    {
+      "id": "removed:Spring.MoveCtrl.SetLeaveTracks",
+      "kind": "removed",
+      "name": "Spring.MoveCtrl.SetLeaveTracks",
+      "since": "83.0",
+      "note": "Last registered in 0.82.7.1 (rts/Lua/LuaSyncedMoveCtrl.cpp)."
+    },
+    {
+      "id": "removed:Spring.MoveCtrl.SetRotationOffset",
+      "kind": "removed",
+      "name": "Spring.MoveCtrl.SetRotationOffset",
+      "since": "83.0",
+      "note": "Still registered, but from 83.0 only as a stub that does nothing or returns fixed values. Last working in 0.82.7.1 (rts/Lua/LuaSyncedMoveCtrl.cpp)."
+    },
+    {
+      "id": "removed:Spring.MoveCtrl.SetShotStop",
+      "kind": "removed",
+      "name": "Spring.MoveCtrl.SetShotStop",
+      "since": "105.0",
+      "note": "Still registered, but from 105.0 only as a stub that does nothing or returns fixed values. Last working in 104.0.1 (rts/Lua/LuaSyncedMoveCtrl.cpp)."
+    },
+    {
+      "id": "removed:Spring.MoveCtrl.SetSlopeStop",
+      "kind": "removed",
+      "name": "Spring.MoveCtrl.SetSlopeStop",
+      "since": "105.0",
+      "note": "Still registered, but from 105.0 only as a stub that does nothing or returns fixed values. Last working in 104.0.1 (rts/Lua/LuaSyncedMoveCtrl.cpp)."
+    },
+    {
+      "id": "removed:Spring.SetDecalAlpha",
+      "kind": "removed",
+      "name": "Spring.SetDecalAlpha",
+      "since": "2025.01.1",
+      "note": "Last registered in 105.1.1 (rts/Lua/LuaUnsyncedCtrl.cpp)."
+    },
+    {
+      "id": "removed:Spring.SetDecalPos",
+      "kind": "removed",
+      "name": "Spring.SetDecalPos",
+      "since": "2025.01.1",
+      "note": "Last registered in 105.1.1 (rts/Lua/LuaUnsyncedCtrl.cpp)."
+    },
+    {
+      "id": "removed:Spring.SetDecalRotation",
+      "kind": "removed",
+      "name": "Spring.SetDecalRotation",
+      "since": "2025.01.1",
+      "note": "Last registered in 105.1.1 (rts/Lua/LuaUnsyncedCtrl.cpp)."
+    },
+    {
+      "id": "removed:Spring.SetDecalSize",
+      "kind": "removed",
+      "name": "Spring.SetDecalSize",
+      "since": "2025.01.1",
+      "note": "Last registered in 105.1.1 (rts/Lua/LuaUnsyncedCtrl.cpp)."
+    },
+    {
+      "id": "removed:Spring.SetDecalTexture",
+      "kind": "removed",
+      "name": "Spring.SetDecalTexture",
+      "since": "2025.01.1",
+      "note": "Last registered in 105.1.1 (rts/Lua/LuaUnsyncedCtrl.cpp)."
+    },
+    {
+      "id": "removed:Spring.SetProjectileSpinAngle",
+      "kind": "removed",
+      "name": "Spring.SetProjectileSpinAngle",
+      "since": "95.0",
+      "note": "Still registered, but from 95.0 only as a stub that does nothing or returns fixed values. Last working in 94.1.1 (rts/Lua/LuaSyncedCtrl.cpp)."
+    },
+    {
+      "id": "removed:Spring.SetProjectileSpinSpeed",
+      "kind": "removed",
+      "name": "Spring.SetProjectileSpinSpeed",
+      "since": "95.0",
+      "note": "Still registered, but from 95.0 only as a stub that does nothing or returns fixed values. Last working in 94.1.1 (rts/Lua/LuaSyncedCtrl.cpp)."
+    },
+    {
+      "id": "removed:Spring.SetProjectileSpinVec",
+      "kind": "removed",
+      "name": "Spring.SetProjectileSpinVec",
+      "since": "95.0",
+      "note": "Still registered, but from 95.0 only as a stub that does nothing or returns fixed values. Last working in 94.1.1 (rts/Lua/LuaSyncedCtrl.cpp)."
+    },
+    {
+      "id": "removed:Spring.SetRulesInfoMap",
+      "kind": "removed",
+      "name": "Spring.SetRulesInfoMap",
+      "since": "0.82.0",
+      "note": "Last registered in 0.81.2.1 (rts/Lua/LuaRules.cpp)."
+    },
+    {
+      "id": "removed:Spring.SetSunManualControl",
+      "kind": "removed",
+      "name": "Spring.SetSunManualControl",
+      "since": "104.0",
+      "note": "remove Spring.SetSunParameters and Spring.SetSunManualControl. Last registered in 103.0.1 (rts/Lua/LuaUnsyncedCtrl.cpp)."
+    },
+    {
+      "id": "removed:Spring.SetSunParameters",
+      "kind": "removed",
+      "name": "Spring.SetSunParameters",
+      "since": "104.0",
+      "note": "remove Spring.SetSunParameters and Spring.SetSunManualControl. Last registered in 103.0.1 (rts/Lua/LuaUnsyncedCtrl.cpp)."
+    },
+    {
+      "id": "removed:Spring.SetUnitFuel",
+      "kind": "removed",
+      "name": "Spring.SetUnitFuel",
+      "since": "101.0",
+      "note": "Still registered, but from 101.0 only as a stub that does nothing or returns fixed values. Last working in 100.0.1 (rts/Lua/LuaSyncedCtrl.cpp)."
+    },
+    {
+      "id": "removed:Spring.SetUnitLineage",
+      "kind": "removed",
+      "name": "Spring.SetUnitLineage",
+      "since": "83.0",
+      "note": "Last registered in 0.82.7.1 (rts/Lua/LuaSyncedCtrl.cpp)."
+    },
+    {
+      "id": "removed:Spring.SetUnitToFeature",
+      "kind": "removed",
+      "name": "Spring.SetUnitToFeature",
+      "since": "105.0",
+      "note": "remove Spring.SetUnitToFeature (use the AllowFeatureCreation callin to block features from being spawned). Last registered in 104.0.1 (rts/Lua/LuaSyncedCtrl.cpp)."
+    },
+    {
+      "id": "removed:Spring.SetUnitTravel",
+      "kind": "removed",
+      "name": "Spring.SetUnitTravel",
+      "since": "105.0",
+      "note": "remove Spring.{Set,Get}UnitTravel. Still registered, but from 105.0 only as a stub that does nothing or returns fixed values. Last working in 104.0.1 (rts/Lua/LuaSyncedCtrl.cpp)."
+    },
+    {
+      "id": "removed:Spring.UnitRendering.SetUnitUniform",
+      "kind": "removed",
+      "name": "Spring.UnitRendering.SetUnitUniform",
+      "since": "101.0",
+      "note": "Last registered in 100.0.1 (rts/Lua/LuaUnitRendering.cpp)."
+    },
+    {
+      "id": "removed:Spring.UpdateInfoTexture",
+      "kind": "removed",
+      "name": "Spring.UpdateInfoTexture",
+      "since": "99.0",
+      "note": "remove Spring.UpdateInfoTexture. Last registered in 98.0.1 (rts/Lua/LuaUnsyncedCtrl.cpp)."
+    },
+    {
+      "id": "removed:Spring.WeaponHaveFreeLineOfFire",
+      "kind": "removed",
+      "name": "Spring.WeaponHaveFreeLineOfFire",
+      "since": "94.0",
+      "note": "Last registered in 93.2.1 (rts/Lua/LuaSyncedRead.cpp)."
+    },
+    {
+      "id": "removed:Spring.WeaponTestRange",
+      "kind": "removed",
+      "name": "Spring.WeaponTestRange",
+      "since": "94.0",
+      "note": "Last registered in 93.2.1 (rts/Lua/LuaSyncedRead.cpp)."
+    },
+    {
+      "id": "removed:Spring.WeaponTestTarget",
+      "kind": "removed",
+      "name": "Spring.WeaponTestTarget",
+      "since": "94.0",
+      "note": "Last registered in 93.2.1 (rts/Lua/LuaSyncedRead.cpp)."
+    },
+    {
+      "id": "removed:Spring.WeaponTryTarget",
+      "kind": "removed",
+      "name": "Spring.WeaponTryTarget",
+      "since": "94.0",
+      "note": "Last registered in 93.2.1 (rts/Lua/LuaSyncedRead.cpp)."
+    },
+    {
+      "id": "removed:VFS.MapArchive",
+      "kind": "removed",
+      "name": "VFS.MapArchive",
+      "since": "2025.01.1",
+      "note": "Last registered in 105.1.1 (rts/Lua/LuaVFS.cpp)."
+    },
+    {
+      "id": "removed:VFS.UnmapArchive",
+      "kind": "removed",
+      "name": "VFS.UnmapArchive",
+      "since": "2025.01.1",
+      "note": "Last registered in 105.1.1 (rts/Lua/LuaVFS.cpp)."
+    },
+    {
+      "id": "removed:gl.ClipDist",
+      "kind": "removed",
+      "name": "gl.ClipDist",
+      "since": "105.1.1",
+      "note": "Last registered in 105.0.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.ConfigScreen",
+      "kind": "removed",
+      "name": "gl.ConfigScreen",
+      "since": "2025.01.1",
+      "note": "Last registered in 105.1.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.CreateVertexArray",
+      "kind": "removed",
+      "name": "gl.CreateVertexArray",
+      "since": "105.1.1",
+      "note": "Last registered in 105.0.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.DeleteVertexArray",
+      "kind": "removed",
+      "name": "gl.DeleteVertexArray",
+      "since": "105.1.1",
+      "note": "Last registered in 105.0.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.DrawBufferedText",
+      "kind": "removed",
+      "name": "gl.DrawBufferedText",
+      "since": "105.1.1",
+      "note": "Last registered in 105.0.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.Eval",
+      "kind": "removed",
+      "name": "gl.Eval",
+      "since": "0.82.0",
+      "note": "Last registered in 0.81.2.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.EvalCoord1",
+      "kind": "removed",
+      "name": "gl.EvalCoord1",
+      "since": "0.82.0",
+      "note": "Last registered in 0.81.2.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.EvalCoord2",
+      "kind": "removed",
+      "name": "gl.EvalCoord2",
+      "since": "0.82.0",
+      "note": "Last registered in 0.81.2.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.EvalDisable",
+      "kind": "removed",
+      "name": "gl.EvalDisable",
+      "since": "0.82.0",
+      "note": "Last registered in 0.81.2.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.EvalEnable",
+      "kind": "removed",
+      "name": "gl.EvalEnable",
+      "since": "0.82.0",
+      "note": "Last registered in 0.81.2.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.EvalMesh1",
+      "kind": "removed",
+      "name": "gl.EvalMesh1",
+      "since": "0.82.0",
+      "note": "Last registered in 0.81.2.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.EvalMesh2",
+      "kind": "removed",
+      "name": "gl.EvalMesh2",
+      "since": "0.82.0",
+      "note": "Last registered in 0.81.2.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.EvalPoint1",
+      "kind": "removed",
+      "name": "gl.EvalPoint1",
+      "since": "0.82.0",
+      "note": "Last registered in 0.81.2.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.EvalPoint2",
+      "kind": "removed",
+      "name": "gl.EvalPoint2",
+      "since": "0.82.0",
+      "note": "Last registered in 0.81.2.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.GetDefaultShaderSources",
+      "kind": "removed",
+      "name": "gl.GetDefaultShaderSources",
+      "since": "105.1.1",
+      "note": "Last registered in 105.0.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.GetDrawMode",
+      "kind": "removed",
+      "name": "gl.GetDrawMode",
+      "since": "105.1.1",
+      "note": "Last registered in 105.0.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.GetScreenProjMatrix",
+      "kind": "removed",
+      "name": "gl.GetScreenProjMatrix",
+      "since": "105.1.1",
+      "note": "Last registered in 105.0.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.GetScreenViewMatrix",
+      "kind": "removed",
+      "name": "gl.GetScreenViewMatrix",
+      "since": "105.1.1",
+      "note": "Last registered in 105.0.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.GetTimerQuery",
+      "kind": "removed",
+      "name": "gl.GetTimerQuery",
+      "since": "105.1.1",
+      "note": "Last registered in 105.0.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.InitNames",
+      "kind": "removed",
+      "name": "gl.InitNames",
+      "since": "89.0",
+      "note": "Last registered in 88.0.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.LoadName",
+      "kind": "removed",
+      "name": "gl.LoadName",
+      "since": "89.0",
+      "note": "Last registered in 88.0.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.Map1",
+      "kind": "removed",
+      "name": "gl.Map1",
+      "since": "0.82.0",
+      "note": "Last registered in 0.81.2.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.Map2",
+      "kind": "removed",
+      "name": "gl.Map2",
+      "since": "0.82.0",
+      "note": "Last registered in 0.81.2.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.MapGrid1",
+      "kind": "removed",
+      "name": "gl.MapGrid1",
+      "since": "0.82.0",
+      "note": "Last registered in 0.81.2.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.MapGrid2",
+      "kind": "removed",
+      "name": "gl.MapGrid2",
+      "since": "0.82.0",
+      "note": "Last registered in 0.81.2.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.PopName",
+      "kind": "removed",
+      "name": "gl.PopName",
+      "since": "89.0",
+      "note": "Last registered in 88.0.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.PushName",
+      "kind": "removed",
+      "name": "gl.PushName",
+      "since": "89.0",
+      "note": "Last registered in 88.0.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.RenderMode",
+      "kind": "removed",
+      "name": "gl.RenderMode",
+      "since": "89.0",
+      "note": "Last registered in 88.0.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.RenderVertexArray",
+      "kind": "removed",
+      "name": "gl.RenderVertexArray",
+      "since": "105.1.1",
+      "note": "Last registered in 105.0.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.SelectBuffer",
+      "kind": "removed",
+      "name": "gl.SelectBuffer",
+      "since": "89.0",
+      "note": "remove gl.SelectBuffer and co. Last registered in 88.0.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.SelectBufferData",
+      "kind": "removed",
+      "name": "gl.SelectBufferData",
+      "since": "89.0",
+      "note": "Last registered in 88.0.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.SetTimerQuery",
+      "kind": "removed",
+      "name": "gl.SetTimerQuery",
+      "since": "105.1.1",
+      "note": "Last registered in 105.0.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.Smoothing",
+      "kind": "removed",
+      "name": "gl.Smoothing",
+      "since": "104.0",
+      "note": "remove gl.Smoothing. Last registered in 103.0.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.UnsafeSetFBO",
+      "kind": "removed",
+      "name": "gl.UnsafeSetFBO",
+      "since": "105.0",
+      "note": "Last registered in 104.0.1 (rts/Lua/LuaFBOs.cpp)."
+    },
+    {
+      "id": "removed:gl.UpdateVertexArray",
+      "kind": "removed",
+      "name": "gl.UpdateVertexArray",
+      "since": "105.1.1",
+      "note": "Last registered in 105.0.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "removed:gl.VertexIndices",
+      "kind": "removed",
+      "name": "gl.VertexIndices",
+      "since": "105.1.1",
+      "note": "Last registered in 105.0.1 (rts/Lua/LuaOpenGL.cpp)."
+    },
+    {
+      "id": "renamed:Game.buildFlags",
+      "kind": "renamed",
+      "name": "Game.buildFlags",
+      "replacement": "Engine.buildFlags",
+      "since": "104.0",
+      "note": "Game.{version,versionFull,versionPatchSet,buildFlags} now reside in the Engine table Engine.wordSize indicates the build type and is either 32 or 64 (or 0 in synced code)"
+    },
+    {
+      "id": "renamed:Game.gameID",
+      "kind": "renamed",
+      "name": "Game.gameID",
+      "replacement": "GameID",
+      "since": "89.0",
+      "note": "replace Game.gameID by synced callin GameID(string gameID)"
+    },
+    {
+      "id": "renamed:Game.version",
+      "kind": "renamed",
+      "name": "Game.version",
+      "replacement": "Engine.version",
+      "since": "104.0",
+      "note": "Game.{version,versionFull,versionPatchSet,buildFlags} now reside in the Engine table Engine.wordSize indicates the build type and is either 32 or 64 (or 0 in synced code)"
+    },
+    {
+      "id": "renamed:Game.versionFull",
+      "kind": "renamed",
+      "name": "Game.versionFull",
+      "replacement": "Engine.versionFull",
+      "since": "104.0",
+      "note": "Game.{version,versionFull,versionPatchSet,buildFlags} now reside in the Engine table Engine.wordSize indicates the build type and is either 32 or 64 (or 0 in synced code)"
+    },
+    {
+      "id": "renamed:Game.versionPatchSet",
+      "kind": "renamed",
+      "name": "Game.versionPatchSet",
+      "replacement": "Engine.versionPatchSet",
+      "since": "104.0",
+      "note": "Game.{version,versionFull,versionPatchSet,buildFlags} now reside in the Engine table Engine.wordSize indicates the build type and is either 32 or 64 (or 0 in synced code)"
+    },
+    {
+      "id": "renamed:Spring.RemoveBuildingDecal",
+      "kind": "renamed",
+      "name": "Spring.RemoveBuildingDecal",
+      "replacement": "Spring.RemoveObjectDecal",
+      "since": "105.0",
+      "note": "rename Spring.RemoveBuildingDecal to Spring.RemoveObjectDecal. Last registered in 104.0.1 (rts/Lua/LuaSyncedCtrl.cpp)."
+    },
+    {
+      "id": "renamed:gl.SetShaderParameter",
+      "kind": "renamed",
+      "name": "gl.SetShaderParameter",
+      "replacement": "gl.SetGeometryShaderParameter",
+      "since": "105.0",
+      "note": "Renamed SetShaderParameter to SetGeometryShaderParameter to avoid confusion of what kind shader parameters belongs to. Last registered in 104.0.1 (rts/Lua/LuaShaders.cpp)."
+    },
+    {
+      "id": "signature:AllowCommand@105.0",
+      "kind": "signature",
+      "name": "AllowCommand",
+      "since": "105.0",
+      "note": "playerID is passed after cmdTag, so fromSynced moves from the 8th argument to the 9th and a 10th, fromLua, follows. The arguments are now unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdOptions, cmdTag, playerID, fromSynced, fromLua."
+    },
+    {
+      "id": "signature:AllowStartPosition@104.0",
+      "kind": "signature",
+      "name": "AllowStartPosition",
+      "since": "104.0",
+      "note": "reorder AllowStartPosition callin parameters and add teamID old: clampedX, clampedY, clampedZ, playerID, readyState, rawX, rawY, rawZ new: playerID, teamID, readyState, clampedX, clampedY, clampedZ, rawX, rawY, rawZ"
+    },
+    {
+      "id": "signature:AllowWeaponInterceptTarget@101.0",
+      "kind": "signature",
+      "name": "AllowWeaponInterceptTarget",
+      "since": "101.0",
+      "note": "The following callins will now have 1-based weapon index arguments: DrawShield, ShieldPreDamaged, AllowWeaponTargetCheck, AllowWeaponTarget, AllowWeaponInterceptTarget, StockpileChanged"
+    },
+    {
+      "id": "signature:AllowWeaponTarget@101.0",
+      "kind": "signature",
+      "name": "AllowWeaponTarget",
+      "since": "101.0",
+      "note": "The following callins will now have 1-based weapon index arguments: DrawShield, ShieldPreDamaged, AllowWeaponTargetCheck, AllowWeaponTarget, AllowWeaponInterceptTarget, StockpileChanged"
+    },
+    {
+      "id": "signature:AllowWeaponTargetCheck@101.0",
+      "kind": "signature",
+      "name": "AllowWeaponTargetCheck",
+      "since": "101.0",
+      "note": "The following callins will now have 1-based weapon index arguments: DrawShield, ShieldPreDamaged, AllowWeaponTargetCheck, AllowWeaponTarget, AllowWeaponInterceptTarget, StockpileChanged"
+    },
+    {
+      "id": "signature:DrawShield@101.0",
+      "kind": "signature",
+      "name": "DrawShield",
+      "since": "101.0",
+      "note": "The following callins will now have 1-based weapon index arguments: DrawShield, ShieldPreDamaged, AllowWeaponTargetCheck, AllowWeaponTarget, AllowWeaponInterceptTarget, StockpileChanged"
+    },
+    {
+      "id": "signature:Game.version@92.0",
+      "kind": "signature",
+      "name": "Game.version",
+      "since": "92.0",
+      "note": "Game.version now returns the same as `spring --sync-version`, e.g. \"92.0\" or \"91.0.1-1283-gf3805a7\""
+    },
+    {
+      "id": "signature:GameID@101.0",
+      "kind": "signature",
+      "name": "GameID",
+      "since": "101.0",
+      "note": "GameID callin now gets the ID string encoded in hex."
+    },
+    {
+      "id": "signature:GamePreload@104.0",
+      "kind": "signature",
+      "name": "GamePreload",
+      "since": "104.0",
+      "note": "The callins GameStart and GamePreload won't be called when a saved game is loaded"
+    },
+    {
+      "id": "signature:GameStart@104.0",
+      "kind": "signature",
+      "name": "GameStart",
+      "since": "104.0",
+      "note": "The callins GameStart and GamePreload won't be called when a saved game is loaded"
+    },
+    {
+      "id": "signature:Script.SetWatchUnit@85.0",
+      "kind": "signature",
+      "name": "Script.SetWatchUnit",
+      "since": "85.0",
+      "note": "call UnitMoveFailed event only for via Script.SetWatchUnit registered UnitDefs"
+    },
+    {
+      "id": "signature:Script.SetWatchWeapon@92.0",
+      "kind": "signature",
+      "name": "Script.SetWatchWeapon",
+      "since": "92.0",
+      "note": "couple the AllowWeapon* callins to SetWatchWeapon state"
+    },
+    {
+      "id": "signature:ShieldPreDamaged@101.0",
+      "kind": "signature",
+      "name": "ShieldPreDamaged",
+      "since": "101.0",
+      "note": "The following callins will now have 1-based weapon index arguments: DrawShield, ShieldPreDamaged, AllowWeaponTargetCheck, AllowWeaponTarget, AllowWeaponInterceptTarget, StockpileChanged"
+    },
+    {
+      "id": "signature:Spring.GetAIInfo@101.0",
+      "kind": "signature",
+      "name": "Spring.GetAIInfo",
+      "since": "101.0",
+      "note": "LuaSyncedRead::GetAIInfo now returns \"UNKNOWN\" for non-local AI's, not \"UKNOWN\""
+    },
+    {
+      "id": "signature:Spring.GetConfigFloat@BAR105 1544",
+      "kind": "signature",
+      "name": "Spring.GetConfigFloat",
+      "since": "BAR105 1544",
+      "note": "Spring.GetConfigInt, Spring.GetConfigFloat and Spring.GetConfigString now accept nil as the second argument (what to return by default if not set). Previously it was treated as 0 (Int and Float) or \"\" (String). To get back previous behaviour:"
+    },
+    {
+      "id": "signature:Spring.GetConfigInt@BAR105 1544",
+      "kind": "signature",
+      "name": "Spring.GetConfigInt",
+      "since": "BAR105 1544",
+      "note": "Spring.GetConfigInt, Spring.GetConfigFloat and Spring.GetConfigString now accept nil as the second argument (what to return by default if not set). Previously it was treated as 0 (Int and Float) or \"\" (String). To get back previous behaviour:"
+    },
+    {
+      "id": "signature:Spring.GetConfigString@BAR105 1544",
+      "kind": "signature",
+      "name": "Spring.GetConfigString",
+      "since": "BAR105 1544",
+      "note": "Spring.GetConfigInt, Spring.GetConfigFloat and Spring.GetConfigString now accept nil as the second argument (what to return by default if not set). Previously it was treated as 0 (Int and Float) or \"\" (String). To get back previous behaviour:"
+    },
+    {
+      "id": "signature:Spring.GetFactoryCommands@105.0",
+      "kind": "signature",
+      "name": "Spring.GetFactoryCommands",
+      "since": "105.0",
+      "note": "make Spring.Get{Unit,Factory}Commands always expect a second argument"
+    },
+    {
+      "id": "signature:Spring.GetFeatureBlocking@95.0",
+      "kind": "signature",
+      "name": "Spring.GetFeatureBlocking",
+      "since": "95.0",
+      "note": "LuaSynced*: make {S,G}et{Unit,Feature}Blocking signatures match Get{Unit,Feature}Blocking(number objectID) --> boolean isBlocking, boolean isSolidObjectCollidable, boolean isProjectileCollidable, boolean isRaySegmentCollidable, boolean crushable, boolean blockEnemyPushing, boolean blockHeightChanges"
+    },
+    {
+      "id": "signature:Spring.GetFeatureRulesParams@102.0",
+      "kind": "signature",
+      "name": "Spring.GetFeatureRulesParams",
+      "since": "102.0",
+      "note": "Get{Game,Team,Unit,Feature}RulesParams will now return { paramName = value, ... }"
+    },
+    {
+      "id": "signature:Spring.GetGameRulesParams@102.0",
+      "kind": "signature",
+      "name": "Spring.GetGameRulesParams",
+      "since": "102.0",
+      "note": "Get{Game,Team,Unit,Feature}RulesParams will now return { paramName = value, ... }"
+    },
+    {
+      "id": "signature:Spring.GetGameSpeed@97.0",
+      "kind": "signature",
+      "name": "Spring.GetGameSpeed",
+      "since": "97.0",
+      "note": "moved Spring.GetGameSpeed() from SyncedRead to UnsyncedRead cause it was causing desyncs in demos"
+    },
+    {
+      "id": "signature:Spring.GetGroundInfo@105.0",
+      "kind": "signature",
+      "name": "Spring.GetGroundInfo",
+      "since": "105.0",
+      "note": "return the terrain-type index from Spring.GetGroundInfo and Spring.GetTerrainTypeData these functions now push [number index, string name, ...] rather than [string name, ...] onto the stack"
+    },
+    {
+      "id": "signature:Spring.GetKeyState@99.0",
+      "kind": "signature",
+      "name": "Spring.GetKeyState",
+      "since": "99.0",
+      "note": "fix Spring.GetKeyState & Spring.PressedKeys expecting SDL2 keycodes while whole lua gets SDL1 ones"
+    },
+    {
+      "id": "signature:Spring.GetPlayerList@104.0",
+      "kind": "signature",
+      "name": "Spring.GetPlayerList",
+      "since": "104.0",
+      "note": "exclude spectators from Spring.GetPlayerList if given a normal (id >= 0) team arg"
+    },
+    {
+      "id": "signature:Spring.GetProjectileTarget@95.0",
+      "kind": "signature",
+      "name": "Spring.GetProjectileTarget",
+      "since": "95.0",
+      "note": "LuaSynced*: slightly change {Get,Set}ProjectileTarget signatures GetProjectileTarget now returns a number instead of a string to indicate target-type GetProjectileTarget now always returns two arguments (if given projectileID is valid) GetProjectileTarget now always returns a target position if projectile has no target object SetProjectileTarget now takes a number instead of a string to indicate target-type"
+    },
+    {
+      "id": "signature:Spring.GetSelectedUnitsCounts@BAR105 1544",
+      "kind": "signature",
+      "name": "Spring.GetSelectedUnitsCounts",
+      "since": "BAR105 1544",
+      "note": "the tables returned by Spring.GetSelectedUnitsSorted and Spring.GetSelectedUnitsCounts no longer have an additional `n` key with corresponding value containing the number of unitdefs."
+    },
+    {
+      "id": "signature:Spring.GetSelectedUnitsSorted@BAR105 1544",
+      "kind": "signature",
+      "name": "Spring.GetSelectedUnitsSorted",
+      "since": "BAR105 1544",
+      "note": "the tables returned by Spring.GetSelectedUnitsSorted and Spring.GetSelectedUnitsCounts no longer have an additional `n` key with corresponding value containing the number of unitdefs."
+    },
+    {
+      "id": "signature:Spring.GetTeamInfo@105.0",
+      "kind": "signature",
+      "name": "Spring.GetTeamInfo",
+      "since": "105.0",
+      "note": "Spring.GetTeamInfo: switched the last two return values around (incomeMultiplier is now 7th, customKeys is now 8th)"
+    },
+    {
+      "id": "signature:Spring.GetTeamRulesParams@102.0",
+      "kind": "signature",
+      "name": "Spring.GetTeamRulesParams",
+      "since": "102.0",
+      "note": "Get{Game,Team,Unit,Feature}RulesParams will now return { paramName = value, ... }"
+    },
+    {
+      "id": "signature:Spring.GetTerrainTypeData@105.0",
+      "kind": "signature",
+      "name": "Spring.GetTerrainTypeData",
+      "since": "105.0",
+      "note": "return the terrain-type index from Spring.GetGroundInfo and Spring.GetTerrainTypeData these functions now push [number index, string name, ...] rather than [string name, ...] onto the stack"
+    },
+    {
+      "id": "signature:Spring.GetUnitArmored@105.0",
+      "kind": "signature",
+      "name": "Spring.GetUnitArmored",
+      "since": "105.0",
+      "note": "Spring.GetUnit{Armored,IsActive} now works on enemies in LoS"
+    },
+    {
+      "id": "signature:Spring.GetUnitBlocking@95.0",
+      "kind": "signature",
+      "name": "Spring.GetUnitBlocking",
+      "since": "95.0",
+      "note": "LuaSynced*: make {S,G}et{Unit,Feature}Blocking signatures match Get{Unit,Feature}Blocking(number objectID) --> boolean isBlocking, boolean isSolidObjectCollidable, boolean isProjectileCollidable, boolean isRaySegmentCollidable, boolean crushable, boolean blockEnemyPushing, boolean blockHeightChanges"
+    },
+    {
+      "id": "signature:Spring.GetUnitCommands@105.0",
+      "kind": "signature",
+      "name": "Spring.GetUnitCommands",
+      "since": "105.0",
+      "note": "The count argument is required. Calling Spring.GetUnitCommands(unitID) with no count raises a Lua error. Pass -1 for the whole queue, or use Spring.GetUnitCommandCount for the length."
+    },
+    {
+      "id": "signature:Spring.GetUnitIsActive@105.0",
+      "kind": "signature",
+      "name": "Spring.GetUnitIsActive",
+      "since": "105.0",
+      "note": "Spring.GetUnit{Armored,IsActive} now works on enemies in LoS"
+    },
+    {
+      "id": "signature:Spring.GetUnitMass@105.0",
+      "kind": "signature",
+      "name": "Spring.GetUnitMass",
+      "since": "105.0",
+      "note": "Spring.GetUnitMass no longer works on enemies outside of LoS"
+    },
+    {
+      "id": "signature:Spring.GetUnitNearestEnemy@95.0",
+      "kind": "signature",
+      "name": "Spring.GetUnitNearestEnemy",
+      "since": "95.0",
+      "note": "Spring.GetUnitNearestEnemy doesn't return neutral units anymore"
+    },
+    {
+      "id": "signature:Spring.GetUnitPieceCollisionVolumeData@101.0",
+      "kind": "signature",
+      "name": "Spring.GetUnitPieceCollisionVolumeData",
+      "since": "101.0",
+      "note": "{Set,Get}UnitPieceCollisionVolumeData now receive 1-based piece index argument (was 0-based)."
+    },
+    {
+      "id": "signature:Spring.GetUnitPieceDirection@101.0",
+      "kind": "signature",
+      "name": "Spring.GetUnitPieceDirection",
+      "since": "101.0",
+      "note": "fix Spring.GetUnitPieceDirection() (returns now same dir as GetEmitDirPos)"
+    },
+    {
+      "id": "signature:Spring.GetUnitPieceInfo@101.0",
+      "kind": "signature",
+      "name": "Spring.GetUnitPieceInfo",
+      "since": "101.0",
+      "note": "Spring.GetUnitPieceInfo() will now set \"[null]\" as the parent name of the root piece instead of \"\""
+    },
+    {
+      "id": "signature:Spring.GetUnitPosition@89.0",
+      "kind": "signature",
+      "name": "Spring.GetUnitPosition",
+      "since": "89.0",
+      "note": "change Spring.GetUnitPosition to return a unit's base-position by default, like .GetFeaturePosition does for features (this is usually a point on the model closer to the ground than its mid-position, so may affect some Lua drawing code)"
+    },
+    {
+      "id": "signature:Spring.GetUnitRulesParams@102.0",
+      "kind": "signature",
+      "name": "Spring.GetUnitRulesParams",
+      "since": "102.0",
+      "note": "Get{Game,Team,Unit,Feature}RulesParams will now return { paramName = value, ... }"
+    },
+    {
+      "id": "signature:Spring.GetUnitWeaponHaveFreeLineOfFire@104.0",
+      "kind": "signature",
+      "name": "Spring.GetUnitWeaponHaveFreeLineOfFire",
+      "since": "104.0",
+      "note": "extend Spring.GetUnitWeaponHaveFreeLineOfFire to take aiming-from coors old API: Spring.GetUnitWeaponHaveFreeLineOfFire(unitID, weaponNum, targetID | [ tgtPosX [, tgtPosY [, tgtPosZ ]]]]) new API: Spring.GetUnitWeaponHaveFreeLineOfFire(unitID, weaponNum, targetID | [srcPosX [, srcPosY [, srcPosZ [, tgtPosX [, tgtPosY [, tgtPosZ]]]]]]) (if the srcPos* arguments are all nil, the default aiming location is used as before)"
+    },
+    {
+      "id": "signature:Spring.GetUnitWeaponHaveFreeLineOfFire@95.0",
+      "kind": "signature",
+      "name": "Spring.GetUnitWeaponHaveFreeLineOfFire",
+      "since": "95.0",
+      "note": "fix {Get,Set}UnitWeapon{Fire,HoldFire,TryTarget,TestTarget,TestRange,HaveFreeLineOfFire} WeaponID argument to use the same 1-starting indexes as rest of lua interface"
+    },
+    {
+      "id": "signature:Spring.GetUnitWeaponTestRange@95.0",
+      "kind": "signature",
+      "name": "Spring.GetUnitWeaponTestRange",
+      "since": "95.0",
+      "note": "fix {Get,Set}UnitWeapon{Fire,HoldFire,TryTarget,TestTarget,TestRange,HaveFreeLineOfFire} WeaponID argument to use the same 1-starting indexes as rest of lua interface"
+    },
+    {
+      "id": "signature:Spring.GetUnitWeaponTestTarget@95.0",
+      "kind": "signature",
+      "name": "Spring.GetUnitWeaponTestTarget",
+      "since": "95.0",
+      "note": "fix {Get,Set}UnitWeapon{Fire,HoldFire,TryTarget,TestTarget,TestRange,HaveFreeLineOfFire} WeaponID argument to use the same 1-starting indexes as rest of lua interface"
+    },
+    {
+      "id": "signature:Spring.GetUnitWeaponTryTarget@95.0",
+      "kind": "signature",
+      "name": "Spring.GetUnitWeaponTryTarget",
+      "since": "95.0",
+      "note": "fix {Get,Set}UnitWeapon{Fire,HoldFire,TryTarget,TestTarget,TestRange,HaveFreeLineOfFire} WeaponID argument to use the same 1-starting indexes as rest of lua interface"
+    },
+    {
+      "id": "signature:Spring.MoveCtrl.SetGroundMoveTypeData@89.0",
+      "kind": "signature",
+      "name": "Spring.MoveCtrl.SetGroundMoveTypeData",
+      "since": "89.0",
+      "note": "MoveCtrl: remove SetGroundMoveTypeData(unitID, \"wantedSpeed\", v) and SetGroundMoveTypeData(unitID, \"maxWantedSpeed\", v) (the preferred way for gadgets to change a unit's speed is by calling SetGroundMoveTypeData(unitID, \"maxSpeed\", v))"
+    },
+    {
+      "id": "signature:Spring.RemoveGrass@97.0",
+      "kind": "signature",
+      "name": "Spring.RemoveGrass",
+      "since": "97.0",
+      "note": "fix wrong coords & crash in Spring.RemoveGrass"
+    },
+    {
+      "id": "signature:Spring.Restart@99.0",
+      "kind": "signature",
+      "name": "Spring.Restart",
+      "since": "99.0",
+      "note": "modified Spring.Restart(parameters, script): it only restarts spring when parameters isn't empty"
+    },
+    {
+      "id": "signature:Spring.SetCameraState@101.0",
+      "kind": "signature",
+      "name": "Spring.SetCameraState",
+      "since": "101.0",
+      "note": "do not start camera transitions from Spring.SetCameraState"
+    },
+    {
+      "id": "signature:Spring.SetFeatureBlocking@95.0",
+      "kind": "signature",
+      "name": "Spring.SetFeatureBlocking",
+      "since": "95.0",
+      "note": "LuaSynced*: make {S,G}et{Unit,Feature}Blocking signatures match Get{Unit,Feature}Blocking(number objectID) --> boolean isBlocking, boolean isSolidObjectCollidable, boolean isProjectileCollidable, boolean isRaySegmentCollidable, boolean crushable, boolean blockEnemyPushing, boolean blockHeightChanges"
+    },
+    {
+      "id": "signature:Spring.SetLosViewColors@100.0",
+      "kind": "signature",
+      "name": "Spring.SetLosViewColors",
+      "since": "100.0",
+      "note": "SetLosViewColors changed: - radar2 colour (see Map changes) is required. - parameters are now in the form of GetLosViewColors output: (always = {r,g,b}, LOS = {r,g,b}, radar = {r,g,b}, jammer = {r,g,b}, radar2 = {r,g,b})"
+    },
+    {
+      "id": "signature:Spring.SetProjectileTarget@95.0",
+      "kind": "signature",
+      "name": "Spring.SetProjectileTarget",
+      "since": "95.0",
+      "note": "LuaSynced*: slightly change {Get,Set}ProjectileTarget signatures GetProjectileTarget now returns a number instead of a string to indicate target-type GetProjectileTarget now always returns two arguments (if given projectileID is valid) GetProjectileTarget now always returns a target position if projectile has no target object SetProjectileTarget now takes a number instead of a string to indicate target-type"
+    },
+    {
+      "id": "signature:Spring.SetUnitBlocking@95.0",
+      "kind": "signature",
+      "name": "Spring.SetUnitBlocking",
+      "since": "95.0",
+      "note": "LuaSynced*: make {S,G}et{Unit,Feature}Blocking signatures match Get{Unit,Feature}Blocking(number objectID) --> boolean isBlocking, boolean isSolidObjectCollidable, boolean isProjectileCollidable, boolean isRaySegmentCollidable, boolean crushable, boolean blockEnemyPushing, boolean blockHeightChanges"
+    },
+    {
+      "id": "signature:Spring.SetUnitPieceCollisionVolumeData@101.0",
+      "kind": "signature",
+      "name": "Spring.SetUnitPieceCollisionVolumeData",
+      "since": "101.0",
+      "note": "{Set,Get}UnitPieceCollisionVolumeData now receive 1-based piece index argument (was 0-based)."
+    },
+    {
+      "id": "signature:StockpileChanged@101.0",
+      "kind": "signature",
+      "name": "StockpileChanged",
+      "since": "101.0",
+      "note": "The following callins will now have 1-based weapon index arguments: DrawShield, ShieldPreDamaged, AllowWeaponTargetCheck, AllowWeaponTarget, AllowWeaponInterceptTarget, StockpileChanged"
+    },
+    {
+      "id": "signature:UnitCommand@105.0",
+      "kind": "signature",
+      "name": "UnitCommand",
+      "since": "105.0",
+      "note": "change {Allow,Unit}Command callin parameters AllowCommand(..., cmdTag, fromSynced) --> AllowCommand(..., cmdTag, playerID, fromSynced, fromLua) UnitCommand(..., cmdTag ) --> UnitCommand(..., cmdTag, playerID, fromSynced, fromLua)"
+    },
+    {
+      "id": "signature:UnitCreated@97.0",
+      "kind": "signature",
+      "name": "UnitCreated",
+      "since": "97.0",
+      "note": "this way unsynced parts of gadgets now get `synced` callins like 'UnitCreated' etc. w/o SendToUnsynced from their synced part"
+    },
+    {
+      "id": "signature:UnitDamaged@95.0",
+      "kind": "signature",
+      "name": "UnitDamaged",
+      "since": "95.0",
+      "note": "projectileID is passed after weaponDefID, so attackerID, attackerDefID and attackerTeam each arrive one place later than in 0.81. The arguments are now unitID, unitDefID, unitTeam, damage, paralyzer, weaponDefID, projectileID, attackerID, attackerDefID, attackerTeam."
+    },
+    {
+      "id": "signature:UnitMoveFailed@85.0",
+      "kind": "signature",
+      "name": "UnitMoveFailed",
+      "since": "85.0",
+      "note": "call UnitMoveFailed event only for via Script.SetWatchUnit registered UnitDefs"
+    },
+    {
+      "id": "signature:UnitUnitCollision@BAR105 1544",
+      "kind": "signature",
+      "name": "UnitUnitCollision",
+      "since": "BAR105 1544",
+      "note": "The return value from the UnitUnitCollision callin is now ignored and there is only one event for each collision. There is no way to get back the old behaviour for now, but if someone needs it it could be arranged."
+    },
+    {
+      "id": "signature:VFS.UseArchive@105.0",
+      "kind": "signature",
+      "name": "VFS.UseArchive",
+      "since": "105.0",
+      "note": "VFS.MapArchive, VFS.UnmapArchive and VFS.UseArchive now take archiveName instead of fileName as the first parameter."
+    },
+    {
+      "id": "signature:gl.CreateTexture@97.0",
+      "kind": "signature",
+      "name": "gl.CreateTexture",
+      "since": "97.0",
+      "note": "gl.Scissor & gl.CreateTexture throw an error on incorrect sizes, too"
+    },
+    {
+      "id": "signature:gl.FeatureShape@101.0",
+      "kind": "signature",
+      "name": "gl.FeatureShape",
+      "since": "101.0",
+      "note": "gl.UnitShape and gl.FeatureShape now take three extra boolean arguments and set their relevant GL state internally (so that calling only these functions is enough to get correctly rendered models; pass in 'false' for the [new] THIRD argument for the fixed behavior, omit it or pass in 'true' [default] to render with your own custom state instead) NOTE: the [new] FOURTH argument should be 'true' if in DrawScreen and 'false' (default) if in DrawWorld; any transforms for these two functions *MUST* include a gl.LoadIdentity call when argument #3 is false (whether they are used in DrawWorld or in DrawScreen) the [new] FIFTH argument determines whether the model is drawn opaque ('true' [default]) or with translucency ('false'); only has an effect when argument #3 is false"
+    },
+    {
+      "id": "signature:gl.LineWidth@97.0",
+      "kind": "signature",
+      "name": "gl.LineWidth",
+      "since": "97.0",
+      "note": "gl.LineWidth & gl.PointSize throw an error when called with incorrect argument (<=0)"
+    },
+    {
+      "id": "signature:gl.PointSize@97.0",
+      "kind": "signature",
+      "name": "gl.PointSize",
+      "since": "97.0",
+      "note": "gl.LineWidth & gl.PointSize throw an error when called with incorrect argument (<=0)"
+    },
+    {
+      "id": "signature:gl.Scissor@97.0",
+      "kind": "signature",
+      "name": "gl.Scissor",
+      "since": "97.0",
+      "note": "gl.Scissor & gl.CreateTexture throw an error on incorrect sizes, too"
+    },
+    {
+      "id": "signature:gl.UnitPieceMatrix@92.0",
+      "kind": "signature",
+      "name": "gl.UnitPieceMatrix",
+      "since": "92.0",
+      "note": "gl.UnitPieceMatrix & gl.UnitPieceMultMatrix do now the same and work from UnitSpace & aren't recursive anymore (don't depend on the parent-piece)"
+    },
+    {
+      "id": "signature:gl.UnitPieceMultMatrix@92.0",
+      "kind": "signature",
+      "name": "gl.UnitPieceMultMatrix",
+      "since": "92.0",
+      "note": "gl.UnitPieceMatrix & gl.UnitPieceMultMatrix do now the same and work from UnitSpace & aren't recursive anymore (don't depend on the parent-piece)"
+    },
+    {
+      "id": "signature:gl.UnitShape@101.0",
+      "kind": "signature",
+      "name": "gl.UnitShape",
+      "since": "101.0",
+      "note": "gl.UnitShape and gl.FeatureShape now take three extra boolean arguments and set their relevant GL state internally (so that calling only these functions is enough to get correctly rendered models; pass in 'false' for the [new] THIRD argument for the fixed behavior, omit it or pass in 'true' [default] to render with your own custom state instead) NOTE: the [new] FOURTH argument should be 'true' if in DrawScreen and 'false' (default) if in DrawWorld; any transforms for these two functions *MUST* include a gl.LoadIdentity call when argument #3 is false (whether they are used in DrawWorld or in DrawScreen) the [new] FIFTH argument determines whether the model is drawn opaque ('true' [default]) or with translucency ('false'); only has an effect when argument #3 is false"
+    },
+    {
+      "id": "signature:gl.Viewport@97.0",
+      "kind": "signature",
+      "name": "gl.Viewport",
+      "since": "97.0",
+      "note": "fix gl.Viewport"
+    }
+  ],
+  "changelog": [
+    {
+      "version": "BAR105 1544",
+      "line": 452,
+      "text": "onlyLocal for all three Spring.Marker functions (Point, Line, Erase) no longer accepts numerical 0 as false (now follows regular Lua language rules where 0 is true). To get back old behaviour, change `0` to `false`."
+    },
+    {
+      "version": "BAR105 1544",
+      "line": 456,
+      "text": "Spring.GetConfigInt, Spring.GetConfigFloat and Spring.GetConfigString now accept nil as the second argument (what to return by default if not set). Previously it was treated as 0 (Int and Float) or \"\" (String). To get back previous behaviour:"
+    },
+    {
+      "version": "BAR105 1544",
+      "line": 467,
+      "text": "hovercraft and ships brought out of water no longer forced to be upright. To get back previous behaviour, put the `upright = true` tag in all unit defs whose move def is of the hovercraft or ship type."
+    },
+    {
+      "version": "BAR105 1544",
+      "line": 471,
+      "text": "The return value from the UnitUnitCollision callin is now ignored and there is only one event for each collision. There is no way to get back the old behaviour for now, but if someone needs it it could be arranged."
+    },
+    {
+      "version": "BAR105 1544",
+      "line": 476,
+      "text": "Rendering fonts now obeys GL color state. This means that sometimes text will not be the same color as previously. To get back previous behaviour, you might need to add `gl.Color` in front of `gl.Text` calls."
+    },
+    {
+      "version": "BAR105 1544",
+      "line": 480,
+      "text": "removed the following constants: Platform.glSupport16bitDepthBuffer Platform.glSupport24bitDepthBuffer Platform.glSupport32bitDepthBuffer"
+    },
+    {
+      "version": "BAR105 1544",
+      "line": 491,
+      "text": "units with `useFootPrintCollisionVolume` but no `collisionVolumeScales` set will now use the footprint volume (previously mistakenly used the model's sphere). To keep the old hitvolume, set `useFootPrintCollisionVolume` to false for units with no `collisionVolumeScales`. Assuming you apply `lowerkeys` to unit defs, this can also be achieved by putting the following in unit defs post-processing:"
+    },
+    {
+      "version": "BAR105 1544",
+      "line": 508,
+      "text": "tree feature defs `treetype0` through `treetype16` are now provided by the basecontent archive instead of the engine. No known games ship their own basecontent and they would know what to do if so."
+    },
+    {
+      "version": "BAR105 1544",
+      "line": 511,
+      "text": "the `firestarter` weapon tag no longer capped at 10000 in defs (which becomes 100 in Lua WeaponDefs after rescale), now uncapped. To get back previous behaviour, put the following in weapon defs post-processing:"
+    },
+    {
+      "version": "BAR105 1544",
+      "line": 521,
+      "text": "the tables returned by Spring.GetSelectedUnitsSorted and Spring.GetSelectedUnitsCounts no longer have an additional `n` key with corresponding value containing the number of unitdefs."
+    },
+    {
+      "version": "105.0",
+      "line": 713,
+      "text": "change {Allow,Unit}Command callin parameters AllowCommand(..., cmdTag, fromSynced) --> AllowCommand(..., cmdTag, playerID, fromSynced, fromLua) UnitCommand(..., cmdTag            ) -->  UnitCommand(..., cmdTag, playerID, fromSynced, fromLua)"
+    },
+    {
+      "version": "105.0",
+      "line": 716,
+      "text": "remove Game.mapHumanName"
+    },
+    {
+      "version": "105.0",
+      "line": 717,
+      "text": "remove UnitDefs[i].moveDef.{family,type}"
+    },
+    {
+      "version": "105.0",
+      "line": 725,
+      "text": "return the terrain-type index from Spring.GetGroundInfo and Spring.GetTerrainTypeData these functions now push [number index, string name, ...] rather than [string name, ...] onto the stack"
+    },
+    {
+      "version": "105.0",
+      "line": 753,
+      "text": "rename Spring.RemoveBuildingDecal to Spring.RemoveObjectDecal"
+    },
+    {
+      "version": "105.0",
+      "line": 799,
+      "text": "Renamed SetShaderParameter to SetGeometryShaderParameter to avoid confusion of what kind shader parameters belongs to."
+    },
+    {
+      "version": "105.0",
+      "line": 804,
+      "text": "VFS.MapArchive, VFS.UnmapArchive and VFS.UseArchive now take archiveName instead of fileName as the first parameter."
+    },
+    {
+      "version": "105.0",
+      "line": 815,
+      "text": "make Spring.Get{Unit,Factory}Commands always expect a second argument"
+    },
+    {
+      "version": "105.0",
+      "line": 816,
+      "text": "Spring.GetTeamInfo: switched the last two return values around (incomeMultiplier is now 7th, customKeys is now 8th)"
+    },
+    {
+      "version": "105.0",
+      "line": 819,
+      "text": "Spring.GetUnit{Armored,IsActive} now works on enemies in LoS"
+    },
+    {
+      "version": "105.0",
+      "line": 820,
+      "text": "Spring.GetUnitMass no longer works on enemies outside of LoS"
+    },
+    {
+      "version": "105.0",
+      "line": 821,
+      "text": "remove Spring.{Set,Get}UnitTravel"
+    },
+    {
+      "version": "105.0",
+      "line": 822,
+      "text": "remove Spring.SetUnitToFeature (use the AllowFeatureCreation callin to block features from being spawned)"
+    },
+    {
+      "version": "105.0",
+      "line": 861,
+      "text": "Made lockluaui.txt obsolete: no longer necessary for it to exists in order to enable VFS for LuaUI"
+    },
+    {
+      "version": "104.0",
+      "line": 1028,
+      "text": "Undeprecate {unit,feature}def.modelname and add .modeltype and .modelpath to allow reading these without loading the model. Removed def.model.{name,type,path} so they aren't used accidentally."
+    },
+    {
+      "version": "104.0",
+      "line": 1031,
+      "text": "The callins GameStart and GamePreload won't be called when a saved game is loaded"
+    },
+    {
+      "version": "104.0",
+      "line": 1071,
+      "text": "Game.{version,versionFull,versionPatchSet,buildFlags} now reside in the Engine table Engine.wordSize indicates the build type and is either 32 or 64 (or 0 in synced code)"
+    },
+    {
+      "version": "104.0",
+      "line": 1080,
+      "text": "remove Spring.SetSunParameters and Spring.SetSunManualControl"
+    },
+    {
+      "version": "104.0",
+      "line": 1081,
+      "text": "remove gl.Smoothing"
+    },
+    {
+      "version": "104.0",
+      "line": 1111,
+      "text": "reorder AllowStartPosition callin parameters and add teamID old: clampedX, clampedY, clampedZ, playerID, readyState, rawX, rawY, rawZ new: playerID, teamID, readyState, clampedX, clampedY, clampedZ, rawX, rawY, rawZ"
+    },
+    {
+      "version": "104.0",
+      "line": 1119,
+      "text": "extend Spring.GetUnitWeaponHaveFreeLineOfFire to take aiming-from coors old API: Spring.GetUnitWeaponHaveFreeLineOfFire(unitID, weaponNum, targetID | [                                 tgtPosX [, tgtPosY [, tgtPosZ  ]]]]) new API: Spring.GetUnitWeaponHaveFreeLineOfFire(unitID, weaponNum, targetID | [srcPosX [, srcPosY [, srcPosZ [, tgtPosX [, tgtPosY [, tgtPosZ]]]]]]) (if the srcPos* arguments are all nil, the default aiming location is used as before)"
+    },
+    {
+      "version": "104.0",
+      "line": 1128,
+      "text": "exclude spectators from Spring.GetPlayerList if given a normal (id >= 0) team arg"
+    },
+    {
+      "version": "102.0",
+      "line": 1331,
+      "text": "Get{Game,Team,Unit,Feature}RulesParams will now return { paramName = value, ... }"
+    },
+    {
+      "version": "101.0",
+      "line": 1456,
+      "text": "ModInfo: remove losMul & airLosMul -> always handle los ranges in elmos in the _whole_ engine WARNING: this also rescales the returned values in Lua UnitDefs!"
+    },
+    {
+      "version": "101.0",
+      "line": 1458,
+      "text": "ModInfo: make `radarMipLevel` configurable"
+    },
+    {
+      "version": "101.0",
+      "line": 1460,
+      "text": "ModInfo: add new sensors.alwaysVisibleOverridesCloaked (default _off_! before was always on)"
+    },
+    {
+      "version": "101.0",
+      "line": 1461,
+      "text": "modrules.lua: add new `separateJammers` tag (breaks backward compatibility!) default true (old behaviour is false) when enabled each allyTeam only jams their own units"
+    },
+    {
+      "version": "101.0",
+      "line": 1491,
+      "text": "airbases and fuel were removed, use custom commands in combination with Spring.SetUnitLandGoal(unitID, x, y, z [, radius]) and the new transport changes to implement this functionality in lua."
+    },
+    {
+      "version": "101.0",
+      "line": 1560,
+      "text": "GameID callin now gets the ID string encoded in hex."
+    },
+    {
+      "version": "101.0",
+      "line": 1561,
+      "text": "new Lua callin RenderUnitDestroyed is now called just before a unit is invalid, after it finishes its death animation."
+    },
+    {
+      "version": "101.0",
+      "line": 1566,
+      "text": "The following callins will now have 1-based weapon index arguments: DrawShield, ShieldPreDamaged, AllowWeaponTargetCheck, AllowWeaponTarget, AllowWeaponInterceptTarget, StockpileChanged"
+    },
+    {
+      "version": "101.0",
+      "line": 1598,
+      "text": "Lua{Feature,Unit}Defs: make the \"model\" subtable available (as it is for LuaUnitDefs) move the {min,max,mid}{x,y,z} values to this table (these can now be accessed using e.g. *Defs[i].model.midx) deprecate *Defs[i].modelname, use *Defs[i].model.path instead"
+    },
+    {
+      "version": "101.0",
+      "line": 1605,
+      "text": "Game.fogColor constant is no longer available, use gl.GetAtmosphere(\"fogColor\")"
+    },
+    {
+      "version": "101.0",
+      "line": 1606,
+      "text": "Game.groundAmbientColor, Game.groundSpecularColor and Game.groundSunColor are no longer available, use gl.GetSun() instead with appropriate parameters - add unsynced callout Spring.SetSunLighting(table params) -> nil It can be used to modify the following sun lighting parameters: {ground,unit}{Ambient,Diffuse,Specular}Color and specularExponent example usage: Spring.SetSunLighting({ groundAmbientColor = {1, 0.1, 1}, groundDiffuseColor = {1, 0.1, 1}, })"
+    },
+    {
+      "version": "101.0",
+      "line": 1631,
+      "text": "Weapons with tracking will use a radar dot position unless Spring.SetProjectileIgnoreTrackingError(projID, bool ignore) is called."
+    },
+    {
+      "version": "101.0",
+      "line": 1638,
+      "text": "gl.UnitShape and gl.FeatureShape now take three extra boolean arguments and set their relevant GL state internally (so that calling only these functions is enough to get correctly rendered models; pass in 'false' for the [new] THIRD argument for the fixed behavior, omit it or pass in 'true' [default] to render with your own custom state instead) NOTE: the [new] FOURTH argument should be 'true' if in DrawScreen and 'false' (default) if in DrawWorld; any transforms for these two functions *MUST* include a gl.LoadIdentity call when argument #3 is false (whether they are used in DrawWorld or in DrawScreen) the [new] FIFTH argument determines whether the model is drawn opaque ('true' [default]) or with translucency ('false'); only has an effect when argument #3 is false"
+    },
+    {
+      "version": "101.0",
+      "line": 1679,
+      "text": "do not start camera transitions from Spring.SetCameraState"
+    },
+    {
+      "version": "101.0",
+      "line": 1680,
+      "text": "LuaSyncedRead::GetAIInfo now returns \"UNKNOWN\" for non-local AI's, not \"UKNOWN\""
+    },
+    {
+      "version": "101.0",
+      "line": 1681,
+      "text": "{Set,Get}UnitPieceCollisionVolumeData now receive 1-based piece index argument (was 0-based)."
+    },
+    {
+      "version": "101.0",
+      "line": 1684,
+      "text": "fix Spring.GetUnitPieceDirection() (returns now same dir as GetEmitDirPos)"
+    },
+    {
+      "version": "101.0",
+      "line": 1685,
+      "text": "Spring.GetUnitPieceInfo() will now set \"[null]\" as the parent name of the root piece instead of \"\""
+    },
+    {
+      "version": "100.0",
+      "line": 1784,
+      "text": "Added radar2 los colour for colouring the inside of the radar edge. - it is changeable through SetLosViewColors (see Lua changes)"
+    },
+    {
+      "version": "100.0",
+      "line": 1797,
+      "text": "SetLosViewColors changed: - radar2 colour (see Map changes) is required. - parameters are now in the form of GetLosViewColors output: (always = {r,g,b}, LOS = {r,g,b}, radar = {r,g,b}, jammer = {r,g,b}, radar2 = {r,g,b})"
+    },
+    {
+      "version": "100.0",
+      "line": 1804,
+      "text": "convert UnitDef::attackSafetyDistance to a key recognized by Spring.SetMoveTypeData"
+    },
+    {
+      "version": "99.0",
+      "line": 1851,
+      "text": "add headless values from springrc-tempate-headless.txt"
+    },
+    {
+      "version": "99.0",
+      "line": 1858,
+      "text": "save windowed size in separate tags (#4388)"
+    },
+    {
+      "version": "99.0",
+      "line": 1871,
+      "text": "remove los view w/o radar a.k.a. [;] (can be emulated with Spring.SetLosViewColors)"
+    },
+    {
+      "version": "99.0",
+      "line": 1945,
+      "text": "modified Spring.Restart(parameters, script): it only restarts spring when parameters isn't empty"
+    },
+    {
+      "version": "99.0",
+      "line": 1957,
+      "text": "remove Spring.UpdateInfoTexture"
+    },
+    {
+      "version": "99.0",
+      "line": 1958,
+      "text": "fix Spring.GetKeyState & Spring.PressedKeys expecting SDL2 keycodes while whole lua gets SDL1 ones"
+    },
+    {
+      "version": "99.0",
+      "line": 1959,
+      "text": "Spring.PressedKeys now also returns keynames"
+    },
+    {
+      "version": "98.0",
+      "line": 2044,
+      "text": "move magic number to weapondef_post.lua: crater were 1.5x of craterAreaOfEffect while decals are 1.0x -> make them _both same size_"
+    },
+    {
+      "version": "98.0",
+      "line": 2046,
+      "text": "LightningCannon visual now obeys the beamTTL weapondef tag (behaviour same as BeamLaser) - previous value was hardcoded 10"
+    },
+    {
+      "version": "97.0",
+      "line": 2102,
+      "text": "removed -c/--client argument (was only needed in times when clients didn't retrieved their script.txt from the server)"
+    },
+    {
+      "version": "97.0",
+      "line": 2144,
+      "text": "this way unsynced parts of gadgets now get `synced` callins like 'UnitCreated' etc. w/o  SendToUnsynced from their synced part"
+    },
+    {
+      "version": "97.0",
+      "line": 2157,
+      "text": "moved Spring.GetGameSpeed() from SyncedRead to UnsyncedRead cause it was causing desyncs in demos"
+    },
+    {
+      "version": "97.0",
+      "line": 2159,
+      "text": "new TextInput(utf8char) callin, needed cause of changed unicode handling in SDL2"
+    },
+    {
+      "version": "97.0",
+      "line": 2162,
+      "text": "gl.LineWidth & gl.PointSize throw an error when called with incorrect argument (<=0)"
+    },
+    {
+      "version": "97.0",
+      "line": 2163,
+      "text": "gl.Scissor & gl.CreateTexture throw an error on incorrect sizes, too"
+    },
+    {
+      "version": "97.0",
+      "line": 2164,
+      "text": "fix gl.Viewport"
+    },
+    {
+      "version": "97.0",
+      "line": 2174,
+      "text": "fix wrong coords & crash in Spring.RemoveGrass"
+    },
+    {
+      "version": "95.0",
+      "line": 2329,
+      "text": "remove engine support for gamedata/messages.tdf, see examples/Widgets/game_messages.lua for a possible replacement"
+    },
+    {
+      "version": "95.0",
+      "line": 2380,
+      "text": "remove TA-specific code in CobInstance::Create (this changes the argument value to COB's SetMaxReloadTime for units equipped with BeamLasers and / or more than one weapon)"
+    },
+    {
+      "version": "95.0",
+      "line": 2418,
+      "text": "UnitDef: read brakeRate for aircraft without scaling by 0.1 and make brakeRate default to maxAcc, not maxAcc * 3.0 (--> open up your unitdef_post's)"
+    },
+    {
+      "version": "95.0",
+      "line": 2450,
+      "text": "LuaUnitDefs: deprecate the \"drag\" key, was an internal variable"
+    },
+    {
+      "version": "95.0",
+      "line": 2479,
+      "text": "LuaUnitDefs: deprecate canHover (check moveDef.family instead to determine if a unit is a hovercraft)"
+    },
+    {
+      "version": "95.0",
+      "line": 2500,
+      "text": "LuaSynced*: make sure ALL weapon API functions are 1-based UPDATE YOUR GAME'S UNIT_SCRIPT.LUA IF IT HAS LUA-SCRIPTED UNITS AND YOU ARE NOT USING SPRING'S (BASECONTENT) VERSION"
+    },
+    {
+      "version": "95.0",
+      "line": 2504,
+      "text": "LuaSynced*: make {S,G}et{Unit,Feature}Blocking signatures match Get{Unit,Feature}Blocking(number objectID) --> boolean isBlocking, boolean isSolidObjectCollidable, boolean isProjectileCollidable, boolean isRaySegmentCollidable, boolean crushable, boolean blockEnemyPushing, boolean blockHeightChanges"
+    },
+    {
+      "version": "95.0",
+      "line": 2525,
+      "text": "LuaSynced*: slightly change {Get,Set}ProjectileTarget signatures GetProjectileTarget now returns a number instead of a string to indicate target-type GetProjectileTarget now always returns two arguments (if given projectileID is valid) GetProjectileTarget now always returns a target position if projectile has no target object SetProjectileTarget now takes a number instead of a string to indicate target-type"
+    },
+    {
+      "version": "95.0",
+      "line": 2571,
+      "text": "LuaSyncedRead: deprecate the Spring.GetProjectileSpin* functions"
+    },
+    {
+      "version": "95.0",
+      "line": 2611,
+      "text": "Spring.GetUnitNearestEnemy doesn't return neutral units anymore"
+    },
+    {
+      "version": "95.0",
+      "line": 2703,
+      "text": "fix {Get,Set}UnitWeapon{Fire,HoldFire,TryTarget,TestTarget,TestRange,HaveFreeLineOfFire} WeaponID argument to use the same 1-starting indexes as rest of lua interface"
+    },
+    {
+      "version": "92.0",
+      "line": 2973,
+      "text": "fix return in GetInfoMapSize (#2996)"
+    },
+    {
+      "version": "92.0",
+      "line": 2975,
+      "text": "ProcessUnits, GetUnitCount, GetMapCount, GetMapArchiveCount, GetInfoMap, GetPrimaryModInfoCount,GetPrimaryModArchive, GetSideCount, GetModOptionCount, GetCustomOptionCount, GetSkirmishAICount, GetInfoValueInteger, GetInfoValueFloat, GetOptionType, GetOptionNumberDef, GetOptionNumberStep, GetOptionStringMaxLen, GetOptionListCount and GetModValidMapCount returns now -1/-1.0f on error"
+    },
+    {
+      "version": "92.0",
+      "line": 2985,
+      "text": "gl.UnitPieceMatrix & gl.UnitPieceMultMatrix do now the same and work from UnitSpace & aren't recursive anymore (don't depend on the parent-piece)"
+    },
+    {
+      "version": "92.0",
+      "line": 3007,
+      "text": "deprecate LuaUnitDefs.extractSquare"
+    },
+    {
+      "version": "92.0",
+      "line": 3008,
+      "text": "replace LuaFeatureDefs.deathFeature(string) by LuaFeatureDefs.deathFeatureID(number)"
+    },
+    {
+      "version": "92.0",
+      "line": 3011,
+      "text": "couple the AllowWeapon* callins to SetWatchWeapon state"
+    },
+    {
+      "version": "92.0",
+      "line": 3013,
+      "text": "Game.version now returns the same as `spring --sync-version`, e.g. \"92.0\" or \"91.0.1-1283-gf3805a7\""
+    },
+    {
+      "version": "92.0",
+      "line": 3025,
+      "text": "get rid of TYPE_FOOTPRINT, it was an alias for TYPE_SPHERE in the continuous case which is now default and the original intent (a shape defined by the CSG intersection of sphere and footprint) would have been tricky to get right instead support a {Unit,Feature}Def key \"useFootPrintCollisionVolume\" which makes a collision volume a box with dimensions equal to the object's footprint (this overrides any custom scaling and/or offsets)"
+    },
+    {
+      "version": "92.0",
+      "line": 3065,
+      "text": "LUS/COB: deprecate QueryNanoPiece() makes SimCode ~10% faster use the new Spring.SetUnitNanoPieces instead Note, once set the engine won't call `QueryNanoPiece` anymore and instead randomly toggles between the set nanopieces, saving a lot time-consuming COB/LUS calls."
+    },
+    {
+      "version": "92.0",
+      "line": 3079,
+      "text": "remove of manualBombSettings (backward-compatibility code in weapondefs_post.lua)"
+    },
+    {
+      "version": "92.0",
+      "line": 3087,
+      "text": "add new avoidGround weapondef tag (default true)"
+    },
+    {
+      "version": "92.0",
+      "line": 3090,
+      "text": "remove \"nodrawundergray\" now that there is a proper \"floating\" tag"
+    },
+    {
+      "version": "92.0",
+      "line": 3122,
+      "text": "UnitDef::can{Restore, Repair, Reclaim, Capture, Resurrect} now default to true only if the unit is a builder and has the corresponding {Terraform, Repair, Reclaim, Capture, Resurrect}Speed property set to a non-zero value"
+    },
+    {
+      "version": "89.0",
+      "line": 3308,
+      "text": "remove selectkeys.txt support (use uikeys.txt instead)"
+    },
+    {
+      "version": "89.0",
+      "line": 3375,
+      "text": "remove modelCenterOffset tag (can now be dynamically set with Lua)"
+    },
+    {
+      "version": "89.0",
+      "line": 3398,
+      "text": "some config values are now write protected (Spring.SetConfig*)"
+    },
+    {
+      "version": "89.0",
+      "line": 3402,
+      "text": "LuaSyncedRead: better hide enemy radarblobs unit-info"
+    },
+    {
+      "version": "89.0",
+      "line": 3403,
+      "text": "MoveCtrl: remove SetGroundMoveTypeData(unitID, \"wantedSpeed\", v) and SetGroundMoveTypeData(unitID, \"maxWantedSpeed\", v) (the preferred way for gadgets to change a unit's speed is by calling SetGroundMoveTypeData(unitID, \"maxSpeed\", v))"
+    },
+    {
+      "version": "89.0",
+      "line": 3405,
+      "text": "replace Game.gameID by synced callin GameID(string gameID)"
+    },
+    {
+      "version": "89.0",
+      "line": 3413,
+      "text": "remove gl.SelectBuffer and co."
+    },
+    {
+      "version": "89.0",
+      "line": 3421,
+      "text": "change Spring.GetUnitPosition to return a unit's base-position by default, like .GetFeaturePosition does for features (this is usually a point on the model closer to the ground than its mid-position, so may affect some Lua drawing code)"
+    },
+    {
+      "version": "89.0",
+      "line": 3447,
+      "text": "all items in sounds.lua are now converted to lowercase"
+    },
+    {
+      "version": "88.0",
+      "line": 3484,
+      "text": "to be able to use LOG.XYZ you need to update your system.lua"
+    },
+    {
+      "version": "86.0",
+      "line": 3535,
+      "text": "remove support for selectionkeys.txt"
+    },
+    {
+      "version": "85.0",
+      "line": 3718,
+      "text": "removed \"commander\" tag (The Commander selectkeys filter is now defunct (ctrl+c hotkey). Lua it, or add a new one that looks for any canManualFire units.)"
+    },
+    {
+      "version": "85.0",
+      "line": 3723,
+      "text": "added new \"canCloak\" bool tag (If an unit can receive user cloak commands. Before, canCloak was auto set to true if cloakCost >= 0.)"
+    },
+    {
+      "version": "85.0",
+      "line": 3737,
+      "text": "UnitDef[].isCommander returns now false"
+    },
+    {
+      "version": "85.0",
+      "line": 3741,
+      "text": "call UnitMoveFailed event only for via Script.SetWatchUnit registered UnitDefs"
+    },
+    {
+      "version": "85.0",
+      "line": 3742,
+      "text": "added new WeaponDefs[].craterAreaOfEffect"
+    }
+  ]
+}
