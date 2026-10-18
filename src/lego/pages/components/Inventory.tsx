@@ -261,11 +261,15 @@ export function InventoryGrids({
   const sections = useMemo(
     () =>
       inventorySections(
-        { shapes: view.shapes, parts: view.parts, modules: view.modules },
-        pack,
+        {
+          shapes: view.shapes,
+          parts: view.parts,
+          partTotal: view.partFilter.total,
+          modules: view.modules,
+        },
         compounds,
       ),
-    [view.shapes, view.parts, view.modules, pack, compounds],
+    [view.shapes, view.parts, view.partFilter.total, view.modules, compounds],
   );
   const empty = sections.every((section) => section.items.length === 0);
 
@@ -373,10 +377,14 @@ export function InventoryGrids({
  * The grid's sections, in the order they are drawn: Shapes, Parts, Built in
  * modules, Saved modules. Each carries its count before any filter, so its
  * heading can say "12 of 373" while a search, a category or a list narrows it.
+ * Parts count from the chosen colourway's parts instead, as a colourway lists
+ * each shape once (#4540): "Parts 125", not "125 of 373".
  */
 export function inventorySections(
-  view: Pick<InventoryView, "shapes" | "parts" | "modules">,
-  pack: LoadedPack,
+  view: Pick<InventoryView, "shapes" | "parts" | "modules"> & {
+    /** The parts the category holds, `PartFilter.total`. */
+    partTotal: number;
+  },
   compounds: LegoProject[],
 ): GridSection[] {
   const builtInTotal = compounds.filter(isBuiltInModule).length;
@@ -392,7 +400,7 @@ export function inventorySections(
     {
       id: "parts",
       label: "Parts",
-      total: pack.parts.length,
+      total: view.partTotal,
       items: view.parts.map((part) => ({ kind: "part", part })),
     },
     {

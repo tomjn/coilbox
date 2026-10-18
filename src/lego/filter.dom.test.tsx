@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { usePartFilter } from "./filter";
@@ -46,5 +46,19 @@ describe("usePartFilter", () => {
       "b-green",
       "b-grey",
     ]);
+  });
+
+  it("counts the parts a colourway holds, the mixed part too", () => {
+    const withMixed = {
+      ...pack,
+      parts: [...pack.parts, part("m", "m", "mixed")],
+    } as unknown as LoadedPack;
+    const { result } = renderHook(() => usePartFilter(withMixed));
+    expect(result.current.total).toBe(5);
+    act(() => result.current.setCategory("grey"));
+    expect(result.current.total).toBe(3);
+    act(() => result.current.setQuery("a-"));
+    expect(result.current.parts.map((p) => p.id)).toEqual(["a-grey"]);
+    expect(result.current.total).toBe(3);
   });
 });

@@ -876,3 +876,116 @@ describe("the detail panel", () => {
     expect(screen.queryByLabelText("detail")).toBeNull();
   });
 });
+
+/** One tile per shape in the chosen colourway (#4540). */
+describe("a colourway", () => {
+  const tinted = (id: string, shapeId: string, colourway: string) =>
+    ({
+      ...part(id),
+      shapeId,
+      category: colourway,
+      colourway,
+      bbox: { min: [0, 0, 0], max: [1, 1, 1] },
+    }) as unknown as LegoPartInfo;
+  const parts = [
+    tinted("beam-grey", "beam", "grey"),
+    tinted("beam-tan", "beam", "tan"),
+    tinted("block-grey", "block", "grey"),
+    tinted("panel-mixed", "panel", "mixed"),
+  ];
+  const tans = {
+    manifest: {
+      categories: [
+        { id: "tan", label: "Tan" },
+        { id: "grey", label: "Grey" },
+        { id: "mixed", label: "Mixed" },
+      ],
+      swatches: [{ id: "grey" }, { id: "tan" }],
+    },
+    library: { packs: [], atlases: [], dir: "", problems: [] },
+    parts,
+    byId: new Map(parts.map((p) => [p.id, p])),
+  } as unknown as LoadedPack;
+
+  const headings = () =>
+    screen.getAllByRole("heading").map((heading) => heading.textContent);
+
+  function Drawer({
+    onSelectPart,
+  }: {
+    onSelectPart: (part: LegoPartInfo, alt: boolean) => void;
+  }) {
+    const view = useInventoryView(tans, modules);
+    return (
+      <>
+        <InventoryFilters view={view} pack={tans} compounds={modules} />
+        <InventoryGrids
+          view={view}
+          pack={tans}
+          compounds={modules}
+          onSelectPart={onSelectPart}
+          onDeleteModule={vi.fn()}
+          onRenameModule={vi.fn()}
+          onCopyModule={vi.fn()}
+        />
+      </>
+    );
+  }
+
+  it("lists every part, a shape's colourways together, under All categories", () => {
+    render(<Drawer onSelectPart={vi.fn()} />);
+    expect(names("part grid")).toEqual([
+      "beam-tan",
+      "beam-grey",
+      "block-grey",
+      "panel-mixed",
+    ]);
+    expect(headings()).toContain("Parts 4");
+  });
+
+  it("lists each shape once in the colourway, and the mixed part", () => {
+    render(<Drawer onSelectPart={vi.fn()} />);
+    pickCategory("Grey");
+    expect(names("part grid")).toEqual([
+      "beam-grey",
+      "block-grey",
+      "panel-mixed",
+    ]);
+    pickCategory("Tan");
+    expect(names("part grid")).toEqual(["beam-tan", "panel-mixed"]);
+  });
+
+  it("counts what the colourway shows", () => {
+    render(<Drawer onSelectPart={vi.fn()} />);
+    pickCategory("Grey");
+    expect(headings()).toEqual(["Parts 3"]);
+    fireEvent.change(screen.getByLabelText("Search the inventory"), {
+      target: { value: "block" },
+    });
+    expect(headings()).toEqual(["Parts 1 of 3"]);
+    pickCategory("Tan");
+    fireEvent.change(screen.getByLabelText("Search the inventory"), {
+      target: { value: "" },
+    });
+    expect(headings()).toEqual(["Parts 2"]);
+  });
+
+  it("places the shape in the chosen colourway", () => {
+    const onSelectPart = vi.fn();
+    render(<Drawer onSelectPart={onSelectPart} />);
+    pickCategory("Tan");
+    fireEvent.click(screen.getByRole("button", { name: "pick beam-tan" }));
+    expect(onSelectPart).toHaveBeenLastCalledWith(parts[1], false);
+    fireEvent.click(screen.getByRole("button", { name: "pick panel-mixed" }));
+    expect(onSelectPart).toHaveBeenLastCalledWith(parts[3], false);
+  });
+
+  it("places the part clicked under All categories", () => {
+    const onSelectPart = vi.fn();
+    render(<Drawer onSelectPart={onSelectPart} />);
+    fireEvent.click(screen.getByRole("button", { name: "pick beam-grey" }));
+    expect(onSelectPart).toHaveBeenLastCalledWith(parts[0], false);
+    fireEvent.click(screen.getByRole("button", { name: "pick beam-tan" }));
+    expect(onSelectPart).toHaveBeenLastCalledWith(parts[1], false);
+  });
+});
