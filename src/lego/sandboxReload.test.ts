@@ -34,6 +34,7 @@ function written(
     textures,
     textureFiles,
     weaponsLeftOut: [],
+    buildListLeftOut: [],
   };
 }
 

@@ -385,8 +385,10 @@ export async function prepareSandbox(opts: {
   game: GameItem;
   mapName: string;
   unitName: string;
+  /** The builders the unit's own build list adds it to (issue #4515). */
+  builtBy: readonly string[];
 }): Promise<{ sandbox: ScratchSandbox; scenario: Scenario }> {
-  const { enginePath, dataDir, game, mapName, unitName } = opts;
+  const { enginePath, dataDir, game, mapName, unitName, builtBy } = opts;
   const [info, minimap] = await Promise.all([
     primeGameInfo(enginePath, dataDir, game.primaryArchive.name),
     loadUnitsyncMinimap(enginePath, dataDir, mapName, THUMB_MINIMAP_MIP),
@@ -427,7 +429,11 @@ export async function prepareSandbox(opts: {
   return {
     scenario,
     sandbox: {
-      download: buildDownloadMenu(builder, unitName),
+      // A builder the build list already names would list the unit twice.
+      download: buildDownloadMenu(
+        builder && !builtBy.includes(builder.toLowerCase()) ? builder : null,
+        unitName,
+      ),
       gadget: buildSandboxGadget(builder),
       missionId: SANDBOX_MISSION_ID,
       mission,

@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { buildEdgeMap } from "../content/buildTree";
+import { withBuiltUnits } from "../lego/buildList";
 import type { BattleConfig } from "../play/bindings";
 import {
   applyPerks,
@@ -82,6 +84,29 @@ describe("disabledUnitsFor", () => {
     const r = run([]);
     r.startUnit = undefined;
     expect(disabledUnitsFor(r, EDGES, new Map())).toEqual([]);
+  });
+
+  // Issue #4515. A unit made in the builder joins a factory's list through
+  // the mutator, so it is locked and unlocked like any of the game's units.
+  it("locks a built unit a factory builds, and unlocks it", () => {
+    const edges = buildEdgeMap(
+      withBuiltUnits(
+        [
+          { name: "com", buildOptions: ["vplant"] },
+          { name: "vplant", buildOptions: ["tank"] },
+          { name: "tank", buildOptions: [] },
+        ],
+        [{ unitName: "skyfort", builtBy: ["vplant"] }],
+      ),
+    );
+    expect(disabledUnitsFor(run(["com"]), edges, new Map()).sort()).toEqual([
+      "skyfort",
+      "tank",
+      "vplant",
+    ]);
+    expect(
+      disabledUnitsFor(run(["com", "vplant", "skyfort"]), edges, new Map()),
+    ).toEqual(["tank"]);
   });
 });
 

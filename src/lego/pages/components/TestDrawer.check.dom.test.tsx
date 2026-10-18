@@ -146,6 +146,7 @@ beforeEach(() => {
     dir: "/data/games/coilbox-lego-test.sdd",
     name: "Coilbox unit test scratch",
     weaponsLeftOut: [],
+    buildListLeftOut: [],
   });
 });
 
