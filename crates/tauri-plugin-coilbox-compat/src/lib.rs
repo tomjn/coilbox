@@ -597,6 +597,9 @@ mod tests {
         assert_eq!(
             built.files,
             [
+                "LuaRules/Gadgets/coilbox_compat_aircraft_crash.lua",
+                "LuaRules/Gadgets/coilbox_compat_messages_tdf.lua",
+                "LuaRules/Gadgets/coilbox_compat_only_forward_aim.lua",
                 "Objects3D/armcom.s3o",
                 models::DEFS_POST,
                 "modinfo.lua",
