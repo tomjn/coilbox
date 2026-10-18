@@ -59,7 +59,7 @@ import { addShape } from "../addShape";
 import { aimPoint } from "../aimPoint";
 import { type ArrangeAction, arrange } from "../align";
 import { addAnchor, removeAnchor, updateAnchor } from "../anchors";
-import { presetById, ROLES, restAngleWarnings } from "../animPresets";
+import { pickerRoles, presetById, restAngleWarnings } from "../animPresets";
 import { unitAtlas } from "../atlas";
 import { balanceProblem, checkBalance } from "../balance";
 import { legoTexturePrune } from "../bindings";
@@ -198,6 +198,7 @@ import { applyTarget } from "../skeletonSize";
 import type { Vec3 } from "../snapping";
 import { swapModule, swapRefusal } from "../swapModule";
 import { swapPart } from "../swapPart";
+import { upgradeChainProblems } from "../upgradeChain";
 import { useEditShortcuts } from "../useEditShortcuts";
 import { useLegoDocument } from "../useLegoDocument";
 import { useModuleFiles } from "../useModuleFiles";
@@ -638,10 +639,16 @@ function Builder({ id }: { id: string | undefined }) {
     );
   }, [draft, pack, raw]);
 
+  const chainNotes = useMemo(
+    () => (draft ? upgradeChainProblems(draft) : []),
+    [draft],
+  );
+
   const problems = useMemo<Problem[]>(
     () => [
       ...documentProblems,
       ...(budgetNote ? [budgetNote] : []),
+      ...chainNotes,
       ...(balanceNote ? [balanceNote] : []),
       ...footprintNotes,
       ...overlapNotes,
@@ -650,6 +657,7 @@ function Builder({ id }: { id: string | undefined }) {
     [
       documentProblems,
       budgetNote,
+      chainNotes,
       balanceNote,
       footprintNotes,
       overlapNotes,
@@ -3379,7 +3387,7 @@ function Builder({ id }: { id: string | undefined }) {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value={NO_ROLE}>None</SelectItem>
-                                {ROLES.map((role) => (
+                                {pickerRoles(draft.pieces).map((role) => (
                                   <SelectItem key={role.id} value={role.id}>
                                     {role.label}
                                   </SelectItem>

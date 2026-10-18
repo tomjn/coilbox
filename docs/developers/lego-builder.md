@@ -275,6 +275,14 @@ Rename a loadout and export again, or delete one, and the old name goes into the
 
 Switching, adding, duplicating, renaming and deleting are each one undo step. Undo past a switch and you are back on the loadout you were editing, as it was.
 
+### Upgrade chains
+
+A loadout can be an upgrade of another ([issue #3286](https://github.com/tomjn/coilbox/issues/3286)). In the Loadouts popover, pick **From** a loadout under its name. The chain is saved with the project as `upgradesFrom` on the loadout entry, holding the id of the loadout before it.
+
+A chain is a line. The popover greys out a loadout that would make a loop, and one that another loadout already upgrades from. A saved file that holds a loop or a branch still opens, and the problems list reports it. Deleting a loadout in the middle of a chain links the next one to the one before it.
+
+The switch and the Compare loadouts drawer list loadouts in chain order, and a column says which loadout it is from. In the drawer, each cell also shows what changed from the loadout before: a stat's difference (`+50`), or a mount marked `added`, `removed` or `was <module>`. The chain is stored and shown only. Writing it into a game as morph or upgrade data is decided in [issue #3287](https://github.com/tomjn/coilbox/issues/3287), so an export does not carry it yet.
+
 A loadout you are not looking at keeps its pieces as they were. If you deleted the chassis piece one of them hung off, it goes on the root piece when you switch back. If the chassis took its name meanwhile, it gets a number on the end.
 
 ### Mount points
@@ -307,7 +315,9 @@ Unlike the grid and the axes helper, this one has no toggle. Get a unit's facing
 
 An animation preset is a canned motion. It does not ask you to key anything: it asks which piece is the turret, which is the barrel, which is the front left thigh. That is what a **role** is, and it is why roles are a fixed list rather than free text.
 
-Set a role on the selected piece in the Pieces panel. The roles are grouped: Body and Door under Structure, Turret, Barrel, Muzzle flare and Aim point under Weapon, Wheel, Track, Rudder, Wake point and Landing gear under Movement, three segments for each of four legs, and three parts of a build arm.
+Set a role on the selected piece in the Pieces panel. The roles are grouped: Body and Door under Structure, Turret, Barrel, Muzzle flare and Aim point under Weapon, Wheel, Track, Rudder, Wake point and Landing gear under Movement, a thigh, shin and foot for each leg, and three parts of a build arm.
+
+Legs come in numbered pairs, with pair 1 at the front and the numbers going back along the body. A unit can have any number of pairs. The list always offers one pair more than the unit has, so to add a fourth pair, give a piece a role from pair 4.
 
 Then open the **Animation** tab. Each preset says what it does and what it needs, and one it cannot use yet names the missing role rather than sitting greyed out with no explanation:
 
@@ -315,6 +325,7 @@ Then open the **Animation** tab. Each preset says what it does and what it needs
 | --- | --- |
 | Walk, two legs | A thigh and a shin on each side of one pair |
 | Walk, four legs | A thigh on all four legs |
+| Walk, any number of legs | A thigh and a shin on every leg, up to the last pair |
 | Turret sweep | A turret, and a barrel if there is one |
 | Wheels turning | At least one wheel |
 | Rudder follows turns | At least one rudder |
@@ -429,6 +440,8 @@ A plan is built only from the roles and presets that already exist, so it can do
 | --- | --- | --- |
 | Two legs | A hip with the Body role, and a thigh, shin and foot on each side | Walk, two legs |
 | Four legs | A body, and a thigh, shin and foot on each of four legs | Walk, four legs |
+| Six legs | A body, and a thigh, shin and foot on each of six legs | Walk, any number of legs |
+| Eight legs | A body, and a thigh, shin and foot on each of eight legs | Walk, any number of legs |
 | Wheels | A body, and a wheel at each end of each axle | Wheels turning |
 | Tracks | A body, and a run of road wheels on each track | Wheels turning |
 | Turret building | A base with the Body role, a turret, a barrel and a muzzle flare | Turret sweep, Recoil on firing |
@@ -442,6 +455,25 @@ No plan sets a movement class, so every one exports as a unit that cannot move u
 ### Legs
 
 Both leg plans have a leg length from hip to ankle, a stance width between the hips, and a body height, which places an empty `torso` bone above the hip where a turret goes. Each ankle is on the ground. The defaults are the medians of Splinter Faction's 23 two legged walkers: 18.8 leg length, 29.8 stance and 5.4 body height. Four legs uses the same legs and adds a body length of 27.7 between the front and back hips.
+
+Six and eight legs use the same legs again, with the pairs spaced evenly along the body. Their **Gap between leg pairs** is the distance from one pair's hips to the next pair's. No six or eight legged model has been measured, so it starts at the four legged plan's 27.7.
+
+### Gaits
+
+**Walk, any number of legs** counts the unit's leg pairs from its roles and walks them in a wave. Each pair puts its feet down as the pair in front lifts, and the right leg of a pair is half a cycle behind the left. So steps run from the rear to the front along each side. This is the wave gait for a walker of any number of legs, as Song and Choi give it in "The optimally stable ranges of 2n-legged wave gaits" (IEEE Transactions on Systems, Man, and Cybernetics, 1990).
+
+**Time on the ground** picks the gait:
+
+| Legs | At half the cycle | Longer on the ground |
+| --- | --- | --- |
+| Two | The legs in opposition, as **Walk, two legs** | Both feet down for part of each step |
+| Four | The trot, as **Walk, four legs** | The crawl at three quarters, one foot up at a time |
+| Six | The tripod: front and rear left with the middle right, then the other three | Fewer feet up at a time, and one at a time from five sixths |
+| Eight | Four at a time, alternating | Fewer feet up at a time, and one at a time from seven eighths |
+
+It starts at the least time on the ground that keeps three feet down on average: half for six or more legs, and three quarters for four. Three quarters is where the range McGhee and Frank (1968) found the four legged crawl most stable over begins.
+
+Legs come in pairs, so an odd number of legs is a pair with a leg missing. The Animation panel names the missing thigh and shin, as it does for any role a preset needs.
 
 ### Wheels and tracks
 
@@ -477,7 +509,7 @@ The aircraft is a body and a gun, with the barrel's joint on the turret's, which
 
 **Describe it instead**, under the plan list, asks four questions in place of a plan:
 
-- **How does it move?** Two legs, Four legs, Wheels, Tracks, Hovers or Does not move.
+- **How does it move?** Two legs, Four legs, Six legs, Eight legs, Wheels, Tracks, Hovers or Does not move.
 - **How many weapons?** 0 or 1.
 - **Does it build?** No or Yes.
 - **How big?** The same size fields as for a plan.
@@ -494,6 +526,7 @@ The size is the box the joints span, not the parts. The footprint check in the p
 
 - Two legs: stance is the width and the length, since the plan has no body length. Leg length and body height share the height in the proportion they already have. A footprint that is not square gives the stance of the smaller side.
 - Four legs: stance is the width and body length is the length. The height is shared as for two legs.
+- Six and eight legs: stance is the width, and the gap between pairs times the pairs less one is the length. The height is shared as for two legs.
 - Wheels: track width is the width, the axles' span (axle spacing times the axles less one) is the length, and wheel height is the height. The number of axles is kept.
 - Tracks: track width, track length and track height.
 - Turret building: base height and turret height share the height. No joint places the base's width and depth, so the target is the footprint.
@@ -822,6 +855,8 @@ Coilbox reaches the running game through the engine's autohost interface, and th
 ## Making the game use the unit
 
 Straight out of export, nothing lists the unit in any unit's `buildoptions`, so nothing can build it. `/cheat` and `/give` is the only way to get one onto a map.
+
+To put the exported loadouts of a chassis on a factory's build menu, open Compare loadouts, pick a builder under Build menu, tick the loadouts and press Add. This records an `add` for each unit in the game's newest workshop project, in upgrade chain order, and starts a project for the game if it has none. Remove takes them off again. A loadout that has not been exported is listed and not offered.
 
 ### Movement
 

@@ -22,6 +22,21 @@ vi.mock("./WeaponsSection", () => ({
   }),
 }));
 
+vi.mock("./useBuildMenuSource", () => ({
+  useBuildMenuSource: () => ({
+    gameName: null,
+    gameFolder: null,
+    units: null,
+    checksum: undefined,
+    installed: [],
+    unavailable: "Choose a game for this unit first.",
+  }),
+}));
+vi.mock("@/workshop/project", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/workshop/project")>()),
+  useModProjects: () => ({ projects: [] }),
+}));
+
 afterEach(cleanup);
 
 function chassis(): LegoProject {

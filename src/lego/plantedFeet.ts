@@ -15,6 +15,7 @@
  */
 
 import {
+  type Gait,
   legPhase,
   parseLegRole,
   presetById,
@@ -68,10 +69,15 @@ export function plantedFeet(
   for (const entry of project.animations ?? []) {
     const preset = presetById(entry.presetId);
     if (!preset?.id.startsWith("walk.")) continue;
-    const gait = preset.id === "walk.quad" ? "quad" : "biped";
+    const gait: Gait =
+      preset.id === "walk.quad"
+        ? "quad"
+        : preset.id === "walk.legs"
+          ? "wave"
+          : "biped";
     for (const group of roleInstanceGroups(
       project.pieces,
-      presetRoles(preset),
+      presetRoles(preset, project.pieces),
     )) {
       const params = shownParams(project, entry, group.id || null);
       if (!(params[WALK_THIGH] > 0)) continue;
@@ -81,8 +87,12 @@ export function plantedFeet(
       for (const piece of group.pieces) {
         const leg = parseLegRole(piece.role ?? "");
         if (leg?.segment !== "thigh") continue;
-        if (gait === "biped" && leg.pair === 2) continue;
-        const offset = legPhase(leg, gait) === 0 ? 0 : Math.round(lap / 2);
+        if (gait === "biped" && leg.pair !== 1) continue;
+        if (gait === "quad" && leg.pair > 2) continue;
+        // The frame of the cycle the leg's foot comes down on, which is the
+        // phase `walkTrack` puts it at, counted the other way round.
+        const phase = legPhase(leg, gait, params.duty / 100, lap);
+        const offset = Math.round((1 - phase / (2 * Math.PI)) * lap) % lap;
         const [x, , z] = jointOf(project, piece);
         any = true;
         for (const [start, end] of spans) {

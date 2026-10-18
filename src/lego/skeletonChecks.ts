@@ -26,7 +26,7 @@ type Vec3 = [number, number, number];
 
 /** The roles that swing about one end, so their origin should be a joint. A
  *  foot is left out: its part is often centred on the ankle on purpose. */
-const SWINGS_ABOUT_AN_END = /^(leg\.[lr][12]\.(thigh|shin)|buildarm\.arm)$/;
+const SWINGS_ABOUT_AN_END = /^(leg\.[lr][1-9]\d*\.(thigh|shin)|buildarm\.arm)$/;
 
 /** A distance for a sentence, to two places, or two significant figures for a
  *  distance too small to show in two. */

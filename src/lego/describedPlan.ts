@@ -42,6 +42,8 @@ import { between, rise } from "./planMeasure";
 export const MOVES = [
   { id: "biped", label: "Two legs" },
   { id: "quadruped", label: "Four legs" },
+  { id: "hexapod", label: "Six legs" },
+  { id: "octopod", label: "Eight legs" },
   { id: "wheeled", label: "Wheels" },
   { id: "tracked", label: "Tracks" },
   { id: "hover", label: "Hovers" },
@@ -72,6 +74,8 @@ export interface Description {
 const MOUNT: Record<string, string> = {
   biped: "torso",
   quadruped: "torso",
+  hexapod: "torso",
+  octopod: "torso",
   wheeled: "body",
   tracked: "body",
   hover: "deck",

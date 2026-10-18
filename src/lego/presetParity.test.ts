@@ -7,9 +7,11 @@ import {
   BUILD_PREVIEW_AIM,
   BUILD_PREVIEW_LEG,
   cycleSteps,
+  legRoleIds,
   PRESETS,
   RECOIL_PREVIEW_PAUSE,
   type TrackDelta,
+  WALK_PAIRS,
 } from "./animPresets";
 import { buildLuaScript } from "./luaScript";
 import { type LegoPiece, type LegoProject, newProject } from "./model";
@@ -90,6 +92,18 @@ function channels(delta: TrackDelta | null): number[] {
   return [...(delta?.position ?? [0, 0, 0]), ...(delta?.rotation ?? [0, 0, 0])];
 }
 
+/** How many leg pairs the walk for any number of legs is run with: six legs,
+ *  so a pair between the front and the rear is checked too. */
+const PARITY_PAIRS = 3;
+
+/** The roles a preset moves in the unit it is run on. */
+function movedRoles(
+  preset: AnimPreset,
+  params: Record<string, number>,
+): string[] {
+  return preset.moves ? legRoleIds(params[WALK_PAIRS]) : preset.animates;
+}
+
 /** One piece per role the preset touches, named after the role. */
 function unitFor(
   preset: AnimPreset,
@@ -97,7 +111,7 @@ function unitFor(
 ): LegoProject {
   const roles = [
     ...new Set([
-      ...preset.animates,
+      ...movedRoles(preset, params),
       ...preset.requires.map((need) => need.role),
     ]),
   ];
@@ -180,7 +194,12 @@ function cyclePlan(
         to: frames - 1,
         t0: lap / FPS,
         // The poses `cycleThread` samples, as preset times.
-        knots: cycleSteps(preset, params, period).map((frame) => frame / FPS),
+        knots: cycleSteps(
+          preset,
+          params,
+          period,
+          movedRoles(preset, params),
+        ).map((frame) => frame / FPS),
         period,
       },
     ],
@@ -428,6 +447,7 @@ function plan(preset: AnimPreset, params: Record<string, number>): Plan {
   switch (preset.id) {
     case "walk.biped":
     case "walk.quad":
+    case "walk.legs":
       return cyclePlan(preset, params, "StartMoving", CALLIN);
     case "buildarm":
       return cyclePlan(preset, params, "StartBuilding", CALLIN);
@@ -639,7 +659,13 @@ const FITTED_BODY = {
 
 function buildCases() {
   return PRESETS.flatMap((preset) =>
-    paramSets(preset).map(({ label, params }) => {
+    paramSets(preset).map(({ label, params: set }) => {
+      // The walk for any number of legs is told the count, as `walkFit.ts`
+      // tells it from the unit's roles.
+      const params =
+        preset.id === "walk.legs"
+          ? { ...set, [WALK_PAIRS]: PARITY_PAIRS }
+          : set;
       const unit = unitFor(preset, params);
       const planned = plan(preset, params);
       const { checks, bows } = measure(preset, params, unit, planned);
@@ -663,9 +689,9 @@ function buildCases() {
 describe("preset parity fixture", () => {
   const cases = buildCases();
 
-  it("covers all 19 presets", () => {
-    expect(new Set(cases.map((entry) => entry.preset.id)).size).toBe(19);
-    expect(PRESETS).toHaveLength(19);
+  it("covers all 20 presets", () => {
+    expect(new Set(cases.map((entry) => entry.preset.id)).size).toBe(20);
+    expect(PRESETS).toHaveLength(20);
   });
 
   it("matches what the presets generate today", () => {
