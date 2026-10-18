@@ -1247,9 +1247,9 @@ mod tests {
     /// Every file one conversion of the fixed game writes, hashed. The models
     /// and sheets go into a compat mutator, which two players have to build
     /// byte for byte from one manifest (issue #4629). If this fails, the worker
-    /// writes different bytes than the compat writer a manifest pins: move
-    /// `coilbox_compat::WRITER`, add a compat manifest that names the new
-    /// writer, and only then record the new hash here.
+    /// writes different bytes than the compat writer a manifest pins: keep the
+    /// old bytes for that writer, and put the change behind a new
+    /// `coilbox_compat::WRITER` with a compat manifest that names it.
     #[test]
     fn a_fixed_game_converts_to_the_same_bytes() {
         use sha2::{Digest, Sha256};

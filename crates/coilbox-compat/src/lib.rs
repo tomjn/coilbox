@@ -156,20 +156,30 @@ pub struct Converter {
     pub version: String,
 }
 
-/// The version of the code that turns a manifest and a game into a mutator's
-/// bytes (issue #4629). The fixes are pinned by their hashes, but the code
-/// around them decides the bytes too: how the prelude wraps the fixes and the
-/// entry files, which call-in adapters a game's handlers pick, how the scan
+/// The newest version of the code that turns a manifest and a game into a
+/// mutator's bytes (issue #4629). The fixes are pinned by their hashes, but the
+/// code around them decides the bytes too: how the prelude wraps the fixes and
+/// the entry files, which call-in adapters a game's handlers pick, how the scan
 /// reads those handlers, the `modinfo.lua` and `defs_post.lua` text, and how
 /// the worker loads the tiles and converts the models.
 ///
-/// Every manifest names the writer it was built with, and a build refuses a
-/// manifest that names another. The marker records it, so a mutator built by
-/// another writer is stale. Golden tests in the compat plugin and in the worker
-/// hash a fixed build and fail when the bytes change. When one fails, move
-/// this, add a manifest that names the new writer, and only then record the
-/// new hashes.
+/// Every manifest names the writer it is built with, and the marker records
+/// it. A build keeps the behaviour of every writer up to this one and builds a
+/// manifest with the writer it names, so a manifest players may already have
+/// built goes on building the same bytes. It refuses a manifest that names a
+/// newer writer (see [`knows_writer`]).
+///
+/// Golden tests in the compat plugin and in the worker hash a fixed build for
+/// each manifest and each writer, and fail when the bytes change. A change to
+/// the bytes keeps the old behaviour for the writers that had it and puts the
+/// new one behind a new writer: move this, add a manifest that names it, and
+/// record the new writer's hashes beside the old ones.
 pub const WRITER: u32 = 1;
+
+/// Whether this build can write a manifest that names `writer`.
+pub fn knows_writer(writer: u32) -> bool {
+    (1..=WRITER).contains(&writer)
+}
 
 /// The writer of manifests 1 and 2, which predate the `writer` field.
 fn first_writer() -> u32 {
@@ -772,6 +782,17 @@ mod tests {
     #[test]
     fn the_latest_manifest_names_the_writer_this_build_carries() {
         assert_eq!(manifest(latest()).unwrap().writer, WRITER);
+    }
+
+    /// A newer coilbox builds the older manifest a host is on (issue #4564),
+    /// so every manifest's writer stays one this build knows.
+    #[test]
+    fn this_build_knows_every_manifests_writer_and_no_newer_one() {
+        for m in all_manifests() {
+            assert!(knows_writer(m.writer), "manifest {}", m.version);
+        }
+        assert!(!knows_writer(0));
+        assert!(!knows_writer(WRITER + 1));
     }
 
     #[test]

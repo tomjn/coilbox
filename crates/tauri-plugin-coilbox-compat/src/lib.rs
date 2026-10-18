@@ -962,11 +962,11 @@ mod tests {
         hash.finalize().iter().map(|b| format!("{b:02x}")).collect()
     }
 
-    /// The hash of the fixed games built from each manifest this writer builds.
-    /// Adding a manifest adds a line. A line that changes means the plugin, the
-    /// prelude, the adapter choice or the handler scan writes different bytes
-    /// than before for a manifest players may already have built (issue
-    /// #4629).
+    /// The hash of the fixed games built from each manifest, with the writer
+    /// it names. Adding a manifest adds a line. A line that changes means the
+    /// plugin, the prelude, the adapter choice or the handler scan writes
+    /// different bytes than before for a manifest players may already have
+    /// built (issue #4629).
     const GOLDEN: &[(u32, &str)] = &[
         (
             1,
@@ -1001,19 +1001,16 @@ mod tests {
     #[test]
     fn the_fixed_games_build_the_same_bytes_from_every_manifest() {
         let built: Vec<(u32, String)> = (1..=coilbox_compat::latest())
-            .filter(|n| {
-                coilbox_compat::manifest(*n).is_some_and(|m| m.writer == coilbox_compat::WRITER)
-            })
             .map(|n| (n, golden_hash(n)))
             .collect();
         let recorded: Vec<(u32, String)> =
             GOLDEN.iter().map(|(n, h)| (*n, h.to_string())).collect();
-        assert_eq!(coilbox_compat::WRITER, 1);
         assert!(
             recorded == built,
             "the mutator a manifest builds changed. If a line below is new, add it. \
-             If one moved, move coilbox_compat::WRITER, add a compat manifest that names \
-             the new writer, and only then record the hashes:\n{built:#?}"
+             If one moved, keep the old bytes for the writer that manifest names, put \
+             the change behind a new coilbox_compat::WRITER and add a compat manifest \
+             that names it:\n{built:#?}"
         );
     }
 

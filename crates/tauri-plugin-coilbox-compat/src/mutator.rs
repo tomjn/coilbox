@@ -184,12 +184,13 @@ pub fn files(
     Ok(files)
 }
 
-/// Refuse a manifest whose converter or writer is not the one this build
-/// carries: its mutator could not be reproduced byte for byte.
+/// Refuse a manifest whose converter is not the one this build carries, or
+/// whose writer is newer than the newest this build keeps: its mutator could
+/// not be reproduced byte for byte.
 pub fn check_pins(manifest: &coilbox_compat::Manifest) -> Result<(), String> {
-    if manifest.writer != coilbox_compat::WRITER {
+    if !coilbox_compat::knows_writer(manifest.writer) {
         return Err(format!(
-            "compat {} needs compat writer {}, and this coilbox has writer {}",
+            "compat {} needs compat writer {}, and this coilbox has writers up to {}",
             manifest.version,
             manifest.writer,
             coilbox_compat::WRITER
@@ -676,6 +677,18 @@ mod tests {
         let mut other = m.clone();
         other.writer = coilbox_compat::WRITER + 1;
         assert!(check_pins(&other).unwrap_err().contains("writer"));
+        other.writer = 0;
+        assert!(check_pins(&other).is_err());
+    }
+
+    /// A newer coilbox builds the older manifest a host is on (issue #4564),
+    /// with the writer that manifest names.
+    #[test]
+    fn every_manifest_passes_the_pins_whatever_writer_it_names() {
+        for n in 1..=coilbox_compat::latest() {
+            let m = coilbox_compat::manifest(n).unwrap();
+            assert_eq!(check_pins(&m), Ok(()), "manifest {n}");
+        }
     }
 
     #[test]

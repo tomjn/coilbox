@@ -116,21 +116,24 @@ Players get the new manifest when they update coilbox. Their switches stay on, a
 
 ## When the writer changes
 
-The fixes are held by their hashes, but the code around them decides the bytes too. That covers how the prelude wraps the fixes and the entry files, which adapters a game's handlers pick, the `modinfo.lua` and `defs_post.lua` text, and how the worker converts models. `WRITER` in `crates/coilbox-compat/src/lib.rs` is the version of that code.
+The fixes are held by their hashes, but the code around them decides the bytes too. That covers how the prelude wraps the fixes and the entry files, which adapters a game's handlers pick, the `modinfo.lua` and `defs_post.lua` text, and how the worker converts models. `WRITER` in `crates/coilbox-compat/src/lib.rs` is the newest version of that code.
+
+Coilbox keeps every writer's behaviour and builds a manifest with the writer it names. A player on a newer coilbox who joins a host on an older manifest builds that manifest with its old writer, and gets the host's bytes. A coilbox refuses a manifest that names a writer newer than its own `WRITER`, which only a newer coilbox can have.
 
 Three golden tests hash a fixed build and fail when the bytes change:
 
-- `the_fixed_games_build_the_same_bytes_from_every_manifest` in `crates/tauri-plugin-coilbox-compat/src/lib.rs`.
+- `the_fixed_games_build_the_same_bytes_from_every_manifest` in `crates/tauri-plugin-coilbox-compat/src/lib.rs`, one line per manifest.
 - `a_fixed_game_converts_to_the_same_bytes` in `crates/coilbox-unitsync-worker/src/convert3do.rs`.
 - `a_fixed_game_scans_to_the_same_handlers` in `crates/coilbox-unitsync-worker/src/luacompat.rs`.
 
-When a worker test fails, or the plugin's test changes the line of a manifest that already shipped, do these in order:
+A line that moves for a manifest that already shipped is a bug, never a hash to record again. To change the bytes on purpose:
 
 1. Move `WRITER` up by one.
-2. Add a manifest that names the new writer.
-3. Record the new hashes.
+2. Keep the old behaviour for the older writers, and put the new one behind a check of the manifest's writer. The checks are functions beside `WRITER`, one per change, so each writer's behaviour is listed in one place.
+3. Add a manifest that names the new writer.
+4. Add the new manifest's golden line, and the new writer's hash where a worker test keeps one per writer. Every older line stays the same.
 
-A coilbox refuses to build a manifest that names another writer. It refuses a manifest whose `converter` does not match its own `coilbox-3do-convert` version too. So a writer change means a player on the new coilbox cannot build the older manifests. They cannot join a battle on one either.
+A coilbox also refuses a manifest whose `converter` does not match its own `coilbox-3do-convert` version. That pin has one version per coilbox, so moving it makes every older manifest one the new coilbox cannot build.
 
 The test `the_lua_tests_load_the_preludes_this_crate_builds` checks the preludes for manifest 2 that the Lua tests load from `lua/compat/tests/fixtures/`. After a deliberate change to how a prelude is built, run it with `COILBOX_WRITE_FIXTURE=1` to write them again.
 
