@@ -36,6 +36,7 @@ import { campaignImageImport, campaignMediaImport } from "../../bindings";
 import { scenarioAttachment } from "../../missionScenario";
 import type {
   CampaignMission,
+  CampaignUnit,
   MapPreviewConfig,
   UnitPreviewConfig,
 } from "../../model";
@@ -424,10 +425,13 @@ export function MissionEditorDrawer({
   campaignId,
   mission: initial,
   scenarios = [],
+  builtUnits,
   onSave,
 }: {
   campaignId: string;
   mission: CampaignMission;
+  /** The campaign's units from the unit builder, which the restrictions list. */
+  builtUnits?: CampaignUnit[];
   /**
    * Every scenario stored here, as the page that opened this drawer already
    * had them (issue #2392). Only the Scenario heading's "Out of date" marker
@@ -1015,6 +1019,7 @@ export function MissionEditorDrawer({
           <span className="text-sm font-medium">Unit restrictions</span>
           <UnitRestrictions
             gameName={mission.snapshot.gameName}
+            builtUnits={builtUnits}
             disabledUnits={mission.disabledUnits}
             onChange={(disabledUnits) => patch({ disabledUnits })}
           />
