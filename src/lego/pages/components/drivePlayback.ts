@@ -19,6 +19,8 @@ const UP = new THREE.Vector3(0, 1, 0);
 const NORMAL = new THREE.Vector3();
 const YAW = new THREE.Quaternion();
 const TILT = new THREE.Quaternion();
+const FRONT = new THREE.Vector3(0, 0, 1);
+const ROLL = new THREE.Quaternion();
 const DELTA = new THREE.Vector3();
 const PLANE = new THREE.Plane(UP, 0);
 const HIT = new THREE.Vector3();
@@ -60,8 +62,10 @@ export function setDrive(state: SceneState, frames: DriveFrame[] | null) {
 /**
  * Put the unit where its drive has it on `frame`: turned by its heading about
  * straight up first, then tilted to the ground there, which is the engine's
- * order (`CSolidObject::UpdateDirVectors`, `SolidObject.cpp:435-451`). With no
- * drive it is left standing where it is, at the origin.
+ * order (`CSolidObject::UpdateDirVectors`, `SolidObject.cpp:435-451`). A
+ * flier is then rolled about its own front by the bank the engine would give
+ * it (`banking.ts`), positive to its right, a transform of the whole unit and
+ * not a script. With no drive it is left standing where it is, at the origin.
  */
 export function poseRoot(state: SceneState, frame: number) {
   const pose = poseOn(state, frame);
@@ -71,6 +75,10 @@ export function poseRoot(state: SceneState, frame: number) {
   if (pose.up) TILT.setFromUnitVectors(UP, NORMAL.set(...pose.up));
   else TILT.identity();
   state.root.quaternion.multiplyQuaternions(TILT, YAW);
+  if (pose.bank) {
+    ROLL.setFromAxisAngle(FRONT, pose.bank);
+    state.root.quaternion.multiply(ROLL);
+  }
   syncOverlay(state);
 }
 

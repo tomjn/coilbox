@@ -235,6 +235,51 @@ describe("driveAlong", () => {
     expect(upright.frames[120].up).toBeNull();
   });
 
+  /** `GetWantedUpDir` (`SolidObject.cpp:396`): the ground's normal mixed
+   *  with the last up by `upDirSmoothing`, normalised. */
+  it("eases its tilt by upDirSmoothing, from the ground at the start", () => {
+    const ground = { kind: "uneven" as const, degrees: 20, width: 64 };
+    const smoothing = 0.9;
+    const motion: DriveMotion = { ...MOTION, upDirSmoothing: smoothing };
+    const run = driveAlong(pathPoints("circle", motion, []), motion, {
+      start: 15,
+      frames: PREVIEW_FRAMES,
+      ground,
+      tilts: true,
+      minScriptChangeHeading: 1,
+    });
+    let last = groundNormal(ground, 0, 0);
+    let differs = false;
+    for (const { pos, up } of run.frames.slice(0, 200)) {
+      const normal = groundNormal(ground, pos[0], pos[2]);
+      const mixed = normal.map(
+        (n, axis) => n * (1 - smoothing) + last[axis] * smoothing,
+      );
+      const length = Math.hypot(...mixed);
+      const expected = mixed.map((n) => n / length);
+      expect(up).toEqual(expected);
+      last = expected as typeof last;
+      if (Math.hypot(...normal.map((n, i) => n - (up?.[i] ?? 0))) > 1e-3)
+        differs = true;
+    }
+    // It lags the ground, which a unit that follows it at once does not.
+    expect(differs).toBe(true);
+  });
+
+  it("follows the ground at once with no smoothing", () => {
+    const ground = { kind: "uneven" as const, degrees: 20, width: 64 };
+    const motion: DriveMotion = { ...MOTION, upDirSmoothing: 0 };
+    const run = driveAlong(pathPoints("bend", motion, []), motion, {
+      start: 15,
+      frames: PREVIEW_FRAMES,
+      ground,
+      tilts: true,
+      minScriptChangeHeading: 1,
+    });
+    const { pos, up } = run.frames[120];
+    expect(up).toEqual(groundNormal(ground, pos[0], pos[2]));
+  });
+
   it("stands still with no path to drive", () => {
     const run = drive([]);
     expect(run.events).toEqual([]);

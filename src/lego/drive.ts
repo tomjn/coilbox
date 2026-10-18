@@ -32,6 +32,12 @@ import {
   unitSpeedOf,
   unitTurnRateOf,
 } from "@/workshop/moveClasses";
+import {
+  type Flight,
+  flightOf,
+  hoverBankStep,
+  strafeRollStep,
+} from "./banking";
 import { type GroundShape, groundHeight, groundNormal } from "./environment";
 import type { LegoProject } from "./model";
 import type { ScriptDrive, ScriptEvent } from "./scriptPlayback";
@@ -115,6 +121,12 @@ export interface DriveMotion {
   acceleration?: number;
   /** Elmos a frame squared it slows by. Absent means the acceleration. */
   brakeRate?: number;
+  /** Set for a flier, which the engine banks (`banking.ts`). Absent for every
+   *  other unit, whose frames then carry no `bank`. */
+  flight?: Flight;
+  /** The unit's `upDirSmoothing` (`UnitDef.cpp:373`): how much of the last
+   *  frame's up direction it keeps. Absent or 0 follows the ground at once. */
+  upDirSmoothing?: number;
 }
 
 /** Where `DriveMotion`'s two numbers came from, for the panel to say. */
@@ -170,9 +182,17 @@ export function driveMotion(project: LegoProject): DriveSource {
   const brakeRate =
     project.movement?.brakeRate ?? (def ? unitBrakeRateOf(def) : undefined);
 
+  const flight = flightOf(project.movement);
+  // Clamped as the engine clamps it, to 0 to 0.95 (`UnitDef.cpp:373`). A flier
+  // has no ground to follow.
+  const upDirSmoothing = flight
+    ? 0
+    : Math.min(Math.max(project.movement?.upDirSmoothing ?? 0, 0), 0.95);
   return {
     motion: {
       speed: speed.value,
+      ...(flight ? { flight } : {}),
+      ...(upDirSmoothing > 0 ? { upDirSmoothing } : {}),
       ...(acceleration !== undefined ? { acceleration } : {}),
       ...(brakeRate !== undefined ? { brakeRate } : {}),
       turnRate: Math.min(Math.max(turn.value, 1), MAX_HEADING - 1),
@@ -261,6 +281,9 @@ export interface DriveFrame {
   reversing: boolean;
   /** Which way is up for it, or null for a unit that stays upright. */
   up: Vec3 | null;
+  /** How far the engine rolls a flier on this frame, radians about its front,
+   *  positive to its right. Absent for a unit that is not a flier. */
+  bank?: number;
 }
 
 export interface DriveRun {
@@ -500,15 +523,84 @@ export function driveAlong(
     );
   };
 
-  const place = (speed: number): DriveFrame => {
+  // A flier's bank carries from frame to frame, as the engine's does.
+  const flight = motion.flight;
+  let hoverBank = 0;
+  let strafeRoll = 0;
+  let lastVelocity: Vec2 = [0, 0];
+
+  /** The flier's bank on this frame, from how it is steering. */
+  const bankNow = (
+    speed: number,
+    steer: { goalDotRight: number; goalDistance: number } | null,
+  ): number => {
+    if (!flight) return 0;
+    const angle = headingRadians(heading);
+    const way = reversing ? -1 : 1;
+    const velocity: Vec2 = [
+      Math.sin(angle) * speed * way,
+      Math.cos(angle) * speed * way,
+    ];
+    if (flight.style === "gunship") {
+      const lateral =
+        -Math.cos(angle) * (velocity[0] - lastVelocity[0]) +
+        Math.sin(angle) * (velocity[1] - lastVelocity[1]);
+      hoverBank = hoverBankStep({
+        bank: hoverBank,
+        lateral,
+        accRate: rates(motion).accRate,
+        goalDistance: steer?.goalDistance ?? 0,
+        banking: flight.bankingAllowed && steer !== null,
+      });
+      lastVelocity = velocity;
+      return hoverBank;
+    }
+    strafeRoll = strafeRollStep({
+      roll: strafeRoll,
+      goalDotRight: steer?.goalDotRight ?? 0,
+      speed,
+      maxBank: flight.maxBank,
+      maxAileron: flight.maxAileron,
+    });
+    return Math.asin(strafeRoll);
+  };
+
+  // The up direction carries from frame to frame when the unit smooths it. It
+  // starts on the ground under the unit, which is how it is placed.
+  const smoothing = motion.upDirSmoothing ?? 0;
+  let lastUp: Vec3 | null = null;
+
+  /**
+   * `GetWantedUpDir`, `SolidObject.cpp:396`: the ground's normal mixed with the
+   * last up direction by `upDirSmoothing`, then normalised.
+   */
+  const upNow = (shape: GroundShape, px: number, pz: number): Vec3 => {
+    const normal = groundNormal(shape, px, pz);
+    if (smoothing === 0) return normal;
+    const last = lastUp ?? groundNormal(shape, 0, 0);
+    const mixed: Vec3 = [
+      normal[0] * (1 - smoothing) + last[0] * smoothing,
+      normal[1] * (1 - smoothing) + last[1] * smoothing,
+      normal[2] * (1 - smoothing) + last[2] * smoothing,
+    ];
+    const length = Math.hypot(...mixed);
+    lastUp = [mixed[0] / length, mixed[1] / length, mixed[2] / length];
+    return lastUp;
+  };
+
+  const place = (
+    speed: number,
+    steer: { goalDotRight: number; goalDistance: number } | null = null,
+  ): DriveFrame => {
     const shape = options.ground;
     currentSpeed = speed;
     return {
+      ...(flight ? { bank: bankNow(speed, steer) } : {}),
       pos: [x, shape ? groundHeight(shape, x, z) : 0, z],
       heading,
       speed,
       reversing,
-      up: shape && options.tilts ? groundNormal(shape, x, z) : null,
+      up: shape && options.tilts ? upNow(shape, x, z) : null,
     };
   };
 
@@ -584,6 +676,15 @@ export function driveAlong(
           ? Math.min(difference, accRate)
           : -Math.min(-difference, decRate)),
     );
+    // `goalDotRight`: the sine of the angle to the goal, positive to the right
+    // (`StrafeAirMoveType.cpp:861`). A heading counts up to the left.
+    const steer = {
+      goalDotRight: -Math.sin(headingRadians(toShort(wanted - heading))),
+      goalDistance: Math.hypot(
+        points[points.length - 1][0] - x,
+        points[points.length - 1][1] - z,
+      ),
+    };
     if (wanted !== heading) {
       const delta = turnDelta(wanted, heading, motion.turnRate, turn);
       if (Math.abs(delta) >= options.minScriptChangeHeading) {
@@ -595,7 +696,7 @@ export function driveAlong(
     const angle = headingRadians(heading);
     x += Math.sin(angle) * speed * way;
     z += Math.cos(angle) * speed * way;
-    frames.push(place(speed));
+    frames.push(place(speed, steer));
   }
   return { frames, events, arrived };
 }

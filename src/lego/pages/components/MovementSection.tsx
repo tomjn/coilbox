@@ -5,9 +5,10 @@
  */
 
 import { Input } from "@picoframe/frame";
-import { Field } from "../../../components/Field";
+import { CheckField, Field } from "../../../components/Field";
 import { OptionSelect } from "../../../components/OptionSelect";
 import { useUnitDefs } from "../../../workshop/config";
+import { bankingKeys, withEngineBanking } from "../../banking";
 import type { FlightStyle, LegoMovement, LegoProject } from "../../model";
 import {
   declaresMoveClass,
@@ -154,7 +155,7 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
       onMovementChange(
         current && game
           ? suggestFlight(current, game.name, style)
-          : { moveClass: "", flies: style },
+          : withEngineBanking({ moveClass: "", flies: style }),
       );
       return;
     }
@@ -169,7 +170,13 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
       | "reverseSpeed"
       | "acceleration"
       | "brakeRate"
-      | "cruiseAltitude",
+      | "cruiseAltitude"
+      | "upDirSmoothing"
+      | "maxBank"
+      | "maxPitch"
+      | "maxAileron"
+      | "maxElevator"
+      | "maxRudder",
     text: string,
   ) {
     if (!movement) return;
@@ -181,6 +188,12 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
         ? rest
         : { ...rest, [key]: value },
     );
+  }
+
+  function setBankingAllowed(allowed: boolean) {
+    if (!movement) return;
+    const { bankingAllowedFrom: _from, ...rest } = movement;
+    onMovementChange({ ...rest, bankingAllowed: allowed });
   }
 
   return (
@@ -307,6 +320,28 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
               />
             </Field>
           )}
+          {movement.flies ? null : (
+            <Field
+              label="Slope smoothing"
+              help={marks("updirsmoothing")}
+              hint={
+                movement.upDirSmoothing
+                  ? undefined
+                  : "Not set, the engine uses 0 and the unit follows the ground at once"
+              }
+            >
+              <Input
+                type="number"
+                min={0}
+                max={0.95}
+                step="any"
+                value={movement.upDirSmoothing ?? ""}
+                onChange={(event) =>
+                  setNumber("upDirSmoothing", event.target.value)
+                }
+              />
+            </Field>
+          )}
           <Field
             label="Acceleration, elmos a frame squared"
             help={marks("acceleration")}
@@ -345,6 +380,54 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
               onChange={(event) => setNumber("brakeRate", event.target.value)}
             />
           </Field>
+          {movement.flies ? (
+            <>
+              <p className="text-xs text-muted-foreground">
+                The engine banks aircraft, not the script. The preview's roll
+                illustrates these keys.
+              </p>
+              {bankingKeys(movement.flies).map((entry) => {
+                const { key } = entry;
+                if (key === "bankingAllowed") {
+                  return (
+                    <CheckField
+                      key={key}
+                      label={entry.label}
+                      hint={
+                        movement.bankingAllowedFrom ??
+                        "Not set, the engine allows banking"
+                      }
+                      checked={
+                        movement.bankingAllowed ?? entry.engineDefault === true
+                      }
+                      onChange={setBankingAllowed}
+                    />
+                  );
+                }
+                return (
+                  <Field
+                    key={key}
+                    label={entry.label}
+                    help={marks(key.toLowerCase())}
+                    hint={
+                      movement[`${key}From`] ??
+                      (movement[key] !== undefined
+                        ? undefined
+                        : `Not set, the engine uses ${entry.engineDefault}`)
+                    }
+                  >
+                    <Input
+                      type="number"
+                      min={0}
+                      step="any"
+                      value={movement[key] ?? ""}
+                      onChange={(event) => setNumber(key, event.target.value)}
+                    />
+                  </Field>
+                );
+              })}
+            </>
+          ) : null}
           {!movement.speed ? (
             <p className="text-xs text-muted-foreground">
               With no speed the engine treats it as static.

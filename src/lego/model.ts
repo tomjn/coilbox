@@ -316,6 +316,36 @@ export interface LegoMovement {
   cruiseAltitude?: number;
   /** Where `cruiseAltitude` came from, when the game suggested it. */
   cruiseAltitudeFrom?: string;
+  /** Written as `upDirSmoothing` for a unit that follows the ground, such as a
+   *  hovercraft: how much of its last up direction it keeps each frame, 0 to
+   *  0.95 (`UnitDef.cpp:373`, default 0). Written only above 0. */
+  upDirSmoothing?: number;
+  /** Nothing suggests it, so this is never set. The field exists so the
+   *  movement panel can clear a number and its source the same way for every
+   *  key. */
+  upDirSmoothingFrom?: string;
+  /** Written as `bankingAllowed` for a gunship (`HoverAirMoveType.cpp:151`).
+   *  The engine's default is true. See `banking.ts`. */
+  bankingAllowed?: boolean;
+  /** Written as `maxBank` for a plane, the sine of its greatest roll
+   *  (`UnitDef.cpp:559`, default 0.8). */
+  maxBank?: number;
+  /** Written as `maxPitch` for a plane (`UnitDef.cpp:560`, default 0.45). */
+  maxPitch?: number;
+  /** Written as `maxAileron` for a plane (`UnitDef.cpp:564`, default 0.015). */
+  maxAileron?: number;
+  /** Written as `maxElevator` for a plane (`UnitDef.cpp:565`, default 0.01). */
+  maxElevator?: number;
+  /** Written as `maxRudder` for a plane (`UnitDef.cpp:566`, default 0.004). */
+  maxRudder?: number;
+  /** Where each banking key came from, when the game suggested it, keyed by
+   *  the field name with `From` after it. */
+  bankingAllowedFrom?: string;
+  maxBankFrom?: string;
+  maxPitchFrom?: string;
+  maxAileronFrom?: string;
+  maxElevatorFrom?: string;
+  maxRudderFrom?: string;
   /** Written as `speed`, in elmos a second. Absent until somebody or the game
    *  gives it one, and the unit stays static to the engine until then. */
   speed?: number;
@@ -2495,6 +2525,30 @@ function parseBuilder(value: unknown): LegoBuilder | null {
   return Object.keys(builder).length > 0 ? builder : null;
 }
 
+const BANKING_NUMBERS = [
+  "maxBank",
+  "maxPitch",
+  "maxAileron",
+  "maxElevator",
+  "maxRudder",
+] as const;
+
+/** The banking numbers and where each came from, for a flier. */
+function parseBankingNumbers(
+  v: Record<string, unknown>,
+): Partial<LegoMovement> {
+  const out: Record<string, unknown> = {};
+  for (const key of BANKING_NUMBERS) {
+    const x = v[key];
+    if (typeof x === "number" && Number.isFinite(x)) out[key] = x;
+  }
+  for (const key of ["bankingAllowed", ...BANKING_NUMBERS]) {
+    const from = v[`${key}From`];
+    if (typeof from === "string") out[`${key}From`] = from;
+  }
+  return out;
+}
+
 function parseMovement(value: unknown): LegoMovement | null {
   if (typeof value !== "object" || value === null) return null;
   const v = value as Record<string, unknown>;
@@ -2512,6 +2566,13 @@ function parseMovement(value: unknown): LegoMovement | null {
     ...(typeof v.cruiseAltitudeFrom === "string"
       ? { cruiseAltitudeFrom: v.cruiseAltitudeFrom }
       : {}),
+    ...(!flies && number(v.upDirSmoothing)
+      ? { upDirSmoothing: v.upDirSmoothing as number }
+      : {}),
+    ...(flies && typeof v.bankingAllowed === "boolean"
+      ? { bankingAllowed: v.bankingAllowed }
+      : {}),
+    ...(flies ? parseBankingNumbers(v) : {}),
     ...(number(v.speed) ? { speed: v.speed as number } : {}),
     ...(number(v.turnRate) ? { turnRate: v.turnRate as number } : {}),
     ...(number(v.reverseSpeed)

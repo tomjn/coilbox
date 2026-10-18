@@ -74,6 +74,28 @@ describe("poseRoot", () => {
     expect(top.z).toBeCloseTo(-10 * Math.sin(angle));
   });
 
+  /** A positive bank rolls the unit to its right: its right wing goes down
+   *  and its top leans right, at heading 0 towards -x (`HoverAirMoveType.cpp:729`). */
+  it("rolls a flier to its right about its own front", () => {
+    const state = scene([frame({ bank: 0.5 })]);
+    poseRoot(state, 0);
+    const nose = placed(state, [0, 0, 10]);
+    expect(nose.x).toBeCloseTo(0);
+    expect(nose.y).toBeCloseTo(0);
+    expect(nose.z).toBeCloseTo(10);
+    const top = placed(state, [0, 10, 0]);
+    expect(top.x).toBeCloseTo(-10 * Math.sin(0.5));
+    expect(top.y).toBeCloseTo(10 * Math.cos(0.5));
+    const rightWing = placed(state, [-10, 0, 0]);
+    expect(rightWing.y).toBeLessThan(0);
+  });
+
+  it("leaves a unit with no bank as it was", () => {
+    const state = scene([frame({ heading: 16384 })]);
+    poseRoot(state, 0);
+    expect(placed(state, [0, 10, 0]).y).toBeCloseTo(10);
+  });
+
   /** A scenario switched from the drive to another while it plays puts the
    *  unit back at the origin, standing as it does when nothing drives it. */
   it("goes back to the origin in its resting tilt when the drive ends", () => {
