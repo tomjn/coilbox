@@ -8,6 +8,7 @@
 //!   - `campaigns/<id>.json`         one document per local campaign
 //!   - `images/<campaignId>/<uuid>.jpg`  imported panorama art
 //!   - `progress.json`               opaque per-player progress
+//!   - `units/<campaignId>/<unit>/`  copies of builder units (see [`units`])
 //!
 //! A distribution profile can additionally ship *read-only* campaigns as export
 //! files in the portable `.coilbox/campaigns/` folder; [`campaign_list`] merges
@@ -18,11 +19,12 @@
 //! `plugin:coilbox-campaign|<cmd>`.
 
 mod images;
+mod units;
 
 use coilbox_portable::{is_safe_rel, valid_id};
 use images::{data_uri_bytes, data_url, reencode_image, ImageKind};
 use picoframe_core::CliResult;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::path::{Path, PathBuf};
 use tauri::{
@@ -159,7 +161,123 @@ async fn campaign_delete<R: Runtime>(app: AppHandle<R>, id: String) -> CliResult
     if let Ok(dir) = media_dir(&app) {
         let _ = std::fs::remove_dir_all(dir.join(&id));
     }
+    if let Ok(dir) = campaign_units_dir(&app) {
+        let _ = std::fs::remove_dir_all(dir.join(&id));
+    }
     CliResult::ok(json!({}))
+}
+
+/// Copies of builder units live under `<data_dir>/campaign/units/<campaignId>/`
+/// (issue #4516). See [`units`].
+fn campaign_units_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
+    Ok(campaign_dir(app)?.join("units"))
+}
+
+/// One campaign's units folder, with the id validated.
+fn units_root<R: Runtime>(app: &AppHandle<R>, campaign_id: &str) -> Result<PathBuf, String> {
+    if !valid_id(campaign_id) {
+        return Err(format!("invalid campaign id: {campaign_id}"));
+    }
+    Ok(campaign_units_dir(app)?.join(campaign_id))
+}
+
+/// An atlas to carry with a copy, from an extension pack. The base pack's own
+/// atlas ships with coilbox, so it is never copied.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AtlasCopy {
+    /// The pack's folder under `<data_dir>/lego/packs/`.
+    pack: String,
+    /// The atlas's file name in that pack.
+    name: String,
+}
+
+/// Where a copy's textures are read from, in the unit builder's layout under
+/// the same data dir: an extension pack's atlas, and the texture store an
+/// imported unit's textures and a mixed unit's sheets live in.
+fn texture_sources<R: Runtime>(
+    app: &AppHandle<R>,
+    atlas: Option<AtlasCopy>,
+    stored: Vec<String>,
+) -> Result<Vec<(PathBuf, String)>, String> {
+    let lego = coilbox_portable::data_dir(app)?.join("lego");
+    let mut sources = Vec::new();
+    if let Some(atlas) = atlas {
+        if !units::is_file_name(&atlas.pack) || !units::is_file_name(&atlas.name) {
+            return Err(format!("invalid atlas: {}/{}", atlas.pack, atlas.name));
+        }
+        sources.push((
+            lego.join("packs").join(&atlas.pack).join(&atlas.name),
+            atlas.name,
+        ));
+    }
+    for key in stored {
+        if !units::is_file_name(&key) {
+            return Err(format!("invalid texture key: {key}"));
+        }
+        sources.push((lego.join("textures").join(&key), key));
+    }
+    Ok(sources)
+}
+
+/// `campaign_unit_save` stores a campaign's copy of one unit, replacing any
+/// earlier copy of it. Answers the copy's folder.
+#[tauri::command]
+async fn campaign_unit_save<R: Runtime>(
+    app: AppHandle<R>,
+    campaign_id: String,
+    unit_name: String,
+    json: String,
+    atlas: Option<AtlasCopy>,
+    stored: Vec<String>,
+) -> CliResult {
+    let saved = units_root(&app, &campaign_id).and_then(|root| {
+        let sources = texture_sources(&app, atlas, stored)?;
+        units::save_unit(&root, &unit_name, &json, &sources)
+    });
+    match saved {
+        Ok(dir) => CliResult::ok(json!({ "dir": dir.to_string_lossy() })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// `campaign_unit_list` answers every unit copy a campaign holds.
+#[tauri::command]
+async fn campaign_unit_list<R: Runtime>(app: AppHandle<R>, campaign_id: String) -> CliResult {
+    match units_root(&app, &campaign_id) {
+        Ok(root) => CliResult::ok(json!({ "units": units::list_units(&root) })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// `campaign_unit_delete` removes a campaign's copy of one unit.
+#[tauri::command]
+async fn campaign_unit_delete<R: Runtime>(
+    app: AppHandle<R>,
+    campaign_id: String,
+    unit_name: String,
+) -> CliResult {
+    match units_root(&app, &campaign_id).and_then(|root| units::delete_unit(&root, &unit_name)) {
+        Ok(deleted) => CliResult::ok(json!({ "deleted": deleted })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// `campaign_units_copy` copies every unit copy from one campaign to another,
+/// for a duplicated campaign.
+#[tauri::command]
+async fn campaign_units_copy<R: Runtime>(
+    app: AppHandle<R>,
+    from_id: String,
+    to_id: String,
+) -> CliResult {
+    let copied = units_root(&app, &from_id)
+        .and_then(|from| Ok((from, units_root(&app, &to_id)?)))
+        .and_then(|(from, to)| units::copy_units(&from, &to));
+    match copied {
+        Ok(copied) => CliResult::ok(json!({ "copied": copied })),
+        Err(e) => CliResult::err(e),
+    }
 }
 
 /// Shared tail of both image imports: bound + re-encode the decoded bytes for the
@@ -473,7 +591,11 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             campaign_export,
             campaign_import,
             campaign_progress_load,
-            campaign_progress_save
+            campaign_progress_save,
+            campaign_unit_save,
+            campaign_unit_list,
+            campaign_unit_delete,
+            campaign_units_copy
         ])
         .build()
 }
