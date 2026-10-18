@@ -4111,3 +4111,40 @@ mod drive {
         assert_eq!(pose(&timeline, 2, "turret")[0], -182.0);
     }
 }
+
+/// Every `SFX` value against the engine's. `LuaConstSFX::PushEntries`
+/// (`rts/Lua/LuaConstCOB.cpp:213-222`) takes the explode flags from
+/// `PieceProjectile.h:9-17` (`FALL` is pushed as a literal 0, and `RECURSIVE` is
+/// `1 << 14`), and the emit ids from `rts/Sim/Units/Scripts/CobDefines.h:9-20`.
+#[test]
+fn the_sfx_table_holds_the_engines_values() {
+    let lua = Lua::new();
+    let sfx = sfx_table(&lua).expect("the table builds");
+    let engine = [
+        ("SHATTER", 1),
+        ("EXPLODE", 2),
+        ("EXPLODE_ON_HIT", 2),
+        ("FALL", 0),
+        ("SMOKE", 8),
+        ("FIRE", 16),
+        ("NONE", 32),
+        ("NO_CEG_TRAIL", 64),
+        ("NO_HEATCLOUD", 128),
+        ("RECURSIVE", 16384),
+        ("VTOL", 0),
+        ("WAKE", 2),
+        ("REVERSE_WAKE", 4),
+        ("WHITE_SMOKE", 257),
+        ("BLACK_SMOKE", 258),
+        ("BUBBLE", 259),
+        ("CEG", 1024),
+        ("FIRE_WEAPON", 2048),
+        ("DETONATE_WEAPON", 4096),
+        ("GLOBAL", 16384),
+    ];
+    for (name, value) in engine {
+        let got: i64 = sfx.get(name).expect(name);
+        assert_eq!(got, value, "SFX.{name}");
+    }
+    assert_eq!(sfx.pairs::<String, Value>().count(), engine.len());
+}
