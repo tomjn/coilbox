@@ -6,6 +6,7 @@
  */
 
 import { Button, Input, useSetting } from "@picoframe/frame";
+import { formatNumber } from "@/lib/format";
 import type { LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import {
@@ -89,7 +90,7 @@ export function WorthSection({ project, pack, onWorthChange }: Props) {
               <dt className="truncate text-muted-foreground">{LABEL[field]}</dt>
               <dd>
                 <output aria-label={`Total ${LABEL[field].toLowerCase()}`}>
-                  {totals[field].toLocaleString()}
+                  {formatNumber(totals[field])}
                 </output>
               </dd>
             </div>

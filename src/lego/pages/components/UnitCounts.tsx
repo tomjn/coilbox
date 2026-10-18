@@ -5,6 +5,7 @@
  * a count is too high.
  */
 
+import { formatNumber } from "@/lib/format";
 import type { ModelCounts } from "../../s3oBuild";
 
 const ROWS: { key: keyof ModelCounts; label: string }[] = [
@@ -41,8 +42,8 @@ export function UnitCounts({
             <th scope="row" className="text-left font-normal">
               {label}
             </th>
-            <td className="text-right">{unit[key].toLocaleString()}</td>
-            <td className="text-right">{reference[key].toLocaleString()}</td>
+            <td className="text-right">{formatNumber(unit[key])}</td>
+            <td className="text-right">{formatNumber(reference[key])}</td>
           </tr>
         ))}
       </tbody>
