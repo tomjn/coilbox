@@ -14,6 +14,11 @@
 
 import type { ContentRequirement } from "@/content/resolveContent";
 import { launchRequirements } from "@/play/launchContent";
+import {
+  type CompatBattleState,
+  compatLaunchBlock,
+  requiredGameName,
+} from "./compatBattle";
 
 /**
  * The game and map a battle needs installed, named as the host named them.
@@ -22,12 +27,19 @@ import { launchRequirements } from "@/play/launchContent";
  * paths cannot disagree about what counts as needing a game or a map. The
  * engine is left out on purpose: the room compares it by the version the binary
  * reported (`engineMatch`), and the shared check also accepts a folder name.
+ *
+ * A battle that names a compat mutator this machine has not built needs the base
+ * game rather than the mutator (issue #4564), so `games` is what the scan found.
  */
 export function battleRequirements(
   battle: { modname: string; map: string } | undefined,
+  games: readonly { name: string; primaryArchive: { name: string } }[] = [],
 ): ContentRequirement[] {
   return battle
-    ? launchRequirements({ game: battle.modname, map: battle.map })
+    ? launchRequirements({
+        game: requiredGameName(battle.modname, games),
+        map: battle.map,
+      })
     : [];
 }
 
@@ -72,6 +84,11 @@ export interface LaunchContent {
    * `dependencyBlockReason`, else null or absent (issue #3489).
    */
   dependencyBlock?: string | null;
+  /**
+   * Where the compat mutator the battle names stands (issue #4564). Absent or
+   * idle when the battle names no mutator, or this machine has it.
+   */
+  compat?: CompatBattleState;
   /** The battle's map name, as the host named it. */
   mapName: string;
   /** The battle's game name, as the host named it. */
@@ -140,6 +157,8 @@ export function launchBlock(c: LaunchContent): LaunchBlock | null {
       reason: `You do not have the map this battle uses (${map}), so it cannot start for you. Install it to play.`,
     };
   }
+  const compat = c.compat ? compatLaunchBlock(c.compat) : null;
+  if (compat) return compat;
   if (c.dependencyBlock) {
     return {
       short: "Archive missing",
