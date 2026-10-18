@@ -921,6 +921,18 @@ Some games load their units with their own `gamedata/unitdefs.lua` and never rea
 
 **Test in game** starts you as the unit itself, so to see the list, use **Launch sandbox with targets**. It starts you on the game's own start unit, or give yourself a factory from the list.
 
+### In a conquest or a warpath
+
+A conquest or a warpath run can begin with units from the builder, the same way a [campaign](campaigns.md#units-from-the-unit-builder) carries them. On the setup screen, under **Units from the builder**, press **Add unit** and pick from your saved units. The field only shows when you have saved a unit.
+
+Each unit is copied when the conquest or run begins, so editing it in the builder afterwards changes nothing. A conquest keeps its copies under `conquest/units/<galaxy id>/` in coilbox's data folder, and a run under `runlite/units/<run id>/`. Abandoning the conquest, starting it again or deleting the run removes them, and the game coilbox wrote for them.
+
+Every battle launches through a game coilbox writes at launch, `coilbox-lego-conquest-<galaxy id>.sdd` or `coilbox-lego-run-<run id>.sdd`. It depends on the exact game the conquest or run resolved for that battle, so a move to a newer version of the game rewrites it. A location that plays a scenario plays it on top of the same game. What was left out shows under the launch button, as it does in the Test drawer.
+
+In a warpath the units join the build tree under their builders before the run is generated. So a reward can offer one, and the unit limit locks it until a reward unlocks it or its builder, as for any other unit that builder builds.
+
+A shared challenge code does not carry the units. Somebody who imports it plays on the game's own units. Because the rewards of a warpath are drawn from its build tree, a run with builder units can offer different rewards from a run of the same code without them.
+
 ### Movement
 
 A movement class names an entry in the game's own move definitions, and the engine drops a unit that can move but names a class that does not resolve. So the builder never writes a class it made up. **Movement**, in the Animation panel, offers the classes of the unit's own game, read out of that game's `gamedata/movedefs.lua`.
