@@ -14,6 +14,7 @@ vi.mock("@/workshop/compile", () => ({
 vi.mock("./bindings", () => ({
   legoExport: vi.fn(),
   legoScratchGame: vi.fn(),
+  legoScratchPrune: vi.fn(),
   legoReadTextFile: vi.fn(),
   legoWriteTextFile: vi.fn(),
 }));
@@ -25,6 +26,7 @@ import {
   legoExport,
   legoReadTextFile,
   legoScratchGame,
+  legoScratchPrune,
   legoWriteTextFile,
 } from "./bindings";
 import { type LegoPiece, type LegoProject, newProject } from "./model";
@@ -120,7 +122,10 @@ function pack(): LoadedPack {
     manifest: {} as LoadedPack["manifest"],
     library: {
       packs: [],
-      atlases: [{ tex1: "atlas.png", packId: "base", folder: null }],
+      atlases: [
+        { tex1: "atlas.png", packId: "base", folder: null },
+        { tex1: "other.png", packId: "base", folder: null },
+      ],
       dir: "",
       problems: [],
     },
@@ -194,6 +199,7 @@ beforeEach(() => {
     fs.set(`${dir}/modinfo.lua`, written.modinfo);
     return { dir };
   });
+  vi.mocked(legoScratchPrune).mockResolvedValue({ removed: [], kept: [] });
   vi.mocked(legoExport).mockImplementation(
     async ({ dir, unitName }) =>
       ({
@@ -393,5 +399,158 @@ describe("writeMutator", () => {
       );
       expect((await writeMutator(args())).skipped).toBe(false);
     });
+  });
+});
+
+function onAtlas(built: MutatorUnit, atlas: string): MutatorUnit {
+  return { ...built, project: { ...built.project, atlas } };
+}
+
+// Issue #4521. A unit taken out of the set must leave nothing in the folder.
+describe("writeMutator pruning", () => {
+  const folder = "coilbox-lego-campaign.sdd";
+
+  it("removes the files of a unit that left the set, by the digests it was written with", async () => {
+    await writeMutator(args({ units: [unit("alpha"), unit("beta")] }));
+    await writeMutator(args({ units: [unit("alpha")] }));
+
+    expect(legoScratchPrune).toHaveBeenCalledTimes(1);
+    expect(legoScratchPrune).toHaveBeenCalledWith({
+      dataDir: "/data",
+      folder,
+      units: [{ unitName: "beta", digests: ["sha-beta"] }],
+      textures: [],
+    });
+  });
+
+  it("prunes after the folder exists and before the new units are written", async () => {
+    await writeMutator(args({ units: [unit("alpha"), unit("beta")] }));
+    vi.mocked(legoScratchGame).mockClear();
+    vi.mocked(legoExport).mockClear();
+    await writeMutator(args({ units: [unit("alpha")] }));
+
+    const scratch = vi.mocked(legoScratchGame).mock.invocationCallOrder[0];
+    const prune = vi.mocked(legoScratchPrune).mock.invocationCallOrder[0];
+    const exported = vi.mocked(legoExport).mock.invocationCallOrder[0];
+    expect(scratch).toBeLessThan(prune as number);
+    expect(prune).toBeLessThan(exported as number);
+  });
+
+  it("does not prune on the first write, or for a set that only gained units", async () => {
+    await writeMutator(args({ units: [unit("alpha")] }));
+    await writeMutator(args({ units: [unit("alpha"), unit("beta")] }));
+    expect(legoScratchPrune).not.toHaveBeenCalled();
+  });
+
+  it("does not prune when the set is unchanged and the launch is skipped", async () => {
+    await writeMutator(args({ units: [unit("alpha"), unit("beta")] }));
+    await writeMutator(args({ units: [unit("alpha"), unit("beta")] }));
+    expect(legoScratchPrune).not.toHaveBeenCalled();
+  });
+
+  it("removes every unit when the set becomes empty", async () => {
+    await writeMutator(args({ units: [unit("alpha"), unit("beta")] }));
+    await writeMutator(args({ units: [] }));
+    expect(legoScratchPrune).toHaveBeenCalledWith(
+      expect.objectContaining({
+        units: [
+          { unitName: "alpha", digests: ["sha-alpha"] },
+          { unitName: "beta", digests: ["sha-beta"] },
+        ],
+      }),
+    );
+  });
+
+  it("removes a texture that no remaining unit uses", async () => {
+    const first = await writeMutator(
+      args({
+        units: [unit("alpha"), onAtlas(unit("beta"), "other.png")],
+      }),
+    );
+    const [alphaTexture] = first.units[0]?.textureFiles ?? [];
+    const [betaTexture] = first.units[1]?.textureFiles ?? [];
+    expect(alphaTexture).toBeDefined();
+    expect(betaTexture).toBeDefined();
+    expect(betaTexture).not.toBe(alphaTexture);
+
+    await writeMutator(args({ units: [unit("alpha")] }));
+
+    expect(legoScratchPrune).toHaveBeenCalledWith(
+      expect.objectContaining({ textures: [betaTexture] }),
+    );
+  });
+
+  it("keeps a texture a remaining unit still uses", async () => {
+    await writeMutator(args({ units: [unit("alpha"), unit("beta")] }));
+    await writeMutator(args({ units: [unit("alpha")] }));
+    expect(legoScratchPrune).toHaveBeenCalledWith(
+      expect.objectContaining({ textures: [] }),
+    );
+  });
+
+  it("removes the old texture of a unit that stays but changes its atlas", async () => {
+    const first = await writeMutator(args({ units: [unit("alpha")] }));
+    const [old] = first.units[0]?.textureFiles ?? [];
+    await writeMutator(args({ units: [onAtlas(unit("alpha"), "other.png")] }));
+    expect(legoScratchPrune).toHaveBeenCalledWith({
+      dataDir: "/data",
+      folder,
+      units: [],
+      textures: [old],
+    });
+  });
+
+  it("still prunes a unit written by a launch that failed part way", async () => {
+    await writeMutator(args({ units: [unit("alpha")] }));
+    vi.mocked(legoExport).mockImplementation(async ({ dir, unitName }) => {
+      if (unitName === "gamma") throw new Error("disk full");
+      return {
+        owned: [
+          { path: `${dir}/units/${unitName}.lua`, sha256: `sha-${unitName}` },
+        ],
+      } as never;
+    });
+    await expect(
+      writeMutator(
+        args({ units: [unit("alpha"), unit("beta"), unit("gamma")] }),
+      ),
+    ).rejects.toThrow("disk full");
+
+    await writeMutator(args({ units: [unit("alpha")] }));
+
+    expect(legoScratchPrune).toHaveBeenCalledWith(
+      expect.objectContaining({
+        units: [{ unitName: "beta", digests: ["sha-beta"] }],
+      }),
+    );
+  });
+
+  it("prunes what an earlier launch recorded even after another writer cleared the stamp", async () => {
+    await writeMutator(args({ units: [unit("alpha"), unit("beta")] }));
+    await clearStamp("/data", folder);
+    await writeMutator(args({ units: [unit("alpha")] }));
+    expect(legoScratchPrune).toHaveBeenCalledWith(
+      expect.objectContaining({
+        units: [{ unitName: "beta", digests: ["sha-beta"] }],
+      }),
+    );
+  });
+
+  it("prunes nothing from a stamp it cannot read", async () => {
+    await writeMutator(args({ units: [unit("alpha"), unit("beta")] }));
+    fs.set(`/data/games/${folder}.stamp`, "{not json");
+    await writeMutator(args({ units: [unit("alpha")] }));
+    expect(legoScratchPrune).not.toHaveBeenCalled();
+  });
+
+  it("does not leave a stamp behind when the prune fails", async () => {
+    await writeMutator(args({ units: [unit("alpha"), unit("beta")] }));
+    vi.mocked(legoScratchPrune).mockRejectedValueOnce(new Error("locked"));
+    await expect(
+      writeMutator(args({ units: [unit("alpha")] })),
+    ).rejects.toThrow("locked");
+    expect((await writeMutator(args({ units: [unit("alpha")] }))).skipped).toBe(
+      false,
+    );
   });
 });

@@ -1,17 +1,22 @@
+import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
 import type { GuideLine, GuidePlane } from "./guides";
 import {
   axesText,
+  endPosition,
   figure,
   fitToSteps,
   formatNumber,
+  lineLabel,
+  type MeasureEnd,
   measureBetween,
   pieceSize,
   snapMeasurePoint,
 } from "./measure";
 import { type LegoProject, newProject } from "./model";
 import type { LegoPartInfo, LoadedPack } from "./pack";
+import type { Vec3 } from "./snapping";
 
 describe("measureBetween", () => {
   it("gives the signed offset on each axis and the straight length", () => {
@@ -22,6 +27,58 @@ describe("measureBetween", () => {
 
   it("is zero for two equal points", () => {
     expect(measureBetween([1, 1, 1], [1, 1, 1]).length).toBe(0);
+  });
+});
+
+describe("endPosition", () => {
+  /** A piece's world matrix, as three.js keeps it. */
+  function matrix(at: Vec3, turnY = 0): number[] {
+    return new THREE.Matrix4()
+      .compose(
+        new THREE.Vector3(...at),
+        new THREE.Quaternion().setFromAxisAngle(
+          new THREE.Vector3(0, 1, 0),
+          turnY,
+        ),
+        new THREE.Vector3(1, 1, 1),
+      )
+      .toArray();
+  }
+  const onPiece: MeasureEnd = {
+    at: [11, 0, 0],
+    on: { pieceId: "wheel", local: [1, 0, 0] },
+  };
+
+  it("follows a piece that moved", () => {
+    expect(endPosition(onPiece, matrix([10, 0, 0]))).toEqual([11, 0, 0]);
+    expect(endPosition(onPiece, matrix([10, 2, -3]))).toEqual([11, 2, -3]);
+  });
+
+  it("turns with a piece that turned", () => {
+    const [x, y, z] = endPosition(onPiece, matrix([10, 0, 0], Math.PI / 2));
+    expect(x).toBeCloseTo(10);
+    expect(y).toBeCloseTo(0);
+    expect(z).toBeCloseTo(-1);
+  });
+
+  it("stays where it was last drawn once the piece is deleted", () => {
+    expect(endPosition(onPiece, null, [4, 5, 6])).toEqual([4, 5, 6]);
+  });
+
+  it("stays where it was put when the piece is gone and it was never drawn", () => {
+    expect(endPosition(onPiece, null)).toEqual([11, 0, 0]);
+  });
+
+  it("keeps a world end where it is, whatever matrix it is given", () => {
+    const ground: MeasureEnd = { at: [1, 0, 2], on: null };
+    expect(endPosition(ground, matrix([10, 0, 0]))).toEqual([1, 0, 2]);
+  });
+});
+
+describe("lineLabel", () => {
+  it("is the length in the readout's own words", () => {
+    expect(lineLabel([0, 0, 0], [3, 4, 0], 0.25)).toBe("5 elmos, 20 steps");
+    expect(lineLabel([0, 0, 0], [3, 4, 0], null)).toBe("5 elmos");
   });
 });
 
@@ -98,6 +155,7 @@ describe("snapMeasurePoint", () => {
     );
     expect(snapped.point).toEqual([1, 1, 1]);
     expect(snapped.to).toBe("anchor");
+    expect(snapped.anchorIndex).toBe(0);
   });
 
   it("prefers an anchor over a guide that is also in reach", () => {

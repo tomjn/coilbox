@@ -3420,6 +3420,94 @@ async fn lego_scratch_game<R: Runtime>(
     CliResult::ok(json!({ "dir": dir.to_string_lossy() }))
 }
 
+/// One unit taken out of a scratch game's set, with the digests of the files
+/// the export that wrote it recorded.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PruneUnit {
+    unit_name: String,
+    digests: Vec<String>,
+}
+
+/// What pruning a scratch game removed, and what it left because it could not
+/// show the file was its own.
+#[derive(Debug, PartialEq)]
+struct Pruned {
+    removed: Vec<String>,
+    kept: Vec<String>,
+}
+
+/// Remove the files of units that left a scratch game's set (issue #4521).
+///
+/// Only inside `<data_dir>/games/<folder>` with a folder that passes
+/// [`valid_scratch_folder`], and only what coilbox wrote. A unit's files go when
+/// they still hash to a digest its export recorded, by [`sort_stale_files`].
+/// A texture has no digest, because it is copied from a pack or the store, so
+/// the caller names it, and it goes only as a plain file name directly under
+/// `unittextures/`. Every name is checked before the first removal, so a bad one
+/// removes nothing.
+fn prune_scratch_game(
+    data_dir: &Path,
+    folder: &str,
+    units: &[PruneUnit],
+    textures: &[String],
+) -> Result<Pruned, String> {
+    if !valid_scratch_folder(folder) {
+        return Err(format!("not a scratch game folder: {folder}"));
+    }
+    let game = data_dir.join("games").join(folder);
+    if !game.is_dir() || !is_scratch_dir(&game) {
+        return Err(format!("not a scratch game: {}", game.display()));
+    }
+    if let Some(bad) = units.iter().find(|u| !valid_unit_name(&u.unit_name)) {
+        return Err(format!("invalid unit name: {}", bad.unit_name));
+    }
+    let mut texture_paths = Vec::new();
+    for name in textures {
+        texture_paths.push(stored_texture_target(&game.join("unittextures"), name)?);
+    }
+
+    let mut pruned = Pruned {
+        removed: Vec::new(),
+        kept: Vec::new(),
+    };
+    for unit in units {
+        let sorted = sort_stale_files(&game, &unit.unit_name, &unit.digests, false)?;
+        pruned.removed.extend(sorted.ours);
+        pruned.kept.extend(sorted.kept);
+    }
+    for path in texture_paths {
+        // `symlink_metadata` so a link is never followed out of the folder.
+        let is_file = std::fs::symlink_metadata(&path).is_ok_and(|m| m.is_file());
+        if !is_file {
+            continue;
+        }
+        std::fs::remove_file(&path)
+            .map_err(|e| format!("could not remove {}: {e}", path.display()))?;
+        pruned.removed.push(path.to_string_lossy().to_string());
+    }
+    Ok(pruned)
+}
+
+/// `lego_scratch_prune` removes what units that left a scratch game's set wrote
+/// into it. See [`prune_scratch_game`] for what it will and will not touch.
+#[tauri::command]
+async fn lego_scratch_prune(
+    data_dir: String,
+    folder: String,
+    units: Vec<PruneUnit>,
+    textures: Vec<String>,
+) -> CliResult {
+    let root = PathBuf::from(&data_dir);
+    if !root.is_absolute() || !root.is_dir() {
+        return CliResult::err(format!("not a content root: {data_dir}"));
+    }
+    match prune_scratch_game(&root, &folder, &units, &textures) {
+        Ok(pruned) => CliResult::ok(json!({ "removed": pruned.removed, "kept": pruned.kept })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
 /// `lego_run_script` plays a unit's own Lua and reports where its pieces are on
 /// every frame of it.
 ///
@@ -3547,6 +3635,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_export_picture,
             lego_picture_survey,
             lego_scratch_game,
+            lego_scratch_prune,
             lego_run_script,
             lego_probe_script,
             lego_write_text_file,
@@ -4325,6 +4414,140 @@ mod tests {
             .join("scripts/coilbox/skyfort_collision.lua")
             .exists());
         assert!(!dir.path().join("blender/skyfort.mtl").exists());
+    }
+
+    /// A scratch game under a content root, as `lego_scratch_game` lays it out.
+    fn scratch_root(folder: &str) -> (tempfile::TempDir, PathBuf) {
+        let data = tempfile::tempdir().expect("tempdir");
+        let game = data.path().join("games").join(folder);
+        std::fs::create_dir_all(&game).expect("mkdir");
+        (data, game)
+    }
+
+    fn prune_unit(unit_name: &str, digests: Vec<String>) -> PruneUnit {
+        PruneUnit {
+            unit_name: unit_name.to_string(),
+            digests,
+        }
+    }
+
+    // Issue #4521. A unit taken out of a mutator's set must leave nothing behind.
+    #[test]
+    fn pruning_removes_a_dropped_units_files_and_none_of_the_kept_units() {
+        let (data, game) = scratch_root("coilbox-lego-campaign.sdd");
+        let tank = exported_unit(&game, "tank");
+        exported_unit(&game, "skyfort");
+        std::fs::create_dir_all(game.join("weapons")).expect("mkdir");
+        let weapon = game.join("weapons/coilbox_tank_gun.lua");
+        std::fs::write(&weapon, "return {}").expect("weapon");
+        let mut digests = tank;
+        digests.push(hex_digest(b"return {}"));
+
+        let pruned = prune_scratch_game(
+            data.path(),
+            "coilbox-lego-campaign.sdd",
+            &[prune_unit("tank", digests)],
+            &[],
+        )
+        .expect("prune");
+
+        assert!(!game.join("units/tank.lua").exists());
+        assert!(!game.join("objects3d/tank.s3o").exists());
+        assert!(!game.join("scripts/tank.lua").exists());
+        assert!(!game.join("scripts/coilbox/tank_collision.lua").exists());
+        assert!(!weapon.exists());
+        assert!(game.join("units/skyfort.lua").is_file());
+        assert!(game.join("objects3d/skyfort.s3o").is_file());
+        assert!(!pruned.removed.is_empty());
+        assert!(pruned.kept.is_empty());
+    }
+
+    #[test]
+    fn pruning_leaves_a_file_that_is_no_longer_what_was_written() {
+        let (data, game) = scratch_root("coilbox-lego-campaign.sdd");
+        let digests = exported_unit(&game, "tank");
+        std::fs::write(game.join("units/tank.lua"), "somebody's edit").expect("edit");
+
+        let pruned = prune_scratch_game(
+            data.path(),
+            "coilbox-lego-campaign.sdd",
+            &[prune_unit("tank", digests)],
+            &[],
+        )
+        .expect("prune");
+
+        assert!(game.join("units/tank.lua").is_file());
+        assert_eq!(
+            pruned.kept,
+            vec![game.join("units/tank.lua").to_string_lossy()]
+        );
+        assert!(!game.join("objects3d/tank.s3o").exists());
+    }
+
+    #[test]
+    fn pruning_removes_the_textures_named_and_only_from_unittextures() {
+        let (data, game) = scratch_root("coilbox-lego-campaign.sdd");
+        let textures = game.join("unittextures");
+        std::fs::create_dir_all(&textures).expect("mkdir");
+        std::fs::write(textures.join("old.png"), "png").expect("old");
+        std::fs::write(textures.join("current.png"), "png").expect("current");
+        std::fs::write(game.join("modinfo.lua"), "modinfo").expect("modinfo");
+
+        prune_scratch_game(
+            data.path(),
+            "coilbox-lego-campaign.sdd",
+            &[],
+            &["old.png".to_string()],
+        )
+        .expect("prune");
+
+        assert!(!textures.join("old.png").exists());
+        assert!(textures.join("current.png").is_file());
+        assert!(game.join("modinfo.lua").is_file());
+    }
+
+    #[test]
+    fn pruning_refuses_a_folder_that_is_not_a_scratch_game() {
+        let (data, game) = scratch_root("ba1211.sdd");
+        let digests = exported_unit(&game, "tank");
+
+        let refused = prune_scratch_game(
+            data.path(),
+            "ba1211.sdd",
+            &[prune_unit("tank", digests)],
+            &[],
+        );
+
+        assert!(refused.is_err());
+        assert!(game.join("units/tank.lua").is_file());
+    }
+
+    #[test]
+    fn pruning_refuses_names_that_are_paths_before_removing_anything() {
+        let (data, game) = scratch_root("coilbox-lego-campaign.sdd");
+        let digests = exported_unit(&game, "tank");
+        std::fs::write(data.path().join("keep.png"), "png").expect("keep");
+
+        let bad_unit = prune_scratch_game(
+            data.path(),
+            "coilbox-lego-campaign.sdd",
+            &[
+                prune_unit("tank", digests.clone()),
+                prune_unit("../tank", digests),
+            ],
+            &[],
+        );
+        let bad_texture = prune_scratch_game(
+            data.path(),
+            "coilbox-lego-campaign.sdd",
+            &[],
+            &["../../keep.png".to_string()],
+        );
+
+        assert!(bad_unit.is_err());
+        assert!(bad_texture.is_err());
+        assert!(game.join("units/tank.lua").is_file());
+        assert!(data.path().join("keep.png").is_file());
     }
 
     fn wreck(feature: &str, feature_written: Option<String>) -> WreckExport {

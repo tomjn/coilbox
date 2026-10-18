@@ -15,6 +15,8 @@
 import * as THREE from "three";
 import { describe, expect, it, vi } from "vitest";
 
+import type { MeasureEnd } from "../../measure";
+import { newMeasureScene } from "./measureLayer";
 import { attachPointerHandlers } from "./pointerHandlers";
 import type { SceneState } from "./sceneState";
 
@@ -191,11 +193,14 @@ describe("a click while measuring", () => {
       new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }),
     );
     slab.position.y = 3;
+    slab.userData.pieceId = "slab";
     root.add(slab);
     root.updateMatrixWorld(true);
     const picked = vi.fn();
+    const moved = vi.fn();
     return {
       picked,
+      moved,
       scene: {
         renderer: {
           domElement: canvas,
@@ -215,11 +220,14 @@ describe("a click while measuring", () => {
         placingPartRef: { current: null },
         onPickGuideRef: { current: undefined },
         measure: {
+          ...newMeasureScene(),
           active: true,
           onPick: picked,
-          dragFrom: null,
-          layer: null,
+          onMoveEnd: moved,
         },
+        controls: { enabled: true },
+        dragging: false,
+        groups: new Map([["slab", slab]]),
         onGroundPickRef: { current: undefined },
         onSelectRef: { current: vi.fn() },
         snapping,
@@ -254,8 +262,10 @@ describe("a click while measuring", () => {
     click(canvas);
     dispose();
 
-    const [[at]] = picked.mock.calls;
-    expect(at[1]).toBeCloseTo(4);
+    const end = picked.mock.calls[0][0] as MeasureEnd;
+    expect(end.at[1]).toBeCloseTo(4);
+    // A guide's point is a world point, not one on the piece under it.
+    expect(end.on).toBeNull();
     expect(scene.onSelectRef.current).not.toHaveBeenCalled();
   });
 
@@ -266,7 +276,98 @@ describe("a click while measuring", () => {
     click(canvas);
     dispose();
 
-    const [[at]] = picked.mock.calls;
-    expect(at[1]).toBeCloseTo(3);
+    const end = picked.mock.calls[0][0] as MeasureEnd;
+    expect(end.at[1]).toBeCloseTo(3);
+    // Unsnapped on a piece, so held on that piece.
+    expect(end.on?.pieceId).toBe("slab");
+    expect(end.on?.local[1]).toBeCloseTo(0);
+  });
+
+  describe("on an end of a line already drawn", () => {
+    /** One measurement from the middle of the canvas, on the slab at y 3,
+     *  to a point off to the side. */
+    function withLine(canvas: HTMLElement) {
+      const made = measuring(canvas, false);
+      const from: MeasureEnd = { at: [0, 3, 0], on: null };
+      made.scene.measure.measurements = [
+        { id: "m", from, to: { at: [4, 3, 0], on: null } },
+      ];
+      made.scene.measure.lines = {
+        lines: [{ id: "m", from: [0, 3, 0], to: [4, 3, 0] }],
+        pending: null,
+      };
+      return { ...made, from };
+    }
+    const press = { button: 0, pointerId: 1, clientY: 50 };
+    function drag(canvas: HTMLElement, steps: number[]) {
+      canvas.dispatchEvent(
+        new PointerEvent("pointerdown", { ...press, clientX: 50 }),
+      );
+      for (const x of steps)
+        canvas.dispatchEvent(
+          new PointerEvent("pointermove", { ...press, clientX: x }),
+        );
+      canvas.dispatchEvent(
+        new PointerEvent("pointerup", { ...press, clientX: steps.at(-1) }),
+      );
+    }
+
+    it("drags that end, snapped as a click is, and neither selects nor measures", () => {
+      const canvas = document.createElement("canvas");
+      const { picked, moved, scene } = withLine(canvas);
+      const dispose = attachPointerHandlers(scene);
+      canvas.dispatchEvent(
+        new PointerEvent("pointerdown", { ...press, clientX: 50 }),
+      );
+      expect(scene.controls.enabled).toBe(false);
+      canvas.dispatchEvent(
+        new PointerEvent("pointermove", { ...press, clientX: 52 }),
+      );
+      // Not yet past a click's travel.
+      expect(moved).not.toHaveBeenCalled();
+      // Past a click's travel and still over the slab, whose 5 elmos either
+      // side of the middle are 4.5 pixels from this high up.
+      const over = { ...press, clientX: 53, clientY: 53 };
+      canvas.dispatchEvent(new PointerEvent("pointermove", over));
+      canvas.dispatchEvent(new PointerEvent("pointerup", over));
+      dispose();
+
+      expect(moved).toHaveBeenCalledTimes(1);
+      const [which, end] = moved.mock.calls[0] as [
+        { id: string; end: string },
+        MeasureEnd,
+      ];
+      expect(which).toEqual({ id: "m", end: "from" });
+      expect(end.at[0]).toBeGreaterThan(0);
+      expect(end.at[1]).toBeCloseTo(3);
+      expect(end.on?.pieceId).toBe("slab");
+      expect(picked).not.toHaveBeenCalled();
+      expect(scene.onSelectRef.current).not.toHaveBeenCalled();
+      expect(scene.controls.enabled).toBe(true);
+      expect(scene.dragging).toBe(false);
+    });
+
+    it("measures from that end when it is clicked without moving", () => {
+      const canvas = document.createElement("canvas");
+      const { picked, moved, scene, from } = withLine(canvas);
+      const dispose = attachPointerHandlers(scene);
+      click(canvas);
+      dispose();
+
+      expect(picked).toHaveBeenCalledWith(from);
+      expect(moved).not.toHaveBeenCalled();
+    });
+
+    it("leaves the press to the gizmo when a handle has it", () => {
+      const canvas = document.createElement("canvas");
+      const { moved, scene } = withLine(canvas);
+      (scene.gizmo as { axis: string | null }).axis = "X";
+      const dispose = attachPointerHandlers(scene);
+      drag(canvas, [60]);
+      dispose();
+
+      expect(moved).not.toHaveBeenCalled();
+      expect(scene.controls.enabled).toBe(true);
+    });
   });
 });
