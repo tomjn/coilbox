@@ -3283,6 +3283,9 @@ const SCRATCH_UNIT_SCRIPT_GADGET: &[&str] = &["LuaRules", "Gadgets", "coilbox_un
 /// only for a base game that lacks it (issue #4475).
 const SCRATCH_LUARULES_ENTRIES: [&[&str]; 2] =
     [&["LuaRules", "main.lua"], &["LuaRules", "draw.lua"]];
+/// The menu entries that put the units on base game builders' build lists,
+/// read by the engine's base content `download_builds.lua` (issue #4515).
+const SCRATCH_BUILD_LIST: &[&str] = &["download", "coilbox_build_list.tdf"];
 
 /// Write one generated file into the scratch game, creating its folder.
 ///
@@ -3312,14 +3315,17 @@ fn write_scratch_file(dir: &Path, relative: &[&str], contents: &str) -> Result<(
 /// `start_unit` holds the side data and the gadget that spawns a start unit,
 /// which only a caller launching a single unit wants. `lua_rules` holds
 /// `LuaRules/main.lua` and `LuaRules/draw.lua`, each given only when the base
-/// game lacks it. A file not given is removed in both cases, because the
-/// folder is reused and a copy left from an earlier launch would either hide
-/// this game's own or spawn a unit nobody asked for.
+/// game lacks it. `build_list` holds the build list menu entries, given only
+/// when a unit names a builder. A file not given is removed in every case,
+/// because the folder is reused and a copy left from an earlier launch would
+/// hide this game's own, spawn a unit nobody asked for, or list a unit that has
+/// since left.
 fn write_scratch_game(
     dir: &Path,
     [modinfo, unit_script_gadget]: [&str; 2],
     start_unit: [Option<&str>; 2],
     lua_rules: [Option<&str>; 2],
+    build_list: Option<&str>,
     sandbox: Option<&sandbox::Sandbox>,
     runtime_src: Option<&Path>,
 ) -> Result<(), String> {
@@ -3338,6 +3344,7 @@ fn write_scratch_game(
         .into_iter()
         .zip(start_unit)
         .chain(SCRATCH_LUARULES_ENTRIES.into_iter().zip(lua_rules))
+        .chain(std::iter::once((SCRATCH_BUILD_LIST, build_list)))
     {
         match contents {
             Some(contents) => write_scratch_file(dir, relative, contents)?,
@@ -3367,7 +3374,9 @@ fn remove_scratch_file(dir: &Path, relative: &[&str]) -> Result<(), String> {
 /// only when given, the `gamedata/sidedata.lua` declaring a built unit as a
 /// side's start unit and the gadget that spawns it. `lua_rules_main` and `lua_rules_draw` are
 /// `LuaRules/main.lua` and `LuaRules/draw.lua`, given only for a base game that
-/// lacks them and removed otherwise (issue #4475). `sandbox` adds what "Play with this unit"
+/// lacks them and removed otherwise (issue #4475). `build_list` is the menu
+/// entries that put the units on base game builders' build lists, removed when
+/// not given (issue #4515). `sandbox` adds what "Play with this unit"
 /// needs on top, see [`sandbox`]. The unit itself follows through
 /// `lego_export`, which treats the result as any other game folder. Nothing
 /// else in the content root is touched, so removing that one folder undoes the
@@ -3387,6 +3396,7 @@ async fn lego_scratch_game<R: Runtime>(
     lua_rules_main: Option<String>,
     lua_rules_draw: Option<String>,
     sandbox: Option<sandbox::Sandbox>,
+    build_list: Option<String>,
 ) -> CliResult {
     if !valid_scratch_folder(&folder) {
         return CliResult::err(format!("not a scratch game folder: {folder}"));
@@ -3412,6 +3422,7 @@ async fn lego_scratch_game<R: Runtime>(
         [&modinfo, &unit_script_gadget],
         [sidedata.as_deref(), gadget.as_deref()],
         [lua_rules_main.as_deref(), lua_rules_draw.as_deref()],
+        build_list.as_deref(),
         sandbox.as_ref(),
         runtime_src.as_deref(),
     ) {
@@ -4788,6 +4799,7 @@ mod tests {
                 files,
                 start_unit,
                 [None, None],
+                None,
                 Some(&sandbox),
                 Some(src.path()),
             )
@@ -4829,12 +4841,22 @@ mod tests {
             [None, Some("-- handler")],
             None,
             None,
+            None,
         )
         .expect("write");
         assert_eq!(std::fs::read_to_string(&draw).expect("draw"), "-- handler");
         assert!(!main.exists(), "the base game's main.lua is left to it");
 
-        write_scratch_game(dir.path(), files, start_unit, [None, None], None, None).expect("write");
+        write_scratch_game(
+            dir.path(),
+            files,
+            start_unit,
+            [None, None],
+            None,
+            None,
+            None,
+        )
+        .expect("write");
         assert!(!draw.exists(), "the earlier copy would hide the game's own");
         assert_eq!(
             std::fs::read_to_string(dir.path().join("LuaRules/Gadgets/coilbox_start_unit.lua"))
@@ -4859,12 +4881,21 @@ mod tests {
             [None, None],
             None,
             None,
+            None,
         )
         .expect("write");
         assert!(sidedata.exists() && gadget.exists());
 
-        write_scratch_game(dir.path(), files, [None, None], [None, None], None, None)
-            .expect("write");
+        write_scratch_game(
+            dir.path(),
+            files,
+            [None, None],
+            [None, None],
+            None,
+            None,
+            None,
+        )
+        .expect("write");
         assert!(!sidedata.exists());
         assert!(!gadget.exists());
         assert!(dir.path().join("modinfo.lua").exists());
@@ -4872,6 +4903,45 @@ mod tests {
             .path()
             .join("LuaRules/Gadgets/coilbox_unit_script.lua")
             .exists());
+    }
+
+    /// Issue #4515. The build list goes where the engine's `download_builds.lua`
+    /// reads it, and a launch with no builders takes the last one's away.
+    #[test]
+    fn the_build_list_is_written_only_while_a_unit_names_a_builder() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let files = ["modinfo", "unit script"];
+        let list = dir.path().join("download/coilbox_build_list.tdf");
+
+        write_scratch_game(
+            dir.path(),
+            files,
+            [None, None],
+            [None, None],
+            Some("[MENUENTRY1]"),
+            None,
+            None,
+        )
+        .expect("write");
+        assert_eq!(
+            std::fs::read_to_string(&list).expect("list"),
+            "[MENUENTRY1]"
+        );
+
+        write_scratch_game(
+            dir.path(),
+            files,
+            [None, None],
+            [None, None],
+            None,
+            None,
+            None,
+        )
+        .expect("write");
+        assert!(
+            !list.exists(),
+            "an earlier list would keep a unit on a menu"
+        );
     }
 
     #[test]
