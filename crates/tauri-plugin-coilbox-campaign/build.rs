@@ -19,6 +19,8 @@ const COMMANDS: &[&str] = &[
     "campaign_unit_save",
     "campaign_unit_list",
     "campaign_unit_delete",
+    "campaign_unit_file_read",
+    "campaign_unit_file_write",
     "campaign_units_copy",
 ];
 

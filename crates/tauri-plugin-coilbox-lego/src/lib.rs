@@ -2574,7 +2574,16 @@ async fn lego_export<R: Runtime>(
     let mut texture_kept = false;
     if let Some(atlas) = textures.as_ref().and_then(|t| t.atlas.as_ref()) {
         let source = match &source_dir {
-            Some(dir) if valid_atlas_name(&atlas.name) => Ok(dir.join(&atlas.name)),
+            // A campaign copy that does not hold its atlas falls back to the
+            // pack it was built from, which the install gate has checked for.
+            Some(dir) if valid_atlas_name(&atlas.name) => {
+                let carried = dir.join(&atlas.name);
+                if carried.is_file() || atlas.pack.is_none() {
+                    Ok(carried)
+                } else {
+                    atlas_source(&app, atlas)
+                }
+            }
             Some(_) => Err(format!("invalid texture name: {}", atlas.name)),
             None => atlas_source(&app, atlas),
         };
