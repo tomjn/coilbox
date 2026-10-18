@@ -31,6 +31,10 @@ msgstr "Installed — restart to apply."
 msgid "Installing…"
 msgstr "Installing…"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "Language"
+msgstr "Language"
+
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Last checked {lastCheckedTime}"
 msgstr "Last checked {lastCheckedTime}"
@@ -38,6 +42,10 @@ msgstr "Last checked {lastCheckedTime}"
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Restart now"
 msgstr "Restart now"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "System"
+msgstr "System"
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Updates are disabled in development builds."

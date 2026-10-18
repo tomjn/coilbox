@@ -1,7 +1,15 @@
+import { useLingui } from "@lingui/react/macro";
 import { Maximize2, Sparkles, Wrench } from "lucide-react";
+import { Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { useLanguageSetting } from "../../i18n/language";
+import {
+  LOCALES,
+  localeDisplayName,
+  SYSTEM_LANGUAGE,
+} from "../../i18n/locales";
 import { clampUiZoom, UI_ZOOM_LEVELS } from "../../lib/uiZoom";
 import { useAdvancedModeSetting } from "../advanced";
 import {
@@ -23,6 +31,8 @@ import { AboutCoilbox } from "./AboutCoilbox";
  * the sidebar and welcome screen; on brings them back.
  */
 export default function GeneralSettings() {
+  const { t } = useLingui();
+  const [language, setLanguage] = useLanguageSetting();
   const [advanced, setAdvanced] = useAdvancedModeSetting();
   const [fullscreen, setFullscreen] = useFullscreenSetting();
   const [splash, setSplash] = useSplashSetting();
@@ -67,6 +77,20 @@ export default function GeneralSettings() {
         <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           <Maximize2 size={15} /> Display
         </h2>
+        <Field label={t`Language`} className="w-56">
+          <OptionSelect
+            value={language}
+            onValueChange={setLanguage}
+            size="sm"
+            options={[
+              { value: SYSTEM_LANGUAGE, label: t`System` },
+              ...LOCALES.map((code) => ({
+                value: code,
+                label: localeDisplayName(code),
+              })),
+            ]}
+          />
+        </Field>
         <div className="flex items-start gap-3">
           <div className="w-40">
             <OptionSelect
