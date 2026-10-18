@@ -22,6 +22,7 @@ import {
   recordsFor,
 } from "./downloadHistory";
 import { downloadMapAnySource } from "./downloadMap";
+import { SourceWalkError } from "./sourceWalk";
 
 vi.mock("./bindings", () => ({
   dlCancel: vi.fn(async () => ({})),
@@ -136,6 +137,96 @@ describe("the download queue's history", () => {
     );
     expect(record.outcome).toBe("failed");
     expect(record.failure).toBe("hakora: the host refused the connection");
+  });
+
+  it("stores each mirror that was tried, with its plain reason (issue #4577)", async () => {
+    vi.mocked(downloadMapAnySource).mockImplementationOnce(async (args) => {
+      for (const host of ["mirror1.test", "mirror2.test"]) {
+        args.onAttempt?.({
+          source: "springfiles",
+          outcome: "failed",
+          reference: `https://${host}/Isis.sd7`,
+          filename: "Isis.sd7",
+          md5: null,
+          mirror: host,
+          failure: `${host} answered 404 for Isis.sd7`,
+          durationMs: 10,
+        });
+      }
+      throw new SourceWalkError("No source could provide Isis", null);
+    });
+    const { result } = renderHook(() => useDownloadQueue(), { wrapper });
+
+    act(() => {
+      result.current.enqueue(request);
+    });
+    await waitFor(() =>
+      expect(result.current.failureFor("mapAnySource:Isis")).not.toBeNull(),
+    );
+
+    const records = recordsFor(
+      readDownloadHistory(),
+      downloadKey("map", "Isis"),
+    );
+    expect(records.map((r) => r.mirror).sort()).toEqual([
+      "mirror1.test",
+      "mirror2.test",
+    ]);
+  });
+
+  it("exposes the next untried source on a failed item, and after the row is gone", async () => {
+    const next = { source: "springfiles", mirror: "mirror2.test" } as const;
+    vi.mocked(downloadMapAnySource).mockRejectedValueOnce(
+      new SourceWalkError("mirror1.test stopped sending Isis.sd7", next),
+    );
+    const { result } = renderHook(() => useDownloadQueue(), { wrapper });
+
+    act(() => {
+      result.current.enqueue(request);
+    });
+    await waitFor(() => expect(result.current.items[0]?.status).toBe("error"));
+
+    expect(result.current.items[0]?.next).toEqual(next);
+    expect(result.current.nextSourceFor("mapAnySource:Isis")).toEqual(next);
+  });
+
+  it("exposes the next untried source on a cancelled item", async () => {
+    const next = { source: "springfiles", mirror: "mirror2.test" } as const;
+    vi.mocked(downloadMapAnySource).mockRejectedValueOnce(
+      new SourceWalkError("Download cancelled.", next),
+    );
+    const { result } = renderHook(() => useDownloadQueue(), { wrapper });
+
+    act(() => {
+      result.current.enqueue(request);
+    });
+    await waitFor(() =>
+      expect(result.current.items[0]?.status).toBe("canceled"),
+    );
+
+    expect(result.current.items[0]?.next).toEqual(next);
+  });
+
+  it("clears the next source when the download is asked for again", async () => {
+    vi.mocked(downloadMapAnySource).mockRejectedValueOnce(
+      new SourceWalkError("failed", { source: "hakora", mirror: null }),
+    );
+    const { result } = renderHook(() => useDownloadQueue(), { wrapper });
+
+    act(() => {
+      result.current.enqueue(request);
+    });
+    await waitFor(() =>
+      expect(result.current.nextSourceFor("mapAnySource:Isis")).not.toBeNull(),
+    );
+    vi.mocked(downloadMapAnySource).mockImplementationOnce(
+      () => new Promise(() => {}),
+    );
+    act(() => {
+      result.current.enqueue(request);
+    });
+
+    expect(result.current.nextSourceFor("mapAnySource:Isis")).toBeNull();
   });
 
   it("does not record a cancelled download", async () => {

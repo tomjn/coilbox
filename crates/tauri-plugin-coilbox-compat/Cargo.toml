@@ -28,6 +28,9 @@ tauri-plugin-coilbox-workshop = { path = "../tauri-plugin-coilbox-workshop" }
 # its 3do models, and runs the worker scan the test that the mutator is listed
 # reads.
 tauri-plugin-coilbox-unitsync = { path = "../tauri-plugin-coilbox-unitsync" }
+# The hits the Lua compat scan reports, which name the call-in handlers a game
+# defines, so the mutator gets only the call-in adapters the game needs.
+coilbox-luacompat = { path = "../coilbox-luacompat" }
 # The folder the converter writes into before it is copied into the mutator.
 tempfile = { workspace = true }
 

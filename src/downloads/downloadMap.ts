@@ -1,5 +1,6 @@
-import { dlDownloadFileRaw, dlDownloadMapRaw } from "./bindings";
-import { type DownloadAttempt, hostOf } from "./downloadHistory";
+import { dlDownloadMapRaw } from "./bindings";
+import type { DownloadAttempt } from "./downloadHistory";
+import { downloadFromMirrors } from "./downloadMirrors";
 import { withDownloadNotify } from "./downloadNotify";
 import { norm } from "./gameRepos";
 import { type MapSource, mapSourceOrder } from "./mapSources";
@@ -11,6 +12,14 @@ import {
   loadSpringfilesList,
 } from "./mirrorIndex";
 import { type ProgressSink, progressChannel } from "./progressChannel";
+import {
+  AttemptLog,
+  isCancel,
+  nextKind,
+  orderFrom,
+  type SourceStep,
+  SourceWalkError,
+} from "./sourceWalk";
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -22,7 +31,8 @@ const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
  *
  * 1. the maps.evolutionrts.info mirror of maps first made for Beyond All
  *    Reason. Match by filename, since it carries no springname.
- * 2. springfiles catalog mirror. Match by springname/name, fetch the first mirror.
+ * 2. springfiles catalog mirror. Match by springname/name, then fetch each of
+ *    its mirrors in turn until one delivers (issue #4577).
  * 3. the hakora.xyz mirror. Match by filename, like evolutionrts.
  * 4. rapid via pr-downloader, on its own default search, which is springfiles.
  *
@@ -54,20 +64,35 @@ async function downloadMapAnySourceImpl(opts: {
   askedAt?: number;
   /** Told about each source tried, whether it worked or not (issue #4576). */
   onAttempt?: (attempt: DownloadAttempt) => void;
+  /** Skip the sources before this one, for a retry on the next (issue #4577). */
+  startAt?: SourceStep;
 }): Promise<string> {
-  const { mapName, writePath, opId, onProgress } = opts;
+  const { mapName, writePath, opId, onProgress, startAt } = opts;
   const askedAt = opts.askedAt ?? indexTick();
   const target = norm(mapName);
-  const errors: string[] = [];
-  /** What the source being tried is fetching, set just before it fetches. */
-  let fetching: Pick<DownloadAttempt, "reference" | "filename" | "mirror"> = {
-    reference: null,
-    filename: null,
-    mirror: null,
-  };
+  const log = new AttemptLog(opts.onAttempt);
+  const order = mapSourceOrder({ hasWritePath: !!writePath });
 
-  /** A failure the rapid step handled itself, for the loop to report. */
-  let handled: string | null = null;
+  /** Fetch a file from its mirrors, and say which kind of source it was. */
+  const fetchFile = async (
+    source: MapSource,
+    urls: readonly string[],
+    filename: string,
+    label: string,
+  ): Promise<string | null> =>
+    (await downloadFromMirrors({
+      source,
+      urls,
+      destDir: `${writePath}/maps`,
+      filename,
+      opId,
+      onProgress,
+      log,
+      startAt,
+      afterSource: nextKind(order, source),
+    }))
+      ? label
+      : null;
 
   const attempt = async (source: MapSource): Promise<string | null> => {
     switch (source) {
@@ -81,21 +106,13 @@ async function downloadMapAnySourceImpl(opts: {
             ),
           askedAt,
         );
-        const url = hit?.mirrors?.[0];
-        if (!hit || !url) return null;
-        fetching = {
-          reference: url,
-          filename: hit.filename,
-          mirror: hostOf(url),
-        };
-        await dlDownloadFileRaw({
-          url,
-          destDir: `${writePath}/maps`,
-          filename: hit.filename,
-          opId,
-          onProgress: progressChannel(onProgress),
-        });
-        return "springfiles mirror";
+        if (!hit?.mirrors?.length) return null;
+        return fetchFile(
+          source,
+          hit.mirrors,
+          hit.filename,
+          "springfiles mirror",
+        );
       }
       case "hakora": {
         if (!writePath) return null;
@@ -105,19 +122,7 @@ async function downloadMapAnySourceImpl(opts: {
           askedAt,
         );
         if (!hit) return null;
-        fetching = {
-          reference: hit.url,
-          filename: hit.filename,
-          mirror: hostOf(hit.url),
-        };
-        await dlDownloadFileRaw({
-          url: hit.url,
-          destDir: `${writePath}/maps`,
-          filename: hit.filename,
-          opId,
-          onProgress: progressChannel(onProgress),
-        });
-        return "hakora";
+        return fetchFile(source, [hit.url], hit.filename, "hakora");
       }
       case "evolutionrts": {
         if (!writePath) return null;
@@ -127,69 +132,51 @@ async function downloadMapAnySourceImpl(opts: {
           askedAt,
         );
         if (!hit) return null;
-        fetching = {
-          reference: hit.url,
-          filename: hit.filename,
-          mirror: hostOf(hit.url),
-        };
-        await dlDownloadFileRaw({
-          url: hit.url,
-          destDir: `${writePath}/maps`,
-          filename: hit.filename,
+        return fetchFile(
+          source,
+          [hit.url],
+          hit.filename,
+          "evolutionrts mirror",
+        );
+      }
+      case "rapid": {
+        // The pr-downloader step fetches from springfiles too.
+        log.begin(
+          source,
+          { reference: mapName },
+          { recordAs: "springfiles", label: "springfiles (pr-downloader)" },
+        );
+        await dlDownloadMapRaw({
+          springName: mapName,
+          writePath,
           opId,
           onProgress: progressChannel(onProgress),
         });
-        return "evolutionrts mirror";
-      }
-      case "rapid": {
-        const label = "springfiles (pr-downloader)";
-        fetching = { reference: mapName, filename: null, mirror: null };
-        try {
-          await dlDownloadMapRaw({
-            springName: mapName,
-            writePath,
-            opId,
-            onProgress: progressChannel(onProgress),
-          });
-          return label;
-        } catch (e) {
-          errors.push(`${label}: ${msg(e)}`);
-          handled = msg(e);
-        }
-        return null;
+        return "springfiles (pr-downloader)";
       }
     }
   };
 
-  const order = mapSourceOrder({ hasWritePath: !!writePath });
-  for (const source of order) {
-    const startedAt = Date.now();
-    handled = null;
-    fetching = { reference: null, filename: null, mirror: null };
-    const report = (outcome: "ok" | "failed", failure: string | null) =>
-      opts.onAttempt?.({
-        // The pr-downloader step fetches from springfiles too.
-        source: source === "rapid" ? "springfiles" : source,
-        outcome,
-        ...fetching,
-        md5: null,
-        failure,
-        durationMs: Date.now() - startedAt,
-      });
+  for (const source of orderFrom(order, startAt)) {
+    log.begin(source);
     try {
       const result = await attempt(source);
       if (result) {
-        report("ok", null);
+        log.ok();
         return result;
       }
-      if (handled !== null) report("failed", handled);
     } catch (e) {
-      errors.push(`${source}: ${msg(e)}`);
-      report("failed", msg(e));
+      if (e instanceof SourceWalkError) throw e;
+      if (isCancel(e))
+        throw new SourceWalkError(msg(e), nextKind(order, source));
+      log.fail(e);
     }
   }
 
-  throw new Error(`No source could provide "${mapName}". ${errors.join("; ")}`);
+  throw new SourceWalkError(
+    `No source could provide "${mapName}". ${log.errors.join("; ")}`,
+    null,
+  );
 }
 
 export const downloadMapAnySource = withDownloadNotify(

@@ -10,7 +10,8 @@ import {
   useState,
 } from "react";
 import { primeScan, useScanTargetSelection } from "../content/config";
-import { useLibrary } from "../content/useLibrary";
+import { releaseIsNew } from "../content/updates";
+import { useUpdates } from "../content/useUpdates";
 import { useWriteRootPath } from "../downloads/config";
 import { useDownloadQueue } from "../downloads/DownloadQueueProvider";
 import type { ProgressSource } from "../downloads/pages/components/ProgressBar";
@@ -35,6 +36,13 @@ interface GameUpdatesContextValue {
   error: string | null;
   /** A newer game archive is available (release archive not yet installed). */
   updateAvailable: boolean;
+  /**
+   * Everything with a newer version: the profile game, other games and a newer
+   * engine. The topbar badge shows this.
+   */
+  updateCount: number;
+  /** Where the badge goes: the first place that has something to update. */
+  updateTo: string;
   installing: boolean;
   /** Install of the current release finished this session. */
   installed: boolean;
@@ -80,10 +88,14 @@ export function GameUpdatesProvider({ children }: { children: ReactNode }) {
   // Lowercased game filenames present in any content root, for the "have we got
   // this release?" check. The same listing the Games download screen reads.
   const {
-    installedFiles: { games: installedGames },
-    filesRead,
-    refresh: refreshInstalled,
-  } = useLibrary();
+    library: {
+      installedFiles: { games: installedGames },
+      filesRead,
+      refresh: refreshInstalled,
+    },
+    count: libraryUpdates,
+    games: updatedGames,
+  } = useUpdates();
 
   const runCheck = useCallback(async () => {
     if (!repo) return;
@@ -107,10 +119,12 @@ export function GameUpdatesProvider({ children }: { children: ReactNode }) {
   // An unread listing looks like no games at all, so it cannot say one is missing.
   const updateAvailable = useMemo(() => {
     if (!release || !filesRead) return false;
-    const archives = release.assets.filter((a) => isArchive(a.name));
-    if (archives.length === 0) return false;
-    return !archives.some((a) => installedGames.has(a.name.toLowerCase()));
+    return releaseIsNew(
+      release.assets.filter((a) => isArchive(a.name)).map((a) => a.name),
+      installedGames,
+    );
   }, [release, filesRead, installedGames]);
+  const updateCount = libraryUpdates + (updateAvailable ? 1 : 0);
 
   const notifiedRef = useRef(false);
   useEffect(() => {
@@ -203,6 +217,12 @@ export function GameUpdatesProvider({ children }: { children: ReactNode }) {
         checking,
         error,
         updateAvailable,
+        updateCount,
+        updateTo: updateAvailable
+          ? "/settings/game-updates"
+          : updatedGames.length > 0
+            ? "/library/games"
+            : "/settings/engines",
         installing,
         installed,
         profileUpdated,

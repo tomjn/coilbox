@@ -10,6 +10,7 @@ import type {
   QueueItem,
   QueueStatus,
 } from "../downloads/DownloadQueueProvider";
+import type { DownloadHistory } from "../downloads/downloadHistory";
 import type { HubGame, HubGameDownload } from "../hub/api";
 import type { GameItem, MapItem } from "./bindings";
 import { buildLibrary, type LibraryInput } from "./library";
@@ -331,6 +332,90 @@ describe("buildLibrary maps", () => {
 
   it("marks a catalogue map that is not installed as available", () => {
     expect(byId("Tangerine").state).toBe("available");
+  });
+});
+
+describe("buildLibrary update state", () => {
+  const rapidRecord = (md5: string | null): DownloadHistory => ({
+    "game:ba": {
+      "rapid|": {
+        source: "rapid",
+        outcome: "ok",
+        reference: "ba:stable",
+        filename: null,
+        md5,
+        mirror: null,
+        failure: null,
+        durationMs: 10,
+        at: "2026-10-01T00:00:00.000Z",
+      },
+    },
+  });
+  const ba = (extra: Partial<LibraryInput>) =>
+    buildLibrary({ ...input, ...extra }).games.find((g) => g.id === "ba");
+
+  it("raises an update for a rapid game whose tag md5 moved", () => {
+    const game = ba({
+      history: rapidRecord(null),
+      rapidVersions: { "ba:stable": { md5: "bbbb", installed: false } },
+    });
+    expect(game?.state).toBe("update");
+    expect(game?.rapidUpdate).toEqual({ tag: "ba:stable", md5: "bbbb" });
+  });
+
+  it("raises nothing while the tag md5 is the installed one", () => {
+    const game = ba({
+      history: rapidRecord(null),
+      rapidVersions: { "ba:stable": { md5: "aaaa", installed: true } },
+    });
+    expect(game?.state).toBe("installed");
+    expect(game?.rapidUpdate).toBeUndefined();
+  });
+
+  it("raises nothing for a rapid game before the tag has been read", () => {
+    const game = ba({ history: rapidRecord(null), rapidVersions: {} });
+    expect(game?.state).toBe("installed");
+  });
+
+  it("raises nothing for a game that was not installed from rapid", () => {
+    const history = rapidRecord(null);
+    history["game:ba"]["github|"] = {
+      ...history["game:ba"]["rapid|"],
+      source: "github",
+      at: "2026-10-02T00:00:00.000Z",
+    };
+    const game = ba({
+      history,
+      rapidVersions: { "ba:stable": { md5: "bbbb", installed: false } },
+    });
+    expect(game?.state).toBe("installed");
+  });
+
+  it("raises an update for a GitHub game whose latest release is not installed", () => {
+    const sf = buildLibrary(input).games.find((g) => g.id === "sf");
+    expect(sf?.state).toBe("update");
+    expect(sf?.update?.tag).toBe("v0.1.87");
+  });
+
+  it("raises nothing once the latest GitHub release is installed", () => {
+    const sf = buildLibrary({
+      ...input,
+      files: {
+        ...(input.files as NonNullable<LibraryInput["files"]>),
+        games: ["splinterfaction_0.1.87.sdz", "ba-v15.9.8.sdz"],
+      },
+      scan: {
+        ...(input.scan as NonNullable<LibraryInput["scan"]>),
+        games: [
+          scannedGame("SplinterFaction 0.1.87", "SplinterFaction_0.1.87.sdz", {
+            shortname: "SF",
+            version: "0.1.87",
+          }),
+        ],
+      },
+    }).games.find((g) => g.id === "sf");
+    expect(sf?.state).toBe("installed");
+    expect(sf?.update).toBeUndefined();
   });
 });
 
