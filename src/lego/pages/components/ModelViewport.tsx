@@ -76,6 +76,7 @@ import {
   type LegoCollisionVolume,
   type LegoMount,
   type LegoPiece,
+  type LegoPoseOffset,
   type LegoProject,
   pieceById,
 } from "../../model";
@@ -83,6 +84,7 @@ import type { StandardView } from "../../orthoViews";
 import { type OverlapResult, overlapSummary } from "../../overlap";
 import { type LoadedPack, partUnit } from "../../pack";
 import type { FaceTarget } from "../../placePart";
+import type { PoseOffsets } from "../../pose";
 import type { Problem, ProblemSource } from "../../problems";
 import type { RawGeometry } from "../../rawGeometry";
 import {
@@ -158,6 +160,7 @@ import {
   commitGroup,
   dragGroup,
   pieceIdOf,
+  snapPoseDrag,
 } from "./gizmoCommit";
 import { GUIDE_COLOUR } from "./guideLayer";
 import { clearJoinFaces } from "./joinFaceMarks";
@@ -210,6 +213,7 @@ import { useModelSceneSync } from "./useModelSceneSync";
 import { useModelSelection } from "./useModelSelection";
 import { useModelShortcuts } from "./useModelShortcuts";
 import { useOverlap } from "./useOverlap";
+import { usePoseMode } from "./usePoseMode";
 import { useProportionHandles } from "./useProportionHandles";
 import { useScriptFrameStepping } from "./useScriptFrameStepping";
 import { useSkeleton } from "./useSkeleton";
@@ -218,6 +222,8 @@ import { paintCompass, ViewportBar } from "./ViewportBar";
 import { disposeWeaponReach, reachColour } from "./weaponReachLayer";
 
 export type GizmoMode = "translate" | "rotate" | "scale";
+
+const NO_OFFSETS: PoseOffsets = {};
 
 /** Buttons as well as keys, so turning a piece is not a keyboard secret. */
 const MODES: {
@@ -597,6 +603,20 @@ interface Props {
       volume: LegoCollisionVolume,
     ) => void;
   };
+  /**
+   * Posing a piece without changing it (#3355). While `on`, the unit is shown
+   * baked, held in `offsets`, and the gizmo changes the pose rather than the
+   * piece. Absent leaves the mode out.
+   */
+  posing?: {
+    on: boolean;
+    /** The pose being held and edited: each piece's change from rest. */
+    offsets: PoseOffsets;
+    /** A finished drag of one piece. One edit of the pose. */
+    onPose: (pieceId: string, offset: LegoPoseOffset) => void;
+    /** The pose list and its mode switch, in the view's own controls. */
+    control: ReactNode;
+  };
   /** The aim point, while its panel has the gizmo on it. */
   aimPoint: {
     /** Draws the aim point whether or not its own toggle is on, so the panel
@@ -662,6 +682,7 @@ export function ModelViewport({
   anchorPlacement,
   partPlacement,
   collisionEditing,
+  posing,
   aimPoint,
   proportions,
   guides,
@@ -718,6 +739,10 @@ export function ModelViewport({
     onPieceCollisionVolumeChange,
   } = collisionEditing;
   const { showAimPoint = false, onAimChange } = aimPoint;
+  // Playing a script and posing both own the groups, so playing wins.
+  const posingOn = (posing?.on ?? false) && !playing;
+  const poseOffsets = posing?.offsets ?? NO_OFFSETS;
+  const onPose = posing?.onPose;
   const onGuidesEdit = guides?.onEdit;
   const onPackResize = packResize?.onResize;
   const onShapeResize = packResize?.onResizeShape;
@@ -865,6 +890,8 @@ export function ModelViewport({
   onPieceVolumeChangeRef.current = onPieceCollisionVolumeChange;
   const onAimChangeRef = useRef(onAimChange);
   onAimChangeRef.current = onAimChange;
+  const onPoseRef = useRef(onPose);
+  onPoseRef.current = onPose;
   const onPackResizeRef = useRef(onPackResize);
   onPackResizeRef.current = onPackResize;
   const onShapeResizeRef = useRef(onShapeResize);
@@ -1305,6 +1332,8 @@ export function ModelViewport({
         pieceCollisionBoxes: new Map(),
         editPieceId: null,
         onPieceVolumeChangeRef,
+        posing: false,
+        onPoseRef,
         editAim: false,
         onAimChangeRef,
         aimMark,
@@ -1378,7 +1407,7 @@ export function ModelViewport({
         // Built once per drag: the other pieces do not move while one is dragged,
         // so their anchors are fixed for the length of it.
         const pieceId = gizmo.object ? pieceIdOf(gizmo.object) : null;
-        if (gizmo.getMode() === "translate") {
+        if (gizmo.getMode() === "translate" && !state.posing) {
           showTargetAnchors(
             state,
             packRef.current,
@@ -1406,6 +1435,9 @@ export function ModelViewport({
       gizmo.addEventListener("objectChange", () => {
         if (gizmo.object === groupPivot) {
           dragGroup(state);
+        } else if (state.posing) {
+          snapPoseDrag(state);
+          moveDragReadout(state);
         } else {
           followSlideFrame(state);
           forceUniformScale(state);
@@ -1548,7 +1580,14 @@ export function ModelViewport({
     [reduceMotion],
   );
 
-  useModelSceneSync(sceneRef, pack, raw, project, playing, reduceMotion);
+  useModelSceneSync(
+    sceneRef,
+    pack,
+    raw,
+    project,
+    playing || posingOn,
+    reduceMotion && !posingOn,
+  );
 
   useCollisionAndAimVisibility(sceneRef, {
     project,
@@ -1665,11 +1704,27 @@ export function ModelViewport({
     pack,
     project,
     soleSelectedId,
-    playing,
+    playing || posingOn,
     showFreeFaces,
   );
 
-  useGizmoMode(sceneRef, mode, editingVolume, showAimPoint, uniformScale);
+  useGizmoMode(
+    sceneRef,
+    mode,
+    editingVolume,
+    showAimPoint,
+    uniformScale,
+    posingOn,
+  );
+  usePoseMode(
+    sceneRef,
+    posingOn,
+    poseOffsets,
+    project,
+    packRef,
+    rawRef,
+    projectRef,
+  );
 
   const drivePathPoints = standIn.drive?.path ?? null;
   const driveFrames = standIn.drive?.frames;
@@ -2114,6 +2169,7 @@ export function ModelViewport({
               }
             }}
             measure={{ on: measure.active, onChange: measure.setActive }}
+            poses={posing?.control}
             guides={
               guides ? (
                 <GuidesPopover

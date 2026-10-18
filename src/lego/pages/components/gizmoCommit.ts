@@ -5,8 +5,9 @@ import {
   groupTransform,
   transformRoots,
 } from "../../groupTransform";
-import { isEffectivelyHidden, type LegoProject } from "../../model";
+import { isEffectivelyHidden, type LegoProject, pieceById } from "../../model";
 import { partUnit } from "../../pack";
+import { offsetFromTransform } from "../../pose";
 import {
   moveStep,
   snapPosition,
@@ -17,21 +18,24 @@ import { handleBox } from "./collisionHandles";
 import { type GizmoMode, ROTATION_STEP } from "./ModelViewport";
 import { packSubject, showPackHandles } from "./packHandles";
 import type { SceneState } from "./sceneState";
-import { attachPiece, draggedGroup } from "./slideHandle";
+import { attachPiece, draggedGroup, showAllAxes } from "./slideHandle";
 
 /**
  * Which handles the gizmo shows, given what is being edited.
  *
  * A volume is measured along the model's own axes, so it has no rotation to
  * drag and rotate falls back to move. The aim point is one point, so it has no
- * size either and every mode falls back to move.
+ * size either and every mode falls back to move. A pose changes a piece's turn
+ * and move and never its size, so scale falls back to move there too.
  */
 export function gizmoMode(
   mode: GizmoMode,
   editingVolume: boolean,
   editingAim: boolean,
+  posing = false,
 ): GizmoMode {
   if (editingAim) return "translate";
+  if (posing && mode === "scale") return "translate";
   return editingVolume && mode === "rotate" ? "translate" : mode;
 }
 
@@ -60,6 +64,11 @@ function attachToSelection(
   selectedIds: string[],
   placingAnchor: boolean,
 ) {
+  if (state.posing) {
+    attachPosed(state, project, selectedIds);
+    return;
+  }
+
   // Editing a volume takes the handles off the pieces entirely. One set of
   // handles cannot mean two things, and a volume is a property of the unit or
   // of one named piece rather than of whichever piece is selected behind it.
@@ -111,6 +120,31 @@ function attachToSelection(
   state.groupPivot.rotation.set(0, 0, 0);
   state.groupPivot.scale.set(1, 1, 1);
   state.gizmo.attach(state.groupPivot);
+}
+
+/**
+ * Posing handles one piece, the one clicked last. A joined piece stays on its
+ * face, so it can be turned but not moved.
+ */
+function attachPosed(
+  state: SceneState,
+  project: LegoProject,
+  selectedIds: string[],
+) {
+  state.slideFrame.removeFromParent();
+  state.groupIds = [];
+  state.groupChanges = new Map();
+  const id = transformRoots(project, selectedIds)
+    .filter((root) => !isEffectivelyHidden(project, root))
+    .at(-1);
+  const group = id ? state.groups.get(id) : undefined;
+  const joined = id ? pieceById(project, id)?.connection !== undefined : false;
+  if (!group || (joined && state.gizmo.getMode() === "translate")) {
+    state.gizmo.detach();
+    return;
+  }
+  showAllAxes(state.gizmo);
+  state.gizmo.attach(group);
 }
 
 /**
@@ -220,8 +254,54 @@ export function commitAim(state: SceneState) {
   state.onAimChangeRef.current?.([position.x, position.y, position.z]);
 }
 
+/**
+ * Hand a finished pose drag on as a change from rest.
+ *
+ * The groups are in the engine's rotation order while posing, so the three
+ * angles read off the group are the three a `Turn` takes, one per axis.
+ */
+export function commitPose(state: SceneState) {
+  const group = state.gizmo.object;
+  const pieceId = group ? pieceIdOf(group) : null;
+  const rest = pieceId ? state.rest.get(pieceId) : undefined;
+  if (!group || !pieceId || !rest) return;
+  const offset = offsetFromTransform(
+    [group.rotation.x, group.rotation.y, group.rotation.z],
+    [group.position.x, group.position.y, group.position.z],
+    rest,
+  );
+  if (pieceById(state.projectRef.current, pieceId)?.connection) {
+    offset.move = [0, 0, 0];
+  }
+  state.onPoseRef.current?.(pieceId, offset);
+  state.onSnapChange(false);
+}
+
+/**
+ * Keep a pose turn on the same 15 degree steps a piece's turn lands on. A move
+ * is free: a pose has no anchors to seat against.
+ */
+export function snapPoseDrag(state: SceneState) {
+  const group = state.gizmo.object;
+  if (!group || state.gizmo.getMode() !== "rotate" || !state.snapping) {
+    state.onSnapChange(false);
+    return;
+  }
+  group.rotation.set(
+    ...snapRotation(
+      [group.rotation.x, group.rotation.y, group.rotation.z],
+      ROTATION_STEP,
+    ),
+  );
+  state.onSnapChange(true);
+}
+
 /** Write the dragged transform back to the document, once the drag is over. */
 export function commitGizmo(state: SceneState) {
+  if (state.posing) {
+    commitPose(state);
+    return;
+  }
   const group = draggedGroup(state);
   const pieceId = group ? pieceIdOf(group) : null;
   if (!group || !pieceId) return;

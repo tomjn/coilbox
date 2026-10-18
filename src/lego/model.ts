@@ -836,6 +836,39 @@ export interface LegoProject {
    * no budget. See `budget.ts`.
    */
   budget?: number;
+  /**
+   * Named stances of the unit (#3355), in the order the pose list shows them.
+   * A pose is a set of changes from the built shape and never changes it.
+   * Absent means none, which is every unit saved before this existed. See
+   * `pose.ts`.
+   */
+  poses?: LegoPose[];
+}
+
+/**
+ * One piece's change from its built shape in a pose, in the units a script's
+ * `Turn` and `Move` take: radians per axis, and elmos per axis. Either is
+ * absent when the pose leaves that alone.
+ *
+ * `turn` is x, y, z in the order the engine composes them (`YXZ`), so each
+ * entry is the destination of one `Turn(piece, axis, angle)`. `move` is x, y, z
+ * for `Move(piece, axis, distance)`.
+ */
+export interface LegoPoseOffset {
+  turn?: [number, number, number];
+  move?: [number, number, number];
+}
+
+/**
+ * A saved pose. `pieces` is keyed by piece id, because ids survive a rename and
+ * the script writer maps them to names. Only the pieces the pose changes are
+ * in it, so two poses can be combined and a pose stays small. An id of a piece
+ * that has since been deleted stays here and is skipped when the pose is shown.
+ */
+export interface LegoPose {
+  id: string;
+  name: string;
+  pieces: Record<string, LegoPoseOffset>;
 }
 
 /**
@@ -944,6 +977,36 @@ export function parseBudget(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) && value > 0
     ? value
     : null;
+}
+
+/** The poses that can be read, or null when there are none. */
+function parsePoses(value: unknown): LegoPose[] | null {
+  if (!Array.isArray(value)) return null;
+  const poses: LegoPose[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const e = entry as Record<string, unknown>;
+    if (typeof e.id !== "string" || e.id === "") continue;
+    if (poses.some((pose) => pose.id === e.id)) continue;
+    if (typeof e.name !== "string" || e.name.trim() === "") continue;
+    const pieces: Record<string, LegoPoseOffset> = {};
+    if (typeof e.pieces === "object" && e.pieces !== null) {
+      for (const [pieceId, raw] of Object.entries(e.pieces)) {
+        if (typeof raw !== "object" || raw === null) continue;
+        const r = raw as Record<string, unknown>;
+        const turn = parseVec3(r.turn);
+        const move = parseVec3(r.move);
+        if (turn || move) {
+          pieces[pieceId] = {
+            ...(turn ? { turn } : {}),
+            ...(move ? { move } : {}),
+          };
+        }
+      }
+    }
+    poses.push({ id: e.id, name: e.name.trim(), pieces });
+  }
+  return poses.length > 0 ? poses : null;
 }
 
 /** The guides that can be read, or null when there are none. */
@@ -1576,6 +1639,10 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
     ...(skeleton ? { skeleton } : {}),
     ...loadouts,
     ...(budget !== null ? { budget } : {}),
+    ...(() => {
+      const poses = parsePoses(d.poses);
+      return poses ? { poses } : {};
+    })(),
   };
   // A document saved before pieces were written in save order, or hand-edited,
   // may not have its parents first. Normalise here so the invariant holds the

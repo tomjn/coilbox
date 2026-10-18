@@ -362,6 +362,16 @@ Nothing about playback is written to the unit, so stopping restores exactly what
 
 Presets are demonstrations of motion, not the motion itself in every case. A turret in a game points where the target is, and the sweep you see in the viewport is what that motion looks like.
 
+### Poses
+
+A pose is a stance you hold by hand, such as arms raised or doors open, kept under a name. Open **Poses** in the viewport controls and press **Pose the unit**. The unit is shown as the engine draws it, and the move and turn handles now change the pose. They do not change the piece, so leaving the mode puts the unit back as you built it. Scale falls back to move, and a joined piece can be turned but not moved off its face.
+
+Type a name and press **Save** to keep the pose on the unit. Each pose in the list can be applied, overwritten with the pose you are holding, duplicated, renamed (edit the name) and deleted. Applying a pose starts from it, so you can adjust it and save the result as another pose or over the same one.
+
+Undo and redo step through the pose you are holding first. When it has nothing left to step over, they undo the unit's own edits, such as a rename or delete in the pose list.
+
+A pose stores only the pieces you changed. For each piece it holds a turn in radians about x, y and z, in the order the engine applies a script's turns, and a move in elmos. These are the numbers a `Turn` and a `Move` take. A pose that names a piece you have since deleted keeps the entry, skips it when shown, and says how many pieces are gone.
+
 ### Units that build
 
 The engine asks a builder and a factory different questions, so they get different presets.

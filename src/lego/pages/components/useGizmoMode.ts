@@ -18,11 +18,12 @@ export function useGizmoMode(
   editingVolume: boolean,
   showAimPoint: boolean,
   uniformScale: boolean,
+  posing = false,
 ) {
   useEffect(() => {
     const state = sceneRef.current;
     if (!state) return;
-    state.gizmo.setMode(gizmoMode(mode, editingVolume, showAimPoint));
+    state.gizmo.setMode(gizmoMode(mode, editingVolume, showAimPoint, posing));
     // Scale on a volume is the face plates rather than the gizmo, so the mode
     // decides which of the two is on screen.
     attachGizmo(
@@ -33,7 +34,7 @@ export function useGizmoMode(
     );
     showCollisionHandles(state);
     state.render();
-  }, [sceneRef, mode, editingVolume, showAimPoint]);
+  }, [sceneRef, mode, editingVolume, showAimPoint, posing]);
 
   useEffect(() => {
     const state = sceneRef.current;

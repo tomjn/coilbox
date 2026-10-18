@@ -85,6 +85,8 @@ export interface ViewportBarProps {
   view: StandardView | null;
   onView: (view: StandardView, on: boolean) => void;
   measure: Toggle;
+  /** The pose list popover, absent where poses cannot be edited. */
+  poses?: ReactNode;
   /** The guides popover, absent where guides cannot be edited. */
   guides?: ReactNode;
   /** Absent while there are no guides to hide. */
@@ -140,6 +142,7 @@ export function ViewportBar({
   view,
   onView,
   measure,
+  poses,
   guides,
   guideVisibility,
   environment,
@@ -237,6 +240,7 @@ export function ViewportBar({
         hideTitle={`Leave the measure tool (${shortcutLabel("measure")})`}
         showTitle={`Measure between two points (${shortcutLabel("measure")})`}
       />
+      {poses}
       {guides}
       {guideVisibility ? (
         <ViewToggle

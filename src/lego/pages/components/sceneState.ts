@@ -20,7 +20,12 @@ import { importedMaterial, partMaterial } from "../../geometry";
 import type { PieceTransform } from "../../groupTransform";
 import type { GuideLine, GuidePlane } from "../../guides";
 import { JoinedGroup } from "../../joinedWorld";
-import type { LegoCollisionVolume, LegoPiece, LegoProject } from "../../model";
+import type {
+  LegoCollisionVolume,
+  LegoPiece,
+  LegoPoseOffset,
+  LegoProject,
+} from "../../model";
 import type { StandardView } from "../../orthoViews";
 import { getPartGeometry, type LoadedPack } from "../../pack";
 import { seatPieceMesh } from "../../pivot";
@@ -215,6 +220,16 @@ export interface SceneState {
     current:
       | ((pieceId: string, volume: LegoCollisionVolume) => void)
       | undefined;
+  };
+  /**
+   * Whether the gizmo is posing pieces (#3355). The groups are then baked and
+   * in the engine's rotation order, and a finished drag goes to `onPoseRef`
+   * as a change from rest instead of to the document as a new place.
+   */
+  posing: boolean;
+  /** Told a piece's turn and move away from rest when a pose drag ends. */
+  onPoseRef: {
+    current: ((pieceId: string, offset: LegoPoseOffset) => void) | undefined;
   };
   /** Whether the gizmo is on the aim point, which the aim panel decides. */
   editAim: boolean;
