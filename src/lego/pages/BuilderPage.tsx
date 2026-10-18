@@ -76,6 +76,7 @@ import { describePresets, selectionAsCompound } from "../compounds";
 import {
   describeJoin,
   disconnectPiece,
+  faceName,
   type JoinSummary,
   pieceConnectors,
   pieceOwnBox,
@@ -139,6 +140,13 @@ import {
   moduleUpdates,
   type UntrackedModule,
 } from "../moduleUpdates";
+import {
+  markMountPoint,
+  mountPartRefusal,
+  mountRefusal,
+  unmarkMountPoint,
+  updateMountPoint,
+} from "../mountPoints";
 import { movementProblems } from "../movement";
 import { checkOverlap, overlapProblems } from "../overlap";
 import {
@@ -181,7 +189,7 @@ import { skeletonProblems } from "../skeletonChecks";
 import { applyProportions, resetToPlan } from "../skeletonEdit";
 import { applyTarget } from "../skeletonSize";
 import type { Vec3 } from "../snapping";
-import { swapModule } from "../swapModule";
+import { swapModule, swapRefusal } from "../swapModule";
 import { swapPart } from "../swapPart";
 import { useEditShortcuts } from "../useEditShortcuts";
 import { useLegoDocument } from "../useLegoDocument";
@@ -206,6 +214,7 @@ import { LoadoutPicker } from "./components/LoadoutPicker";
 import { PieceSize } from "./components/MeasureReadout";
 import { ModelViewport } from "./components/ModelViewport";
 import { ModuleUpdateBanner } from "./components/ModuleUpdateBanner";
+import { MountPointList } from "./components/MountPointList";
 import { NameInput } from "./components/NameInput";
 import { collisionHandlePieceId } from "./components/PieceCollisionFields";
 import { PieceTree } from "./components/PieceTree";
@@ -786,6 +795,11 @@ function Builder({ id }: { id: string | undefined }) {
     if ("module" in placingPart) {
       if (!target) return;
       const { module } = placingPart;
+      const refused = mountRefusal(draft, target.parentId, target.to, module);
+      if (refused) {
+        void notify({ title: "Mount point", body: refused, level: "warning" });
+        return;
+      }
       const inserted = placeModule(
         draft,
         module,
@@ -810,6 +824,15 @@ function Builder({ id }: { id: string | undefined }) {
       return;
     }
     const pieceId = crypto.randomUUID();
+    const partRefused = mountPartRefusal(draft, target.parentId, target.to);
+    if (partRefused) {
+      void notify({
+        title: "Mount point",
+        body: partRefused,
+        level: "warning",
+      });
+      return;
+    }
     if (!placePart(draft, pack, placingPart.part, target, placingPart, pieceId))
       return;
     queueTwin(pieceId);
@@ -1349,6 +1372,11 @@ function Builder({ id }: { id: string | undefined }) {
     title: string,
   ) {
     if (!pack) return;
+    const refused = swapRefusal(project, pieceId, module);
+    if (refused) {
+      void notify({ title, body: refused, level: "warning" });
+      return;
+    }
     const result = swapModule(
       project,
       pack,
@@ -3217,6 +3245,49 @@ function Builder({ id }: { id: string | undefined }) {
                             onRemove={(anchorId) =>
                               edit((project) =>
                                 removeAnchor(project, selected.id, anchorId),
+                              )
+                            }
+                          />
+
+                          <MountPointList
+                            piece={selected}
+                            project={draft}
+                            connectors={
+                              pack
+                                ? pieceConnectors(pack, selected).map((c) => ({
+                                    id: c.id,
+                                    label: faceName(pack, selected, c.id),
+                                  }))
+                                : []
+                            }
+                            onMark={(connector) =>
+                              pack &&
+                              edit((project) =>
+                                markMountPoint(
+                                  project,
+                                  pack,
+                                  selected.id,
+                                  connector,
+                                ),
+                              )
+                            }
+                            onChange={(connector, change) =>
+                              edit((project) =>
+                                updateMountPoint(
+                                  project,
+                                  selected.id,
+                                  connector,
+                                  change,
+                                ),
+                              )
+                            }
+                            onRemove={(connector) =>
+                              edit((project) =>
+                                unmarkMountPoint(
+                                  project,
+                                  selected.id,
+                                  connector,
+                                ),
                               )
                             }
                           />

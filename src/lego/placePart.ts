@@ -18,6 +18,7 @@ import {
   pieceById,
   uniquePieceName,
 } from "./model";
+import { isMount, mountPartRefusal } from "./mountPoints";
 import type { LegoPartInfo, LoadedPack } from "./pack";
 import type { Vec3 } from "./snapping";
 
@@ -121,7 +122,8 @@ export function ownFace(
 /**
  * The document with `part` added as a child of the target's piece and joined to
  * its face, as `pieceId`. Null when there is nothing to join: the piece or its
- * face is missing, or the part has no connectors.
+ * face is missing, the part has no connectors, or the face is a mount point,
+ * which takes modules only (#3279).
  */
 export function placePart(
   project: LegoProject,
@@ -135,6 +137,7 @@ export function placePart(
   if (!parent) return null;
   const theirs = pieceConnectors(pack, parent).find((c) => c.id === target.to);
   if (!theirs) return null;
+  if (mountPartRefusal(project, parent.id, target.to)) return null;
   const own = ownFace(pack, part, theirs, options.cycle);
   if (!own) return null;
 
@@ -178,7 +181,8 @@ function rank(id: string): number {
  * `FACE_ORDER` that no child is connected to. Judged from saved connections
  * alone, so a child placed freely beside the piece does not take a face. When
  * every face has a child, the one with the fewest, and `crowded` says so. Null
- * for a piece with no part or no faces.
+ * for a piece with no part or no faces. A mount point is never picked, since
+ * it is filled on purpose (#3279).
  */
 export function freeFace(
   project: LegoProject,
@@ -189,6 +193,7 @@ export function freeFace(
   if (!parent) return null;
   const faces = pieceConnectors(pack, parent)
     .map((connector, index) => ({ id: connector.id, index }))
+    .filter((face) => !isMount(project, parentId, face.id))
     .sort((a, b) => rank(a.id) - rank(b.id) || a.index - b.index);
   if (faces.length === 0) return null;
   const used = new Map<string, number>();

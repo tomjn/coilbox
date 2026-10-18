@@ -522,6 +522,22 @@ export interface LegoPiece {
    * loadout. Only meaningful while the unit has `loadouts`. See `loadouts.ts`.
    */
   inLoadout?: true;
+  /**
+   * Connectors of this piece a game maker has marked as places a module goes
+   * (#3279). Stored on the piece, so a chassis keeps them across a save, a
+   * module copy and a loadout switch. See `mountPoints.ts`.
+   */
+  mountPoints?: LegoMountPoint[];
+}
+
+/** A connector marked as a place a module goes, and which modules fit. */
+export interface LegoMountPoint {
+  /** The id of the connector on the piece. */
+  connector: string;
+  name: string;
+  /** Module categories that fit, compared without regard to case. Empty fits
+   *  nothing yet. */
+  accepts: string[];
 }
 
 /** A piece's place in a ring of copies. See `LegoPiece.ring`. */
@@ -1736,7 +1752,31 @@ function parsePiece(raw: unknown): LegoPiece | null {
     })(),
     ...(typeof p.bone === "string" && p.bone !== "" ? { bone: p.bone } : {}),
     ...(p.inLoadout === true ? { inLoadout: true } : {}),
+    ...(() => {
+      const mountPoints = parseMountPoints(p.mountPoints);
+      return mountPoints.length > 0 ? { mountPoints } : {};
+    })(),
   };
+}
+
+function parseMountPoints(raw: unknown): LegoMountPoint[] {
+  const out: LegoMountPoint[] = [];
+  for (const item of Array.isArray(raw) ? raw : []) {
+    if (typeof item !== "object" || item === null) continue;
+    const v = item as Record<string, unknown>;
+    if (typeof v.connector !== "string" || v.connector === "") continue;
+    if (out.some((m) => m.connector === v.connector)) continue;
+    out.push({
+      connector: v.connector,
+      name: typeof v.name === "string" ? v.name : "",
+      accepts: Array.isArray(v.accepts)
+        ? v.accepts.filter(
+            (c): c is string => typeof c === "string" && c.trim() !== "",
+          )
+        : [],
+    });
+  }
+  return out;
 }
 
 /**

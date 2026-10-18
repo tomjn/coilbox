@@ -169,6 +169,7 @@ import {
   moveDragReadout,
   newMeasureScene,
 } from "./measureLayer";
+import { clearMountMarks } from "./mountMarks";
 import { disposeOverlap } from "./overlapLayer";
 import { type CheckStatus, ProblemsButton } from "./ProblemsButton";
 import { buildPackPreview } from "./packHandles";
@@ -1329,6 +1330,7 @@ export function ModelViewport({
         uniformScale: false,
         anchors: null,
         joinMarks: [],
+        mountMarks: [],
         targetAnchors: null,
         seatMark,
         seatOutline,
@@ -1473,6 +1475,7 @@ export function ModelViewport({
           gizmo.dispose();
           clearAnchors(state);
           clearJoinFaces(state);
+          clearMountMarks(state);
           disposeMeasure(state);
           for (const helper of state.selectOutlines) helper.dispose();
           state.targetAnchors?.geometry.dispose();
