@@ -14,7 +14,13 @@ import {
   WALK_PAIRS,
 } from "./animPresets";
 import { buildLuaScript } from "./luaScript";
-import { type LegoPiece, type LegoProject, newProject } from "./model";
+import {
+  type LegoAction,
+  type LegoPiece,
+  type LegoPose,
+  type LegoProject,
+  newProject,
+} from "./model";
 import { at, CREATED, type ScriptEvent } from "./scriptPlayback";
 import { fitWalk } from "./walkFit";
 
@@ -407,16 +413,21 @@ function steadyPlan(): Plan {
 }
 
 /**
- * One shot straight ahead, then three seconds for the lean to ease out. The
- * lean follows the shot's direction, which `track()` cannot give, so only the
- * level body after it settles is compared.
+ * One shot straight ahead, then as long as the lean takes to decay below the
+ * 0.0001 radians the script treats as level, plus a second. The lean follows
+ * the shot's direction, which `track()` cannot give, so only the level body
+ * after it has settled is compared.
  */
-function settlePlan(): Plan {
-  const frames = CALLIN + 5 * FPS;
+function settlePlan(preset: AnimPreset, params: Record<string, number>): Plan {
+  const lean = deg(param(preset, params, "lean"));
+  const settle = param(preset, params, "settle");
+  const decay = lean > 1e-4 ? settle * Math.log(lean / 1e-4) : 0;
+  const level = CALLIN + Math.ceil((decay + 1) * FPS);
+  const frames = level + FPS;
   return {
     events: [...CREATED, { frame: CALLIN, callin: "RockUnit", args: [0, -1] }],
     frames,
-    spans: [{ from: CALLIN + 3 * FPS, to: frames - 1, t0: 0 }],
+    spans: [{ from: level, to: frames - 1, t0: 0 }],
     exceptions: [
       "The lean follows the shot's direction, so only the body level again after it has settled is compared. Its size and direction are checked in recoilSettleIdle.test.ts.",
     ],
@@ -518,7 +529,7 @@ function plan(preset: AnimPreset, params: Record<string, number>): Plan {
     case "idle.look":
       return steadyPlan();
     case "body.settle":
-      return settlePlan();
+      return settlePlan(preset, params);
     case "wake.moving":
       return wakePlan();
     case "gear.stow":
@@ -727,8 +738,180 @@ function buildCases() {
   );
 }
 
+/**
+ * Actions (#3356) are checked against the schedule they are written from: the
+ * unit is at rest when the call-in fires, then reaches each key's pose in
+ * straight lines after the time that key gives. Nothing in `track()` stands for
+ * them, so the schedule is the specification.
+ */
+const ACTION_POSES: LegoPose[] = [
+  {
+    id: "up",
+    name: "Up",
+    pieces: {
+      arm: { turn: [1, 0, 0], move: [0, 0, 3] },
+      hatch: { move: [0, 4, 0] },
+    },
+  },
+  {
+    id: "out",
+    name: "Out",
+    pieces: { arm: { turn: [-0.5, 0.25, 0.8] } },
+  },
+];
+
+function actionUnit(action: LegoAction): LegoProject {
+  const base = newProject({
+    id: "parity",
+    rootPieceId: "root",
+    name: "parity",
+    packId: "lego",
+    packVersion: "1",
+    now: "2026-10-16T00:00:00Z",
+  });
+  const part = (name: string): LegoPiece => ({
+    id: name,
+    name,
+    parentId: "root",
+    partId: "x",
+    position: [0, 0, 0],
+    rotation: [0, 0, 0],
+    scale: [1, 1, 1],
+  });
+  return {
+    ...base,
+    pieces: [...base.pieces, part("arm"), part("hatch")],
+    poses: ACTION_POSES,
+    actions: [action],
+  };
+}
+
+/** The channels of a pose for a piece, as the runtime lays them out. */
+function poseChannels(pose: LegoPose, piece: string): number[] {
+  const offset = pose.pieces[piece];
+  return [...(offset?.move ?? [0, 0, 0]), ...(offset?.turn ?? [0, 0, 0])];
+}
+
+/**
+ * Where an action is `t` seconds after its call-in: straight lines between the
+ * keys, from rest to the first, and for a loop round and round after the last.
+ */
+function scheduled(action: LegoAction, piece: string, t: number): number[] {
+  const poses = action.keys.map((key) => {
+    const pose = ACTION_POSES.find((entry) => entry.id === key.pose);
+    if (!pose) throw new Error(`no pose ${key.pose}`);
+    return { seconds: key.seconds, at: poseChannels(pose, piece) };
+  });
+  const knots = [{ time: 0, at: [0, 0, 0, 0, 0, 0] }];
+  let time = 0;
+  poses.forEach((key) => {
+    time += key.seconds;
+    knots.push({ time, at: key.at });
+  });
+  const lap = time;
+  while (
+    action.loop &&
+    knots.at(-1)?.time !== undefined &&
+    (knots.at(-1)?.time ?? 0) < t + lap
+  ) {
+    for (const key of poses) {
+      time += key.seconds;
+      knots.push({ time, at: key.at });
+    }
+  }
+  for (let i = 1; i < knots.length; i++) {
+    const [a, b] = [knots[i - 1], knots[i]];
+    if (t > b.time) continue;
+    const share = b.time === a.time ? 1 : (t - a.time) / (b.time - a.time);
+    return a.at.map((v, c) => v + (b.at[c] - v) * share);
+  }
+  return knots.at(-1)?.at ?? [0, 0, 0, 0, 0, 0];
+}
+
+function actionCase(
+  name: string,
+  action: LegoAction,
+  events: ScriptEvent[],
+  seconds: number,
+) {
+  const unit = actionUnit(action);
+  const frames = CALLIN + Math.round(seconds * FPS) + 1;
+  const growth = LUA_ROUNDING * (1 + frames / FPS);
+  const checks: Check[] = [];
+  for (const piece of unit.pieces) {
+    for (let channel = 0; channel < 6; channel++) {
+      const values: number[] = [];
+      for (let frame = CALLIN; frame < frames; frame++) {
+        values.push(
+          round(scheduled(action, piece.name, (frame - CALLIN) / FPS)[channel]),
+        );
+      }
+      let travel = 0;
+      for (let i = 1; i < values.length; i++) {
+        travel = Math.max(travel, Math.abs(values[i] - values[i - 1]));
+      }
+      const flat = values.every((v) => v === values[0]);
+      checks.push({
+        piece: piece.name,
+        channel,
+        from: CALLIN,
+        to: frames - 1,
+        ...(flat ? { constant: values[0] } : { expected: values }),
+        tolerance: round(travel + growth),
+      });
+    }
+  }
+  return {
+    name,
+    script: buildLuaScript(unit),
+    pieces: unit.pieces.map((piece) => piece.name),
+    events: [...CREATED, ...events],
+    frames,
+    exceptions: [
+      "Compared against the key schedule, in straight lines, within one frame of the fastest axis.",
+    ],
+    checks,
+  };
+}
+
+function actionCases() {
+  return [
+    actionCase(
+      "action, looping, StartMoving",
+      {
+        id: "loop",
+        name: "Loop",
+        trigger: "StartMoving",
+        loop: true,
+        keys: [
+          { pose: "up", seconds: 1 },
+          { pose: "out", seconds: 2 },
+        ],
+      },
+      [{ frame: CALLIN, callin: "StartMoving" }],
+      10,
+    ),
+    actionCase(
+      "action, one shot, Shot1",
+      {
+        id: "once",
+        name: "Once",
+        trigger: "Shot1",
+        loop: false,
+        keys: [
+          { pose: "out", seconds: 0.5 },
+          { pose: "up", seconds: 1.5 },
+        ],
+      },
+      [{ frame: CALLIN, callin: "Shot1" }],
+      4,
+    ),
+  ];
+}
+
 describe("preset parity fixture", () => {
   const cases = buildCases();
+  const actions = actionCases();
 
   it("covers all 23 presets", () => {
     expect(new Set(cases.map((entry) => entry.preset.id)).size).toBe(23);
@@ -740,7 +923,7 @@ describe("preset parity fixture", () => {
       {
         generatedBy:
           "src/lego/presetParity.test.ts. Regenerate with UPDATE_PRESET_PARITY=1 bun run test presetParity",
-        cases: cases.map((entry) => entry.fixture),
+        cases: [...cases.map((entry) => entry.fixture), ...actions],
       },
       null,
       1,

@@ -56,6 +56,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { notify } from "@/notify/notify";
+import { actionProblems } from "../actions";
 import { addShape } from "../addShape";
 import { aimPoint } from "../aimPoint";
 import { type ArrangeAction, arrange } from "../align";
@@ -669,11 +670,17 @@ function Builder({ id }: { id: string | undefined }) {
     [draft],
   );
 
+  const actionNotes = useMemo(
+    () => (draft ? actionProblems(draft) : []),
+    [draft],
+  );
+
   const problems = useMemo<Problem[]>(
     () => [
       ...documentProblems,
       ...(budgetNote ? [budgetNote] : []),
       ...chainNotes,
+      ...actionNotes,
       ...(balanceNote ? [balanceNote] : []),
       ...footprintNotes,
       ...overlapNotes,
@@ -683,6 +690,7 @@ function Builder({ id }: { id: string | undefined }) {
       documentProblems,
       budgetNote,
       chainNotes,
+      actionNotes,
       balanceNote,
       footprintNotes,
       overlapNotes,
@@ -2837,6 +2845,7 @@ function Builder({ id }: { id: string | undefined }) {
                   onChange={(animations) =>
                     edit((project) => ({ ...project, animations }))
                   }
+                  onActionsEdit={edit}
                   onScriptTimeline={setScriptTimeline}
                   onScriptRun={setLastScriptRun}
                   pack={loaded}

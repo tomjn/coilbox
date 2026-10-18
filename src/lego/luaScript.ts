@@ -10,6 +10,7 @@
  * document, where they are already lower case and identifier-safe.
  */
 
+import { emitActions } from "./actions";
 import {
   type AnimPreset,
   type EmitInstance,
@@ -433,6 +434,18 @@ export function buildLuaScript(project: LegoProject): string {
     }
   });
 
+  // Actions come after the presets, so a unit without any is written exactly
+  // as it was. Their signals are strings, which cost no bits.
+  const actions = emitActions(project, (piece) => use(piece) as string);
+  signals.push(...actions.signals);
+  functions.push(...actions.functions);
+  for (const [hook, lines] of Object.entries(actions.hooks)) {
+    hooks.set(hook as LuaHook, [
+      ...(hooks.get(hook as LuaHook) ?? []),
+      ...(lines ?? []),
+    ]);
+  }
+
   const root = rootName;
   if (root) used.add(root);
 
@@ -500,6 +513,8 @@ export function buildLuaScript(project: LegoProject): string {
         : signature;
     out.push(`function ${named}`, ...lines, "end", "");
   }
+
+  out.push(...actions.own);
 
   out.push(
     "function script.Killed(recentDamage, maxHealth)",

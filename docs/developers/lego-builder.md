@@ -357,7 +357,7 @@ Three presets follow how the unit is moving, and play best under **Driving along
 
 Two presets add the small motions around a shot.
 
-- **Body settles after a shot** defines the engine's `RockUnit`, which the engine calls after a weapon fires with the direction opposite the shot in the unit's own space. A shot straight ahead lifts the nose and a shot to one side tips the top the other way. The lean snaps to **Lean per shot** in two frames and eases level with a lag of **Settle time**. The 2.75 degree default is what Balanced Annihilation's `ROCKUNIT.H` turns the base by at full strength (500 of COB's 65536 angle units to a turn). A unit without this preset defines no `RockUnit`, so the engine makes no extra call on its shots. The preview rocks the unit straight back after each shot, because the scenarios do not work out the shot's direction. Do not apply it with **Body rocks on starting and stopping**, which turns the same piece about the same axis.
+- **Body settles after a shot** defines the engine's `RockUnit`, which the engine calls after a weapon fires with the direction opposite the shot in the unit's own space. A shot straight ahead lifts the nose and a shot to one side tips the top the other way. The lean snaps to **Lean per shot** in two frames and eases level with a lag of **Settle time**. The 2.75 degree default is what Balanced Annihilation's `ROCKUNIT.H` turns the base by at full strength (500 of COB's 65536 angle units to a turn). A unit without this preset defines no `RockUnit`, so the engine makes no extra call on its shots. The preview calls `RockUnit` after each shot with the opposite of the weapon's last aim heading, as the engine does. Do not apply it with **Body rocks on starting and stopping**, which turns the same piece about the same axis.
 - **Turret looks around when idle** turns each turret slowly between waypoints inside its yaw range after the unit has stood still, not aimed and not fired for **Idle time before looking**. A turret with no range looks **Turn either side** of straight ahead. The look starts from `Create`, so a unit that has never moved does it, and stops at the next `StartMoving`, `AimWeapon` or `Shot`. `StartMoving` also turns the turret back to centre.
 
 **Recoil on firing** kicks each weapon's own barrel from its own `Shot` call-in. A flare beside the barrel, rather than under it, kicks with it.
@@ -391,6 +391,16 @@ Type a name and press **Save** to keep the pose on the unit. Each pose in the li
 Undo and redo step through the pose you are holding first. When it has nothing left to step over, they undo the unit's own edits, such as a rename or delete in the pose list.
 
 A pose stores only the pieces you changed. For each piece it holds a turn in radians about x, y and z, in the order the engine applies a script's turns, and a move in elmos. These are the numbers a `Turn` and a `Move` take. A pose that names a piece you have since deleted keeps the entry, skips it when shown, and says how many pieces are gone.
+
+### Actions
+
+An action is a motion made of saved poses in time. In the **Animation** panel, press the plus beside **Actions**. The timeline opens beside the view. Add poses as keys, give each the seconds to reach it from the key before, and pick the call-in that starts it: `Create`, `StartMoving`, `StopMoving`, `Activate`, `Deactivate`, `StartBuilding`, `StopBuilding`, a `Shot` call-in, or a function of its own name. The first key's time is from rest, or from the last key when the action loops.
+
+A looping action stops on the matching call-in (`StopMoving` for `StartMoving`, `Deactivate` for `Activate`, `StopBuilding` for `StartBuilding`) and the pieces return to rest. Any other trigger loops until it is started again. A function of its own gets a `<name>Stop` function. An action that does not loop plays once and holds its last pose.
+
+The script writes each action as a thread. Each `Turn` and `Move` has the speed that reaches the key on time, worked out per axis as the distance divided by the seconds, and a `Sleep` waits for the key. Times are rounded to whole frames. A key whose pose was deleted is skipped and its time goes to the next key. Pieces a pose names that the unit no longer has are skipped. Each action has a signal of its own, written as a string, so presets and actions together are not limited by the bits of one number.
+
+The preview plays an action by running this script, so what you see is what the game runs. Actions and presets that move the same piece fight, and the one called last wins. The panel and the problems list name those pieces. Blending them is a separate piece of work.
 
 ### Units that build
 

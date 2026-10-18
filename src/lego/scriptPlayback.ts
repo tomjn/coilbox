@@ -414,24 +414,11 @@ export const FIRE_INTERVAL_FRAMES = at(FIRE_INTERVAL_S);
  *  inclusive, for a scenario that holds the stand-in still while it fires. */
 function fireVolley(startS: number, endS: number): ScriptEvent[] {
   const shots = Math.round((endS - startS) / FIRE_INTERVAL_S) + 1;
-  return Array.from({ length: shots }, (_, index) => {
-    const frame = at(startS + index * FIRE_INTERVAL_S);
-    return [
-      { frame, engine: "fire" as const, args: [1] },
-      // The engine rocks the unit after a shot that has left, away from the
-      // direction of fire (`Weapon.cpp:606-608`). The shot's real direction
-      // is not worked out here, so the preview rocks it straight back, which
-      // is `(0, -1)` in the unit's own space. Ambient because most units
-      // define no `RockUnit`. `resolveScenario` drops it with a shot that
-      // does not fire.
-      {
-        frame,
-        callin: "RockUnit",
-        args: [0, -1],
-        ambient: true,
-      },
-    ];
-  }).flat();
+  return Array.from({ length: shots }, (_, index) => ({
+    frame: at(startS + index * FIRE_INTERVAL_S),
+    engine: "fire" as const,
+    args: [1],
+  }));
 }
 
 /** Aim and fire events merged into one series, sorted by frame, with an aim
