@@ -1,9 +1,5 @@
 import { CHART_PALETTE, pairsStayApart } from "@/lib/chartPalette";
-import {
-  formatCompact,
-  formatDuration,
-  formatNumber,
-} from "@/lib/format";
+import { formatCompact, formatDuration, formatNumber } from "@/lib/format";
 import {
   isBlackHex,
   NON_TEXT_CONTRAST,
