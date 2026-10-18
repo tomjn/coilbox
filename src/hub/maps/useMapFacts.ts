@@ -56,11 +56,25 @@ export function useMapFacts(mapName: string | undefined): MapFacts | null {
 export function useManyMapFacts(
   names: readonly string[],
 ): Map<string, MapFacts> {
+  return useMapFactsBatch(names).facts;
+}
+
+/**
+ * {@link useManyMapFacts}, and whether the hub has answered for the names as
+ * they are now. A caller that filters on the facts needs that to tell "no map
+ * matches" apart from "not asked yet". With the hub switched off there is
+ * nothing to wait for, so it reads as answered.
+ */
+export function useMapFactsBatch(names: readonly string[]): {
+  facts: Map<string, MapFacts>;
+  answered: boolean;
+} {
   const hubUrl = useHubUrl();
   const [facts, setFacts] = useState<Map<string, MapFacts>>(new Map());
   // Joined rather than passed as an array, so a caller rebuilding an equal list
   // every render does not restart the effect.
   const key = names.join("\n");
+  const [answeredKey, setAnsweredKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isHubEnabled()) return;
@@ -80,13 +94,16 @@ export function useManyMapFacts(
       // Replaced rather than merged: the answers are for the names asked about,
       // and a name that has left the list has left the screen with it.
       setFacts(found);
+      setAnsweredKey(`${hubUrl}\n${key}`);
     });
     return () => {
       live = false;
     };
   }, [hubUrl, key]);
 
-  return facts;
+  const answered =
+    !isHubEnabled() || key === "" || answeredKey === `${hubUrl}\n${key}`;
+  return { facts, answered };
 }
 
 /**

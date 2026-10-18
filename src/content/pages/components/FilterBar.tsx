@@ -10,11 +10,12 @@ import {
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
-/** One filter chip: a value, its label and how many items it would show. */
+/** One filter chip: a value, its label and how many items it would show,
+ *  when that is known before the chip is pressed. */
 export interface FilterChip {
   value: string;
   label: string;
-  count: number;
+  count?: number;
 }
 
 /**
@@ -90,9 +91,11 @@ export function FilterBar({
               className="data-[state=on]:border-primary data-[state=on]:bg-primary/10"
             >
               {c.label}
-              <span className="tabular-nums text-muted-foreground">
-                {c.count}
-              </span>
+              {c.count !== undefined && (
+                <span className="tabular-nums text-muted-foreground">
+                  {c.count}
+                </span>
+              )}
             </ToggleGroupItem>
           ))}
         </ToggleGroup>

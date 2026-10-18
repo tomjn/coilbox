@@ -64,9 +64,17 @@ pub fn games_dir(data_dir: &str) -> Result<PathBuf, String> {
 #[serde(rename_all = "camelCase")]
 pub struct Marker {
     pub manifest_version: u32,
+    /// The [`coilbox_compat::WRITER`] that wrote the folder. A marker from
+    /// before the field was written by the first.
+    #[serde(default = "first_writer")]
+    pub writer: u32,
     /// The base archive's checksum as unitsync reports it.
     pub base_checksum: String,
     pub coilbox_version: String,
+}
+
+fn first_writer() -> u32 {
+    1
 }
 
 /// `modinfo.lua`. The engine appends `version` to `name` unless the name
@@ -144,9 +152,17 @@ pub fn files(
     Ok(files)
 }
 
-/// Refuse a manifest whose converter is not the one this build carries: its
-/// models could not be reproduced byte for byte.
-pub fn check_converter(manifest: &coilbox_compat::Manifest) -> Result<(), String> {
+/// Refuse a manifest whose converter or writer is not the one this build
+/// carries: its mutator could not be reproduced byte for byte.
+pub fn check_pins(manifest: &coilbox_compat::Manifest) -> Result<(), String> {
+    if manifest.writer != coilbox_compat::WRITER {
+        return Err(format!(
+            "compat {} needs compat writer {}, and this coilbox has writer {}",
+            manifest.version,
+            manifest.writer,
+            coilbox_compat::WRITER
+        ));
+    }
     let pin = &manifest.converter;
     if pin.name != "coilbox-3do-convert" || pin.version != coilbox_3do_convert::VERSION {
         return Err(format!(
@@ -166,15 +182,23 @@ pub fn check_converter(manifest: &coilbox_compat::Manifest) -> Result<(), String
 pub enum Stale {
     /// Built from an older or newer manifest than the one coilbox builds now.
     Manifest { built: u32, now: u32 },
+    /// Written by another version of the code that writes the mutator.
+    Writer { built: u32, now: u32 },
     /// The base archive has changed since.
     BaseChecksum { built: String, now: String },
     /// The folder has no marker coilbox can read.
     NoMarker,
 }
 
-/// Why a mutator built as `marker` is stale against manifest `now` and the
-/// base archive's current checksum. Empty means it is current.
-pub fn staleness(marker: Option<&Marker>, now: u32, base_checksum: &str) -> Vec<Stale> {
+/// Why a mutator built as `marker` is stale against manifest `now`, the
+/// writer that manifest names, and the base archive's current checksum. Empty
+/// means it is current.
+pub fn staleness(
+    marker: Option<&Marker>,
+    now: u32,
+    writer: u32,
+    base_checksum: &str,
+) -> Vec<Stale> {
     let Some(marker) = marker else {
         return vec![Stale::NoMarker];
     };
@@ -183,6 +207,12 @@ pub fn staleness(marker: Option<&Marker>, now: u32, base_checksum: &str) -> Vec<
         why.push(Stale::Manifest {
             built: marker.manifest_version,
             now,
+        });
+    }
+    if marker.writer != writer {
+        why.push(Stale::Writer {
+            built: marker.writer,
+            now: writer,
         });
     }
     if !marker.base_checksum.eq_ignore_ascii_case(base_checksum) {
@@ -232,6 +262,7 @@ mod tests {
     fn marker(n: u32, checksum: &str) -> Marker {
         Marker {
             manifest_version: n,
+            writer: coilbox_compat::WRITER,
             base_checksum: checksum.into(),
             coilbox_version: "1.2.3".into(),
         }
@@ -420,23 +451,26 @@ mod tests {
     }
 
     #[test]
-    fn the_latest_manifest_pins_the_converter_this_build_carries() {
+    fn the_latest_manifest_pins_the_converter_and_writer_this_build_carries() {
         let m = coilbox_compat::manifest(coilbox_compat::latest()).unwrap();
-        assert_eq!(check_converter(&m), Ok(()));
+        assert_eq!(check_pins(&m), Ok(()));
         let mut other = m.clone();
         other.converter.version = "0.0.0".into();
-        assert!(check_converter(&other).is_err());
+        assert!(check_pins(&other).is_err());
+        let mut other = m.clone();
+        other.writer = coilbox_compat::WRITER + 1;
+        assert!(check_pins(&other).unwrap_err().contains("writer"));
     }
 
     #[test]
     fn a_mutator_built_as_now_is_current() {
-        assert!(staleness(Some(&marker(1, "ABC")), 1, "abc").is_empty());
+        assert!(staleness(Some(&marker(1, "ABC")), 1, W, "abc").is_empty());
     }
 
     #[test]
     fn a_new_manifest_makes_it_stale() {
         assert_eq!(
-            staleness(Some(&marker(1, "abc")), 2, "abc"),
+            staleness(Some(&marker(1, "abc")), 2, W, "abc"),
             [Stale::Manifest { built: 1, now: 2 }]
         );
     }
@@ -444,7 +478,7 @@ mod tests {
     #[test]
     fn a_changed_base_archive_makes_it_stale() {
         assert_eq!(
-            staleness(Some(&marker(1, "abc")), 1, "def"),
+            staleness(Some(&marker(1, "abc")), 1, W, "def"),
             [Stale::BaseChecksum {
                 built: "abc".into(),
                 now: "def".into()
@@ -452,9 +486,32 @@ mod tests {
         );
     }
 
+    const W: u32 = coilbox_compat::WRITER;
+
+    #[test]
+    fn another_writer_makes_it_stale() {
+        let mut old = marker(1, "abc");
+        old.writer = W + 1;
+        assert_eq!(
+            staleness(Some(&old), 1, W, "abc"),
+            [Stale::Writer {
+                built: W + 1,
+                now: W
+            }]
+        );
+    }
+
+    /// Markers written before the field read as the first writer.
+    #[test]
+    fn a_marker_without_a_writer_was_written_by_the_first() {
+        let old = r#"{"manifestVersion": 2, "baseChecksum": "abc", "coilboxVersion": "1.2.3"}"#;
+        let marker: Marker = serde_json::from_str(old).unwrap();
+        assert_eq!(marker.writer, 1);
+    }
+
     #[test]
     fn a_folder_without_a_marker_is_stale() {
-        assert_eq!(staleness(None, 1, "abc"), [Stale::NoMarker]);
+        assert_eq!(staleness(None, 1, W, "abc"), [Stale::NoMarker]);
     }
 
     #[test]

@@ -154,7 +154,16 @@ export interface Library {
 }
 
 const lc = (s: string) => s.toLowerCase();
-const stem = (filename: string) => filename.replace(/\.(sd7|sdz)$/i, "");
+const stem = (filename: string) => filename.replace(/\.(sd7|sdz|sdd)$/i, "");
+
+/**
+ * A name in the raw disk listing that may have a record of its own: a Spring
+ * archive, and not a hidden file. The listing is every file in the folder, so
+ * without this `.DS_Store` became a game (issue #4646). Names the scan gives
+ * are never tested, because a rapid game's archive name has no extension.
+ */
+const isArchiveName = (name: string) =>
+  !name.startsWith(".") && /\.(sdz|sd7|sdd)$/i.test(name);
 /** A version compares the same with or without a leading v. */
 const bareVersion = (v: string) => v.trim().replace(/^v(?=\d)/i, "");
 
@@ -200,9 +209,10 @@ function stateOf(
   return noSource ? "noSource" : "available";
 }
 
-function installedFilesOf(input: LibraryInput): Library["installedFiles"] {
-  const maps = new Set(input.files?.maps.map(lc));
-  const games = new Set(input.files?.games.map(lc));
+/** Lowercased archive names the unitsync scan gives. */
+function scannedFilesOf(input: LibraryInput): Library["installedFiles"] {
+  const maps = new Set<string>();
+  const games = new Set<string>();
   for (const m of input.scan?.maps ?? []) {
     for (const a of m.archives) maps.add(lc(a.name));
     if (m.fileName) maps.add(lc(m.fileName));
@@ -213,9 +223,20 @@ function installedFilesOf(input: LibraryInput): Library["installedFiles"] {
   return { maps, games };
 }
 
+function installedFilesOf(
+  input: LibraryInput,
+  scanned: Library["installedFiles"],
+): Library["installedFiles"] {
+  return {
+    maps: new Set([...(input.files?.maps.map(lc) ?? []), ...scanned.maps]),
+    games: new Set([...(input.files?.games.map(lc) ?? []), ...scanned.games]),
+  };
+}
+
 function buildGames(
   input: LibraryInput,
   installedFiles: Set<string>,
+  scannedFiles: Set<string>,
 ): LibraryGame[] {
   const scanned = input.scan?.games ?? null;
   const resolver = createGameResolver(scanned);
@@ -303,6 +324,7 @@ function buildGames(
   for (const file of installedFiles) {
     let key = byFile.get(file);
     if (!key) {
+      if (!scannedFiles.has(file) && !isArchiveName(file)) continue;
       const id = keyOfName(stem(file).replace(/_/g, " "));
       key = record(id.key, id.title).id;
       byFile.set(file, key);
@@ -385,6 +407,7 @@ function buildGames(
 function buildMaps(
   input: LibraryInput,
   installedFiles: Set<string>,
+  scannedFiles: Set<string>,
 ): LibraryMap[] {
   const records = new Map<string, LibraryMap>();
   const byFile = new Map<string, string>();
@@ -471,6 +494,7 @@ function buildMaps(
       if (r) r.onDisk = true;
       continue;
     }
+    if (!scannedFiles.has(file) && !isArchiveName(file)) continue;
     const r = record(stem(file));
     r.onDisk = true;
     byFile.set(file, lc(r.id));
@@ -524,10 +548,11 @@ function buildMaps(
  * mirror's game name meets the hub's entry through the hub title.
  */
 export function buildLibrary(input: LibraryInput): Library {
-  const installedFiles = installedFilesOf(input);
+  const scanned = scannedFilesOf(input);
+  const installedFiles = installedFilesOf(input, scanned);
   return {
-    games: buildGames(input, installedFiles.games),
-    maps: buildMaps(input, installedFiles.maps),
+    games: buildGames(input, installedFiles.games, scanned.games),
+    maps: buildMaps(input, installedFiles.maps, scanned.maps),
     installedFiles,
   };
 }

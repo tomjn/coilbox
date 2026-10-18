@@ -110,9 +110,35 @@ pub fn convert(
     archive: &str,
     staging: &Path,
 ) -> Result<Models, String> {
-    let read = |file: &str| {
-        tauri_plugin_coilbox_unitsync::archive_text_blocking(engine_path, data_dir, archive, file)
-    };
+    convert_reading(
+        |file| {
+            tauri_plugin_coilbox_unitsync::archive_text_blocking(
+                engine_path,
+                data_dir,
+                archive,
+                file,
+            )
+        },
+        || {
+            tauri_plugin_coilbox_unitsync::convert_3do_blocking(
+                engine_path,
+                data_dir,
+                archive,
+                &staging.to_string_lossy(),
+            )
+        },
+        staging,
+    )
+}
+
+/// [`convert`], with `read` returning a file of the base game by path and
+/// `run` converting its models into `staging` and answering with the
+/// converter's result line.
+pub fn convert_reading(
+    read: impl Fn(&str) -> Result<Option<String>, String>,
+    run: impl FnOnce() -> Result<String, String>,
+    staging: &Path,
+) -> Result<Models, String> {
     let defs = read("gamedata/defs.lua")?;
     let defs_post = read(DEFS_POST)?;
     if let Some(why) = hook_problem(defs.as_deref(), defs_post.as_deref()) {
@@ -121,13 +147,7 @@ pub fn convert(
             ..Models::default()
         });
     }
-    let out = tauri_plugin_coilbox_unitsync::convert_3do_blocking(
-        engine_path,
-        data_dir,
-        archive,
-        &staging.to_string_lossy(),
-    )?;
-    let conversion = parse_conversion(&out)?;
+    let conversion = parse_conversion(&run()?)?;
     Ok(Models {
         dir: Some(staging.to_path_buf()),
         conversion,
