@@ -163,6 +163,7 @@ end
 for _, file in ipairs({
 	"gadget-aircraft-crash-83.lua",
 	"gadget-aircraft-crash-83-v2.lua",
+	"gadget-aircraft-crash-83-v3.lua",
 	"gadget-only-forward-aim-105.lua",
 	"gadget-messages-tdf-95.lua",
 	"gadget-model-center-offset-89.lua",
@@ -181,9 +182,10 @@ end
 -- Aircraft crash
 --------------------------------------------------------------------------------
 
--- The fix the latest manifest lists. gadget-aircraft-crash-83 is the same
--- gadget without the check for a game made for a newer engine.
-local CRASH = "gadget-aircraft-crash-83-v2.lua"
+-- The fix the latest manifest lists. gadget-aircraft-crash-83-v2 is the same
+-- gadget without the check for the engine a game's modinfo.lua names, and
+-- gadget-aircraft-crash-83 lacks the check for newer Spring calls too.
+local CRASH = "gadget-aircraft-crash-83-v3.lua"
 
 -- A COB script that does `set CRASHING to 1`, among other code.
 local function cob(sets)
@@ -311,6 +313,65 @@ do
 		files = { ["luarules/gadgets/coilbox_compat_aircraft_crash.lua"] = "Spring.GetUnitRotation(1)" },
 	})
 	check("crash: does not count its own file as the game's", not engine.removed)
+end
+
+-- The mutator's modinfo.lua as the engine hands it to the gadget: the base
+-- game's name and version under compatbasename and compatbaseversion. The
+-- values are the ones in the games' own modinfo.lua (name_pure and version).
+local function modinfo(name, version)
+	return function()
+		return { name = name .. " (compat 7)", version = "7", compatbasename = name, compatbaseversion = version }
+	end
+end
+
+local function crashWithModinfo(name, version, file)
+	return load(file or CRASH, {
+		files = {
+			["modinfo.lua"] = modinfo(name, version),
+			["scripts/plane.cob"] = cob(false),
+		},
+		unitDefs = { [PLANE] = { isStrafingAirUnit = true, scriptName = "scripts/plane.cob" } },
+	})
+end
+
+do
+	check("crash: turns off for Expand and Exterminate 0.46, made for Spring 0.88",
+		crashWithModinfo("Expand and Exterminate", "0.46 for Spring 0.88").removed)
+	check("crash: the earlier fix is unchanged and stays on for it",
+		not crashWithModinfo("Expand and Exterminate", "0.46 for Spring 0.88", "gadget-aircraft-crash-83-v2.lua").removed)
+	check("crash: stays on for XTA 9.65", not crashWithModinfo("XTA", "9.65").removed)
+	check("crash: stays on for Complete Annihilation stable-8405",
+		not crashWithModinfo("Complete Annihilation stable-8405", "stable-8405").removed)
+	check("crash: stays on for Spring 1944 2.31, whose name has a number that is not an engine's",
+		not crashWithModinfo("Spring 1944", "2.31").removed)
+end
+
+do
+	for _, version in ipairs({ "1.2 for Spring 0.88", "for spring 85", "Spring 0.83", "r5 FOR SPRING 91.0", "3.1 (Spring v94.1)" }) do
+		check("crash: turns off for a version that reads '" .. version .. "'",
+			crashWithModinfo("Some Game", version).removed)
+	end
+	check("crash: turns off when the name gives the engine", crashWithModinfo("Some Game for Spring 0.88", "1").removed)
+	for _, version in ipairs({
+		"9.65", "0.46", "83", "stable-8405", "for Spring 0.82.7.1", "Spring 0.75", "for Spring 8", "Springfield 90",
+		"Spring 1944", "for Spring", "", "Spring 83abc", "Springs 90",
+	}) do
+		check("crash: stays on for a version that reads '" .. version .. "'",
+			not crashWithModinfo("Some Game", version).removed)
+	end
+end
+
+do
+	local function with(modinfoFile)
+		return aircraft({ files = { ["modinfo.lua"] = modinfoFile } })
+	end
+	check("crash: a modinfo.lua without the base game's values is no sign",
+		not with(function() return { name = "G (compat 7)", version = "for Spring 0.88" } end).removed)
+	check("crash: a modinfo.lua the engine cannot include is no sign",
+		not with(function() error("boom") end).removed)
+	check("crash: a modinfo.lua that returns no table is no sign", not with(function() return "x" end).removed)
+	check("crash: values that are not strings are no sign",
+		not with(function() return { compatbasename = 5, compatbaseversion = {} } end).removed)
 end
 
 do
