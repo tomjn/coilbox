@@ -101,6 +101,7 @@ import {
   type PieceTransform,
   transformRoots,
 } from "../groupTransform";
+import { importScript, importSummary } from "../importScript";
 import { useInventoryView } from "../inventory";
 import { withLimits } from "../jointLimits";
 import { liftIntoUnit, pasteIntoUnit, saveModuleMeshes } from "../liftIntoUnit";
@@ -1858,6 +1859,34 @@ function Builder({ id }: { id: string | undefined }) {
   }
 
   /**
+   * Imports a Lua unit script into the unit (#643): read back as actions when
+   * it is simple enough, kept as the unit's own script when it is not. A game's
+   * script brings the library files and definition it reads.
+   */
+  function importUnitScript(
+    lua: string,
+    from: {
+      includes?: Record<string, string>;
+      unitDef?: Record<string, unknown> | null;
+    } = {},
+  ) {
+    if (!draft) return;
+    const result = importScript(draft, lua, {
+      ...from,
+      newId: () => crypto.randomUUID(),
+    });
+    stopPlayback();
+    edit(() => result.project);
+    setStrip("script");
+    setStripOpen(true);
+    void notify({
+      title: "Script imported",
+      body: importSummary(result),
+      level: result.unmatched.length > 0 ? "warning" : "success",
+    });
+  }
+
+  /**
    * Takes the game's compiled script again, for a unit read out of an SDD
    * somebody is still editing. Playback stops for the same reason an edit
    * stops it: what is on screen is no longer what ran.
@@ -2655,6 +2684,7 @@ function Builder({ id }: { id: string | undefined }) {
                       onScriptChange={changeScript}
                       onScriptRelease={releaseScript}
                       onCompiledReload={reloadCompiled}
+                      onScriptImport={(lua) => importUnitScript(lua)}
                       lastRun={lastScriptRun}
                     />
                   ) : pack ? (
@@ -2695,6 +2725,7 @@ function Builder({ id }: { id: string | undefined }) {
                           onLift={async (module) => {
                             await saveCompound(module);
                           }}
+                          onUseScript={importUnitScript}
                         />
                       }
                     />

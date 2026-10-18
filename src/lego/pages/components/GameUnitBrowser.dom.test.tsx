@@ -468,3 +468,58 @@ describe("GameUnitBrowser", () => {
     });
   });
 });
+
+/** A game unit's script, imported into the unit being built (#643). */
+describe("using a game unit's script", () => {
+  async function openCommander(onUseScript = vi.fn()) {
+    mocks.readS3o.mockResolvedValue({ root: piece("base") });
+    const project = unit({ game: gameRecordFor(sf, [sf, xta]) });
+    render(
+      <GameUnitBrowser project={project} query="" onUseScript={onUseScript} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Commander/ }));
+    await waitFor(() => expect(screen.getByText("base")).toBeTruthy());
+    return onUseScript;
+  }
+
+  it("reads that unit's script and hands it over with what it reads", async () => {
+    mocks.adopt.mockResolvedValue({
+      script: "-- armcom",
+      kind: "lua",
+      includes: { "lib.lua": "return {}" },
+      unitDef: { name: "armcom" },
+      notes: [],
+    });
+    const onUseScript = await openCommander();
+
+    fireEvent.click(screen.getByRole("button", { name: /Use its script/ }));
+
+    await waitFor(() => expect(onUseScript).toHaveBeenCalled());
+    expect(onUseScript).toHaveBeenCalledWith("-- armcom", {
+      includes: { "lib.lua": "return {}" },
+      unitDef: { name: "armcom" },
+    });
+    expect(mocks.adopt.mock.calls[0][0].imported.game).toMatchObject({
+      archive: "sf.sdz",
+      unit: "armcom",
+    });
+  });
+
+  it("says why when the unit has no script to import", async () => {
+    mocks.adopt.mockResolvedValue({
+      script: null,
+      kind: "cob",
+      includes: {},
+      unitDef: null,
+      notes: [],
+    });
+    const onUseScript = await openCommander();
+
+    fireEvent.click(screen.getByRole("button", { name: /Use its script/ }));
+
+    expect(
+      await screen.findByText("armcom has only a compiled script."),
+    ).toBeTruthy();
+    expect(onUseScript).not.toHaveBeenCalled();
+  });
+});

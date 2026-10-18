@@ -460,6 +460,21 @@ You do not need to take ownership to see the unit run. The preview already plays
 
 A unit opened out of a game brings its own script with it. See [Opening a unit from a game](#opening-a-unit-from-a-game).
 
+**Import** on the Script tab loads a `.lua` unit script from a file. To take the script of another unit in the same game, open it under Game units in the inventory and choose **Use its script**. A compiled unit's `.bos` is converted first, as it is when a unit is opened from a game, and the library files and unit definition the script reads come with it.
+
+The script's piece names are matched to the unit's. A name that differs from one of the unit's pieces only in case is changed to the unit's spelling, because an `.s3o` keeps its piece names exactly and a script asking for `Arm` cannot find `arm`. Any other name the unit lacks is listed above the editor, and **Match pieces** renames each one to a piece you pick.
+
+A simple script becomes actions of poses, which you can then edit like any other. See [Actions](#actions). Everything in the script has to fit, or none of it is taken apart and it is kept as the unit's own script, exactly as written apart from the case changes. The unit also needs no presets applied and no compiled script, because either would keep playing beside the actions. What fits:
+
+- `local` piece declarations, one name or several to a call, and `local` signal numbers or strings.
+- A `local function` thread made of `Turn` and `Move` calls with number arguments and `Sleep`, with an optional `SetSignalMask` first and at most one `while true do` loop at the end. Each `Sleep` ends a key. Every axis that moves needs the speed that arrives exactly when the `Sleep` ends, which is the distance divided by the `Sleep` in whole frames (`floor(ms / 33)` of them, at 30 a second). The last key of a thread that does not loop has no `Sleep`, and its speeds have to agree on one time.
+- A loop with no lead in, or a lead in that plays the same keys in the same times as the loop, which is how the builder writes one.
+- A `script.` call-in that starts the thread with `StartThread`, alone or after a `Signal`. That call-in becomes the action's trigger. A call-in the engine does not make becomes the action's own function.
+- For a looping thread started by `StartMoving`, `Activate`, `StartBuilding` or a function of its own, a stop call-in (`StopMoving`, `Deactivate`, `StopBuilding` or the function's name with `Stop` after it) that calls a `local function` of a `Signal` followed by `Turn` or `Move` calls back to 0.
+- Any other call-in either empty or exactly what the builder writes for it, such as `Killed` exploding the root piece. A call-in left empty gets the builder's version.
+
+A script the builder wrote from actions reads back to the same actions, and those write the same script again. Two things can change in a hand written script that fits. A stop sends pieces back to rest at the builder's speed, and a loop with no lead in reaches its first key from rest in that key's time, where the script took the loop's speed.
+
 **Discard this script and use the presets** gives it back. The stored text goes and the unit is generated from its presets again. Undo brings the text back if that was a mistake, so copy it first if you want to keep it past this session. The case worth knowing about: a unit whose script was taken over and then emptied animates nothing and no preset can reach it, and this is the only way out short of editing files on disk.
 
 ## Start from a skeleton

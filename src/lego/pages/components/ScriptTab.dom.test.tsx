@@ -48,6 +48,16 @@ vi.mock("../../adoptGameScript", () => ({
   adoptGameScript: (...args: unknown[]) => adopt(...args),
 }));
 
+const openDialog = vi.fn();
+vi.mock("@tauri-apps/plugin-dialog", () => ({
+  open: (...args: unknown[]) => openDialog(...args),
+}));
+
+const readText = vi.fn();
+vi.mock("../../bindings", () => ({
+  legoReadTextFile: (args: unknown) => readText(args),
+}));
+
 function unit(over: Partial<LegoProject> = {}): LegoProject {
   const base = newProject({
     id: "p",
@@ -63,6 +73,7 @@ function unit(over: Partial<LegoProject> = {}): LegoProject {
 const onScriptChange = vi.fn();
 const onScriptRelease = vi.fn();
 const onCompiledReload = vi.fn();
+const onScriptImport = vi.fn();
 
 function show(project: LegoProject, lastRun: ScriptTimeline | null = null) {
   return render(
@@ -71,6 +82,7 @@ function show(project: LegoProject, lastRun: ScriptTimeline | null = null) {
       onScriptChange={onScriptChange}
       onScriptRelease={onScriptRelease}
       onCompiledReload={onCompiledReload}
+      onScriptImport={onScriptImport}
       lastRun={lastRun}
     />,
   );
@@ -91,6 +103,9 @@ beforeEach(() => {
   decompileBytes.mockResolvedValue({ source: "", warnings: [] });
   onCompiledReload.mockClear();
   adopt.mockReset();
+  onScriptImport.mockClear();
+  openDialog.mockReset();
+  readText.mockReset();
   preferredTarget.mockReturnValue({ target });
 });
 
@@ -517,5 +532,69 @@ describe("coverage dimming", () => {
     expect(
       screen.getByRole("switch", { name: "Show what ran" }),
     ).toHaveProperty("disabled", true);
+  });
+});
+
+/** Importing a script from a file (#643). What it becomes is the page's
+ *  decision, in `importScript.ts`. */
+describe("importing a script", () => {
+  it("reads the chosen file and hands its text over", async () => {
+    openDialog.mockResolvedValue("/scripts/bot.lua");
+    readText.mockResolvedValue({ text: "-- bot" });
+    show(unit());
+
+    fireEvent.click(screen.getByRole("button", { name: /Import/ }));
+
+    await waitFor(() => expect(onScriptImport).toHaveBeenCalledWith("-- bot"));
+    expect(readText).toHaveBeenCalledWith({ path: "/scripts/bot.lua" });
+  });
+
+  it("does nothing when no file is chosen", async () => {
+    openDialog.mockResolvedValue(null);
+    show(unit());
+
+    fireEvent.click(screen.getByRole("button", { name: /Import/ }));
+
+    await waitFor(() => expect(openDialog).toHaveBeenCalled());
+    expect(readText).not.toHaveBeenCalled();
+    expect(onScriptImport).not.toHaveBeenCalled();
+  });
+
+  it("says so when the file cannot be read", async () => {
+    openDialog.mockResolvedValue("/scripts/bot.lua");
+    readText.mockRejectedValue(new Error("denied"));
+    show(unit());
+
+    fireEvent.click(screen.getByRole("button", { name: /Import/ }));
+
+    expect(
+      await screen.findByText(/Could not read \/scripts\/bot\.lua/),
+    ).toBeTruthy();
+  });
+
+  it("lists the piece names the unit does not have in one line", () => {
+    show(unit({ script: 'local t, g = piece("turret", "gun")\n' }));
+
+    expect(screen.getByText("Not on this unit: turret, gun.")).toBeTruthy();
+  });
+
+  it("renames a name to the unit's piece picked for it, and keeps the result", () => {
+    const [root] = unit().pieces;
+    show(unit({ script: 'local t = piece("turret")\n' }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Match pieces" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "Piece for turret" }));
+    fireEvent.click(screen.getByRole("option", { name: root.name }));
+    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+
+    expect(onScriptChange).toHaveBeenCalledWith(
+      `local t = piece("${root.name}")\n`,
+    );
+  });
+
+  it("says nothing about piece names a generated script uses", () => {
+    show(unit());
+
+    expect(screen.queryByText(/Not on this unit/)).toBeNull();
   });
 });

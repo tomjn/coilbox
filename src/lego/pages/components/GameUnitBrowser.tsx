@@ -6,10 +6,18 @@
  * of the model picker, and opening one lists its pieces. Each piece can be
  * lifted, with everything under it, into the inventory (#3262): see
  * `liftPiece.ts`.
+ *
+ * An open unit also offers its animation script, to import into the unit
+ * being built (#643). The page decides what the script becomes.
  */
 
 import { Button } from "@picoframe/frame";
-import { ArrowUpFromLine, ChevronDown, ChevronRight } from "lucide-react";
+import {
+  ArrowUpFromLine,
+  ChevronDown,
+  ChevronRight,
+  FileCode2,
+} from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   useUnitsyncArchiveTree,
@@ -76,9 +84,28 @@ interface Props {
   query: string;
   /** Keeps a lifted piece in the inventory. Absent offers no lift. */
   onLift?: (module: LegoProject) => Promise<void>;
+  /** Imports a game unit's Lua script, with what it reads. Absent offers no
+   *  import. */
+  onUseScript?: (
+    lua: string,
+    from: {
+      includes: Record<string, string>;
+      unitDef: Record<string, unknown> | null;
+    },
+  ) => void;
 }
 
-export function GameUnitBrowser({ project, query, onLift }: Props) {
+/** Reading a unit's script for import, shown on its row. */
+type ScriptRead =
+  | { member: string; state: "reading" }
+  | { member: string; state: "failed"; message: string };
+
+export function GameUnitBrowser({
+  project,
+  query,
+  onLift,
+  onUseScript,
+}: Props) {
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const installed = useMemo(() => scan.data?.games ?? [], [scan.data]);
@@ -127,6 +154,7 @@ export function GameUnitBrowser({ project, query, onLift }: Props) {
   const [openMember, setOpenMember] = useState<string | null>(null);
   const [pieces, setPieces] = useState<Pieces | null>(null);
   const [lift, setLift] = useState<Lift | null>(null);
+  const [scriptRead, setScriptRead] = useState<ScriptRead | null>(null);
   const reads = useRef(0);
 
   // A different game is a different list, so nothing stays open across it.
@@ -136,6 +164,7 @@ export function GameUnitBrowser({ project, query, onLift }: Props) {
     setOpenMember(null);
     setPieces(null);
     setLift(null);
+    setScriptRead(null);
   }, [archive]);
 
   async function toggle(row: GameModelRow) {
@@ -255,6 +284,49 @@ export function GameUnitBrowser({ project, query, onLift }: Props) {
     }
   }
 
+  /**
+   * Read a game unit's script and hand it to the page to import. A compiled
+   * script is converted from its `.bos` when the game ships one, with the
+   * pieces of the unit being built, the same as adopting it on import.
+   */
+  async function takeScript(row: GameModelRow) {
+    if (!onUseScript || !target || !archive || !row.unit) return;
+    if (source.state !== "ready") return;
+    setScriptRead({ member: row.member, state: "reading" });
+    const adopted = await adoptGameScript(
+      {
+        ...project,
+        imported: {
+          source: row.member,
+          game: {
+            name: source.game.name,
+            archive,
+            member: row.member,
+            unit: row.unit,
+          },
+        },
+      },
+      target,
+    );
+    if (adopted.script === null) {
+      setScriptRead({
+        member: row.member,
+        state: "failed",
+        message:
+          adopted.notes[0] ??
+          (adopted.kind === "cob"
+            ? `${row.unit} has only a compiled script.`
+            : `${row.unit} has no script.`),
+      });
+      return;
+    }
+    setScriptRead(null);
+    onUseScript(adopted.script, {
+      includes: adopted.includes,
+      unitDef: adopted.unitDef,
+    });
+  }
+
   if (source.state !== "ready") {
     return <Note>{source.message}</Note>;
   }
@@ -299,6 +371,25 @@ export function GameUnitBrowser({ project, query, onLift }: Props) {
                 {row.unit}
               </span>
             </button>
+            {isOpen && row.unit && onUseScript ? (
+              <div className="flex items-center gap-2 py-1 pl-12">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={scriptRead?.state === "reading"}
+                  onClick={() => void takeScript(row)}
+                >
+                  <FileCode2 size={14} /> Use its script
+                </Button>
+                {scriptRead?.member === row.member ? (
+                  <span className="min-w-0 text-xs text-muted-foreground">
+                    {scriptRead.state === "reading"
+                      ? "Reading."
+                      : scriptRead.message}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
             {isOpen ? (
               <PieceList
                 pieces={pieces}

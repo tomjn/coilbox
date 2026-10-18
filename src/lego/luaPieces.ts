@@ -8,11 +8,40 @@
  *
  * Matches the double-quoted, parenthesised form the generator emits
  * (`piece("name")`), the unparenthesised single-quoted form a converted BOS
- * script uses (`piece 'name'`), and the long-bracket form (`piece [[name]]`).
+ * script uses (`piece 'name'`), the long-bracket form (`piece [[name]]`), and
+ * a call naming several at once (`piece("base", "turret")`).
  */
 export function declaredPieces(lua: string): string[] {
-  const re = /piece\s*\(?\s*(?:"([^"]+)"|'([^']+)'|\[\[([^\]]+)\]\])\s*\)?/g;
-  return [...lua.matchAll(re)].map((match) => match[1] ?? match[2] ?? match[3]);
+  return pieceNameLiterals(lua).map((literal) => literal.name);
+}
+
+/** One piece name as a script writes it, with where its text starts and ends
+ *  (the quotes or brackets excluded). */
+export interface PieceNameLiteral {
+  name: string;
+  start: number;
+  end: number;
+}
+
+const PIECE_CALL =
+  /\bpiece\s*(?:\(([^)]*)\)|("[^"]+"|'[^']+'|\[\[[^\]]+\]\]))/g;
+const STRING_LITERAL = /"([^"]+)"|'([^']+)'|\[\[([^\]]+)\]\]/g;
+
+/** Every piece name a script's `piece(...)` calls name, in order, with its
+ *  place in the text so it can be rewritten. */
+export function pieceNameLiterals(lua: string): PieceNameLiteral[] {
+  const found: PieceNameLiteral[] = [];
+  for (const call of lua.matchAll(PIECE_CALL)) {
+    const args = call[1] ?? call[2];
+    const argsAt = call.index + call[0].indexOf(args);
+    for (const literal of args.matchAll(STRING_LITERAL)) {
+      const name = literal[1] ?? literal[2] ?? literal[3];
+      const open = literal[0].startsWith("[[") ? 2 : 1;
+      const start = argsAt + literal.index + open;
+      found.push({ name, start, end: start + name.length });
+    }
+  }
+  return found;
 }
 
 /**
@@ -35,11 +64,26 @@ export function missingPieces(lua: string, pieces: Iterable<string>): string[] {
  * {@link missingPieces} itself returned.
  */
 export function lineNamingPiece(lua: string, name: string): number {
-  const re = /piece\s*\(?\s*(?:"([^"]+)"|'([^']+)'|\[\[([^\]]+)\]\])\s*\)?/g;
-  for (const match of lua.matchAll(re)) {
-    if ((match[1] ?? match[2] ?? match[3]) === name) {
-      return lua.slice(0, match.index).split("\n").length;
-    }
+  const literal = pieceNameLiterals(lua).find((entry) => entry.name === name);
+  return literal ? lua.slice(0, literal.start).split("\n").length : 1;
+}
+
+/**
+ * The script with piece names swapped by `mapping` (script name to new name),
+ * wherever a `piece(...)` call names them. Nothing else in the text changes,
+ * so a variable keeps its name and only the piece it asks the model for moves.
+ */
+export function renameScriptPieces(
+  lua: string,
+  mapping: Record<string, string>,
+): string {
+  let out = "";
+  let at = 0;
+  for (const literal of pieceNameLiterals(lua)) {
+    const to = mapping[literal.name];
+    if (to === undefined || to === literal.name) continue;
+    out += lua.slice(at, literal.start) + to;
+    at = literal.end;
   }
-  return 1;
+  return out + lua.slice(at);
 }
