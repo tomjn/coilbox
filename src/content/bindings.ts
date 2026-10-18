@@ -4351,3 +4351,53 @@ export const unitsyncConvert3do = defineCommand<
   },
   Convert3doResult
 >("coilbox-unitsync", "unitsync_convert_3do");
+
+/** One use of a Lua name the engine removed or changed. */
+export interface LuaCompatHit {
+  /** The catalogue entry, such as `removed:Spring.GetUnitTravel`. */
+  entryId: string;
+  /** 1-based. */
+  line: number;
+  /** 1-based, counted in characters. */
+  column: number;
+  /** The name as the source wrote it, such as `Spring.GetUnitTravel` or
+   * `gadget:UnitDamaged`. */
+  text: string;
+}
+
+/** The hits in one Lua file. */
+export interface LuaCompatFile {
+  /** The archive file the Lua is in. */
+  archive: string;
+  /** The member's path inside that archive. */
+  path: string;
+  hits: LuaCompatHit[];
+}
+
+export interface LuaCompatResult {
+  /** Files with at least one hit. */
+  files: LuaCompatFile[];
+  /** How many `.lua` files were read, with or without hits. */
+  filesScanned: number;
+  /** The archives read: the game first, then its dependencies. */
+  archives: string[];
+  /** Dependencies the game names that nothing installed answers to. */
+  unresolved: string[];
+  errors: string[];
+}
+
+/**
+ * Find each use of a Lua API the engine removed or changed in a game's Lua and
+ * in the Lua of the archives it depends on (issue #4553). Reads `luarules`,
+ * `luaui`, `luaintro`, `gamedata` and `scripts`, skips `springcontent` and
+ * `maphelper`, and evaluates nothing. `archiveName` is the game's primary
+ * archive.
+ */
+export const unitsyncLuaCompatScan = defineCommand<
+  {
+    enginePath: string;
+    dataDir: string;
+    archiveName: string;
+  },
+  LuaCompatResult
+>("coilbox-unitsync", "unitsync_lua_compat_scan");
