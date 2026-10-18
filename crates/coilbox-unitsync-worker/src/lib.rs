@@ -48,6 +48,7 @@ pub enum Mode {
     UnitRender(UnitRenderArgs),
     UnitModels(UnitModelsArgs),
     Convert3do(Convert3doArgs),
+    LuaCompat(LuaCompatArgs),
     UnitRenderKeys(UnitRenderKeysArgs),
     /// `--config`: read the curated set of engine settings. No fields of its
     /// own beyond the flag, so this is a unit variant rather than an empty
@@ -92,6 +93,7 @@ impl Mode {
             Mode::UnitRender(args) => args.to_args(),
             Mode::UnitModels(args) => args.to_args(),
             Mode::Convert3do(args) => args.to_args(),
+            Mode::LuaCompat(args) => args.to_args(),
             Mode::UnitRenderKeys(args) => args.to_args(),
             Mode::Config => vec!["--config".to_string()],
             Mode::ConfigSet(args) => args.to_args(),
@@ -463,6 +465,43 @@ impl Convert3doArgs {
             game: game.unwrap_or_default(),
             out_dir,
         })
+    }
+}
+
+/// `--lua-compat`: scan a game's Lua, and the Lua of the archives it depends on,
+/// for calls to APIs the current engine removed or changed (issue #4553).
+///
+/// Only the game is needed. The catalogue of names is built into the scanner.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LuaCompatArgs {
+    pub game: String,
+}
+
+impl LuaCompatArgs {
+    pub fn to_args(&self) -> Vec<String> {
+        vec![
+            "--lua-compat".to_string(),
+            "--game".to_string(),
+            self.game.clone(),
+        ]
+    }
+
+    /// Recover a `--lua-compat` invocation from a worker argv. As with the
+    /// others here, `args` may be exactly what [`LuaCompatArgs::to_args`]
+    /// returns or a full process argv carrying unrelated flags, which are
+    /// skipped rather than rejected.
+    pub fn from_args(args: &[String]) -> Result<Self, String> {
+        let mut game = None;
+        let mut it = args.iter();
+        while let Some(a) = it.next() {
+            if a == "--game" {
+                game = it.next().cloned();
+            }
+        }
+        match game {
+            Some(game) if !game.trim().is_empty() => Ok(LuaCompatArgs { game }),
+            _ => Err("--lua-compat needs --game <archive>".into()),
+        }
     }
 }
 
@@ -2917,6 +2956,24 @@ mod tests {
         assert!(!a.contains(&"--extract".to_string()));
         let recovered = ArchiveArgs::from_args(&a).expect("valid argv");
         assert_eq!(recovered, original);
+    }
+
+    #[test]
+    fn lua_compat_round_trips_through_to_args_and_from_args() {
+        let original = LuaCompatArgs {
+            game: "xta-9.65.sd7".into(),
+        };
+        let a = original.to_args();
+        assert!(a.contains(&"--lua-compat".to_string()));
+        let recovered = LuaCompatArgs::from_args(&a).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    #[test]
+    fn lua_compat_refuses_a_missing_or_blank_game() {
+        assert!(LuaCompatArgs::from_args(&["--lua-compat".to_string()]).is_err());
+        let blank = ["--lua-compat".to_string(), "--game".into(), " ".into()];
+        assert!(LuaCompatArgs::from_args(&blank).is_err());
     }
 
     fn game_args() -> GameArgs {
