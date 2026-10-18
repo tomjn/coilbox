@@ -3,11 +3,13 @@
 //!
 //! `compat_build` writes `coilbox-compat-<stem>-<n>.sdd` under a content root's
 //! `games/` from compat manifest `n`, and `compat_status` says whether the one
-//! already there is stale. See `mutator` for the folder and its files.
+//! already there is stale. See `mutator` for the folder and its files, and
+//! `models` for the base game's `.3do` models converted into it.
 //!
 //! Registered as `"coilbox-compat"`. The frontend invokes
 //! `plugin:coilbox-compat|<cmd>`.
 
+pub mod models;
 pub mod mutator;
 
 use picoframe_core::CliResult;
@@ -29,19 +31,49 @@ pub struct Built {
     pub folder: String,
     /// Every file written, relative to `dir`.
     pub files: Vec<String>,
+    /// What the 3do converter said about the base game's models.
+    pub models: models::Conversion,
+    /// Why the converted models are not used, when they cannot be.
+    pub notes: Vec<String>,
 }
 
 /// Write the compat mutator for the game in `archive_name` under `data_dir`'s
-/// `games/`, from manifest `manifest_version`. Replaces whatever the folder
-/// held. `game_name` and `base_checksum` are the game's name and its archive's
-/// checksum as unitsync reports them.
+/// `games/`, from manifest `manifest_version`, with the game's `.3do` models
+/// converted by the worker for the engine at `engine_path`. Replaces whatever
+/// the folder held. `game_name` and `base_checksum` are the game's name and its
+/// archive's checksum as unitsync reports them.
 pub fn build(
+    engine_path: &str,
     data_dir: &str,
     archive_name: &str,
     game_name: &str,
     base_checksum: &str,
     manifest_version: u32,
     coilbox_version: &str,
+) -> Result<Built, String> {
+    let staging = tempfile::tempdir()
+        .map_err(|e| format!("could not make a folder to convert the models into: {e}"))?;
+    build_with(
+        data_dir,
+        archive_name,
+        game_name,
+        base_checksum,
+        manifest_version,
+        coilbox_version,
+        || models::convert(engine_path, data_dir, archive_name, staging.path()),
+    )
+}
+
+/// [`build`], with the models `convert` gives. It runs once the request is
+/// known to be sound, and before anything is written.
+pub fn build_with(
+    data_dir: &str,
+    archive_name: &str,
+    game_name: &str,
+    base_checksum: &str,
+    manifest_version: u32,
+    coilbox_version: &str,
+    convert: impl FnOnce() -> Result<models::Models, String>,
 ) -> Result<Built, String> {
     let manifest = coilbox_compat::manifest(manifest_version)
         .ok_or_else(|| format!("there is no compat manifest {manifest_version}"))?;
@@ -59,13 +91,50 @@ pub fn build(
         base_checksum: base_checksum.to_string(),
         coilbox_version: coilbox_version.to_string(),
     };
-    let files = mutator::files(&manifest, game_name, &marker)?;
-    tauri_plugin_coilbox_workshop::write_mutator(&dir, &files)?;
-    Ok(Built {
+    let mut files = mutator::files(&manifest, game_name, &marker)?;
+    let models = convert()?;
+    write_with_models(&dir, &mut files, &models, manifest_version).map(|files| Built {
         dir: dir.to_string_lossy().into_owned(),
         folder,
-        files: files.into_iter().map(|f| f.path).collect(),
+        files,
+        models: models.conversion,
+        notes: models.notes,
     })
+}
+
+/// Write `files` and the converted `models` into `dir`, with the marker that
+/// ends `files` written last, so a write that stops part way leaves none.
+/// Answers with every path written, sorted, with the marker last.
+fn write_with_models(
+    dir: &std::path::Path,
+    files: &mut Vec<tauri_plugin_coilbox_workshop::CompiledFile>,
+    models: &models::Models,
+    manifest_version: u32,
+) -> Result<Vec<String>, String> {
+    let marker = files
+        .pop()
+        .filter(|f| f.path == mutator::MARKER)
+        .ok_or("the mutator's files do not end with its marker")?;
+    let converted = match &models.dir {
+        Some(from) => models::list(from)?,
+        None => Vec::new(),
+    };
+    if let Some(post) = models::defs_post(&models::model_keys(&converted), manifest_version) {
+        files.push(post);
+        files.sort_by(|a, b| a.path.cmp(&b.path));
+    }
+    tauri_plugin_coilbox_workshop::write_mutator(dir, files)?;
+    if let Some(from) = &models.dir {
+        models::copy(from, &converted, dir)?;
+    }
+    let at = dir.join(&marker.path);
+    std::fs::write(&at, &marker.contents)
+        .map_err(|e| format!("could not write {}: {e}", at.display()))?;
+    let mut paths: Vec<String> = files.iter().map(|f| f.path.clone()).collect();
+    paths.extend(converted);
+    paths.sort();
+    paths.push(marker.path);
+    Ok(paths)
 }
 
 /// Where the compat mutator for a game stands.
@@ -107,10 +176,12 @@ fn envelope<T: Serialize>(result: Result<T, String>) -> CliResult {
     }
 }
 
-/// [`build`], recording the running coilbox's version in the marker.
+/// [`build`], recording the running coilbox's version in the marker. On a
+/// blocking task, since converting a game's models takes seconds.
 #[tauri::command]
 async fn compat_build<R: Runtime>(
     app: AppHandle<R>,
+    engine_path: String,
     data_dir: String,
     archive_name: String,
     game_name: String,
@@ -118,14 +189,20 @@ async fn compat_build<R: Runtime>(
     manifest_version: u32,
 ) -> CliResult {
     let version = app.package_info().version.to_string();
-    envelope(build(
-        &data_dir,
-        &archive_name,
-        &game_name,
-        &base_checksum,
-        manifest_version,
-        &version,
-    ))
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        build(
+            &engine_path,
+            &data_dir,
+            &archive_name,
+            &game_name,
+            &base_checksum,
+            manifest_version,
+            &version,
+        )
+    })
+    .await
+    .unwrap_or_else(|e| Err(format!("the compat build task failed: {e}")));
+    envelope(result)
 }
 
 /// [`status`].
@@ -152,10 +229,24 @@ mod tests {
         (dir, path)
     }
 
+    /// A build of a game with no `.3do` models.
+    fn plain(
+        data: &str,
+        archive: &str,
+        game: &str,
+        checksum: &str,
+        n: u32,
+        version: &str,
+    ) -> Result<Built, String> {
+        build_with(data, archive, game, checksum, n, version, || {
+            Ok(models::Models::default())
+        })
+    }
+
     #[test]
     fn a_build_writes_the_folder_and_status_finds_it_current() {
         let (_keep, data) = root();
-        let built = build(&data, "xta-9.65.sd7", "XTA 9.65", "1234abcd", 1, "1.2.3").unwrap();
+        let built = plain(&data, "xta-9.65.sd7", "XTA 9.65", "1234abcd", 1, "1.2.3").unwrap();
         assert_eq!(built.folder, "coilbox-compat-xta-9.65-1.sdd");
         assert_eq!(built.files, ["modinfo.lua", mutator::MARKER]);
         let dir = std::path::Path::new(&built.dir);
@@ -181,7 +272,7 @@ mod tests {
     #[test]
     fn status_reports_a_changed_base_archive() {
         let (_keep, data) = root();
-        build(&data, "xta-9.65.sd7", "XTA 9.65", "1234abcd", 1, "1.2.3").unwrap();
+        plain(&data, "xta-9.65.sd7", "XTA 9.65", "1234abcd", 1, "1.2.3").unwrap();
         let s = status(&data, "xta-9.65.sd7", "99999999").unwrap();
         assert_eq!(
             s.stale,
@@ -195,7 +286,7 @@ mod tests {
     #[test]
     fn status_reports_a_folder_built_from_another_manifest() {
         let (_keep, data) = root();
-        let built = build(&data, "xta-9.65.sd7", "XTA 9.65", "1234abcd", 1, "1.2.3").unwrap();
+        let built = plain(&data, "xta-9.65.sd7", "XTA 9.65", "1234abcd", 1, "1.2.3").unwrap();
         // There is only one manifest so far, so a folder from a manifest this
         // build does not know stands in for one built before the manifest moved.
         let other = coilbox_compat::latest() + 1;
@@ -230,10 +321,10 @@ mod tests {
     #[test]
     fn a_rebuild_replaces_what_the_folder_held() {
         let (_keep, data) = root();
-        let built = build(&data, "xta-9.65.sd7", "XTA 9.65", "1234abcd", 1, "1.2.3").unwrap();
+        let built = plain(&data, "xta-9.65.sd7", "XTA 9.65", "1234abcd", 1, "1.2.3").unwrap();
         let leftover = std::path::Path::new(&built.dir).join("leftover.lua");
         std::fs::write(&leftover, "return {}").unwrap();
-        build(&data, "xta-9.65.sd7", "XTA 9.65", "5678", 1, "1.2.3").unwrap();
+        plain(&data, "xta-9.65.sd7", "XTA 9.65", "5678", 1, "1.2.3").unwrap();
         assert!(!leftover.exists());
         assert!(status(&data, "xta-9.65.sd7", "5678")
             .unwrap()
@@ -244,9 +335,78 @@ mod tests {
     #[test]
     fn a_build_is_refused_without_a_checksum_a_manifest_or_a_content_root() {
         let (_keep, data) = root();
-        assert!(build(&data, "xta.sd7", "XTA", "", 1, "1").is_err());
-        assert!(build(&data, "xta.sd7", "XTA", "1", 9999, "1").is_err());
-        assert!(build("relative", "xta.sd7", "XTA", "1", 1, "1").is_err());
-        assert!(build(&data, "../xta.sd7", "XTA", "1", 1, "1").is_err());
+        assert!(plain(&data, "xta.sd7", "XTA", "", 1, "1").is_err());
+        assert!(plain(&data, "xta.sd7", "XTA", "1", 9999, "1").is_err());
+        assert!(plain("relative", "xta.sd7", "XTA", "1", 1, "1").is_err());
+        assert!(plain(&data, "../xta.sd7", "XTA", "1", 1, "1").is_err());
+    }
+
+    #[test]
+    fn converted_models_are_copied_in_and_named_in_defs_post_before_the_marker() {
+        let (_keep, data) = root();
+        let staging = tempfile::tempdir().unwrap();
+        for f in ["Objects3D/armcom.s3o", "unittextures/3do/objects3d.png"] {
+            let p = staging.path().join(f);
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(p, [0u8, 1, 2, 255]).unwrap();
+        }
+        let built = build_with(
+            &data,
+            "xta-9.65.sd7",
+            "XTA 9.65",
+            "1234abcd",
+            1,
+            "1.2.3",
+            || {
+                Ok(models::Models {
+                    dir: Some(staging.path().to_path_buf()),
+                    conversion: models::Conversion {
+                        models_found: 1,
+                        models_written: 1,
+                        ..Default::default()
+                    },
+                    notes: Vec::new(),
+                })
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            built.files,
+            [
+                "Objects3D/armcom.s3o",
+                models::DEFS_POST,
+                "modinfo.lua",
+                "unittextures/3do/objects3d.png",
+                mutator::MARKER,
+            ]
+        );
+        let dir = std::path::Path::new(&built.dir);
+        assert_eq!(
+            std::fs::read(dir.join("Objects3D/armcom.s3o")).unwrap(),
+            [0u8, 1, 2, 255]
+        );
+        let post = std::fs::read_to_string(dir.join(models::DEFS_POST)).unwrap();
+        assert!(post.contains(r#"["armcom"] = true,"#), "{post}");
+        assert_eq!(built.models.models_written, 1);
+        assert!(mutator::read_marker(dir).is_some());
+    }
+
+    #[test]
+    fn nothing_is_converted_for_a_request_that_is_refused() {
+        let (_keep, data) = root();
+        let refused = build_with(&data, "xta.sd7", "XTA", "", 1, "1", || {
+            panic!("converted before the request was checked")
+        });
+        assert!(refused.is_err());
+    }
+
+    #[test]
+    fn a_failed_conversion_writes_nothing() {
+        let (_keep, data) = root();
+        let failed = build_with(&data, "xta.sd7", "XTA", "1", 1, "1", || {
+            Err("the 3do converter wrote nothing".into())
+        });
+        assert!(failed.is_err());
+        assert!(!std::path::Path::new(&data).join("games").exists());
     }
 }
