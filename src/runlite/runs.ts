@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { discardUnits } from "../campaign/units";
 import { createDocumentStore } from "../lib/documentStore";
 import {
   runliteMetaLoad,
@@ -77,9 +78,11 @@ export function useRuns() {
     await persist({ ...store.getForWrite(), [id]: run });
   }, []);
 
-  /** Remove a run (abandon), preserving every other run. */
+  /** Remove a run (abandon), preserving every other run. Its builder units go
+   *  first, so a run whose units cannot be removed is kept (issue #4518). */
   const deleteRun = useCallback(async (id: string) => {
     const next = { ...store.getForWrite() };
+    if (next[id]?.units) await discardUnits({ scope: "warpath", id });
     delete next[id];
     await persist(next);
   }, []);

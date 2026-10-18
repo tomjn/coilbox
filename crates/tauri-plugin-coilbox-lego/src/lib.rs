@@ -3623,19 +3623,29 @@ async fn lego_scratch_prune(
     }
 }
 
-/// The folder a campaign's units mutator is written into (issue #4516), the
-/// only kind of scratch game that is removed.
-const CAMPAIGN_SCRATCH_PREFIX: &str = "coilbox-lego-campaign-";
+/// The folders a campaign's (issue #4516), a conquest's or a warpath run's
+/// (issue #4518) units mutator is written into, the only kinds of scratch game
+/// that are removed.
+const UNITS_SCRATCH_PREFIXES: [&str; 3] = [
+    "coilbox-lego-campaign-",
+    "coilbox-lego-conquest-",
+    "coilbox-lego-run-",
+];
 
-/// Remove a campaign's units mutator and the stamp beside it (issue #4543).
+/// Remove a units mutator and the stamp beside it (issue #4543).
 ///
 /// Only `<data_dir>/games/<folder>` with a folder that passes
-/// [`valid_scratch_folder`] and starts with [`CAMPAIGN_SCRATCH_PREFIX`], so the
-/// Test drawer's own folder and every real game stay out of reach. A folder that
-/// is a link is refused rather than followed. Answers whether a folder was there.
-fn remove_campaign_scratch_game(data_dir: &Path, folder: &str) -> Result<bool, String> {
-    if !valid_scratch_folder(folder) || !folder.starts_with(CAMPAIGN_SCRATCH_PREFIX) {
-        return Err(format!("not a campaign units game folder: {folder}"));
+/// [`valid_scratch_folder`] and starts with one of [`UNITS_SCRATCH_PREFIXES`],
+/// so the Test drawer's own folder and every real game stay out of reach. A
+/// folder that is a link is refused rather than followed. Answers whether a
+/// folder was there.
+fn remove_units_scratch_game(data_dir: &Path, folder: &str) -> Result<bool, String> {
+    if !valid_scratch_folder(folder)
+        || !UNITS_SCRATCH_PREFIXES
+            .iter()
+            .any(|prefix| folder.starts_with(prefix))
+    {
+        return Err(format!("not a units game folder: {folder}"));
     }
     let games = data_dir.join("games");
     let game = games.join(folder);
@@ -3658,15 +3668,16 @@ fn remove_campaign_scratch_game(data_dir: &Path, folder: &str) -> Result<bool, S
     }
 }
 
-/// `lego_scratch_remove` removes a deleted campaign's units mutator. See
-/// [`remove_campaign_scratch_game`] for what it will and will not touch.
+/// `lego_scratch_remove` removes a deleted campaign's, conquest's or run's
+/// units mutator. See
+/// [`remove_units_scratch_game`] for what it will and will not touch.
 #[tauri::command]
 async fn lego_scratch_remove(data_dir: String, folder: String) -> CliResult {
     let root = PathBuf::from(&data_dir);
     if !root.is_absolute() || !root.is_dir() {
         return CliResult::err(format!("not a content root: {data_dir}"));
     }
-    match remove_campaign_scratch_game(&root, &folder) {
+    match remove_units_scratch_game(&root, &folder) {
         Ok(removed) => CliResult::ok(json!({ "removed": removed })),
         Err(e) => CliResult::err(e),
     }
@@ -4652,7 +4663,7 @@ mod tests {
             .join("games/coilbox-lego-campaign-one.sdd.stamp");
         std::fs::write(&own_stamp, "{}").expect("stamp");
 
-        let removed = remove_campaign_scratch_game(data.path(), "coilbox-lego-campaign-one.sdd")
+        let removed = remove_units_scratch_game(data.path(), "coilbox-lego-campaign-one.sdd")
             .expect("remove");
 
         assert!(removed);
@@ -4662,10 +4673,24 @@ mod tests {
         assert!(other_stamp.is_file());
     }
 
+    // Issue #4518. A conquest's and a run's units games are removed the same way.
+    #[test]
+    fn removing_a_conquests_or_runs_units_game() {
+        for folder in [
+            "coilbox-lego-conquest-generated-1.sdd",
+            "coilbox-lego-run-run-1.sdd",
+        ] {
+            let (data, game) = scratch_root(folder);
+            exported_unit(&game, "tank");
+            assert!(remove_units_scratch_game(data.path(), folder).expect("remove"));
+            assert!(!game.exists());
+        }
+    }
+
     #[test]
     fn removing_a_campaigns_units_game_that_is_not_there_is_not_an_error() {
         let data = tempfile::tempdir().expect("tempdir");
-        let removed = remove_campaign_scratch_game(data.path(), "coilbox-lego-campaign-one.sdd")
+        let removed = remove_units_scratch_game(data.path(), "coilbox-lego-campaign-one.sdd")
             .expect("remove");
         assert!(!removed);
     }
@@ -4684,7 +4709,7 @@ mod tests {
             "coilbox-lego-campaign-x.sdd/..",
         ] {
             assert!(
-                remove_campaign_scratch_game(data.path(), folder).is_err(),
+                remove_units_scratch_game(data.path(), folder).is_err(),
                 "{folder}"
             );
         }
@@ -4705,9 +4730,7 @@ mod tests {
         )
         .expect("link");
 
-        assert!(
-            remove_campaign_scratch_game(data.path(), "coilbox-lego-campaign-one.sdd").is_err()
-        );
+        assert!(remove_units_scratch_game(data.path(), "coilbox-lego-campaign-one.sdd").is_err());
         assert!(elsewhere.path().join("keep.txt").is_file());
     }
 

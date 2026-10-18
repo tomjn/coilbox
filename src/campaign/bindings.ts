@@ -142,6 +142,13 @@ export interface StoredCampaignUnit {
 }
 
 /**
+ * Whose unit copies a command reads or writes: a campaign's (the default), a
+ * conquest's, keyed by galaxy id, or a warpath run's (issue #4518). Each keeps
+ * its copies beside its own data.
+ */
+export type UnitsScope = "campaign" | "conquest" | "warpath";
+
+/**
  * Store a campaign's copy of one builder unit under
  * `units/<campaignId>/<unitName>/`, replacing an earlier copy whole (issue
  * #4516). `atlas` is an extension pack's atlas to carry, and `stored` the
@@ -151,6 +158,7 @@ export interface StoredCampaignUnit {
 export const campaignUnitSave = defineCommand<
   {
     campaignId: string;
+    scope?: UnitsScope;
     unitName: string;
     json: string;
     atlas: { pack: string; name: string } | null;
@@ -161,15 +169,21 @@ export const campaignUnitSave = defineCommand<
 
 /** Every builder unit copy a campaign holds. */
 export const campaignUnitList = defineCommand<
-  { campaignId: string },
+  { campaignId: string; scope?: UnitsScope },
   { units: StoredCampaignUnit[] }
 >("coilbox-campaign", "campaign_unit_list");
 
 /** Remove a campaign's copy of one builder unit. */
 export const campaignUnitDelete = defineCommand<
-  { campaignId: string; unitName: string },
+  { campaignId: string; scope?: UnitsScope; unitName: string },
   { deleted: boolean }
 >("coilbox-campaign", "campaign_unit_delete");
+
+/** Remove every builder unit copy one conquest or run holds. */
+export const campaignUnitsDelete = defineCommand<
+  { campaignId: string; scope: UnitsScope },
+  { deleted: boolean }
+>("coilbox-campaign", "campaign_units_delete");
 
 /** Copy every builder unit copy from one campaign to another. */
 export const campaignUnitsCopy = defineCommand<

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { GalaxyDoc } from "./model";
+import type { ConquestState, GalaxyDoc } from "./model";
 import {
   linkKind,
   newConquestState,
@@ -436,6 +436,26 @@ describe("reconcileState", () => {
     delete state.owners.c; // newly added node seeds from authored owner
     const healed = reconcileState(doc, state);
     expect(healed.owners).toEqual({ a: "p", b: "e", c: "e" });
+  });
+
+  // Issue #4518.
+  it("keeps the units from the unit builder and drops an entry that will not read", () => {
+    const doc = galaxy();
+    const skyfort = {
+      unitName: "skyfort",
+      projectId: "p-skyfort",
+      name: "Skyfort",
+      builtBy: ["armlab"],
+      copiedAt: "t0",
+    };
+    const state = {
+      ...newConquestState(doc, { seed: 1 }, "t0"),
+      units: [skyfort, { unitName: "Not A Name", projectId: "p-x" }],
+    } as ConquestState;
+    expect(reconcileState(doc, state).units).toEqual([skyfort]);
+    expect(
+      reconcileState(doc, newConquestState(doc, { seed: 1 }, "t0")).units,
+    ).toBeUndefined();
   });
 
   it("seeds a missing revealed set and drops stale ids under fog", () => {

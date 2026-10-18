@@ -1,43 +1,64 @@
 import { describe, expect, it } from "vitest";
 import {
-  campaignUnitsFolder,
   generatedGameNote,
-  isCampaignUnitsArchive,
   isGeneratedGame,
   isMutatorArchive,
   isPlaybackArchive,
   isScratchArchive,
+  isUnitsArchive,
   isWorkshopMutatorArchive,
   MUTATOR_FOLDER,
   PLAYBACK_FOLDER,
   SCRATCH_FOLDER,
+  unitsFolder,
   WORKSHOP_MUTATOR_FOLDER,
   withoutGeneratedGames,
 } from "./generatedGames";
 
 const game = (name: string) => ({ name, primaryArchive: { name } });
 
-// Issue #4516.
-describe("campaignUnitsFolder", () => {
+// Issues #4516 and #4518.
+describe("unitsFolder", () => {
   it("names one folder per campaign, in the shape the export guard accepts", () => {
     const id = "0b6f3a3e-9a39-4d0a-8f39-3b1d2f4c5e6a";
-    expect(campaignUnitsFolder(id)).toBe(`coilbox-lego-campaign-${id}.sdd`);
-    expect(campaignUnitsFolder("Camp-01")).toBe(
+    expect(unitsFolder("campaign", id)).toBe(`coilbox-lego-campaign-${id}.sdd`);
+    expect(unitsFolder("campaign", "Camp-01")).toBe(
       "coilbox-lego-campaign-camp-01.sdd",
     );
   });
 
+  it("names a conquest's and a run's folder apart from a campaign's", () => {
+    expect(unitsFolder("conquest", "generated-1")).toBe(
+      "coilbox-lego-conquest-generated-1.sdd",
+    );
+    const run = "run-0b6f3a3e-9a39-4d0a-8f39-3b1d2f4c5e6a";
+    expect(unitsFolder("warpath", run)).toBe(`coilbox-lego-run-${run}.sdd`);
+  });
+
+  it("names an id too long for a folder by a hash of it, the same each time", () => {
+    const long = `map-${"x".repeat(60)}`;
+    const folder = unitsFolder("conquest", long) as string;
+    expect(folder).toMatch(/^coilbox-lego-conquest-[0-9a-f]{8}\.sdd$/);
+    expect(unitsFolder("conquest", long)).toBe(folder);
+    expect(unitsFolder("conquest", `${long}y`)).not.toBe(folder);
+  });
+
   it("refuses an id that cannot name a folder", () => {
-    expect(campaignUnitsFolder("a_b")).toBeNull();
-    expect(campaignUnitsFolder("x".repeat(40))).toBeNull();
+    expect(unitsFolder("campaign", "a_b")).toBeNull();
+    expect(unitsFolder("warpath", "../x")).toBeNull();
   });
 
   it("is a generated game, not one to offer", () => {
-    const folder = campaignUnitsFolder("c1") as string;
-    expect(isCampaignUnitsArchive(folder)).toBe(true);
-    expect(isGeneratedGame(folder)).toBe(true);
-    expect(isCampaignUnitsArchive(SCRATCH_FOLDER)).toBe(false);
-    expect(isScratchArchive(folder)).toBe(false);
+    for (const folder of [
+      unitsFolder("campaign", "c1") as string,
+      unitsFolder("conquest", "g1") as string,
+      unitsFolder("warpath", "run-1") as string,
+    ]) {
+      expect(isUnitsArchive(folder)).toBe(true);
+      expect(isGeneratedGame(folder)).toBe(true);
+      expect(isScratchArchive(folder)).toBe(false);
+    }
+    expect(isUnitsArchive(SCRATCH_FOLDER)).toBe(false);
   });
 });
 

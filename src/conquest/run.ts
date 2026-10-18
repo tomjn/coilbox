@@ -1,4 +1,5 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
+import type { UnitsOwner } from "../campaign/units";
 import type { SkirmishAi } from "../content/bindings";
 import type { ReplayProvenance } from "../content/replayUserState";
 import type { SkirmishDraft } from "../play/drafts";
@@ -123,6 +124,15 @@ export function useConquestBattleRun(
     ),
   );
 
+  // The builder units the conquest began with (issue #4518).
+  const units = useMemo(
+    (): UnitsOwner | undefined =>
+      state?.units
+        ? { scope: "conquest", id: galaxy.id, units: state.units }
+        : undefined,
+    [galaxy.id, state?.units],
+  );
+
   const battle = useBattleRun<ConquestState>({
     launchMode: "conquest",
     gameRef: conquestGameRef(galaxy, state),
@@ -137,6 +147,7 @@ export function useConquestBattleRun(
     provenance,
     scenario,
     scenarioDifficulty,
+    units,
   });
   return {
     ...battle,

@@ -456,10 +456,11 @@ export const legoScratchPrune = defineCommand<
 >("coilbox-lego", "lego_scratch_prune");
 
 /**
- * Remove a deleted campaign's units mutator and the stamp beside it (issue
- * #4543). Only `games/coilbox-lego-campaign-*.sdd`, so the Test drawer's folder
- * and every installed game are refused. `removed` is false when the campaign
- * never launched with units, so there was no folder.
+ * Remove a deleted campaign's, conquest's or run's units mutator and the stamp
+ * beside it (issues #4543 and #4518). Only the folder names `unitsFolder` in
+ * `src/lib/generatedGames.ts` makes, so the Test drawer's folder and every
+ * installed game are refused. `removed` is false when it never launched with
+ * units, so there was no folder.
  */
 export const legoScratchRemove = defineCommand<
   { dataDir: string; folder: string },

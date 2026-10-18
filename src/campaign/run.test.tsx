@@ -21,7 +21,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SkirmishDraft } from "../play/drafts";
 
 const {
-  composeCampaignUnits,
+  composeUnits,
   installedAtlases,
   launchScenario,
   loadUnitCopies,
@@ -30,7 +30,7 @@ const {
   saved,
   scanState,
 } = vi.hoisted(() => ({
-  composeCampaignUnits: vi.fn(),
+  composeUnits: vi.fn(),
   // The folders of the atlas packs installed, set per test.
   installedAtlases: { folders: [] as string[] },
   launchScenario: vi.fn(),
@@ -46,7 +46,7 @@ const {
 vi.mock("../scenario/launch", () => ({ launchScenario }));
 vi.mock("./units", async (importActual) => ({
   ...(await importActual<typeof import("./units")>()),
-  composeCampaignUnits,
+  composeUnits,
   loadUnitCopies,
 }));
 vi.mock("../lego/pack", () => ({
@@ -231,8 +231,8 @@ beforeEach(() => {
   progressState.file = { schemaVersion: 1, campaigns: {} };
   saved.length = 0;
   scanState.missingDependencies = undefined;
-  composeCampaignUnits.mockReset();
-  composeCampaignUnits.mockResolvedValue(null);
+  composeUnits.mockReset();
+  composeUnits.mockResolvedValue(null);
   loadUnitCopies.mockReset();
   loadUnitCopies.mockResolvedValue(new Map());
   installedAtlases.folders = [];
@@ -371,7 +371,7 @@ describe("a campaign with units from the unit builder", () => {
   }
 
   it("launches a preset mission as the mutator over the resolved game", async () => {
-    composeCampaignUnits.mockResolvedValue({
+    composeUnits.mockResolvedValue({
       name: "Coilbox campaign c1",
       leftOut: ["armlab is not in BA, so it does not build tank."],
     });
@@ -382,7 +382,7 @@ describe("a campaign with units from the unit builder", () => {
       await result.current.start();
     });
 
-    expect(composeCampaignUnits).toHaveBeenCalledWith(
+    expect(composeUnits).toHaveBeenCalledWith(
       campaign,
       { enginePath: "/engine", dataDir: "/data", executable: "/engine/spring" },
       { name: "BA", archive: "ba.sdz" },
@@ -397,7 +397,7 @@ describe("a campaign with units from the unit builder", () => {
   });
 
   it("plays a scenario mission on top of the mutator", async () => {
-    composeCampaignUnits.mockResolvedValue({
+    composeUnits.mockResolvedValue({
       name: "Coilbox campaign c1",
       leftOut: [],
     });
@@ -414,7 +414,7 @@ describe("a campaign with units from the unit builder", () => {
   });
 
   it("shows why the mutator could not be written and launches nothing", async () => {
-    composeCampaignUnits.mockRejectedValue(
+    composeUnits.mockRejectedValue(
       new Error("This campaign's copy of Tank is missing."),
     );
     const { campaign, mission } = withUnits();

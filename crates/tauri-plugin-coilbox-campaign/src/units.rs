@@ -16,6 +16,26 @@ use std::path::{Path, PathBuf};
 /// The file in each copy's folder that holds the unit itself.
 const UNIT_FILE: &str = "unit.json";
 
+/// The folder every owner of one kind keeps its copies in, under the data dir:
+/// a campaign's (the default), a conquest's or a warpath run's (issue #4518).
+pub fn scope_dir(data_dir: &Path, scope: Option<&str>) -> Result<PathBuf, String> {
+    match scope {
+        None | Some("campaign") => Ok(data_dir.join("campaign").join("units")),
+        Some("conquest") => Ok(data_dir.join("conquest").join("units")),
+        Some("warpath") => Ok(data_dir.join("runlite").join("units")),
+        Some(other) => Err(format!("unknown units scope: {other}")),
+    }
+}
+
+/// Remove every copy one owner holds. False when it held none.
+pub fn delete_all(root: &Path) -> Result<bool, String> {
+    if !root.exists() {
+        return Ok(false);
+    }
+    remove_dir(root)?;
+    Ok(true)
+}
+
 /// A unit name becomes a folder name, so it is held to the rule the builder
 /// normalises unit names to: lower case letters, digits and underscores.
 pub fn valid_unit_name(name: &str) -> bool {
@@ -361,6 +381,44 @@ mod tests {
         assert!(write_unit_file(&root, "Tank", "x.png", b"x").is_err());
         assert!(write_unit_file(&root, "tank", UNIT_FILE, b"not json").is_err());
         assert!(write_unit_file(&root, "tank", UNIT_FILE, b"[1]").is_err());
+    }
+
+    // Issue #4518. Each mode keeps its copies with its own data, and a campaign
+    // keeps the folder it always had.
+    #[test]
+    fn each_scope_has_its_own_folder() {
+        let data = Path::new("/data");
+        assert_eq!(
+            scope_dir(data, None).expect("default"),
+            data.join("campaign/units")
+        );
+        assert_eq!(
+            scope_dir(data, Some("campaign")).expect("campaign"),
+            data.join("campaign/units")
+        );
+        assert_eq!(
+            scope_dir(data, Some("conquest")).expect("conquest"),
+            data.join("conquest/units")
+        );
+        assert_eq!(
+            scope_dir(data, Some("warpath")).expect("warpath"),
+            data.join("runlite/units")
+        );
+        assert!(scope_dir(data, Some("../x")).is_err());
+    }
+
+    #[test]
+    fn delete_all_removes_one_owners_copies_and_no_other() {
+        let tmp = tempfile::tempdir().expect("temp");
+        let one = tmp.path().join("units/run-1");
+        let two = tmp.path().join("units/run-2");
+        save_unit(&one, "tank", "{}", &[]).expect("one");
+        save_unit(&two, "tank", "{}", &[]).expect("two");
+
+        assert!(delete_all(&one).expect("deleted"));
+        assert!(!one.exists());
+        assert_eq!(list_units(&two).len(), 1);
+        assert!(!delete_all(&one).expect("again"));
     }
 
     #[test]
