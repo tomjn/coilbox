@@ -51,6 +51,7 @@ import {
   addAction,
   deleteAction,
   isHookTrigger,
+  setDefaultBlend,
   soloActionProject,
 } from "../../actions";
 import { aimPoint } from "../../aimPoint";
@@ -1903,14 +1904,43 @@ export function AnimationPanel({
                   <Plus size={14} />
                 </Button>
               </div>
+              {actions.length > 0 ? (
+                <div className="mt-2 flex items-center gap-2">
+                  <label
+                    htmlFor="action-blend"
+                    className="min-w-0 flex-1 text-xs"
+                    title="Seconds an action takes to ease in from where the pieces are, and to ease back to rest. An action can set its own."
+                  >
+                    Blend time (s)
+                  </label>
+                  <Input
+                    id="action-blend"
+                    type="number"
+                    min={0}
+                    step={0.1}
+                    value={project.actionBlend ?? 0}
+                    onChange={(event) => {
+                      // Read now: the edit runs later, when the event's
+                      // input has gone back to the stored value.
+                      const next =
+                        event.target.value === ""
+                          ? Number.NaN
+                          : Number(event.target.value);
+                      onActionsEdit((p) => setDefaultBlend(p, next));
+                    }}
+                    className="h-8 w-20 text-xs"
+                  />
+                </div>
+              ) : null}
               {actions.map((action) => {
-                const where = [
-                  ...new Set(
-                    actionClashes(project)
-                      .filter((clash) => clash.action.id === action.id)
-                      .map((clash) => clash.piece.name),
-                  ),
-                ];
+                const shared = new Map<string, string[]>();
+                for (const clash of actionClashes(project)) {
+                  if (clash.action.id !== action.id) continue;
+                  shared.set(clash.with, [
+                    ...(shared.get(clash.with) ?? []),
+                    clash.piece.name,
+                  ]);
+                }
                 return (
                   <div key={action.id} className="mt-2">
                     <div className="flex items-center gap-2">
@@ -1963,11 +1993,14 @@ export function AnimationPanel({
                         <Trash2 size={14} />
                       </Button>
                     </div>
-                    {where.length > 0 ? (
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        Also moved by something else: {where.join(", ")}.
+                    {[...shared].map(([other, pieces]) => (
+                      <p
+                        key={other}
+                        className="mt-0.5 text-xs text-muted-foreground"
+                      >
+                        {action.name} and {other} both move {pieces.join(", ")}.
                       </p>
-                    ) : null}
+                    ))}
                   </div>
                 );
               })}

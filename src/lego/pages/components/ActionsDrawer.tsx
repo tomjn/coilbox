@@ -20,6 +20,7 @@ import {
   actionClashes,
   actionHooks,
   addKey,
+  blendOf,
   emitActions,
   isHookTrigger,
   liveSteps,
@@ -27,10 +28,12 @@ import {
   removeKey,
   renameAction,
   STOP_CALLIN,
+  setActionBlend,
   setActionLoop,
   setActionTrigger,
   setKeyPose,
   setKeySeconds,
+  sharedOutcome,
   soloActionProject,
   triggerProblem,
 } from "../../actions";
@@ -101,6 +104,7 @@ export function ActionsDrawer({
   const clashText = [
     ...new Set(clashes.map((clash) => `${clash.piece.name} (${clash.with})`)),
   ];
+  const blend = blendOf(action, project);
   const edit = (change: (p: LegoProject) => LegoProject) => onEdit(change);
   const ownProblem = isOwn ? triggerProblem(project, action.trigger) : null;
 
@@ -209,6 +213,43 @@ export function ActionsDrawer({
                   edit((p) => setActionLoop(p, actionId, on))
                 }
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {(["blendIn", "blendOut"] as const).map((which) => (
+                <Field
+                  key={which}
+                  label={which === "blendIn" ? "Blend in (s)" : "Blend out (s)"}
+                >
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.1}
+                    value={action[which] ?? ""}
+                    placeholder={String(blend[which])}
+                    onChange={(event) => {
+                      // Read now: the edit runs later, when the event's
+                      // input has gone back to the stored value.
+                      const next =
+                        event.target.value === ""
+                          ? null
+                          : Number(event.target.value);
+                      edit((p) => setActionBlend(p, actionId, which, next));
+                    }}
+                    aria-label={
+                      which === "blendIn"
+                        ? "Seconds to ease in from where the pieces are"
+                        : "Seconds to ease back to rest"
+                    }
+                    title={
+                      which === "blendIn"
+                        ? "Seconds to reach the first key from wherever the pieces are. Empty uses the unit's time."
+                        : "Seconds to return to rest when it stops. Empty uses the unit's time."
+                    }
+                    className="h-8 text-xs"
+                  />
+                </Field>
+              ))}
             </div>
 
             <div className="flex flex-col gap-2">
@@ -344,8 +385,8 @@ export function ActionsDrawer({
 
             {clashText.length > 0 ? (
               <p className="text-xs text-muted-foreground">
-                Also moved by something else: {clashText.join(", ")}. The one
-                called last wins.
+                Also moved by something else: {clashText.join(", ")}.{" "}
+                {sharedOutcome(project)}
               </p>
             ) : null}
           </div>

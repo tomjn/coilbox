@@ -120,6 +120,26 @@ describe("ActionsDrawer", () => {
     expect(applied(onEdit).actions?.[0].loop).toBe(false);
   });
 
+  it("sets how long it eases in and out, and clears it back to the unit's time", () => {
+    const { onEdit } = open({ ...PROJECT, actionBlend: 0.4 });
+    const blendIn = screen.getByLabelText(
+      "Seconds to ease in from where the pieces are",
+    );
+    expect(blendIn).toHaveProperty("placeholder", "0.4");
+    fireEvent.change(blendIn, { target: { value: "0.25" } });
+    expect(applied(onEdit).actions?.[0].blendIn).toBe(0.25);
+    cleanup();
+    const own = { ...PROJECT, actions: [{ ...ACTION, blendOut: 1 }] };
+    const out = open(own);
+    fireEvent.change(screen.getByLabelText("Seconds to ease back to rest"), {
+      target: { value: "" },
+    });
+    const change = out.onEdit.mock.calls[0][0] as (
+      p: LegoProject,
+    ) => LegoProject;
+    expect(change(own).actions?.[0]).not.toHaveProperty("blendOut");
+  });
+
   it("plays the action", () => {
     const { onPlay } = open();
     fireEvent.click(screen.getByRole("button", { name: /Play/ }));

@@ -400,7 +400,11 @@ A looping action stops on the matching call-in (`StopMoving` for `StartMoving`, 
 
 The script writes each action as a thread. Each `Turn` and `Move` has the speed that reaches the key on time, worked out per axis as the distance divided by the seconds, and a `Sleep` waits for the key. Times are rounded to whole frames. A key whose pose was deleted is skipped and its time goes to the next key. Pieces a pose names that the unit no longer has are skipped. Each action has a signal of its own, written as a string, so presets and actions together are not limited by the bits of one number.
 
-The preview plays an action by running this script, so what you see is what the game runs. Actions and presets that move the same piece fight, and the one called last wins. The panel and the problems list name those pieces. Blending them is a separate piece of work.
+The preview plays an action by running this script, so what you see is what the game runs. Actions and presets that move the same piece fight, and the one called last wins. The panel and the problems list name those pieces, with both owners.
+
+An action can ease in and out. Set a blend time on the action, or one for the unit under **Actions** in the Animation panel, in seconds. When an action starts over another, it reaches its first key over its blend in time from wherever the pieces are, instead of from rest. A looping action that stops returns to rest over its blend out time instead of at a fixed speed of 4. A unit where no action has a blend time is written exactly as before.
+
+A unit that blends gives a piece two actions share to whichever started last: the other action's thread ends, and its stop no longer sends that piece home. The script keeps its own record of where each axis is, from the speed of the last call and `Spring.GetGameFrame`. It does not call `GetPieceRotation`, because the preview's script runtime has no such call. Only moves an action makes are recorded, so a blend does not start from where a preset left a piece.
 
 ### Units that build
 
