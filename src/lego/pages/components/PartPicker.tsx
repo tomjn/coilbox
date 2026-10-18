@@ -40,8 +40,8 @@ import { getShapeGeometry, type ShapeKind } from "../../shapes";
 import { type GridWindow, gridScroll, useRootHeight } from "./gridScroll";
 
 /** Cell size in pixels. Big enough to read a small part, small enough to scan. */
-const CELL = 72;
-const GAP = 8;
+export const CELL = 72;
+export const GAP = 8;
 const PITCH = CELL + GAP;
 /** Rows kept either side of the viewport, so scrolling never shows a gap. */
 const OVERSCAN = 2;
