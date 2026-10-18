@@ -35,6 +35,7 @@ function CommandDialog({
   children,
   className,
   showCloseButton = true,
+  closeLabel,
   commandProps,
   ...props
 }: React.ComponentProps<typeof Dialog> & {
@@ -42,6 +43,7 @@ function CommandDialog({
   description?: string;
   className?: string;
   showCloseButton?: boolean;
+  closeLabel?: string;
   /** Passed through to the inner `Command`, e.g. `shouldFilter={false}` for
    *  a caller that ranks and filters its own results. */
   commandProps?: React.ComponentProps<typeof Command>;
@@ -55,6 +57,7 @@ function CommandDialog({
       <DialogContent
         className={cn("overflow-hidden p-0", className)}
         showCloseButton={showCloseButton}
+        closeLabel={closeLabel}
       >
         <Command
           {...commandProps}
@@ -173,7 +176,7 @@ function CommandShortcut({
     <span
       data-slot="command-shortcut"
       className={cn(
-        "ml-auto text-xs tracking-widest text-muted-foreground",
+        "ms-auto text-xs tracking-widest text-muted-foreground",
         className,
       )}
       {...props}
