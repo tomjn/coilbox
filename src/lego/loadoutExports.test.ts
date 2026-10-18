@@ -346,3 +346,68 @@ describe("adopting a definition per loadout", () => {
     ).toBe(true);
   });
 });
+
+describe("a project exported before it had loadouts", () => {
+  const OLD = [
+    { path: `${DIR}/units/armpw.lua`, sha256: "old-def" },
+    { path: `${DIR}/objects3d/armpw.s3o`, sha256: "old-model" },
+  ];
+
+  /** Exported plain under `armpw`, then given a second loadout. */
+  function grown(): LegoProject {
+    next = 0;
+    const exported = {
+      ...plain(),
+      exported: { dir: DIR, at: "t0", unitName: "armpw", def: {}, files: OLD },
+    };
+    return renameLoadout(
+      addLoadout(exported, { newId, name: "Heavy" }),
+      "id1",
+      "Light",
+    );
+  }
+
+  it("lists the old name's files as left behind once every loadout is exported", () => {
+    let project = grown();
+    project = exportedAs(project, "Light");
+    project = exportedAs(project, "Heavy");
+    expect(project.exported).toBeUndefined();
+    expect(project.staleExports).toEqual([
+      { dir: DIR, at: "t0", unitName: "armpw", files: OLD },
+    ]);
+  });
+
+  it("leaves other folders' old receipts until they are exported into", () => {
+    const project = grown();
+    const other = {
+      dir: "/games/other.sdd",
+      at: "t0",
+      unitName: "armpw",
+      def: {},
+      files: [],
+    };
+    const both = { ...project, exportedElsewhere: [other] };
+    const done = exportedAs(both, "Light");
+    expect(done.exportedElsewhere).toEqual([other]);
+    expect(done.staleExports?.map((s) => s.dir)).toEqual([DIR]);
+  });
+
+  it("hands the receipt to the loadout that keeps the old name", () => {
+    let project = grown();
+    project = setLoadoutUnitName(project, idOf(project, "Heavy"), "armpw");
+    project = exportedAs(project, "Light");
+    // Another loadout exporting does not strand the receipt.
+    expect(project.staleExports ?? []).toEqual([]);
+    expect(
+      project.loadouts?.find((l) => l.name === "Heavy")?.exported?.files,
+    ).toEqual(OLD);
+    project = exportedAs(project, "Heavy", "t2");
+    const heavy = project.loadouts?.find((l) => l.name === "Heavy");
+    expect(heavy?.exported?.files.map((f) => f.sha256)).toEqual([
+      "sha-armpw",
+      "old-model",
+    ]);
+    expect(project.staleExports ?? []).toEqual([]);
+    expect(project.exported).toBeUndefined();
+  });
+});

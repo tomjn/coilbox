@@ -943,4 +943,53 @@ describe("a unit with loadouts (issue #3282)", () => {
     expect(sent.scriptWritten).toBe("s");
     expect(sent.unitDefFields).not.toBeNull();
   });
+
+  it("offers to claim the definition of every loadout that has no digest", async () => {
+    const base = twoLoadouts();
+    const noDigest = (unitName: string) => ({
+      dir: "/games/some.sdd",
+      at: "t",
+      unitName,
+      def: {},
+      files: [],
+    });
+    legoGameLanguage.mockResolvedValue({ texts: {} });
+    legoReadTextFile.mockResolvedValue({ text: "return {}" });
+    const onAdoptLoadout = vi.fn();
+    render(
+      <ExportDrawer
+        open
+        onOpenChange={vi.fn()}
+        project={{
+          ...base,
+          loadouts: base.loadouts?.map((l) => ({
+            ...l,
+            exported: noDigest(
+              l.id === "l1" ? "skyfort_loadout_1" : "skyfort_heavy",
+            ),
+          })),
+        }}
+        pack={pack}
+        raw={null}
+        onRemember={vi.fn()}
+        onStale={vi.fn()}
+        onAdopt={vi.fn()}
+        onRememberLoadout={vi.fn()}
+        onAdoptLoadout={onAdoptLoadout}
+        onLoadoutUnitName={vi.fn()}
+      />,
+    );
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Treat skyfort_heavy.lua as coilbox's",
+      }),
+    );
+    await waitFor(() => expect(onAdoptLoadout).toHaveBeenCalled());
+    expect(onAdoptLoadout.mock.calls[0][0]).toBe("l2");
+    expect(
+      screen.getByRole("button", {
+        name: "Treat skyfort_loadout_1.lua as coilbox's",
+      }),
+    ).toBeTruthy();
+  });
 });

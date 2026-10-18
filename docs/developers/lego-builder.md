@@ -269,6 +269,8 @@ The default unit name is the unit name and the loadout name joined by an undersc
 
 Each loadout is written by the same export as any unit, so it has its own model (its pieces differ), script, unit definition and collision script. Each also has its own receipt for every game folder. A re-export of one loadout updates its own files and no other loadout's, and a hand edit to one loadout's definition survives a re-export without touching the others. Every loadout's in game name is the unit name and the loadout name, such as "Pawn Light". The texture atlas is shared and written once. The build picture is one picture for the unit, so each loadout gets a copy of it under its own name.
 
+A unit exported before it had loadouts keeps its old files in the game. When you export a loadout into that folder, the old name goes into the same list, unless a loadout now exports under that name, in which case that loadout takes over the receipt. The drawer offers "Treat this file as coilbox's" for each loadout whose definition in the folder has no record of being written by coilbox.
+
 Rename a loadout and export again, or delete one, and the old name goes into the list the drawer shows under "Left behind by a rename", with an offer to remove the files coilbox can prove it wrote. The workshop lists each exported loadout as its own unit.
 
 Switching, adding, duplicating, renaming and deleting are each one undo step. Undo past a switch and you are back on the loadout you were editing, as it was.

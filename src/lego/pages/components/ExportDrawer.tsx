@@ -553,40 +553,64 @@ export function ExportDrawer({
   // A definition already in the folder that the receipt has no digest for: one
   // exported before digests were recorded, or the game's own that an older
   // export kept. Coilbox cannot tell which, so the person says (issue #4272).
-  const unclaimed = definitionUnclaimed(
-    receiptFor(project, dir),
-    dir,
-    project.unitName,
-  );
-  const definitionPath = `${dir.replace(/[\\/]+$/, "")}/units/${project.unitName}.lua`;
-  const [definitionThere, setDefinitionThere] = useState(false);
+  // Every unit the export writes has its own definition, so each loadout is
+  // asked on its own (#3282).
+  const folder = dir.replace(/[\\/]+$/, "");
+  const claimable = (
+    whole.loadouts
+      ? whole.loadouts.map((loadout) => ({
+          id: loadout.id as string | null,
+          unitName: loadoutNames.get(loadout.id) ?? "",
+          receipts: loadout,
+          label: loadout.name,
+        }))
+      : [
+          {
+            id: null as string | null,
+            unitName: project.unitName,
+            receipts: project,
+            label: project.name,
+          },
+        ]
+  )
+    .filter((unit) =>
+      definitionUnclaimed(receiptFor(unit.receipts, dir), dir, unit.unitName),
+    )
+    .map((unit) => ({
+      ...unit,
+      path: `${folder}/units/${unit.unitName}.lua`,
+    }));
+  const claimablePaths = claimable.map((unit) => unit.path).join("\n");
+  const [definitionsThere, setDefinitionsThere] = useState<string[]>([]);
   const [adopting, setAdopting] = useState(false);
   useEffect(() => {
-    setDefinitionThere(false);
-    if (!isOpen || !unclaimed) return;
+    setDefinitionsThere([]);
+    if (!isOpen || claimablePaths === "") return;
     let live = true;
-    legoReadTextFile({ path: definitionPath }).then(
-      () => live && setDefinitionThere(true),
-      () => {},
-    );
+    for (const path of claimablePaths.split("\n")) {
+      legoReadTextFile({ path }).then(
+        () => live && setDefinitionsThere((there) => [...there, path]),
+        () => {},
+      );
+    }
     return () => {
       live = false;
     };
-  }, [isOpen, unclaimed, definitionPath]);
+  }, [isOpen, claimablePaths]);
 
-  async function adoptDefinition() {
+  async function adoptDefinition(unit: (typeof claimable)[number]) {
     setAdopting(true);
     try {
       // Read now rather than when the drawer looked, so the digest is of the
       // file as it is when the person chose.
-      const { text } = await legoReadTextFile({ path: definitionPath });
+      const { text } = await legoReadTextFile({ path: unit.path });
       const bytes = new TextEncoder().encode(text);
       const sha256 = Array.from(
         new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)),
         (byte) => byte.toString(16).padStart(2, "0"),
       ).join("");
-      const file = { path: definitionPath, sha256 };
-      if (whole.activeLoadout) onAdoptLoadout(whole.activeLoadout, dir, file);
+      const file = { path: unit.path, sha256 };
+      if (unit.id) onAdoptLoadout(unit.id, dir, file);
       else onAdopt(adoptFile(project, dir, file));
     } catch (error) {
       setResult({
@@ -1408,19 +1432,26 @@ export function ExportDrawer({
               </div>
             </div>
 
-            {unclaimed && definitionThere ? (
-              <div className="flex items-center gap-2 text-xs">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={adopting}
-                  title={definitionPath}
-                  onClick={() => void adoptDefinition()}
+            {claimable
+              .filter((unit) => definitionsThere.includes(unit.path))
+              .map((unit) => (
+                <div
+                  key={unit.path}
+                  className="flex items-center gap-2 text-xs"
                 >
-                  Treat this file as coilbox's
-                </Button>
-              </div>
-            ) : null}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={adopting}
+                    title={unit.path}
+                    onClick={() => void adoptDefinition(unit)}
+                  >
+                    {unit.id
+                      ? `Treat ${unit.unitName}.lua as coilbox's`
+                      : "Treat this file as coilbox's"}
+                  </Button>
+                </div>
+              ))}
 
             {/* What a rename left in the game folder. Shown rather than cleared
                 on its own: two units under two names is occasionally what

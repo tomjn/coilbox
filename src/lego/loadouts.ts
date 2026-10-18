@@ -12,7 +12,7 @@
  * here returns a new project, so through `edit` each is one undo step.
  */
 
-import { adoptFile, recordExport, samePath } from "./exportRecord";
+import { adoptFile, receiptFor, recordExport, samePath } from "./exportRecord";
 import {
   type ExportedFile,
   type LegoExport,
@@ -269,7 +269,11 @@ export function deleteLoadout(project: LegoProject, id: string): LegoProject {
   // can prove it wrote.
   const retired = left.length >= 2 ? [loadouts[at]] : [loadouts[at], ...left];
   const staleExports = retired.reduce(
-    (list, loadout) => withRetired(list, loadout),
+    (list, loadout) =>
+      withReceipts(list, [
+        loadout.exported,
+        ...(loadout.exportedElsewhere ?? []),
+      ]),
     switched.staleExports ?? [],
   );
   const kept = staleExports.length > 0 ? { staleExports } : {};
@@ -365,27 +369,27 @@ export function claimForLoadout(
   };
 }
 
-/** The leftovers with every receipt `loadout` holds added, unless one for that
+/** The leftovers with every one of `receipts` added, unless one for that
  *  folder and name is there already. */
-function withRetired(list: StaleExport[], loadout: LegoLoadout): StaleExport[] {
-  const receipts = [loadout.exported, ...(loadout.exportedElsewhere ?? [])];
-  return receipts.reduce<StaleExport[]>((out, receipt) => {
-    if (!receipt) return out;
+function withReceipts(
+  list: StaleExport[],
+  receipts: (LegoExport | undefined)[],
+): StaleExport[] {
+  const out = [...list];
+  for (const receipt of receipts) {
+    if (!receipt) continue;
     const there = out.some(
       (s) => samePath(s.dir, receipt.dir) && s.unitName === receipt.unitName,
     );
-    return there
-      ? out
-      : [
-          ...out,
-          {
-            dir: receipt.dir,
-            at: receipt.at,
-            unitName: receipt.unitName,
-            files: receipt.files,
-          },
-        ];
-  }, list);
+    if (!there)
+      out.push({
+        dir: receipt.dir,
+        at: receipt.at,
+        unitName: receipt.unitName,
+        files: receipt.files,
+      });
+  }
+  return out;
 }
 
 /**
@@ -473,8 +477,10 @@ export function recordLoadoutExport(
   next: Omit<LegoExport, "files">,
   written: ExportedFile[],
 ): LegoProject {
-  const entry = project.loadouts?.find((l) => l.id === id);
-  if (!project.loadouts || !entry) return project;
+  if (!project.loadouts?.some((l) => l.id === id)) return project;
+  const settled = settleProjectReceipts(project, next.dir);
+  const entry = settled.loadouts?.find((l) => l.id === id) as LegoLoadout;
+  project = settled;
   const record = recordExport(
     {
       exported: entry.exported,
@@ -487,7 +493,7 @@ export function recordLoadoutExport(
   return {
     ...project,
     staleExports: record.staleExports,
-    loadouts: project.loadouts.map((l) =>
+    loadouts: (project.loadouts ?? []).map((l) =>
       l.id === id
         ? {
             ...l,
@@ -548,4 +554,58 @@ export function exportTargets(
       const unit = loadoutUnit(project, l.id);
       return unit ? [{ loadoutId: l.id, unit }] : [];
     });
+}
+
+/**
+ * The project's own receipts for `dir`, from before it had loadouts, dealt with
+ * as a loadout is exported into that folder (#3282).
+ *
+ * A receipt whose name a loadout now exports under goes to that loadout, unless
+ * it has a receipt for the folder already, so the files carry on being its own.
+ * Any other is a name nothing exports under any more, so it joins the leftovers
+ * and the export drawer offers to remove what coilbox wrote. Either way the
+ * project stops holding it.
+ */
+function settleProjectReceipts(project: LegoProject, dir: string): LegoProject {
+  const names = loadoutUnitNames(project);
+  const old = [project.exported, ...(project.exportedElsewhere ?? [])].filter(
+    (receipt): receipt is LegoExport =>
+      receipt !== undefined && samePath(receipt.dir, dir),
+  );
+  if (old.length === 0) return project;
+  let loadouts = project.loadouts ?? [];
+  let staleExports = project.staleExports ?? [];
+  for (const receipt of old) {
+    const owner = loadouts.find((l) => names.get(l.id) === receipt.unitName);
+    if (!owner) {
+      staleExports = withReceipts(staleExports, [receipt]);
+      continue;
+    }
+    if (receiptFor(owner, dir)) continue;
+    loadouts = loadouts.map((l) =>
+      l.id !== owner.id
+        ? l
+        : l.exported
+          ? {
+              ...l,
+              exportedElsewhere: [...(l.exportedElsewhere ?? []), receipt],
+            }
+          : { ...l, exported: receipt },
+    );
+  }
+  const { exported: _latest, exportedElsewhere: _others, ...rest } = project;
+  const elsewhere = (project.exportedElsewhere ?? []).filter(
+    (receipt) => !samePath(receipt.dir, dir),
+  );
+  const latest =
+    project.exported && !samePath(project.exported.dir, dir)
+      ? project.exported
+      : undefined;
+  return {
+    ...rest,
+    ...(latest ? { exported: latest } : {}),
+    ...(elsewhere.length > 0 ? { exportedElsewhere: elsewhere } : {}),
+    ...(staleExports.length > 0 ? { staleExports } : {}),
+    loadouts,
+  };
 }
