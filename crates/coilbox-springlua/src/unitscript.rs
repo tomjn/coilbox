@@ -412,6 +412,11 @@ struct Run {
     /// How many times a thread has slept or begun to wait so far.
     parks: u64,
     frame: u32,
+    /// The heading each weapon was last told to aim at, in radians to the right
+    /// of the unit's front, by weapon number. The engine rocks the unit away
+    /// from the direction of fire, and the preview's shot goes where the last
+    /// aim pointed (`Weapon.cpp:606-608`).
+    aim_headings: HashMap<u32, f64>,
 }
 
 impl Run {
@@ -479,6 +484,7 @@ impl Run {
             functions,
             runners: Vec::new(),
             parks: 0,
+            aim_headings: HashMap::new(),
             frame: 0,
         })
     }
@@ -744,6 +750,15 @@ impl Run {
     /// a plain `AimWeapon` or `AimShield`. Here it is decided per call-in
     /// instead.
     fn start_callin(&mut self, callin: &str, args: Vec<Value>) -> Result<bool, String> {
+        if let Some(("AimWeapon", weapon)) = numbered_weapon_callin(callin) {
+            if let Some(heading) = args.first().and_then(|arg| match arg {
+                Value::Number(n) => Some(*n),
+                Value::Integer(n) => Some(*n as f64),
+                _ => None,
+            }) {
+                self.aim_headings.insert(weapon, heading);
+            }
+        }
         let (callin, args) = match numbered_weapon_callin(callin) {
             Some((stem, weapon)) => self.weapon_callin(stem, weapon, args),
             None => (callin.to_string(), args),
@@ -891,7 +906,23 @@ impl Run {
         let mut sim = self.sim.borrow_mut();
         let frame = sim.frame;
         sim.model.shot(frame, weapon, piece);
-        Ok(())
+        drop(sim);
+        self.rock_unit(weapon)
+    }
+
+    /// After a shot the engine rocks the unit away from the direction of fire,
+    /// if the script defines `RockUnit` (`Weapon.cpp:606-608`). The Lua call is
+    /// handed the opposite of the shot in the unit's own space, as x and z
+    /// (`LuaUnitScript.cpp:686-691`). The shot goes where the weapon last
+    /// aimed, which is `(sin heading, cos heading)` for a heading counted from
+    /// the front towards +x, so the rock is its negative. A weapon never told
+    /// to aim fires straight ahead.
+    fn rock_unit(&mut self, weapon: u32) -> Result<(), String> {
+        let heading = self.aim_headings.get(&weapon).copied().unwrap_or(0.0);
+        let queued_at = self.runners.len();
+        let args = vec![Value::Number(-heading.sin()), Value::Number(-heading.cos())];
+        self.start_callin("RockUnit", args)?;
+        self.tick_queued_call_ins(queued_at)
     }
 
     /// What `QueryWeapon` names, or the `AimFromWeapon` piece when that names
