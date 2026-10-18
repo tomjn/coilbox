@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Inbox,
   Loader2,
+  type LucideIcon,
   TriangleAlert,
 } from "lucide-react";
 import { type ReactNode, useState } from "react";
@@ -17,6 +18,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 /** Inline error banner (matches the content settings pages). */
 export function ErrorBanner({ message }: { message: string }) {
@@ -281,14 +283,24 @@ export function MissingDependencyBanner({ notes }: { notes: string[] }) {
   );
 }
 
-/** Loading skeleton rows. */
-export function SkeletonList() {
+/** The card grid the Games and Maps pages lay their cards out in. */
+export const CARD_GRID =
+  "grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-3";
+
+/** Loading skeleton rows, or cards in {@link CARD_GRID} for a grid page. */
+export function SkeletonList({ grid = false }: { grid?: boolean }) {
+  const keys = grid
+    ? ["a", "b", "c", "d", "e", "f", "g", "h"]
+    : ["a", "b", "c", "d"];
   return (
-    <div className="flex flex-col gap-2">
-      {["a", "b", "c", "d"].map((k) => (
+    <div className={grid ? CARD_GRID : "flex flex-col gap-2"}>
+      {keys.map((k) => (
         <Skeleton
           key={k}
-          className="h-14 rounded-lg border border-border/50 bg-card"
+          className={cn(
+            "rounded-lg border border-border/50 bg-card",
+            grid ? "aspect-[4/3]" : "h-14",
+          )}
         />
       ))}
     </div>
@@ -308,12 +320,22 @@ export function Centered({ children }: { children: ReactNode }) {
   );
 }
 
-/** Empty result state. */
-export function EmptyState({ label }: { label: ReactNode }) {
+/** Empty result state, with an optional icon in place of the inbox and an
+ * optional control below the message. */
+export function EmptyState({
+  label,
+  icon: Icon = Inbox,
+  action,
+}: {
+  label: ReactNode;
+  icon?: LucideIcon;
+  action?: ReactNode;
+}) {
   return (
     <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-10 text-center">
-      <Inbox className="size-6 text-muted-foreground" />
+      <Icon className="size-6 text-muted-foreground" />
       <p className="text-sm text-muted-foreground">{label}</p>
+      {action}
     </div>
   );
 }
