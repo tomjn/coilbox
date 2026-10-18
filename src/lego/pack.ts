@@ -58,8 +58,9 @@ export interface LegoPartInfo {
   /**
    * Shared by parts that use the same geometry, which is often but not always
    * a colourway family: some parts share a shapeId incidentally, through the
-   * mesh rather than through any relationship worth browsing by. Used to look
-   * up a part's siblings (`shapeVariants`), not to group the parts browser.
+   * mesh rather than through any relationship worth browsing by. A shape's
+   * colourways are found by `shapeGroups` in `partOrder.ts`, which starts from
+   * it.
    */
   shapeId: string;
   name: string;
@@ -911,14 +912,6 @@ export function partDimensions(part: LegoPartInfo): number[] {
   return part.bbox.max
     .map((max, i) => max - part.bbox.min[i])
     .sort((a, b) => b - a);
-}
-
-/** Every colourway a shape is available in, in the order the pack lists them. */
-export function shapeVariants(
-  pack: LoadedPack,
-  shapeId: string,
-): LegoPartInfo[] {
-  return pack.parts.filter((part) => part.shapeId === shapeId);
 }
 
 /**
