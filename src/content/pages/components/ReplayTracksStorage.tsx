@@ -7,7 +7,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { formatBytes } from "@/lib/format";
+import { formatBytes, formatNumber } from "@/lib/format";
 import { notify } from "@/notify/notify";
 import { contentReplayTracksClear } from "../../bindings";
 import {
@@ -23,7 +23,7 @@ const msg = (e: unknown): string =>
   e instanceof Error ? e.message : String(e);
 
 const plural = (n: number, one: string, many: string) =>
-  `${n.toLocaleString()} ${n === 1 ? one : many}`;
+  `${formatNumber(n)} ${n === 1 ? one : many}`;
 
 /**
  * What recorded tracks take on disk, the limit on it, and a button that

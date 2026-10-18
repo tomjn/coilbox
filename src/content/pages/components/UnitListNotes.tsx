@@ -1,3 +1,4 @@
+import { formatNumber } from "@/lib/format";
 import type { UnitSource } from "../../replayBuildOrders";
 import {
   misfits,
@@ -28,7 +29,7 @@ export function StoredListNote({
 }
 
 function count(n: number, one: string, many: string): string {
-  return `${n.toLocaleString()} ${n === 1 ? one : many}`;
+  return `${formatNumber(n)} ${n === 1 ? one : many}`;
 }
 
 /**
@@ -42,7 +43,7 @@ export function OrderFitNote({ fit }: { fit: OrderFit }) {
   if (wrong === 0) return null;
   return (
     <p className="text-xs text-amber-600 dark:text-amber-400">
-      {wrong.toLocaleString()} of{" "}
+      {formatNumber(wrong)} of{" "}
       {count(fit.orders, "build order", "build orders")}{" "}
       {wrong === 1 ? "does" : "do"} not fit this unit list, so names and costs
       may be wrong.

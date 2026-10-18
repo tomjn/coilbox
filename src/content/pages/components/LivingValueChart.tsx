@@ -10,7 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { formatDuration } from "@/lib/format";
+import { formatDuration, formatNumber } from "@/lib/format";
 import type { DemoInfo } from "../../bindings";
 import { FRAMES_PER_SECOND } from "../../chatClock";
 import { type ChartSeries, seriesTeams } from "../../matchStats";
@@ -348,7 +348,7 @@ function OpenValueChart({
                       />
                       <Tooltip
                         formatter={(v, name) => [
-                          `${Math.round(Number(v)).toLocaleString()} ${resource}`,
+                          `${formatNumber(Math.round(Number(v)))} ${resource}`,
                           LABEL[name as SplitBucket] ?? name,
                         ]}
                         labelFormatter={(t) => axisTime(Number(t))}
@@ -397,7 +397,7 @@ function OpenValueChart({
         definitions, and every panel has the same scale. Metal and energy are
         never added together.
         {value.unpriced > 0 &&
-          ` ${value.unpriced.toLocaleString()} of ${value.finished.toLocaleString()} finished units have no cost in the installed game and count nothing.`}
+          ` ${formatNumber(value.unpriced)} of ${formatNumber(value.finished)} finished units have no cost in the installed game and count nothing.`}
       </p>
     ) : undefined,
   );

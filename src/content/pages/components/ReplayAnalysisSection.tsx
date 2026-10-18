@@ -20,7 +20,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Progress } from "@/components/ui/progress";
-import { formatBytes, formatDuration } from "@/lib/format";
+import { formatBytes, formatDuration, formatNumber } from "@/lib/format";
 import {
   contentAnalysisCheck,
   type DemoInfo,
@@ -85,7 +85,7 @@ function when(ms: number): string {
 }
 
 export function plural(n: number, one: string, many: string): string {
-  return `${n.toLocaleString()} ${n === 1 ? one : many}`;
+  return `${formatNumber(n)} ${n === 1 ? one : many}`;
 }
 
 /** A length of time in words, to the nearest sensible unit. */
@@ -822,8 +822,8 @@ function Stored({
           ) : (
             <p>
               Analysed. {plural(counts.unitCreated, "unit made", "units made")},{" "}
-              {counts.unitFinished.toLocaleString()} finished and{" "}
-              {counts.unitDestroyed.toLocaleString()} lost.
+              {formatNumber(counts.unitFinished)} finished and{" "}
+              {formatNumber(counts.unitDestroyed)} lost.
             </p>
           )}
           <p className="text-xs text-muted-foreground">

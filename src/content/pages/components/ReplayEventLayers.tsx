@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { HeatLegend } from "@/components/HeatLegend";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { formatNumber } from "@/lib/format";
 import { drawHeatField } from "@/lib/heatCanvas";
 import { HEAT_KIND_OF_LAYER } from "@/lib/heatRamp";
 import { ANALYSIS_SECTION_ID } from "../../replayAnalysis";
@@ -159,7 +160,7 @@ export function goToAnalysis() {
 }
 
 const plural = (n: number, one: string, many: string) =>
-  `${n.toLocaleString()} ${n === 1 ? one : many}`;
+  `${formatNumber(n)} ${n === 1 ? one : many}`;
 
 /** The outline shapes the finished marks use, one for each kind of building. */
 function OutlineKey({ ev }: { ev: EventLayers }) {
@@ -437,7 +438,7 @@ export function EventLayerHelp({ ev }: { ev: EventLayers }) {
           Each death counts its unit's metal cost from the installed game, so
           this is where value was lost and not where units died.
           {ev.costed < ev.deaths.length &&
-            ` ${(ev.deaths.length - ev.costed).toLocaleString()} ${ev.deaths.length - ev.costed === 1 ? "death is" : "deaths are"} of a unit with no stated cost and count nothing.`}
+            ` ${formatNumber(ev.deaths.length - ev.costed)} ${ev.deaths.length - ev.costed === 1 ? "death is" : "deaths are"} of a unit with no stated cost and count nothing.`}
         </p>
       )}
       {ev.damageOn && ev.damageRead.status === "done" && ev.damageRecorded && (
@@ -465,7 +466,7 @@ export function EventLayerHelp({ ev }: { ev: EventLayers }) {
 /** What the damage layer counts and leaves out, for the map's help entry. */
 function DamageHelp({ ev }: { ev: EventLayers }) {
   const sums = ev.damageSums;
-  const whole = (n: number) => Math.round(n).toLocaleString();
+  const whole = (n: number) => formatNumber(Math.round(n));
   const seconds = Math.round(ev.damageFrames / 30);
   return (
     <>

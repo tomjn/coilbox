@@ -2,6 +2,7 @@ import { cn, useTheme } from "@picoframe/frame";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { HeatLegend } from "@/components/HeatLegend";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { formatNumber } from "@/lib/format";
 import { drawHeatField } from "@/lib/heatCanvas";
 import { buildHeatField } from "@/lib/heatField";
 import { HEAT_KIND_OF_LAYER } from "@/lib/heatRamp";
@@ -528,9 +529,9 @@ export function ReplayMap({
               built. An order that was cancelled or never carried out is drawn
               like any other.
               {built.unplaced > 0 &&
-                ` ${built.unplaced.toLocaleString()} factory queue ${built.unplaced === 1 ? "order has" : "orders have"} no position and ${built.unplaced === 1 ? "is" : "are"} not drawn.`}
+                ` ${formatNumber(built.unplaced)} factory queue ${built.unplaced === 1 ? "order has" : "orders have"} no position and ${built.unplaced === 1 ? "is" : "are"} not drawn.`}
               {built.offMap > 0 &&
-                ` ${built.offMap.toLocaleString()} ${built.offMap === 1 ? "order was" : "orders were"} placed off the map and ${built.offMap === 1 ? "is" : "are"} not drawn.`}
+                ` ${formatNumber(built.offMap)} ${built.offMap === 1 ? "order was" : "orders were"} placed off the map and ${built.offMap === 1 ? "is" : "are"} not drawn.`}
               {on.buildings && " A mark is one order, in its player's colour."}
             </p>
           )}
@@ -538,18 +539,17 @@ export function ReplayMap({
             <>
               <p>
                 Order density shows where orders were aimed, which is roughly
-                where attention went.{" "}
-                {(orderField?.counted ?? 0).toLocaleString()} orders
+                where attention went. {formatNumber(orderField?.counted ?? 0)}{" "}
+                orders
                 {timeWindow ? " in this window" : ""} are on it, from the
                 player's own selection, widgets acting for them and AIs alike
                 {bySender.lua > 0 &&
-                  `, and ${bySender.lua.toLocaleString()} of them were sent by widgets`}
+                  `, and ${formatNumber(bySender.lua)} of them were sent by widgets`}
                 .
               </p>
               <p>
                 Orders aimed at a unit are not on it, as the replay holds the
-                unit and not its position.{" "}
-                {allOrders.unitAimed.toLocaleString()}{" "}
+                unit and not its position. {formatNumber(allOrders.unitAimed)}{" "}
                 {allOrders.unitAimed === 1 ? "order was" : "orders were"} aimed
                 at a unit
                 {timeWindow
@@ -557,9 +557,9 @@ export function ReplayMap({
                   : ""}
                 .
                 {allOrders.custom > 0 &&
-                  ` ${allOrders.custom.toLocaleString()} ${allOrders.custom === 1 ? "order was" : "orders were"} a command the engine does not define, which a game or a widget made up and which says nothing about where it points, and ${allOrders.custom === 1 ? "is" : "are"} left out.`}
+                  ` ${formatNumber(allOrders.custom)} ${allOrders.custom === 1 ? "order was" : "orders were"} a command the engine does not define, which a game or a widget made up and which says nothing about where it points, and ${allOrders.custom === 1 ? "is" : "are"} left out.`}
                 {(orderField?.dropped ?? 0) > 0 &&
-                  ` ${(orderField?.dropped ?? 0).toLocaleString()} ${orderField?.dropped === 1 ? "order was" : "orders were"} aimed off the map and ${orderField?.dropped === 1 ? "is" : "are"} not drawn.`}
+                  ` ${formatNumber(orderField?.dropped ?? 0)} ${orderField?.dropped === 1 ? "order was" : "orders were"} aimed off the map and ${orderField?.dropped === 1 ? "is" : "are"} not drawn.`}
               </p>
             </>
           )}
@@ -858,14 +858,14 @@ export function ReplayMap({
             {orderField && orderField.peak > 0 && (
               <HeatLegend
                 label="Where orders were aimed"
-                peak={`${Math.round(orderField.peakWithinRadius ?? 0).toLocaleString()} ${Math.round(orderField.peakWithinRadius ?? 0) === 1 ? "order" : "orders"} within ${Math.round(orderField.radius).toLocaleString()} elmos of one spot${timeWindow ? " in this window" : ""}`}
+                peak={`${formatNumber(Math.round(orderField.peakWithinRadius ?? 0))} ${Math.round(orderField.peakWithinRadius ?? 0) === 1 ? "order" : "orders"} within ${formatNumber(Math.round(orderField.radius))} elmos of one spot${timeWindow ? " in this window" : ""}`}
                 kind={HEAT_KIND_OF_LAYER.orderDensity}
               />
             )}
             {field && field.peak > 0 && (
               <HeatLegend
                 label="Where buildings were ordered"
-                peak={`${Math.round(field.peakWithinRadius ?? 0).toLocaleString()} ${Math.round(field.peakWithinRadius ?? 0) === 1 ? "order" : "orders"} within ${Math.round(field.radius).toLocaleString()} elmos of one spot${timeWindow ? " in this window" : ""}`}
+                peak={`${formatNumber(Math.round(field.peakWithinRadius ?? 0))} ${Math.round(field.peakWithinRadius ?? 0) === 1 ? "order" : "orders"} within ${formatNumber(Math.round(field.radius))} elmos of one spot${timeWindow ? " in this window" : ""}`}
                 kind={HEAT_KIND_OF_LAYER.density}
               />
             )}

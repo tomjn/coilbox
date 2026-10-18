@@ -2,6 +2,7 @@ import { buttonVariants, cn } from "@picoframe/frame";
 import { ArrowDown, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { Link, useParams } from "react-router";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { formatNumber } from "@/lib/format";
 import { useModProjects } from "@/workshop/project";
 import { unitEditPath } from "@/workshop/routes";
 import {
@@ -569,8 +570,8 @@ export default function GameUnitPage() {
 
             <dt className="text-muted-foreground">Size</dt>
             <dd>
-              {countTriangles(model.root).toLocaleString()} triangles in{" "}
-              {countPieces(model.root).toLocaleString()} pieces
+              {formatNumber(countTriangles(model.root))} triangles in{" "}
+              {formatNumber(countPieces(model.root))} pieces
             </dd>
 
             <dt className="text-muted-foreground">Textures</dt>

@@ -1,11 +1,12 @@
 import { Button } from "@picoframe/frame";
 import { FolderOpen, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { formatDateTime } from "@/lib/format";
 import type { ContentRoot } from "../../bindings";
 import { StatusBadge } from "./StatusBadge";
 
 function fmtTime(ms?: number): string {
-  return ms ? new Date(ms).toLocaleString() : "never";
+  return ms ? formatDateTime(new Date(ms)) : "never";
 }
 
 function Stat({ label, value }: { label: string; value: number }) {

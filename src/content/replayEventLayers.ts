@@ -11,6 +11,7 @@
  * order layers are.
  */
 
+import { formatNumber } from "@/lib/format";
 import type { HeatPoints } from "@/lib/heatField";
 import type { StoredReplayAnalysis, UnitDatasetEntry } from "./bindings";
 import type { LogEvent } from "./replayAnalysisEvents";
@@ -243,7 +244,7 @@ export function windowSubject(
 }
 
 const plural = (n: number, one: string, many: string) =>
-  `${n.toLocaleString()} ${n === 1 ? one : many}`;
+  `${formatNumber(n)} ${n === 1 ? one : many}`;
 
 /** The legend of a deaths field: what is counted and what the peak holds. */
 export function deathLegend(
@@ -252,11 +253,11 @@ export function deathLegend(
   inWindow: boolean,
 ): { label: string; peak: string } {
   const peak = Math.round(field.peakWithinRadius ?? 0);
-  const where = `within ${Math.round(field.radius).toLocaleString()} elmos of one spot${inWindow ? " in this window" : ""}`;
+  const where = `within ${formatNumber(Math.round(field.radius))} elmos of one spot${inWindow ? " in this window" : ""}`;
   return weighted
     ? {
         label: "Where metal was lost",
-        peak: `${peak.toLocaleString()} metal of units lost ${where}`,
+        peak: `${formatNumber(peak)} metal of units lost ${where}`,
       }
     : {
         label: "Where units died",

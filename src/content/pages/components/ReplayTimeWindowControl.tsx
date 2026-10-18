@@ -1,7 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { useEffect, useRef, useState } from "react";
 import { Slider } from "@/components/ui/slider";
-import { formatDuration } from "@/lib/format";
+import { formatDuration, formatNumber } from "@/lib/format";
 import { axisTicks } from "../../replayTimeline";
 import {
   type ActivitySeries,
@@ -39,7 +39,7 @@ const SUBJECT_NOTE: Record<WindowSubject, string> = {
 /** A count as a short label, such as "2,897 of 2,897 building orders". */
 function countText(count: WindowCount, noun: string): string {
   if (count.total === 0) return `No ${noun}.`;
-  return `${count.inside.toLocaleString()} of ${count.total.toLocaleString()} ${noun}.`;
+  return `${formatNumber(count.inside)} of ${formatNumber(count.total)} ${noun}.`;
 }
 
 /**

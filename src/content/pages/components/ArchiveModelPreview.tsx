@@ -14,7 +14,7 @@ import { Blocks } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import { builderOpenUrl } from "@/lego/archiveOpen";
-import { formatBytes } from "@/lib/format";
+import { formatBytes, formatNumber } from "@/lib/format";
 import {
   MODEL_PREVIEW_CAP,
   type ModelFormat,
@@ -110,8 +110,8 @@ export function ArchiveModelPreview({
 
         <dt className="text-muted-foreground">Size</dt>
         <dd>
-          {triangles.toLocaleString()} triangles in{" "}
-          {countPieces(model.root).toLocaleString()} pieces
+          {formatNumber(triangles)} triangles in{" "}
+          {formatNumber(countPieces(model.root))} pieces
           {size != null ? `, ${formatBytes(size)} on disk` : ""}
         </dd>
 

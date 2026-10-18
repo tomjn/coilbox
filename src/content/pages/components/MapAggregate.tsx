@@ -6,6 +6,7 @@ import { OptionSelect } from "@/components/OptionSelect";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { formatNumber } from "@/lib/format";
 import { drawHeatField } from "@/lib/heatCanvas";
 import { HEAT_KIND_OF_LAYER } from "@/lib/heatRamp";
 import type { MapScene3D } from "@/lib/mapScene";
@@ -123,7 +124,7 @@ const NORMALISE_NOTE: Record<Normalise, string> = {
 };
 
 const plural = (n: number, one: string, many: string) =>
-  `${n.toLocaleString()} ${n === 1 ? one : many}`;
+  `${formatNumber(n)} ${n === 1 ? one : many}`;
 
 /**
  * Every match of one map in the library, drawn as one picture (#1161).
@@ -485,11 +486,11 @@ export function MapAggregate({
           data-testid="aggregate-summary"
         >
           {filtered
-            ? `${matchCount(shown.length)} of the ${family.matches.length.toLocaleString()} on this map in your library ${shown.length === 1 ? "is" : "are"} in this picture.`
-            : `${shown.length === 1 ? "The 1 match" : `All ${shown.length.toLocaleString()} matches`} on this map in your library ${shown.length === 1 ? "is" : "are"} in this picture.`}{" "}
+            ? `${matchCount(shown.length)} of the ${formatNumber(family.matches.length)} on this map in your library ${shown.length === 1 ? "is" : "are"} in this picture.`
+            : `${shown.length === 1 ? "The 1 match" : `All ${formatNumber(shown.length)} matches`} on this map in your library ${shown.length === 1 ? "is" : "are"} in this picture.`}{" "}
           {read.reading
-            ? `Reading replays: ${read.done.toLocaleString()} of ${read.total.toLocaleString()}.`
-            : `${withOrders.toLocaleString()} ${withOrders === 1 ? "has" : "have"} orders recorded, and ${withEvents.toLocaleString()} ${withEvents === 1 ? "has" : "have"} been analysed and ${withEvents === 1 ? "has" : "have"} event data.`}
+            ? `Reading replays: ${formatNumber(read.done)} of ${formatNumber(read.total)}.`
+            : `${formatNumber(withOrders)} ${withOrders === 1 ? "has" : "have"} orders recorded, and ${formatNumber(withEvents)} ${withEvents === 1 ? "has" : "have"} been analysed and ${withEvents === 1 ? "has" : "have"} event data.`}
           {diverged > 0 &&
             ` ${plural(diverged, "was", "were")} analysed and the playback did not reproduce the match, so ${diverged === 1 ? "it has" : "they have"} no events.`}
         </p>
@@ -724,7 +725,7 @@ export function MapAggregate({
                   onPressedChange={setShowStarts}
                   data-testid="layer-starts"
                 >
-                  Start positions · {startMatches.toLocaleString()}
+                  Start positions · {formatNumber(startMatches)}
                 </Toggle>
                 <ToggleGroup
                   type="single"
@@ -743,7 +744,7 @@ export function MapAggregate({
                       data-testid={`layer-${id}`}
                     >
                       {LAYER_LABEL[id]} ·{" "}
-                      {perLayer[id].contributing.toLocaleString()}
+                      {formatNumber(perLayer[id].contributing)}
                     </ToggleGroupItem>
                   ))}
                 </ToggleGroup>
@@ -935,7 +936,7 @@ function LayerNotes({
         )}
       {drawn.contributing > 0 && windowed && (
         <p className="text-xs text-muted-foreground" data-testid="window-count">
-          {drawn.contributing.toLocaleString()} of {matchCount(drawn.available)}{" "}
+          {formatNumber(drawn.contributing)} of {matchCount(drawn.available)}{" "}
           {drawn.contributing === 1 ? "has" : "have"} anything on this layer in{" "}
           {windowLabel(timeWindow)}.
         </p>

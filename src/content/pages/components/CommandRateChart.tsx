@@ -10,7 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { formatDuration } from "@/lib/format";
+import { formatDuration, formatNumber } from "@/lib/format";
 import type { DemoInfo, OrderSource } from "../../bindings";
 import {
   commandRows,
@@ -220,11 +220,11 @@ export function CommandRateChart({
               One order is one command. This is not the same count as the
               trailer's, so neither checks the other.
               {rates.trailing > 0 &&
-                ` ${rates.trailing.toLocaleString()} orders in the last part-period are left out.`}
+                ` ${formatNumber(rates.trailing)} orders in the last part-period are left out.`}
               {rates.pregame > 0 &&
-                ` ${rates.pregame.toLocaleString()} orders before the game started are left out.`}
+                ` ${formatNumber(rates.pregame)} orders before the game started are left out.`}
               {rates.unattributed > 0 &&
-                ` ${rates.unattributed.toLocaleString()} orders from players with no team are left out.`}
+                ` ${formatNumber(rates.unattributed)} orders from players with no team are left out.`}
             </p>
           </SectionHelp>
         )}

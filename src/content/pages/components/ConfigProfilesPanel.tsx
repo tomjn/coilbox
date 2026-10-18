@@ -3,6 +3,7 @@ import { RotateCcw, Save, Trash2, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { formatDateTime } from "@/lib/format";
 import {
   type ConfigProfile,
   contentConfigBackup,
@@ -178,7 +179,7 @@ export function ConfigProfilesPanel({ rootPath }: { rootPath: string }) {
                       {p.name}
                     </span>
                     <span className="block truncate text-xs text-muted-foreground">
-                      {new Date(p.createdAtMs).toLocaleString()}
+                      {formatDateTime(new Date(p.createdAtMs))}
                       {parts ? ` · ${parts}` : " · empty"}
                     </span>
                   </div>

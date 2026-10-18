@@ -12,6 +12,7 @@
  * numbers.
  */
 
+import { formatNumber } from "@/lib/format";
 import { heatGridSize } from "@/lib/heatField";
 import type { LogEvent } from "./replayAnalysisEvents";
 import type { MapWorld } from "./replayMapLayers";
@@ -172,8 +173,8 @@ export function damageLegend(
   mode: DamageMode,
   inWindow: boolean,
 ): { label: string; peak: string } {
-  const peak = Math.round(field.peakWithinRadius ?? 0).toLocaleString();
-  const where = `within ${Math.round(field.radius).toLocaleString()} elmos of one spot${inWindow ? " in this window" : ""}`;
+  const peak = formatNumber(Math.round(field.peakWithinRadius ?? 0));
+  const where = `within ${formatNumber(Math.round(field.radius))} elmos of one spot${inWindow ? " in this window" : ""}`;
   return mode === "at"
     ? {
         label: "Where damage landed",
