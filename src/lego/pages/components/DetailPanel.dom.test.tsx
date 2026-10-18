@@ -258,6 +258,41 @@ describe("a part", () => {
     expect(onSelect).toHaveBeenCalledWith({ kind: "part", id: tan.id });
   });
 
+  it("offers a colourway whose part has its own mesh", () => {
+    // The bundled pack gives three team colour parts a mesh of their own.
+    const team = {
+      ...part("p-team", "green"),
+      shapeId: "beam-4-team",
+      name: "team colour beam",
+    };
+    // A shape in all three colourways, as most of the bundled pack's are.
+    const bars = ["green", "grey", "tan"].map((colourway) => ({
+      ...part(`bar-${colourway}`, colourway),
+      shapeId: "bar",
+      name: `${colourway} bar`,
+      bbox: { min: [0, 0, 0], max: [1, 1, 1] },
+    }));
+    const pack = {
+      ...packWith(),
+      manifest: {
+        categories: [
+          { id: "green", label: "Team colour" },
+          { id: "grey", label: "Grey" },
+          { id: "tan", label: "Tan" },
+        ],
+      },
+      parts: [grey, tan, team, ...bars],
+      byId: new Map([grey, tan, team, ...bars].map((p) => [p.id, p])),
+    } as unknown as LoadedPack;
+    const { onSelect } = show({ kind: "part", id: grey.id }, { pack });
+    const labels = screen
+      .getAllByRole("button", { pressed: false })
+      .map((b) => b.textContent);
+    expect(labels).toEqual(["Team colour", "Tan"]);
+    fireEvent.click(button("Team colour") as HTMLElement);
+    expect(onSelect).toHaveBeenCalledWith({ kind: "part", id: team.id });
+  });
+
   it("names the pack once there is more than one", () => {
     render(
       <DetailPanel

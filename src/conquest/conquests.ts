@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { discardUnits } from "../campaign/units";
 import { createDocumentStore } from "../lib/documentStore";
 import { conquestList, conquestStateLoad, conquestStateSave } from "./bindings";
 import {
@@ -98,6 +99,11 @@ async function saveConquestState(
   state: ConquestState | undefined,
 ): Promise<void> {
   const conquests = { ...stateStore.getForWrite().conquests };
+  // Removing a conquest removes its builder units first, so one that cannot be
+  // removed leaves the conquest to try again (issue #4518).
+  if (!state && conquests[galaxyId]?.units) {
+    await discardUnits({ scope: "conquest", id: galaxyId });
+  }
   if (state) {
     conquests[galaxyId] = state;
   } else {

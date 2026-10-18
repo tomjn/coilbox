@@ -31,11 +31,7 @@ import {
   runDifficulty,
 } from "./results";
 import { ensureCampaignScenarioMedia } from "./scenarioMedia";
-import {
-  composeCampaignUnits,
-  loadUnitCopies,
-  missingAtlasPacks,
-} from "./units";
+import { composeUnits, loadUnitCopies, missingAtlasPacks } from "./units";
 
 /* -------------------------------------------------------------------------- *
  * The mission run hook — install check, launch, automatic result detection from
@@ -298,7 +294,7 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
         ? games.find((g) => g.name === mission.scenario?.setup.gameName)
         : game;
       const units = unitsBase
-        ? await composeCampaignUnits(campaign, target, {
+        ? await composeUnits(campaign, target, {
             name: unitsBase.name,
             archive: unitsBase.primaryArchive.name,
           })

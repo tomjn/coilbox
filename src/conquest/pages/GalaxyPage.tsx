@@ -14,6 +14,8 @@ import { Switch } from "@/components/ui/switch";
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
 import { useFactionLogos } from "@/factions/logos";
+import { StartingUnits } from "../../campaign/pages/components/StartingUnits";
+import { carryUnits } from "../../campaign/units";
 import { ChallengeRecordLine } from "../../challenge/ChallengeRecordLine";
 import { galaxyIdentity } from "../../challenge/identity";
 import { conquestRunResult } from "../../challenge/result";
@@ -35,6 +37,7 @@ import {
   usePerformanceMode,
   useReduceMotion,
 } from "../../general/display";
+import type { LegoProject } from "../../lego/model";
 import { assetUrl } from "../../lib/assetUrl";
 import { usePreferredTarget } from "../../play/config";
 import { resolveGameByShortname } from "../../play/installedGames";
@@ -874,16 +877,23 @@ function GalaxyScreen({
           faction={setupFaction}
           onFaction={setSetupFaction}
           options={handmade?.fields}
-          onStart={async (playerSide) => {
+          onStart={async (playerSide, units) => {
+            const fresh = handmade
+              ? handmade.newState(setupFaction, playerSide)
+              : newConquestState(galaxy, {
+                  playerFactionId: setupFaction,
+                  playerSide,
+                  seed: randomSeed(),
+                });
+            // The builder units are copied first, so a copy that fails
+            // starts no conquest (issue #4518).
+            const carried =
+              units.length > 0
+                ? await carryUnits({ scope: "conquest", id: galaxy.id }, units)
+                : [];
             await saveFor(
               galaxy.id,
-              handmade
-                ? handmade.newState(setupFaction, playerSide)
-                : newConquestState(galaxy, {
-                    playerFactionId: setupFaction,
-                    playerSide,
-                    seed: randomSeed(),
-                  }),
+              carried.length > 0 ? { ...fresh, units: carried } : fresh,
             );
           }}
         />
@@ -1206,7 +1216,11 @@ export function RunSetupPanel({
   onFaction: (id: string) => void;
   /** More fields for the panel, shown above its buttons. */
   options?: ReactNode;
-  onStart: (playerSide: string | undefined) => Promise<void>;
+  /** Start with this side and these units from the unit builder. */
+  onStart: (
+    playerSide: string | undefined,
+    units: LegoProject[],
+  ) => Promise<void>;
 }) {
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
@@ -1221,6 +1235,8 @@ export function RunSetupPanel({
   }, [scanData, scanLoading, scanError, runScan]);
   const [side, setSide] = useState("");
   const [busy, setBusy] = useState(false);
+  const [units, setUnits] = useState<LegoProject[]>([]);
+  const [startError, setStartError] = useState<string | null>(null);
   const choices = playableFactions(galaxy);
   const installedGame = resolveGameByShortname(
     galaxy.game,
@@ -1384,6 +1400,18 @@ export function RunSetupPanel({
         />
       )}
       {options}
+      <StartingUnits
+        label={
+          <span
+            className={`font-display text-[10px] font-medium uppercase tracking-[0.2em] ${HUD_ACCENT_INK.teal}`}
+          >
+            Units from the builder
+          </span>
+        }
+        picked={units}
+        onChange={setUnits}
+        disabled={busy}
+      />
       {canRegenerate && (
         <Button
           variant="outline"
@@ -1409,8 +1437,13 @@ export function RunSetupPanel({
         className="font-display uppercase tracking-wide"
         onClick={async () => {
           setBusy(true);
+          setStartError(null);
           try {
-            await onStart(effectiveSide);
+            await onStart(effectiveSide, units);
+          } catch (e) {
+            setStartError(
+              `The conquest was not started. ${e instanceof Error ? e.message : String(e)}`,
+            );
           } finally {
             setBusy(false);
           }
@@ -1424,6 +1457,7 @@ export function RunSetupPanel({
           </>
         )}
       </Button>
+      {startError && <ErrorBanner message={startError} />}
     </BracketFrame>
   );
 }

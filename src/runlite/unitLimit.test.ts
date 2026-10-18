@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { UnitDatasetEntry } from "../content/bindings";
 import { buildBuildGraph, buildEdgeMap } from "../content/buildTree";
 import { morphEdgeMap } from "../content/morphGraph";
+import { withBuiltUnits } from "../lego/buildList";
 import { generateRun } from "./generate";
 import type { RogueliteRun } from "./model";
 import {
@@ -733,6 +734,71 @@ describe("a run with a derived start set", () => {
     expect(locked.size).toBeGreaterThan(0);
     for (const unit of start) expect(locked.has(unit)).toBe(false);
     for (const unit of offered) expect(locked.has(unit)).toBe(true);
+  });
+});
+
+// Issue #4518. A unit from the unit builder that a run carries is in the graph
+// its rewards are drawn from, so it is offered, locked and unlocked like the
+// game's own units.
+describe("a run carrying a unit from the unit builder", () => {
+  // More units than the starter kit's twelve, so the carried one is past it.
+  const bots = Array.from({ length: 15 }, (_, i) => `bot_${i}`);
+  const game: UnitDatasetEntry[] = [
+    { name: "com", buildOptions: ["lab"] },
+    { name: "lab", buildOptions: bots },
+    ...bots.map((name) => ({ name, buildOptions: [] })),
+  ];
+  const units = withBuiltUnits(game, [
+    { unitName: "skyfort", builtBy: ["lab"], fullName: "Skyfort" },
+  ]);
+
+  it("is offered by a reward, locked until it is taken, and open after", () => {
+    const build = buildGraphFor("com", units);
+    if (!build) throw new Error("expected a build graph");
+    expect(build.names.get("skyfort")).toBe("Skyfort");
+    // Some seed's run offers it, as it would any of the lab's units.
+    const offering = Array.from({ length: 40 }, (_, seed) =>
+      generateRun({
+        seed,
+        length: "long",
+        difficulty: 2,
+        game: { shortname: "sf" },
+        factionId: "player",
+        skin: "galaxy",
+        maps: [{ name: "Small", size: 64 }],
+        build,
+        now: "2026-10-18T00:00:00.000Z",
+      }),
+    ).find((run) =>
+      run.nodes.some((n) =>
+        (n.reward?.options ?? []).some(
+          (o) => o.kind === "unlock" && o.unit === "skyfort",
+        ),
+      ),
+    );
+    if (!offering) throw new Error("no run offered the carried unit");
+    const option = offering.nodes
+      .flatMap((n) => n.reward?.options ?? [])
+      .find((o) => o.kind === "unlock" && o.unit === "skyfort");
+    expect(option).toMatchObject({ unitName: "Skyfort" });
+    expect(offering.progress.unlockedUnits).not.toContain("skyfort");
+
+    const limit = (run: RogueliteRun) => {
+      const readiness = limitReadiness(run, { status: "ready", units });
+      if (readiness.kind !== "ready" || readiness.limit.kind !== "limited") {
+        throw new Error("expected a limit");
+      }
+      return readiness.limit.disabled;
+    };
+    expect(limit(offering)).toContain("skyfort");
+    const taken: RogueliteRun = {
+      ...offering,
+      progress: {
+        ...offering.progress,
+        unlockedUnits: [...offering.progress.unlockedUnits, "skyfort"],
+      },
+    };
+    expect(limit(taken)).not.toContain("skyfort");
   });
 });
 

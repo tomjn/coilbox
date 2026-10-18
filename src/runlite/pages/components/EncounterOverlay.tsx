@@ -178,6 +178,7 @@ export function EncounterOverlay({
             </p>
             <BattleLaunchGate
               error={enc.error ?? (scenario ? undefined : hold?.error)}
+              leftOut={enc.leftOut}
               hold={scenario ? undefined : (hold ?? undefined)}
               noEngine={enc.noEngine}
               missing={enc.missing}

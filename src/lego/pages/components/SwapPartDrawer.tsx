@@ -46,11 +46,11 @@ export function SwapPartDrawer({
       {
         id: "parts",
         label: "Parts",
-        total: pack.parts.length,
+        total: filter.total,
         items: parts.map((part) => ({ kind: "part" as const, part })),
       },
     ],
-    [pack, parts],
+    [filter.total, parts],
   );
 
   return (

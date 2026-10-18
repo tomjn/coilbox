@@ -173,6 +173,20 @@ export function packShapeGroups(pack: LoadedPack): ShapeGroup[] {
   return groups;
 }
 
+/**
+ * Every colourway of a part's shape, the part itself among them, in the pack's
+ * category order. A part in no group, from a pack loaded since, is alone.
+ */
+export function shapeColourways(
+  pack: LoadedPack,
+  part: LegoPartInfo,
+): LegoPartInfo[] {
+  const group = packShapeGroups(pack).find((g) =>
+    g.parts.some((member) => member.id === part.id),
+  );
+  return group?.parts ?? [part];
+}
+
 /** A part's title, unique among the pack's parts. */
 export function partTitle(pack: LoadedPack, part: LegoPartInfo): string {
   let titles = titlesOfPack.get(pack);

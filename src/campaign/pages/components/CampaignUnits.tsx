@@ -14,27 +14,30 @@ import {
   detachCopy,
   libraryChanged,
   type UnitSource,
+  type UnitsOwner,
   updateUnit,
   withoutUnit,
   withUnit,
 } from "../../units";
 
 /**
- * Drawer body listing the unit builder's saved units, so one can be attached
- * to the campaign. Picking one hands it back and closes.
+ * The unit builder's saved units, so one can be attached. A unit already
+ * attached, or one that cannot be, is shown with the reason and cannot be
+ * picked. `onLeave` runs when the link to the builder takes the player away.
  */
-export function UnitPickerDrawer({
-  campaign,
+export function UnitPickerList({
+  owner,
   projects,
   onPick,
+  onLeave,
 }: {
-  campaign: Campaign;
+  owner: Pick<UnitsOwner, "units">;
   projects: LegoProject[];
   onPick: (project: LegoProject) => void;
+  onLeave?: () => void;
 }) {
-  const drawer = useDrawer();
   const [query, setQuery] = useState("");
-  const attached = new Set((campaign.units ?? []).map((u) => u.projectId));
+  const attached = new Set((owner.units ?? []).map((u) => u.projectId));
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return projects.filter(
@@ -52,7 +55,7 @@ export function UnitPickerDrawer({
         <Link
           className="font-medium underline underline-offset-4"
           to="/lego"
-          onClick={() => drawer.close()}
+          onClick={onLeave}
         >
           unit builder
         </Link>
@@ -69,20 +72,17 @@ export function UnitPickerDrawer({
         placeholder="Search units…"
         className="h-8"
       />
-      <ul className="flex flex-col gap-1.5">
+      <ul className="flex max-h-72 flex-col gap-1.5 overflow-y-auto">
         {filtered.map((p) => {
           const refusal = attached.has(p.id)
             ? "Already attached"
-            : attachRefusal(campaign, p);
+            : attachRefusal(owner, p);
           return (
             <li key={p.id}>
               <button
                 type="button"
                 disabled={!!refusal}
-                onClick={() => {
-                  onPick(p);
-                  drawer.close();
-                }}
+                onClick={() => onPick(p)}
                 className="flex w-full flex-col gap-0.5 rounded-md border border-border/50 bg-card p-3 text-left enabled:hover:border-border enabled:hover:bg-muted/40 disabled:opacity-60"
               >
                 <span className="truncate text-sm font-medium">{p.name}</span>
@@ -103,6 +103,33 @@ export function UnitPickerDrawer({
         )}
       </ul>
     </div>
+  );
+}
+
+/**
+ * Drawer body listing the unit builder's saved units, so one can be attached
+ * to the campaign. Picking one hands it back and closes.
+ */
+export function UnitPickerDrawer({
+  campaign,
+  projects,
+  onPick,
+}: {
+  campaign: Campaign;
+  projects: LegoProject[];
+  onPick: (project: LegoProject) => void;
+}) {
+  const drawer = useDrawer();
+  return (
+    <UnitPickerList
+      owner={campaign}
+      projects={projects}
+      onPick={(project) => {
+        onPick(project);
+        drawer.close();
+      }}
+      onLeave={() => drawer.close()}
+    />
   );
 }
 
