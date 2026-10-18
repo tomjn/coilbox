@@ -144,6 +144,7 @@ import {
   markMountPoint,
   mountPartRefusal,
   mountRefusal,
+  seatRefusal,
   unmarkMountPoint,
   updateMountPoint,
 } from "../mountPoints";
@@ -1150,11 +1151,26 @@ function Builder({ id }: { id: string | undefined }) {
           })
         : null;
     const before = draft ? pieceById(draft, pieceId) : undefined;
+    const refused =
+      drag && seat && draft
+        ? seatRefusal(draft, pieceId, seat, compounds)
+        : null;
+    if (refused) {
+      void notify({ title: "Mount point", body: refused, level: "warning" });
+    }
     if (before?.connection && pack && draft) {
       let detached: string | null = null;
       if (drag) {
         const after = pieceById(
-          dragPiece(draft, pack, pieceId, drag(), seat ?? null, slide ?? null),
+          dragPiece(
+            draft,
+            pack,
+            pieceId,
+            drag(),
+            seat ?? null,
+            slide ?? null,
+            compounds,
+          ),
           pieceId,
         );
         if (after && !after.connection) {
@@ -1169,7 +1185,15 @@ function Builder({ id }: { id: string | undefined }) {
     }
     place([pieceId], (project) =>
       drag && pack
-        ? dragPiece(project, pack, pieceId, drag(), seat ?? null, slide ?? null)
+        ? dragPiece(
+            project,
+            pack,
+            pieceId,
+            drag(),
+            seat ?? null,
+            slide ?? null,
+            compounds,
+          )
         : typedJoinedTransform(project, pack, pieceId, change).project,
     );
   }

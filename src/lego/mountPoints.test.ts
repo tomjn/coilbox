@@ -13,11 +13,13 @@ import {
   mountContents,
   mountRefusal,
   parseCategories,
+  seatRefusal,
   unmarkMountPoint,
   updateMountPoint,
 } from "./mountPoints";
 import type { LegoPartInfo, LoadedPack } from "./pack";
 import { freeFace, placePart } from "./placePart";
+import { dragPiece, type Seat } from "./seat";
 import { swapModule, swapRefusal } from "./swapModule";
 
 type Vec3 = [number, number, number];
@@ -340,5 +342,73 @@ describe("swapping on a mount point", () => {
       "Turret takes Turret, Side weapon only.",
     );
     expect(swapRefusal(placed.project, id, module("Turret"))).toBeNull();
+  });
+});
+
+describe("dragging onto a mount point", () => {
+  const seat: Seat = { parentId: "hull", connector: "-y", to: "+y" };
+  const drop = {
+    position: [0, 0.8, 0] as Vec3,
+    rotation: [0, 0, 0] as Vec3,
+    scale: [1, 1, 1] as Vec3,
+  };
+  const ref = { id: "module-Turret", instance: "i1" };
+
+  function withDragged(extra: Partial<LegoPiece>): LegoProject {
+    const base = mounted();
+    return {
+      ...base,
+      pieces: [...base.pieces, piece({ id: "gun", partId: "gun", ...extra })],
+    };
+  }
+
+  it("joins a fitting module to the mount and the active loadout", () => {
+    n = 0;
+    const two = addLoadout(withDragged({ module: ref }), {
+      newId,
+      name: "Second",
+    });
+    const out = dragPiece(two, pack(), "gun", drop, seat, null, [
+      module("Turret"),
+    ]);
+    const gun = out.pieces.find((p) => p.id === "gun");
+    expect(gun?.parentId).toBe("hull");
+    expect(gun?.connection?.to).toBe("+y");
+    expect(gun?.inLoadout).toBe(true);
+  });
+
+  it("does not join a module of another category", () => {
+    const out = dragPiece(
+      withDragged({ module: ref }),
+      pack(),
+      "gun",
+      drop,
+      seat,
+      null,
+      [module("Engine")],
+    );
+    const gun = out.pieces.find((p) => p.id === "gun");
+    expect(gun?.connection).toBeUndefined();
+    expect(gun?.parentId).toBe("root");
+    expect(
+      seatRefusal(withDragged({ module: ref }), "gun", seat, [
+        module("Engine"),
+      ]),
+    ).toBe("Turret takes Turret, Side weapon only.");
+  });
+
+  it("does not join a plain part", () => {
+    const project = withDragged({});
+    const out = dragPiece(project, pack(), "gun", drop, seat, null, []);
+    expect(out.pieces.find((p) => p.id === "gun")?.connection).toBeUndefined();
+    expect(seatRefusal(project, "gun", seat, [])).toBe(
+      "Turret takes modules only.",
+    );
+  });
+
+  it("joins anything to a connector that is not a mount", () => {
+    const off: Seat = { parentId: "hull", connector: "-y", to: "-y" };
+    const out = dragPiece(withDragged({}), pack(), "gun", drop, off, null, []);
+    expect(out.pieces.find((p) => p.id === "gun")?.connection?.to).toBe("-y");
   });
 });

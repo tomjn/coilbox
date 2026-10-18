@@ -9,7 +9,6 @@ import { snapToGuides } from "../../guides";
 import { snapMeasurePoint } from "../../measure";
 import type { LegoPiece, LegoProject } from "../../model";
 import { descendantIds, pieceById } from "../../model";
-import { isMount } from "../../mountPoints";
 import { type LoadedPack, partUnit } from "../../pack";
 import { pieceMesh, type RawGeometry } from "../../rawGeometry";
 import type { Seat } from "../../seat";
@@ -483,10 +482,7 @@ export function applySnap(state: SceneState) {
     seated.facing &&
     moving?.connector &&
     moving.facing &&
-    facesOppose(moving.facing, seated.facing) &&
-    // A mount point is filled by placing a module on it, which checks the
-    // category, so a drag only moves the piece there (#3279).
-    !isMount(project, seated.owner, seated.connector)
+    facesOppose(moving.facing, seated.facing)
       ? {
           parentId: seated.owner,
           connector: moving.connector,

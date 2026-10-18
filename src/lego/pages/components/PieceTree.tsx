@@ -32,6 +32,7 @@ import {
   pieceById,
   pieceKind,
 } from "../../model";
+import { mountContents } from "../../mountPoints";
 import type { RawGeometry } from "../../rawGeometry";
 import { canReparent } from "../../reparent";
 
@@ -310,6 +311,19 @@ function Rows({
                   )}
                 </span>
                 <span className="truncate">{piece.name}</span>
+                {piece.mountPoints?.length ? (
+                  <span
+                    aria-label="Mount points"
+                    className="min-w-0 truncate text-[10px] text-orange-500"
+                  >
+                    {mountContents(project, piece)
+                      .map(
+                        ({ mount, onIt }) =>
+                          `${mount.name}: ${onIt ?? "empty"}`,
+                      )
+                      .join(", ")}
+                  </span>
+                ) : null}
                 {join ? (
                   <span
                     role="img"

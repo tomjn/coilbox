@@ -267,9 +267,9 @@ A loadout you are not looking at keeps its pieces as they were. If you deleted t
 
 ### Mount points
 
-A mount point marks a connector of a chassis piece as the place a module goes ([issue #3279](https://github.com/tomjn/coilbox/issues/3279)). Select the piece, pick a connector under **Mount points**, then name it and type the module categories that fit, separated by commas. Mount points show in the viewport as orange squares, and the panel says what sits on each.
+A mount point marks a connector of a chassis piece as the place a module goes ([issue #3279](https://github.com/tomjn/coilbox/issues/3279)). Select the piece, pick a connector under **Mount points**, then name it and type the module categories that fit, separated by commas. Mount points show in the viewport as orange squares, and the panel and the piece tree say what sits on each.
 
-A module can only be placed on a mount point if its category is in the list, ignoring case. A module with no category does not fit, and a mount with no categories takes nothing. Swapping a module on a mount follows the same rule, and a part from the strip is refused. The message names the categories the mount takes. A module placed on a mount joins the loadout you are editing. Pasting or adding without choosing a face never picks a mount point, and dragging a piece onto one moves it without joining it.
+A module can only be placed on a mount point if its category is in the list, ignoring case. A module with no category does not fit, and a mount with no categories takes nothing. Swapping a module on a mount follows the same rule, and a part from the strip is refused. The message names the categories the mount takes. A module placed on a mount joins the loadout you are editing. Pasting or adding without choosing a face never picks a mount point. Dragging a module onto a mount joins it by the same rule, and a module that does not fit, or a plain part, lands free where you drop it with the same message.
 
 ## Judging size
 

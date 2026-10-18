@@ -155,3 +155,27 @@ export function mountContents(
       )?.name ?? null,
   }));
 }
+
+/**
+ * Why the dragged piece may not join the connector it seated against, or null
+ * when it may. A module instance's piece fits by its module's category, found
+ * in `modules`. A plain part, and a module no longer in the library, do not fit
+ * a mount (#3279).
+ */
+export function seatRefusal(
+  project: LegoProject,
+  pieceId: string,
+  seat: { parentId: string; to: string },
+  modules: readonly LegoProject[],
+): string | null {
+  if (!isMount(project, seat.parentId, seat.to)) return null;
+  const ref = pieceById(project, pieceId)?.module;
+  if (!ref) return mountPartRefusal(project, seat.parentId, seat.to);
+  const module = modules.find((m) => m.id === ref.id);
+  return mountRefusal(
+    project,
+    seat.parentId,
+    seat.to,
+    module ?? ({} as LegoProject),
+  );
+}
