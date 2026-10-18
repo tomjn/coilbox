@@ -51,6 +51,7 @@ import {
   type LoadedPack,
   partSize,
 } from "../../pack";
+import { partTitle, visibleTags } from "../../partOrder";
 import {
   disposeRawGeometry,
   getMeshGeometry,
@@ -122,12 +123,12 @@ export function itemKey(item: GridItem): string {
   }
 }
 
-function itemName(item: GridItem): string {
+function itemName(item: GridItem, pack: LoadedPack): string {
   switch (item.kind) {
     case "shape":
       return item.shape.label;
     case "part":
-      return item.part.name;
+      return partTitle(pack, item.part);
     case "module":
       return item.module.name;
   }
@@ -406,7 +407,7 @@ export function TileGrid({
       const at = tileAt(grid, index);
       if (!at) return null;
       const key = itemKey(item);
-      const name = itemName(item);
+      const name = itemName(item, pack);
       const selected = key === selectedKey;
       const starred = favourites?.has(key) ?? false;
       const onStar = onFavourite && (() => onFavourite(item));
@@ -417,7 +418,7 @@ export function TileGrid({
         item.kind === "shape"
           ? `${name}, ${item.shape.size.join(" x ")}`
           : item.kind === "part"
-            ? `${name}, ${item.part.tags.join(", ")}`
+            ? `${name}, ${visibleTags(item.part.tags).join(", ")}`
             : [
                 placesModules
                   ? `Place ${name} on a connector. Alt adds it to the selected piece`
