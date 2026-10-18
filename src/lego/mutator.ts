@@ -137,10 +137,14 @@ export interface MutatorResult {
 }
 
 /** What `legoExport` is given for a unit, less the folder it goes into. */
-type ExportPayload = Omit<Parameters<typeof legoExport>[0], "dir">;
+export type ExportPayload = Omit<Parameters<typeof legoExport>[0], "dir">;
 
-/** A unit built into the arguments `legoExport` takes, not yet written. */
-interface PreparedUnit {
+/**
+ * A unit built into the arguments `legoExport` takes, not yet written. A
+ * campaign stores one of these as its copy of a unit (issue #4516), so it can
+ * write the unit again without the parts pack.
+ */
+export interface PreparedUnit {
   payload: ExportPayload;
   textures: string;
   textureFiles: string[];
@@ -219,7 +223,15 @@ export async function buildListFor(
 
 /** Build one unit into what a mutator folder holds for it. */
 export async function prepareUnit(
-  { baseGame, workshopProjects, gameWeapons, gameMovement }: MutatorContext,
+  {
+    baseGame,
+    workshopProjects,
+    gameWeapons,
+    gameMovement,
+  }: Pick<
+    MutatorContext,
+    "baseGame" | "workshopProjects" | "gameWeapons" | "gameMovement"
+  >,
   { project: unit, pack, raw }: MutatorUnit,
 ): Promise<PreparedUnit> {
   // The same slots and files a real export writes, less the game weapons this
@@ -585,14 +597,40 @@ async function rescannedName(
  * Throws with a reason a person can act on.
  */
 export async function writeMutator(args: MutatorArgs): Promise<MutatorResult> {
-  const { folder, units, extras, onWritten, onScanning, ...context } = args;
+  const { units, ...rest } = args;
+  const prepared: PreparedUnit[] = [];
+  for (const unit of units) prepared.push(await prepareUnit(rest, unit));
+  return writePreparedMutator({ ...rest, prepared, builtBy: builtByOf(units) });
+}
+
+export interface PreparedMutatorArgs extends Omit<MutatorArgs, "units"> {
+  /** The units, already built, in the order they go in. */
+  prepared: readonly PreparedUnit[];
+  /** Which base game units build each of them. */
+  builtBy: readonly BuiltBy[];
+}
+
+/**
+ * `writeMutator` for units that are already built, such as a campaign's copies
+ * (issue #4516). The same skip, prune and rescan.
+ */
+export async function writePreparedMutator(
+  args: PreparedMutatorArgs,
+): Promise<MutatorResult> {
+  const {
+    folder,
+    prepared,
+    builtBy,
+    extras,
+    onWritten,
+    onScanning,
+    ...context
+  } = args;
   const { target, baseGame } = context;
 
-  const prepared: PreparedUnit[] = [];
-  for (const unit of units) prepared.push(await prepareUnit(context, unit));
   const { buildList, leftOut: buildListLeftOut } = await buildListFor(
     context,
-    builtByOf(units),
+    builtBy,
   );
   const files = await folderFiles({ ...context, folder, extras, buildList });
 
