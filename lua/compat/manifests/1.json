@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "fixes": [],
+  "converter": { "crate": "coilbox-3do-convert", "version": "0.0.0" }
+}

@@ -1,0 +1,2 @@
+# SHA-256 of every fix file that appears in a manifest, one "<hash>  <id>" per line.
+# A fix is immutable once listed here. Change one by adding a new fix with a new id.
