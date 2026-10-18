@@ -28,6 +28,10 @@
 //! A fix in `lua/compat/gadgets/` is a gadget instead (issue #4559), and its
 //! `-- gadget: coilbox_compat_<name>` line names the gadget and the file it is
 //! written to in the game's `LuaRules/Gadgets/`. See [`gadget_files`].
+//!
+//! A fix in `lua/compat/defs/` is a def fix instead (issue #4560), and its
+//! `-- defs: defs_post, weapondefs_post` line names the def files of the
+//! mutator it runs in. See [`DefsFile`] and [`defs_block`].
 
 use std::collections::BTreeMap;
 
@@ -43,6 +47,7 @@ const MANIFESTS: &[(u32, &str)] = &[
     (2, include_str!("../../../lua/compat/manifests/2.json")),
     (3, include_str!("../../../lua/compat/manifests/3.json")),
     (4, include_str!("../../../lua/compat/manifests/4.json")),
+    (5, include_str!("../../../lua/compat/manifests/5.json")),
 ];
 
 /// Every fix file, by id.
@@ -60,6 +65,26 @@ const FIXES: &[(&str, &str)] = &[
         include_str!("../../../lua/compat/compat-callin-hooks.lua"),
     ),
     (
+        "defs-commander-85",
+        include_str!("../../../lua/compat/defs/defs-commander-85.lua"),
+    ),
+    (
+        "defs-helpers",
+        include_str!("../../../lua/compat/defs/defs-helpers.lua"),
+    ),
+    (
+        "defs-manual-bomb-settings-92",
+        include_str!("../../../lua/compat/defs/defs-manual-bomb-settings-92.lua"),
+    ),
+    (
+        "defs-model-center-offset-89",
+        include_str!("../../../lua/compat/defs/defs-model-center-offset-89.lua"),
+    ),
+    (
+        "defs-weapon-consts-87",
+        include_str!("../../../lua/compat/defs/defs-weapon-consts-87.lua"),
+    ),
+    (
         "gadget-aircraft-crash-83",
         include_str!("../../../lua/compat/gadgets/gadget-aircraft-crash-83.lua"),
     ),
@@ -70,6 +95,10 @@ const FIXES: &[(&str, &str)] = &[
     (
         "gadget-messages-tdf-95",
         include_str!("../../../lua/compat/gadgets/gadget-messages-tdf-95.lua"),
+    ),
+    (
+        "gadget-model-center-offset-89",
+        include_str!("../../../lua/compat/gadgets/gadget-model-center-offset-89.lua"),
     ),
     (
         "gadget-only-forward-aim-105",
@@ -239,6 +268,9 @@ pub struct Header {
     /// The name of a gadget fix, which is also its file name in the game's
     /// `LuaRules/Gadgets/`. `None` for a fix that is not a gadget.
     pub gadget: Option<String>,
+    /// The def files a def fix runs in, by [`DefsFile::name`]. Empty for a fix
+    /// that is not a def fix.
+    pub defs: Vec<String>,
 }
 
 fn list(value: &str) -> Vec<String> {
@@ -255,7 +287,7 @@ fn list(value: &str) -> Vec<String> {
 /// Returns `None` if `id` or `license` is missing. `catalogue` may be empty.
 pub fn parse_header(source: &str) -> Option<Header> {
     let (mut id, mut catalogue, mut license, mut states) = (None, Vec::new(), None, Vec::new());
-    let mut gadget = None;
+    let (mut gadget, mut defs) = (None, Vec::new());
     for line in source.lines() {
         let Some(rest) = line.strip_prefix("--") else {
             break;
@@ -270,6 +302,7 @@ pub fn parse_header(source: &str) -> Option<Header> {
             "license" => license = Some(value.to_string()),
             "states" => states = list(value),
             "gadget" => gadget = Some(value.to_string()),
+            "defs" => defs = list(value),
             _ => {}
         }
     }
@@ -279,6 +312,7 @@ pub fn parse_header(source: &str) -> Option<Header> {
         license: license?,
         states,
         gadget,
+        defs,
     })
 }
 
@@ -348,31 +382,41 @@ pub fn prelude(manifest: &Manifest, state: LuaState) -> Option<String> {
          -- Each fix below is a file in lua/compat/ in the coilbox repository.\n\
          -- license: {LICENSE}\n\
          \n\
-         local compat = {{}}\n\
-         \n\
-         local function failed(id, err)\n\
-         \tlocal message = \"coilbox compat fix \" .. id .. \" failed: \" .. tostring(err)\n\
-         \tif type(Spring) == \"table\" and type(Spring.Log) == \"function\" then\n\
-         \t\tSpring.Log(\"coilbox-compat\", type(LOG) == \"table\" and LOG.ERROR or \"error\", message)\n\
-         \telseif type(Spring) == \"table\" and type(Spring.Echo) == \"function\" then\n\
-         \t\tSpring.Echo(message)\n\
-         \tend\n\
-         end\n",
+         {RUNNER}",
         n = manifest.version,
         state = state.name(),
     );
     for (id, src) in fixes {
-        out.push_str(&format!(
-            "\n-- fix: {id}\n\
-             do\n\
-             local ok, err = pcall(function(...)\n\
-             {src}\
-             end, compat)\n\
-             if not ok then failed({id:?}, err) end\n\
-             end\n"
-        ));
+        out.push_str(&fix_chunk(id, src));
     }
     Some(out)
+}
+
+/// The start of a prelude or a def fix block: the table the fixes share and
+/// the function that logs one that fails.
+const RUNNER: &str = "local compat = {}\n\
+     \n\
+     local function failed(id, err)\n\
+     \tlocal message = \"coilbox compat fix \" .. id .. \" failed: \" .. tostring(err)\n\
+     \tif type(Spring) == \"table\" and type(Spring.Log) == \"function\" then\n\
+     \t\tSpring.Log(\"coilbox-compat\", type(LOG) == \"table\" and LOG.ERROR or \"error\", message)\n\
+     \telseif type(Spring) == \"table\" and type(Spring.Echo) == \"function\" then\n\
+     \t\tSpring.Echo(message)\n\
+     \tend\n\
+     end\n";
+
+/// One fix, run as a function given the shared `compat` table, inside a
+/// `pcall`.
+fn fix_chunk(id: &str, src: &str) -> String {
+    format!(
+        "\n-- fix: {id}\n\
+         do\n\
+         local ok, err = pcall(function(...)\n\
+         {src}\
+         end, compat)\n\
+         if not ok then failed({id:?}, err) end\n\
+         end\n"
+    )
 }
 
 /// An entry file with its state's prelude included in front of the original.
@@ -423,6 +467,80 @@ pub fn gadget_files(manifest: &Manifest) -> Vec<(String, String)> {
         .collect();
     files.sort();
     files
+}
+
+/// The def files of a mutator that def fixes run in. The engine's
+/// `gamedata/defs.lua` loads `defs_post.lua` once every def table is built, and
+/// its `weapondefs.lua` loads `weapondefs_post.lua` once the weapon files are
+/// read, before any unit's own weapons join the shared table.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DefsFile {
+    DefsPost,
+    WeaponDefsPost,
+}
+
+impl DefsFile {
+    /// Both, in the order the engine loads them.
+    pub const ALL: [DefsFile; 2] = [DefsFile::WeaponDefsPost, DefsFile::DefsPost];
+
+    /// The word a def fix's `defs` line uses for this file.
+    pub fn name(self) -> &'static str {
+        match self {
+            DefsFile::DefsPost => "defs_post",
+            DefsFile::WeaponDefsPost => "weapondefs_post",
+        }
+    }
+
+    /// Where the mutator writes this file.
+    pub fn path(self) -> &'static str {
+        match self {
+            DefsFile::DefsPost => "gamedata/defs_post.lua",
+            DefsFile::WeaponDefsPost => "gamedata/weapondefs_post.lua",
+        }
+    }
+}
+
+/// Whether the fix `id` is a def fix, which [`defs_block`] writes.
+pub fn is_defs_fix(id: &str) -> bool {
+    fix_source(id)
+        .and_then(parse_header)
+        .is_some_and(|h| !h.defs.is_empty())
+}
+
+/// The def fixes `manifest` lists for `file`, in manifest order.
+pub fn defs_fixes(manifest: &Manifest, file: DefsFile) -> Vec<&'static str> {
+    manifest
+        .fixes
+        .iter()
+        .filter_map(|id| FIXES.iter().find(|(i, _)| i == id).copied())
+        .filter(|(_, src)| {
+            parse_header(src).is_some_and(|h| h.defs.iter().any(|d| d == file.name()))
+        })
+        .map(|(id, _)| id)
+        .collect()
+}
+
+/// The Lua that runs the def fixes `manifest` lists for `file`, for the
+/// mutator to put in that file, or `None` when it lists none. Each fix runs as
+/// a prelude fix does, given the shared `compat` table inside a `pcall`, so a
+/// fix that fails is logged and the defs still load.
+pub fn defs_block(manifest: &Manifest, file: DefsFile) -> Option<String> {
+    let fixes = defs_fixes(manifest, file);
+    if fixes.is_empty() {
+        return None;
+    }
+    let mut out = format!(
+        "-- The def fixes of compat manifest {n}. Each is a file in lua/compat/defs/\n\
+         -- in the coilbox repository.\n\
+         \n\
+         {RUNNER}",
+        n = manifest.version,
+    );
+    for id in fixes {
+        let src = fix_source(id).expect("a listed def fix has a source");
+        out.push_str(&fix_chunk(id, src));
+    }
+    Some(out)
 }
 
 /// A prelude fix that puts a call-in's arguments back in an older order, and
@@ -667,6 +785,7 @@ mod tests {
     fn every_fix_file_is_embedded_and_its_header_agrees() {
         let mut on_disk = fix_files_in(compat_dir());
         on_disk.extend(fix_files_in(compat_dir().join("gadgets")));
+        on_disk.extend(fix_files_in(compat_dir().join("defs")));
         let embedded: BTreeSet<String> = FIXES.iter().map(|(id, _)| id.to_string()).collect();
         assert_eq!(on_disk, embedded);
         for (id, src) in FIXES {
@@ -822,6 +941,93 @@ mod tests {
             .find(|(p, _)| p.ends_with("coilbox_compat_aircraft_crash.lua"))
             .unwrap();
         assert_eq!(src, fix_source("gadget-aircraft-crash-83-v2").unwrap());
+    }
+
+    #[test]
+    fn manifest_5_is_manifest_4_with_the_def_fixes_and_their_gadget() {
+        let (four, five) = (manifest(4).unwrap(), manifest(5).unwrap());
+        assert_eq!(five.fixes[..four.fixes.len()], four.fixes[..]);
+        assert_eq!(
+            five.fixes[four.fixes.len()..],
+            [
+                "gadget-model-center-offset-89",
+                "defs-helpers",
+                "defs-commander-85",
+                "defs-model-center-offset-89",
+                "defs-weapon-consts-87",
+                "defs-manual-bomb-settings-92",
+            ]
+        );
+        assert_eq!(five.converter, four.converter);
+        assert_eq!(five.writer, four.writer);
+        for state in [LuaState::Synced, LuaState::Unsynced] {
+            let rest = |m: &Manifest| {
+                let p = prelude(m, state).unwrap();
+                p.split_once('\n').unwrap().1.to_string()
+            };
+            assert_eq!(rest(&four), rest(&five), "{}", state.name());
+        }
+    }
+
+    #[test]
+    fn the_def_fixes_are_the_files_in_defs_and_name_only_files_that_exist() {
+        let in_folder = fix_files_in(compat_dir().join("defs"));
+        let defs: BTreeSet<String> = FIXES
+            .iter()
+            .filter(|(id, _)| is_defs_fix(id))
+            .map(|(id, _)| id.to_string())
+            .collect();
+        assert_eq!(defs, in_folder);
+        let names: Vec<&str> = DefsFile::ALL.iter().map(|f| f.name()).collect();
+        for (id, src) in FIXES {
+            let h = parse_header(src).unwrap();
+            let kinds = [!h.states.is_empty(), h.gadget.is_some(), !h.defs.is_empty()];
+            assert_eq!(kinds.iter().filter(|k| **k).count(), 1, "{id}: one kind");
+            for file in &h.defs {
+                assert!(
+                    names.contains(&file.as_str()),
+                    "{id}: unknown def file {file}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_def_helpers_come_first_in_each_def_file() {
+        for m in all_manifests() {
+            for file in DefsFile::ALL {
+                if let Some(first) = defs_fixes(&m, file).first() {
+                    assert_eq!(*first, "defs-helpers", "manifest {}", m.version);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn each_def_file_gets_only_its_own_fixes() {
+        assert!(DefsFile::ALL
+            .iter()
+            .all(|f| defs_block(&manifest(4).unwrap(), *f).is_none()));
+        let five = manifest(5).unwrap();
+        assert_eq!(
+            defs_fixes(&five, DefsFile::DefsPost),
+            [
+                "defs-helpers",
+                "defs-commander-85",
+                "defs-model-center-offset-89",
+                "defs-weapon-consts-87",
+            ]
+        );
+        assert_eq!(
+            defs_fixes(&five, DefsFile::WeaponDefsPost),
+            ["defs-helpers", "defs-manual-bomb-settings-92"]
+        );
+        let block = defs_block(&five, DefsFile::DefsPost).unwrap();
+        assert!(block.contains(fix_source("defs-commander-85").unwrap()));
+        assert!(block.contains("-- fix: defs-helpers\n"));
+        assert!(!block.contains("defs-manual-bomb-settings-92"));
+        assert!(!block.contains('\r'));
+        assert_eq!(block, defs_block(&five, DefsFile::DefsPost).unwrap());
     }
 
     #[test]

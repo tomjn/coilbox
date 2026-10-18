@@ -165,6 +165,7 @@ for _, file in ipairs({
 	"gadget-aircraft-crash-83-v2.lua",
 	"gadget-only-forward-aim-105.lua",
 	"gadget-messages-tdf-95.lua",
+	"gadget-model-center-offset-89.lua",
 }) do
 	local engine = load(file, { files = { ["gamedata/messages.tdf"] = "x" } })
 	local info = engine.env.GetInfo(engine.env)
@@ -552,6 +553,71 @@ do
 		table.concat(engine.logs, "; "))
 	local noSection = messages({ parsed = { other = {} } })
 	check("messages: so is a file with no [messages] section", noSection.removed and #noSection.logs == 1)
+end
+
+--------------------------------------------------------------------------------
+-- modelCenterOffset
+--------------------------------------------------------------------------------
+
+local OFFSET = "gadget-model-center-offset-89.lua"
+
+local CENTRED, PLAIN = 1, 2
+
+local function centred(opts)
+	opts = opts or {}
+	local moved = {}
+	local engine = load(OFFSET, {
+		synced = opts.synced,
+		unitDefs = opts.unitDefs or {
+			[CENTRED] = { customParams = { modelcenteroffset = "0 -5 2.5" } },
+			[PLAIN] = { customParams = {} },
+		},
+		spring = {
+			GetUnitDefDimensions = function(unitDefID)
+				return { midx = 1, midy = 10, midz = unitDefID }
+			end,
+			SetUnitMidAndAimPos = function(unitID, mx, my, mz, ax, ay, az, relative)
+				moved[#moved + 1] = { unitID, mx, my, mz, ax, ay, az, relative }
+				return true
+			end,
+			GetAllUnits = function()
+				return opts.existing or {}
+			end,
+			GetUnitDefID = function()
+				return CENTRED
+			end,
+		},
+	})
+	engine.moved = moved
+	return engine
+end
+
+do
+	local engine = centred({ synced = false })
+	check("offset: has no unsynced half", engine.returned == false)
+end
+
+do
+	local engine = centred({ unitDefs = { [PLAIN] = { customParams = {} }, [3] = { customParams = { modelcenteroffset = "1 2" } } } })
+	check("offset: turns off in a game with no def that has the parameter", engine.removed)
+end
+
+do
+	local engine = centred()
+	check("offset: stays on when a def has the parameter", not engine.removed)
+	call(engine, "UnitCreated", 7, CENTRED)
+	call(engine, "UnitCreated", 8, PLAIN)
+	local m = engine.moved
+	check("offset: one unit is moved", #m == 1, tostring(#m))
+	check("offset: its middle is the model's middle plus the offset",
+		m[1] and m[1][1] == 7 and m[1][2] == 1 and m[1][3] == 5 and m[1][4] == 3.5)
+	check("offset: its aim point is its middle, in its own space",
+		m[1] and m[1][5] == 1 and m[1][6] == 5 and m[1][7] == 3.5 and m[1][8] == true)
+end
+
+do
+	local engine = centred({ existing = { 4 } })
+	check("offset: a unit there before the gadget loaded is moved", #engine.moved == 1 and engine.moved[1][1] == 4)
 end
 
 support.report()
