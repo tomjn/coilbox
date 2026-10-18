@@ -17,6 +17,7 @@
 
 import type { GameItem } from "@/content/bindings";
 import { carriedShortname, rememberedShortname } from "../container/shortnames";
+import { parkedPieces } from "./loadouts";
 import type { LegoGameRef, LegoProject, LegoUnitGame } from "./model";
 
 /** Enough of a game to compare it: a record, or an old import's game. */
@@ -167,11 +168,12 @@ export function installedGameFor(
 
 /**
  * The pieces in a unit that came out of its game: every mesh of a unit opened
- * from a game, and any piece lifted off one of the game's units (#3262).
+ * from a game, and any piece lifted off one of the game's units (#3262), in
+ * every loadout and not only the one on screen.
  */
 export function liftedPieces(project: LegoProject): string[] {
   const opened = Boolean(project.imported?.game);
-  return project.pieces
+  return [...project.pieces, ...parkedPieces(project)]
     .filter((piece) => piece.lifted || (opened && piece.meshId))
     .map((piece) => piece.name);
 }

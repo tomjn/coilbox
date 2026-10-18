@@ -515,6 +515,13 @@ export interface LegoPiece {
    * plan places a bone against its own parent bone. See `bodyPlans.ts`.
    */
   bone?: string;
+  /**
+   * This piece and everything under it belong to the active loadout rather
+   * than the chassis (#3281), so switching loadouts takes them away and brings
+   * the other loadout's own pieces in. Absent means chassis, shared by every
+   * loadout. Only meaningful while the unit has `loadouts`. See `loadouts.ts`.
+   */
+  inLoadout?: true;
 }
 
 /** A piece's place in a ring of copies. See `LegoPiece.ring`. */
@@ -796,6 +803,44 @@ export interface LegoProject {
    * `releaseSkeleton`.
    */
   skeleton?: LegoSkeleton;
+  /**
+   * The named loadouts of this chassis, in the order the switch lists them
+   * (#3281). Absent means a unit with no loadouts, which is every unit saved
+   * before this existed. When present there are at least two, and the one
+   * `activeLoadout` names is the one the project's own pieces and fields are:
+   * every other one is parked in its `content`. See `loadouts.ts`.
+   */
+  loadouts?: LegoLoadout[];
+  /** The id of the loadout being edited. Present exactly when `loadouts` is. */
+  activeLoadout?: string;
+}
+
+/**
+ * The fields of a unit that each loadout has its own of. Everything else on
+ * the project belongs to the chassis and is shared.
+ */
+export const LOADOUT_FIELDS = [
+  "animations",
+  "script",
+  "unitDef",
+  "builder",
+] as const;
+
+/** What a loadout holds apart from the chassis, while it is not active. */
+export type LegoLoadoutContent = Pick<
+  LegoProject,
+  (typeof LOADOUT_FIELDS)[number]
+> & {
+  /** The loadout's own pieces, each subtree hanging off a chassis piece. */
+  pieces: LegoPiece[];
+};
+
+/** One loadout of a chassis. See `LegoProject.loadouts`. */
+export interface LegoLoadout {
+  id: string;
+  name: string;
+  /** Absent on the active loadout, whose content is the project itself. */
+  content?: LegoLoadoutContent;
 }
 
 /**
@@ -1393,6 +1438,7 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
   const movement = parseMovement(d.movement);
   const worth = parseWorth(d.worth);
   const mount = parseMount(d.mount, pieces);
+  const { pieces: flagged, ...loadouts } = parseLoadouts(d, pieces);
   const project: LegoProject = {
     schemaVersion: LEGO_SCHEMA_VERSION,
     id: d.id,
@@ -1414,7 +1460,7 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
     createdAt: typeof d.createdAt === "string" ? d.createdAt : "",
     updatedAt: typeof d.updatedAt === "string" ? d.updatedAt : "",
     rootPieceId: d.rootPieceId,
-    pieces,
+    pieces: flagged,
     ...(mount ? { mount } : {}),
     ...(typeof d.radius === "number" ? { radius: d.radius } : {}),
     ...(typeof d.height === "number" ? { height: d.height } : {}),
@@ -1478,6 +1524,7 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
       return guides ? { guides } : {};
     })(),
     ...(skeleton ? { skeleton } : {}),
+    ...loadouts,
   };
   // A document saved before pieces were written in save order, or hand-edited,
   // may not have its parents first. Normalise here so the invariant holds the
@@ -1688,6 +1735,88 @@ function parsePiece(raw: unknown): LegoPiece | null {
       return ring ? { ring } : {};
     })(),
     ...(typeof p.bone === "string" && p.bone !== "" ? { bone: p.bone } : {}),
+    ...(p.inLoadout === true ? { inLoadout: true } : {}),
+  };
+}
+
+/**
+ * The loadouts, and which is active, or nothing for a unit without them.
+ *
+ * Fewer than two is a unit without loadouts, and its pieces lose their loadout
+ * flag: that is also how a module file sheds the flag its pieces were copied
+ * with. An active id the list does not have gets an entry of its own for the
+ * project's pieces, rather than one of the parked loadouts being overwritten.
+ */
+function parseLoadouts(
+  d: Record<string, unknown>,
+  pieces: LegoPiece[],
+): Pick<LegoProject, "loadouts" | "activeLoadout" | "pieces"> {
+  const loadouts: LegoLoadout[] = [];
+  for (const raw of Array.isArray(d.loadouts) ? d.loadouts : []) {
+    const loadout = parseLoadout(raw);
+    if (loadout && !loadouts.some((other) => other.id === loadout.id))
+      loadouts.push(loadout);
+  }
+  const wanted = typeof d.activeLoadout === "string" ? d.activeLoadout : "";
+  const active = loadouts.findIndex((loadout) => loadout.id === wanted);
+  if (active >= 0) {
+    const { content: _live, ...entry } = loadouts[active];
+    loadouts[active] = entry;
+  } else if (loadouts.length > 0) {
+    let id = wanted || "loadout";
+    while (loadouts.some((loadout) => loadout.id === id)) id = `${id}_`;
+    loadouts.unshift({ id, name: "Loadout" });
+  }
+  if (loadouts.length < 2) {
+    return {
+      pieces: pieces.map(({ inLoadout: _flag, ...piece }) => piece),
+    };
+  }
+  const activeId = loadouts.find((loadout) => !loadout.content)?.id as string;
+  return { pieces, loadouts, activeLoadout: activeId };
+}
+
+function parseLoadout(raw: unknown): LegoLoadout | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const v = raw as Record<string, unknown>;
+  if (typeof v.id !== "string" || v.id === "") return null;
+  if (typeof v.name !== "string" || v.name.trim() === "") return null;
+  const c = v.content;
+  if (typeof c !== "object" || c === null) return { id: v.id, name: v.name };
+  const content = c as Record<string, unknown>;
+  const pieces: LegoPiece[] = [];
+  const taken = new Set<string>();
+  for (const rawPiece of Array.isArray(content.pieces) ? content.pieces : []) {
+    const piece = parsePiece(rawPiece);
+    if (!piece) continue;
+    const name = uniquePieceName(piece.name, taken);
+    taken.add(name);
+    pieces.push(name === piece.name ? piece : { ...piece, name });
+  }
+  const builder = parseBuilder(content.builder);
+  return {
+    id: v.id,
+    name: v.name,
+    content: {
+      pieces,
+      ...(Array.isArray(content.animations)
+        ? {
+            animations: content.animations
+              .map(parseApplied)
+              .filter((a) => a !== null),
+          }
+        : {}),
+      ...(typeof content.script === "string" ? { script: content.script } : {}),
+      ...(typeof content.unitDef === "object" && content.unitDef !== null
+        ? {
+            unitDef: content.unitDef as Record<
+              string,
+              string | number | boolean
+            >,
+          }
+        : {}),
+      ...(builder ? { builder } : {}),
+    },
   };
 }
 
