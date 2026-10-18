@@ -1,0 +1,26 @@
+[
+  {
+    "id": "signature:UnitDamaged@95.0",
+    "kind": "signature",
+    "name": "UnitDamaged",
+    "since": "95.0",
+    "note": "projectileID is passed after weaponDefID, so attackerID, attackerDefID and attackerTeam each arrive one place later than in 0.81. The arguments are now unitID, unitDefID, unitTeam, damage, paralyzer, weaponDefID, projectileID, attackerID, attackerDefID, attackerTeam.",
+    "changelog": "add missing projectileID argument to UnitDamaged"
+  },
+  {
+    "id": "signature:AllowCommand@105.0",
+    "kind": "signature",
+    "name": "AllowCommand",
+    "since": "105.0",
+    "note": "playerID is passed after cmdTag, so fromSynced moves from the 8th argument to the 9th and a 10th, fromLua, follows. The arguments are now unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdOptions, cmdTag, playerID, fromSynced, fromLua.",
+    "changelog": "AllowCommand(..., cmdTag, fromSynced) --> AllowCommand(..., cmdTag, playerID, fromSynced, fromLua)"
+  },
+  {
+    "id": "signature:Spring.GetUnitCommands@105.0",
+    "kind": "signature",
+    "name": "Spring.GetUnitCommands",
+    "since": "105.0",
+    "note": "The count argument is required. Calling Spring.GetUnitCommands(unitID) with no count raises a Lua error. Pass -1 for the whole queue, or use Spring.GetUnitCommandCount for the length.",
+    "changelog": "make Spring.Get{Unit,Factory}Commands always expect a second argument"
+  }
+]
