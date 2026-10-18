@@ -52,7 +52,7 @@ import StorageSection from "./pages/StorageSection";
  * Setup packs (`../packs`) used to have its own page here too, at
  * `content/setup-packs`. Sharing a pack now happens from the Coilbox hub
  * screen instead, where sharing already lives; the old path stays wired up
- * as a redirect to Downloads > Maps, the same way the replays/stats paths
+ * as a redirect to Library > Maps, the same way the replays/stats paths
  * redirect above, so an old shared link still lands somewhere useful.
  *
  * Route Components are lazy-loaded; settings Components are imported eagerly (not
@@ -230,7 +230,7 @@ const contentPlugin: FramePlugin = {
     {
       path: "content/setup-packs",
       lazy: async () => ({
-        default: makeLegacyRedirect("/downloads/maps"),
+        default: makeLegacyRedirect("/library/maps"),
       }),
     },
     // The browser paths retired when Content became Library. Every live route

@@ -6384,10 +6384,12 @@ dependencies = [
 name = "tauri-plugin-coilbox-compat"
 version = "0.0.0"
 dependencies = [
+ "coilbox-3do",
  "coilbox-3do-convert",
  "coilbox-compat",
  "coilbox-luacompat",
  "coilbox-portable",
+ "coilbox-s3o",
  "coilbox-springlua",
  "picoframe-core",
  "serde",

@@ -6,7 +6,7 @@ import { canonicalProfileId } from "./renamedIds";
 
 /**
  * Nav hiding driven by the distribution profile's `hide` list. A bundled build can
- * remove top-level features it doesn't want (e.g. `downloads.games`) by id, without
+ * remove top-level features it doesn't want (e.g. `library.games`) by id, without
  * a fork. Mirrors the Advanced-mode gating in `../general/advanced`, but the source
  * is the read-once profile rather than a live user setting — so these are plain
  * predicates (not reactive hooks): the profile can't change during the session.
@@ -58,8 +58,7 @@ export const UNWIRED_ANALYTICS_IDS: string[] = [];
 export const HIDEABLE_NAV_IDS: string[] = [
   "library.games",
   "content.setupPacks",
-  "downloads.browse",
-  "downloads.games",
+  "library.rapid",
   "hub.browse",
   "multiplayer.battles",
   "multiplayer.stats",

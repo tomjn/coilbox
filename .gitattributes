@@ -37,3 +37,8 @@ crates/coilbox-unitpatch/tests/fixtures/**/*.fbi -text
 # The compatibility fixes and manifests are hashed, and a mutator built from them
 # must be byte identical on every machine (issue #4555). CRLF would change both.
 lua/compat/** text eol=lf
+
+# The compat identical-builds fixture is read byte for byte (issue #4563). A checkout
+# that turned its line endings into CRLF would change what is built, and the
+# platform check would then blame the writer for a difference the checkout made.
+crates/tauri-plugin-coilbox-compat/tests/fixtures/** -text

@@ -1,0 +1,5 @@
+UnitName=Test scout;
+Name=Test scout;
+ObjectName=testscout.3do;
+MaxDamage=120;
+BuildTime=40;

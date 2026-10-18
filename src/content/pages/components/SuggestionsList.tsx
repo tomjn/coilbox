@@ -2,6 +2,7 @@ import { Button, cn } from "@picoframe/frame";
 import { AlertCircle, CheckCircle2, Download, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
+import { errorText } from "@/lib/helpers";
 import type { WriteRoot } from "../../../downloads/config";
 import type { EnqueueInput } from "../../../downloads/DownloadQueueProvider";
 import {
@@ -12,7 +13,6 @@ import {
 } from "../../../downloads/gameRepos";
 import { loadGithubReleases } from "../../../downloads/githubReleases";
 import { QueueProgress } from "../../../downloads/pages/components/ProgressBar";
-import { errMessage } from "../../../downloads/pages/components/states";
 import { useQueuedDownload } from "../../../downloads/useQueuedDownload";
 import {
   resolveSuggestedArt,
@@ -272,7 +272,7 @@ function SuggestionCard({
       if (settled?.status === "done") onDownloaded();
       else if (settled?.error) onFailed(settled.error);
     } catch (e) {
-      onFailed(errMessage(e));
+      onFailed(errorText(e));
     }
   }
 

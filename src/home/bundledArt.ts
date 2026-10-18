@@ -941,7 +941,7 @@ const blueprints: Drawing = {
   },
 };
 
-/** A map sheet coming down off the network. */
+/** A map sheet coming down off the network: the download queue's picture. */
 const downloadMaps: Drawing = {
   pools: [
     [160, 58, 122, 0.18],
@@ -963,26 +963,6 @@ const downloadMaps: Drawing = {
       `<circle cx="160" cy="64" r="4" fill="${p.spark}" fill-opacity="0.8"/>`
     );
   },
-};
-
-/** A game case coming down off the network. */
-const downloadGames: Drawing = {
-  pools: [
-    [160, 56, 118, 0.18],
-    [160, 138, 92, 0.1],
-  ],
-  paint: (p) =>
-    `<rect x="112" y="18" width="96" height="76" rx="6" fill="${p.line}" fill-opacity="0.22"/>` +
-    `<rect x="112" y="18" width="96" height="76" rx="6" fill="none" stroke="${p.line}" stroke-width="1.8" stroke-opacity="0.45"/>` +
-    `<path d="M126 18 L126 94" fill="none" stroke="${p.faint}" stroke-width="1.5" stroke-opacity="0.4"/>` +
-    `<rect x="140" y="34" width="52" height="4" rx="2" fill="${p.faint}" fill-opacity="0.38"/>` +
-    `<rect x="140" y="46" width="34" height="4" rx="2" fill="${p.faint}" fill-opacity="0.26"/>` +
-    `<circle cx="176" cy="72" r="9" fill="none" stroke="${p.faint}" stroke-width="1.5" stroke-opacity="0.34"/>` +
-    `<g fill="none" stroke="${p.spark}" stroke-width="2.5" stroke-opacity="0.55" stroke-linecap="round" stroke-linejoin="round">` +
-    '<path d="M160 104 L160 142"/>' +
-    '<path d="M144 126 L160 142 L176 126"/>' +
-    "</g>" +
-    `<rect x="96" y="150" width="128" height="4" rx="2" fill="${p.faint}" fill-opacity="0.3"/>`,
 };
 
 /**
@@ -1706,9 +1686,8 @@ const DRAWINGS: Record<string, Drawing> = {
   // Not a nav item, and not renamed with the rest. It gates the hub screen's
   // "Share a pack" button. See `HIDEABLE_NAV_IDS`.
   "content.setupPacks": setupPacks,
-  "downloads.browse": downloads,
-  "downloads.maps": downloadMaps,
-  "downloads.games": downloadGames,
+  "library.rapid": downloads,
+  "library.downloads": downloadMaps,
   "hub.browse": hub,
   "lego.units": legoUnits,
   "lego.parts": legoParts,

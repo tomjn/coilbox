@@ -2326,6 +2326,42 @@ pub fn archive_text_blocking(
     text_in_archive_output(&out, archive, file)
 }
 
+/// The sync checksum unitsync gives the game whose primary archive is
+/// `archive`, as the hex text the worker prints, or `None` when unitsync gives
+/// none. It covers the archive and its dependencies, which is what players
+/// joining a battle compare. Blocking, and it hashes them all.
+pub fn game_checksum_blocking(
+    engine_path: &str,
+    data_dir: &str,
+    archive: &str,
+) -> Result<Option<String>, String> {
+    let (bin, libpath, engine_dir) = prepare(engine_path)?;
+    let args = build_game_args(&libpath.to_string_lossy(), data_dir, archive, None);
+    let envs = loader_envs(&engine_dir, data_dir);
+    let out = run_worker_blocking(bin, args, envs, SCAN_TIMEOUT, "game checksum".into(), None)?;
+    checksum_in_game_output(&out, archive)
+}
+
+/// The checksum in the worker's answer to a read of one game.
+fn checksum_in_game_output(out: &str, archive: &str) -> Result<Option<String>, String> {
+    let out: serde_json::Value = serde_json::from_str(out)
+        .map_err(|e| format!("the game read did not come back as JSON: {e}"))?;
+    if let Some(checksum) = out["checksum"].as_str() {
+        return Ok(Some(checksum.to_string()));
+    }
+    let errors: Vec<&str> = out["errors"]
+        .as_array()
+        .map(|errors| errors.iter().filter_map(|e| e.as_str()).collect())
+        .unwrap_or_default();
+    if errors
+        .iter()
+        .any(|e| e.starts_with("could not open archive"))
+    {
+        return Err(format!("could not open the archive {archive}"));
+    }
+    Ok(None)
+}
+
 /// The text in the worker's answer to a read of one archive file.
 fn text_in_archive_output(out: &str, archive: &str, file: &str) -> Result<Option<String>, String> {
     let out: serde_json::Value = serde_json::from_str(out)
@@ -2692,6 +2728,20 @@ mod tests {
         let err = text_in_archive_output(large, "a.sdz", "f.lua").unwrap_err();
         assert!(err.contains("too large"), "{err}");
         assert!(text_in_archive_output("nope", "a.sdz", "f.lua").is_err());
+    }
+
+    #[test]
+    fn a_game_read_gives_its_checksum_or_none_or_an_error() {
+        let held = r#"{"sides":[],"checksum":"1a2b3c4d","errors":[]}"#;
+        assert_eq!(
+            checksum_in_game_output(held, "a.sdd"),
+            Ok(Some("1a2b3c4d".to_string()))
+        );
+        let none = r#"{"sides":[],"errors":["no sync checksum for a.sdd"]}"#;
+        assert_eq!(checksum_in_game_output(none, "a.sdd"), Ok(None));
+        let closed = r#"{"sides":[],"errors":["could not open archive a.sdd"]}"#;
+        assert!(checksum_in_game_output(closed, "a.sdd").is_err());
+        assert!(checksum_in_game_output("nope", "a.sdd").is_err());
     }
 
     #[test]

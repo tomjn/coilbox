@@ -1,0 +1,5 @@
+UnitName=Test tank;
+Name=Test tank;
+ObjectName=testtank.3do;
+MaxDamage=600;
+BuildTime=150;

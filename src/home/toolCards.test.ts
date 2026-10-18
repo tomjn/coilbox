@@ -249,13 +249,13 @@ describe("how tall a row of pictureless cards is", () => {
   const NAV = [
     { id: "play", label: "Play", items: [{ ...SKIRMISH }, { ...REPLAYS }] },
     {
-      id: "downloads",
-      label: "Downloads",
+      id: "library",
+      label: "Library",
       items: [
         {
-          id: "downloads.maps",
+          id: "library.maps",
           label: "Maps",
-          to: "/downloads/maps",
+          to: "/library/maps",
           icon: Rocket,
         },
       ],
@@ -308,22 +308,22 @@ describe("how tall a row of pictureless cards is", () => {
 
   it("counts the suggested map's picture as a picture in its row", () => {
     // The map card is not a tool card and does not walk the art chain, but it
-    // is a picture in the Downloads row all the same, so the tools beside it
+    // is a picture in the Library row all the same, so the tools beside it
     // keep their footprint.
-    registerByTool("override", { "downloads.maps": false });
-    const downloads = section(grid("SUGGESTED"), "Downloads");
-    expect(downloads).toContain("SUGGESTED");
-    expect(downloads).not.toContain(CHIP);
-    expect(downloads).toContain("min-h-28");
+    registerByTool("override", { "library.maps": false });
+    const library = section(grid("SUGGESTED"), "Library");
+    expect(library).toContain("SUGGESTED");
+    expect(library).not.toContain(CHIP);
+    expect(library).toContain("min-h-28");
   });
 
   it("draws the compact row where the layout hands over no map card", () => {
     // The same group on a page that placed the two zones apart. Without the map
     // card the row is pictureless throughout and may size to its content.
-    registerByTool("override", { "downloads.maps": false });
-    const downloads = section(grid(), "Downloads");
-    expect(downloads).toContain(CHIP);
-    expect(downloads).not.toContain("min-h-28");
+    registerByTool("override", { "library.maps": false });
+    const library = section(grid(), "Library");
+    expect(library).toContain(CHIP);
+    expect(library).not.toContain("min-h-28");
   });
 
   it("leaves a group with pictures alone", () => {
@@ -335,18 +335,18 @@ describe("how tall a row of pictureless cards is", () => {
 });
 
 describe("where the suggested map's card goes", () => {
-  /** The nav Coilbox has: a Downloads group, and another group either side. */
+  /** The nav Coilbox has: a Library group, and another group either side. */
   const NAV = [
     { id: "play", label: "Play", items: [{ ...SKIRMISH }] },
     {
-      id: "downloads",
-      label: "Downloads",
+      id: "library",
+      label: "Library",
       items: [
-        { id: "downloads.maps", label: "Maps", to: "/downloads/maps" },
+        { id: "library.maps", label: "Maps", to: "/library/maps" },
         { ...DOCS },
       ],
     },
-    { id: "library", label: "Library", items: [{ ...SKIRMISH, id: "c" }] },
+    { id: "records", label: "Records", items: [{ ...SKIRMISH, id: "c" }] },
   ];
 
   /** The grid, with a recognisable stand-in for the map card. */
@@ -371,24 +371,22 @@ describe("where the suggested map's card goes", () => {
     return found;
   }
 
-  it("puts it in the Downloads group and nowhere else", () => {
-    // A map suggestion is a download, so it belongs beside Browse Rapid, Maps
-    // and Games rather than in a section of its own at the foot of the page.
+  it("puts it in the Library group and nowhere else", () => {
+    // A map suggestion is a download, so it belongs beside Maps and Games
+    // rather than in a section of its own at the foot of the page.
     const html = grid();
     expect(html.match(/SUGGESTED/g)).toHaveLength(1);
-    expect(section(html, "Downloads")).toContain("SUGGESTED");
+    expect(section(html, "Library")).toContain("SUGGESTED");
     expect(section(html, "Play")).not.toContain("SUGGESTED");
-    expect(section(html, "Library")).not.toContain("SUGGESTED");
+    expect(section(html, "Records")).not.toContain("SUGGESTED");
   });
 
   it("puts it after the tools and before the shared links card", () => {
     // Links leave the app, so they stay last whatever else joins the group.
-    const downloads = section(grid(), "Downloads");
-    expect(downloads.indexOf("Maps")).toBeLessThan(
-      downloads.indexOf("SUGGESTED"),
-    );
-    expect(downloads.indexOf("SUGGESTED")).toBeLessThan(
-      downloads.indexOf("lucide-external-link"),
+    const library = section(grid(), "Library");
+    expect(library.indexOf("Maps")).toBeLessThan(library.indexOf("SUGGESTED"));
+    expect(library.indexOf("SUGGESTED")).toBeLessThan(
+      library.indexOf("lucide-external-link"),
     );
   });
 

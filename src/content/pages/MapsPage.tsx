@@ -1,11 +1,15 @@
-import { Button } from "@picoframe/frame";
+import { Button, useDrawer } from "@picoframe/frame";
 import { CloudOff, Loader2, Map as MapIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
+import { useImportParam } from "../../deeplink/useImportParam";
 import { useWriteRoot } from "../../downloads/config";
 import { useDownloadQueue } from "../../downloads/DownloadQueueProvider";
 import { MapPacksBanner } from "../../downloads/pages/components/MapPacksBanner";
+import { nextDrawerKey } from "../../general/drawerKey";
+import { useRecordHubImport } from "../../hub/imports";
 import { useMapFactsBatch } from "../../hub/maps/useMapFacts";
+import { presetRoute } from "../../play/presets";
 import { isHubEnabled } from "../../profile/profile";
 import { filterUninstalledMaps, useSuggestedMaps } from "../branding";
 import { useScanTargetSelection, useUnitsyncThumbnails } from "../config";
@@ -173,6 +177,46 @@ export default function MapsPage() {
     () => filterUninstalledMaps(suggested, installedFiles, scanned),
     [suggested, installedFiles, scanned],
   );
+
+  // A confirmed `coilbox://import` deep link for a setup pack lands here with
+  // the pack code in the query string (issue #388). This is the one content
+  // screen no distribution profile can hide: `library.maps` is not in
+  // `HIDEABLE_NAV_IDS`, unlike the hub screen, which redirects home when the
+  // hub is off. The old `/downloads/maps` path redirects here with its query.
+  const { code: importCode, hubItemId } = useImportParam();
+  const recordHubImport = useRecordHubImport();
+  const drawer = useDrawer();
+
+  const openPackImport = async (initialCode?: string) => {
+    const { ImportPackForm } = await import(
+      "../../packs/pages/components/ImportPackForm"
+    );
+    drawer.open({
+      title: "Import a setup pack",
+      width: "26rem",
+      content: (
+        // A fresh form every time, because the last one may still be mounted and
+        // would keep the code it already ran (issue #1395).
+        <ImportPackForm
+          key={nextDrawerKey()}
+          initialCode={initialCode}
+          onImported={(presetIds, content) =>
+            recordHubImport(
+              hubItemId,
+              presetIds,
+              presetIds[0] ? presetRoute(presetIds[0]) : "/library/maps",
+              content,
+            )
+          }
+        />
+      ),
+    });
+  };
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run once when the deep-link code arrives, not on every drawer identity change
+  useEffect(() => {
+    if (importCode) void openPackImport(importCode);
+  }, [importCode]);
 
   const resetPage = () => setLimit(PAGE);
   const showMore = (

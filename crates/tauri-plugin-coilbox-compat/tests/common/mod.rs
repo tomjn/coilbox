@@ -14,6 +14,14 @@ pub fn setup() -> Result<(PathBuf, String), String> {
     if !data.join("games").join(&game).exists() {
         return Err(format!("{game} is not installed"));
     }
+    Ok((engine()?, game))
+}
+
+/// The engine folder holding a `libunitsync`, with the worker pointed at.
+/// Needs no game.
+pub fn engine() -> Result<PathBuf, String> {
+    let home = PathBuf::from(std::env::var_os("HOME").ok_or("no HOME")?);
+    let data = home.join(".spring");
     let lib = if cfg!(target_os = "macos") {
         "libunitsync.dylib"
     } else if cfg!(windows) {
@@ -44,5 +52,5 @@ pub fn setup() -> Result<(PathBuf, String), String> {
         return Err("the unitsync worker is not built".into());
     }
     std::env::set_var("UNITSYNC_WORKER", &worker);
-    Ok((engine, game))
+    Ok(engine)
 }

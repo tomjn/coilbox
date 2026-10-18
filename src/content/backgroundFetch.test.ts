@@ -152,7 +152,7 @@ describe("fetchListsInBackground", () => {
   });
 
   it("skips the springfiles game list when the profile hides game downloads", async () => {
-    m.hidden.add("downloads.games");
+    m.hidden.add("library.games");
     await fetchListsInBackground({ enabled: true, hubUrl });
     expect(m.loadSpringfilesList.mock.calls).toEqual([["map"]]);
   });
