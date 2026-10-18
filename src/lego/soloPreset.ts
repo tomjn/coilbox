@@ -19,7 +19,12 @@ export const SOLO_SCENARIOS: Record<string, string> = {
   "walk.quad": "moving",
   "walk.legs": "moving",
   "turret.track": "firing",
-  "wheels.roll": "moving",
+  // Follows the unit's speed, which only the driving scenario changes.
+  "wheels.roll": "driving",
+  // Steers with the heading and rocks with the acceleration, both of which
+  // only a drive changes.
+  "wheels.steer": "driving",
+  "body.rock": "driving",
   // Reads the heading, which only the driving scenario changes.
   "rudder.follow": "driving",
   // Emits the reverse wake when told the unit backs up, which only a drive says.

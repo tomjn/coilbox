@@ -252,12 +252,27 @@ export interface EmitInstance {
   name(base: string): string;
 }
 
+/** One of the unit's wheels, measured (#3352). See `wheelFit.ts`. */
+export interface EmitWheel {
+  /** The Lua name of the piece. */
+  piece: string;
+  /** Its radius in elmos, or null when its shape does not give one. */
+  radius: number | null;
+  /** Whether it is ahead of the middle of the unit's wheels, so it steers. */
+  front: boolean;
+}
+
 export interface EmitContext {
   /**
    * Names of the pieces carrying a role, in document order. Asking marks them
    * used, so the script declares a local for exactly what it references.
    */
   pieces(role: string): string[];
+  /** The pieces with the wheel role, in document order, with what the wheel
+   *  presets need to know about each. Asking marks them used. */
+  wheels(): EmitWheel[];
+  /** How fast the unit speeds up and brakes, in elmos a frame squared. */
+  motion: { accRate: number; decRate: number };
   /** The unit's weapons, in slot order. */
   weapons(): EmitWeapon[];
   /**
@@ -1340,10 +1355,54 @@ export const TURRET_TRACK: AnimPreset = {
   },
 };
 
+/**
+ * How often the wheel presets read the unit's speed and heading, in frames. A
+ * tenth of a second follows a change of speed closely enough that the wheels
+ * do not visibly lag, and costs a third of the reads a poll every frame would.
+ * A design choice. The engine's cost for it has not been measured.
+ */
+const WHEEL_POLL_FRAMES = 3;
+
+/** `COBSCALE`: `CURRENT_SPEED` is elmos a frame times this
+ *  (`UnitScript.cpp:1118`). */
+const COBSCALE = 65536;
+
+/**
+ * The speed the preview answers `CURRENT_SPEED` with when nothing drives the
+ * unit, in elmos a frame: `known` in `crates/coilbox-unitpose/src/unitvalue.rs`
+ * says 65536, one elmo a frame. `track` plays the wheels at it.
+ */
+const UNDRIVEN_SPEED = 1;
+
+/**
+ * Wheels that roll at the unit's speed.
+ *
+ * A wheel rolling without slipping turns at the unit's speed over its radius,
+ * so a script that reads `CURRENT_SPEED` while it runs gets the right rate at
+ * every speed, speeding up, slowing down and backing up. The walks bake the
+ * speed in when the script is written (`walkFit.ts`), which suits a walker
+ * that moves at the one speed it was fitted for. A wheel has no cycle to fit,
+ * and a unit that brakes to a stop would spin its wheels at full speed all the
+ * way down if the rate were fixed. So the wheels read it. The preview answers
+ * `CURRENT_SPEED` on every frame of a drive.
+ *
+ * The engine calls `StopMoving` when the unit is told to stop, not when it has
+ * stopped: a unit rolls on at its brake rate (`GroundMoveType.cpp:2455` and
+ * `StopEngine`, which sets only the wanted speed). So `StopMoving` only marks
+ * the thread, and the thread ends once the speed reads 0.
+ *
+ * The rate is set outright on each poll. `Spin` takes an acceleration, but
+ * the engine's reading of it is not one this was able to check, and a poll a
+ * tenth of a second apart is close enough without it.
+ *
+ * The radius is measured from the wheel (`wheelFit.ts`). A wheel with none,
+ * and no radius typed, keeps the fixed rate this preset always had.
+ */
 export const WHEELS_ROLL: AnimPreset = {
   id: "wheels.roll",
   label: "Wheels turning",
-  description: "Spins every wheel at a steady rate, as it would while moving.",
+  description:
+    "Turns every wheel at the unit's speed over the wheel's radius, backwards when it backs up. A wheel with no round shape to measure turns at a steady rate.",
   requires: [{ role: "wheel", count: 1 }],
   animates: ["wheel"],
   params: [
@@ -1356,23 +1415,80 @@ export const WHEELS_ROLL: AnimPreset = {
       step: 0.1,
       fallback: 1.2,
     },
+    {
+      id: "radius",
+      label: "Wheel radius (0 measures it)",
+      unit: "m",
+      min: 0,
+      max: 30,
+      step: 0.1,
+      fallback: 0,
+    },
   ],
+  /**
+   * The preview plays the script, so this is what the script does with nothing
+   * driving the unit: the fixed rate, or the rate for the preview's own speed
+   * when a radius is typed.
+   */
   track(t, params, role) {
     if (role !== "wheel") return null;
-    return { rotation: [TAU * value(this, params, "rate") * t, 0, 0] };
+    const radius = value(this, params, "radius");
+    const rate =
+      radius > 0
+        ? (ENGINE_FPS * UNDRIVEN_SPEED) / radius
+        : TAU * value(this, params, "rate");
+    return { rotation: [rate * t, 0, 0] };
   },
   /** Continuous, so `Spin` rather than a thread of `Turn` calls. */
   emit(ctx) {
-    const wheels = ctx.pieces("wheel");
+    const typed = value(this, ctx.params, "radius");
+    const wheels = ctx.wheels().map((wheel) => ({
+      piece: wheel.piece,
+      radius: typed > 0 ? typed : wheel.radius,
+    }));
     if (wheels.length === 0) return null;
-    const speed = lua(TAU * value(this, ctx.params, "rate"));
+    const rate = lua(TAU * value(this, ctx.params, "rate"));
+    const fixed = wheels.filter((wheel) => wheel.radius === null);
+    const following = wheels.filter((wheel) => wheel.radius !== null);
+    const start = fixed.map(({ piece }) => `  Spin(${piece}, x_axis, ${rate})`);
+    const stop = fixed.map(({ piece }) => `  StopSpin(${piece}, x_axis)`);
+    if (following.length === 0) {
+      return { functions: [], hooks: { StartMoving: start, StopMoving: stop } };
+    }
+    // Radians a second for each 65536th of an elmo a frame.
+    const per = (radius: number) =>
+      Number((ENGINE_FPS / COBSCALE / radius).toPrecision(6));
+    const each = (line: (piece: string, radius: number) => string) =>
+      following.map(({ piece, radius }) => line(piece, radius as number));
     return {
-      functions: [],
-      hooks: {
-        StartMoving: wheels.map(
-          (wheel) => `  Spin(${wheel}, x_axis, ${speed})`,
+      functions: [
+        "local wheelsRollStopped = true",
+        "",
+        "local function wheelsRoll()",
+        `  SetSignalMask(${ctx.signal})`,
+        "  while true do",
+        "    local speed = GetUnitValue(COB.CURRENT_SPEED)",
+        "    if wheelsRollStopped and speed == 0 then",
+        ...each((piece) => `      StopSpin(${piece}, x_axis)`),
+        "      return",
+        "    end",
+        "    if GetUnitValue(COB.REVERSING) == 1 then speed = -speed end",
+        ...each(
+          (piece, radius) =>
+            `    Spin(${piece}, x_axis, speed * ${per(radius)})`,
         ),
-        StopMoving: wheels.map((wheel) => `  StopSpin(${wheel}, x_axis)`),
+        `    Sleep(${WHEEL_POLL_FRAMES * SLEEP_FRAME_MS})`,
+        "  end",
+        "end",
+      ],
+      hooks: {
+        StartMoving: [
+          `  Signal(${ctx.signal})`,
+          "  wheelsRollStopped = false",
+          "  StartThread(wheelsRoll)",
+          ...start,
+        ],
+        StopMoving: ["  wheelsRollStopped = true", ...stop],
       },
     };
   },
@@ -1480,6 +1596,197 @@ export const RUDDER_FOLLOWS: AnimPreset = {
       hooks: {
         StartMoving: [`  Signal(${ctx.signal})`, "  StartThread(rudderFollow)"],
         StopMoving: [`  Signal(${ctx.signal})`, "  rudderFollowStop()"],
+      },
+    };
+  },
+};
+
+/**
+ * The steering reads the heading as the rudder does, every
+ * `RUDDER_POLL_FRAMES`. A driven heading wobbles from frame to frame, and the
+ * rudder's note says a shorter poll swings with it. A poll of 3 frames did:
+ * round a steady circle the wheels swung between 0 and the slider's limit.
+ */
+const STEER_POLL_FRAMES = RUDDER_POLL_FRAMES;
+
+/** Radians of steering for each heading unit turned in one poll, with the
+ *  rudder's degrees of swing for each degree a second of turn. */
+const STEER_PER_HEADING =
+  (RUDDER_PER_TURN_RATE * (TAU / HEADING_CIRCLE)) /
+  (STEER_POLL_FRAMES / ENGINE_FPS);
+
+/**
+ * The front wheels swinging with the unit's turning.
+ *
+ * Which wheels are in front comes from where they are (`frontWheels`): ahead
+ * of the middle of the wheels along z. The heading is read the way the
+ * rudder's is, and for the same reason. A wheel's steering is a `Turn` about
+ * y, which composes outside the spin about x (`ENGINE_ROTATION_ORDER`), so a
+ * wheel can spin and steer at once.
+ *
+ * Backing up reverses the steering. A unit reversing with its wheels turned
+ * left swings its heading to the right, so a heading turning left while it
+ * reverses is a wheel turned right.
+ */
+export const WHEELS_STEER: AnimPreset = {
+  id: "wheels.steer",
+  label: "Front wheels steer",
+  description:
+    "Swings the wheels ahead of the middle of the wheels with the unit's turning while it moves, and straightens them when the turn ends.",
+  requires: [{ role: "wheel", count: 1 }],
+  animates: ["wheel"],
+  params: [
+    {
+      id: "max",
+      label: "Largest angle",
+      unit: "deg",
+      min: 0,
+      max: 45,
+      step: 1,
+      fallback: 30,
+    },
+  ],
+  /** The angle depends on the unit's heading, which a time cannot give. */
+  track() {
+    return null;
+  },
+  emit(ctx) {
+    const front = ctx.wheels().filter((wheel) => wheel.front);
+    if (front.length === 0) return null;
+    const most = deg(value(this, ctx.params, "max"));
+    const speed = lua(most / RUDDER_SWING_SECONDS);
+    const turnAll = (angle: string) =>
+      front.map(
+        ({ piece }) => `    Turn(${piece}, y_axis, ${angle}, ${speed})`,
+      );
+    const half = HEADING_CIRCLE / 2;
+    return {
+      functions: [
+        "local function wheelsSteer()",
+        `  SetSignalMask(${ctx.signal})`,
+        "  local last = GetUnitValue(COB.HEADING)",
+        "  while true do",
+        `    Sleep(${STEER_POLL_FRAMES * SLEEP_FRAME_MS})`,
+        "    local now = GetUnitValue(COB.HEADING)",
+        `    local swing = ((now - last + ${half}) % ${HEADING_CIRCLE} - ${half}) * ${Number(STEER_PER_HEADING.toPrecision(6))}`,
+        "    last = now",
+        "    if GetUnitValue(COB.REVERSING) == 1 then swing = -swing end",
+        `    if swing > ${lua(most)} then swing = ${lua(most)} end`,
+        `    if swing < -${lua(most)} then swing = -${lua(most)} end`,
+        ...turnAll("swing"),
+        "  end",
+        "end",
+        "",
+        "local function wheelsSteerStop()",
+        ...turnAll("0"),
+        "end",
+      ],
+      hooks: {
+        StartMoving: [`  Signal(${ctx.signal})`, "  StartThread(wheelsSteer)"],
+        StopMoving: [`  Signal(${ctx.signal})`, "  wheelsSteerStop()"],
+      },
+    };
+  },
+};
+
+/**
+ * How long the body's lean takes to follow a change of acceleration, in
+ * seconds: it closes 63 percent of the gap to where the acceleration points it
+ * in this time. A design choice.
+ */
+const ROCK_SETTLE_SECONDS = 0.3;
+
+/**
+ * A lean smaller than this, in radians, is level. It is the last decimal place
+ * `lua()` writes an angle to, so a smaller one would write as 0.
+ */
+const ROCK_LEVEL = 1e-4;
+
+/**
+ * The body pitching with the unit's acceleration.
+ *
+ * Speeding up pitches the nose up and braking pitches it down, which is a
+ * negative `Turn` about x and a positive one (the barrel lifts with a negative
+ * x, `AIM_TRACK`). The lean aims for the slider's angle times the share of the
+ * unit's full acceleration, or full braking, the speed changed by over the
+ * poll, and eases there and back on a first order lag. So the size of the rock
+ * follows the unit's own `acceleration` and `brakeRate` (`rates` in
+ * `drive.ts`, 0.5 elmos a frame squared each when the unit sets none) and the
+ * slider says how far the body leans at full power.
+ *
+ * The acceleration is read from `CURRENT_SPEED` on each poll. The engine's
+ * `StopMoving` comes when the unit is told to stop, before it has slowed, so
+ * the thread runs on until the speed is 0 and the body level.
+ */
+export const BODY_ROCK: AnimPreset = {
+  id: "body.rock",
+  label: "Body rocks on starting and stopping",
+  description:
+    "Pitches the body back as the unit speeds up and forward as it brakes, in proportion to how hard, and eases it level again.",
+  requires: [{ role: "base", count: 1 }],
+  animates: ["base"],
+  params: [
+    {
+      id: "strength",
+      label: "Lean at full power",
+      unit: "deg",
+      min: 0,
+      max: 20,
+      step: 0.5,
+      fallback: 6,
+    },
+  ],
+  /** The lean depends on the unit's acceleration, which a time cannot give. */
+  track() {
+    return null;
+  },
+  emit(ctx) {
+    const bodies = ctx.pieces("base");
+    if (bodies.length === 0) return null;
+    const strength = lua(deg(value(this, ctx.params, "strength")));
+    const { accRate, decRate } = ctx.motion;
+    const poll = WHEEL_POLL_FRAMES;
+    // The share of full power a change of speed over one poll is.
+    const share = (rate: number) =>
+      Number((1 / (COBSCALE * poll * rate)).toPrecision(6));
+    const catchUp = 1 - Math.exp(-(poll / ENGINE_FPS) / ROCK_SETTLE_SECONDS);
+    const turnAll = (angle: string, rate: string) =>
+      bodies.map((body) => `    Turn(${body}, x_axis, ${angle}, ${rate})`);
+    return {
+      functions: [
+        "local bodyRockStopped = true",
+        "",
+        "local function bodyRock()",
+        `  SetSignalMask(${ctx.signal})`,
+        "  local last = GetUnitValue(COB.CURRENT_SPEED)",
+        "  local lean = 0",
+        "  while true do",
+        `    Sleep(${poll * SLEEP_FRAME_MS})`,
+        "    local now = GetUnitValue(COB.CURRENT_SPEED)",
+        "    local push = now - last",
+        "    last = now",
+        `    if push > 0 then push = push * ${share(accRate)} else push = push * ${share(decRate)} end`,
+        "    if push > 1 then push = 1 end",
+        "    if push < -1 then push = -1 end",
+        "    local was = lean",
+        `    lean = lean + (-${strength} * push - lean) * ${Number(catchUp.toPrecision(6))}`,
+        `    local level = bodyRockStopped and now == 0 and lean < ${ROCK_LEVEL} and lean > -${ROCK_LEVEL}`,
+        "    if level then lean = 0 end",
+        "    local step = lean - was",
+        "    if step < 0 then step = -step end",
+        // Reaches the new angle by the next poll.
+        ...turnAll("lean", `step * ${ENGINE_FPS / poll}`),
+        "    if level then return end",
+        "  end",
+        "end",
+      ],
+      hooks: {
+        StartMoving: [
+          `  Signal(${ctx.signal})`,
+          "  bodyRockStopped = false",
+          "  StartThread(bodyRock)",
+        ],
+        StopMoving: ["  bodyRockStopped = true"],
       },
     };
   },
@@ -2432,6 +2739,8 @@ export const PRESETS: AnimPreset[] = [
   RECOIL,
   IDLE_SWAY,
   WRECK_POSE,
+  WHEELS_STEER,
+  BODY_ROCK,
 ];
 
 export function presetById(id: string): AnimPreset | undefined {

@@ -33,7 +33,7 @@ const SPIN_AXIS = 0;
  * The axis a cylinder or tube runs along, or null for any other piece. Read the
  * way the generators read it: 0, 1 or 2, else y.
  */
-function cylinderAxle(piece: LegoPiece): 0 | 1 | 2 | null {
+export function cylinderAxle(piece: LegoPiece): 0 | 1 | 2 | null {
   if (!piece.shape || !isRoundShapeKind(piece.shape.kind)) return null;
   const axis = piece.shape.options?.axis;
   return axis === 0 || axis === 1 || axis === 2 ? axis : 1;

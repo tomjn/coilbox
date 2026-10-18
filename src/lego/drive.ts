@@ -86,7 +86,10 @@ const LEAST_RATE = 0.01;
 
 /** The unit's `accRate` and `decRate`, elmos a frame squared. A unit that
  *  states no brake rate brakes at its acceleration (`UnitDef.cpp:459`). */
-function rates(motion: DriveMotion): { accRate: number; decRate: number } {
+export function rates(motion: DriveMotion): {
+  accRate: number;
+  decRate: number;
+} {
   const accRate = Math.max(
     LEAST_RATE,
     motion.acceleration ?? DEFAULT_ACCELERATION,
