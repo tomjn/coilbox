@@ -100,7 +100,7 @@ fn build_reading(
 ) -> Result<Built, String> {
     let manifest = coilbox_compat::manifest(manifest_version)
         .ok_or_else(|| format!("there is no compat manifest {manifest_version}"))?;
-    mutator::check_converter(&manifest)?;
+    mutator::check_pins(&manifest)?;
     let manifest = coilbox_compat::for_game(&manifest, handlers);
     if base_checksum.trim().is_empty() {
         return Err(format!(
@@ -112,6 +112,7 @@ fn build_reading(
     coilbox_portable::refuse_in_bundle(&dir)?;
     let marker = Marker {
         manifest_version,
+        writer: manifest.writer,
         base_checksum: base_checksum.to_string(),
         coilbox_version: coilbox_version.to_string(),
     };
@@ -174,7 +175,8 @@ pub struct Status {
 }
 
 /// Whether the newest compat mutator built for `archive_name` under
-/// `data_dir` matches the latest manifest and the archive's current checksum.
+/// `data_dir` matches the latest manifest, the writer this build carries, and
+/// the archive's current checksum.
 pub fn status(data_dir: &str, archive_name: &str, base_checksum: &str) -> Result<Status, String> {
     let latest = coilbox_compat::latest();
     let games = mutator::games_dir(data_dir)?;
@@ -188,7 +190,12 @@ pub fn status(data_dir: &str, archive_name: &str, base_checksum: &str) -> Result
     let marker = mutator::read_marker(&games.join(&folder));
     Ok(Status {
         latest,
-        stale: mutator::staleness(marker.as_ref(), latest, base_checksum),
+        stale: mutator::staleness(
+            marker.as_ref(),
+            latest,
+            coilbox_compat::WRITER,
+            base_checksum,
+        ),
         folder: Some(folder),
     })
 }
@@ -285,6 +292,7 @@ mod tests {
             mutator::read_marker(dir).unwrap(),
             Marker {
                 manifest_version: n,
+                writer: coilbox_compat::WRITER,
                 base_checksum: "1234abcd".into(),
                 coilbox_version: "1.2.3".into(),
             }
