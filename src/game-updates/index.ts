@@ -12,8 +12,9 @@ const hasUpdateRepo = () => !!getProfile().release?.repo;
  * Game-updates plugin. When a distribution profile names a GitHub repo
  * (`release.repo`), this checks that repo's latest release for a newer game
  * archive than the one installed, and offers an in-app download + unitsync rescan
- * (and pulls an updated profile.json if the release ships one). Inert — settings
- * section hidden, badge never shown, provider a no-op — in vanilla Coilbox.
+ * (and pulls an updated profile.json if the release ships one). The settings
+ * section is hidden in vanilla Coilbox. The topbar badge counts every game and
+ * engine with a newer version, not only the profile's game.
  *
  * The settings Component is imported eagerly (not lazy): the frame settings page
  * renders it directly without a Suspense boundary, so React.lazy can't be used.
