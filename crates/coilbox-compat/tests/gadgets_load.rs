@@ -38,11 +38,11 @@ fn load(path: &str, source: &str, synced: bool) -> Value {
 
 #[test]
 fn every_gadget_loads_in_lua_5_1_and_only_in_its_own_state() {
-    let files: Vec<(String, String)> = [3, 4, 5]
+    let files: Vec<(String, String)> = [3, 4, 5, 7]
         .into_iter()
         .flat_map(|n| gadget_files(&manifest(n).unwrap()))
         .collect();
-    assert_eq!(files.len(), 10);
+    assert_eq!(files.len(), 14);
     for (path, source) in &files {
         let name = PathBuf::from(path)
             .file_stem()
@@ -115,7 +115,7 @@ fn the_aircraft_gadget_finds_set_crashing_in_a_cob_script_under_lua_5_1() {
     let push1 = "\u{1}\u{10}\u{2}\u{10}\u{1}\0\0\0";
     let set = "\0 \u{8}\u{10}";
     let get = "\0 \u{4}\u{10}";
-    for n in [3, 4] {
+    for n in [3, 4, 7] {
         for (script, crashes) in [
             (format!("{push97}{push1}{set}"), true),
             (format!("{push97}{get}{push1}{set}"), false),
@@ -168,4 +168,37 @@ fn the_aircraft_gadget_turns_off_for_a_newer_game_under_lua_5_1() {
             ),
         ]
     ));
+}
+
+/// The mutator's `modinfo.lua` for a base game with this name and version, as
+/// the writer gives it when the manifest lists `game-identity`.
+fn mutator_modinfo(name: &str, version: &str) -> String {
+    format!(
+        "return {{ name = \"{name} (compat 7)\", version = \"7\", \
+         compatbasename = \"{name}\", compatbaseversion = \"{version}\" }}"
+    )
+}
+
+/// The engine the base game's name and version name, read by the aircraft
+/// gadget of manifest 7 under Lua 5.1 (#4645), with the three games' own
+/// values: Expand and Exterminate 0.46 is made for Spring 0.88 and turns it
+/// off. XTA 9.65, Complete Annihilation stable-8405 and Spring 1944 2.31 name
+/// no engine, so their own version numbers must not read as one.
+#[test]
+fn the_aircraft_gadget_reads_the_engine_a_game_names_under_lua_5_1() {
+    for (name, version, off) in [
+        ("Expand and Exterminate", "0.46 for Spring 0.88", true),
+        ("XTA", "9.65", false),
+        ("Complete Annihilation stable-8405", "stable-8405", false),
+        ("Spring 1944", "2.31", false),
+        ("Some Game", "for spring 85", true),
+        ("Some Game", "Spring 0.83", true),
+        ("Some Game", "for Spring 0.82.7.1", false),
+        ("Some Game", "Spring 83abc", false),
+    ] {
+        let files = [("modinfo.lua", mutator_modinfo(name, version))];
+        let files: Vec<(&str, &str)> = files.iter().map(|(p, t)| (*p, t.as_str())).collect();
+        assert_eq!(aircraft_removed(7, &files), off, "{name} {version}");
+        assert!(!aircraft_removed(4, &files), "manifest 4, {name} {version}");
+    }
 }
