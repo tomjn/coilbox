@@ -21,6 +21,7 @@ import {
   type LegoProject,
   newProject,
 } from "./model";
+import { convertPresetToAction } from "./presetToAction";
 import { at, CREATED, type ScriptEvent } from "./scriptPlayback";
 import { fitWalk } from "./walkFit";
 
@@ -782,6 +783,33 @@ function buildCases() {
 }
 
 /**
+ * A preset converted into actions (#4512) is checked against the preset's own
+ * `track()`, with the preset's own plan, so the runtime shows the action plays
+ * what the preset plays. At the defaults, for every preset that converts.
+ */
+function convertedCases() {
+  return PRESETS.filter((preset) => typeof preset.motions !== "string").map(
+    (preset) => {
+      const params: Record<string, number> =
+        preset.id === "walk.legs" ? { [WALK_PAIRS]: PARITY_PAIRS } : {};
+      const unit = unitFor(preset, params);
+      const planned = plan(preset, params);
+      const { checks } = measure(preset, params, unit, planned);
+      const converted = convertPresetToAction(unit, preset.id, "parity");
+      return {
+        name: `${preset.id} converted to actions, defaults`,
+        script: buildLuaScript(converted),
+        pieces: unit.pieces.map((piece) => piece.name),
+        events: planned.events,
+        frames: planned.frames,
+        exceptions: planned.exceptions,
+        checks,
+      };
+    },
+  );
+}
+
+/**
  * Actions (#3356) are checked against the schedule they are written from: the
  * unit is at rest when the call-in fires, then reaches each key's pose in
  * straight lines after the time that key gives. Nothing in `track()` stands for
@@ -1037,6 +1065,7 @@ function actionCases() {
 describe("preset parity fixture", () => {
   const cases = buildCases();
   const actions = actionCases();
+  const converted = convertedCases();
 
   it("covers every preset in PRESETS", () => {
     expect(new Set(cases.map((entry) => entry.preset.id))).toEqual(
@@ -1049,7 +1078,11 @@ describe("preset parity fixture", () => {
       {
         generatedBy:
           "src/lego/presetParity.test.ts. Regenerate with UPDATE_PRESET_PARITY=1 bun run test presetParity",
-        cases: [...cases.map((entry) => entry.fixture), ...actions],
+        cases: [
+          ...cases.map((entry) => entry.fixture),
+          ...actions,
+          ...converted,
+        ],
       },
       null,
       1,
