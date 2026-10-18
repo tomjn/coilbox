@@ -726,7 +726,9 @@ Once you are on the map, press Enter and type:
 /give <unit>
 ```
 
-Cheats have to be on before `/give` does anything. Spawning is left to you: `/give` is one line to type and a spawner would be a gadget to maintain.
+Cheats have to be on before `/give` does anything. You rarely need it, because the scratch game's gadget gives you one of the unit a second in. It goes on the nearest clear ground to your start position, so it does not land inside a commander the game puts there.
+
+A game missing `LuaRules/draw.lua` or `LuaRules/main.lua` runs no gadgets at all, because the engine drops LuaRules without saying so when either file is missing. Empty Mod lacks `draw.lua`. Coilbox asks unitsync which of the two the game has, and the scratch game supplies a missing one that starts the engine's gadget handler.
 
 You need an engine, at least one game and at least one map installed. The drawer says which of those is missing rather than failing at launch.
 
