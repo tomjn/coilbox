@@ -18,11 +18,16 @@ vi.mock("../content/config", () => ({
   primeScan: vi.fn(),
   useScanTargetSelection: () => ({ selected: null }),
 }));
-vi.mock("../content/useLibrary", () => ({
-  useLibrary: () => ({
-    installedFiles: { games: library.games, maps: new Set() },
-    filesRead: library.filesRead,
-    refresh: async () => {},
+vi.mock("../content/useUpdates", () => ({
+  useUpdates: () => ({
+    library: {
+      installedFiles: { games: library.games, maps: new Set() },
+      filesRead: library.filesRead,
+      refresh: async () => {},
+    },
+    games: [],
+    engine: undefined,
+    count: 0,
   }),
 }));
 vi.mock("../downloads/config", () => ({ useWriteRootPath: () => "/w" }));
