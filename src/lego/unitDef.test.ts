@@ -230,6 +230,144 @@ describe("legoUnitDef", () => {
     );
   });
 
+  // Issue #3359. The engine banks aircraft from these keys, so a script adds
+  // none of it. A gunship's move type reads `bankingAllowed` and a plane's the
+  // other five.
+  it("writes a plane's five banking keys and not bankingAllowed", () => {
+    const p = {
+      ...project("Dart", "dart"),
+      movement: {
+        moveClass: "",
+        flies: "plane" as const,
+        speed: 280,
+        maxBank: 0.8,
+        maxPitch: 0.45,
+        maxAileron: 0.015,
+        maxElevator: 0.01,
+        maxRudder: 0.004,
+        bankingAllowed: false,
+      },
+    };
+    const def = legoUnitDef(p, bounds({ x: 32, z: 32 }));
+    expect(def).toMatchObject({
+      maxBank: 0.8,
+      maxPitch: 0.45,
+      maxAileron: 0.015,
+      maxElevator: 0.01,
+      maxRudder: 0.004,
+    });
+    expect(def).not.toHaveProperty("bankingAllowed");
+  });
+
+  it("writes a gunship's bankingAllowed and none of the plane keys", () => {
+    const p = {
+      ...project("Hornet", "hornet"),
+      movement: {
+        moveClass: "",
+        flies: "gunship" as const,
+        speed: 150,
+        bankingAllowed: false,
+        maxBank: 0.5,
+      },
+    };
+    const def = legoUnitDef(p, bounds({ x: 32, z: 32 }));
+    expect(def.bankingAllowed).toBe(false);
+    for (const key of ["maxBank", "maxPitch", "maxAileron", "maxElevator"])
+      expect(def).not.toHaveProperty(key);
+    expect(buildUnitDef(p, bounds({ x: 32, z: 32 }))).toContain(
+      "bankingAllowed = false,",
+    );
+  });
+
+  it("leaves the engine's defaults to a flier that states no banking", () => {
+    const p = {
+      ...project("Dart", "dart"),
+      movement: { moveClass: "", flies: "plane" as const, speed: 280 },
+    };
+    const def = legoUnitDef(p, bounds({ x: 32, z: 32 }));
+    for (const key of ["maxBank", "maxPitch", "bankingAllowed"])
+      expect(def).not.toHaveProperty(key);
+  });
+
+  it("writes a hovercraft no banking keys, since the engine tilts it with the slope", () => {
+    const p = {
+      ...project("Skiff", "skiff"),
+      movement: { moveClass: "HOVER3", speed: 120, turnRate: 500 },
+    };
+    const def = legoUnitDef(p, bounds({ x: 32, z: 32 }));
+    expect(def.movementclass).toBe("HOVER3");
+    for (const key of [
+      "bankingAllowed",
+      "maxBank",
+      "maxPitch",
+      "maxAileron",
+      "maxElevator",
+      "maxRudder",
+    ])
+      expect(def).not.toHaveProperty(key);
+  });
+
+  // Issue #3359. `upDirSmoothing` (`UnitDef.cpp:373`, default 0) is written for
+  // a unit that follows the ground, only when it is above the default.
+  it("writes upDirSmoothing for a hovercraft only when set above 0", () => {
+    const hover = (upDirSmoothing?: number) =>
+      legoUnitDef(
+        {
+          ...project("Skiff", "skiff"),
+          movement: {
+            moveClass: "HOVER3",
+            speed: 120,
+            ...(upDirSmoothing === undefined ? {} : { upDirSmoothing }),
+          },
+        },
+        bounds({ x: 32, z: 32 }),
+      );
+    expect(hover(0.8).upDirSmoothing).toBe(0.8);
+    expect(hover(0)).not.toHaveProperty("upDirSmoothing");
+    expect(hover()).not.toHaveProperty("upDirSmoothing");
+  });
+
+  it("does not write upDirSmoothing for a flier", () => {
+    const def = legoUnitDef(
+      {
+        ...project("Dart", "dart"),
+        movement: {
+          moveClass: "",
+          flies: "plane" as const,
+          speed: 280,
+          upDirSmoothing: 0.5,
+        },
+      },
+      bounds({ x: 32, z: 32 }),
+    );
+    expect(def).not.toHaveProperty("upDirSmoothing");
+  });
+
+  it("writes a ground unit exactly as before", () => {
+    const p = {
+      ...project("Rover", "rover"),
+      movement: {
+        moveClass: "WHEELEDTANK2",
+        speed: 60,
+        turnRate: 600,
+        // Banking numbers on a unit that does not fly are ignored.
+        maxBank: 0.3,
+        bankingAllowed: false,
+      },
+    };
+    const def = legoUnitDef(p, bounds({ x: 32, z: 32 }));
+    expect(def).toMatchObject({
+      canmove: true,
+      movementclass: "WHEELEDTANK2",
+      speed: 60,
+      turnrate: 600,
+    });
+    const keys = Object.keys(def);
+    expect(keys).not.toContain("maxBank");
+    expect(keys).not.toContain("bankingAllowed");
+    expect(keys).not.toContain("canfly");
+  });
+
   it("stays static for a flier with no speed", () => {
     const p = {
       ...project("Dart", "dart"),
@@ -961,7 +1099,16 @@ describe("DERIVED_FIELDS", () => {
   };
   const b = bounds({ x: 32, z: 48 });
   const slots = [{ name: "gun", maxangledif: 90, maindir: "0 0 1" }];
-  const mobile = legoUnitDefWithHome(everything, b, "def", totals, slots);
+  const mobile = legoUnitDefWithHome(
+    {
+      ...everything,
+      movement: { ...everything.movement, upDirSmoothing: 0.5 } as never,
+    },
+    b,
+    "def",
+    totals,
+    slots,
+  );
   const still = legoUnitDefWithHome(
     { ...everything, movement: undefined },
     b,
@@ -990,6 +1137,27 @@ describe("DERIVED_FIELDS", () => {
         flies: "gunship",
         speed: 150,
         cruiseAltitude: 90,
+        bankingAllowed: true,
+      },
+    },
+    b,
+    "def",
+    totals,
+    slots,
+  );
+
+  const plane = legoUnitDefWithHome(
+    {
+      ...everything,
+      movement: {
+        moveClass: "",
+        flies: "plane",
+        speed: 280,
+        maxBank: 0.8,
+        maxPitch: 0.45,
+        maxAileron: 0.015,
+        maxElevator: 0.01,
+        maxRudder: 0.004,
       },
     },
     b,
@@ -1000,6 +1168,7 @@ describe("DERIVED_FIELDS", () => {
 
   it("names every field the builder writes, or says why it is not there", () => {
     const written = new Set([
+      ...Object.keys(plane),
       ...Object.keys(mobile),
       ...Object.keys(still),
       ...Object.keys(gunship),
@@ -1035,6 +1204,7 @@ describe("DERIVED_FIELDS", () => {
         defValue(mobile, path) ??
           defValue(still, path) ??
           defValue(gunship, path) ??
+          defValue(plane, path) ??
           defValue(factory, path),
         path,
       ).toBeDefined();

@@ -489,6 +489,45 @@ function gearPlan(preset: AnimPreset, params: Record<string, number>): Plan {
   };
 }
 
+/**
+ * `Activate` starts the spin-up and the run ends on `Deactivate`, so what is
+ * compared is the spin-up and the full speed after it, the pose `track()`
+ * plays. The wind down after `Deactivate` is not compared.
+ */
+function rotorPlan(preset: AnimPreset, params: Record<string, number>): Plan {
+  const ramp = Math.max(param(preset, params, "spinUp"), 0.05);
+  const stop = CALLIN + Math.round((ramp + 2) * FPS);
+  return {
+    events: [
+      ...CREATED,
+      { frame: CALLIN, callin: "Activate" },
+      { frame: stop, callin: "Deactivate" },
+    ],
+    frames: stop + 1,
+    spans: [{ from: CALLIN, to: stop - 1, t0: 0 }],
+    exceptions: [
+      "The wind down after Deactivate is not compared. Its timing is checked in rotor.test.ts.",
+    ],
+  };
+}
+
+/**
+ * No drive, so the heading reads 0 throughout and the hull stays level. What
+ * this checks is that the script runs under the runtime. A turning heading is
+ * checked in hoverLean.test.ts.
+ */
+function leanPlan(): Plan {
+  const frames = CALLIN + 5 * FPS;
+  return {
+    events: [...CREATED, { frame: CALLIN, callin: "StartMoving" }],
+    frames,
+    spans: [{ from: CALLIN, to: frames - 1, t0: 0 }],
+    exceptions: [
+      "The unit is not driven, so its heading does not change and the hull stays level. A turning heading is checked in hoverLean.test.ts.",
+    ],
+  };
+}
+
 function plan(preset: AnimPreset, params: Record<string, number>): Plan {
   switch (preset.id) {
     case "walk.biped":
@@ -534,6 +573,10 @@ function plan(preset: AnimPreset, params: Record<string, number>): Plan {
       return wakePlan();
     case "gear.stow":
       return gearPlan(preset, params);
+    case "rotor.spin":
+      return rotorPlan(preset, params);
+    case "hover.lean":
+      return leanPlan();
   }
   throw new Error(`no parity plan for ${preset.id}`);
 }
@@ -995,9 +1038,10 @@ describe("preset parity fixture", () => {
   const cases = buildCases();
   const actions = actionCases();
 
-  it("covers all 23 presets", () => {
-    expect(new Set(cases.map((entry) => entry.preset.id)).size).toBe(23);
-    expect(PRESETS).toHaveLength(23);
+  it("covers every preset in PRESETS", () => {
+    expect(new Set(cases.map((entry) => entry.preset.id))).toEqual(
+      new Set(PRESETS.map((preset) => preset.id)),
+    );
   });
 
   it("matches what the presets generate today", () => {

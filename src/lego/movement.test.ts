@@ -469,6 +469,78 @@ describe("suggestFlight", () => {
     });
   });
 
+  // Issue #3359. A key the game's fliers state is suggested as their median,
+  // and a key none states takes the engine's default.
+  it("suggests a plane's banking keys from the game's planes", () => {
+    const game: GameMovementData = {
+      moveDefs: [],
+      units: {
+        a: { canfly: true, speed: 300, maxbank: 0.6, maxaileron: 0.02 },
+        b: { canfly: true, speed: 320, maxBank: 1, maxpitch: 0.3 },
+        c: { canfly: true, speed: 280, maxbank: 0.7 },
+        gun: { canfly: true, hoverattack: true, speed: 100, maxbank: 0.1 },
+      },
+    };
+    const m = suggestFlight(game, "Test Game", "plane");
+    expect(m).toMatchObject({
+      maxBank: 0.7,
+      maxBankFrom: "Median of 3 Test Game planes",
+      maxAileron: 0.02,
+      maxPitch: 0.3,
+      // Nothing states these, so the engine's defaults.
+      maxElevator: 0.01,
+      maxElevatorFrom: "Engine default",
+      maxRudder: 0.004,
+    });
+    expect(m).not.toHaveProperty("bankingAllowed");
+  });
+
+  it("suggests a gunship's bankingAllowed from what most gunships state", () => {
+    const game: GameMovementData = {
+      moveDefs: [],
+      units: {
+        a: {
+          canfly: true,
+          hoverattack: true,
+          speed: 90,
+          bankingallowed: false,
+        },
+        b: { canfly: true, hoverattack: true, speed: 90, bankingAllowed: 0 },
+        c: { canfly: true, hoverattack: true, speed: 90, bankingallowed: true },
+        d: { canfly: true, hoverattack: true, speed: 90 },
+      },
+    };
+    const m = suggestFlight(game, "Test Game", "gunship");
+    expect(m.bankingAllowed).toBe(false);
+    expect(m.bankingAllowedFrom).toBe("Majority of 3 Test Game gunships");
+    expect(m).not.toHaveProperty("maxBank");
+  });
+
+  it("uses the engine's defaults when the game has no flier", () => {
+    const m = suggestFlight(SPLINTER, "Splinter Faction", "plane");
+    expect(m).toMatchObject({
+      maxBank: 0.8,
+      maxPitch: 0.45,
+      maxAileron: 0.015,
+      maxElevator: 0.01,
+      maxRudder: 0.004,
+    });
+    expect(
+      suggestFlight(SPLINTER, "Splinter Faction", "gunship"),
+    ).toMatchObject({ bankingAllowed: true });
+  });
+
+  it("suggests no banking for a ground class", () => {
+    const m = suggestMotion(
+      { moveDefs: [], units: { t: { movementclass: "TANK2", speed: 60 } } },
+      "Test Game",
+      "TANK2",
+    );
+    expect(
+      Object.keys(m).filter((k) => /bank|maxPitch|maxRudder/.test(k)),
+    ).toEqual([]);
+  });
+
   it("falls back on every flier when none has the style", () => {
     const only = { moveDefs: [], units: { bomber: AIR.units.bomber } };
     const m = suggestFlight(only, "Test Game", "gunship");
@@ -476,9 +548,11 @@ describe("suggestFlight", () => {
     expect(m.speedFrom).toBe("Median of 1 Test Game fliers");
   });
 
-  it("sets nothing when the game has no flier", () => {
+  it("suggests no speed or height when the game has no flier", () => {
     const m = suggestFlight(SPLINTER, "Splinter Faction", "plane");
-    expect(m).toEqual({ moveClass: "", flies: "plane" });
+    expect(m).toMatchObject({ moveClass: "", flies: "plane" });
+    for (const key of ["speed", "turnRate", "cruiseAltitude", "acceleration"])
+      expect(m).not.toHaveProperty(key);
   });
 
   it("counts as moving once it has a speed, and survives a save", () => {
