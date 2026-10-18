@@ -28,7 +28,7 @@
  * https://github.com/tomjn/coilbox/issues/715.
  */
 
-import { Button } from "@picoframe/frame";
+import { Button, Input } from "@picoframe/frame";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { FolderOpen, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
@@ -36,6 +36,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { workshopCompile } from "@/workshop/compile";
 import { useModProjects } from "@/workshop/project";
 import {
@@ -72,6 +73,12 @@ import {
   recordExport,
 } from "../../exportRecord";
 import { liftCredits } from "../../liftPiece";
+import {
+  type ExportTarget,
+  exportTargets,
+  loadoutUnit,
+  loadoutUnitNames,
+} from "../../loadouts";
 import { unitScript } from "../../luaScript";
 import type {
   ExportedFile,
@@ -131,6 +138,27 @@ interface Props {
   onAdopt: (
     receipts: Pick<LegoProject, "exported" | "exportedElsewhere">,
   ) => void;
+  /** The same for a loadout of a unit that has them (#3282): the receipt goes
+   *  on that loadout and no other, and the project keeps the folder and the
+   *  choices. `next` and `written` are recorded against the project as it is
+   *  when the edit lands, so exporting every loadout in a row loses none. */
+  onRememberLoadout: (
+    loadoutId: string,
+    settings: {
+      exportDir: string;
+      exportTexture: boolean;
+      exportOverwriteTexture: boolean;
+      exportScript: boolean;
+      exportGlb: boolean;
+      exportObj: boolean;
+    },
+    next: Omit<LegoExport, "files">,
+    written: ExportedFile[],
+  ) => void;
+  /** A definition said to be coilbox's, for one loadout. */
+  onAdoptLoadout: (loadoutId: string, dir: string, file: ExportedFile) => void;
+  /** The name a loadout exports under, as the person typed it. */
+  onLoadoutUnitName: (loadoutId: string, name: string) => void;
 }
 
 /** What is still in the game folder under one name the unit no longer uses. */
@@ -140,6 +168,13 @@ interface Leftover {
   ours: string[];
   /** Files under that name that coilbox did not write, or no longer recognises. */
   kept: string[];
+}
+
+/** One loadout's line in the answer to exporting every loadout. */
+interface BatchLine {
+  unitName: string;
+  /** Null when it went through. */
+  problem: string | null;
 }
 
 type Result =
@@ -191,6 +226,8 @@ type Result =
       pictureProblem: string | null;
     }
   | { state: "failed"; message: string };
+
+type Done = Extract<Result, { state: "done" }>;
 
 /** The standalone "Save GLB…" button, independent of the export above. */
 type GlbSave =
@@ -339,16 +376,63 @@ function FieldChanges({
   );
 }
 
+/**
+ * What a unit's textures come to on export: imported pictures, a sheet made
+ * from mixed parts, or the atlas its parts share. Asked of each unit written,
+ * since a loadout can hold parts the next one does not.
+ */
+function textureFacts(
+  project: LegoProject,
+  pack: LoadedPack,
+  raw: RawGeometry | null,
+) {
+  const imported = project.imported ? importedTextures(project.imported) : null;
+  // A unit of parts holding a lifted piece draws from more than one picture
+  // and a model names one, so on export they go onto one sheet (#3260). Null
+  // for every other unit, which exports exactly as it did before.
+  const mixed = sheetSources(project, pack, raw);
+  const heldBack = mixed && "refused" in mixed ? mixed.refused : null;
+  const sheetFrom = mixed && "sources" in mixed ? mixed.sources : null;
+  // The same two textures again, named as the PNGs a Blender file can carry.
+  const blender = project.imported ? blenderTextures(project.imported) : null;
+  const unit = unitAtlas(project, pack.library.atlases);
+  // What the atlas is called once written, which is what the s3o names and
+  // what a game folder ends up holding. Never the pack's own name for it: that
+  // is generic enough to land on a file the game already has.
+  return {
+    imported,
+    heldBack,
+    sheetFrom,
+    blender,
+    atlas: unit.texture,
+    atlasFile: exportTextureName(unit.texture),
+    // Everything that needs the atlas file itself, rather than only its name,
+    // needs it to actually be installed.
+    installed: unit.installed,
+  };
+}
+
 export function ExportDrawer({
   open: isOpen,
   onOpenChange,
-  project,
+  project: whole,
   pack,
   raw,
   onRemember,
   onStale,
   onAdopt,
+  onRememberLoadout,
+  onAdoptLoadout,
+  onLoadoutUnitName,
 }: Props) {
+  // The unit the drawer describes: the project, or with loadouts the one on
+  // screen as its own unit under its own name and receipts (#3282).
+  const project =
+    (whole.activeLoadout ? loadoutUnit(whole, whole.activeLoadout) : null) ??
+    whole;
+  const loadoutNames = loadoutUnitNames(whole);
+  const [scope, setScope] = useState<"active" | "all">("active");
+  const [batch, setBatch] = useState<BatchLine[] | null>(null);
   const [dir, setDir] = useState(project.exportDir ?? "");
   const [withTexture, setWithTexture] = useState(
     project.exportTexture !== false,
@@ -409,12 +493,13 @@ export function ExportDrawer({
   // A name the game itself declares is the game's. Export already keeps that
   // unit's own `units/<name>.lua` rather than overwriting it, so writing our
   // name over the game's would rename a unit that was never ours.
-  const gameNamesThisUnit =
+  const gameNames = (unitName: string) =>
     gameText.state === "read" &&
     Object.hasOwn(
       gameText.texts[language]?.names ?? {},
-      project.unitName.toLowerCase(),
+      unitName.toLowerCase(),
     );
+  const gameNamesThisUnit = gameNames(project.unitName);
   const writesLanguage = home === "language" && !gameNamesThisUnit;
 
   // What a rename left in the game folder, looked for each time the drawer
@@ -500,7 +585,9 @@ export function ExportDrawer({
         new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)),
         (byte) => byte.toString(16).padStart(2, "0"),
       ).join("");
-      onAdopt(adoptFile(project, dir, { path: definitionPath, sha256 }));
+      const file = { path: definitionPath, sha256 };
+      if (whole.activeLoadout) onAdoptLoadout(whole.activeLoadout, dir, file);
+      else onAdopt(adoptFile(project, dir, file));
     } catch (error) {
       setResult({
         state: "failed",
@@ -548,26 +635,11 @@ export function ExportDrawer({
   // unit having to change.
   // A unit imported from somebody else's model draws with its own textures out
   // of the store, and none of the atlas below applies to it.
-  const imported = project.imported ? importedTextures(project.imported) : null;
-  // A unit of parts holding a lifted piece draws from more than one picture
-  // and a model names one, so on export they go onto one sheet (#3260). Null
-  // for every other unit, which exports exactly as it did before.
-  const mixed = sheetSources(project, pack, raw);
-  const heldBack = mixed && "refused" in mixed ? mixed.refused : null;
-  const sheetFrom = mixed && "sources" in mixed ? mixed.sources : null;
+  const facts = textureFacts(project, pack, raw);
+  const { imported, heldBack, sheetFrom, blender } = facts;
+  const { atlas, atlasFile, installed } = facts;
   const sheetNames = sheetTextureNames(project.unitName);
   const credits = liftCredits(project);
-  // The same two textures again, named as the PNGs a Blender file can carry.
-  const blender = project.imported ? blenderTextures(project.imported) : null;
-  const unit = unitAtlas(project, pack.library.atlases);
-  const atlas = unit.texture;
-  // What the atlas is called once written, which is what the s3o names and
-  // what a game folder ends up holding. Never the pack's own name for it: that
-  // is generic enough to land on a file the game already has.
-  const atlasFile = exportTextureName(atlas);
-  // Everything that needs the atlas file itself, rather than only its name,
-  // needs it to actually be installed.
-  const installed = unit.installed;
 
   async function chooseFolder() {
     const picked = await open({
@@ -586,6 +658,7 @@ export function ExportDrawer({
   // the same answer to the same question. A mixed unit's is its sheet.
   async function glbColourUrl(
     sheet: CombinedSheet | null,
+    { blender, installed, atlas, atlasFile }: ReturnType<typeof textureFacts>,
   ): Promise<string | null> {
     if (sheet) return (await decodedTexture(sheet.blender.colour)).dataUrl;
     if (blender) {
@@ -618,7 +691,7 @@ export function ExportDrawer({
       const sheet = sheetFrom
         ? await buildCombinedSheet(project, pack, raw, sheetFrom)
         : null;
-      const colourUrl = await glbColourUrl(sheet);
+      const colourUrl = await glbColourUrl(sheet, facts);
       const bytes = await exportGlb(project, pack, raw, colourUrl, sheet?.uv);
       if (!bytes) {
         setGlbSave({
@@ -640,26 +713,24 @@ export function ExportDrawer({
     }
   }
 
-  async function runExport() {
-    if (heldBack) {
-      setResult({ state: "failed", message: heldBack });
-      return;
-    }
+  /**
+   * Write one unit: the project, or one of its loadouts as a unit of its own.
+   * Everything below reads `project` as that unit, its name, its pieces and its
+   * receipts, so a loadout is written by the same code as any unit. Throws with
+   * the reason when the unit could not be written.
+   */
+  async function exportOne(target: ExportTarget): Promise<Done> {
+    const project = target.unit;
+    const facts = textureFacts(project, pack, raw);
+    const { imported, heldBack, sheetFrom, blender, atlas, atlasFile } = facts;
+    const { installed } = facts;
+    const writesLanguage = home === "language" && !gameNames(project.unitName);
+    if (heldBack) throw new Error(heldBack);
     // A mixed unit's sheet is made first, since the model names it and its
     // UVs point onto it.
-    let sheet: CombinedSheet | null = null;
-    if (sheetFrom) {
-      setResult({ state: "working" });
-      try {
-        sheet = await buildCombinedSheet(project, pack, raw, sheetFrom);
-      } catch (error) {
-        setResult({
-          state: "failed",
-          message: error instanceof Error ? error.message : String(error),
-        });
-        return;
-      }
-    }
+    const sheet: CombinedSheet | null = sheetFrom
+      ? await buildCombinedSheet(project, pack, raw, sheetFrom)
+      : null;
     // The s3o header names the atlas whether or not this export copies it, so a
     // unit exported without the texture still finds one already installed.
     const model = sheet
@@ -674,263 +745,271 @@ export function ExportDrawer({
           texture1: imported ? imported.texture1 : atlasFile,
           texture2: imported?.texture2,
         });
-    if (!model) {
-      setResult({ state: "failed", message: "This unit has no root piece." });
-      return;
-    }
-    setResult({ state: "working" });
+    if (!model) throw new Error("This unit has no root piece.");
     // Measured rather than taken off the build: a build's `mid` is the header's,
     // which is the aim point, and the definition is derived from the bounding
     // box. Derived once here because two things read it: the Lua file the engine
     // loads, and the receipt the workshop turns into a unit (issue #2651).
     const bounds = unitBounds(project, pack, raw);
     const totals = worthTotals(project, pack);
-    try {
-      // Read again from the workshop every time, so the weapon it writes is
-      // the one the workshop holds now (issue #3274).
-      const weapons = await exportWeapons(project, workshopProjects, (made) =>
-        workshopCompile({ project: made }),
-      );
-      const def = legoUnitDef(project, bounds, home, totals, weapons.slots);
-      // What coilbox wrote into this folder, which is not always the latest
-      // export's receipt (issue #4267).
-      const folderReceipt = receiptFor(project, dir);
-      // The wreck the unit leaves, painted with the unit's own textures
-      // (issue #3310).
-      const wreck = buildWreck(
-        project,
-        pack,
-        raw,
-        { texture1: model.texture1, texture2: model.texture2 },
-        def,
-        sheet?.uv,
-      );
-      const exported = await legoExport({
-        dir,
-        unitName: project.unitName,
-        // A mixed unit's sheet is always written: it is made from this build,
-        // so no game can already have it.
-        textures: sheet
-          ? { atlas: null, stored: sheet.place }
-          : withTexture
-            ? {
-                atlas:
-                  !imported && installed
-                    ? {
-                        name: atlas,
-                        pack: installed.folder,
-                        writeAs: atlasFile,
-                      }
-                    : null,
-                stored: imported ? imported.place : [],
-              }
-            : null,
-        overwriteTexture: withOverwriteTexture,
-        script: withScript ? unitScript(project) : null,
-        // A script still exactly as the last export wrote it has not been
-        // touched, so it is replaced with this build's (issue #3245).
-        scriptWritten: writtenDigest(
-          folderReceipt,
-          dir,
-          `scripts/${project.unitName}.lua`,
-        ),
-        // Not behind the script checkbox. That one is about not clobbering a
-        // game's own hand-written script, and this file is coilbox's: it is
-        // rewritten, or taken away, on every export.
-        pieceCollision: buildPieceCollisionScript(
-          project,
-          bakedPieces(project, pack, raw).pieces,
-        ),
-        // Unlike the atlas and the script, there is no scenario where a
-        // built unit should export without one: with no unit definition the
-        // engine has nothing to spawn.
-        unitDef: buildUnitDef(project, bounds, home, totals, weapons.slots),
-        // The fields the build decides, beside what the last export wrote
-        // there, so a re-export updates the ones nobody has changed.
-        unitDefFields: derivedFields(def, folderReceipt, dir, project.unitName),
-        // Where the name goes for a game that will not read one in the
-        // definition. Coilbox's own file beside the game's, never the game's
-        // (issue #2683).
-        text: writesLanguage ? { language, ...unitWords(project) } : null,
-        model,
-        weapons: weapons.files,
-        ...(wreck
+    // Read again from the workshop every time, so the weapon it writes is
+    // the one the workshop holds now (issue #3274).
+    const weapons = await exportWeapons(project, workshopProjects, (made) =>
+      workshopCompile({ project: made }),
+    );
+    const def = legoUnitDef(project, bounds, home, totals, weapons.slots);
+    // What coilbox wrote into this folder, which is not always the latest
+    // export's receipt (issue #4267).
+    const folderReceipt = receiptFor(project, dir);
+    // The wreck the unit leaves, painted with the unit's own textures
+    // (issue #3310).
+    const wreck = buildWreck(
+      project,
+      pack,
+      raw,
+      { texture1: model.texture1, texture2: model.texture2 },
+      def,
+      sheet?.uv,
+    );
+    const exported = await legoExport({
+      dir,
+      unitName: project.unitName,
+      // A mixed unit's sheet is always written: it is made from this build,
+      // so no game can already have it.
+      textures: sheet
+        ? { atlas: null, stored: sheet.place }
+        : withTexture
           ? {
-              wreck: {
-                model: wreck.model,
-                feature: wreck.feature,
-                featureWritten: writtenDigest(
-                  folderReceipt,
-                  dir,
-                  wreckFeaturePath(project.unitName),
-                ),
-              },
-            }
-          : {}),
-      });
-
-      // The Blender half, which the engine reads none of. A texture the decoder
-      // cannot read stops these two and nothing else: the model, the script and
-      // the definition are already written and are what the game runs on.
-      let glbPath: string | null = null;
-      let objPath: string | null = null;
-      let mtlPath: string | null = null;
-      let written: BlenderTextureWritten[] = [];
-      let blenderProblem: string | null = null;
-      // Every file this run put on disk under the unit's name, for the receipt
-      // a later rename reads to know what is still its own (issue #2680).
-      let owned: ExportedFile[] = exported.owned;
-
-      // The build picture, if one has been taken. Its own step because it is
-      // write once: a picture in the game that the builder did not write is the
-      // game maker's, and the receipt's digest is how that is told. A failure
-      // here is reported and does not undo the export above.
-      let picturePath: string | null = null;
-      let pictureKept = false;
-      let pictureProblem: string | null = null;
-      if (withPicture && project.picture) {
-        try {
-          const placed = await legoExportPicture({
-            dir,
-            unitName: project.unitName,
-            id: project.id,
-            written: pictureDigest(folderReceipt, dir, project.unitName),
-          });
-          pictureKept = placed.kept;
-          picturePath = placed.kept ? null : placed.path;
-          owned = [...owned, ...placed.owned];
-        } catch (error) {
-          pictureProblem =
-            error instanceof Error ? error.message : String(error);
-        }
-      }
-
-      try {
-        // The mask is not a colour map, so it goes beside whichever file is
-        // written rather than into a material slot that would misdescribe it.
-        // A mixed unit's two sheets go the way an imported unit's own
-        // textures do.
-        const pictures = sheet ? sheet.blender : blender;
-        const place = pictures?.mask ? [pictures.mask] : [];
-
-        if (withGlb && (pictures || installed)) {
-          const colourUrl = await glbColourUrl(sheet);
-          const bytes = await exportGlb(
-            project,
-            pack,
-            raw,
-            colourUrl,
-            sheet?.uv,
-          );
-          if (bytes) {
-            const glbWritten = await legoExportGlb({
-              dir,
-              unitName: project.unitName,
-              bytes: Array.from(new Uint8Array(bytes)),
-              textures: place,
-            });
-            glbPath = glbWritten.path;
-            written = [...written, ...glbWritten.textures];
-            owned = [...owned, ...glbWritten.owned];
-          }
-        }
-
-        if (withObj && (pictures || installed)) {
-          const objBuild = buildObj(project, pack, raw, {
-            unitName: project.unitName,
-            textureName: pictures
-              ? (pictures.colour?.writeAs ?? null)
-              : atlasFile,
-            maskName: pictures?.mask?.writeAs,
-            sheet: sheet?.uv,
-          });
-          if (objBuild) {
-            const objWritten = await legoExportObj({
-              dir,
-              unitName: project.unitName,
-              obj: objBuild.obj,
-              mtl: objBuild.mtl,
               atlas:
-                !pictures && installed
-                  ? { name: atlas, pack: installed.folder, writeAs: atlasFile }
+                !imported && installed
+                  ? {
+                      name: atlas,
+                      pack: installed.folder,
+                      writeAs: atlasFile,
+                    }
                   : null,
-              // The colour texture as well this time: an `.mtl` names a file
-              // beside it rather than carrying the picture the way a `.glb`
-              // does.
-              textures: pictures
-                ? [pictures.colour, ...place].filter((t) => t !== null)
-                : [],
-            });
-            objPath = objWritten.obj;
-            mtlPath = objWritten.mtl;
-            written = [...written, ...objWritten.textures];
-            owned = [...owned, ...objWritten.owned];
+              stored: imported ? imported.place : [],
+            }
+          : null,
+      overwriteTexture: withOverwriteTexture,
+      script: withScript ? unitScript(project) : null,
+      // A script still exactly as the last export wrote it has not been
+      // touched, so it is replaced with this build's (issue #3245).
+      scriptWritten: writtenDigest(
+        folderReceipt,
+        dir,
+        `scripts/${project.unitName}.lua`,
+      ),
+      // Not behind the script checkbox. That one is about not clobbering a
+      // game's own hand-written script, and this file is coilbox's: it is
+      // rewritten, or taken away, on every export.
+      pieceCollision: buildPieceCollisionScript(
+        project,
+        bakedPieces(project, pack, raw).pieces,
+      ),
+      // Unlike the atlas and the script, there is no scenario where a
+      // built unit should export without one: with no unit definition the
+      // engine has nothing to spawn.
+      unitDef: buildUnitDef(project, bounds, home, totals, weapons.slots),
+      // The fields the build decides, beside what the last export wrote
+      // there, so a re-export updates the ones nobody has changed.
+      unitDefFields: derivedFields(def, folderReceipt, dir, project.unitName),
+      // Where the name goes for a game that will not read one in the
+      // definition. Coilbox's own file beside the game's, never the game's
+      // (issue #2683).
+      text: writesLanguage ? { language, ...unitWords(project) } : null,
+      model,
+      weapons: weapons.files,
+      ...(wreck
+        ? {
+            wreck: {
+              model: wreck.model,
+              feature: wreck.feature,
+              featureWritten: writtenDigest(
+                folderReceipt,
+                dir,
+                wreckFeaturePath(project.unitName),
+              ),
+            },
           }
-        }
+        : {}),
+    });
+
+    // The Blender half, which the engine reads none of. A texture the decoder
+    // cannot read stops these two and nothing else: the model, the script and
+    // the definition are already written and are what the game runs on.
+    let glbPath: string | null = null;
+    let objPath: string | null = null;
+    let mtlPath: string | null = null;
+    let written: BlenderTextureWritten[] = [];
+    let blenderProblem: string | null = null;
+    // Every file this run put on disk under the unit's name, for the receipt
+    // a later rename reads to know what is still its own (issue #2680).
+    let owned: ExportedFile[] = exported.owned;
+
+    // The build picture, if one has been taken. Its own step because it is
+    // write once: a picture in the game that the builder did not write is the
+    // game maker's, and the receipt's digest is how that is told. A failure
+    // here is reported and does not undo the export above.
+    let picturePath: string | null = null;
+    let pictureKept = false;
+    let pictureProblem: string | null = null;
+    if (withPicture && project.picture) {
+      try {
+        const placed = await legoExportPicture({
+          dir,
+          unitName: project.unitName,
+          id: project.id,
+          written: pictureDigest(folderReceipt, dir, project.unitName),
+        });
+        pictureKept = placed.kept;
+        picturePath = placed.kept ? null : placed.path;
+        owned = [...owned, ...placed.owned];
       } catch (error) {
-        blenderProblem = error instanceof Error ? error.message : String(error);
+        pictureProblem = error instanceof Error ? error.message : String(error);
+      }
+    }
+
+    try {
+      // The mask is not a colour map, so it goes beside whichever file is
+      // written rather than into a material slot that would misdescribe it.
+      // A mixed unit's two sheets go the way an imported unit's own
+      // textures do.
+      const pictures = sheet ? sheet.blender : blender;
+      const place = pictures?.mask ? [pictures.mask] : [];
+
+      if (withGlb && (pictures || installed)) {
+        const colourUrl = await glbColourUrl(sheet, facts);
+        const bytes = await exportGlb(project, pack, raw, colourUrl, sheet?.uv);
+        if (bytes) {
+          const glbWritten = await legoExportGlb({
+            dir,
+            unitName: project.unitName,
+            bytes: Array.from(new Uint8Array(bytes)),
+            textures: place,
+          });
+          glbPath = glbWritten.path;
+          written = [...written, ...glbWritten.textures];
+          owned = [...owned, ...glbWritten.owned];
+        }
       }
 
-      // Only on the way out of a successful export, so the receipt never claims
-      // a folder holds a unit that failed to reach it. A re-export overwrites
-      // the receipt for its folder, which is what keeps a second run from
-      // becoming a second unit (issue #2651). The receipts for other folders are
-      // kept (issue #4267). Where the name
-      // changed, the receipt it replaces is moved aside rather than dropped,
-      // since the files under the old name are still in the folder and after
-      // this nothing else knows they are there (issue #2680).
-      onRemember({
-        exportDir: dir,
-        exportTexture: withTexture,
-        exportOverwriteTexture: withOverwriteTexture,
-        exportScript: withScript,
-        exportGlb: withGlb,
-        exportObj: withObj,
-        ...recordExport(
-          project,
-          {
+      if (withObj && (pictures || installed)) {
+        const objBuild = buildObj(project, pack, raw, {
+          unitName: project.unitName,
+          textureName: pictures
+            ? (pictures.colour?.writeAs ?? null)
+            : atlasFile,
+          maskName: pictures?.mask?.writeAs,
+          sheet: sheet?.uv,
+        });
+        if (objBuild) {
+          const objWritten = await legoExportObj({
             dir,
-            at: new Date().toISOString(),
             unitName: project.unitName,
-            // What the file got from coilbox, not only what this build gives:
-            // a field kept because it was edited stays at the value last
-            // written, so the next export still sees the edit.
-            def: receiptDef(
-              def,
-              folderReceipt,
-              dir,
-              project.unitName,
-              exported,
-            ),
-          },
-          owned,
-        ),
-      });
-      setResult({
-        state: "done",
-        ...exported,
-        built: def,
-        weaponSlots: weapons.slots.length,
-        weaponsMissing: weapons.missing,
-        glb: glbPath,
-        obj: objPath,
-        mtl: mtlPath,
-        picture: picturePath,
-        pictureKept,
-        pictureProblem,
-        // Both Blender files write the mask, into the same folder under the
-        // same name, so a run that wrote both reports it once.
-        blenderTextures: written.filter(
-          (t, i) => written.findIndex((other) => other.path === t.path) === i,
-        ),
-        blenderProblem,
-      });
+            obj: objBuild.obj,
+            mtl: objBuild.mtl,
+            atlas:
+              !pictures && installed
+                ? { name: atlas, pack: installed.folder, writeAs: atlasFile }
+                : null,
+            // The colour texture as well this time: an `.mtl` names a file
+            // beside it rather than carrying the picture the way a `.glb`
+            // does.
+            textures: pictures
+              ? [pictures.colour, ...place].filter((t) => t !== null)
+              : [],
+          });
+          objPath = objWritten.obj;
+          mtlPath = objWritten.mtl;
+          written = [...written, ...objWritten.textures];
+          owned = [...owned, ...objWritten.owned];
+        }
+      }
     } catch (error) {
-      setResult({
-        state: "failed",
-        message: error instanceof Error ? error.message : String(error),
-      });
+      blenderProblem = error instanceof Error ? error.message : String(error);
     }
+
+    // Only on the way out of a successful export, so the receipt never claims
+    // a folder holds a unit that failed to reach it. A re-export overwrites
+    // the receipt for its folder, which is what keeps a second run from
+    // becoming a second unit (issue #2651). The receipts for other folders are
+    // kept (issue #4267). Where the name
+    // changed, the receipt it replaces is moved aside rather than dropped,
+    // since the files under the old name are still in the folder and after
+    // this nothing else knows they are there (issue #2680).
+    const settings = {
+      exportDir: dir,
+      exportTexture: withTexture,
+      exportOverwriteTexture: withOverwriteTexture,
+      exportScript: withScript,
+      exportGlb: withGlb,
+      exportObj: withObj,
+    };
+    const next = {
+      dir,
+      at: new Date().toISOString(),
+      unitName: project.unitName,
+      // What the file got from coilbox, not only what this build gives:
+      // a field kept because it was edited stays at the value last
+      // written, so the next export still sees the edit.
+      def: receiptDef(def, folderReceipt, dir, project.unitName, exported),
+    };
+    if (target.loadoutId)
+      onRememberLoadout(target.loadoutId, settings, next, owned);
+    else onRemember({ ...settings, ...recordExport(project, next, owned) });
+    return {
+      state: "done",
+      ...exported,
+      built: def,
+      weaponSlots: weapons.slots.length,
+      weaponsMissing: weapons.missing,
+      glb: glbPath,
+      obj: objPath,
+      mtl: mtlPath,
+      picture: picturePath,
+      pictureKept,
+      pictureProblem,
+      // Both Blender files write the mask, into the same folder under the
+      // same name, so a run that wrote both reports it once.
+      blenderTextures: written.filter(
+        (t, i) => written.findIndex((other) => other.path === t.path) === i,
+      ),
+      blenderProblem,
+    };
+  }
+
+  async function runExport() {
+    const targets = exportTargets(whole, scope);
+    setResult({ state: "working" });
+    setBatch(null);
+    if (scope === "active" || targets.length === 1) {
+      try {
+        setResult(await exportOne(targets[0]));
+      } catch (error) {
+        setResult({
+          state: "failed",
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+      return;
+    }
+    // Every loadout in turn. One that cannot be written is reported and the
+    // rest still go, since they are separate units.
+    const lines: BatchLine[] = [];
+    for (const target of targets) {
+      try {
+        await exportOne(target);
+        lines.push({ unitName: target.unit.unitName, problem: null });
+      } catch (error) {
+        lines.push({
+          unitName: target.unit.unitName,
+          problem: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+    setBatch(lines);
+    setResult({ state: "idle" });
   }
 
   return (
@@ -966,6 +1045,55 @@ export function ExportDrawer({
                 </Button>
               </div>
             </div>
+
+            {whole.loadouts ? (
+              <div className="flex flex-col gap-2">
+                <span className="text-sm font-medium">Loadouts</span>
+                <ToggleGroup
+                  type="single"
+                  variant="outline"
+                  size="sm"
+                  value={scope}
+                  aria-label="Which loadouts to export"
+                  onValueChange={(value) => {
+                    if (value === "active" || value === "all") setScope(value);
+                  }}
+                >
+                  <ToggleGroupItem value="active">This loadout</ToggleGroupItem>
+                  <ToggleGroupItem value="all">All loadouts</ToggleGroupItem>
+                </ToggleGroup>
+                <ul className="flex flex-col gap-1.5">
+                  {whole.loadouts.map((loadout) => {
+                    const name = loadoutNames.get(loadout.id) ?? "";
+                    const written =
+                      scope === "all" || loadout.id === whole.activeLoadout;
+                    return (
+                      <li
+                        key={loadout.id}
+                        className={`flex items-center gap-2 text-xs ${written ? "" : "opacity-50"}`}
+                      >
+                        <span className="w-28 shrink-0 truncate">
+                          {loadout.name}
+                        </span>
+                        <Input
+                          key={`${loadout.id}:${name}`}
+                          aria-label={`Unit name for ${loadout.name}`}
+                          className="h-7 text-xs"
+                          defaultValue={name}
+                          onBlur={(event) => {
+                            if (event.currentTarget.value !== name)
+                              onLoadoutUnitName(
+                                loadout.id,
+                                event.currentTarget.value,
+                              );
+                          }}
+                        />
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : null}
 
             <div className="flex flex-col gap-2">
               <span className="text-sm font-medium">Unit definition</span>
@@ -1400,6 +1528,21 @@ export function ExportDrawer({
                 {result.state === "working" ? "Exporting" : "Export"}
               </Button>
             </div>
+
+            {batch ? (
+              <ul className="flex flex-col gap-1 text-xs">
+                {batch.map((line) => (
+                  <li
+                    key={line.unitName}
+                    className={line.problem ? "text-destructive" : undefined}
+                  >
+                    {line.problem
+                      ? `${line.unitName} was not written: ${line.problem}`
+                      : `${line.unitName} written`}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
 
             {result.state === "done" ? (
               <div className="flex flex-col gap-2 text-xs">
