@@ -316,6 +316,14 @@ export interface LegoMovement {
   cruiseAltitude?: number;
   /** Where `cruiseAltitude` came from, when the game suggested it. */
   cruiseAltitudeFrom?: string;
+  /** Written as `upDirSmoothing` for a unit that follows the ground, such as a
+   *  hovercraft: how much of its last up direction it keeps each frame, 0 to
+   *  0.95 (`UnitDef.cpp:373`, default 0). Written only above 0. */
+  upDirSmoothing?: number;
+  /** Nothing suggests it, so this is never set. The field exists so the
+   *  movement panel can clear a number and its source the same way for every
+   *  key. */
+  upDirSmoothingFrom?: string;
   /** Written as `bankingAllowed` for a gunship (`HoverAirMoveType.cpp:151`).
    *  The engine's default is true. See `banking.ts`. */
   bankingAllowed?: boolean;
@@ -2528,6 +2536,9 @@ function parseMovement(value: unknown): LegoMovement | null {
       : {}),
     ...(typeof v.cruiseAltitudeFrom === "string"
       ? { cruiseAltitudeFrom: v.cruiseAltitudeFrom }
+      : {}),
+    ...(!flies && number(v.upDirSmoothing)
+      ? { upDirSmoothing: v.upDirSmoothing as number }
       : {}),
     ...(flies && typeof v.bankingAllowed === "boolean"
       ? { bankingAllowed: v.bankingAllowed }

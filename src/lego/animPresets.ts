@@ -87,6 +87,9 @@ export const ROLES: LegoRole[] = [
   // An aircraft's landing gear, each piece's joint at the hinge. `LANDING_GEAR`
   // turns it up on take off and down on landing.
   { id: "gear", label: "Landing gear", group: "Movement" },
+  // A gunship's rotor, its joint on the shaft. `ROTOR_SPIN` spins it about the
+  // vertical axis while the aircraft is up.
+  { id: "rotor", label: "Rotor", group: "Movement" },
   ...legRoleEntries(2),
   { id: "buildarm.base", label: "Build arm base", group: "Build arm" },
   { id: "buildarm.arm", label: "Build arm", group: "Build arm" },
@@ -1620,6 +1623,93 @@ export const RUDDER_FOLLOWS: AnimPreset = {
 };
 
 /**
+ * Degrees of hull lean for each degree a second the unit turns. A design
+ * choice, as the rudder's is: the engine says only that a heading is 65536 to a
+ * circle. The slider caps what that reaches.
+ */
+const LEAN_PER_TURN_RATE = 0.25;
+
+/** Radians of lean for each heading unit turned in one poll. */
+const LEAN_PER_HEADING =
+  (LEAN_PER_TURN_RATE * (TAU / HEADING_CIRCLE)) /
+  (RUDDER_POLL_FRAMES / ENGINE_FPS);
+
+/**
+ * A hovercraft hull that leans into its turns.
+ *
+ * A hovercraft is a ground unit, and `CGroundMoveType::ChangeHeading` calls the
+ * script's `ChangeHeading` only for a turn of `minScriptChangeHeading` or more
+ * in one frame (`GroundMoveType.cpp:1452-1453`), which no unchanged game
+ * reaches (`ENGINE_MIN_SCRIPT_CHANGE_HEADING`). So this reads the heading as the
+ * rudder does, with `GetUnitValue(COB.HEADING)`, and leans the hull with the
+ * turn it measures. The lean is a `Turn` about z, which is a roll to the unit's
+ * right when positive, so a right turn (a falling heading) leans right.
+ *
+ * The slope tilt is the engine's and needs no script (`upDirSmoothing`). The
+ * lean is added to it inside the piece.
+ */
+export const HOVER_LEAN: AnimPreset = {
+  id: "hover.lean",
+  label: "Hull leans into turns",
+  description:
+    "Leans the hull into the unit's turning while it moves, and eases it level when the turn ends.",
+  requires: [{ role: "base", count: 1 }],
+  animates: ["base"],
+  params: [
+    {
+      id: "max",
+      label: "Largest lean",
+      unit: "deg",
+      min: 0,
+      max: 30,
+      step: 1,
+      fallback: 8,
+    },
+  ],
+  /** The lean depends on the unit's heading, which a time cannot give. */
+  track() {
+    return null;
+  },
+  emit(ctx) {
+    const hulls = ctx.pieces("base");
+    if (hulls.length === 0) return null;
+    const most = deg(value(this, ctx.params, "max"));
+    const speed = lua(most / RUDDER_SWING_SECONDS);
+    const turnAll = (angle: string) =>
+      hulls.map((hull) => `    Turn(${hull}, z_axis, ${angle}, ${speed})`);
+    const half = HEADING_CIRCLE / 2;
+    return {
+      functions: [
+        "local function hullLean()",
+        `  SetSignalMask(${ctx.signal})`,
+        "  local last = GetUnitValue(COB.HEADING)",
+        "  while true do",
+        `    Sleep(${RUDDER_POLL_FRAMES * SLEEP_FRAME_MS})`,
+        "    local now = GetUnitValue(COB.HEADING)",
+        // A signed short, so a turn across the wrap is the short way round.
+        // A left turn raises the heading, so `lean` is its size to the left and
+        // the roll is its negative.
+        `    local lean = ((now - last + ${half}) % ${HEADING_CIRCLE} - ${half}) * ${Number(LEAN_PER_HEADING.toPrecision(6))}`,
+        "    last = now",
+        `    if lean > ${lua(most)} then lean = ${lua(most)} end`,
+        `    if lean < -${lua(most)} then lean = -${lua(most)} end`,
+        ...turnAll("-lean"),
+        "  end",
+        "end",
+        "",
+        "local function hullLeanStop()",
+        ...turnAll("0"),
+        "end",
+      ],
+      hooks: {
+        StartMoving: [`  Signal(${ctx.signal})`, "  StartThread(hullLean)"],
+        StopMoving: [`  Signal(${ctx.signal})`, "  hullLeanStop()"],
+      },
+    };
+  },
+};
+
+/**
  * The steering reads the heading as the rudder does, every
  * `RUDDER_POLL_FRAMES`. A driven heading wobbles from frame to frame, and the
  * rudder's note says a shorter poll swings with it. A poll of 3 frames did:
@@ -1969,6 +2059,77 @@ export const LANDING_GEAR: AnimPreset = {
           ...turn("0"),
           "  end",
         ],
+      },
+    };
+  },
+};
+
+/**
+ * Rotors that spin while the aircraft is up.
+ *
+ * A gunship's rotor turns whether it is moving or hovering still, so this
+ * follows `Activate` and `Deactivate`, which the hovering air move type calls on
+ * take off and on landing (`HoverAirMoveType.cpp:211,206`), and not
+ * `StartMoving` and `StopMoving`, which it calls only as the speed leaves and
+ * returns to zero (`HoverAirMoveType.cpp:996-997`). A rotor on a unit that
+ * hovers would otherwise stop dead in the air.
+ *
+ * `Spin` and `StopSpin` take an acceleration that is gained every frame
+ * (`UnitScript.cpp:187-188`), so the spin-up time sets it as
+ * `speed / (time * frames a second)`. The rotor spins about its own y axis, so
+ * its joint is the shaft.
+ */
+export const ROTOR_SPIN: AnimPreset = {
+  id: "rotor.spin",
+  label: "Rotors spin while flying",
+  description:
+    "Spins every rotor from take off to landing, spinning up when the aircraft lifts and winding down when it lands.",
+  requires: [{ role: "rotor", count: 1 }],
+  animates: ["rotor"],
+  params: [
+    {
+      id: "rate",
+      label: "Turns per second",
+      unit: "hz",
+      min: 0.5,
+      max: 10,
+      step: 0.5,
+      fallback: 4,
+    },
+    {
+      id: "spinUp",
+      label: "Spin up and down time",
+      unit: "s",
+      min: 0.1,
+      max: 8,
+      step: 0.1,
+      fallback: 2,
+    },
+  ],
+  /** Spinning up, then at full speed, as it is from `Activate`. */
+  track(t, params, role) {
+    if (role !== "rotor") return null;
+    const top = TAU * value(this, params, "rate");
+    const ramp = Math.max(value(this, params, "spinUp"), 0.05);
+    const angle = t < ramp ? (top * t * t) / (2 * ramp) : top * (t - ramp / 2);
+    return { rotation: [0, angle, 0] };
+  },
+  emit(ctx) {
+    const rotors = ctx.pieces("rotor");
+    if (rotors.length === 0) return null;
+    const top = TAU * value(this, ctx.params, "rate");
+    const ramp = Math.max(value(this, ctx.params, "spinUp"), 0.05);
+    const speed = lua(top);
+    const accel = lua(top / (ramp * ENGINE_FPS));
+    return {
+      functions: [],
+      hooks: {
+        Activate: rotors.map(
+          (rotor) => `  Spin(${rotor}, y_axis, ${speed}, ${accel})`,
+        ),
+        Deactivate: rotors.map(
+          (rotor) => `  StopSpin(${rotor}, y_axis, ${accel})`,
+        ),
       },
     };
   },
@@ -2911,6 +3072,7 @@ export const PRESETS: AnimPreset[] = [
   RUDDER_FOLLOWS,
   WAKE_WHILE_MOVING,
   LANDING_GEAR,
+  ROTOR_SPIN,
   BUILDARM,
   BUILD_AIM,
   BUILD_FACTORY,
@@ -2923,6 +3085,7 @@ export const PRESETS: AnimPreset[] = [
   WRECK_POSE,
   WHEELS_STEER,
   BODY_ROCK,
+  HOVER_LEAN,
   BREAK_APART,
 ];
 
@@ -3002,6 +3165,7 @@ const ROLE_ROTATION_AXES: Record<string, readonly number[]> = {
   "buildarm.nozzle": [0],
   door: [1],
   base: [1, 2],
+  rotor: [1],
   aim: [0, 1],
 };
 

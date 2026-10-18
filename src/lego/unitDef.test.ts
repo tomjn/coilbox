@@ -307,6 +307,42 @@ describe("legoUnitDef", () => {
       expect(def).not.toHaveProperty(key);
   });
 
+  // Issue #3359. `upDirSmoothing` (`UnitDef.cpp:373`, default 0) is written for
+  // a unit that follows the ground, only when it is above the default.
+  it("writes upDirSmoothing for a hovercraft only when set above 0", () => {
+    const hover = (upDirSmoothing?: number) =>
+      legoUnitDef(
+        {
+          ...project("Skiff", "skiff"),
+          movement: {
+            moveClass: "HOVER3",
+            speed: 120,
+            ...(upDirSmoothing === undefined ? {} : { upDirSmoothing }),
+          },
+        },
+        bounds({ x: 32, z: 32 }),
+      );
+    expect(hover(0.8).upDirSmoothing).toBe(0.8);
+    expect(hover(0)).not.toHaveProperty("upDirSmoothing");
+    expect(hover()).not.toHaveProperty("upDirSmoothing");
+  });
+
+  it("does not write upDirSmoothing for a flier", () => {
+    const def = legoUnitDef(
+      {
+        ...project("Dart", "dart"),
+        movement: {
+          moveClass: "",
+          flies: "plane" as const,
+          speed: 280,
+          upDirSmoothing: 0.5,
+        },
+      },
+      bounds({ x: 32, z: 32 }),
+    );
+    expect(def).not.toHaveProperty("upDirSmoothing");
+  });
+
   it("writes a ground unit exactly as before", () => {
     const p = {
       ...project("Rover", "rover"),
@@ -1063,7 +1099,16 @@ describe("DERIVED_FIELDS", () => {
   };
   const b = bounds({ x: 32, z: 48 });
   const slots = [{ name: "gun", maxangledif: 90, maindir: "0 0 1" }];
-  const mobile = legoUnitDefWithHome(everything, b, "def", totals, slots);
+  const mobile = legoUnitDefWithHome(
+    {
+      ...everything,
+      movement: { ...everything.movement, upDirSmoothing: 0.5 } as never,
+    },
+    b,
+    "def",
+    totals,
+    slots,
+  );
   const still = legoUnitDefWithHome(
     { ...everything, movement: undefined },
     b,

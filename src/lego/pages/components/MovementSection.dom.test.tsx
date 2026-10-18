@@ -410,6 +410,39 @@ describe("MovementSection", () => {
     expect(screen.queryByText("Max bank")).toBeNull();
   });
 
+  it("edits slope smoothing on a ground unit and not on a flier", () => {
+    const onMovementChange = vi.fn();
+    const { unmount } = render(
+      <MovementSection
+        project={project("wheel", {
+          movement: { moveClass: "WHEELEDTANK2", speed: 120 },
+        })}
+        bounds={BOUNDS}
+        onMovementChange={onMovementChange}
+      />,
+    );
+    expect(
+      screen.getByText(/Not set, the engine uses 0 and the unit follows/),
+    ).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/^Slope smoothing/), {
+      target: { value: "0.6" },
+    });
+    expect(onMovementChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ upDirSmoothing: 0.6 }),
+    );
+    unmount();
+    render(
+      <MovementSection
+        project={project("", {
+          movement: { moveClass: "", flies: "plane", speed: 280 },
+        })}
+        bounds={BOUNDS}
+        onMovementChange={vi.fn()}
+      />,
+    );
+    expect(screen.queryByLabelText(/^Slope smoothing/)).toBeNull();
+  });
+
   it("shows a ground unit no banking", () => {
     render(
       <MovementSection

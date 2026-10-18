@@ -31,6 +31,10 @@ export const SOLO_SCENARIOS: Record<string, string> = {
   "wake.moving": "driving",
   // Stows on take off and lowers on landing, which only this scenario sends.
   "gear.stow": "take-off-landing",
+  // Spins from take off to landing, which only this scenario sends.
+  "rotor.spin": "take-off-landing",
+  // Reads the heading, which only the driving scenario changes.
+  "hover.lean": "driving",
   buildarm: "building",
   "build.aim": "building",
   "build.factory": "building-factory",

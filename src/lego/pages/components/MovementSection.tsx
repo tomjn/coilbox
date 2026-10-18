@@ -171,6 +171,7 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
       | "acceleration"
       | "brakeRate"
       | "cruiseAltitude"
+      | "upDirSmoothing"
       | "maxBank"
       | "maxPitch"
       | "maxAileron"
@@ -315,6 +316,28 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
                 value={movement.reverseSpeed ?? ""}
                 onChange={(event) =>
                   setNumber("reverseSpeed", event.target.value)
+                }
+              />
+            </Field>
+          )}
+          {movement.flies ? null : (
+            <Field
+              label="Slope smoothing"
+              help={marks("updirsmoothing")}
+              hint={
+                movement.upDirSmoothing
+                  ? undefined
+                  : "Not set, the engine uses 0 and the unit follows the ground at once"
+              }
+            >
+              <Input
+                type="number"
+                min={0}
+                max={0.95}
+                step="any"
+                value={movement.upDirSmoothing ?? ""}
+                onChange={(event) =>
+                  setNumber("upDirSmoothing", event.target.value)
                 }
               />
             </Field>

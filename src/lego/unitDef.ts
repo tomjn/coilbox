@@ -180,7 +180,15 @@ function movementFields(project: LegoProject): Record<string, unknown> {
           : {}),
         ...bankingFields(movement),
       }
-    : { movementclass: movement.moveClass };
+    : {
+        movementclass: movement.moveClass,
+        // Written only when changed: the engine's default is 0, which follows
+        // the ground at once (`UnitDef.cpp:373`).
+        ...(typeof movement.upDirSmoothing === "number" &&
+        movement.upDirSmoothing > 0
+          ? { upDirSmoothing: movement.upDirSmoothing }
+          : {}),
+      };
   return {
     canmove: true,
     ...flight,
@@ -416,6 +424,7 @@ export const DERIVED_FIELDS: readonly string[] = [
   "canmove",
   "maxslope",
   "movementclass",
+  "upDirSmoothing",
   "canfly",
   "hoverattack",
   "cruisealtitude",

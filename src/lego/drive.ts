@@ -124,6 +124,9 @@ export interface DriveMotion {
   /** Set for a flier, which the engine banks (`banking.ts`). Absent for every
    *  other unit, whose frames then carry no `bank`. */
   flight?: Flight;
+  /** The unit's `upDirSmoothing` (`UnitDef.cpp:373`): how much of the last
+   *  frame's up direction it keeps. Absent or 0 follows the ground at once. */
+  upDirSmoothing?: number;
 }
 
 /** Where `DriveMotion`'s two numbers came from, for the panel to say. */
@@ -180,10 +183,16 @@ export function driveMotion(project: LegoProject): DriveSource {
     project.movement?.brakeRate ?? (def ? unitBrakeRateOf(def) : undefined);
 
   const flight = flightOf(project.movement);
+  // Clamped as the engine clamps it, to 0 to 0.95 (`UnitDef.cpp:373`). A flier
+  // has no ground to follow.
+  const upDirSmoothing = flight
+    ? 0
+    : Math.min(Math.max(project.movement?.upDirSmoothing ?? 0, 0), 0.95);
   return {
     motion: {
       speed: speed.value,
       ...(flight ? { flight } : {}),
+      ...(upDirSmoothing > 0 ? { upDirSmoothing } : {}),
       ...(acceleration !== undefined ? { acceleration } : {}),
       ...(brakeRate !== undefined ? { brakeRate } : {}),
       turnRate: Math.min(Math.max(turn.value, 1), MAX_HEADING - 1),
@@ -556,6 +565,29 @@ export function driveAlong(
     return Math.asin(strafeRoll);
   };
 
+  // The up direction carries from frame to frame when the unit smooths it. It
+  // starts on the ground under the unit, which is how it is placed.
+  const smoothing = motion.upDirSmoothing ?? 0;
+  let lastUp: Vec3 | null = null;
+
+  /**
+   * `GetWantedUpDir`, `SolidObject.cpp:396`: the ground's normal mixed with the
+   * last up direction by `upDirSmoothing`, then normalised.
+   */
+  const upNow = (shape: GroundShape, px: number, pz: number): Vec3 => {
+    const normal = groundNormal(shape, px, pz);
+    if (smoothing === 0) return normal;
+    const last = lastUp ?? groundNormal(shape, 0, 0);
+    const mixed: Vec3 = [
+      normal[0] * (1 - smoothing) + last[0] * smoothing,
+      normal[1] * (1 - smoothing) + last[1] * smoothing,
+      normal[2] * (1 - smoothing) + last[2] * smoothing,
+    ];
+    const length = Math.hypot(...mixed);
+    lastUp = [mixed[0] / length, mixed[1] / length, mixed[2] / length];
+    return lastUp;
+  };
+
   const place = (
     speed: number,
     steer: { goalDotRight: number; goalDistance: number } | null = null,
@@ -568,7 +600,7 @@ export function driveAlong(
       heading,
       speed,
       reversing,
-      up: shape && options.tilts ? groundNormal(shape, x, z) : null,
+      up: shape && options.tilts ? upNow(shape, x, z) : null,
     };
   };
 
