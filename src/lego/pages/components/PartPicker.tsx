@@ -16,7 +16,14 @@
 
 import { Button } from "@picoframe/frame";
 import { Star } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type RefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import * as THREE from "three";
 
 import { useCanvas3D } from "@/lib/useCanvas3D";
@@ -30,6 +37,7 @@ import {
   partSize,
 } from "../../pack";
 import { getShapeGeometry, type ShapeKind } from "../../shapes";
+import { type GridWindow, gridScroll, useRootHeight } from "./gridScroll";
 
 /** Cell size in pixels. Big enough to read a small part, small enough to scan. */
 const CELL = 72;
@@ -71,6 +79,11 @@ interface Props {
   /** Kinds of the favourite shapes. With `onFavouriteShape`, each gets a star. */
   favouriteShapes?: ReadonlySet<string>;
   onFavouriteShape?: (shape: ShapeKind) => void;
+  /**
+   * A scroller further out to scroll with, in place of one of the grid's own,
+   * as `./gridScroll` describes. Given or not for the life of the grid.
+   */
+  scrollRoot?: RefObject<HTMLElement | null>;
 }
 
 /** One cell of the grid: a part of the pack or a generated shape. */
@@ -120,9 +133,14 @@ export function PartPicker({
   onSelectShape,
   favouriteShapes,
   onFavouriteShape,
+  scrollRoot,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const rootHeight = useRootHeight(scrollRoot);
+  // On a page, the canvas waits for the page's scroller to be measured.
+  const ready = !scrollRoot || rootHeight > 0;
   const stateRef = useRef<ViewportState | null>(null);
   const [view, setView] = useState<Visible>({
     columns: 1,
@@ -149,11 +167,24 @@ export function PartPicker({
     [pack, parts, shapes],
   );
 
+  const scrolling = useCallback(
+    () =>
+      contentRef.current && hostRef.current
+        ? gridScroll(
+            contentRef.current,
+            hostRef.current,
+            scrollRef.current,
+            scrollRoot ? scrollRoot.current : undefined,
+          )
+        : null,
+    [scrollRoot],
+  );
+
   useCanvas3D(
     hostRef,
     ({ renderer }) => {
-      const scroller = scrollRef.current;
-      if (!scroller) return;
+      const scroll = scrolling();
+      if (!scroll) return;
 
       const scene = new THREE.Scene();
       addStandardLights(scene);
@@ -174,9 +205,8 @@ export function PartPicker({
       };
       stateRef.current = state;
 
-      const render = () =>
-        layout(state, scroller.scrollTop, scroller.clientHeight);
-      scroller.addEventListener("scroll", render, { passive: true });
+      const render = () => layout(state, scroll.window());
+      const unwatch = scroll.watch(render);
 
       return {
         render,
@@ -184,38 +214,41 @@ export function PartPicker({
           state.columns = Math.max(1, Math.floor((width + GAP) / PITCH));
         },
         dispose: () => {
-          scroller.removeEventListener("scroll", render);
+          unwatch();
           for (const mesh of state.pool) scene.remove(mesh);
           stateRef.current = null;
         },
       };
     },
     [],
+    ready,
   );
 
   // Filtering changes which cells are in the grid, not how it is drawn, so the
   // renderer and its geometry cache survive.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a change of ready builds a new canvas with an empty state, which needs filling again
   useEffect(() => {
     const state = stateRef.current;
-    const scroller = scrollRef.current;
-    if (!state || !scroller) return;
+    const scroll = scrolling();
+    if (!state || !scroll) return;
     state.cells = cells;
     state.pack = pack;
-    scroller.scrollTop = 0;
+    scroll.reset();
     setFocusIndex(0);
-    layout(state, 0, scroller.clientHeight);
-  }, [pack, cells]);
+    layout(state, scroll.window());
+  }, [pack, cells, scrolling, ready]);
 
   // Separate from the effect above: switching a unit's atlas changes none of
   // the parts on screen or the scroll position, only what they are drawn
   // with, so this leaves both alone and just redraws in place.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a change of ready builds a new canvas with an empty state, which needs filling again
   useEffect(() => {
     const state = stateRef.current;
-    const scroller = scrollRef.current;
-    if (!state || !scroller) return;
+    const scroll = scrolling();
+    if (!state || !scroll) return;
     state.atlas = atlas;
-    layout(state, scroller.scrollTop, scroller.clientHeight);
-  }, [atlas]);
+    layout(state, scroll.window());
+  }, [atlas, scrolling, ready]);
 
   // Arrow keys move the roving tab stop, so focus has to follow it onto a
   // button that may only exist after the next render.
@@ -223,7 +256,7 @@ export function PartPicker({
   useEffect(() => {
     if (!chasingFocus.current) return;
     chasingFocus.current = false;
-    scrollRef.current
+    contentRef.current
       ?.querySelector<HTMLButtonElement>(`[data-index="${focusIndex}"]`)
       ?.focus();
   }, [focusIndex]);
@@ -266,16 +299,9 @@ export function PartPicker({
       const next = Math.min(cells.length - 1, Math.max(0, focusIndex + delta));
       chasingFocus.current = true;
       setFocusIndex(next);
-      const scroller = scrollRef.current;
-      if (!scroller) return;
-      const top = Math.floor(next / view.columns) * PITCH;
-      if (top < scroller.scrollTop) {
-        scroller.scrollTop = top;
-      } else if (top + CELL > scroller.scrollTop + scroller.clientHeight) {
-        scroller.scrollTop = top + CELL - scroller.clientHeight;
-      }
+      scrolling()?.reveal(Math.floor(next / view.columns) * PITCH, CELL);
     },
-    [focusIndex, cells.length, view.columns],
+    [focusIndex, cells.length, view.columns, scrolling],
   );
 
   const onKeyDown = (event: React.KeyboardEvent) => {
@@ -302,103 +328,112 @@ export function PartPicker({
     }
   }
 
+  const height = Math.max(rows * PITCH - GAP, 0);
+  const cellButtons = visible.map((index) => {
+    const cell = cells[index];
+    const { part, shape } = cell;
+    const row = Math.floor(index / view.columns);
+    const column = index % view.columns;
+    const selected = shape
+      ? shape.id === selectedShape
+      : part?.id === selectedId;
+    const starred = shape
+      ? (favouriteShapes?.has(shape.id) ?? false)
+      : (favourites?.has(part?.id ?? "") ?? false);
+    const onStar = shape
+      ? onFavouriteShape && (() => onFavouriteShape(shape))
+      : onFavourite && part && (() => onFavourite(part));
+    return (
+      <div
+        key={cell.key}
+        className="group absolute"
+        style={{
+          left: column * PITCH,
+          top: row * PITCH,
+          width: CELL,
+          height: CELL,
+        }}
+      >
+        <button
+          type="button"
+          data-index={index}
+          tabIndex={index === focusIndex ? 0 : -1}
+          aria-pressed={selected}
+          title={cell.title}
+          onMouseEnter={() => setHoverIndex(index)}
+          onMouseLeave={() => setHoverIndex((at) => (at === index ? null : at))}
+          onFocus={() => {
+            setFocusIndex(index);
+            // Keyboard users get the same look at the part as the pointer.
+            setHoverIndex(index);
+          }}
+          onBlur={() => setHoverIndex((at) => (at === index ? null : at))}
+          onKeyDown={(event) => {
+            // The stars are out of the tab order, like the other cells,
+            // so F is how the keyboard reaches one.
+            if (
+              event.key.toLowerCase() === "f" &&
+              !event.ctrlKey &&
+              !event.metaKey &&
+              !event.altKey &&
+              onStar
+            ) {
+              event.preventDefault();
+              onStar();
+              return;
+            }
+            onKeyDown(event);
+          }}
+          onClick={(event) =>
+            shape
+              ? onSelectShape?.(shape, event.altKey)
+              : part && onSelect?.(part, event.altKey)
+          }
+          className={`absolute inset-0 rounded border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+            selected
+              ? "border-primary bg-primary/10"
+              : "border-transparent hover:border-border hover:bg-muted/40"
+          }`}
+        >
+          <span className="sr-only">{cell.name}</span>
+        </button>
+        {onStar ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            tabIndex={-1}
+            className={`absolute right-0 top-0 transition-opacity focus:opacity-100 group-hover:opacity-100 ${starred ? "opacity-100" : "opacity-0"}`}
+            onClick={onStar}
+            aria-pressed={starred}
+            aria-label={`Favourite the ${cell.name} ${shape ? "shape" : "part"}`}
+            title={starred ? "Remove from favourites" : "Favourite"}
+          >
+            <Star size={14} fill={starred ? "currentColor" : "none"} />
+          </Button>
+        ) : null}
+      </div>
+    );
+  });
+
+  if (scrollRoot) {
+    return (
+      <div ref={contentRef} className="relative shrink-0" style={{ height }}>
+        <div
+          ref={hostRef}
+          className="pointer-events-none sticky top-0"
+          style={{ height: Math.min(height, rootHeight) }}
+        />
+        {cellButtons}
+      </div>
+    );
+  }
+
   return (
     <div className="relative min-h-0 flex-1">
       <div ref={hostRef} className="pointer-events-none absolute inset-0" />
       <div ref={scrollRef} className="absolute inset-0 overflow-y-auto">
-        <div
-          className="relative"
-          style={{ height: Math.max(rows * PITCH - GAP, 0) }}
-        >
-          {visible.map((index) => {
-            const cell = cells[index];
-            const { part, shape } = cell;
-            const row = Math.floor(index / view.columns);
-            const column = index % view.columns;
-            const selected = shape
-              ? shape.id === selectedShape
-              : part?.id === selectedId;
-            const starred = shape
-              ? (favouriteShapes?.has(shape.id) ?? false)
-              : (favourites?.has(part?.id ?? "") ?? false);
-            const onStar = shape
-              ? onFavouriteShape && (() => onFavouriteShape(shape))
-              : onFavourite && part && (() => onFavourite(part));
-            return (
-              <div
-                key={cell.key}
-                className="group absolute"
-                style={{
-                  left: column * PITCH,
-                  top: row * PITCH,
-                  width: CELL,
-                  height: CELL,
-                }}
-              >
-                <button
-                  type="button"
-                  data-index={index}
-                  tabIndex={index === focusIndex ? 0 : -1}
-                  aria-pressed={selected}
-                  title={cell.title}
-                  onMouseEnter={() => setHoverIndex(index)}
-                  onMouseLeave={() =>
-                    setHoverIndex((at) => (at === index ? null : at))
-                  }
-                  onFocus={() => {
-                    setFocusIndex(index);
-                    // Keyboard users get the same look at the part as the pointer.
-                    setHoverIndex(index);
-                  }}
-                  onBlur={() =>
-                    setHoverIndex((at) => (at === index ? null : at))
-                  }
-                  onKeyDown={(event) => {
-                    // The stars are out of the tab order, like the other cells,
-                    // so F is how the keyboard reaches one.
-                    if (
-                      event.key.toLowerCase() === "f" &&
-                      !event.ctrlKey &&
-                      !event.metaKey &&
-                      !event.altKey &&
-                      onStar
-                    ) {
-                      event.preventDefault();
-                      onStar();
-                      return;
-                    }
-                    onKeyDown(event);
-                  }}
-                  onClick={(event) =>
-                    shape
-                      ? onSelectShape?.(shape, event.altKey)
-                      : part && onSelect?.(part, event.altKey)
-                  }
-                  className={`absolute inset-0 rounded border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                    selected
-                      ? "border-primary bg-primary/10"
-                      : "border-transparent hover:border-border hover:bg-muted/40"
-                  }`}
-                >
-                  <span className="sr-only">{cell.name}</span>
-                </button>
-                {onStar ? (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    tabIndex={-1}
-                    className={`absolute right-0 top-0 transition-opacity focus:opacity-100 group-hover:opacity-100 ${starred ? "opacity-100" : "opacity-0"}`}
-                    onClick={onStar}
-                    aria-pressed={starred}
-                    aria-label={`Favourite the ${cell.name} ${shape ? "shape" : "part"}`}
-                    title={starred ? "Remove from favourites" : "Favourite"}
-                  >
-                    <Star size={14} fill={starred ? "currentColor" : "none"} />
-                  </Button>
-                ) : null}
-              </div>
-            );
-          })}
+        <div ref={contentRef} className="relative" style={{ height }}>
+          {cellButtons}
         </div>
       </div>
     </div>
@@ -428,11 +463,8 @@ interface ViewportState {
  * units are pixels here, which keeps the mapping between a cell on screen and
  * its position in the scene obvious.
  */
-function layout(
-  state: ViewportState,
-  scrollTop: number,
-  viewportHeight: number,
-) {
+function layout(state: ViewportState, slice: GridWindow) {
+  const { top: scrollTop, height: viewportHeight } = slice;
   const { renderer, scene, camera, pool, columns, cells, pack, atlas } = state;
   if (!pack || viewportHeight === 0) return;
   const material = partMaterial(atlas ?? baseAtlas(pack));

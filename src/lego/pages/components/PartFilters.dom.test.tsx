@@ -167,6 +167,74 @@ describe("the Shapes category", () => {
   });
 });
 
+/**
+ * The row has to stay one line in the builder's drawer, which shares its width
+ * with the kind and list buttons (#4464). happy-dom lays nothing out, so these
+ * check the classes the layout rests on, not the layout itself.
+ */
+describe("the row in a narrow space", () => {
+  function row(container: HTMLElement) {
+    return container.firstElementChild as HTMLElement;
+  }
+
+  /** Opens the category menu and picks the named option. */
+  function pickCategory(option: string) {
+    fireEvent.click(screen.getByRole("combobox", { name: "Part category" }));
+    fireEvent.click(screen.getByRole("option", { name: option }));
+  }
+
+  it("is a container that never wraps, with a search box that can shrink", () => {
+    const { container } = show(pack());
+    expect(row(container).className).toContain("@container");
+    expect(row(container).className).toContain("flex-nowrap");
+    expect(row(container).className).not.toContain("flex-wrap");
+    expect(screen.getByLabelText("Search parts").className).toContain(
+      "min-w-32",
+    );
+  });
+
+  it("swaps the category buttons for a menu below a container width", () => {
+    const { container } = show(pack(), { showShapes: true });
+    const buttons = screen.getByRole("group", { name: "Part category" });
+    expect(buttons.className).toContain("hidden");
+    expect(buttons.className).toContain("@2xl:flex");
+    const menu = screen.getByRole("combobox", { name: "Part category" });
+    expect(menu.className).toContain("@2xl:hidden");
+    expect(row(container).textContent).toContain("7 parts");
+  });
+
+  it("waits for more room before the buttons when the pack menu is there too", () => {
+    show(pack({ packs: [manifest("lego"), manifest("extras")] }));
+    expect(
+      screen.getByRole("group", { name: "Part category" }).className,
+    ).toContain("@4xl:flex");
+    expect(
+      screen.getByRole("combobox", { name: "Part category" }).className,
+    ).toContain("@4xl:hidden");
+  });
+
+  it("shows the category in force in the menu", () => {
+    show(pack(), { category: "tan" });
+    expect(
+      screen.getByRole("combobox", { name: "Part category" }).textContent,
+    ).toBe("Tan");
+  });
+
+  it("offers the same choices in the menu as the buttons", () => {
+    show(pack(), { category: "tan", showShapes: true });
+    pickCategory("Shapes");
+    expect(onCategory).toHaveBeenCalledWith(SHAPES_CATEGORY);
+    cleanup();
+    show(pack(), { category: "tan" });
+    pickCategory("All");
+    expect(onCategory).toHaveBeenLastCalledWith(null);
+    cleanup();
+    show(pack());
+    pickCategory("Grey");
+    expect(onCategory).toHaveBeenLastCalledWith("grey");
+  });
+});
+
 describe("the pack picker", () => {
   /** One pack means nothing to choose between, and a control with one option
    *  is noise. */
