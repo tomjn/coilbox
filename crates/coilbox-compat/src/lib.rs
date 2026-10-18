@@ -20,6 +20,10 @@
 //!
 //! `id` is the file name without `.lua`. `catalogue` lists the ids of the
 //! `engineLuaCompat.json` entries the fix addresses.
+//!
+//! A fix with a `-- states: synced, unsynced` line is part of the Lua prelude
+//! (issue #4558), and the line says which Lua states it runs in. See
+//! [`prelude`] and [`prelude_files`].
 
 use std::collections::BTreeMap;
 
@@ -30,10 +34,50 @@ use sha2::{Digest, Sha256};
 pub const LICENSE: &str = "MIT or GNU GPL, v2 or later";
 
 /// Every manifest, by version number.
-const MANIFESTS: &[(u32, &str)] = &[(1, include_str!("../../../lua/compat/manifests/1.json"))];
+const MANIFESTS: &[(u32, &str)] = &[
+    (1, include_str!("../../../lua/compat/manifests/1.json")),
+    (2, include_str!("../../../lua/compat/manifests/2.json")),
+];
 
-/// Every fix file, by id. Empty until a fix is written.
-const FIXES: &[(&str, &str)] = &[];
+/// Every fix file, by id.
+const FIXES: &[(&str, &str)] = &[
+    (
+        "callin-allow-command-105",
+        include_str!("../../../lua/compat/callin-allow-command-105.lua"),
+    ),
+    (
+        "callin-unit-damaged-95",
+        include_str!("../../../lua/compat/callin-unit-damaged-95.lua"),
+    ),
+    (
+        "compat-callin-hooks",
+        include_str!("../../../lua/compat/compat-callin-hooks.lua"),
+    ),
+    (
+        "gl-smoothing",
+        include_str!("../../../lua/compat/gl-smoothing.lua"),
+    ),
+    (
+        "spring-make-font",
+        include_str!("../../../lua/compat/spring-make-font.lua"),
+    ),
+    (
+        "spring-set-unit-to-feature",
+        include_str!("../../../lua/compat/spring-set-unit-to-feature.lua"),
+    ),
+    (
+        "spring-sun-parameters",
+        include_str!("../../../lua/compat/spring-sun-parameters.lua"),
+    ),
+    (
+        "spring-unit-travel",
+        include_str!("../../../lua/compat/spring-unit-travel.lua"),
+    ),
+    (
+        "spring-update-info-texture",
+        include_str!("../../../lua/compat/spring-update-info-texture.lua"),
+    ),
+];
 
 /// The recorded SHA-256 of every fix a manifest lists.
 const HASHES: &str = include_str!("../../../lua/compat/manifests/hashes.txt");
@@ -143,13 +187,25 @@ pub struct Header {
     pub id: String,
     pub catalogue: Vec<String>,
     pub license: String,
+    /// The Lua states a prelude fix runs in. Empty for a fix that is not part
+    /// of the prelude.
+    pub states: Vec<String>,
+}
+
+fn list(value: &str) -> Vec<String> {
+    value
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+        .collect()
 }
 
 /// Reads the `-- key: value` lines at the top of a fix file.
 ///
 /// Returns `None` if `id` or `license` is missing. `catalogue` may be empty.
 pub fn parse_header(source: &str) -> Option<Header> {
-    let (mut id, mut catalogue, mut license) = (None, Vec::new(), None);
+    let (mut id, mut catalogue, mut license, mut states) = (None, Vec::new(), None, Vec::new());
     for line in source.lines() {
         let Some(rest) = line.strip_prefix("--") else {
             break;
@@ -160,15 +216,9 @@ pub fn parse_header(source: &str) -> Option<Header> {
         let value = value.trim();
         match key.trim() {
             "id" => id = Some(value.to_string()),
-            "catalogue" => {
-                catalogue = value
-                    .split(',')
-                    .map(str::trim)
-                    .filter(|s| !s.is_empty())
-                    .map(String::from)
-                    .collect()
-            }
+            "catalogue" => catalogue = list(value),
             "license" => license = Some(value.to_string()),
+            "states" => states = list(value),
             _ => {}
         }
     }
@@ -176,7 +226,143 @@ pub fn parse_header(source: &str) -> Option<Header> {
         id: id?,
         catalogue,
         license: license?,
+        states,
     })
+}
+
+/// The two Lua states a game's Lua runs in. The engine gives `gl` and the
+/// unsynced controls only to the unsynced one, so each has its own prelude.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LuaState {
+    Synced,
+    Unsynced,
+}
+
+impl LuaState {
+    /// The word a fix's `states` line uses for this state.
+    pub fn name(self) -> &'static str {
+        match self {
+            LuaState::Synced => "synced",
+            LuaState::Unsynced => "unsynced",
+        }
+    }
+
+    /// Where the mutator puts this state's prelude.
+    pub fn prelude_path(self) -> &'static str {
+        match self {
+            LuaState::Synced => "compat/prelude-synced.lua",
+            LuaState::Unsynced => "compat/prelude-unsynced.lua",
+        }
+    }
+}
+
+/// The files the engine starts each Lua handle from, with the state each runs
+/// in. Where a handle has two candidates, the engine takes the first that
+/// exists: `luaui.lua` before `LuaUI/main.lua` (`rts/Lua/LuaUI.cpp`). The
+/// others are fixed names in `LuaRules.cpp`, `LuaGaia.cpp` and `LuaIntro.cpp`.
+pub const ENTRY_FILES: &[(&[&str], LuaState)] = &[
+    (&["LuaRules/main.lua"], LuaState::Synced),
+    (&["LuaRules/draw.lua"], LuaState::Unsynced),
+    (&["LuaGaia/main.lua"], LuaState::Synced),
+    (&["LuaGaia/draw.lua"], LuaState::Unsynced),
+    (&["luaui.lua", "LuaUI/main.lua"], LuaState::Unsynced),
+    (&["LuaIntro/main.lua"], LuaState::Unsynced),
+];
+
+/// The prelude fixes `manifest` lists for `state`, in manifest order.
+fn prelude_fixes(manifest: &Manifest, state: LuaState) -> Vec<(&'static str, &'static str)> {
+    manifest
+        .fixes
+        .iter()
+        .filter_map(|id| FIXES.iter().find(|(i, _)| i == id).copied())
+        .filter(|(_, src)| {
+            parse_header(src).is_some_and(|h| h.states.iter().any(|s| s == state.name()))
+        })
+        .collect()
+}
+
+/// The prelude for one Lua state, built from the fixes `manifest` lists for
+/// it, or `None` when it lists none.
+///
+/// Each fix runs as a function given the shared `compat` table, inside a
+/// `pcall`, so a fix that fails is logged and the game's Lua still loads.
+pub fn prelude(manifest: &Manifest, state: LuaState) -> Option<String> {
+    let fixes = prelude_fixes(manifest, state);
+    if fixes.is_empty() {
+        return None;
+    }
+    let mut out = format!(
+        "-- Written by coilbox's compatibility mode from compat manifest {n}, {state} state.\n\
+         -- Each fix below is a file in lua/compat/ in the coilbox repository.\n\
+         -- license: {LICENSE}\n\
+         \n\
+         local compat = {{}}\n\
+         \n\
+         local function failed(id, err)\n\
+         \tlocal message = \"coilbox compat fix \" .. id .. \" failed: \" .. tostring(err)\n\
+         \tif type(Spring) == \"table\" and type(Spring.Log) == \"function\" then\n\
+         \t\tSpring.Log(\"coilbox-compat\", type(LOG) == \"table\" and LOG.ERROR or \"error\", message)\n\
+         \telseif type(Spring) == \"table\" and type(Spring.Echo) == \"function\" then\n\
+         \t\tSpring.Echo(message)\n\
+         \tend\n\
+         end\n",
+        n = manifest.version,
+        state = state.name(),
+    );
+    for (id, src) in fixes {
+        out.push_str(&format!(
+            "\n-- fix: {id}\n\
+             do\n\
+             local ok, err = pcall(function(...)\n\
+             {src}\
+             end, compat)\n\
+             if not ok then failed({id:?}, err) end\n\
+             end\n"
+        ));
+    }
+    Some(out)
+}
+
+/// An entry file with its state's prelude included in front of the original.
+///
+/// The include goes on the original's first line, so every line of the game's
+/// code keeps its number in an error message.
+pub fn wrap_entry(original: &str, state: LuaState) -> String {
+    format!("VFS.Include(\"{}\") {original}", state.prelude_path())
+}
+
+/// Every Lua file the prelude adds to a compat mutator built from `manifest`:
+/// the prelude for each state that has fixes, and each entry file the base
+/// game has for that state, wrapped. `read` returns the base game's copy of a
+/// path, or `None` when it has none. The files are sorted by path.
+///
+/// A game with no file for a handle gets none written, so the engine runs
+/// nothing there, as it would for the game alone.
+pub fn prelude_files(
+    manifest: &Manifest,
+    mut read: impl FnMut(&str) -> Option<String>,
+) -> Vec<(String, String)> {
+    let mut files = Vec::new();
+    for state in [LuaState::Synced, LuaState::Unsynced] {
+        let Some(prelude) = prelude(manifest, state) else {
+            continue;
+        };
+        let mut used = false;
+        for (candidates, _) in ENTRY_FILES.iter().filter(|(_, s)| *s == state) {
+            if let Some((path, original)) = candidates
+                .iter()
+                .find_map(|path| read(path).map(|text| (*path, text)))
+            {
+                files.push((path.to_string(), wrap_entry(&original, state)));
+                used = true;
+            }
+        }
+        if used {
+            files.push((state.prelude_path().to_string(), prelude));
+        }
+    }
+    files.sort();
+    files
 }
 
 #[cfg(test)]
@@ -316,5 +502,189 @@ mod tests {
         assert_eq!(h.catalogue, ["one", "two"]);
         assert_eq!(h.license, LICENSE);
         assert!(parse_header("-- id: a\n").is_none());
+        assert!(h.states.is_empty());
+    }
+
+    #[test]
+    fn a_header_reads_the_states_a_prelude_fix_runs_in() {
+        let src = "-- id: a\n-- states: synced, unsynced\n-- license: x\n\n-- states: not-this\n";
+        assert_eq!(parse_header(src).unwrap().states, ["synced", "unsynced"]);
+    }
+
+    #[test]
+    fn every_prelude_fix_names_only_states_that_exist_and_ends_in_a_newline() {
+        for (id, src) in FIXES {
+            let header = parse_header(src).unwrap();
+            for state in &header.states {
+                assert!(
+                    state == "synced" || state == "unsynced",
+                    "{id}: unknown state {state}"
+                );
+            }
+            assert!(src.ends_with('\n'), "{id}");
+            assert!(!src.contains('\r'), "{id}");
+        }
+    }
+
+    #[test]
+    fn the_hooks_come_first_in_every_manifest_with_a_prelude() {
+        for m in all_manifests() {
+            let prelude: Vec<&String> = m
+                .fixes
+                .iter()
+                .filter(|id| {
+                    !parse_header(fix_source(id).unwrap())
+                        .unwrap()
+                        .states
+                        .is_empty()
+                })
+                .collect();
+            if let Some(first) = prelude.first() {
+                assert_eq!(*first, "compat-callin-hooks", "manifest {}", m.version);
+            }
+        }
+    }
+
+    #[test]
+    fn manifest_1_has_no_prelude() {
+        let m = manifest(1).unwrap();
+        assert!(prelude(&m, LuaState::Synced).is_none());
+        assert!(prelude(&m, LuaState::Unsynced).is_none());
+        assert!(prelude_files(&m, |_| Some("x".into())).is_empty());
+    }
+
+    #[test]
+    fn each_state_gets_only_its_own_fixes() {
+        let m = manifest(2).unwrap();
+        let synced = prelude(&m, LuaState::Synced).unwrap();
+        let unsynced = prelude(&m, LuaState::Unsynced).unwrap();
+        for both in ["compat-callin-hooks", "callin-unit-damaged-95"] {
+            assert!(synced.contains(&format!("-- fix: {both}\n")), "{both}");
+            assert!(unsynced.contains(&format!("-- fix: {both}\n")), "{both}");
+        }
+        for only in [
+            "spring-unit-travel",
+            "spring-set-unit-to-feature",
+            "callin-allow-command-105",
+        ] {
+            assert!(synced.contains(&format!("-- fix: {only}\n")), "{only}");
+            assert!(!unsynced.contains(&format!("-- fix: {only}\n")), "{only}");
+        }
+        for only in [
+            "gl-smoothing",
+            "spring-make-font",
+            "spring-update-info-texture",
+            "spring-sun-parameters",
+        ] {
+            assert!(unsynced.contains(&format!("-- fix: {only}\n")), "{only}");
+            assert!(!synced.contains(&format!("-- fix: {only}\n")), "{only}");
+        }
+        assert!(
+            synced.find("-- fix: compat-callin-hooks").unwrap()
+                < synced.find("-- fix: spring-unit-travel").unwrap()
+        );
+    }
+
+    #[test]
+    fn a_prelude_carries_each_fix_unchanged() {
+        let m = manifest(2).unwrap();
+        let synced = prelude(&m, LuaState::Synced).unwrap();
+        assert!(synced.contains(fix_source("spring-unit-travel").unwrap()));
+        assert!(!synced.contains('\r'));
+    }
+
+    #[test]
+    fn a_wrapped_entry_file_keeps_the_original_on_its_own_line_numbers() {
+        let original = "local a = 1\nreturn a\n";
+        let wrapped = wrap_entry(original, LuaState::Synced);
+        assert_eq!(
+            wrapped,
+            "VFS.Include(\"compat/prelude-synced.lua\") local a = 1\nreturn a\n"
+        );
+        assert_eq!(wrapped.lines().count(), original.lines().count());
+        assert!(wrap_entry("", LuaState::Unsynced)
+            .starts_with("VFS.Include(\"compat/prelude-unsynced.lua\")"));
+    }
+
+    #[test]
+    fn only_the_entry_files_a_game_has_are_written() {
+        let m = manifest(2).unwrap();
+        let files = prelude_files(&m, |path| {
+            (path == "LuaRules/main.lua").then(|| "-- rules\n".to_string())
+        });
+        let paths: Vec<&str> = files.iter().map(|(p, _)| p.as_str()).collect();
+        assert_eq!(paths, ["LuaRules/main.lua", "compat/prelude-synced.lua"]);
+        assert_eq!(
+            files[0].1,
+            "VFS.Include(\"compat/prelude-synced.lua\") -- rules\n"
+        );
+        assert!(prelude_files(&m, |_| None).is_empty());
+    }
+
+    #[test]
+    fn luaui_lua_is_taken_before_luaui_main_lua() {
+        let m = manifest(2).unwrap();
+        let both = prelude_files(&m, |path| match path {
+            "luaui.lua" | "LuaUI/main.lua" => Some(path.to_string()),
+            _ => None,
+        });
+        let paths: Vec<&str> = both.iter().map(|(p, _)| p.as_str()).collect();
+        assert_eq!(paths, ["compat/prelude-unsynced.lua", "luaui.lua"]);
+        let main_only = prelude_files(&m, |path| (path == "LuaUI/main.lua").then(String::new));
+        assert_eq!(main_only[0].0, "LuaUI/main.lua");
+    }
+
+    #[test]
+    fn every_entry_file_of_a_full_game_is_wrapped_for_its_state() {
+        let m = manifest(2).unwrap();
+        let files = prelude_files(&m, |path| Some(format!("-- {path}\n")));
+        let paths: Vec<&str> = files.iter().map(|(p, _)| p.as_str()).collect();
+        assert_eq!(
+            paths,
+            [
+                "LuaGaia/draw.lua",
+                "LuaGaia/main.lua",
+                "LuaIntro/main.lua",
+                "LuaRules/draw.lua",
+                "LuaRules/main.lua",
+                "compat/prelude-synced.lua",
+                "compat/prelude-unsynced.lua",
+                "luaui.lua",
+            ]
+        );
+        for (path, text) in &files {
+            if path.starts_with("compat/") {
+                continue;
+            }
+            let state = if path.ends_with("main.lua") && !path.starts_with("LuaIntro") {
+                LuaState::Synced
+            } else {
+                LuaState::Unsynced
+            };
+            assert_eq!(text, &wrap_entry(&format!("-- {path}\n"), state), "{path}");
+        }
+    }
+
+    /// The preludes for manifest 2, as the Lua tests in `lua/compat/tests/`
+    /// load them. `COILBOX_WRITE_FIXTURE=1` writes them again after a
+    /// deliberate change to how a prelude is built.
+    #[test]
+    fn the_lua_tests_load_the_preludes_this_crate_builds() {
+        let m = manifest(2).unwrap();
+        for state in [LuaState::Synced, LuaState::Unsynced] {
+            let built = prelude(&m, state).unwrap();
+            let path = compat_dir()
+                .join("tests/fixtures")
+                .join(format!("prelude-2-{}.lua", state.name()));
+            if std::env::var_os("COILBOX_WRITE_FIXTURE").is_some() {
+                fs::write(&path, &built).unwrap();
+            }
+            let on_disk = fs::read_to_string(&path).unwrap_or_default();
+            assert!(
+                on_disk == built,
+                "{} is not what manifest 2 builds",
+                path.display()
+            );
+        }
     }
 }
