@@ -417,6 +417,15 @@ describe("buildLibrary update state", () => {
     expect(sf?.state).toBe("installed");
     expect(sf?.update).toBeUndefined();
   });
+
+  it("keeps the update but shows no update state once the player turns updates off (issue #4580)", () => {
+    const sf = buildLibrary({
+      ...input,
+      updatesOff: new Set(["game:splinterfaction"]),
+    }).games.find((g) => g.id === "sf");
+    expect(sf?.state).toBe("installed");
+    expect(sf?.update?.tag).toBe("v0.1.87");
+  });
 });
 
 describe("buildLibrary installed files", () => {
@@ -438,5 +447,52 @@ describe("buildLibrary installed files", () => {
     expect(empty.games).toEqual([]);
     expect(empty.maps).toEqual([]);
     expect(empty.installedFiles.maps.size).toBe(0);
+  });
+});
+
+describe("buildLibrary stray files (#4646)", () => {
+  const JUNK = [".DS_Store", "Thumbs.db", "notes.txt"];
+  const bare: LibraryInput = {
+    scan: { games: [], maps: [] },
+    files: {
+      games: [...JUNK, "Stray_Game-1.0.sdz"],
+      maps: [...JUNK, "Stray_Map.SD7"],
+    },
+    hubGames: [],
+    catalogues: [],
+    queue: [],
+  };
+
+  it("makes no record of a file on disk that is not an archive", () => {
+    const { games, maps, installedFiles } = buildLibrary(bare);
+    expect(games.map((g) => [g.id, g.state])).toEqual([
+      ["stray game-1.0", "local"],
+    ]);
+    expect(maps.map((m) => [m.id, m.state])).toEqual([["stray_map", "local"]]);
+    // Still listed as on disk, which marks nothing installed by itself.
+    expect(installedFiles.games.has(".ds_store")).toBe(true);
+  });
+
+  it("keeps the card of a scanned .sdd game, a rapid game and a .sdd map", () => {
+    const { games, maps } = buildLibrary({
+      ...bare,
+      scan: {
+        games: [
+          scannedGame("Folder Game 0.1", "foldergame.sdd", { version: "0.1" }),
+          scannedGame("Rapid Game test-42", "rapid game test-42", {
+            version: "test-42",
+          }),
+        ],
+        maps: [scannedMap("Folder Map", "foldermap.sdd")],
+      },
+    });
+    expect(games.map((g) => g.title).sort()).toEqual([
+      "Folder Game",
+      "Rapid Game",
+      "stray game-1.0",
+    ]);
+    for (const g of games) expect(g.state).toBe("local");
+    expect(maps.map((m) => m.id).sort()).toEqual(["Folder Map", "stray_map"]);
+    expect(maps.find((m) => m.id === "Folder Map")?.state).toBe("local");
   });
 });

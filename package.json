@@ -29,6 +29,7 @@
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
     "docs:thumbs": "bash scripts/docs-thumbs.sh",
+    "i18n:extract": "lingui extract --clean",
     "lint": "biome check .",
     "test": "vitest run",
     "format": "biome format --write .",
@@ -36,6 +37,8 @@
   },
   "dependencies": {
     "@fontsource-variable/oxanium": "^5.3.0",
+    "@lingui/core": "6.10.0",
+    "@lingui/react": "6.10.0",
     "@picoframe/frame": "^0.10.0",
     "@picoframe/plugin-sdk": "^0.10.0",
     "@shadcn/react": "^0.3.1",
@@ -69,6 +72,9 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.1",
+    "@lingui/cli": "6.10.0",
+    "@lingui/format-po": "6.10.0",
+    "@lingui/vite-plugin": "6.10.0",
     "@tailwindcss/vite": "^4.3.3",
     "@tauri-apps/cli": "^2.12.1",
     "@testing-library/dom": "^10.4.2",

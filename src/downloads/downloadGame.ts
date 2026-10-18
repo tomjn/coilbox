@@ -1,8 +1,9 @@
 import { loadGithubGameRepos } from "../content/branding";
 import { dlDownloadFileRaw, dlDownloadRaw } from "./bindings";
-import { type DownloadAttempt, hostOf } from "./downloadHistory";
+import { type DownloadAttempt, downloadKey, hostOf } from "./downloadHistory";
 import { downloadFromMirrors } from "./downloadMirrors";
 import { withDownloadNotify } from "./downloadNotify";
+import { pinnedSource, readGamePrefs } from "./gamePrefs";
 import {
   GAME_REPOS,
   githubRepoForGame,
@@ -52,6 +53,9 @@ const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
  *
  * Progress arrives as a sink rather than a channel, because each attempt needs a
  * channel of its own: see `progressChannel` for what sharing one costs.
+ *
+ * A source the player pinned on the game's page goes first (issue #4580). A
+ * pinned rapid master is tried before the other masters.
  */
 async function downloadGameAnySourceImpl(opts: {
   gameName: string;
@@ -75,10 +79,19 @@ async function downloadGameAnySourceImpl(opts: {
   // authoritative once loaded, the in-code GAME_REPOS list is the fallback seed.
   const repos = mergeGameRepos(await loadGithubGameRepos(), GAME_REPOS);
 
+  const pin = pinnedSource(readGamePrefs(), downloadKey("game", gameName));
   const order = gameSourceOrder({
     hasGithubRepo: !!githubRepoForGame(repos, gameName),
     hasWritePath: !!writePath,
+    pinned: pin?.source,
   });
+  const masters =
+    pin?.source === "rapid" && pin.mirror
+      ? [
+          ...DEFAULT_RAPID_MASTERS.filter((m) => hostOf(m.url) === pin.mirror),
+          ...DEFAULT_RAPID_MASTERS.filter((m) => hostOf(m.url) !== pin.mirror),
+        ]
+      : DEFAULT_RAPID_MASTERS;
 
   /** Fetch a file from its mirrors, and say which kind of source it was. */
   const fetchFile = async (
@@ -168,7 +181,7 @@ async function downloadGameAnySourceImpl(opts: {
       // `rapidMasters.ts`), so BAR itself now comes back as "no source could
       // provide" here.
       case "rapid": {
-        for (const master of DEFAULT_RAPID_MASTERS) {
+        for (const master of masters) {
           log.begin(
             source,
             { reference: gameName, mirror: hostOf(master.url) },

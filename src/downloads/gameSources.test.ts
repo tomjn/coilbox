@@ -40,4 +40,35 @@ describe("gameSourceOrder (issue #500)", () => {
       gameSourceOrder({ hasGithubRepo: false, hasWritePath: false }),
     ).toEqual(["rapid"]);
   });
+
+  it("moves a pinned source to the front and keeps the rest in order (issue #4580)", () => {
+    const all = { hasGithubRepo: true, hasWritePath: true };
+    expect(gameSourceOrder({ ...all, pinned: "rapid" })).toEqual([
+      "rapid",
+      "github",
+      "springfiles",
+    ]);
+    expect(gameSourceOrder({ ...all, pinned: "springfiles" })).toEqual([
+      "springfiles",
+      "github",
+      "rapid",
+    ]);
+  });
+
+  it("ignores a pinned source the game cannot use", () => {
+    expect(
+      gameSourceOrder({
+        hasGithubRepo: false,
+        hasWritePath: true,
+        pinned: "github",
+      }),
+    ).toEqual(["springfiles", "rapid"]);
+    expect(
+      gameSourceOrder({
+        hasGithubRepo: true,
+        hasWritePath: true,
+        pinned: "url",
+      }),
+    ).toEqual(["github", "springfiles", "rapid"]);
+  });
 });

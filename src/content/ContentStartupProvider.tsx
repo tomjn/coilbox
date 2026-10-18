@@ -7,12 +7,12 @@ import { BundledEngineSetup } from "./BundledEngineSetup";
 import { fetchListsInBackground } from "./backgroundFetch";
 import { contentRescan } from "./bindings";
 import {
+  preferredTarget,
   primeGameHeaders,
   primeGameInfo,
   primeMapMeta,
   primeScan,
   primeThumbnails,
-  targetKey,
   targetsFromState,
   useContentPrefs,
 } from "./config";
@@ -38,7 +38,7 @@ export default function ContentStartupProvider({
   children: ReactNode;
 }) {
   const [prefs] = useContentPrefs();
-  const [selectedKey] = useSetting<string>("content.scanTarget", "");
+  const [preferredId] = useSetting<string>("content.preferredEngineId", "");
   const [dlConfig, setDlConfig] = useDownloadsConfig();
   const hubUrl = useTrustedHubUrl();
   // The game the skirmish setup last held, which is the game the player last used.
@@ -74,8 +74,7 @@ export default function ContentStartupProvider({
       // it runs alongside the scan. Fire-and-forget.
       warmAllRoots(state).catch(() => {});
       const targets = targetsFromState(state);
-      const target =
-        targets.find((t) => targetKey(t) === selectedKey) ?? targets[0];
+      const target = preferredTarget(targets, preferredId);
       if (!target) return;
       const { enginePath, rootPath } = target;
       const scan = await primeScan(enginePath, rootPath);
@@ -104,7 +103,7 @@ export default function ContentStartupProvider({
       // The failure is recorded in the shared scan-error cache and surfaced by
       // the content page the user opens — nothing to show here.
     }
-  }, [prefs.probeZeroK, selectedKey]);
+  }, [prefs.probeZeroK, preferredId]);
 
   useEffect(() => {
     if (ran.current) return;

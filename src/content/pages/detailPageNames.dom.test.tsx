@@ -149,6 +149,25 @@ vi.mock("../mapEligibility", () => ({
 vi.mock("../usePlayMap", () => ({ usePlayMap: () => () => {} }));
 vi.mock("../usePlayGame", () => ({ usePlayGame: () => () => {} }));
 vi.mock("../branding", () => ({ useBrandingEntry: () => null }));
+vi.mock("../useGameLibrary", () => ({
+  useGameLibrary: () => ({
+    record: undefined,
+    versions: { rows: [], snapshots: [] },
+    indexAge: null,
+    rapidLoading: false,
+    rapidErrors: [],
+    sources: [],
+    installedFrom: null,
+    prefKey: "game:test",
+    updatesOn: true,
+    writePath: "/data",
+    statusOf: () => null,
+    install: () => {},
+    update: async () => {},
+    updating: false,
+    updateFailure: null,
+  }),
+}));
 vi.mock("@/factions/logos", () => ({ useFactionLogos: () => ({}) }));
 vi.mock("@/profile/hidden", () => ({ isProfileHidden: () => true }));
 vi.mock("@/general/advanced", () => ({ useAdvancedMode: () => false }));

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { LuaCompatResult } from "./bindings";
-import { buildReport, type CompatEntry } from "./compatReport";
+import { buildReport, type CompatEntry, engineVersion } from "./compatReport";
 
 /** A game with nothing wrong: Lua defs, Lua modinfo and its own widgets. */
 const CLEAN = [
@@ -153,15 +153,79 @@ describe("buildReport", () => {
       {
         heading: "LuaUI/modfonts.lua",
         lines: [
-          "3:9 Spring.MakeFont, removed in 95.0",
-          "7:1 Game.version, renamed to Engine.version in 104.0, arguments changed in 104.0",
+          "3:9 Spring.MakeFont, removed in Spring 95.0",
+          "7:1 Game.version, renamed to Engine.version in Spring 104.0",
         ],
       },
       {
         heading: "base.sdz: LuaRules/main.lua",
-        lines: ["1:1 Spring.MakeFont, removed in 95.0"],
+        lines: ["1:1 Spring.MakeFont, removed in Spring 95.0"],
       },
     ]);
+  });
+
+  it("puts signature hits in an info finding that is not a problem", () => {
+    const report = buildReport({
+      files: CLEAN,
+      catalogue: CATALOGUE,
+      lua: lua({
+        files: [
+          {
+            archive: "game.sd7",
+            path: "LuaUI/a.lua",
+            hits: [
+              {
+                entryId: "removed:Spring.MakeFont",
+                line: 1,
+                column: 1,
+                text: "Spring.MakeFont",
+              },
+              {
+                entryId: "signature:Game.version",
+                line: 2,
+                column: 4,
+                text: "Game.version",
+              },
+            ],
+          },
+        ],
+      }),
+    });
+    expect(report.map((f) => [f.kind, f.severity, f.count])).toEqual([
+      ["lua-api", "problem", 1],
+      ["lua-signature", "info", 1],
+    ]);
+    expect(report[0].details?.[0].lines).toEqual([
+      "1:1 Spring.MakeFont, removed in Spring 95.0",
+    ]);
+    expect(report[1].details?.[0].lines).toEqual([
+      "2:4 Game.version, arguments changed in Spring 104.0",
+    ]);
+  });
+
+  it("reports no problem for a game whose only hits are signature entries", () => {
+    const report = buildReport({
+      files: CLEAN,
+      catalogue: CATALOGUE,
+      lua: lua({
+        files: [
+          {
+            archive: "game.sd7",
+            path: "LuaUI/a.lua",
+            hits: [
+              {
+                entryId: "signature:Game.version",
+                line: 2,
+                column: 4,
+                text: "Game.version",
+              },
+            ],
+          },
+        ],
+      }),
+    });
+    expect(report.map((f) => f.kind)).toEqual(["lua-signature"]);
+    expect(report.some((f) => f.severity === "problem")).toBe(false);
   });
 
   it("lists each removed def tag with the units and weapons that set it", () => {
@@ -183,11 +247,11 @@ describe("buildReport", () => {
     expect(f).toMatchObject({ kind: "def-tags", count: 2 });
     expect(f.details).toEqual([
       {
-        heading: "UnitDefs.canCapture, changed in 92.0 (2)",
+        heading: "UnitDefs.canCapture, changed in Spring 92.0 (2)",
         lines: ["armcap", "corcap"],
       },
       {
-        heading: "WeaponDefs.firestarter, changed in 92.0 (2)",
+        heading: "WeaponDefs.firestarter, changed in Spring 92.0 (2)",
         lines: ["armcom.dgun", "flamer"],
       },
     ]);
@@ -203,7 +267,7 @@ describe("buildReport", () => {
       },
     });
     expect(f.details?.map((d) => d.heading)).toEqual([
-      "UnitDefs.moveDef.family, changed in 92.0 (1)",
+      "UnitDefs.moveDef.family, changed in Spring 92.0 (1)",
     ]);
   });
 
@@ -318,5 +382,18 @@ describe("buildReport", () => {
       defs: { units: { cap: { cancapture: true } }, weaponDefs: {} },
     });
     expect(report.map((f) => f.kind)).toEqual(["def-tags"]);
+  });
+});
+
+describe("engineVersion", () => {
+  it.each([
+    ["89.0", "Spring 89.0"],
+    ["105.0", "Spring 105.0"],
+    ["105.1.1", "Recoil 105.1.1"],
+    ["2025.01.1", "Recoil 2025.01.1"],
+    ["BAR105 1544", "Recoil 105.1.1-1544"],
+    ["unknown", "unknown"],
+  ])("shows %s as %s", (since, shown) => {
+    expect(engineVersion(since)).toBe(shown);
   });
 });

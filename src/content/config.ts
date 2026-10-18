@@ -197,32 +197,63 @@ export function usePreferredEngine(
 }
 
 /**
- * Target selection shared by the Maps and Games pages: the available targets,
- * the persisted current choice, and a setter. With no explicit choice it falls
- * back to the preferred engine (newest by default), then to the first available.
+ * The target for the preferred engine id, as `usePreferredEngine` resolves it
+ * (the saved pick, else the newest engine), then the first available.
+ */
+export function preferredTarget(
+  targets: ScanTarget[],
+  prefId: string,
+): ScanTarget | null {
+  const engines = targets.map((t) => ({
+    id: t.engineId,
+    version: t.engineVersion,
+  }));
+  const resolvedId =
+    engines.find((e) => e.id === prefId)?.id ?? newestEngineId(engines);
+  return targets.find((t) => t.engineId === resolvedId) ?? targets[0] ?? null;
+}
+
+/**
+ * The scan target every content page reads: the preferred engine from Settings
+ * (newest by default), then the first available. The saved `content.scanTarget`
+ * pick is not read here, so a pick made on an engine picker cannot override the
+ * preferred engine on a page that has no picker.
  */
 export function useScanTargetSelection() {
   const { targets, loading, error, refresh } = useContentTargets();
-  const [selectedKey, setSelectedKey] = useSetting<string>(
-    "content.scanTarget",
-    "",
-  );
-  const { resolvedId } = usePreferredEngine(
+  const { prefId } = usePreferredEngine(
     targets.map((t) => ({ id: t.engineId, version: t.engineVersion })),
   );
-  const selected =
-    targets.find((t) => targetKey(t) === selectedKey) ??
-    targets.find((t) => t.engineId === resolvedId) ??
-    targets[0] ??
-    null;
+  const selected = preferredTarget(targets, prefId);
   return {
     targets,
     selected,
     selectedKey: selected ? targetKey(selected) : "",
-    setSelectedKey,
     loading,
     error,
     refresh,
+  };
+}
+
+/**
+ * Target selection for the pages that edit an engine, Engine config and Engine
+ * profiles. The engine is the thing being edited there, so they keep a picker
+ * that reaches any installed engine. The pick is saved as `content.scanTarget`
+ * and falls back to what `useScanTargetSelection` resolves while unset.
+ */
+export function useEngineEditTarget() {
+  const base = useScanTargetSelection();
+  const [pickedKey, setSelectedKey] = useSetting<string>(
+    "content.scanTarget",
+    "",
+  );
+  const selected =
+    base.targets.find((t) => targetKey(t) === pickedKey) ?? base.selected;
+  return {
+    ...base,
+    selected,
+    selectedKey: selected ? targetKey(selected) : "",
+    setSelectedKey,
   };
 }
 

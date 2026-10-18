@@ -64,8 +64,7 @@ const EMPTY_CHIP: Record<GameChip, string> = {
  * session.
  */
 export default function GamesPage() {
-  const { targets, selected, selectedKey, setSelectedKey } =
-    useScanTargetSelection();
+  const { targets, selected, selectedKey } = useScanTargetSelection();
   const {
     data,
     unvouched,
@@ -178,7 +177,6 @@ export default function GamesPage() {
       <BrowserToolbar
         targets={targets}
         selectedKey={selectedKey}
-        onSelect={setSelectedKey}
         onRescan={() => run(true)}
         scanning={loading}
         onCancel={cancel}

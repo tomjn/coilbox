@@ -50,8 +50,22 @@ cargo_lane() {
   run_check cargo-doctest cargo test --workspace --doc
 }
 
+# Fail when a translatable string was added, changed or removed without
+# re-running `bun run i18n:extract`. CI compares against git, which a clean
+# checkout allows. Here the catalogs may hold uncommitted translations, so the
+# comparison is against a copy taken before extracting. Either way the
+# catalogs are left extracted, ready to commit.
+i18n_extract_check() {
+  local before="$OUT_DIR/locales-before"
+  # Chained, because errexit does not apply inside the `if` in run_check.
+  cp -R src/locales "$before" &&
+    bun run i18n:extract &&
+    diff -r "$before" src/locales
+}
+
 js_lane() {
   run_check biome bunx biome ci .
+  run_check i18n-extract i18n_extract_check
   run_check typecheck bun run typecheck
   run_check test bun run test
   # The mission runtime and the blueprint widget are Lua the engine runs, so

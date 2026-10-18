@@ -42,8 +42,7 @@ function savedAt(ms: number): string {
  * root and the engine is that root's selected engine.
  */
 export default function SavegamesPage() {
-  const { targets, selected, selectedKey, setSelectedKey } =
-    useScanTargetSelection();
+  const { targets, selected, selectedKey } = useScanTargetSelection();
   const { state } = useContentState();
   const { saves, loading, error, refresh, ready } = useSaves(
     selected?.rootPath,
@@ -138,7 +137,6 @@ export default function SavegamesPage() {
       <BrowserToolbar
         targets={targets}
         selectedKey={selectedKey}
-        onSelect={setSelectedKey}
         onRescan={refresh}
         scanning={loading}
       />

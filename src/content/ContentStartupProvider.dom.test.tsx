@@ -49,7 +49,7 @@ vi.mock("./contentState", () => ({
 vi.mock("./rapidPoolWarm", () => ({ warmAllRoots: step("rapid") }));
 vi.mock("./config", () => ({
   useContentPrefs: () => [{ autoScanOnStartup: h.autoScan, probeZeroK: false }],
-  targetKey: (t: { rootPath: string }) => t.rootPath,
+  preferredTarget: (targets: unknown[]) => targets[0] ?? null,
   targetsFromState: () => [{ enginePath: "/e", rootPath: "/d" }],
   primeScan: async () => {
     h.calls.push("scan:start");

@@ -1,4 +1,13 @@
 import type { EnqueueInput } from "../downloads/DownloadQueueProvider";
+import { downloadKey, hostOf } from "../downloads/downloadHistory";
+import {
+  type GamePrefsStore,
+  pinnedSource,
+  readGamePrefs,
+  sameStep,
+} from "../downloads/gamePrefs";
+import type { SourceStep } from "../downloads/sourceWalk";
+import type { HubGameDownload } from "../hub/api";
 import { hubGameDownloadRequest } from "../hub/games/download";
 import { compareGameVersions } from "../play/installedGames";
 import type { LibraryGame, LibrarySource } from "./library";
@@ -160,17 +169,56 @@ export function sourceRequest(
 }
 
 /**
+ * Every key the game's history and choices can be stored under: the record's
+ * id, its title and each installed version's name.
+ */
+export function gameKeys(g: LibraryGame): string[] {
+  return [
+    ...new Set([
+      `game:${g.id}`,
+      downloadKey("game", g.title),
+      ...g.installed.map((i) => downloadKey("game", i.name)),
+    ]),
+  ];
+}
+
+/**
+ * The key the game page stores its choices under. It is the one a download
+ * that knows only the game's name reads (see `downloadGame.ts`).
+ */
+export function gamePrefKey(g: LibraryGame): string {
+  return downloadKey("game", g.installed[0]?.name ?? g.title);
+}
+
+/** The step a hub download stands for, as a pin names it. */
+export function hubDownloadStep(d: HubGameDownload): SourceStep {
+  return d.kind === "url"
+    ? { source: "url", mirror: hostOf(d.value) }
+    : { source: d.kind, mirror: null };
+}
+
+/** The hub's downloads with the pinned one first, the rest in the hub's order. */
+export function pinnedHubDownloads(
+  downloads: readonly HubGameDownload[],
+  pin: SourceStep | undefined,
+): HubGameDownload[] {
+  const first = downloads.filter((d) => sameStep(pin, hubDownloadStep(d)));
+  return [...first, ...downloads.filter((d) => !first.includes(d))];
+}
+
+/**
  * The queue request that installs a game: the hub's sources in the hub's
- * order, or the best mirror archive when the hub names none. Throws with the
- * reason when nothing can be fetched.
+ * order with the player's pinned source first, or the best mirror archive when
+ * the hub names none. Throws with the reason when nothing can be fetched.
  */
 export async function installRequest(
   g: LibraryGame,
   writePath: string,
+  prefs: GamePrefsStore = readGamePrefs(),
 ): Promise<EnqueueInput> {
   if (g.hub && g.hub.downloads.length > 0) {
     return hubGameDownloadRequest(
-      g.hub.downloads,
+      pinnedHubDownloads(g.hub.downloads, pinnedSource(prefs, ...gameKeys(g))),
       `${writePath}/games`,
       g.title,
     );

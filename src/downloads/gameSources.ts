@@ -24,14 +24,21 @@ export type GameSource = "github" | "springfiles" | "rapid";
  *   mirror, so it comes before pr-downloader. Needs a write root.
  * - `rapid`: pr-downloader. Always the final fallback, and the only step that
  *   works without a write root (the sidecar has its own default).
+ *
+ * `pinned` is the source the player chose for this game on its page (issue
+ * #4580). It moves to the front when it is in the order, and the rest keep
+ * their places behind it.
  */
 export function gameSourceOrder(opts: {
   hasGithubRepo: boolean;
   hasWritePath: boolean;
+  pinned?: string;
 }): GameSource[] {
   const order: GameSource[] = [];
   if (opts.hasGithubRepo && opts.hasWritePath) order.push("github");
   if (opts.hasWritePath) order.push("springfiles");
   order.push("rapid");
+  const at = order.indexOf(opts.pinned as GameSource);
+  if (at > 0) order.unshift(...order.splice(at, 1));
   return order;
 }

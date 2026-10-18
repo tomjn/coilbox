@@ -1,0 +1,56 @@
+msgid ""
+msgstr ""
+"POT-Creation-Date: 2026-10-18 22:10+0100\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: @lingui/cli\n"
+"Language: zh-Hans\n"
+
+#: src/updater/pages/UpdatesSettingsSection.tsx
+msgid "Check for updates"
+msgstr ""
+
+#: src/updater/pages/UpdatesSettingsSection.tsx
+msgid "Checking…"
+msgstr ""
+
+#: src/updater/pages/UpdatesSettingsSection.tsx
+msgid "Current version"
+msgstr ""
+
+#: src/updater/pages/UpdatesSettingsSection.tsx
+msgid "Download & install"
+msgstr ""
+
+#: src/updater/pages/UpdatesSettingsSection.tsx
+msgid "Installed — restart to apply."
+msgstr ""
+
+#: src/updater/pages/UpdatesSettingsSection.tsx
+msgid "Installing…"
+msgstr ""
+
+#: src/updater/pages/UpdatesSettingsSection.tsx
+msgid "Last checked {lastCheckedTime}"
+msgstr ""
+
+#: src/updater/pages/UpdatesSettingsSection.tsx
+msgid "Restart now"
+msgstr ""
+
+#: src/updater/pages/UpdatesSettingsSection.tsx
+msgid "Updates are disabled in development builds."
+msgstr ""
+
+#: src/updater/pages/UpdatesSettingsSection.tsx
+msgid "Updates for this build are managed by its distributor."
+msgstr ""
+
+#: src/updater/pages/UpdatesSettingsSection.tsx
+msgid "Version {newVersion} available"
+msgstr ""
+
+#: src/updater/pages/UpdatesSettingsSection.tsx
+msgid "You're up to date."
+msgstr ""
