@@ -822,6 +822,7 @@ dependencies = [
 name = "coilbox-compat"
 version = "0.0.0"
 dependencies = [
+ "coilbox-luacompat",
  "coilbox-springlua",
  "serde",
  "serde_json",
@@ -6384,6 +6385,7 @@ version = "0.0.0"
 dependencies = [
  "coilbox-3do-convert",
  "coilbox-compat",
+ "coilbox-luacompat",
  "coilbox-portable",
  "coilbox-springlua",
  "picoframe-core",
