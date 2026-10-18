@@ -3,6 +3,7 @@ import { LIBRARY_GAMES_INPUT } from "./fixtures/libraryGames";
 import { buildLibrary, type LibraryGame } from "./library";
 import {
   chipCounts,
+  gamePrefKey,
   inGamesGrid,
   installRequest,
   matchesChip,
@@ -120,6 +121,41 @@ describe("download requests", () => {
       label: "Metal Factions",
       args: { gameName: "Metal Factions V1.4", writePath: "/data" },
       sizeBytes: 100,
+    });
+  });
+
+  it("installs a hub game from the pinned source first (issue #4580)", async () => {
+    const mf = byId("mf");
+    const withUrl: LibraryGame = {
+      ...mf,
+      hub: mf.hub && {
+        ...mf.hub,
+        downloads: [
+          { kind: "rapid", value: "mf:stable" },
+          {
+            kind: "url",
+            value: "https://files.example/mf.sdz",
+            filename: "mf.sdz",
+          },
+        ],
+      },
+    };
+    const prefs = {
+      [gamePrefKey(withUrl)]: {
+        pin: { source: "url" as const, mirror: "files.example" },
+      },
+    };
+    expect(await installRequest(withUrl, "/data", prefs)).toEqual({
+      kind: "file",
+      label: "Metal Factions",
+      args: {
+        url: "https://files.example/mf.sdz",
+        destDir: "/data/games",
+        filename: "mf.sdz",
+      },
+    });
+    expect(await installRequest(withUrl, "/data", {})).toMatchObject({
+      kind: "rapid",
     });
   });
 
