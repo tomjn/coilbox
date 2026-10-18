@@ -5,6 +5,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { lineLabel } from "../../measure";
 import { newProject } from "../../model";
 import type { LegoPartInfo, LoadedPack } from "../../pack";
 import { DragReadout, MeasureReadout, PieceSize } from "./MeasureReadout";
@@ -39,6 +40,21 @@ describe("MeasureReadout", () => {
     expect(screen.getByText("1. 5 elmos, 20 steps")).toBeTruthy();
     expect(screen.getByText("X 3, Y 4, Z 0 elmos")).toBeTruthy();
     expect(screen.getByText("X 12, Y 16, Z 0 steps")).toBeTruthy();
+  });
+
+  it("reads the same figure as the label on the line", () => {
+    render(
+      <MeasureReadout
+        measurements={[{ id: "a", from: [1, 0, 0], to: [1, 2, 0] }]}
+        start={null}
+        hover={null}
+        step={0.5}
+        onClear={() => {}}
+      />,
+    );
+    expect(
+      screen.getByText(`1. ${lineLabel([1, 0, 0], [1, 2, 0], 0.5)}`),
+    ).toBeTruthy();
   });
 
   it("gives elmos only when the pack has no step", () => {
