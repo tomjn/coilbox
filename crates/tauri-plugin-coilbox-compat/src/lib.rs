@@ -9,6 +9,7 @@
 //! Registered as `"coilbox-compat"`. The frontend invokes
 //! `plugin:coilbox-compat|<cmd>`.
 
+pub mod defs;
 mod handlers;
 pub mod models;
 pub mod mutator;
@@ -34,7 +35,8 @@ pub struct Built {
     pub files: Vec<String>,
     /// What the 3do converter said about the base game's models.
     pub models: models::Conversion,
-    /// Why the converted models are not used, when they cannot be.
+    /// Why the converted models or the def fixes are not used, when they
+    /// cannot be.
     pub notes: Vec<String>,
 }
 
@@ -102,7 +104,7 @@ fn build_reading(
     manifest_version: u32,
     coilbox_version: &str,
     handlers: &[coilbox_compat::Handler],
-    read: impl FnMut(&str) -> Result<Option<String>, String>,
+    mut read: impl FnMut(&str) -> Result<Option<String>, String>,
     convert: impl FnOnce() -> Result<models::Models, String>,
 ) -> Result<Built, String> {
     let manifest = coilbox_compat::manifest(manifest_version)
@@ -123,24 +125,29 @@ fn build_reading(
         base_checksum: base_checksum.to_string(),
         coilbox_version: coilbox_version.to_string(),
     };
-    let mut files = mutator::files(&manifest, game_name, short_name, &marker, read)?;
+    let mut files = mutator::files(&manifest, game_name, short_name, &marker, &mut read)?;
+    let defs = defs::plan(&manifest, &mut read)?;
     let models = convert()?;
-    write_with_models(&dir, &mut files, &models, manifest_version).map(|files| Built {
+    let mut notes = models.notes.clone();
+    notes.extend(defs.notes.iter().cloned());
+    write_with_models(&dir, &mut files, &models, &defs, manifest_version).map(|files| Built {
         dir: dir.to_string_lossy().into_owned(),
         folder,
         files,
         models: models.conversion,
-        notes: models.notes,
+        notes,
     })
 }
 
-/// Write `files` and the converted `models` into `dir`, with the marker that
-/// ends `files` written last, so a write that stops part way leaves none.
-/// Answers with every path written, sorted, with the marker last.
+/// Write `files`, the converted `models` and the def files of `defs` into
+/// `dir`, with the marker that ends `files` written last, so a write that
+/// stops part way leaves none. Answers with every path written, sorted, with
+/// the marker last.
 fn write_with_models(
     dir: &std::path::Path,
     files: &mut Vec<tauri_plugin_coilbox_workshop::CompiledFile>,
     models: &models::Models,
+    defs: &defs::Plan,
     manifest_version: u32,
 ) -> Result<Vec<String>, String> {
     let marker = files
@@ -151,10 +158,13 @@ fn write_with_models(
         Some(from) => models::list(from)?,
         None => Vec::new(),
     };
-    if let Some(post) = models::defs_post(&models::model_keys(&converted), manifest_version) {
-        files.push(post);
-        files.sort_by(|a, b| a.path.cmp(&b.path));
-    }
+    let post = models::defs_post(
+        &models::model_keys(&converted),
+        defs.defs_post.as_deref(),
+        manifest_version,
+    );
+    files.extend(post.into_iter().chain(defs.weapondefs_post.clone()));
+    files.sort_by(|a, b| a.path.cmp(&b.path));
     tauri_plugin_coilbox_workshop::write_mutator(dir, files)?;
     if let Some(from) = &models.dir {
         models::copy(from, &converted, dir)?;
@@ -300,7 +310,12 @@ mod tests {
                 .collect();
         let expected: Vec<String> = gadgets
             .into_iter()
-            .chain(["modinfo.lua".to_string(), mutator::MARKER.to_string()])
+            .chain([
+                models::DEFS_POST.to_string(),
+                "gamedata/weapondefs_post.lua".to_string(),
+                "modinfo.lua".to_string(),
+                mutator::MARKER.to_string(),
+            ])
             .collect();
         assert_eq!(built.files, expected);
         let dir = std::path::Path::new(&built.dir);
@@ -763,6 +778,21 @@ mod tests {
             let path = path.to_lowercase();
             assert!(paths(&with_gadgets).contains(&path), "{path}");
         }
+
+        let (commander, bombs) = (
+            "-- fix: defs-commander-85\n",
+            "-- fix: defs-manual-bomb-settings-92\n",
+        );
+        let weapons = "gamedata/weapondefs_post.lua";
+        let with_defs = golden_build(5, &FIXTURES[0]);
+        let post = text(&with_defs, models::DEFS_POST).unwrap();
+        assert!(post.contains(commander) && post.contains("local converted = {"));
+        assert!(text(&with_defs, weapons).unwrap().contains(bombs));
+        assert!(!text(&full, models::DEFS_POST).unwrap().contains(commander));
+        assert!(text(&full, weapons).is_none());
+        let defs_only = golden_build(5, &FIXTURES[2]);
+        assert!(text(&defs_only, models::DEFS_POST).is_none());
+        assert!(text(&defs_only, weapons).unwrap().contains(bombs));
     }
 
     /// The hash of every fixed game built from manifest `n`.
@@ -803,6 +833,10 @@ mod tests {
         (
             4,
             "fc84ec81f4a375d31b5f9797580e141b6da9ba60cfcf98871ed38fde6da5f693",
+        ),
+        (
+            5,
+            "8a678ce14a48f4bff3503d89b553486e337779101ac2730effc825439648a7d5",
         ),
     ];
 
@@ -864,9 +898,11 @@ mod tests {
             [
                 "LuaRules/Gadgets/coilbox_compat_aircraft_crash.lua",
                 "LuaRules/Gadgets/coilbox_compat_messages_tdf.lua",
+                "LuaRules/Gadgets/coilbox_compat_model_center_offset.lua",
                 "LuaRules/Gadgets/coilbox_compat_only_forward_aim.lua",
                 "Objects3D/armcom.s3o",
                 models::DEFS_POST,
+                "gamedata/weapondefs_post.lua",
                 "modinfo.lua",
                 "unittextures/3do/objects3d.png",
                 mutator::MARKER,

@@ -218,20 +218,52 @@ pub fn model_keys(files: &[String]) -> BTreeSet<String> {
 }
 
 /// `gamedata/defs_post.lua`, pointing every unit, feature and weapon whose
-/// model is in `models` at the converted `.s3o`, or `None` when nothing was
-/// converted. `n` is the manifest it was built from.
-pub fn defs_post(models: &BTreeSet<String>, n: u32) -> Option<CompiledFile> {
-    if models.is_empty() {
+/// model is in `models` at the converted `.s3o`, then running the def fixes in
+/// `fixes` (see `defs`), or `None` when there is neither. `n` is the manifest
+/// it was built from.
+pub fn defs_post(models: &BTreeSet<String>, fixes: Option<&str>, n: u32) -> Option<CompiledFile> {
+    if models.is_empty() && fixes.is_none() {
         return None;
     }
+    let mut contents = format!(
+        "-- Written by coilbox's compatibility mode. Rebuilt from compat manifest {n}, so do not edit it.\n\
+         -- license: {license}\n",
+        license = coilbox_compat::LICENSE,
+    );
+    if !models.is_empty() {
+        contents.push_str(&repoint(models));
+    }
+    if let Some(fixes) = fixes {
+        contents.push('\n');
+        contents.push_str(fixes);
+    }
+    contents.push_str(&format!(
+        "\n\
+         -- The engine's own copy of this file, which this one covers up. Not a\n\
+         -- tail call: VFS.Include reads its caller's environment, which a tail\n\
+         -- call has already dropped.\n\
+         local base = VFS.BASE or \"b\"\n\
+         if VFS.FileExists({path}, base) then\n\
+         \x20 local engine_defs_post = VFS.Include({path}, nil, base)\n\
+         \x20 return engine_defs_post\n\
+         end\n\
+         return {{}}\n",
+        path = lua_string(DEFS_POST),
+    ));
+    Some(CompiledFile {
+        path: DEFS_POST.into(),
+        contents,
+    })
+}
+
+/// The part of `defs_post.lua` that points the defs at the converted models.
+fn repoint(models: &BTreeSet<String>) -> String {
     let table: String = models
         .iter()
         .map(|key| format!("  [{}] = true,\n", lua_string(key)))
         .collect();
-    let contents = format!(
-        "-- Written by coilbox's compatibility mode. Rebuilt from compat manifest {n}, so do not edit it.\n\
-         -- license: {license}\n\
-         --\n\
+    format!(
+        "--\n\
          -- Points every def whose model was converted at the .s3o. The base game's\n\
          -- .3do is still there, and the engine tries .3do first for a name with no\n\
          -- extension.\n\
@@ -273,24 +305,8 @@ pub fn defs_post(models: &BTreeSet<String>, n: u32) -> Option<CompiledFile> {
          \n\
          repoint(DEFS.unitDefs, \"objectname\")\n\
          repoint(DEFS.featureDefs, \"object\")\n\
-         repoint(DEFS.weaponDefs, \"model\")\n\
-         \n\
-         -- The engine's own copy of this file, which this one covers up. Not a\n\
-         -- tail call: VFS.Include reads its caller's environment, which a tail\n\
-         -- call has already dropped.\n\
-         local base = VFS.BASE or \"b\"\n\
-         if VFS.FileExists({path}, base) then\n\
-         \x20 local engine_defs_post = VFS.Include({path}, nil, base)\n\
-         \x20 return engine_defs_post\n\
-         end\n\
-         return {{}}\n",
-        license = coilbox_compat::LICENSE,
-        path = lua_string(DEFS_POST),
-    );
-    Some(CompiledFile {
-        path: DEFS_POST.into(),
-        contents,
-    })
+         repoint(DEFS.weaponDefs, \"model\")\n"
+    )
 }
 
 /// Copy `files`, relative to `from`, into `to`.
@@ -329,7 +345,7 @@ mod tests {
 
     #[test]
     fn nothing_converted_writes_no_file() {
-        assert!(defs_post(&BTreeSet::new(), 1).is_none());
+        assert!(defs_post(&BTreeSet::new(), None, 1).is_none());
     }
 
     /// Runs the written file over a `DEFS` like the engine's `defs.lua` builds,
@@ -338,6 +354,7 @@ mod tests {
     fn run(defs: &str) -> (serde_json::Value, serde_json::Value) {
         let post = defs_post(
             &keys(&["objects3d/armcom.s3o", "objects3d/arm/mech.s3o"]),
+            None,
             1,
         )
         .expect("a file");
@@ -406,8 +423,8 @@ mod tests {
     #[test]
     fn the_file_has_lf_endings_and_the_same_bytes_each_time() {
         let models = keys(&["objects3d/b.s3o", "objects3d/a.s3o"]);
-        let a = defs_post(&models, 1).unwrap().contents;
-        assert_eq!(a, defs_post(&models, 1).unwrap().contents);
+        let a = defs_post(&models, None, 1).unwrap().contents;
+        assert_eq!(a, defs_post(&models, None, 1).unwrap().contents);
         assert!(!a.contains('\r'));
         assert!(a.find("[\"a\"]").unwrap() < a.find("[\"b\"]").unwrap());
     }
