@@ -182,6 +182,19 @@ interface Target {
   name: string;
 }
 
+/** The axes each piece moves on, by kind. */
+interface Moved {
+  turn: Map<string, Set<number>>;
+  move: Map<string, Set<number>>;
+}
+
+/** The call a line makes: the engine's, or the one that also records where the
+ *  piece is going when the unit blends (see `BLEND_HELPERS`). */
+function callName(kind: "turn" | "move", tracked: boolean): string {
+  if (kind === "turn") return tracked ? "ActTurn" : "Turn";
+  return tracked ? "ActMove" : "Move";
+}
+
 /**
  * The calls that take every target from `from` to `to` in `seconds`, then the
  * sleep that waits for them. Per axis, so one axis that has to travel further
@@ -194,8 +207,9 @@ function stepLines(
   to: Map<string, Values>,
   seconds: number,
   indent: string,
-  moved: { turn: Map<string, Set<number>>; move: Map<string, Set<number>> },
+  moved: Moved,
   sleep: boolean,
+  tracked: boolean,
 ): { lines: string[]; frames: number } {
   const frames = framesOf(seconds);
   const lines: string[] = [];
@@ -203,7 +217,7 @@ function stepLines(
     const before = from.get(piece.id) ?? REST;
     const after = to.get(piece.id) ?? REST;
     for (const kind of ["turn", "move"] as const) {
-      const call = kind === "turn" ? "Turn" : "Move";
+      const call = callName(kind, tracked);
       for (let axis = 0; axis < 3; axis++) {
         const was = before[kind][axis];
         const now = after[kind][axis];
@@ -265,6 +279,7 @@ export function emitActions(
     out.hooks[hook] = [...(out.hooks[hook] ?? []), ...lines];
   };
 
+  const plans: Plan[] = [];
   for (const action of project.actions ?? []) {
     if (triggerProblem(project, action.trigger)) continue;
     const steps = liveSteps(action, project);
@@ -276,9 +291,24 @@ export function emitActions(
       base = `${slug(action.name) || "action"}_${n}`;
     }
     taken.add(base.toLowerCase());
-    const thread = `action_${base}`;
-    const signal = `SIG_ACTION_${base.toUpperCase()}`;
+    plans.push({
+      action,
+      steps,
+      pieces,
+      thread: `action_${base}`,
+      signal: `SIG_ACTION_${base.toUpperCase()}`,
+      ...blendOf(action, project),
+    });
+  }
 
+  // A unit blends when any action eases in or out. Then every action writes
+  // through the helpers, because the action that is interrupted is whichever
+  // one was running.
+  const blending = unitBlends(project);
+  if (blending) out.functions.push(...BLEND_HELPERS, "");
+
+  for (const plan of plans) {
+    const { action, steps, pieces, thread, signal, blendIn, blendOut } = plan;
     const targets = pieces.map((piece) => ({ piece, name: use(piece) }));
     const keyed = steps.map(
       (step) =>
@@ -286,18 +316,18 @@ export function emitActions(
           pieces.map((piece) => [piece.id, valuesOf(step.pose, piece.id)]),
         ),
     );
-    const moved = {
+    const moved: Moved = {
       turn: new Map<string, Set<number>>(),
       move: new Map<string, Set<number>>(),
     };
     const rest = new Map<string, Values>();
 
-    const lead: string[] = [];
+    const leadParts: string[][] = [];
     let previous = rest;
     steps.forEach((step, index) => {
       const last = !action.loop && index === steps.length - 1;
-      lead.push(
-        ...stepLines(
+      leadParts.push(
+        stepLines(
           targets,
           previous,
           keyed[index],
@@ -305,6 +335,7 @@ export function emitActions(
           "  ",
           moved,
           !last,
+          blending,
         ).lines,
       );
       previous = keyed[index];
@@ -326,6 +357,7 @@ export function emitActions(
           "    ",
           moved,
           true,
+          blending,
         ),
         ...steps
           .slice(1)
@@ -338,6 +370,7 @@ export function emitActions(
               "    ",
               moved,
               true,
+              blending,
             ),
           ),
       ];
@@ -348,22 +381,58 @@ export function emitActions(
     }
     const looping = loop.length > 0 && loopFrames > 0;
 
+    // With a blend in, the first key is reached over that time from wherever
+    // the pieces are, on every axis the action ever moves, because the action
+    // that held them left them anywhere.
+    if (blendIn > 0) {
+      const last = !action.loop && steps.length === 1;
+      const lines = blendLines(targets, moved, keyed[0], blendIn, "  ");
+      if (!last) lines.push(`  Sleep(${framesOf(blendIn) * SLEEP_FRAME_MS})`);
+      leadParts[0] = lines;
+    }
+    const lead = leadParts.flat();
+
+    // The pieces another action also moves. Whichever starts last takes them,
+    // and the one it took them from no longer sends them home.
+    const sharedWith = plans.filter(
+      (other) =>
+        other !== plan &&
+        other.pieces.some((p) => pieces.some((mine) => mine.id === p.id)),
+    );
+    const sharedIds = new Set(
+      pieces
+        .filter((mine) =>
+          sharedWith.some((other) =>
+            other.pieces.some((p) => p.id === mine.id),
+          ),
+        )
+        .map((piece) => piece.id),
+    );
+
     const stop = STOP_CALLIN[action.trigger];
     const stopName = `${thread}Stop`;
-    const restLines = [
-      ...[...moved.turn].flatMap(([id, axes]) => {
-        const name = targets.find((t) => t.piece.id === id)?.name;
-        return [...axes].map(
-          (axis) => `  Turn(${name}, ${AXES[axis]}, 0, ${REST_SPEED})`,
-        );
-      }),
-      ...[...moved.move].flatMap(([id, axes]) => {
-        const name = targets.find((t) => t.piece.id === id)?.name;
-        return [...axes].map(
-          (axis) => `  Move(${name}, ${AXES[axis]}, 0, ${REST_SPEED})`,
-        );
-      }),
-    ];
+    const restLine = (
+      kind: "turn" | "move",
+      id: string,
+      axis: number,
+    ): string => {
+      const name = targets.find((t) => t.piece.id === id)?.name;
+      if (!blending) {
+        return `  ${callName(kind, false)}(${name}, ${AXES[axis]}, 0, ${REST_SPEED})`;
+      }
+      const call =
+        blendOut > 0
+          ? `Blend${kind === "turn" ? "Turn" : "Move"}(${name}, ${AXES[axis]}, 0, ${lua(blendOut)})`
+          : `${callName(kind, true)}(${name}, ${AXES[axis]}, 0, ${REST_SPEED})`;
+      return sharedIds.has(id)
+        ? `  if ACT_OWNER[${name}] == ${signal} then ${call} end`
+        : `  ${call}`;
+    };
+    const restLines = (["turn", "move"] as const).flatMap((kind) =>
+      [...moved[kind]].flatMap(([id, axes]) =>
+        [...axes].map((axis) => restLine(kind, id, axis)),
+      ),
+    );
 
     out.signals.push(`local ${signal} = ${luaString(signal)}`);
     out.functions.push(
@@ -386,6 +455,14 @@ export function emitActions(
     out.functions.push("");
 
     const start = [`  Signal(${signal})`, `  StartThread(${thread})`];
+    if (blending) {
+      start.unshift(
+        ...sharedWith.map((other) => `  Signal(${other.signal})`),
+        ...targets
+          .filter((t) => sharedIds.has(t.piece.id))
+          .map((t) => `  ACT_OWNER[${t.name}] = ${signal}`),
+      );
+    }
     if (isHookTrigger(project, action.trigger)) {
       addHook(action.trigger, start);
       if (looping && stop) addHook(stop, [`  ${stopName}()`]);
@@ -399,6 +476,139 @@ export function emitActions(
   }
   return out;
 }
+
+/** An action with the things emitting it needs settled first. */
+interface Plan {
+  action: LegoAction;
+  steps: Step[];
+  pieces: LegoPiece[];
+  thread: string;
+  signal: string;
+  blendIn: number;
+  blendOut: number;
+}
+
+/** Seconds an action eases in over and out over: its own, or the project's. */
+export function blendOf(
+  action: LegoAction,
+  project: LegoProject,
+): { blendIn: number; blendOut: number } {
+  const fallback = project.actionBlend ?? 0;
+  return {
+    blendIn: action.blendIn ?? fallback,
+    blendOut: action.blendOut ?? fallback,
+  };
+}
+
+/**
+ * The calls that take every axis the action moves to its first key over
+ * `seconds`, each at the speed that covers what is left to go by then.
+ */
+function blendLines(
+  targets: Target[],
+  moved: Moved,
+  first: Map<string, Values>,
+  seconds: number,
+  indent: string,
+): string[] {
+  const lines: string[] = [];
+  for (const kind of ["turn", "move"] as const) {
+    const call = kind === "turn" ? "BlendTurn" : "BlendMove";
+    for (const { piece, name } of targets) {
+      const axes = moved[kind].get(piece.id);
+      if (!axes) continue;
+      const to = first.get(piece.id) ?? REST;
+      for (const axis of [...axes].sort()) {
+        lines.push(
+          `${indent}${call}(${name}, ${AXES[axis]}, ${lua(to[kind][axis])}, ${lua(seconds)})`,
+        );
+      }
+    }
+  }
+  return lines;
+}
+
+/**
+ * The helpers a blending unit's script carries. The engine and the preview
+ * runtime both move a piece by `speed / 30` a frame toward its destination,
+ * so these note each call an action makes and work out from the frames since
+ * where the piece has got to. A blend starts from that.
+ *
+ * The engine can read a piece's angle back with `GetPieceRotation`
+ * (`LuaUnitScript.cpp:1919`), but the preview's script runtime has no such
+ * call, and a script that used it would not play there. `Spring.GetGameFrame`
+ * is in both.
+ */
+const BLEND_HELPERS = [
+  "-- Where the actions have left each piece, so a blend can start from there.",
+  "local ACT_AT = {}",
+  "local ACT_OWNER = {}",
+  "",
+  "local function act_entry(kind, p, axis)",
+  '  local key = kind .. p .. ":" .. axis',
+  "  local a = ACT_AT[key]",
+  "  if not a then",
+  '    a = { at = 0, to = 0, speed = 0, since = 0, turn = kind == "t" }',
+  "    ACT_AT[key] = a",
+  "  end",
+  "  return a",
+  "end",
+  "",
+  "-- The piece moves speed / 30 a frame, starting the frame of the call.",
+  "local function act_now(a)",
+  "  local travel = (Spring.GetGameFrame() - a.since) * a.speed / 30",
+  "  local delta = a.to - a.at",
+  "  if a.turn then",
+  "    delta = math.fmod(delta + 3 * math.pi, 2 * math.pi) - math.pi",
+  "  end",
+  "  if travel <= 0 then",
+  "    return a.at",
+  "  elseif travel >= math.abs(delta) then",
+  "    return a.to",
+  "  end",
+  "  local at = a.at + (delta > 0 and travel or -travel)",
+  "  if a.turn and at > math.pi then",
+  "    at = at - 2 * math.pi",
+  "  elseif a.turn and at < -math.pi then",
+  "    at = at + 2 * math.pi",
+  "  end",
+  "  return at",
+  "end",
+  "",
+  "local function act_go(fn, kind, p, axis, to, speed)",
+  "  local a = act_entry(kind, p, axis)",
+  "  a.at = act_now(a)",
+  "  a.since = Spring.GetGameFrame()",
+  "  a.to = to",
+  "  if speed then",
+  "    a.speed = speed",
+  "    fn(p, axis, to, speed)",
+  "  else",
+  "    a.at = to",
+  "    a.speed = 0",
+  "    fn(p, axis, to)",
+  "  end",
+  "end",
+  "",
+  "local function act_over(fn, kind, p, axis, to, seconds)",
+  "  local a = act_entry(kind, p, axis)",
+  "  local now = act_now(a)",
+  "  local distance = math.abs(to - now)",
+  '  if kind == "t" then',
+  "    distance = math.abs(math.fmod(to - now + 3 * math.pi, 2 * math.pi) - math.pi)",
+  "  end",
+  "  if distance < 0.0001 then",
+  "    act_go(fn, kind, p, axis, to)",
+  "  else",
+  "    act_go(fn, kind, p, axis, to, distance / seconds)",
+  "  end",
+  "end",
+  "",
+  'local function ActTurn(p, axis, to, speed) act_go(Turn, "t", p, axis, to, speed) end',
+  'local function ActMove(p, axis, to, speed) act_go(Move, "m", p, axis, to, speed) end',
+  'local function BlendTurn(p, axis, to, seconds) act_over(Turn, "t", p, axis, to, seconds) end',
+  'local function BlendMove(p, axis, to, seconds) act_over(Move, "m", p, axis, to, seconds) end',
+];
 
 /**
  * The call-in the preview plays an action through, as a scenario id from
@@ -446,12 +656,16 @@ export interface ActionClash {
   piece: LegoPiece;
   /** What else moves it: another action's name or a preset's label. */
   with: string;
+  /** The other action, when it is one and not a preset. */
+  other?: LegoAction;
 }
 
 /**
  * Where an action and another action or a preset move the same piece. Two
- * motions on one piece at once fight, and the later call wins. Blending them is
- * #3358, so this names the piece and leaves the choice to the game maker.
+ * motions on one piece at once fight. A unit that blends gives the piece to
+ * whichever action started last (`emitActions`), and one that does not leaves
+ * it to whichever call came last. Either way the game maker is told who shares
+ * it.
  */
 export function actionClashes(project: LegoProject): ActionClash[] {
   const actions = project.actions ?? [];
@@ -482,17 +696,37 @@ export function actionClashes(project: LegoProject): ActionClash[] {
   }));
   for (const { action, pieces } of owned) {
     for (const piece of pieces) {
-      const others = [
-        ...owned
-          .filter((o) => o.action.id !== action.id)
-          .filter((o) => o.pieces.some((p) => p.id === piece.id))
-          .map((o) => o.action.name),
-        ...presetPieces.filter((p) => p.ids.has(piece.id)).map((p) => p.label),
-      ];
-      for (const name of others) clashes.push({ action, piece, with: name });
+      const actionsWith = owned
+        .filter((o) => o.action.id !== action.id)
+        .filter((o) => o.pieces.some((p) => p.id === piece.id));
+      for (const o of actionsWith) {
+        clashes.push({ action, piece, with: o.action.name, other: o.action });
+      }
+      for (const p of presetPieces.filter((p) => p.ids.has(piece.id))) {
+        clashes.push({ action, piece, with: p.label });
+      }
     }
   }
   return clashes;
+}
+
+/** What happens to a shared piece, in a few words. */
+export function sharedOutcome(project: LegoProject): string {
+  return unitBlends(project)
+    ? "The one started last takes it."
+    : "The one called last wins.";
+}
+
+/** Whether any action of the unit eases in or out, which is what makes its
+ *  script track where the pieces are. */
+export function unitBlends(project: LegoProject): boolean {
+  return (project.actions ?? []).some((action) => {
+    if (triggerProblem(project, action.trigger)) return false;
+    if (liveSteps(action, project).length === 0) return false;
+    if (actionPieces(action, project).length === 0) return false;
+    const { blendIn, blendOut } = blendOf(action, project);
+    return blendIn > 0 || blendOut > 0;
+  });
 }
 
 /** What is wrong with each action, for the problems list. */
@@ -526,8 +760,17 @@ export function actionProblems(project: LegoProject): Problem[] {
       );
     }
   }
+  // Two actions that share a piece are one finding, told from the one listed
+  // first.
+  const listed = (project.actions ?? []).map((a) => a.id);
   const byPiece = new Map<string, ActionClash[]>();
   for (const clash of actionClashes(project)) {
+    if (
+      clash.other &&
+      listed.indexOf(clash.other.id) < listed.indexOf(clash.action.id)
+    ) {
+      continue;
+    }
     const key = `${clash.action.id}:${clash.with}`;
     byPiece.set(key, [...(byPiece.get(key) ?? []), clash]);
   }
@@ -537,7 +780,7 @@ export function actionProblems(project: LegoProject): Problem[] {
       problem(
         "actions",
         "warning",
-        `${action.name} and ${other} both move ${group.map((c) => c.piece.name).join(", ")}. The one called last wins.`,
+        `${action.name} and ${other} both move ${group.map((c) => c.piece.name).join(", ")}. ${sharedOutcome(project)}`,
         group.map((c) => c.piece.id),
       ),
     );
@@ -621,6 +864,33 @@ export function setActionLoop(
   loop: boolean,
 ): LegoProject {
   return mapAction(project, id, (a) => ({ ...a, loop }));
+}
+
+/** Set how long an action eases in or out over, in seconds. Null goes back to
+ *  the project's time. Not negative and not a number that is not one. */
+export function setActionBlend(
+  project: LegoProject,
+  id: string,
+  which: "blendIn" | "blendOut",
+  seconds: number | null,
+): LegoProject {
+  if (seconds !== null && (!Number.isFinite(seconds) || seconds < 0)) {
+    return project;
+  }
+  return mapAction(project, id, (a) => {
+    const { [which]: _was, ...rest } = a;
+    return seconds === null ? rest : { ...rest, [which]: seconds };
+  });
+}
+
+/** Set the blend time every action without one of its own uses. 0 removes it. */
+export function setDefaultBlend(
+  project: LegoProject,
+  seconds: number,
+): LegoProject {
+  if (!Number.isFinite(seconds) || seconds < 0) return project;
+  const { actionBlend: _was, ...rest } = project;
+  return seconds === 0 ? rest : { ...rest, actionBlend: seconds };
 }
 
 /** Add a key for a pose at the end of the action. */

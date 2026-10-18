@@ -44,6 +44,8 @@ export const SOLO_SCENARIOS: Record<string, string> = {
   "aim.track": "firing",
   recoil: "firing",
   "idle.sway": "starting-stopping",
+  "idle.look": "idle",
+  "body.settle": "firing",
   "wreck.pose": "destroyed",
   "wreck.breakApart": "destroyed",
 };

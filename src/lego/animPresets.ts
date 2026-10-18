@@ -191,6 +191,10 @@ export type LuaHook =
   | "StartBuilding"
   | "StopBuilding"
   | "QueryNanoPiece"
+  // The engine calls this after a weapon fires, with the direction opposite
+  // the shot in the unit's own space (#3357). A unit that defines it pays for
+  // the call on every shot, so the script writes it only when a preset uses it.
+  | "RockUnit"
   | "Killed";
 
 /**
@@ -217,6 +221,13 @@ export interface EmitWeapon {
    * marks it used, as `EmitContext.pieces` does.
    */
   piece(role: WeaponRole): string | undefined;
+  /**
+   * The weapon's flare when it is not under the weapon's barrel, or undefined.
+   * A flare under the barrel is carried by it, so it needs no move of its own.
+   * One beside the barrel stays where it was when the barrel kicks, unless the
+   * script moves it too. Asking marks it used, as `piece` does.
+   */
+  looseFlare(): string | undefined;
   /**
    * A signal of this preset's own for this weapon alone. Each weapon needs its
    * own, because aiming starts with `Signal`, which would otherwise cancel
@@ -317,6 +328,13 @@ export interface EmitResult {
   /** Threads and helpers, written above the callins. */
   functions: string[];
   hooks: Partial<Record<LuaHook, string[]>>;
+  /**
+   * Lines that go at the top of a callin, ahead of every preset's `hooks`. An
+   * aim ends in `return true`, so a preset that only has to note the aim
+   * happened cannot add its line after it, and it has to run before the aim's
+   * own turns start.
+   */
+  first?: Partial<Record<LuaHook, string[]>>;
 }
 
 /** What a preset is written once for, when that can be more than once. */
@@ -634,6 +652,9 @@ function cycleThreads(
   options: {
     name: string;
     start: LuaHook;
+    /** More call-ins that start the thread too, such as `Create` for motion
+     *  that must play on a unit that has not yet done what `start` waits for. */
+    alsoStart?: LuaHook[];
     stop?: LuaHook;
     /** The roles to move, when not the preset's `animates`. */
     roles?: string[];
@@ -664,6 +685,9 @@ function cycleThreads(
     functions,
     hooks: {
       [options.start]: started,
+      ...Object.fromEntries(
+        (options.alsoStart ?? []).map((hook) => [hook, started]),
+      ),
       ...(options.stop ? { [options.stop]: stopped } : {}),
     },
   };
@@ -2763,12 +2787,21 @@ export const RECOIL: AnimPreset = {
     for (const weapon of ctx.weapons()) {
       const barrel = weapon.piece("barrel");
       if (!barrel) continue;
+      // A flare beside the barrel moves with it, so it stays in front of the
+      // muzzle. One under the barrel is carried by it already.
+      const flare = weapon.looseFlare();
       hooks[`Shot${weapon.number}`] = [
         `  Signal(${weapon.signal})`,
         `  SetSignalMask(${weapon.signal})`,
         `  Move(${barrel}, z_axis, -${lua(kick)}, ${lua(kick / kickTime)})`,
+        ...(flare
+          ? [`  Move(${flare}, z_axis, -${lua(kick)}, ${lua(kick / kickTime)})`]
+          : []),
         `  WaitForMove(${barrel}, z_axis)`,
         `  Move(${barrel}, z_axis, 0, ${lua(kick / returnTime)})`,
+        ...(flare
+          ? [`  Move(${flare}, z_axis, 0, ${lua(kick / returnTime)})`]
+          : []),
       ];
     }
     return Object.keys(hooks).length > 0 ? { functions: [], hooks } : null;
@@ -2813,12 +2846,281 @@ export const IDLE_SWAY: AnimPreset = {
   },
   emit(ctx) {
     // The opposite of walking: idle motion picks up once the unit stops, and
-    // stands down the moment it moves again.
+    // stands down the moment it moves again. It also starts from `Create`,
+    // because a unit that has not moved yet has never stopped (#3357).
     return cycleThreads(this, ctx, {
       name: "idleSway",
       start: "StopMoving",
+      alsoStart: ["Create"],
       stop: "StartMoving",
     });
+  },
+};
+
+/**
+ * The turn of the body, in radians, a shot of unit strength gives it at the
+ * lean slider's default, in degrees. Balanced Annihilation's `RockUnit` turns
+ * the base by the engine's argument, which for a script in COB is the shot's
+ * direction times 500, and 500 of COB's 65536 angle units to a turn is 2.75
+ * degrees (`CobInstance.cpp:269-273`). The Lua `RockUnit` is handed the
+ * direction on its own, so the slider is that same angle.
+ */
+const SETTLE_LEAN_DEGREES = 2.75;
+
+/**
+ * How long the body takes to reach the lean after a shot, in frames. Balanced
+ * Annihilation's rock turns at 50 degrees a second, so 2.75 degrees takes
+ * about 2 frames. A design choice here, not a measurement.
+ */
+const SETTLE_KICK_FRAMES = 2;
+
+/** Frames between the steps of the easing back. A design choice. */
+const SETTLE_STEP_FRAMES = 3;
+
+/**
+ * The body tipping away from each shot and easing level.
+ *
+ * The engine calls `RockUnit(x, z)` after a weapon fires, if the script has
+ * one (`Weapon.cpp:606-608`). `x` and `z` are the unit vector opposite the
+ * shot, in the unit's own space, so firing straight ahead gives `(0, -1)`.
+ * The body is pushed that way, so its top goes that way: a shot ahead lifts
+ * the nose, which is a negative turn about x as in `BODY_ROCK`, and a shot
+ * along +x pushes the top along -x, which is a positive turn about z. Balanced
+ * Annihilation's `ROCKUNIT.H` turns about z by the argument's own sign, the
+ * other way, so its roll leans into a sideways shot. The pitch agrees with it.
+ *
+ * The lean snaps to the shot's size in a couple of frames and decays on a first
+ * order lag, the same shape as `BODY_ROCK`, in steps. The next shot replaces
+ * the lean in progress.
+ */
+export const BODY_SETTLE: AnimPreset = {
+  id: "body.settle",
+  label: "Body settles after a shot",
+  description:
+    "Tips the body a little away from the shot each time a weapon fires, and eases it level again.",
+  requires: [{ role: "base", count: 1 }],
+  animates: ["base"],
+  params: [
+    {
+      id: "lean",
+      label: "Lean per shot",
+      unit: "deg",
+      min: 0,
+      max: 15,
+      step: 0.25,
+      fallback: SETTLE_LEAN_DEGREES,
+    },
+    {
+      id: "settle",
+      label: "Settle time",
+      unit: "s",
+      min: 0.05,
+      max: 1.5,
+      step: 0.05,
+      fallback: 0.25,
+    },
+  ],
+  /** The lean follows the shot's direction, which a time cannot give. */
+  track() {
+    return null;
+  },
+  emit(ctx) {
+    const bodies = ctx.pieces("base");
+    if (bodies.length === 0) return null;
+    const lean = deg(value(this, ctx.params, "lean"));
+    if (lean <= 0) return null;
+    const settle = Math.max(value(this, ctx.params, "settle"), 0.01);
+    const decay = Math.exp(-(SETTLE_STEP_FRAMES / ENGINE_FPS) / settle);
+    const turnAll = (axis: string, angle: string) =>
+      bodies.map((body) => `  Turn(${body}, ${axis}, ${angle}, speed)`);
+    return {
+      functions: [
+        "local bodySettlePitch = 0",
+        "local bodySettleRoll = 0",
+        "",
+        // `rate` is the steps a second, so the turn lands by the next step.
+        "local function bodySettleTurn(pitch, roll, rate)",
+        "  local speed = (pitch - bodySettlePitch) * rate",
+        "  if speed < 0 then speed = -speed end",
+        ...turnAll("x_axis", "pitch"),
+        "  speed = (roll - bodySettleRoll) * rate",
+        "  if speed < 0 then speed = -speed end",
+        ...turnAll("z_axis", "roll"),
+        "  bodySettlePitch = pitch",
+        "  bodySettleRoll = roll",
+        "end",
+      ],
+      hooks: {
+        RockUnit: [
+          `  Signal(${ctx.signal})`,
+          `  SetSignalMask(${ctx.signal})`,
+          `  local pitch = ${lua(lean)} * rockDir_z`,
+          `  local roll = -${lua(lean)} * rockDir_x`,
+          `  bodySettleTurn(pitch, roll, ${ENGINE_FPS / SETTLE_KICK_FRAMES})`,
+          `  Sleep(${SETTLE_KICK_FRAMES * SLEEP_FRAME_MS})`,
+          `  while pitch > ${ROCK_LEVEL} or pitch < -${ROCK_LEVEL} or roll > ${ROCK_LEVEL} or roll < -${ROCK_LEVEL} do`,
+          `    pitch = pitch * ${Number(decay.toPrecision(6))}`,
+          `    roll = roll * ${Number(decay.toPrecision(6))}`,
+          `    bodySettleTurn(pitch, roll, ${ENGINE_FPS / SETTLE_STEP_FRAMES})`,
+          `    Sleep(${SETTLE_STEP_FRAMES * SLEEP_FRAME_MS})`,
+          "  end",
+          "  bodySettleTurn(0, 0, 0)",
+        ],
+      },
+    };
+  },
+};
+
+/** The look-around's waypoints, as shares of the half range either side of the
+ *  middle. An irregular order, so a turret does not seem to be swinging on a
+ *  pendulum. A design choice. */
+const IDLE_LOOK_SHARES = [0.6, -0.4, -0.7, 0.3];
+
+/** Frames between the checks that the unit has been quiet long enough. */
+const IDLE_LOOK_POLL_FRAMES = 10;
+
+/**
+ * The turret looking slowly around while the unit has nothing to do.
+ *
+ * After the unit has not moved, aimed or fired for the delay, each turret turns
+ * to a waypoint inside its yaw range, rests there, and turns to the next. A
+ * turret with no range looks the turn slider's angle either side of straight
+ * ahead. The look stops at the next `StartMoving`, `AimWeapon` or `Shot`, and
+ * starts again after the delay. `StartMoving` also turns the turret back to
+ * centre, which `AimWeapon` does not, since the aim turns it to where it wants.
+ *
+ * One thread, started from `Create`, so a unit that has not moved looks around
+ * too. It wakes every `IDLE_LOOK_POLL_FRAMES` frames to count the quiet, which
+ * the engine's cost for has not been measured.
+ *
+ * The aim's `Turn` replaces the look's on the same axis, so a look under way
+ * when a target appears gives way to the aim. The thread issues no more turns
+ * until the unit has been quiet again.
+ */
+export const IDLE_LOOK: AnimPreset = {
+  id: "idle.look",
+  label: "Turret looks around when idle",
+  description:
+    "After the unit has stood still without aiming or firing for a while, each turret slowly looks around inside its range. It stops when the unit moves or a weapon aims.",
+  requires: [{ role: "turret", count: 1 }],
+  animates: ["turret"],
+  params: [
+    {
+      id: "delay",
+      label: "Idle time before looking",
+      unit: "s",
+      min: 1,
+      max: 30,
+      step: 0.5,
+      fallback: 4,
+    },
+    {
+      id: "speed",
+      label: "Turn speed",
+      unit: "deg",
+      min: 1,
+      max: 90,
+      step: 1,
+      fallback: 20,
+    },
+    {
+      id: "pause",
+      label: "Pause at each look",
+      unit: "s",
+      min: 0.1,
+      max: 10,
+      step: 0.1,
+      fallback: 1.5,
+    },
+    {
+      id: "turn",
+      label: "Turn either side, with no range",
+      unit: "deg",
+      min: 5,
+      max: 180,
+      step: 5,
+      fallback: 40,
+    },
+  ],
+  /** What the turret does depends on how long the unit has been quiet. */
+  track() {
+    return null;
+  },
+  emit(ctx) {
+    const turrets = ctx.pieces("turret");
+    if (turrets.length === 0) return null;
+    const delay = Math.max(
+      1,
+      Math.round(value(this, ctx.params, "delay") * ENGINE_FPS),
+    );
+    const speed = lua(deg(value(this, ctx.params, "speed")));
+    const pause =
+      Math.max(1, Math.round(value(this, ctx.params, "pause") * ENGINE_FPS)) *
+      SLEEP_FRAME_MS;
+    const sideways = value(this, ctx.params, "turn");
+
+    // Each turret's waypoints, in degrees from straight ahead.
+    const waypoints = turrets.map((turret, index) => {
+      const range = yawRange(ctx.limits?.(turret));
+      const middle = range ? (range.min + range.max) / 2 : 0;
+      const half = range ? (range.max - range.min) / 2 : sideways;
+      return IDLE_LOOK_SHARES.map(
+        (_, step) =>
+          middle +
+          half * IDLE_LOOK_SHARES[(step + index) % IDLE_LOOK_SHARES.length],
+      );
+    });
+
+    // Any aim or shot means the unit is busy, so the count starts again.
+    const busy = Object.fromEntries(
+      ctx.weapons().flatMap((weapon) => [
+        [`AimWeapon${weapon.number}`, ["  idleLookQuiet = 0"]],
+        [`Shot${weapon.number}`, ["  idleLookQuiet = 0"]],
+      ]),
+    ) as EmitResult["first"];
+    return {
+      functions: [
+        "local idleLookQuiet = 0",
+        "local idleLookMoving = false",
+        "",
+        "local function idleLookWait()",
+        `  while idleLookMoving or idleLookQuiet < ${delay} do`,
+        `    Sleep(${IDLE_LOOK_POLL_FRAMES * SLEEP_FRAME_MS})`,
+        `    idleLookQuiet = idleLookQuiet + ${IDLE_LOOK_POLL_FRAMES}`,
+        "  end",
+        "end",
+        "",
+        "local function idleLook()",
+        "  while true do",
+        ...IDLE_LOOK_SHARES.flatMap((_, step) => [
+          "    idleLookWait()",
+          ...turrets.map(
+            (turret, index) =>
+              `    Turn(${turret}, y_axis, ${lua(deg(waypoints[index][step]))}, ${speed})`,
+          ),
+          ...turrets.map((turret) => `    WaitForTurn(${turret}, y_axis)`),
+          `    Sleep(${pause})`,
+        ]),
+        "  end",
+        "end",
+      ],
+      hooks: {
+        Create: ["  StartThread(idleLook)"],
+        StartMoving: [
+          // Centred only when the look had begun. Before that the turret is
+          // where something else left it.
+          `  if idleLookQuiet >= ${delay} then`,
+          ...turrets.map(
+            (turret) => `    Turn(${turret}, y_axis, 0, ${speed})`,
+          ),
+          "  end",
+          "  idleLookMoving = true",
+          "  idleLookQuiet = 0",
+        ],
+        StopMoving: ["  idleLookMoving = false", "  idleLookQuiet = 0"],
+      },
+      first: busy,
+    };
   },
 };
 
@@ -3087,6 +3389,8 @@ export const PRESETS: AnimPreset[] = [
   BODY_ROCK,
   HOVER_LEAN,
   BREAK_APART,
+  BODY_SETTLE,
+  IDLE_LOOK,
 ];
 
 export function presetById(id: string): AnimPreset | undefined {
