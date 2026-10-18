@@ -37,6 +37,7 @@ import { ArchiveRow } from "./components/ArchiveRow";
 import { BrandingLinks } from "./components/BrandingLinks";
 import { BrandingScreenshots } from "./components/BrandingScreenshots";
 import { FindingList } from "./components/CompatFindings";
+import { CompatMode } from "./components/CompatMode";
 import { Convert3doDrawer } from "./components/Convert3doDrawer";
 import { DeleteArchiveButton } from "./components/DeleteArchiveButton";
 import {
@@ -303,6 +304,15 @@ export default function GameDetailPage() {
       {hasFindings && (
         <section id="compat" className="flex scroll-mt-4 flex-col gap-2">
           <h2 className="text-sm font-medium">Compatibility</h2>
+          {selected?.enginePath && selected.rootPath && (
+            <CompatMode
+              enginePath={selected.enginePath}
+              dataDir={selected.rootPath}
+              archiveName={game.primaryArchive.name}
+              gameName={game.name}
+              checksum={gameInfo?.checksum}
+            />
+          )}
           <FindingList
             findings={compat.findings}
             actions={{
