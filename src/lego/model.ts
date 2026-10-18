@@ -836,6 +836,14 @@ export interface LegoProject {
    * no budget. See `budget.ts`.
    */
   budget?: number;
+  /**
+   * The ids of the modules a campaign hands the player later (#3289). A loadout
+   * holding one is locked, and so is a unit without loadouts that holds one. Data
+   * for a mission to read: it changes no model and no definition. A list for the
+   * unit, not for the module, so the same module is free in another unit. Absent
+   * means none. See `locks.ts`.
+   */
+  lockedModules?: string[];
 }
 
 /**
@@ -875,6 +883,12 @@ export interface LegoLoadout {
    * start of a chain. See `upgradeChain.ts`.
    */
   upgradesFrom?: string;
+  /**
+   * Locked until a campaign grants it (#3289). Absent means free. A loadout can
+   * also be locked by a module it holds, which is not stored here. See
+   * `locks.ts`.
+   */
+  locked?: true;
   /**
    * This loadout's own receipts, one per game folder (#3282), read the way the
    * project's are. They stay on the entry whichever loadout is active, so
@@ -944,6 +958,15 @@ export function parseBudget(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) && value > 0
     ? value
     : null;
+}
+
+/** The module ids a stored lock list holds: non-empty strings, once each. */
+function parseLockedModules(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const ids = value.filter(
+    (id): id is string => typeof id === "string" && id !== "",
+  );
+  return [...new Set(ids)];
 }
 
 /** The guides that can be read, or null when there are none. */
@@ -1487,6 +1510,7 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
   const movement = parseMovement(d.movement);
   const worth = parseWorth(d.worth);
   const budget = parseBudget(d.budget);
+  const lockedModules = parseLockedModules(d.lockedModules);
   const mount = parseMount(d.mount, pieces);
   const { pieces: flagged, ...loadouts } = parseLoadouts(d, pieces);
   const project: LegoProject = {
@@ -1576,6 +1600,7 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
     ...(skeleton ? { skeleton } : {}),
     ...loadouts,
     ...(budget !== null ? { budget } : {}),
+    ...(lockedModules.length > 0 ? { lockedModules } : {}),
   };
   // A document saved before pieces were written in save order, or hand-edited,
   // may not have its parents first. Normalise here so the invariant holds the
@@ -1878,6 +1903,7 @@ function parseLoadout(raw: unknown): LegoLoadout | null {
     ...(typeof v.upgradesFrom === "string" && v.upgradesFrom !== ""
       ? { upgradesFrom: v.upgradesFrom }
       : {}),
+    ...(v.locked === true ? { locked: true as const } : {}),
     ...(exported ? { exported } : {}),
     ...(elsewhere.length > 0 ? { exportedElsewhere: elsewhere } : {}),
   };
