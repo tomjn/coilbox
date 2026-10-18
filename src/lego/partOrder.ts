@@ -7,7 +7,7 @@
  * sort here uses it, and so can anything that wants one entry per shape.
  */
 
-import type { LegoPartInfo } from "./pack";
+import type { LegoPartInfo, LoadedPack } from "./pack";
 
 /** A colourway as the pack's `categories` list it, in the order it lists them. */
 export interface ColourwayCategory {
@@ -158,4 +158,27 @@ export function partTitles(parts: LegoPartInfo[]): Map<string, string> {
         : part.name,
     ]),
   );
+}
+
+const groupsOfPack = new WeakMap<LoadedPack, ShapeGroup[]>();
+const titlesOfPack = new WeakMap<LoadedPack, Map<string, string>>();
+
+/** `shapeGroups` for a whole pack, worked out once per loaded pack. */
+export function packShapeGroups(pack: LoadedPack): ShapeGroup[] {
+  let groups = groupsOfPack.get(pack);
+  if (!groups) {
+    groups = shapeGroups(pack.parts, pack.manifest.categories);
+    groupsOfPack.set(pack, groups);
+  }
+  return groups;
+}
+
+/** A part's title, unique among the pack's parts. */
+export function partTitle(pack: LoadedPack, part: LegoPartInfo): string {
+  let titles = titlesOfPack.get(pack);
+  if (!titles) {
+    titles = partTitles(pack.parts);
+    titlesOfPack.set(pack, titles);
+  }
+  return titles.get(part.id) ?? part.name;
 }

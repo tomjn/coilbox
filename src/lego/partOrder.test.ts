@@ -3,12 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import type { LegoPackManifest, LegoPartInfo } from "./pack";
-import {
-  partTitles,
-  shapeGroups,
-  sortByShape,
-  visibleTags,
-} from "./partOrder";
+import { partTitles, shapeGroups, sortByShape, visibleTags } from "./partOrder";
 
 function part(overrides: Partial<LegoPartInfo> & { id: string }): LegoPartInfo {
   return {
@@ -99,9 +94,10 @@ describe("shapeGroups and sortByShape", () => {
       part({ id: "x-red", shapeId: "x", colourway: "red" }),
       part({ id: "x-grey", shapeId: "x", colourway: "grey" }),
     ];
-    expect(
-      shapeGroups(odd, ORDER)[0].parts.map((p) => p.id),
-    ).toEqual(["x-grey", "x-red"]);
+    expect(shapeGroups(odd, ORDER)[0].parts.map((p) => p.id)).toEqual([
+      "x-grey",
+      "x-red",
+    ]);
   });
 
   it("joins groups with the same name and size and different colourways", () => {

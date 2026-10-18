@@ -10,6 +10,8 @@
  * Category narrows which of them match, and `null` means every category, a
  * genuine all rather than a stand-in for anything else.
  *
+ * The result lists a shape's colourways side by side (`partOrder.ts`).
+ *
  * Which pack a part came from is a third narrowing of the same kind, and it
  * stacks with the other two rather than replacing them. Parts stay in one grid
  * however many packs are loaded: every pack shares the atlas, so a unit mixes
@@ -20,6 +22,7 @@
 import { useMemo, useState } from "react";
 
 import type { LegoPartInfo, LoadedPack } from "./pack";
+import { packShapeGroups, sortByShape } from "./partOrder";
 import { SHAPE_KINDS, type ShapeKind } from "./shapes";
 
 /**
@@ -82,7 +85,13 @@ export function usePartFilter(pack: LoadedPack | null): PartFilter {
   const [category, setCategory] = useState<string | null>(null);
   const [packId, setPackId] = useState<string | null>(null);
   const parts = useMemo(
-    () => (pack ? filterParts(pack.parts, query, category, packId) : []),
+    () =>
+      pack
+        ? sortByShape(
+            filterParts(pack.parts, query, category, packId),
+            packShapeGroups(pack),
+          )
+        : [],
     [pack, query, category, packId],
   );
   // A pack that lists no swatches cannot give a shape its surface, so it
