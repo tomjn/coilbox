@@ -36,8 +36,8 @@
   },
   "dependencies": {
     "@fontsource-variable/oxanium": "^5.3.0",
-    "@picoframe/frame": "^0.9.1",
-    "@picoframe/plugin-sdk": "^0.9.1",
+    "@picoframe/frame": "^0.10.0",
+    "@picoframe/plugin-sdk": "^0.10.0",
     "@shadcn/react": "^0.3.1",
     "@tauri-apps/api": "^2.12.1",
     "@tauri-apps/plugin-deep-link": "2.6.1",
