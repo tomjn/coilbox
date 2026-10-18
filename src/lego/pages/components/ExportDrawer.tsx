@@ -230,6 +230,11 @@ type Result =
        *  locks (#3289). */
       lockedList: string | null;
       lockedProblem: string | null;
+      /** Lists under the chassis's old name, emptied because the receipt shows
+       *  coilbox wrote them. */
+      lockedEmptied: string[];
+      /** Lists under an old name that were edited since, and left alone. */
+      lockedKept: string[];
     }
   | { state: "failed"; message: string };
 
@@ -872,8 +877,19 @@ export function ExportDrawer({
     // reported and does not undo the export above.
     let lockedList: string | null = null;
     let lockedProblem: string | null = null;
+    let lockedFile: ExportedFile | null = null;
+    let lockedEmptied: string[] = [];
+    let lockedKept: string[] = [];
     try {
-      lockedList = await writeLockedList(dir, whole);
+      const listed = await writeLockedList(
+        dir,
+        whole,
+        folderReceipt?.files ?? [],
+      );
+      lockedFile = listed.file;
+      lockedList = listed.file?.path ?? null;
+      lockedEmptied = listed.emptied;
+      lockedKept = listed.kept;
     } catch (error) {
       lockedProblem = error instanceof Error ? error.message : String(error);
     }
@@ -889,6 +905,7 @@ export function ExportDrawer({
     // Every file this run put on disk under the unit's name, for the receipt
     // a later rename reads to know what is still its own (issue #2680).
     let owned: ExportedFile[] = exported.owned;
+    if (lockedFile) owned = [...owned, lockedFile];
 
     // The build picture, if one has been taken. Its own step because it is
     // write once: a picture in the game that the builder did not write is the
@@ -1015,6 +1032,8 @@ export function ExportDrawer({
       pictureProblem,
       lockedList,
       lockedProblem,
+      lockedEmptied,
+      lockedKept,
       // Both Blender files write the mask, into the same folder under the
       // same name, so a run that wrote both reports it once.
       blenderTextures: written.filter(
@@ -1713,6 +1732,28 @@ export function ExportDrawer({
                 ) : null}
                 {result.lockedList ? (
                   <code className="break-all">{result.lockedList}</code>
+                ) : null}
+                {result.lockedEmptied.length > 0 ? (
+                  <p className="text-muted-foreground">
+                    The chassis was renamed, so the list of locked units under
+                    its old name was emptied:{" "}
+                    {result.lockedEmptied.map((path) => (
+                      <code key={path} className="break-all">
+                        {path}
+                      </code>
+                    ))}
+                  </p>
+                ) : null}
+                {result.lockedKept.length > 0 ? (
+                  <p className="text-muted-foreground">
+                    A list of locked units under the old name was edited since
+                    it was written, and has been left alone:{" "}
+                    {result.lockedKept.map((path) => (
+                      <code key={path} className="break-all">
+                        {path}
+                      </code>
+                    ))}
+                  </p>
                 ) : null}
                 {result.lockedProblem ? (
                   <p className="text-destructive">

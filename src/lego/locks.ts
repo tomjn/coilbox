@@ -151,9 +151,14 @@ export function lockedListPath(project: LegoProject): string {
  * list written earlier is cleared.
  */
 export function lockedListText(project: LegoProject): string {
-  const rows = lockedUnitNames(project).map(
-    (name) => `\t${JSON.stringify(name)},\n`,
-  );
+  return listText(lockedUnitNames(project));
+}
+
+/** The list with nothing in it, which is what a list is cleared to. */
+export const EMPTY_LOCKED_LIST = listText([]);
+
+function listText(names: string[]): string {
+  const rows = names.map((name) => `\t${JSON.stringify(name)},\n`);
   return [
     "-- Written by coilbox. The units of this chassis a campaign unlocks.",
     "-- Put them on a mission's buildable list and grant them with unlock_unit.",
