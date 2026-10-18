@@ -431,7 +431,15 @@ export const legoScratchPrune = defineCommand<
   {
     dataDir: string;
     folder: string;
-    units: { unitName: string; digests: string[] }[];
+    units: {
+      unitName: string;
+      digests: string[];
+      /**
+       * For a unit that stays in the set (issue #4528): remove just these
+       * parts of it. Left out, the unit left the set and all its files go.
+       */
+      only?: ("weapons" | "wreck")[];
+    }[];
     textures: string[];
   },
   { removed: string[]; kept: string[] }
