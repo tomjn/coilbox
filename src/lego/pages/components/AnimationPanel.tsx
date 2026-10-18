@@ -90,6 +90,7 @@ import {
 import { movesInGame } from "../../movement";
 import type { LoadedPack } from "../../pack";
 import { pieceRest } from "../../pieceRest";
+import { type PlantedFeet, plantedFeet } from "../../plantedFeet";
 import type { RawGeometry } from "../../rawGeometry";
 import { pieceWorldRest, unitBounds, unitSize } from "../../s3oBuild";
 import { scenarioMark } from "../../scenarioMarks";
@@ -397,6 +398,8 @@ interface Props {
     onDrag?: (at: [number, number], frame: number) => void;
     /** The unit's own drive, for the scenario that drives it. */
     drive?: DrivePlacement | null;
+    /** Where a fitted walk holds each foot on the ground, frame by frame. */
+    planted?: PlantedFeet | null;
   }) => void;
   /** What the unit's game lacks for effects to draw its own bitmaps, or null
    *  when it has everything they need. Shown only for a scenario that fires
@@ -544,6 +547,19 @@ export function AnimationPanel({
         soloRef.current
           ? soloProject(project, soloRef.current, soloCopyRef.current)
           : project,
+      ),
+    [project],
+  );
+  /** Where the walk the run plays holds each foot, from the same project the
+   *  run's script is written from. */
+  const plantedNow = useCallback(
+    (events: ScriptEvent[]) =>
+      plantedFeet(
+        soloRef.current
+          ? soloProject(project, soloRef.current, soloCopyRef.current)
+          : project,
+        events,
+        PREVIEW_FRAMES,
       ),
     [project],
   );
@@ -746,6 +762,7 @@ export function AnimationPanel({
             // own rather than being carried back past it.
             motion: null,
             drive: placement,
+            planted: plantedNow(events),
           });
           const scene = withWorld(events, null, {
             radius: 0,
@@ -763,6 +780,7 @@ export function AnimationPanel({
         onStandIn({
           ...NO_STAND_IN,
           motion: motionOf(scenario.events, withValues),
+          planted: plantedNow(scenario.events),
         });
         return runEvents(scenario.events, withValues, resume);
       }
@@ -881,6 +899,7 @@ export function AnimationPanel({
         aims: aimsOf(events, driven?.run.frames),
         // A drive really moves the unit, so what it leaves behind stays put.
         motion: driven ? null : motionOf(events, withValues),
+        planted: plantedNow(events),
         ...(driven ? { drive: driven.placement } : {}),
         ...(scenario.movingTarget
           ? {
@@ -922,6 +941,7 @@ export function AnimationPanel({
     [
       runEvents,
       scriptNow,
+      plantedNow,
       values,
       project,
       compiled,

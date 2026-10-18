@@ -580,7 +580,8 @@ function paramSets(
     },
     // A walk fitted to a body (#3349) moves in a shape of its own, so it is
     // run as `buildLuaScript` writes it for the default legs at a walker's
-    // speed, and again for a run.
+    // speed, and again for a run. Its legs are solved from their lengths
+    // (#3350), and a walker whose leg pieces give none keeps #3349's walk.
     ...(preset.id.startsWith("walk.")
       ? [
           {
@@ -591,13 +592,26 @@ function paramSets(
             label: "fitted, running",
             params: fitWalk(FITTED_BODY, { duty: 35 }),
           },
+          {
+            label: "fitted, no leg lengths",
+            params: fitWalk(
+              { legLength: FITTED_BODY.legLength, speed: FITTED_BODY.speed },
+              {},
+            ),
+          },
         ]
       : []),
   ];
 }
 
-/** The plans' default leg length and a walker's speed, for the fitted walks. */
-const FITTED_BODY = { legLength: 18.8, speed: 45 };
+/** The plans' default leg, split as they split it, and a walker's speed, for
+ *  the fitted walks. */
+const FITTED_BODY = {
+  legLength: 18.8,
+  speed: 45,
+  thighLength: 18.8 * 0.395,
+  shinLength: 18.8 * (1 - 0.395),
+};
 
 function buildCases() {
   return PRESETS.flatMap((preset) =>

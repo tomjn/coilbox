@@ -17,6 +17,7 @@ import type { Aim } from "../../aimResolver";
 import type { DriveFrame } from "../../drive";
 import type { UnitMotion } from "../../effects";
 import type { LegoProject } from "../../model";
+import type { PlantedFeet } from "../../plantedFeet";
 import type {
   NanoStyle,
   ScriptTimeline,
@@ -53,6 +54,9 @@ export interface StandInPlacement {
   motion?: UnitMotion | null;
   /** The unit's own drive, for a scenario that drives it along a path. */
   drive?: DrivePlacement | null;
+  /** Where a fitted walk holds each foot on the ground on each frame of the
+   *  run, for the planted foot dots. Absent or null when no walk is solved. */
+  planted?: PlantedFeet | null;
   /** Where the game maker let the stand-in go after dragging it, unit-local x
    *  and z in elmos, and the frame they let it go on. Absent for a scenario
    *  whose stand-in cannot be moved. */

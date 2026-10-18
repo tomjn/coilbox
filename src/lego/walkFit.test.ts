@@ -3,16 +3,27 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { WALK_BIPED, WALK_FITTED, WALK_QUAD } from "./animPresets";
+import {
+  WALK_BIPED,
+  WALK_DROP,
+  WALK_FITTED,
+  WALK_QUAD,
+  WALK_SHIN,
+  WALK_THIGH,
+} from "./animPresets";
 import { BIPED, type BodyPlan, projectFromPlan, QUADRUPED } from "./bodyPlans";
 import { buildLuaScript } from "./luaScript";
 import type { LegoProject } from "./model";
+import { problemTexts } from "./problems";
 import {
   fittedParams,
   fitWalk,
+  legLengths,
   overridesFit,
+  pastReach,
   shownParams,
   walkBody,
+  walkProblems,
   withoutFitOverrides,
 } from "./walkFit";
 
@@ -235,7 +246,7 @@ describe("the walk a skeleton gives no reason to change", () => {
   });
 });
 
-describe("a fitted walk's track", () => {
+describe("a fitted walk's track with no leg lengths to solve with", () => {
   const params = fitWalk({ legLength: 18.8, speed: 45 }, {});
 
   it("keeps the knee straight while the foot is down and bends it only in the air", () => {
@@ -262,25 +273,29 @@ describe("a fitted walk's track", () => {
   });
 });
 
-/** One frame of the left leg as the script left it. */
+/** One frame of the left leg and the body as the script left them. */
 interface LegFrame {
   frame: number;
   thigh: number;
   shin: number;
+  /** The body piece's y offset, from the walk lowering it. */
+  body: number;
 }
 
 /**
  * Runs the unit's script under luajit with the engine's piece motion stood in
- * for: `Turn` with a speed moves the piece toward its target by speed / 30 a
- * frame and stops there (`CUnitScript::TickTurnAnim` and `TurnToward`), and
- * `Sleep(ms)` wakes the thread `floor(ms / 33)` frames later, as the unit
- * script gadget's `Sleep` does. `StartMoving` fires on frame 0. Returns the
- * left thigh and shin's x angles on every frame.
+ * for: `Turn` and `Move` with a speed move the piece toward its target by
+ * speed / 30 a frame and stop there (`CUnitScript::TickTurnAnim` and
+ * `TurnToward`), and `Sleep(ms)` wakes the thread `floor(ms / 33)` frames
+ * later, as the unit script gadget's `Sleep` does. `StartMoving` fires on
+ * frame 0. Returns the left thigh's and shin's x angles and the body's y
+ * offset on every frame.
  */
 function walkLeg(
   lua: string,
   thigh: string,
   shin: string,
+  body: string,
   frames: number,
 ): LegFrame[] {
   const harness = `
@@ -291,18 +306,18 @@ local frame = 0
 local anims = {}
 local threads = {}
 local current = nil
-local function anim(p, axis)
-  local key = p .. ":" .. axis
+local function anim(kind, p, axis)
+  local key = kind .. ":" .. p .. ":" .. axis
   anims[key] = anims[key] or { at = 0, dest = 0, speed = 0 }
   return anims[key]
 end
-function piece(name) return name end
-function Turn(p, axis, dest, speed)
-  local a = anim(p, axis)
+local function head(a, dest, speed)
   a.dest = dest
   if speed == nil or speed == 0 then a.at = dest a.speed = 0 else a.speed = speed end
 end
-function Move() end
+function piece(name) return name end
+function Turn(p, axis, dest, speed) head(anim("turn", p, axis), dest, speed) end
+function Move(p, axis, dest, speed) head(anim("move", p, axis), dest, speed) end
 function Spin() end
 function StopSpin() end
 function Explode() end
@@ -347,7 +362,7 @@ for f = 0, ${frames - 1} do
       else a.at = a.at - step end
     end
   end
-  io.write(f, " ", anim("${thigh}", x_axis).at, " ", anim("${shin}", x_axis).at, "\\n")
+  io.write(f, " ", anim("turn", "${thigh}", x_axis).at, " ", anim("turn", "${shin}", x_axis).at, " ", anim("move", "${body}", y_axis).at, "\\n")
 end
 `;
   const result = spawnSync("luajit", ["-e", harness], { input: lua });
@@ -359,103 +374,222 @@ end
     .split("\n")
     .filter(Boolean)
     .map((line) => {
-      const [frame, thighAngle, shinAngle] = line.split(" ").map(Number);
-      return { frame, thigh: thighAngle, shin: shinAngle };
+      const [frame, thighAngle, shinAngle, bodyY] = line.split(" ").map(Number);
+      return { frame, thigh: thighAngle, shin: shinAngle, body: bodyY };
     });
 }
 
-/** A run of frames with the left foot down: the knee straight. */
-function stances(legs: LegFrame[]): LegFrame[][] {
-  const runs: LegFrame[][] = [];
-  let run: LegFrame[] = [];
-  for (const leg of legs) {
-    if (leg.shin === 0) {
-      run.push(leg);
-    } else if (run.length > 0) {
-      runs.push(run);
-      run = [];
-    }
-  }
-  // The last run may have been cut off by the end of the frames.
-  return runs;
+/** A biped whose thigh is `share` of its `legLength`, at `speed`. */
+function walker(legLength: number, share: number, speed: number): LegoProject {
+  const unit = fromPlan(BIPED, { legLength }, speed);
+  const thigh = legLength * share;
+  return {
+    ...unit,
+    pieces: unit.pieces.map((piece) =>
+      /^[lr]shin$/.test(piece.name)
+        ? { ...piece, position: [0, -thigh, 0] }
+        : /^[lr]foot$/.test(piece.name)
+          ? { ...piece, position: [0, -(legLength - thigh), 0] }
+          : piece,
+    ),
+    animations: [{ presetId: "walk.biped", params: {} }],
+  };
 }
 
-describe("a fitted walk under luajit", () => {
+/** How far a run of numbers spreads, the furthest two apart. */
+function spread(values: number[]): number {
+  return Math.max(...values) - Math.min(...values);
+}
+
+interface Stance {
+  /** Where on the ground the ankle is, the body's travel added in. */
+  along: number[];
+  /** The ankle's height above the ground, the body's drop counted. */
+  height: number[];
+}
+
+/**
+ * The left foot's times on the ground after the first lap, which starts from
+ * rest, found by when they are meant to be: the frames from a lap's start to
+ * `down` after it. The script's thread runs a frame behind the preset's time
+ * or level with it depending on when it woke, so the lap's start is the frame
+ * whose thigh angle is the cycle's first pose.
+ *
+ * The ankle's place comes from the leg's own pieces: the shin hangs the
+ * thigh's length below the hip and the foot the shin's length below the knee,
+ * and a Turn about x by `a` puts a point `l` below the joint `l * sin(a)`
+ * behind it and `l * cos(a)` below. The hip rests `legLength` above the
+ * ground, lowered by the body's Move.
+ */
+function stancesOf(
+  legs: LegFrame[],
+  unit: LegoProject,
+  speed: number,
+  params: Record<string, number>,
+): Stance[] {
+  const lap = Math.round(params.period * FPS);
+  const down = Math.round((params.duty / 100) * lap);
+  const lengths = legLengths(unit);
+  if (!lengths) throw new Error("the walker has no leg lengths");
+  const { thighLength: a, shinLength: b } = lengths;
+  const first = WALK_BIPED.track(0, params, "leg.l1.thigh")?.rotation?.[0];
+  const start = [lap, lap + 1, lap - 1].find(
+    (frame) => Math.abs(legs[frame].thigh - (first ?? 0)) < 1e-3,
+  );
+  if (start === undefined) throw new Error("no lap starts on the first pose");
+  const stances: Stance[] = [];
+  for (let from = start; from + down < legs.length; from += lap) {
+    const run = legs.slice(from, from + down + 1);
+    stances.push({
+      along: run.map(
+        (leg) =>
+          (speed * leg.frame) / FPS -
+          a * Math.sin(leg.thigh) -
+          b * Math.sin(leg.thigh + leg.shin),
+      ),
+      height: run.map(
+        (leg) =>
+          a +
+          b +
+          leg.body -
+          a * Math.cos(leg.thigh) -
+          b * Math.cos(leg.thigh + leg.shin),
+      ),
+    });
+  }
+  return stances;
+}
+
+/**
+ * How far rounding alone can move the ankle. `lua()` writes each angle and
+ * each speed to four decimal places, so a pose lands up to half the last
+ * place off, and a speed half the last place per second slow, which is that
+ * over 30 in a frame. The thigh's error moves the whole leg and the shin's
+ * the shin, and a spread is two such errors in opposite directions.
+ */
+function roundingAllowance(a: number, b: number): number {
+  const angle = 0.5e-4 * (1 + 1 / FPS);
+  return 2 * (a * angle + b * 2 * angle);
+}
+
+describe("a fitted walk under luajit (#3350)", () => {
   /**
-   * Two skeletons with different legs at one speed, stepped for long enough
-   * to give several strides after the first, which starts from rest.
-   *
-   * Where the ankle is comes from the leg's own pieces: the shin hangs the
-   * thigh's length below the hip and the foot the shin's length below the
-   * knee, and a Turn about x by `a` puts a point `l` below the joint `l *
-   * sin(a)` behind it, a positive thigh angle being the leg swung back. The
-   * ground moves past the body at the unit's speed, so where the ankle is on
-   * the ground is the body's travel plus the ankle's place under the body.
-   *
-   * The allowance is one frame of the unit's own travel, speed / 30. The
-   * engine moves the unit and its pieces once a frame, so a foot cannot be
-   * held any closer to one spot than the distance the body moves in a frame.
-   * It covers the Turns going in straight lines between the poses the script
-   * samples, the four decimal places the poses are written to, and the frame
-   * a foot comes down on.
+   * Two legs of different lengths and proportions at one speed, stepped for
+   * long enough to give several strides after the first, which starts from
+   * rest. The script has a pose on every frame a foot is down, so a planted
+   * foot is held to what rounding the poses to four places allows.
    */
-  for (const legLength of [12, 30]) {
-    it(`plants a ${legLength} elmo leg's foot and steps the unit's speed times the period each stride`, () => {
+  for (const [legLength, share] of [
+    [12, 0.395],
+    [30, 0.6],
+  ]) {
+    it(`plants a ${legLength} elmo leg's foot with a thigh ${share} of it and the knee bent`, () => {
       const speed = 40;
-      const unit = fromPlan(BIPED, { legLength }, speed);
+      const unit = walker(legLength, share, speed);
       const fitted = fittedParams(unit, "walk.biped", {});
+      expect(fitted[WALK_THIGH]).toBeCloseTo(legLength * share, 9);
+      expect(fitted[WALK_SHIN]).toBeCloseTo(legLength * (1 - share), 9);
       const lap = Math.round(fitted.period * FPS);
-      const legs = walkLeg(buildLuaScript(unit), "lthigh", "lshin", lap * 6);
-
-      const thighLength = -(
-        unit.pieces.find((piece) => piece.name === "lshin")?.position[1] ?? 0
+      const legs = walkLeg(
+        buildLuaScript(unit),
+        "lthigh",
+        "lshin",
+        "hip",
+        lap * 6,
       );
-      const shinLength = -(
-        unit.pieces.find((piece) => piece.name === "lfoot")?.position[1] ?? 0
+      const stances = stancesOf(legs, unit, speed, fitted);
+      expect(stances.length).toBeGreaterThanOrEqual(4);
+
+      const allowance = roundingAllowance(
+        fitted[WALK_THIGH],
+        fitted[WALK_SHIN],
       );
-      expect(thighLength + shinLength).toBeCloseTo(legLength, 9);
+      for (const { along, height } of stances) {
+        expect(spread(along)).toBeLessThan(allowance);
+        expect(spread(height)).toBeLessThan(allowance);
+        // On the ground, with the body lowered to it.
+        for (const h of height) expect(Math.abs(h)).toBeLessThan(allowance);
+      }
 
-      const ground = (leg: LegFrame) =>
-        (speed * leg.frame) / FPS -
-        thighLength * Math.sin(leg.thigh) -
-        shinLength * Math.sin(leg.thigh + leg.shin);
-      const allowance = speed / FPS;
-
-      // The first stance starts from rest, so it is left out. Every other one
-      // holds the knee straight from the frame the foot comes down to the
-      // frame it lifts. A Turn's speed is written to four decimal places, so
-      // the knee can straighten a frame late and the run be a frame shorter.
-      const planted = stances(legs).slice(1);
-      expect(planted.length).toBeGreaterThanOrEqual(4);
+      // The knee bends while the foot is down, where #3349 kept it straight.
+      const knee = (frame: number) =>
+        WALK_BIPED.track(frame / FPS, fitted, "leg.l1.shin")?.rotation?.[0] ??
+        0;
       const down = Math.round((fitted.duty / 100) * lap);
-      for (const run of planted) {
-        expect(run.length).toBeGreaterThanOrEqual(down);
-        expect(run.length).toBeLessThanOrEqual(down + 1);
-      }
-
-      for (const run of planted) {
-        const spots = run.map(ground);
-        expect(Math.max(...spots) - Math.min(...spots)).toBeLessThan(allowance);
-      }
+      expect(knee(0)).toBeCloseTo(0, 6);
+      expect(knee(down / 2)).toBeGreaterThan(0);
+      console.log(
+        `#3350 ${legLength} elmo leg, thigh ${share}: knee ${(knee(down / 2) / DEG).toFixed(1)} degrees at mid stance, along ${Math.max(...stances.map((run) => spread(run.along))).toFixed(5)}, height ${Math.max(...stances.map((run) => spread(run.height))).toFixed(5)}, allowance ${allowance.toFixed(5)}`,
+      );
 
       // All a planted foot's travel in a cycle is the step it takes in the
-      // air, from where it lifted to where it comes down next. That is the
-      // unit's speed times the period when the foot did not slide.
-      const steps = planted.slice(1).map((run, index) => {
-        const lifted = planted[index][planted[index].length - 1];
-        return ground(run[0]) - ground(lifted);
-      });
-      expect(steps.length).toBeGreaterThanOrEqual(3);
-      for (const step of steps) {
-        expect(Math.abs(step - speed * fitted.period)).toBeLessThan(allowance);
+      // air, which is the unit's speed times the period.
+      for (let index = 1; index < stances.length; index++) {
+        const lifted = stances[index - 1].along.at(-1) ?? 0;
+        const landed = stances[index].along[0];
+        expect(Math.abs(landed - lifted - speed * fitted.period)).toBeLessThan(
+          allowance,
+        );
       }
     });
   }
 
-  it("takes a longer stride on the longer leg", () => {
-    const stride = (legLength: number) =>
-      fittedParams(fromPlan(BIPED, { legLength }, 40), "walk.biped", {})
-        .period * 40;
-    expect(stride(30)).toBeGreaterThan(stride(12) * 2);
+  it("flags a stride past the legs' reach and slides the foot only then", () => {
+    // Both set by hand: 40 elmos a second for half of 1 s is a 20 elmo
+    // sweep, where a 12 elmo leg swung 20 degrees either side covers 8.2.
+    const speed = 40;
+    const reaching = walker(12, 0.395, speed);
+    const unit: LegoProject = {
+      ...reaching,
+      animations: [
+        { presetId: "walk.biped", params: { period: 1, stride: 20 } },
+      ],
+    };
+    const fitted = fittedParams(unit, "walk.biped", { period: 1, stride: 20 });
+    expect(pastReach(fitted)).toBe(true);
+    expect(problemTexts(walkProblems(unit))).toEqual([
+      '"Walk, two legs" strides further than the legs reach, so the feet slide.',
+    ]);
+    expect(walkProblems(reaching)).toEqual([]);
+
+    const legs = walkLeg(
+      buildLuaScript(unit),
+      "lthigh",
+      "lshin",
+      "hip",
+      30 * 6,
+    );
+    for (const leg of legs) {
+      expect(Number.isFinite(leg.thigh) && Number.isFinite(leg.shin)).toBe(
+        true,
+      );
+    }
+    // The straight leg is pointed at the foot it cannot reach, so at each
+    // end of the stance the ankle falls short along the line from the hip.
+    const half = (speed * fitted.period * fitted.duty) / 100 / 2;
+    const leg = fitted[WALK_THIGH] + fitted[WALK_SHIN];
+    const reached = (leg * half) / Math.hypot(half, leg - fitted[WALK_DROP]);
+    const allowance = roundingAllowance(fitted[WALK_THIGH], fitted[WALK_SHIN]);
+    const stances = stancesOf(legs, unit, speed, fitted);
+    expect(stances.length).toBeGreaterThanOrEqual(4);
+    for (const { along } of stances) {
+      expect(Math.abs(spread(along) - 2 * (half - reached))).toBeLessThan(
+        allowance,
+      );
+    }
+  });
+
+  it("says so when the leg joints give the solve no lengths", () => {
+    const unit = walker(12, 0.395, 40);
+    const upside: LegoProject = {
+      ...unit,
+      pieces: unit.pieces.map((piece) =>
+        piece.name === "lshin" ? { ...piece, position: [0, 3, 0] } : piece,
+      ),
+    };
+    expect(legLengths(upside)).toBeNull();
+    expect(problemTexts(walkProblems(upside))).toEqual([
+      'The legs do not hang down from their joints, so "Walk, two legs" cannot keep the feet planted.',
+    ]);
   });
 });
