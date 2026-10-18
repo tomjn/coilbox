@@ -111,6 +111,61 @@ describe("downloadMapAnySource, hakora step (issue #2860)", () => {
   });
 });
 
+describe("downloadMapAnySource, attempts reported (issue #4576)", () => {
+  it("reports the source, file and host of a map that arrived", async () => {
+    dlHakoraMaps.mockResolvedValueOnce({
+      maps: [
+        {
+          filename: "some-map-v2.sdz",
+          url: "https://example.com/some-map-v2.sdz",
+          size: "1M",
+        },
+      ],
+    });
+    dlDownloadFileRaw.mockResolvedValueOnce({ message: "ok", path: "" });
+    const onAttempt = vi.fn();
+
+    await downloadMapAnySource({
+      mapName: "Some Map v2",
+      writePath: "/data",
+      onProgress: () => {},
+      onAttempt,
+    });
+
+    expect(onAttempt).toHaveBeenCalledTimes(1);
+    expect(onAttempt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: "hakora",
+        outcome: "ok",
+        reference: "https://example.com/some-map-v2.sdz",
+        filename: "some-map-v2.sdz",
+        mirror: "example.com",
+        failure: null,
+      }),
+    );
+  });
+
+  it("reports the pr-downloader step's failure although it handles the error itself", async () => {
+    dlDownloadMapRaw.mockRejectedValue(new Error("no source could provide"));
+    const onAttempt = vi.fn();
+
+    await downloadMapAnySource({
+      mapName: "Nonexistent Map",
+      writePath: "/data",
+      onProgress: () => {},
+      onAttempt,
+    }).catch(() => {});
+
+    expect(onAttempt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: "springfiles",
+        outcome: "failed",
+        failure: "no source could provide",
+      }),
+    );
+  });
+});
+
 describe("downloadMapAnySource, no source has the map", () => {
   it("reports every attempted source's error rather than installing something else", async () => {
     dlDownloadMapRaw.mockRejectedValue(new Error("no source could provide"));

@@ -83,4 +83,58 @@ describe("useLibrary", () => {
       ["new", "local"],
     ]);
   });
+
+  // A failed read is not a report that the player has nothing. Dropping the
+  // listing would re-offer every map they have.
+  it("keeps the last listing when a read fails", async () => {
+    dlInstalledContent.mockResolvedValue({
+      maps: ["throne_v8.sd7"],
+      games: [],
+    });
+    const { result } = renderHook(() => useLibrary());
+    await waitFor(() =>
+      expect(result.current.installedFiles.maps.has("throne_v8.sd7")).toBe(
+        true,
+      ),
+    );
+
+    invalidateInstalledContent();
+    dlInstalledContent.mockRejectedValue(new Error("disk"));
+    act(() => {
+      for (const cb of completeListeners) cb();
+    });
+
+    await waitFor(() => expect(dlInstalledContent).toHaveBeenCalledTimes(2));
+    await act(async () => {});
+    expect(result.current.installedFiles.maps.has("throne_v8.sd7")).toBe(true);
+    expect(result.current.filesRead).toBe(true);
+  });
+
+  // A caller that acts on "the player has no maps" has to tell a listing that
+  // has not landed from an empty one, and has to stop waiting once the read
+  // has gone as far as it will.
+  it("says when the disk has answered, even with a failure", async () => {
+    let fail: (e: Error) => void = () => {};
+    dlInstalledContent.mockReturnValue(
+      new Promise((_, reject) => {
+        fail = reject;
+      }),
+    );
+    const { result } = renderHook(() => useLibrary());
+    await waitFor(() => expect(dlInstalledContent).toHaveBeenCalledTimes(1));
+    expect(result.current.filesAnswered).toBe(false);
+    expect(result.current.filesRead).toBe(false);
+
+    await act(async () => fail(new Error("disk")));
+    expect(result.current.filesAnswered).toBe(true);
+    expect(result.current.filesRead).toBe(false);
+  });
+
+  it("says a listing has been read once one lands", async () => {
+    dlInstalledContent.mockResolvedValue({ maps: [], games: [] });
+    const { result } = renderHook(() => useLibrary());
+    expect(result.current.filesRead).toBe(false);
+    await waitFor(() => expect(result.current.filesRead).toBe(true));
+    expect(result.current.filesAnswered).toBe(true);
+  });
 });

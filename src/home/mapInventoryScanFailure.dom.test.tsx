@@ -31,13 +31,15 @@ vi.mock("../downloads/bindings", () => ({
 }));
 vi.mock("../downloads/config", () => ({
   useContentRoots: () => ({ paths: ["/d"], loading: false }),
+  useContentRootPaths: () => ["/d"],
   useWriteRoot: () => "/d",
 }));
 vi.mock("../downloads/DownloadQueueProvider", () => ({
   identityOf: () => "",
   useDownloadComplete: () => {},
-  useDownloadQueue: () => ({}),
+  useDownloadQueue: () => ({ items: [] }),
 }));
+vi.mock("../hub/gameIcons", () => ({ useHubGames: () => null }));
 vi.mock("../play/config", () => ({
   usePreferredTarget: () => ({
     target: { enginePath: "/e", dataDir: "/d" },
