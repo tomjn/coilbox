@@ -757,6 +757,12 @@ mod tests {
         assert!(!unsynced.contains(damaged));
         assert!(text(&ui_only, models::DEFS_POST).is_none());
         assert!(!paths(&ui_only).iter().any(|p| p.ends_with(".s3o")));
+
+        let with_gadgets = golden_build(3, &FIXTURES[0]);
+        for (path, _) in coilbox_compat::gadget_files(&coilbox_compat::manifest(3).unwrap()) {
+            let path = path.to_lowercase();
+            assert!(paths(&with_gadgets).contains(&path), "{path}");
+        }
     }
 
     /// The hash of every fixed game built from manifest `n`.
@@ -789,6 +795,10 @@ mod tests {
         (
             2,
             "595eb4f1042f0b1f328da80a63044634b5ed60afd71bc5c2cd956af8a20deb18",
+        ),
+        (
+            3,
+            "7a0f8a84911b5cac4f21313e9a1490f9e19299c0a71e4e2d0f264f87a656d3cf",
         ),
     ];
 
