@@ -1,6 +1,7 @@
 import { cn } from "@picoframe/frame";
 import { AlertTriangle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { formatDateTime, formatNumber } from "@/lib/format";
 import type { Report } from "../../bindings";
 import {
   detectEarlyTermination,
@@ -13,7 +14,7 @@ import {
 export function fmtWhen(iso: string): string {
   if (!iso) return "—";
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
+  return Number.isNaN(d.getTime()) ? iso : formatDateTime(d);
 }
 
 /** Display labels for known config keys; others fall back to de-underscoring. */
@@ -100,11 +101,11 @@ export function SummaryBand({ report }: { report: Report }) {
   const s = summarize(report);
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-      <Stat label="Requests" value={s.totalRequests.toLocaleString()} />
+      <Stat label="Requests" value={formatNumber(s.totalRequests)} />
       <Stat label="Throughput" value={`${s.throughput.toFixed(1)}/s`} />
       <Stat
         label="Errors"
-        value={s.totalErrors.toLocaleString()}
+        value={formatNumber(s.totalErrors)}
         emphasis={s.totalErrors > 0 ? "error" : undefined}
       />
       <Stat

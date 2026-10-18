@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Progress } from "@/components/ui/progress";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { formatNumber } from "@/lib/format";
 import {
   type LogLine,
   type Report,
@@ -147,11 +148,11 @@ function RunProgress({
       )}
       {live ? (
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-          <LiveStat label="Sent" value={live.sent.toLocaleString()} />
+          <LiveStat label="Sent" value={formatNumber(live.sent)} />
           <LiveStat label="Rate" value={`${live.rate.toFixed(0)}/s`} />
           <LiveStat
             label="Errors"
-            value={live.errors.toLocaleString()}
+            value={formatNumber(live.errors)}
             emphasis={live.errors > 0}
           />
         </div>
