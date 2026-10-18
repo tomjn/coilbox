@@ -259,7 +259,8 @@ function Body({
     return (
       <p className="text-sm text-muted-foreground">
         This page opens one model out of an archive, and it was not told which.
-        Browse an archive under Content and open a model from its preview.
+        Browse an archive under Library &gt; Archives and open a model from its
+        preview.
       </p>
     );
   }
