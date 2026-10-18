@@ -254,27 +254,68 @@ export function parseUnitCopy(json: string): CampaignUnitCopy | null {
   }
 }
 
+/** A stored copy that will read, with its folder and the textures in it. */
+export interface StoredCopy {
+  copy: CampaignUnitCopy;
+  dir: string;
+  files: string[];
+}
+
 /** Every copy a campaign holds that will read, with the folder it is in. */
 export async function loadUnitCopies(
   campaignId: string,
-): Promise<Map<string, { copy: CampaignUnitCopy; dir: string }>> {
+): Promise<Map<string, StoredCopy>> {
   const { units } = await campaignUnitList({ campaignId });
-  const copies = new Map<string, { copy: CampaignUnitCopy; dir: string }>();
+  const copies = new Map<string, StoredCopy>();
   for (const stored of units) {
     const copy = parseUnitCopy(stored.json);
-    if (copy) copies.set(stored.unitName, { copy, dir: stored.dir });
+    if (copy) {
+      copies.set(stored.unitName, {
+        copy,
+        dir: stored.dir,
+        files: stored.files,
+      });
+    }
   }
   return copies;
 }
 
 /**
- * A copy as the mutator writes it. A copy that carries its textures has them
- * read out of its own folder rather than a pack or the store.
+ * The atlas pack a copy depends on because its folder does not hold the
+ * atlas, or null. A copy made on this machine always holds it, and so does an
+ * import whose file carried it. One whose atlas did not arrive is read from the
+ * pack it was built from.
  */
-export function launchedUnit(
-  copy: CampaignUnitCopy,
-  dir: string,
-): PreparedUnit {
+export function atlasPackNeeded(stored: StoredCopy): string | null {
+  const atlas = stored.copy.built.payload.textures?.atlas;
+  if (!atlas?.pack || stored.files.includes(atlas.name)) return null;
+  return atlas.pack;
+}
+
+/**
+ * The atlas packs a campaign's units need and `installed` lacks, each once.
+ * `installed` is the folder names of the atlas packs on this machine.
+ */
+export function missingAtlasPacks(
+  copies: ReadonlyMap<string, StoredCopy>,
+  installed: ReadonlySet<string>,
+): string[] {
+  const missing = new Set<string>();
+  for (const stored of copies.values()) {
+    const pack = atlasPackNeeded(stored);
+    if (pack && !installed.has(pack)) missing.add(pack);
+  }
+  return [...missing];
+}
+
+/**
+ * A copy as the mutator writes it. A copy that carries its textures has them
+ * read out of its own folder rather than a pack or the store. An atlas the
+ * folder does not hold keeps naming its pack, which the engine side reads it
+ * from instead.
+ */
+export function launchedUnit(stored: StoredCopy): PreparedUnit {
+  const { copy, dir } = stored;
   const textures = copy.built.payload.textures;
   if (!copy.carriesTextures || !textures) return copy.built;
   return {
@@ -283,7 +324,10 @@ export function launchedUnit(
       ...copy.built.payload,
       textures: {
         ...textures,
-        atlas: textures.atlas && { ...textures.atlas, pack: null },
+        atlas: textures.atlas && {
+          ...textures.atlas,
+          pack: atlasPackNeeded(stored) ?? null,
+        },
         sourceDir: dir,
       },
     },
@@ -408,7 +452,7 @@ export async function composeCampaignUnits(
     const moving = withGameMovement(
       unit,
       stored.copy,
-      launchedUnit(stored.copy, stored.dir),
+      launchedUnit(stored),
       game,
       base.name,
     );

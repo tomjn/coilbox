@@ -32,6 +32,12 @@ pub fn is_file_name(name: &str) -> bool {
     is_safe_rel(rel) && rel.components().count() == 1 && name != UNIT_FILE
 }
 
+/// A file in a copy's folder that an export carries: the unit itself, or one of
+/// its textures.
+fn is_copy_file(name: &str) -> bool {
+    name == UNIT_FILE || is_file_name(name)
+}
+
 /// One stored copy, as listed.
 #[derive(Serialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -40,6 +46,9 @@ pub struct StoredUnit {
     pub json: String,
     /// The copy's folder, which its textures are read from at launch.
     pub dir: String,
+    /// The textures in that folder, by file name. A copy whose atlas is not in
+    /// here depends on an installed atlas pack.
+    pub files: Vec<String>,
 }
 
 /// Write one copy: the unit's JSON and the textures to carry, each read from
@@ -105,12 +114,73 @@ pub fn list_units(root: &Path) -> Vec<StoredUnit> {
             units.push(StoredUnit {
                 unit_name: name,
                 json,
+                files: texture_names(&dir),
                 dir: dir.to_string_lossy().to_string(),
             });
         }
     }
     units.sort_by(|a, b| a.unit_name.cmp(&b.unit_name));
     units
+}
+
+/// The textures in a copy's folder: every file but the unit itself.
+fn texture_names(dir: &Path) -> Vec<String> {
+    let mut names: Vec<String> = std::fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|entry| entry.path().is_file())
+        .filter_map(|entry| entry.file_name().to_str().map(str::to_string))
+        .filter(|name| is_file_name(name))
+        .collect();
+    names.sort();
+    names
+}
+
+/// Read one file out of a copy's folder, for an export to carry.
+pub fn read_unit_file(root: &Path, unit_name: &str, file: &str) -> Result<Vec<u8>, String> {
+    if !valid_unit_name(unit_name) {
+        return Err(format!("invalid unit name: {unit_name}"));
+    }
+    if !is_copy_file(file) {
+        return Err(format!("invalid unit file name: {file}"));
+    }
+    std::fs::read(root.join(unit_name).join(file))
+        .map_err(|e| format!("could not read {file} of {unit_name}: {e}"))
+}
+
+/// Write one file into a copy's folder, for an import. An import writes the
+/// textures first and `unit.json` last, because a folder without a `unit.json`
+/// is not a copy and is not listed, so a copy that stops part way is never read.
+///
+/// `unit.json` has to be a JSON object. Nothing else is checked: the bytes came
+/// out of a file the user picked, which is already in memory, so writing them
+/// costs no more than that file did.
+pub fn write_unit_file(
+    root: &Path,
+    unit_name: &str,
+    file: &str,
+    bytes: &[u8],
+) -> Result<(), String> {
+    if !valid_unit_name(unit_name) {
+        return Err(format!("invalid unit name: {unit_name}"));
+    }
+    if !is_copy_file(file) {
+        return Err(format!("invalid unit file name: {file}"));
+    }
+    if file == UNIT_FILE
+        && !matches!(
+            serde_json::from_slice::<serde_json::Value>(bytes),
+            Ok(serde_json::Value::Object(_))
+        )
+    {
+        return Err(format!("{unit_name} has no readable unit"));
+    }
+    let dir = root.join(unit_name);
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("could not create {}: {e}", dir.display()))?;
+    std::fs::write(dir.join(file), bytes)
+        .map_err(|e| format!("could not write {file} of {unit_name}: {e}"))
 }
 
 /// Remove one copy. False when there was none.
@@ -186,6 +256,7 @@ mod tests {
             vec![StoredUnit {
                 unit_name: "tank".into(),
                 json: "{}".into(),
+                files: vec!["camo.png".into()],
                 dir: dir.to_string_lossy().to_string(),
             }]
         );
@@ -246,6 +317,50 @@ mod tests {
         assert!(delete_unit(&root, "tank").expect("deleted"));
         assert!(!delete_unit(&root, "tank").expect("again"));
         assert_eq!(list_units(&root).len(), 1);
+    }
+
+    #[test]
+    fn a_file_read_from_one_campaign_writes_into_another_unchanged() {
+        let tmp = tempfile::tempdir().expect("temp");
+        let source = texture(tmp.path(), "camo.png", b"\x89png\x00\xff");
+        let from = tmp.path().join("units/c1");
+        let to = tmp.path().join("units/c2");
+        save_unit(&from, "tank", "{\"v\":1}", &[(source, "camo.png".into())]).expect("tank");
+
+        for file in ["camo.png", UNIT_FILE] {
+            let bytes = read_unit_file(&from, "tank", file).expect("read");
+            write_unit_file(&to, "tank", file, &bytes).expect("write");
+        }
+
+        let copied = list_units(&to);
+        assert_eq!(copied.len(), 1);
+        assert_eq!(copied[0].json, "{\"v\":1}");
+        assert_eq!(copied[0].files, vec!["camo.png".to_string()]);
+        assert_eq!(
+            std::fs::read(to.join("tank/camo.png")).expect("texture"),
+            b"\x89png\x00\xff"
+        );
+    }
+
+    #[test]
+    fn a_copy_without_its_unit_file_is_not_listed() {
+        let tmp = tempfile::tempdir().expect("temp");
+        let root = tmp.path().join("units/c1");
+        write_unit_file(&root, "tank", "camo.png", b"png").expect("texture only");
+        assert!(list_units(&root).is_empty());
+    }
+
+    #[test]
+    fn file_access_refuses_names_that_could_leave_the_folder() {
+        let tmp = tempfile::tempdir().expect("temp");
+        let root = tmp.path().join("units/c1");
+        save_unit(&root, "tank", "{}", &[]).expect("tank");
+        assert!(read_unit_file(&root, "../tank", UNIT_FILE).is_err());
+        assert!(read_unit_file(&root, "tank", "../c2/x").is_err());
+        assert!(write_unit_file(&root, "tank", "../x.png", b"x").is_err());
+        assert!(write_unit_file(&root, "Tank", "x.png", b"x").is_err());
+        assert!(write_unit_file(&root, "tank", UNIT_FILE, b"not json").is_err());
+        assert!(write_unit_file(&root, "tank", UNIT_FILE, b"[1]").is_err());
     }
 
     #[test]

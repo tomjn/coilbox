@@ -238,9 +238,10 @@ export default function CampaignBuilderPage() {
       // Inline every stored image (icon, background, each mission's panorama and
       // side graphic) as a data URI, and read every attached scenario's dialogue
       // clips out of the media store, so the export is one self-contained file
-      // that still plays its radio messages elsewhere (#769).
+      // that still plays its radio messages elsewhere (#769). The campaign's
+      // unit copies travel in it too (#4517).
       const [inlined, media] = await Promise.all([
-        inlineCampaignImages(campaign),
+        inlineCampaignImages(campaign, { units: true }),
         collectCampaignScenarioMedia(campaign),
       ]);
       const file = wrapCampaignForExport(

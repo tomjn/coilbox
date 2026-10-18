@@ -12,7 +12,12 @@ import { type MissionNeed, needNotice } from "../../missionNeeds";
 import type { CampaignMission } from "../../model";
 import { PhaseCard } from "./PhaseCard";
 
-const KIND_LABEL = { engine: "Engine", game: "Game", map: "Map" } as const;
+const KIND_LABEL = {
+  engine: "Engine",
+  game: "Game",
+  map: "Map",
+  atlas: "Atlas pack",
+} as const;
 
 /** The newest Recoil release, which is what a campaign gets when it names no
  *  engine, or why there is none to offer. */
@@ -123,27 +128,29 @@ function NeedRow({
           </AlertDescription>
         </Alert>
       )}
-      <Button
-        onClick={download}
-        disabled={dl.busy || !notice.canDownload || !input}
-        className="w-fit"
-      >
-        {dl.busy ? (
-          <Loader2 className="size-4 animate-spin" />
-        ) : (
-          <Download className="size-4" />
-        )}
-        {dl.status === "queued"
-          ? "Waiting for a slot…"
-          : dl.busy
-            ? "Downloading…"
-            : "Download & Install"}
-      </Button>
+      {need.kind !== "atlas" && (
+        <Button
+          onClick={download}
+          disabled={dl.busy || !notice.canDownload || !input}
+          className="w-fit"
+        >
+          {dl.busy ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Download className="size-4" />
+          )}
+          {dl.status === "queued"
+            ? "Waiting for a slot…"
+            : dl.busy
+              ? "Downloading…"
+              : "Download & Install"}
+        </Button>
+      )}
       {dl.busy && <QueueProgress item={dl} />}
       {/* Best-effort by name can miss content whose name differs, so the
           Downloads page stays as the fallback. There is no page for an engine
           offer: its notice sends the player to Settings. */}
-      {need.kind !== "engine" && (
+      {(need.kind === "map" || need.kind === "game") && (
         <Link
           to={need.kind === "map" ? "/downloads/maps" : "/downloads/games"}
           className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:underline"

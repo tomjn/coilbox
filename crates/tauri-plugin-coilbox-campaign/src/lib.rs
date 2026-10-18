@@ -263,6 +263,46 @@ async fn campaign_unit_delete<R: Runtime>(
     }
 }
 
+/// `campaign_unit_file_read` reads one file of a unit copy (its `unit.json` or
+/// a texture) as a `data:` URI, for a campaign export to carry.
+#[tauri::command]
+async fn campaign_unit_file_read<R: Runtime>(
+    app: AppHandle<R>,
+    campaign_id: String,
+    unit_name: String,
+    file: String,
+) -> CliResult {
+    let read = units_root(&app, &campaign_id)
+        .and_then(|root| units::read_unit_file(&root, &unit_name, &file));
+    match read {
+        Ok(bytes) => CliResult::ok(json!({
+            "dataUri": data_url("application/octet-stream", &bytes)
+        })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// `campaign_unit_file_write` writes one file of a unit copy from a `data:` URI,
+/// for a campaign import. Write the textures before `unit.json`.
+#[tauri::command]
+async fn campaign_unit_file_write<R: Runtime>(
+    app: AppHandle<R>,
+    campaign_id: String,
+    unit_name: String,
+    file: String,
+    data_uri: String,
+) -> CliResult {
+    let Some(bytes) = data_uri_bytes(&data_uri) else {
+        return CliResult::err("invalid unit file data URI");
+    };
+    let written = units_root(&app, &campaign_id)
+        .and_then(|root| units::write_unit_file(&root, &unit_name, &file, &bytes));
+    match written {
+        Ok(()) => CliResult::ok(json!({ "file": file })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
 /// `campaign_units_copy` copies every unit copy from one campaign to another,
 /// for a duplicated campaign.
 #[tauri::command]
@@ -595,6 +635,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             campaign_unit_save,
             campaign_unit_list,
             campaign_unit_delete,
+            campaign_unit_file_read,
+            campaign_unit_file_write,
             campaign_units_copy
         ])
         .build()
