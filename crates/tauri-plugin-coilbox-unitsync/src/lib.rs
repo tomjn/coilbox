@@ -2124,13 +2124,26 @@ pub fn game_short_name_blocking(
     short_name_in_scan(&out, game)
 }
 
-/// [`game_short_name_blocking`], with `None` for a game that declares no short
-/// name. The compat mutator copies it into its own modinfo (issue #4620).
-pub fn game_declared_short_name_blocking(
+/// What the scan says an installed game declares in its own modinfo. Each is
+/// `None` when the game declares none.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct DeclaredGame {
+    /// The modinfo `shortname`.
+    pub short_name: Option<String>,
+    /// The modinfo `name` as written, which is what `Game.gameName` reads. The
+    /// scan lists the game under this name and its version.
+    pub name: Option<String>,
+    /// The modinfo `version`, which is what `Game.gameVersion` reads.
+    pub version: Option<String>,
+}
+
+/// What the installed game named `game` declares in its modinfo. The compat
+/// mutator copies it into its own modinfo (issues #4620 and #4633).
+pub fn game_declared_blocking(
     engine_path: &str,
     data_dir: &str,
     game: &str,
-) -> Result<Option<String>, String> {
+) -> Result<DeclaredGame, String> {
     let (bin, libpath, engine_dir) = prepare(engine_path)?;
     let args = build_args(&libpath.to_string_lossy(), data_dir);
     let envs = loader_envs(&engine_dir, data_dir);
@@ -2142,7 +2155,7 @@ pub fn game_declared_short_name_blocking(
         "game short name".into(),
         None,
     )?;
-    declared_short_name_in_scan(&out, game)
+    declared_game_in_scan(&out, game)
 }
 
 /// The scan of `data_dir`, as the JSON the worker prints and `unitsync_scan`
@@ -2342,20 +2355,34 @@ fn text_in_archive_output(out: &str, archive: &str, file: &str) -> Result<Option
     ))
 }
 
-/// The `shortname` in the scan's entry for the game named `game`, or `None`
-/// when the game declares none.
-fn declared_short_name_in_scan(scan: &str, game: &str) -> Result<Option<String>, String> {
+/// A non-blank info item of a scan entry, trimmed.
+fn declared_item(entry: &serde_json::Value, key: &str) -> Option<String> {
+    entry["info"][key]
+        .as_str()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+}
+
+/// The scan's entry for the game named `game`.
+fn declared_game_in_scan(scan: &str, game: &str) -> Result<DeclaredGame, String> {
     let scan: serde_json::Value =
         serde_json::from_str(scan).map_err(|e| format!("the scan did not read as JSON: {e}"))?;
     let entry = scan["games"]
         .as_array()
         .and_then(|games| games.iter().find(|g| g["name"].as_str() == Some(game)))
         .ok_or_else(|| format!("no installed game is named {game:?}"))?;
-    Ok(entry["info"]["shortname"]
-        .as_str()
-        .map(str::trim)
-        .filter(|name| !name.is_empty())
-        .map(str::to_string))
+    Ok(DeclaredGame {
+        short_name: declared_item(entry, "shortname"),
+        name: declared_item(entry, "name_pure"),
+        version: declared_item(entry, "version"),
+    })
+}
+
+/// The `shortname` in the scan's entry for the game named `game`, or `None`
+/// when the game declares none.
+fn declared_short_name_in_scan(scan: &str, game: &str) -> Result<Option<String>, String> {
+    Ok(declared_game_in_scan(scan, game)?.short_name)
 }
 
 /// The `shortname` in the scan's entry for the game named `game`.
@@ -2678,6 +2705,36 @@ mod tests {
             Ok(Some("BYAR".to_string()))
         );
         assert!(declared_short_name_in_scan(SCAN, "Absent 1").is_err());
+    }
+
+    const SCAN_DECLARED: &str = r#"{"maps":[],"games":[
+        {"name":"XTA 9.65","info":{"name":"XTA 9.65","name_pure":" XTA ","version":" 9.65 ","shortname":"XTA"}},
+        {"name":"Bare","info":{"name":"Bare","name_pure":"Bare"}}
+    ],"errors":[]}"#;
+
+    #[test]
+    fn a_game_declares_its_own_name_and_version_apart_from_the_listed_name() {
+        assert_eq!(
+            declared_game_in_scan(SCAN_DECLARED, "XTA 9.65"),
+            Ok(DeclaredGame {
+                short_name: Some("XTA".into()),
+                name: Some("XTA".into()),
+                version: Some("9.65".into()),
+            })
+        );
+    }
+
+    #[test]
+    fn a_game_with_no_version_or_short_name_declares_none() {
+        assert_eq!(
+            declared_game_in_scan(SCAN_DECLARED, "Bare"),
+            Ok(DeclaredGame {
+                short_name: None,
+                name: Some("Bare".into()),
+                version: None,
+            })
+        );
+        assert!(declared_game_in_scan(SCAN_DECLARED, "Absent").is_err());
     }
 
     #[test]

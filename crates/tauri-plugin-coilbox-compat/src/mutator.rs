@@ -19,6 +19,7 @@
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+use tauri_plugin_coilbox_unitsync::DeclaredGame;
 use tauri_plugin_coilbox_workshop::{lua_string, CompiledFile};
 
 /// The start of every compat mutator's folder name.
@@ -84,16 +85,45 @@ fn first_writer() -> u32 {
 /// `shortname` is the base game's own, so game Lua that checks
 /// `Game.gameShortName` sees the game and not the mutator. It is left out when
 /// the base game declares none.
-fn modinfo(game_name: &str, short_name: Option<&str>, n: u32) -> String {
-    let shortname = short_name
+///
+/// A manifest that lists [`coilbox_compat::GAME_IDENTITY_FIX`] also gets the
+/// base game's `name` and `version` as `compatbasename` and `compatbaseversion`,
+/// which that fix copies into `Game.gameName` and `Game.gameVersion` (issue
+/// #4633). They are left out of every other manifest, whose bytes are fixed. A
+/// base game with no version gets an empty one, which is what it reads as.
+fn modinfo(
+    game_name: &str,
+    declared: &DeclaredGame,
+    manifest: &coilbox_compat::Manifest,
+) -> String {
+    let n = manifest.version;
+    let shortname = declared
+        .short_name
+        .as_deref()
         .map(|s| format!("\x20 shortname = {},\n", lua_string(s)))
         .unwrap_or_default();
+    let identity = if manifest
+        .fixes
+        .iter()
+        .any(|id| id == coilbox_compat::GAME_IDENTITY_FIX)
+    {
+        let name = declared
+            .name
+            .as_deref()
+            .map(|s| format!("\x20 compatbasename = {},\n", lua_string(s)))
+            .unwrap_or_default();
+        let version = lua_string(declared.version.as_deref().unwrap_or_default());
+        format!("{name}\x20 compatbaseversion = {version},\n")
+    } else {
+        String::new()
+    };
     format!(
         "-- Written by coilbox's compatibility mode. Rebuilt from compat manifest {n}, so do not edit it.\n\
          return {{\n\
          \x20 name = {name},\n\
          \x20 version = {version},\n\
          {shortname}\
+         {identity}\
          \x20 modtype = 1,\n\
          \x20 depend = {{\n\
          \x20   {depend},\n\
@@ -118,7 +148,7 @@ fn modinfo(game_name: &str, short_name: Option<&str>, n: u32) -> String {
 pub fn files(
     manifest: &coilbox_compat::Manifest,
     game_name: &str,
-    short_name: Option<&str>,
+    declared: &DeclaredGame,
     marker: &Marker,
     read: impl FnMut(&str) -> Result<Option<String>, String>,
 ) -> Result<Vec<CompiledFile>, String> {
@@ -137,7 +167,7 @@ pub fn files(
     }
     let mut files = vec![CompiledFile {
         path: "modinfo.lua".into(),
-        contents: modinfo(game_name, short_name, manifest.version),
+        contents: modinfo(game_name, declared, manifest),
     }];
     for (path, contents) in coilbox_compat::prelude_files(manifest, read)?
         .into_iter()
@@ -268,6 +298,37 @@ mod tests {
         Ok(None)
     }
 
+    fn declared_short(short: &str) -> DeclaredGame {
+        DeclaredGame {
+            short_name: Some(short.into()),
+            ..Default::default()
+        }
+    }
+
+    fn xta() -> DeclaredGame {
+        DeclaredGame {
+            short_name: Some("XTA".into()),
+            name: Some("XTA".into()),
+            version: Some("9.65".into()),
+        }
+    }
+
+    fn modinfo_of(files: &[CompiledFile]) -> String {
+        files
+            .iter()
+            .find(|f| f.path == "modinfo.lua")
+            .unwrap()
+            .contents
+            .clone()
+    }
+
+    fn eval(modinfo: &str) -> serde_json::Value {
+        coilbox_springlua::SpringLua::new(tempfile::tempdir().unwrap().path())
+            .unwrap()
+            .eval_value(modinfo, "modinfo.lua")
+            .unwrap()
+    }
+
     fn marker(n: u32, checksum: &str) -> Marker {
         Marker {
             manifest_version: n,
@@ -316,7 +377,14 @@ mod tests {
     #[test]
     fn the_modinfo_depends_on_the_base_game_and_names_the_version() {
         let m = coilbox_compat::manifest(1).unwrap();
-        let files = files(&m, "XTA \"v\" 9.65", None, &marker(1, "abc"), no_file).unwrap();
+        let files = files(
+            &m,
+            "XTA \"v\" 9.65",
+            &DeclaredGame::default(),
+            &marker(1, "abc"),
+            no_file,
+        )
+        .unwrap();
         let modinfo = &files[0];
         assert_eq!(modinfo.path, "modinfo.lua");
         assert!(modinfo
@@ -336,7 +404,14 @@ mod tests {
     #[test]
     fn the_modinfo_carries_the_base_games_short_name() {
         let m = coilbox_compat::manifest(1).unwrap();
-        let files = files(&m, "XTA 9.65", Some("XTA"), &marker(1, "abc"), no_file).unwrap();
+        let files = files(
+            &m,
+            "XTA 9.65",
+            &declared_short("XTA"),
+            &marker(1, "abc"),
+            no_file,
+        )
+        .unwrap();
         let lua = coilbox_springlua::SpringLua::new(tempfile::tempdir().unwrap().path())
             .unwrap()
             .eval_value(&files[0].contents, "modinfo.lua")
@@ -347,14 +422,28 @@ mod tests {
     #[test]
     fn a_game_with_no_short_name_gets_none_in_the_modinfo() {
         let m = coilbox_compat::manifest(1).unwrap();
-        let files = files(&m, "XTA 9.65", None, &marker(1, "abc"), no_file).unwrap();
+        let files = files(
+            &m,
+            "XTA 9.65",
+            &DeclaredGame::default(),
+            &marker(1, "abc"),
+            no_file,
+        )
+        .unwrap();
         assert!(!files[0].contents.contains("shortname"));
     }
 
     #[test]
     fn a_short_name_is_escaped_as_a_lua_string() {
         let m = coilbox_compat::manifest(1).unwrap();
-        let files = files(&m, "XTA", Some("X\"\\TA"), &marker(1, "abc"), no_file).unwrap();
+        let files = files(
+            &m,
+            "XTA",
+            &declared_short("X\"\\TA"),
+            &marker(1, "abc"),
+            no_file,
+        )
+        .unwrap();
         let lua = coilbox_springlua::SpringLua::new(tempfile::tempdir().unwrap().path())
             .unwrap()
             .eval_value(&files[0].contents, "modinfo.lua")
@@ -362,10 +451,79 @@ mod tests {
         assert_eq!(lua["shortname"], "X\"\\TA");
     }
 
+    /// Issue #4633: the engine reads `Game.gameName` and `Game.gameVersion`
+    /// from the mutator's modinfo, so the base game's go beside them.
+    #[test]
+    fn the_modinfo_carries_the_base_games_name_and_version_from_manifest_6() {
+        let m = coilbox_compat::manifest(6).unwrap();
+        let files = files(&m, "XTA 9.65", &xta(), &marker(6, "abc"), no_file).unwrap();
+        let lua = eval(&modinfo_of(&files));
+        assert_eq!(lua["compatbasename"], "XTA");
+        assert_eq!(lua["compatbaseversion"], "9.65");
+        assert_eq!(lua["name"], "XTA 9.65 (compat 6)");
+        assert_eq!(lua["version"], "6");
+        assert_eq!(lua["shortname"], "XTA");
+    }
+
+    #[test]
+    fn a_base_game_with_no_version_is_written_with_an_empty_one() {
+        let m = coilbox_compat::manifest(6).unwrap();
+        let bare = DeclaredGame {
+            name: Some("Bare".into()),
+            ..Default::default()
+        };
+        let files = files(&m, "Bare", &bare, &marker(6, "abc"), no_file).unwrap();
+        let lua = eval(&modinfo_of(&files));
+        assert_eq!(lua["compatbasename"], "Bare");
+        assert_eq!(lua["compatbaseversion"], "");
+    }
+
+    #[test]
+    fn the_base_games_name_and_version_are_escaped_as_lua_strings() {
+        let m = coilbox_compat::manifest(6).unwrap();
+        let odd = DeclaredGame {
+            name: Some("X\"\\TA".into()),
+            version: Some("1\"\n2".into()),
+            ..Default::default()
+        };
+        let files = files(&m, "XTA", &odd, &marker(6, "abc"), no_file).unwrap();
+        let lua = eval(&modinfo_of(&files));
+        assert_eq!(lua["compatbasename"], "X\"\\TA");
+        assert_eq!(lua["compatbaseversion"], "1\"\n2");
+    }
+
+    /// A shipped manifest builds the same bytes whatever the scan says, so the
+    /// base game's name and version are written only for a manifest that lists
+    /// the fix that reads them.
+    #[test]
+    fn manifests_before_6_write_the_same_modinfo_whatever_the_base_declares() {
+        for n in 1..=5 {
+            let m = coilbox_compat::manifest(n).unwrap();
+            let with = files(&m, "XTA 9.65", &xta(), &marker(n, "abc"), no_file).unwrap();
+            let without = files(
+                &m,
+                "XTA 9.65",
+                &declared_short("XTA"),
+                &marker(n, "abc"),
+                no_file,
+            )
+            .unwrap();
+            assert_eq!(modinfo_of(&with), modinfo_of(&without), "manifest {n}");
+            assert!(!modinfo_of(&with).contains("compatbase"), "manifest {n}");
+        }
+    }
+
     #[test]
     fn the_files_are_sorted_with_lf_endings_and_the_marker_last() {
         let m = coilbox_compat::manifest(1).unwrap();
-        let files = files(&m, "XTA 9.65", None, &marker(1, "abc"), no_file).unwrap();
+        let files = files(
+            &m,
+            "XTA 9.65",
+            &DeclaredGame::default(),
+            &marker(1, "abc"),
+            no_file,
+        )
+        .unwrap();
         let paths: Vec<_> = files.iter().map(|f| f.path.as_str()).collect();
         assert_eq!(paths, ["modinfo.lua", MARKER]);
         for f in &files {
@@ -379,8 +537,22 @@ mod tests {
     #[test]
     fn two_builds_of_the_same_manifest_are_the_same_bytes() {
         let m = coilbox_compat::manifest(1).unwrap();
-        let a = files(&m, "XTA 9.65", None, &marker(1, "abc"), no_file).unwrap();
-        let b = files(&m, "XTA 9.65", None, &marker(1, "abc"), no_file).unwrap();
+        let a = files(
+            &m,
+            "XTA 9.65",
+            &DeclaredGame::default(),
+            &marker(1, "abc"),
+            no_file,
+        )
+        .unwrap();
+        let b = files(
+            &m,
+            "XTA 9.65",
+            &DeclaredGame::default(),
+            &marker(1, "abc"),
+            no_file,
+        )
+        .unwrap();
         let bytes = |fs: &[CompiledFile]| -> Vec<(String, String)> {
             fs.iter()
                 .map(|f| (f.path.clone(), f.contents.clone()))
@@ -393,7 +565,14 @@ mod tests {
     fn a_manifest_that_lists_a_fix_outside_the_prelude_is_refused() {
         let mut m = coilbox_compat::manifest(1).unwrap();
         m.fixes.push("not-a-prelude-fix".into());
-        assert!(files(&m, "XTA 9.65", None, &marker(1, "abc"), no_file).is_err());
+        assert!(files(
+            &m,
+            "XTA 9.65",
+            &DeclaredGame::default(),
+            &marker(1, "abc"),
+            no_file
+        )
+        .is_err());
     }
 
     #[test]
@@ -402,7 +581,14 @@ mod tests {
         let read = |path: &str| -> Result<Option<String>, String> {
             Ok((path == "LuaRules/main.lua").then(|| "-- the game's rules\n".to_string()))
         };
-        let files = files(&m, "XTA 9.65", None, &marker(2, "abc"), read).unwrap();
+        let files = files(
+            &m,
+            "XTA 9.65",
+            &DeclaredGame::default(),
+            &marker(2, "abc"),
+            read,
+        )
+        .unwrap();
         let paths: Vec<_> = files.iter().map(|f| f.path.as_str()).collect();
         assert_eq!(
             paths,
@@ -426,7 +612,14 @@ mod tests {
     #[test]
     fn the_gadgets_are_written_to_luarules_gadgets_as_they_are() {
         let m = coilbox_compat::manifest(3).unwrap();
-        let files = files(&m, "XTA 9.65", None, &marker(3, "abc"), no_file).unwrap();
+        let files = files(
+            &m,
+            "XTA 9.65",
+            &DeclaredGame::default(),
+            &marker(3, "abc"),
+            no_file,
+        )
+        .unwrap();
         let paths: Vec<_> = files.iter().map(|f| f.path.as_str()).collect();
         assert_eq!(
             paths,
@@ -442,7 +635,14 @@ mod tests {
             files[1].contents,
             coilbox_compat::fix_source("gadget-messages-tdf-95").unwrap()
         );
-        let again = super::files(&m, "XTA 9.65", None, &marker(3, "abc"), no_file).unwrap();
+        let again = super::files(
+            &m,
+            "XTA 9.65",
+            &DeclaredGame::default(),
+            &marker(3, "abc"),
+            no_file,
+        )
+        .unwrap();
         assert!(files
             .iter()
             .zip(&again)
@@ -454,7 +654,14 @@ mod tests {
         let m = coilbox_compat::manifest(2).unwrap();
         let read = |_: &str| -> Result<Option<String>, String> { Err("no worker".into()) };
         assert_eq!(
-            files(&m, "XTA 9.65", None, &marker(2, "abc"), read).err(),
+            files(
+                &m,
+                "XTA 9.65",
+                &DeclaredGame::default(),
+                &marker(2, "abc"),
+                read
+            )
+            .err(),
             Some("no worker".to_string())
         );
     }
