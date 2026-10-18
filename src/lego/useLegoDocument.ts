@@ -22,6 +22,7 @@ import { withConnections } from "./connectors";
 import { emptyDocument, primarySelection, reduceDocument } from "./document";
 import { pruneInstanceSettings } from "./instanceSettings";
 import { liftedModuleRefusal } from "./liftPiece";
+import { claimForLoadout } from "./loadouts";
 import type { LegoProject } from "./model";
 import { insertModule } from "./moduleMount";
 import type { LoadedPack } from "./pack";
@@ -59,7 +60,11 @@ export interface LegoDocumentSession {
   select: (id: string | null) => void;
   /** Adds a piece to the selection, or takes it out again. */
   toggleSelect: (id: string) => void;
-  edit: (change: (project: LegoProject) => LegoProject) => void;
+  /** `alone` makes the edit an undo step of its own, as a loadout switch is. */
+  edit: (
+    change: (project: LegoProject) => LegoProject,
+    options?: { alone?: boolean },
+  ) => void;
   /**
    * Fills in what the document can work out for itself (#4354). Unlike `edit`
    * it does not mark the document changed, so opening a unit never writes it,
@@ -124,19 +129,26 @@ export function useLegoDocument(
   // Read through a ref so `edit` keeps one identity once the pack arrives.
   const packRef = useRef(pack);
   packRef.current = pack;
-  const edit = useCallback((change: (project: LegoProject) => LegoProject) => {
-    // Joins are resolved inside the edit, so the pieces an edit moves through
-    // their joins land in the same document and undo with it.
-    dispatch({
-      type: "edit",
-      change: (project) =>
-        // A removed instance takes its animation settings with it (#4315).
-        pruneInstanceSettings(
-          withConnections(change, packRef.current)(project),
-        ),
-      at: Date.now(),
-    });
-  }, []);
+  const edit = useCallback(
+    (
+      change: (project: LegoProject) => LegoProject,
+      options: { alone?: boolean } = {},
+    ) => {
+      // Joins are resolved inside the edit, so the pieces an edit moves through
+      // their joins land in the same document and undo with it.
+      dispatch({
+        type: "edit",
+        change: (project) =>
+          // A removed instance takes its animation settings with it (#4315).
+          pruneInstanceSettings(
+            withConnections(change, packRef.current)(project),
+          ),
+        at: Date.now(),
+        alone: options.alone,
+      });
+    },
+    [],
+  );
   const fill = useCallback(
     (change: (project: LegoProject) => LegoProject) =>
       dispatch({ type: "fill", fill: change }),
@@ -262,8 +274,9 @@ export function useLegoDocument(
       asModule,
     );
     // One edit however many roots the cutting has, so a paste of several pieces
-    // takes one undo step.
-    edit(() => inserted.project);
+    // takes one undo step. A module dropped in while there are loadouts goes
+    // into the loadout on screen.
+    edit(() => claimForLoadout(inserted.project, inserted.rootPieceIds));
     const said = describePresets(inserted.presets);
     if (said)
       void notify({ title: "Module animations", body: said, level: "info" });

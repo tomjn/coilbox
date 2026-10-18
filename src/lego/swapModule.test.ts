@@ -177,6 +177,21 @@ describe("swapModule", () => {
     expect(out?.project.pieces.some((p) => p.name === "nozzle")).toBe(false);
   });
 
+  it("keeps a loadout's copy in that loadout", () => {
+    const placed = withSmall();
+    const start = {
+      ...placed,
+      pieces: placed.pieces.map((p) =>
+        p.parentId === "hull" ? { ...p, inLoadout: true as const } : p,
+      ),
+    };
+    const arm = byName(start, "arm") as LegoPiece;
+    const out = swapModule(start, pack(), arm.id, BIG, counter("b"));
+    const top = out?.project.pieces.find((p) => p.parentId === "hull");
+    expect(top?.module).toBeDefined();
+    expect(top?.inLoadout).toBe(true);
+  });
+
   it("joins the new mount where the old root was joined", () => {
     const start = withSmall();
     const oldRoot = byName(start, "stand") as LegoPiece;

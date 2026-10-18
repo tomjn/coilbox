@@ -50,7 +50,17 @@ export const emptyDocument: LegoDocument = {
 
 export type LegoDocumentAction =
   | { type: "open"; project: LegoProject }
-  | { type: "edit"; change: (project: LegoProject) => LegoProject; at: number }
+  | {
+      type: "edit";
+      change: (project: LegoProject) => LegoProject;
+      at: number;
+      /**
+       * A step of its own, never folded into the gesture before or after it.
+       * Switching loadouts is one, so undo steps back across the switch rather
+       * than taking the edit before it along.
+       */
+      alone?: boolean;
+    }
   /**
    * Fills in what a document can work out for itself, such as the box of a
    * mesh (#4354). Not an edit: it does not mark the document changed, and it
@@ -142,7 +152,9 @@ export function reduceDocument(
       // Edits in quick succession are one gesture. Dragging a slider should
       // undo in a single step, not sixty.
       const continues =
-        action.at - state.editedAt < COALESCE_MS && state.past.length > 0;
+        !action.alone &&
+        action.at - state.editedAt < COALESCE_MS &&
+        state.past.length > 0;
       return {
         ...state,
         project: next,
@@ -151,7 +163,7 @@ export function reduceDocument(
           : [...state.past, current].slice(-HISTORY_LIMIT),
         future: [],
         dirty: true,
-        editedAt: action.at,
+        editedAt: action.alone ? 0 : action.at,
         selectedIds: reseatSelection(state.selectedIds, current, next),
       };
     }
