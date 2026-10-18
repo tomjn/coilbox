@@ -17,7 +17,7 @@ import type { SceneState } from "./sceneState";
  */
 
 /** Move handles on all three axes, for a piece that can go anywhere. */
-function showAllAxes(gizmo: SceneState["gizmo"]) {
+export function showAllAxes(gizmo: SceneState["gizmo"]) {
   gizmo.showX = true;
   gizmo.showY = true;
   gizmo.showZ = true;

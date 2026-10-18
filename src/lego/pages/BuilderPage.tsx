@@ -29,6 +29,7 @@ import {
   useDeferredValue,
   useEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
 } from "react";
@@ -169,6 +170,16 @@ import { attachToBone } from "../partOnBone";
 import { buildPieceCollisionScript } from "../pieceCollisionScript";
 import { currentPivot, pivotChoices, setPivot } from "../pivot";
 import { attachToFreeFace, type FaceTarget, placePart } from "../placePart";
+import {
+  deletePose,
+  duplicatePose,
+  emptyDraft,
+  offsetsOf,
+  overwritePose,
+  reduceDraft,
+  renamePose,
+  savePose,
+} from "../pose";
 import { type Problem, type ProblemSource, problem } from "../problems";
 import {
   deleteCompound,
@@ -228,6 +239,7 @@ import { MountPointList } from "./components/MountPointList";
 import { NameInput } from "./components/NameInput";
 import { collisionHandlePieceId } from "./components/PieceCollisionFields";
 import { PieceTree } from "./components/PieceTree";
+import { PosesPopover } from "./components/PosesPopover";
 import { ProblemErrors } from "./components/ProblemErrors";
 import type { CheckStatus } from "./components/ProblemsButton";
 import { ProportionsPanel } from "./components/ProportionsPanel";
@@ -441,6 +453,13 @@ function Builder({ id }: { id: string | undefined }) {
   /** What the module update banner was dismissed at (#3304). */
   const [dismissedUpdates, setDismissedUpdates] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
+  /**
+   * Whether the gizmo is posing the unit rather than building it (#3355), and
+   * the pose it is holding. The draft is not the document: posing never
+   * changes a piece, and only saving puts a pose on the unit.
+   */
+  const [posing, setPosing] = useState(false);
+  const [poseDraft, dispatchPose] = useReducer(reduceDraft, emptyDraft);
   /**
    * What playing means for a unit that owns its script: the poses a run of that
    * script produced, rather than the presets it no longer has.
@@ -1660,10 +1679,40 @@ function Builder({ id }: { id: string | undefined }) {
     });
   }
 
+  /** Leaving the mode drops the pose being held, and the unit is as it was. */
+  function setPosingMode(on: boolean) {
+    setPosing(on);
+    dispatchPose({ type: "clear" });
+    if (on) setPlaying(false);
+  }
+  // Playing the preview shows the unit moving by its script, which a held pose
+  // would only fight, so starting it leaves the mode.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only starting to play matters
+  useEffect(() => {
+    if (playing) setPosingMode(false);
+  }, [playing]);
+
+  function applyPose(poseId: string) {
+    const pose = draft?.poses?.find((candidate) => candidate.id === poseId);
+    if (!draft || !pose) return;
+    if (!posing) setPosingMode(true);
+    dispatchPose({ type: "load", offsets: offsetsOf(pose, draft) });
+  }
+
+  // While posing, undo and redo step the pose first, and fall through to the
+  // unit's own history once the pose has nothing left to step over. That keeps
+  // a saved pose's rename or delete undoable from inside the mode.
+  const poseUndo = posing && poseDraft.past.length > 0;
+  const poseRedo = posing && poseDraft.future.length > 0;
+  const undo = poseUndo ? () => dispatchPose({ type: "undo" }) : doc.undo;
+  const redo = poseRedo ? () => dispatchPose({ type: "redo" }) : doc.redo;
+  const canUndo = poseUndo || doc.canUndo;
+  const canRedo = poseRedo || doc.canRedo;
+
   useEditShortcuts({
     remove: removeSelected,
-    undo: doc.undo,
-    redo: doc.redo,
+    undo,
+    redo,
     copy: copySelection,
     paste: pasteClipboard,
     duplicate: duplicateSelection,
@@ -2066,8 +2115,8 @@ function Builder({ id }: { id: string | undefined }) {
                                 <TipButton
                                   size="icon"
                                   variant="outline"
-                                  onClick={doc.undo}
-                                  disabled={!doc.canUndo}
+                                  onClick={undo}
+                                  disabled={!canUndo}
                                   aria-label="Undo"
                                 >
                                   <Undo size={14} />
@@ -2082,8 +2131,8 @@ function Builder({ id }: { id: string | undefined }) {
                                 <TipButton
                                   size="icon"
                                   variant="outline"
-                                  onClick={doc.redo}
-                                  disabled={!doc.canRedo}
+                                  onClick={redo}
+                                  disabled={!canRedo}
                                   aria-label="Redo"
                                 >
                                   <Redo size={14} />
@@ -2396,6 +2445,59 @@ function Builder({ id }: { id: string | undefined }) {
                       }
                     : undefined
                 }
+                posing={{
+                  on: posing,
+                  offsets: poseDraft.offsets,
+                  onPose: (pieceId, offset) =>
+                    dispatchPose({ type: "set", pieceId, offset }),
+                  control: (
+                    <PosesPopover
+                      project={draft}
+                      posing={posing}
+                      onPosingChange={setPosingMode}
+                      changed={Object.keys(poseDraft.offsets).length > 0}
+                      onSave={(name) =>
+                        edit(
+                          (project) =>
+                            savePose(project, {
+                              id: crypto.randomUUID(),
+                              name,
+                              offsets: poseDraft.offsets,
+                            }),
+                          { alone: true },
+                        )
+                      }
+                      onApply={applyPose}
+                      onOverwrite={(poseId) =>
+                        edit(
+                          (project) =>
+                            overwritePose(project, poseId, poseDraft.offsets),
+                          { alone: true },
+                        )
+                      }
+                      onRename={(poseId, name) =>
+                        edit((project) => renamePose(project, poseId, name), {
+                          alone: true,
+                        })
+                      }
+                      onDuplicate={(poseId) =>
+                        edit(
+                          (project) =>
+                            duplicatePose(project, poseId, crypto.randomUUID()),
+                          { alone: true },
+                        )
+                      }
+                      onDelete={(poseId) =>
+                        edit((project) => deletePose(project, poseId), {
+                          alone: true,
+                        })
+                      }
+                      onReset={() =>
+                        dispatchPose({ type: "load", offsets: {} })
+                      }
+                    />
+                  ),
+                }}
                 aimPoint={{
                   // The same reasoning, for the marker the aim point panel
                   // is about: opening the panel draws the point it is
