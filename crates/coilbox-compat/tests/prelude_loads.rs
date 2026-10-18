@@ -142,7 +142,13 @@ fn expand_and_exterminate_loads_with_the_prelude_in_front() {
     let file = std::fs::File::open(ee_archive()).expect("the E&E archive");
     let mut archive = zip::ZipArchive::new(file).unwrap();
     let m = manifest(2).unwrap();
-    let written = prelude_files::<()>(&m, |path| Ok(read_from_zip(&mut archive, path))).unwrap();
+    let written: Vec<(String, String)> = prelude_files::<()>(&m, |path| {
+        Ok(read_from_zip(&mut archive, path).map(String::into_bytes))
+    })
+    .unwrap()
+    .into_iter()
+    .map(|(path, bytes)| (path, String::from_utf8(bytes).unwrap()))
+    .collect();
     let paths: Vec<&str> = written.iter().map(|(p, _)| p.as_str()).collect();
     assert_eq!(
         paths,

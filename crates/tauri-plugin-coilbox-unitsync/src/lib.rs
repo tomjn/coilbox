@@ -2236,6 +2236,66 @@ fn last_result_line(out: &str) -> Result<String, String> {
         .ok_or_else(|| "the unitsync worker printed progress but no result".to_string())
 }
 
+/// A file inside the archive `archive` as its own bytes, or `None` when the
+/// archive holds no such file. Blocking. Unlike [`archive_text_blocking`] it
+/// changes no byte, which the compat plugin needs to copy a game's Lua entry
+/// file into a mutator as the game shipped it (issue #4641).
+pub fn archive_bytes_blocking(
+    engine_path: &str,
+    data_dir: &str,
+    archive: &str,
+    file: &str,
+) -> Result<Option<Vec<u8>>, String> {
+    let (bin, libpath, engine_dir) = prepare(engine_path)?;
+    let args = build_archive_file_args(&libpath.to_string_lossy(), data_dir, archive, file, true);
+    let envs = loader_envs(&engine_dir, data_dir);
+    let out = run_worker_blocking(
+        bin,
+        args,
+        envs,
+        MINIMAP_TIMEOUT,
+        "archive bytes".into(),
+        None,
+    )?;
+    bytes_in_archive_output(&out, archive, file)
+}
+
+/// The bytes in the worker's answer to a raw read of one archive file.
+fn bytes_in_archive_output(
+    out: &str,
+    archive: &str,
+    file: &str,
+) -> Result<Option<Vec<u8>>, String> {
+    let out: serde_json::Value = serde_json::from_str(out)
+        .map_err(|e| format!("the archive read did not come back as JSON: {e}"))?;
+    if let Some(url) = out["dataUrl"].as_str() {
+        let (_, b64) = url
+            .split_once(";base64,")
+            .ok_or_else(|| format!("{file} in {archive} came back without its bytes"))?;
+        return base64::engine::general_purpose::STANDARD
+            .decode(b64)
+            .map(Some)
+            .map_err(|e| format!("{file} in {archive} came back as bad base64: {e}"));
+    }
+    let errors: Vec<&str> = out["errors"]
+        .as_array()
+        .map(|errors| errors.iter().filter_map(|e| e.as_str()).collect())
+        .unwrap_or_default();
+    if errors
+        .iter()
+        .any(|e| e.starts_with("could not open archive"))
+    {
+        return Err(format!("could not open the archive {archive}"));
+    }
+    if out["truncated"].as_bool() == Some(true) {
+        return Err(format!("{file} in {archive} is too large to read"));
+    }
+    // A file the archive holds always comes back with its bytes, empty ones
+    // included. A missing one comes back with none and, as for a text read,
+    // without the member's own error.
+    Ok(None)
+}
+
 /// Every unit's definition in `archive`, as `unitsync_unit_defs` answers, with
 /// no cache. Blocking, and not a command of its own: the compat plugin's tests
 /// read it to check what a built mutator points each unit's model at.
@@ -2709,6 +2769,31 @@ mod tests {
     fn a_file_the_archive_does_not_hold_is_none() {
         let out = r#"{"kind":"binary","size":0,"truncated":false,"errors":["could not read member f.lua"]}"#;
         assert_eq!(text_in_archive_output(out, "a.sdz", "f.lua"), Ok(None));
+    }
+
+    #[test]
+    fn a_raw_read_is_the_files_own_bytes() {
+        let out = r#"{"kind":"binary","dataUrl":"data:application/octet-stream;base64,LS0gY2Fm6Qo=","size":8,"truncated":false,"errors":[]}"#;
+        assert_eq!(
+            bytes_in_archive_output(out, "a.sdz", "f.lua"),
+            Ok(Some(b"-- caf\xe9\n".to_vec()))
+        );
+        let empty = r#"{"kind":"binary","dataUrl":"data:application/octet-stream;base64,","size":0,"truncated":false,"errors":[]}"#;
+        assert_eq!(
+            bytes_in_archive_output(empty, "a.sdz", "f.lua"),
+            Ok(Some(Vec::new()))
+        );
+    }
+
+    #[test]
+    fn a_raw_read_of_a_missing_file_is_none_and_a_closed_archive_an_error() {
+        let missing = r#"{"kind":"binary","size":0,"truncated":false,"errors":[]}"#;
+        assert_eq!(bytes_in_archive_output(missing, "a.sdz", "f.lua"), Ok(None));
+        let closed = r#"{"kind":"binary","size":0,"truncated":false,"errors":["could not open archive a.sdz"]}"#;
+        assert!(bytes_in_archive_output(closed, "a.sdz", "f.lua").is_err());
+        let large = r#"{"kind":"binary","size":999999999,"truncated":true,"errors":[]}"#;
+        assert!(bytes_in_archive_output(large, "a.sdz", "f.lua").is_err());
+        assert!(bytes_in_archive_output("nope", "a.sdz", "f.lua").is_err());
     }
 
     /// What the worker gave for a missing file in SplinterFaction_0.1.89.sdz:
