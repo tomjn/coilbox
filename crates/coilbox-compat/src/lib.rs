@@ -42,6 +42,7 @@ const MANIFESTS: &[(u32, &str)] = &[
     (1, include_str!("../../../lua/compat/manifests/1.json")),
     (2, include_str!("../../../lua/compat/manifests/2.json")),
     (3, include_str!("../../../lua/compat/manifests/3.json")),
+    (4, include_str!("../../../lua/compat/manifests/4.json")),
 ];
 
 /// Every fix file, by id.
@@ -61,6 +62,10 @@ const FIXES: &[(&str, &str)] = &[
     (
         "gadget-aircraft-crash-83",
         include_str!("../../../lua/compat/gadgets/gadget-aircraft-crash-83.lua"),
+    ),
+    (
+        "gadget-aircraft-crash-83-v2",
+        include_str!("../../../lua/compat/gadgets/gadget-aircraft-crash-83-v2.lua"),
     ),
     (
         "gadget-messages-tdf-95",
@@ -794,6 +799,29 @@ mod tests {
             let rest = |p: &str| p.split_once('\n').unwrap().1.to_string();
             assert_eq!(rest(&a), rest(&b), "{}", state.name());
         }
+    }
+
+    #[test]
+    fn manifest_4_is_manifest_3_with_the_new_aircraft_gadget() {
+        let (three, four) = (manifest(3).unwrap(), manifest(4).unwrap());
+        let swapped: Vec<String> = three
+            .fixes
+            .iter()
+            .map(|id| match id.as_str() {
+                "gadget-aircraft-crash-83" => "gadget-aircraft-crash-83-v2".to_string(),
+                _ => id.clone(),
+            })
+            .collect();
+        assert_eq!(four.fixes, swapped);
+        assert_eq!(four.converter, three.converter);
+        let paths =
+            |m: &Manifest| -> Vec<String> { gadget_files(m).into_iter().map(|(p, _)| p).collect() };
+        assert_eq!(paths(&four), paths(&three));
+        let (_, src) = gadget_files(&four)
+            .into_iter()
+            .find(|(p, _)| p.ends_with("coilbox_compat_aircraft_crash.lua"))
+            .unwrap();
+        assert_eq!(src, fix_source("gadget-aircraft-crash-83-v2").unwrap());
     }
 
     #[test]
