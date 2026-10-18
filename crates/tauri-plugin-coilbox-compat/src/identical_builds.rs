@@ -108,7 +108,11 @@ fn build_fixture(n: u32, game: &[(String, Vec<u8>)]) -> (tempfile::TempDir, Buil
         &root.path().to_string_lossy(),
         ARCHIVE,
         "Fixture Game 1",
-        Some("FG"),
+        &DeclaredGame {
+            short_name: Some("FG".into()),
+            name: Some("Fixture Game".into()),
+            version: Some("1".into()),
+        },
         "1234abcd",
         n,
         "0.0.0",
