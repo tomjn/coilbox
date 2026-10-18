@@ -137,6 +137,8 @@ export interface StoredCampaignUnit {
   json: string;
   /** The copy's folder, which its textures are read from at launch. */
   dir: string;
+  /** The textures in that folder, by file name. */
+  files: string[];
 }
 
 /**
@@ -174,3 +176,19 @@ export const campaignUnitsCopy = defineCommand<
   { fromId: string; toId: string },
   { copied: number }
 >("coilbox-campaign", "campaign_units_copy");
+
+/** Read one file of a unit copy, `unit.json` or a texture, as a `data:` URI. */
+export const campaignUnitFileRead = defineCommand<
+  { campaignId: string; unitName: string; file: string },
+  { dataUri: string }
+>("coilbox-campaign", "campaign_unit_file_read");
+
+/**
+ * Write one file of a unit copy from a `data:` URI. Write the textures before
+ * `unit.json`: a folder without one is not a copy, so a copy that stops part
+ * way is never read.
+ */
+export const campaignUnitFileWrite = defineCommand<
+  { campaignId: string; unitName: string; file: string; dataUri: string },
+  { file: string }
+>("coilbox-campaign", "campaign_unit_file_write");

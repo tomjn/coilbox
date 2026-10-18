@@ -22,14 +22,19 @@ import type { SkirmishDraft } from "../play/drafts";
 
 const {
   composeCampaignUnits,
+  installedAtlases,
   launchScenario,
+  loadUnitCopies,
   playLaunch,
   progressState,
   saved,
   scanState,
 } = vi.hoisted(() => ({
   composeCampaignUnits: vi.fn(),
+  // The folders of the atlas packs installed, set per test.
+  installedAtlases: { folders: [] as string[] },
   launchScenario: vi.fn(),
+  loadUnitCopies: vi.fn(),
   playLaunch: vi.fn(),
   // Dependency archives the scanned game lacks, set per test.
   scanState: { missingDependencies: undefined as string[] | undefined },
@@ -39,7 +44,25 @@ const {
 }));
 
 vi.mock("../scenario/launch", () => ({ launchScenario }));
-vi.mock("./units", () => ({ composeCampaignUnits }));
+vi.mock("./units", async (importActual) => ({
+  ...(await importActual<typeof import("./units")>()),
+  composeCampaignUnits,
+  loadUnitCopies,
+}));
+vi.mock("../lego/pack", () => ({
+  loadPack: async () => ({
+    library: {
+      atlases: [
+        { tex1: "atlas.png", packId: "base", folder: null },
+        ...installedAtlases.folders.map((folder) => ({
+          tex1: "camo.png",
+          packId: folder,
+          folder,
+        })),
+      ],
+    },
+  }),
+}));
 
 // The progress store, with the plugin taken out of it. Real React state, so a
 // save re-renders the hook under test exactly as the app's own store does.
@@ -210,6 +233,9 @@ beforeEach(() => {
   scanState.missingDependencies = undefined;
   composeCampaignUnits.mockReset();
   composeCampaignUnits.mockResolvedValue(null);
+  loadUnitCopies.mockReset();
+  loadUnitCopies.mockResolvedValue(new Map());
+  installedAtlases.folders = [];
   playLaunch.mockReset();
   playLaunch.mockResolvedValue({ exitCode: null });
 });
@@ -413,5 +439,83 @@ describe("a campaign with units from the unit builder", () => {
     });
 
     expect(vi.mocked(toBattleConfig).mock.calls[0][0].gameType).toBe("BA");
+  });
+});
+
+// Issue #4517. A copy that does not hold its atlas is read from the pack it was
+// built from, so the gate asks for that pack the way it asks for a map.
+describe("a campaign whose units need an atlas pack", () => {
+  const camo = {
+    unitName: "jeep",
+    projectId: "p-jeep",
+    name: "Jeep",
+    builtBy: [],
+    copiedAt: "",
+  };
+
+  function copyNeeding(files: string[]) {
+    return new Map([
+      [
+        "jeep",
+        {
+          dir: "/app/campaign/units/c1/jeep",
+          files,
+          copy: {
+            built: {
+              payload: {
+                textures: {
+                  atlas: { name: "camo.png", pack: "camo-pack", writeAs: "x" },
+                  stored: [],
+                },
+              },
+            },
+          },
+        },
+      ],
+    ]);
+  }
+
+  function run() {
+    const { campaign, mission } = campaignWith(flat());
+    return renderHook(() =>
+      useMissionRun({ ...campaign, units: [camo] }, mission),
+    );
+  }
+
+  it("reports the pack as missing, like a map, and cannot start", async () => {
+    loadUnitCopies.mockResolvedValue(copyNeeding([]));
+    const { result } = run();
+
+    await waitFor(() =>
+      expect(result.current.missing).toEqual({
+        kind: "atlas",
+        name: "camo-pack",
+      }),
+    );
+    expect(result.current.needs).toEqual([
+      { kind: "atlas", name: "camo-pack" },
+    ]);
+    expect(result.current.canStart).toBe(false);
+  });
+
+  it("starts once the pack is installed", async () => {
+    loadUnitCopies.mockResolvedValue(copyNeeding([]));
+    installedAtlases.folders = ["camo-pack"];
+    const { result } = run();
+
+    await waitFor(() => expect(loadUnitCopies).toHaveBeenCalled());
+    await act(async () => {});
+    expect(result.current.needs).toEqual([]);
+    expect(result.current.canStart).toBe(true);
+  });
+
+  it("asks for nothing when the copy carries its atlas", async () => {
+    loadUnitCopies.mockResolvedValue(copyNeeding(["camo.png"]));
+    const { result } = run();
+
+    await waitFor(() => expect(loadUnitCopies).toHaveBeenCalled());
+    await act(async () => {});
+    expect(result.current.needs).toEqual([]);
+    expect(result.current.canStart).toBe(true);
   });
 });

@@ -195,6 +195,27 @@ export interface CampaignUnit {
   builtBy: string[];
   /** When the copy was taken. */
   copiedAt: string;
+  /**
+   * The files of the copy, by name, while the campaign is an export file
+   * (issue #4517): `unit.json` and each texture, as `data` refs. Never set on a
+   * stored campaign. Import writes them into the copy's folder and removes the
+   * field.
+   */
+  files?: Record<string, ImageRef>;
+}
+
+/** The file in a unit copy's folder that holds the unit itself. */
+export const UNIT_FILE = "unit.json";
+
+/** Whether a name is a bare file name, never a path. The plugin checks again. */
+function isUnitFileName(name: string): boolean {
+  return (
+    name.length > 0 &&
+    name.length <= 128 &&
+    !/[/\\]/.test(name) &&
+    name !== "." &&
+    name !== ".."
+  );
 }
 
 export interface Campaign {
@@ -336,6 +357,22 @@ export function parseMapDownload(value: unknown): MapDownloadHint | undefined {
 }
 
 /**
+ * Narrow an unknown to a unit's carried files. Only inline `data` refs under a
+ * name that cannot leave the copy's folder are kept.
+ */
+function parseUnitFiles(value: unknown): Record<string, ImageRef> | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const files: Record<string, ImageRef> = {};
+  for (const [name, raw] of Object.entries(value)) {
+    const ref = parseImageRef(raw);
+    if (ref?.kind === "data" && isUnitFileName(name)) {
+      files[name] = ref;
+    }
+  }
+  return Object.keys(files).length > 0 ? files : undefined;
+}
+
+/**
  * Narrow an unknown to the campaign's attached units, or undefined when there
  * are none. An entry without a unit name or a source is dropped, and so is a
  * second entry with a name already seen, since one unit name is one unit in
@@ -351,12 +388,14 @@ function parseUnits(value: unknown): CampaignUnit[] | undefined {
       continue;
     if (typeof u.projectId !== "string" || u.projectId === "") continue;
     if (units.some((seen) => seen.unitName === u.unitName)) continue;
+    const files = parseUnitFiles(u.files);
     units.push({
       unitName: u.unitName,
       projectId: u.projectId,
       name: typeof u.name === "string" ? u.name : u.unitName,
       builtBy: stringArray(u.builtBy),
       copiedAt: typeof u.copiedAt === "string" ? u.copiedAt : "",
+      ...(files ? { files } : {}),
     });
   }
   return units.length > 0 ? units : undefined;
