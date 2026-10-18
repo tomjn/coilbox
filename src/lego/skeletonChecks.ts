@@ -20,6 +20,7 @@ import { type Problem, problem } from "./problems";
 import type { RawGeometry } from "./rawGeometry";
 import { SAME_PLACE } from "./reparent";
 import { bakedPieces } from "./s3oBuild";
+import { walkProblems } from "./walkFit";
 
 type Vec3 = [number, number, number];
 
@@ -33,7 +34,8 @@ function elmos(distance: number): number {
   return Number(distance.toFixed(2)) || Number(distance.toPrecision(2));
 }
 
-/** The problems for the three checks, in the order they are described. */
+/** The problems for the three checks, in the order they are described, and
+ *  the walk's own (`walkProblems`). */
 export function skeletonProblems(
   project: LegoProject,
   pack: LoadedPack,
@@ -45,6 +47,7 @@ export function skeletonProblems(
     ...feetOffGround(project, baked, origins),
     ...pivotsAwayFromJoints(project, pack),
     ...mismatchedSides(project, baked.pieces, origins),
+    ...walkProblems(project),
   ];
 }
 
