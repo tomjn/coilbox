@@ -313,8 +313,7 @@ function Rows({
                 <span className="truncate">{piece.name}</span>
                 {piece.mountPoints?.length ? (
                   <span
-                    role="group"
-                    aria-label="Mount points"
+                    title="Mount points"
                     className="min-w-0 truncate text-[10px] text-orange-500"
                   >
                     {mountContents(project, piece)

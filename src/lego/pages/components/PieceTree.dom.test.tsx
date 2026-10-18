@@ -179,9 +179,9 @@ describe("the shape of the list", () => {
             : p,
       ),
     });
-    const mounts = within(row("hull")).getByLabelText("Mount points");
+    const mounts = within(row("hull")).getByTitle("Mount points");
     expect(mounts.textContent).toBe("Top: turret, Front: empty");
-    expect(within(row("skirt")).queryByLabelText("Mount points")).toBeNull();
+    expect(within(row("skirt")).queryByTitle("Mount points")).toBeNull();
   });
 
   /**
