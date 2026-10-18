@@ -11,9 +11,12 @@
  * for that reason.
  */
 
+import { I18nProvider } from "@lingui/react";
 import { act, cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DownloadQueueProvider } from "../../downloads/DownloadQueueProvider";
+import { i18n, loadLocale } from "../../i18n";
+import { messages as enMessages } from "../../locales/en/messages.po";
 import { UpdaterProvider } from "../UpdaterProvider";
 import UpdatesSettingsSection from "./UpdatesSettingsSection";
 
@@ -36,13 +39,19 @@ import.meta.env.DEV = false;
 
 function renderSection() {
   return render(
-    <DownloadQueueProvider>
-      <UpdaterProvider>
-        <UpdatesSettingsSection />
-      </UpdaterProvider>
-    </DownloadQueueProvider>,
+    <I18nProvider i18n={i18n}>
+      <DownloadQueueProvider>
+        <UpdaterProvider>
+          <UpdatesSettingsSection />
+        </UpdaterProvider>
+      </DownloadQueueProvider>
+    </I18nProvider>,
   );
 }
+
+beforeEach(async () => {
+  await loadLocale("en");
+});
 
 afterEach(() => {
   cleanup();
@@ -69,5 +78,38 @@ describe("UpdatesSettingsSection", () => {
       .getByText("Download & install")
       .closest("button");
     expect(installButton?.className).toContain("bg-primary");
+  });
+
+  // Issue #4590: the section's strings come from the active catalog.
+  it("shows the English source text under the en catalog", async () => {
+    await act(async () => {
+      renderSection();
+    });
+
+    expect(await screen.findByText("Check for updates")).toBeTruthy();
+    expect(screen.getByText("Current version")).toBeTruthy();
+  });
+
+  it("shows a translated string from a fixture catalog", async () => {
+    // The en catalog with one message translated. Message IDs are hashes of
+    // the English text, so the ID is looked up rather than written out. A
+    // compiled message with no placeholders is a one-element array.
+    const checkId = Object.keys(enMessages).find(
+      (id) => enMessages[id]?.[0] === "Check for updates",
+    );
+    if (!checkId) throw new Error("en catalog has no 'Check for updates'");
+    i18n.loadAndActivate({
+      locale: "fr",
+      messages: { ...enMessages, [checkId]: ["Rechercher des mises à jour"] },
+    });
+
+    await act(async () => {
+      renderSection();
+    });
+
+    expect(await screen.findByText("Rechercher des mises à jour")).toBeTruthy();
+    expect(screen.queryByText("Check for updates")).toBeNull();
+    // Untranslated messages still show their English source.
+    expect(screen.getByText("Current version")).toBeTruthy();
   });
 });

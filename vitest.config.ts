@@ -1,7 +1,11 @@
 import { fileURLToPath } from "node:url";
+import { lingui } from "@lingui/vite-plugin";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  // The same macro transform and catalog loading as vite.config.ts, which
+  // vitest does not read.
+  plugins: [lingui({ macroTransform: true, failOnCompileError: true })],
   // Mirror the `@` → src alias from vite.config.ts so tests that transitively
   // import `@/components/ui/*` (e.g. multiplayer store → VerificationCodeDialog)
   // resolve it — vitest doesn't read vite.config.ts's resolve settings.

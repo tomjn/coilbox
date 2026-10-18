@@ -1,3 +1,4 @@
+import { I18nProvider } from "@lingui/react";
 import { AppFrame, type HomeOverride } from "@picoframe/frame";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { StrictMode } from "react";
@@ -9,6 +10,7 @@ import { loadHomeBackground } from "./home/background";
 import { loadContentArt } from "./home/contentArt";
 import HomeRoute from "./home/HomeRoute";
 import { loadHomeMarkup } from "./home/markup";
+import { i18n, loadLocale } from "./i18n";
 import { applyUiZoom, DEFAULT_UI_ZOOM, UI_ZOOM_KEY } from "./lib/uiZoom";
 import { applyProfilePages } from "./profile/CustomPage";
 import { applyProfileSettingsHiding } from "./profile/hidden";
@@ -48,6 +50,11 @@ if (import.meta.env.DEV) performance.mark("coilbox:boot:settings");
 // default. Absent profile => empty, so vanilla Coilbox is untouched.
 const { profile } = await loadProfile();
 if (import.meta.env.DEV) performance.mark("coilbox:boot:profile");
+
+// Load the catalog before first render, so the first frame is already in the
+// player's language. English until the Language setting exists (#4591).
+await loadLocale("en");
+if (import.meta.env.DEV) performance.mark("coilbox:boot:locale");
 const appTitle = profile.title ?? "Coilbox";
 
 // Paint the profile's boot background immediately (ending any white flash this
@@ -200,18 +207,20 @@ window.addEventListener("error", (e) => {
 
 createRoot(root).render(
   <StrictMode>
-    <ErrorBoundary>
-      <AppFrame
-        plugins={appPlugins}
-        title={appTitle}
-        home={home}
-        layout={buildLayoutConfig(profile, menuImageSrc)}
-        settingsStorage={settingsStorage}
-      />
-    </ErrorBoundary>
-    {profile.splash && splashSrc && (
-      <Splash config={profile.splash} src={splashSrc} />
-    )}
+    <I18nProvider i18n={i18n}>
+      <ErrorBoundary>
+        <AppFrame
+          plugins={appPlugins}
+          title={appTitle}
+          home={home}
+          layout={buildLayoutConfig(profile, menuImageSrc)}
+          settingsStorage={settingsStorage}
+        />
+      </ErrorBoundary>
+      {profile.splash && splashSrc && (
+        <Splash config={profile.splash} src={splashSrc} />
+      )}
+    </I18nProvider>
   </StrictMode>,
 );
 if (import.meta.env.DEV) performance.mark("coilbox:boot:render");

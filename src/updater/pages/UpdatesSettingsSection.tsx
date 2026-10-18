@@ -1,4 +1,6 @@
+import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
+import type { ReactNode } from "react";
 import { QueueProgress } from "../../downloads/pages/components/ProgressBar";
 import { isUpdaterEnabled } from "../../profile/profile";
 import { useUpdater } from "../UpdaterProvider";
@@ -10,10 +12,13 @@ import { useUpdater } from "../UpdaterProvider";
  * the governing reason when set, and because it's the only way to see this state
  * under `tauri dev`.
  */
-function inertReason(): string | null {
+function inertReason(): ReactNode {
   if (!isUpdaterEnabled())
-    return "Updates for this build are managed by its distributor.";
-  if (import.meta.env.DEV) return "Updates are disabled in development builds.";
+    return (
+      <Trans>Updates for this build are managed by its distributor.</Trans>
+    );
+  if (import.meta.env.DEV)
+    return <Trans>Updates are disabled in development builds.</Trans>;
   return null;
 }
 
@@ -33,11 +38,17 @@ export default function UpdatesSettingsSection() {
     restart,
   } = useUpdater();
   const inert = inertReason();
+  const newVersion = update?.version;
+  const lastCheckedTime = lastChecked
+    ? new Date(lastChecked).toLocaleTimeString()
+    : null;
 
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <div className="text-sm text-muted-foreground">Current version</div>
+        <div className="text-sm text-muted-foreground">
+          <Trans>Current version</Trans>
+        </div>
         <div className="text-lg font-medium">{version ?? "…"}</div>
       </div>
 
@@ -50,7 +61,7 @@ export default function UpdatesSettingsSection() {
           {update && (
             <div className="flex flex-col gap-3 rounded-lg border border-primary/60 bg-primary/5 p-4">
               <div className="font-medium">
-                Version {update.version} available
+                <Trans>Version {newVersion} available</Trans>
               </div>
               {update.body && (
                 <pre className="max-h-48 overflow-auto whitespace-pre-wrap text-sm text-muted-foreground">
@@ -60,8 +71,12 @@ export default function UpdatesSettingsSection() {
 
               {installed ? (
                 <div className="flex items-center gap-3">
-                  <span className="text-sm">Installed — restart to apply.</span>
-                  <Button onClick={() => void restart()}>Restart now</Button>
+                  <span className="text-sm">
+                    <Trans>Installed — restart to apply.</Trans>
+                  </span>
+                  <Button onClick={() => void restart()}>
+                    <Trans>Restart now</Trans>
+                  </Button>
                 </div>
               ) : progress.status === "downloading" ? (
                 // The same bar, size, speed and time left as every other
@@ -69,10 +84,12 @@ export default function UpdatesSettingsSection() {
                 // transfer now reports to.
                 <QueueProgress item={download} />
               ) : progress.status === "installing" ? (
-                <div className="text-sm text-muted-foreground">Installing…</div>
+                <div className="text-sm text-muted-foreground">
+                  <Trans>Installing…</Trans>
+                </div>
               ) : (
                 <Button onClick={() => void runInstall()}>
-                  Download &amp; install
+                  <Trans>Download &amp; install</Trans>
                 </Button>
               )}
             </div>
@@ -84,11 +101,15 @@ export default function UpdatesSettingsSection() {
               onClick={() => void runCheck()}
               disabled={checking}
             >
-              {checking ? "Checking…" : "Check for updates"}
+              {checking ? (
+                <Trans>Checking…</Trans>
+              ) : (
+                <Trans>Check for updates</Trans>
+              )}
             </Button>
-            {lastChecked && (
+            {lastCheckedTime && (
               <span className="text-xs text-muted-foreground">
-                Last checked {new Date(lastChecked).toLocaleTimeString()}
+                <Trans>Last checked {lastCheckedTime}</Trans>
               </span>
             )}
           </div>
@@ -96,7 +117,9 @@ export default function UpdatesSettingsSection() {
           {error && <p className="text-sm text-destructive">{error}</p>}
 
           {!update && lastChecked && !checking && (
-            <p className="text-sm text-muted-foreground">You're up to date.</p>
+            <p className="text-sm text-muted-foreground">
+              <Trans>You're up to date.</Trans>
+            </p>
           )}
         </>
       )}
