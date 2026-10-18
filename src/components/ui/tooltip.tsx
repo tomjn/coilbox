@@ -1,4 +1,4 @@
-import { Tooltip as TooltipPrimitive } from "radix-ui";
+import { Direction, Tooltip as TooltipPrimitive } from "radix-ui";
 import type * as React from "react";
 
 import { cn } from "@/lib/utils";
@@ -34,11 +34,13 @@ function TooltipContent({
   children,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Content>) {
+  const dir = Direction.useDirection();
   return (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Content
         data-slot="tooltip-content"
         sideOffset={sideOffset}
+        dir={dir}
         className={cn(
           // The popover's own colours rather than the registry's inverted ones.
           // Inverting means a white chip with dark text in the dark scheme,

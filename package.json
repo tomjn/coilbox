@@ -16,6 +16,7 @@
     "icon:macos-glass": "bash scripts/build-macos-glass-icon.sh",
     "stars:catalogue": "bun scripts/build-star-catalogue.mjs && biome check --write src/conquest/realstars/catalogue.json",
     "keybinds:defaults": "bun scripts/build-engine-keybinds.mjs && biome check --write src/content/engineKeybinds.generated.ts",
+    "mapinfo:keys": "bun scripts/build-engine-mapinfo-keys.mjs && biome format --write src/data/engineMapInfoKeys.json",
     "luacompat:catalogue": "bun scripts/build-engine-lua-compat.mjs && biome format --write src/data/engineLuaCompat.json",
     "unitfields:defaults": "bun scripts/build-engine-unit-fields.mjs && biome check --write src/content/engineUnitFields.generated.ts",
     "lego:pack": "bun scripts/legopack/build.mjs",
@@ -35,8 +36,8 @@
   },
   "dependencies": {
     "@fontsource-variable/oxanium": "^5.3.0",
-    "@picoframe/frame": "^0.9.1",
-    "@picoframe/plugin-sdk": "^0.9.1",
+    "@picoframe/frame": "^0.10.0",
+    "@picoframe/plugin-sdk": "^0.10.0",
     "@shadcn/react": "^0.3.1",
     "@tauri-apps/api": "^2.12.1",
     "@tauri-apps/plugin-deep-link": "2.6.1",

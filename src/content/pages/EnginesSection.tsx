@@ -11,6 +11,7 @@ import {
   type Engine,
 } from "../bindings";
 import { useContentState, usePreferredEngine } from "../config";
+import { useEngineUpdate } from "../useUpdates";
 import { EngineRow } from "./components/EngineRow";
 
 const msg = (e: unknown): string =>
@@ -25,6 +26,7 @@ export default function EnginesSection() {
   const { state, setState, loading } = useContentState();
   const allEngines = (state?.roots ?? []).flatMap((r) => r.engines);
   const { resolvedId, setPrefId } = usePreferredEngine(allEngines);
+  const newerEngine = useEngineUpdate();
   const [verifying, setVerifying] = useState<Set<string>>(new Set());
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -130,6 +132,12 @@ export default function EnginesSection() {
             </section>
           ))}
         </div>
+      )}
+
+      {newerEngine && (
+        <p className="text-sm font-medium">
+          Newer engine available: {newerEngine}
+        </p>
       )}
 
       <EngineInstaller />
