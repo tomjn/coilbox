@@ -153,7 +153,7 @@ const BODY_LENGTH = elmos("bodyLength", "Body length", 5, 70, 27.7, {
  */
 function legPair(
   parent: string,
-  pair: 1 | 2,
+  pair: number,
   { legLength, stance }: Record<string, number>,
   z: number,
   suffix: string,
@@ -223,7 +223,7 @@ function trunk(
  * a pair's two thigh joints, and body height as the torso joint's rise above
  * the body joint. Each is the mean over the legs or pairs that were picked.
  */
-function measureLegs(joints: Joints, body: string, pairs: (1 | 2)[]) {
+function measureLegs(joints: Joints, body: string, pairs: number[]) {
   const sides = ["l", "r"] as const;
   return {
     legLength: mean(
@@ -280,10 +280,90 @@ export const QUADRUPED: BodyPlan = {
   }),
 };
 
+/**
+ * The gap between one leg pair's hips and the next pair's, for a plan with
+ * more than two pairs. No six or eight legged model has been measured, so it is
+ * the four legged plan's gap between its two pairs, 27.7, and its range.
+ */
+const LEG_GAP = elmos("legGap", "Gap between leg pairs", 5, 70, 27.7, {
+  bone: "thigh.l1",
+  axis: 2,
+});
+
+/**
+ * A body on `pairs` leg pairs, evenly spaced along it with pair 1 at the front
+ * (#3351). Each pair is the four legged plan's, and the walk is the one for any
+ * number of legs, whose gait follows the count.
+ */
+function manyLegs(
+  id: string,
+  label: string,
+  description: string,
+  pairs: number,
+): BodyPlan {
+  const numbers = Array.from({ length: pairs }, (_, i) => i + 1);
+  return {
+    id,
+    label,
+    description,
+    proportions: [LEG_LENGTH, STANCE, BODY_HEIGHT, LEG_GAP],
+    bones(proportions) {
+      const gap = proportions.legGap as number;
+      return [
+        ...trunk("body", proportions),
+        ...numbers.flatMap((pair) =>
+          legPair(
+            "body",
+            pair,
+            proportions,
+            gap * ((pairs - 1) / 2 - (pair - 1)),
+            String(pair),
+          ),
+        ),
+      ];
+    },
+    presets: [{ presetId: "walk.legs", params: {} }],
+    // The gap is the mean over each side of the gaps between neighbouring
+    // pairs' thigh joints.
+    measure: (joints) => ({
+      ...measureLegs(joints, "body", numbers),
+      legGap: mean(
+        numbers
+          .slice(1)
+          .flatMap((pair) =>
+            (["l", "r"] as const).map((side) =>
+              between(
+                joints,
+                `thigh.${side}${pair - 1}`,
+                `thigh.${side}${pair}`,
+              ),
+            ),
+          ),
+      ),
+    }),
+  };
+}
+
+export const HEXAPOD = manyLegs(
+  "hexapod",
+  "Six legs",
+  "A body on six legs, walking three at a time.",
+  3,
+);
+
+export const OCTOPOD = manyLegs(
+  "octopod",
+  "Eight legs",
+  "A body on eight legs, walking four at a time.",
+  4,
+);
+
 /** Every plan a unit can start from. */
 export const BODY_PLANS: BodyPlan[] = [
   BIPED,
   QUADRUPED,
+  HEXAPOD,
+  OCTOPOD,
   WHEELED,
   TRACKED,
   TURRET_BUILDING,
