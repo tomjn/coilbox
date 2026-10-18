@@ -880,6 +880,13 @@ export interface LegoProject {
    * byte for byte what it was. See `actions.ts`.
    */
   actions?: LegoAction[];
+  /**
+   * Seconds an action takes to ease in from wherever the pieces are and to
+   * ease back to rest, for every action that sets no time of its own (#3358).
+   * Absent or 0 means none, and a unit where no action blends is written
+   * exactly as before.
+   */
+  actionBlend?: number;
 }
 
 /**
@@ -931,6 +938,12 @@ export interface LegoAction {
    *  repeats until the unit is told to start it again. */
   loop: boolean;
   keys: LegoActionKey[];
+  /** Seconds to reach the first key from wherever the pieces are, when this
+   *  action starts over another. Absent uses the project's `actionBlend`. */
+  blendIn?: number;
+  /** Seconds to return to rest when a looping action stops. Absent uses the
+   *  project's `actionBlend`. */
+  blendOut?: number;
 }
 
 /**
@@ -1077,6 +1090,14 @@ function parsePoses(value: unknown): LegoPose[] | null {
   return poses.length > 0 ? poses : null;
 }
 
+/** A stored number of seconds, or null when it is not a finite one of 0 or
+ *  more. */
+function parseSeconds(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? value
+    : null;
+}
+
 /** The actions that can be read, or null when there are none. */
 function parseActions(value: unknown): LegoAction[] | null {
   if (!Array.isArray(value)) return null;
@@ -1104,12 +1125,16 @@ function parseActions(value: unknown): LegoAction[] | null {
         keys.push({ pose: k.pose, seconds: k.seconds });
       }
     }
+    const blendIn = parseSeconds(e.blendIn);
+    const blendOut = parseSeconds(e.blendOut);
     actions.push({
       id: e.id,
       name: e.name.trim(),
       trigger: e.trigger,
       loop: e.loop === true,
       keys,
+      ...(blendIn !== null ? { blendIn } : {}),
+      ...(blendOut !== null ? { blendOut } : {}),
     });
   }
   return actions.length > 0 ? actions : null;
@@ -1763,6 +1788,10 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
     ...(() => {
       const actions = parseActions(d.actions);
       return actions ? { actions } : {};
+    })(),
+    ...(() => {
+      const actionBlend = parseSeconds(d.actionBlend);
+      return actionBlend !== null && actionBlend > 0 ? { actionBlend } : {};
     })(),
   };
   // A document saved before pieces were written in save order, or hand-edited,

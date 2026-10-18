@@ -3842,6 +3842,90 @@ mod engine_fire {
         }));
     }
 
+    /// A turn as the engine keeps it, brought into -PI..PI. Angles are held
+    /// from 0 to a full turn, so -1 reads as 5.28.
+    fn turned(timeline: &Timeline, frame: usize, piece: &str) -> f64 {
+        let angle = rot_y(timeline, frame, piece);
+        (angle + std::f64::consts::PI).rem_euclid(std::f64::consts::TAU) - std::f64::consts::PI
+    }
+
+    fn aim(frame: u32, heading: f64) -> ScriptEvent {
+        ScriptEvent {
+            frame,
+            callin: "AimWeapon1".into(),
+            args: vec![heading, 0.0],
+            ambient: false,
+            world: None,
+            engine: None,
+        }
+    }
+
+    /// The script writes the two arguments it is given into the turn of two
+    /// pieces, so the test can read them back.
+    const ROCK_SCRIPT: &str = r#"
+        local base, turret = piece("base", "turret")
+        function script.AimWeapon1(heading, pitch) return true end
+        function script.RockUnit(x, z)
+            Turn(base, y_axis, x)
+            Turn(turret, y_axis, z)
+        end
+    "#;
+
+    /// The engine hands `RockUnit` the opposite of the shot in the unit's own
+    /// space after `Shot` (`Weapon.cpp:606-608`, `LuaUnitScript.cpp:686-691`).
+    /// A weapon aimed a quarter turn to +x shoots along +x, so the rock is
+    /// along -x.
+    #[test]
+    fn fire_calls_rock_unit_away_from_the_last_aim() {
+        let timeline = fired(
+            ROCK_SCRIPT,
+            &[aim(2, std::f64::consts::FRAC_PI_2), fire(5, 1.0)],
+            8,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_close(turned(&timeline, 7, "base"), -1.0);
+        assert_close(turned(&timeline, 7, "turret"), 0.0);
+        assert_close(turned(&timeline, 4, "base"), 0.0);
+    }
+
+    #[test]
+    fn rock_unit_follows_the_latest_aim_of_that_weapon() {
+        let timeline = fired(
+            ROCK_SCRIPT,
+            &[
+                aim(1, std::f64::consts::FRAC_PI_2),
+                aim(3, std::f64::consts::PI),
+                fire(5, 1.0),
+            ],
+            8,
+        );
+
+        // Aimed behind, so the rock is forwards.
+        assert_close(turned(&timeline, 7, "base"), 0.0);
+        assert_close(turned(&timeline, 7, "turret"), 1.0);
+    }
+
+    #[test]
+    fn a_weapon_never_aimed_rocks_the_unit_straight_back() {
+        let timeline = fired(ROCK_SCRIPT, &[fire(5, 1.0)], 8);
+
+        assert_close(turned(&timeline, 7, "base"), 0.0);
+        assert_close(turned(&timeline, 7, "turret"), -1.0);
+    }
+
+    #[test]
+    fn a_script_without_rock_unit_is_not_told_it_lacks_one() {
+        let timeline = fired(
+            "function script.AimWeapon1() return true end",
+            &[fire(5, 1.0)],
+            8,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert!(!timeline.warnings.iter().any(|w| w.contains("RockUnit")));
+    }
+
     #[test]
     fn no_weapon_piece_at_all_records_a_shot_from_no_piece_and_says_so() {
         let timeline = fired("function script.Create() end", &[fire(5, 1.0)], 8);
