@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  campaignUnitsFolder,
   generatedGameNote,
+  isCampaignUnitsArchive,
   isGeneratedGame,
   isMutatorArchive,
   isPlaybackArchive,
@@ -14,6 +16,30 @@ import {
 } from "./generatedGames";
 
 const game = (name: string) => ({ name, primaryArchive: { name } });
+
+// Issue #4516.
+describe("campaignUnitsFolder", () => {
+  it("names one folder per campaign, in the shape the export guard accepts", () => {
+    const id = "0b6f3a3e-9a39-4d0a-8f39-3b1d2f4c5e6a";
+    expect(campaignUnitsFolder(id)).toBe(`coilbox-lego-campaign-${id}.sdd`);
+    expect(campaignUnitsFolder("Camp-01")).toBe(
+      "coilbox-lego-campaign-camp-01.sdd",
+    );
+  });
+
+  it("refuses an id that cannot name a folder", () => {
+    expect(campaignUnitsFolder("a_b")).toBeNull();
+    expect(campaignUnitsFolder("x".repeat(40))).toBeNull();
+  });
+
+  it("is a generated game, not one to offer", () => {
+    const folder = campaignUnitsFolder("c1") as string;
+    expect(isCampaignUnitsArchive(folder)).toBe(true);
+    expect(isGeneratedGame(folder)).toBe(true);
+    expect(isCampaignUnitsArchive(SCRATCH_FOLDER)).toBe(false);
+    expect(isScratchArchive(folder)).toBe(false);
+  });
+});
 
 describe("isScratchArchive", () => {
   it("recognises the unit builder's scratch game, whatever its casing", () => {
