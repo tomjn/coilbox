@@ -232,14 +232,14 @@ pub fn read_marker(dir: &Path) -> Option<Marker> {
     serde_json::from_str(&text).ok()
 }
 
-/// The newest compat mutator built for `archive_name` in `games`, as its folder
-/// name and manifest version, or `None` when there is none.
-pub fn newest_built(games: &Path, archive_name: &str) -> Result<Option<(String, u32)>, String> {
+/// Every compat mutator built for `archive_name` in `games`, as its folder
+/// name and manifest version, in no particular order.
+pub fn built_folders(games: &Path, archive_name: &str) -> Result<Vec<(String, u32)>, String> {
     let start = format!("{PREFIX}{}-", stem(archive_name)?);
     let Ok(entries) = std::fs::read_dir(games) else {
-        return Ok(None);
+        return Ok(Vec::new());
     };
-    let newest = entries
+    Ok(entries
         .flatten()
         .filter(|e| e.path().is_dir())
         .filter_map(|e| e.file_name().into_string().ok())
@@ -249,8 +249,15 @@ pub fn newest_built(games: &Path, archive_name: &str) -> Result<Option<(String, 
             let v = n.parse::<u32>().ok().filter(|v| v.to_string() == n)?;
             Some((name, v))
         })
-        .max_by_key(|(_, n)| *n);
-    Ok(newest)
+        .collect())
+}
+
+/// The newest compat mutator built for `archive_name` in `games`, as its folder
+/// name and manifest version, or `None` when there is none.
+pub fn newest_built(games: &Path, archive_name: &str) -> Result<Option<(String, u32)>, String> {
+    Ok(built_folders(games, archive_name)?
+        .into_iter()
+        .max_by_key(|(_, n)| *n))
 }
 
 #[cfg(test)]

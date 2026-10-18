@@ -157,6 +157,15 @@ export interface Library {
 
 const lc = (s: string) => s.toLowerCase();
 const stem = (filename: string) => filename.replace(/\.(sd7|sdz|sdd)$/i, "");
+/**
+ * What two file names of one map share: the name without its extension, in
+ * lower case, and without a v in front of the version. Springfiles has
+ * `all_that_glitters_v1.2.sd7` where beyond-all-reason/Maps has
+ * `all_that_glitters_1.2.sd7`, and a folder and an archive of one map differ
+ * by extension (issue #4657).
+ */
+const matchKey = (filename: string) =>
+  lc(stem(filename)).replace(/(?<=[_\s-])v(?=\d)/g, "");
 
 /**
  * A name in the raw disk listing that may have a record of its own: a Spring
@@ -414,6 +423,12 @@ function buildMaps(
 ): LibraryMap[] {
   const records = new Map<string, LibraryMap>();
   const byFile = new Map<string, string>();
+  /** The same files by `matchKey`, for a name that is not in `byFile`. */
+  const byMatchKey = new Map<string, string>();
+  const link = (file: string, key: string) => {
+    byFile.set(file, key);
+    if (!byMatchKey.has(matchKey(file))) byMatchKey.set(matchKey(file), key);
+  };
 
   const record = (id: string): LibraryMap => {
     let r = records.get(lc(id));
@@ -427,8 +442,8 @@ function buildMaps(
   for (const m of input.scan?.maps ?? []) {
     const r = record(m.name);
     r.installed ??= m;
-    for (const a of m.archives) byFile.set(lc(a.name), lc(m.name));
-    if (m.fileName) byFile.set(lc(m.fileName), lc(m.name));
+    for (const a of m.archives) link(lc(a.name), lc(m.name));
+    if (m.fileName) link(lc(m.fileName), lc(m.name));
   }
 
   // Springfiles names its maps, so it goes first and the mirrors that only
@@ -439,12 +454,16 @@ function buildMaps(
   );
   const add = (springName: string | undefined, source: LibrarySource) => {
     const file = lc(source.filename);
-    const found = byFile.get(file) ?? (springName ? lc(springName) : undefined);
+    // A spring name is exact, so only a mirror that gives none is matched by
+    // stem. Springfiles lists both `bridge_1` and `bridge_v1` as maps.
+    const found =
+      byFile.get(file) ??
+      (springName ? lc(springName) : byMatchKey.get(matchKey(file)));
     const r = found
       ? (records.get(found) ?? record(springName ?? stem(source.filename)))
       : record(stem(source.filename));
     r.sources.push(source);
-    byFile.set(file, lc(r.id));
+    link(file, lc(r.id));
   };
   for (const c of ordered) {
     if (c.source === "springfiles" && c.kind === "map") {
@@ -491,7 +510,9 @@ function buildMaps(
   }
 
   for (const file of installedFiles) {
-    const key = byFile.get(file);
+    const key =
+      byFile.get(file) ??
+      (isArchiveName(file) ? byMatchKey.get(matchKey(file)) : undefined);
     if (key) {
       const r = records.get(key);
       if (r) r.onDisk = true;
@@ -500,7 +521,7 @@ function buildMaps(
     if (!scannedFiles.has(file) && !isArchiveName(file)) continue;
     const r = record(stem(file));
     r.onDisk = true;
-    byFile.set(file, lc(r.id));
+    link(file, lc(r.id));
   }
 
   for (const item of input.queue) {
@@ -512,6 +533,7 @@ function buildMaps(
           ? lc(item.args.mapName)
           : item.kind === "file"
             ? (byFile.get(lc(item.args.filename)) ??
+              byMatchKey.get(matchKey(item.args.filename)) ??
               lc(stem(item.args.filename)))
             : undefined;
     if (!key) continue;
