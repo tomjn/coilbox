@@ -76,6 +76,9 @@ vi.mock("../branding", () => ({
   useSuggestedMaps: () => [],
 }));
 vi.mock("../usePlayGame", () => ({ usePlayGame: () => () => {} }));
+// The update sources read the download history and the rapid indexes.
+const UPDATE_SOURCES = { catalogues: [], rapidVersions: {} };
+vi.mock("../useUpdates", () => ({ useUpdateSources: () => UPDATE_SOURCES }));
 vi.mock("../usePlayMap", () => ({ usePlayMap: () => () => {} }));
 vi.mock("../../downloads/bindings", () => ({
   dlInstalledContent: async () => ({ games: [], maps: [] }),

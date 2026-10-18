@@ -67,6 +67,9 @@ vi.mock("../branding", () => ({
   useSuggestedGames: () => [],
 }));
 vi.mock("../usePlayGame", () => ({ usePlayGame: () => () => {} }));
+// The update sources read the download history and the rapid indexes.
+const UPDATE_SOURCES = { catalogues: [], rapidVersions: {} };
+vi.mock("../useUpdates", () => ({ useUpdateSources: () => UPDATE_SOURCES }));
 vi.mock("../../downloads/config", () => ({
   useWriteRoot: () => ({ path: "/data", loading: false }),
 }));

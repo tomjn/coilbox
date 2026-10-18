@@ -141,4 +141,13 @@ describe("download requests", () => {
       sizeBytes: 200,
     });
   });
+
+  it("updates a rapid game from the tag that moved", async () => {
+    const ba = { ...byId("ba"), rapidUpdate: { tag: "ba:stable", md5: "abc" } };
+    expect(await updateRequest(ba, "/data")).toEqual({
+      kind: "rapid",
+      label: "Balanced Annihilation",
+      args: { tag: "ba:stable" },
+    });
+  });
 });

@@ -7,16 +7,10 @@ import {
   type EnqueueInput,
   useDownloadQueue,
 } from "../../downloads/DownloadQueueProvider";
-import {
-  GAME_REPOS,
-  githubRepoForGame,
-  mergeGameRepos,
-} from "../../downloads/gameRepos";
 import { useHubGames, useHubGamesFailure } from "../../hub/gameIcons";
 import {
   filterUninstalledGames,
   useBrandingCatalog,
-  useGithubGameRepos,
   useSuggestedGames,
 } from "../branding";
 import { useScanTargetSelection, useUnitsyncGameHeaders } from "../config";
@@ -37,6 +31,7 @@ import {
 } from "../libraryGames";
 import { type CatalogueRequest, useLibrary } from "../useLibrary";
 import { usePlayGame } from "../usePlayGame";
+import { useUpdateSources } from "../useUpdates";
 import { BrowserToolbar } from "./components/BrowserToolbar";
 import { FilterBar } from "./components/FilterBar";
 import { GameCard } from "./components/GameCard";
@@ -105,22 +100,22 @@ export default function GamesPage() {
   const scanned = result?.games ?? [];
   const busy = loading || (!!selected && !data && !error && !cancelled);
 
-  const catalogRepos = useGithubGameRepos();
-  const catalogues = useMemo((): CatalogueRequest[] => {
-    const repos = mergeGameRepos(catalogRepos, GAME_REPOS);
-    const found = new Set<string>();
-    for (const g of result?.games ?? []) {
-      const repo = githubRepoForGame(repos, g.name);
-      if (repo) found.add(repo);
-    }
-    return [
+  // The same update sources the topbar badge counts from, plus the
+  // springfiles index, which tells a hub game with no source of its own
+  // apart from one springfiles has.
+  const updateSources = useUpdateSources(result);
+  const catalogues = useMemo(
+    (): CatalogueRequest[] => [
       { source: "springfiles", kind: "game" },
-      ...[...found].map(
-        (repo): CatalogueRequest => ({ source: "github", kind: "game", repo }),
-      ),
-    ];
-  }, [result, catalogRepos]);
-  const library = useLibrary({ scan: result, catalogues });
+      ...updateSources.catalogues,
+    ],
+    [updateSources.catalogues],
+  );
+  const library = useLibrary({
+    scan: result,
+    catalogues,
+    rapidVersions: updateSources.rapidVersions,
+  });
   const records = useMemo(
     () => library.games.filter(inGamesGrid),
     [library.games],

@@ -181,11 +181,18 @@ export async function installRequest(
   return request;
 }
 
-/** The queue request that fetches a game's newer version. */
+/**
+ * The queue request that fetches a game's newer version: the newer archive
+ * itself, or the rapid tag that now points at a new package.
+ */
 export async function updateRequest(
   g: LibraryGame,
   writePath: string,
 ): Promise<EnqueueInput> {
   const request = g.update && sourceRequest(g.update, g.title, writePath);
-  return request ?? installRequest(g, writePath);
+  if (request) return request;
+  if (g.rapidUpdate) {
+    return { kind: "rapid", label: g.title, args: { tag: g.rapidUpdate.tag } };
+  }
+  return installRequest(g, writePath);
 }
