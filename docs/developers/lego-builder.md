@@ -237,7 +237,7 @@ Built in modules are not files. The app builds them each time it loads the parts
 
 ### Share a module as a file
 
-Point at a module and press **Save to file** to write it to a `.coilbox-module.json` file, which you can send to someone else. Built in modules can be saved too. **Load from file**, beside the module list in the strip and on the Lego Parts page, adds a module from a file to your own.
+Point at a module and press **Save to file** to write it to a `.coilbox-module.json` file, which you can send to someone else. Built in modules can be saved too. **Load from file**, beside the module list in the strip and at the top of the Lego Parts page, adds a module from a file to your own.
 
 - A module that uses parts no installed pack has still loads, and a warning lists the parts that are missing.
 - If you already have a module with the same id, coilbox asks whether to **Replace** it or **Keep both**. Closing the question keeps both.
@@ -1020,6 +1020,6 @@ Record any further outcome here, and on [issue #565](https://github.com/tomjn/co
 
 ## Parts packs
 
-The bundled pack is derived from KaiserJ's original v2 lego parts, released on the [Spring forums](https://springrts.com/phpbb/viewtopic.php?t=22283) with "do whatever the heck you'd like with these". Several packs can be installed at once and they share one atlas, so parts from all of them can sit in the same unit. A pack picker appears in the parts filters once there is more than one. The format, where extension packs go and how to build one are in [the parts pack guide](../reference/lego-parts-pack.md).
+The bundled pack is derived from KaiserJ's original v2 lego parts, released on the [Spring forums](https://springrts.com/phpbb/viewtopic.php?t=22283) with "do whatever the heck you'd like with these". Several packs can be installed at once and they share one atlas, so parts from all of them can sit in the same unit. A pack picker appears once there is more than one, in the strip's parts filters and at the top of the Lego Parts page. The format, where extension packs go and how to build one are in [the parts pack guide](../reference/lego-parts-pack.md).
 
 A unit records the pack it was built against. Opening one whose pack is not installed still works: the pieces keep their names, hierarchy and transforms, and any piece whose part is missing draws nothing and is counted in the warnings above the viewport.

@@ -20,8 +20,10 @@
  */
 
 import { Button, cn, Input } from "@picoframe/frame";
+import { TriangleAlert } from "lucide-react";
 
 import { OptionSelect } from "@/components/OptionSelect";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ButtonGroup } from "@/components/ui/button-group";
 import {
   Select,
@@ -54,6 +56,8 @@ interface Props {
   shown: number;
   /** Adds the Shapes category, for a grid that lists generated shapes. */
   showShapes?: boolean;
+  /** False for a page that puts the pack menu in its header instead. */
+  showPacks?: boolean;
   className?: string;
 }
 
@@ -67,16 +71,16 @@ export function PartFilters({
   onPackId,
   shown,
   showShapes = false,
+  showPacks = true,
   className,
 }: Props) {
-  const packs = pack.library.packs;
   const choices = [
     { value: EVERY_CATEGORY, label: "All" },
     ...pack.manifest.categories.map((c) => ({ value: c.id, label: c.label })),
     ...(showShapes ? [{ value: SHAPES_CATEGORY, label: "Shapes" }] : []),
   ];
   // The pack menu takes room of its own, so the buttons wait for more.
-  const many = packs.length > 1;
+  const many = showPacks && pack.library.packs.length > 1;
   return (
     <div
       className={cn(
@@ -92,29 +96,13 @@ export function PartFilters({
         className="w-56 min-w-32"
         aria-label="Search parts"
       />
-      {packs.length > 1 ? (
-        <Select
-          value={packId ?? EVERY_PACK}
-          onValueChange={(value) =>
-            onPackId(value === EVERY_PACK ? null : value)
-          }
-        >
-          <SelectTrigger
-            size="sm"
-            className="w-44 min-w-32"
-            aria-label="Parts pack"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={EVERY_PACK}>All packs</SelectItem>
-            {packs.map((manifest) => (
-              <SelectItem key={manifest.id} value={manifest.id}>
-                {manifest.id}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {showPacks ? (
+        <PackSelect
+          pack={pack}
+          packId={packId}
+          onPackId={onPackId}
+          className="w-44 min-w-32"
+        />
       ) : null}
       <ButtonGroup
         aria-label="Part category"
@@ -155,6 +143,43 @@ export function PartFilters({
 }
 
 /**
+ * Which pack's parts to list. Nothing while only one pack is installed.
+ */
+export function PackSelect({
+  pack,
+  packId,
+  onPackId,
+  className,
+}: {
+  pack: LoadedPack;
+  /** null means every pack. */
+  packId: string | null;
+  onPackId: (packId: string | null) => void;
+  className?: string;
+}) {
+  const packs = pack.library.packs;
+  if (packs.length < 2) return null;
+  return (
+    <Select
+      value={packId ?? EVERY_PACK}
+      onValueChange={(value) => onPackId(value === EVERY_PACK ? null : value)}
+    >
+      <SelectTrigger size="sm" className={className} aria-label="Parts pack">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={EVERY_PACK}>All packs</SelectItem>
+        {packs.map((manifest) => (
+          <SelectItem key={manifest.id} value={manifest.id}>
+            {manifest.id}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+/**
  * Packs that could not be loaded, and where an extension pack goes.
  *
  * Shown rather than logged: the only person who can fix a pack that will not
@@ -163,17 +188,24 @@ export function PartFilters({
 export function PackProblems({ pack }: { pack: LoadedPack }) {
   if (pack.library.problems.length === 0) return null;
   return (
-    <ul className="border-b border-amber-500/40 bg-amber-500/5 px-6 py-2 text-xs text-muted-foreground">
-      {pack.library.problems.map((problem) => (
-        <li key={problem}>{problem}</li>
-      ))}
-      {pack.library.dir ? (
-        <li>
-          Extension packs live in <code>{pack.library.dir}</code>, one folder
-          each.
-        </li>
-      ) : null}
-    </ul>
+    <Alert variant="warning">
+      <TriangleAlert />
+      <AlertDescription>
+        <ul className="flex flex-col gap-1">
+          {pack.library.problems.map((problem) => (
+            <li key={problem} className="break-words">
+              {problem}
+            </li>
+          ))}
+          {pack.library.dir ? (
+            <li className="break-words">
+              Extension packs live in <code>{pack.library.dir}</code>, one
+              folder each.
+            </li>
+          ) : null}
+        </ul>
+      </AlertDescription>
+    </Alert>
   );
 }
 
@@ -189,7 +221,7 @@ export function PackAtlases({ pack }: { pack: LoadedPack }) {
   const atlases = pack.library.atlases;
   if (atlases.length < 2) return null;
   return (
-    <p className="border-b border-border px-6 py-2 text-xs text-muted-foreground">
+    <p className="text-xs text-muted-foreground">
       {atlases.length} atlases installed, and a unit samples one of them:{" "}
       {atlases.map((atlas, index) => (
         <span key={atlas.tex1}>

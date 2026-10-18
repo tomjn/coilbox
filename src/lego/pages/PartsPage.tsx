@@ -1,5 +1,10 @@
-import { ToyBrick, TriangleAlert } from "lucide-react";
+import { Button } from "@picoframe/frame";
+import { FileUp, ToyBrick } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+
+import { PageHeader } from "@/components/PageHeader";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorBanner } from "@/content/pages/components/states";
 
 import { useInventoryView } from "../inventory";
 import { withLabels } from "../moduleFilter";
@@ -10,7 +15,12 @@ import { useModuleFiles } from "../useModuleFiles";
 import { useSharedModuleImport, useShareModule } from "../useModuleShare";
 import { InventoryFilters, InventoryGrids } from "./components/Inventory";
 import { PartDetail, ShapeDetail } from "./components/PartDetail";
-import { PackAtlases, PackProblems } from "./components/PartFilters";
+import {
+  PackAtlases,
+  PackProblems,
+  PackSelect,
+} from "./components/PartFilters";
+import { CELL, GAP } from "./components/PartPicker";
 
 type Status =
   | { state: "loading" }
@@ -58,21 +68,33 @@ export default function PartsPage() {
 
   return (
     <div ref={scrollRef} className="h-full overflow-y-auto">
-      <div className="flex min-h-full flex-col">
-        <header className="border-b border-border px-6 py-4">
-          <h1 className="flex items-center gap-2 text-lg font-semibold leading-none">
-            <ToyBrick size={18} /> Lego Parts
-          </h1>
-          <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-            The pieces a model can be assembled from. Every one is already
-            mapped to the same texture, so a model built entirely from them
-            needs no UV work.
-          </p>
-        </header>
+      <div className="flex min-h-full flex-col gap-4 p-4">
+        <PageHeader
+          title={
+            <>
+              <ToyBrick size={18} /> Lego Parts
+            </>
+          }
+          actions={
+            pack ? (
+              <>
+                <PackSelect
+                  pack={pack}
+                  packId={view.partFilter.packId}
+                  onPackId={view.partFilter.setPackId}
+                  className="w-44"
+                />
+                <Button variant="outline" onClick={moduleFiles.loadFile}>
+                  <FileUp size={16} /> Load from file
+                </Button>
+              </>
+            ) : null
+          }
+        />
 
         {status.state === "loading" ? <Loading /> : null}
         {status.state === "missing" ? (
-          <Missing message={status.message} />
+          <ErrorBanner message={`No parts pack installed: ${status.message}`} />
         ) : null}
 
         {pack ? (
@@ -80,11 +102,10 @@ export default function PartsPage() {
             <PackProblems pack={pack} />
             <PackAtlases pack={pack} />
             <InventoryFilters
-              onLoadModuleFile={moduleFiles.loadFile}
               view={view}
               pack={pack}
               compounds={compounds}
-              className="border-b border-border px-6 py-3"
+              showPacks={false}
             />
             <InventoryGrids
               view={view}
@@ -141,31 +162,21 @@ export default function PartsPage() {
   );
 }
 
+/** The parts grid's own cell and gap, so nothing moves when it lands. */
 function Loading() {
   return (
-    <div className="grid flex-1 grid-cols-[repeat(auto-fill,minmax(108px,1fr))] gap-2 p-6">
+    <div
+      className="grid"
+      style={{ gridTemplateColumns: `repeat(auto-fill, ${CELL}px)`, gap: GAP }}
+    >
       {Array.from({ length: 24 }, (_, i) => (
-        <div
+        <Skeleton
           // biome-ignore lint/suspicious/noArrayIndexKey: fixed-length skeleton, nothing reorders
           key={i}
-          className="h-[108px] animate-pulse rounded bg-muted"
+          className="rounded"
+          style={{ height: CELL }}
         />
       ))}
-    </div>
-  );
-}
-
-function Missing({ message }: { message: string }) {
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-      <TriangleAlert className="text-muted-foreground" size={28} />
-      <h2 className="text-base font-medium">No parts pack installed</h2>
-      <p className="max-w-prose text-sm text-muted-foreground">
-        Put a pack in <code>.coilbox/legoparts/</code> beside the executable, or
-        reinstall to restore the bundled one. The format is documented in the
-        Lego parts pack guide.
-      </p>
-      <p className="max-w-prose text-xs text-muted-foreground">{message}</p>
     </div>
   );
 }
