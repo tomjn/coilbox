@@ -25,6 +25,7 @@ Guides for people who play games through coilbox. To install it, see [Install](.
 - [Get games, maps and engines](downloads.md). Download maps, map packs, games and engines, install a file you already have, choose the folders coilbox reads and saves to, and free up space.
 - [Settings and keybinds](settings.md). Change the game's graphics, sound and controls, edit keybinds, keep copies of your settings, find the engine log after a crash, and set up notifications and updates.
 - [Portable mode](portable-mode.md). Run coilbox from one folder, next to skylobby or another lobby, without touching your other settings.
+- [Compatibility mode](compatibility-mode.md). Play an old Spring game on a current engine, read what its report found, and what the fixes cannot do.
 
 ## Share
 
