@@ -154,4 +154,17 @@ describe("the family view", () => {
     )(project);
     expect(applied.activeLoadout).toBe(project.loadouts?.[1].id);
   });
+
+  it("shows which loadouts are locked, and by what", () => {
+    const base = two();
+    const project = {
+      ...base,
+      loadouts: base.loadouts?.map((l, i) =>
+        i === 1 ? { ...l, locked: true as const } : l,
+      ),
+    };
+    show(project);
+    fireEvent.click(screen.getByRole("button", { name: "Compare loadouts" }));
+    expect(screen.getAllByText("Locked")).toHaveLength(1);
+  });
 });

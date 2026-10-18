@@ -363,6 +363,10 @@ function Builder({ id }: { id: string | undefined }) {
   // The built in modules first, then the user's own.
   const compounds = useModules(pack);
   const moduleFiles = useModuleFiles(pack, compounds);
+  const moduleNames = useMemo(
+    () => new Map(compounds.map((module) => [module.id, module.name])),
+    [compounds],
+  );
   const shareModule = useShareModule();
   const { loading: modulesLoading } = useLegoCompounds();
   // Only for the keep-set when a texture changes: the store is shared, so
@@ -2044,6 +2048,7 @@ function Builder({ id }: { id: string | undefined }) {
                             pack={pack}
                             raw={raw}
                             capture={doc.capture}
+                            moduleNames={moduleNames}
                           />
                         </div>
                       </div>

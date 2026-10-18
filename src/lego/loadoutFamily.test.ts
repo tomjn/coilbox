@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { loadoutFamily } from "./loadoutFamily";
 import { duplicateLoadout, renameLoadout, switchLoadout } from "./loadouts";
+import { setLoadoutLocked, setModuleLocked } from "./locks";
 import {
   type LegoPiece,
   type LegoProject,
@@ -192,5 +193,22 @@ describe("loadoutFamily", () => {
     // The project on screen is still the first loadout's.
     expect(pieceById(two, "cannon")?.name).toBe("cannon");
     expect(row(loadoutFamily(two, none), "hull:top")?.cells[1]).toBe("rocket");
+  });
+});
+
+describe("locks in the family", () => {
+  it("marks a locked column with why", () => {
+    const base = copied(chassis(), renamePiece("cannon", "rocket"));
+    const locked = setLoadoutLocked(
+      base,
+      base.loadouts?.[1].id as string,
+      true,
+    );
+    const family = loadoutFamily(
+      setModuleLocked(locked, "m", true),
+      () => null,
+      (id) => `module ${id}`,
+    );
+    expect(family?.columns.map((c) => c.locked)).toEqual([undefined, "Locked"]);
   });
 });
