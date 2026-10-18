@@ -3,12 +3,14 @@
 //!
 //! `compat_build` writes `coilbox-compat-<stem>-<n>.sdd` under a content root's
 //! `games/` from compat manifest `n`, and `compat_status` says whether the one
-//! already there is stale. See `mutator` for the folder and its files.
+//! already there is stale. See `mutator` for the folder and its files, and
+//! `models` for the base game's `.3do` models converted into it.
 //!
 //! Registered as `"coilbox-compat"`. The frontend invokes
 //! `plugin:coilbox-compat|<cmd>`.
 
 mod handlers;
+pub mod models;
 pub mod mutator;
 
 use picoframe_core::CliResult;
@@ -30,14 +32,19 @@ pub struct Built {
     pub folder: String,
     /// Every file written, relative to `dir`.
     pub files: Vec<String>,
+    /// What the 3do converter said about the base game's models.
+    pub models: models::Conversion,
+    /// Why the converted models are not used, when they cannot be.
+    pub notes: Vec<String>,
 }
 
 /// Write the compat mutator for the game in `archive_name` under `data_dir`'s
 /// `games/`, from manifest `manifest_version`. Replaces whatever the folder
 /// held. `game_name` and `base_checksum` are the game's name and its archive's
-/// checksum as unitsync reports them. The game's Lua entry files are read
-/// through the unitsync worker of the engine at `engine_path`, which also scans
-/// the game's Lua for the call-in handlers that pick its call-in adapters.
+/// checksum as unitsync reports them. The game's Lua entry files are read, and
+/// its `.3do` models converted, through the unitsync worker of the engine at
+/// `engine_path`, which also scans the game's Lua for the call-in handlers that
+/// pick its call-in adapters.
 pub fn build(
     data_dir: &str,
     engine_path: &str,
@@ -53,6 +60,8 @@ pub fn build(
         archive_name,
     )?;
     let handlers = handlers::handlers_in(&scan, archive_name)?;
+    let staging = tempfile::tempdir()
+        .map_err(|e| format!("could not make a folder to convert the models into: {e}"))?;
     build_reading(
         data_dir,
         archive_name,
@@ -69,11 +78,14 @@ pub fn build(
                 file,
             )
         },
+        || models::convert(engine_path, data_dir, archive_name, staging.path()),
     )
 }
 
-/// [`build`], with `read` returning a file of the base game by path, and
-/// `handlers` the call-in handlers the base game's Lua defines.
+/// [`build`], with `read` returning a file of the base game by path,
+/// `handlers` the call-in handlers the base game's Lua defines, and `convert`
+/// its converted models. `convert` runs once the request is known to be sound,
+/// and before anything is written.
 #[allow(clippy::too_many_arguments)]
 fn build_reading(
     data_dir: &str,
@@ -84,6 +96,7 @@ fn build_reading(
     coilbox_version: &str,
     handlers: &[coilbox_compat::Handler],
     read: impl FnMut(&str) -> Result<Option<String>, String>,
+    convert: impl FnOnce() -> Result<models::Models, String>,
 ) -> Result<Built, String> {
     let manifest = coilbox_compat::manifest(manifest_version)
         .ok_or_else(|| format!("there is no compat manifest {manifest_version}"))?;
@@ -102,13 +115,50 @@ fn build_reading(
         base_checksum: base_checksum.to_string(),
         coilbox_version: coilbox_version.to_string(),
     };
-    let files = mutator::files(&manifest, game_name, &marker, read)?;
-    tauri_plugin_coilbox_workshop::write_mutator(&dir, &files)?;
-    Ok(Built {
+    let mut files = mutator::files(&manifest, game_name, &marker, read)?;
+    let models = convert()?;
+    write_with_models(&dir, &mut files, &models, manifest_version).map(|files| Built {
         dir: dir.to_string_lossy().into_owned(),
         folder,
-        files: files.into_iter().map(|f| f.path).collect(),
+        files,
+        models: models.conversion,
+        notes: models.notes,
     })
+}
+
+/// Write `files` and the converted `models` into `dir`, with the marker that
+/// ends `files` written last, so a write that stops part way leaves none.
+/// Answers with every path written, sorted, with the marker last.
+fn write_with_models(
+    dir: &std::path::Path,
+    files: &mut Vec<tauri_plugin_coilbox_workshop::CompiledFile>,
+    models: &models::Models,
+    manifest_version: u32,
+) -> Result<Vec<String>, String> {
+    let marker = files
+        .pop()
+        .filter(|f| f.path == mutator::MARKER)
+        .ok_or("the mutator's files do not end with its marker")?;
+    let converted = match &models.dir {
+        Some(from) => models::list(from)?,
+        None => Vec::new(),
+    };
+    if let Some(post) = models::defs_post(&models::model_keys(&converted), manifest_version) {
+        files.push(post);
+        files.sort_by(|a, b| a.path.cmp(&b.path));
+    }
+    tauri_plugin_coilbox_workshop::write_mutator(dir, files)?;
+    if let Some(from) = &models.dir {
+        models::copy(from, &converted, dir)?;
+    }
+    let at = dir.join(&marker.path);
+    std::fs::write(&at, &marker.contents)
+        .map_err(|e| format!("could not write {}: {e}", at.display()))?;
+    let mut paths: Vec<String> = files.iter().map(|f| f.path.clone()).collect();
+    paths.extend(converted);
+    paths.sort();
+    paths.push(marker.path);
+    Ok(paths)
 }
 
 /// Where the compat mutator for a game stands.
@@ -150,7 +200,8 @@ fn envelope<T: Serialize>(result: Result<T, String>) -> CliResult {
     }
 }
 
-/// [`build`], recording the running coilbox's version in the marker.
+/// [`build`], recording the running coilbox's version in the marker. On a
+/// blocking task, since converting a game's models takes seconds.
 #[tauri::command]
 async fn compat_build<R: Runtime>(
     app: AppHandle<R>,
@@ -162,15 +213,20 @@ async fn compat_build<R: Runtime>(
     manifest_version: u32,
 ) -> CliResult {
     let version = app.package_info().version.to_string();
-    envelope(build(
-        &data_dir,
-        &engine_path,
-        &archive_name,
-        &game_name,
-        &base_checksum,
-        manifest_version,
-        &version,
-    ))
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        build(
+            &data_dir,
+            &engine_path,
+            &archive_name,
+            &game_name,
+            &base_checksum,
+            manifest_version,
+            &version,
+        )
+    })
+    .await
+    .unwrap_or_else(|e| Err(format!("the compat build task failed: {e}")));
+    envelope(result)
 }
 
 /// [`status`].
@@ -190,6 +246,10 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn no_models() -> Result<models::Models, String> {
+        Ok(models::Models::default())
+    }
 
     fn no_file(_: &str) -> Result<Option<String>, String> {
         Ok(None)
@@ -214,6 +274,7 @@ mod tests {
             "1.2.3",
             &[],
             no_file,
+            no_models,
         )
         .unwrap();
         assert_eq!(built.folder, format!("coilbox-compat-xta-9.65-{n}.sdd"));
@@ -250,6 +311,7 @@ mod tests {
             "1.2.3",
             &[],
             no_file,
+            no_models,
         )
         .unwrap();
         let s = status(&data, "xta-9.65.sd7", "99999999").unwrap();
@@ -274,6 +336,7 @@ mod tests {
             "1.2.3",
             &[],
             no_file,
+            no_models,
         )
         .unwrap();
         // A folder from a manifest this build does not know stands in for one
@@ -314,6 +377,7 @@ mod tests {
             "1.2.3",
             &[],
             read,
+            no_models,
         )
         .unwrap();
         let dir = std::path::Path::new(&built.dir);
@@ -356,6 +420,7 @@ mod tests {
                 "1.2.3",
                 handlers,
                 read,
+                no_models,
             )
             .unwrap();
             std::fs::read_to_string(
@@ -391,6 +456,7 @@ mod tests {
             "1.2.3",
             &[],
             no_file,
+            no_models,
         )
         .unwrap();
         let leftover = std::path::Path::new(&built.dir).join("leftover.lua");
@@ -404,6 +470,7 @@ mod tests {
             "1.2.3",
             &[],
             no_file,
+            no_models,
         )
         .unwrap();
         assert!(!leftover.exists());
@@ -416,9 +483,148 @@ mod tests {
     #[test]
     fn a_build_is_refused_without_a_checksum_a_manifest_or_a_content_root() {
         let (_keep, data) = root();
-        assert!(build_reading(&data, "xta.sd7", "XTA", "", 1, "1", &[], no_file).is_err());
-        assert!(build_reading(&data, "xta.sd7", "XTA", "1", 9999, "1", &[], no_file).is_err());
-        assert!(build_reading("relative", "xta.sd7", "XTA", "1", 1, "1", &[], no_file).is_err());
-        assert!(build_reading(&data, "../xta.sd7", "XTA", "1", 1, "1", &[], no_file).is_err());
+        assert!(
+            build_reading(&data, "xta.sd7", "XTA", "", 1, "1", &[], no_file, no_models).is_err()
+        );
+        assert!(build_reading(
+            &data,
+            "xta.sd7",
+            "XTA",
+            "1",
+            9999,
+            "1",
+            &[],
+            no_file,
+            no_models
+        )
+        .is_err());
+        assert!(build_reading(
+            "relative",
+            "xta.sd7",
+            "XTA",
+            "1",
+            1,
+            "1",
+            &[],
+            no_file,
+            no_models
+        )
+        .is_err());
+        assert!(build_reading(
+            &data,
+            "../xta.sd7",
+            "XTA",
+            "1",
+            1,
+            "1",
+            &[],
+            no_file,
+            no_models
+        )
+        .is_err());
+    }
+
+    fn some_models(staging: &std::path::Path) -> Result<models::Models, String> {
+        for f in ["Objects3D/armcom.s3o", "unittextures/3do/objects3d.png"] {
+            let p = staging.join(f);
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(p, [0u8, 1, 2, 255]).unwrap();
+        }
+        Ok(models::Models {
+            dir: Some(staging.to_path_buf()),
+            conversion: models::Conversion {
+                models_found: 1,
+                models_written: 1,
+                ..Default::default()
+            },
+            notes: Vec::new(),
+        })
+    }
+
+    #[test]
+    fn converted_models_are_copied_in_and_named_in_defs_post_before_the_marker() {
+        let (_keep, data) = root();
+        let staging = tempfile::tempdir().unwrap();
+        let built = build_reading(
+            &data,
+            "xta-9.65.sd7",
+            "XTA 9.65",
+            "1234abcd",
+            coilbox_compat::latest(),
+            "1.2.3",
+            &[],
+            no_file,
+            || some_models(staging.path()),
+        )
+        .unwrap();
+        assert_eq!(
+            built.files,
+            [
+                "Objects3D/armcom.s3o",
+                models::DEFS_POST,
+                "modinfo.lua",
+                "unittextures/3do/objects3d.png",
+                mutator::MARKER,
+            ]
+        );
+        let dir = std::path::Path::new(&built.dir);
+        assert_eq!(
+            std::fs::read(dir.join("Objects3D/armcom.s3o")).unwrap(),
+            [0u8, 1, 2, 255]
+        );
+        let post = std::fs::read_to_string(dir.join(models::DEFS_POST)).unwrap();
+        assert!(post.contains(r#"["armcom"] = true,"#), "{post}");
+        assert_eq!(built.models.models_written, 1);
+        assert!(mutator::read_marker(dir).is_some());
+    }
+
+    /// The prelude's wrapped entry files and the converted models land in the
+    /// same folder, neither covering the other.
+    #[test]
+    fn the_prelude_and_the_models_are_both_written() {
+        let (_keep, data) = root();
+        let staging = tempfile::tempdir().unwrap();
+        let read = |path: &str| -> Result<Option<String>, String> {
+            Ok((path == "LuaRules/main.lua").then(|| "-- the game's own\n".to_string()))
+        };
+        let built = build_reading(
+            &data,
+            "xta-9.65.sd7",
+            "XTA 9.65",
+            "1234abcd",
+            coilbox_compat::latest(),
+            "1.2.3",
+            &[],
+            read,
+            || some_models(staging.path()),
+        )
+        .unwrap();
+        for f in [
+            "LuaRules/main.lua",
+            models::DEFS_POST,
+            "Objects3D/armcom.s3o",
+        ] {
+            assert!(built.files.iter().any(|b| b == f), "{f}: {:?}", built.files);
+        }
+        assert_eq!(built.files.last().unwrap(), mutator::MARKER);
+    }
+
+    #[test]
+    fn nothing_is_converted_for_a_request_that_is_refused() {
+        let (_keep, data) = root();
+        let refused = build_reading(&data, "xta.sd7", "XTA", "", 1, "1", &[], no_file, || {
+            panic!("converted before the request was checked")
+        });
+        assert!(refused.is_err());
+    }
+
+    #[test]
+    fn a_failed_conversion_writes_nothing() {
+        let (_keep, data) = root();
+        let failed = build_reading(&data, "xta.sd7", "XTA", "1", 1, "1", &[], no_file, || {
+            Err("the 3do converter wrote nothing".into())
+        });
+        assert!(failed.is_err());
+        assert!(!std::path::Path::new(&data).join("games").exists());
     }
 }

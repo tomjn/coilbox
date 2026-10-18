@@ -33,11 +33,12 @@ import {
   type RateSample,
   rateFrom,
 } from "./downloadRate";
-import { attemptsToRecord } from "./downloadRecording";
+import { attemptsToRecord, failureText } from "./downloadRecording";
 import { indexTick } from "./mirrorIndex";
 import { errMessage } from "./pages/components/states";
 import { type ProgressSink, progressChannel } from "./progressChannel";
 import { laneOf, type QueueLane, startable } from "./queueLanes";
+import { type SourceStep, SourceWalkError } from "./sourceWalk";
 import { installEngine } from "./warmEngineCache";
 
 /**
@@ -56,7 +57,7 @@ export type EnqueueInput = (
       // first, pr-downloader last, per issue 500), rather than pinning rapid.
       kind: "game";
       label: string;
-      args: { gameName: string; writePath?: string };
+      args: { gameName: string; writePath?: string; startAt?: SourceStep };
     }
   | {
       kind: "map";
@@ -70,7 +71,7 @@ export type EnqueueInput = (
       // browse page or a curated pack).
       kind: "mapAnySource";
       label: string;
-      args: { mapName: string; writePath?: string };
+      args: { mapName: string; writePath?: string; startAt?: SourceStep };
     }
   | {
       kind: "file";
@@ -131,6 +132,12 @@ interface QueueItemMeta {
   queuedAt?: number;
   /** Failure message (non-cancel errors only). */
   error: string | null;
+  /**
+   * The first source a download that tries several did not get to, when it
+   * failed or was cancelled (issue #4577). What a retry button offers. Null
+   * when every source was tried, and for a download that tries one.
+   */
+  next?: SourceStep | null;
 }
 
 /** A tracked download: the enqueued request plus its live queue state. */
@@ -236,6 +243,12 @@ interface DownloadQueueValue {
    */
   failureFor: (identity: string) => string | null;
   /**
+   * The next untried source for the last attempt at this identity, kept the way
+   * {@link failureFor} keeps its message. Null when there is none or the same
+   * download has been asked for again (issue #4577).
+   */
+  nextSourceFor: (identity: string) => SourceStep | null;
+  /**
    * Whether the last attempt at this identity finished. Outlives the row like
    * {@link failureFor} does, so a screen still showing "not installed" after its
    * own download succeeded can say so rather than offer the download again.
@@ -299,6 +312,9 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
    * span of time after which "this failed" stops being the truth.
    */
   const [failures, setFailures] = useState<Record<string, string>>({});
+
+  /** The next untried source for each identity, kept beside the failures. */
+  const [nexts, setNexts] = useState<Record<string, SourceStep>>({});
 
   /** The identities whose last attempt finished, kept the same way. */
   const [completions, setCompletions] = useState<Record<string, true>>({});
@@ -531,18 +547,22 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
         setCompletions((c) => ({ ...c, [item.identity]: true }));
         for (const fn of completeListeners.current) fn(settled);
       } catch (e) {
-        const msg = errMessage(e);
-        const canceled = /cancel/i.test(msg);
+        const raw = errMessage(e);
+        const canceled = /cancel/i.test(raw);
+        const msg = canceled ? raw : failureText(item, raw);
+        const next = e instanceof SourceWalkError ? e.next : null;
         const meta = {
           status: canceled ? "canceled" : "error",
           error: canceled ? null : msg,
+          next,
           progress: null,
           rate: IDLE_RATE,
         } as const;
         patch(item.id, meta);
+        if (next) setNexts((n) => ({ ...n, [item.identity]: next }));
         if (!canceled) {
           setFailures((f) => ({ ...f, [item.identity]: msg }));
-          remember(msg);
+          remember(raw);
         }
         settled = { ...item, ...meta } as QueueItem;
       } finally {
@@ -589,6 +609,11 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
       const { [identity]: _gone, ...rest } = f;
       return rest;
     });
+    setNexts((n) => {
+      if (!(identity in n)) return n;
+      const { [identity]: _gone, ...rest } = n;
+      return rest;
+    });
     setCompletions((c) => {
       if (!(identity in c)) return c;
       const { [identity]: _gone, ...rest } = c;
@@ -608,6 +633,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
       startedAt: null,
       queuedAt: indexTick(),
       error: null,
+      next: null,
     } as QueueItem;
     // Push into the ref as well as state: two enqueues in the same tick both
     // read the ref, so without this the second would miss the first and add a
@@ -710,6 +736,11 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
     [failures],
   );
 
+  const nextSourceFor = useCallback(
+    (identity: string) => nexts[identity] ?? null,
+    [nexts],
+  );
+
   const completedFor = useCallback(
     (identity: string) => identity in completions,
     [completions],
@@ -780,6 +811,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
       cancel,
       statusFor,
       failureFor,
+      nextSourceFor,
       completedFor,
       itemFor,
       onComplete,
@@ -796,6 +828,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
       cancel,
       statusFor,
       failureFor,
+      nextSourceFor,
       completedFor,
       itemFor,
       onComplete,

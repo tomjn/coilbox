@@ -2156,6 +2156,58 @@ pub fn lua_compat_scan_blocking(
     )
 }
 
+/// Convert every `.3do` in `archive` into `out_dir`, as `unitsync_convert_3do`
+/// does, and answer with the worker's result line. Blocking, with no progress
+/// and no cancel: the compat plugin calls it from a blocking task to put a
+/// game's models into its mutator (issue #4557).
+pub fn convert_3do_blocking(
+    engine_path: &str,
+    data_dir: &str,
+    archive: &str,
+    out_dir: &str,
+) -> Result<String, String> {
+    let (bin, libpath, engine_dir) = prepare(engine_path)?;
+    let args = build_convert_3do_args(&libpath.to_string_lossy(), data_dir, archive, out_dir);
+    let envs = loader_envs(&engine_dir, data_dir);
+    let out = run_worker_blocking(
+        bin,
+        args,
+        envs,
+        CONVERT_TIMEOUT,
+        "3do conversion".into(),
+        None,
+    )?;
+    last_result_line(&out)
+}
+
+/// The last line of a streaming mode's output that is not a progress line,
+/// which is its result. See [`run_worker_streaming`].
+fn last_result_line(out: &str) -> Result<String, String> {
+    out.lines()
+        .rev()
+        .filter(|line| !line.trim().is_empty())
+        .find(|line| {
+            serde_json::from_str::<serde_json::Value>(line)
+                .map_or(true, |value| value.get("progress").is_none())
+        })
+        .map(str::to_string)
+        .ok_or_else(|| "the unitsync worker printed progress but no result".to_string())
+}
+
+/// Every unit's definition in `archive`, as `unitsync_unit_defs` answers, with
+/// no cache. Blocking, and not a command of its own: the compat plugin's tests
+/// read it to check what a built mutator points each unit's model at.
+pub fn unit_defs_blocking(
+    engine_path: &str,
+    data_dir: &str,
+    archive: &str,
+) -> Result<String, String> {
+    let (bin, libpath, engine_dir) = prepare(engine_path)?;
+    let args = build_unit_defs_args(&libpath.to_string_lossy(), data_dir, archive, None);
+    let envs = loader_envs(&engine_dir, data_dir);
+    run_worker_blocking(bin, args, envs, SCAN_TIMEOUT, "unit defs".into(), None)
+}
+
 /// What the scan says about an installed game, for matching an adapter to it
 /// (issue #3799).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -2497,6 +2549,13 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_conversion_answers_with_its_last_line_that_is_not_progress() {
+        let out = "{\"progress\":{\"phase\":\"scan\"}}\n{\"modelsFound\":2}\n\n{\"progress\":{\"phase\":\"model\"}}\n";
+        assert_eq!(last_result_line(out).unwrap(), "{\"modelsFound\":2}");
+        assert!(last_result_line("{\"progress\":{}}\n").is_err());
+    }
 
     const SCAN: &str = r#"{"maps":[],"games":[
         {"name":"Other Game 1","info":{"shortname":"OG"}},

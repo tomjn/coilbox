@@ -42,8 +42,10 @@ export interface DownloadAttempt {
   md5: string | null;
   /** The host that served the file, for a source with several. */
   mirror: string | null;
-  /** Why it failed. Null when it did not. #4577 writes the plain wording. */
+  /** Why it failed, in plain words naming the host and file. Null when it did not. */
   failure: string | null;
+  /** The error text the download came back with, for a log (issue #4577). */
+  detail?: string | null;
   durationMs: number;
 }
 
