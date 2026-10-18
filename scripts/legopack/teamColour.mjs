@@ -166,7 +166,9 @@ function predict(filter, left, up, corner) {
       return pu <= pc ? up : corner;
     }
     default:
-      throw new Error(`the atlas uses PNG filter ${filter}, which does not exist`);
+      throw new Error(
+        `the atlas uses PNG filter ${filter}, which does not exist`,
+      );
   }
 }
 

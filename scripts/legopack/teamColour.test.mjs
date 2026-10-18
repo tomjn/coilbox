@@ -120,7 +120,9 @@ describe("the bundled atlas", () => {
     ),
   );
   const atlas = decodePng(
-    readFileSync(new URL("../../src-tauri/legoparts/atlas.png", import.meta.url)),
+    readFileSync(
+      new URL("../../src-tauri/legoparts/atlas.png", import.meta.url),
+    ),
   );
 
   it("has an alpha channel", () => {
@@ -146,9 +148,7 @@ describe("the bundled atlas", () => {
     const { width, height, data } = atlas;
     for (const swatch of pack.swatches) {
       // UVs run up from the bottom and pixel rows down from the top.
-      const x = Math.floor(
-        ((swatch.uv.min[0] + swatch.uv.max[0]) / 2) * width,
-      );
+      const x = Math.floor(((swatch.uv.min[0] + swatch.uv.max[0]) / 2) * width);
       const y = Math.floor(
         (1 - (swatch.uv.min[1] + swatch.uv.max[1]) / 2) * height,
       );
