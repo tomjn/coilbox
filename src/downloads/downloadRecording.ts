@@ -1,4 +1,4 @@
-import type { QueueItem } from "./DownloadQueueProvider";
+import type { EnqueueInput, QueueItem } from "./DownloadQueueProvider";
 import { type DownloadAttempt, downloadKey, hostOf } from "./downloadHistory";
 import { describeFailure, type FailureContext } from "./failureReason";
 
@@ -85,44 +85,57 @@ export function attemptsToRecord(
       },
     },
   ];
-  const each = (key: string): RecordToWrite[] =>
-    reported.map((attempt) => ({ key, attempt }));
-
+  const key = historyKeyOf(item);
+  if (!key) return [];
   switch (item.kind) {
     case "game":
-      return each(downloadKey("game", item.args.gameName));
     case "mapAnySource":
-      return each(downloadKey("map", item.args.mapName));
+      return reported.map((attempt) => ({ key, attempt }));
     case "rapid":
-      return single(downloadKey("game", item.label), "rapid", {
+      return single(key, "rapid", {
         reference: item.args.tag,
         filename: null,
         url: item.args.masterUrl,
       });
     case "map":
-      return single(downloadKey("map", item.args.springName), "springfiles", {
+      return single(key, "springfiles", {
         reference: item.args.searchUrl ?? item.args.springName,
         filename: null,
         url: item.args.searchUrl,
       });
-    case "file": {
-      const name = stem(item.args.filename);
-      const from = {
+    case "file":
+      return single(key, "url", {
         reference: item.args.url,
         filename: item.args.filename,
         url: item.args.url,
-      };
-      if (item.args.destDir.endsWith("/maps"))
-        return single(downloadKey("map", name), "url", from);
-      if (item.args.destDir.endsWith("/games"))
-        return single(
-          downloadKey("game", name.replace(/_/g, " ")),
-          "url",
-          from,
-        );
-      return [];
-    }
+      });
     default:
       return [];
+  }
+}
+
+/**
+ * The history key a download's attempts are stored under, or null for one that
+ * stores nothing: an engine, or a file outside the games and maps folders.
+ */
+export function historyKeyOf(item: EnqueueInput): string | null {
+  switch (item.kind) {
+    case "game":
+      return downloadKey("game", item.args.gameName);
+    case "mapAnySource":
+      return downloadKey("map", item.args.mapName);
+    case "rapid":
+      return downloadKey("game", item.label);
+    case "map":
+      return downloadKey("map", item.args.springName);
+    case "file": {
+      const name = stem(item.args.filename);
+      if (item.args.destDir.endsWith("/maps")) return downloadKey("map", name);
+      if (item.args.destDir.endsWith("/games"))
+        return downloadKey("game", name.replace(/_/g, " "));
+      return null;
+    }
+    default:
+      return null;
   }
 }

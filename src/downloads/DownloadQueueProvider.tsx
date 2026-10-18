@@ -138,6 +138,13 @@ interface QueueItemMeta {
    * when every source was tried, and for a download that tries one.
    */
   next?: SourceStep | null;
+  /**
+   * The source and host a download that tries several is on now (issue #4583).
+   * Null or absent before the first attempt starts, and for the other kinds.
+   */
+  trying?: SourceStep | null;
+  /** When the item finished, failed or was cancelled. Absent until then. */
+  settledAt?: number;
 }
 
 /** A tracked download: the enqueued request plus its live queue state. */
@@ -207,6 +214,12 @@ interface DownloadQueueValue {
    */
   active: QueueItem | null;
   queued: QueueItem[];
+  /**
+   * The last run of each download this session that has stopped, whether it
+   * finished, failed or was cancelled. Kept after the row leaves `items`, and
+   * dropped when the same download is asked for again (issue #4583).
+   */
+  settled: QueueItem[];
   /**
    * Add a download and return its id. When an equal item is already queued or
    * active nothing is added and that item's id comes back, so the caller can
@@ -319,6 +332,9 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
   /** The identities whose last attempt finished, kept the same way. */
   const [completions, setCompletions] = useState<Record<string, true>>({});
 
+  /** The last settled run of each identity, kept the same way. */
+  const [settledRuns, setSettledRuns] = useState<Record<string, QueueItem>>({});
+
   // The item running in each lane. Set synchronously in startNext so the pump
   // can't launch a second item into a lane before the "active" status commits
   // to state.
@@ -403,6 +419,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
       item: QueueItem,
       onProgress: ProgressSink,
       onAttempt: (attempt: DownloadAttempt) => void,
+      onSource: (step: SourceStep) => void,
     ) => {
       switch (item.kind) {
         case "rapid":
@@ -426,6 +443,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
             askedAt: item.queuedAt,
             onProgress,
             onAttempt,
+            onSource,
           });
           libraryChanged(item);
           warmAllRoots().catch(() => {});
@@ -445,6 +463,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
             askedAt: item.queuedAt,
             onProgress,
             onAttempt,
+            onSource,
           });
           libraryChanged(item);
           return;
@@ -524,6 +543,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
       };
       let settled = { ...item, status: "done", progress: null } as QueueItem;
       const attempts: DownloadAttempt[] = [];
+      let trying: SourceStep | null = null;
       // Remember where it came from, and what went wrong if it did. Storage
       // trouble must never turn a finished download into a failed one.
       const remember = (failure: string | null) => {
@@ -541,7 +561,15 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
         }
       };
       try {
-        await start(item, onProgress, (a) => attempts.push(a));
+        await start(
+          item,
+          onProgress,
+          (a) => attempts.push(a),
+          (step) => {
+            trying = step;
+            patch(item.id, { trying: step });
+          },
+        );
         remember(null);
         patch(item.id, { status: "done", progress: null, rate: IDLE_RATE });
         setCompletions((c) => ({ ...c, [item.identity]: true }));
@@ -571,6 +599,16 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
         // earlier downloads did.
         rescanIfLaneDone(item);
         samplesRef.current.delete(item.id);
+        const settledAt = Date.now();
+        patch(item.id, { settledAt });
+        setSettledRuns((s) => ({
+          ...s,
+          [item.identity]: {
+            ...settled,
+            trying,
+            settledAt,
+          } as QueueItem,
+        }));
         settle(settled);
         prune(item.id);
       }
@@ -585,13 +623,15 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
     const busy = new Set(busyLanesRef.current.keys());
     for (const next of startable(itemsRef.current, busy)) {
       busyLanesRef.current.set(laneOf(next), next.id);
-      patch(next.id, {
+      const meta = {
         status: "active",
         progress: null,
         rate: IDLE_RATE,
         startedAt: Date.now(),
-      });
-      void run(next);
+      } as const;
+      patch(next.id, meta);
+      // The started item, so what it records knows how long it ran.
+      void run({ ...next, ...meta } as QueueItem);
     }
   }, [patch, run]);
 
@@ -617,6 +657,11 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
     setCompletions((c) => {
       if (!(identity in c)) return c;
       const { [identity]: _gone, ...rest } = c;
+      return rest;
+    });
+    setSettledRuns((s) => {
+      if (!(identity in s)) return s;
+      const { [identity]: _gone, ...rest } = s;
       return rest;
     });
     const already = itemsRef.current.find(
@@ -765,6 +810,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
     () => items.filter((i) => i.status === "queued"),
     [items],
   );
+  const settledList = useMemo(() => Object.values(settledRuns), [settledRuns]);
 
   // A download that goes quiet sends no event saying so, so the rate has to be
   // re-read against the clock for the stall to ever show. Covers the reported
@@ -804,6 +850,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
       running,
       active,
       queued,
+      settled: settledList,
       reported,
       report,
       enqueue,
@@ -821,6 +868,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
       running,
       active,
       queued,
+      settledList,
       reported,
       report,
       enqueue,

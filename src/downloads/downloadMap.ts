@@ -66,11 +66,13 @@ async function downloadMapAnySourceImpl(opts: {
   onAttempt?: (attempt: DownloadAttempt) => void;
   /** Skip the sources before this one, for a retry on the next (issue #4577). */
   startAt?: SourceStep;
+  /** Told which source each attempt is on as it starts (issue #4583). */
+  onSource?: (step: SourceStep) => void;
 }): Promise<string> {
   const { mapName, writePath, opId, onProgress, startAt } = opts;
   const askedAt = opts.askedAt ?? indexTick();
   const target = norm(mapName);
-  const log = new AttemptLog(opts.onAttempt);
+  const log = new AttemptLog(opts.onAttempt, opts.onSource);
   const order = mapSourceOrder({ hasWritePath: !!writePath });
 
   /** Fetch a file from its mirrors, and say which kind of source it was. */

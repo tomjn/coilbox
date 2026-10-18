@@ -9,6 +9,7 @@ import {
   Package,
   X,
 } from "lucide-react";
+import { Link } from "react-router";
 import {
   Popover,
   PopoverContent,
@@ -221,6 +222,12 @@ export default function DownloadQueueBadge() {
             </ul>
           </div>
         )}
+        <Link
+          to="/library/downloads"
+          className="shrink-0 border-t border-border px-4 py-2 text-xs text-muted-foreground hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          All downloads
+        </Link>
       </PopoverContent>
     </Popover>
   );

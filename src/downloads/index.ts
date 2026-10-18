@@ -3,6 +3,7 @@ import {
   Download,
   Gamepad2,
   Globe,
+  History,
   Map as MapIcon,
   Package,
 } from "lucide-react";
@@ -32,6 +33,22 @@ const downloadsPlugin: FramePlugin = {
   // topbar widget: active progress + queued list while downloads run.
   slots: [{ slot: "topbar.right", order: 2, Component: DownloadQueueBadge }],
   nav: [
+    {
+      // The queue and its history, in the Library group the content plugin
+      // declares (issue #4583). Groups merge by id across plugins.
+      id: "library",
+      label: "Library",
+      order: 15,
+      items: [
+        {
+          id: "library.downloads",
+          label: "Downloads",
+          to: "/library/downloads",
+          order: 1.75,
+          icon: History,
+        },
+      ],
+    },
     {
       id: "downloads",
       label: "Downloads",
@@ -84,6 +101,11 @@ const downloadsPlugin: FramePlugin = {
     },
   ],
   routes: [
+    {
+      path: "library/downloads",
+      lazy: () => import("./pages/ActivityPage"),
+      crumb: "Downloads",
+    },
     {
       path: "downloads",
       lazy: gateProfileHidden(
