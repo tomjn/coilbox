@@ -100,6 +100,7 @@ import {
   transformRoots,
 } from "../groupTransform";
 import { useInventoryView } from "../inventory";
+import { withLimits } from "../jointLimits";
 import { liftIntoUnit, pasteIntoUnit, saveModuleMeshes } from "../liftIntoUnit";
 import {
   holdsLiftedPieces,
@@ -218,6 +219,7 @@ import { FitPlanDrawer } from "./components/FitPlanDrawer";
 import { GameUnitBrowser } from "./components/GameUnitBrowser";
 import { InventoryFilters, InventoryGrids } from "./components/Inventory";
 import { JoinedTo } from "./components/JoinedTo";
+import { JointLimitFields } from "./components/JointLimitFields";
 import { LoadoutPicker } from "./components/LoadoutPicker";
 import { PieceSize } from "./components/MeasureReadout";
 import { ModelViewport } from "./components/ModelViewport";
@@ -2931,6 +2933,14 @@ function Builder({ id }: { id: string | undefined }) {
                             pack={pack}
                             raw={raw}
                             pieceId={selected.id}
+                          />
+                          <JointLimitFields
+                            piece={selected}
+                            onChange={(limits) =>
+                              edit((project) =>
+                                withLimits(project, selected.id, limits),
+                              )
+                            }
                           />
                           {selected.shape &&
                           isKnownShapeKind(selected.shape.kind) ? (

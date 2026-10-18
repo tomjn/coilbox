@@ -161,6 +161,7 @@ import {
 } from "./gizmoCommit";
 import { GUIDE_COLOUR } from "./guideLayer";
 import { clearJoinFaces } from "./joinFaceMarks";
+import { disposeJointLimits } from "./jointLimitsLayer";
 import { DragReadout, MeasureReadout } from "./MeasureReadout";
 import {
   beginDragReadout,
@@ -202,6 +203,7 @@ import { useCollisionAndAimVisibility } from "./useCollisionAndAimVisibility";
 import { useFootprint } from "./useFootprint";
 import { useGizmoMode } from "./useGizmoMode";
 import { useGuides } from "./useGuides";
+import { useJointLimits } from "./useJointLimits";
 import { useMeasure } from "./useMeasure";
 import { useModelAnchors } from "./useModelAnchors";
 import { useModelEnvironment } from "./useModelEnvironment";
@@ -1309,6 +1311,7 @@ export function ModelViewport({
         onAimChangeRef,
         aimMark,
         weaponReach: null,
+        jointLimits: null,
         balance: null,
         planted: null,
         skeleton: null,
@@ -1535,6 +1538,7 @@ export function ModelViewport({
           state.aimMark.geometry.dispose();
           aimMaterial.dispose();
           if (state.weaponReach) disposeWeaponReach(state.weaponReach);
+          if (state.jointLimits) disposeJointLimits(state.jointLimits);
           if (state.balance) disposeBalance(state.balance);
           disposePlanted(state);
           if (state.skeleton) disposeSkeleton(state.skeleton);
@@ -1570,6 +1574,8 @@ export function ModelViewport({
     raw,
     show: showReach,
   });
+
+  useJointLimits(sceneRef, { project, pack, raw, pieceId: soleSelectedId });
 
   useEffect(() => {
     rememberDrawMode(drawMode);
