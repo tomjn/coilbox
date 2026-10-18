@@ -87,10 +87,15 @@ describe("useLibrary", () => {
   // A failed read is not a report that the player has nothing. Dropping the
   // listing would re-offer every map they have.
   it("keeps the last listing when a read fails", async () => {
-    dlInstalledContent.mockResolvedValue({ maps: ["throne_v8.sd7"], games: [] });
+    dlInstalledContent.mockResolvedValue({
+      maps: ["throne_v8.sd7"],
+      games: [],
+    });
     const { result } = renderHook(() => useLibrary());
     await waitFor(() =>
-      expect(result.current.installedFiles.maps.has("throne_v8.sd7")).toBe(true),
+      expect(result.current.installedFiles.maps.has("throne_v8.sd7")).toBe(
+        true,
+      ),
     );
 
     invalidateInstalledContent();
