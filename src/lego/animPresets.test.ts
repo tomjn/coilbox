@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   AIM_TRACK,
+  BREAK_APART,
   BUILD_FACTORY,
   BUILDARM,
   countRoles,
@@ -219,9 +220,14 @@ describe("presets", () => {
   it("gives a preset that animates nothing no parameters to animate with", () => {
     for (const preset of PRESETS) {
       if (preset.animates.length > 0) continue;
-      // The wake's interval is how often it emits, not how far anything moves.
-      if (preset !== WAKE_WHILE_MOVING) expect(preset.params).toEqual([]);
-      expect(preset.track(0, {}, preset.requires[0].role)).toBeNull();
+      // The wake's interval is how often it emits, not how far anything moves,
+      // and breaking apart's are how much of the unit goes and at what damage.
+      if (preset !== WAKE_WHILE_MOVING && preset !== BREAK_APART) {
+        expect(preset.params).toEqual([]);
+      }
+      expect(
+        preset.track(0, {}, preset.requires[0]?.role ?? "base"),
+      ).toBeNull();
     }
   });
 
