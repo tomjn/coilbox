@@ -225,7 +225,9 @@ The Inventory tab lists parts and modules in one place. The **All**, **Parts** a
 
 Everything is in one grid, under the headings Shapes, Parts, Built in modules and Saved modules. Each heading counts its section, as in "Parts 373", and says "Parts 12 of 373" while a search, a category or a list narrows it. A section with nothing to show is left out. The arrow keys move through every section as one list.
 
-With **Modules** chosen there is a category menu beside the search box. Search needs every term to appear in a module's name, category or tags. Point at a module and open the menu at its top left to rename it, delete it, save it to a file, share it, or change its category and tags.
+Clicking a tile also opens it in the panel beside the grid, in place of whatever the panel showed before. A part shows its size, its colourways, its tags and where it came from in the source file. A shape shows its kind and default size, with **Add** in the builder. A module shows its pieces and, when it was lifted from a game, the game and units it came from, with **Place** in the builder. The panel closes with its X or Escape. On the Lego Parts page it stays in view while the grid scrolls.
+
+With **Modules** chosen there is a category menu beside the search box. Search needs every term to appear in a module's name, category or tags. Click one of your own modules to rename it, change its category and tags, save it to a file, share it or delete it from the panel. The name, category and tags save when you press Enter or leave the field, and Escape gives up an edit. A module lifted from a game cannot be saved to a file.
 
 ### Built in modules
 
@@ -233,13 +235,13 @@ The Inventory lists a set of modules that come with the app, under a "Built in m
 
 A single leg is the front left one. Its walk needs a right leg too, so it is held back until the unit has one. The pair of legs brings the walk with it.
 
-You cannot rename, relabel or delete a built in module. Its menu has **Make my own copy** instead, which saves a copy among your own modules with a new id and a name like "Wheel copy". The copy is yours to change.
+You cannot rename, relabel or delete a built in module. Its panel has **Make my own copy** instead, which saves a copy among your own modules with a new id and a name like "Wheel copy", and opens the copy in the panel. The copy is yours to change.
 
 Built in modules are not files. The app builds them each time it loads the parts pack, from parts in the bundled pack, so they work with any atlas. Each has a fixed id starting `builtin.`, which stays the same between versions. If you replace the bundled pack with one that lacks a part a built in module uses, that module does not appear.
 
 ### Share a module as a file
 
-Point at a module, open its menu and choose **Save to file** to write it to a `.coilbox-module.json` file, which you can send to someone else. Built in modules can be saved too. **Load from file**, beside the module list in the strip and at the top of the Lego Parts page, adds a module from a file to your own.
+Click a module and choose **Save to file** in the panel to write it to a `.coilbox-module.json` file, which you can send to someone else. Built in modules can be saved too. **Load from file**, beside the module list in the strip and at the top of the Lego Parts page, adds a module from a file to your own.
 
 - A module that uses parts no installed pack has still loads, and a warning lists the parts that are missing.
 - If you already have a module with the same id, coilbox asks whether to **Replace** it or **Keep both**. Closing the question keeps both.

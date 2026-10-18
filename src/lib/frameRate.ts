@@ -10,7 +10,8 @@
  * the part pickers draw each tile as its own call.
  *
  * The views come from the registry in `./renderStats`, so nothing in a view
- * has to know the label exists.
+ * has to know the label exists. A host marked `data-frame-rate="off"` gets no
+ * label, for a preview too small to give a corner to it.
  */
 
 import { type Registered, registeredCanvases } from "./renderStats";
@@ -73,6 +74,7 @@ export function showFrameRates(): () => void {
       tracked.delete(canvas);
     }
     for (const canvas of live) {
+      if (canvas.host.dataset.frameRate === "off") continue;
       const frame = canvas.renderer.info.render.frame;
       const one = tracked.get(canvas);
       if (!one) {

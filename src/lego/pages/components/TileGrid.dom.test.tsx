@@ -361,37 +361,22 @@ describe("the keyboard", () => {
   });
 });
 
-describe("a module's actions", () => {
-  it("sit behind one menu on its tile", () => {
+/** A module's actions are in the detail panel (#4537), so its tile is a part's. */
+describe("a module's tile", () => {
+  it("has only its star beside the tile itself", () => {
     render(
       <TileGrid
         pack={pack}
         sections={sections({ modules: [module("a")] })}
-        moduleActions={{
-          onDelete: () => {},
-          onRename: () => {},
-          onCopy: () => {},
-        }}
+        favourites={new Set()}
+        onFavourite={() => {}}
       />,
     );
     expect(
-      screen.getByRole("button", { name: "Actions for the Module a module" }),
-    ).toBeTruthy();
-  });
-
-  it("are not offered on a part", () => {
-    render(
-      <TileGrid
-        pack={pack}
-        sections={sections({ parts: [part("beam")] })}
-        moduleActions={{
-          onDelete: () => {},
-          onRename: () => {},
-          onCopy: () => {},
-        }}
-      />,
-    );
-    expect(screen.queryByRole("button", { name: /^Actions for/ })).toBeNull();
+      screen
+        .getAllByRole("button")
+        .map((button) => button.getAttribute("aria-label") ?? "tile"),
+    ).toEqual(["tile", "Favourite the Module a module"]);
   });
 });
 

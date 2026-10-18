@@ -1,19 +1,18 @@
 // @vitest-environment happy-dom
 
 /**
- * The Lego Parts page's frame (#4535) and what its detail panel shows after a
- * click (#4523). The two grids and the panel's contents are replaced by buttons
- * and a name, so the test sees only which of them the page chooses to show.
+ * The Lego Parts page's frame (#4535) and what it hands the inventory grid.
+ * The grid is replaced by what it was given, so the test sees only the page's
+ * choices. `components/Inventory.dom.test.tsx` covers the detail panel.
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { LegoProject } from "../model";
-import type { LegoPartInfo, LoadedPack } from "../pack";
+import type { LoadedPack } from "../pack";
 import { CELL } from "./components/TileGrid";
 
-const part = { id: "p1", name: "grey block" } as unknown as LegoPartInfo;
 const module = { id: "m1", name: "Hull section" } as unknown as LegoProject;
 function packWith(
   over: { packs?: string[]; problems?: string[] } = {},
@@ -60,32 +59,24 @@ vi.mock("./components/PartFilters", async (actual) => ({
 
 vi.mock("./components/Inventory", async () => {
   type Grids = {
-    onSelectPart: (part: LegoPartInfo, alt: boolean) => void;
-    onSelectModule: (module: LegoProject) => void;
-    aside: React.ReactNode;
+    escapeAnywhere?: boolean;
+    scrollRoot?: unknown;
+    onInsertModule?: unknown;
   };
   return {
     InventoryFilters: () => null,
-    InventoryGrids: ({ onSelectPart, onSelectModule, aside }: Grids) => (
-      <>
-        <button type="button" onClick={() => onSelectPart(part, false)}>
-          pick part
-        </button>
-        <button type="button" onClick={() => onSelectModule(module)}>
-          pick module
-        </button>
-        {aside}
-      </>
+    InventoryGrids: ({ escapeAnywhere, scrollRoot, onInsertModule }: Grids) => (
+      <section
+        aria-label="grid"
+        data-escape={escapeAnywhere ? "anywhere" : "inside"}
+        data-scroll={scrollRoot ? "page" : "own"}
+        data-places={onInsertModule ? "yes" : "no"}
+      >
+        pick part
+      </section>
     ),
   };
 });
-
-vi.mock("./components/PartDetail", () => ({
-  PartDetail: ({ part }: { part: LegoPartInfo }) => (
-    <aside aria-label="details">{part.name}</aside>
-  ),
-  ShapeDetail: () => null,
-}));
 
 import PartsPage from "./PartsPage";
 
@@ -155,17 +146,12 @@ describe("the page frame", () => {
   });
 });
 
-describe("the detail panel", () => {
-  it("opens for a part", async () => {
+describe("the grid", () => {
+  it("scrolls with the page, closes its panel on any Escape and places nothing", async () => {
     render(<PartsPage />);
-    fireEvent.click(await screen.findByText("pick part"));
-    expect(screen.getByLabelText("details").textContent).toBe("grey block");
-  });
-
-  it("closes when a module is clicked, rather than keeping the part", async () => {
-    render(<PartsPage />);
-    fireEvent.click(await screen.findByText("pick part"));
-    fireEvent.click(screen.getByText("pick module"));
-    expect(screen.queryByLabelText("details")).toBeNull();
+    const grid = await screen.findByLabelText("grid");
+    expect(grid.getAttribute("data-scroll")).toBe("page");
+    expect(grid.getAttribute("data-escape")).toBe("anywhere");
+    expect(grid.getAttribute("data-places")).toBe("no");
   });
 });
