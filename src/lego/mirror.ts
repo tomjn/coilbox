@@ -21,6 +21,7 @@ import * as THREE from "three";
 
 import { insertCompoundAt, subtreeAsCompound } from "./compounds";
 import { freePiece, joinAt } from "./connectors";
+import { mirrorLimits } from "./jointLimits";
 import {
   descendantIds,
   type LegoPiece,
@@ -187,13 +188,17 @@ export function mirrorPiece(
         ? { ...current, role: mirrorRole(current.role) }
         : current;
       // A weapon's arc points to the other side too (issue #3274).
-      const sided =
+      const aimed =
         roled.weapon?.heading !== undefined
           ? {
               ...roled,
               weapon: { ...roled.weapon, heading: -roled.weapon.heading || 0 },
             }
           : roled;
+      // A turn range to the right becomes the same range to the left (#3353).
+      const sided = aimed.limits
+        ? { ...aimed, limits: mirrorLimits(aimed.limits) }
+        : aimed;
       // The mirrored piece is placed by the mirror, and its old join would put
       // it straight back, so it is freed and then joined again. Joins below it
       // are written against it and still hold.

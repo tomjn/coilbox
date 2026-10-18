@@ -528,6 +528,28 @@ export interface LegoPiece {
    * module copy and a loadout switch. See `mountPoints.ts`.
    */
   mountPoints?: LegoMountPoint[];
+  /**
+   * How far this piece may turn (#3353). Absent means it turns as far as it is
+   * told, which is every piece made before this existed, so no schema version
+   * moves for it. See `jointLimits.ts` for what each range means.
+   */
+  limits?: LegoPieceLimits;
+}
+
+/** A lowest and highest angle in degrees, `min` below `max`. */
+export interface LegoAngleRange {
+  min: number;
+  max: number;
+}
+
+/**
+ * The turn a piece is held to. `yaw` is degrees to the right of the unit's
+ * front, the way a weapon's `heading` is. `pitch` is elevation in degrees,
+ * positive up, the way an aim function is handed it.
+ */
+export interface LegoPieceLimits {
+  yaw?: LegoAngleRange;
+  pitch?: LegoAngleRange;
 }
 
 /** A connector marked as a place a module goes, and which modules fit. */
@@ -1791,7 +1813,35 @@ function parsePiece(raw: unknown): LegoPiece | null {
       const mountPoints = parseMountPoints(p.mountPoints);
       return mountPoints.length > 0 ? { mountPoints } : {};
     })(),
+    ...(() => {
+      const limits = parsePieceLimits(p.limits);
+      return limits ? { limits } : {};
+    })(),
   };
+}
+
+function parseAngleRange(value: unknown): LegoAngleRange | null {
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  const { min, max } = v;
+  return typeof min === "number" &&
+    typeof max === "number" &&
+    Number.isFinite(min) &&
+    Number.isFinite(max) &&
+    min < max
+    ? { min, max }
+    : null;
+}
+
+/** A piece's limits, or null when there is no usable range in them. */
+function parsePieceLimits(value: unknown): LegoPieceLimits | null {
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  const yaw = parseAngleRange(v.yaw);
+  const pitch = parseAngleRange(v.pitch);
+  return yaw || pitch
+    ? { ...(yaw ? { yaw } : {}), ...(pitch ? { pitch } : {}) }
+    : null;
 }
 
 function parseMountPoints(raw: unknown): LegoMountPoint[] {
