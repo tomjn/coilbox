@@ -8,6 +8,7 @@ mod github_cache;
 mod install;
 mod progress;
 mod rapid;
+mod rapid_cache;
 mod sidecar;
 mod sources;
 
@@ -427,28 +428,79 @@ fn dl_cancel(op_id: String) -> CliResult {
     CliResult::ok(json!({}))
 }
 
+/// A rapid index body and how many seconds ago it was fetched. Reads the disk
+/// copy unless `refresh` is set or there is none, and stores what it fetches.
+async fn rapid_index(url: String, refresh: bool) -> Result<(String, u64), String> {
+    if !refresh {
+        let key = url.clone();
+        let stored = tauri::async_runtime::spawn_blocking(move || rapid_cache::read_blocking(&key))
+            .await
+            .ok()
+            .flatten();
+        if let Some(entry) = stored {
+            let age = entry.age_secs(rapid_cache::now_secs());
+            return Ok((entry.body, age));
+        }
+    }
+    let body = fetch_gz(url.clone()).await?;
+    let entry = rapid_cache::Entry {
+        url,
+        fetched_at: rapid_cache::now_secs(),
+        body,
+    };
+    let entry = tauri::async_runtime::spawn_blocking(move || {
+        rapid_cache::write_blocking(&entry);
+        entry
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    Ok((entry.body, 0))
+}
+
 /// `dl_repos` — list rapid repositories from a master index (default springrts).
+/// Answers from the disk copy when there is one, unless `refresh` is set, and
+/// returns `ageSecs`, the time since the index was fetched.
 #[tauri::command]
-async fn dl_repos(master_url: Option<String>) -> CliResult {
+async fn dl_repos(master_url: Option<String>, refresh: Option<bool>) -> CliResult {
     let base = master_url
         .filter(|s| !s.trim().is_empty())
         .unwrap_or_else(|| DEFAULT_MASTER.into());
     let url = format!("{}/repos.gz", base.trim_end_matches('/'));
-    match fetch_gz(url).await {
-        Ok(body) => CliResult::ok(json!({ "repos": rapid::parse_repos(&body) })),
+    match rapid_index(url, refresh.unwrap_or(false)).await {
+        Ok((body, age)) => CliResult::ok(json!({
+            "repos": rapid::parse_repos(&body),
+            "ageSecs": age,
+        })),
         Err(e) => CliResult::err(format!("failed to fetch rapid repos: {e}")),
     }
 }
 
-/// `dl_versions` — list downloadable tags within one rapid repository.
+/// `dl_versions` — list downloadable tags within one rapid repository, with
+/// each marked installed when `data_dir`'s pool holds its md5. Cached like
+/// `dl_repos`.
 #[tauri::command]
-async fn dl_versions(repo_url: String) -> CliResult {
+async fn dl_versions(
+    repo_url: String,
+    data_dir: Option<String>,
+    refresh: Option<bool>,
+) -> CliResult {
     if repo_url.trim().is_empty() {
         return CliResult::err("repo_url is required");
     }
     let url = format!("{}/versions.gz", repo_url.trim_end_matches('/'));
-    match fetch_gz(url).await {
-        Ok(body) => CliResult::ok(json!({ "versions": rapid::parse_versions(&body) })),
+    match rapid_index(url, refresh.unwrap_or(false)).await {
+        Ok((body, age)) => {
+            let mut versions = rapid::parse_versions(&body);
+            if let Some(dir) = data_dir.filter(|d| !d.trim().is_empty()) {
+                let pool = tauri::async_runtime::spawn_blocking(move || {
+                    rapid::pool_md5s(std::path::Path::new(&dir))
+                })
+                .await
+                .unwrap_or_default();
+                rapid::mark_installed(&mut versions, &pool);
+            }
+            CliResult::ok(json!({ "versions": versions, "ageSecs": age }))
+        }
         Err(e) => CliResult::err(format!("failed to fetch rapid versions: {e}")),
     }
 }
@@ -1564,6 +1616,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             use tauri::Manager;
             sidecar::set_resource_dir(app.path().resource_dir().ok());
             github_cache::set_dir(coilbox_portable::cache_dir(app).ok());
+            rapid_cache::set_dir(coilbox_portable::cache_dir(app).ok());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
