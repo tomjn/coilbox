@@ -62,10 +62,16 @@ pub fn build(
     let handlers = handlers::handlers_in(&scan, archive_name)?;
     let staging = tempfile::tempdir()
         .map_err(|e| format!("could not make a folder to convert the models into: {e}"))?;
+    let short_name = tauri_plugin_coilbox_unitsync::game_declared_short_name_blocking(
+        engine_path,
+        data_dir,
+        game_name,
+    )?;
     build_reading(
         data_dir,
         archive_name,
         game_name,
+        short_name.as_deref(),
         base_checksum,
         manifest_version,
         coilbox_version,
@@ -91,6 +97,7 @@ fn build_reading(
     data_dir: &str,
     archive_name: &str,
     game_name: &str,
+    short_name: Option<&str>,
     base_checksum: &str,
     manifest_version: u32,
     coilbox_version: &str,
@@ -116,7 +123,7 @@ fn build_reading(
         base_checksum: base_checksum.to_string(),
         coilbox_version: coilbox_version.to_string(),
     };
-    let mut files = mutator::files(&manifest, game_name, &marker, read)?;
+    let mut files = mutator::files(&manifest, game_name, short_name, &marker, read)?;
     let models = convert()?;
     write_with_models(&dir, &mut files, &models, manifest_version).map(|files| Built {
         dir: dir.to_string_lossy().into_owned(),
@@ -276,6 +283,7 @@ mod tests {
             &data,
             "xta-9.65.sd7",
             "XTA 9.65",
+            None,
             "1234abcd",
             n,
             "1.2.3",
@@ -314,6 +322,7 @@ mod tests {
             &data,
             "xta-9.65.sd7",
             "XTA 9.65",
+            None,
             "1234abcd",
             coilbox_compat::latest(),
             "1.2.3",
@@ -339,6 +348,7 @@ mod tests {
             &data,
             "xta-9.65.sd7",
             "XTA 9.65",
+            None,
             "1234abcd",
             1,
             "1.2.3",
@@ -380,6 +390,7 @@ mod tests {
             &data,
             "xta-9.65.sd7",
             "XTA 9.65",
+            None,
             "1234abcd",
             2,
             "1.2.3",
@@ -423,6 +434,7 @@ mod tests {
                 &data,
                 "xta-9.65.sd7",
                 "XTA 9.65",
+                None,
                 "1234abcd",
                 2,
                 "1.2.3",
@@ -459,6 +471,7 @@ mod tests {
             &data,
             "xta-9.65.sd7",
             "XTA 9.65",
+            None,
             "1234abcd",
             coilbox_compat::latest(),
             "1.2.3",
@@ -473,6 +486,7 @@ mod tests {
             &data,
             "xta-9.65.sd7",
             "XTA 9.65",
+            None,
             "5678",
             coilbox_compat::latest(),
             "1.2.3",
@@ -491,13 +505,24 @@ mod tests {
     #[test]
     fn a_build_is_refused_without_a_checksum_a_manifest_or_a_content_root() {
         let (_keep, data) = root();
-        assert!(
-            build_reading(&data, "xta.sd7", "XTA", "", 1, "1", &[], no_file, no_models).is_err()
-        );
         assert!(build_reading(
             &data,
             "xta.sd7",
             "XTA",
+            None,
+            "",
+            1,
+            "1",
+            &[],
+            no_file,
+            no_models
+        )
+        .is_err());
+        assert!(build_reading(
+            &data,
+            "xta.sd7",
+            "XTA",
+            None,
             "1",
             9999,
             "1",
@@ -510,6 +535,7 @@ mod tests {
             "relative",
             "xta.sd7",
             "XTA",
+            None,
             "1",
             1,
             "1",
@@ -522,6 +548,7 @@ mod tests {
             &data,
             "../xta.sd7",
             "XTA",
+            None,
             "1",
             1,
             "1",
@@ -795,6 +822,7 @@ mod tests {
             &data,
             "xta-9.65.sd7",
             "XTA 9.65",
+            None,
             "1234abcd",
             coilbox_compat::latest(),
             "1.2.3",
@@ -837,6 +865,7 @@ mod tests {
             &data,
             "xta-9.65.sd7",
             "XTA 9.65",
+            None,
             "1234abcd",
             coilbox_compat::latest(),
             "1.2.3",
@@ -858,18 +887,36 @@ mod tests {
     #[test]
     fn nothing_is_converted_for_a_request_that_is_refused() {
         let (_keep, data) = root();
-        let refused = build_reading(&data, "xta.sd7", "XTA", "", 1, "1", &[], no_file, || {
-            panic!("converted before the request was checked")
-        });
+        let refused = build_reading(
+            &data,
+            "xta.sd7",
+            "XTA",
+            None,
+            "",
+            1,
+            "1",
+            &[],
+            no_file,
+            || panic!("converted before the request was checked"),
+        );
         assert!(refused.is_err());
     }
 
     #[test]
     fn a_failed_conversion_writes_nothing() {
         let (_keep, data) = root();
-        let failed = build_reading(&data, "xta.sd7", "XTA", "1", 1, "1", &[], no_file, || {
-            Err("the 3do converter wrote nothing".into())
-        });
+        let failed = build_reading(
+            &data,
+            "xta.sd7",
+            "XTA",
+            None,
+            "1",
+            1,
+            "1",
+            &[],
+            no_file,
+            || Err("the 3do converter wrote nothing".into()),
+        );
         assert!(failed.is_err());
         assert!(!std::path::Path::new(&data).join("games").exists());
     }

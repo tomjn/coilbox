@@ -1,0 +1,12 @@
+{
+  "generatedBy": "scripts/build-engine-mapinfo-keys.mjs",
+  "engine": "2026.09.01",
+  "source": "rts/Map/MapInfo.cpp",
+  "warned": [
+    {
+      "key": "atmosphere.skyDir",
+      "level": "deprecated",
+      "message": "atmosphere.skyDir in mapinfo.lua was never used and now deprecated, use atmosphere.skyAxisAngle instead"
+    }
+  ]
+}

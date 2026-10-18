@@ -45,9 +45,11 @@ import { mergeMapTiers } from "../mapTiers";
 import { type MapSize, sameMapFamily } from "../mapVersions";
 import { refightFilenames, useReplayUserState } from "../replayUserState";
 import { allPlayers, guessPrimaryPlayer, mapRecordFor } from "../stats";
+import { useMapCompatReport } from "../useMapCompatReport";
 import { usePlayMap } from "../usePlayMap";
 import { useStartNames } from "../useStartNames";
 import { ArchiveRow } from "./components/ArchiveRow";
+import { FindingList } from "./components/CompatFindings";
 import { DeleteArchiveButton } from "./components/DeleteArchiveButton";
 import { MapAggregate } from "./components/MapAggregate";
 import { mapSizeLabel } from "./components/MapThumb";
@@ -125,6 +127,11 @@ export default function MapDetailPage() {
     archiveName,
   );
   const archivePath = archiveTree?.archivePath;
+  const compatFindings = useMapCompatReport(
+    selected?.enginePath,
+    selected?.rootPath,
+    archiveName,
+  );
 
   // Per-map record (#460): a distribution profile can hide stats entirely, in
   // which case the roots stay empty so `useReplayStats` never ingests.
@@ -330,6 +337,13 @@ export default function MapDetailPage() {
       {mapInfo.info?.warnings?.length ? (
         <WarningBanner warnings={mapInfo.info.warnings} noun="map" />
       ) : null}
+
+      {compatFindings.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-sm font-medium">Compatibility</h2>
+          <FindingList findings={compatFindings} />
+        </section>
+      )}
 
       {!statsHidden && (
         <section className="rounded-lg border border-border/60 bg-card p-4">
