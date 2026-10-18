@@ -265,6 +265,12 @@ Switching, adding, duplicating, renaming and deleting are each one undo step. Un
 
 A loadout you are not looking at keeps its pieces as they were. If you deleted the chassis piece one of them hung off, it goes on the root piece when you switch back. If the chassis took its name meanwhile, it gets a number on the end.
 
+### Mount points
+
+A mount point marks a connector of a chassis piece as the place a module goes ([issue #3279](https://github.com/tomjn/coilbox/issues/3279)). Select the piece, pick a connector under **Mount points**, then name it and type the module categories that fit, separated by commas. Mount points show in the viewport as orange squares, and the panel says what sits on each.
+
+A module can only be placed on a mount point if its category is in the list, ignoring case. A module with no category does not fit, and a mount with no categories takes nothing. Swapping a module on a mount follows the same rule, and a part from the strip is refused. The message names the categories the mount takes. A module placed on a mount joins the loadout you are editing. Pasting or adding without choosing a face never picks a mount point, and dragging a piece onto one moves it without joining it.
+
 ## Judging size
 
 A unit built from small parts can look substantial and be a fraction of a real one, so the builder gives you two readings.
