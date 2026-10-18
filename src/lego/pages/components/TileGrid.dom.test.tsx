@@ -84,6 +84,8 @@ const module = (id: string): LegoProject =>
   ({ id, name: `Module ${id}`, pieces: [] }) as unknown as LegoProject;
 
 const pack = {
+  parts: [] as LegoPartInfo[],
+  manifest: { categories: [] },
   library: {
     packs: [],
     atlases: [{ tex1: "atlas.png", packId: "lego", folder: null }],
@@ -207,6 +209,28 @@ describe("sections", () => {
       "Cylinder, 2 x 2 x 2",
       "beam, beam",
       "Module a, 0 pieces",
+    ]);
+  });
+});
+
+describe("part names", () => {
+  it("hides atlas row tags and tells parts with one name apart", () => {
+    const one = {
+      ...part("one"),
+      name: "grey beam",
+      tags: ["beam", "row5"],
+      sourceNames: ["Object12"],
+    } as LegoPartInfo;
+    const two = { ...one, id: "two", sourceNames: ["Object40"] };
+    const { container } = render(
+      <TileGrid
+        pack={{ ...pack, parts: [one, two] } as LoadedPack}
+        sections={sections({ parts: [one, two] })}
+      />,
+    );
+    expect(tiles(container).map((tile) => tile.title)).toEqual([
+      "grey beam (Object12), beam",
+      "grey beam (Object40), beam",
     ]);
   });
 });

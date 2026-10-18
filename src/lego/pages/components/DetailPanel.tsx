@@ -50,6 +50,7 @@ import {
   partSize,
   shapeVariants,
 } from "../../pack";
+import { partTitle, visibleTags } from "../../partOrder";
 import {
   disposeRawGeometry,
   loadRawGeometry,
@@ -249,7 +250,7 @@ function PartBody({
   return (
     <Frame
       frame={frame}
-      name={part.name}
+      name={partTitle(pack, part)}
       size={partDimensions(part)
         .map((n) => n.toFixed(2))
         .join(" x ")}
@@ -301,7 +302,7 @@ function PartBody({
         <dd>{part.shape}</dd>
 
         <dt>Tags</dt>
-        <dd>{part.tags.join(", ")}</dd>
+        <dd>{visibleTags(part.tags).join(", ")}</dd>
 
         <dt>Triangles</dt>
         <dd>
