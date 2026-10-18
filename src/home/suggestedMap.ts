@@ -15,7 +15,6 @@
 
 import {
   createContext,
-  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -31,14 +30,13 @@ import {
   useSuggestedMaps,
 } from "../content/branding";
 import { useUnitsyncScan } from "../content/config";
-import { installedContent } from "../content/installedContent";
 import { scanSettled } from "../content/scanSettled";
+import { useLibrary } from "../content/useLibrary";
 import { useContentRoots, useWriteRoot } from "../downloads/config";
 import {
   type EnqueueInput,
   identityOf,
   type QueueStatus,
-  useDownloadComplete,
   useDownloadQueue,
 } from "../downloads/DownloadQueueProvider";
 import {
@@ -670,23 +668,9 @@ export function useMapInventory(): MapInventory {
   const { paths, loading: rootsLoading } = useContentRoots();
   const { target, loading: targetLoading } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
-  const [files, setFiles] = useState<ReadonlySet<string> | null>(null);
-
-  const refresh = useCallback(async () => {
-    if (paths.length === 0) return;
-    try {
-      const { maps } = await installedContent({ paths });
-      setFiles(new Set(maps));
-    } catch {
-      // Leave the last listing in place. A failed read is not a report that the
-      // user has nothing, and treating it as one re-offers an installed map.
-    }
-  }, [paths]);
-
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-  useDownloadComplete(refresh);
+  // The disk listing alone. The scan's names are kept apart below.
+  const { installedFiles, filesRead } = useLibrary();
+  const files = filesRead ? installedFiles.maps : null;
 
   // A target that has resolved but not scanned yet is the case to wait for. See
   // {@link scanSettled}, which the get-started offer waits on too so that the
