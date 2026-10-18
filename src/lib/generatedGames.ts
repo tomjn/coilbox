@@ -8,7 +8,8 @@
  * cannot play missions (`src/scenario/mutator.ts`), a workshop project is
  * tested in one on every game, since a mutator archive is the one route that
  * works everywhere (`src/workshop/mutator.ts`, issue #1278), and a replay's
- * recorded track is played back in one (issue #3793). All five are
+ * recorded track is played back in one (issue #3793). Compatibility mode wraps
+ * an old game in one so it runs on a current engine (issue #4556). All of them are
  * loose `.sdd` folders under the content root's `games/`, so unitsync scans
  * them and reports them as games like any other, and every game list picks
  * them up.
@@ -47,6 +48,31 @@ export const WORKSHOP_MUTATOR_FOLDER = "coilbox-workshop-test.sdd";
  * in `tauri-plugin-coilbox-content`.
  */
 export const PLAYBACK_FOLDER = "coilbox-replay-playback.sdd";
+
+/**
+ * The start of every compatibility mode mutator's folder (issue #4556), which
+ * is `coilbox-compat-<stem>-<n>.sdd`, matching `mutator::PREFIX` in
+ * `tauri-plugin-coilbox-compat`. `<stem>` is the base archive's file name,
+ * lowercased, without its extension, and `<n>` is the compat manifest version.
+ */
+export const COMPAT_PREFIX = "coilbox-compat-";
+
+const COMPAT_FOLDER = new RegExp(
+  `^${COMPAT_PREFIX}(.+)-(0|[1-9][0-9]*)\\.sdd$`,
+);
+
+/** Whether a scanned archive is a compatibility mode mutator. */
+export function isCompatArchive(archiveName: string): boolean {
+  return COMPAT_FOLDER.test(archiveName.toLowerCase());
+}
+
+/**
+ * The base archive's stem a compatibility mode mutator wraps, or null for an
+ * archive that is not one.
+ */
+export function compatBaseName(archiveName: string): string | null {
+  return COMPAT_FOLDER.exec(archiveName.toLowerCase())?.[1] ?? null;
+}
 
 /**
  * The start of every campaign's (issue #4516), conquest's and warpath run's
@@ -141,6 +167,8 @@ export function generatedGameNote(archiveName: string): string | null {
     return `Coilbox writes this game to test a workshop project in, and rewrites it on every test launch. It is not a game to play. ${UNDO}`;
   if (isUnitsArchive(archiveName))
     return `Coilbox writes this game to put the units from the builder that a campaign, conquest or warpath carries in, and rewrites it when one of its battles launches. It is not a game to play. ${UNDO}`;
+  if (isCompatArchive(archiveName))
+    return `Coilbox writes this game to run an old game on a current engine, and rebuilds it when its fixes or the old game change. Choose the old game itself rather than this. ${UNDO}`;
   if (isPlaybackArchive(archiveName))
     return `Coilbox writes this game to play a recorded replay back in, and rewrites it on every playback. It is not a game to play. ${UNDO}`;
   return null;
