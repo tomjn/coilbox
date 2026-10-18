@@ -1,11 +1,9 @@
 /**
- * The builder's one inventory (issue #3306): the filter row and the grids.
+ * The builder's one inventory (issue #3306): the filter row and the grid.
  *
- * Parts and modules are drawn by two canvases, one each, because the parts grid
- * is virtualised over thousands of cells and the module grid draws a few tens of
- * assemblies with headings. With "All" they are stacked in one column and share
- * its height. A kind with nothing to show is left out, so a filter that empties
- * one hands the whole column to the other.
+ * Shapes, parts and modules are drawn by one grid in sections (#4536), on the
+ * Lego Parts page and in the builder's drawer alike. A section with nothing to
+ * show is left out.
  *
  * State lives in `useInventoryView`, because the caller records what a unit
  * took from the inventory and so needs the same recent and favourite lists.
@@ -13,22 +11,24 @@
 
 import { Button, cn, Input } from "@picoframe/frame";
 import { FileUp } from "lucide-react";
-import type { ReactNode, RefObject } from "react";
+import { type ReactNode, type RefObject, useMemo } from "react";
 
 import { ButtonGroup } from "@/components/ui/button-group";
 import type { LegoAtlas } from "../../atlas";
-import type {
-  InventoryKind,
-  InventoryList,
-  InventoryView,
+import {
+  type InventoryKind,
+  type InventoryList,
+  type InventoryRef,
+  type InventoryView,
+  refKey,
 } from "../../inventory";
 import type { LegoProject } from "../../model";
 import type { LegoPartInfo, LoadedPack } from "../../pack";
-import type { ShapeKind } from "../../shapes";
-import { CompoundPicker } from "./CompoundPicker";
+import { SHAPE_KINDS, type ShapeKind } from "../../shapes";
+import { isBuiltInModule } from "../../starterModules";
 import { ModuleFilters } from "./ModuleFilters";
 import { PartFilters } from "./PartFilters";
-import { PartPicker } from "./PartPicker";
+import { type GridItem, type GridSection, TileGrid } from "./TileGrid";
 
 const KINDS: { value: InventoryKind; label: string }[] = [
   { value: "all", label: "All" },
@@ -190,29 +190,31 @@ interface GridsProps {
   selectedShape?: string;
   /** The builder adds the shape. The Lego Parts page shows its detail. */
   onSelectShape?: (shape: ShapeKind, alt: boolean) => void;
-  /** Absent on the Lego Parts page, as `CompoundPicker` allows. */
+  /** Absent on the Lego Parts page, which has no unit to place a module in. */
   onInsertModule?: (module: LegoProject, now: boolean) => void;
   /** The Lego Parts page's answer to a click on a module, which has no unit. */
   onSelectModule?: (module: LegoProject) => void;
+  /** The module the Lego Parts page has chosen, drawn as chosen. */
+  selectedModuleId?: string;
   placingModuleId?: string;
   onDeleteModule: (id: string) => void;
   onRenameModule: (module: LegoProject, name: string) => void;
   onCopyModule: (module: LegoProject) => void;
-  /** Absent hides each cell's save to file button. */
+  /** Absent leaves Save to file out of each module's menu. */
   onSaveModuleFile?: (module: LegoProject) => void;
-  /** Absent hides each cell's share button. */
+  /** Absent leaves Share out of each module's menu. */
   onShareModule?: (module: LegoProject) => void;
   onLabelsModule?: (
     module: LegoProject,
     labels: { category: string | undefined; tags: string[] },
   ) => void;
-  /** Drawn instead of the grids when the kind is "Game units". */
+  /** Drawn instead of the grid when the kind is "Game units". */
   gameUnits?: ReactNode;
-  /** Beside the grids, such as the Lego Parts page's part detail. */
+  /** Beside the grid, such as the Lego Parts page's part detail. */
   aside?: ReactNode;
   /**
-   * The page's scroller, for a page that scrolls the parts and the modules as
-   * one (#4468). Absent, each grid scrolls in its own share of the height.
+   * The page's scroller, for a page that scrolls the grid with everything
+   * else on it (#4468). Absent, the grid scrolls in a box of its own.
    */
   scrollRoot?: RefObject<HTMLElement | null>;
 }
@@ -234,6 +236,7 @@ export function InventoryGrids({
   onSelectShape,
   onInsertModule,
   onSelectModule,
+  selectedModuleId,
   placingModuleId,
   onDeleteModule,
   onRenameModule,
@@ -246,17 +249,20 @@ export function InventoryGrids({
   scrollRoot,
 }: GridsProps) {
   const { inventory } = view;
-  const favouriteParts = new Set(
-    inventory.favourites.filter((r) => r.kind === "part").map((r) => r.id),
+  const favourites = useMemo(
+    () => new Set(inventory.favourites.map(refKey)),
+    [inventory.favourites],
   );
-  const favouriteModules = new Set(
-    inventory.favourites.filter((r) => r.kind === "module").map((r) => r.id),
+  const sections = useMemo(
+    () =>
+      inventorySections(
+        { shapes: view.shapes, parts: view.parts, modules: view.modules },
+        pack,
+        compounds,
+      ),
+    [view.shapes, view.parts, view.modules, pack, compounds],
   );
-  const favouriteShapes = new Set(
-    inventory.favourites.filter((r) => r.kind === "shape").map((r) => r.id),
-  );
-  const hasCells = view.parts.length > 0 || view.shapes.length > 0;
-  const empty = !hasCells && view.modules.length === 0;
+  const empty = sections.every((section) => section.items.length === 0);
 
   if (view.kind === "units") {
     return (
@@ -266,64 +272,58 @@ export function InventoryGrids({
     );
   }
 
+  const selectedKey = placingModuleId
+    ? refKey({ kind: "module", id: placingModuleId })
+    : selectedShape
+      ? refKey({ kind: "shape", id: selectedShape })
+      : selectedPartId
+        ? refKey({ kind: "part", id: selectedPartId })
+        : selectedModuleId
+          ? refKey({ kind: "module", id: selectedModuleId })
+          : undefined;
+
   return (
     <div className="flex min-h-0 flex-1">
-      <div className="flex min-h-0 flex-1 flex-col">
+      {/* No width of its own beyond its share of the row, so the canvas inside
+          can never size it (#4520). The page pads its own content, the drawer
+          needs this to keep the headings off its edges. */}
+      <div
+        className={cn(
+          "flex min-h-0 min-w-0 flex-1 flex-col",
+          !scrollRoot && "pl-2 pt-2",
+        )}
+      >
         {empty ? (
           <p className="flex-1 px-6 py-10 text-center text-sm text-muted-foreground">
             {emptyText(view.list)}
           </p>
-        ) : null}
-        {hasCells ? (
-          <PartPicker
+        ) : (
+          <TileGrid
             pack={pack}
-            parts={view.parts}
-            shapes={view.shapes}
-            selectedShape={selectedShape}
-            onSelectShape={onSelectShape}
-            favouriteShapes={favouriteShapes}
-            onFavouriteShape={(shape) =>
-              inventory.toggleFavourite({ kind: "shape", id: shape.id })
-            }
-            scrollRoot={scrollRoot}
+            sections={sections}
             atlas={atlas}
-            selectedId={selectedPartId}
-            onSelect={onSelectPart}
-            favourites={favouriteParts}
-            onFavourite={(part) =>
-              inventory.toggleFavourite({ kind: "part", id: part.id })
-            }
+            selectedKey={selectedKey}
+            placesModules={onInsertModule !== undefined}
+            onPick={(item, alt) => {
+              if (item.kind === "part") onSelectPart?.(item.part, alt);
+              else if (item.kind === "shape") onSelectShape?.(item.shape, alt);
+              else if (onInsertModule) onInsertModule(item.module, alt);
+              else onSelectModule?.(item.module);
+            }}
+            favourites={favourites}
+            onFavourite={(item) => inventory.toggleFavourite(refOf(item))}
+            knownModules={compounds}
+            moduleActions={{
+              onDelete: onDeleteModule,
+              onRename: onRenameModule,
+              onCopy: onCopyModule,
+              onSaveFile: onSaveModuleFile,
+              onShare: onShareModule,
+              onLabels: onLabelsModule,
+            }}
+            scrollRoot={scrollRoot}
           />
-        ) : null}
-        {view.modules.length > 0 ? (
-          <div
-            className={cn(
-              "flex min-h-0 flex-1",
-              hasCells && "border-t border-border",
-            )}
-          >
-            <CompoundPicker
-              pack={pack}
-              compounds={view.modules}
-              known={compounds}
-              atlas={atlas}
-              onInsert={onInsertModule}
-              onSelect={onSelectModule}
-              placingId={placingModuleId}
-              onDelete={onDeleteModule}
-              onRename={onRenameModule}
-              onCopy={onCopyModule}
-              onSaveFile={onSaveModuleFile}
-              onShare={onShareModule}
-              favourites={favouriteModules}
-              onFavourite={(module) =>
-                inventory.toggleFavourite({ kind: "module", id: module.id })
-              }
-              onLabels={onLabelsModule}
-              scrollRoot={scrollRoot}
-            />
-          </div>
-        ) : null}
+        )}
       </div>
       {scrollRoot && aside ? (
         <div className="sticky top-0 self-start">{aside}</div>
@@ -332,4 +332,56 @@ export function InventoryGrids({
       )}
     </div>
   );
+}
+
+/**
+ * The grid's sections, in the order they are drawn: Shapes, Parts, Built in
+ * modules, Saved modules. Each carries its count before any filter, so its
+ * heading can say "12 of 373" while a search, a category or a list narrows it.
+ */
+export function inventorySections(
+  view: Pick<InventoryView, "shapes" | "parts" | "modules">,
+  pack: LoadedPack,
+  compounds: LegoProject[],
+): GridSection[] {
+  const builtInTotal = compounds.filter(isBuiltInModule).length;
+  const builtIn = view.modules.filter(isBuiltInModule);
+  const saved = view.modules.filter((module) => !isBuiltInModule(module));
+  return [
+    {
+      id: "shapes",
+      label: "Shapes",
+      total: SHAPE_KINDS.length,
+      items: view.shapes.map((shape) => ({ kind: "shape", shape })),
+    },
+    {
+      id: "parts",
+      label: "Parts",
+      total: pack.parts.length,
+      items: view.parts.map((part) => ({ kind: "part", part })),
+    },
+    {
+      id: "built-in",
+      label: "Built in modules",
+      total: builtInTotal,
+      items: builtIn.map((module) => ({ kind: "module", module })),
+    },
+    {
+      id: "saved",
+      label: "Saved modules",
+      total: compounds.length - builtInTotal,
+      items: saved.map((module) => ({ kind: "module", module })),
+    },
+  ];
+}
+
+function refOf(item: GridItem): InventoryRef {
+  switch (item.kind) {
+    case "shape":
+      return { kind: "shape", id: item.shape.id };
+    case "part":
+      return { kind: "part", id: item.part.id };
+    case "module":
+      return { kind: "module", id: item.module.id };
+  }
 }

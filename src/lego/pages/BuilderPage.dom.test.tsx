@@ -103,23 +103,29 @@ vi.mock("./components/TestDrawer", () => ({
 }));
 // Reads a display setting from the app frame, which nothing here provides.
 // Draws one button for each shape, which is how a test chooses one.
-vi.mock("./components/PartPicker", () => ({
-  PartPicker: ({
-    shapes,
-    onSelectShape,
+vi.mock("./components/TileGrid", () => ({
+  TileGrid: ({
+    sections,
+    onPick,
   }: {
-    shapes?: ShapeKind[];
-    onSelectShape?: (shape: ShapeKind, alt: boolean) => void;
+    sections: { items: { kind: string; shape?: ShapeKind }[] }[];
+    onPick?: (item: { kind: string; shape?: ShapeKind }, alt: boolean) => void;
   }) =>
-    shapes?.map((shape) => (
-      <button
-        key={shape.kind}
-        type="button"
-        onClick={() => onSelectShape?.(shape, false)}
-      >
-        {`Add the ${shape.label} shape`}
-      </button>
-    )),
+    sections
+      .flatMap((section) => section.items)
+      .flatMap((item) =>
+        item.kind === "shape" && item.shape
+          ? [
+              <button
+                key={item.shape.id}
+                type="button"
+                onClick={() => onPick?.(item, false)}
+              >
+                {`Add the ${item.shape.label} shape`}
+              </button>,
+            ]
+          : [],
+      ),
 }));
 // Reads the unit's file in its game through unitsync, for a factory's yardmap.
 vi.mock("./components/useBuiltUnitDef", () => ({
