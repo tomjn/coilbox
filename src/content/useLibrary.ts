@@ -58,18 +58,36 @@ export interface LibraryOptions {
   catalogues?: readonly CatalogueRequest[];
 }
 
+/** The library record, and how far the disk listing behind it has got. */
+export interface LibraryRecord extends Library {
+  /**
+   * A disk listing has landed, so `installedFiles` includes what is on disk.
+   * False before the first read lands, and after a failed one with nothing
+   * read before it. An unread listing looks exactly like an empty install.
+   */
+  filesRead: boolean;
+  /** The disk has been asked and has answered, even if the read failed. */
+  filesAnswered: boolean;
+  /** Read the disk listing again. */
+  refresh: () => Promise<void>;
+}
+
 /**
  * The library record: one entry per game and per map, merging the scan, the
  * archives on disk, the hub games list, the mirror indexes and the download
  * queue (see {@link buildLibrary}). The only reader of `installedContent`. The
  * disk listing is read again whenever a download finishes.
+ *
+ * A failed read keeps the last listing. It is not a report that the player has
+ * nothing, and dropping the listing would offer them every map they have.
  */
 export function useLibrary({
   scan = null,
   catalogues = [],
-}: LibraryOptions = {}): Library {
+}: LibraryOptions = {}): LibraryRecord {
   const rootPaths = useContentRootPaths();
   const [files, setFiles] = useState<LibraryInput["files"]>(null);
+  const [filesAnswered, setFilesAnswered] = useState(false);
   const readFiles = useCallback(async () => {
     if (rootPaths.length === 0) {
       setFiles(null);
@@ -78,7 +96,9 @@ export function useLibrary({
     try {
       setFiles(await installedContent({ paths: rootPaths }));
     } catch {
-      setFiles(null);
+      // Leave the last listing in place.
+    } finally {
+      setFilesAnswered(true);
     }
   }, [rootPaths]);
   useEffect(() => {
@@ -116,7 +136,7 @@ export function useLibrary({
   // biome-ignore lint/correctness/useExhaustiveDependencies: `queueKey` stands for `items`
   const queue = useMemo(() => items, [queueKey]);
 
-  return useMemo(
+  const library = useMemo(
     () =>
       buildLibrary({
         scan,
@@ -126,5 +146,14 @@ export function useLibrary({
         queue,
       }),
     [scan, files, hubGames, loaded, queue],
+  );
+  return useMemo(
+    () => ({
+      ...library,
+      filesRead: files !== null,
+      filesAnswered,
+      refresh: readFiles,
+    }),
+    [library, files, filesAnswered, readFiles],
   );
 }
