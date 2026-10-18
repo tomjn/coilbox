@@ -17,3 +17,5 @@ coilbox-springlua = { path = "../coilbox-springlua" }
 tempfile = { workspace = true }
 # Reads a real game's entry files out of its archive for the ignored test.
 zip = { workspace = true }
+# Reads the call-in handlers a game's Lua defines, as the mutator build does.
+coilbox-luacompat = { path = "../coilbox-luacompat" }
