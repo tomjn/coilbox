@@ -109,6 +109,15 @@ describe("buildExportArtifact html", () => {
     expect(out).not.toContain('href="assets/tree.css"');
   });
 
+  it("writes the document language from opts, and defaults to en", () => {
+    expect(html(buildExportArtifact(input(), opts))).toContain(
+      '<html lang="en">',
+    );
+    expect(
+      html(buildExportArtifact(input(), { ...opts, lang: "fr" })),
+    ).toContain('<html lang="fr">');
+  });
+
   it("renders a no-pic placeholder rather than a broken image", () => {
     const out = html(buildExportArtifact(input(), opts));
     // armsolar has no pic

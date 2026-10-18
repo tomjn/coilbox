@@ -76,6 +76,8 @@ export interface ExportOptions {
   scope: "all" | "current";
   wrapper: "branded" | "neutral";
   format: "html" | "zip";
+  /** The exported document's `lang`. Defaults to `en`. */
+  lang?: string;
 }
 
 /** A file to write for the zip format. Exactly one of `text`/`base64` is set. */
