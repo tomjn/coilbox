@@ -80,6 +80,7 @@ import {
   loadoutUnit,
   loadoutUnitNames,
 } from "../../loadouts";
+import { writeLockedList } from "../../lockedListIo";
 import { unitScript } from "../../luaScript";
 import type {
   ExportedFile,
@@ -225,6 +226,10 @@ type Result =
        *  and it was left alone. */
       pictureKept: boolean;
       pictureProblem: string | null;
+      /** `luarules/configs/coilbox_locked_units/<unit>.lua`, when the unit has
+       *  locks (#3289). */
+      lockedList: string | null;
+      lockedProblem: string | null;
     }
   | { state: "failed"; message: string };
 
@@ -863,6 +868,16 @@ export function ExportDrawer({
         : {}),
     });
 
+    // The list of units a campaign unlocks, for the whole family. A failure is
+    // reported and does not undo the export above.
+    let lockedList: string | null = null;
+    let lockedProblem: string | null = null;
+    try {
+      lockedList = await writeLockedList(dir, whole);
+    } catch (error) {
+      lockedProblem = error instanceof Error ? error.message : String(error);
+    }
+
     // The Blender half, which the engine reads none of. A texture the decoder
     // cannot read stops these two and nothing else: the model, the script and
     // the definition are already written and are what the game runs on.
@@ -998,6 +1013,8 @@ export function ExportDrawer({
       picture: picturePath,
       pictureKept,
       pictureProblem,
+      lockedList,
+      lockedProblem,
       // Both Blender files write the mask, into the same folder under the
       // same name, so a run that wrote both reports it once.
       blenderTextures: written.filter(
@@ -1692,6 +1709,15 @@ export function ExportDrawer({
                   <p className="text-destructive">
                     The unit is exported, but the build picture is not:{" "}
                     {result.pictureProblem}
+                  </p>
+                ) : null}
+                {result.lockedList ? (
+                  <code className="break-all">{result.lockedList}</code>
+                ) : null}
+                {result.lockedProblem ? (
+                  <p className="text-destructive">
+                    The unit is exported, but the list of locked units is not:{" "}
+                    {result.lockedProblem}
                   </p>
                 ) : null}
                 {result.glb ? (
