@@ -94,6 +94,7 @@ pub use ledger::{
 pub use lua::lua_string;
 pub use model::{GameEdits, ModProject, ReadOnlyLuaBlock};
 pub use mutator::write_mutator;
+pub use package::write_sdz_entries;
 pub use preflight::{preflight, PreflightReport};
 pub use tweak_pack::{pack as pack_tweak_slots, TweakSlotPack};
 
