@@ -18,6 +18,7 @@
     "keybinds:defaults": "bun scripts/build-engine-keybinds.mjs && biome check --write src/content/engineKeybinds.generated.ts",
     "unitfields:defaults": "bun scripts/build-engine-unit-fields.mjs && biome check --write src/content/engineUnitFields.generated.ts",
     "lego:pack": "bun scripts/legopack/build.mjs",
+    "lego:atlas": "bun scripts/legopack/teamColour.mjs",
     "lego:reads3o": "bun scripts/reads3o.mjs",
     "lego:reference": "bun scripts/reference-model.mjs",
     "clean": "bash scripts/clean.sh",

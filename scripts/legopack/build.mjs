@@ -16,13 +16,14 @@
  */
 
 import { createHash } from "node:crypto";
-import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { COLOURWAYS, categorise } from "./categorise.mjs";
 import { buildMesh } from "./mesh.mjs";
 import { readObj } from "./obj.mjs";
+import { teamColourAtlas } from "./teamColour.mjs";
 import { writePack } from "./writePack.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -99,11 +100,13 @@ function main() {
     atlas,
     categories: COLOURWAYS,
   });
-  // The atlas already is a PNG, so it goes across untouched.
-  copyFileSync(args.atlas, join(outDir, "atlas.png"));
+  // The atlas gains the team colour mask its first column was painted for
+  // (issue #4364). See teamColour.mjs.
+  const atlasOut = teamColourAtlas(atlasBytes);
+  writeFileSync(join(outDir, "atlas.png"), atlasOut);
   writeFileSync(join(outDir, "LICENCE.txt"), `${LICENCE}\n`);
 
-  report(stats, written, meta, audit, atlasBytes.length);
+  report(stats, written, meta, audit, atlasOut.length);
 }
 
 function buildParts(source, quiet) {

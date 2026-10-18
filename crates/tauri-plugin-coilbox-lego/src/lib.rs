@@ -1943,9 +1943,9 @@ async fn lego_texture_png<R: Runtime>(app: AppHandle<R>, key: String) -> CliResu
 /// `lego_atlas_png` hands a parts atlas back as a PNG `data:` URL with the alpha
 /// the engine would read.
 ///
-/// The `.glb` export bakes the team colour in by that alpha, and the bundled
-/// atlas has none, which the webview reads as full team colour everywhere
-/// (#4173). Going through [`texture::engine_atlas`] means the `.glb` and the
+/// The `.glb` export bakes the team colour in by that alpha, and an atlas with
+/// none would read in the webview as full team colour everywhere (#4173).
+/// Going through [`texture::engine_atlas`] means the `.glb` and the
 /// `.s3o` follow one rule: no alpha channel is an alpha of 0, and an alpha the
 /// atlas has is kept.
 #[tauri::command]
