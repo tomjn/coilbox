@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { useScanTargetSelection, useUnitsyncEngineConfig } from "../config";
+import { useEngineEditTarget, useUnitsyncEngineConfig } from "../config";
 import { BrowserToolbar } from "./components/BrowserToolbar";
 import { EngineSettingField } from "./components/EngineSettingField";
 import {
@@ -29,7 +29,7 @@ import {
  */
 export function EngineConfigPage({ category }: { category: string }) {
   const { targets, selected, selectedKey, setSelectedKey } =
-    useScanTargetSelection();
+    useEngineEditTarget();
   const { data, loading, error, run, write } = useUnitsyncEngineConfig(
     selected?.enginePath,
     selected?.rootPath,

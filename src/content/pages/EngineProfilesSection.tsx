@@ -1,4 +1,4 @@
-import { useScanTargetSelection } from "../config";
+import { useEngineEditTarget } from "../config";
 import { BrowserToolbar } from "./components/BrowserToolbar";
 import { ConfigProfilesPanel } from "./components/ConfigProfilesPanel";
 import { EmptyState } from "./components/states";
@@ -18,7 +18,7 @@ import { EmptyState } from "./components/states";
  */
 export default function EngineProfilesSection() {
   const { targets, selected, selectedKey, setSelectedKey, loading, refresh } =
-    useScanTargetSelection();
+    useEngineEditTarget();
 
   return (
     <div className="space-y-4">

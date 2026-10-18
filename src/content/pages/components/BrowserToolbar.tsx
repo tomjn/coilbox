@@ -5,9 +5,9 @@ import { type ScanTarget, targetKey, targetLabel } from "../../config";
 import { TargetPicker } from "./TargetPicker";
 
 /**
- * Compact Content-browser controls. With a single engine it stays out of the way
- * (just a muted "via …" label); the picker only appears when there's a real
- * choice. A small Rescan button re-reads the engine on demand. When no engine is
+ * Compact Content-browser controls. Without `onSelect`, or with a single engine,
+ * it stays out of the way (just a muted "via …" label); the picker only appears
+ * on the pages that edit an engine, when there's a real choice. A small Rescan button re-reads the engine on demand. When no engine is
  * available at all it points the user at the settings pages instead.
  *
  * While a scan is running the Rescan button turns into a spinning "Cancel scan"
@@ -25,7 +25,8 @@ export function BrowserToolbar({
 }: {
   targets: ScanTarget[];
   selectedKey: string;
-  onSelect: (key: string) => void;
+  /** Omit it and the toolbar shows the engine but offers no choice. */
+  onSelect?: (key: string) => void;
   onRescan: () => void;
   scanning: boolean;
   onCancel?: () => void;
@@ -54,7 +55,7 @@ export function BrowserToolbar({
 
   return (
     <div className="flex items-center gap-2">
-      {targets.length > 1 ? (
+      {onSelect && targets.length > 1 ? (
         <TargetPicker
           targets={targets}
           value={selectedKey}

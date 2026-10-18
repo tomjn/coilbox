@@ -72,8 +72,7 @@ const NONE_CHECKED: Record<PlayType, string> = {
  * and the play type the 1v1, Team and Water chips filter on.
  */
 export default function MapsPage() {
-  const { targets, selected, selectedKey, setSelectedKey } =
-    useScanTargetSelection();
+  const { targets, selected, selectedKey } = useScanTargetSelection();
   const {
     data,
     unvouched,
@@ -198,7 +197,6 @@ export default function MapsPage() {
       <BrowserToolbar
         targets={targets}
         selectedKey={selectedKey}
-        onSelect={setSelectedKey}
         onRescan={() => run(true)}
         scanning={loading}
         onCancel={cancel}
