@@ -18,10 +18,13 @@ import {
   ChevronRight,
   FileCode,
   Pause,
+  Pencil,
   Play,
+  Plus,
   Square,
   StepBack,
   StepForward,
+  Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -42,6 +45,14 @@ import { Switch } from "@/components/ui/switch";
 import { animCobProbe, animCobRun } from "../../../animation/bindings";
 import { OptionSelect } from "../../../components/OptionSelect";
 import { useReduceMotion } from "../../../general/display";
+import {
+  actionClashes,
+  actionScenario,
+  addAction,
+  deleteAction,
+  isHookTrigger,
+  soloActionProject,
+} from "../../actions";
 import { aimPoint } from "../../aimPoint";
 import {
   type Aim,
@@ -134,6 +145,7 @@ import { overridesFit, shownParams, withoutFitOverrides } from "../../walkFit";
 import { pickedWeapon } from "../../weaponModule";
 import { unitReaches } from "../../weaponReach";
 import type { LegoWorth } from "../../worth";
+import { ActionsDrawer } from "./ActionsDrawer";
 import { BuilderReport } from "./BuilderReport";
 import { GameFitSection } from "./GameFitSection";
 import { MovementSection } from "./MovementSection";
@@ -342,6 +354,9 @@ interface Props {
   playing: boolean;
   onPlayingChange: (playing: boolean) => void;
   onChange: (applied: AppliedPreset[]) => void;
+  /** Edits the unit's actions (#3356). The Actions section is shown only when
+   *  this is given. */
+  onActionsEdit?: (change: (project: LegoProject) => LegoProject) => void;
   /** Opens the strip on its Script tab, which is where a script is read,
    *  edited, taken over or handed back now. */
   onShowScript: () => void;
@@ -421,6 +436,7 @@ export function AnimationPanel({
   playing,
   onPlayingChange,
   onChange,
+  onActionsEdit,
   onShowScript,
   onBuilderChange,
   onMovementChange,
@@ -504,6 +520,9 @@ export function AnimationPanel({
   const latestRun = useRef(0);
   const isCallMode = scenarioId === CALL_FUNCTION;
   const applied = project.animations ?? [];
+  const actions = project.actions ?? [];
+  /** Whether there is anything to play: a preset or an action. */
+  const hasAnimation = applied.length > 0 || actions.length > 0;
   const counts = countRoles(project.pieces);
   const owned = project.script !== undefined;
   // The compiled file the unit's game shipped, when that is what animates it.
@@ -527,6 +546,19 @@ export function AnimationPanel({
       : null;
   const soloRef = useRef<string | null>(solo);
   soloRef.current = solo;
+  /** The action playing alone, a preview like `soloId` and held in a ref for
+   *  the same reason. */
+  const [soloActionId, setSoloActionId] = useState<string | null>(null);
+  const soloAction =
+    !playsOwnScript &&
+    soloActionId &&
+    actions.some((a) => a.id === soloActionId)
+      ? soloActionId
+      : null;
+  const soloActionRef = useRef<string | null>(soloAction);
+  soloActionRef.current = soloAction;
+  /** The action whose timeline is open. */
+  const [timelineId, setTimelineId] = useState<string | null>(null);
   /** The copy of a module picked for each preset in its panel, by preset id.
    *  Absent means all copies, the shared settings. */
   const [picked, setPicked] = useState<Record<string, string>>({});
@@ -547,9 +579,11 @@ export function AnimationPanel({
   const scriptNow = useCallback(
     () =>
       unitScript(
-        soloRef.current
-          ? soloProject(project, soloRef.current, soloCopyRef.current)
-          : project,
+        soloActionRef.current
+          ? soloActionProject(project, soloActionRef.current)
+          : soloRef.current
+            ? soloProject(project, soloRef.current, soloCopyRef.current)
+            : project,
       ),
     [project],
   );
@@ -558,9 +592,11 @@ export function AnimationPanel({
   const plantedNow = useCallback(
     (events: ScriptEvent[]) =>
       plantedFeet(
-        soloRef.current
-          ? soloProject(project, soloRef.current, soloCopyRef.current)
-          : project,
+        soloActionRef.current
+          ? soloActionProject(project, soloActionRef.current)
+          : soloRef.current
+            ? soloProject(project, soloRef.current, soloCopyRef.current)
+            : project,
         events,
         PREVIEW_FRAMES,
       ),
@@ -580,6 +616,8 @@ export function AnimationPanel({
   const stop = useCallback(() => {
     soloRef.current = null;
     setSoloId(null);
+    soloActionRef.current = null;
+    setSoloActionId(null);
     onPlayingChange(false);
     onScriptTimeline(null);
     onScriptRun(null);
@@ -1054,16 +1092,20 @@ export function AnimationPanel({
   const currentScript = useMemo(
     () =>
       unitScript(
-        solo ? soloProject(project, solo, soloCopyRef.current) : project,
+        soloAction
+          ? soloActionProject(project, soloAction)
+          : solo
+            ? soloProject(project, solo, soloCopyRef.current)
+            : project,
       ),
-    [project, solo],
+    [project, solo, soloAction],
   );
   const lastScript = useRef(currentScript);
   const rerunTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => {
     if (lastScript.current === currentScript) return;
     lastScript.current = currentScript;
-    if (playsOwnScript || applied.length === 0) {
+    if (playsOwnScript || !hasAnimation) {
       clearTimeout(rerunTimer.current);
       stopRef.current();
       return;
@@ -1071,7 +1113,7 @@ export function AnimationPanel({
     if (!hasRunRef.current) return;
     clearTimeout(rerunTimer.current);
     rerunTimer.current = setTimeout(() => rerunRef.current(), SETTLE_MS);
-  }, [currentScript, playsOwnScript, applied.length]);
+  }, [currentScript, playsOwnScript, hasAnimation]);
   useEffect(() => () => clearTimeout(rerunTimer.current), []);
 
   /**
@@ -1131,6 +1173,8 @@ export function AnimationPanel({
     const scenarioFor = soloScenario(presetId);
     if (!scenarioFor) return;
     soloRef.current = presetId;
+    soloActionRef.current = null;
+    setSoloActionId(null);
     if (copy !== undefined) soloCopyRef.current = copy;
     setSoloId(presetId);
     setScenarioId(scenarioFor);
@@ -1141,10 +1185,35 @@ export function AnimationPanel({
     void start(scenarioFor);
   }
 
+  /** Play one action alone, in the scenario that sends its call-ins, or by
+   *  calling its function. */
+  function playActionAlone(actionId: string) {
+    const action = actions.find((a) => a.id === actionId);
+    if (!action) return;
+    soloRef.current = null;
+    setSoloId(null);
+    soloActionRef.current = actionId;
+    setSoloActionId(actionId);
+    lastScript.current = scriptNow();
+    clearTimeout(rerunTimer.current);
+    const scenarioFor = actionScenario(project, action);
+    if (scenarioFor === null || !isHookTrigger(project, action.trigger)) {
+      setScenarioId(CALL_FUNCTION);
+      setCallFunction(action.trigger);
+      setCallArgsText("");
+      fireCall(action.trigger, "");
+      return;
+    }
+    setScenarioId(scenarioFor);
+    void start(scenarioFor);
+  }
+
   /** Back to every preset together, in the scenario already chosen. */
   function playAll() {
     soloRef.current = null;
     setSoloId(null);
+    soloActionRef.current = null;
+    setSoloActionId(null);
     lastScript.current = scriptNow();
     clearTimeout(rerunTimer.current);
     if (isCallMode) fireCall(callFunction, callArgsText);
@@ -1197,10 +1266,10 @@ export function AnimationPanel({
             reduceMotion ||
             running ||
             (isCallMode && !callFunction) ||
-            (!playsOwnScript && applied.length === 0)
+            (!playsOwnScript && !hasAnimation)
           }
           onClick={() =>
-            solo
+            solo || soloAction
               ? playAll()
               : playing
                 ? onScriptPausedChange(!scriptPaused)
@@ -1212,7 +1281,7 @@ export function AnimationPanel({
           {playing && !scriptPaused ? <Pause size={14} /> : <Play size={14} />}
           {running
             ? "Running"
-            : solo
+            : solo || soloAction
               ? "Play all"
               : !playing
                 ? "Play"
@@ -1233,7 +1302,7 @@ export function AnimationPanel({
         <span className="min-w-32 flex-1 text-xs text-muted-foreground">
           {reduceMotion
             ? "Playback is off while your system asks for reduced motion."
-            : !playsOwnScript && applied.length === 0
+            : !playsOwnScript && !hasAnimation
               ? "Apply one below."
               : `${PREVIEW_SECONDS} seconds, looped`}
         </span>
@@ -1810,6 +1879,101 @@ export function AnimationPanel({
 
           <GameFitSection project={project} bounds={bounds} />
 
+          {onActionsEdit ? (
+            <div className="border-b border-border/60 px-3 py-2">
+              <div className="flex items-start gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">Actions</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Saved poses in time, written into the script beside the
+                    presets.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  aria-label="New action"
+                  title="New action"
+                  onClick={() => {
+                    const id = crypto.randomUUID();
+                    onActionsEdit((p) => addAction(p, { id, name: "Action" }));
+                    setTimelineId(id);
+                  }}
+                >
+                  <Plus size={14} />
+                </Button>
+              </div>
+              {actions.map((action) => {
+                const where = [
+                  ...new Set(
+                    actionClashes(project)
+                      .filter((clash) => clash.action.id === action.id)
+                      .map((clash) => clash.piece.name),
+                  ),
+                ];
+                return (
+                  <div key={action.id} className="mt-2">
+                    <div className="flex items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-medium">
+                          {action.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {action.trigger}, {action.keys.length}{" "}
+                          {action.keys.length === 1 ? "key" : "keys"}
+                          {action.loop ? ", loops" : ""}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant={
+                          soloAction === action.id && playing
+                            ? "default"
+                            : "outline"
+                        }
+                        disabled={
+                          reduceMotion || running || action.keys.length === 0
+                        }
+                        aria-pressed={soloAction === action.id && playing}
+                        aria-label={`Preview ${action.name} on its own`}
+                        title="Play this action on its own, without changing the unit"
+                        onClick={() => playActionAlone(action.id)}
+                      >
+                        <Play size={14} />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        aria-label={`Edit ${action.name}`}
+                        title="Edit the timeline"
+                        onClick={() => setTimelineId(action.id)}
+                      >
+                        <Pencil size={14} />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        aria-label={`Delete ${action.name}`}
+                        title="Delete"
+                        onClick={() => {
+                          if (timelineId === action.id) setTimelineId(null);
+                          onActionsEdit((p) => deleteAction(p, action.id));
+                        }}
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    </div>
+                    {where.length > 0 ? (
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Also moved by something else: {where.join(", ")}.
+                      </p>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+
           {PRESETS.map((preset) => {
             const entry = applied.find((a) => a.presetId === preset.id);
             const missing = unmetRequirements(preset, counts);
@@ -1982,6 +2146,19 @@ export function AnimationPanel({
             </p>
           ) : null}
         </div>
+        {onActionsEdit && timelineId ? (
+          <ActionsDrawer
+            project={project}
+            actionId={timelineId}
+            onOpenChange={(open) => {
+              if (!open) setTimelineId(null);
+            }}
+            onEdit={onActionsEdit}
+            onPlay={playActionAlone}
+            playing={soloAction === timelineId && playing}
+            playDisabled={reduceMotion || running}
+          />
+        ) : null}
       </div>
     );
   }
