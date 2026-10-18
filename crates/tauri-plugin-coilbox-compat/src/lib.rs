@@ -191,24 +191,25 @@ mod tests {
     #[test]
     fn a_build_writes_the_folder_and_status_finds_it_current() {
         let (_keep, data) = root();
+        let n = coilbox_compat::latest();
         let built = build_reading(
             &data,
             "xta-9.65.sd7",
             "XTA 9.65",
             "1234abcd",
-            1,
+            n,
             "1.2.3",
             no_file,
         )
         .unwrap();
-        assert_eq!(built.folder, "coilbox-compat-xta-9.65-1.sdd");
+        assert_eq!(built.folder, format!("coilbox-compat-xta-9.65-{n}.sdd"));
         assert_eq!(built.files, ["modinfo.lua", mutator::MARKER]);
         let dir = std::path::Path::new(&built.dir);
         assert!(dir.join("modinfo.lua").is_file());
         assert_eq!(
             mutator::read_marker(dir).unwrap(),
             Marker {
-                manifest_version: 1,
+                manifest_version: n,
                 base_checksum: "1234abcd".into(),
                 coilbox_version: "1.2.3".into(),
             }
@@ -231,7 +232,7 @@ mod tests {
             "xta-9.65.sd7",
             "XTA 9.65",
             "1234abcd",
-            1,
+            coilbox_compat::latest(),
             "1.2.3",
             no_file,
         )
@@ -259,8 +260,8 @@ mod tests {
             no_file,
         )
         .unwrap();
-        // There is only one manifest so far, so a folder from a manifest this
-        // build does not know stands in for one built before the manifest moved.
+        // A folder from a manifest this build does not know stands in for one
+        // built before the manifest moved.
         let other = coilbox_compat::latest() + 1;
         let games = std::path::Path::new(&data).join("games");
         let moved = games.join(format!("coilbox-compat-xta-9.65-{other}.sdd"));
@@ -323,7 +324,7 @@ mod tests {
             "xta-9.65.sd7",
             "XTA 9.65",
             "1234abcd",
-            1,
+            coilbox_compat::latest(),
             "1.2.3",
             no_file,
         )
@@ -335,7 +336,7 @@ mod tests {
             "xta-9.65.sd7",
             "XTA 9.65",
             "5678",
-            1,
+            coilbox_compat::latest(),
             "1.2.3",
             no_file,
         )
