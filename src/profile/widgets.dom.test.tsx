@@ -21,7 +21,19 @@ vi.mock("../downloads/config", () => ({
   useWriteRootPath: () => "",
 }));
 vi.mock("../downloads/pages/components/MapPacksBanner", () => ({
-  MapPacksBanner: () => null,
+  MapPacksBanner: ({ installed }: { installed: Set<string> }) => (
+    <div data-testid="packs">{[...installed].join(",")}</div>
+  ),
+}));
+const library = vi.hoisted(() => ({
+  filesRead: false,
+  maps: new Set<string>(),
+}));
+vi.mock("../content/useLibrary", () => ({
+  useLibrary: () => ({
+    installedFiles: { maps: library.maps, games: new Set() },
+    filesRead: library.filesRead,
+  }),
 }));
 vi.mock("../content/pages/components/SetupCard", () => ({
   HomeSetupCard: () => null,
@@ -40,5 +52,21 @@ describe("build tree widgets", () => {
     render(<PageWidget name={name} arg="Some Game" />);
     const embed = await screen.findByTestId("embed");
     expect(embed.textContent).toBe(`${mode}:Some Game`);
+  });
+});
+
+describe("map pack widget", () => {
+  it("draws nothing before the disk listing lands", () => {
+    library.filesRead = false;
+    library.maps = new Set();
+    render(<PageWidget name="map-pack" />);
+    expect(screen.queryByTestId("packs")).toBeNull();
+  });
+
+  it("hands the banner the library's installed maps", () => {
+    library.filesRead = true;
+    library.maps = new Set(["throne_v8.sd7"]);
+    render(<PageWidget name="map-pack" />);
+    expect(screen.getByTestId("packs").textContent).toBe("throne_v8.sd7");
   });
 });

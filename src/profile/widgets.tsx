@@ -1,8 +1,8 @@
-import { lazy, type ReactNode, Suspense, useEffect, useState } from "react";
+import { lazy, type ReactNode, Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { installedContent } from "../content/installedContent";
 import { HomeSetupCard } from "../content/pages/components/SetupCard";
-import { useContentRootPaths, useWriteRootPath } from "../downloads/config";
+import { useLibrary } from "../content/useLibrary";
+import { useWriteRootPath } from "../downloads/config";
 import { MapPacksBanner } from "../downloads/pages/components/MapPacksBanner";
 import BrandedWelcome from "./BrandedWelcome";
 
@@ -41,23 +41,18 @@ function BuildTreeWidget({
 /**
  * `@widget/map-pack` — the map-pack download banner, standalone. It self-resolves its
  * pack list from the branding catalog + profile; the only data it needs supplied is the
- * installed-maps set and the write path, resolved here from the downloads config exactly
- * as GetStartedCard does (both hooks/command are self-contained — no scoped provider).
+ * installed-maps set, from the library record, and the write path, from the downloads
+ * config.
  */
 function MapPackWidget() {
-  const rootPaths = useContentRootPaths();
   const writePath = useWriteRootPath("maps");
-  const [maps, setMaps] = useState<Set<string>>(new Set());
-  useEffect(() => {
-    if (rootPaths.length === 0) {
-      setMaps(new Set());
-      return;
-    }
-    installedContent({ paths: rootPaths })
-      .then(({ maps }) => setMaps(new Set(maps)))
-      .catch(() => setMaps(new Set()));
-  }, [rootPaths]);
-  return <MapPacksBanner installed={maps} writePath={writePath} />;
+  const { installedFiles, filesRead } = useLibrary();
+  // An unread listing would offer every map in every pack, as GetStartedCard
+  // also avoids.
+  if (!filesRead) return null;
+  return (
+    <MapPacksBanner installed={installedFiles.maps} writePath={writePath} />
+  );
 }
 
 export const WIDGET_REGISTRY: Record<string, (arg?: string) => ReactNode> = {
