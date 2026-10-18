@@ -7,7 +7,7 @@
  */
 
 import { Button, Input } from "@picoframe/frame";
-import { Copy, Layers, Plus, Trash2 } from "lucide-react";
+import { Columns3, Copy, Layers, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { OptionSelect } from "@/components/OptionSelect";
@@ -26,6 +26,10 @@ import {
   switchLoadout,
 } from "../../loadouts";
 import { type LegoLoadout, type LegoProject, pieceById } from "../../model";
+import type { LoadedPack } from "../../pack";
+import type { RawGeometry } from "../../rawGeometry";
+import { type Capture, THUMBNAIL_VIEW } from "../../thumbnail";
+import { LoadoutFamilyDrawer } from "./LoadoutFamilyDrawer";
 
 interface Props {
   project: LegoProject;
@@ -35,14 +39,50 @@ interface Props {
     change: (project: LegoProject) => LegoProject,
     options: { alone: true },
   ) => void;
+  /** What the family view needs for the stats and the pictures. Without them it
+   *  shows the mounts only, and no pictures. */
+  pack?: LoadedPack | null;
+  raw?: RawGeometry | null;
+  capture?: Capture;
 }
+
+/** The side of the square each loadout is photographed at, in pixels. */
+const FAMILY_PICTURE_PIXELS = 160;
 
 const newId = () => crypto.randomUUID();
 
-export function LoadoutPicker({ project, selectedId, onEdit }: Props) {
+export function LoadoutPicker({
+  project,
+  selectedId,
+  onEdit,
+  pack = null,
+  raw = null,
+  capture,
+}: Props) {
   const loadouts = project.loadouts;
   const edit = (change: (project: LegoProject) => LegoProject) =>
     onEdit(change, { alone: true });
+  const [comparing, setComparing] = useState(false);
+  const [pictures, setPictures] = useState<Record<string, string>>({});
+
+  // Only the loadout on the chassis can be photographed, so each is photographed
+  // when it is about to leave and when the family view opens.
+  function remember() {
+    const id = project.activeLoadout;
+    const canvas = id
+      ? capture?.({
+          pixels: FAMILY_PICTURE_PIXELS,
+          background: null,
+          view: THUMBNAIL_VIEW,
+        })
+      : null;
+    if (id && canvas)
+      setPictures((was) => ({ ...was, [id]: canvas.toDataURL("image/png") }));
+  }
+  function switchTo(id: string) {
+    remember();
+    edit((p) => switchLoadout(p, id));
+  }
 
   return (
     <div className="flex items-center gap-1 px-1 text-xs text-muted-foreground">
@@ -52,7 +92,7 @@ export function LoadoutPicker({ project, selectedId, onEdit }: Props) {
           <OptionSelect
             size="sm"
             value={project.activeLoadout ?? ""}
-            onValueChange={(id) => edit((p) => switchLoadout(p, id))}
+            onValueChange={switchTo}
             options={loadouts.map((l) => ({ value: l.id, label: l.name }))}
             ariaLabel="Loadout"
             className="h-5 w-40 border-transparent bg-transparent px-1 text-xs hover:border-border focus-visible:border-border"
@@ -113,6 +153,32 @@ export function LoadoutPicker({ project, selectedId, onEdit }: Props) {
           <PieceSharing project={project} pieceId={selectedId} onEdit={edit} />
         </PopoverContent>
       </Popover>
+      {loadouts && loadouts.length > 1 ? (
+        <>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-5"
+            title="Compare loadouts"
+            aria-label="Compare loadouts"
+            onClick={() => {
+              remember();
+              setComparing(true);
+            }}
+          >
+            <Columns3 className="size-3.5" />
+          </Button>
+          <LoadoutFamilyDrawer
+            open={comparing}
+            onOpenChange={setComparing}
+            project={project}
+            pack={pack}
+            raw={raw}
+            pictures={pictures}
+            onSwitch={switchTo}
+          />
+        </>
+      ) : null}
     </div>
   );
 }

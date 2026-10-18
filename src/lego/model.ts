@@ -857,6 +857,20 @@ export interface LegoLoadout {
   name: string;
   /** Absent on the active loadout, whose content is the project itself. */
   content?: LegoLoadoutContent;
+  /**
+   * The name this loadout exports under, when the game maker has chosen one
+   * (#3282). Absent means the unit name and the loadout name joined. See
+   * `loadoutUnitNames` in `loadoutExports.ts`.
+   */
+  unitName?: string;
+  /**
+   * This loadout's own receipts, one per game folder (#3282), read the way the
+   * project's are. They stay on the entry whichever loadout is active, so
+   * switching never moves them. The names a loadout has stopped exporting under
+   * go in the project's `staleExports`, which every export shares.
+   */
+  exported?: LegoExport;
+  exportedElsewhere?: LegoExport[];
 }
 
 /**
@@ -1821,8 +1835,22 @@ function parseLoadout(raw: unknown): LegoLoadout | null {
   const v = raw as Record<string, unknown>;
   if (typeof v.id !== "string" || v.id === "") return null;
   if (typeof v.name !== "string" || v.name.trim() === "") return null;
+  const exported = parseExport(v.exported);
+  const elsewhere = parseOtherExports(
+    v.exportedElsewhere,
+    exported ?? undefined,
+  );
+  const entry: LegoLoadout = {
+    id: v.id,
+    name: v.name,
+    ...(typeof v.unitName === "string" && v.unitName !== ""
+      ? { unitName: v.unitName }
+      : {}),
+    ...(exported ? { exported } : {}),
+    ...(elsewhere.length > 0 ? { exportedElsewhere: elsewhere } : {}),
+  };
   const c = v.content;
-  if (typeof c !== "object" || c === null) return { id: v.id, name: v.name };
+  if (typeof c !== "object" || c === null) return entry;
   const content = c as Record<string, unknown>;
   const pieces: LegoPiece[] = [];
   const taken = new Set<string>();
@@ -1835,8 +1863,7 @@ function parseLoadout(raw: unknown): LegoLoadout | null {
   }
   const builder = parseBuilder(content.builder);
   return {
-    id: v.id,
-    name: v.name,
+    ...entry,
     content: {
       pieces,
       ...(Array.isArray(content.animations)

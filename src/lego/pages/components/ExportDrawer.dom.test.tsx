@@ -20,6 +20,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EMPTY_EDITS, type ModProject } from "@/workshop/project";
+import { addLoadout, switchLoadout } from "../../loadouts";
 import { newProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import type { RawGeometry } from "../../rawGeometry";
@@ -121,6 +122,8 @@ function show(
   onRemember = vi.fn(),
   raw: RawGeometry | null = null,
   onAdopt = vi.fn(),
+  onRememberLoadout = vi.fn(),
+  onLoadoutUnitName = vi.fn(),
 ) {
   return render(
     <ExportDrawer
@@ -132,6 +135,9 @@ function show(
       onRemember={onRemember}
       onStale={vi.fn()}
       onAdopt={onAdopt}
+      onRememberLoadout={onRememberLoadout}
+      onAdoptLoadout={vi.fn()}
+      onLoadoutUnitName={onLoadoutUnitName}
     />,
   );
 }
@@ -826,5 +832,164 @@ describe("treating a definition as coilbox's", () => {
       sent.find((f: { path: string }) => f.path === "objectname").last,
     ).toBe("skyfort_old");
     expect(screen.queryByRole("button", { name: label })).toBeNull();
+  });
+});
+
+describe("a unit with loadouts (issue #3282)", () => {
+  /** "Loadout 1" and "Heavy", where Heavy has a gun piece the first does not. */
+  function twoLoadouts() {
+    let n = 0;
+    const added = addLoadout(project, {
+      newId: () => `l${++n}`,
+      name: "Heavy",
+    });
+    const heavy = {
+      ...added,
+      pieces: [
+        ...added.pieces,
+        {
+          ...added.pieces[0],
+          id: "gun",
+          name: "gun",
+          parentId: "base",
+          inLoadout: true as const,
+        },
+      ],
+    };
+    return { ...switchLoadout(heavy, "l1"), exportDir: project.exportDir };
+  }
+
+  async function open(shown: ReturnType<typeof twoLoadouts>) {
+    legoGameLanguage.mockResolvedValue({ texts: {} });
+    legoExport.mockImplementation(async (args: { unitName: string }) =>
+      exportResult({ model: `/game/objects3d/${args.unitName}.s3o` }),
+    );
+    const onRememberLoadout = vi.fn();
+    const onRemember = vi.fn();
+    show(shown, onRemember, null, vi.fn(), onRememberLoadout);
+    await waitFor(() =>
+      expect(screen.getByText(/goes into the definition/)).toBeTruthy(),
+    );
+    return { onRememberLoadout, onRemember };
+  }
+
+  it("writes the loadout on screen under its own name and receipt", async () => {
+    const { onRememberLoadout, onRemember } = await open(twoLoadouts());
+    fireEvent.click(screen.getByRole("button", { name: "Export" }));
+    await waitFor(() => expect(legoExport).toHaveBeenCalledTimes(1));
+    const sent = legoExport.mock.calls[0][0];
+    expect(sent.unitName).toBe("skyfort_loadout_1");
+    expect(sent.unitDef).toContain("skyfort_loadout_1");
+    expect(sent.unitDef).toContain("Sky Fortress Loadout 1");
+    await waitFor(() => expect(onRememberLoadout).toHaveBeenCalledTimes(1));
+    expect(onRememberLoadout.mock.calls[0][0]).toBe("l1");
+    expect(onRememberLoadout.mock.calls[0][2].unitName).toBe(
+      "skyfort_loadout_1",
+    );
+    expect(onRemember).not.toHaveBeenCalled();
+  });
+
+  it("writes every loadout, each with its own model, definition and receipt", async () => {
+    const { onRememberLoadout } = await open(twoLoadouts());
+    fireEvent.click(screen.getByRole("radio", { name: "All loadouts" }));
+    fireEvent.click(screen.getByRole("button", { name: "Export" }));
+    await waitFor(() => expect(legoExport).toHaveBeenCalledTimes(2));
+    const [first, second] = legoExport.mock.calls.map((call) => call[0]);
+    expect([first.unitName, second.unitName]).toEqual([
+      "skyfort_loadout_1",
+      "skyfort_heavy",
+    ]);
+    expect(JSON.stringify(first.model)).not.toBe(JSON.stringify(second.model));
+    expect(first.unitDef).not.toBe(second.unitDef);
+    await waitFor(() => expect(onRememberLoadout).toHaveBeenCalledTimes(2));
+    expect(onRememberLoadout.mock.calls.map((call) => call[0])).toEqual([
+      "l1",
+      "l2",
+    ]);
+    expect(await screen.findByText("skyfort_heavy written")).toBeTruthy();
+  });
+
+  it("names the units from the drawer", async () => {
+    const onLoadoutUnitName = vi.fn();
+    legoGameLanguage.mockResolvedValue({ texts: {} });
+    show(twoLoadouts(), vi.fn(), null, vi.fn(), vi.fn(), onLoadoutUnitName);
+    const input = await screen.findByLabelText("Unit name for Heavy");
+    fireEvent.change(input, { target: { value: "Big Gun" } });
+    fireEvent.blur(input);
+    expect(onLoadoutUnitName).toHaveBeenCalledWith("l2", "Big Gun");
+  });
+
+  it("sends the loadout's own receipt when it is exported again", async () => {
+    const base = twoLoadouts();
+    const receipt = {
+      dir: "/games/some.sdd",
+      at: "t",
+      unitName: "skyfort_loadout_1",
+      def: {},
+      files: [
+        { path: "/games/some.sdd/units/skyfort_loadout_1.lua", sha256: "mine" },
+        { path: "/games/some.sdd/scripts/skyfort_loadout_1.lua", sha256: "s" },
+      ],
+    };
+    await open({
+      ...base,
+      loadouts: base.loadouts?.map((l) =>
+        l.id === "l1" ? { ...l, exported: receipt } : l,
+      ),
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Export" }));
+    await waitFor(() => expect(legoExport).toHaveBeenCalled());
+    const sent = legoExport.mock.calls[0][0];
+    expect(sent.scriptWritten).toBe("s");
+    expect(sent.unitDefFields).not.toBeNull();
+  });
+
+  it("offers to claim the definition of every loadout that has no digest", async () => {
+    const base = twoLoadouts();
+    const noDigest = (unitName: string) => ({
+      dir: "/games/some.sdd",
+      at: "t",
+      unitName,
+      def: {},
+      files: [],
+    });
+    legoGameLanguage.mockResolvedValue({ texts: {} });
+    legoReadTextFile.mockResolvedValue({ text: "return {}" });
+    const onAdoptLoadout = vi.fn();
+    render(
+      <ExportDrawer
+        open
+        onOpenChange={vi.fn()}
+        project={{
+          ...base,
+          loadouts: base.loadouts?.map((l) => ({
+            ...l,
+            exported: noDigest(
+              l.id === "l1" ? "skyfort_loadout_1" : "skyfort_heavy",
+            ),
+          })),
+        }}
+        pack={pack}
+        raw={null}
+        onRemember={vi.fn()}
+        onStale={vi.fn()}
+        onAdopt={vi.fn()}
+        onRememberLoadout={vi.fn()}
+        onAdoptLoadout={onAdoptLoadout}
+        onLoadoutUnitName={vi.fn()}
+      />,
+    );
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Treat skyfort_heavy.lua as coilbox's",
+      }),
+    );
+    await waitFor(() => expect(onAdoptLoadout).toHaveBeenCalled());
+    expect(onAdoptLoadout.mock.calls[0][0]).toBe("l2");
+    expect(
+      screen.getByRole("button", {
+        name: "Treat skyfort_loadout_1.lua as coilbox's",
+      }),
+    ).toBeTruthy();
   });
 });

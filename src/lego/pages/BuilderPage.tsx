@@ -107,6 +107,11 @@ import {
   openedFrom,
   withMeshBoxes,
 } from "../liftPiece";
+import {
+  adoptLoadoutFile,
+  recordLoadoutExport,
+  setLoadoutUnitName,
+} from "../loadouts";
 import { fitToSteps } from "../measure";
 import { canFixMesh, DEFAULT_SMOOTHING_ANGLE_DEG } from "../meshFix";
 import {
@@ -1881,6 +1886,22 @@ function Builder({ id }: { id: string | undefined }) {
           onAdopt={(receipts) =>
             edit((project) => ({ ...project, ...receipts }))
           }
+          onRememberLoadout={(id, settings, next, written) =>
+            edit((project) =>
+              recordLoadoutExport(
+                { ...project, ...settings },
+                id,
+                next,
+                written,
+              ),
+            )
+          }
+          onAdoptLoadout={(id, dir, file) =>
+            edit((project) => adoptLoadoutFile(project, id, dir, file))
+          }
+          onLoadoutUnitName={(id, name) =>
+            edit((project) => setLoadoutUnitName(project, id, name))
+          }
         />
 
         <BuildPictureDrawer
@@ -2000,6 +2021,9 @@ function Builder({ id }: { id: string | undefined }) {
                             project={draft}
                             selectedId={selectedId}
                             onEdit={edit}
+                            pack={pack}
+                            raw={raw}
+                            capture={doc.capture}
                           />
                         </div>
                       </div>
