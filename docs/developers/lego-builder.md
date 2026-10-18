@@ -823,6 +823,8 @@ Coilbox reaches the running game through the engine's autohost interface, and th
 
 Straight out of export, nothing lists the unit in any unit's `buildoptions`, so nothing can build it. `/cheat` and `/give` is the only way to get one onto a map.
 
+To put the exported loadouts of a chassis on a factory's build menu, open Compare loadouts, pick a builder under Build menu, tick the loadouts and press Add. This records an `add` for each unit in the game's newest workshop project, in upgrade chain order, and starts a project for the game if it has none. Remove takes them off again. A loadout that has not been exported is listed and not offered.
+
 ### Movement
 
 A movement class names an entry in the game's own move definitions, and the engine drops a unit that can move but names a class that does not resolve. So the builder never writes a class it made up. **Movement**, in the Animation panel, offers the classes of the unit's own game, read out of that game's `gamedata/movedefs.lua`.

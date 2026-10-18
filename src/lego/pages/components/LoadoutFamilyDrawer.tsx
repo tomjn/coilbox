@@ -30,6 +30,7 @@ import {
   weaponExportPlan,
 } from "../../weaponModule";
 import { worthTotals } from "../../worth";
+import { BuildMenuSection } from "./BuildMenuSection";
 import { useWeaponSource, type WeaponSource } from "./WeaponsSection";
 
 interface Props {
@@ -112,7 +113,7 @@ function FamilyTable({ project, pack, raw, pictures, onSwitch }: Props) {
   const shown = family.rows.filter((row) => row.differs || showSame);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 px-5 pt-4 pb-6">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 px-5 pt-4 pb-3">
       <div className="flex items-center gap-2">
         <Checkbox
           id="lego-family-same"
@@ -190,6 +191,7 @@ function FamilyTable({ project, pack, raw, pictures, onSwitch }: Props) {
           </tbody>
         </table>
       </div>
+      <BuildMenuSection project={project} />
     </div>
   );
 }
