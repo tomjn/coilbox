@@ -43,7 +43,7 @@ export async function resolveCompatTarget(opts: {
   const { target, game, settings } = opts;
   if (!settings[game.primaryArchive.name]?.enabled) return { kind: "off" };
 
-  const rebuild = `Open ${game.name} under Content and choose Rebuild.`;
+  const rebuild = `Open ${game.name} under Library > Games and choose Rebuild.`;
   const blocked = (why: string): CompatTarget => ({
     kind: "blocked",
     message: `Compatibility mode is on for ${game.name}, but ${why} ${rebuild}`,
