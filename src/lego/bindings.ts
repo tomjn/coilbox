@@ -385,9 +385,10 @@ export const legoExportObj = defineCommand<
 
 /**
  * Prepare the scratch `.sdd` a unit is tested in, at
- * `<dataDir>/games/<folder>`, and write the four files the caller generated:
- * the `modinfo.lua`, the side data naming the built unit as the start unit, the
- * gadget that spawns it, and the gadget that turns Lua unit scripts on. Where each lands is fixed on the Rust side. The
+ * `<dataDir>/games/<folder>`, and write the files the caller generated: the
+ * `modinfo.lua`, the gadget that turns Lua unit scripts on, and, when given,
+ * the side data naming a built unit as the start unit and the gadget that
+ * spawns it. Where each lands is fixed on the Rust side. The
  * unit itself goes in afterwards through `legoExport`, which treats it as any
  * other game folder. `folder` must be coilbox's own scratch name.
  */
@@ -396,8 +397,13 @@ export const legoScratchGame = defineCommand<
     dataDir: string;
     folder: string;
     modinfo: string;
-    sidedata: string;
-    gadget: string;
+    /**
+     * The side data and the gadget that spawn a start unit. Both are left out
+     * by a caller that has no single unit to start with, and a copy left in the
+     * folder by an earlier launch is removed.
+     */
+    sidedata?: string;
+    gadget?: string;
     unitScriptGadget: string;
     /**
      * `LuaRules/main.lua` and `LuaRules/draw.lua`, each only for a base game
