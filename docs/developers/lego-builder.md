@@ -340,6 +340,7 @@ Then open the **Animation** tab. Each preset says what it does and what it needs
 | Recoil on firing | A barrel |
 | Idle sway | A body |
 | Wreck pose | A body |
+| Break apart | Nothing |
 | Aim while building | A build arm |
 | Factory build cycle | A door |
 | Nano from the nozzle | A nano emit point |
@@ -688,6 +689,8 @@ A built unit leaves a wreck when it dies. The definition names it as `corpse = "
 The wreck is shaped like the **Wreck pose** preset when that is applied, and like the unit at rest when it is not. A wreck runs no script, so the pose is baked into its model. It holds half the unit's metal cost and half its health, rounded down, which is what Splinter Faction gives its own wrecks. It blocks the ground where a building stood, but not where a unit drove.
 
 Splinter Faction's death gadget drops a second wreck of its own when heat kills a unit, named by `customparams.corpse`. The builder writes that as an empty name, so a built unit there leaves only the one wreck. A heat kill's wreck then holds the feature file's half of the metal, not the gadget's full amount.
+
+The **Break apart** preset writes how the unit comes apart when it dies. It breaks the unit along its connections, and along the piece tree for a unit with none. The engine hands `Killed` the damage taken lately and the unit's health, and the script works out `recentDamage / maxHealth`. A hit up to the light threshold (25% by default) throws off the weakest third of the unit's branches whole, with smoke. A hit up to the medium threshold (50%) cuts one level deeper, throws two thirds, and adds fire. Anything heavier cuts at every connection, throws every part with smoke, fire and an explosion on impact, and shatters the body. The weakest group is the smallest. **How much breaks off** scales those shares. The engine draws debris in the model's rest pose, so a thrown part does not keep a pose an animation left it in. Every grade returns wreck level 1, because the export writes one wreck and no heap, and a higher level would leave none.
 
 The wreck's model is rewritten every export. Its feature file follows the script's rule: it is replaced while it is still what the last export wrote, and left alone once you edit it. The export drawer lists both, and says when it kept the feature file.
 
