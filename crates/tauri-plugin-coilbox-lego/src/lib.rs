@@ -3303,20 +3303,22 @@ fn write_scratch_file(dir: &Path, relative: &[&str], contents: &str) -> Result<(
         .map_err(|e| format!("could not write {}: {e}", target.display()))
 }
 
-/// Write the scratch game's generated files into `dir`: the `modinfo.lua`, the
-/// side data, the start unit gadget and the unit script gadget, in that order,
-/// and the sandbox's files
-/// before them when there is a sandbox. The sandbox goes first because
-/// installing the runtime removes the start unit gadget (see
+/// Write the scratch game's generated files into `dir`: the `modinfo.lua` and
+/// the unit script gadget, then the start unit's side data and gadget, and the
+/// sandbox's files before them when there is a sandbox. The sandbox goes first
+/// because installing the runtime removes the start unit gadget (see
 /// [`sandbox::write`]).
 ///
-/// `lua_rules` holds `LuaRules/main.lua` and `LuaRules/draw.lua`, each given
-/// only when the base game lacks it. One not given is removed, because the
-/// folder is reused and a copy left from testing on another game would hide
-/// this game's own.
+/// `start_unit` holds the side data and the gadget that spawns a start unit,
+/// which only a caller launching a single unit wants. `lua_rules` holds
+/// `LuaRules/main.lua` and `LuaRules/draw.lua`, each given only when the base
+/// game lacks it. A file not given is removed in both cases, because the
+/// folder is reused and a copy left from an earlier launch would either hide
+/// this game's own or spawn a unit nobody asked for.
 fn write_scratch_game(
     dir: &Path,
-    [modinfo, sidedata, gadget, unit_script_gadget]: [&str; 4],
+    [modinfo, unit_script_gadget]: [&str; 2],
+    start_unit: [Option<&str>; 2],
     lua_rules: [Option<&str>; 2],
     sandbox: Option<&sandbox::Sandbox>,
     runtime_src: Option<&Path>,
@@ -3330,15 +3332,13 @@ fn write_scratch_game(
             tauri_plugin_coilbox_scenario::runtime::read_marker(dir)?;
         }
     }
-    for (relative, contents) in [
-        (SCRATCH_MODINFO, modinfo),
-        (SCRATCH_SIDEDATA, sidedata),
-        (SCRATCH_GADGET, gadget),
-        (SCRATCH_UNIT_SCRIPT_GADGET, unit_script_gadget),
-    ] {
-        write_scratch_file(dir, relative, contents)?;
-    }
-    for (relative, contents) in SCRATCH_LUARULES_ENTRIES.into_iter().zip(lua_rules) {
+    write_scratch_file(dir, SCRATCH_MODINFO, modinfo)?;
+    write_scratch_file(dir, SCRATCH_UNIT_SCRIPT_GADGET, unit_script_gadget)?;
+    for (relative, contents) in [SCRATCH_SIDEDATA, SCRATCH_GADGET]
+        .into_iter()
+        .zip(start_unit)
+        .chain(SCRATCH_LUARULES_ENTRIES.into_iter().zip(lua_rules))
+    {
         match contents {
             Some(contents) => write_scratch_file(dir, relative, contents)?,
             None => remove_scratch_file(dir, relative)?,
@@ -3361,11 +3361,11 @@ fn remove_scratch_file(dir: &Path, relative: &[&str]) -> Result<(), String> {
 
 /// `lego_scratch_game` prepares the `.sdd` a unit is tested in.
 ///
-/// It writes the four files the frontend generated into
+/// It writes the files the frontend generated into
 /// `<data_dir>/games/<folder>`: the `modinfo.lua` naming the base game, the
-/// `gamedata/sidedata.lua` declaring the built unit as a side's start unit,
-/// the gadget that spawns it, and the gadget that turns Lua unit scripts on
-/// where the base game has not. `lua_rules_main` and `lua_rules_draw` are
+/// gadget that turns Lua unit scripts on where the base game has not, and,
+/// only when given, the `gamedata/sidedata.lua` declaring a built unit as a
+/// side's start unit and the gadget that spawns it. `lua_rules_main` and `lua_rules_draw` are
 /// `LuaRules/main.lua` and `LuaRules/draw.lua`, given only for a base game that
 /// lacks them and removed otherwise (issue #4475). `sandbox` adds what "Play with this unit"
 /// needs on top, see [`sandbox`]. The unit itself follows through
@@ -3381,8 +3381,8 @@ async fn lego_scratch_game<R: Runtime>(
     data_dir: String,
     folder: String,
     modinfo: String,
-    sidedata: String,
-    gadget: String,
+    sidedata: Option<String>,
+    gadget: Option<String>,
     unit_script_gadget: String,
     lua_rules_main: Option<String>,
     lua_rules_draw: Option<String>,
@@ -3409,7 +3409,8 @@ async fn lego_scratch_game<R: Runtime>(
     };
     if let Err(e) = write_scratch_game(
         &dir,
-        [&modinfo, &sidedata, &gadget, &unit_script_gadget],
+        [&modinfo, &unit_script_gadget],
+        [sidedata.as_deref(), gadget.as_deref()],
         [lua_rules_main.as_deref(), lua_rules_draw.as_deref()],
         sandbox.as_ref(),
         runtime_src.as_deref(),
@@ -4554,13 +4555,15 @@ mod tests {
             mission: "return {}".into(),
             ship_runtime: true,
         };
-        let files = ["modinfo", "sidedata", "start unit", "unit script"];
+        let files = ["modinfo", "unit script"];
+        let start_unit = [Some("sidedata"), Some("start unit")];
 
         // Twice, so the second launch finds the first one's files in place.
         for _ in 0..2 {
             write_scratch_game(
                 dir.path(),
                 files,
+                start_unit,
                 [None, None],
                 Some(&sandbox),
                 Some(src.path()),
@@ -4591,21 +4594,61 @@ mod tests {
     #[test]
     fn a_luarules_entry_is_written_only_while_the_base_game_lacks_it() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let files = ["modinfo", "sidedata", "start unit", "unit script"];
+        let files = ["modinfo", "unit script"];
+        let start_unit = [Some("sidedata"), Some("start unit")];
         let draw = dir.path().join("LuaRules/draw.lua");
         let main = dir.path().join("LuaRules/main.lua");
 
-        write_scratch_game(dir.path(), files, [None, Some("-- handler")], None, None)
-            .expect("write");
+        write_scratch_game(
+            dir.path(),
+            files,
+            start_unit,
+            [None, Some("-- handler")],
+            None,
+            None,
+        )
+        .expect("write");
         assert_eq!(std::fs::read_to_string(&draw).expect("draw"), "-- handler");
         assert!(!main.exists(), "the base game's main.lua is left to it");
 
-        write_scratch_game(dir.path(), files, [None, None], None, None).expect("write");
+        write_scratch_game(dir.path(), files, start_unit, [None, None], None, None).expect("write");
         assert!(!draw.exists(), "the earlier copy would hide the game's own");
         assert_eq!(
             std::fs::read_to_string(dir.path().join("LuaRules/Gadgets/coilbox_start_unit.lua"))
                 .expect("gadget"),
             "start unit"
+        );
+    }
+
+    /// A caller that launches several units has no start unit, and the folder
+    /// is reused, so the last launch's spawn gadget must not survive it.
+    #[test]
+    fn a_scratch_game_without_a_start_unit_removes_the_last_ones() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let files = ["modinfo", "unit script"];
+        let sidedata = dir.path().join("gamedata/sidedata.lua");
+        let gadget = dir.path().join("LuaRules/Gadgets/coilbox_start_unit.lua");
+
+        write_scratch_game(
+            dir.path(),
+            files,
+            [Some("sidedata"), Some("start unit")],
+            [None, None],
+            None,
+            None,
+        )
+        .expect("write");
+        assert!(sidedata.exists() && gadget.exists());
+
+        write_scratch_game(dir.path(), files, [None, None], [None, None], None, None)
+            .expect("write");
+        assert!(!sidedata.exists());
+        assert!(!gadget.exists());
+        assert!(dir.path().join("modinfo.lua").exists());
+        assert!(
+            dir.path()
+                .join("LuaRules/Gadgets/coilbox_unit_script.lua")
+                .exists()
         );
     }
 
