@@ -67,6 +67,22 @@ A scenario can vary by difficulty, and then the player picks a level on the miss
 
 Which game can play a scenario mission, and what a game has to do to play one itself, is [the mission runtime's](mission-runtime.md) business rather than the campaign's.
 
+## Units from the unit builder
+
+A campaign can bring its own units, made in the [unit builder](lego-builder.md). Under **Units** in the campaign editor, press **Attach unit** and pick one of your saved units. Every mission in the campaign then launches with it.
+
+Attaching takes a copy, the same way attaching a preset snapshots its setup. The copy is the unit already built: its model, unit definition, script and the rest of what a game folder holds for it, plus the unit's own document. Coilbox stores it under `campaign/units/<campaign id>/` in its data folder. Editing the unit in the builder afterwards does not change the campaign. The row says **Changed in the library** when the builder's copy is newer, and **Update from library** takes a fresh copy. Nothing else ever does.
+
+The copy carries the unit's atlas only when it comes from an atlas pack. The bundled atlas ships with coilbox, so a unit built on it carries none. An imported unit, or one that mixes parts with lifted pieces, always carries its own textures.
+
+When a mission starts, coilbox writes a game of its own, `coilbox-lego-campaign-<campaign id>.sdd`, that depends on the mission's game and holds the campaign's units. It is written against the exact game the mission names, so it is rewritten when that changes, and left alone when nothing has. The mission launches as that game. A mission that plays a scenario plays it on top of the same game. The replay records that game's name rather than the base game's.
+
+A unit enters play through the builders picked for it under [Built by](lego-builder.md#built-by). Some games never read that list. Beyond All Reason and Zero-K are two. The briefing names what was left out after **Start Mission**, the same lines the Test drawer shows.
+
+The mission editor's **Restricted Units** lists the campaign's units with the game's own, under the builders that build them, so a mission can hold one back like any other unit.
+
+This is singleplayer only. A game coilbox writes on one machine cannot be synced to a lobby. Export does not carry the copies yet ([issue #4517](https://github.com/tomjn/coilbox/issues/4517)).
+
 ## Export and import
 
 A campaign can be exported to a single `.json` file (Campaign Builder > a campaign > Export) for sharing. The export format:
