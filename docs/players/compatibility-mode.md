@@ -6,10 +6,6 @@ With compatibility mode on, coilbox writes a second game that loads the old one 
 
 Each game has its own switch, and coilbox builds nothing until you turn it on.
 
-::: warning Screenshot needed
-A screenshot of a game page's Compatibility section, with the switch on and the build result showing, goes here.
-:::
-
 ## Check a game
 
 1. Open Library > Games and select the game.
@@ -24,10 +20,6 @@ An archive's page in Library > Archives has a Convert models button for a game w
 Each row is one kind of finding. The number on the right is how many there are, where counting them means something. A row with an arrow opens to show the details, such as each file and line behind a count of Lua calls.
 
 A warning triangle is a problem: something the current engine no longer does. An info icon is worth knowing and changes nothing on its own.
-
-::: warning Screenshot needed
-A screenshot of a game's report, with the Lua calls row opened to show files and lines, goes here.
-:::
 
 Engine versions in the details name the engine as it was called at the time. Up to 105.0 that is Spring, for example "removed in Spring 105.0". From 105.1.1 on it is Recoil.
 
