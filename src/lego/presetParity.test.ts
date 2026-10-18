@@ -363,7 +363,28 @@ function wheelsPlan(): Plan {
     events: [...CREATED, { frame: CALLIN, callin: "StartMoving" }],
     frames,
     spans: [{ from: CALLIN, to: frames - 1, t0: 0 }],
-    exceptions: [],
+    exceptions: [
+      "The parity unit's wheels are parts with no round shape to measure, so they turn at the fixed rate unless a radius is set. With one set they turn at the preview's undriven speed over that radius. Following a changing speed is checked in wheelMotion.test.ts.",
+    ],
+  };
+}
+
+/**
+ * Nothing drives the unit, so its heading and speed hold, and neither the
+ * front wheels nor the body move. The parity unit has one wheel, so none of it
+ * is in front and the steering writes nothing. What this checks is that the
+ * scripts run under the runtime. Following a heading and an acceleration is
+ * checked in wheelMotion.test.ts.
+ */
+function steadyPlan(): Plan {
+  const frames = CALLIN + 5 * FPS;
+  return {
+    events: [...CREATED, { frame: CALLIN, callin: "StartMoving" }],
+    frames,
+    spans: [{ from: CALLIN, to: frames - 1, t0: 0 }],
+    exceptions: [
+      "The unit is not driven, so its heading and speed do not change and nothing steers or leans. Following them is checked in wheelMotion.test.ts.",
+    ],
   };
 }
 
@@ -454,6 +475,9 @@ function plan(preset: AnimPreset, params: Record<string, number>): Plan {
       return wheelsPlan();
     case "rudder.follow":
       return rudderPlan();
+    case "wheels.steer":
+    case "body.rock":
+      return steadyPlan();
     case "wake.moving":
       return wakePlan();
     case "gear.stow":
@@ -665,9 +689,9 @@ function buildCases() {
 describe("preset parity fixture", () => {
   const cases = buildCases();
 
-  it("covers all 18 presets", () => {
-    expect(new Set(cases.map((entry) => entry.preset.id)).size).toBe(18);
-    expect(PRESETS).toHaveLength(18);
+  it("covers all 20 presets", () => {
+    expect(new Set(cases.map((entry) => entry.preset.id)).size).toBe(20);
+    expect(PRESETS).toHaveLength(20);
   });
 
   it("matches what the presets generate today", () => {
