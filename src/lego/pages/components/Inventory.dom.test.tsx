@@ -2,8 +2,9 @@
 
 /**
  * The one inventory (issue #3306): the kind filter, the recent and favourites
- * lists, and what is drawn for each. The grid is replaced with lists of
- * names, because what is under test is which items reach it.
+ * lists, and what is drawn for each, and which tile the detail panel shows
+ * (#4537). The grid is replaced with lists of names and the panel with what it
+ * was asked to show, because what is under test is which items reach them.
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -66,6 +67,8 @@ vi.mock("./TileGrid", async () => {
   return {
     TileGrid: ({
       sections,
+      selectedKey,
+      onPick,
       favourites,
       onFavourite,
       scrollRoot,
@@ -76,13 +79,19 @@ vi.mock("./TileGrid", async () => {
         total: number;
         items: Item[];
       }[];
+      selectedKey?: string;
+      onPick: (item: Item, alt: boolean) => void;
       favourites: ReadonlySet<string>;
       onFavourite: (item: Item) => void;
       scrollRoot?: unknown;
     }) => {
       const items = sections.flatMap((section) => section.items);
       return (
-        <section aria-label="grid" data-scroll={scrollRoot ? "page" : "own"}>
+        <section
+          aria-label="grid"
+          data-scroll={scrollRoot ? "page" : "own"}
+          data-selected={selectedKey ?? ""}
+        >
           {sections
             .filter((section) => section.items.length > 0)
             .map((section) => (
@@ -97,6 +106,9 @@ vi.mock("./TileGrid", async () => {
                 {these.map((item) => (
                   <li key={keyOf(item)}>
                     {nameOf(item)}
+                    <button type="button" onClick={() => onPick(item, false)}>
+                      pick {nameOf(item)}
+                    </button>
                     <button type="button" onClick={() => onFavourite(item)}>
                       {favourites.has(keyOf(item)) ? "unstar" : "star"}{" "}
                       {nameOf(item)}
@@ -111,6 +123,30 @@ vi.mock("./TileGrid", async () => {
     },
   };
 });
+
+/** What the panel was asked to show, a field that uses Escape, and its X. */
+vi.mock("./DetailPanel", () => ({
+  DetailPanel: ({
+    selected,
+    onClose,
+  }: {
+    selected: { kind: string; id: string };
+    onClose: () => void;
+  }) => (
+    <aside aria-label="detail">
+      {`${selected.kind}:${selected.id}`}
+      <input
+        aria-label="panel field"
+        onKeyDown={(event) => {
+          if (event.key === "Escape") event.preventDefault();
+        }}
+      />
+      <button type="button" onClick={onClose}>
+        close
+      </button>
+    </aside>
+  ),
+}));
 
 import { type InventoryRef, useInventoryView } from "../../inventory";
 import { InventoryFilters, InventoryGrids } from "./Inventory";
@@ -152,9 +188,11 @@ const modules = [module("leg"), module("turret")];
 function Harness({
   known = modules,
   showGameUnits = false,
+  escapeAnywhere = false,
 }: {
   known?: LegoProject[];
   showGameUnits?: boolean;
+  escapeAnywhere?: boolean;
 }) {
   const view = useInventoryView(pack, known);
   return (
@@ -173,6 +211,7 @@ function Harness({
         onDeleteModule={vi.fn()}
         onRenameModule={vi.fn()}
         onCopyModule={vi.fn()}
+        escapeAnywhere={escapeAnywhere}
       />
       <button
         type="button"
@@ -558,9 +597,12 @@ describe("one scroll for the page", () => {
         onDeleteModule={vi.fn()}
         onRenameModule={vi.fn()}
         onCopyModule={vi.fn()}
-        aside={<aside aria-label="detail" />}
       />
     );
+  }
+
+  function openDetail() {
+    fireEvent.click(screen.getByRole("button", { name: "pick beam" }));
   }
 
   it("hands the page's scroller to the grid", () => {
@@ -572,6 +614,7 @@ describe("one scroll for the page", () => {
 
   it("keeps the detail beside the grids in view as the page scrolls", () => {
     render(<Grids page />);
+    openDetail();
     const holder = screen.getByLabelText("detail").parentElement as HTMLElement;
     expect(holder.className).toContain("sticky");
     expect(holder.className).toContain("top-0");
@@ -582,7 +625,69 @@ describe("one scroll for the page", () => {
     expect(screen.getByLabelText("grid").getAttribute("data-scroll")).toBe(
       "own",
     );
+    openDetail();
     const holder = screen.getByLabelText("detail").parentElement as HTMLElement;
     expect(holder.className).not.toContain("sticky");
+  });
+});
+
+/** One panel for every kind of tile (#4537). */
+describe("the detail panel", () => {
+  const detail = () =>
+    screen.queryByLabelText("detail")?.firstChild?.textContent;
+  const selectedKey = () =>
+    screen.getByLabelText("grid").getAttribute("data-selected");
+
+  it("is closed until a tile is picked", () => {
+    render(<Harness />);
+    expect(screen.queryByLabelText("detail")).toBeNull();
+  });
+
+  it("opens a shape, a part and a module, each replacing the last", () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "pick Cylinder" }));
+    expect(detail()).toBe("shape:cylinder");
+    expect(selectedKey()).toBe("shape:cylinder");
+
+    fireEvent.click(screen.getByRole("button", { name: "pick beam" }));
+    expect(detail()).toBe("part:beam");
+    expect(selectedKey()).toBe("part:beam");
+
+    fireEvent.click(screen.getByRole("button", { name: "pick turret" }));
+    expect(detail()).toBe("module:turret");
+    expect(selectedKey()).toBe("module:turret");
+    expect(screen.getAllByLabelText("detail")).toHaveLength(1);
+  });
+
+  it("closes with its X", () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "pick leg" }));
+    fireEvent.click(screen.getByRole("button", { name: "close" }));
+    expect(screen.queryByLabelText("detail")).toBeNull();
+    expect(selectedKey()).toBe("");
+  });
+
+  it("closes with Escape from anywhere on the Lego Parts page", () => {
+    render(<Harness escapeAnywhere />);
+    fireEvent.click(screen.getByRole("button", { name: "pick leg" }));
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(screen.queryByLabelText("detail")).toBeNull();
+  });
+
+  it("stays open when a field in it used the Escape", () => {
+    render(<Harness escapeAnywhere />);
+    fireEvent.click(screen.getByRole("button", { name: "pick leg" }));
+    fireEvent.keyDown(screen.getByLabelText("panel field"), { key: "Escape" });
+    expect(detail()).toBe("module:leg");
+  });
+
+  it("in the builder, closes with Escape only from the grid or the panel", () => {
+    render(<Harness />);
+    const pick = screen.getByRole("button", { name: "pick leg" });
+    fireEvent.click(pick);
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(detail()).toBe("module:leg");
+    fireEvent.keyDown(pick, { key: "Escape" });
+    expect(screen.queryByLabelText("detail")).toBeNull();
   });
 });

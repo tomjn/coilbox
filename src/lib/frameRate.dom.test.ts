@@ -115,6 +115,20 @@ describe("showFrameRates", () => {
     view.stop();
   });
 
+  it("leaves a view marked off without a label", () => {
+    const view = fakeView();
+    view.host.dataset.frameRate = "off";
+    const hide = showFrameRates();
+    frame(0);
+    for (let i = 0; i < 20; i++) {
+      view.info.render.frame++;
+      frame(100);
+    }
+    expect(view.host.childElementCount).toBe(0);
+    hide();
+    view.stop();
+  });
+
   it("drops the label of a view that closed", () => {
     const view = fakeView();
     const hide = showFrameRates();
