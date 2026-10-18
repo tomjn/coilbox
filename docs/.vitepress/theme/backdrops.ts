@@ -63,9 +63,9 @@ export const BACKDROPS: Record<string, Backdrop> = {
   "conquest.md": { toolId: "conquest.list", strength: PAGE_STRENGTH },
   "roguelite-run.md": { toolId: "runlite.list", strength: PAGE_STRENGTH },
   "mission-runtime.md": { toolId: "scenario.builder", strength: PAGE_STRENGTH },
-  "map-packs.md": { toolId: "downloads.maps", strength: PAGE_STRENGTH },
+  "map-packs.md": { toolId: "library.downloads", strength: PAGE_STRENGTH },
   "branding-catalog.md": { toolId: "content.games", strength: PAGE_STRENGTH },
-  "distributing.md": { toolId: "downloads.browse", strength: PAGE_STRENGTH },
+  "distributing.md": { toolId: "library.rapid", strength: PAGE_STRENGTH },
   "portable-mode.md": { toolId: "content.archives", strength: PAGE_STRENGTH },
   "lobby-moderation.md": {
     toolId: "multiplayer.chat",

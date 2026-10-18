@@ -16,7 +16,7 @@ describe("withDownloadNotify", () => {
       expect.objectContaining({
         level: "success",
         body: "byar:test",
-        to: "/downloads",
+        to: "/library/downloads",
       }),
     );
   });
@@ -30,7 +30,7 @@ describe("withDownloadNotify", () => {
       expect.objectContaining({
         level: "error",
         body: "byar:test",
-        to: "/downloads",
+        to: "/library/downloads",
       }),
     );
   });

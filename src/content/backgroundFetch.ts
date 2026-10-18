@@ -69,7 +69,7 @@ export async function fetchListsInBackground({
     () => loadSpringfilesEngines(),
     warmGameReleases,
   ];
-  if (!isProfileHidden("downloads.games")) {
+  if (!isProfileHidden("library.games")) {
     fetches.push(() => loadSpringfilesList("game"));
   }
   if (hubUrl) fetches.push(() => loadHubGames(hubUrl, false));

@@ -76,7 +76,7 @@ function RequirementRow({
         <p className="text-xs text-muted-foreground">
           {req.gameName} depends on it, and coilbox cannot download an archive
           by this name. Find it in{" "}
-          <Link className="underline underline-offset-4" to="/downloads/games">
+          <Link className="underline underline-offset-4" to="/library/games">
             game downloads
           </Link>
           , then try again.

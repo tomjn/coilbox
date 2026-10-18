@@ -53,8 +53,8 @@ Coilbox reads the folder in place and never writes into it. It searches it after
   "title": "Splinter Faction - Coilbox",
   "mode": "dark",
   "accent": "orange",
-  "hide": ["downloads.browse", "downloads.games", "content.games"],
-  "hideSettings": ["engines", "engine-settings", "downloads"],
+  "hide": ["library.rapid", "content.games"],
+  "hideSettings": ["engines", "engine-settings", "sources"],
   "gameFilter": { "regex": "^Splinter *Faction" },
   "welcome": {
     "css": ".coilbox-welcome{display:flex;flex-direction:column;align-items:center;gap:20px;padding:64px 32px;text-align:center;font-family:system-ui}.coilbox-welcome img{width:200px}.coilbox-welcome h1{color:hsl(var(--primary));font-weight:800}.coilbox-welcome .cta a{padding:10px 20px;border-radius:8px;font-weight:600;text-decoration:none}.coilbox-welcome .cta a.primary{background:hsl(var(--primary));color:hsl(var(--primary-foreground))}",
@@ -121,7 +121,7 @@ Profile content is composable through a single `@<namespace>/<rest>` token. The 
 | Token                          | Means                                                                 |
 | ------------------------------ | --------------------------------------------------------------------- |
 | `@.coilbox/<path>`             | A **file** under the portable `.coilbox/` folder. A path that escapes the folder (`..`, absolute) is rejected — it can only read files you shipped. |
-| `@route/<app-route>`           | An **in-app route**, e.g. `@route/singleplayer`, `@route/downloads/games`. |
+| `@route/<app-route>`           | An **in-app route**, e.g. `@route/singleplayer`, `@route/library/games`. |
 | `@widget/<name>[/<arg>]`       | An embedded **live Coilbox component** (see [widgets](#widget-catalogue) below). |
 
 Anything that can't be resolved (a missing file, an unknown widget, an escaping path) renders a **visible error/placeholder**, never a silent blank — so a typo in a bundle is obvious rather than mysterious.
@@ -275,8 +275,7 @@ Hides top-level navigation items (sidebar + welcome launcher) by id, and makes t
 
 | id                   | Sidebar item          |
 | -------------------- | --------------------- |
-| `downloads.browse`   | Downloads > Browse Rapid |
-| `downloads.games`    | Downloads > Games     |
+| `library.rapid`      | Library > Rapid repositories (advanced mode) |
 | `library.games`      | Library > Games       |
 | `content.setupPacks` | Coilbox hub's "Share a pack" button |
 | `multiplayer.stats`  | Records > Player stats |
@@ -290,7 +289,7 @@ Hides top-level navigation items (sidebar + welcome launcher) by id, and makes t
 | `analytics.run` | The button that runs the engine over a replay to analyse it, and everything that steers a run. An analysis that is already stored still shows |
 
 ```json
-{ "version": 1, "hide": ["downloads.games", "library.games"] }
+{ "version": 1, "hide": ["library.games", "library.rapid"] }
 ```
 
 > The four `analytics.*` ids hide parts of a page, not nav items, so a distribution can switch the replay analytics off piece by piece. `analytics.run` is separate from the rest because it is the only part that costs anything: it spends CPU time running the engine over a replay. All four work today. [Where a replay's numbers come from](../reference/replay-data-sources.md) says what each part of the replay analytics shows.
@@ -300,6 +299,8 @@ Hides top-level navigation items (sidebar + welcome launcher) by id, and makes t
 > See **[routes.md](../reference/routes.md)** for the full list of pages and nav ids.
 
 > **Renamed ids still work.** Content became Library, so `content.maps`, `content.games`, `content.blueprints`, `content.archives` and the `content` settings section are now `library.*` and `library`. A profile written against the old names keeps working, in `hide`, `hideSettings` and `art` alike, and the profile health check names the replacement rather than reporting the id as matching nothing. `content.setupPacks` did not change, because it never named a nav item.
+>
+> The Downloads group went into the Library the same way. `downloads.games` and `downloads.maps` are now `library.games` and `library.maps`, `downloads.browse` is `library.rapid`, and the `downloads` settings section is `sources`. A profile that hid `downloads.games` now hides the Library Games page.
 >
 > The paths moved too, so `#/content/maps` is now `#/library/maps` and so on. A `@route/content/...` ref and a hand-written `#/content/...` link both still resolve, because the old paths redirect, but they cost a redirect on the way. Prefer the new ones.
 
@@ -313,7 +314,7 @@ Hides settings sections from the Settings navigation by id. **Any** app settings
 | `content-folders` | Content Folders    |
 | `engines`         | Engines            |
 | `engine-settings` | Engine Settings    |
-| `downloads`       | Downloads          |
+| `sources`         | Sources            |
 | `lobby-servers`   | Lobby servers      |
 | `uberstress`      | uberstress         |
 | `mapconv`         | mapconv            |
@@ -323,7 +324,7 @@ Hides settings sections from the Settings navigation by id. **Any** app settings
 | `frame.appearance`| Appearance (theme/accent) |
 
 ```json
-{ "version": 1, "hideSettings": ["engines", "engine-settings", "downloads"] }
+{ "version": 1, "hideSettings": ["engines", "engine-settings", "sources"] }
 ```
 
 Hiding the built-in **Appearance** section pairs well with forcing `mode` / `accent` — it removes the theme controls so the brand's look is fixed:
@@ -410,7 +411,7 @@ Instead of inlining the markup, point `html`/`css` at a **file** in your `.coilb
 - **Links that go nowhere**: an `<a>` Coilbox cannot follow is ignored, and says why in the developer console. An `https:` or `http:` link opens in the system browser, a `mailto:` link in the mail client and a `tel:` link in the dialler, so Coilbox stays on screen behind whatever opens. A `#/…` hash link moves around inside the app. Everything else is a mistake it will not act on, because following it would replace Coilbox with whatever is at the other end and only a restart would bring it back. A relative `href="images/logo.webp"` is the picture rather than a page, an `href="@route/play/replays"` needs the `navigate` marker below to mean anything, and an app-absolute `href="/play/replays"` is a full page load, so write that one as `#/play/replays`.
 - **Actions**: the welcome HTML can't run JavaScript, but any element carrying a `data-coilbox-action` attribute is wired to a built-in action when clicked — the interactive hook available without scripting.
   - `data-coilbox-action="quit"` closes Coilbox. Use it to add your own exit control to a branded landing page (handy for fullscreen builds). This works regardless of the [`quit`](#quit-boolean) flag.
-  - `data-coilbox-action="navigate"` goes to an in-app route named in a `data-coilbox-route` attribute (or the element's `href`), using the same `@route/<path>` / `.md` / `/path` scheme as [custom pages](#custom-pages) — so `@route/singleplayer` and `/downloads/games` both resolve to the same route a page link would. A route that doesn't resolve is ignored (no crash). This makes a "Play now" button possible on the welcome screen from any element, not just an `<a href="#/…">`. A `#/…` hash link is not one of those spellings and does not need to be: it navigates on its own, with or without the marker.
+  - `data-coilbox-action="navigate"` goes to an in-app route named in a `data-coilbox-route` attribute (or the element's `href`), using the same `@route/<path>` / `.md` / `/path` scheme as [custom pages](#custom-pages) — so `@route/singleplayer` and `/library/games` both resolve to the same route a page link would. A route that doesn't resolve is ignored (no crash). This makes a "Play now" button possible on the welcome screen from any element, not just an `<a href="#/…">`. A `#/…` hash link is not one of those spellings and does not need to be: it navigates on its own, with or without the marker.
 
   The same markers work in the [`home`](#home-object) key's markup, and mean the same thing there.
 

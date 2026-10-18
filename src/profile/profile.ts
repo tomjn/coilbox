@@ -228,7 +228,7 @@ export interface Profile {
   icon?: string;
   /** App-frame chrome (breadcrumb/history/popover/fullscreen/menu/logos). */
   layout?: ProfileLayout;
-  /** Nav item ids to hide from the sidebar/launcher, e.g. ["downloads.games"]. */
+  /** Nav item ids to hide from the sidebar/launcher, e.g. ["library.games"]. */
   hide?: string[];
   /** Settings section ids to hide from the settings nav, e.g. ["uberstress"]. */
   hideSettings?: string[];

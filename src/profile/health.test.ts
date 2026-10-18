@@ -20,7 +20,7 @@ function base(): HealthInputs {
     scenarioFailures: [],
     writable: { writeRoot: { writable: true }, dataDir: { writable: true } },
     hide: [],
-    hideableNavIds: ["library.games", "downloads.browse", "downloads.games"],
+    hideableNavIds: ["library.games", "library.rapid"],
     hideSettings: [],
     settingsIds: ["content-folders", "engines", "uberstress"],
     appIcon: null,

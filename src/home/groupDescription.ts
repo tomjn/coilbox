@@ -3,8 +3,7 @@
  * is for.
  *
  * The headings alone leave a lot unsaid. "Play" and "Library" are guessable,
- * but nothing on the page distinguishes Library from Downloads, and a heading
- * reading "Mapping Tools" tells a first-time player nothing about whether it is
+ * but a heading reading "Mapping Tools" tells a first-time player nothing about whether it is
  * for them.
  *
  * ## Why a table here rather than a field on each group
@@ -28,8 +27,7 @@ const GROUP_DESCRIPTIONS: Readonly<Record<string, string>> = {
   multiplayer: "Log in to a lobby server, chat, and join battles.",
   records: "Your career, player stats and replays of games already played.",
   library:
-    "Everything installed on this machine: maps, games, blueprints and archives.",
-  downloads: "Find and install maps, games and other content.",
+    "Your maps, games and blueprints, what other players have shared, and what is downloading.",
   builder: "Build your own campaigns and scenarios.",
   uberstress: "Run engine stress tests and compare the results.",
   mapconv: "Compile and decompile maps.",

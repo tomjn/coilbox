@@ -1,16 +1,18 @@
 import { Button, Input, useSetting } from "@picoframe/frame";
-import { Plus, Server, Swords, Trash2 } from "lucide-react";
+import { Globe, Plus, Server, Swords, Trash2 } from "lucide-react";
 import { Field } from "@/components/Field";
 import { Switch } from "@/components/ui/switch";
+import { HubAddressField } from "../../hub/pages/components/HubAddressField";
 import { AUTO_DOWNLOAD_ON_JOIN_KEY } from "../../multiplayer/battle/autoDownload";
+import { isHubEnabled } from "../../profile/profile";
 import { useDownloadsConfig } from "../config";
 
 /**
- * The downloads plugin's settings section (frame settings page at
- * `/settings/downloads`). Two concerns, both persisted immediately (no Save
- * button):
- *  - the list of rapid masters offered in the Browse Rapid / Games dropdowns
+ * Settings > Library > Sources (frame settings page at `/settings/sources`,
+ * issue #4584). Three concerns, all persisted immediately (no Save button):
+ *  - the list of rapid masters offered on the Rapid repositories page
  *  - whether joining a battle fetches missing content on its own (issue #439)
+ *  - which Coilbox hub to read, while the hub is on
  *
  * Where downloads are written is not here. It is chosen beside the folders
  * themselves, in the content plugin's Content folders page.
@@ -123,6 +125,16 @@ export default function DownloadsSettings() {
           />
         </label>
       </section>
+
+      {/* The hub, unless the profile has switched it off */}
+      {isHubEnabled() && (
+        <section className="space-y-3">
+          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            <Globe size={15} /> Coilbox hub
+          </h2>
+          <HubAddressField />
+        </section>
+      )}
     </div>
   );
 }
