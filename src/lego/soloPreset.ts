@@ -17,6 +17,7 @@ import type { LegoProject } from "./model";
 export const SOLO_SCENARIOS: Record<string, string> = {
   "walk.biped": "moving",
   "walk.quad": "moving",
+  "walk.legs": "moving",
   "turret.track": "firing",
   "wheels.roll": "moving",
   // Reads the heading, which only the driving scenario changes.
@@ -61,7 +62,7 @@ export function soloProject(
   instance: string | null = null,
 ): LegoProject {
   const preset = presetById(presetId);
-  const roles = new Set(preset ? presetRoles(preset) : []);
+  const roles = new Set(preset ? presetRoles(preset, project.pieces) : []);
   return {
     ...project,
     animations: (project.animations ?? []).filter(

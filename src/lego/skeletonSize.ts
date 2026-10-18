@@ -12,6 +12,9 @@
  *   height in the proportion they already have.
  * - Four legs: stance sets the width and body length the length. The height is
  *   shared as for two legs.
+ * - Six and eight legs: stance sets the width, and the gap between pairs the
+ *   length over the gaps between the pairs, so the leg count is kept. The
+ *   height is shared as for two legs.
  * - Wheels: track width sets the width, the span of the axles the length
  *   (axle spacing over the gaps between the axles, so the axle count is kept),
  *   and wheel height the height.
@@ -126,6 +129,22 @@ function splitHeight(
   return out;
 }
 
+/** The rule for a body on `pairs` evenly spaced leg pairs. */
+function manyLegsRule(pairs: number): Rule {
+  return {
+    measure: (v) => ({
+      x: v.stance,
+      z: (pairs - 1) * v.legGap,
+      height: v.legLength + v.bodyHeight,
+    }),
+    fit: (v, g, plan) => ({
+      stance: g.x,
+      legGap: g.z / (pairs - 1),
+      ...splitHeight(plan, ["legLength", "bodyHeight"], v, g.height),
+    }),
+  };
+}
+
 const RULES: Record<string, Rule> = {
   biped: {
     measure: (v) => ({
@@ -150,6 +169,8 @@ const RULES: Record<string, Rule> = {
       ...splitHeight(plan, ["legLength", "bodyHeight"], v, g.height),
     }),
   },
+  hexapod: manyLegsRule(3),
+  octopod: manyLegsRule(4),
   wheeled: {
     measure: (v) => ({
       x: v.trackWidth,
