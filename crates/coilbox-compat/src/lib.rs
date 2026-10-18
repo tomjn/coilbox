@@ -338,6 +338,103 @@ pub fn is_prelude_fix(id: &str) -> bool {
         .is_some_and(|h| !h.states.is_empty())
 }
 
+/// A prelude fix that puts a call-in's arguments back in an older order, and
+/// how to tell a handler written for the current order.
+struct Adapter {
+    fix: &'static str,
+    /// The catalogue entry the fix addresses, which the scan of a game's Lua
+    /// names a handler's call-in by.
+    entry: &'static str,
+    /// The 0-based position of the first argument the change moved.
+    moved: usize,
+    /// How many arguments the old list had.
+    old_len: usize,
+    /// Part of the name of the argument the change added, lower case. The old
+    /// list has nothing by that name.
+    added: &'static str,
+}
+
+/// Changing this changes the mutator two players build from the same manifest,
+/// so a change here needs a new manifest, as a changed fix does.
+const ADAPTERS: &[Adapter] = &[
+    Adapter {
+        fix: "callin-unit-damaged-95",
+        entry: "signature:UnitDamaged@95.0",
+        moved: 6,
+        old_len: 9,
+        added: "proj",
+    },
+    Adapter {
+        fix: "callin-allow-command-105",
+        entry: "signature:AllowCommand@105.0",
+        moved: 7,
+        old_len: 8,
+        added: "player",
+    },
+];
+
+/// A call-in handler a game's Lua defines, as the scan of it reports one: the
+/// catalogue entry of the call-in, such as `signature:UnitDamaged@95.0`, and
+/// the arguments the handler takes from the engine.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Handler {
+    pub entry: String,
+    pub params: Vec<String>,
+}
+
+#[derive(PartialEq)]
+enum Order {
+    Old,
+    New,
+    /// The handler reads none of the arguments the change moved.
+    Either,
+}
+
+fn order(adapter: &Adapter, params: &[String]) -> Order {
+    let named: Vec<String> = params
+        .iter()
+        .filter(|p| *p != "...")
+        .map(|p| p.to_ascii_lowercase())
+        .collect();
+    if named.len() > adapter.old_len || named.iter().any(|p| p.contains(adapter.added)) {
+        Order::New
+    } else if named.len() > adapter.moved {
+        Order::Old
+    } else {
+        Order::Either
+    }
+}
+
+/// `manifest` without the call-in adapters a game whose Lua defines `handlers`
+/// does not need, keeping the order of the rest.
+///
+/// An adapter is left out when at least one handler of its call-in takes the
+/// current order and none takes the old one. A game with no handler the scan
+/// can read, or with handlers of both orders, keeps it, as it was shipped
+/// with it. The answer depends on nothing but `handlers`, and the order they
+/// come in does not change it.
+pub fn for_game(manifest: &Manifest, handlers: &[Handler]) -> Manifest {
+    let unneeded = |id: &String| {
+        ADAPTERS.iter().filter(|a| a.fix == id).any(|a| {
+            let orders: Vec<Order> = handlers
+                .iter()
+                .filter(|h| h.entry == a.entry)
+                .map(|h| order(a, &h.params))
+                .collect();
+            orders.contains(&Order::New) && !orders.contains(&Order::Old)
+        })
+    };
+    Manifest {
+        fixes: manifest
+            .fixes
+            .iter()
+            .filter(|id| !unneeded(id))
+            .cloned()
+            .collect(),
+        ..manifest.clone()
+    }
+}
+
 /// Every Lua file the prelude adds to a compat mutator built from `manifest`:
 /// the prelude for each state that has fixes, and each entry file the base
 /// game has for that state, wrapped. `read` returns the base game's copy of a
@@ -655,6 +752,80 @@ mod tests {
         assert!(is_prelude_fix("spring-unit-travel"));
         assert!(is_prelude_fix("compat-callin-hooks"));
         assert!(!is_prelude_fix("no-such-fix"));
+    }
+
+    fn handler(entry: &str, params: &[&str]) -> Handler {
+        Handler {
+            entry: entry.into(),
+            params: params.iter().map(|s| s.to_string()).collect(),
+        }
+    }
+
+    const DAMAGED: &str = "signature:UnitDamaged@95.0";
+    const COMMAND: &str = "signature:AllowCommand@105.0";
+
+    fn left_out(handlers: &[Handler]) -> Vec<String> {
+        let full = manifest(2).unwrap();
+        let picked = for_game(&full, handlers);
+        full.fixes
+            .into_iter()
+            .filter(|id| !picked.fixes.contains(id))
+            .collect()
+    }
+
+    #[test]
+    fn each_adapter_names_the_catalogue_entry_its_fix_addresses() {
+        for a in ADAPTERS {
+            let header = parse_header(fix_source(a.fix).unwrap()).unwrap();
+            assert_eq!(header.catalogue, [a.entry], "{}", a.fix);
+        }
+    }
+
+    #[test]
+    fn a_handler_that_names_the_new_argument_takes_the_new_order() {
+        let new = handler(DAMAGED, &["u", "d", "t", "dmg", "p", "w", "projID", "a"]);
+        assert_eq!(left_out(&[new]), ["callin-unit-damaged-95"]);
+        let new = handler(COMMAND, &["u", "d", "t", "c", "p", "o", "tag", "playerID"]);
+        assert_eq!(left_out(&[new]), ["callin-allow-command-105"]);
+    }
+
+    #[test]
+    fn a_handler_with_more_arguments_than_the_old_list_takes_the_new_order() {
+        let ten: Vec<String> = (0..10).map(|i| format!("a{i}")).collect();
+        let ten: Vec<&str> = ten.iter().map(String::as_str).collect();
+        assert_eq!(
+            left_out(&[handler(DAMAGED, &ten)]),
+            ["callin-unit-damaged-95"]
+        );
+        assert_eq!(
+            left_out(&[handler(COMMAND, &ten[..9])]),
+            ["callin-allow-command-105"]
+        );
+    }
+
+    #[test]
+    fn a_handler_that_reads_the_moved_arguments_by_the_old_order_keeps_the_adapter() {
+        let old = handler(DAMAGED, &["u", "d", "t", "dmg", "p", "w", "attackerID"]);
+        let new = handler(DAMAGED, &["u", "d", "t", "dmg", "p", "w", "projectileID"]);
+        assert!(left_out(std::slice::from_ref(&old)).is_empty());
+        // A game updated in one place and not another keeps what it shipped
+        // with, as neither order suits every handler.
+        assert!(left_out(&[old, new]).is_empty());
+    }
+
+    #[test]
+    fn a_handler_that_never_reads_the_moved_arguments_decides_nothing() {
+        let short = handler(DAMAGED, &["u", "d", "t", "dmg", "p", "w", "..."]);
+        assert!(left_out(std::slice::from_ref(&short)).is_empty());
+        let new = handler(DAMAGED, &["u", "d", "t", "dmg", "p", "w", "projectileID"]);
+        assert_eq!(left_out(&[short, new]), ["callin-unit-damaged-95"]);
+    }
+
+    #[test]
+    fn a_manifest_without_the_adapter_is_left_as_it_is() {
+        let m = manifest(1).unwrap();
+        let new = handler(DAMAGED, &["u", "d", "t", "dmg", "p", "w", "projectileID"]);
+        assert_eq!(for_game(&m, &[new]), m);
     }
 
     #[test]

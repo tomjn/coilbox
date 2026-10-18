@@ -14,7 +14,9 @@
 //!   `obj.Spring.GetUnitTravel` do not.
 //! - A call-in such as `UnitDamaged`, where the code defines it: `function
 //!   gadget:UnitDamaged(`, `function UnitDamaged(`, or `gadget.UnitDamaged =`.
-//!   A call-in is a name the engine calls, so calling it is not a use.
+//!   A call-in is a name the engine calls, so calling it is not a use. The hit
+//!   for a definition carries the arguments the handler takes, which pick the
+//!   call-in adapters a compat mutator gets (issue #4622).
 //!
 //! A definition of a chain (`function Spring.GetUnitTravel()`) is not a use
 //! either. It is a game supplying the function itself.
@@ -98,6 +100,13 @@ pub struct Hit {
     /// The name as the source wrote it: `Spring.GetUnitTravel`, or
     /// `gadget:UnitDamaged` for a definition.
     pub text: String,
+    /// For a call-in defined as a function, the arguments it takes from the
+    /// engine as the source names them, with `...` kept. The table a
+    /// `gadget.UnitDamaged(self, ...)` is defined on is not one of them, and
+    /// `gadget:UnitDamaged(...)` names none. `None` for a member chain, and
+    /// for a call-in assigned something other than a function.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub params: Option<Vec<String>>,
 }
 
 /// Every use of a name in `catalogue` found in `source`, in source order.
@@ -147,8 +156,35 @@ fn definition(toks: &[Token], at: usize, catalogue: &Catalogue, hits: &mut Vec<H
         end += 2;
     }
     let last = &toks[end - 1].text;
-    push(hits, &catalogue.call_ins, last, &toks[start..end]);
+    let dotted = end - start > 1 && toks[end - 2].is_sym(".");
+    let args = arguments(toks, end, dotted);
+    push(hits, &catalogue.call_ins, last, &toks[start..end], args);
     end
+}
+
+/// The names in the parameter list that opens at `open`, or `None` when no
+/// list opens there. With `receiver`, the first is the table the function is
+/// called on, as `g:UnitDamaged(...)` calls a `gadget.UnitDamaged(self, ...)`,
+/// and is left out.
+fn arguments(toks: &[Token], open: usize, receiver: bool) -> Option<Vec<String>> {
+    if !toks.get(open)?.is_sym("(") {
+        return None;
+    }
+    let mut names = Vec::new();
+    for t in &toks[open + 1..] {
+        if t.is_sym(")") {
+            if receiver && !names.is_empty() {
+                names.remove(0);
+            }
+            return Some(names);
+        }
+        if t.kind == Kind::Ident || t.is_sym("...") {
+            names.push(t.text.clone());
+        } else if !t.is_sym(",") {
+            return None;
+        }
+    }
+    None
 }
 
 /// A chain of names joined by `.`, starting at `at`. Returns the index after it.
@@ -163,7 +199,7 @@ fn chain_use(toks: &[Token], at: usize, catalogue: &Catalogue, hits: &mut Vec<Hi
     let joined: String = parts.iter().map(|t| t.text.as_str()).collect();
     // `parts` alternates names and dots, so joining it gives `a.b.c`.
     if catalogue.chains.contains_key(&joined) {
-        push(hits, &catalogue.chains, &joined, parts);
+        push(hits, &catalogue.chains, &joined, parts, None);
     }
 
     // `gadget.UnitDamaged = function` or a bare global `UnitDamaged = ...`.
@@ -173,18 +209,29 @@ fn chain_use(toks: &[Token], at: usize, catalogue: &Catalogue, hits: &mut Vec<Hi
         && !toks.get(end + 1).is_some_and(|t| t.is_ident("nil"));
     let is_local = at > 0 && toks[at - 1].is_ident("local");
     if assigned && !is_local {
+        let args = toks
+            .get(end + 1)
+            .filter(|t| t.is_ident("function"))
+            .and_then(|_| arguments(toks, end + 2, parts.len() > 1));
         push(
             hits,
             &catalogue.call_ins,
             &parts[parts.len() - 1].text,
             parts,
+            args,
         );
     }
     end
 }
 
 /// Add a hit for each entry stored under `key`, with the source text of `parts`.
-fn push(hits: &mut Vec<Hit>, map: &HashMap<String, Vec<String>>, key: &str, parts: &[Token]) {
+fn push(
+    hits: &mut Vec<Hit>,
+    map: &HashMap<String, Vec<String>>,
+    key: &str,
+    parts: &[Token],
+    params: Option<Vec<String>>,
+) {
     let Some(ids) = map.get(key) else { return };
     let first = &parts[0];
     let text: String = parts.iter().map(|t| t.text.as_str()).collect();
@@ -194,6 +241,7 @@ fn push(hits: &mut Vec<Hit>, map: &HashMap<String, Vec<String>>, key: &str, part
             line: first.line,
             column: first.column,
             text: text.clone(),
+            params: params.clone(),
         });
     }
 }
@@ -233,6 +281,7 @@ mod tests {
                 line: 1,
                 column: 11,
                 text: "Spring.GetUnitTravel".into(),
+                params: None,
             }]
         );
     }
@@ -277,6 +326,52 @@ mod tests {
         assert!(ids("local function UnitDamaged() end").is_empty());
         assert!(ids("UnitDamaged = nil").is_empty());
         assert!(ids("if x.UnitDamaged == 1 then end").is_empty());
+    }
+
+    fn params(src: &str) -> Vec<Option<Vec<String>>> {
+        scan(src, &catalogue())
+            .into_iter()
+            .map(|h| h.params)
+            .collect()
+    }
+
+    fn names(list: &[&str]) -> Option<Vec<String>> {
+        Some(list.iter().map(|s| s.to_string()).collect())
+    }
+
+    #[test]
+    fn a_call_in_definition_reports_the_arguments_it_takes() {
+        assert_eq!(
+            params("function gadget:UnitDamaged(unitID, unitDefID, ...)\nend"),
+            [names(&["unitID", "unitDefID", "..."])]
+        );
+        assert_eq!(
+            params("function UnitDamaged(u, d) end"),
+            [names(&["u", "d"])]
+        );
+        assert_eq!(params("function gadget:UnitDamaged() end"), [names(&[])]);
+    }
+
+    #[test]
+    fn the_table_a_dotted_call_in_is_defined_on_is_not_an_argument() {
+        assert_eq!(
+            params("function gadget.UnitDamaged(self, u, d) end"),
+            [names(&["u", "d"])]
+        );
+        assert_eq!(
+            params("gadget.UnitDamaged = function(self, u) end"),
+            [names(&["u"])]
+        );
+        assert_eq!(
+            params("UnitDamaged = function(u, d) end"),
+            [names(&["u", "d"])]
+        );
+    }
+
+    #[test]
+    fn a_call_in_assigned_something_else_has_no_arguments_to_report() {
+        assert_eq!(params("gadget.UnitDamaged = handler"), [None]);
+        assert_eq!(params("local f = Spring.GetUnitTravel"), [None]);
     }
 
     #[test]

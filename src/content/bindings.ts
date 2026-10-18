@@ -4363,6 +4363,9 @@ export interface LuaCompatHit {
   /** The name as the source wrote it, such as `Spring.GetUnitTravel` or
    * `gadget:UnitDamaged`. */
   text: string;
+  /** For a call-in defined as a function, the arguments it takes from the
+   * engine, with `...` kept. Absent for a member chain. */
+  params?: string[];
 }
 
 /** The hits in one Lua file. */
