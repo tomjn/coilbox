@@ -23,6 +23,7 @@ export default defineConfig({
     port: 1430,
     strictPort: true,
   },
+  optimizeDeps: { entries: ["index.html"] },
   envPrefix: ["VITE_", "TAURI_"],
   build: {
     target:
