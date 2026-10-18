@@ -63,6 +63,7 @@ import {
   staleMapOptionTags,
 } from "./battleOptions";
 import { battleRoomHref } from "./battleRoomKey";
+import { type CompatBattleState, requiredGameName } from "./compatBattle";
 import {
   battleStartable,
   clampBonus,
@@ -81,6 +82,7 @@ import { type EngineMatch, engineMatch } from "./engineMatch";
 import { leaveBattle } from "./leaveBattle";
 import { diffRestrictTags } from "./restrictTags";
 import { optionTagSlots } from "./tweakDelivery";
+import { useCompatBattle } from "./useCompatBattle";
 import { useEngineVersionCheck } from "./useEngineVersionCheck";
 import { type TweakDelivery, useTweakDelivery } from "./useTweakDelivery";
 
@@ -210,6 +212,15 @@ export interface BattleRoomView {
   gameMissing: boolean;
   /** A dependency archive of the installed game is missing, worded, else null. */
   dependencyBlock: string | null;
+  /**
+   * The game this machine has to hold for the battle: the battle's own, or the
+   * base game when it names a compat mutator that is not built here.
+   */
+  requiredGame: string | undefined;
+  /** Where the compat mutator the battle names stands (issue #4564). */
+  compat: CompatBattleState;
+  /** Build the compat mutator again after a failure. */
+  retryCompat: () => void;
   /** True once local content presence is known (scan settled). */
   contentKnown: boolean;
   /**
@@ -577,7 +588,7 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
   // drawer uses for imports (issue #2458). This room only adds its own extra
   // blockers on top (players not ready, host not present).
   const contentVerdict = resolveVerdict({
-    requirements: battleRequirements(battle),
+    requirements: battleRequirements(battle, games),
     installed: {
       games: games.map((g) => ({
         name: g.name,
@@ -613,6 +624,20 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
   const dependencyBlock = missingDependency?.gameName
     ? dependencyBlockReason(missingDependency.label, missingDependency.gameName)
     : null;
+  // The battle names a compat mutator that is not built here (issue #4564). The
+  // game to get is then its base game, and the mutator is built from that.
+  const requiredGame = battle
+    ? requiredGameName(battle.modname, games)
+    : undefined;
+  const compat = useCompatBattle({
+    gameName: battle?.modname,
+    games,
+    enginePath,
+    dataDir,
+    contentKnown,
+    rescan: async () => (await scan.runWithReason(true)).data?.games ?? null,
+  });
+  const compatPending = compat.state.status !== "idle";
 
   const rows = useMemo(
     () => (battle ? membersToRows(battle, me, state?.users) : []),
@@ -644,7 +669,7 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
         mapMissing,
         gameMissing,
         engineMissing,
-        dependencyMissing,
+        dependencyMissing: dependencyMissing || compatPending,
       })
     : "pending";
 
@@ -758,7 +783,13 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     // never finish.
     if (!activeKey || !myStatus || (!contentKnown && !engineMissing)) return;
     const desired =
-      engineMissing || mapMissing || gameMissing || dependencyMissing ? 2 : 1;
+      engineMissing ||
+      mapMissing ||
+      gameMissing ||
+      dependencyMissing ||
+      compatPending
+        ? 2
+        : 1;
     if (myStatus.battleStatus.sync !== desired) pushStatus({ sync: desired });
   }, [
     activeKey,
@@ -768,6 +799,7 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     mapMissing,
     gameMissing,
     dependencyMissing,
+    compatPending,
     pushStatus,
   ]);
 
@@ -1371,7 +1403,9 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     }
     // The same exact-name match `contentVerdict` makes above.
     return {
-      game: found.games.some((g) => g.name === battle?.modname),
+      game: found.games.some(
+        (g) => g.name === requiredGameName(battle?.modname ?? "", found.games),
+      ),
       map: found.maps.some((m) => m.name === battle?.map),
     };
   }, [
@@ -1431,6 +1465,9 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     mapMissing,
     gameMissing,
     dependencyBlock,
+    requiredGame,
+    compat: compat.state,
+    retryCompat: compat.retry,
     contentKnown,
     contentUnreadable,
     contentUnreadableReason,

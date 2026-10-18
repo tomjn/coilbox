@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { isCompatContentName } from "./compatBattle";
 
 /**
  * Auto-download missing battle content on join (issue #439). Joining a battle is
@@ -26,6 +27,8 @@ export interface AutoDownloadInputs {
   inFlight: boolean;
   /** Auto-download already fired once for this (battle, content); don't repeat it. */
   alreadyAttempted: boolean;
+  /** The game's name, when it is a game. A compat mutator is built, never downloaded. */
+  gameName?: string;
 }
 
 /**
@@ -39,6 +42,7 @@ export function shouldAutoStartDownload(i: AutoDownloadInputs): boolean {
   return (
     i.enabled &&
     i.contentMissing &&
+    !(i.gameName && isCompatContentName(i.gameName)) &&
     i.writeRootReady &&
     i.queueIdle &&
     !i.inFlight &&
@@ -65,9 +69,11 @@ export function useAutoDownload(opts: {
   writeRootReady: boolean;
   queueIdle: boolean;
   inFlight: boolean;
+  /** The game's name, so a compat mutator is never fetched. */
+  gameName?: string;
   start: () => void;
 }): void {
-  const { key, enabled, writeRootReady, queueIdle, inFlight } = opts;
+  const { key, enabled, writeRootReady, queueIdle, inFlight, gameName } = opts;
   const startRef = useRef(opts.start);
   startRef.current = opts.start;
   useEffect(() => {
@@ -78,9 +84,10 @@ export function useAutoDownload(opts: {
       queueIdle,
       inFlight,
       alreadyAttempted: autoStartedKeys.has(key),
+      gameName,
     });
     if (!go) return;
     autoStartedKeys.add(key);
     startRef.current();
-  }, [key, enabled, writeRootReady, queueIdle, inFlight]);
+  }, [key, enabled, writeRootReady, queueIdle, inFlight, gameName]);
 }

@@ -158,6 +158,86 @@ describe("battleRequirements and a dependency archive", () => {
   });
 });
 
+describe("a battle that names a compat mutator", () => {
+  const battle = { modname: "XTA 9.65 (compat 4)", map: "Tabula" };
+  const game = (name: string) => ({
+    name,
+    primaryArchive: { name: `${name}.sd7` },
+  });
+
+  it("needs the base game while the mutator is not built", () => {
+    const requirements = battleRequirements(battle, [game("Other")]);
+    const missing = computeMissingRequirements(requirements, {
+      games: [{ name: "Other" }],
+      maps: [battle.map],
+      engineVersions: [],
+    });
+    expect(missing.map((r) => [r.kind, r.label])).toEqual([
+      ["game", "XTA 9.65"],
+    ]);
+  });
+
+  it("needs nothing once the base game is installed, for the mutator is built from it", () => {
+    const games = [game("XTA 9.65")];
+    const missing = computeMissingRequirements(
+      battleRequirements(battle, games),
+      {
+        games: [{ name: "XTA 9.65" }],
+        maps: [battle.map],
+        engineVersions: [],
+      },
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it("asks for the mutator itself once it is installed", () => {
+    const games = [game("XTA 9.65"), game(battle.modname)];
+    const missing = computeMissingRequirements(
+      battleRequirements(battle, games),
+      { games: [{ name: "XTA 9.65" }], maps: [battle.map], engineVersions: [] },
+    );
+    expect(missing.map((r) => r.label)).toEqual([battle.modname]);
+  });
+
+  it("leaves a plain name as it was", () => {
+    const names = (games: Parameters<typeof battleRequirements>[1]) =>
+      battleRequirements({ modname: "XTA 9.65", map: "Tabula" }, games).map(
+        (r) => [r.kind, r.label],
+      );
+    expect(names([])).toEqual(names([game("XTA 9.65")]));
+    expect(names([])).toContainEqual(["game", "XTA 9.65"]);
+  });
+
+  it("blocks the launch while the mutator builds", () => {
+    const block = launchBlock(
+      content({
+        compat: { status: "building", baseName: "XTA 9.65", version: 4 },
+      }),
+    );
+    expect(block?.short).toBe("Building");
+  });
+
+  it("tells a player on an older coilbox to update", () => {
+    const block = launchBlock(
+      content({
+        compat: {
+          status: "update",
+          baseName: "XTA 9.65",
+          version: 6,
+          latest: 5,
+        },
+      }),
+    );
+    expect(block?.short).toBe("Update coilbox");
+    expect(block?.reason).toContain("host is on a newer coilbox");
+    expect(block?.reason).toContain("version 6");
+  });
+
+  it("blocks nothing for an idle state", () => {
+    expect(launchBlock(content({ compat: { status: "idle" } }))).toBeNull();
+  });
+});
+
 describe("startedWithoutYou", () => {
   it("keeps the reason and adds what just happened", () => {
     const block = launchBlock(content({ mapMissing: true }));

@@ -13,6 +13,7 @@ import {
 } from "@/downloads/pages/components/ProgressBar";
 import { errMessage } from "@/downloads/pages/components/states";
 import { AUTO_DOWNLOAD_ON_JOIN_KEY, useAutoDownload } from "./autoDownload";
+import { isCompatContentName } from "./compatBattle";
 import type { ContentPresence } from "./useBattleRoom";
 
 /**
@@ -70,6 +71,8 @@ export function MissingContentCard({
 
   async function downloadGame() {
     setError(null);
+    // A compat mutator is built from its base game, so no source has one.
+    if (isCompatContentName(gameName)) return;
     enqueue(input);
   }
 
@@ -125,6 +128,7 @@ export function MissingContentCard({
     writeRootReady: !!writePath,
     queueIdle: active == null && queued.length === 0,
     inFlight: downloading,
+    gameName,
     start: downloadIfStillMissing,
   });
 

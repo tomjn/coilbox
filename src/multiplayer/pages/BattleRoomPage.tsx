@@ -34,6 +34,7 @@ import { BattleMovedPanel } from "../battle/BattleMovedPanel";
 import { BattleOptionsDrawer } from "../battle/BattleOptionsDrawer";
 import { BattleRoomHeader } from "../battle/BattleRoomHeader";
 import { filterOptionTags } from "../battle/battleOptions";
+import { CompatBattleCard } from "../battle/CompatBattleCard";
 import { alliesFromRows } from "../battle/config";
 import { launchBlock, startedWithoutYou } from "../battle/contentBlock";
 import { draftToHostSeed, hostSeedAiNotice } from "../battle/fromSkirmish";
@@ -110,8 +111,9 @@ function BattleRoomPage() {
     mapMissing: room.mapMissing,
     gameMissing: room.gameMissing,
     dependencyBlock: room.dependencyBlock,
+    compat: room.compat,
     mapName: room.battle?.map ?? "",
-    gameName: room.battle?.modname ?? "",
+    gameName: room.requiredGame ?? room.battle?.modname ?? "",
   });
   const blockReason = block?.reason ?? null;
   const launch = useBattleLaunch(
@@ -790,10 +792,11 @@ function BattleRoomPage() {
           {room.gameMissing && (
             <MissingContentCard
               battleId={battle.id}
-              gameName={battle.modname}
+              gameName={room.requiredGame ?? battle.modname}
               onRescan={room.rescan}
             />
           )}
+          <CompatBattleCard state={room.compat} onRetry={room.retryCompat} />
           {/* Game-type presets + Balance (issue #344): unlike AutohostControls
               this works self-hosted too (founder-direct force calls), so it
               renders regardless of `selfHost` and only hides itself where the
