@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
-import { useContentRootPaths, useWriteRoot } from "../../downloads/config";
+import { useMemo, useState } from "react";
+import { useWriteRoot } from "../../downloads/config";
 import {
   filterUninstalledGames,
   useBrandingCatalog,
   useSuggestedGames,
 } from "../branding";
 import { useScanTargetSelection, useUnitsyncGameHeaders } from "../config";
-import { installedContent } from "../installedContent";
 import { useScanWithLastKnown } from "../lastKnownScan";
+import { useLibrary } from "../useLibrary";
 import { usePlayGame } from "../usePlayGame";
 import { BrowserToolbar } from "./components/BrowserToolbar";
 import { FilterBar } from "./components/FilterBar";
@@ -71,15 +71,7 @@ export default function GamesPage() {
   const writeRoot = useWriteRoot("games");
   const suggested = useSuggestedGames();
   const entries = useBrandingCatalog();
-  const rootPaths = useContentRootPaths();
-  const [installed, setInstalled] = useState<Set<string>>(new Set());
-  const wantInstalled = !busy && games.length === 0;
-  useEffect(() => {
-    if (!wantInstalled || rootPaths.length === 0) return;
-    installedContent({ paths: rootPaths })
-      .then(({ games }) => setInstalled(new Set(games)))
-      .catch(() => setInstalled(new Set()));
-  }, [wantInstalled, rootPaths]);
+  const installed = useLibrary({ scan: result }).installedFiles.games;
   const suggestions = useMemo(
     () => filterUninstalledGames(suggested, entries, installed, games),
     [suggested, entries, installed, games],
