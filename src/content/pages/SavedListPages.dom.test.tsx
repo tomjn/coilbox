@@ -3,7 +3,7 @@
  * Issue #3715: the Maps and Games pages draw the last saved scan before the live
  * scan returns. While it is unchecked the list says so and no row can be played.
  */
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -72,6 +72,7 @@ vi.mock("../branding", () => ({
   useGithubGameRepos: () => [],
   useBrandingEntry: () => undefined,
   useBrandingImage: () => undefined,
+  useCachedImage: () => undefined,
   useSuggestedGames: () => [],
   useSuggestedMaps: () => [],
 }));
@@ -96,6 +97,23 @@ vi.mock("../../hub/gameIcons", () => ({
 vi.mock("../../downloads/config", () => ({
   useContentRootPaths: () => [],
   useWriteRoot: () => null,
+}));
+// Every mirror index reads, and carries nothing.
+vi.mock("../../downloads/mirrorIndex", () => ({
+  loadSpringfilesList: async () => ({ results: [] }),
+  loadHakoraMaps: async () => ({ maps: [] }),
+  loadEvolutionRtsMaps: async () => ({ maps: [] }),
+}));
+vi.mock("../../downloads/githubReleases", () => ({
+  loadGithubReleases: async () => [],
+}));
+// The Maps page asks the hub about the cards on screen and draws the map
+// packs banner, both of which read the hub address from settings.
+vi.mock("../../hub/maps/useMapFacts", () => ({
+  useMapFactsBatch: () => ({ facts: new Map(), answered: true }),
+}));
+vi.mock("../../downloads/pages/components/MapPacksBanner", () => ({
+  MapPacksBanner: () => null,
 }));
 vi.mock("./components/BrowserToolbar", () => ({
   BrowserToolbar: () => null,
@@ -127,10 +145,18 @@ function renderPage(page: React.ReactNode) {
   return render(<MemoryRouter>{page}</MemoryRouter>);
 }
 
+/** The Maps page says it is reading the mirror indexes until every read has
+ *  settled. */
+const mirrorsRead = () =>
+  waitFor(() =>
+    expect(screen.queryByText(/Reading the mirror indexes/)).toBeNull(),
+  );
+
 describe("Maps page with a saved scan", () => {
-  it("lists the saved maps while the live scan runs, says it is checking, and cannot play them", () => {
+  it("lists the saved maps while the live scan runs, says it is checking, and cannot play them", async () => {
     unchecked("checking", null);
     renderPage(<MapsPage />);
+    await mirrorsRead();
     expect(screen.getByText("Saved Map")).toBeTruthy();
     expect(screen.getByText("Gone Map")).toBeTruthy();
     expect(screen.getByRole("status").textContent).toMatch(/Checking/);
@@ -150,7 +176,7 @@ describe("Maps page with a saved scan", () => {
     }
   });
 
-  it("enables play and shows no status once the live scan has answered", () => {
+  it("enables play and shows no status once the live scan has answered", async () => {
     mockHook = {
       data: { ...SAVED, maps: [SAVED.maps[0]] },
       result: { ...SAVED, maps: [SAVED.maps[0]] },
@@ -159,6 +185,7 @@ describe("Maps page with a saved scan", () => {
       error: null,
     };
     renderPage(<MapsPage />);
+    await mirrorsRead();
     expect(screen.queryByText("Gone Map")).toBeNull();
     expect(screen.queryByRole("status")).toBeNull();
     const [play] = screen.getAllByRole("button", { name: "Play" });
