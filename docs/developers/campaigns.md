@@ -81,7 +81,9 @@ A unit enters play through the builders picked for it under [Built by](lego-buil
 
 The mission editor's **Restricted Units** lists the campaign's units with the game's own, under the builders that build them, so a mission can hold one back like any other unit.
 
-This is singleplayer only. A game coilbox writes on one machine cannot be synced to a lobby. Export does not carry the copies yet ([issue #4517](https://github.com/tomjn/coilbox/issues/4517)).
+This is singleplayer only. A game coilbox writes on one machine cannot be synced to a lobby.
+
+Export and import carry the copies. The bundled atlas is never put in the file, because it ships with coilbox. A copy built on an atlas pack carries its atlas, and if a copy arrives without it, the install gate asks for that pack.
 
 ## Export and import
 
@@ -95,7 +97,7 @@ A campaign can be exported to a single `.json` file (Campaign Builder > a campai
 }
 ```
 
-Any campaign **images** are inlined as base64 `data:` URIs, so the file is self-contained — no separate images to send along. Import (Campaign Builder > Import) reads the same file back and validates it before adding it as an editable local campaign; a malformed or unrecognised file is rejected with an inline error rather than crashing anything.
+Any campaign **images** are inlined as base64 `data:` URIs, so the file is self-contained — no separate images to send along. Each [unit copy](#units-from-the-unit-builder) is carried the same way: export puts its `unit.json` and textures into the file, and import writes them back. Import (Campaign Builder > Import) reads the same file back and validates it before adding it as an editable local campaign; a malformed or unrecognised file is rejected with an inline error rather than crashing anything.
 
 **Audio and video are not inlined** (they'd be far too large, and can't be streamed from a data URI). A single-file export of a campaign that uses imported audio/video therefore keeps references that only resolve on the machine that authored it. To distribute a campaign with audio/video, bundle it (below) and ship the media files alongside it, referenced by relative path.
 
