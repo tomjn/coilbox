@@ -29,20 +29,58 @@
  * it alone, so a hand edit to it is the truth about the game while the receipt
  * is a record of what was generated.
  *
- * Either way there is one unit per project, because a project has one current
- * export. Running the export again rewrites that receipt rather than adding a
- * second, so a re-export can never become a second unit.
+ * Either way there is one unit per receipt, because a project has one current
+ * export per folder. Running the export again rewrites that receipt rather than
+ * adding a second, so a re-export can never become a second unit. A project
+ * with loadouts has a receipt for each loadout, so each is its own unit, and
+ * its origin names the loadout as well as the project (#3282).
  */
 import { receiptFor, samePath } from "@/lego/exportRecord";
-import type { LegoProject } from "@/lego/model";
+import type { LegoLoadout, LegoProject } from "@/lego/model";
 import { type CloneOrigin, normaliseCloneKey, type UnitClones } from "./clones";
 
 /** Stable empty, so a page with no built units does not re-render for one. */
 const NONE: Record<string, CloneOrigin> = {};
 
+/**
+ * What holds a unit's receipts: a project, or one of its loadouts, which is a
+ * unit of its own once exported (#3282).
+ */
+interface Exporter {
+  project: LegoProject;
+  /** The receipts: the project's own or its loadout's. */
+  source: Pick<LegoProject, "exported" | "exportedElsewhere">;
+  loadout?: LegoLoadout;
+}
+
+/** Each project, and each of its loadouts that has been exported. */
+function exporters(projects: LegoProject[]): Exporter[] {
+  return projects.flatMap((project) => [
+    { project, source: project },
+    ...(project.loadouts ?? []).map((loadout) => ({
+      project,
+      source: loadout,
+      loadout,
+    })),
+  ]);
+}
+
+/** The origin of a unit: the project, and the loadout when it is one's. */
+function originOf({
+  project,
+  loadout,
+}: Pick<Exporter, "project" | "loadout">): CloneOrigin {
+  return {
+    kind: "lego",
+    projectId: project.id,
+    projectName: project.name,
+    ...(loadout ? { loadoutId: loadout.id, loadoutName: loadout.name } : {}),
+  };
+}
+
 /** Whether an export went into this game's folder. */
 export function exportedInto(
-  project: LegoProject,
+  project: Pick<LegoProject, "exported" | "exportedElsewhere">,
   gameFolder: string | undefined,
 ): boolean {
   if (!gameFolder) return false;
@@ -87,7 +125,9 @@ export function withLegoUnits(
   gameFolder: string | undefined,
   gameUnits: Record<string, unknown>,
 ): LegoUnits {
-  const built = projects.filter((p) => exportedInto(p, gameFolder));
+  const built = exporters(projects).filter((e) =>
+    exportedInto(e.source, gameFolder),
+  );
   const stale = gameFolder
     ? projects.flatMap((project) =>
         (project.staleExports ?? [])
@@ -101,8 +141,11 @@ export function withLegoUnits(
   let out = clones;
   const builtBy: Record<string, CloneOrigin> = {};
   const conflicts: string[] = [];
-  for (const project of built) {
-    const exported = gameFolder ? receiptFor(project, gameFolder) : undefined;
+  for (const exporter of built) {
+    const { project } = exporter;
+    const exported = gameFolder
+      ? receiptFor(exporter.source, gameFolder)
+      : undefined;
     if (!exported) continue;
     const key = normaliseCloneKey(exported.unitName);
     if (!key) continue;
@@ -115,11 +158,7 @@ export function withLegoUnits(
       conflicts.push(project.name);
       continue;
     }
-    const origin: CloneOrigin = {
-      kind: "lego",
-      projectId: project.id,
-      projectName: project.name,
-    };
+    const origin = originOf(exporter);
     builtBy[key] = origin;
     // Only where the game's read has nothing. Where it has the unit, that is
     // the engine reading the exported file, hand edits and all, and standing an
@@ -146,12 +185,7 @@ export function withLegoUnits(
     if (!key || Object.hasOwn(builtBy, key) || Object.hasOwn(out, key))
       continue;
     if (!Object.hasOwn(gameUnits, key)) continue;
-    builtBy[key] = {
-      kind: "lego",
-      projectId: project.id,
-      projectName: project.name,
-      stale: true,
-    };
+    builtBy[key] = { ...originOf({ project }), stale: true };
   }
 
   return { clones: out, conflicts, builtBy };

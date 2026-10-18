@@ -399,3 +399,53 @@ describe("an exported unit lands in the clone set and nowhere else", () => {
     expect(overrides).toEqual({ skyfort: { maxdamage: 2000 } });
   });
 });
+
+describe("a project with exported loadouts (issue #3282)", () => {
+  const receipt = (unitName: string) => ({
+    dir: BA_FOLDER,
+    at: "2026-10-18T12:00:00.000Z",
+    unitName,
+    files: [],
+    def: { ...BUILT_DEF, objectname: unitName },
+  });
+
+  it("lists each loadout as its own unit, with the loadout in its origin", () => {
+    const loadouts = project({
+      exported: undefined,
+      loadouts: [
+        { id: "a", name: "Light", exported: receipt("skyfort_light") },
+        { id: "b", name: "Heavy", exported: receipt("skyfort_heavy") },
+        { id: "c", name: "Never exported" },
+      ],
+      activeLoadout: "a",
+    });
+    const { builtBy, clones, conflicts } = withLegoUnits(
+      {},
+      [loadouts],
+      BA_FOLDER,
+      {},
+    );
+    expect(Object.keys(builtBy).sort()).toEqual([
+      "skyfort_heavy",
+      "skyfort_light",
+    ]);
+    expect(builtBy.skyfort_heavy).toEqual({
+      kind: "lego",
+      projectId: "proj-1",
+      projectName: "Sky Fortress",
+      loadoutId: "b",
+      loadoutName: "Heavy",
+    });
+    expect(Object.keys(clones).sort()).toEqual(Object.keys(builtBy).sort());
+    expect(conflicts).toEqual([]);
+  });
+
+  it("leaves a unit without loadouts with the origin it had", () => {
+    const { builtBy } = withLegoUnits({}, [project()], BA_FOLDER, {});
+    expect(builtBy.skyfort).toEqual({
+      kind: "lego",
+      projectId: "proj-1",
+      projectName: "Sky Fortress",
+    });
+  });
+});
