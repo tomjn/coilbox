@@ -52,7 +52,7 @@ import {
   missingLuaRulesEntries,
 } from "./scratchGame";
 import { sheetSources } from "./textureSheet";
-import { buildUnitDef, footprintSteps, legoUnitDef } from "./unitDef";
+import { footprintSteps, legoUnitDef, renderUnitDef } from "./unitDef";
 import { scratchWeapons } from "./weaponModule";
 import { worthTotals } from "./worth";
 import { buildWreck } from "./wreck";
@@ -146,6 +146,12 @@ export type ExportPayload = Omit<Parameters<typeof legoExport>[0], "dir">;
  */
 export interface PreparedUnit {
   payload: ExportPayload;
+  /**
+   * The unit definition's fields that `payload.unitDef` was written from, so a
+   * campaign can write the definition again with a movement class from the game
+   * it launches on (issue #4542). Absent from a copy made before that.
+   */
+  def?: Record<string, unknown>;
   textures: string;
   textureFiles: string[];
   weaponsLeftOut: string[];
@@ -328,13 +334,7 @@ export async function prepareUnit(
     // the bounding box.
     // A definition home, always. The mutator is coilbox's own, built fresh
     // here, and it has no localisation file to read a name out of.
-    unitDef: buildUnitDef(
-      project,
-      bounds,
-      "def",
-      worthTotals(project, pack),
-      weapons.slots,
-    ),
+    unitDef: renderUnitDef(project.unitName, def),
     unitDefFields: null,
     text: null,
     model,
@@ -352,6 +352,7 @@ export async function prepareUnit(
   };
   return {
     payload,
+    def,
     textures: JSON.stringify(textures),
     textureFiles: [
       ...(textures.atlas ? [textures.atlas.writeAs] : []),

@@ -9,12 +9,14 @@ vi.mock("../lego/mutator", () => ({
   prepareUnit: vi.fn(),
   writePreparedMutator: vi.fn(),
 }));
-vi.mock("../content/config", () => ({
-  loadUnitsyncUnitDataset: vi.fn(),
+vi.mock("../lego/bindings", () => ({
+  legoScratchRemove: vi.fn(),
+}));
+vi.mock("../workshop/config", () => ({
+  loadUnitDefs: vi.fn(),
 }));
 
-import { loadUnitsyncUnitDataset } from "../content/config";
-import type { ExportTextures } from "../lego/bindings";
+import { type ExportTextures, legoScratchRemove } from "../lego/bindings";
 import { type LegoProject, newProject } from "../lego/model";
 import {
   type PreparedUnit,
@@ -22,7 +24,9 @@ import {
   writePreparedMutator,
 } from "../lego/mutator";
 import type { LoadedPack } from "../lego/pack";
+import { renderUnitDef } from "../lego/unitDef";
 import type { PlayTarget } from "../play/config";
+import { loadUnitDefs } from "../workshop/config";
 import {
   campaignUnitDelete,
   campaignUnitList,
@@ -35,6 +39,7 @@ import {
   type CampaignUnitCopy,
   composeCampaignUnits,
   libraryChanged,
+  removeUnitsGame,
   updateUnit,
   withoutUnit,
   withUnit,
@@ -335,6 +340,160 @@ function stored(
   };
 }
 
+/** The unit-defs read of a base game with these movement classes. */
+function gameDefs(classes: string[]) {
+  const units: Record<string, Record<string, unknown>> = { armlab: {} };
+  for (const name of classes) {
+    units[`unit_${name.toLowerCase()}`] = {
+      canmove: true,
+      movementclass: name,
+      speed: 72,
+      turnrate: 500,
+    };
+  }
+  return {
+    units,
+    moveDefs: classes.map((name) => ({ name, footprintx: 3 })),
+    weaponDefs: {},
+    armorDefs: {},
+    unitErrors: [],
+    errors: [],
+  } as never;
+}
+
+/** A stored copy of a unit built as a building, with parts that say how it should move. */
+function building(
+  unitName: string,
+  role: string,
+  extra: Partial<LegoProject> = {},
+) {
+  const source = project(unitName, extra);
+  source.pieces = [
+    ...source.pieces,
+    { ...source.pieces[0], id: "mover", parentId: source.rootPieceId, role },
+  ];
+  const def = {
+    unitname: unitName,
+    footprintx: 3,
+    footprintz: 3,
+    canmove: false,
+    maxslope: 15,
+  };
+  const built = prepared(unitName, baseAtlas);
+  built.payload.unitDef = renderUnitDef(unitName, def);
+  built.def = def;
+  const copy: CampaignUnitCopy = {
+    formatVersion: 1,
+    unitName,
+    projectId: `p-${unitName}`,
+    copiedAt: "",
+    source,
+    built,
+    carriesTextures: false,
+  };
+  return {
+    unitName,
+    json: JSON.stringify(copy),
+    dir: `/app/campaign/units/c1/${unitName}`,
+  };
+}
+
+describe("a unit built to move", () => {
+  beforeEach(() => {
+    vi.mocked(writePreparedMutator).mockResolvedValue({
+      dir: "/data/games/coilbox-lego-campaign-c1.sdd",
+      name: "Coilbox campaign c1",
+      skipped: false,
+      units: [],
+      buildListLeftOut: [],
+    });
+  });
+
+  const base = { name: "Splinter Faction", archive: "sf.sdz" };
+
+  it("takes the base game's walker class for legs and its wheeled class for wheels", async () => {
+    vi.mocked(loadUnitDefs).mockResolvedValue(gameDefs(["KBOT3", "TANK2"]));
+    vi.mocked(campaignUnitList).mockResolvedValue({
+      units: [building("walker", "leg.l1.thigh"), building("rover", "wheel")],
+    });
+
+    const result = await composeCampaignUnits(
+      campaign([entry("walker"), entry("rover")]),
+      target,
+      base,
+    );
+
+    const [walker, rover] =
+      vi.mocked(writePreparedMutator).mock.calls[0][0].prepared;
+    expect(walker.payload.unitDef).toContain('movementclass = "KBOT3"');
+    expect(walker.payload.unitDef).toContain("canmove = true");
+    expect(walker.payload.unitDef).not.toContain("canmove = false");
+    expect(walker.payload.unitDef).not.toContain("maxslope");
+    expect(rover.payload.unitDef).toContain('movementclass = "TANK2"');
+    expect(result?.leftOut).toEqual([]);
+  });
+
+  it("names the unit in the left out lines when the base game has no class for it", async () => {
+    vi.mocked(loadUnitDefs).mockResolvedValue(gameDefs(["SHIP3"]));
+    vi.mocked(campaignUnitList).mockResolvedValue({
+      units: [building("walker", "leg.l1.thigh")],
+    });
+
+    const result = await composeCampaignUnits(
+      campaign([entry("walker")]),
+      target,
+      base,
+    );
+
+    const [walker] = vi.mocked(writePreparedMutator).mock.calls[0][0].prepared;
+    expect(walker.payload.unitDef).toContain("canmove = false");
+    expect(result?.leftOut).toHaveLength(1);
+    expect(result?.leftOut[0]).toContain("The walker");
+    expect(result?.leftOut[0]).toContain("Splinter Faction");
+  });
+
+  it("names the unit when the base game's classes could not be read", async () => {
+    vi.mocked(loadUnitDefs).mockRejectedValue(new Error("no"));
+    vi.mocked(campaignUnitList).mockResolvedValue({
+      units: [building("rover", "wheel")],
+    });
+
+    const result = await composeCampaignUnits(
+      campaign([entry("rover")]),
+      target,
+      base,
+    );
+
+    expect(result?.leftOut).toHaveLength(1);
+    expect(result?.leftOut[0]).toContain("The rover");
+  });
+
+  it("leaves a unit with nothing that moves, and one with its own class, as it was", async () => {
+    vi.mocked(loadUnitDefs).mockResolvedValue(gameDefs(["KBOT3"]));
+    vi.mocked(campaignUnitList).mockResolvedValue({
+      units: [
+        building("turret", "turret"),
+        building("picked", "leg.l1.thigh", {
+          movement: { moveClass: "KBOT3", speed: 10 },
+        }),
+      ],
+    });
+
+    const result = await composeCampaignUnits(
+      campaign([entry("turret"), entry("picked")]),
+      target,
+      base,
+    );
+
+    const [turret, picked] =
+      vi.mocked(writePreparedMutator).mock.calls[0][0].prepared;
+    expect(turret.payload.unitDef).toContain("canmove = false");
+    // Its own class is already in the copy's definition, not added again here.
+    expect(picked.payload.unitDef).toContain("canmove = false");
+    expect(result?.leftOut).toEqual([]);
+  });
+});
+
 describe("composing a mission's mutator", () => {
   beforeEach(() => {
     vi.mocked(writePreparedMutator).mockResolvedValue({
@@ -346,9 +505,7 @@ describe("composing a mission's mutator", () => {
         "Beyond All Reason loads its units without reading a build list",
       ],
     });
-    vi.mocked(loadUnitsyncUnitDataset).mockResolvedValue({
-      units: [{ name: "ARMLAB" }],
-    } as never);
+    vi.mocked(loadUnitDefs).mockResolvedValue(gameDefs(["KBOT3"]));
   });
 
   it("writes nothing for a campaign with no units", async () => {
@@ -387,7 +544,7 @@ describe("composing a mission's mutator", () => {
       { unitName: "jeep", builtBy: [] },
     ]);
     // Builders are checked against the base game's own units.
-    expect(args.gameMovement?.units).toEqual({ armlab: {} });
+    expect(Object.keys(args.gameMovement?.units ?? {})).toContain("armlab");
     // A copy on the bundled atlas reads it from the pack as it always did.
     expect(args.prepared[0].payload.textures).toEqual(baseAtlas);
     // A copy that carries its atlas has it read out of its own folder.
@@ -415,7 +572,7 @@ describe("composing a mission's mutator", () => {
     vi.mocked(campaignUnitList).mockResolvedValue({
       units: [stored("tank", false)],
     });
-    vi.mocked(loadUnitsyncUnitDataset).mockRejectedValue(new Error("no"));
+    vi.mocked(loadUnitDefs).mockRejectedValue(new Error("no"));
     await composeCampaignUnits(campaign([entry("tank")]), target, {
       name: "BA",
       archive: "ba.sdz",
@@ -423,5 +580,38 @@ describe("composing a mission's mutator", () => {
     expect(vi.mocked(writePreparedMutator).mock.calls[0][0].gameMovement).toBe(
       null,
     );
+  });
+});
+
+describe("deleting a campaign's units game", () => {
+  beforeEach(() => {
+    vi.mocked(legoScratchRemove).mockResolvedValue({ removed: true });
+  });
+
+  it("removes that campaign's folder from the content root", async () => {
+    await removeUnitsGame("c1", "/data");
+    expect(legoScratchRemove).toHaveBeenCalledTimes(1);
+    expect(legoScratchRemove).toHaveBeenCalledWith({
+      dataDir: "/data",
+      folder: "coilbox-lego-campaign-c1.sdd",
+    });
+  });
+
+  it("asks the guard about no other campaign's folder", async () => {
+    await removeUnitsGame("c2", "/data");
+    expect(legoScratchRemove).toHaveBeenCalledWith({
+      dataDir: "/data",
+      folder: "coilbox-lego-campaign-c2.sdd",
+    });
+  });
+
+  it("does nothing for an id that cannot name a folder, so none was ever written", async () => {
+    await removeUnitsGame("not/a/folder", "/data");
+    expect(legoScratchRemove).not.toHaveBeenCalled();
+  });
+
+  it("lets a refusal through, so the campaign is not deleted over a folder that stayed", async () => {
+    vi.mocked(legoScratchRemove).mockRejectedValue(new Error("refused"));
+    await expect(removeUnitsGame("c1", "/data")).rejects.toThrow("refused");
   });
 });

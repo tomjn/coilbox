@@ -3614,6 +3614,55 @@ async fn lego_scratch_prune(
     }
 }
 
+/// The folder a campaign's units mutator is written into (issue #4516), the
+/// only kind of scratch game that is removed.
+const CAMPAIGN_SCRATCH_PREFIX: &str = "coilbox-lego-campaign-";
+
+/// Remove a campaign's units mutator and the stamp beside it (issue #4543).
+///
+/// Only `<data_dir>/games/<folder>` with a folder that passes
+/// [`valid_scratch_folder`] and starts with [`CAMPAIGN_SCRATCH_PREFIX`], so the
+/// Test drawer's own folder and every real game stay out of reach. A folder that
+/// is a link is refused rather than followed. Answers whether a folder was there.
+fn remove_campaign_scratch_game(data_dir: &Path, folder: &str) -> Result<bool, String> {
+    if !valid_scratch_folder(folder) || !folder.starts_with(CAMPAIGN_SCRATCH_PREFIX) {
+        return Err(format!("not a campaign units game folder: {folder}"));
+    }
+    let games = data_dir.join("games");
+    let game = games.join(folder);
+    let stamp = games.join(format!("{folder}.stamp"));
+    match std::fs::remove_file(&stamp) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(format!("could not remove {}: {e}", stamp.display())),
+    }
+    // `symlink_metadata` so a link is never followed out of the content root.
+    match std::fs::symlink_metadata(&game) {
+        Ok(meta) if meta.is_dir() => {
+            std::fs::remove_dir_all(&game)
+                .map_err(|e| format!("could not remove {}: {e}", game.display()))?;
+            Ok(true)
+        }
+        Ok(_) => Err(format!("not a scratch game: {}", game.display())),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(e) => Err(format!("could not read {}: {e}", game.display())),
+    }
+}
+
+/// `lego_scratch_remove` removes a deleted campaign's units mutator. See
+/// [`remove_campaign_scratch_game`] for what it will and will not touch.
+#[tauri::command]
+async fn lego_scratch_remove(data_dir: String, folder: String) -> CliResult {
+    let root = PathBuf::from(&data_dir);
+    if !root.is_absolute() || !root.is_dir() {
+        return CliResult::err(format!("not a content root: {data_dir}"));
+    }
+    match remove_campaign_scratch_game(&root, &folder) {
+        Ok(removed) => CliResult::ok(json!({ "removed": removed })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
 /// `lego_run_script` plays a unit's own Lua and reports where its pieces are on
 /// every frame of it.
 ///
@@ -3742,6 +3791,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_picture_survey,
             lego_scratch_game,
             lego_scratch_prune,
+            lego_scratch_remove,
             lego_run_script,
             lego_probe_script,
             lego_write_text_file,
@@ -4574,6 +4624,82 @@ mod tests {
             digests.push(hex_digest(contents.as_bytes()));
         }
         digests
+    }
+
+    // Issue #4543. Deleting a campaign removes its folder and no other campaign's.
+    #[test]
+    fn removing_a_campaigns_units_game_leaves_another_campaigns() {
+        let (data, game) = scratch_root("coilbox-lego-campaign-one.sdd");
+        exported_unit(&game, "tank");
+        let other = data.path().join("games/coilbox-lego-campaign-two.sdd");
+        std::fs::create_dir_all(other.join("units")).expect("mkdir");
+        std::fs::write(other.join("modinfo.lua"), "modinfo").expect("modinfo");
+        let other_stamp = data
+            .path()
+            .join("games/coilbox-lego-campaign-two.sdd.stamp");
+        std::fs::write(&other_stamp, "{}").expect("stamp");
+        let own_stamp = data
+            .path()
+            .join("games/coilbox-lego-campaign-one.sdd.stamp");
+        std::fs::write(&own_stamp, "{}").expect("stamp");
+
+        let removed = remove_campaign_scratch_game(data.path(), "coilbox-lego-campaign-one.sdd")
+            .expect("remove");
+
+        assert!(removed);
+        assert!(!game.exists());
+        assert!(!own_stamp.exists());
+        assert!(other.join("modinfo.lua").is_file());
+        assert!(other_stamp.is_file());
+    }
+
+    #[test]
+    fn removing_a_campaigns_units_game_that_is_not_there_is_not_an_error() {
+        let data = tempfile::tempdir().expect("tempdir");
+        let removed = remove_campaign_scratch_game(data.path(), "coilbox-lego-campaign-one.sdd")
+            .expect("remove");
+        assert!(!removed);
+    }
+
+    #[test]
+    fn removing_refuses_a_folder_that_is_not_a_campaigns_units_game() {
+        let (data, test_game) = scratch_root("coilbox-lego-test.sdd");
+        let real = data.path().join("games/balanced-annihilation.sdd");
+        std::fs::create_dir_all(&real).expect("mkdir");
+
+        for folder in [
+            "coilbox-lego-test.sdd",
+            "balanced-annihilation.sdd",
+            "coilbox-lego-campaign-..sdd",
+            "../coilbox-lego-campaign-x.sdd",
+            "coilbox-lego-campaign-x.sdd/..",
+        ] {
+            assert!(
+                remove_campaign_scratch_game(data.path(), folder).is_err(),
+                "{folder}"
+            );
+        }
+        assert!(test_game.is_dir());
+        assert!(real.is_dir());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn removing_does_not_follow_a_link_out_of_the_content_root() {
+        let data = tempfile::tempdir().expect("tempdir");
+        let elsewhere = tempfile::tempdir().expect("tempdir");
+        std::fs::write(elsewhere.path().join("keep.txt"), "keep").expect("file");
+        std::fs::create_dir_all(data.path().join("games")).expect("mkdir");
+        std::os::unix::fs::symlink(
+            elsewhere.path(),
+            data.path().join("games/coilbox-lego-campaign-one.sdd"),
+        )
+        .expect("link");
+
+        assert!(
+            remove_campaign_scratch_game(data.path(), "coilbox-lego-campaign-one.sdd").is_err()
+        );
+        assert!(elsewhere.path().join("keep.txt").is_file());
     }
 
     // Issue #4521. A unit taken out of a mutator's set must leave nothing behind.

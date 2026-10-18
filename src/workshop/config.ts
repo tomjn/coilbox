@@ -44,6 +44,36 @@ export function invalidateUnitDefs() {
 }
 
 /**
+ * Read a game's unit definitions outside a component, off the same session
+ * cache and in-flight reads as {@link useUnitDefs}. For a caller that only
+ * knows at load time whether it needs them, such as a campaign launch choosing a
+ * movement class from the base game (issue #4542).
+ */
+export async function loadUnitDefs(
+  enginePath: string,
+  dataDir: string,
+  gameArchive: string,
+): Promise<UnitDefsResult> {
+  const key = cacheKey(enginePath, dataDir, gameArchive);
+  const res =
+    cached?.key === key
+      ? cached.result
+      : await shareInFlight(pending, key, () =>
+          unitsyncUnitDefs({ enginePath, dataDir, gameArchive }),
+        );
+  if (cached?.key !== key && res.checksum) cached = { key, result: res };
+  // The same defaults the hook applies, for a worker that left a key out.
+  return {
+    ...res,
+    units: res.units ?? {},
+    armorDefs: res.armorDefs ?? {},
+    moveDefs: Array.isArray(res.moveDefs) ? res.moveDefs : [],
+    unitErrors: res.unitErrors ?? [],
+    errors: res.errors ?? [],
+  };
+}
+
+/**
  * Every key a game declares for every unit, for the game whose archive is
  * named. Nothing is read until all three arguments are known, so a page can
  * mount the hook before the user has picked a game.

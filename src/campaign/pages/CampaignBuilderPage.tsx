@@ -40,6 +40,7 @@ import {
   parseCampaignExport,
   wrapCampaignForExport,
 } from "../transfer";
+import { removeUnitsGame } from "../units";
 import { CampaignRowMenu } from "./components/CampaignRowMenu";
 import { CampaignRowThumb } from "./components/CampaignRowThumb";
 
@@ -179,6 +180,8 @@ export default function CampaignBuilderPage() {
   // which is what somebody is looking at when it fails, so nothing is caught
   // here.
   const remove = async (id: string) => {
+    // First, so a folder that cannot be removed leaves the campaign to retry.
+    if (target) await removeUnitsGame(id, target.dataDir);
     await campaignDelete({ id });
     await refreshCampaigns();
   };

@@ -68,7 +68,19 @@ const { save } = vi.hoisted(() => ({
 }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ save, open: vi.fn() }));
 
-vi.mock("../../play/config", () => ({ usePreferredTarget: () => ({}) }));
+const { preferredTarget, legoScratchRemove } = vi.hoisted(() => ({
+  preferredTarget: {
+    current: {} as { target?: { enginePath: string; dataDir: string } },
+  },
+  legoScratchRemove: vi.fn(async () => ({ removed: true })),
+}));
+vi.mock("../../play/config", () => ({
+  usePreferredTarget: () => preferredTarget.current,
+}));
+vi.mock("../../lego/bindings", async () => ({
+  ...(await vi.importActual<Record<string, unknown>>("../../lego/bindings")),
+  legoScratchRemove,
+}));
 // The rendered minimaps a row falls back to when a campaign has no emblem. The
 // real batch comes off the unitsync worker, so the tests put maps in here
 // directly and every row reads the same map the app would have handed it.
@@ -232,6 +244,34 @@ describe("a campaign row", () => {
     await vi.waitFor(() =>
       expect(campaignDelete).toHaveBeenCalledWith({ id: "beachhead" }),
     );
+  });
+
+  // Issue #4543: a campaign with units from the builder leaves a generated game
+  // folder in the content root, which goes with the campaign.
+  it("removes the campaign's generated units game when it deletes the campaign", async () => {
+    preferredTarget.current = {
+      target: { enginePath: "/engine", dataDir: "/data" },
+    };
+    try {
+      show([local]);
+      openMenuByKeyboard("Beachhead");
+      fireEvent.keyDown(screen.getByRole("menuitem", { name: /Delete/ }), {
+        key: "Enter",
+      });
+      cleanup();
+      render(opened[0].content);
+      fireEvent.click(screen.getByRole("button", { name: /Delete/ }));
+
+      await vi.waitFor(() =>
+        expect(campaignDelete).toHaveBeenCalledWith({ id: "beachhead" }),
+      );
+      expect(legoScratchRemove).toHaveBeenCalledWith({
+        dataDir: "/data",
+        folder: "coilbox-lego-campaign-beachhead.sdd",
+      });
+    } finally {
+      preferredTarget.current = {};
+    }
   });
 
   // Issue #2203: the scenario list's version of this faded the trigger in on
