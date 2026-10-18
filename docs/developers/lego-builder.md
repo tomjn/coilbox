@@ -143,13 +143,13 @@ The shape changes its numbers, not its scale, so its texture does not stretch.
 
 A shape has no panel detail. It tiles a small swatch of plain surface from its colourway, mirrored at each edge, at the same texture density as the pack's parts. A bigger shape shows more tiles rather than a stretched one.
 
-On the bundled atlas the team colour colourway is plain red, the same red the team colour parts are drawn in. Tan is a grainy concrete, where the mirrored tiles show a repeating pattern. Grey is a flat light grey.
+On the bundled atlas the team colour colourway is plain team colour, the same colour the team colour parts are drawn in. Tan is a grainy concrete, where the mirrored tiles show a repeating pattern. Grey is a flat light grey.
 
 A shape takes the colourway most of the unit's parts and shapes use when it is added, or the pack's first one when the unit has none. It keeps that colourway. The piece panel has no control to change it, and **Change part** is not offered for a shape.
 
 A cylinder, a tube or a cone can show a wheel hub on its flat ends instead. Tick **Hub on ends** in the piece panel. The hub is the [round panel](../reference/lego-parts-pack.md#round-panels) the pack draws for the shape's colourway, fitted to each end, so it stretches with the radius. On the bundled pack it is drawn at the parts' own density at a radius of 1.6 units, and it starts to look soft past 3.2 units. A tube's end ring shows the outer part of the hub. The choice is off for a new shape, and the side keeps its swatch either way.
 
-A shape takes team colour only where the atlas's alpha channel says so, as a part does. The bundled atlas has no alpha channel, so neither parts nor shapes from it show team colour in a game. An atlas pack can paint alpha into a swatch to give shapes team colour. See [swatches](../reference/lego-parts-pack.md#swatches).
+A shape takes team colour only where the atlas's alpha channel says so, as a part does. The bundled atlas marks its whole team colour column, so its team colour parts and shapes show the player's colour in the builder, in thumbnails and in a game. Its tan and grey ones show none. An atlas pack can paint alpha into a swatch to give shapes team colour. See [swatches](../reference/lego-parts-pack.md#swatches).
 
 ### Connectors on a shape
 

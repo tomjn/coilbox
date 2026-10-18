@@ -705,8 +705,8 @@ export function ExportDrawer({
         : null;
     }
     if (!installed) return null;
-    // Through Rust rather than the asset URL: the atlas has no alpha channel,
-    // which the bake reads as all team colour (#4173).
+    // Through Rust rather than the asset URL: an atlas with no alpha channel
+    // reads in the bake as all team colour (#4173).
     const { dataUrl } = await legoAtlasPng({
       atlas: { name: atlas, pack: installed.folder, writeAs: atlasFile },
     });

@@ -580,9 +580,9 @@ describe("the build picture", () => {
 });
 
 /**
- * The bundled atlas has no alpha channel, which the `.glb` bake reads as full
- * team colour, so a unit built from parts was written entirely in team colour
- * (#4173). The atlas has to come from the same Rust rule the `.s3o` export
+ * An atlas with no alpha channel, as the bundled one was, reads in the `.glb`
+ * bake as full team colour, so a unit built from parts was written entirely in
+ * team colour (#4173). The atlas has to come from the same Rust rule the `.s3o` export
  * writes it by, not straight from its file.
  */
 describe("the .glb of a unit built from parts", () => {
