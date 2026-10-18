@@ -846,6 +846,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "coilbox-luacompat"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "coilbox-map-catalog"
 version = "0.0.0"
 dependencies = [
@@ -1005,6 +1013,7 @@ dependencies = [
  "coilbox-assets",
  "coilbox-assimp",
  "coilbox-bos2lua",
+ "coilbox-luacompat",
  "coilbox-map-catalog",
  "coilbox-s3o",
  "coilbox-texture",

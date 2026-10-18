@@ -19,6 +19,7 @@ members = [
   "crates/coilbox-track-thin",
   "crates/coilbox-gamebackup",
   "crates/coilbox-bos2lua",
+  "crates/coilbox-luacompat",
   "crates/coilbox-unitpose",
   "crates/coilbox-assets",
   "crates/coilbox-map-catalog",

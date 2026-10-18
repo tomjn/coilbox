@@ -79,6 +79,13 @@ vi.mock("../usePlayMap", () => ({ usePlayMap: () => () => {} }));
 vi.mock("../../downloads/bindings", () => ({
   dlInstalledContent: async () => ({ games: [], maps: [] }),
 }));
+// The library also reads the download queue and the hub's games, and this
+// page has neither.
+vi.mock("../../downloads/DownloadQueueProvider", () => ({
+  useDownloadQueue: () => ({ items: [] }),
+  useDownloadComplete: () => {},
+}));
+vi.mock("../../hub/gameIcons", () => ({ useHubGames: () => null }));
 vi.mock("../../downloads/config", () => ({
   useContentRootPaths: () => [],
   useWriteRoot: () => null,

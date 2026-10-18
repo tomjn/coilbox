@@ -39,6 +39,7 @@ const COMMANDS: &[&str] = &[
     "unitsync_lua_repl_exec",
     "unitsync_archive_extract",
     "unitsync_convert_3do",
+    "unitsync_lua_compat_scan",
     "unitsync_cancel",
 ];
 
