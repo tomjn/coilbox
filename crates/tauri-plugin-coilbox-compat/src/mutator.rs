@@ -111,8 +111,10 @@ fn modinfo(game_name: &str, short_name: Option<&str>, n: u32) -> String {
 /// The Lua prelude's fixes (#4558) are written with the base game's entry files
 /// wrapped to load it, which `read` returns by path, `None` for one the game
 /// does not have. The gadget fixes (#4559) are written to `LuaRules/Gadgets/`
-/// as they are. The def fixes are written by #4560. Until they are, a manifest
-/// that lists one is refused rather than built without it.
+/// as they are. The def fixes (#4560) go in the def files, which the build
+/// writes once it knows which the game can take (see `defs`). A manifest that
+/// lists a fix of no kind this coilbox knows is refused rather than built
+/// without it.
 pub fn files(
     manifest: &coilbox_compat::Manifest,
     game_name: &str,
@@ -123,11 +125,11 @@ pub fn files(
     if game_name.trim().is_empty() {
         return Err("the base game has no name to depend on".into());
     }
-    if manifest
-        .fixes
-        .iter()
-        .any(|id| !coilbox_compat::is_prelude_fix(id) && !coilbox_compat::is_gadget_fix(id))
-    {
+    if manifest.fixes.iter().any(|id| {
+        !coilbox_compat::is_prelude_fix(id)
+            && !coilbox_compat::is_gadget_fix(id)
+            && !coilbox_compat::is_defs_fix(id)
+    }) {
         return Err(format!(
             "compat {} lists fixes this coilbox cannot write yet",
             manifest.version

@@ -38,11 +38,11 @@ fn load(path: &str, source: &str, synced: bool) -> Value {
 
 #[test]
 fn every_gadget_loads_in_lua_5_1_and_only_in_its_own_state() {
-    let files: Vec<(String, String)> = [3, 4]
+    let files: Vec<(String, String)> = [3, 4, 5]
         .into_iter()
         .flat_map(|n| gadget_files(&manifest(n).unwrap()))
         .collect();
-    assert_eq!(files.len(), 6);
+    assert_eq!(files.len(), 10);
     for (path, source) in &files {
         let name = PathBuf::from(path)
             .file_stem()

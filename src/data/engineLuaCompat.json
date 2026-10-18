@@ -64,6 +64,13 @@
       "note": "UnitDef::can{Restore, Repair, Reclaim, Capture, Resurrect} now default to true only if the unit is a builder and has the corresponding {Terraform, Repair, Reclaim, Capture, Resurrect}Speed property set to a non-zero value"
     },
     {
+      "id": "defTag:UnitDefs.commander",
+      "kind": "defTag",
+      "name": "UnitDefs.commander",
+      "since": "85.0",
+      "note": "The engine no longer reads a unit def's commander tag, so UnitDefs[id].isCommander is false for every unit. Games since mark a commander with customParams.iscommander."
+    },
+    {
       "id": "defTag:UnitDefs.extractSquare",
       "kind": "defTag",
       "name": "UnitDefs.extractSquare",
@@ -76,6 +83,13 @@
       "name": "UnitDefs.isCommander",
       "since": "85.0",
       "note": "UnitDef[].isCommander returns now false"
+    },
+    {
+      "id": "defTag:UnitDefs.modelCenterOffset",
+      "kind": "defTag",
+      "name": "UnitDefs.modelCenterOffset",
+      "since": "89.0",
+      "note": "The engine no longer moves a unit's middle by the def's modelCenterOffset. Spring.SetUnitMidAndAimPos sets it from Lua instead."
     },
     {
       "id": "defTag:UnitDefs.modelname",
@@ -104,6 +118,13 @@
       "name": "WeaponDefs.firestarter",
       "since": "BAR105 1544",
       "note": "the `firestarter` weapon tag no longer capped at 10000 in defs (which becomes 100 in Lua WeaponDefs after rescale), now uncapped. To get back previous behaviour, put the following in weapon defs post-processing:"
+    },
+    {
+      "id": "defTag:WeaponDefs.manualBombSettings",
+      "kind": "defTag",
+      "name": "WeaponDefs.manualBombSettings",
+      "since": "92.0",
+      "note": "The engine no longer works out the burst of an AircraftBomb weapon. The engine's own gamedata/weapondefs_post.lua does it instead, but only for a weapon that sets manualBombSettings, the reverse of what the tag meant, and not at all in a game that ships its own weapondefs_post.lua."
     },
     {
       "id": "file:gamedata/messages.tdf",

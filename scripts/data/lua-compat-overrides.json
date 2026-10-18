@@ -22,5 +22,29 @@
     "since": "105.0",
     "note": "The count argument is required. Calling Spring.GetUnitCommands(unitID) with no count raises a Lua error. Pass -1 for the whole queue, or use Spring.GetUnitCommandCount for the length.",
     "changelog": "make Spring.Get{Unit,Factory}Commands always expect a second argument"
+  },
+  {
+    "id": "defTag:UnitDefs.commander",
+    "kind": "defTag",
+    "name": "UnitDefs.commander",
+    "since": "85.0",
+    "note": "The engine no longer reads a unit def's commander tag, so UnitDefs[id].isCommander is false for every unit. Games since mark a commander with customParams.iscommander.",
+    "changelog": "removed \"commander\" tag (The Commander selectkeys filter is now defunct (ctrl+c hotkey). Lua it, or add a new one that looks for any canManualFire units.)"
+  },
+  {
+    "id": "defTag:UnitDefs.modelCenterOffset",
+    "kind": "defTag",
+    "name": "UnitDefs.modelCenterOffset",
+    "since": "89.0",
+    "note": "The engine no longer moves a unit's middle by the def's modelCenterOffset. Spring.SetUnitMidAndAimPos sets it from Lua instead.",
+    "changelog": "remove modelCenterOffset tag (can now be dynamically set with Lua)"
+  },
+  {
+    "id": "defTag:WeaponDefs.manualBombSettings",
+    "kind": "defTag",
+    "name": "WeaponDefs.manualBombSettings",
+    "since": "92.0",
+    "note": "The engine no longer works out the burst of an AircraftBomb weapon. The engine's own gamedata/weapondefs_post.lua does it instead, but only for a weapon that sets manualBombSettings, the reverse of what the tag meant, and not at all in a game that ships its own weapondefs_post.lua.",
+    "changelog": "remove of manualBombSettings (backward-compatibility code in weapondefs_post.lua)"
   }
 ]

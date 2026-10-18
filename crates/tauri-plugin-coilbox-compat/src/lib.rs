@@ -9,6 +9,7 @@
 //! Registered as `"coilbox-compat"`. The frontend invokes
 //! `plugin:coilbox-compat|<cmd>`.
 
+pub mod defs;
 mod handlers;
 pub mod models;
 pub mod mutator;
@@ -34,7 +35,8 @@ pub struct Built {
     pub files: Vec<String>,
     /// What the 3do converter said about the base game's models.
     pub models: models::Conversion,
-    /// Why the converted models are not used, when they cannot be.
+    /// Why the converted models or the def fixes are not used, when they
+    /// cannot be.
     pub notes: Vec<String>,
     /// The ids of the prelude fixes written, which define the functions the
     /// engine removed.
@@ -43,7 +45,8 @@ pub struct Built {
     /// whether the game needs it.
     pub gadgets: Vec<String>,
     /// How many converted models `gamedata/defs_post.lua` points the game's
-    /// defs at.
+    /// defs at, plus how many of the base game's unit and weapon defs the def
+    /// fixes change, counted on a read of its defs (see `defs::changed`).
     pub def_overrides: usize,
 }
 
@@ -94,13 +97,16 @@ pub fn build(
             )
         },
         || models::convert(engine_path, data_dir, archive_name, staging.path()),
+        || tauri_plugin_coilbox_unitsync::unit_defs_blocking(engine_path, data_dir, archive_name),
     )
 }
 
 /// [`build`], with `read` returning a file of the base game by path,
-/// `handlers` the call-in handlers the base game's Lua defines, and `convert`
-/// its converted models. `convert` runs once the request is known to be sound,
-/// and before anything is written.
+/// `handlers` the call-in handlers the base game's Lua defines, `convert` its
+/// converted models, and `read_defs` its defs as `unitsync_unit_defs` reads
+/// them. `convert` runs once the request is known to be sound, and before
+/// anything is written. `read_defs` runs only when def fixes were written, to
+/// count the defs they change.
 #[allow(clippy::too_many_arguments)]
 fn build_reading(
     data_dir: &str,
@@ -111,8 +117,9 @@ fn build_reading(
     manifest_version: u32,
     coilbox_version: &str,
     handlers: &[coilbox_compat::Handler],
-    read: impl FnMut(&str) -> Result<Option<String>, String>,
+    mut read: impl FnMut(&str) -> Result<Option<String>, String>,
     convert: impl FnOnce() -> Result<models::Models, String>,
+    read_defs: impl FnOnce() -> Result<String, String>,
 ) -> Result<Built, String> {
     let manifest = coilbox_compat::manifest(manifest_version)
         .ok_or_else(|| format!("there is no compat manifest {manifest_version}"))?;
@@ -132,7 +139,8 @@ fn build_reading(
         base_checksum: base_checksum.to_string(),
         coilbox_version: coilbox_version.to_string(),
     };
-    let mut files = mutator::files(&manifest, game_name, short_name, &marker, read)?;
+    let mut files = mutator::files(&manifest, game_name, short_name, &marker, &mut read)?;
+    let defs = defs::plan(&manifest, &mut read)?;
     let models = convert()?;
     let prelude_fixes = manifest
         .fixes
@@ -147,25 +155,39 @@ fn build_reading(
             Some(name.strip_suffix(".lua").unwrap_or(name).to_string())
         })
         .collect();
-    write_with_models(&dir, &mut files, &models, manifest_version).map(|files| Built {
+    let mut notes = models.notes.clone();
+    notes.extend(defs.notes.iter().cloned());
+    let files = write_with_models(&dir, &mut files, &models, &defs, manifest_version)?;
+    let mut def_overrides = models::model_keys(&files).len();
+    if !defs.written.is_empty() {
+        match read_defs().and_then(|read| defs::changed(&manifest, &defs.written, &read)) {
+            Ok(n) => def_overrides += n,
+            Err(e) => notes.push(format!(
+                "Could not read the game's defs to count what the def fixes change: {e}"
+            )),
+        }
+    }
+    Ok(Built {
         dir: dir.to_string_lossy().into_owned(),
         folder,
-        def_overrides: models::model_keys(&files).len(),
+        def_overrides,
         files,
         models: models.conversion,
-        notes: models.notes,
+        notes,
         prelude_fixes,
         gadgets,
     })
 }
 
-/// Write `files` and the converted `models` into `dir`, with the marker that
-/// ends `files` written last, so a write that stops part way leaves none.
-/// Answers with every path written, sorted, with the marker last.
+/// Write `files`, the converted `models` and the def files of `defs` into
+/// `dir`, with the marker that ends `files` written last, so a write that
+/// stops part way leaves none. Answers with every path written, sorted, with
+/// the marker last.
 fn write_with_models(
     dir: &std::path::Path,
     files: &mut Vec<tauri_plugin_coilbox_workshop::CompiledFile>,
     models: &models::Models,
+    defs: &defs::Plan,
     manifest_version: u32,
 ) -> Result<Vec<String>, String> {
     let marker = files
@@ -176,10 +198,13 @@ fn write_with_models(
         Some(from) => models::list(from)?,
         None => Vec::new(),
     };
-    if let Some(post) = models::defs_post(&models::model_keys(&converted), manifest_version) {
-        files.push(post);
-        files.sort_by(|a, b| a.path.cmp(&b.path));
-    }
+    let post = models::defs_post(
+        &models::model_keys(&converted),
+        defs.defs_post.as_deref(),
+        manifest_version,
+    );
+    files.extend(post.into_iter().chain(defs.weapondefs_post.clone()));
+    files.sort_by(|a, b| a.path.cmp(&b.path));
     tauri_plugin_coilbox_workshop::write_mutator(dir, files)?;
     if let Some(from) = &models.dir {
         models::copy(from, &converted, dir)?;
@@ -324,6 +349,10 @@ mod tests {
         Ok(None)
     }
 
+    fn no_defs() -> Result<String, String> {
+        Err("no defs in this test".into())
+    }
+
     fn root() -> (tempfile::TempDir, String) {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().to_string_lossy().into_owned();
@@ -345,6 +374,7 @@ mod tests {
             &[],
             no_file,
             no_models,
+            || Ok(r#"{"units":{"armcom":{"commander":1},"armpw":{}},"weaponDefs":{}}"#.into()),
         )
         .unwrap();
         assert_eq!(built.folder, format!("coilbox-compat-xta-9.65-{n}.sdd"));
@@ -355,13 +385,25 @@ mod tests {
                 .collect();
         let expected: Vec<String> = gadgets
             .into_iter()
-            .chain(["modinfo.lua".to_string(), mutator::MARKER.to_string()])
+            .chain([
+                models::DEFS_POST.to_string(),
+                "gamedata/weapondefs_post.lua".to_string(),
+                "modinfo.lua".to_string(),
+                mutator::MARKER.to_string(),
+            ])
             .collect();
         assert_eq!(built.files, expected);
-        assert_eq!(built.def_overrides, 0);
+        // The commander the def fixes give customparams.iscommander.
+        assert_eq!(built.def_overrides, 1);
+        assert!(built.notes.is_empty(), "{:?}", built.notes);
         let manifest = coilbox_compat::manifest(n).unwrap();
+        let def_fixes = manifest
+            .fixes
+            .iter()
+            .filter(|id| coilbox_compat::is_defs_fix(id))
+            .count();
         assert_eq!(
-            built.prelude_fixes.len() + built.gadgets.len(),
+            built.prelude_fixes.len() + built.gadgets.len() + def_fixes,
             manifest.fixes.len()
         );
         assert!(built
@@ -403,6 +445,7 @@ mod tests {
             &[],
             no_file,
             no_models,
+            no_defs,
         )
         .unwrap();
         let s = status(&data, "xta-9.65.sd7", "99999999").unwrap();
@@ -429,6 +472,7 @@ mod tests {
             &[],
             no_file,
             no_models,
+            no_defs,
         )
         .unwrap();
         // A folder from a manifest this build does not know stands in for one
@@ -471,6 +515,7 @@ mod tests {
             &[],
             read,
             no_models,
+            no_defs,
         )
         .unwrap();
         let dir = std::path::Path::new(&built.dir);
@@ -515,6 +560,7 @@ mod tests {
                 handlers,
                 read,
                 no_models,
+                no_defs,
             )
             .unwrap();
             std::fs::read_to_string(
@@ -545,6 +591,7 @@ mod tests {
                 &[],
                 no_file,
                 no_models,
+                no_defs,
             )
             .unwrap()
         };
@@ -586,6 +633,7 @@ mod tests {
             &[],
             no_file,
             no_models,
+            no_defs,
         )
         .unwrap();
         let leftover = std::path::Path::new(&built.dir).join("leftover.lua");
@@ -601,6 +649,7 @@ mod tests {
             &[],
             no_file,
             no_models,
+            no_defs,
         )
         .unwrap();
         assert!(!leftover.exists());
@@ -623,7 +672,8 @@ mod tests {
             "1",
             &[],
             no_file,
-            no_models
+            no_models,
+            no_defs,
         )
         .is_err());
         assert!(build_reading(
@@ -636,7 +686,8 @@ mod tests {
             "1",
             &[],
             no_file,
-            no_models
+            no_models,
+            no_defs,
         )
         .is_err());
         assert!(build_reading(
@@ -649,7 +700,8 @@ mod tests {
             "1",
             &[],
             no_file,
-            no_models
+            no_models,
+            no_defs,
         )
         .is_err());
         assert!(build_reading(
@@ -662,7 +714,8 @@ mod tests {
             "1",
             &[],
             no_file,
-            no_models
+            no_models,
+            no_defs,
         )
         .is_err());
     }
@@ -800,6 +853,7 @@ mod tests {
             &handlers,
             read,
             || models::convert_reading(read, || run_converter(staging.path()), staging.path()),
+            no_defs,
         )
         .unwrap();
         let dir = std::path::Path::new(&built.dir);
@@ -862,6 +916,21 @@ mod tests {
             let path = path.to_lowercase();
             assert!(paths(&with_gadgets).contains(&path), "{path}");
         }
+
+        let (commander, bombs) = (
+            "-- fix: defs-commander-85\n",
+            "-- fix: defs-manual-bomb-settings-92\n",
+        );
+        let weapons = "gamedata/weapondefs_post.lua";
+        let with_defs = golden_build(5, &FIXTURES[0]);
+        let post = text(&with_defs, models::DEFS_POST).unwrap();
+        assert!(post.contains(commander) && post.contains("local converted = {"));
+        assert!(text(&with_defs, weapons).unwrap().contains(bombs));
+        assert!(!text(&full, models::DEFS_POST).unwrap().contains(commander));
+        assert!(text(&full, weapons).is_none());
+        let defs_only = golden_build(5, &FIXTURES[2]);
+        assert!(text(&defs_only, models::DEFS_POST).is_none());
+        assert!(text(&defs_only, weapons).unwrap().contains(bombs));
     }
 
     /// The hash of every fixed game built from manifest `n`.
@@ -902,6 +971,10 @@ mod tests {
         (
             4,
             "fc84ec81f4a375d31b5f9797580e141b6da9ba60cfcf98871ed38fde6da5f693",
+        ),
+        (
+            5,
+            "8a678ce14a48f4bff3503d89b553486e337779101ac2730effc825439648a7d5",
         ),
     ];
 
@@ -956,6 +1029,7 @@ mod tests {
             &[],
             no_file,
             || some_models(staging.path()),
+            no_defs,
         )
         .unwrap();
         assert_eq!(
@@ -963,9 +1037,11 @@ mod tests {
             [
                 "LuaRules/Gadgets/coilbox_compat_aircraft_crash.lua",
                 "LuaRules/Gadgets/coilbox_compat_messages_tdf.lua",
+                "LuaRules/Gadgets/coilbox_compat_model_center_offset.lua",
                 "LuaRules/Gadgets/coilbox_compat_only_forward_aim.lua",
                 "Objects3D/armcom.s3o",
                 models::DEFS_POST,
+                "gamedata/weapondefs_post.lua",
                 "modinfo.lua",
                 "unittextures/3do/objects3d.png",
                 mutator::MARKER,
@@ -1002,6 +1078,7 @@ mod tests {
             &[],
             read,
             || some_models(staging.path()),
+            no_defs,
         )
         .unwrap();
         for f in [
@@ -1012,6 +1089,48 @@ mod tests {
             assert!(built.files.iter().any(|b| b == f), "{f}: {:?}", built.files);
         }
         assert_eq!(built.files.last().unwrap(), mutator::MARKER);
+    }
+
+    #[test]
+    fn a_failed_read_of_the_defs_is_noted_and_counts_nothing() {
+        let (_keep, data) = root();
+        let built = build_reading(
+            &data,
+            "xta-9.65.sd7",
+            "XTA 9.65",
+            None,
+            "1234abcd",
+            coilbox_compat::latest(),
+            "1.2.3",
+            &[],
+            no_file,
+            no_models,
+            no_defs,
+        )
+        .unwrap();
+        assert_eq!(built.def_overrides, 0);
+        assert_eq!(built.notes.len(), 1);
+        assert!(built.notes[0].contains("no defs in this test"));
+    }
+
+    #[test]
+    fn a_manifest_without_def_fixes_never_reads_the_defs() {
+        let (_keep, data) = root();
+        let built = build_reading(
+            &data,
+            "xta-9.65.sd7",
+            "XTA 9.65",
+            None,
+            "1234abcd",
+            4,
+            "1.2.3",
+            &[],
+            no_file,
+            no_models,
+            || panic!("read the defs for a manifest with no def fixes"),
+        )
+        .unwrap();
+        assert!(built.notes.is_empty());
     }
 
     #[test]
@@ -1028,6 +1147,7 @@ mod tests {
             &[],
             no_file,
             || panic!("converted before the request was checked"),
+            no_defs,
         );
         assert!(refused.is_err());
     }
@@ -1046,6 +1166,7 @@ mod tests {
             &[],
             no_file,
             || Err("the 3do converter wrote nothing".into()),
+            no_defs,
         );
         assert!(failed.is_err());
         assert!(!std::path::Path::new(&data).join("games").exists());
