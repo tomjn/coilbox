@@ -24,6 +24,10 @@
 //! A fix with a `-- states: synced, unsynced` line is part of the Lua prelude
 //! (issue #4558), and the line says which Lua states it runs in. See
 //! [`prelude`] and [`prelude_files`].
+//!
+//! A fix in `lua/compat/gadgets/` is a gadget instead (issue #4559), and its
+//! `-- gadget: coilbox_compat_<name>` line names the gadget and the file it is
+//! written to in the game's `LuaRules/Gadgets/`. See [`gadget_files`].
 
 use std::collections::BTreeMap;
 
@@ -37,6 +41,7 @@ pub const LICENSE: &str = "MIT or GNU GPL, v2 or later";
 const MANIFESTS: &[(u32, &str)] = &[
     (1, include_str!("../../../lua/compat/manifests/1.json")),
     (2, include_str!("../../../lua/compat/manifests/2.json")),
+    (3, include_str!("../../../lua/compat/manifests/3.json")),
 ];
 
 /// Every fix file, by id.
@@ -52,6 +57,18 @@ const FIXES: &[(&str, &str)] = &[
     (
         "compat-callin-hooks",
         include_str!("../../../lua/compat/compat-callin-hooks.lua"),
+    ),
+    (
+        "gadget-aircraft-crash-83",
+        include_str!("../../../lua/compat/gadgets/gadget-aircraft-crash-83.lua"),
+    ),
+    (
+        "gadget-messages-tdf-95",
+        include_str!("../../../lua/compat/gadgets/gadget-messages-tdf-95.lua"),
+    ),
+    (
+        "gadget-only-forward-aim-105",
+        include_str!("../../../lua/compat/gadgets/gadget-only-forward-aim-105.lua"),
     ),
     (
         "gl-smoothing",
@@ -190,6 +207,9 @@ pub struct Header {
     /// The Lua states a prelude fix runs in. Empty for a fix that is not part
     /// of the prelude.
     pub states: Vec<String>,
+    /// The name of a gadget fix, which is also its file name in the game's
+    /// `LuaRules/Gadgets/`. `None` for a fix that is not a gadget.
+    pub gadget: Option<String>,
 }
 
 fn list(value: &str) -> Vec<String> {
@@ -206,6 +226,7 @@ fn list(value: &str) -> Vec<String> {
 /// Returns `None` if `id` or `license` is missing. `catalogue` may be empty.
 pub fn parse_header(source: &str) -> Option<Header> {
     let (mut id, mut catalogue, mut license, mut states) = (None, Vec::new(), None, Vec::new());
+    let mut gadget = None;
     for line in source.lines() {
         let Some(rest) = line.strip_prefix("--") else {
             break;
@@ -219,6 +240,7 @@ pub fn parse_header(source: &str) -> Option<Header> {
             "catalogue" => catalogue = list(value),
             "license" => license = Some(value.to_string()),
             "states" => states = list(value),
+            "gadget" => gadget = Some(value.to_string()),
             _ => {}
         }
     }
@@ -227,6 +249,7 @@ pub fn parse_header(source: &str) -> Option<Header> {
         catalogue,
         license: license?,
         states,
+        gadget,
     })
 }
 
@@ -336,6 +359,41 @@ pub fn is_prelude_fix(id: &str) -> bool {
     fix_source(id)
         .and_then(parse_header)
         .is_some_and(|h| !h.states.is_empty())
+}
+
+/// The start of every gadget fix's name, so a game's own gadget for the same
+/// thing can be told apart from it in the infolog.
+pub const GADGET_PREFIX: &str = "coilbox_compat_";
+
+/// The gadget name of the fix `id`, or `None` when it is not a gadget fix.
+fn gadget_name(id: &str) -> Option<String> {
+    fix_source(id).and_then(parse_header)?.gadget
+}
+
+/// Whether the fix `id` is a gadget, which [`gadget_files`] writes.
+pub fn is_gadget_fix(id: &str) -> bool {
+    gadget_name(id).is_some()
+}
+
+/// Every gadget fix `manifest` lists, as the path in the mutator and the
+/// fix's source unchanged, sorted by path. The game's gadget handler loads
+/// each from `LuaRules/Gadgets/`, and each gadget decides when it loads whether
+/// the game needs it, from the game's own files. So every game built from one
+/// manifest gets the same gadget files.
+pub fn gadget_files(manifest: &Manifest) -> Vec<(String, String)> {
+    let mut files: Vec<(String, String)> = manifest
+        .fixes
+        .iter()
+        .filter_map(|id| {
+            let name = gadget_name(id)?;
+            Some((
+                format!("LuaRules/Gadgets/{name}.lua"),
+                fix_source(id)?.to_string(),
+            ))
+        })
+        .collect();
+    files.sort();
+    files
 }
 
 /// Every Lua file the prelude adds to a compat mutator built from `manifest`:
@@ -448,13 +506,19 @@ mod tests {
         assert_eq!(on_disk, embedded);
     }
 
-    #[test]
-    fn every_fix_file_is_embedded_and_its_header_agrees() {
-        let on_disk: BTreeSet<String> = fs::read_dir(compat_dir())
+    /// The ids of the fix files in `dir`.
+    fn fix_files_in(dir: PathBuf) -> BTreeSet<String> {
+        fs::read_dir(dir)
             .unwrap()
             .map(|e| e.unwrap().file_name().into_string().unwrap())
             .filter_map(|n| n.strip_suffix(".lua").map(String::from))
-            .collect();
+            .collect()
+    }
+
+    #[test]
+    fn every_fix_file_is_embedded_and_its_header_agrees() {
+        let mut on_disk = fix_files_in(compat_dir());
+        on_disk.extend(fix_files_in(compat_dir().join("gadgets")));
         let embedded: BTreeSet<String> = FIXES.iter().map(|(id, _)| id.to_string()).collect();
         assert_eq!(on_disk, embedded);
         for (id, src) in FIXES {
@@ -519,6 +583,86 @@ mod tests {
         assert_eq!(h.license, LICENSE);
         assert!(parse_header("-- id: a\n").is_none());
         assert!(h.states.is_empty());
+    }
+
+    #[test]
+    fn a_header_reads_the_name_of_a_gadget_fix() {
+        let src = "-- id: a\n-- gadget: coilbox_compat_a\n-- license: x\n";
+        let h = parse_header(src).unwrap();
+        assert_eq!(h.gadget.as_deref(), Some("coilbox_compat_a"));
+        assert!(h.states.is_empty());
+        assert_eq!(
+            parse_header("-- id: a\n-- license: x\n").unwrap().gadget,
+            None
+        );
+    }
+
+    #[test]
+    fn the_gadget_fixes_are_the_files_in_gadgets_and_carry_their_name() {
+        let in_folder = fix_files_in(compat_dir().join("gadgets"));
+        let gadgets: BTreeSet<String> = FIXES
+            .iter()
+            .filter(|(id, _)| is_gadget_fix(id))
+            .map(|(id, _)| id.to_string())
+            .collect();
+        assert_eq!(gadgets, in_folder);
+        for id in &gadgets {
+            let header = parse_header(fix_source(id).unwrap()).unwrap();
+            let name = header.gadget.unwrap();
+            assert!(name.starts_with(GADGET_PREFIX), "{id}: {name}");
+            assert!(
+                name[GADGET_PREFIX.len()..]
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'),
+                "{id}: {name}"
+            );
+            assert!(
+                header.states.is_empty(),
+                "{id}: a gadget is not in the prelude"
+            );
+            assert!(
+                fix_source(id)
+                    .unwrap()
+                    .contains(&format!("name = \"{name}\",")),
+                "{id}: GetInfo does not register as {name}"
+            );
+        }
+    }
+
+    #[test]
+    fn manifest_3_is_manifest_2_with_the_gadgets() {
+        let (two, three) = (manifest(2).unwrap(), manifest(3).unwrap());
+        assert_eq!(three.fixes[..two.fixes.len()], two.fixes[..]);
+        assert!(gadget_files(&two).is_empty());
+        let paths: Vec<String> = gadget_files(&three).into_iter().map(|(p, _)| p).collect();
+        assert_eq!(
+            paths,
+            [
+                "LuaRules/Gadgets/coilbox_compat_aircraft_crash.lua",
+                "LuaRules/Gadgets/coilbox_compat_messages_tdf.lua",
+                "LuaRules/Gadgets/coilbox_compat_only_forward_aim.lua",
+            ]
+        );
+        for state in [LuaState::Synced, LuaState::Unsynced] {
+            let (a, b) = (
+                prelude(&two, state).unwrap(),
+                prelude(&three, state).unwrap(),
+            );
+            let rest = |p: &str| p.split_once('\n').unwrap().1.to_string();
+            assert_eq!(rest(&a), rest(&b), "{}", state.name());
+        }
+    }
+
+    #[test]
+    fn a_gadget_is_written_as_its_fix_file() {
+        let files = gadget_files(&manifest(3).unwrap());
+        let (_, src) = files
+            .iter()
+            .find(|(p, _)| p.ends_with("coilbox_compat_messages_tdf.lua"))
+            .unwrap();
+        assert_eq!(src, fix_source("gadget-messages-tdf-95").unwrap());
+        assert!(!is_gadget_fix("spring-unit-travel"));
+        assert!(!is_prelude_fix("gadget-messages-tdf-95"));
     }
 
     #[test]
