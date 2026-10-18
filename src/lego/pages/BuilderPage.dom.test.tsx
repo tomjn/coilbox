@@ -102,33 +102,73 @@ vi.mock("./components/TestDrawer", () => ({
   TestDrawer: () => null,
 }));
 // Reads a display setting from the app frame, which nothing here provides.
-// Draws one button for each shape, which is how a test chooses one.
+// Draws one button for each shape and part, which is how a test chooses one,
+// and says which tile is drawn as chosen.
 vi.mock("./components/TileGrid", () => ({
   TileGrid: ({
     sections,
     onPick,
+    selectedKey,
   }: {
-    sections: { items: { kind: string; shape?: ShapeKind }[] }[];
-    onPick?: (item: { kind: string; shape?: ShapeKind }, alt: boolean) => void;
-  }) =>
-    sections
-      .flatMap((section) => section.items)
-      .flatMap((item) =>
-        item.kind === "shape" && item.shape
-          ? [
-              <button
-                key={item.shape.id}
-                type="button"
-                onClick={() => onPick?.(item, false)}
-              >
-                {`Add the ${item.shape.label} shape`}
-              </button>,
-            ]
-          : [],
-      ),
+    sections: {
+      items: { kind: string; shape?: ShapeKind; part?: { id: string } }[];
+    }[];
+    onPick?: (
+      item: { kind: string; shape?: ShapeKind; part?: { id: string } },
+      alt: boolean,
+    ) => void;
+    selectedKey?: string;
+  }) => (
+    <div aria-label="tiles" data-selected={selectedKey ?? ""}>
+      {sections
+        .flatMap((section) => section.items)
+        .flatMap((item) =>
+          item.kind === "shape" && item.shape
+            ? [
+                <button
+                  key={item.shape.id}
+                  type="button"
+                  onClick={() => onPick?.(item, false)}
+                >
+                  {`Add the ${item.shape.label} shape`}
+                </button>,
+              ]
+            : item.kind === "part" && item.part
+              ? [
+                  <button
+                    key={item.part.id}
+                    type="button"
+                    onClick={() => onPick?.(item, false)}
+                  >
+                    {`Pick the ${item.part.id} part`}
+                  </button>,
+                ]
+              : [],
+        )}
+    </div>
+  ),
 }));
-// Opens beside the grid on a pick, with a preview this DOM cannot draw.
-vi.mock("./components/DetailPanel", () => ({ DetailPanel: () => null }));
+// Opens beside the grid on a pick, with a preview this DOM cannot draw. Its
+// one control is the Colourway control's tan choice for a grey part.
+vi.mock("./components/DetailPanel", () => ({
+  DetailPanel: ({
+    selected,
+    onSelect,
+  }: {
+    selected: { kind: string; id: string };
+    onSelect: (ref: { kind: string; id: string }) => void;
+  }) =>
+    selected.kind === "part" ? (
+      <button
+        type="button"
+        onClick={() =>
+          onSelect({ kind: "part", id: selected.id.replace(/-grey$/, "-tan") })
+        }
+      >
+        Tan
+      </button>
+    ) : null,
+}));
 // Reads the unit's file in its game through unitsync, for a factory's yardmap.
 vi.mock("./components/useBuiltUnitDef", () => ({
   useBuiltUnitDef: () => ({ game: undefined, key: null, def: undefined }),
@@ -246,6 +286,40 @@ describe("a shape chosen in the strip (#3337)", () => {
     expect(
       screen.queryByRole("button", { name: "Add the Cylinder shape" }),
     ).toBeNull();
+  });
+});
+
+/** The panel's Colourway control switches the part being placed (#4540). */
+describe("a part chosen in the strip", () => {
+  const part = (id: string, colourway: string) => ({
+    id,
+    name: id,
+    shape: "beam",
+    shapeId: "beam",
+    category: colourway,
+    colourway,
+    material: "",
+    tags: [],
+    sourceNames: [],
+    packId: "lego",
+    bbox: { min: [0, 0, 0], max: [1, 1, 1] },
+  });
+
+  it("is placed in the colourway the panel switches it to", async () => {
+    const parts = [part("beam-grey", "grey"), part("beam-tan", "tan")];
+    packLoad = loadedPack(parts).then((pack) => ({
+      ...pack,
+      byId: new Map(parts.map((p) => [p.id, p])),
+    }));
+    show(unit());
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Pick the beam-grey part" }),
+    );
+    const tiles = screen.getByLabelText("tiles");
+    expect(tiles.getAttribute("data-selected")).toBe("part:beam-grey");
+    fireEvent.click(screen.getByRole("button", { name: "Tan" }));
+    expect(tiles.getAttribute("data-selected")).toBe("part:beam-tan");
+    expect(doc.current.edit).not.toHaveBeenCalled();
   });
 });
 

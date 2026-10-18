@@ -178,6 +178,11 @@ interface GridsProps {
   selectedPartId?: string;
   /** Absent on the Lego Parts page, which has no unit to take a part. */
   onSelectPart?: (part: LegoPartInfo, alt: boolean) => void;
+  /**
+   * The panel's Colourway control chose another colourway of the part being
+   * placed, which the builder then places instead (#4540).
+   */
+  onSwitchPlacingPart?: (part: LegoPartInfo) => void;
   /** The builder adds the shape. Absent on the Lego Parts page. */
   onSelectShape?: (shape: ShapeKind, alt: boolean) => void;
   /** Absent on the Lego Parts page, which has no unit to place a module in. */
@@ -224,6 +229,7 @@ export function InventoryGrids({
   atlas,
   selectedPartId,
   onSelectPart,
+  onSwitchPlacingPart,
   onSelectShape,
   onInsertModule,
   placingModuleId,
@@ -304,7 +310,17 @@ export function InventoryGrids({
         onShare: onShareModule,
         onLabels: onLabelsModule,
       }}
-      onSelect={setSelected}
+      onSelect={(next) => {
+        const part = next.kind === "part" ? pack.byId.get(next.id) : undefined;
+        if (
+          part &&
+          selected.kind === "part" &&
+          selected.id === selectedPartId
+        ) {
+          onSwitchPlacingPart?.(part);
+        }
+        setSelected(next);
+      }}
       onClose={() => setSelected(null)}
       onAddShape={onSelectShape && ((shape) => onSelectShape(shape, false))}
       onPlaceModule={

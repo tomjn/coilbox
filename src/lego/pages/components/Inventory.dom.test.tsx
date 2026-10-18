@@ -124,17 +124,33 @@ vi.mock("./TileGrid", async () => {
   };
 });
 
-/** What the panel was asked to show, a field that uses Escape, and its X. */
+/**
+ * What the panel was asked to show, a field that uses Escape, its X, and a
+ * Colourway control that picks the tan part of a shape named "<shape>-<colour>".
+ */
 vi.mock("./DetailPanel", () => ({
   DetailPanel: ({
     selected,
+    onSelect,
     onClose,
   }: {
     selected: { kind: string; id: string };
+    onSelect: (ref: { kind: string; id: string }) => void;
     onClose: () => void;
   }) => (
     <aside aria-label="detail">
       {`${selected.kind}:${selected.id}`}
+      <button
+        type="button"
+        onClick={() =>
+          onSelect({
+            kind: "part",
+            id: selected.id.replace(/-[a-z]+$/, "-tan"),
+          })
+        }
+      >
+        Tan
+      </button>
       <input
         aria-label="panel field"
         onKeyDown={(event) => {
@@ -912,8 +928,13 @@ describe("a colourway", () => {
 
   function Drawer({
     onSelectPart,
+    onSwitchPlacingPart,
+    placing,
   }: {
     onSelectPart: (part: LegoPartInfo, alt: boolean) => void;
+    onSwitchPlacingPart?: (part: LegoPartInfo) => void;
+    /** The part the builder is placing. */
+    placing?: string;
   }) {
     const view = useInventoryView(tans, modules);
     return (
@@ -924,6 +945,8 @@ describe("a colourway", () => {
           pack={tans}
           compounds={modules}
           onSelectPart={onSelectPart}
+          onSwitchPlacingPart={onSwitchPlacingPart}
+          selectedPartId={placing}
           onDeleteModule={vi.fn()}
           onRenameModule={vi.fn()}
           onCopyModule={vi.fn()}
@@ -987,5 +1010,43 @@ describe("a colourway", () => {
     expect(onSelectPart).toHaveBeenLastCalledWith(parts[0], false);
     fireEvent.click(screen.getByRole("button", { name: "pick beam-tan" }));
     expect(onSelectPart).toHaveBeenLastCalledWith(parts[1], false);
+  });
+
+  it("switches the part in the panel with its Colourway control", () => {
+    render(<Drawer onSelectPart={vi.fn()} />);
+    pickCategory("Grey");
+    fireEvent.click(screen.getByRole("button", { name: "pick beam-grey" }));
+    fireEvent.click(screen.getByRole("button", { name: "Tan" }));
+    expect(screen.getByLabelText("detail").firstChild?.textContent).toBe(
+      "part:beam-tan",
+    );
+  });
+
+  it("places the other colourway when the panel switches the part being placed", () => {
+    const onSwitchPlacingPart = vi.fn();
+    render(
+      <Drawer
+        onSelectPart={vi.fn()}
+        onSwitchPlacingPart={onSwitchPlacingPart}
+        placing="beam-grey"
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "pick beam-grey" }));
+    fireEvent.click(screen.getByRole("button", { name: "Tan" }));
+    expect(onSwitchPlacingPart).toHaveBeenCalledWith(parts[1]);
+  });
+
+  it("leaves what is placed alone when the panel shows another part", () => {
+    const onSwitchPlacingPart = vi.fn();
+    render(
+      <Drawer
+        onSelectPart={vi.fn()}
+        onSwitchPlacingPart={onSwitchPlacingPart}
+        placing="block-grey"
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "pick beam-grey" }));
+    fireEvent.click(screen.getByRole("button", { name: "Tan" }));
+    expect(onSwitchPlacingPart).not.toHaveBeenCalled();
   });
 });
