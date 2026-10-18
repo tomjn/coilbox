@@ -565,6 +565,7 @@ mod tests {
     struct Fixture {
         archive: &'static str,
         game: &'static str,
+        short_name: Option<&'static str>,
         files: &'static [(&'static str, &'static str)],
         lua: &'static [(&'static str, &'static str)],
     }
@@ -585,6 +586,7 @@ mod tests {
         Fixture {
             archive: "xta-9.65.sd7",
             game: "XTA 9.65",
+            short_name: Some("XTA"),
             files: &[
                 ("LuaRules/main.lua", "-- rules\r\nreturn include('x')\n"),
                 ("LuaRules/draw.lua", "-- draw, caf\u{e9}\n"),
@@ -604,6 +606,7 @@ mod tests {
         Fixture {
             archive: "BA-V9.79.SDZ",
             game: "Balanced \"Annihilation\" \\ V9.79",
+            short_name: Some("BA\\\""),
             files: &[
                 ("LuaRules/main.lua", "-- rules\n"),
                 ("gamedata/defs.lua", "LoadDefs('defs_post')\n"),
@@ -618,6 +621,7 @@ mod tests {
         Fixture {
             archive: "SplinterFaction.sdd",
             game: "Splinter Faction 0.1.86",
+            short_name: None,
             files: &[
                 ("LuaUI/main.lua", "-- ui\n"),
                 ("gamedata/defs_post.lua", "return {}\n"),
@@ -681,6 +685,7 @@ mod tests {
             &data,
             fixture.archive,
             fixture.game,
+            fixture.short_name,
             "1234abcd",
             n,
             "1.2.3",
@@ -770,11 +775,11 @@ mod tests {
     const GOLDEN: &[(u32, &str)] = &[
         (
             1,
-            "6d8ef68bd3e9c61ee4ba13b6eac91d23c913b4fc4e3b6bbff2153d773a35f0b0",
+            "679d265ba887f16b342fa9c22117c6fdd13879b25209e99c9716b99802a72db3",
         ),
         (
             2,
-            "322f2bcdef54ba487afe64cb2624ca6987b655b89b22e964ef0519040ab01478",
+            "595eb4f1042f0b1f328da80a63044634b5ed60afd71bc5c2cd956af8a20deb18",
         ),
     ];
 
