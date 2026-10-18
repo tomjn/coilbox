@@ -36,6 +36,15 @@ pub struct Built {
     pub models: models::Conversion,
     /// Why the converted models are not used, when they cannot be.
     pub notes: Vec<String>,
+    /// The ids of the prelude fixes written, which define the functions the
+    /// engine removed.
+    pub prelude_fixes: Vec<String>,
+    /// The names of the polyfill gadgets written. Each decides when it loads
+    /// whether the game needs it.
+    pub gadgets: Vec<String>,
+    /// How many converted models `gamedata/defs_post.lua` points the game's
+    /// defs at.
+    pub def_overrides: usize,
 }
 
 /// Write the compat mutator for the game in `archive_name` under `data_dir`'s
@@ -125,12 +134,28 @@ fn build_reading(
     };
     let mut files = mutator::files(&manifest, game_name, short_name, &marker, read)?;
     let models = convert()?;
+    let prelude_fixes = manifest
+        .fixes
+        .iter()
+        .filter(|id| coilbox_compat::is_prelude_fix(id))
+        .cloned()
+        .collect();
+    let gadgets = coilbox_compat::gadget_files(&manifest)
+        .into_iter()
+        .filter_map(|(path, _)| {
+            let name = path.strip_prefix("LuaRules/Gadgets/")?;
+            Some(name.strip_suffix(".lua").unwrap_or(name).to_string())
+        })
+        .collect();
     write_with_models(&dir, &mut files, &models, manifest_version).map(|files| Built {
         dir: dir.to_string_lossy().into_owned(),
         folder,
+        def_overrides: models::model_keys(&files).len(),
         files,
         models: models.conversion,
         notes: models.notes,
+        prelude_fixes,
+        gadgets,
     })
 }
 
@@ -207,6 +232,23 @@ pub fn status(data_dir: &str, archive_name: &str, base_checksum: &str) -> Result
     })
 }
 
+/// Delete every compat mutator built for `archive_name` under `data_dir`,
+/// which are generated folders and never the original game. Answers with the
+/// folders deleted.
+pub fn remove(data_dir: &str, archive_name: &str) -> Result<Vec<String>, String> {
+    let games = mutator::games_dir(data_dir)?;
+    let mut removed = Vec::new();
+    for (folder, _) in mutator::built_folders(&games, archive_name)? {
+        let dir = games.join(&folder);
+        coilbox_portable::refuse_in_bundle(&dir)?;
+        std::fs::remove_dir_all(&dir)
+            .map_err(|e| format!("could not delete {}: {e}", dir.display()))?;
+        removed.push(folder);
+    }
+    removed.sort();
+    Ok(removed)
+}
+
 fn envelope<T: Serialize>(result: Result<T, String>) -> CliResult {
     match result.and_then(|v| serde_json::to_value(v).map_err(|e| e.to_string())) {
         Ok(v) => CliResult::ok(v),
@@ -249,11 +291,24 @@ async fn compat_status(data_dir: String, archive_name: String, base_checksum: St
     envelope(status(&data_dir, &archive_name, &base_checksum))
 }
 
+/// [`remove`].
+#[tauri::command]
+async fn compat_remove(data_dir: String, archive_name: String) -> CliResult {
+    let result = tauri::async_runtime::spawn_blocking(move || remove(&data_dir, &archive_name))
+        .await
+        .unwrap_or_else(|e| Err(format!("the compat remove task failed: {e}")));
+    envelope(result)
+}
+
 /// Build the plugin. Registered as `"coilbox-compat"` (crate name minus the
 /// `tauri-plugin-` prefix).
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-compat")
-        .invoke_handler(tauri::generate_handler![compat_build, compat_status])
+        .invoke_handler(tauri::generate_handler![
+            compat_build,
+            compat_status,
+            compat_remove
+        ])
         .build()
 }
 
@@ -303,6 +358,16 @@ mod tests {
             .chain(["modinfo.lua".to_string(), mutator::MARKER.to_string()])
             .collect();
         assert_eq!(built.files, expected);
+        assert_eq!(built.def_overrides, 0);
+        let manifest = coilbox_compat::manifest(n).unwrap();
+        assert_eq!(
+            built.prelude_fixes.len() + built.gadgets.len(),
+            manifest.fixes.len()
+        );
+        assert!(built
+            .gadgets
+            .iter()
+            .all(|g| g.starts_with(coilbox_compat::GADGET_PREFIX)));
         let dir = std::path::Path::new(&built.dir);
         assert!(dir.join("modinfo.lua").is_file());
         assert_eq!(
@@ -463,6 +528,40 @@ mod tests {
         assert!(!picked.contains(adapter));
         assert!(picked.contains("-- fix: callin-allow-command-105\n"));
         assert_eq!(picked, prelude(&[new_order]));
+    }
+
+    #[test]
+    fn remove_deletes_every_mutator_of_the_game_and_nothing_else() {
+        let (_keep, data) = root();
+        let build = |archive: &str, n: u32| {
+            build_reading(
+                &data,
+                archive,
+                "XTA 9.65",
+                None,
+                "1234abcd",
+                n,
+                "1.2.3",
+                &[],
+                no_file,
+                no_models,
+            )
+            .unwrap()
+        };
+        let first = build("xta-9.65.sd7", 1);
+        let second = build("xta-9.65.sd7", coilbox_compat::latest());
+        let other = build("other.sd7", coilbox_compat::latest());
+        let mut expected = vec![first.folder.clone(), second.folder.clone()];
+        expected.sort();
+        assert_eq!(remove(&data, "xta-9.65.sd7").unwrap(), expected);
+        assert!(!std::path::Path::new(&first.dir).exists());
+        assert!(!std::path::Path::new(&second.dir).exists());
+        assert!(std::path::Path::new(&other.dir).is_dir());
+        assert_eq!(
+            status(&data, "xta-9.65.sd7", "1234abcd").unwrap().folder,
+            None
+        );
+        assert!(remove(&data, "xta-9.65.sd7").unwrap().is_empty());
     }
 
     #[test]
