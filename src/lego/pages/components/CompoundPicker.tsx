@@ -599,7 +599,11 @@ export function CompoundPicker({
   // to draw into, and the mount effect only runs once.
   if (scrollRoot) {
     return (
-      <div ref={contentRef} className="relative shrink-0" style={{ height }}>
+      <div
+        ref={contentRef}
+        className="relative w-full min-w-0 shrink-0"
+        style={{ height }}
+      >
         <div
           ref={hostRef}
           className="pointer-events-none sticky top-0"
