@@ -149,7 +149,9 @@ describe("clicking a module", () => {
         onSelect={onSelect}
       />,
     );
-    fireEvent.click(container.querySelector("button[title^='Place']") as Element);
+    fireEvent.click(
+      container.querySelector("button[title^='Place']") as Element,
+    );
     expect(onInsert).toHaveBeenCalledOnce();
     expect(onSelect).not.toHaveBeenCalled();
   });
