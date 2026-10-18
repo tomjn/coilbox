@@ -477,7 +477,7 @@ fn convert_group(
             group.tiles_packed = packed.rects.len();
             group.tiles_that_did_not_fit = dropped;
             let side = packed.image.width();
-            let png = coilbox_texture::encode_png(&packed.image)
+            let png = coilbox_3do_convert::encode_sheet(&packed.image)
                 .ok_or_else(|| format!("could not encode the sheet for {folder}"))?;
             let record = coilbox_3do_convert::Sheet::of(
                 &packed,

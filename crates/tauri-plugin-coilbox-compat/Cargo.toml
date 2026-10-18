@@ -24,11 +24,13 @@ coilbox-3do-convert = { path = "../coilbox-3do-convert" }
 coilbox-portable = { path = "../coilbox-portable" }
 # `write_mutator` and `lua_string`, the writers the workshop test mutator uses.
 tauri-plugin-coilbox-workshop = { path = "../tauri-plugin-coilbox-workshop" }
-# Reads the base game's Lua entry files to wrap them with the prelude, and runs
-# the worker scan the test that the mutator is listed reads.
+# Reads the base game's Lua entry files to wrap them with the prelude, converts
+# its 3do models, and runs the worker scan the test that the mutator is listed
+# reads.
 tauri-plugin-coilbox-unitsync = { path = "../tauri-plugin-coilbox-unitsync" }
+# The folder the converter writes into before it is copied into the mutator.
+tempfile = { workspace = true }
 
 [dev-dependencies]
-tempfile = { workspace = true }
 # Evaluates the written modinfo.lua the way the engine reads it.
 coilbox-springlua = { path = "../coilbox-springlua" }

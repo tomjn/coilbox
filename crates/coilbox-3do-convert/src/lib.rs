@@ -36,6 +36,26 @@ pub use sheet::{Sheet, SheetTile, FIRST_TOP_ROWS_VERSION, SHEET_DIR, SHEET_KIND,
 /// it, and `a_fixed_conversion_writes_the_same_bytes` fails until it does.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// A finished sheet as PNG bytes, or `None` if the encoder refuses it.
+///
+/// The compression and filter are named rather than left to the `image`
+/// crate's defaults, so a release of it that changes them cannot change the
+/// bytes two players build (issue #4557). The PNG writer adds no time chunk.
+pub fn encode_sheet(sheet: &image::RgbaImage) -> Option<Vec<u8>> {
+    use image::codecs::png::{CompressionType, FilterType, PngEncoder};
+    use image::ImageEncoder;
+    let mut png = Vec::new();
+    PngEncoder::new_with_quality(&mut png, CompressionType::Fast, FilterType::Adaptive)
+        .write_image(
+            sheet.as_raw(),
+            sheet.width(),
+            sheet.height(),
+            image::ExtendedColorType::Rgba8,
+        )
+        .ok()?;
+    Some(png)
+}
+
 /// The tiles a model's flat-colour faces need: a fallback grey always, plus one
 /// small tile per distinct palette entry the model names that `palette`
 /// resolves.
@@ -332,5 +352,97 @@ mod tests {
         let model = model_with(vec![named_face("arm2"), named_face("")]);
 
         assert_eq!(tile_names(&model), vec!["arm2".to_string(), String::new()]);
+    }
+
+    /// A `.3do` of one textured triangle, laid out by hand: the root piece,
+    /// its three corners, the triangle's indices, then the names.
+    fn a_small_3do() -> Vec<u8> {
+        const OBJECT: i32 = 13 * 4;
+        let vertices = OBJECT;
+        let indices = vertices + 3 * 12;
+        let primitive = indices + 3 * 2;
+        let texture = primitive + 8 * 4;
+        let name = texture + 5;
+        let mut out = Vec::new();
+        let mut put = |values: &[i32]| {
+            for v in values {
+                out.extend_from_slice(&v.to_le_bytes());
+            }
+        };
+        // Version, vertex and primitive counts, no selection face, offset from
+        // the parent, name, a zero, the vertex and primitive offsets, and no
+        // sibling or child.
+        put(&[1, 3, 1, -1, 0, 0, 0, name, 0, vertices, primitive, 0, 0]);
+        put(&[0, 0, 0, 65536, 0, 0, 65536, 0, 65536]);
+        let mut out_indices = Vec::new();
+        for i in [0u16, 1, 2] {
+            out_indices.extend_from_slice(&i.to_le_bytes());
+        }
+        out.extend_from_slice(&out_indices);
+        let mut put = |values: &[i32]| {
+            for v in values {
+                out.extend_from_slice(&v.to_le_bytes());
+            }
+        };
+        put(&[0, 3, 0, indices, texture, 0, 0, 0]);
+        out.extend_from_slice(b"arm2\0base\0");
+        out
+    }
+
+    /// Every file one conversion of [`a_small_3do`] writes: the `.s3o`, the
+    /// sheet's PNG and its record.
+    fn convert_the_small_3do() -> [Vec<u8>; 3] {
+        let model = coilbox_3do::read(&a_small_3do()).expect("the fixture parses");
+        let mut tiles: Vec<Tile> = tile_names(&model)
+            .into_iter()
+            .map(|name| Tile {
+                name,
+                image: image::RgbaImage::from_fn(16, 16, |x, y| {
+                    image::Rgba([(x * 16) as u8, (y * 16) as u8, 7, 0])
+                }),
+            })
+            .collect();
+        tiles.extend(palette_tiles(&model, None));
+        let packed = pack(&tiles).expect("pack");
+        let converted = to_s3o(&model, &packed.rects, "3do/objects3d.png").expect("convert");
+        [
+            coilbox_s3o::write(&converted.model).expect("write the model"),
+            encode_sheet(&packed.image).expect("encode the sheet"),
+            Sheet::of(&packed, "objects3d.png")
+                .write()
+                .expect("write the record"),
+        ]
+    }
+
+    /// Two players build a compat mutator separately, and a multiplayer game
+    /// needs the two to be the same bytes (issue #4557).
+    #[test]
+    fn converting_one_3do_twice_writes_the_same_bytes() {
+        let first = convert_the_small_3do();
+        let second = convert_the_small_3do();
+        assert!(first.iter().all(|bytes| !bytes.is_empty()));
+        assert_eq!(first, second);
+        assert!(!first[2].contains(&b'\r'), "the record has LF endings");
+    }
+
+    /// The sheet's PNG bytes, which [`a_fixed_conversion_writes_the_same_bytes`]
+    /// does not cover because it hashes the pixels. If this fails, the PNG
+    /// writer changed what it writes for the same pixels. That changes the
+    /// mutator two players build, so it needs the same version bump and new
+    /// compat manifest that test asks for.
+    #[test]
+    fn the_sheet_png_is_the_same_bytes() {
+        use sha2::{Digest, Sha256};
+
+        let [_, png, _] = convert_the_small_3do();
+        let hex: String = Sha256::digest(&png)
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        assert_eq!(VERSION, "0.1.0");
+        assert_eq!(
+            hex, "a96f7118a61f79b7b8df3bfc781862f00e14217f858a1b40522bf1827994101d",
+            "the sheet's PNG bytes changed"
+        );
     }
 }
