@@ -13,6 +13,8 @@
 
 import * as THREE from "three";
 import type { SkeletonJoint } from "../../skeletonJoints";
+import { type LabelBox, shownLabels } from "./labelLayout";
+import { labelPixelSize } from "./labelSize";
 import type { SceneState } from "./sceneState";
 import { label } from "./weaponReachLayer";
 
@@ -20,12 +22,59 @@ import { label } from "./weaponReachLayer";
  *  selection and the weapon ring colours. */
 export const SKELETON_COLOUR = 0xe879f9;
 
+/** How far right of its marker a label starts, as a share of its width. */
+const LABEL_OFFSET = 0.15;
+
 /** A label that keeps its size on screen in either kind of camera. */
 function skeletonLabel(text: string): THREE.Sprite {
   const sprite = label(text, "#f5d0fe");
   // To the right of the marker, not on it.
-  sprite.center.set(-0.15, 0.5);
+  sprite.center.set(-LABEL_OFFSET, 0.5);
   return sprite;
+}
+
+const AT = new THREE.Vector3();
+
+/**
+ * Hide each label that would cover a nearer one on screen, for the view
+ * `camera` draws into a `width` by `height` CSS pixel canvas. The labels of
+ * the pieces in `always`, the selection and the hovered piece, are shown
+ * whatever they cover. Run before each render, since any camera move changes
+ * which labels collide.
+ */
+export function layoutSkeletonLabels(
+  skeleton: THREE.Group,
+  camera: THREE.Camera,
+  { width, height }: { width: number; height: number },
+  always: ReadonlySet<string>,
+): void {
+  skeleton.updateWorldMatrix(true, true);
+  camera.updateMatrixWorld();
+  const boxes: LabelBox[] = [];
+  const sprites: THREE.Sprite[] = [];
+  for (const child of skeleton.children) {
+    if (!(child instanceof THREE.Sprite)) continue;
+    sprites.push(child);
+    AT.setFromMatrixPosition(child.matrixWorld).applyMatrix4(
+      camera.matrixWorldInverse,
+    );
+    const depth = -AT.z;
+    AT.applyMatrix4(camera.projectionMatrix);
+    const size = labelPixelSize(child);
+    boxes.push({
+      id: child.userData.pieceId,
+      left: ((AT.x + 1) / 2) * width + LABEL_OFFSET * size.width,
+      top: ((1 - AT.y) / 2) * height - size.height / 2,
+      width: size.width,
+      height: size.height,
+      depth,
+      always: always.has(child.userData.pieceId),
+    });
+  }
+  const shown = shownLabels(boxes);
+  for (const sprite of sprites) {
+    sprite.visible = shown.has(sprite.userData.pieceId);
+  }
 }
 
 /**
