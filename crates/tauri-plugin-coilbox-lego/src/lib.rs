@@ -2326,6 +2326,25 @@ struct ExportTextures {
     atlas: Option<AtlasRef>,
     #[serde(default)]
     stored: Vec<StoredTextureRef>,
+    /// A folder every texture is read from instead of its pack or the store,
+    /// by the same file names. A campaign's copy of a unit carries its own
+    /// textures (issue #4516), so it launches without the pack it was built
+    /// from.
+    #[serde(default)]
+    source_dir: Option<String>,
+}
+
+/// The folder an export reads its textures from instead of their usual
+/// places, checked to be an absolute folder that exists.
+fn texture_source_dir(dir: Option<&str>) -> Result<Option<PathBuf>, String> {
+    let Some(dir) = dir else {
+        return Ok(None);
+    };
+    let path = PathBuf::from(dir);
+    if !path.is_absolute() || !path.is_dir() {
+        return Err(format!("not a texture folder: {dir}"));
+    }
+    Ok(Some(path))
 }
 
 /// A stored texture's file in the store. The key is content addressed and comes
@@ -2546,10 +2565,20 @@ async fn lego_export<R: Runtime>(
     // with a game's own by accident, so a file already there is either a copy
     // an earlier export made or one the author put there, and neither is ours
     // to overwrite.
+    let source_dir =
+        match texture_source_dir(textures.as_ref().and_then(|t| t.source_dir.as_deref())) {
+            Ok(dir) => dir,
+            Err(e) => return CliResult::err(e),
+        };
     let mut texture_path = None;
     let mut texture_kept = false;
     if let Some(atlas) = textures.as_ref().and_then(|t| t.atlas.as_ref()) {
-        let source = match atlas_source(&app, atlas) {
+        let source = match &source_dir {
+            Some(dir) if valid_atlas_name(&atlas.name) => Ok(dir.join(&atlas.name)),
+            Some(_) => Err(format!("invalid texture name: {}", atlas.name)),
+            None => atlas_source(&app, atlas),
+        };
+        let source = match source {
             Ok(path) => path,
             Err(e) => return CliResult::err(e),
         };
@@ -2579,9 +2608,10 @@ async fn lego_export<R: Runtime>(
     let mut stored_kept = Vec::new();
     let stored = textures.map(|t| t.stored).unwrap_or_default();
     if !stored.is_empty() {
-        let store = match lego_dir(&app) {
-            Ok(base) => base.join("textures"),
-            Err(e) => return CliResult::err(e),
+        let store = match (&source_dir, lego_dir(&app)) {
+            (Some(dir), _) => dir.clone(),
+            (None, Ok(base)) => base.join("textures"),
+            (None, Err(e)) => return CliResult::err(e),
         };
         let into = root.join("unittextures");
         if let Err(e) = std::fs::create_dir_all(&into) {
@@ -3955,6 +3985,20 @@ mod glb_picture {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_texture_folder_must_be_an_absolute_folder_that_exists() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().to_string_lossy().to_string();
+        assert_eq!(
+            texture_source_dir(Some(&path)).expect("a folder"),
+            Some(dir.path().to_path_buf())
+        );
+        assert_eq!(texture_source_dir(None).expect("none"), None);
+        assert!(texture_source_dir(Some("relative/textures")).is_err());
+        let missing = dir.path().join("gone").to_string_lossy().to_string();
+        assert!(texture_source_dir(Some(&missing)).is_err());
+    }
 
     #[test]
     fn a_text_file_written_reads_back_and_makes_its_folder() {
