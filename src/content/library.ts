@@ -6,9 +6,20 @@ import type {
   SpringFile,
 } from "../downloads/bindings";
 import type { QueueItem } from "../downloads/DownloadQueueProvider";
+import {
+  type DownloadHistory,
+  downloadKey,
+  recordsFor,
+} from "../downloads/downloadHistory";
 import type { HubGame } from "../hub/api";
 import { compareGameVersions } from "../play/installedGames";
 import type { GameItem, MapItem, ScanResult } from "./bindings";
+import {
+  githubGameUpdate,
+  type RapidTagState,
+  type RapidUpdate,
+  rapidGameUpdate,
+} from "./updates";
 
 /**
  * Where a game or map stands for the player.
@@ -83,8 +94,13 @@ export interface LibraryGame {
   installed: GameItem[];
   hub?: HubGame;
   sources: LibrarySource[];
-  /** The newest source above the newest installed version. */
+  /**
+   * The newest GitHub release the game is not on, or a mirror's archive with a
+   * higher version than the newest installed.
+   */
   update?: LibrarySource;
+  /** The rapid tag the game was fetched from now points at a new package. */
+  rapidUpdate?: RapidUpdate;
   /** The queue's item for this game, running or not. */
   download?: LibraryDownload;
 }
@@ -121,6 +137,10 @@ export interface LibraryInput {
   hubGames: readonly HubGame[] | null;
   catalogues: readonly LoadedCatalogue[];
   queue: readonly QueueItem[];
+  /** Where each item came from, so a rapid game's tag is known. */
+  history?: DownloadHistory;
+  /** What each rapid tag points at now, for the tags the history names. */
+  rapidVersions?: Readonly<Record<string, RapidTagState>>;
 }
 
 export interface Library {
@@ -323,10 +343,22 @@ function buildGames(
         bareVersion(a.info.version ?? ""),
       ),
     );
+    r.update = githubGameUpdate(r.sources);
+    const keys = new Set([
+      `game:${r.id}`,
+      downloadKey("game", r.title),
+      ...r.installed.map((g) => downloadKey("game", g.name)),
+    ]);
+    r.rapidUpdate = rapidGameUpdate(
+      recordsFor(input.history ?? {}, ...keys),
+      input.rapidVersions ?? {},
+    );
+    // A GitHub release is judged above by its archives. A mirror that names no
+    // release is judged by the version in the archive's name.
     const newest = r.installed[0]?.info.version;
-    if (newest) {
+    if (newest && !r.update) {
       for (const s of r.sources) {
-        if (s.installed || !s.version) continue;
+        if (s.kind === "github" || s.installed || !s.version) continue;
         const ahead =
           compareGameVersions(bareVersion(s.version), bareVersion(newest)) > 0;
         const best =
@@ -343,7 +375,7 @@ function buildGames(
       r.installed.length > 0 || onDisk.has(r.id),
       !!r.hub || r.sources.length > 0,
       r.download,
-      !!r.update,
+      !!r.update || !!r.rapidUpdate,
       r.sources.length === 0 && r.hub?.downloads.length === 0,
     );
   }

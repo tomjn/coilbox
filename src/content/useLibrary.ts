@@ -4,6 +4,7 @@ import {
   useDownloadComplete,
   useDownloadQueue,
 } from "../downloads/DownloadQueueProvider";
+import { useDownloadHistory } from "../downloads/downloadHistory";
 import { loadGithubReleases } from "../downloads/githubReleases";
 import {
   loadEvolutionRtsMaps,
@@ -56,6 +57,8 @@ export interface LibraryOptions {
    * the index says why.
    */
   catalogues?: readonly CatalogueRequest[];
+  /** What each rapid tag points at now, which a rapid game's update needs. */
+  rapidVersions?: LibraryInput["rapidVersions"];
 }
 
 /** The library record, and how far the disk listing behind it has got. */
@@ -84,7 +87,9 @@ export interface LibraryRecord extends Library {
 export function useLibrary({
   scan = null,
   catalogues = [],
+  rapidVersions,
 }: LibraryOptions = {}): LibraryRecord {
+  const history = useDownloadHistory();
   const rootPaths = useContentRootPaths();
   const [files, setFiles] = useState<LibraryInput["files"]>(null);
   const [filesAnswered, setFilesAnswered] = useState(false);
@@ -144,8 +149,10 @@ export function useLibrary({
         hubGames,
         catalogues: loaded,
         queue,
+        history,
+        rapidVersions,
       }),
-    [scan, files, hubGames, loaded, queue],
+    [scan, files, hubGames, loaded, queue, history, rapidVersions],
   );
   return useMemo(
     () => ({
