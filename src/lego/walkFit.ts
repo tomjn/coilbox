@@ -73,7 +73,7 @@ export interface WalkBody {
 }
 
 /** Where a piece's joint rests in the unit, its parents' positions added up. */
-function jointOf(project: LegoProject, piece: LegoPiece): number[] {
+export function jointOf(project: LegoProject, piece: LegoPiece): number[] {
   const at = [0, 0, 0];
   const seen = new Set<string>();
   let current: LegoPiece | undefined = piece;

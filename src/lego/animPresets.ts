@@ -553,13 +553,13 @@ function cycleThreads(
 const LEG_SEGMENTS = ["thigh", "shin", "foot"] as const;
 type LegSegment = (typeof LEG_SEGMENTS)[number];
 
-interface LegRole {
+export interface LegRole {
   side: "l" | "r";
   pair: 1 | 2;
   segment: LegSegment;
 }
 
-function parseLegRole(role: string): LegRole | null {
+export function parseLegRole(role: string): LegRole | null {
   const match = /^leg\.([lr])([12])\.(thigh|shin|foot)$/.exec(role);
   if (!match) return null;
   return {
@@ -576,7 +576,7 @@ function parseLegRole(role: string): LegRole | null {
  * together, front left with rear right, which is what a trot is and what stops
  * the model rocking.
  */
-function legPhase(leg: LegRole, gait: "biped" | "quad"): number {
+export function legPhase(leg: LegRole, gait: "biped" | "quad"): number {
   if (gait === "biped") return leg.side === "l" ? 0 : Math.PI;
   const diagonal = (leg.side === "l") === (leg.pair === 1);
   return diagonal ? 0 : Math.PI;
