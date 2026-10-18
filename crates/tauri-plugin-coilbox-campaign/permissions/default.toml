@@ -19,6 +19,7 @@ permissions = [
   "allow-campaign-unit-save",
   "allow-campaign-unit-list",
   "allow-campaign-unit-delete",
+  "allow-campaign-units-delete",
   "allow-campaign-unit-file-read",
   "allow-campaign-unit-file-write",
   "allow-campaign-units-copy",

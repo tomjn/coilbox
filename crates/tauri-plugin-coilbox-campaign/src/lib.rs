@@ -175,10 +175,22 @@ fn campaign_units_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String>
 
 /// One campaign's units folder, with the id validated.
 fn units_root<R: Runtime>(app: &AppHandle<R>, campaign_id: &str) -> Result<PathBuf, String> {
-    if !valid_id(campaign_id) {
-        return Err(format!("invalid campaign id: {campaign_id}"));
+    scoped_units_root(app, None, campaign_id)
+}
+
+/// The units folder of one campaign, conquest or warpath run (issue #4518). A
+/// conquest's copies live beside its galaxies and a run's beside its runs, so
+/// each mode's data stays in its own folder.
+fn scoped_units_root<R: Runtime>(
+    app: &AppHandle<R>,
+    scope: Option<&str>,
+    id: &str,
+) -> Result<PathBuf, String> {
+    if !valid_id(id) {
+        return Err(format!("invalid units owner id: {id}"));
     }
-    Ok(campaign_units_dir(app)?.join(campaign_id))
+    let data = coilbox_portable::data_dir(app)?;
+    Ok(units::scope_dir(&data, scope)?.join(id))
 }
 
 /// An atlas to carry with a copy, from an extension pack. The base pack's own
@@ -226,12 +238,13 @@ fn texture_sources<R: Runtime>(
 async fn campaign_unit_save<R: Runtime>(
     app: AppHandle<R>,
     campaign_id: String,
+    scope: Option<String>,
     unit_name: String,
     json: String,
     atlas: Option<AtlasCopy>,
     stored: Vec<String>,
 ) -> CliResult {
-    let saved = units_root(&app, &campaign_id).and_then(|root| {
+    let saved = scoped_units_root(&app, scope.as_deref(), &campaign_id).and_then(|root| {
         let sources = texture_sources(&app, atlas, stored)?;
         units::save_unit(&root, &unit_name, &json, &sources)
     });
@@ -243,8 +256,12 @@ async fn campaign_unit_save<R: Runtime>(
 
 /// `campaign_unit_list` answers every unit copy a campaign holds.
 #[tauri::command]
-async fn campaign_unit_list<R: Runtime>(app: AppHandle<R>, campaign_id: String) -> CliResult {
-    match units_root(&app, &campaign_id) {
+async fn campaign_unit_list<R: Runtime>(
+    app: AppHandle<R>,
+    campaign_id: String,
+    scope: Option<String>,
+) -> CliResult {
+    match scoped_units_root(&app, scope.as_deref(), &campaign_id) {
         Ok(root) => CliResult::ok(json!({ "units": units::list_units(&root) })),
         Err(e) => CliResult::err(e),
     }
@@ -255,9 +272,29 @@ async fn campaign_unit_list<R: Runtime>(app: AppHandle<R>, campaign_id: String) 
 async fn campaign_unit_delete<R: Runtime>(
     app: AppHandle<R>,
     campaign_id: String,
+    scope: Option<String>,
     unit_name: String,
 ) -> CliResult {
-    match units_root(&app, &campaign_id).and_then(|root| units::delete_unit(&root, &unit_name)) {
+    match scoped_units_root(&app, scope.as_deref(), &campaign_id)
+        .and_then(|root| units::delete_unit(&root, &unit_name))
+    {
+        Ok(deleted) => CliResult::ok(json!({ "deleted": deleted })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// `campaign_units_delete` removes every unit copy one owner holds, for a
+/// conquest or warpath run that is abandoned or deleted (issue #4518). A
+/// campaign's go with `campaign_delete`.
+#[tauri::command]
+async fn campaign_units_delete<R: Runtime>(
+    app: AppHandle<R>,
+    campaign_id: String,
+    scope: Option<String>,
+) -> CliResult {
+    match scoped_units_root(&app, scope.as_deref(), &campaign_id)
+        .and_then(|root| units::delete_all(&root))
+    {
         Ok(deleted) => CliResult::ok(json!({ "deleted": deleted })),
         Err(e) => CliResult::err(e),
     }
@@ -635,6 +672,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             campaign_unit_save,
             campaign_unit_list,
             campaign_unit_delete,
+            campaign_units_delete,
             campaign_unit_file_read,
             campaign_unit_file_write,
             campaign_units_copy
