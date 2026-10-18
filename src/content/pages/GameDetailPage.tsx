@@ -6,15 +6,17 @@ import {
   useSetting,
 } from "@picoframe/frame";
 import { Boxes, FolderOpen, Loader2, Trophy } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { GameEquivalents } from "@/blueprint/pages/components/GameEquivalents";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useFactionLogos } from "@/factions/logos";
 import { nextDrawerKey } from "@/general/drawerKey";
 import { generatedGameNote } from "@/lib/generatedGames";
 import { isProfileHidden } from "@/profile/hidden";
+import { setGamePin, setGameUpdates } from "../../downloads/gamePrefs";
 import { type Archive, contentOpenPath } from "../bindings";
 import { useBrandingEntry } from "../branding";
 import {
@@ -32,6 +34,7 @@ import { missingDependencyNotes } from "../gameDependencies";
 import { refightFilenames, useReplayUserState } from "../replayUserState";
 import { allPlayers, factionRecordsFor, guessPrimaryPlayer } from "../stats";
 import { useCompatReport } from "../useCompatReport";
+import { useGameLibrary } from "../useGameLibrary";
 import { usePlayGame } from "../usePlayGame";
 import { ArchiveRow } from "./components/ArchiveRow";
 import { BrandingLinks } from "./components/BrandingLinks";
@@ -44,6 +47,9 @@ import {
   useFactionReachableCounts,
 } from "./components/FactionBuildList";
 import { GameHeader } from "./components/GameHeader";
+import { GameLibrarySummary } from "./components/GameLibrarySummary";
+import { GameSourcesTab } from "./components/GameSourcesTab";
+import { GameVersionsTab } from "./components/GameVersionsTab";
 import { MissionRuntimeSection } from "./components/MissionRuntimeSection";
 import { OptionsList } from "./components/OptionsList";
 import { StartModeActions } from "./components/StartModeActions";
@@ -175,6 +181,10 @@ export default function GameDetailPage() {
     [statRecords, factionNames, statsPlayer, refights],
   );
 
+  // The Versions and Sources tabs and the library facts above them (#4580).
+  const lib = useGameLibrary(decoded, data);
+  const [tab, setTab] = useState("overview");
+
   if (error && !data)
     return (
       <DetailError
@@ -260,260 +270,310 @@ export default function GameDetailPage() {
         onPlay={() => playGame(game.name)}
       />
 
-      {generated && (
-        <Alert>
-          <AlertDescription className="max-w-prose">
-            {generated} It is not offered anywhere a game is picked, which is
-            why you will not find it in Singleplayer or in a scenario&apos;s
-            setup.
-          </AlertDescription>
-        </Alert>
+      <GameLibrarySummary
+        game={game}
+        record={lib.record}
+        installedFrom={lib.installedFrom}
+        engine={selected?.engineVersion}
+        updatesOn={lib.updatesOn}
+        onUpdatesChange={(on) => setGameUpdates(lib.prefKey, on)}
+        canUpdate={!!lib.writePath && !!lib.record}
+        updating={lib.updating}
+        onUpdate={lib.update}
+      />
+      {lib.updateFailure && (
+        <p role="alert" className="break-words text-xs text-destructive">
+          {lib.updateFailure}
+        </p>
       )}
 
-      <div className="flex flex-col gap-1">
-        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          {game.info.shortname && (
-            <span className="font-mono">{game.info.shortname}</span>
-          )}
-          {gameInfo?.checksum && (
-            <span className="font-mono">checksum {gameInfo.checksum}</span>
-          )}
-        </div>
-        {game.info.description && (
-          <p className="max-w-prose text-sm text-muted-foreground">
-            {game.info.description}
-          </p>
-        )}
-      </div>
-
-      <StartModeActions gameName={game.name} />
-
-      {brand && <BrandingLinks entry={brand} />}
-      {brand?.screenshots?.length ? (
-        <BrandingScreenshots shots={brand.screenshots} />
-      ) : null}
-
-      {missingDependencyNotes(game).length > 0 && (
-        <MissingDependencyBanner notes={missingDependencyNotes(game)} />
-      )}
-      {game.warnings?.length ? (
-        <WarningBanner warnings={game.warnings} noun="game" />
-      ) : null}
-
-      {hasFindings && (
-        <section id="compat" className="flex scroll-mt-4 flex-col gap-2">
-          <h2 className="text-sm font-medium">Compatibility</h2>
-          <FindingList
-            findings={compat.findings}
-            actions={{
-              "models-3do": selected && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5"
-                  onClick={openConvert}
-                >
-                  <Boxes className="size-4" /> Convert models
-                </Button>
-              ),
-            }}
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="versions">Versions</TabsTrigger>
+          <TabsTrigger value="sources">Sources</TabsTrigger>
+        </TabsList>
+        <TabsContent value="versions">
+          <GameVersionsTab
+            table={lib.versions}
+            indexAge={lib.indexAge}
+            loading={lib.rapidLoading}
+            errors={lib.rapidErrors}
+            canInstall={!!lib.writePath}
+            statusOf={lib.statusOf}
+            onInstall={lib.install}
+            onRemoved={() => navigate("/library/games")}
           />
-        </section>
-      )}
+        </TabsContent>
+        <TabsContent value="sources">
+          <GameSourcesTab
+            rows={lib.sources}
+            onPin={(step) => setGamePin(lib.prefKey, step)}
+          />
+        </TabsContent>
+        <TabsContent value="overview" className="flex flex-col gap-5">
+          {generated && (
+            <Alert>
+              <AlertDescription className="max-w-prose">
+                {generated} It is not offered anywhere a game is picked, which
+                is why you will not find it in Singleplayer or in a
+                scenario&apos;s setup.
+              </AlertDescription>
+            </Alert>
+          )}
 
-      {(gameInfoLoading ||
-        (gameInfo &&
-          (gameInfo.sides.length > 0 || gameInfo.unitCount > 0))) && (
-        <section className="flex flex-col gap-2">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-sm font-medium">{sectionHeading}</h2>
-            {/* Per-faction browsing (FactionBuildList) never reaches the units no
+          <div className="flex flex-col gap-1">
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              {game.info.shortname && (
+                <span className="font-mono">{game.info.shortname}</span>
+              )}
+              {gameInfo?.checksum && (
+                <span className="font-mono">checksum {gameInfo.checksum}</span>
+              )}
+            </div>
+            {game.info.description && (
+              <p className="max-w-prose text-sm text-muted-foreground">
+                {game.info.description}
+              </p>
+            )}
+          </div>
+
+          <StartModeActions gameName={game.name} />
+
+          {brand && <BrandingLinks entry={brand} />}
+          {brand?.screenshots?.length ? (
+            <BrandingScreenshots shots={brand.screenshots} />
+          ) : null}
+
+          {missingDependencyNotes(game).length > 0 && (
+            <MissingDependencyBanner notes={missingDependencyNotes(game)} />
+          )}
+          {game.warnings?.length ? (
+            <WarningBanner warnings={game.warnings} noun="game" />
+          ) : null}
+
+          {hasFindings && (
+            <section id="compat" className="flex scroll-mt-4 flex-col gap-2">
+              <h2 className="text-sm font-medium">Compatibility</h2>
+              <FindingList
+                findings={compat.findings}
+                actions={{
+                  "models-3do": selected && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      onClick={openConvert}
+                    >
+                      <Boxes className="size-4" /> Convert models
+                    </Button>
+                  ),
+                }}
+              />
+            </section>
+          )}
+
+          {(gameInfoLoading ||
+            (gameInfo &&
+              (gameInfo.sides.length > 0 || gameInfo.unitCount > 0))) && (
+            <section className="flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-sm font-medium">{sectionHeading}</h2>
+                {/* Per-faction browsing (FactionBuildList) never reaches the units no
                 faction's build tree reaches, so this is the one way back to all
                 of them, "Other units" included, unless the read that would
                 populate it failed outright. Then there is nothing for it to
                 link to either. */}
-            {datasetStatus === "error" ? (
-              <Button type="button" variant="outline" size="sm" disabled>
-                All units
-              </Button>
-            ) : (
-              <Link
-                to={`/library/games/${encodeURIComponent(game.name)}/units`}
-                className={cn(
-                  buttonVariants({ variant: "outline", size: "sm" }),
+                {datasetStatus === "error" ? (
+                  <Button type="button" variant="outline" size="sm" disabled>
+                    All units
+                  </Button>
+                ) : (
+                  <Link
+                    to={`/library/games/${encodeURIComponent(game.name)}/units`}
+                    className={cn(
+                      buttonVariants({ variant: "outline", size: "sm" }),
+                    )}
+                  >
+                    All units
+                  </Link>
                 )}
-              >
-                All units
-              </Link>
-            )}
-          </div>
-          {/* An unreadable unit list leaves every faction button, and All
+              </div>
+              {/* An unreadable unit list leaves every faction button, and All
               units, on nothing. The errors say this is a coilbox read
               failure, not the game shipping none. */}
-          {datasetStatus === "error" && (
-            <Alert variant="destructive">
-              <AlertTitle>Could not read this game&apos;s units</AlertTitle>
-              <AlertDescription>
-                <ul className="flex flex-col gap-1 font-mono text-xs">
-                  {(dataset?.errors ?? []).map((e) => (
-                    <li key={e} className="break-words">
-                      {e}
-                    </li>
-                  ))}
-                </ul>
-              </AlertDescription>
-            </Alert>
-          )}
-          {/* The read succeeded (Zero-K: 614 units, no errors) but every side's
+              {datasetStatus === "error" && (
+                <Alert variant="destructive">
+                  <AlertTitle>Could not read this game&apos;s units</AlertTitle>
+                  <AlertDescription>
+                    <ul className="flex flex-col gap-1 font-mono text-xs">
+                      {(dataset?.errors ?? []).map((e) => (
+                        <li key={e} className="break-words">
+                          {e}
+                        </li>
+                      ))}
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              )}
+              {/* The read succeeded (Zero-K: 614 units, no errors) but every side's
               start unit is one the dataset never defines, so every per-faction
               button below is correctly dead. Without this, that reads as a
               broken page rather than the game's own sides.lua declining to
               hand back a usable commander. All units still works, since the
               roster it lists never depended on a side resolving. */}
-          {noSideReachesAnything && (
-            <p className="text-xs text-muted-foreground">
-              None of this game&apos;s sides resolve to a start unit in its
-              roster, so every build tree below is empty. All units still lists
-              the full roster.
-            </p>
+              {noSideReachesAnything && (
+                <p className="text-xs text-muted-foreground">
+                  None of this game&apos;s sides resolve to a start unit in its
+                  roster, so every build tree below is empty. All units still
+                  lists the full roster.
+                </p>
+              )}
+              {gameInfoLoading || !gameInfo || !selected ? (
+                <div className="flex h-12 items-center justify-center gap-2 rounded-lg border border-border/50 bg-card text-xs text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" />
+                  Loading sides…
+                </div>
+              ) : hasSides ? (
+                <FactionBuildList
+                  enginePath={selected.enginePath}
+                  dataDir={selected.rootPath}
+                  gameArchive={game.primaryArchive.name}
+                  gameName={game.name}
+                  sides={gameInfo.sides}
+                  units={dataset?.units ?? []}
+                  buildpics={buildpics}
+                  factionLogos={factionLogos}
+                  branding={brand}
+                />
+              ) : null}
+            </section>
           )}
-          {gameInfoLoading || !gameInfo || !selected ? (
-            <div className="flex h-12 items-center justify-center gap-2 rounded-lg border border-border/50 bg-card text-xs text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
-              Loading sides…
-            </div>
-          ) : hasSides ? (
-            <FactionBuildList
-              enginePath={selected.enginePath}
-              dataDir={selected.rootPath}
-              gameArchive={game.primaryArchive.name}
-              gameName={game.name}
-              sides={gameInfo.sides}
-              units={dataset?.units ?? []}
-              buildpics={buildpics}
-              factionLogos={factionLogos}
-              branding={brand}
-            />
-          ) : null}
-        </section>
-      )}
 
-      {otherInfo.length > 0 && (
-        <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-medium">Metadata</h2>
-          <dl className="grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-4 gap-y-1 rounded-lg border border-border/50 bg-card p-3 text-sm">
-            {otherInfo.map(([k, v]) => (
-              <div key={k} className="contents">
-                <dt className="font-mono text-xs text-muted-foreground">{k}</dt>
-                <dd className="break-words">{v}</dd>
-              </div>
-            ))}
-          </dl>
-        </section>
-      )}
+          {otherInfo.length > 0 && (
+            <section className="flex flex-col gap-2">
+              <h2 className="text-sm font-medium">Metadata</h2>
+              <dl className="grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-4 gap-y-1 rounded-lg border border-border/50 bg-card p-3 text-sm">
+                {otherInfo.map(([k, v]) => (
+                  <div key={k} className="contents">
+                    <dt className="font-mono text-xs text-muted-foreground">
+                      {k}
+                    </dt>
+                    <dd className="break-words">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          )}
 
-      {/* What converting a layout of this game between its sides has been
+          {/* What converting a layout of this game between its sides has been
           told, which is a fact about the game rather than about any layout, so
           it belongs here and not on a blueprint (issue #1533). Nothing at all
           for a game nobody has answered anything about. */}
-      <GameEquivalents gameArchive={game.primaryArchive.name} />
+          <GameEquivalents gameArchive={game.primaryArchive.name} />
 
-      {!statsHidden && factionNames.length > 0 && (
-        <section className="rounded-lg border border-border/60 bg-card p-4">
-          <h2 className="mb-1 flex items-center gap-2 text-sm font-medium">
-            <Trophy className="size-4 text-muted-foreground" />
-            Your record by faction
-          </h2>
-          {statsIngesting && statRecords.length === 0 ? (
-            <Skeleton className="h-12 rounded bg-muted" />
-          ) : (
-            <ul className="divide-y divide-border/40">
-              {factionRecords.map((f) => (
-                <li
-                  key={f.faction}
-                  className="flex items-center gap-3 py-1.5 text-sm"
-                >
-                  <span className="min-w-0 flex-1 truncate" title={f.faction}>
-                    {f.faction}
-                  </span>
-                  {f.games === 0 ? (
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      No games recorded
-                    </span>
-                  ) : f.decided === 0 ? (
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {f.games} game{f.games === 1 ? "" : "s"} · outcome unknown
-                    </span>
-                  ) : (
-                    <TallyBar games={f.games} wins={f.wins} />
-                  )}
-                </li>
-              ))}
-            </ul>
+          {!statsHidden && factionNames.length > 0 && (
+            <section className="rounded-lg border border-border/60 bg-card p-4">
+              <h2 className="mb-1 flex items-center gap-2 text-sm font-medium">
+                <Trophy className="size-4 text-muted-foreground" />
+                Your record by faction
+              </h2>
+              {statsIngesting && statRecords.length === 0 ? (
+                <Skeleton className="h-12 rounded bg-muted" />
+              ) : (
+                <ul className="divide-y divide-border/40">
+                  {factionRecords.map((f) => (
+                    <li
+                      key={f.faction}
+                      className="flex items-center gap-3 py-1.5 text-sm"
+                    >
+                      <span
+                        className="min-w-0 flex-1 truncate"
+                        title={f.faction}
+                      >
+                        {f.faction}
+                      </span>
+                      {f.games === 0 ? (
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          No games recorded
+                        </span>
+                      ) : f.decided === 0 ? (
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          {f.games} game{f.games === 1 ? "" : "s"} · outcome
+                          unknown
+                        </span>
+                      ) : (
+                        <TallyBar games={f.games} wins={f.wins} />
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
           )}
-        </section>
-      )}
 
-      {/* Both this and the mission runtime below can run long enough on their
+          {/* Both this and the mission runtime below can run long enough on their
           own to push the primary archive and dependencies off the first
           screen, so they open collapsed. */}
-      <OptionsList
-        options={gameInfo?.options ?? []}
-        title="Game options"
-        defaultOpen={false}
-      />
+          <OptionsList
+            options={gameInfo?.options ?? []}
+            title="Game options"
+            defaultOpen={false}
+          />
 
-      <MissionRuntimeSection game={game} />
+          <MissionRuntimeSection game={game} />
 
-      <section className="flex flex-col gap-2">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-medium">Primary archive</h2>
-          <div className="flex items-center gap-2">
-            {game.primaryArchive.path && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5"
-                onClick={() => openFolder(game.primaryArchive)}
-              >
-                <FolderOpen className="size-4" /> Open folder
-              </Button>
+          <section className="flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-medium">Primary archive</h2>
+              <div className="flex items-center gap-2">
+                {game.primaryArchive.path && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5"
+                    onClick={() => openFolder(game.primaryArchive)}
+                  >
+                    <FolderOpen className="size-4" /> Open folder
+                  </Button>
+                )}
+                {game.primaryArchive.path &&
+                  isDeletableArchive(game.primaryArchive.path) && (
+                    <DeleteArchiveButton
+                      path={game.primaryArchive.path}
+                      name={game.primaryArchive.name}
+                      onDeleted={() => navigate("/library/games")}
+                    />
+                  )}
+              </div>
+            </div>
+            <ul>
+              <ArchiveRow archive={game.primaryArchive} />
+            </ul>
+          </section>
+
+          <section className="flex flex-col gap-2">
+            <h2 className="text-sm font-medium">
+              Dependencies ({game.dependencyArchives.length})
+            </h2>
+            {game.dependencyArchives.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                This game depends on no other archives.
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {game.dependencyArchives.map((a) => (
+                  <ArchiveRow
+                    key={a.name}
+                    archive={a}
+                    classification={classifyArchive(data, a.name)}
+                  />
+                ))}
+              </ul>
             )}
-            {game.primaryArchive.path &&
-              isDeletableArchive(game.primaryArchive.path) && (
-                <DeleteArchiveButton
-                  path={game.primaryArchive.path}
-                  name={game.primaryArchive.name}
-                  onDeleted={() => navigate("/library/games")}
-                />
-              )}
-          </div>
-        </div>
-        <ul>
-          <ArchiveRow archive={game.primaryArchive} />
-        </ul>
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium">
-          Dependencies ({game.dependencyArchives.length})
-        </h2>
-        {game.dependencyArchives.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            This game depends on no other archives.
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {game.dependencyArchives.map((a) => (
-              <ArchiveRow
-                key={a.name}
-                archive={a}
-                classification={classifyArchive(data, a.name)}
-              />
-            ))}
-          </ul>
-        )}
-      </section>
+          </section>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
