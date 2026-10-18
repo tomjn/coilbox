@@ -52,7 +52,23 @@ const {
   settleTypedValuesTweaks,
   workshopCompile,
   writeStartWithUnit,
+  compatStatus,
+  primeGameInfo,
 } = vi.hoisted(() => ({
+  compatStatus: vi.fn(
+    async (
+      _args: unknown,
+    ): Promise<{
+      latest: number;
+      folder: string | null;
+      stale: unknown[];
+    }> => ({
+      latest: 2,
+      folder: "coilbox-compat-ba-2.sdd",
+      stale: [],
+    }),
+  ),
+  primeGameInfo: vi.fn(async () => ({ checksum: "abc123", options: [] })),
   writeStartWithUnit: vi.fn(async (_args: unknown) => ({
     dir: "/data/games/coilbox-workshop-test.sdd",
   })),
@@ -107,7 +123,9 @@ const {
   launch: vi.fn(
     async (
       _kind: string,
-      _opts: { config: { gameType: string; modOptions: unknown } },
+      _opts: {
+        config: { gameType: string; modOptions: unknown; compatBase?: string };
+      },
     ) => ({ exitCode: 0 }),
   ),
   workshopPreflight: vi.fn(async () => ({
@@ -137,6 +155,10 @@ let mockCompiled: {
   loading: false,
   error: null,
 };
+let mockCompat: Record<string, { enabled: boolean; version: number }> = {};
+vi.mock("@/content/compatSettings", () => ({
+  useCompatSettings: () => [mockCompat, vi.fn()],
+}));
 let mockGameInfoOptions: { key: string; name: string }[] = [];
 
 vi.mock("../../compile", async () => ({
@@ -156,6 +178,10 @@ vi.mock("@/content/config", () => ({
   useUnitsyncGameInfo: () => ({ info: { options: mockGameInfoOptions } }),
   useUnitsyncThumbnails: () => ({ thumbs: new Map() }),
   primeScan,
+  primeGameInfo,
+}));
+vi.mock("@/compat/bindings", () => ({
+  compatStatus: (args: unknown) => compatStatus(args),
 }));
 vi.mock("@/play/PlayProvider", () => ({
   usePlay: () => ({ running: false, launch }),
@@ -175,9 +201,14 @@ vi.mock("@/play/config", () => ({
   initialParticipants: () => [
     { id: 1, kind: "you", name: "You", side: "", allyTeam: 0 },
   ],
-  toBattleConfig: (opts: { gameType: string; modOptions: unknown }) => ({
+  toBattleConfig: (opts: {
+    gameType: string;
+    modOptions: unknown;
+    compatBase?: string;
+  }) => ({
     gameType: opts.gameType,
     modOptions: opts.modOptions,
+    compatBase: opts.compatBase,
   }),
 }));
 vi.mock("../../mutator", () => ({ workshopTestMutator }));
@@ -219,8 +250,14 @@ function compiled(over: {
 
 const ZEUS = { key: "armzeus", label: "Zeus", inGame: true };
 
-function draw(unit?: { key: string; label: string; inGame: boolean }) {
+function draw(
+  unit?: { key: string; label: string; inGame: boolean },
+  compat?: { enabled: boolean },
+) {
   installSettingsStorage(memorySettingsStorage());
+  mockCompat = compat
+    ? { [GAME.primaryArchive.name]: { ...compat, version: 2 } }
+    : {};
   return render(
     <PersistentStoreProvider>
       {/** biome-ignore lint/suspicious/noExplicitAny: a trimmed test fixture, not the real ModProject */}
@@ -232,13 +269,19 @@ function draw(unit?: { key: string; label: string; inGame: boolean }) {
 afterEach(() => {
   cleanup();
   mockScanError = null;
-  primeScan.mockClear();
+  primeScan.mockReset();
+  primeScan.mockResolvedValue({
+    games: [GAME, WORKSHOP_TEST_GAME],
+    maps: [MAP],
+  });
   launch.mockClear();
   workshopTestMutator.mockClear();
   workshopPreflight.mockClear();
   settleTypedValuesTweaks.mockClear();
   workshopCompile.mockClear();
   writeStartWithUnit.mockClear();
+  compatStatus.mockClear();
+  primeGameInfo.mockClear();
   workshopPreflight.mockResolvedValue({ blockers: [], review: [], passes: [] });
   mockCompiled = compiled({});
   mockGameInfoOptions = [];
@@ -366,6 +409,124 @@ describe("PlayLocallyButton", () => {
     expect(
       screen.getByText(/1 typed value is written so the game's own Lua/),
     ).toBeTruthy();
+  });
+
+  describe("compatibility mode (issue #4562)", () => {
+    const MUTATOR_GAME = {
+      name: `${project.gameName} (compat 2)`,
+      primaryArchive: { name: "coilbox-compat-ba-2.sdd", path: "" },
+    };
+    const tweakSlot = () => {
+      mockCompiled = compiled({
+        files: [{ path: "modinfo.lua", contents: "" }],
+        tweakdefs: "do end",
+      });
+      mockGameInfoOptions = [{ key: "tweakdefs", name: "tweakdefs" }];
+    };
+    const play = () => {
+      fireEvent.click(screen.getByRole("button", { name: /^test$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
+    };
+
+    it("launches the mutator in place of the game when the switch is on and the mutator is current", async () => {
+      tweakSlot();
+      primeScan.mockResolvedValueOnce({
+        games: [GAME, MUTATOR_GAME],
+        maps: [MAP],
+      });
+      draw(undefined, { enabled: true });
+      play();
+
+      await vi.waitFor(() => expect(launch).toHaveBeenCalledTimes(1));
+      expect(compatStatus).toHaveBeenCalledWith({
+        dataDir: "/data",
+        archiveName: "ba.sdd",
+        baseChecksum: "abc123",
+      });
+      const [, opts] = launch.mock.calls[0];
+      expect(opts.config.gameType).toBe(MUTATOR_GAME.name);
+      expect(opts.config.compatBase).toBe(project.gameName);
+    });
+
+    it("rescans once for a mutator built since the last scan", async () => {
+      tweakSlot();
+      primeScan
+        .mockResolvedValueOnce({ games: [GAME], maps: [MAP] })
+        .mockResolvedValueOnce({ games: [GAME, MUTATOR_GAME], maps: [MAP] });
+      draw(undefined, { enabled: true });
+      play();
+
+      await vi.waitFor(() => expect(launch).toHaveBeenCalledTimes(1));
+      expect(primeScan).toHaveBeenLastCalledWith("/engines/105", "/data", true);
+      expect(launch.mock.calls[0][1].config.gameType).toBe(MUTATOR_GAME.name);
+    });
+
+    it("builds the workshop test game over the mutator on the mutator route", async () => {
+      mockCompiled = compiled({
+        files: [{ path: "modinfo.lua", contents: "return {}" }],
+      });
+      primeScan
+        .mockResolvedValueOnce({ games: [GAME, MUTATOR_GAME], maps: [MAP] })
+        .mockResolvedValueOnce({
+          games: [GAME, MUTATOR_GAME, WORKSHOP_TEST_GAME],
+          maps: [MAP],
+        });
+      draw(undefined, { enabled: true });
+      play();
+
+      await vi.waitFor(() => expect(launch).toHaveBeenCalledTimes(1));
+      expect(workshopTestMutator).toHaveBeenCalledWith(
+        expect.objectContaining({
+          project: { ...project, gameName: MUTATOR_GAME.name },
+        }),
+      );
+      const [, opts] = launch.mock.calls[0];
+      expect(opts.config.gameType).toBe(WORKSHOP_TEST_GAME.name);
+      expect(opts.config.compatBase).toBe(project.gameName);
+    });
+
+    it("blocks the launch when the mutator is stale, and names Rebuild", async () => {
+      tweakSlot();
+      compatStatus.mockResolvedValueOnce({
+        latest: 3,
+        folder: "coilbox-compat-ba-2.sdd",
+        stale: [{ kind: "manifest", built: 2, now: 3 }],
+      });
+      draw(undefined, { enabled: true });
+      play();
+
+      expect(await screen.findByText(/choose Rebuild/)).toBeTruthy();
+      expect(screen.getByText(/out of date/)).toBeTruthy();
+      expect(launch).not.toHaveBeenCalled();
+      expect(workshopTestMutator).not.toHaveBeenCalled();
+    });
+
+    it("blocks the launch when the mutator has not been built", async () => {
+      tweakSlot();
+      compatStatus.mockResolvedValueOnce({
+        latest: 2,
+        folder: null,
+        stale: [],
+      });
+      draw(undefined, { enabled: true });
+      play();
+
+      expect(await screen.findByText(/has not been built/)).toBeTruthy();
+      expect(launch).not.toHaveBeenCalled();
+    });
+
+    it("leaves the game alone, and asks the plugin nothing, when the switch is off", async () => {
+      tweakSlot();
+      draw(undefined, { enabled: false });
+      play();
+
+      await vi.waitFor(() => expect(launch).toHaveBeenCalledTimes(1));
+      expect(compatStatus).not.toHaveBeenCalled();
+      expect(primeGameInfo).not.toHaveBeenCalled();
+      const [, opts] = launch.mock.calls[0];
+      expect(opts.config.gameType).toBe(project.gameName);
+      expect(opts.config.compatBase).toBeUndefined();
+    });
   });
 
   it("says the scan failed, and no map is missing, when Init failed", () => {
