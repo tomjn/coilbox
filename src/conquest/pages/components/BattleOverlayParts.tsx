@@ -231,6 +231,7 @@ export function BattleLaunchGate({
   onChooseGame,
   onDeclineUpgrade,
   hold,
+  leftOut = [],
 }: {
   error?: string | null;
   noEngine: boolean;
@@ -259,10 +260,17 @@ export function BattleLaunchGate({
   /** Something the battle waits on that is not the content scan, such as a
    *  warpath's unit data (issue #3473). Shown on the disabled launch button. */
   hold?: { label: string; busy: boolean };
+  /** What the last launch left out of the builder units (issue #4518). */
+  leftOut?: readonly string[];
 }) {
   return (
     <>
       {error && <ErrorBanner message={error} />}
+      {leftOut.map((line) => (
+        <p key={line} className="text-xs text-muted-foreground">
+          Left out: {line}
+        </p>
+      ))}
       {noEngine ? (
         <p className="text-sm text-muted-foreground">
           Install an engine first (

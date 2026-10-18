@@ -37,7 +37,7 @@ import {
   attachRefusal,
   attachUnit,
   type CampaignUnitCopy,
-  composeCampaignUnits,
+  composeUnits,
   libraryChanged,
   removeUnitsGame,
   updateUnit,
@@ -420,7 +420,7 @@ describe("a unit built to move", () => {
       units: [building("walker", "leg.l1.thigh"), building("rover", "wheel")],
     });
 
-    const result = await composeCampaignUnits(
+    const result = await composeUnits(
       campaign([entry("walker"), entry("rover")]),
       target,
       base,
@@ -442,7 +442,7 @@ describe("a unit built to move", () => {
       units: [building("walker", "leg.l1.thigh")],
     });
 
-    const result = await composeCampaignUnits(
+    const result = await composeUnits(
       campaign([entry("walker")]),
       target,
       base,
@@ -461,11 +461,7 @@ describe("a unit built to move", () => {
       units: [building("rover", "wheel")],
     });
 
-    const result = await composeCampaignUnits(
-      campaign([entry("rover")]),
-      target,
-      base,
-    );
+    const result = await composeUnits(campaign([entry("rover")]), target, base);
 
     expect(result?.leftOut).toHaveLength(1);
     expect(result?.leftOut[0]).toContain("The rover");
@@ -482,7 +478,7 @@ describe("a unit built to move", () => {
       ],
     });
 
-    const result = await composeCampaignUnits(
+    const result = await composeUnits(
       campaign([entry("turret"), entry("picked")]),
       target,
       base,
@@ -513,7 +509,7 @@ describe("composing a mission's mutator", () => {
 
   it("writes nothing for a campaign with no units", async () => {
     expect(
-      await composeCampaignUnits(campaign(), target, {
+      await composeUnits(campaign(), target, {
         name: "BA",
         archive: "ba.sdz",
       }),
@@ -529,7 +525,7 @@ describe("composing a mission's mutator", () => {
       ],
     });
 
-    const result = await composeCampaignUnits(
+    const result = await composeUnits(
       campaign([entry("tank", { builtBy: ["armlab"] }), entry("jeep")]),
       target,
       { name: "Splinter Faction v0.1.86", archive: "sf.sdz" },
@@ -564,7 +560,7 @@ describe("composing a mission's mutator", () => {
   it("refuses when a unit's copy is missing", async () => {
     vi.mocked(campaignUnitList).mockResolvedValue({ units: [] });
     await expect(
-      composeCampaignUnits(campaign([entry("tank")]), target, {
+      composeUnits(campaign([entry("tank")]), target, {
         name: "BA",
         archive: "ba.sdz",
       }),
@@ -579,7 +575,7 @@ describe("composing a mission's mutator", () => {
       units: [stored("tank", false)],
     });
     vi.mocked(loadUnitDefs).mockRejectedValue(new Error("no"));
-    await composeCampaignUnits(campaign([entry("tank")]), target, {
+    await composeUnits(campaign([entry("tank")]), target, {
       name: "BA",
       archive: "ba.sdz",
     });

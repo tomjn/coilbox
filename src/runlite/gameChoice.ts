@@ -23,13 +23,19 @@ export function withGameChoice(
 
 /**
  * The run's start unit and unlocked units that a game does not have, given the
- * names of that game's units. Empty when the run moves over cleanly.
+ * names of that game's units. Empty when the run moves over cleanly. A unit
+ * from the unit builder the run carries is never missing: it goes in with the
+ * mutator written over whichever version the run plays (issue #4518).
  */
 export function unitsMissingFrom(
   run: RogueliteRun,
   unitNames: Iterable<string>,
 ): string[] {
-  const have = new Set([...unitNames].map((n) => n.toLowerCase()));
+  const have = new Set(
+    [...unitNames, ...(run.units ?? []).map((u) => u.unitName)].map((n) =>
+      n.toLowerCase(),
+    ),
+  );
   const wanted = new Set(
     [run.startUnit, ...run.progress.unlockedUnits].filter(
       (u): u is string => !!u,

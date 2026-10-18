@@ -395,6 +395,7 @@ function Briefing({
 
       <BattleLaunchGate
         error={run.error}
+        leftOut={run.leftOut}
         noEngine={run.noEngine}
         missing={run.missing}
         scanFailure={run.scanFailure}

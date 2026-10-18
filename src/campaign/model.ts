@@ -378,7 +378,7 @@ function parseUnitFiles(value: unknown): Record<string, ImageRef> | undefined {
  * second entry with a name already seen, since one unit name is one unit in
  * the game.
  */
-function parseUnits(value: unknown): CampaignUnit[] | undefined {
+export function parseUnits(value: unknown): CampaignUnit[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const units: CampaignUnit[] = [];
   for (const raw of value) {

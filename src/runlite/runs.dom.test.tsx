@@ -8,6 +8,7 @@ const hoisted = vi.hoisted(() => ({
   stateSave: vi.fn(),
   metaLoad: vi.fn(),
   metaSave: vi.fn(),
+  discardUnits: vi.fn(),
 }));
 
 vi.mock("./bindings", () => ({
@@ -16,6 +17,7 @@ vi.mock("./bindings", () => ({
   runliteMetaLoad: hoisted.metaLoad,
   runliteMetaSave: hoisted.metaSave,
 }));
+vi.mock("../campaign/units", () => ({ discardUnits: hoisted.discardUnits }));
 
 afterEach(cleanup);
 
@@ -89,6 +91,61 @@ beforeEach(() => {
   hoisted.stateSave.mockReset().mockResolvedValue(undefined);
   hoisted.metaLoad.mockReset();
   hoisted.metaSave.mockReset().mockResolvedValue(undefined);
+  hoisted.discardUnits.mockReset().mockResolvedValue(undefined);
+});
+
+// Issue #4518.
+describe("a run carrying units from the unit builder", () => {
+  const skyfort = {
+    unitName: "skyfort",
+    projectId: "p-skyfort",
+    name: "Skyfort",
+    builtBy: ["armlab"],
+    copiedAt: "2026-10-18T00:00:00.000Z",
+  };
+  beforeEach(() => {
+    hoisted.stateLoad.mockResolvedValue({
+      json: JSON.stringify({
+        schemaVersion: 1,
+        runs: { a: { ...run("a"), units: [skyfort] }, b: run("b") },
+      }),
+    });
+    hoisted.metaLoad.mockResolvedValue({ json: goodMeta });
+  });
+
+  it("keeps its units through a load", async () => {
+    const h = await load();
+    await waitFor(() => expect(h.runsApi().loading).toBe(false));
+    expect(h.runsApi().runs.a.units).toEqual([skyfort]);
+    expect(h.runsApi().runs.b.units).toBeUndefined();
+  });
+
+  it("removes its units before the run, and nothing for a run without", async () => {
+    const h = await load();
+    await waitFor(() => expect(h.runsApi().loading).toBe(false));
+    await act(async () => {
+      await h.runsApi().deleteRun("a");
+    });
+    expect(hoisted.discardUnits).toHaveBeenCalledWith({
+      scope: "warpath",
+      id: "a",
+    });
+    expect(hoisted.discardUnits.mock.invocationCallOrder[0]).toBeLessThan(
+      hoisted.stateSave.mock.invocationCallOrder[0],
+    );
+    await act(async () => {
+      await h.runsApi().deleteRun("b");
+    });
+    expect(hoisted.discardUnits).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the run when its units could not be removed", async () => {
+    hoisted.discardUnits.mockRejectedValue(new Error("refused"));
+    const h = await load();
+    await waitFor(() => expect(h.runsApi().loading).toBe(false));
+    await expect(h.runsApi().deleteRun("a")).rejects.toThrow("refused");
+    expect(hoisted.stateSave).not.toHaveBeenCalled();
+  });
 });
 
 describe("after the runs failed to load", () => {
