@@ -76,7 +76,8 @@ function axleOf(project: LegoProject, id: string): THREE.Vector3 {
 /**
  * Runs a unit script under luajit with the engine calls stubbed, calls
  * `Create` and then `StartMoving`, and returns the axis index (0 for x) that
- * `Spin` was called with, by piece name.
+ * `Spin` was called with, by piece name. The unit moves at one elmo a frame.
+ * A thread the call starts runs to its first `Sleep`.
  */
 function spunOnStartMoving(lua: string): Record<string, number> {
   const harness = `
@@ -93,8 +94,11 @@ function SetSignalMask() end
 function Explode() end
 function WaitForTurn() end
 function WaitForMove() end
-function Sleep() end
-function StartThread() end
+-- A thread runs to its first Sleep, which is where the wheels have spun.
+function Sleep() error("sleep") end
+function StartThread(fn) pcall(fn) end
+COB = { CURRENT_SPEED = 29, REVERSING = 109 }
+function GetUnitValue(id) if id == COB.CURRENT_SPEED then return 65536 end return 0 end
 SFX = { SHATTER = 1 }
 script = {}
 local chunk = assert(loadstring(io.read("*a")))
