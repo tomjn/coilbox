@@ -32,6 +32,9 @@ export function GameCardShell({
   selected,
   art,
   action,
+  badge,
+  subtitle,
+  footer,
   className,
   artClassName,
   children,
@@ -54,6 +57,12 @@ export function GameCardShell({
   art?: ReactNode;
   /** Trailing caption control (Play button, Choose-game chip). */
   action?: ReactNode;
+  /** A state badge pinned to the art's top left corner. */
+  badge?: ReactNode;
+  /** The caption's second line, in place of the version. */
+  subtitle?: ReactNode;
+  /** A row under the caption, such as a download's progress bar. */
+  footer?: ReactNode;
   className?: string;
   /** Overrides the art region's aspect/height (default `aspect-video`). */
   artClassName?: string;
@@ -77,6 +86,7 @@ export function GameCardShell({
         {loading && (
           <Skeleton className="absolute inset-0 rounded-none bg-muted-foreground/10" />
         )}
+        {badge && <div className="absolute left-2 top-2 z-10">{badge}</div>}
         {selected && (
           <div
             className="absolute right-2 top-2 z-10 flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm ring-2 ring-background"
@@ -87,7 +97,12 @@ export function GameCardShell({
         )}
       </div>
       {children}
-      <div className="flex flex-1 items-center justify-between gap-2 p-2">
+      <div
+        className={cn(
+          "flex items-center justify-between gap-2 p-2",
+          !footer && "flex-1",
+        )}
+      >
         <div className="flex min-w-0 flex-col gap-0.5">
           <div className="flex items-center gap-1.5">
             <p className="truncate text-sm font-semibold" title={title}>
@@ -97,14 +112,16 @@ export function GameCardShell({
             {sdd && <SddBadge />}
             {warnings?.length ? <WarningIcon warnings={warnings} /> : null}
           </div>
-          {version && (
-            <span className="text-xs text-muted-foreground">
-              {versionLabel(version)}
-            </span>
-          )}
+          {subtitle ??
+            (version && (
+              <span className="text-xs text-muted-foreground">
+                {versionLabel(version)}
+              </span>
+            ))}
         </div>
         {action}
       </div>
+      {footer && <div className="mt-auto px-2 pb-2">{footer}</div>}
     </div>
   );
 }

@@ -5,28 +5,30 @@ import { BASES, contrast, hsl, type Rgb } from "../lib/contrast.testhelper";
 import { CARD_FOCUS_CLASS } from "./cardShell";
 
 /**
- * Why the welcome cards' focus ring is drawn in `--foreground` and not `--ring`.
+ * Whether `--ring` clears 3:1, and why the welcome cards still draw theirs in
+ * `--foreground`.
  *
  * WCAG 1.4.11 asks a focus indicator for 3:1 against the colour beside it.
  * {@link CARD_FOCUS_CLASS} offsets the ring outward, so the colour beside it is
  * the page's own surface and never the card's artwork, and the question is one
  * these numbers can answer: how far the ink sits from `--background` and `--card`.
  *
- * `--ring` is not obliged to sit anywhere. picoframe hands it to the accent, which
- * is a hue chosen to look like the product rather than to contrast with the page,
- * and on the accent every install starts with it is a mid-grey. `--foreground` has
- * no such freedom: it is the ink body text is set in, so the ramp has to keep it
- * far from the surface or nothing on the page is readable.
+ * `--ring` used to sit nowhere in particular: picoframe handed it to the accent, a
+ * hue chosen to look like the product, and the default was a mid-grey (#1089).
+ * From @picoframe/frame 0.10.0 every base and accent keeps `--ring` at 3:1 or
+ * better against the page, and the sweep below asserts it from the shipped
+ * theme.css, so a later release that regresses it fails here. `--foreground` is
+ * measured beside it because the welcome cards were built on it while `--ring`
+ * could not carry the indicator.
  *
- * That is the whole argument, and the sweep below is what makes it a measurement.
+ * The sweep below is what makes it a measurement.
  * Accents are read out of `@picoframe/frame/src/theme.css` rather than transcribed,
  * so an accent added upstream joins the sweep on the next `bun install` instead of
  * quietly sitting outside it.
  *
- * What this does not cover: the buttons on the same page. picoframe's own button
- * variant draws `ring-ring` and inherits the failure, as do the five older Coilbox
- * cards that copied `outline-ring`. That is one defect in one token reaching the
- * whole app, and it is filed (#1089) rather than worked around card by card.
+ * The buttons on the same page draw `ring-ring`, as do the five older Coilbox
+ * cards that copied `outline-ring`, so the token fix reaches them without a
+ * change in this repo.
  *
  * The colour maths is transcribed from WCAG 2.2, copied rather than imported for
  * the reason `theme/mutedForeground.test.ts` gives.
@@ -59,6 +61,12 @@ function accents(): { light: Accent[]; dark: Accent[] } {
   const dark: Accent[] = [["neutral", null]];
   const block =
     /(\.dark)?\[data-accent="([a-z]+)"\](:not\(\.dark\))?\s*\{([^}]*)\}/g;
+  // An accent whose `.dark` block sets its own `--ring` overrides the light one.
+  const darkOwn = new Set<string>();
+  for (const m of THEME.matchAll(
+    /\.dark\[data-accent="([a-z]+)"\]\s*\{([^}]*)\}/g,
+  ))
+    if (/--ring:/.test(m[2])) darkOwn.add(m[1]);
   let found = block.exec(THEME);
   while (found) {
     const [, isDark, name, , body] = found;
@@ -66,7 +74,11 @@ function accents(): { light: Accent[]; dark: Accent[] } {
     const cycling =
       /--ring:\s*var\(--pf-accent-hue\)\s+([\d.]+)%\s+([\d.]+)%/.exec(body);
     // A cycling accent declared without `.dark` applies in both schemes.
-    const targets = isDark ? [dark] : cycling ? [light, dark] : [light];
+    const targets = isDark
+      ? [dark]
+      : cycling && !darkOwn.has(name)
+        ? [light, dark]
+        : [light];
     if (fixed)
       for (const t of targets)
         t.push([name, hsl(+fixed[1], +fixed[2] / 100, +fixed[3] / 100)]);
@@ -119,9 +131,29 @@ function worst(scheme: "light" | "dark", ink: Ink) {
 /** WCAG 1.4.11, the bar a focus indicator has to clear. */
 const AA_NON_TEXT = 3;
 
+/**
+ * The lightness of the base-derived `--ring` in `:root` and `.dark`, read out of
+ * theme.css. Hue and saturation come from the base, so only the lightness is a
+ * fixed number there.
+ */
+function baseRingLightness(selector: string): number {
+  const block = new RegExp(`^${selector}\\s*\\{([^}]*)\\}`, "m").exec(THEME);
+  const found =
+    /--ring:\s*var\(--base-hue\)\s+calc\(var\(--base-sat\)\s*\*\s*5%\)\s+([\d.]+)%/.exec(
+      block?.[1] ?? "",
+    );
+  if (!found) throw new Error(`theme.css has no base --ring in ${selector}`);
+  return +found[1] / 100;
+}
+
+const BASE_RING_L = {
+  light: baseRingLightness(":root"),
+  dark: baseRingLightness("\\.dark"),
+};
+
 /** `--ring`, falling back to the base-derived value where no accent sets one. */
 const ringInk: Ink = (scheme, { hue, sat }, ring) =>
-  ring ?? hsl(hue, (sat * 5) / 100, scheme === "light" ? 0.65 : 0.4);
+  ring ?? hsl(hue, (sat * 5) / 100, BASE_RING_L[scheme]);
 
 /** `--foreground`: near-black tinted by the text knob in light, near-white in dark. */
 const foregroundInk: Ink = (scheme, { hue, satText }) =>
@@ -129,11 +161,11 @@ const foregroundInk: Ink = (scheme, { hue, satText }) =>
 
 describe("the focus ring's colour", () => {
   for (const scheme of ["light", "dark"] as const) {
-    it(`--ring cannot carry a conformant indicator in the ${scheme} scheme`, () => {
-      // Not a wish for it to fail: this is the reason the cards do not use it,
-      // and if picoframe ever calibrates the token this test says so by failing.
+    it(`--ring clears 1.4.11 everywhere in the ${scheme} scheme`, () => {
       const measured = worst(scheme, ringInk);
-      expect(measured.ratio, measured.where).toBeLessThan(AA_NON_TEXT);
+      expect(measured.ratio, measured.where).toBeGreaterThanOrEqual(
+        AA_NON_TEXT,
+      );
     });
 
     it(`--foreground clears 1.4.11 everywhere in the ${scheme} scheme`, () => {

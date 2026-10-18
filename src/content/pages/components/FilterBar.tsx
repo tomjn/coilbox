@@ -8,10 +8,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+
+/** One filter chip: a value, its label and how many items it would show. */
+export interface FilterChip {
+  value: string;
+  label: string;
+  count: number;
+}
 
 /**
- * Shared filter bar for the content browsers: a name search box, a sort dropdown,
- * and a live "shown / total" count. Mirrors the downloads section's filter UX so
+ * Shared filter bar for the content browsers: an optional row of filter chips,
+ * a name search box, a sort dropdown, and a live "shown / total" count. The
+ * chips are the hub browse page's toggle items with the same pressed style.
+ * Each one carries its own count, so the bar shows the "shown / total" count
+ * only while a search narrows the list. Mirrors the downloads section's filter UX so
  * the two surfaces feel the same. Filtering itself lives in the pages (in-memory
  * over the scan results); this is presentation only.
  */
@@ -28,6 +39,10 @@ export function FilterBar({
   noun,
   trailing,
   sortClassName = "w-36",
+  chips,
+  chip,
+  onChip,
+  chipsLabel,
 }: {
   search: string;
   onSearch: (v: string) => void;
@@ -45,10 +60,44 @@ export function FilterBar({
   trailing?: ReactNode;
   /** Width of the sort dropdown, for a page whose options have longer labels. */
   sortClassName?: string;
+  /** Mutually exclusive filters shown ahead of the search box. */
+  chips?: FilterChip[];
+  /** The pressed chip's value. */
+  chip?: string;
+  onChip?: (v: string) => void;
+  /** The chip group's accessible name. */
+  chipsLabel?: string;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div className="relative max-w-xs flex-1">
+      {chips && (
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="sm"
+          spacing={1}
+          value={chip}
+          // Pressing the pressed chip again would clear the group. One chip
+          // is always the filter, so that press does nothing.
+          onValueChange={(v) => v && onChip?.(v)}
+          aria-label={chipsLabel}
+          className="flex-wrap"
+        >
+          {chips.map((c) => (
+            <ToggleGroupItem
+              key={c.value}
+              value={c.value}
+              className="data-[state=on]:border-primary data-[state=on]:bg-primary/10"
+            >
+              {c.label}
+              <span className="tabular-nums text-muted-foreground">
+                {c.count}
+              </span>
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      )}
+      <div className="relative min-w-40 max-w-xs flex-1">
         <Search
           size={14}
           className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground"
@@ -75,9 +124,11 @@ export function FilterBar({
         </SelectContent>
       </Select>
       {trailing}
-      <span className="text-sm text-muted-foreground">
-        {search.trim() ? `${shown} / ${total}` : total} {noun}
-      </span>
+      {(!chips || search.trim()) && (
+        <span className="text-sm text-muted-foreground">
+          {search.trim() ? `${shown} / ${total}` : total} {noun}
+        </span>
+      )}
     </div>
   );
 }

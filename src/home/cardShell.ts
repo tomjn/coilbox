@@ -120,19 +120,18 @@ export const ART_DIM_CLASS = "text-[hsl(var(--foreground)/0.75)]";
  * `BrandingScreenshots`) all declare their own, so the welcome cards were the
  * exception rather than the rule.
  *
- * ## Why it is not the ring token
+ * ## Why it is `--foreground` and not the ring token
  *
- * Those five use `outline-ring`, and it cannot carry a conformant indicator.
- * WCAG 1.4.11 wants 3:1 against the adjacent colour, and `--ring` is a hue token
- * with no relationship to `--background`: swept over every base, every accent and
- * both ramps it falls to 1.46:1 on the light scheme's default and 2.28:1 on the
- * dark scheme's, failing on six of picoframe's 17 accent families in light and
- * three in dark. The default install is one of the failures in both. That is a
- * defect in the token rather than in how these cards use it, and it reaches every
- * focus ring in the app, so it is filed rather than fixed here (#1089).
+ * Those five use `outline-ring`. Until @picoframe/frame 0.10.0 that token could
+ * not carry a conformant indicator: WCAG 1.4.11 wants 3:1 against the adjacent
+ * colour, and `--ring` fell to 1.46:1 on the light scheme's default and 2.28:1 on
+ * the dark scheme's (#1089). picoframe now keeps it at 3:1 or better on every
+ * base and accent, and `focusRing.test.ts` asserts that from the shipped theme.
+ * The welcome cards keep `--foreground` because it was chosen while the token
+ * was broken and it clears 3:1 by a wide margin.
  *
- * `--foreground` has no such freedom: it is the ink body text is set in, so the
- * ramp is obliged to keep it far from `--background`. Measured the same way it
+ * `--foreground` is the ink body text is set in, so the ramp is obliged to keep
+ * it far from `--background`. Measured the same way it
  * never drops below 11.95:1. The ring lands on the page's own surface rather than
  * on the card, which is what makes that the number that counts: `outline-offset`
  * is positive, so there are two pixels of background between the card's edge and

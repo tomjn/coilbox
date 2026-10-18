@@ -69,12 +69,16 @@ vi.mock("../branding", () => ({
   filterUninstalledGames: () => [],
   filterUninstalledMaps: () => [],
   useBrandingCatalog: () => [],
+  useGithubGameRepos: () => [],
   useBrandingEntry: () => undefined,
   useBrandingImage: () => undefined,
   useSuggestedGames: () => [],
   useSuggestedMaps: () => [],
 }));
 vi.mock("../usePlayGame", () => ({ usePlayGame: () => () => {} }));
+// The update sources read the download history and the rapid indexes.
+const UPDATE_SOURCES = { catalogues: [], rapidVersions: {} };
+vi.mock("../useUpdates", () => ({ useUpdateSources: () => UPDATE_SOURCES }));
 vi.mock("../usePlayMap", () => ({ usePlayMap: () => () => {} }));
 vi.mock("../../downloads/bindings", () => ({
   dlInstalledContent: async () => ({ games: [], maps: [] }),
@@ -82,10 +86,13 @@ vi.mock("../../downloads/bindings", () => ({
 // The library also reads the download queue and the hub's games, and this
 // page has neither.
 vi.mock("../../downloads/DownloadQueueProvider", () => ({
-  useDownloadQueue: () => ({ items: [] }),
+  useDownloadQueue: () => ({ items: [], itemFor: () => null }),
   useDownloadComplete: () => {},
 }));
-vi.mock("../../hub/gameIcons", () => ({ useHubGames: () => null }));
+vi.mock("../../hub/gameIcons", () => ({
+  useHubGames: () => null,
+  useHubGamesFailure: () => null,
+}));
 vi.mock("../../downloads/config", () => ({
   useContentRootPaths: () => [],
   useWriteRoot: () => null,
@@ -102,11 +109,11 @@ vi.mock("./components/GameCard", () => ({
     game,
     playDisabled,
   }: {
-    game: { name: string };
+    game: { title: string };
     playDisabled?: boolean;
   }) => (
     <button type="button" disabled={playDisabled}>
-      Play {game.name}
+      Play {game.title}
     </button>
   ),
 }));

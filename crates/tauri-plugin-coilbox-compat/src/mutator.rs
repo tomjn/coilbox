@@ -110,9 +110,9 @@ fn modinfo(game_name: &str, short_name: Option<&str>, n: u32) -> String {
 ///
 /// The Lua prelude's fixes (#4558) are written with the base game's entry files
 /// wrapped to load it, which `read` returns by path, `None` for one the game
-/// does not have. The other fixes and the converted models are written by
-/// #4557, #4559 and #4560. Until they are, a manifest that lists one is refused
-/// rather than built without it.
+/// does not have. The gadget fixes (#4559) are written to `LuaRules/Gadgets/`
+/// as they are. The def fixes are written by #4560. Until they are, a manifest
+/// that lists one is refused rather than built without it.
 pub fn files(
     manifest: &coilbox_compat::Manifest,
     game_name: &str,
@@ -126,7 +126,7 @@ pub fn files(
     if manifest
         .fixes
         .iter()
-        .any(|id| !coilbox_compat::is_prelude_fix(id))
+        .any(|id| !coilbox_compat::is_prelude_fix(id) && !coilbox_compat::is_gadget_fix(id))
     {
         return Err(format!(
             "compat {} lists fixes this coilbox cannot write yet",
@@ -137,7 +137,10 @@ pub fn files(
         path: "modinfo.lua".into(),
         contents: modinfo(game_name, short_name, manifest.version),
     }];
-    for (path, contents) in coilbox_compat::prelude_files(manifest, read)? {
+    for (path, contents) in coilbox_compat::prelude_files(manifest, read)?
+        .into_iter()
+        .chain(coilbox_compat::gadget_files(manifest))
+    {
         files.push(CompiledFile { path, contents });
     }
     files.sort_by(|a, b| a.path.cmp(&b.path));
@@ -409,6 +412,32 @@ mod tests {
             assert!(!f.contents.contains('\r'), "{}", f.path);
             assert!(f.contents.ends_with('\n'), "{}", f.path);
         }
+    }
+
+    #[test]
+    fn the_gadgets_are_written_to_luarules_gadgets_as_they_are() {
+        let m = coilbox_compat::manifest(3).unwrap();
+        let files = files(&m, "XTA 9.65", None, &marker(3, "abc"), no_file).unwrap();
+        let paths: Vec<_> = files.iter().map(|f| f.path.as_str()).collect();
+        assert_eq!(
+            paths,
+            [
+                "LuaRules/Gadgets/coilbox_compat_aircraft_crash.lua",
+                "LuaRules/Gadgets/coilbox_compat_messages_tdf.lua",
+                "LuaRules/Gadgets/coilbox_compat_only_forward_aim.lua",
+                "modinfo.lua",
+                MARKER
+            ]
+        );
+        assert_eq!(
+            files[1].contents,
+            coilbox_compat::fix_source("gadget-messages-tdf-95").unwrap()
+        );
+        let again = super::files(&m, "XTA 9.65", None, &marker(3, "abc"), no_file).unwrap();
+        assert!(files
+            .iter()
+            .zip(&again)
+            .all(|(a, b)| a.path == b.path && a.contents == b.contents));
     }
 
     #[test]

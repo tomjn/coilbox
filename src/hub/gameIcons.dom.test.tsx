@@ -44,7 +44,12 @@ vi.mock("@/content/branding", () => ({
 }));
 
 import { GameIcon } from "@/components/GameIcon";
-import { loadHubGames, resetHubGames, useHubGames } from "./gameIcons";
+import {
+  loadHubGames,
+  resetHubGames,
+  useHubGames,
+  useHubGamesFailure,
+} from "./gameIcons";
 
 const SF_LOGO = "https://assets.example/coilbox-assets/games/SF/logo.png";
 
@@ -222,5 +227,43 @@ describe("useHubGames", () => {
     await act(async () => {});
     expect(screen.getByTestId("probe").textContent).toBe("none");
     expect(hoisted.fetchHubGames).not.toHaveBeenCalled();
+  });
+});
+
+describe("useHubGamesFailure", () => {
+  function Probe() {
+    const failure = useHubGamesFailure();
+    return <span data-testid="probe">{failure ?? "none"}</span>;
+  }
+  const probe = () => screen.getByTestId("probe").textContent;
+
+  it("gives the hub client's reason when the read fails", async () => {
+    hoisted.fetchHubGames.mockResolvedValue({ ok: false, reason: "down" });
+    render(<Probe />);
+    await act(async () => {});
+    expect(probe()).toBe("down");
+  });
+
+  it("gives the thrown message when the read throws", async () => {
+    hoisted.fetchHubGames.mockRejectedValue(new Error("boom"));
+    render(<Probe />);
+    await act(async () => {});
+    expect(probe()).toBe("boom");
+  });
+
+  it("is null once a later read succeeds", async () => {
+    hoisted.fetchHubGames.mockResolvedValueOnce({ ok: false, reason: "down" });
+    await loadHubGames("https://hub.example", false);
+    hoisted.fetchHubGames.mockImplementation(() => answer([]));
+    render(<Probe />);
+    await act(async () => {});
+    expect(probe()).toBe("none");
+  });
+
+  it("is null with no trusted hub", async () => {
+    hoisted.hub = null;
+    render(<Probe />);
+    await act(async () => {});
+    expect(probe()).toBe("none");
   });
 });
