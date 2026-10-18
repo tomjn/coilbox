@@ -49,6 +49,7 @@ export function movementKinds(project: LegoProject): MoveKind[] {
 const MOVING_PRESETS: Record<string, MoveKind> = {
   "walk.biped": "kbot",
   "walk.quad": "kbot",
+  "walk.legs": "kbot",
   "wheels.roll": "tank",
 };
 

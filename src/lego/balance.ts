@@ -38,7 +38,7 @@ export function isSupportRole(role: string | undefined): boolean {
   return (
     role === "wheel" ||
     role === "track" ||
-    /^leg\.[lr][12]\.foot$/.test(role ?? "")
+    /^leg\.[lr][1-9]\d*\.foot$/.test(role ?? "")
   );
 }
 

@@ -19,9 +19,41 @@ export interface LegoRole {
 }
 
 /**
+ * A leg role's label. Pair 1 is always the front pair, so it says so. A later
+ * pair is front or rear or in between depending on how many the unit has, so
+ * it is only numbered.
+ */
+export function legRoleLabel(side: "l" | "r", pair: number, segment: string) {
+  const sided = side === "l" ? "left" : "right";
+  return pair === 1
+    ? `Front ${sided} ${segment}`
+    : `${sided === "left" ? "Left" : "Right"} ${segment}, pair ${pair}`;
+}
+
+/** The picker's entries for every leg of pairs 1 to `pairs`, front first. */
+export function legRoleEntries(pairs: number): LegoRole[] {
+  const entries: LegoRole[] = [];
+  for (let pair = 1; pair <= pairs; pair++) {
+    for (const side of ["l", "r"] as const) {
+      for (const segment of ["thigh", "shin", "foot"]) {
+        entries.push({
+          id: `leg.${side}${pair}.${segment}`,
+          label: legRoleLabel(side, pair, segment),
+          group: "Legs",
+        });
+      }
+    }
+  }
+  return entries;
+}
+
+/**
  * Legs are numbered as well as sided, which the plan's `leg.<l|r>.<segment>`
  * did not allow for. A quadruped needs a second pair, and without an index
- * there is no way to say which is which.
+ * there is no way to say which is which. Pair 1 is at the front and the
+ * numbers go back along the body (#3351). Two pairs are listed here, and a
+ * unit may have any number: `isRole` takes any pair, and `pickerRoles` lists
+ * one pair past the unit's last.
  */
 export const ROLES: LegoRole[] = [
   { id: "base", label: "Body", group: "Structure" },
@@ -44,18 +76,7 @@ export const ROLES: LegoRole[] = [
   // An aircraft's landing gear, each piece's joint at the hinge. `LANDING_GEAR`
   // turns it up on take off and down on landing.
   { id: "gear", label: "Landing gear", group: "Movement" },
-  { id: "leg.l1.thigh", label: "Front left thigh", group: "Legs" },
-  { id: "leg.l1.shin", label: "Front left shin", group: "Legs" },
-  { id: "leg.l1.foot", label: "Front left foot", group: "Legs" },
-  { id: "leg.r1.thigh", label: "Front right thigh", group: "Legs" },
-  { id: "leg.r1.shin", label: "Front right shin", group: "Legs" },
-  { id: "leg.r1.foot", label: "Front right foot", group: "Legs" },
-  { id: "leg.l2.thigh", label: "Rear left thigh", group: "Legs" },
-  { id: "leg.l2.shin", label: "Rear left shin", group: "Legs" },
-  { id: "leg.l2.foot", label: "Rear left foot", group: "Legs" },
-  { id: "leg.r2.thigh", label: "Rear right thigh", group: "Legs" },
-  { id: "leg.r2.shin", label: "Rear right shin", group: "Legs" },
-  { id: "leg.r2.foot", label: "Rear right foot", group: "Legs" },
+  ...legRoleEntries(2),
   { id: "buildarm.base", label: "Build arm base", group: "Build arm" },
   { id: "buildarm.arm", label: "Build arm", group: "Build arm" },
   { id: "buildarm.nozzle", label: "Build nozzle", group: "Build arm" },
@@ -71,7 +92,33 @@ export const ROLES: LegoRole[] = [
 const ROLE_IDS = new Set(ROLES.map((role) => role.id));
 
 export function isRole(value: string): boolean {
-  return ROLE_IDS.has(value);
+  return ROLE_IDS.has(value) || parseLegRole(value) !== null;
+}
+
+/** The highest leg pair number any of `roles` names, 0 for none. */
+export function lastLegPair(roles: Iterable<string | undefined>): number {
+  let last = 0;
+  for (const role of roles) {
+    const leg = parseLegRole(role ?? "");
+    if (leg && leg.pair > last) last = leg.pair;
+  }
+  return last;
+}
+
+/**
+ * The roles the piece panel offers: `ROLES`, with the legs running to one pair
+ * past the last the unit has, so a pair can always be added and the list stays
+ * as long as the unit needs.
+ */
+export function pickerRoles(pieces: { role?: string }[]): LegoRole[] {
+  const pairs = Math.max(2, lastLegPair(pieces.map((piece) => piece.role)) + 1);
+  const legs = legRoleEntries(pairs);
+  const first = ROLES.findIndex((role) => role.group === "Legs");
+  return [
+    ...ROLES.slice(0, first),
+    ...legs,
+    ...ROLES.slice(first).filter((role) => role.group !== "Legs"),
+  ];
 }
 
 export interface PresetParam {
@@ -240,8 +287,24 @@ export interface AnimPreset {
   copies?: PresetCopies;
   /** Roles that must be filled, with how many pieces each needs at least. */
   requires: { role: string; count: number }[];
-  /** Every role this preset may move. */
+  /**
+   * More roles that must be filled, which depend on what the unit holds, such
+   * as a thigh and a shin for every leg up to the unit's last pair (#3351).
+   * `unmetRequirements` checks these with `requires`.
+   */
+  requiresFor?(roleCounts: Map<string, number>): {
+    role: string;
+    count: number;
+  }[];
+  /** Every role this preset may move, or for one with `moves`, the roles it
+   *  moves on every unit it can be applied to. */
   animates: string[];
+  /**
+   * Whether the preset also moves a role not in `animates`, for a preset
+   * whose roles have no fixed number, such as legs counted from 1 with no last
+   * pair (#3351). `presetMovesRole` asks both.
+   */
+  moves?(role: string): boolean;
   params: PresetParam[];
   /**
    * Where the preset puts a piece at time `t`, null when it does not move that
@@ -331,11 +394,12 @@ export function cycleSteps(
   preset: AnimPreset,
   params: Record<string, number>,
   period: number,
+  roles: string[] = preset.animates,
 ): number[] {
   const frames = Math.max(1, Math.round(period * ENGINE_FPS));
   const fixed = preset.poses?.(params, frames) ?? [];
   const curves: number[][] = [];
-  for (const role of preset.animates) {
+  for (const role of roles) {
     const samples = Array.from({ length: frames + 1 }, (_, frame) =>
       preset.track(frame / ENGINE_FPS, params, role),
     );
@@ -403,14 +467,15 @@ function cycleThread(
   preset: AnimPreset,
   params: Record<string, number>,
   instance: EmitInstance,
-  options: { name: string; period: number },
+  options: { name: string; period: number; roles?: string[] },
 ): string[] | null {
-  const targets = preset.animates.flatMap((role) =>
+  const roles = options.roles ?? preset.animates;
+  const targets = roles.flatMap((role) =>
     instance.pieces(role).map((piece) => ({ role, piece })),
   );
   if (targets.length === 0) return null;
 
-  const bounds = cycleSteps(preset, params, options.period);
+  const bounds = cycleSteps(preset, params, options.period, roles);
   const count = bounds.length - 1;
 
   // Sample the whole cycle before writing any of it. A step's move is measured
@@ -519,6 +584,8 @@ function cycleThreads(
     name: string;
     start: LuaHook;
     stop?: LuaHook;
+    /** The roles to move, when not the preset's `animates`. */
+    roles?: string[];
     /** The params one instance is written with, when not its own. */
     params?: (instance: EmitInstance) => Record<string, number>;
   },
@@ -533,6 +600,7 @@ function cycleThreads(
     const thread = cycleThread(preset, params, instance, {
       name,
       period,
+      ...(options.roles ? { roles: options.roles } : {}),
     });
     if (!thread) continue;
     if (functions.length > 0) functions.push("");
@@ -555,31 +623,78 @@ type LegSegment = (typeof LEG_SEGMENTS)[number];
 
 export interface LegRole {
   side: "l" | "r";
-  pair: 1 | 2;
+  /** Counted from 1 at the front, with no last pair. */
+  pair: number;
   segment: LegSegment;
 }
 
 export function parseLegRole(role: string): LegRole | null {
-  const match = /^leg\.([lr])([12])\.(thigh|shin|foot)$/.exec(role);
+  const match = /^leg\.([lr])([1-9]\d*)\.(thigh|shin|foot)$/.exec(role);
   if (!match) return null;
   return {
     side: match[1] as "l" | "r",
-    pair: Number(match[2]) as 1 | 2,
+    pair: Number(match[2]),
     segment: match[3] as LegSegment,
   };
 }
+
+/** A walk's gait: the two fixed ones, and the wave gait `walk.legs` plays. */
+export type Gait = "biped" | "quad" | "wave";
 
 /**
  * Where a leg sits in the cycle.
  *
  * A biped's two legs are opposite each other. A quadruped moves diagonal pairs
  * together, front left with rear right, which is what a trot is and what stops
- * the model rocking.
+ * the model rocking. The wave gait's legs are placed by `waveTouchdown`.
  */
-export function legPhase(leg: LegRole, gait: "biped" | "quad"): number {
+export function legPhase(
+  leg: LegRole,
+  gait: Gait,
+  duty = 0.5,
+  frames?: number,
+): number {
   if (gait === "biped") return leg.side === "l" ? 0 : Math.PI;
-  const diagonal = (leg.side === "l") === (leg.pair === 1);
-  return diagonal ? 0 : Math.PI;
+  if (gait === "quad") {
+    const diagonal = (leg.side === "l") === (leg.pair === 1);
+    return diagonal ? 0 : Math.PI;
+  }
+  const down = waveTouchdown(leg, duty, frames);
+  return down === 0 ? 0 : TAU * (1 - down);
+}
+
+/**
+ * When a leg of the wave gait puts its foot down, as a share of the cycle
+ * after the front left foot does (#3351).
+ *
+ * This is the wave gait of a walker with 2n legs as Song and Choi give it
+ * ("The optimally stable ranges of 2n-legged wave gaits", IEEE Transactions on
+ * Systems, Man, and Cybernetics 20(4), 1990, after McGhee and Frank 1968 for
+ * four legs). With the legs counted front to back and `duty` the share of the
+ * cycle a foot is down, the left leg of pair k comes down `(k - 1) * duty`
+ * after the front left, and each right leg half a cycle after its left. So a
+ * pair comes down as the pair in front of it lifts, and the lifts run from the
+ * rear to the front along each side, as an insect's do.
+ *
+ * The time on the ground picks the gait. At half the cycle it is the
+ * alternating gait: two legs in opposition, the trot on four, the tripod on
+ * six (front and rear left with middle right, then the others) and the
+ * alternating tetrapod on eight. Longer on the ground it slows into the
+ * ripple and then the wave, where one leg on each side is in the air at a
+ * time and at the most only one foot at all.
+ *
+ * `frames`, when given, is the cycle's length in frames, and the answer is put
+ * on the nearest whole frame, so a fitted walk's feet land on its poses.
+ */
+export function waveTouchdown(
+  leg: Pick<LegRole, "side" | "pair">,
+  duty: number,
+  frames?: number,
+): number {
+  const share = (leg.pair - 1) * duty + (leg.side === "r" ? 0.5 : 0);
+  const cycle = share - Math.floor(share);
+  if (frames === undefined) return cycle;
+  return (Math.round(cycle * frames) % frames) / frames;
 }
 
 /**
@@ -705,10 +820,28 @@ function walkPoses(
   preset: AnimPreset,
   params: Record<string, number>,
   frames: number,
+  gait: Gait,
 ): number[] {
   if (value(preset, params, WALK_FITTED) !== 1) return [];
   const down = Math.round((value(preset, params, "duty") / 100) * frames);
   const half = Math.round(frames / 2);
+  if (gait === "wave") {
+    // Each leg comes down on a frame of its own, so the poses are the frames
+    // each lands and lifts on, or every frame for a solved leg.
+    if (solvesLegs(params)) return Array.from({ length: frames }, (_, f) => f);
+    const pairs = Math.max(1, Math.round(value(preset, params, WALK_PAIRS)));
+    const landings = new Set<number>();
+    for (let pair = 1; pair <= pairs; pair++) {
+      for (const side of ["l", "r"] as const) {
+        landings.add(
+          Math.round(
+            waveTouchdown({ side, pair }, down / frames, frames) * frames,
+          ),
+        );
+      }
+    }
+    return [...landings].flatMap((frame) => [frame, (frame + down) % frames]);
+  }
   if (!solvesLegs(params)) {
     return [0, down, half, half + down].map((frame) => frame % frames);
   }
@@ -730,14 +863,14 @@ function walkTrack(
   t: number,
   params: Record<string, number>,
   role: string,
-  gait: "biped" | "quad",
+  gait: Gait,
 ): TrackDelta | null {
   const leg = parseLegRole(role);
   if (!leg) return null;
-  if (gait === "biped" && leg.pair === 2) return null;
+  if (gait === "biped" && leg.pair !== 1) return null;
+  if (gait === "quad" && leg.pair > 2) return null;
 
   const period = Math.max(value(preset, params, "period"), 0.05);
-  const phase = (t / period) * TAU + legPhase(leg, gait);
   const swing = deg(value(preset, params, "stride"));
   const knee = deg(value(preset, params, "knee"));
   const duty = Math.min(
@@ -745,6 +878,14 @@ function walkTrack(
     0.95,
   );
   const fitted = value(preset, params, WALK_FITTED) === 1;
+  const phase =
+    (t / period) * TAU +
+    legPhase(
+      leg,
+      gait,
+      duty,
+      fitted ? Math.round(period * ENGINE_FPS) : undefined,
+    );
 
   let thigh: number;
   let shin: number;
@@ -841,7 +982,7 @@ const WALK_PARAMS: PresetParam[] = [
   },
 ];
 
-function legRoles(pairs: (1 | 2)[]): string[] {
+function legRoles(pairs: number[]): string[] {
   const roles: string[] = [];
   for (const pair of pairs) {
     for (const side of ["l", "r"] as const) {
@@ -871,7 +1012,7 @@ export const WALK_BIPED: AnimPreset = {
     return walkTrack(this, t, params, role, "biped");
   },
   poses(params, frames) {
-    return walkPoses(this, params, frames);
+    return walkPoses(this, params, frames, "biped");
   },
   emit(ctx) {
     return walkEmit(this, ctx);
@@ -896,10 +1037,90 @@ export const WALK_QUAD: AnimPreset = {
     return walkTrack(this, t, params, role, "quad");
   },
   poses(params, frames) {
-    return walkPoses(this, params, frames);
+    return walkPoses(this, params, frames, "quad");
   },
   emit(ctx) {
     return walkEmit(this, ctx);
+  },
+};
+
+/**
+ * The leg roles of pairs 1 to `pairs`, front first, which is what a wave gait
+ * walk moves on a unit with that many pairs.
+ */
+export function legRoleIds(pairs: number): string[] {
+  return legRoles(Array.from({ length: Math.max(1, pairs) }, (_, i) => i + 1));
+}
+
+/**
+ * The time on the ground a walk with any number of legs starts at for a unit
+ * with `pairs` leg pairs, as a percentage (#3351).
+ *
+ * A body stands on its feet only while three or more are down around it.
+ * With `2 * pairs` legs each down for `duty` of the cycle, `2 * pairs * duty`
+ * feet are down on average, so three takes a duty of at least
+ * `3 / (2 * pairs)`. Less than half the cycle on the ground is a run, so the
+ * duty is never below half. That gives the tripod for six legs and the
+ * alternating tetrapod for eight, both at half, and the crawl at three
+ * quarters for four, where the range McGhee and Frank (1968) found the four
+ * legged wave gait most stable over begins. Two legs cannot stand on two feet
+ * in any gait and keep the half a biped always walked at. `gaits.test.ts`
+ * checks the body stays over the feet on every frame of these.
+ */
+export function waveDuty(pairs: number): number {
+  return pairs < 2 ? 50 : Math.max(50, 300 / (2 * pairs));
+}
+
+/** How many leg pairs the unit has, laid over a `walk.legs` walk's params by
+ *  `walkFit.ts`. Not a slider, and never saved. */
+export const WALK_PAIRS = "legPairs";
+
+const WALK_LEGS_PARAMS: PresetParam[] = WALK_PARAMS.map((param) =>
+  // Up to the wave gait of eight legs, seven eighths of the cycle on the
+  // ground, so the slow gaits of six and eight legs are in reach.
+  param.id === "duty" ? { ...param, max: 90 } : param,
+);
+
+/**
+ * A walk for any number of leg pairs (#3351), in the wave gait
+ * (`waveTouchdown`). The pairs are counted from the unit's own leg roles, and
+ * the time on the ground, which picks the gait, starts at `waveDuty`'s for that
+ * many. It stands beside the two fixed walks, which saved units still name.
+ */
+export const WALK_LEGS: AnimPreset = {
+  id: "walk.legs",
+  label: "Walk, any number of legs",
+  description:
+    "A wave of steps from the rear to the front along each side. Half the time on the ground is the tripod on six legs, more is slower and steadier. Needs a thigh and a shin on each leg.",
+  requires: [
+    { role: "leg.l1.thigh", count: 1 },
+    { role: "leg.l1.shin", count: 1 },
+    { role: "leg.r1.thigh", count: 1 },
+    { role: "leg.r1.shin", count: 1 },
+  ],
+  requiresFor(roleCounts) {
+    return legRoles(
+      Array.from({ length: lastLegPair(roleCounts.keys()) }, (_, i) => i + 1),
+    )
+      .filter((role) => !role.endsWith(".foot"))
+      .map((role) => ({ role, count: 1 }));
+  },
+  copies: { per: "instance", noun: "sets of legs" },
+  animates: legRoles([1]),
+  moves: (role) => parseLegRole(role) !== null,
+  params: WALK_LEGS_PARAMS,
+  track(t, params, role) {
+    return walkTrack(this, t, params, role, "wave");
+  },
+  poses(params, frames) {
+    return walkPoses(this, params, frames, "wave");
+  },
+  emit(ctx) {
+    return walkEmit(
+      this,
+      ctx,
+      legRoleIds(Math.round(value(this, ctx.params, WALK_PAIRS))),
+    );
   },
 };
 
@@ -911,7 +1132,11 @@ export const WALK_QUAD: AnimPreset = {
  * A walk fitted to the unit says so above its thread, with the numbers it was
  * fitted to, so whoever edits the script knows the timing is not arbitrary.
  */
-function walkEmit(preset: AnimPreset, ctx: EmitContext): EmitResult | null {
+function walkEmit(
+  preset: AnimPreset,
+  ctx: EmitContext,
+  roles?: string[],
+): EmitResult | null {
   const fitted = value(preset, ctx.params, WALK_FITTED) === 1;
   // One body, so one drop. Every set of legs is solved to the ground the
   // shared walk lowers the body to, even one with a swing of its own.
@@ -921,6 +1146,7 @@ function walkEmit(preset: AnimPreset, ctx: EmitContext): EmitResult | null {
     name: "walk",
     start: "StartMoving",
     stop: "StopMoving",
+    ...(roles ? { roles } : {}),
     ...(drop > 0
       ? {
           params: (instance: EmitInstance) =>
@@ -2139,6 +2365,7 @@ export const WRECK_POSE: AnimPreset = {
 export const PRESETS: AnimPreset[] = [
   WALK_BIPED,
   WALK_QUAD,
+  WALK_LEGS,
   TURRET_TRACK,
   WHEELS_ROLL,
   RUDDER_FOLLOWS,
@@ -2170,9 +2397,30 @@ export function unmetRequirements(
   preset: AnimPreset,
   roleCounts: Map<string, number>,
 ): string[] {
-  return preset.requires
-    .filter((need) => (roleCounts.get(need.role) ?? 0) < need.count)
-    .map((need) => need.role);
+  const needs = [
+    ...preset.requires,
+    ...(preset.requiresFor?.(roleCounts) ?? []),
+  ];
+  return [
+    ...new Set(
+      needs
+        .filter((need) => (roleCounts.get(need.role) ?? 0) < need.count)
+        .map((need) => need.role),
+    ),
+  ];
+}
+
+/** Whether a preset moves a role: one it lists, or one its `moves` takes. */
+export function presetMovesRole(preset: AnimPreset, role: string): boolean {
+  return preset.animates.includes(role) || preset.moves?.(role) === true;
+}
+
+/** Whether a preset moves or needs a role. */
+export function presetUsesRole(preset: AnimPreset, role: string): boolean {
+  return (
+    presetMovesRole(preset, role) ||
+    preset.requires.some((need) => need.role === role)
+  );
 }
 
 /** How many pieces carry each role. */
@@ -2187,6 +2435,8 @@ export function countRoles(pieces: { role?: string }[]): Map<string, number> {
 
 /** A role's label, or the raw id if a document carries one we dropped. */
 export function roleLabel(id: string): string {
+  const leg = parseLegRole(id);
+  if (leg) return legRoleLabel(leg.side, leg.pair, leg.segment);
   return ROLES.find((role) => role.id === id)?.label ?? id;
 }
 
@@ -2212,13 +2462,11 @@ const ROLE_ROTATION_AXES: Record<string, readonly number[]> = {
   aim: [0, 1],
 };
 
-const LEG_ROLE = /^leg\.[lr][12]\.(?:thigh|shin|foot)$/;
-
 /** The axes a role's rest rotation should sit on a right angle for. Empty for
  *  a role no preset ever turns. Leg roles turn about x regardless of side or
  *  pair, so they match by pattern rather than one table entry each. */
 function roleRotationAxes(role: string): readonly number[] {
-  if (LEG_ROLE.test(role)) return [0];
+  if (parseLegRole(role)) return [0];
   return ROLE_ROTATION_AXES[role] ?? [];
 }
 

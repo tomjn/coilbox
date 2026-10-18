@@ -10,19 +10,27 @@ import {
   HOVER_BOB,
   IDLE_SWAY,
   isRole,
+  legPhase,
   OPEN_CLOSE,
   PRESETS,
+  parseLegRole,
+  pickerRoles,
   presetById,
+  presetMovesRole,
   RECOIL,
   ROLES,
   restAngleWarnings,
+  roleLabel,
   TURRET_TRACK,
   unmetRequirements,
   WAKE_WHILE_MOVING,
   WALK_BIPED,
+  WALK_LEGS,
   WALK_QUAD,
   WHEELS_ROLL,
   WRECK_POSE,
+  waveDuty,
+  waveTouchdown,
 } from "./animPresets";
 
 /** The x rotation a preset gives a role, in degrees, for readable assertions. */
@@ -144,8 +152,34 @@ describe("roles", () => {
   it("recognises only its own vocabulary", () => {
     expect(isRole("turret")).toBe(true);
     expect(isRole("leg.r2.foot")).toBe(true);
-    expect(isRole("leg.l3.thigh")).toBe(false);
+    // Any number of leg pairs (#3351), counted from 1.
+    expect(isRole("leg.l3.thigh")).toBe(true);
+    expect(isRole("leg.r12.shin")).toBe(true);
+    expect(isRole("leg.l0.thigh")).toBe(false);
+    expect(isRole("leg.l03.thigh")).toBe(false);
+    expect(isRole("leg.l3.knee")).toBe(false);
     expect(isRole("whatever")).toBe(false);
+  });
+
+  it("reads a leg role of any pair", () => {
+    expect(parseLegRole("leg.r4.foot")).toEqual({
+      side: "r",
+      pair: 4,
+      segment: "foot",
+    });
+    expect(roleLabel("leg.l1.thigh")).toBe("Front left thigh");
+    expect(roleLabel("leg.r3.shin")).toBe("Right shin, pair 3");
+  });
+
+  it("offers one leg pair past the unit's last in the picker", () => {
+    const legs = (pieces: { role?: string }[]) =>
+      pickerRoles(pieces).filter((role) => role.group === "Legs").length;
+    expect(legs([])).toBe(12);
+    expect(legs([{ role: "leg.l2.foot" }])).toBe(18);
+    expect(legs([{ role: "leg.r4.thigh" }])).toBe(30);
+    // The rest of the list is as it was, legs where they always were.
+    const ids = pickerRoles([]).map((role) => role.id);
+    expect(ids).toEqual(ROLES.map((role) => role.id));
   });
 });
 
@@ -193,8 +227,8 @@ describe("presets", () => {
 
   it("moves nothing it does not claim to animate", () => {
     for (const preset of PRESETS) {
-      for (const role of ROLES) {
-        if (preset.animates.includes(role.id)) continue;
+      for (const role of pickerRoles([{ role: "leg.l4.thigh" }])) {
+        if (presetMovesRole(preset, role.id)) continue;
         expect(preset.track(0.37, {}, role.id)).toBeNull();
       }
     }
@@ -223,6 +257,19 @@ describe("unmetRequirements", () => {
     ]);
 
     expect(unmetRequirements(WALK_BIPED, counts)).toEqual([]);
+  });
+
+  it("names every leg a walk for any number of legs is missing, up to the last pair", () => {
+    const counts = countRoles(
+      ["l1", "r1", "l2", "l3", "r3"].flatMap((leg) => [
+        { role: `leg.${leg}.thigh` },
+        { role: `leg.${leg}.shin` },
+      ]),
+    );
+    expect(unmetRequirements(WALK_LEGS, counts)).toEqual([
+      "leg.r2.thigh",
+      "leg.r2.shin",
+    ]);
   });
 
   it("ignores pieces with no role at all", () => {
@@ -291,6 +338,78 @@ describe("walk.quad", () => {
       -pitch(WALK_QUAD, t, "leg.r1.thigh"),
       4,
     );
+  });
+});
+
+describe("walk.legs gaits (#3351)", () => {
+  /** Each leg's touchdown as a share of the cycle, front left first. */
+  const table = (pairs: number, duty: number) =>
+    Array.from({ length: pairs }, (_, i) =>
+      (["l", "r"] as const).map((side) =>
+        Number(waveTouchdown({ side, pair: i + 1 }, duty).toFixed(6)),
+      ),
+    );
+
+  it("is the tripod on six legs at half the time on the ground", () => {
+    // Front and rear left with middle right, then the other three.
+    expect(table(3, 0.5)).toEqual([
+      [0, 0.5],
+      [0.5, 0],
+      [0, 0.5],
+    ]);
+  });
+
+  it("is the alternating tetrapod on eight legs at half", () => {
+    expect(table(4, 0.5)).toEqual([
+      [0, 0.5],
+      [0.5, 0],
+      [0, 0.5],
+      [0.5, 0],
+    ]);
+  });
+
+  it("is the trot on four legs and opposition on two at half, as the fixed walks", () => {
+    for (const [pairs, gait] of [
+      [1, "biped"],
+      [2, "quad"],
+    ] as const) {
+      for (let pair = 1; pair <= pairs; pair++) {
+        for (const side of ["l", "r"] as const) {
+          const leg = { side, pair, segment: "thigh" as const };
+          expect(legPhase(leg, "wave", 0.5)).toBeCloseTo(
+            legPhase(leg, gait),
+            12,
+          );
+        }
+      }
+    }
+  });
+
+  it("is the crawl on four legs at three quarters, the rear leg first after the front on each side", () => {
+    expect(table(2, 0.75)).toEqual([
+      [0, 0.5],
+      [0.75, 0.25],
+    ]);
+  });
+
+  it("is the wave on six legs at five sixths, lifting rear to front", () => {
+    const duty = 5 / 6;
+    const lifts = table(3, duty).map(([left]) => (left + duty) % 1);
+    // The rear left lifts first, then the middle, then the front, a sixth
+    // apart.
+    [5 / 6, 4 / 6, 3 / 6].forEach((lift, i) => {
+      expect(lifts[i]).toBeCloseTo(lift, 5);
+    });
+  });
+
+  it("starts at the least time on the ground that keeps three feet down", () => {
+    expect([1, 2, 3, 4, 5].map(waveDuty)).toEqual([50, 75, 50, 50, 50]);
+  });
+
+  it("moves every pair it is given and not only the first", () => {
+    expect(WALK_LEGS.track(0.2, {}, "leg.l7.shin")).not.toBeNull();
+    expect(WALK_QUAD.track(0.2, {}, "leg.l3.shin")).toBeNull();
+    expect(WALK_BIPED.track(0.2, {}, "leg.l2.shin")).toBeNull();
   });
 });
 
