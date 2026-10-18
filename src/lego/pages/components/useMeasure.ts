@@ -5,11 +5,38 @@ import {
   useRef,
   useState,
 } from "react";
-import type { Measurement } from "../../measure";
+import type { MeasureEnd, Measurement } from "../../measure";
 import { isShortcut } from "../../shortcuts";
 import type { Vec3 } from "../../snapping";
-import { drawMeasurements } from "./measureLayer";
+import { drawMeasurements, type MeasureLines } from "./measureLayer";
 import type { SceneState } from "./sceneState";
+
+/**
+ * Where the lines are drawn, for the readout to subscribe to. The scene says
+ * whenever a frame moves one, which a piece being dragged or animated does on
+ * every frame, so the readout follows without the viewport rendering again.
+ */
+export interface MeasureLinesStore {
+  subscribe: (listener: () => void) => () => void;
+  get: () => MeasureLines;
+  set: (lines: MeasureLines) => void;
+}
+
+function linesStore(): MeasureLinesStore {
+  let lines: MeasureLines = { lines: [], pending: null };
+  const listeners = new Set<() => void>();
+  return {
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    get: () => lines,
+    set: (next) => {
+      lines = next;
+      for (const listener of listeners) listener();
+    },
+  };
+}
 
 /** Whether the key press was meant for a text field. */
 function typing(event: KeyboardEvent): boolean {
@@ -34,11 +61,12 @@ export function useMeasure(
 ) {
   const [active, setActive] = useState(false);
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
-  const [start, setStart] = useState<Vec3 | null>(null);
-  const [hover, setHover] = useState<Vec3 | null>(null);
+  const [start, setStart] = useState<MeasureEnd | null>(null);
+  const [hover, setHover] = useState<MeasureEnd | null>(null);
   const [moved, setMoved] = useState<Vec3 | null>(null);
   // The click handler is registered once, so it reads the first point here.
-  const startRef = useRef<Vec3 | null>(null);
+  const startRef = useRef<MeasureEnd | null>(null);
+  const [lines] = useState(linesStore);
 
   const clear = useCallback(() => {
     setMeasurements([]);
@@ -71,6 +99,11 @@ export function useMeasure(
     state.measure.onHover = (at) => {
       if (startRef.current) setHover(at);
     };
+    state.measure.onMoveEnd = ({ id, end }, at) =>
+      setMeasurements((all) =>
+        all.map((m) => (m.id === id ? { ...m, [end]: at } : m)),
+      );
+    state.measure.onLines = lines.set;
     state.measure.onDrag = (next) =>
       setMoved((prev) =>
         prev && next && prev.every((v, i) => v === next[i]) ? prev : next,
@@ -80,7 +113,7 @@ export function useMeasure(
       setStart(null);
       setHover(null);
     }
-  }, [sceneRef, scene, active]);
+  }, [sceneRef, scene, active, lines]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: scene is only here to rerun the effect on a rebuilt scene
   useEffect(() => {
@@ -103,5 +136,5 @@ export function useMeasure(
     return () => window.removeEventListener("keydown", down);
   }, [active]);
 
-  return { active, setActive, measurements, start, hover, moved, clear };
+  return { active, setActive, measurements, lines, moved, clear };
 }

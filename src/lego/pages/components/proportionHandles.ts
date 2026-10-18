@@ -17,14 +17,15 @@ export const GRAB_RADIUS = 12;
 /** Amber, apart from the fuchsia skeleton lines it sits on. */
 export const HANDLE_COLOUR = 0xfbbf24;
 
-/** The handle nearest to the pointer within `GRAB_RADIUS`, or null. */
-export function handleUnderPointer(
-  handles: ProportionHandle[],
+/** The handle nearest to the pointer within `GRAB_RADIUS`, or null. Any
+ *  point that can be dragged will do, such as a measurement's end. */
+export function handleUnderPointer<T extends Pick<ProportionHandle, "at">>(
+  handles: T[],
   camera: THREE.Camera,
   size: { width: number; height: number },
   pointer: { x: number; y: number },
-): ProportionHandle | null {
-  let best: ProportionHandle | null = null;
+): T | null {
+  let best: T | null = null;
   let bestDistance = GRAB_RADIUS;
   for (const handle of handles) {
     const ndc = new THREE.Vector3(...handle.at).project(camera);

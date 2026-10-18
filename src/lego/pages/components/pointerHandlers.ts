@@ -10,7 +10,7 @@ import {
 } from "./collisionHandles";
 import { pickGround } from "./drivePlayback";
 import { pieceIdOf } from "./gizmoCommit";
-import { groundPoint } from "./measureLayer";
+import { endsOnScreen, groundPoint, type MeasureEndRef } from "./measureLayer";
 import {
   beginPackDrag,
   endPackDrag,
@@ -18,6 +18,7 @@ import {
   movePackDrag,
 } from "./packHandles";
 import { firstPieceHit, hoverPlaceFace, placeOnClick } from "./placeByFace";
+import { handleUnderPointer } from "./proportionHandles";
 import type { SceneState } from "./sceneState";
 import { setHoveredAndNotify } from "./selectionAndHoverOutlines";
 import { grabStandIn, letGoOfStandIn, moveStandIn } from "./standInDrag";
@@ -38,6 +39,10 @@ import { grabStandIn, letGoOfStandIn, moveStandIn } from "./standInDrag";
  * straight after the split, mirrored the caller's own `dispose` and missed
  * those four. See #2544.
  */
+/** How far, in CSS pixels, the pointer may travel between press and release
+ *  and still be a click. */
+const CLICK_TRAVEL = 4;
+
 export function attachPointerHandlers(state: SceneState): () => void {
   const { renderer, root } = state;
   const raycaster = new THREE.Raycaster();
@@ -117,7 +122,64 @@ export function attachPointerHandlers(state: SceneState): () => void {
     const raw = hit
       ? ([hit.point.x, hit.point.y, hit.point.z] as Vec3)
       : groundPoint(state, raycaster);
-    return raw ? measurePoint(state, raw) : null;
+    return raw
+      ? measurePoint(state, raw, pieceIdOf(hit?.object ?? null))
+      : null;
+  };
+
+  // A measurement's end pressed while measuring. It moves once the pointer
+  // has travelled as far as a click may, and a press that goes nowhere is a
+  // click on that end, which measures from or to it.
+  let grab: (MeasureEndRef & { moved: boolean }) | null = null;
+
+  const grabMeasureEnd = (event: PointerEvent) => {
+    const rect = renderer.domElement.getBoundingClientRect();
+    const end = handleUnderPointer(
+      endsOnScreen(state.measure.lines.lines),
+      state.camera,
+      rect,
+      { x: event.clientX - rect.left, y: event.clientY - rect.top },
+    );
+    if (!end) return;
+    grab = { id: end.id, end: end.end, moved: false };
+    // The orbit has already taken this press, so it is switched off rather
+    // than asked not to start, as the collision plates do.
+    state.controls.enabled = false;
+    renderer.domElement.setPointerCapture(event.pointerId);
+  };
+  const moveMeasureEnd = (event: PointerEvent) => {
+    if (!grab) return;
+    if (
+      !grab.moved &&
+      pressedAt &&
+      Math.hypot(event.clientX - pressedAt.x, event.clientY - pressedAt.y) <=
+        CLICK_TRAVEL
+    )
+      return;
+    grab.moved = true;
+    state.dragging = true;
+    aimAt(event);
+    const at = measureAt(raycaster.intersectObject(root, true)[0]);
+    if (at) state.measure.onMoveEnd?.({ id: grab.id, end: grab.end }, at);
+  };
+  /** Let go of the end. True when it was dragged rather than clicked. */
+  const dropMeasureEnd = (event: PointerEvent): boolean => {
+    const held = grab;
+    grab = null;
+    if (!held) return false;
+    state.controls.enabled = true;
+    state.dragging = false;
+    if (renderer.domElement.hasPointerCapture(event.pointerId))
+      renderer.domElement.releasePointerCapture(event.pointerId);
+    if (held.moved) return true;
+    const clicked = state.measure.measurements.find((m) => m.id === held.id);
+    if (clicked) state.measure.onPick?.(clicked[held.end]);
+    return true;
+  };
+  const onPointerCancel = (event: PointerEvent) => {
+    if (grab) grab.moved = true;
+    dropMeasureEnd(event);
+    pressedAt = null;
   };
 
   // Selection happens on release, not on press, and only when the pointer
@@ -139,15 +201,21 @@ export function attachPointerHandlers(state: SceneState): () => void {
       state.collisionDrag !== null ||
       state.packDrag !== null ||
       state.standInDrag !== null;
+    if (state.measure.active && !pressedOnGizmo && event.button === 0)
+      grabMeasureEnd(event);
   };
   const onPointerUp = (event: PointerEvent) => {
     const from = pressedAt;
     const onGizmo = pressedOnGizmo;
     pressedAt = null;
     pressedOnGizmo = false;
+    if (dropMeasureEnd(event)) return;
     if (!from || onGizmo) return;
     // Anything past a few pixels was an orbit or a drag, not a click.
-    if (Math.hypot(event.clientX - from.x, event.clientY - from.y) > 4) return;
+    if (
+      Math.hypot(event.clientX - from.x, event.clientY - from.y) > CLICK_TRAVEL
+    )
+      return;
 
     const bounds = renderer.domElement.getBoundingClientRect();
     pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
@@ -187,6 +255,7 @@ export function attachPointerHandlers(state: SceneState): () => void {
   };
   renderer.domElement.addEventListener("pointerdown", onPointerDown);
   renderer.domElement.addEventListener("pointerup", onPointerUp);
+  renderer.domElement.addEventListener("pointercancel", onPointerCancel);
 
   // Raycasting on every `pointermove` would run it far more often than the
   // screen can show a result, so a move only records where the pointer is
@@ -238,6 +307,10 @@ export function attachPointerHandlers(state: SceneState): () => void {
     setHoveredAndNotify(state, found);
   };
   const onPointerMove = (event: PointerEvent) => {
+    if (grab) {
+      moveMeasureEnd(event);
+      return;
+    }
     if (state.dragging) return;
     const bounds = renderer.domElement.getBoundingClientRect();
     hoverAt = {
@@ -266,6 +339,7 @@ export function attachPointerHandlers(state: SceneState): () => void {
     renderer.domElement.removeEventListener("pointercancel", onStandInUp);
     renderer.domElement.removeEventListener("pointerdown", onPointerDown);
     renderer.domElement.removeEventListener("pointerup", onPointerUp);
+    renderer.domElement.removeEventListener("pointercancel", onPointerCancel);
     renderer.domElement.removeEventListener("pointermove", onPointerMove);
     renderer.domElement.removeEventListener("pointerleave", onPointerLeave);
   };
