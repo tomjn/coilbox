@@ -47,7 +47,7 @@ export default function UpdatesSettingsSection() {
     <div className="flex flex-col gap-4">
       <div>
         <div className="text-sm text-muted-foreground">
-          <Trans>Current version</Trans>
+          <Trans>Current version</Trans> <Trans>Deliberate break</Trans>
         </div>
         <div className="text-lg font-medium">{version ?? "…"}</div>
       </div>
