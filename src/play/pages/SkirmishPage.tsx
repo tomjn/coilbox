@@ -24,6 +24,7 @@ import {
   identify,
 } from "@/container/container";
 import { rememberCarriedShortname } from "@/container/shortnames";
+import { useCompatSettings } from "@/content/compatSettings";
 import {
   useReplays,
   useUnitsyncGameHeaders,
@@ -87,6 +88,7 @@ import type { ModProject } from "../../workshop/project";
 import { applyTweakMutatorRoute } from "../applyTweakMutatorRoute";
 import type { BattleConfig } from "../bindings";
 import { playExportPreset, playImportPreset } from "../bindings";
+import { type CompatTarget, resolveCompatTarget } from "../compatTarget";
 import {
   aiKey,
   applyRestrictions,
@@ -229,6 +231,7 @@ export default function SkirmishPage() {
     BattleRestrictions | undefined
   >(() => draft.restrictions);
   const [error, setError] = useState<string | null>(null);
+  const [compatSettings] = useCompatSettings();
   // A one-line notice when applying a preset/draft into a game that doesn't
   // offer one of its AIs, so the remap to a valid default isn't silent (#501).
   const [aiNotice, setAiNotice] = useState<string | null>(null);
@@ -570,6 +573,7 @@ export default function SkirmishPage() {
   // where a freshly-computed array must be used instead of stale state.
   async function buildConfig(
     parts: Participant[] = participants,
+    compat: CompatTarget = { kind: "off" },
   ): Promise<BattleConfig | null> {
     if (!selectedGame || !selectedMap) return null;
     // Roll each Random-faction bot to a concrete side here, at the impure launch
@@ -582,7 +586,8 @@ export default function SkirmishPage() {
       toBattleConfig({
         participants: resolved,
         mapName: selectedMap.name,
-        gameType: selectedGame.name,
+        gameType: compat.kind === "use" ? compat.gameType : selectedGame.name,
+        compatBase: compat.kind === "use" ? compat.baseName : undefined,
         startPosType,
         startRects,
         modOptions: modOptionValues,
@@ -669,7 +674,20 @@ export default function SkirmishPage() {
 
   async function onStart(parts: Participant[] = participants) {
     if (!target || dependencyBlock) return;
-    const config = await buildConfig(parts);
+    // Only a game whose switch is on is looked at (issue #4562). A stale or
+    // missing mutator stops the launch rather than launching without it.
+    const compat = selectedGame
+      ? await resolveCompatTarget({
+          target,
+          game: selectedGame,
+          settings: compatSettings,
+        })
+      : ({ kind: "off" } as const);
+    if (compat.kind === "blocked") {
+      setError(compat.message);
+      return;
+    }
+    const config = await buildConfig(parts, compat);
     if (!config) return;
     // Whether this game counts against a preset is settled now, from the setup
     // as it stands at launch. The sheet is locked while a game runs, so nothing
