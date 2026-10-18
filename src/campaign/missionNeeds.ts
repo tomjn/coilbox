@@ -2,8 +2,11 @@ import { missingLaunchContent } from "@/play/launchContent";
 
 /** One thing a mission needs and this machine does not have. */
 export interface MissionNeed {
-  kind: "engine" | "game" | "map";
-  /** The game or map name. An engine has none: a campaign does not name one. */
+  kind: "engine" | "game" | "map" | "atlas";
+  /**
+   * The game or map name, or an atlas pack's folder. An engine has none: a
+   * campaign does not name one.
+   */
   name: string;
 }
 
@@ -69,6 +72,12 @@ export function needNotice(input: {
   noWriteRoot: boolean;
 }): NeedNotice {
   const { need, failure, engineRelease, noWriteRoot } = input;
+  if (need.kind === "atlas") {
+    return {
+      canDownload: false,
+      message: `${need.name} is an atlas pack one of this campaign's units is drawn with. Put it in the parts library's extension packs folder and restart coilbox.`,
+    };
+  }
   if (noWriteRoot) {
     return {
       canDownload: false,

@@ -1,8 +1,9 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useUnitsyncScan } from "../content/config";
 import { dependencyBlockReason } from "../content/gameDependencies";
 import { loadReplays } from "../content/replayList";
 import { useReplayUserState } from "../content/replayUserState";
+import { loadPack } from "../lego/pack";
 import type { BattleConfig } from "../play/bindings";
 import {
   gameOptionSchema,
@@ -20,7 +21,7 @@ import { usePlay } from "../play/PlayProvider";
 import { type Difficulty, usesDifficulty } from "../scenario/model";
 import { launchScenarioForPlayer } from "../scenario/playerLaunch";
 import { useCampaignProgress } from "./campaigns";
-import { missionNeeds } from "./missionNeeds";
+import { type MissionNeed, missionNeeds } from "./missionNeeds";
 import type { Campaign, CampaignMission } from "./model";
 import {
   applyDefeat,
@@ -30,7 +31,11 @@ import {
   runDifficulty,
 } from "./results";
 import { ensureCampaignScenarioMedia } from "./scenarioMedia";
-import { composeCampaignUnits } from "./units";
+import {
+  composeCampaignUnits,
+  loadUnitCopies,
+  missingAtlasPacks,
+} from "./units";
 
 /* -------------------------------------------------------------------------- *
  * The mission run hook — install check, launch, automatic result detection from
@@ -56,10 +61,46 @@ export type MissionRunPhase =
   | "victory"
   | "defeat";
 
-/** What a mission needs installed before it can launch (exact-name match). */
+/**
+ * What a mission needs installed before it can launch (exact-name match). An
+ * atlas is the folder of an atlas pack one of the campaign's units depends on
+ * (issue #4517).
+ */
 export interface MissionRequirement {
-  kind: "game" | "map";
+  kind: "game" | "map" | "atlas";
   name: string;
+}
+
+/**
+ * The atlas packs this campaign's units need and this machine lacks. A copy
+ * made here or imported from a file that carried its atlas needs none. Empty
+ * while it is being read, and when it cannot be read: a launch then reports
+ * the unit that did not load, as it did before.
+ */
+function useMissingAtlasPacks(campaign: Campaign) {
+  const [missing, setMissing] = useState<string[]>([]);
+  const [rechecks, setRechecks] = useState(0);
+  const hasUnits = (campaign.units?.length ?? 0) > 0;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: rechecks only re-runs the read
+  useEffect(() => {
+    if (!hasUnits) {
+      setMissing([]);
+      return;
+    }
+    let cancelled = false;
+    Promise.all([loadUnitCopies(campaign.id), loadPack()])
+      .then(([copies, pack]) => {
+        const installed = new Set(
+          pack.library.atlases.flatMap((a) => (a.folder ? [a.folder] : [])),
+        );
+        if (!cancelled) setMissing(missingAtlasPacks(copies, installed));
+      })
+      .catch(() => !cancelled && setMissing([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [hasUnits, campaign.id, rechecks]);
+  return { missing, recheck: () => setRechecks((n) => n + 1) };
 }
 
 /**
@@ -125,6 +166,7 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
   // list for. Kept after the game closes, the way the Test drawer keeps them.
   const [leftOut, setLeftOut] = useState<string[]>([]);
 
+  const atlasPacks = useMissingAtlasPacks(campaign);
   const snapshot = mission.snapshot;
   const games = scan.data?.games ?? [];
   const maps = scan.data?.maps ?? [];
@@ -143,7 +185,9 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
         ? { kind: "game", name: snapshot.gameName }
         : !maps.some((m) => m.name === snapshot.mapName)
           ? { kind: "map", name: snapshot.mapName }
-          : null;
+          : atlasPacks.missing.length > 0
+            ? { kind: "atlas", name: atlasPacks.missing[0] }
+            : null;
 
   // A game that is installed but lacks an archive it depends on would stop in
   // the engine, so the briefing stops first and names the archive (issue #3489).
@@ -166,15 +210,24 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
   const noEngine = !targetLoading && !target;
   // Everything the briefing's download panel has to get, engine first. `missing`
   // above names only the first thing short, which is all the launch needs.
-  const needs = missionNeeds({
-    unfinished: !!unfinished,
-    noEngine,
-    scanReady,
-    gameName: snapshot.gameName,
-    mapName: snapshot.mapName,
-    games,
-    maps,
-  });
+  const needs: MissionNeed[] = [
+    ...missionNeeds({
+      unfinished: !!unfinished,
+      noEngine,
+      scanReady,
+      gameName: snapshot.gameName,
+      mapName: snapshot.mapName,
+      games,
+      maps,
+    }),
+    // After the content a download can fetch. Nothing is asked of the player
+    // about a pack until the engine, game and map are in place.
+    ...(unfinished || noEngine || !scanReady
+      ? []
+      : atlasPacks.missing.map(
+          (name): MissionNeed => ({ kind: "atlas", name }),
+        )),
+  ];
   const scanLoading = !!target && !scanReady && scan.loading;
   const canStart =
     !!target &&
@@ -458,6 +511,7 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
     refreshTarget,
     /** Force a rescan so a just-installed game/map clears `missing` (install gate). */
     recheck: async () => {
+      atlasPacks.recheck();
       await scan.run(true);
     },
   };

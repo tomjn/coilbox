@@ -323,6 +323,7 @@ function stored(
   unitName: string,
   carriesTextures: boolean,
   textures = baseAtlas,
+  files: string[] = [],
 ) {
   const copy: CampaignUnitCopy = {
     formatVersion: 1,
@@ -337,6 +338,7 @@ function stored(
     unitName,
     json: JSON.stringify(copy),
     dir: `/app/campaign/units/c1/${unitName}`,
+    files,
   };
 }
 
@@ -395,6 +397,7 @@ function building(
     unitName,
     json: JSON.stringify(copy),
     dir: `/app/campaign/units/c1/${unitName}`,
+    files: [] as string[],
   };
 }
 
@@ -520,7 +523,10 @@ describe("composing a mission's mutator", () => {
 
   it("writes the stored copies against the base game the gate resolved", async () => {
     vi.mocked(campaignUnitList).mockResolvedValue({
-      units: [stored("tank", false), stored("jeep", true, packAtlas)],
+      units: [
+        stored("tank", false),
+        stored("jeep", true, packAtlas, ["camo.png"]),
+      ],
     });
 
     const result = await composeCampaignUnits(
