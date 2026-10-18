@@ -8,6 +8,7 @@
  * the same as the builder reads them for the loadout on screen.
  */
 
+import { budgetStanding } from "./budget";
 import { loadoutUnit, loadoutUnitNames } from "./loadouts";
 import type { LegoProject } from "./model";
 import { mountContents } from "./mountPoints";
@@ -24,7 +25,7 @@ export interface FamilyColumn {
 export interface FamilyRow {
   /** `piece:connector` for a mount, the stat's id for a stat. */
   id: string;
-  kind: "mount" | "stat";
+  kind: "mount" | "stat" | "budget";
   label: string;
   /** One per column: what sits on the mount, or the figure. Null is empty. */
   cells: (string | null)[];
@@ -34,6 +35,8 @@ export interface FamilyRow {
    *  figure. */
   highest?: number[];
   lowest?: number[];
+  /** Budget row: the columns over the chassis budget. */
+  over?: number[];
 }
 
 export interface Family {
@@ -47,6 +50,22 @@ function figure(value: number): string {
 
 function allSame(cells: (string | null)[]): boolean {
   return cells.every((cell) => cell === cells[0]);
+}
+
+/** What is left of the chassis budget in each column, and which are over. */
+function budgetRow(budget: number, costs: (number | null)[]): FamilyRow {
+  const standings = costs.map((cost) => budgetStanding(budget, cost));
+  const cells = standings.map((s) =>
+    s ? `${figure(Math.abs(s.left))} ${s.over ? "over" : "left"}` : null,
+  );
+  return {
+    id: "budget",
+    kind: "budget",
+    label: `Budget (${figure(budget)})`,
+    cells,
+    differs: !allSame(cells),
+    over: standings.flatMap((s, i) => (s?.over ? [i] : [])),
+  };
 }
 
 /**
@@ -122,6 +141,9 @@ export function loadoutFamily(
         }
       }
       rows.push(row);
+      if (id === "cost" && project.budget !== undefined) {
+        rows.push(budgetRow(project.budget, values));
+      }
     }
   }
 

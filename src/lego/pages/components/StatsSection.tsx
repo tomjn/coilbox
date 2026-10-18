@@ -8,8 +8,10 @@
  * by hand in the game's file, which shows the file's value. See `unitStats.ts`.
  */
 
+import { Input } from "@picoframe/frame";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
+import { Label } from "@/components/ui/label";
 import { normaliseCloneKey } from "@/workshop/clones";
 import { useUnitDefs } from "@/workshop/config";
 import { DPS_HELP, type WeaponInput } from "@/workshop/derivedStats";
@@ -17,6 +19,7 @@ import { exportedInto } from "@/workshop/legoUnits";
 import { useModProjects } from "@/workshop/project";
 import { unitEditPath } from "@/workshop/routes";
 import { unitEffectiveWeapons } from "@/workshop/unitWeapons";
+import { budgetStanding } from "../../budget";
 import { receiptFor } from "../../exportRecord";
 import type { LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
@@ -48,6 +51,9 @@ interface Props {
   bounds: UnitBounds;
   /** The game unit to compare with, or null when none is chosen. */
   reference: ReferenceUnit | null;
+  /** Sets or clears the chassis budget. Without it the budget is not offered
+   *  and only a budget already set is shown. */
+  onBudgetChange?: (budget: number | undefined) => void;
 }
 
 /**
@@ -64,7 +70,13 @@ function figure(value: number): string {
   return Number(value.toFixed(1)).toLocaleString();
 }
 
-export function StatsSection({ project, pack, bounds, reference }: Props) {
+export function StatsSection({
+  project,
+  pack,
+  bounds,
+  reference,
+  onBudgetChange,
+}: Props) {
   const { target, scan } = useTestGame();
   const { projects: tweakProjects } = useModProjects();
   const source = useWeaponSource(project);
@@ -125,6 +137,7 @@ export function StatsSection({ project, pack, bounds, reference }: Props) {
           return picked && "def" in picked ? [{ def: picked.def }] : [];
         });
   const ownStats = unitStats(def, weapons);
+  const standing = budgetStanding(project.budget, ownStats.cost);
   const fields =
     file && gameDefs && key ? statFields(file, gameDefs.weaponDefs, key) : null;
 
@@ -218,6 +231,42 @@ export function StatsSection({ project, pack, bounds, reference }: Props) {
           />
         ))}
       </dl>
+      {onBudgetChange || project.budget !== undefined ? (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs tabular-nums">
+          <Label htmlFor="lego-budget" className="text-muted-foreground">
+            Budget
+          </Label>
+          <Input
+            id="lego-budget"
+            type="number"
+            min={1}
+            className="h-6 w-20 text-xs"
+            disabled={!onBudgetChange}
+            defaultValue={project.budget ?? ""}
+            key={project.budget ?? "none"}
+            onBlur={(event) => {
+              const value = Number(event.currentTarget.value);
+              const next =
+                event.currentTarget.value.trim() !== "" &&
+                Number.isFinite(value) &&
+                value > 0
+                  ? value
+                  : undefined;
+              if (next !== project.budget) onBudgetChange?.(next);
+            }}
+          />
+          {standing ? (
+            <output
+              aria-label="Budget left"
+              className={standing.over ? "text-destructive" : undefined}
+            >
+              {standing.over
+                ? `${figure(-standing.left)} over`
+                : `${figure(standing.left)} left`}
+            </output>
+          ) : null}
+        </div>
+      ) : null}
       {missingReference ? (
         <p className="text-xs text-muted-foreground">{missingReference}</p>
       ) : null}
