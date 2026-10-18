@@ -4,12 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import {
   type CompatBuilt,
-  type CompatStale,
   type CompatStatus,
   compatBuild,
   compatRemove,
   compatStatus,
 } from "../../../compat/bindings";
+import { staleReason } from "../../../compat/staleReason";
 import {
   useCompatSettings,
   withCompatEntry,
@@ -18,20 +18,6 @@ import {
 
 const msg = (e: unknown): string =>
   e instanceof Error ? e.message : String(e);
-
-/** One line for why a built mutator is out of date. */
-export function staleReason(why: CompatStale): string {
-  switch (why.kind) {
-    case "manifest":
-      return `built from compatibility version ${why.built}, now ${why.now}`;
-    case "writer":
-      return `written by an older coilbox (writer ${why.built}, now ${why.now})`;
-    case "baseChecksum":
-      return "the game has changed since it was built";
-    case "noMarker":
-      return "its record of what it was built from is missing";
-  }
-}
 
 const plural = (n: number, one: string, many: string) =>
   `${n} ${n === 1 ? one : many}`;
