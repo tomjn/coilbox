@@ -13,6 +13,7 @@ import { followCamera, setDrive } from "./drivePlayback";
 import { bakedVertices, placeEffects } from "./effectsPlayback";
 import { attachGizmo } from "./gizmoCommit";
 import { refreshSelection } from "./overlayFollow";
+import { disposePlanted, placePlanted } from "./plantedLayer";
 import { type SceneState, syncScene } from "./sceneState";
 import { poseSkeleton } from "./skeletonLayer";
 import { placeStandIn, type StandInPlacement } from "./standInPlayback";
@@ -133,12 +134,18 @@ export function useScriptFrameStepping(
             frameAt(timeline, elapsed),
             bakedVertices(projectRef.current, packRef.current, rawRef.current),
           );
+          placePlanted(
+            state,
+            standInRef.current.planted,
+            frameAt(timeline, elapsed),
+          );
           onScriptFrameRef.current?.(frameAt(timeline, elapsed));
         } else {
           // No run on screen yet, or the last one failed. The unit holds its
           // built pose, and there is no track for a stand-in to be about.
           state.standIn.visible = false;
           state.effects.object.visible = false;
+          placePlanted(state, null, 0);
         }
         state.render();
       }
@@ -155,6 +162,7 @@ export function useScriptFrameStepping(
       // nothing standing beside it.
       current.standIn.visible = false;
       current.effects.object.visible = false;
+      disposePlanted(current);
       disposeBaked(current);
       syncScene(current, packRef.current, rawRef.current, projectRef.current);
       refreshSelection(current);
@@ -203,6 +211,7 @@ export function useScriptFrameStepping(
       frame,
       bakedVertices(projectRef.current, packRef.current, rawRef.current),
     );
+    placePlanted(state, standIn.planted, frame);
     state.render();
   }, [
     sceneRef,

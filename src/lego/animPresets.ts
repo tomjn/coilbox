@@ -515,15 +515,22 @@ function cycleThread(
 function cycleThreads(
   preset: AnimPreset,
   ctx: EmitContext,
-  options: { name: string; start: LuaHook; stop?: LuaHook },
+  options: {
+    name: string;
+    start: LuaHook;
+    stop?: LuaHook;
+    /** The params one instance is written with, when not its own. */
+    params?: (instance: EmitInstance) => Record<string, number>;
+  },
 ): EmitResult | null {
   const functions: string[] = [];
   const started: string[] = [];
   const stopped: string[] = [];
   for (const instance of ctx.instances()) {
     const name = instance.name(options.name);
-    const period = Math.max(value(preset, instance.params, "period"), 0.05);
-    const thread = cycleThread(preset, instance.params, instance, {
+    const params = options.params?.(instance) ?? instance.params;
+    const period = Math.max(value(preset, params, "period"), 0.05);
+    const thread = cycleThread(preset, params, instance, {
       name,
       period,
     });
@@ -546,13 +553,13 @@ function cycleThreads(
 const LEG_SEGMENTS = ["thigh", "shin", "foot"] as const;
 type LegSegment = (typeof LEG_SEGMENTS)[number];
 
-interface LegRole {
+export interface LegRole {
   side: "l" | "r";
   pair: 1 | 2;
   segment: LegSegment;
 }
 
-function parseLegRole(role: string): LegRole | null {
+export function parseLegRole(role: string): LegRole | null {
   const match = /^leg\.([lr])([12])\.(thigh|shin|foot)$/.exec(role);
   if (!match) return null;
   return {
@@ -569,7 +576,7 @@ function parseLegRole(role: string): LegRole | null {
  * together, front left with rear right, which is what a trot is and what stops
  * the model rocking.
  */
-function legPhase(leg: LegRole, gait: "biped" | "quad"): number {
+export function legPhase(leg: LegRole, gait: "biped" | "quad"): number {
   if (gait === "biped") return leg.side === "l" ? 0 : Math.PI;
   const diagonal = (leg.side === "l") === (leg.pair === 1);
   return diagonal ? 0 : Math.PI;
@@ -583,6 +590,93 @@ function legPhase(leg: LegRole, gait: "biped" | "quad"): number {
  * where the walk it replaces swings the thigh along a sine all the way round.
  */
 export const WALK_FITTED = "fitted";
+
+/**
+ * The other params `walkFit.ts` lays over a fitted walk, none of them sliders
+ * and none saved (#3350). The thigh's and the shin's lengths, in elmos, from
+ * the leg's joints. The unit's speed in elmos a second. How far the body is
+ * lowered while walking, in elmos, so a foot can reach the ground at both
+ * ends of its time on it. A fitted walk with no leg lengths keeps the knee
+ * straight on the ground as #3349 did.
+ */
+export const WALK_THIGH = "thighLength";
+export const WALK_SHIN = "shinLength";
+export const WALK_SPEED = "speed";
+export const WALK_DROP = "drop";
+
+/** How far a fitted foot moves back while it is down: the unit's speed over
+ *  its time on the ground, so it stays put on the ground. */
+export function walkSweep(params: Record<string, number>): number {
+  const period = Math.max(value(WALK_BIPED, params, "period"), 0.05);
+  return (
+    value(WALK_BIPED, params, WALK_SPEED) *
+    period *
+    (value(WALK_BIPED, params, "duty") / 100)
+  );
+}
+
+/**
+ * The thigh's and the shin's angles that put the ankle at `z` ahead of the hip
+ * and `y` above it, for a leg of those two lengths hanging straight down at
+ * rest. A Turn about x by `a` puts a point `l` below the joint `l * sin(a)`
+ * behind it and `l * cos(a)` below, so the ankle's direction from the hip is
+ * the angle `atan2(-z, -y)`, and the thigh sits back from that by the angle
+ * the bent knee puts between the thigh and the line from hip to ankle. The
+ * knee bends forward. A target past the leg's reach gets the straight leg
+ * pointed at it, and one nearer the hip than the leg folds gets the folded
+ * leg, so the angles are always finite.
+ */
+export function legAngles(
+  thighLength: number,
+  shinLength: number,
+  z: number,
+  y: number,
+): { thigh: number; shin: number } {
+  const a = thighLength;
+  const b = shinLength;
+  const reach = Math.min(Math.max(Math.hypot(z, y), Math.abs(a - b)), a + b);
+  const cosKnee = (reach * reach - a * a - b * b) / (2 * a * b);
+  const knee = Math.acos(Math.min(1, Math.max(-1, cosKnee)));
+  const bend = Math.atan2(b * Math.sin(knee), a + b * Math.cos(knee));
+  return { thigh: Math.atan2(-z, -y) - bend, shin: knee };
+}
+
+/**
+ * Where a fitted leg's ankle is meant to be, as `z` ahead of the hip and `y`
+ * above it, `share` of the way round its stride (`strideShare`).
+ *
+ * On the ground the target stays put in the world while the body moves over
+ * it at the unit's speed, so under the body it moves back in a straight line
+ * at that speed, from half the sweep ahead of the hip to half behind. The
+ * ground is the leg's length below the hip at rest, less the body's drop.
+ *
+ * In the air it comes forward again on an arc, easing out and in so it
+ * leaves and lands at rest, and rising at the middle by what the knee bend
+ * lifts the foot when the thigh hangs straight, `shin * (1 - cos(knee))`.
+ */
+function ankleTarget(
+  params: Record<string, number>,
+  share: number,
+  knee: number,
+): { z: number; y: number } {
+  const half = walkSweep(params) / 2;
+  const ground =
+    -((params[WALK_THIGH] ?? 0) + (params[WALK_SHIN] ?? 0)) +
+    (params[WALK_DROP] ?? 0);
+  if (share < 0.5) return { z: half * (1 - 4 * share), y: ground };
+  const air = 2 * share - 1;
+  return {
+    z: -half * Math.cos(Math.PI * air),
+    y:
+      ground +
+      (params[WALK_SHIN] ?? 0) * (1 - Math.cos(knee)) * Math.sin(Math.PI * air),
+  };
+}
+
+/** Whether a fitted walk has the leg lengths to solve its legs with. */
+function solvesLegs(params: Record<string, number>): boolean {
+  return (params[WALK_THIGH] ?? 0) > 0 && (params[WALK_SHIN] ?? 0) > 0;
+}
 
 /**
  * How far round its stride a leg is, from 0 to 1. The first half is the foot
@@ -615,7 +709,20 @@ function walkPoses(
   if (value(preset, params, WALK_FITTED) !== 1) return [];
   const down = Math.round((value(preset, params, "duty") / 100) * frames);
   const half = Math.round(frames / 2);
-  return [0, down, half, half + down].map((frame) => frame % frames);
+  if (!solvesLegs(params)) {
+    return [0, down, half, half + down].map((frame) => frame % frames);
+  }
+  // A solved leg has a pose on every frame its foot is down (#3350). The
+  // engine moves a piece once a frame, so a Turn written a frame ahead lands
+  // on the solved angles on every frame, which is as still as the engine can
+  // hold the foot. Between poses two frames apart the angles go in a straight
+  // line and the foot does not. Measured for #3350 on legs of 12, 18.8 and 30
+  // elmos at 40 and 45 elmos a second, it strays up to 0.17 elmos along the
+  // ground and 0.32 up and down.
+  return Array.from({ length: down + 1 }, (_, frame) => [
+    frame,
+    (frame + half) % frames,
+  ]).flat();
 }
 
 function walkTrack(
@@ -658,6 +765,16 @@ function walkTrack(
       const warped = share * TAU - Math.PI / 2;
       thigh = swing * Math.sin(warped);
       shin = knee * (1 - Math.cos(warped)) * 0.5;
+    } else if (solvesLegs(params)) {
+      // Each leg solved for where its ankle is meant to be (#3350), so a foot
+      // on the ground stays put with the knee bent.
+      const { z, y } = ankleTarget(params, share, knee);
+      ({ thigh, shin } = legAngles(
+        params[WALK_THIGH],
+        params[WALK_SHIN],
+        z,
+        y,
+      ));
     } else if (share < 0.5) {
       // On the ground. The ankle moves back in a straight line at one speed,
       // from as far forward as the swing reaches to as far back, which is what
@@ -795,21 +912,55 @@ export const WALK_QUAD: AnimPreset = {
  * fitted to, so whoever edits the script knows the timing is not arbitrary.
  */
 function walkEmit(preset: AnimPreset, ctx: EmitContext): EmitResult | null {
+  const fitted = value(preset, ctx.params, WALK_FITTED) === 1;
+  // One body, so one drop. Every set of legs is solved to the ground the
+  // shared walk lowers the body to, even one with a swing of its own.
+  const drop =
+    fitted && solvesLegs(ctx.params) ? value(preset, ctx.params, WALK_DROP) : 0;
   const result = cycleThreads(preset, ctx, {
     name: "walk",
     start: "StartMoving",
     stop: "StopMoving",
+    ...(drop > 0
+      ? {
+          params: (instance: EmitInstance) =>
+            solvesLegs(instance.params)
+              ? { ...instance.params, [WALK_DROP]: drop }
+              : instance.params,
+        }
+      : {}),
   });
-  if (!result || value(preset, ctx.params, WALK_FITTED) !== 1) return result;
+  if (!result || !fitted) return result;
   const period = Math.max(value(preset, ctx.params, "period"), 0.05);
   const frames = Math.round(period * ENGINE_FPS);
   const down = Math.round((value(preset, ctx.params, "duty") / 100) * frames);
+  // The body goes down by the drop over one foot's time on the ground, and
+  // back up as fast when the unit stops. A unit with no body piece cannot be
+  // lowered, so its feet sit the drop above the ground.
+  const [body] = drop > 0 ? ctx.pieces("base") : [];
+  const lower = body
+    ? {
+        StartMoving: [
+          ...(result.hooks.StartMoving ?? []),
+          `  Move(${body}, y_axis, ${lua(-drop)}, ${lua((drop * ENGINE_FPS) / down)})`,
+        ],
+        StopMoving: [
+          ...(result.hooks.StopMoving ?? []),
+          `  Move(${body}, y_axis, 0, ${lua((drop * ENGINE_FPS) / down)})`,
+        ],
+      }
+    : {};
   return {
-    ...result,
     functions: [
       `-- Fitted to the unit's legs and speed: a stride every ${frames} frames, each foot down for ${down} of them.`,
+      ...(body
+        ? [
+            `-- Each foot stays put while it is down, with the body ${lua(drop)} elmos lower so it reaches the ground.`,
+          ]
+        : []),
       ...result.functions,
     ],
+    hooks: { ...result.hooks, ...lower },
   };
 }
 

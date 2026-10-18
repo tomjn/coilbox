@@ -233,6 +233,9 @@ export interface SceneState {
   /** The balance check's dot and outline on the ground, in `overlay`.
    *  Rebuilt whenever the result changes. */
   balance: THREE.Group | null;
+  /** A dot under each foot a fitted walk holds on the ground, in `overlay`,
+   *  while a walk plays (`plantedLayer.ts`). */
+  planted: THREE.Points | null;
   /** The footprint check's rectangles on the ground, in `overlay`.
    *  Rebuilt whenever the result changes. */
   footprint: THREE.Group | null;
