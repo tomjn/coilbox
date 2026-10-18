@@ -10,6 +10,7 @@ import {
 } from "@/content/config";
 import { UnitPicker } from "@/content/pages/components/UnitPicker";
 import { unknownSelected } from "@/content/techForest";
+import { withBuiltUnits } from "@/lego/buildList";
 import { usePreferredTarget } from "@/play/config";
 import { allowedFromBans, bansFromAllowed } from "../../unitBans";
 
@@ -42,6 +43,7 @@ export function UnitRestrictions({
   gameName,
   disabledUnits,
   onChange,
+  builtUnits,
 }: {
   /** Passed through to the picker's scrolling list, for a caller giving it a
    *  pane of its own to fill. */
@@ -49,6 +51,15 @@ export function UnitRestrictions({
   gameName: string;
   disabledUnits: string[];
   onChange: (next: string[]) => void;
+  /**
+   * Units from the unit builder a campaign launches with (issue #4516). They
+   * are listed with the game's own, under the builders that build them.
+   */
+  builtUnits?: readonly {
+    unitName: string;
+    name: string;
+    builtBy: readonly string[];
+  }[];
 }) {
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
@@ -63,7 +74,21 @@ export function UnitRestrictions({
     target?.dataDir,
     game?.primaryArchive.name,
   );
-  const units = dataset.dataset?.units ?? [];
+  const gameUnits = dataset.dataset?.units;
+  const units = useMemo(
+    () =>
+      builtUnits && builtUnits.length > 0
+        ? withBuiltUnits(
+            gameUnits ?? [],
+            builtUnits.map((u) => ({
+              unitName: u.unitName,
+              builtBy: u.builtBy,
+              fullName: u.name,
+            })),
+          )
+        : (gameUnits ?? []),
+    [gameUnits, builtUnits],
+  );
   // Faction blocks. Fall back to nothing when sides are unknown, and the picker
   // shows one unheaded list instead.
   const factions = useMemo(
@@ -97,7 +122,7 @@ export function UnitRestrictions({
   const resolving = scan.loading || gameInfo.loading || dataset.loading;
   // No unit graph to offer: work out why, so the fallback can say so and offer
   // the retry that actually addresses it.
-  const unavailable = !resolving && (!game || units.length === 0);
+  const unavailable = !resolving && (!game || (gameUnits ?? []).length === 0);
   const infoError = gameInfo.info?.errors?.[0];
 
   if (unavailable) {

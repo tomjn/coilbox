@@ -280,3 +280,52 @@ describe("parseCampaignJson - snapshot validation", () => {
     expect(c!.missions[0].snapshot).toEqual(snapshot);
   });
 });
+
+// Issue #4516.
+describe("parseCampaignJson - attached units", () => {
+  function withUnits(units: unknown): string {
+    return JSON.stringify({ ...JSON.parse(campaignJson()), units });
+  }
+
+  it("keeps each attached unit's entry", () => {
+    const c = parseCampaignJson(
+      withUnits([
+        {
+          unitName: "tank",
+          projectId: "p1",
+          name: "Tank",
+          builtBy: ["armlab", 3],
+          copiedAt: "2026-10-18T00:00:00Z",
+        },
+      ]),
+    );
+    expect(c!.units).toEqual([
+      {
+        unitName: "tank",
+        projectId: "p1",
+        name: "Tank",
+        builtBy: ["armlab"],
+        copiedAt: "2026-10-18T00:00:00Z",
+      },
+    ]);
+  });
+
+  it("is absent on a campaign with none", () => {
+    expect(parseCampaignJson(campaignJson())!.units).toBeUndefined();
+    expect(parseCampaignJson(withUnits([]))!.units).toBeUndefined();
+  });
+
+  it("drops an entry no game could load, and a second with a name already seen", () => {
+    const c = parseCampaignJson(
+      withUnits([
+        { unitName: "Tank", projectId: "p1" },
+        { unitName: "tank", projectId: "" },
+        { unitName: "tank", projectId: "p2" },
+        { unitName: "tank", projectId: "p3" },
+        "tank",
+      ]),
+    );
+    expect(c!.units?.map((u) => u.projectId)).toEqual(["p2"]);
+    expect(c!.units?.[0].name).toBe("tank");
+  });
+});

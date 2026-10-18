@@ -46,6 +46,7 @@ import { campaignMediaFiles, deleteUnnamedMedia } from "../media";
 import { missionFromScenario, scenarioAttachment } from "../missionScenario";
 import type { Campaign, CampaignMission } from "../model";
 import { CampaignImage, CampaignImageField } from "./components/CampaignImage";
+import { CampaignUnits } from "./components/CampaignUnits";
 import { DECORATIVE_DEFAULTS, PlaybackTuning } from "./components/MediaPlayer";
 import { MissionEditorDrawer } from "./components/MissionEditorDrawer";
 import { MissionFacts, MissionSetup } from "./components/MissionFacts";
@@ -160,6 +161,10 @@ export default function CampaignEditPage() {
 
   const loaded = campaigns.find((c) => c.campaign.id === id);
   const [campaign, setCampaign] = useState<Campaign | null>(null);
+  // The document as last rendered, for a change that lands after an await,
+  // such as a unit copy that takes a moment to build (issue #4516).
+  const latest = useRef<Campaign | null>(null);
+  latest.current = campaign;
   const [loadedId, setLoadedId] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [save, setSave] = useState<SaveState>({ kind: "idle" });
@@ -465,6 +470,11 @@ export default function CampaignEditPage() {
     navigate(missionId ? `${to}/${encodeURIComponent(missionId)}` : to);
   };
 
+  /** Apply a change to the document as it is now, then persist it. */
+  const changeLatest = async (change: (c: Campaign) => Campaign) => {
+    if (latest.current) await persist(change(latest.current));
+  };
+
   const removeMission = (m: CampaignMission) =>
     persistMedia({
       ...campaign,
@@ -494,6 +504,7 @@ export default function CampaignEditPage() {
           campaignId={campaign.id}
           mission={m}
           scenarios={scenarios}
+          builtUnits={campaign.units}
           onSave={applyMission}
         />
       ),
@@ -703,6 +714,8 @@ export default function CampaignEditPage() {
           )}
         </CollapsibleContent>
       </Collapsible>
+
+      <CampaignUnits campaign={campaign} onChange={changeLatest} />
 
       <section className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">

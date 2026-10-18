@@ -12,18 +12,25 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { campaignImageImportData, campaignMediaImportData } = vi.hoisted(() => ({
-  campaignImageImportData: vi.fn(async (_args: { campaignId: string }) => ({
-    file: "new-image.jpg",
-  })),
-  campaignMediaImportData: vi.fn(async (_args: { campaignId: string }) => ({
-    file: "new-clip.ogg",
-  })),
-}));
+const { campaignImageImportData, campaignMediaImportData, campaignUnitsCopy } =
+  vi.hoisted(() => ({
+    campaignUnitsCopy: vi.fn(
+      async (_args: { fromId: string; toId: string }) => ({
+        copied: 1,
+      }),
+    ),
+    campaignImageImportData: vi.fn(async (_args: { campaignId: string }) => ({
+      file: "new-image.jpg",
+    })),
+    campaignMediaImportData: vi.fn(async (_args: { campaignId: string }) => ({
+      file: "new-clip.ogg",
+    })),
+  }));
 vi.mock("./bindings", async () => ({
   ...(await vi.importActual<Record<string, unknown>>("./bindings")),
   campaignImageImportData,
   campaignMediaImportData,
+  campaignUnitsCopy,
 }));
 
 // Reading a stored image back off disk is the plugin's job, and the round trip
@@ -104,6 +111,32 @@ describe("the title a copy gets", () => {
 });
 
 describe("a copy of a campaign", () => {
+  // Issue #4516. The copies of builder units live under the campaign's id too.
+  it("copies its builder units into its own folder", async () => {
+    const unit = {
+      unitName: "tank",
+      projectId: "p-tank",
+      name: "Tank",
+      builtBy: [],
+      copiedAt: "",
+    };
+    const { campaign } = await duplicateCampaign(
+      campaignNamed({ units: [unit] }),
+      "Copy of Beachhead",
+    );
+
+    expect(campaignUnitsCopy).toHaveBeenCalledWith({
+      fromId: "source-id",
+      toId: campaign.id,
+    });
+    expect(campaign.units).toEqual([unit]);
+  });
+
+  it("copies no units for a campaign with none", async () => {
+    await duplicateCampaign(campaignNamed(), "Copy of Beachhead");
+    expect(campaignUnitsCopy).not.toHaveBeenCalled();
+  });
+
   it("takes a new id and the title it was given, and keeps the rest", async () => {
     const source = campaignNamed();
 

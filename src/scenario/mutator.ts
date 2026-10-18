@@ -100,11 +100,19 @@ export async function writeTestMutator(
    * is nothing to compile and the bytes travel as they are.
    */
   shipped?: string,
+  /**
+   * A generated game to depend on instead of the scenario's own, for a
+   * campaign's units (issue #4516). It depends on the scenario's game itself.
+   */
+  dependOn?: string,
 ): Promise<TestMutator> {
   const result = await scenarioTestMutator({
     dataDir,
     scenarioId: scenario.id,
-    modinfo: buildMutatorModInfo(scenario.setup.gameName, scenario.name),
+    modinfo: buildMutatorModInfo(
+      dependOn ?? scenario.setup.gameName,
+      scenario.name,
+    ),
     mission: shipped ?? compileScenario(scenario),
   });
   return {
