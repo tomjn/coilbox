@@ -300,6 +300,8 @@ export interface SceneState {
   anchors: THREE.Group | null;
   /** Outlines of the faces the selected piece is joined by, drawn in piece groups. */
   joinMarks: THREE.Object3D[];
+  /** A mark on each mount point of the unit (#3279). */
+  mountMarks: THREE.Object3D[];
   /** Every other piece's anchors, shown only while something is being dragged. */
   targetAnchors: THREE.Points | null;
   /** A dot on the pair that seated, and a box round the piece it seated to. */

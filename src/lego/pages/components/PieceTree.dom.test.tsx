@@ -161,6 +161,29 @@ describe("the shape of the list", () => {
     expect(within(hull).queryByText("flare")).toBeNull();
   });
 
+  it("says what sits on each mount point of a piece", () => {
+    const project = walker();
+    show({
+      ...project,
+      pieces: project.pieces.map((p) =>
+        p.id === "hull"
+          ? {
+              ...p,
+              mountPoints: [
+                { connector: "+y", name: "Top", accepts: ["Turret"] },
+                { connector: "+z", name: "Front", accepts: ["Turret"] },
+              ],
+            }
+          : p.id === "turret"
+            ? { ...p, connection: { connector: "-y", to: "+y" } }
+            : p,
+      ),
+    });
+    const mounts = within(row("hull")).getByTitle("Mount points");
+    expect(mounts.textContent).toBe("Top: turret, Front: empty");
+    expect(within(row("skirt")).queryByTitle("Mount points")).toBeNull();
+  });
+
   /**
    * The whole tree stays on screen while something in it is selected. The
    * builder once showed a single clipped row at this moment, so a selection

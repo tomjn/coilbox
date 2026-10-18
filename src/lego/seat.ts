@@ -8,7 +8,9 @@
  */
 
 import { editJoined, freePiece, same, twistOf } from "./connectors";
+import { claimForLoadout } from "./loadouts";
 import { type LegoPiece, type LegoProject, pieceById } from "./model";
+import { isMount, seatRefusal } from "./mountPoints";
 import type { LoadedPack } from "./pack";
 import { reparentPiece, worldMatrix } from "./reparent";
 import type { Vec3 } from "./snapping";
@@ -40,6 +42,10 @@ export interface DraggedTransform {
  * correctly. A piece that did not move at all, as with a click on the handles
  * that goes nowhere, is left joined.
  *
+ * A seat on a mount point (#3279) is used only when the piece is a module
+ * whose category the mount lists, found in `modules`, and the piece then joins
+ * the active loadout. Any other piece is dropped free.
+ *
  * Done as one change, so the move, the new parent and the join undo together.
  */
 export function dragPiece(
@@ -49,9 +55,15 @@ export function dragPiece(
   transform: DraggedTransform,
   seat: Seat | null,
   slide: [number, number] | null = null,
+  modules: readonly LegoProject[] = [],
 ): LegoProject {
   const before = pieceById(project, pieceId);
   if (!before) return project;
+  // A mount point takes only a module of a category it lists. Otherwise the
+  // piece lands where it was dropped, free, as a refused placement is (#3279).
+  if (seat && seatRefusal(project, pieceId, seat, modules)) {
+    return dragPiece(project, pack, pieceId, transform, null, null, modules);
+  }
 
   const moved =
     !same(before.position, transform.position) ||
@@ -76,7 +88,7 @@ export function dragPiece(
     const parent = pieceById(next, seat.parentId);
     if (!piece || !parent) return freeAt(next, pieceId);
     const twist = twistOf(next, pack, piece, droppedWorld, parent, seat);
-    return {
+    const joined: LegoProject = {
       ...next,
       pieces: next.pieces.map((p) =>
         p.id === pieceId
@@ -91,6 +103,9 @@ export function dragPiece(
           : p,
       ),
     };
+    return isMount(joined, seat.parentId, seat.to)
+      ? claimForLoadout(joined, [pieceId])
+      : joined;
   }
 
   // A slide along the face keeps the join and moves it, so the piece is not

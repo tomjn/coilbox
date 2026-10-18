@@ -55,6 +55,7 @@ import {
 } from "./model";
 import { placeModule } from "./moduleMount";
 import { pieceFingerprint } from "./moduleUpdates";
+import { mountPointAt, mountRefusal } from "./mountPoints";
 import type { LoadedPack } from "./pack";
 import { ringMembers } from "./ringSet";
 import { carriedId } from "./swapPart";
@@ -137,6 +138,21 @@ function combined(
     removedPresets: [...new Set(all.flatMap((r) => r.removedPresets))],
     broken: resolved.broken.filter((id) => !before.has(id)),
   };
+}
+
+/**
+ * Why `module` cannot take the place of the instance `pieceId` is in, or null.
+ * The only reason is a mount point (#3279) the old module sits on that does not
+ * take the new module's category.
+ */
+export function swapRefusal(
+  project: LegoProject,
+  pieceId: string,
+  module: LegoProject,
+): string | null {
+  const top = instanceTop(project, pieceId);
+  if (!top?.parentId || !top.connection) return null;
+  return mountRefusal(project, top.parentId, top.connection.to, module);
 }
 
 /**
@@ -260,6 +276,10 @@ function swapOne(
   const oldIds = new Set(old.map((p) => p.id));
   const parentId = top.parentId;
   if (!parentId || !pieceById(project, parentId)) return null;
+  if (swapRefusal(project, pieceId, module)) return null;
+  const onMount =
+    top.connection !== undefined &&
+    mountPointAt(pieceById(project, parentId), top.connection.to) !== undefined;
 
   // What is kept: pieces hanging off the instance that are not part of it.
   const kept = project.pieces.filter(
@@ -342,14 +362,16 @@ function swapOne(
     };
   });
 
-  // A copy that was a loadout's own is replaced by one in the same loadout.
+  // A copy that was a loadout's own is replaced by one in the same loadout, and
+  // a module on a mount point is the loadout's own.
   const merged = {
     ...inserted.project,
-    pieces: top.inLoadout
-      ? pieces.map((p) =>
-          roots.has(p.id) ? { ...p, inLoadout: true as const } : p,
-        )
-      : pieces,
+    pieces:
+      top.inLoadout || (onMount && project.loadouts)
+        ? pieces.map((p) =>
+            roots.has(p.id) ? { ...p, inLoadout: true as const } : p,
+          )
+        : pieces,
   };
   const removedPresets = (merged.animations ?? [])
     .map((applied) => applied.presetId)

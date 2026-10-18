@@ -3,6 +3,7 @@ import type { LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import { showAnchors } from "./anchorsAndSnapping";
 import { showJoinFaces } from "./joinFaceMarks";
+import { showMountMarks } from "./mountMarks";
 import type { SceneState } from "./sceneState";
 
 /**
@@ -33,6 +34,7 @@ export function useModelAnchors(
       playing ? null : soleSelectedId,
       showFreeFaces,
     );
+    showMountMarks(state, pack, project, playing);
     state.render();
   }, [sceneRef, pack, project, soleSelectedId, playing, showFreeFaces]);
 }
