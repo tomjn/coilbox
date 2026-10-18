@@ -2021,6 +2021,9 @@ function Builder({ id }: { id: string | undefined }) {
                             project={draft}
                             selectedId={selectedId}
                             onEdit={edit}
+                            pack={pack}
+                            raw={raw}
+                            capture={doc.capture}
                           />
                         </div>
                       </div>
