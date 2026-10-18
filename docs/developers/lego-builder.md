@@ -911,6 +911,14 @@ Straight out of export, nothing lists the unit in any unit's `buildoptions`, so 
 
 To put the exported loadouts of a chassis on a factory's build menu, open Compare loadouts, pick a builder under Build menu, tick the loadouts and press Add. This records an `add` for each unit in the game's newest workshop project, in upgrade chain order, and starts a project for the game if it has none. Remove takes them off again. A loadout that has not been exported is listed and not offered.
 
+### Built by
+
+**Built by**, in the Animation panel, lists the builders of the unit's own game that build this unit. Pick one under **Add a builder**. This changes no file of the game. When coilbox launches the unit through a game it generates, such as **Test in game**, it writes `download/coilbox_build_list.tdf` into that game. The engine's base content reads every file under `download/` after all the unit files have loaded and before the game's `unitdefs_post.lua` runs. It adds the unit to the end of each builder's `buildoptions`. The game's own post processing still runs, because nothing replaces it.
+
+Some games load their units with their own `gamedata/unitdefs.lua` and never read `download/`. Beyond All Reason and Zero-K do that. Spring 1944 replaces `download_builds.lua` with its own. Coilbox asks the game which kind it is before it launches. If the game will not read the list, the Test drawer says so under the launch buttons, and the unit can still be spawned with `/cheat` and `/give`. A builder that is not in the game being tested is left off and named there too.
+
+**Test in game** starts you as the unit itself, so to see the list, use **Launch sandbox with targets**. It starts you on the game's own start unit, or give yourself a factory from the list.
+
 ### Movement
 
 A movement class names an entry in the game's own move definitions, and the engine drops a unit that can move but names a class that does not resolve. So the builder never writes a class it made up. **Movement**, in the Animation panel, offers the classes of the unit's own game, read out of that game's `gamedata/movedefs.lua`.
