@@ -305,11 +305,19 @@ export function resolveScenario(
   // same wording. Dedupe so the panel shows each distinct note once rather
   // than one row per event, which also keeps AnimationPanel's `key={note}`
   // list free of duplicate keys.
+  // The engine rocks the unit only for a shot that fired.
+  const shotFrames = new Set(
+    events.filter((event) => event.engine === "fire").map((e) => e.frame),
+  );
+  const rocked = events.filter(
+    (event) => event.callin !== "RockUnit" || shotFrames.has(event.frame),
+  );
+
   return {
     // Only a series is out of order. Every other scenario keeps the order it
     // was written in, which for two events on one frame is the order they
     // fire in.
-    events: series ? events.sort(byFrameAimFirst) : events,
+    events: series ? rocked.sort(byFrameAimFirst) : rocked,
     notes: [...new Set(notes)],
   };
 }

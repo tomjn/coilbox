@@ -52,13 +52,21 @@ export function answeredCallins(script: string): Map<string, boolean> {
 /**
  * What an engine event asks of the script without a call-in of its own.
  * `factory-build` and `factory-finish` are what start and stop a factory's
- * `StartBuilding` and `StopBuilding`, and `fire` is `Shot1`.
+ * `StartBuilding` and `StopBuilding`, and `fire` is `Shot1`, and `RockUnit`
+ * after it (`Weapon.cpp:606-608`).
  */
-const ENGINE_CALLINS: Record<string, string> = {
-  "factory-build": "StartBuilding",
-  "factory-finish": "StopBuilding",
-  fire: "Shot1",
+const ENGINE_CALLINS: Record<string, string[]> = {
+  "factory-build": ["StartBuilding"],
+  "factory-finish": ["StopBuilding"],
+  fire: ["Shot1", "RockUnit"],
 };
+
+/**
+ * Call-ins a generated script leaves out until a preset fills them, because a
+ * unit that defines one pays for the engine calling it. Not defining one is
+ * not a script that was taken over, so a preset can still fill it.
+ */
+const OPTIONAL_CALLINS = new Set(["RockUnit"]);
 
 /** The call-ins a scenario puts the unit through, apart from the ones every
  *  scenario starts with. */
@@ -66,8 +74,11 @@ export function scenarioCallins(scenario: Scenario): string[] {
   const names = new Set<string>();
   for (const event of scenario.events) {
     if (event.ambient || event.callin === "Create") continue;
-    const name = event.callin ?? ENGINE_CALLINS[event.engine ?? ""];
-    if (name) names.add(name);
+    for (const name of event.callin
+      ? [event.callin]
+      : (ENGINE_CALLINS[event.engine ?? ""] ?? [])) {
+      names.add(name);
+    }
   }
   return [...names];
 }
@@ -86,7 +97,14 @@ function presetsFilling(callins: string[]): string[] {
         pieces: () => ["piece"],
         wheels: () => [{ piece: "piece", radius: 1, front: true }],
         motion: { accRate: 0.5, decRate: 0.5 },
-        weapons: () => [{ number: 1, piece: () => "piece", signal: "SIG" }],
+        weapons: () => [
+          {
+            number: 1,
+            piece: () => "piece",
+            looseFlare: () => undefined,
+            signal: "SIG",
+          },
+        ],
         instances: () => [
           {
             id: "",
@@ -121,11 +139,15 @@ export function scenarioMark(
   const answered = answeredCallins(script);
   if (callins.some((name) => answered.get(name))) return null;
 
-  const undefinedCallins = callins.filter((name) => !answered.has(name));
+  const undefinedCallins = callins.filter(
+    (name) => !answered.has(name) && !OPTIONAL_CALLINS.has(name),
+  );
   if (undefinedCallins.length === callins.length) {
     return `Presets do not cover this. Take the script over and write ${undefinedCallins.join(", ")}.`;
   }
-  const empty = callins.filter((name) => answered.has(name));
+  const empty = callins.filter(
+    (name) => answered.has(name) || OPTIONAL_CALLINS.has(name),
+  );
   const fillers = presetsFilling(empty);
   return fillers.length > 0
     ? `Nothing to do. Add ${fillers.join(", ")} to react.`

@@ -339,6 +339,8 @@ Then open the **Animation** tab. Each preset says what it does and what it needs
 | Aim point | An aim point |
 | Recoil on firing | A barrel |
 | Idle sway | A body |
+| Body settles after a shot | A body |
+| Turret looks around when idle | A turret |
 | Wreck pose | A body |
 | Aim while building | A build arm |
 | Factory build cycle | A door |
@@ -351,6 +353,15 @@ Three presets follow how the unit is moving, and play best under **Driving along
 - **Wheels turning** turns each wheel at the unit's speed divided by the wheel's radius, so a wheel rolls without slipping at every speed, slows as the unit brakes, and turns backwards when it backs up. The radius is half the width of the wheel's cylinder, tube or cone across its axle, times the scale it has in the unit. It takes the biggest such shape at or under the wheel piece. A wheel made from a part of the pack has no shape to measure, so it turns at the **Turns per second** rate unless you type a **Wheel radius**, which then applies to every wheel. The wheels read the speed while it runs rather than baking it in as the walks do, because the unit brakes after the engine's `StopMoving` and its wheels should slow with it.
 - **Front wheels steer** swings the wheels ahead of the middle of the wheels with the unit's turning, up to the **Largest angle** slider, and straightens them when the turn ends. A unit with three axles steers the first, and a unit with one axle steers none. The two front wheels of a mirrored pair swing the same way, and the wheels swing the other way when the unit backs up.
 - **Body rocks on starting and stopping** pitches the body back as the unit speeds up and forward as it brakes, then eases it level. **Lean at full power** is the angle for a unit speeding up at its whole acceleration, or braking at its whole brake rate, both from **Movement**, so a gentle unit rocks less than a sharp one. The lean follows the acceleration with a lag of about a third of a second.
+
+Two presets add the small motions around a shot.
+
+- **Body settles after a shot** defines the engine's `RockUnit`, which the engine calls after a weapon fires with the direction opposite the shot in the unit's own space. A shot straight ahead lifts the nose and a shot to one side tips the top the other way. The lean snaps to **Lean per shot** in two frames and eases level with a lag of **Settle time**. The 2.75 degree default is what Balanced Annihilation's `ROCKUNIT.H` turns the base by at full strength (500 of COB's 65536 angle units to a turn). A unit without this preset defines no `RockUnit`, so the engine makes no extra call on its shots. The preview rocks the unit straight back after each shot, because the scenarios do not work out the shot's direction. Do not apply it with **Body rocks on starting and stopping**, which turns the same piece about the same axis.
+- **Turret looks around when idle** turns each turret slowly between waypoints inside its yaw range after the unit has stood still, not aimed and not fired for **Idle time before looking**. A turret with no range looks **Turn either side** of straight ahead. The look starts from `Create`, so a unit that has never moved does it, and stops at the next `StartMoving`, `AimWeapon` or `Shot`. `StartMoving` also turns the turret back to centre.
+
+**Recoil on firing** kicks each weapon's own barrel from its own `Shot` call-in. A flare beside the barrel, rather than under it, kicks with it.
+
+**Idle sway** now starts from `Create` as well as `StopMoving`, so a unit that has not moved yet sways.
 
 **Play** runs the script the presets generate, the same Lua an export writes, and shows what it does in the viewport. A mistake in the script shows up here rather than after export. Each run lasts 15 seconds and loops. Change a preset, one of its sliders or a role while a run is on screen, and the new script runs as soon as you stop editing.
 

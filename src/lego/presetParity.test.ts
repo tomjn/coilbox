@@ -389,6 +389,23 @@ function steadyPlan(): Plan {
 }
 
 /**
+ * One shot straight ahead, then three seconds for the lean to ease out. The
+ * lean follows the shot's direction, which `track()` cannot give, so only the
+ * level body after it settles is compared.
+ */
+function settlePlan(): Plan {
+  const frames = CALLIN + 5 * FPS;
+  return {
+    events: [...CREATED, { frame: CALLIN, callin: "RockUnit", args: [0, -1] }],
+    frames,
+    spans: [{ from: CALLIN + 3 * FPS, to: frames - 1, t0: 0 }],
+    exceptions: [
+      "The lean follows the shot's direction, so only the body level again after it has settled is compared. Its size and direction are checked in recoilSettleIdle.test.ts.",
+    ],
+  };
+}
+
+/**
  * No drive, so the heading reads 0 throughout and the rudder holds straight.
  * `track()` cannot say more, since the rudder follows the heading and not the
  * time. What this checks is that the script runs under the runtime.
@@ -456,8 +473,9 @@ function plan(preset: AnimPreset, params: Record<string, number>): Plan {
     // Hovering starts on Create, which every run fires on its first frame.
     case "hover.bob":
       return cyclePlan(preset, params, "Create", 0);
+    // Starts on Create, so a unit that has not moved sways too (#3357).
     case "idle.sway":
-      return cyclePlan(preset, params, "StopMoving", CALLIN);
+      return cyclePlan(preset, params, "Create", 0);
     case "turret.track":
     case "aim.track":
       return aimPlan(preset, params);
@@ -477,7 +495,10 @@ function plan(preset: AnimPreset, params: Record<string, number>): Plan {
       return rudderPlan();
     case "wheels.steer":
     case "body.rock":
+    case "idle.look":
       return steadyPlan();
+    case "body.settle":
+      return settlePlan();
     case "wake.moving":
       return wakePlan();
     case "gear.stow":
@@ -689,9 +710,9 @@ function buildCases() {
 describe("preset parity fixture", () => {
   const cases = buildCases();
 
-  it("covers all 20 presets", () => {
-    expect(new Set(cases.map((entry) => entry.preset.id)).size).toBe(20);
-    expect(PRESETS).toHaveLength(20);
+  it("covers all 22 presets", () => {
+    expect(new Set(cases.map((entry) => entry.preset.id)).size).toBe(22);
+    expect(PRESETS).toHaveLength(22);
   });
 
   it("matches what the presets generate today", () => {
