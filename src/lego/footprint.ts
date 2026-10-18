@@ -10,6 +10,7 @@
  * position, and that is also where the viewport's plates sit.
  */
 
+import { formatNumber } from "@/lib/format";
 import { roleLabel } from "./animPresets";
 import { SAME_POSITION } from "./balance";
 import type { LegoProject } from "./model";
@@ -240,7 +241,7 @@ export function footprintProblems(result: FootprintResult): Problem[] {
       problem(
         "footprint",
         "warning",
-        `Sticks out of its ${inForce.x}x${inForce.z} footprint by ${Number(overhang[axis].toFixed(2))} elmos on ${axis}.`,
+        `Sticks out of its ${inForce.x}x${inForce.z} footprint by ${formatNumber(overhang[axis], { maximumFractionDigits: 2 })} elmos on ${axis}.`,
       ),
     );
 }

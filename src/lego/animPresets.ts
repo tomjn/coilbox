@@ -11,6 +11,7 @@
  * what it needs, and the panel can say what is missing.
  */
 
+import { formatFixed } from "@/lib/format";
 import { EVERY_CUT, WRECK_STAGES } from "./breakApart";
 import {
   clampedHeading,
@@ -3778,7 +3779,7 @@ export function restAngleWarnings(piece: {
     if (Math.abs(degrees - nearest) <= REST_ANGLE_TOLERANCE_DEG) continue;
     const clean = ((nearest % 360) + 360) % 360;
     warnings.push(
-      `${roleLabel(piece.role)} turns about ${AXIS_LETTERS[axis]}, and this piece's rest rotation there is ${degrees.toFixed(1)}°, not a right angle. A hand-edited Turn call may not land where it looks like it should. The nearest clean angle is ${clean}°.`,
+      `${roleLabel(piece.role)} turns about ${AXIS_LETTERS[axis]}, and this piece's rest rotation there is ${formatFixed(degrees, 1)}°, not a right angle. A hand-edited Turn call may not land where it looks like it should. The nearest clean angle is ${clean}°.`,
     );
   }
   return warnings;

@@ -16,6 +16,7 @@ import { Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { formatNumber } from "@/lib/format";
 import {
   actionClashes,
   actionHooks,
@@ -258,7 +259,7 @@ export function ActionsDrawer({
                 <span className="text-muted-foreground">
                   {seconds === 0
                     ? "No time yet"
-                    : `${Number(seconds.toFixed(2))} s`}
+                    : `${formatNumber(seconds, { maximumFractionDigits: 2 })} s`}
                 </span>
               </div>
               {action.keys.length === 0 ? (

@@ -19,6 +19,14 @@ export function formatNumber(
   return n.toLocaleString(getLocale(), opts);
 }
 
+/** `n` with exactly `digits` decimals, the way `toFixed` writes it but with the app language's separator. */
+export function formatFixed(n: number, digits: number): string {
+  return formatNumber(n, {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+}
+
 /** `n` shortened for a glance, e.g. `12.3K` under `en`. */
 export function formatCompact(
   n: number,

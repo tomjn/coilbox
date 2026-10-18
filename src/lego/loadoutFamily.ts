@@ -8,6 +8,7 @@
  * the same as the builder reads them for the loadout on screen.
  */
 
+import { formatNumber } from "@/lib/format";
 import { budgetStanding } from "./budget";
 import { loadoutUnit, loadoutUnitNames } from "./loadouts";
 import { lockReason, unitLocks } from "./locks";
@@ -56,7 +57,7 @@ export interface Family {
 }
 
 function figure(value: number): string {
-  return String(Number(value.toFixed(1)));
+  return formatNumber(value, { maximumFractionDigits: 1 });
 }
 
 function allSame(cells: (string | null)[]): boolean {

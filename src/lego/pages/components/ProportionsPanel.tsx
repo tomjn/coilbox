@@ -22,6 +22,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
+import { formatNumber } from "@/lib/format";
 import {
   type BodyPlan,
   type BodyPlanProportion,
@@ -218,7 +219,7 @@ function FittedProportions({
                 {value === undefined
                   ? "Not measured"
                   : proportion.unit === "elmo"
-                    ? `${Number(value.toFixed(3))} elmos`
+                    ? `${formatNumber(value, { maximumFractionDigits: 3 })} elmos`
                     : String(value)}
               </dd>
             </div>

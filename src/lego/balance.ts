@@ -12,6 +12,7 @@
  * plane is x and z, so a point on it is `[x, z]`.
  */
 
+import { formatNumber } from "@/lib/format";
 import { childrenOf, type LegoProject } from "./model";
 import type { LoadedPack } from "./pack";
 import { type Problem, problem } from "./problems";
@@ -413,7 +414,7 @@ export function checkBalance(
   if (resting.length === 0) {
     return {
       status: "notApplicable",
-      reason: `The lowest foot or wheel is ${Number(lowestSupport.toFixed(2))} elmos above the ground.`,
+      reason: `The lowest foot or wheel is ${formatNumber(lowestSupport, { maximumFractionDigits: 2 })} elmos above the ground.`,
     };
   }
 
@@ -460,9 +461,9 @@ function summaryText(result: BalanceResult): string {
         ? "One foot or wheel on the ground, so the support area has no width."
         : "The feet or wheels on the ground are in a line, so the support area has no width.";
     case "outside":
-      return `Weight centre is ${Number(result.outsideBy.toFixed(2))} elmos outside the feet.`;
+      return `Weight centre is ${formatNumber(result.outsideBy, { maximumFractionDigits: 2 })} elmos outside the feet.`;
     case "inside":
-      return `Weight centre is ${Number((-result.outsideBy).toFixed(2))} elmos inside the feet.`;
+      return `Weight centre is ${formatNumber(-result.outsideBy, { maximumFractionDigits: 2 })} elmos inside the feet.`;
   }
 }
 
@@ -475,7 +476,7 @@ export function balanceProblem(result: BalanceResult): Problem | null {
     ? problem(
         "balance",
         "warning",
-        `Looks as if it would tip: the weight centre is ${Number(result.outsideBy.toFixed(2))} elmos outside the feet.${result.guessed ? ` ${GUESSED}` : ""}`,
+        `Looks as if it would tip: the weight centre is ${formatNumber(result.outsideBy, { maximumFractionDigits: 2 })} elmos outside the feet.${result.guessed ? ` ${GUESSED}` : ""}`,
         result.resting,
       )
     : null;

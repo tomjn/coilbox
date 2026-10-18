@@ -26,6 +26,7 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useGameUnits } from "@/content/useGameUnits";
+import { formatFixed } from "@/lib/format";
 import type { Scenario } from "@/scenario/model";
 import {
   UnitGameProvider,
@@ -117,7 +118,7 @@ function SpinControls({
         <div className="flex items-center justify-between text-xs">
           <span className="font-medium">Spin speed</span>
           <span className="font-mono text-muted-foreground">
-            {magnitude.toFixed(2)}×
+            {formatFixed(magnitude, 2)}×
           </span>
         </div>
         <Slider

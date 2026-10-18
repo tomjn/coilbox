@@ -13,6 +13,7 @@
  */
 
 import * as THREE from "three";
+import { formatNumber } from "@/lib/format";
 import type { Vec3 } from "../../snapping";
 import {
   aimFromPosition,
@@ -138,7 +139,7 @@ export function label(text: string, colour: string): THREE.Sprite {
 
 /** The label a weapon's ring carries: its name and the range it states. */
 export function reachLabel(reach: WeaponReach): string {
-  return `${reach.number} ${reach.name}, stated range ${Number(reach.range.toFixed(1))}`;
+  return `${reach.number} ${reach.name}, stated range ${formatNumber(reach.range, { maximumFractionDigits: 1 })}`;
 }
 
 /** One weapon's ring or wedge, its drop line and its label. */
