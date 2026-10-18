@@ -4,8 +4,8 @@ import type { LuaCompatResult } from "./bindings";
 /**
  * What would stop an old game running on the current engine, worked out from
  * reads the page has already made (issue #4554). Pure, so every finding kind is
- * tested from fixed inputs. The map page's report (issue #4565) shares
- * {@link Finding} and the row component that draws it.
+ * tested from fixed inputs. The map page's report in `mapCompatReport.ts`
+ * (issue #4565) shares {@link Finding} and the row component that draws it.
  */
 
 /** `problem` is something the engine no longer does. `info` is worth knowing
@@ -135,15 +135,11 @@ export function buildReport(inputs: CompatReportInputs): Finding[] {
       details: [{ heading: "Not installed", lines: unresolved }],
     });
 
-  const errors = [...(inputs.errors ?? []), ...(inputs.lua?.errors ?? [])];
-  if (errors.length > 0)
-    out.push({
-      kind: "read-errors",
-      label: "Could not check everything",
-      severity: "info",
-      count: errors.length,
-      details: [{ heading: "Errors", lines: errors }],
-    });
+  const errors = readErrorsFinding([
+    ...(inputs.errors ?? []),
+    ...(inputs.lua?.errors ?? []),
+  ]);
+  if (errors) out.push(errors);
 
   return out;
 }
@@ -235,6 +231,19 @@ function gadgetFinding(
     severity: "info",
     count: details.length,
     details,
+  };
+}
+
+/** The row for reads that failed, or null when none did. Shared with the map
+ *  report. */
+export function readErrorsFinding(errors: string[]): Finding | null {
+  if (errors.length === 0) return null;
+  return {
+    kind: "read-errors",
+    label: "Could not check everything",
+    severity: "info",
+    count: errors.length,
+    details: [{ heading: "Errors", lines: errors }],
   };
 }
 

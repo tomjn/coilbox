@@ -29,7 +29,7 @@ function Label({ finding }: { finding: Finding }) {
 }
 
 /**
- * One finding from {@link buildReport}: its label and count, with an action
+ * One finding from the game or the map report: its label and count, with an action
  * beside it when the page has one. A finding with details expands to show
  * them, such as the files and lines behind a Lua count.
  */

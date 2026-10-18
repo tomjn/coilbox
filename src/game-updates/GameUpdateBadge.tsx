@@ -3,19 +3,19 @@ import { Link } from "react-router";
 import { useGameUpdates } from "./GameUpdatesProvider";
 
 /**
- * topbar.right slot: a "Game update" pill, shown only when the profile's release
- * repo has a newer game archive than the one installed.
+ * topbar.right slot: a pill with the count of games and engines that have a
+ * newer version, shown only when there is at least one.
  */
 export default function GameUpdateBadge() {
-  const { updateAvailable } = useGameUpdates();
-  if (!updateAvailable) return null;
+  const { updateCount, updateTo } = useGameUpdates();
+  if (updateCount === 0) return null;
   return (
     <Link
-      to="/settings/game-updates"
+      to={updateTo}
       className="flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20"
     >
       <Gamepad2 size={14} />
-      Game update
+      {updateCount === 1 ? "1 update" : `${updateCount} updates`}
     </Link>
   );
 }
