@@ -4645,11 +4645,10 @@ mod tests {
         assert!(!sidedata.exists());
         assert!(!gadget.exists());
         assert!(dir.path().join("modinfo.lua").exists());
-        assert!(
-            dir.path()
-                .join("LuaRules/Gadgets/coilbox_unit_script.lua")
-                .exists()
-        );
+        assert!(dir
+            .path()
+            .join("LuaRules/Gadgets/coilbox_unit_script.lua")
+            .exists());
     }
 
     #[test]
