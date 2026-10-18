@@ -1,9 +1,10 @@
 import { defineConfig } from "@lingui/cli";
 import { formatter } from "@lingui/format-po";
+import { LOCALES, SOURCE_LOCALE } from "./src/i18n/locales";
 
 export default defineConfig({
-  sourceLocale: "en",
-  locales: ["en", "fr", "de", "es", "ja", "zh-Hans"],
+  sourceLocale: SOURCE_LOCALE,
+  locales: [...LOCALES],
   // An untranslated message falls back to its English source.
   fallbackLocales: { default: "en" },
   catalogs: [
