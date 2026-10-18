@@ -7,11 +7,19 @@ import {
   WALK_BIPED,
   WALK_DROP,
   WALK_FITTED,
+  WALK_PAIRS,
   WALK_QUAD,
   WALK_SHIN,
   WALK_THIGH,
 } from "./animPresets";
-import { BIPED, type BodyPlan, projectFromPlan, QUADRUPED } from "./bodyPlans";
+import {
+  BIPED,
+  type BodyPlan,
+  HEXAPOD,
+  OCTOPOD,
+  projectFromPlan,
+  QUADRUPED,
+} from "./bodyPlans";
 import { buildLuaScript } from "./luaScript";
 import type { LegoProject } from "./model";
 import { problemTexts } from "./problems";
@@ -163,6 +171,38 @@ describe("fitting a walk to the unit's body", () => {
     expect(fast.stride).toBe(70);
     const slow = fitWalk({ legLength: 40, speed: 2 }, {});
     expect(slow.period).toBe(4);
+  });
+});
+
+describe("the walk for any number of legs (#3351)", () => {
+  it("counts the pairs from the unit's leg roles and starts at the time on the ground for that many", () => {
+    for (const [plan, pairs, duty] of [
+      [BIPED, 1, 50],
+      [QUADRUPED, 2, 75],
+      [HEXAPOD, 3, 50],
+      [OCTOPOD, 4, 50],
+    ] as const) {
+      const params = fittedParams(fromPlan(plan), "walk.legs", {});
+      expect(params[WALK_PAIRS]).toBe(pairs);
+      expect(params.duty).toBe(duty);
+    }
+  });
+
+  it("keeps a time on the ground set by hand", () => {
+    const params = fittedParams(fromPlan(HEXAPOD), "walk.legs", { duty: 70 });
+    expect(params.duty).toBe(70);
+  });
+
+  it("fits the walk to the legs of every pair", () => {
+    const unit = fromPlan(OCTOPOD, undefined, 45);
+    const params = fittedParams(unit, "walk.legs", {});
+    expect(params[WALK_FITTED]).toBe(1);
+    expect(params[WALK_THIGH]).toBeCloseTo(18.8 * 0.395, 9);
+    expect(walkProblems(unit)).toEqual([]);
+  });
+
+  it("leaves the fixed walks without a pair count", () => {
+    expect(fittedParams(fromPlan(QUADRUPED), "walk.quad", {})).toEqual({});
   });
 });
 

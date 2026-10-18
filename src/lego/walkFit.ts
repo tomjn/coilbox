@@ -39,14 +39,19 @@
 import {
   type AnimPreset,
   type AppliedPreset,
+  lastLegPair,
+  parseLegRole,
   presetById,
   WALK_BIPED,
   WALK_DROP,
   WALK_FITTED,
+  WALK_LEGS,
+  WALK_PAIRS,
   WALK_SHIN,
   WALK_SPEED,
   WALK_THIGH,
   walkSweep,
+  waveDuty,
 } from "./animPresets";
 import type { LegoPiece, LegoProject } from "./model";
 import { type Problem, problem } from "./problems";
@@ -55,7 +60,7 @@ import { type Problem, problem } from "./problems";
  *  number of them, because `cycleThread` sleeps whole frames. */
 const ENGINE_FPS = 30;
 
-const WALK_PRESETS = new Set(["walk.biped", "walk.quad"]);
+const WALK_PRESETS = new Set(["walk.biped", "walk.quad", "walk.legs"]);
 
 /** What a walk is fitted to. */
 export interface WalkBody {
@@ -100,7 +105,14 @@ export function legLengths(
 ): { thighLength: number; shinLength: number } | null {
   const thighs: number[] = [];
   const shins: number[] = [];
-  for (const leg of ["l1", "r1", "l2", "r2"]) {
+  // Front to back and left before right, the order the first four legs were
+  // always added up in.
+  const pairs = lastLegPair(project.pieces.map((piece) => piece.role));
+  const legs = Array.from({ length: pairs }, (_, i) => [
+    `l${i + 1}`,
+    `r${i + 1}`,
+  ]).flat();
+  for (const leg of legs) {
     const joint = (segment: string) => {
       const piece = project.pieces.find(
         (entry) => entry.role === `leg.${leg}.${segment}`,
@@ -249,8 +261,30 @@ export function fittedParams(
   params: Record<string, number>,
 ): Record<string, number> {
   if (!WALK_PRESETS.has(presetId)) return params;
+  const counted =
+    presetId === WALK_LEGS.id ? withLegPairs(project, params) : params;
   const body = walkBody(project);
-  return body ? fitWalk(body, params) : params;
+  return body ? fitWalk(body, counted) : counted;
+}
+
+/**
+ * A `walk.legs` walk's params with the unit's leg pairs laid over them
+ * (#3351), counted from its leg roles, and the time on the ground for that
+ * many pairs (`waveDuty`) unless the game maker set one.
+ */
+function withLegPairs(
+  project: LegoProject,
+  params: Record<string, number>,
+): Record<string, number> {
+  const pairs = Math.max(
+    1,
+    lastLegPair(project.pieces.map((piece) => piece.role)),
+  );
+  return {
+    ...params,
+    duty: given(params, "duty") ?? waveDuty(pairs),
+    [WALK_PAIRS]: pairs,
+  };
 }
 
 /** The params a fitted walk works out for itself, which a game maker's own
@@ -326,7 +360,7 @@ export function walkProblems(project: LegoProject): Problem[] {
     if (!WALK_PRESETS.has(entry.presetId)) continue;
     const label = presetById(entry.presetId)?.label ?? entry.presetId;
     const thighs = project.pieces
-      .filter((piece) => /^leg\.[lr][12]\.thigh$/.test(piece.role ?? ""))
+      .filter((piece) => parseLegRole(piece.role ?? "")?.segment === "thigh")
       .map((piece) => piece.id);
     if (body.thighLength === undefined) {
       out.push(

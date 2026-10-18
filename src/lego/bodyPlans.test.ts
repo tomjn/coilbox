@@ -11,6 +11,8 @@ import {
   BODY_PLANS,
   type BodyPlan,
   bodyPlanById,
+  HEXAPOD,
+  OCTOPOD,
   planProportions,
   projectFromPlan,
   QUADRUPED,
@@ -317,6 +319,8 @@ function boneWorld(
 describe.each([
   { plan: BIPED, pairs: [1], preset: "walk.biped" },
   { plan: QUADRUPED, pairs: [1, 2], preset: "walk.quad" },
+  { plan: HEXAPOD, pairs: [1, 2, 3], preset: "walk.legs" },
+  { plan: OCTOPOD, pairs: [1, 2, 3, 4], preset: "walk.legs" },
 ])("the $plan.id plan", ({ plan, pairs, preset }) => {
   it("is in the registry", () => {
     expect(bodyPlanById(plan.id)).toBe(plan);
@@ -451,6 +455,36 @@ describe("the four legged plan", () => {
     const world = boneWorld(fromPlan(QUADRUPED, { bodyLength: 30 }));
     expect(world.get("thigh.l1")?.[2]).toBe(15);
     expect(world.get("thigh.l2")?.[2]).toBe(-15);
+  });
+});
+
+describe("the six and eight legged plans (#3351)", () => {
+  it("space the pairs evenly from the front, the gap apart, centred on the body", () => {
+    const world = boneWorld(fromPlan(OCTOPOD, { legGap: 20 }));
+    expect(
+      [1, 2, 3, 4].map((pair) => world.get(`thigh.l${pair}`)?.[2]),
+    ).toEqual([30, 10, -10, -30]);
+    const six = boneWorld(fromPlan(HEXAPOD));
+    expect(six.get("thigh.r2")?.[2]).toBe(0);
+    expect(six.get("thigh.l1")?.[2]).toBe(27.7);
+  });
+
+  it("take the four legged plan's legs and its gap between pairs", () => {
+    for (const plan of [HEXAPOD, OCTOPOD]) {
+      expect(planProportions(plan)).toEqual({
+        legLength: 18.8,
+        stance: 29.8,
+        bodyHeight: 5.4,
+        legGap: 27.7,
+      });
+    }
+  });
+
+  it("measure the gap back off the joints", () => {
+    const project = fromPlan(OCTOPOD, { legGap: 22, stance: 31 });
+    const measured = OCTOPOD.measure?.(boneWorld(project), {});
+    expect(measured?.legGap).toBeCloseTo(22, 9);
+    expect(measured?.stance).toBeCloseTo(31, 9);
   });
 });
 
