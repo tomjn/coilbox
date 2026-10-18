@@ -233,7 +233,55 @@ describe("buildReport", () => {
   it("flags gamedata/messages.tdf", () => {
     expect(kinds([...CLEAN, "GameData/Messages.tdf"])).toEqual([
       "messages-tdf",
+      "compat-gadgets",
     ]);
+  });
+
+  it("lists the compat gadgets a build turns on and what each found", () => {
+    const report = buildReport({
+      files: [...CLEAN, "units/armfig.fbi", "gamedata/messages.tdf"],
+      catalogue: CATALOGUE,
+      defs: {
+        units: {
+          armfig: { canfly: "1" },
+          armatlas: { canfly: 1, transportcapacity: 1 },
+          armbrawl: { CanFly: true, hoverAttack: true },
+          armca: { canfly: 1, builder: "1" },
+          armthund: { canfly: 1, builder: "0" },
+          armcom: { weapondefs: { dgun: { weapontype: "DGun" } } },
+        },
+        weaponDefs: {
+          laser: { turret: 1 },
+          rocket: { turret: "0" },
+          starburst: { weaponType: "StarburstLauncher" },
+          vlaunch: { vlaunch: 1 },
+        },
+      },
+    });
+    const gadgets = report.find((f) => f.kind === "compat-gadgets");
+    expect(gadgets).toMatchObject({ severity: "info", count: 3 });
+    expect(gadgets?.details).toEqual([
+      {
+        heading: "coilbox_compat_aircraft_crash",
+        lines: ["armfig", "armthund"],
+      },
+      {
+        heading: "coilbox_compat_only_forward_aim",
+        lines: ["armcom.dgun", "rocket"],
+      },
+      {
+        heading: "coilbox_compat_messages_tdf",
+        lines: ["gamedata/messages.tdf"],
+      },
+    ]);
+  });
+
+  it("lists no compat gadgets for a game with nothing wrong", () => {
+    expect(
+      kinds(CLEAN, {
+        defs: { units: { armfig: { canfly: true } }, weaponDefs: {} },
+      }),
+    ).toEqual([]);
   });
 
   it("names the dependencies whose Lua was not scanned", () => {
