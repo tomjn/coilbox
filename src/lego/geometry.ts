@@ -61,7 +61,7 @@ export function partMaterial(atlas: LegoAtlas): THREE.MeshStandardMaterial {
     metalness: 0.05,
   });
   // The atlas's alpha is the team colour mask, as it is in an `.s3o`'s first
-  // texture. The base atlas has none, so its parts are drawn as they are.
+  // texture. The bundled atlas masks its team colour column (#4364).
   paintTeamColourIfMasked(material, textureUrl);
   materials.set(textureUrl, { material, texture });
   return material;

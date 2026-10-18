@@ -445,14 +445,12 @@ fn stored_png(source: &Path, keep_alpha: bool) -> Result<BlenderPng, String> {
 /// The engine draws an s3o's first texture mixed with the player's colour by
 /// its alpha, `mix(diffuse.rgb, teamColor.rgb, diffuse.a)` in
 /// `ModelFragProg.glsl`, and loads a PNG with no alpha channel as fully opaque.
-/// KaiserJ's atlas has none, so written as it stands it draws a unit entirely
-/// in team colour (#4164). An atlas with no alpha is written with an alpha of
-/// 0, which is the parts' own colours and no team colour anywhere. One that has
-/// an alpha carries a mask somebody drew, and is written exactly as it is.
-///
-/// The pack keeps its atlas opaque rather than shipping this. The builder's
-/// webview draws the parts from that file, and with an alpha of 0 it drew every
-/// part black.
+/// An atlas with no alpha written as it stands draws a unit entirely in team
+/// colour (#4164), so it is written with an alpha of 0, which is the parts' own
+/// colours and no team colour anywhere. One that has an alpha carries a mask
+/// somebody drew, and is written exactly as it is. The bundled atlas is one of
+/// those: `scripts/legopack/teamColour.mjs` masks its team colour column
+/// (#4364).
 pub fn engine_atlas(bytes: &[u8]) -> Result<Vec<u8>, String> {
     let img = image::load_from_memory(bytes)
         .map_err(|e| format!("could not read the atlas as an image: {e}"))?;
@@ -528,22 +526,34 @@ mod tests {
     }
 
     /// The bundled atlas, which the builder draws with and an export writes
-    /// from. It stays opaque: the webview drew every part black when it had an
-    /// alpha of 0. So the alpha the engine needs is added on the way out.
+    /// from, carries the team colour mask of its first column (#4364). The
+    /// export writes it as it is, so a unit built from team colour parts shows
+    /// the player's colour in a game, and the tan and grey columns show none.
     #[test]
-    fn the_bundled_atlas_is_opaque_and_its_export_has_no_team_colour() {
+    fn the_bundled_atlas_exports_with_team_colour_in_its_first_column_only() {
         let path =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../../src-tauri/legoparts/atlas.png");
         let bytes = std::fs::read(&path).expect("bundled atlas");
-        assert!(!image::load_from_memory(&bytes)
-            .expect("decode")
-            .color()
-            .has_alpha());
+        let written = engine_atlas(&bytes).expect("atlas");
+        assert_eq!(written, bytes);
 
-        let written =
-            image::load_from_memory(&engine_atlas(&bytes).expect("atlas")).expect("decode");
-        assert!(written.color().has_alpha());
-        assert!(written.to_rgba8().pixels().all(|pixel| pixel[3] == 0));
+        let img = image::load_from_memory(&written).expect("decode");
+        assert!(img.color().has_alpha());
+        let img = img.to_rgba8();
+        let first_column = img.width() / 3;
+        let (mut masked, mut stray) = (0, 0);
+        for (x, _, pixel) in img.enumerate_pixels() {
+            if pixel[3] == 0 {
+                continue;
+            }
+            if x <= first_column {
+                masked += 1;
+            } else {
+                stray += 1;
+            }
+        }
+        assert!(masked > 0);
+        assert_eq!(stray, 0);
     }
 
     /// The engine appends `00` to a `.3do` texture name, so a face naming

@@ -227,7 +227,7 @@ A swatch is a rectangle of plain surface on the atlas that the unit builder's ge
 
 A shape is cut on a grid one `tile` wide, and each piece samples the swatch with every other copy mirrored, so there is no seam and nothing stretches as the shape is resized. A shape's UVs never leave its swatch.
 
-The bundled pack has three swatches, team colour, tan and grey, each 64 pixels square. The team colour one is plain red, as the whole team colour column of the atlas is. Tan is grainy concrete. Grey is a flat light grey.
+The bundled pack has three swatches, team colour, tan and grey, each 64 pixels square. The team colour one is all team colour, as most of the team colour column of the atlas is. Tan is grainy concrete. Grey is a flat light grey.
 
 Only the base pack's swatches count. Extension packs and atlas packs use them. A base pack that lists none offers no shapes. A swatch with no id, an id another swatch has, a rectangle outside the atlas or a `tile` that is not a positive number is skipped, and the Lego Parts screen reports how many.
 
@@ -276,7 +276,7 @@ There is no directory in the blob. `pack.json` holds it.
 
 **Triangles wind counter-clockwise** seen from outside, matching s3o. See [the s3o format](https://github.com/tomjn/coilbox/blob/main/docs/internal/s3o-format.md).
 
-**The atlas's alpha channel is the team colour mask** once it is in a game. The engine mixes an s3o's first texture with the player's colour by its alpha: 0 is the atlas's own colour and 255 is all team colour, and a PNG with no alpha loads as 255 everywhere. An export writes an atlas that has no alpha channel with an alpha of 0, so a unit shows the parts' own colours and no team colour. The `.glb` export bakes the same atlas in through the same function, so the two cannot disagree. An atlas that has an alpha channel is written as it is, so an atlas pack that wants team colour on some parts paints it into its alpha. The bundled atlas stays opaque, because the builder draws the parts from it, and with an alpha of 0 the builder drew every part black. A game exported to before this fix keeps its old opaque copy until the export drawer is told to replace textures already there.
+**The atlas's alpha channel is the team colour mask** once it is in a game. The engine mixes an s3o's first texture with the player's colour by its alpha: 0 is the atlas's own colour and 255 is all team colour, and a PNG with no alpha loads as 255 everywhere. An export writes an atlas that has no alpha channel with an alpha of 0, so a unit shows the parts' own colours and no team colour. The `.glb` export bakes the same atlas in through the same function, so the two cannot disagree. An atlas that has an alpha channel is written as it is, so an atlas pack that wants team colour on some parts paints it into its alpha. The bundled atlas has one, which marks its team colour column. A game exported to before that keeps its old copy, with no team colour, until the export drawer is told to replace textures already there.
 
 **v runs up from the bottom of the atlas**, as it does in an `.obj` and in the builder. The engine reads an s3o's v from the top of a PNG, so the s3o export writes a part's v as 1 - v. The `.obj` and `.glb` exports keep the pack's v. A mesh imported from a game's own model is already in the engine's convention, and is exported as it came.
 
@@ -294,6 +294,26 @@ bun run lego:pack --obj <legosv2.obj> --atlas <lego2skin.png> --version 2026.07.
 
 The sources are not checked in. KaiserJ released them on [the Spring forums](https://springrts.com/phpbb/viewtopic.php?t=22283).
 
+### The team colour mask
+
+KaiserJ's atlas is an RGB PNG with no alpha channel. He painted its first column red to mark the team colour set, and left the mask to whoever used the kit. In the release thread, Forboding Angel, whose Evolution RTS was built from these parts, wrote "The red pieces ARE teamcolor" and made the mask by hand.
+
+The build makes it by rule, in `scripts/legopack/teamColour.mjs`, and writes `atlas.png` with an alpha channel. For each pixel in the first column, how far its red stands above its green and blue becomes the alpha. What is left becomes the colour, scaled so that the engine's mix gives it back. So:
+
+- Pure red is all team colour.
+- Darker red is darker team colour, which keeps the panel lines.
+- Pink edges are a pale tint of team colour.
+- A red player sees the atlas exactly as KaiserJ drew it.
+- Black, grey and white pixels in the first column, and every pixel in the tan and grey columns, have an alpha of 0 and show no team colour.
+
+To rebuild only the atlas, without the OBJ:
+
+```
+bun run lego:atlas --atlas <lego2skin2048_2-2.png>
+```
+
+The input has to be KaiserJ's original, the file `pack.json` names under `source.atlas`, with the sha256 under `source.atlasSha256`. It refuses a PNG that already has an alpha channel, so it cannot be run on its own output, which has had the red taken out of its colour.
+
 Before trusting a full run, dump one part and look at it in Blender. A UV or winding mistake would otherwise be baked into every part in the pack.
 
 ```
@@ -308,7 +328,7 @@ The part names in the source file are `Object1848_copy5182` and carry no meaning
 
 - **Colourway**, the category. The atlas is three vertical columns of the same panel layout in team colour red, tan and grey, and a part's `u` says which it samples. A unit generally wants one colourway throughout, which makes this the cut worth browsing by. Parts spanning a boundary are "mixed".
 
-  The first column is the original kit's team colour set. KaiserJ painted it red to mark where a modder adds the team colour mask, and the atlas ships with no mask, so these parts draw red in the builder and in a game ([issue #4364](https://github.com/tomjn/coilbox/issues/4364)). Its id is `green`, the name the converter first gave it by mistake. It keeps that id because a saved unit names a shape's swatch by it.
+  The first column is the original kit's team colour set. KaiserJ painted it red to mark where a modder adds the team colour mask, and shipped it with no mask. The build adds one, so these parts draw in the player's colour in the builder and in a game. See [the team colour mask](#the-team-colour-mask). Its id is `green`, the name the converter first gave it by mistake. It keeps that id because a saved unit names a shape's swatch by it.
 - **Shape**: sheet, beam, plate or block, from the bounding box aspect ratio.
 - **Size**: a quintile of the longest side.
 - **Row**: which eighth of the atlas the part sits in vertically, which groups parts the artist drew near each other.
