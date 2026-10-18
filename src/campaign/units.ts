@@ -6,7 +6,8 @@
  * the unit already built: the model, the unit definition, the script and the
  * rest of what a game folder holds for it, plus the source document. It is
  * built once, on attach, with nothing taken from any game, because the game it
- * launches on is chosen mission by mission. It carries its atlas only when the
+ * launches on is chosen mission by mission. A unit with legs or wheels takes its
+ * movement class from that game at launch (issue #4542). It carries its atlas only when the
  * atlas is not the bundled one, and the textures of an imported or mixed unit
  * always, so a mission launches without the parts pack.
  *
@@ -19,10 +20,14 @@
  * lobby.
  */
 
-import { loadUnitsyncUnitDataset } from "../content/config";
 import { legoScratchRemove } from "../lego/bindings";
 import type { BuiltBy } from "../lego/buildList";
 import type { LegoProject } from "../lego/model";
+import {
+  builtToMove,
+  type GameMovementData,
+  scratchMovement,
+} from "../lego/movement";
 import {
   type PreparedUnit,
   prepareUnit,
@@ -30,8 +35,10 @@ import {
 } from "../lego/mutator";
 import type { LoadedPack } from "../lego/pack";
 import type { RawGeometry } from "../lego/rawGeometry";
+import { footprintSteps, movedUnitDef, renderUnitDef } from "../lego/unitDef";
 import { campaignUnitsFolder } from "../lib/generatedGames";
 import type { PlayTarget } from "../play/config";
+import { loadUnitDefs } from "../workshop/config";
 import type { ModProject } from "../workshop/project";
 import {
   campaignUnitDelete,
@@ -299,27 +306,73 @@ export interface ComposedUnits {
 }
 
 /**
- * The base game's units, keyed by name, for the build list to check its
- * builders against. Null when they will not read, which leaves the builders
- * unchecked rather than stopping the launch.
+ * The base game's units and move definitions, for the build list to check its
+ * builders against and for a unit that moves to take a class from. Null when
+ * they will not read, which leaves the builders unchecked and the movers
+ * without a class rather than stopping the launch.
  */
-async function gameUnits(
+async function gameMovement(
   target: PlayTarget,
   archive: string,
-): Promise<Record<string, Record<string, unknown>> | null> {
+): Promise<GameMovementData | null> {
   try {
-    const dataset = await loadUnitsyncUnitDataset(
-      target.enginePath,
-      target.dataDir,
-      archive,
-    );
-    if (dataset.units.length === 0) return null;
-    return Object.fromEntries(
-      dataset.units.map((u) => [u.name.toLowerCase(), {}]),
-    );
+    const defs = await loadUnitDefs(target.enginePath, target.dataDir, archive);
+    if (Object.keys(defs.units).length === 0) return null;
+    return { units: defs.units, moveDefs: defs.moveDefs };
   } catch {
     return null;
   }
+}
+
+/**
+ * A copy as it launches on this game. A unit built with legs or wheels and no
+ * movement class of its own was stored as a building, because a copy is built
+ * with no game. It takes a class from the base game here, chosen the way the
+ * Test drawer chooses one, or is left out with the reason when the game has
+ * none to give (issue #4542).
+ */
+function withGameMovement(
+  unit: CampaignUnit,
+  copy: CampaignUnitCopy,
+  launched: PreparedUnit,
+  game: GameMovementData | null,
+  gameName: string,
+): { unit: PreparedUnit; leftOut: string[] } {
+  if (!builtToMove(copy.source)) return { unit: launched, leftOut: [] };
+  const stays = (why: string) => ({
+    unit: launched,
+    leftOut: [`${unit.name} launches as a building: ${why}`],
+  });
+  const def = launched.def;
+  if (!def) {
+    return stays(
+      "its copy predates movement classes. Update the copy from the unit builder.",
+    );
+  }
+  if (!game) {
+    return stays(`the movement classes of ${gameName} could not be read.`);
+  }
+  const footprint = Math.max(
+    Number(def.footprintx) || 1,
+    Number(def.footprintz) || 1,
+  );
+  const movement = scratchMovement(copy.source, game, gameName, footprint);
+  if (!movement) {
+    return stays(`${gameName} has no movement class that suits it.`);
+  }
+  return {
+    unit: {
+      ...launched,
+      payload: {
+        ...launched.payload,
+        unitDef: renderUnitDef(
+          launched.payload.unitName,
+          movedUnitDef(def, movement),
+        ),
+      },
+    },
+    leftOut: [],
+  };
 }
 
 /**
@@ -341,7 +394,9 @@ export async function composeCampaignUnits(
     );
   }
   const copies = await loadUnitCopies(campaign.id);
+  const game = await gameMovement(target, base.archive);
   const prepared: PreparedUnit[] = [];
+  const movementLeftOut: string[] = [];
   const builtBy: BuiltBy[] = [];
   for (const unit of units) {
     const stored = copies.get(unit.unitName);
@@ -350,17 +405,24 @@ export async function composeCampaignUnits(
         `This campaign's copy of ${unit.name} is missing. Attach it again from the unit builder.`,
       );
     }
-    prepared.push(launchedUnit(stored.copy, stored.dir));
+    const moving = withGameMovement(
+      unit,
+      stored.copy,
+      launchedUnit(stored.copy, stored.dir),
+      game,
+      base.name,
+    );
+    prepared.push(moving.unit);
+    movementLeftOut.push(...moving.leftOut);
     builtBy.push({ unitName: unit.unitName, builtBy: unit.builtBy });
   }
-  const known = await gameUnits(target, base.archive);
   const result = await writePreparedMutator({
     target,
     baseGame: base.name,
     baseArchive: base.archive,
     workshopProjects: [],
     gameWeapons: null,
-    gameMovement: known ? { units: known, moveDefs: [] } : null,
+    gameMovement: game,
     folder,
     prepared,
     builtBy,
@@ -369,6 +431,7 @@ export async function composeCampaignUnits(
     name: result.name,
     leftOut: [
       ...prepared.flatMap((unit) => unit.weaponsLeftOut),
+      ...movementLeftOut,
       ...result.buildListLeftOut,
     ],
   };
