@@ -8,10 +8,12 @@
  * the same as the builder reads them for the loadout on screen.
  */
 
+import { budgetStanding } from "./budget";
 import { loadoutUnit, loadoutUnitNames } from "./loadouts";
 import type { LegoProject } from "./model";
 import { mountContents } from "./mountPoints";
 import { STATS, type UnitStats } from "./unitStats";
+import { chainOrder, predecessorOf } from "./upgradeChain";
 
 export interface FamilyColumn {
   id: string;
@@ -19,12 +21,14 @@ export interface FamilyColumn {
   /** The unit name this loadout exports under. */
   exportName: string;
   active: boolean;
+  /** The name of the loadout this one upgrades from, when the project has it. */
+  upgradesFrom?: string;
 }
 
 export interface FamilyRow {
   /** `piece:connector` for a mount, the stat's id for a stat. */
   id: string;
-  kind: "mount" | "stat";
+  kind: "mount" | "stat" | "budget";
   label: string;
   /** One per column: what sits on the mount, or the figure. Null is empty. */
   cells: (string | null)[];
@@ -34,6 +38,12 @@ export interface FamilyRow {
    *  figure. */
   highest?: number[];
   lowest?: number[];
+  /** Budget row: the columns over the chassis budget. */
+  over?: number[];
+  /** Present when the loadouts form a chain. One per column: what that column
+   *  adds, removes or changes against the loadout it upgrades from. Null for the
+   *  start of a chain and for a column the same as its predecessor. */
+  changes?: (string | null)[];
 }
 
 export interface Family {
@@ -49,6 +59,22 @@ function allSame(cells: (string | null)[]): boolean {
   return cells.every((cell) => cell === cells[0]);
 }
 
+/** What is left of the chassis budget in each column, and which are over. */
+function budgetRow(budget: number, costs: (number | null)[]): FamilyRow {
+  const standings = costs.map((cost) => budgetStanding(budget, cost));
+  const cells = standings.map((s) =>
+    s ? `${figure(Math.abs(s.left))} ${s.over ? "over" : "left"}` : null,
+  );
+  return {
+    id: "budget",
+    kind: "budget",
+    label: `Budget (${figure(budget)})`,
+    cells,
+    differs: !allSame(cells),
+    over: standings.flatMap((s, i) => (s?.over ? [i] : [])),
+  };
+}
+
 /**
  * The family of a unit, or null when it has fewer than two loadouts and so
  * nothing to compare. `statsFor` reads the stats of one loadout as a unit, or
@@ -61,17 +87,56 @@ export function loadoutFamily(
   const loadouts = project.loadouts;
   if (!loadouts || loadouts.length < 2) return null;
   const names = loadoutUnitNames(project);
-  const units = loadouts.map((loadout) => ({
+  const ordered = chainOrder(loadouts);
+  const units = ordered.map((loadout) => ({
     loadout,
     unit: loadoutUnit(project, loadout.id),
   }));
 
-  const columns: FamilyColumn[] = loadouts.map((loadout) => ({
-    id: loadout.id,
-    name: loadout.name,
-    exportName: names.get(loadout.id) ?? project.unitName,
-    active: loadout.id === project.activeLoadout,
-  }));
+  const columns: FamilyColumn[] = ordered.map((loadout) => {
+    const from = predecessorOf(project, loadout);
+    return {
+      id: loadout.id,
+      name: loadout.name,
+      exportName: names.get(loadout.id) ?? project.unitName,
+      active: loadout.id === project.activeLoadout,
+      ...(from ? { upgradesFrom: from.name } : {}),
+    };
+  });
+  // For each column, the column it upgrades from, or -1.
+  const before = ordered.map((loadout) =>
+    loadout.upgradesFrom
+      ? ordered.findIndex((other) => other.id === loadout.upgradesFrom)
+      : -1,
+  );
+  const chained = before.some((at) => at >= 0);
+  const mountChanges = (cells: (string | null)[]) =>
+    chained
+      ? {
+          changes: cells.map((cell, i) => {
+            const was = before[i] < 0 ? cell : cells[before[i]];
+            if (cell === was) return null;
+            return was === null
+              ? "added"
+              : cell === null
+                ? "removed"
+                : `was ${was}`;
+          }),
+        }
+      : {};
+  const statChanges = (values: (number | null)[]) =>
+    chained
+      ? {
+          changes: values.map((value, i) => {
+            const was = before[i] < 0 ? null : values[before[i]];
+            if (value === null || was === null) return null;
+            const delta = Number((value - was).toFixed(1));
+            return delta === 0
+              ? null
+              : `${delta > 0 ? "+" : ""}${figure(delta)}`;
+          }),
+        }
+      : {};
 
   // Every mount any loadout has, in the order first met. A mount sits on a
   // piece, and a piece keeps its id from one loadout to the next.
@@ -100,6 +165,7 @@ export function loadoutFamily(
       label: (labelCount.get(label) ?? 0) > 1 ? `${pieceName} ${label}` : label,
       cells,
       differs: !allSame(cells),
+      ...mountChanges(cells),
     };
   });
 
@@ -109,7 +175,14 @@ export function loadoutFamily(
       const values = stats.map((s) => (s as UnitStats)[id]);
       const cells = values.map((v) => (v === null ? null : figure(v)));
       const differs = !allSame(cells);
-      const row: FamilyRow = { id, kind: "stat", label, cells, differs };
+      const row: FamilyRow = {
+        id,
+        kind: "stat",
+        label,
+        cells,
+        differs,
+        ...statChanges(values),
+      };
       const numbers = values.filter((v): v is number => v !== null);
       if (differs && numbers.length >= 2) {
         const top = Math.max(...numbers);
@@ -122,6 +195,9 @@ export function loadoutFamily(
         }
       }
       rows.push(row);
+      if (id === "cost" && project.budget !== undefined) {
+        rows.push(budgetRow(project.budget, values));
+      }
     }
   }
 

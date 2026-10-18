@@ -29,6 +29,12 @@ import { type LegoLoadout, type LegoProject, pieceById } from "../../model";
 import type { LoadedPack } from "../../pack";
 import type { RawGeometry } from "../../rawGeometry";
 import { type Capture, THUMBNAIL_VIEW } from "../../thumbnail";
+import {
+  chainOrder,
+  predecessorOf,
+  setUpgradesFrom,
+  upgradeRefusal,
+} from "../../upgradeChain";
 import { LoadoutFamilyDrawer } from "./LoadoutFamilyDrawer";
 
 interface Props {
@@ -48,6 +54,8 @@ interface Props {
 
 /** The side of the square each loadout is photographed at, in pixels. */
 const FAMILY_PICTURE_PIXELS = 160;
+
+const NO_PREDECESSOR = "__none";
 
 const newId = () => crypto.randomUUID();
 
@@ -93,7 +101,13 @@ export function LoadoutPicker({
             size="sm"
             value={project.activeLoadout ?? ""}
             onValueChange={switchTo}
-            options={loadouts.map((l) => ({ value: l.id, label: l.name }))}
+            options={chainOrder(loadouts).map((l) => {
+              const from = predecessorOf(project, l);
+              return {
+                value: l.id,
+                label: from ? `${l.name} (from ${from.name})` : l.name,
+              };
+            })}
             ariaLabel="Loadout"
             className="h-5 w-40 border-transparent bg-transparent px-1 text-xs hover:border-border focus-visible:border-border"
           />
@@ -117,11 +131,33 @@ export function LoadoutPicker({
         <PopoverContent side="bottom" align="start" className="w-72 space-y-3">
           {loadouts ? (
             <ul className="space-y-1">
-              {loadouts.map((loadout) => (
+              {chainOrder(loadouts).map((loadout) => (
                 <LoadoutRow
                   key={loadout.id}
                   loadout={loadout}
                   active={loadout.id === project.activeLoadout}
+                  fromOptions={[
+                    { value: NO_PREDECESSOR, label: "Not an upgrade" },
+                    ...loadouts
+                      .filter((other) => other.id !== loadout.id)
+                      .map((other) => ({
+                        value: other.id,
+                        label: `From ${other.name}`,
+                        disabled:
+                          other.id !== loadout.upgradesFrom &&
+                          upgradeRefusal(project, loadout.id, other.id) !==
+                            null,
+                      })),
+                  ]}
+                  onUpgradesFrom={(from) =>
+                    edit((p) =>
+                      setUpgradesFrom(
+                        p,
+                        loadout.id,
+                        from === NO_PREDECESSOR ? null : from,
+                      ),
+                    )
+                  }
                   onRename={(name) =>
                     edit((p) => renameLoadout(p, loadout.id, name))
                   }
@@ -186,11 +222,15 @@ export function LoadoutPicker({
 function LoadoutRow({
   loadout,
   active,
+  fromOptions,
+  onUpgradesFrom,
   onRename,
   onDelete,
 }: {
   loadout: LegoLoadout;
   active: boolean;
+  fromOptions: { value: string; label: string; disabled?: boolean }[];
+  onUpgradesFrom: (from: string) => void;
   onRename: (name: string) => void;
   onDelete: () => void;
 }) {
@@ -203,29 +243,41 @@ function LoadoutRow({
   }
 
   return (
-    <li className="flex items-center gap-1">
-      <Input
-        value={name}
-        onChange={(event) => setName(event.target.value)}
-        onBlur={commit}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") event.currentTarget.blur();
-          if (event.key === "Escape") setName(loadout.name);
-        }}
-        aria-label={`Name of ${loadout.name}`}
-        aria-current={active ? "true" : undefined}
-        className={`h-7 min-w-0 flex-1 text-xs ${active ? "font-semibold" : ""}`}
-      />
-      <Button
-        size="icon"
-        variant="ghost"
-        className="size-7"
-        title="Delete"
-        aria-label={`Delete ${loadout.name}`}
-        onClick={onDelete}
-      >
-        <Trash2 className="size-3.5" />
-      </Button>
+    <li className="space-y-1">
+      <div className="flex items-center gap-1">
+        <Input
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          onBlur={commit}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.currentTarget.blur();
+            if (event.key === "Escape") setName(loadout.name);
+          }}
+          aria-label={`Name of ${loadout.name}`}
+          aria-current={active ? "true" : undefined}
+          className={`h-7 min-w-0 flex-1 text-xs ${active ? "font-semibold" : ""}`}
+        />
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-7"
+          title="Delete"
+          aria-label={`Delete ${loadout.name}`}
+          onClick={onDelete}
+        >
+          <Trash2 className="size-3.5" />
+        </Button>
+      </div>
+      {fromOptions.length > 2 ? (
+        <OptionSelect
+          size="sm"
+          value={loadout.upgradesFrom ?? NO_PREDECESSOR}
+          onValueChange={onUpgradesFrom}
+          options={fromOptions}
+          ariaLabel={`Upgrade of, for ${loadout.name}`}
+          className="h-6 w-full text-xs"
+        />
+      ) : null}
     </li>
   );
 }

@@ -829,6 +829,13 @@ export interface LegoProject {
   loadouts?: LegoLoadout[];
   /** The id of the loadout being edited. Present exactly when `loadouts` is. */
   activeLoadout?: string;
+  /**
+   * The most a loadout of this chassis should cost (#3284), in the same cost
+   * the stats panel shows. A chassis field, so every loadout is measured
+   * against the one figure. Over it is a warning, never a block. Absent means
+   * no budget. See `budget.ts`.
+   */
+  budget?: number;
 }
 
 /**
@@ -863,6 +870,11 @@ export interface LegoLoadout {
    * `loadoutUnitNames` in `loadoutExports.ts`.
    */
   unitName?: string;
+  /**
+   * The id of the loadout this one is an upgrade of (#3286). Absent for the
+   * start of a chain. See `upgradeChain.ts`.
+   */
+  upgradesFrom?: string;
   /**
    * This loadout's own receipts, one per game folder (#3282), read the way the
    * project's are. They stay on the entry whichever loadout is active, so
@@ -925,6 +937,13 @@ export interface LegoGuide {
   /** A line's place in the unit's space. */
   point?: [number, number, number];
   hidden?: boolean;
+}
+
+/** A stored budget, or null for anything that is not a positive number. */
+export function parseBudget(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? value
+    : null;
 }
 
 /** The guides that can be read, or null when there are none. */
@@ -1467,6 +1486,7 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
   const builder = parseBuilder(d.builder);
   const movement = parseMovement(d.movement);
   const worth = parseWorth(d.worth);
+  const budget = parseBudget(d.budget);
   const mount = parseMount(d.mount, pieces);
   const { pieces: flagged, ...loadouts } = parseLoadouts(d, pieces);
   const project: LegoProject = {
@@ -1555,6 +1575,7 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
     })(),
     ...(skeleton ? { skeleton } : {}),
     ...loadouts,
+    ...(budget !== null ? { budget } : {}),
   };
   // A document saved before pieces were written in save order, or hand-edited,
   // may not have its parents first. Normalise here so the invariant holds the
@@ -1827,7 +1848,15 @@ function parseLoadouts(
     };
   }
   const activeId = loadouts.find((loadout) => !loadout.content)?.id as string;
-  return { pieces, loadouts, activeLoadout: activeId };
+  const known = new Set(loadouts.map((loadout) => loadout.id));
+  const linked = loadouts.map((loadout) => {
+    if (!loadout.upgradesFrom) return loadout;
+    if (loadout.upgradesFrom !== loadout.id && known.has(loadout.upgradesFrom))
+      return loadout;
+    const { upgradesFrom: _gone, ...rest } = loadout;
+    return rest;
+  });
+  return { pieces, loadouts: linked, activeLoadout: activeId };
 }
 
 function parseLoadout(raw: unknown): LegoLoadout | null {
@@ -1845,6 +1874,9 @@ function parseLoadout(raw: unknown): LegoLoadout | null {
     name: v.name,
     ...(typeof v.unitName === "string" && v.unitName !== ""
       ? { unitName: v.unitName }
+      : {}),
+    ...(typeof v.upgradesFrom === "string" && v.upgradesFrom !== ""
+      ? { upgradesFrom: v.upgradesFrom }
       : {}),
     ...(exported ? { exported } : {}),
     ...(elsewhere.length > 0 ? { exportedElsewhere: elsewhere } : {}),

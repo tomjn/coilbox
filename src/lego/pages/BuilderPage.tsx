@@ -64,6 +64,7 @@ import { unitAtlas } from "../atlas";
 import { balanceProblem, checkBalance } from "../balance";
 import { legoTexturePrune } from "../bindings";
 import { releaseSkeleton } from "../bodyPlans";
+import { budgetProblem, budgetStanding, unitCost } from "../budget";
 import { addBuildArm, builderKind, pickArmParts } from "../buildArm";
 import { pictureIsStale } from "../buildPicture";
 import {
@@ -197,6 +198,7 @@ import { applyTarget } from "../skeletonSize";
 import type { Vec3 } from "../snapping";
 import { swapModule, swapRefusal } from "../swapModule";
 import { swapPart } from "../swapPart";
+import { upgradeChainProblems } from "../upgradeChain";
 import { useEditShortcuts } from "../useEditShortcuts";
 import { useLegoDocument } from "../useLegoDocument";
 import { useModuleFiles } from "../useModuleFiles";
@@ -628,9 +630,25 @@ function Builder({ id }: { id: string | undefined }) {
     [footprint],
   );
 
+  // A budget overrun is a design warning on the unit on screen, not a fault in
+  // the document, so it joins the list here rather than in `projectProblems`.
+  const budgetNote = useMemo(() => {
+    if (!draft || draft.budget === undefined || !pack) return null;
+    return budgetProblem(
+      budgetStanding(draft.budget, unitCost(draft, pack, raw)),
+    );
+  }, [draft, pack, raw]);
+
+  const chainNotes = useMemo(
+    () => (draft ? upgradeChainProblems(draft) : []),
+    [draft],
+  );
+
   const problems = useMemo<Problem[]>(
     () => [
       ...documentProblems,
+      ...(budgetNote ? [budgetNote] : []),
+      ...chainNotes,
       ...(balanceNote ? [balanceNote] : []),
       ...footprintNotes,
       ...overlapNotes,
@@ -638,6 +656,8 @@ function Builder({ id }: { id: string | undefined }) {
     ],
     [
       documentProblems,
+      budgetNote,
+      chainNotes,
       balanceNote,
       footprintNotes,
       overlapNotes,
@@ -2732,6 +2752,11 @@ function Builder({ id }: { id: string | undefined }) {
                   }
                   onWorthChange={(worth) =>
                     edit((project) => ({ ...project, worth }))
+                  }
+                  onBudgetChange={(budget) =>
+                    edit(({ budget: _old, ...project }) =>
+                      budget === undefined ? project : { ...project, budget },
+                    )
                   }
                   onWeaponChange={(pieceId, weapon) =>
                     edit((project) => ({

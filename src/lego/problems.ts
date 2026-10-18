@@ -17,7 +17,8 @@ export type ProblemSource =
   | "balance"
   | "footprint"
   | "overlap"
-  | "skeleton";
+  | "skeleton"
+  | "budget";
 
 export interface Problem {
   source: ProblemSource;
@@ -36,6 +37,7 @@ export const PROBLEM_SOURCES: { id: ProblemSource; label: string }[] = [
   { id: "footprint", label: "Footprint" },
   { id: "overlap", label: "Overlap" },
   { id: "skeleton", label: "Skeleton" },
+  { id: "budget", label: "Budget" },
 ];
 
 const SEVERITY_ORDER: ProblemSeverity[] = ["error", "warning", "note"];

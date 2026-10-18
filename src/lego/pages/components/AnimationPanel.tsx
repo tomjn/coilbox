@@ -353,6 +353,8 @@ interface Props {
   onMovementChange: (movement: LegoMovement | undefined) => void;
   /** The table that sets the unit's health, cost and mass (issue #3280). */
   onWorthChange: (worth: LegoWorth) => void;
+  /** Sets or clears the chassis budget (issue #3284). */
+  onBudgetChange?: (budget: number | undefined) => void;
   /** What a turret or aim point fires, and over what arc (issue #3274). The
    *  Weapons section is shown only when this is given. */
   onWeaponChange?: (pieceId: string, weapon: LegoPieceWeapon) => void;
@@ -423,6 +425,7 @@ export function AnimationPanel({
   onBuilderChange,
   onMovementChange,
   onWorthChange,
+  onBudgetChange,
   onWeaponChange,
   referenceUnit,
   onScriptTimeline,
@@ -1802,6 +1805,7 @@ export function AnimationPanel({
             pack={pack}
             bounds={bounds}
             reference={referenceUnit ?? null}
+            onBudgetChange={onBudgetChange}
           />
 
           <GameFitSection project={project} bounds={bounds} />
