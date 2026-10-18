@@ -84,6 +84,8 @@ function presetsFilling(callins: string[]): string[] {
         params,
         signal: "SIG",
         pieces: () => ["piece"],
+        root: "piece",
+        breakGroups: () => [{ pieces: ["piece"], whole: true }],
         wheels: () => [{ piece: "piece", radius: 1, front: true }],
         motion: { accRate: 0.5, decRate: 0.5 },
         weapons: () => [{ number: 1, piece: () => "piece", signal: "SIG" }],

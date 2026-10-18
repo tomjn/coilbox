@@ -11,6 +11,8 @@
  * what it needs, and the panel can say what is missing.
  */
 
+import { EVERY_CUT, WRECK_STAGES } from "./breakApart";
+
 export interface LegoRole {
   id: string;
   label: string;
@@ -252,7 +254,24 @@ export interface EmitWheel {
   front: boolean;
 }
 
+/** Pieces that leave a destroyed unit together (#3354). See `breakApart.ts`. */
+export interface EmitBreakGroup {
+  /** The Lua names of the pieces, the top piece first. Asking marks them used. */
+  readonly pieces: string[];
+  /** Whether it is a whole branch, which one `Explode` with `SFX.RECURSIVE`
+   *  throws. Otherwise each piece is exploded on its own. */
+  whole: boolean;
+}
+
 export interface EmitContext {
+  /** The Lua name of the root piece, or undefined for a unit with none. */
+  readonly root: string | undefined;
+  /**
+   * The groups the unit breaks into along its connections when cut at every
+   * place with at most `depth` places between it and the root, weakest first.
+   * Empty for a unit with only a root.
+   */
+  breakGroups(depth: number): EmitBreakGroup[];
   /**
    * Names of the pieces carrying a role, in document order. Asking marks them
    * used, so the script declares a local for exactly what it references.
@@ -2669,6 +2688,170 @@ export const WRECK_POSE: AnimPreset = {
   },
 };
 
+/**
+ * The grades a destroyed unit breaks apart in, lightest first (#3354).
+ *
+ * `share` is how much of the unit's weakest groups are thrown at that grade,
+ * and `depth` how finely the unit is cut (`breakGroups`): light and medium
+ * hits throw bigger groups, a heavy hit cuts at every connection. The shares
+ * are thirds because Balanced Annihilation's scripts have three grades before
+ * the one that repeats the last, and the game maker's `amount` scales them.
+ *
+ * `corpse` is the wreck level the grade returns: 1, 2 and 3, as the three bands
+ * of Balanced Annihilation's scripts do. Of the 417 scripts in
+ * balanced_annihilation-v15.9.8 with a `Killed`, 386 cut severity at 25, 50 and
+ * 99 and set `corpsetype` to 1, 2 and 3 in those bands. The engine reads level `n` as `n - 1` steps down the wreck's
+ * `featuredead` chain (`CUnit::~CUnit` calls `CreateWreck(level - 1)` and
+ * `CFeatureHandler::CreateWreckage` walks `deathFeatureDefID`), so a level past
+ * the stages the unit's export writes (`WRECK_STAGES`) leaves no wreck at all.
+ * The export writes one, so every grade returns 1 until it writes a heap.
+ */
+interface BreakGrade {
+  id: "light" | "medium" | "heavy";
+  depth: number;
+  share: number;
+  /** The `SFX` names thrown pieces get. Debris always falls: `PF_Fall` is
+   *  unused in the engine and `SFX.FALL` is 0. */
+  flags: string[];
+  /** What happens to the root, which is what is left when the groups are gone.
+   *  `SFX.NONE` is a flash with no debris. */
+  root: "SFX.NONE" | "SFX.SHATTER";
+  corpse: number;
+}
+
+const BREAK_GRADES: BreakGrade[] = [
+  {
+    id: "light",
+    depth: 1,
+    share: 1 / 3,
+    flags: ["SFX.SMOKE"],
+    root: "SFX.NONE",
+    corpse: 1,
+  },
+  {
+    id: "medium",
+    depth: 2,
+    share: 2 / 3,
+    flags: ["SFX.SMOKE", "SFX.FIRE"],
+    root: "SFX.NONE",
+    corpse: 2,
+  },
+  {
+    id: "heavy",
+    depth: EVERY_CUT,
+    share: 1,
+    flags: ["SFX.SMOKE", "SFX.FIRE", "SFX.EXPLODE_ON_HIT"],
+    root: "SFX.SHATTER",
+    corpse: 3,
+  },
+];
+
+export const BREAK_APART: AnimPreset = {
+  id: "wreck.breakApart",
+  label: "Break apart",
+  description:
+    "When the unit dies it comes apart along its joins. A light hit throws off a few of the biggest groups of parts, a heavy hit throws off every part one by one, smallest first, and the wreck follows what the hit left. A unit with no joins breaks along its piece tree.",
+  requires: [],
+  animates: [],
+  params: [
+    {
+      id: "amount",
+      label: "How much breaks off",
+      unit: "%",
+      min: 10,
+      max: 100,
+      step: 5,
+      fallback: 100,
+    },
+    {
+      id: "light",
+      label: "Light hit up to",
+      unit: "%",
+      min: 1,
+      max: 100,
+      step: 1,
+      fallback: 25,
+    },
+    {
+      id: "medium",
+      label: "Medium hit up to",
+      unit: "%",
+      min: 1,
+      max: 200,
+      step: 1,
+      fallback: 50,
+    },
+  ],
+  /** Nothing moves: the pieces are thrown and hidden, which the preview marks
+   *  on the scrubber. */
+  track() {
+    return null;
+  },
+  /**
+   * Severity is `recentDamage / maxHealth` (`LuaUnitScript.cpp` documents it
+   * so for Killed). `recentDamage` is the damage taken lately, decayed by 0.9
+   * a slow update, and a self destruct adds twice the unit's health to it
+   * (`Unit.cpp`). The engine's COB side passes the ratio as a percentage and
+   * Balanced Annihilation's scripts cut it at 25, 50 and 99, so the defaults
+   * are the first two, as percentages. Everything above the second is the
+   * heavy grade: BA's third band and the one past it do the same thing.
+   *
+   * The groups are worked out here and written out flat, one `if` for each
+   * grade, so the script shows what each grade throws and the game maker can
+   * edit it. Every `if` returns, so `buildLuaScript` leaves out the
+   * `Explode` and `return 1` it writes for a unit with nothing in `Killed`.
+   */
+  emit(ctx) {
+    const root = ctx.root;
+    if (!root) return null;
+    const amount = Math.min(
+      1,
+      Math.max(0.1, value(this, ctx.params, "amount") / 100),
+    );
+    const medium = Math.max(value(this, ctx.params, "medium"), 0) / 100;
+    const light = Math.min(
+      Math.max(value(this, ctx.params, "light"), 0) / 100,
+      medium,
+    );
+    const limits = [light, medium];
+
+    const lines: string[] = ["  local severity = recentDamage / maxHealth"];
+    BREAK_GRADES.forEach((grade, index) => {
+      const groups = ctx.breakGroups(grade.depth);
+      const thrown =
+        groups.length === 0
+          ? 0
+          : Math.max(1, Math.ceil(groups.length * grade.share * amount));
+      const flags = grade.flags.join(" + ");
+      const body: string[] = [];
+      for (const group of groups.slice(0, thrown)) {
+        const pieces = group.pieces;
+        if (group.whole && pieces.length > 1) {
+          body.push(`Explode(${pieces[0]}, SFX.RECURSIVE + ${flags})`);
+        } else {
+          for (const piece of pieces) body.push(`Explode(${piece}, ${flags})`);
+        }
+        for (const piece of pieces) body.push(`Hide(${piece})`);
+      }
+      body.push(
+        `Explode(${root}, ${grade.root})`,
+        `return ${Math.min(grade.corpse, WRECK_STAGES)}`,
+      );
+      const last = index === BREAK_GRADES.length - 1;
+      if (last) {
+        lines.push(...body.map((line) => `  ${line}`));
+      } else {
+        lines.push(
+          `  if severity <= ${lua(limits[index])} then`,
+          ...body.map((line) => `    ${line}`),
+          "  end",
+        );
+      }
+    });
+    return { functions: [], hooks: { Killed: lines } };
+  },
+};
+
 export const PRESETS: AnimPreset[] = [
   WALK_BIPED,
   WALK_QUAD,
@@ -2690,6 +2873,7 @@ export const PRESETS: AnimPreset[] = [
   WRECK_POSE,
   WHEELS_STEER,
   BODY_ROCK,
+  BREAK_APART,
 ];
 
 export function presetById(id: string): AnimPreset | undefined {
