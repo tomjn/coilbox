@@ -228,6 +228,29 @@ describe("a part", () => {
     expect(screen.queryByText("Pack")).toBeNull();
   });
 
+  it("leaves atlas row tags out of its tags and tells twins apart", () => {
+    const first = {
+      ...part("p-one", "grey"),
+      tags: ["beam", "row5"],
+      sourceNames: ["Object12"],
+    };
+    const twin = { ...first, id: "p-two", sourceNames: ["Object40"] };
+    const pack = {
+      ...packWith(),
+      parts: [first, twin],
+      byId: new Map([
+        [first.id, first],
+        [twin.id, twin],
+      ]),
+    } as unknown as LoadedPack;
+    const { container } = show({ kind: "part", id: twin.id }, { pack });
+    expect(
+      screen.getByRole("heading", { name: "grey beam (Object40)" }),
+    ).toBeTruthy();
+    expect(container.textContent).toContain("beam");
+    expect(container.textContent).not.toContain("row5");
+  });
+
   it("switches colourway by choosing the other part", () => {
     const { onSelect } = show({ kind: "part", id: grey.id });
     expect(button("Grey")?.getAttribute("aria-pressed")).toBe("true");
