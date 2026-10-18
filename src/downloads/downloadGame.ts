@@ -1,5 +1,6 @@
 import { loadGithubGameRepos } from "../content/branding";
 import { dlDownloadFileRaw, dlDownloadRaw } from "./bindings";
+import { type DownloadAttempt, hostOf } from "./downloadHistory";
 import { withDownloadNotify } from "./downloadNotify";
 import {
   GAME_REPOS,
@@ -50,11 +51,19 @@ async function downloadGameAnySourceImpl(opts: {
   onProgress: ProgressSink;
   /** The `indexTick` when the download was asked for. Defaults to now. */
   askedAt?: number;
+  /** Told about each source tried, whether it worked or not (issue #4576). */
+  onAttempt?: (attempt: DownloadAttempt) => void;
 }): Promise<string> {
   const { gameName, writePath, opId, onProgress } = opts;
   const askedAt = opts.askedAt ?? indexTick();
   const target = norm(gameName);
   const errors: string[] = [];
+  /** What the source being tried is fetching, set just before it fetches. */
+  let fetching: Pick<DownloadAttempt, "reference" | "filename" | "mirror"> = {
+    reference: null,
+    filename: null,
+    mirror: null,
+  };
 
   // The unified GitHub game-repo registry (issue #512): the catalog is
   // authoritative once loaded, the in-code GAME_REPOS list is the fallback seed.
@@ -85,6 +94,11 @@ async function downloadGameAnySourceImpl(opts: {
             `${repo} has no release matching "${gameName}" in its latest ${archives.length} release(s) (newest: ${archives[0].filename})`,
           );
         }
+        fetching = {
+          reference: hit.tag,
+          filename: hit.filename,
+          mirror: hostOf(hit.url),
+        };
         await dlDownloadFileRaw({
           url: hit.url,
           destDir: `${writePath}/games`,
@@ -107,6 +121,11 @@ async function downloadGameAnySourceImpl(opts: {
         );
         const url = found?.mirrors?.[0];
         if (!found || !url) return null;
+        fetching = {
+          reference: url,
+          filename: found.filename,
+          mirror: hostOf(url),
+        };
         await dlDownloadFileRaw({
           url,
           destDir: `${writePath}/games`,
@@ -127,6 +146,11 @@ async function downloadGameAnySourceImpl(opts: {
       case "rapid": {
         const rapidErrors: string[] = [];
         for (const master of DEFAULT_RAPID_MASTERS) {
+          fetching = {
+            reference: gameName,
+            filename: null,
+            mirror: hostOf(master.url),
+          };
           try {
             await dlDownloadRaw({
               tag: gameName,
@@ -150,11 +174,26 @@ async function downloadGameAnySourceImpl(opts: {
     hasWritePath: !!writePath,
   });
   for (const source of order) {
+    const startedAt = Date.now();
+    fetching = { reference: null, filename: null, mirror: null };
+    const report = (outcome: "ok" | "failed", failure: string | null) =>
+      opts.onAttempt?.({
+        source,
+        outcome,
+        ...fetching,
+        md5: null,
+        failure,
+        durationMs: Date.now() - startedAt,
+      });
     try {
       const result = await attempt(source);
-      if (result) return result;
+      if (result) {
+        report("ok", null);
+        return result;
+      }
     } catch (e) {
       errors.push(`${source}: ${msg(e)}`);
+      report("failed", msg(e));
     }
   }
 
