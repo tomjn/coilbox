@@ -202,6 +202,7 @@ import { FitPlanDrawer } from "./components/FitPlanDrawer";
 import { GameUnitBrowser } from "./components/GameUnitBrowser";
 import { InventoryFilters, InventoryGrids } from "./components/Inventory";
 import { JoinedTo } from "./components/JoinedTo";
+import { LoadoutPicker } from "./components/LoadoutPicker";
 import { PieceSize } from "./components/MeasureReadout";
 import { ModelViewport } from "./components/ModelViewport";
 import { ModuleUpdateBanner } from "./components/ModuleUpdateBanner";
@@ -1943,6 +1944,11 @@ function Builder({ id }: { id: string | undefined }) {
                             />
                           )}
                           <UnitGamePicker project={draft} onChange={setGame} />
+                          <LoadoutPicker
+                            project={draft}
+                            selectedId={selectedId}
+                            onEdit={edit}
+                          />
                         </div>
                       </div>
 
