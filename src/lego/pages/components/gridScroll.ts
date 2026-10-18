@@ -1,13 +1,13 @@
 /**
  * Where a canvas grid scrolls (#4468).
  *
- * The parts and module grids draw their cells on one canvas with a layer of
- * buttons over it. By default a grid scrolls itself: the canvas fills a box and
- * a scroller on top moves the buttons, which is what the builder's drawer
- * wants. Given a `scrollRoot`, a grid is as tall as its cells and scrolls with
- * that root instead, so the Lego Parts page can hold both grids under one
- * scroll bar. The canvas is then a sticky box no taller than the root, so only
- * the rows on screen are drawn either way.
+ * The inventory grid (`./TileGrid`) draws its tiles on one canvas laid over a
+ * layer of buttons. By default it scrolls itself: the canvas fills a box and a
+ * scroller under it moves the buttons, which is what the builder's drawer
+ * wants. Given a `scrollRoot`, the grid is as tall as its tiles and scrolls
+ * with that root instead, so the Lego Parts page has one scroll bar. The canvas
+ * is then a sticky box no taller than the root, so only the rows on screen are
+ * drawn either way.
  */
 
 import { type RefObject, useEffect, useState } from "react";
@@ -75,8 +75,9 @@ export function gridScroll(
     },
     watch: (draw) => {
       scroller.addEventListener("scroll", draw, { passive: true });
-      // On a page, a grid above this one growing or shrinking moves this one
-      // without any scroll, so the page's contents are watched too.
+      // On a page, anything above the grid growing or shrinking, such as the
+      // filter row wrapping, moves it without any scroll, so the page's
+      // contents are watched too.
       const observer = page ? new ResizeObserver(draw) : null;
       if (observer)
         for (const child of scroller.children) observer.observe(child);

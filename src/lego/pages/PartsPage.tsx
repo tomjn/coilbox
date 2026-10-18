@@ -20,7 +20,7 @@ import {
   PackProblems,
   PackSelect,
 } from "./components/PartFilters";
-import { CELL, GAP } from "./components/PartPicker";
+import { CELL, GAP, LABEL } from "./components/TileGrid";
 
 type Status =
   | { state: "loading" }
@@ -38,6 +38,7 @@ export default function PartsPage() {
   const [status, setStatus] = useState<Status>({ state: "loading" });
   const [selected, setSelected] = useState<LegoPartInfo | null>(null);
   const [selectedShape, setSelectedShape] = useState<ShapeKind | null>(null);
+  const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -114,19 +115,23 @@ export default function PartsPage() {
               selectedPartId={selected?.id}
               onSelectPart={(part) => {
                 setSelectedShape(null);
+                setSelectedModuleId(null);
                 setSelected(part);
               }}
               selectedShape={selectedShape?.id}
               onSelectShape={(shape) => {
                 setSelected(null);
+                setSelectedModuleId(null);
                 setSelectedShape(shape);
               }}
               // Modules have no detail view yet, so choosing one closes whatever
               // the panel was showing rather than leaving it up.
-              onSelectModule={() => {
+              onSelectModule={(module) => {
                 setSelected(null);
                 setSelectedShape(null);
+                setSelectedModuleId(module.id);
               }}
+              selectedModuleId={selectedModuleId ?? undefined}
               onDeleteModule={(id) => void deleteCompound(id)}
               onRenameModule={(compound, name) =>
                 void saveCompound({ ...compound, name })
@@ -162,18 +167,22 @@ export default function PartsPage() {
   );
 }
 
-/** The parts grid's own cell and gap, so nothing moves when it lands. */
+/** The grid's own tile and gap, so nothing moves when it lands. */
 function Loading() {
   return (
     <div
       className="grid"
-      style={{ gridTemplateColumns: `repeat(auto-fill, ${CELL}px)`, gap: GAP }}
+      style={{
+        gridTemplateColumns: `repeat(auto-fill, ${CELL}px)`,
+        columnGap: GAP,
+        rowGap: GAP + LABEL,
+      }}
     >
       {Array.from({ length: 24 }, (_, i) => (
         <Skeleton
           // biome-ignore lint/suspicious/noArrayIndexKey: fixed-length skeleton, nothing reorders
           key={i}
-          className="rounded"
+          className="rounded-md"
           style={{ height: CELL }}
         />
       ))}

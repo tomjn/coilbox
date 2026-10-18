@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { LegoProject } from "../model";
 import type { LegoPartInfo, LoadedPack } from "../pack";
-import { CELL } from "./components/PartPicker";
+import { CELL } from "./components/TileGrid";
 
 const part = { id: "p1", name: "grey block" } as unknown as LegoPartInfo;
 const module = { id: "m1", name: "Hull section" } as unknown as LegoProject;

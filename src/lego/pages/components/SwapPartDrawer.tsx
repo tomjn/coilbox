@@ -16,7 +16,7 @@ import { usePartFilter } from "../../filter";
 import type { LegoPartInfo, LoadedPack } from "../../pack";
 import { variantsFirst } from "../../swapPart";
 import { NoMatches, PartFilters } from "./PartFilters";
-import { PartPicker } from "./PartPicker";
+import { TileGrid } from "./TileGrid";
 
 interface Props {
   open: boolean;
@@ -40,6 +40,17 @@ export function SwapPartDrawer({
   const parts = useMemo(
     () => variantsFirst(pack, current, filter.parts),
     [pack, current, filter.parts],
+  );
+  const sections = useMemo(
+    () => [
+      {
+        id: "parts",
+        label: "Parts",
+        total: pack.parts.length,
+        items: parts.map((part) => ({ kind: "part" as const, part })),
+      },
+    ],
+    [pack, parts],
   );
 
   return (
@@ -75,11 +86,11 @@ export function SwapPartDrawer({
             {parts.length === 0 ? (
               <NoMatches />
             ) : (
-              <PartPicker
+              <TileGrid
                 pack={pack}
-                parts={parts}
+                sections={sections}
                 atlas={atlas}
-                onSelect={onPick}
+                onPick={(item) => item.kind === "part" && onPick(item.part)}
               />
             )}
           </div>

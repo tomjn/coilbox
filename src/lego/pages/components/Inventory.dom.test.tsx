@@ -2,8 +2,8 @@
 
 /**
  * The one inventory (issue #3306): the kind filter, the recent and favourites
- * lists, and what is drawn for each. The two canvases are replaced with lists
- * of names, because what is under test is which items reach them.
+ * lists, and what is drawn for each. The grid is replaced with lists of
+ * names, because what is under test is which items reach it.
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -35,73 +35,82 @@ vi.mock("@picoframe/frame", async (importOriginal) => {
   };
 });
 
-vi.mock("./PartPicker", () => ({
-  PartPicker: ({
-    parts,
-    favourites,
-    onFavourite,
-    shapes,
-    favouriteShapes,
-    onFavouriteShape,
-    scrollRoot,
-  }: {
-    scrollRoot?: unknown;
-    parts: LegoPartInfo[];
-    favourites: ReadonlySet<string>;
-    onFavourite: (part: LegoPartInfo) => void;
-    shapes: ShapeKind[];
-    favouriteShapes: ReadonlySet<string>;
-    onFavouriteShape: (shape: ShapeKind) => void;
-  }) => (
-    <>
-      <ul aria-label="shape grid">
-        {shapes.map((shape) => (
-          <li key={shape.id}>
-            {shape.label}
-            <button type="button" onClick={() => onFavouriteShape(shape)}>
-              {favouriteShapes.has(shape.id) ? "unstar" : "star"} {shape.label}
-            </button>
-          </li>
-        ))}
-      </ul>
-      <ul aria-label="part grid" data-scroll={scrollRoot ? "page" : "own"}>
-        {parts.map((part) => (
-          <li key={part.id}>
-            {part.name}
-            <button type="button" onClick={() => onFavourite(part)}>
-              {favourites.has(part.id) ? "unstar" : "star"} {part.name}
-            </button>
-          </li>
-        ))}
-      </ul>
-    </>
-  ),
-}));
-
-vi.mock("./CompoundPicker", () => ({
-  CompoundPicker: ({
-    compounds,
-    favourites,
-    onFavourite,
-    scrollRoot,
-  }: {
-    scrollRoot?: unknown;
-    compounds: LegoProject[];
-    favourites: ReadonlySet<string>;
-    onFavourite: (module: LegoProject) => void;
-  }) => (
-    <ul aria-label="module grid" data-scroll={scrollRoot ? "page" : "own"}>
-      {compounds.map((module) => (
-        <li key={module.id}>
-          {module.name}
-          <button type="button" onClick={() => onFavourite(module)}>
-            {favourites.has(module.id) ? "unstar" : "star"} {module.name}
-          </button>
-        </li>
-      ))}
-    </ul>
-  ),
-}));
+/**
+ * The grid, as one list per kind of tile and the headings with their counts.
+ * A list with nothing in it is left out, as the grid leaves out an empty
+ * section.
+ */
+vi.mock("./TileGrid", async () => {
+  const { sectionCount } = await import("./sectionGrid");
+  type Item =
+    | { kind: "shape"; shape: ShapeKind }
+    | { kind: "part"; part: LegoPartInfo }
+    | { kind: "module"; module: LegoProject };
+  const keyOf = (item: Item) =>
+    item.kind === "shape"
+      ? `shape:${item.shape.id}`
+      : item.kind === "part"
+        ? `part:${item.part.id}`
+        : `module:${item.module.id}`;
+  const nameOf = (item: Item) =>
+    item.kind === "shape"
+      ? item.shape.label
+      : item.kind === "part"
+        ? item.part.name
+        : item.module.name;
+  const GRIDS = [
+    { kind: "shape", label: "shape grid" },
+    { kind: "part", label: "part grid" },
+    { kind: "module", label: "module grid" },
+  ] as const;
+  return {
+    TileGrid: ({
+      sections,
+      favourites,
+      onFavourite,
+      scrollRoot,
+    }: {
+      sections: {
+        id: string;
+        label: string;
+        total: number;
+        items: Item[];
+      }[];
+      favourites: ReadonlySet<string>;
+      onFavourite: (item: Item) => void;
+      scrollRoot?: unknown;
+    }) => {
+      const items = sections.flatMap((section) => section.items);
+      return (
+        <section aria-label="grid" data-scroll={scrollRoot ? "page" : "own"}>
+          {sections
+            .filter((section) => section.items.length > 0)
+            .map((section) => (
+              <h3 key={section.id}>
+                {`${section.label} ${sectionCount(section.items.length, section.total)}`}
+              </h3>
+            ))}
+          {GRIDS.map(({ kind, label }) => {
+            const these = items.filter((item) => item.kind === kind);
+            return these.length === 0 ? null : (
+              <ul key={kind} aria-label={label}>
+                {these.map((item) => (
+                  <li key={keyOf(item)}>
+                    {nameOf(item)}
+                    <button type="button" onClick={() => onFavourite(item)}>
+                      {favourites.has(keyOf(item)) ? "unstar" : "star"}{" "}
+                      {nameOf(item)}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            );
+          })}
+        </section>
+      );
+    },
+  };
+});
 
 import { type InventoryRef, useInventoryView } from "../../inventory";
 import { InventoryFilters, InventoryGrids } from "./Inventory";
@@ -248,6 +257,46 @@ describe("the count", () => {
   });
 });
 
+describe("the section headings", () => {
+  const headings = () =>
+    screen.getAllByRole("heading").map((heading) => heading.textContent);
+
+  it("count each section, with built in modules apart from saved ones", () => {
+    const starter = { ...module("Wheel"), id: "builtin.wheel" };
+    render(<Harness known={[starter, ...modules]} />);
+    expect(headings()).toEqual([
+      `Shapes ${SHAPE_KINDS.length}`,
+      "Parts 3",
+      "Built in modules 1",
+      "Saved modules 2",
+    ]);
+  });
+
+  it("say how many of the whole section a search leaves", () => {
+    render(<Harness />);
+    fireEvent.change(screen.getByLabelText("Search the inventory"), {
+      target: { value: "e" },
+    });
+    expect(headings()).toContain("Parts 2 of 3");
+    expect(headings()).toContain("Saved modules 2");
+  });
+
+  it("leave out a section a filter empties", () => {
+    render(<Harness />);
+    fireEvent.change(screen.getByLabelText("Search the inventory"), {
+      target: { value: "tur" },
+    });
+    expect(headings()).toEqual(["Saved modules 1 of 2"]);
+  });
+
+  it("count a list as a narrowing too", () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "use wedge" }));
+    fireEvent.click(screen.getByRole("button", { name: "Recent" }));
+    expect(headings()).toEqual(["Parts 1 of 3"]);
+  });
+});
+
 describe("shapes", () => {
   it("are listed beside the parts by default", () => {
     render(<Harness />);
@@ -265,9 +314,9 @@ describe("shapes", () => {
     fireEvent.change(search, { target: { value: "slope" } });
     expect(names("shape grid")).toEqual(["Wedge"]);
     fireEvent.change(search, { target: { value: "round" } });
-    expect(screen.queryByLabelText("part grid")).toBeTruthy();
+    expect(screen.queryByLabelText("grid")).toBeTruthy();
     fireEvent.change(search, { target: { value: "beam" } });
-    expect(names("shape grid")).toEqual([]);
+    expect(screen.queryByLabelText("shape grid")).toBeNull();
   });
 
   it("are the only cells under the Shapes category", () => {
@@ -275,21 +324,21 @@ describe("shapes", () => {
     fireEvent.click(screen.getByRole("button", { name: "Parts" }));
     fireEvent.click(screen.getByRole("button", { name: "Shapes" }));
     expect(names("shape grid")).toEqual(ALL_SHAPES);
-    expect(names("part grid")).toEqual([]);
+    expect(screen.queryByLabelText("part grid")).toBeNull();
   });
 
   it("are hidden by a colour", () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "Parts" }));
     fireEvent.click(screen.getByRole("button", { name: "Grey" }));
-    expect(names("shape grid")).toEqual([]);
+    expect(screen.queryByLabelText("shape grid")).toBeNull();
     expect(names("part grid")).toEqual(["beam", "block", "wedge"]);
   });
 
   it("stay when a pack is picked", () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "pick another pack" }));
-    expect(names("part grid")).toEqual([]);
+    expect(screen.queryByLabelText("part grid")).toBeNull();
     expect(names("shape grid")).toEqual(ALL_SHAPES);
   });
 
@@ -494,8 +543,8 @@ describe("the filter row in a narrow space", () => {
 });
 
 /**
- * The Lego Parts page scrolls as one, parts then modules (#4468). The builder's
- * drawer keeps a scroller in each grid.
+ * The Lego Parts page scrolls as one (#4468). The builder's drawer keeps a
+ * scroller in the grid.
  */
 describe("one scroll for the page", () => {
   function Grids({ page }: { page: boolean }) {
@@ -514,14 +563,11 @@ describe("one scroll for the page", () => {
     );
   }
 
-  it("hands the page's scroller to both grids", () => {
+  it("hands the page's scroller to the grid", () => {
     render(<Grids page />);
-    expect(screen.getByLabelText("part grid").getAttribute("data-scroll")).toBe(
+    expect(screen.getByLabelText("grid").getAttribute("data-scroll")).toBe(
       "page",
     );
-    expect(
-      screen.getByLabelText("module grid").getAttribute("data-scroll"),
-    ).toBe("page");
   });
 
   it("keeps the detail beside the grids in view as the page scrolls", () => {
@@ -531,14 +577,11 @@ describe("one scroll for the page", () => {
     expect(holder.className).toContain("top-0");
   });
 
-  it("leaves each grid its own scroller where no page scroller is given", () => {
+  it("leaves the grid its own scroller where no page scroller is given", () => {
     render(<Grids page={false} />);
-    expect(screen.getByLabelText("part grid").getAttribute("data-scroll")).toBe(
+    expect(screen.getByLabelText("grid").getAttribute("data-scroll")).toBe(
       "own",
     );
-    expect(
-      screen.getByLabelText("module grid").getAttribute("data-scroll"),
-    ).toBe("own");
     const holder = screen.getByLabelText("detail").parentElement as HTMLElement;
     expect(holder.className).not.toContain("sticky");
   });
