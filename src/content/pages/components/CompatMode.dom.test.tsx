@@ -18,6 +18,8 @@ const store = vi.hoisted(() => new Map<string, unknown>());
 const build = vi.hoisted(() => vi.fn());
 const status = vi.hoisted(() => vi.fn());
 const remove = vi.hoisted(() => vi.fn());
+const exportSdz = vi.hoisted(() => vi.fn());
+const save = vi.hoisted(() => vi.fn());
 
 vi.mock("@picoframe/frame", async () => {
   const react = await vi.importActual<typeof import("react")>("react");
@@ -42,7 +44,10 @@ vi.mock("../../../compat/bindings", () => ({
   compatBuild: (args: unknown) => build(args),
   compatStatus: (args: unknown) => status(args),
   compatRemove: (args: unknown) => remove(args),
+  compatExport: (args: unknown) => exportSdz(args),
 }));
+
+vi.mock("@tauri-apps/plugin-dialog", () => ({ save }));
 
 const { CompatMode } = await import("./CompatMode");
 
@@ -90,6 +95,8 @@ beforeEach(() => {
   build.mockReset();
   status.mockReset();
   remove.mockReset();
+  exportSdz.mockReset();
+  save.mockReset();
 });
 afterEach(cleanup);
 
@@ -208,5 +215,53 @@ describe("CompatMode", () => {
     await screen.findByText("no space left on device");
     expect(store.has("content.compat")).toBe(false);
     expect(compatSwitch().getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("exports the current folder to the path the player picks", async () => {
+    status.mockResolvedValue(CURRENT);
+    save.mockResolvedValue("/home/tom/xta-compat.sdz");
+    exportSdz.mockResolvedValue({
+      path: "/home/tom/xta-compat.sdz",
+      folder: BUILT.folder,
+      files: ["modinfo.lua", ".coilbox-compat.json"],
+    });
+    render(view());
+    fireEvent.click(await screen.findByRole("button", { name: /Export/ }));
+    await waitFor(() => expect(exportSdz).toHaveBeenCalledTimes(1));
+    expect(save.mock.calls[0][0].defaultPath).toBe(
+      "coilbox-compat-xta-9.65-2.sdz",
+    );
+    expect(exportSdz).toHaveBeenCalledWith({
+      dataDir: "/data",
+      archiveName: "xta-9.65.sd7",
+      baseChecksum: "1234abcd",
+      dest: "/home/tom/xta-compat.sdz",
+    });
+    await screen.findByText(/Exported 2 files to/);
+  });
+
+  it("exports nothing when the save dialog is cancelled", async () => {
+    status.mockResolvedValue(CURRENT);
+    save.mockResolvedValue(null);
+    render(view());
+    fireEvent.click(await screen.findByRole("button", { name: /Export/ }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    expect(exportSdz).not.toHaveBeenCalled();
+  });
+
+  it("offers no export for a stale folder", async () => {
+    status.mockResolvedValue(STALE);
+    render(view());
+    await screen.findByRole("button", { name: /Rebuild/ });
+    expect(screen.queryByRole("button", { name: /Export/ })).toBeNull();
+  });
+
+  it("shows why an export was refused", async () => {
+    status.mockResolvedValue(CURRENT);
+    save.mockResolvedValue("/home/tom/xta-compat.sdz");
+    exportSdz.mockRejectedValue(new Error("the folder is out of date"));
+    render(view());
+    fireEvent.click(await screen.findByRole("button", { name: /Export/ }));
+    await screen.findByText("the folder is out of date");
   });
 });
