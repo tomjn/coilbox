@@ -166,16 +166,38 @@ fn scan_archive(us: &Unitsync, archive: &str, out: &mut LuaCompatOutput) {
         return;
     };
 
-    let members: BTreeSet<String> = us
+    let list = us
         .list_archive_files(handle)
         .into_iter()
-        .map(|(path, _)| path)
+        .map(|(path, _)| path);
+    // Uncapped, because a cap would skip the biggest files without saying so. A
+    // game's own Lua is the size it is.
+    scan_members(
+        archive,
+        list,
+        |member| {
+            us.read_archive_member(handle, member, usize::MAX)
+                .map(|(_, bytes)| bytes)
+        },
+        out,
+    );
+    us.close_archive(handle);
+}
+
+/// Scan the Lua among `list`, the paths in `archive`, reading each through
+/// `read`, adding to `out`.
+fn scan_members(
+    archive: &str,
+    list: impl IntoIterator<Item = String>,
+    read: impl Fn(&str) -> Option<Vec<u8>>,
+    out: &mut LuaCompatOutput,
+) {
+    let members: BTreeSet<String> = list
+        .into_iter()
         .filter(|path| is_scanned_lua(path))
         .collect();
     for member in members {
-        // Uncapped, because a cap would skip the biggest files without saying
-        // so. A game's own Lua is the size it is.
-        let Some((_, bytes)) = us.read_archive_member(handle, &member, usize::MAX) else {
+        let Some(bytes) = read(&member) else {
             out.errors
                 .push(format!("could not read {member} in {archive}"));
             continue;
@@ -190,7 +212,6 @@ fn scan_archive(us: &Unitsync, archive: &str, out: &mut LuaCompatOutput) {
             });
         }
     }
-    us.close_archive(handle);
 }
 
 #[cfg(test)]
@@ -219,5 +240,88 @@ mod tests {
         assert!(!is_scanned_lua("lups/lups.lua"));
         assert!(!is_scanned_lua("modinfo.lua"));
         assert!(!is_scanned_lua("objects3d/luaui/a.lua"));
+    }
+
+    /// The Lua of a small game, with a handler in each place the scan reads
+    /// and in one it does not, and a file that is not UTF-8.
+    fn a_game() -> Vec<(&'static str, Vec<u8>)> {
+        let mut latin1 = b"-- caf\xe9\n".to_vec();
+        latin1.extend_from_slice(
+            b"function gadget:UnitDamaged(u, d, t, dmg, p, w, attackerID)\nend\n",
+        );
+        vec![
+            (
+                "LuaRules/Gadgets/damage.lua",
+                b"function gadget:UnitDamaged(unitID, unitDefID, unitTeam, damage, paralyzer, weaponDefID, projectileID, attackerID)\nend\n".to_vec(),
+            ),
+            (
+                "LuaRules\\Gadgets\\command.lua",
+                b"gadget.AllowCommand = function(self, u, d, t, c, p, o, tag, synced)\n  return true\nend\n".to_vec(),
+            ),
+            ("luarules/gadgets/latin1.lua", latin1),
+            (
+                "LuaUI/Widgets/spread.lua",
+                b"function widget:UnitDamaged(...)\nend\nlocal f = Spring.GetUnitTravel\n".to_vec(),
+            ),
+            (
+                "lups/damage.lua",
+                b"function UnitDamaged(a, b, c, d, e, f, projectileID)\nend\n".to_vec(),
+            ),
+            (
+                "scripts/armcom.lua",
+                b"function AllowCommand(u, d, t, c, p, o, tag, playerID)\nend\n".to_vec(),
+            ),
+            ("gamedata/defs.lua", b"return {}\n".to_vec()),
+        ]
+    }
+
+    /// The handlers one scan of the fixed game reports, hashed: the archive,
+    /// the file, the call-in and the arguments, which pick the call-in adapters
+    /// of a compat mutator (issue #4629). Where in the file a hit is does not
+    /// change what is built, so it is left out. If this fails, the handlers a
+    /// mutator is built from changed: move `coilbox_compat::WRITER`, add a
+    /// compat manifest that names the new writer, and only then record the new
+    /// hash here.
+    #[test]
+    fn a_fixed_game_scans_to_the_same_handlers() {
+        use sha2::{Digest, Sha256};
+
+        let game = a_game();
+        let mut out = LuaCompatOutput::default();
+        scan_members(
+            "xta.sd7",
+            game.iter().map(|(path, _)| path.to_string()),
+            |member| {
+                game.iter()
+                    .find(|(path, _)| *path == member)
+                    .map(|(_, bytes)| bytes.clone())
+            },
+            &mut out,
+        );
+        assert_eq!(out.files_scanned, 6);
+        let mut lines = String::new();
+        for file in &out.files {
+            for hit in &file.hits {
+                if let Some(params) = &hit.params {
+                    lines.push_str(&format!(
+                        "{} {} {} {}\n",
+                        file.archive,
+                        file.path,
+                        hit.entry_id,
+                        params.join(",")
+                    ));
+                }
+            }
+        }
+        assert_eq!(lines.lines().count(), 5, "{lines}");
+        let hex: String = Sha256::digest(lines.as_bytes())
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        assert_eq!(coilbox_compat::WRITER, 1);
+        assert_eq!(
+            hex, "3779c9c72d517a813808e3e4edc2600e275835b81b241b70db7ddf072804c48f",
+            "the handlers the scan reports changed, so coilbox_compat::WRITER has to move:\n{lines}"
+        );
     }
 }
