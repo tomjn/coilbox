@@ -2899,6 +2899,11 @@ function Builder({ id }: { id: string | undefined }) {
                       movement ? { ...project, movement } : project,
                     )
                   }
+                  onBuiltByChange={(builtBy) =>
+                    edit(({ builtBy: _old, ...project }) =>
+                      builtBy.length > 0 ? { ...project, builtBy } : project,
+                    )
+                  }
                   onWorthChange={(worth) =>
                     edit((project) => ({ ...project, worth }))
                   }

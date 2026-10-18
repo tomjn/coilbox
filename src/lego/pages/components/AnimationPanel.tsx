@@ -148,6 +148,7 @@ import { unitReaches } from "../../weaponReach";
 import type { LegoWorth } from "../../worth";
 import { ActionsDrawer } from "./ActionsDrawer";
 import { BuilderReport } from "./BuilderReport";
+import { BuiltBySection } from "./BuiltBySection";
 import { GameFitSection } from "./GameFitSection";
 import { MovementSection } from "./MovementSection";
 import type { ReferenceUnit } from "./ReferencePicker";
@@ -374,6 +375,9 @@ interface Props {
   /** What a turret or aim point fires, and over what arc (issue #3274). The
    *  Weapons section is shown only when this is given. */
   onWeaponChange?: (pieceId: string, weapon: LegoPieceWeapon) => void;
+  /** Which base game units build this one (issue #4515). The Built by
+   *  section is shown only when this is given. */
+  onBuiltByChange?: (builtBy: string[]) => void;
   /** The game unit picked beside the build, for the stats to compare with. */
   referenceUnit?: ReferenceUnit | null;
   /**
@@ -444,6 +448,7 @@ export function AnimationPanel({
   onWorthChange,
   onBudgetChange,
   onWeaponChange,
+  onBuiltByChange,
   referenceUnit,
   onScriptTimeline,
   onScriptRun,
@@ -1859,6 +1864,13 @@ export function AnimationPanel({
             bounds={bounds}
             onMovementChange={onMovementChange}
           />
+
+          {onBuiltByChange ? (
+            <BuiltBySection
+              project={project}
+              onBuiltByChange={onBuiltByChange}
+            />
+          ) : null}
 
           <WorthSection
             project={project}
