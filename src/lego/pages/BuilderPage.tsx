@@ -59,7 +59,7 @@ import { addShape } from "../addShape";
 import { aimPoint } from "../aimPoint";
 import { type ArrangeAction, arrange } from "../align";
 import { addAnchor, removeAnchor, updateAnchor } from "../anchors";
-import { presetById, ROLES, restAngleWarnings } from "../animPresets";
+import { pickerRoles, presetById, restAngleWarnings } from "../animPresets";
 import { unitAtlas } from "../atlas";
 import { balanceProblem, checkBalance } from "../balance";
 import { legoTexturePrune } from "../bindings";
@@ -3338,7 +3338,7 @@ function Builder({ id }: { id: string | undefined }) {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value={NO_ROLE}>None</SelectItem>
-                                {ROLES.map((role) => (
+                                {pickerRoles(draft.pieces).map((role) => (
                                   <SelectItem key={role.id} value={role.id}>
                                     {role.label}
                                   </SelectItem>

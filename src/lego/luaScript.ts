@@ -16,6 +16,7 @@ import {
   type EmitResult,
   type LuaHook,
   presetById,
+  presetMovesRole,
 } from "./animPresets";
 import type { LegoPiece, LegoProject } from "./model";
 import {
@@ -150,9 +151,24 @@ export function unitScript(project: LegoProject): string {
   return project.script ?? buildLuaScript(project);
 }
 
-/** The roles a preset animates or needs, which its instances are made of. */
-export function presetRoles(preset: AnimPreset): string[] {
-  return [...preset.animates, ...preset.requires.map((need) => need.role)];
+/**
+ * The roles a preset animates or needs, which its instances are made of. A
+ * preset that moves roles past its list (`AnimPreset.moves`) also gets those
+ * of `pieces` it moves.
+ */
+export function presetRoles(
+  preset: AnimPreset,
+  pieces: { role?: string }[] = [],
+): string[] {
+  const listed = [
+    ...preset.animates,
+    ...preset.requires.map((need) => need.role),
+  ];
+  if (!preset.moves) return listed;
+  const more = pieces
+    .map((piece) => piece.role ?? "")
+    .filter((role) => role && presetMovesRole(preset, role));
+  return [...new Set([...listed, ...more])];
 }
 
 /**
@@ -190,7 +206,7 @@ export function roleInstanceGroups(
 function isCopy(preset: AnimPreset, group: LegoPiece[]): boolean {
   const role = preset.copies?.role;
   return group.some((piece) =>
-    role ? piece.role === role : preset.animates.includes(piece.role ?? ""),
+    role ? piece.role === role : presetMovesRole(preset, piece.role ?? ""),
   );
 }
 
@@ -204,7 +220,7 @@ export function presetInstanceIds(
   preset: AnimPreset,
 ): string[] {
   if (preset.copies?.per !== "instance") return [];
-  return roleInstanceGroups(project.pieces, presetRoles(preset))
+  return roleInstanceGroups(project.pieces, presetRoles(preset, project.pieces))
     .filter((group) => isCopy(preset, group.pieces))
     .map((group) => group.id);
 }
@@ -225,9 +241,10 @@ export function presetCopies(project: LegoProject, preset: AnimPreset): number {
         : weapon.carrier?.role === role,
     ).length;
   }
-  return roleInstances(project.pieces, presetRoles(preset)).filter((group) =>
-    isCopy(preset, group),
-  ).length;
+  return roleInstances(
+    project.pieces,
+    presetRoles(preset, project.pieces),
+  ).filter((group) => isCopy(preset, group)).length;
 }
 
 export function buildLuaScript(project: LegoProject): string {
@@ -303,7 +320,10 @@ export function buildLuaScript(project: LegoProject): string {
           },
         })),
       instances: () =>
-        roleInstanceGroups(project.pieces, presetRoles(preset)).map(
+        roleInstanceGroups(
+          project.pieces,
+          presetRoles(preset, project.pieces),
+        ).map(
           (group, index): EmitInstance => ({
             id: group.id,
             params: own?.[group.id]

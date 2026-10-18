@@ -33,7 +33,7 @@
  */
 
 import * as THREE from "three";
-import { presetById } from "./animPresets";
+import { presetById, presetUsesRole } from "./animPresets";
 import { insertCompound, type PresetOutcome } from "./compounds";
 import { pieceConnectors, resolveConnections, transformOf } from "./connectors";
 import {
@@ -75,12 +75,6 @@ export interface SwapModuleResult {
 }
 
 const QUARTER = Math.PI / 2;
-
-function presetRoles(presetId: string): string[] {
-  const preset = presetById(presetId);
-  if (!preset) return [];
-  return [...preset.animates, ...preset.requires.map((need) => need.role)];
-}
 
 /**
  * The piece at the top of the part of a module instance `pieceId` is in: the
@@ -376,10 +370,11 @@ function swapOne(
   const removedPresets = (merged.animations ?? [])
     .map((applied) => applied.presetId)
     .filter((id) => {
-      const roles = presetRoles(id);
+      const preset = presetById(id);
+      if (!preset) return false;
       return (
-        roles.some((role) => oldRoles.has(role)) &&
-        !merged.pieces.some((p) => p.role && roles.includes(p.role))
+        [...oldRoles].some((role) => presetUsesRole(preset, role)) &&
+        !merged.pieces.some((p) => p.role && presetUsesRole(preset, p.role))
       );
     });
   const { animations, ...bare } = merged;

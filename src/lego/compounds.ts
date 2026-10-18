@@ -21,6 +21,7 @@ import {
   type AppliedPreset,
   countRoles,
   presetById,
+  presetUsesRole,
   unmetRequirements,
 } from "./animPresets";
 import { freePiece } from "./connectors";
@@ -168,10 +169,7 @@ function presetsFor(
   return (project.animations ?? []).flatMap((applied) => {
     const preset = presetById(applied.presetId);
     if (!preset) return [];
-    const belongs = [
-      ...preset.animates,
-      ...preset.requires.map((need) => need.role),
-    ].some((role) => roles.has(role));
+    const belongs = [...roles].some((role) => presetUsesRole(preset, role));
     return belongs
       ? [{ presetId: applied.presetId, params: { ...applied.params } }]
       : [];
