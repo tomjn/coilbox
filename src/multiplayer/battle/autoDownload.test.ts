@@ -49,4 +49,17 @@ describe("shouldAutoStartDownload", () => {
       false,
     );
   });
+
+  it("never fires for a compat mutator, which is built and not downloaded", () => {
+    expect(
+      shouldAutoStartDownload(ready({ gameName: "XTA 9.65 (compat 4)" })),
+    ).toBe(false);
+    expect(
+      shouldAutoStartDownload(ready({ gameName: "coilbox-compat-xta-4.sdd" })),
+    ).toBe(false);
+  });
+
+  it("fires for a plain game name", () => {
+    expect(shouldAutoStartDownload(ready({ gameName: "XTA 9.65" }))).toBe(true);
+  });
 });

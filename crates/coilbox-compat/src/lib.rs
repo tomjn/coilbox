@@ -48,6 +48,7 @@ const MANIFESTS: &[(u32, &str)] = &[
     (3, include_str!("../../../lua/compat/manifests/3.json")),
     (4, include_str!("../../../lua/compat/manifests/4.json")),
     (5, include_str!("../../../lua/compat/manifests/5.json")),
+    (6, include_str!("../../../lua/compat/manifests/6.json")),
 ];
 
 /// Every fix file, by id.
@@ -105,6 +106,10 @@ const FIXES: &[(&str, &str)] = &[
         include_str!("../../../lua/compat/gadgets/gadget-only-forward-aim-105.lua"),
     ),
     (
+        "game-identity",
+        include_str!("../../../lua/compat/game-identity.lua"),
+    ),
+    (
         "gl-smoothing",
         include_str!("../../../lua/compat/gl-smoothing.lua"),
     ),
@@ -129,6 +134,11 @@ const FIXES: &[(&str, &str)] = &[
         include_str!("../../../lua/compat/spring-update-info-texture.lua"),
     ),
 ];
+
+/// The fix that makes `Game.gameName` and `Game.gameVersion` read as the base
+/// game's (issue #4633). It reads them from the mutator's `modinfo.lua`, which
+/// the writer fills in for a manifest that lists it and for no other.
+pub const GAME_IDENTITY_FIX: &str = "game-identity";
 
 /// The recorded SHA-256 of every fix a manifest lists.
 const HASHES: &str = include_str!("../../../lua/compat/manifests/hashes.txt");
@@ -970,6 +980,21 @@ mod tests {
     }
 
     #[test]
+    fn manifest_6_is_manifest_5_with_the_game_identity_fix() {
+        let (five, six) = (manifest(5).unwrap(), manifest(6).unwrap());
+        assert_eq!(six.fixes[..five.fixes.len()], five.fixes[..]);
+        assert_eq!(six.fixes[five.fixes.len()..], [GAME_IDENTITY_FIX]);
+        assert_eq!(six.converter, five.converter);
+        assert_eq!(six.writer, five.writer);
+        assert!(is_prelude_fix(GAME_IDENTITY_FIX));
+        for state in [LuaState::Synced, LuaState::Unsynced] {
+            let p = prelude(&six, state).unwrap();
+            assert!(p.contains("-- fix: game-identity\n"), "{}", state.name());
+            assert!(!prelude(&five, state).unwrap().contains("game-identity"));
+        }
+    }
+
+    #[test]
     fn the_def_fixes_are_the_files_in_defs_and_name_only_files_that_exist() {
         let in_folder = fix_files_in(compat_dir().join("defs"));
         let defs: BTreeSet<String> = FIXES
@@ -1296,26 +1321,28 @@ mod tests {
         }
     }
 
-    /// The preludes for manifest 2, as the Lua tests in `lua/compat/tests/`
-    /// load them. `COILBOX_WRITE_FIXTURE=1` writes them again after a
-    /// deliberate change to how a prelude is built.
+    /// The preludes for manifests 2 and 6, as the Lua tests in
+    /// `lua/compat/tests/` load them. `COILBOX_WRITE_FIXTURE=1` writes them
+    /// again after a deliberate change to how a prelude is built.
     #[test]
     fn the_lua_tests_load_the_preludes_this_crate_builds() {
-        let m = manifest(2).unwrap();
-        for state in [LuaState::Synced, LuaState::Unsynced] {
-            let built = prelude(&m, state).unwrap();
-            let path = compat_dir()
-                .join("tests/fixtures")
-                .join(format!("prelude-2-{}.lua", state.name()));
-            if std::env::var_os("COILBOX_WRITE_FIXTURE").is_some() {
-                fs::write(&path, &built).unwrap();
+        for n in [2, 6] {
+            let m = manifest(n).unwrap();
+            for state in [LuaState::Synced, LuaState::Unsynced] {
+                let built = prelude(&m, state).unwrap();
+                let path = compat_dir()
+                    .join("tests/fixtures")
+                    .join(format!("prelude-{n}-{}.lua", state.name()));
+                if std::env::var_os("COILBOX_WRITE_FIXTURE").is_some() {
+                    fs::write(&path, &built).unwrap();
+                }
+                let on_disk = fs::read_to_string(&path).unwrap_or_default();
+                assert!(
+                    on_disk == built,
+                    "{} is not what manifest {n} builds",
+                    path.display()
+                );
             }
-            let on_disk = fs::read_to_string(&path).unwrap_or_default();
-            assert!(
-                on_disk == built,
-                "{} is not what manifest 2 builds",
-                path.display()
-            );
         }
     }
 }

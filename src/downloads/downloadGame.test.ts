@@ -46,7 +46,7 @@ import { downloadKey } from "./downloadHistory";
 import { GAME_PREFS_KEY } from "./gamePrefs";
 import { invalidateGithubReleases } from "./githubReleases";
 import { DEFAULT_RAPID_MASTERS } from "./rapidMasters";
-import type { SourceWalkError } from "./sourceWalk";
+import { SourceWalkError } from "./sourceWalk";
 
 /** A game with no GitHub repo and no springfiles entry, so only rapid is tried. */
 const BAR_GAME = "Beyond All Reason test-30922-8064a43";
@@ -507,5 +507,33 @@ describe("downloadGameAnySource, a pinned source (issue #4580)", () => {
     expect(dlDownloadRaw.mock.invocationCallOrder[0]).toBeLessThan(
       dlGithubReleaseArchives.mock.invocationCallOrder[0],
     );
+  });
+
+  it("offers the source after the pinned one, and a retry from it skips the pin (issue #4583)", async () => {
+    writeStoredSetting(GAME_PREFS_KEY, {
+      [downloadKey("game", MF)]: {
+        pin: { source: "rapid", mirror: null },
+      },
+    });
+    dlDownloadRaw.mockRejectedValueOnce(new Error("Download cancelled."));
+    const err = await fetchMf().catch((e) => e);
+    expect(err).toBeInstanceOf(SourceWalkError);
+    expect(err.next).toEqual({ source: "github", mirror: null });
+
+    const onSource = vi.fn();
+    await expect(
+      downloadGameAnySource({
+        gameName: MF,
+        writePath: "/data",
+        onProgress: () => {},
+        startAt: err.next,
+        onSource,
+      }),
+    ).resolves.toBe("github release");
+    expect(dlDownloadRaw).toHaveBeenCalledTimes(1);
+    expect(onSource).toHaveBeenLastCalledWith({
+      source: "github",
+      mirror: "example.com",
+    });
   });
 });

@@ -36,13 +36,19 @@ function M.root()
 	return (arg[0]:match("^(.*)/tests/[^/]+$") or ".")
 end
 
-local PRELUDES = {
-	["compat/prelude-synced.lua"] = "/tests/fixtures/prelude-2-synced.lua",
-	["compat/prelude-unsynced.lua"] = "/tests/fixtures/prelude-2-unsynced.lua",
-}
+--- Where the prelude `path` names is kept, for the preludes of manifest `n`.
+local function preludes(n)
+	return {
+		["compat/prelude-synced.lua"] = "/tests/fixtures/prelude-" .. n .. "-synced.lua",
+		["compat/prelude-unsynced.lua"] = "/tests/fixtures/prelude-" .. n .. "-unsynced.lua",
+	}
+end
 
 --- A fresh engine state. `synced` picks which prelude it loads and whether it
 --- has gl. `spring` adds to or replaces entries of the Spring table.
+--- `manifest` picks which manifest's prelude it loads, 2 by default. `game`
+--- is the Game table the engine builds, and `modinfo` is what the mutator's
+--- modinfo.lua returns.
 function M.newEngine(opts)
 	opts = opts or {}
 	local engine = { registered = {}, logs = {}, frame = 0, units = {} }
@@ -105,9 +111,15 @@ function M.newEngine(opts)
 	end
 	env.UnitDefs = opts.unitDefs or {}
 	env.FeatureDefNames = opts.featureDefNames or {}
+	env.Game = opts.game
+	local files = preludes(opts.manifest or 2)
 	env.VFS = {
+		MOD = "M",
 		Include = function(path)
-			local file = PRELUDES[path]
+			if path == "modinfo.lua" and opts.modinfo then
+				return opts.modinfo
+			end
+			local file = files[path]
 			assert(file, "no such file in the test VFS: " .. path)
 			local chunk = assert(loadfile(M.root() .. file))
 			setfenv(chunk, env)
