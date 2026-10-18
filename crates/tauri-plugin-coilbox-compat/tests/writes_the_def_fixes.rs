@@ -182,6 +182,11 @@ fn the_commanders_get_iscommander_and_the_bombs_keep_their_burst() {
         &base_text,
     )
     .unwrap();
-    eprintln!("{counted} defs counted as changed by the def fixes");
+    eprintln!(
+        "{counted} defs counted as changed by the def fixes, defOverrides {}",
+        built.def_overrides
+    );
     assert!(counted >= commanders.len() + with_area);
+    let models = tauri_plugin_coilbox_compat::models::model_keys(&built.files).len();
+    assert_eq!(built.def_overrides, models + counted);
 }
