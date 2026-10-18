@@ -52,6 +52,9 @@ export interface CloneOrigin {
   projectId: string;
   /** What the project is called, for saying so on the page. */
   projectName: string;
+  /** The loadout of the project this unit is, when it is one (#3282). */
+  loadoutId?: string;
+  loadoutName?: string;
   /**
    * Whether this is a name the project has stopped exporting under, whose files
    * a rename left in the game (issue #2680).

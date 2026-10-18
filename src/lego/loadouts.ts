@@ -12,13 +12,18 @@
  * here returns a new project, so through `edit` each is one undo step.
  */
 
+import { adoptFile, receiptFor, recordExport, samePath } from "./exportRecord";
 import {
+  type ExportedFile,
+  type LegoExport,
   type LegoLoadout,
   type LegoLoadoutContent,
   type LegoPiece,
   type LegoProject,
   LOADOUT_FIELDS,
+  normalisePieceName,
   pieceById,
+  type StaleExport,
   uniquePieceName,
 } from "./model";
 
@@ -131,11 +136,16 @@ export function switchLoadout(project: LegoProject, id: string): LegoProject {
       loadout.id === project.activeLoadout
         ? { ...loadout, content: parked }
         : loadout.id === id
-          ? { id: loadout.id, name: loadout.name }
+          ? withoutContent(loadout)
           : loadout,
     ),
     activeLoadout: id,
   };
+}
+
+function withoutContent(loadout: LegoLoadout): LegoLoadout {
+  const { content: _parked, ...entry } = loadout;
+  return entry;
 }
 
 /** A unit without loadouts becomes one with a single loadout of what it has,
@@ -254,10 +264,24 @@ export function deleteLoadout(project: LegoProject, id: string): LegoProject {
       ? switchLoadout(project, loadouts[at > 0 ? at - 1 : 1].id)
       : project;
   const left = (switched.loadouts ?? []).filter((l) => l.id !== id);
-  if (left.length >= 2) return { ...switched, loadouts: left };
+  // The files a loadout wrote stay in the game when it goes. Its receipts move
+  // to the leftovers, where the export drawer offers to remove what coilbox
+  // can prove it wrote.
+  const retired = left.length >= 2 ? [loadouts[at]] : [loadouts[at], ...left];
+  const staleExports = retired.reduce(
+    (list, loadout) =>
+      withReceipts(list, [
+        loadout.exported,
+        ...(loadout.exportedElsewhere ?? []),
+      ]),
+    switched.staleExports ?? [],
+  );
+  const kept = staleExports.length > 0 ? { staleExports } : {};
+  if (left.length >= 2) return { ...switched, ...kept, loadouts: left };
   const { loadouts: _loadouts, activeLoadout: _active, ...plain } = switched;
   return {
     ...plain,
+    ...kept,
     pieces: plain.pieces.map(({ inLoadout: _flag, ...piece }) => piece),
   };
 }
@@ -342,5 +366,246 @@ export function claimForLoadout(
     pieces: project.pieces.map((p) =>
       claim.has(p.id) ? { ...p, inLoadout: true as const } : p,
     ),
+  };
+}
+
+/** The leftovers with every one of `receipts` added, unless one for that
+ *  folder and name is there already. */
+function withReceipts(
+  list: StaleExport[],
+  receipts: (LegoExport | undefined)[],
+): StaleExport[] {
+  const out = [...list];
+  for (const receipt of receipts) {
+    if (!receipt) continue;
+    const there = out.some(
+      (s) => samePath(s.dir, receipt.dir) && s.unitName === receipt.unitName,
+    );
+    if (!there)
+      out.push({
+        dir: receipt.dir,
+        at: receipt.at,
+        unitName: receipt.unitName,
+        files: receipt.files,
+      });
+  }
+  return out;
+}
+
+/**
+ * The name each loadout exports under, by loadout id. Empty for a unit without
+ * loadouts, which exports under its own name.
+ *
+ * A name the game maker chose is used as chosen, cleaned to a Spring unit name:
+ * lower case, with letters, digits and underscores only. The others are the
+ * unit name and the loadout name joined by an underscore and cleaned the same
+ * way, so "Light" on `armpw` is `armpw_light`. Names are unique among the
+ * loadouts. Chosen names are settled first, in loadout order, and a name that
+ * is already taken gets the smallest number after it, so `armpw_light` taken
+ * makes the next `armpw_light2`.
+ */
+export function loadoutUnitNames(project: LegoProject): Map<string, string> {
+  const names = new Map<string, string>();
+  const loadouts = project.loadouts ?? [];
+  const take = (loadout: LegoLoadout, raw: string) =>
+    names.set(loadout.id, uniquePieceName(raw, names.values()));
+  for (const loadout of loadouts) {
+    if (loadout.unitName) take(loadout, loadout.unitName);
+  }
+  for (const loadout of loadouts) {
+    if (!loadout.unitName) take(loadout, `${project.unitName}_${loadout.name}`);
+  }
+  return names;
+}
+
+/** Name loadout `id` for export, or go back to the joined name for an empty one. */
+export function setLoadoutUnitName(
+  project: LegoProject,
+  id: string,
+  name: string,
+): LegoProject {
+  const loadouts = project.loadouts;
+  const cleaned = name.trim() === "" ? undefined : normalisePieceName(name);
+  if (!loadouts?.some((l) => l.id === id && l.unitName !== cleaned))
+    return project;
+  return {
+    ...project,
+    loadouts: loadouts.map((l) => {
+      if (l.id !== id) return l;
+      const { unitName: _old, ...rest } = l;
+      return cleaned ? { ...rest, unitName: cleaned } : rest;
+    }),
+  };
+}
+
+/**
+ * Loadout `id` as the whole unit the exporter takes: its pieces and fields on
+ * the chassis, its own export name and its own receipts in place of the
+ * project's. Null when `id` is not a loadout of the project.
+ *
+ * The in game name is the unit's and the loadout's joined, so the units a game
+ * lists are told apart.
+ */
+export function loadoutUnit(
+  project: LegoProject,
+  id: string,
+): LegoProject | null {
+  const entry = project.loadouts?.find((l) => l.id === id);
+  const unitName = loadoutUnitNames(project).get(id);
+  if (!entry || !unitName) return null;
+  const {
+    exported: _latest,
+    exportedElsewhere: _others,
+    ...unit
+  } = switchLoadout(project, id);
+  return {
+    ...unit,
+    name: `${project.name} ${entry.name}`,
+    unitName,
+    ...(entry.exported ? { exported: entry.exported } : {}),
+    ...(entry.exportedElsewhere
+      ? { exportedElsewhere: entry.exportedElsewhere }
+      : {}),
+  };
+}
+
+/** Put the export of loadout `id` on record, leaving every other loadout's
+ *  receipts as they were. Names it stopped using join the project's leftovers. */
+export function recordLoadoutExport(
+  project: LegoProject,
+  id: string,
+  next: Omit<LegoExport, "files">,
+  written: ExportedFile[],
+): LegoProject {
+  if (!project.loadouts?.some((l) => l.id === id)) return project;
+  const settled = settleProjectReceipts(project, next.dir);
+  const entry = settled.loadouts?.find((l) => l.id === id) as LegoLoadout;
+  project = settled;
+  const record = recordExport(
+    {
+      exported: entry.exported,
+      exportedElsewhere: entry.exportedElsewhere,
+      staleExports: project.staleExports,
+    },
+    next,
+    written,
+  );
+  return {
+    ...project,
+    staleExports: record.staleExports,
+    loadouts: (project.loadouts ?? []).map((l) =>
+      l.id === id
+        ? {
+            ...l,
+            exported: record.exported,
+            ...(record.exportedElsewhere.length > 0
+              ? { exportedElsewhere: record.exportedElsewhere }
+              : {}),
+          }
+        : l,
+    ),
+  };
+}
+
+/** Say a file in `dir` is coilbox's, for loadout `id` only. */
+export function adoptLoadoutFile(
+  project: LegoProject,
+  id: string,
+  dir: string,
+  file: ExportedFile,
+): LegoProject {
+  const loadouts = project.loadouts;
+  if (!loadouts?.some((l) => l.id === id)) return project;
+  return {
+    ...project,
+    loadouts: loadouts.map((l) => {
+      if (l.id !== id) return l;
+      const { exported, exportedElsewhere } = adoptFile(l, dir, file);
+      return {
+        ...l,
+        ...(exported ? { exported } : {}),
+        ...(exportedElsewhere ? { exportedElsewhere } : {}),
+      };
+    }),
+  };
+}
+
+/** One unit an export writes: the project itself, or one of its loadouts. */
+export interface ExportTarget {
+  /** Null for a unit without loadouts. */
+  loadoutId: string | null;
+  unit: LegoProject;
+}
+
+/**
+ * The units an export writes. A unit without loadouts is the project itself,
+ * the same object, so it exports exactly as it did before loadouts. With
+ * loadouts it is the active one or every one, each as `loadoutUnit` gives it.
+ */
+export function exportTargets(
+  project: LegoProject,
+  which: "active" | "all",
+): ExportTarget[] {
+  const loadouts = project.loadouts;
+  if (!loadouts) return [{ loadoutId: null, unit: project }];
+  return loadouts
+    .filter((l) => which === "all" || l.id === project.activeLoadout)
+    .flatMap((l) => {
+      const unit = loadoutUnit(project, l.id);
+      return unit ? [{ loadoutId: l.id, unit }] : [];
+    });
+}
+
+/**
+ * The project's own receipts for `dir`, from before it had loadouts, dealt with
+ * as a loadout is exported into that folder (#3282).
+ *
+ * A receipt whose name a loadout now exports under goes to that loadout, unless
+ * it has a receipt for the folder already, so the files carry on being its own.
+ * Any other is a name nothing exports under any more, so it joins the leftovers
+ * and the export drawer offers to remove what coilbox wrote. Either way the
+ * project stops holding it.
+ */
+function settleProjectReceipts(project: LegoProject, dir: string): LegoProject {
+  const names = loadoutUnitNames(project);
+  const old = [project.exported, ...(project.exportedElsewhere ?? [])].filter(
+    (receipt): receipt is LegoExport =>
+      receipt !== undefined && samePath(receipt.dir, dir),
+  );
+  if (old.length === 0) return project;
+  let loadouts = project.loadouts ?? [];
+  let staleExports = project.staleExports ?? [];
+  for (const receipt of old) {
+    const owner = loadouts.find((l) => names.get(l.id) === receipt.unitName);
+    if (!owner) {
+      staleExports = withReceipts(staleExports, [receipt]);
+      continue;
+    }
+    if (receiptFor(owner, dir)) continue;
+    loadouts = loadouts.map((l) =>
+      l.id !== owner.id
+        ? l
+        : l.exported
+          ? {
+              ...l,
+              exportedElsewhere: [...(l.exportedElsewhere ?? []), receipt],
+            }
+          : { ...l, exported: receipt },
+    );
+  }
+  const { exported: _latest, exportedElsewhere: _others, ...rest } = project;
+  const elsewhere = (project.exportedElsewhere ?? []).filter(
+    (receipt) => !samePath(receipt.dir, dir),
+  );
+  const latest =
+    project.exported && !samePath(project.exported.dir, dir)
+      ? project.exported
+      : undefined;
+  return {
+    ...rest,
+    ...(latest ? { exported: latest } : {}),
+    ...(elsewhere.length > 0 ? { exportedElsewhere: elsewhere } : {}),
+    ...(staleExports.length > 0 ? { staleExports } : {}),
+    loadouts,
   };
 }
