@@ -23,9 +23,9 @@ import {
   waitFor,
 } from "@testing-library/react";
 import type { ReactNode } from "react";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type DownloadProgress, dlDownloadEngineRecoil } from "./bindings";
-import { MemoryRouter } from "react-router";
 import DownloadQueueBadge from "./DownloadQueueBadge";
 import {
   DownloadQueueProvider,
