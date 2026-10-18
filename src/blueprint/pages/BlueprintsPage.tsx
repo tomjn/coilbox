@@ -6,7 +6,7 @@
  * scenario that happened to contain it, which is exactly the binding splitting
  * the model was meant to remove.
  *
- * This follows the shape of the other libraries under Content: a grid of cards,
+ * This follows the shape of the other libraries under Library: a grid of cards,
  * a filter, and a detail page behind each card. A layout names units by their
  * internal name, so it belongs to a game the way a scenario does, and the filter
  * is by game for the same reason.
@@ -430,7 +430,8 @@ function NewBlueprintButton({
         )}
         {games.length === 0 && !scanning && !scanError && (
           <p className="text-xs text-amber-600 dark:text-amber-400">
-            No games found. Install one under Content, then come back.
+            No games found. Install one under Library &gt; Games, then come
+            back.
           </p>
         )}
         {error && <p className="text-xs text-destructive">{error}</p>}

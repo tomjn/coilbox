@@ -442,7 +442,7 @@ export function GameList({
     return (
       <p className="px-5 py-4 text-xs text-muted-foreground">
         No games are installed, so there is nothing to open a model out of. Add
-        one under Content.
+        one under Library &gt; Games.
       </p>
     );
   }
