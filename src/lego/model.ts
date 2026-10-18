@@ -743,6 +743,12 @@ export interface LegoProject {
   /** The movement class, speed and turn rate, when the unit moves. */
   movement?: LegoMovement;
   /**
+   * The base game units that build this one, by unit key (issue #4515). A
+   * mutator adds the unit to the end of each one's build list. Absent means
+   * nothing builds it, so it can only be spawned.
+   */
+  builtBy?: string[];
+  /**
    * What each kind of part is worth, which sets the unit's health, cost and
    * mass (issue #3280). Absent means the placeholder table in `worth.ts`.
    * Stored on the unit rather than per game, because a unit may be for no
@@ -1718,6 +1724,7 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
   const collisionVolume = parseCollisionVolume(d.collisionVolume);
   const builder = parseBuilder(d.builder);
   const movement = parseMovement(d.movement);
+  const builtBy = parseBuiltBy(d.builtBy);
   const worth = parseWorth(d.worth);
   const budget = parseBudget(d.budget);
   const lockedModules = parseLockedModules(d.lockedModules);
@@ -1754,6 +1761,7 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
     ...(d.pieceSelection === true ? { pieceSelection: true } : {}),
     ...(builder ? { builder } : {}),
     ...(movement ? { movement } : {}),
+    ...(builtBy ? { builtBy } : {}),
     ...(worth ? { worth } : {}),
     ...(typeof d.unitDef === "object" && d.unitDef !== null
       ? { unitDef: d.unitDef as Record<string, string | number | boolean> }
@@ -2523,6 +2531,23 @@ function parseBuilder(value: unknown): LegoBuilder | null {
     ...(v.factory === true ? { factory: true } : {}),
   };
   return Object.keys(builder).length > 0 ? builder : null;
+}
+
+/**
+ * The base game units that build this one, lowercased and each once. A key
+ * that cannot go in a build list is kept, so the Test drawer can say so.
+ */
+function parseBuiltBy(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  const keys = [
+    ...new Set(
+      value
+        .filter((key): key is string => typeof key === "string")
+        .map((key) => key.trim().toLowerCase())
+        .filter((key) => key !== ""),
+    ),
+  ];
+  return keys.length > 0 ? keys : null;
 }
 
 const BANKING_NUMBERS = [

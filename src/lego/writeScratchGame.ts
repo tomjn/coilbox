@@ -15,6 +15,8 @@ import { legoScratchGame, type ScratchSandbox } from "./bindings";
 import type { LegoProject } from "./model";
 import type { GameMovementData } from "./movement";
 import {
+  buildListFor,
+  builtByOf,
   clearStamp,
   exportPrepared,
   folderFiles,
@@ -56,8 +58,11 @@ export interface ScratchGameArgs {
   onWritten?: (dir: string) => void;
 }
 
-/** What writing the unit into the scratch game put on disk. */
-export type WrittenScratchUnit = WrittenUnit;
+/**
+ * What writing the unit into the scratch game put on disk, and the builders
+ * left off its build list.
+ */
+export type WrittenScratchUnit = WrittenUnit & { buildListLeftOut: string[] };
 
 /** The start unit and sandbox the Test drawer adds to its scratch game. */
 function testExtras(unitName: string, sandbox?: ScratchSandbox): MutatorExtras {
@@ -92,7 +97,11 @@ export async function writeScratchGame({
     onScanning,
     onWritten,
   });
-  return { ...result.units[0], name: result.name };
+  return {
+    ...result.units[0],
+    name: result.name,
+    buildListLeftOut: result.buildListLeftOut,
+  };
 }
 
 /**
@@ -110,14 +119,22 @@ export async function writeScratchUnit({
   ...context
 }: ScratchGameArgs): Promise<WrittenScratchUnit> {
   const prepared = await prepareUnit(context, { project, pack, raw });
+  const { buildList, leftOut } = await buildListFor(
+    context,
+    builtByOf([{ project, pack, raw }]),
+  );
   await clearStamp(context.target.dataDir, SCRATCH_FOLDER);
   const { dir } = await legoScratchGame(
     await folderFiles({
       ...context,
       folder: SCRATCH_FOLDER,
       extras: testExtras(project.unitName, sandbox),
+      buildList,
     }),
   );
   onWritten?.(dir);
-  return exportPrepared(dir, prepared);
+  return {
+    ...(await exportPrepared(dir, prepared)),
+    buildListLeftOut: leftOut,
+  };
 }

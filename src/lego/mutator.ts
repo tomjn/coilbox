@@ -28,6 +28,13 @@ import {
   legoWriteTextFile,
   type ScratchSandbox,
 } from "./bindings";
+import {
+  BUILD_LIST_PROBE_LUA,
+  type BuiltBy,
+  buildListEntries,
+  buildListTdf,
+  readsBuildList,
+} from "./buildList";
 import { buildCombinedSheet } from "./combinedSheet";
 import { unitScript } from "./luaScript";
 import type { ExportedFile, LegoProject } from "./model";
@@ -125,6 +132,8 @@ export interface MutatorResult {
   skipped: boolean;
   /** One entry per unit, in the order they were given. */
   units: WrittenUnit[];
+  /** A line for each builder left off the build list, and why. */
+  buildListLeftOut: string[];
 }
 
 /** What `legoExport` is given for a unit, less the folder it goes into. */
@@ -164,6 +173,48 @@ export async function luaRulesEntries(
     ...(missing.includes("LuaRules/main.lua") ? { luaRulesMain: entry } : {}),
     ...(missing.includes("LuaRules/draw.lua") ? { luaRulesDraw: entry } : {}),
   };
+}
+
+/** The units and the base game units that build them, from their documents. */
+export function builtByOf(units: readonly MutatorUnit[]): BuiltBy[] {
+  return units.map(({ project }) => ({
+    unitName: project.unitName,
+    builtBy: project.builtBy ?? [],
+  }));
+}
+
+/**
+ * The mutator's build list (issue #4515), and a line for each builder left off
+ * it. The file is written whether or not the base game reads it, because a game
+ * that does not ignores it. Asking is only for saying so.
+ */
+export async function buildListFor(
+  { target, baseGame, baseArchive, gameMovement }: MutatorContext,
+  units: readonly BuiltBy[],
+): Promise<{ buildList?: string; leftOut: string[] }> {
+  const { entries, leftOut } = buildListEntries(
+    units,
+    baseGame,
+    gameMovement?.units ?? null,
+  );
+  if (entries.length === 0) return { leftOut };
+  const res = await unitsyncLuaExec({
+    enginePath: target.enginePath,
+    dataDir: target.dataDir,
+    archive: baseArchive,
+    source: BUILD_LIST_PROBE_LUA,
+  });
+  const names = entries.map((entry) => entry.unitName).join(", ");
+  if (res.error) {
+    leftOut.push(
+      `Could not tell whether ${baseGame} reads a build list: ${res.error}`,
+    );
+  } else if (!readsBuildList(res.result)) {
+    leftOut.push(
+      `${baseGame} loads its units without reading a build list from a mutator, so nothing in it builds ${names}.`,
+    );
+  }
+  return { buildList: buildListTdf(entries), leftOut };
 }
 
 /** Build one unit into what a mutator folder holds for it. */
@@ -305,10 +356,13 @@ type FolderFiles = Parameters<typeof legoScratchGame>[0];
 export async function folderFiles({
   folder,
   extras,
+  buildList,
   ...context
 }: MutatorContext & {
   folder: string;
   extras?: MutatorExtras;
+  /** The build list from `buildListFor`, when any unit names a builder. */
+  buildList?: string;
 }): Promise<FolderFiles> {
   const { target, baseGame, baseArchive } = context;
   return {
@@ -324,6 +378,7 @@ export async function folderFiles({
     unitScriptGadget: buildUnitScriptGadget(),
     ...(await luaRulesEntries(target, baseGame, baseArchive)),
     ...(extras?.sandbox ? { sandbox: extras.sandbox } : {}),
+    ...(buildList ? { buildList } : {}),
   };
 }
 
@@ -535,7 +590,11 @@ export async function writeMutator(args: MutatorArgs): Promise<MutatorResult> {
 
   const prepared: PreparedUnit[] = [];
   for (const unit of units) prepared.push(await prepareUnit(context, unit));
-  const files = await folderFiles({ ...context, folder, extras });
+  const { buildList, leftOut: buildListLeftOut } = await buildListFor(
+    context,
+    builtByOf(units),
+  );
+  const files = await folderFiles({ ...context, folder, extras, buildList });
 
   const hash = await sha256(
     JSON.stringify({ files, units: prepared.map((p) => p.payload) }),
@@ -551,6 +610,7 @@ export async function writeMutator(args: MutatorArgs): Promise<MutatorResult> {
       name: stamp.name,
       skipped: true,
       units: stamp.units,
+      buildListLeftOut,
     };
   }
 
@@ -621,5 +681,5 @@ export async function writeMutator(args: MutatorArgs): Promise<MutatorResult> {
     path: stampPath(target.dataDir, folder),
     text: JSON.stringify(record),
   });
-  return { dir, name, skipped: false, units: written };
+  return { dir, name, skipped: false, units: written, buildListLeftOut };
 }

@@ -161,8 +161,8 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
   }, [open]);
   /** Kept once written, so the reveal button survives a later failure. */
   const [scratchDir, setScratchDir] = useState<string | null>(null);
-  /** The weapons the last write left out of the scratch unit. */
-  const [weaponsLeftOut, setWeaponsLeftOut] = useState<string[]>([]);
+  /** The weapons and builders the last write left out of the scratch unit. */
+  const [leftOut, setLeftOut] = useState<string[]>([]);
   /** The last load check's report, cleared when another run starts. */
   const [check, setCheck] = useState<UnitCheckReport | null>(null);
   /** Which action the busy phases belong to. */
@@ -215,7 +215,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
       onWritten: setScratchDir,
       onScanning: () => setPhase({ state: "scanning" }),
     });
-    setWeaponsLeftOut(written.weaponsLeftOut);
+    setLeftOut([...written.weaponsLeftOut, ...written.buildListLeftOut]);
     return written;
   }
 
@@ -325,6 +325,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
         game,
         mapName: map.name,
         unitName: project.unitName,
+        builtBy: project.builtBy ?? [],
       });
       return {
         sandbox,
@@ -357,7 +358,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
         gameMovement,
         sandbox: run.sandbox,
       });
-      setWeaponsLeftOut(written.weaponsLeftOut);
+      setLeftOut([...written.weaponsLeftOut, ...written.buildListLeftOut]);
       const changes = sandboxChanges(run.loaded, written);
       const said: string[] = [];
       if (changes.reload) {
@@ -636,7 +637,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
                 </p>
               ) : null}
 
-              {weaponsLeftOut.map((line) => (
+              {leftOut.map((line) => (
                 <p key={line} className="text-xs text-muted-foreground">
                   Left out: {line}
                 </p>

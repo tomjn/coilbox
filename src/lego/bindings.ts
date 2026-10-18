@@ -413,6 +413,11 @@ export const legoScratchGame = defineCommand<
     luaRulesDraw?: string;
     /** What "Play with this unit" adds on top (issue #3341). */
     sandbox?: ScratchSandbox;
+    /**
+     * `download/coilbox_build_list.tdf`, which puts the units on base game
+     * builders' build lists (issue #4515). Left out, it is removed.
+     */
+    buildList?: string;
   },
   { dir: string }
 >("coilbox-lego", "lego_scratch_game");

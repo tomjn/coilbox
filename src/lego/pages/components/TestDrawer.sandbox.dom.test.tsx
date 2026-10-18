@@ -151,6 +151,7 @@ function unitFiles(
     textures: changed.texture ? "atlas-2" : "atlas",
     textureFiles: ["coilbox_atlas.png"],
     weaponsLeftOut: [],
+    buildListLeftOut: [],
     files: [
       {
         path: `${DIR}/objects3d/probe_unit.s3o`,
@@ -235,6 +236,7 @@ describe("TestDrawer's sandbox launch", () => {
       game: GAME,
       mapName: "AcidicQuarry 5.17",
       unitName: "probe_unit",
+      builtBy: [],
     });
     expect(writeScratchGame).toHaveBeenCalledWith(
       expect.objectContaining({

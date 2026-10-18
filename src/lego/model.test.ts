@@ -1414,3 +1414,22 @@ describe("the unit's game (#3257)", () => {
     expect(newProject({ ...base, game: sf }).game).toEqual(sf);
   });
 });
+
+// Issue #4515.
+describe("parseLegoProjectJson's builtBy", () => {
+  const parsed = (builtBy: unknown) =>
+    parseLegoProjectJson(
+      JSON.stringify({ ...project([piece("root", null)]), builtBy }),
+    )?.builtBy;
+
+  it("keeps the builders lowercased, each once", () => {
+    expect(
+      parsed(["FedLandFac", "fedlandfac", " fedengineer ", 3, ""]),
+    ).toEqual(["fedlandfac", "fedengineer"]);
+  });
+
+  it("drops an empty or malformed list", () => {
+    expect(parsed([])).toBeUndefined();
+    expect(parsed("fedlandfac")).toBeUndefined();
+  });
+});

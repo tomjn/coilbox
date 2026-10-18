@@ -53,6 +53,7 @@ import {
   legoScratchPrune,
   legoWriteTextFile,
 } from "./bindings";
+import { BUILD_LIST_PROBE_LUA, buildListTdf } from "./buildList";
 import { type LegoPiece, type LegoProject, newProject } from "./model";
 import {
   clearStamp,
@@ -594,6 +595,101 @@ describe("writeMutator pruning", () => {
     expect((await writeMutator(args({ units: [unit("alpha")] }))).skipped).toBe(
       false,
     );
+  });
+});
+
+// Issue #4515. The unit joins its builders' lists through a file the engine's
+// base content reads, so no file of the base game is replaced.
+describe("writeMutator's build list", () => {
+  function gameReadsBuildList(answer: string) {
+    vi.mocked(unitsyncLuaExec).mockImplementation(async ({ source }) => ({
+      result:
+        source === BUILD_LIST_PROBE_LUA
+          ? answer
+          : '"LuaRules/main.lua;LuaRules/draw.lua"',
+      errors: [],
+    }));
+  }
+
+  function builtBy(name: string, builders: string[]): MutatorUnit {
+    const one = unit(name);
+    return { ...one, project: { ...one.project, builtBy: builders } };
+  }
+
+  it("writes each unit onto the builders it names", async () => {
+    gameReadsBuildList('"yes"');
+    const result = await writeMutator(
+      args({
+        units: [builtBy("alpha", ["fedlandfac"]), unit("beta")],
+      }),
+    );
+
+    const written = vi.mocked(legoScratchGame).mock.calls[0]?.[0];
+    expect(written?.buildList).toBe(
+      buildListTdf([{ unitName: "alpha", builtBy: ["fedlandfac"] }]),
+    );
+    expect(written?.buildList).toContain(
+      "[MENUENTRY1]\n{\n\tunitmenu=fedlandfac;\n\tunitname=alpha;\n}",
+    );
+    expect(written?.buildList).not.toContain("beta");
+    expect(unitsyncLuaExec).toHaveBeenCalledWith(
+      expect.objectContaining({
+        archive: "SplinterFaction_0.1.86.sdz",
+        source: BUILD_LIST_PROBE_LUA,
+      }),
+    );
+    expect(result.buildListLeftOut).toEqual([]);
+  });
+
+  it("still writes the list for a game that will not read it, and says so", async () => {
+    gameReadsBuildList('"no"');
+    const result = await writeMutator(
+      args({ units: [builtBy("alpha", ["armlab"])] }),
+    );
+    expect(vi.mocked(legoScratchGame).mock.calls[0]?.[0].buildList).toContain(
+      "unitmenu=armlab;",
+    );
+    expect(result.buildListLeftOut).toEqual([
+      "Splinter Faction v0.1.86 loads its units without reading a build list from a mutator, so nothing in it builds alpha.",
+    ]);
+  });
+
+  it("leaves out a builder the base game does not have", async () => {
+    gameReadsBuildList('"yes"');
+    const result = await writeMutator(
+      args({
+        units: [builtBy("alpha", ["armlab", "fedlandfac"])],
+        gameMovement: { units: { fedlandfac: {} }, moveDefs: [] },
+      }),
+    );
+    const list = vi.mocked(legoScratchGame).mock.calls[0]?.[0].buildList;
+    expect(list).toContain("unitmenu=fedlandfac;");
+    expect(list).not.toContain("armlab");
+    expect(result.buildListLeftOut).toEqual([
+      "armlab is not in Splinter Faction v0.1.86, so it does not build alpha.",
+    ]);
+  });
+
+  it("writes no list and asks nothing when no unit names a builder", async () => {
+    await writeMutator(args());
+    expect(vi.mocked(legoScratchGame).mock.calls[0]?.[0]).not.toHaveProperty(
+      "buildList",
+    );
+    expect(
+      vi
+        .mocked(unitsyncLuaExec)
+        .mock.calls.some(([call]) => call.source === BUILD_LIST_PROBE_LUA),
+    ).toBe(false);
+  });
+
+  it("rewrites the folder when a builder is added", async () => {
+    gameReadsBuildList('"yes"');
+    await writeMutator(args());
+    const second = await writeMutator(
+      args({ units: [builtBy("alpha", ["fedlandfac"])] }),
+    );
+    expect(second.skipped).toBe(false);
+    expect(legoScratchGame).toHaveBeenCalledTimes(2);
   });
 });
 
