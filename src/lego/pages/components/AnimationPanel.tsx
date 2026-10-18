@@ -129,6 +129,7 @@ import {
 } from "../../targetMotion";
 import { isBuilder } from "../../unitDef";
 import { controlFor } from "../../unitValueControls";
+import { overridesFit, shownParams, withoutFitOverrides } from "../../walkFit";
 import { pickedWeapon } from "../../weaponModule";
 import { unitReaches } from "../../weaponReach";
 import type { LegoWorth } from "../../worth";
@@ -275,6 +276,7 @@ const PARAM_SUFFIX: Record<PresetParam["unit"], string> = {
   m: " m",
   hz: "/s",
   "deg/s": "°/s",
+  "%": "%",
 };
 
 /**
@@ -1893,29 +1895,57 @@ export function AnimationPanel({
                   </div>
                 ) : null}
 
+                {entry && overridesFit(project, entry, copy) ? (
+                  <div className="mt-2 flex justify-end">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-xs"
+                      onClick={() =>
+                        onChange(
+                          applied.map((a) =>
+                            a.presetId === preset.id
+                              ? withoutFitOverrides(a, copy)
+                              : a,
+                          ),
+                        )
+                      }
+                    >
+                      Fit to body
+                    </Button>
+                  </div>
+                ) : null}
+
                 {entry
-                  ? preset.params.map((param) => (
-                      <div key={param.id} className="mt-2">
-                        <div className="flex items-center justify-between text-xs">
-                          <span>{param.label}</span>
-                          <span className="text-muted-foreground">
-                            {paramFor(entry, copy, param.id)}
-                            {PARAM_SUFFIX[param.unit]}
-                          </span>
+                  ? preset.params.map((param) => {
+                      // A walk fitted to the unit shows the numbers it is
+                      // written with, not the slider's default.
+                      const shown =
+                        shownParams(project, entry, copy)[param.id] ??
+                        paramFor(entry, copy, param.id);
+                      return (
+                        <div key={param.id} className="mt-2">
+                          <div className="flex items-center justify-between text-xs">
+                            <span>{param.label}</span>
+                            <span className="text-muted-foreground">
+                              {Number(shown.toFixed(2))}
+                              {PARAM_SUFFIX[param.unit]}
+                            </span>
+                          </div>
+                          <Slider
+                            className="mt-1"
+                            min={param.min}
+                            max={param.max}
+                            step={param.step}
+                            value={[shown]}
+                            onValueChange={([next]) =>
+                              setParam(preset.id, param.id, next, copy)
+                            }
+                            aria-label={`${preset.label}: ${param.label}`}
+                          />
                         </div>
-                        <Slider
-                          className="mt-1"
-                          min={param.min}
-                          max={param.max}
-                          step={param.step}
-                          value={[paramFor(entry, copy, param.id)]}
-                          onValueChange={([next]) =>
-                            setParam(preset.id, param.id, next, copy)
-                          }
-                          aria-label={`${preset.label}: ${param.label}`}
-                        />
-                      </div>
-                    ))
+                      );
+                    })
                   : null}
               </div>
             );

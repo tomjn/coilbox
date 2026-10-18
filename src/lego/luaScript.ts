@@ -23,6 +23,7 @@ import {
   pieceCollisionInclude,
 } from "./pieceCollisionScript";
 import { luaString } from "./unitDef";
+import { fittedParams } from "./walkFit";
 import { scriptWeapons } from "./weaponModule";
 
 /**
@@ -264,7 +265,10 @@ export function buildLuaScript(project: LegoProject): string {
     return localName(piece.name);
   };
 
-  applied.forEach(({ preset, params, instances: own }, index) => {
+  applied.forEach(({ preset, params: saved, instances: own }, index) => {
+    // A walk is fitted to the unit's legs and speed here, beneath the game
+    // maker's own numbers (`walkFit.ts`). Every other preset is as saved.
+    const params = fittedParams(project, preset.id, saved);
     const signal = `SIG_${preset.id.replace(/[^a-z0-9]+/gi, "_").toUpperCase()}`;
     let presetSignal = false;
     // The signals named after the preset's, one per weapon or per instance.
@@ -302,7 +306,12 @@ export function buildLuaScript(project: LegoProject): string {
         roleInstanceGroups(project.pieces, presetRoles(preset)).map(
           (group, index): EmitInstance => ({
             id: group.id,
-            params: own?.[group.id] ? { ...params, ...own[group.id] } : params,
+            params: own?.[group.id]
+              ? fittedParams(project, preset.id, {
+                  ...saved,
+                  ...own[group.id],
+                })
+              : params,
             number: index + 1,
             pieces(role) {
               const names = group.pieces
