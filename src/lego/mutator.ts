@@ -24,6 +24,7 @@ import {
   legoExport,
   legoReadTextFile,
   legoScratchGame,
+  legoScratchPrune,
   legoWriteTextFile,
   type ScratchSandbox,
 } from "./bindings";
@@ -99,6 +100,8 @@ export interface MutatorArgs extends MutatorContext {
 
 /** What writing one unit into a mutator put on disk. */
 export interface WrittenUnit {
+  /** The name the unit was exported under, which its files are named after. */
+  unitName: string;
   dir: string;
   /** Every file the unit was written as, with the digest of what was written. */
   files: ExportedFile[];
@@ -331,6 +334,7 @@ export async function exportPrepared(
 ): Promise<WrittenUnit> {
   const { owned } = await legoExport({ dir, ...prepared.payload });
   return {
+    unitName: prepared.payload.unitName,
     dir,
     files: owned,
     textures: prepared.textures,
@@ -362,6 +366,10 @@ export async function exportPrepared(
  * the app. A sandbox that ships the runtime always rewrites for the second
  * reason. Deleting the folder always rewrites, because the folder's
  * `modinfo.lua` is read back and compared too.
+ *
+ * Clearing the stamp blanks `hash` and keeps `units`. A blank hash matches
+ * nothing, so the folder is rewritten, and the units are what the next write
+ * removes if they have left the set (issue #4521).
  */
 interface MutatorStamp {
   hash: string;
@@ -385,15 +393,61 @@ async function sha256(text: string): Promise<string> {
 }
 
 /**
+ * The units a folder was last written with, as far as its stamp says, whether
+ * or not the stamp still matches anything. Empty when there is no readable
+ * stamp, and a unit recorded without its name is left out: nothing says which
+ * files are its own.
+ */
+async function recordedUnits(
+  dataDir: string,
+  folder: string,
+): Promise<WrittenUnit[]> {
+  try {
+    const { text } = await legoReadTextFile({
+      path: stampPath(dataDir, folder),
+    });
+    const stamp = JSON.parse(text) as Partial<MutatorStamp> | null;
+    if (!stamp || !Array.isArray(stamp.units)) return [];
+    return stamp.units.filter(
+      (unit): unit is WrittenUnit =>
+        typeof unit?.unitName === "string" &&
+        Array.isArray(unit.files) &&
+        Array.isArray(unit.textureFiles),
+    );
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Write a stamp that matches no launch but still names these units, so the next
+ * write can remove them if they have left the set.
+ */
+async function writeUnmatchedStamp(
+  dataDir: string,
+  folder: string,
+  dir: string,
+  units: WrittenUnit[],
+): Promise<void> {
+  const record: MutatorStamp = { hash: "", dir, name: "", units };
+  await legoWriteTextFile({
+    path: stampPath(dataDir, folder),
+    text: JSON.stringify(record),
+  });
+}
+
+/**
  * Forget what the folder was last written as. Anything that changes the folder
  * without going through `writeMutator` has to call this first, or a later launch
  * could find a stamp that matches and skip a folder that has since changed.
+ * The units the stamp named are kept, for the next write to prune.
  */
 export async function clearStamp(
   dataDir: string,
   folder: string,
 ): Promise<void> {
-  await legoWriteTextFile({ path: stampPath(dataDir, folder), text: "" });
+  const units = await recordedUnits(dataDir, folder);
+  await writeUnmatchedStamp(dataDir, folder, "", units);
 }
 
 /** The stamp, if there is a readable one and the folder is still there. */
@@ -471,11 +525,47 @@ export async function writeMutator(args: MutatorArgs): Promise<MutatorResult> {
     };
   }
 
+  const earlier = await recordedUnits(target.dataDir, folder);
   await clearStamp(target.dataDir, folder);
   const { dir } = await legoScratchGame(files);
   onWritten?.(dir);
+
+  // Units the last write made that this one does not, and the textures nothing
+  // in this set uses any more. Pruned before anything new goes in, and the
+  // stamp keeps naming what is still on disk, so a launch that fails part way
+  // is still cleaned up after by the next.
+  const names = new Set(prepared.map((p) => p.payload.unitName));
+  const leaving = earlier.filter((unit) => !names.has(unit.unitName));
+  const usedTextures = new Set(prepared.flatMap((p) => p.textureFiles));
+  const textures = [
+    ...new Set(earlier.flatMap((unit) => unit.textureFiles)),
+  ].filter((texture) => !usedTextures.has(texture));
+  if (leaving.length > 0 || textures.length > 0) {
+    await legoScratchPrune({
+      dataDir: target.dataDir,
+      folder,
+      units: leaving.map((unit) => ({
+        unitName: unit.unitName,
+        digests: unit.files.map((file) => file.sha256),
+      })),
+      textures,
+    });
+  }
   const written: WrittenUnit[] = [];
-  for (const one of prepared) written.push(await exportPrepared(dir, one));
+  const onDisk = () => {
+    const done = new Set(written.map((unit) => unit.unitName));
+    return [
+      ...earlier.filter(
+        (unit) => names.has(unit.unitName) && !done.has(unit.unitName),
+      ),
+      ...written,
+    ];
+  };
+  await writeUnmatchedStamp(target.dataDir, folder, dir, onDisk());
+  for (const one of prepared) {
+    written.push(await exportPrepared(dir, one));
+    await writeUnmatchedStamp(target.dataDir, folder, dir, onDisk());
+  }
 
   onScanning?.();
   const name = await rescannedName(target, folder);
