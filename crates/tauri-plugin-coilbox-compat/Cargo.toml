@@ -40,3 +40,5 @@ coilbox-springlua = { path = "../coilbox-springlua" }
 # Hashes the files a fixed build writes, so a change to them fails a test until
 # the compat writer moves (issue #4629).
 sha2 = { workspace = true }
+# Reads the exported archive back, to check its files and their order.
+zip = { workspace = true }
