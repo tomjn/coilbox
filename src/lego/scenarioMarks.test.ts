@@ -132,4 +132,18 @@ describe("scenarioMark", () => {
   it("does not count AimWeapon1's fallback as a reaction to aiming", () => {
     expect(mark("firing", bare)).toMatch(/^Nothing to do\./);
   });
+
+  it("does not mark a unit that only settles after a shot", () => {
+    const lua = buildLuaScript(
+      project(
+        [{ id: "h", name: "hull", role: "base" }],
+        [{ presetId: "body.settle", params: {} }],
+      ),
+    );
+    expect(mark("firing", lua)).toBeNull();
+  });
+
+  it("offers the settle to a unit that fires and reacts to nothing", () => {
+    expect(mark("firing", bare)).toContain("Body settles after a shot");
+  });
 });

@@ -36,7 +36,14 @@ describe("the scenario for each preset", () => {
         breakGroups: () => [{ pieces: ["piece"], whole: true }],
         wheels: () => [{ piece: "piece", radius: 1, front: true }],
         motion: { accRate: 0.5, decRate: 0.5 },
-        weapons: () => [{ number: 1, piece: () => "piece", signal: "SIG" }],
+        weapons: () => [
+          {
+            number: 1,
+            piece: () => "piece",
+            looseFlare: () => undefined,
+            signal: "SIG",
+          },
+        ],
         instances: () => [
           {
             id: "",
@@ -56,6 +63,10 @@ describe("the scenario for each preset", () => {
         expect(filled).toEqual(["QueryNanoPiece"]);
       } else if (preset.id === "hover.bob") {
         expect(filled).toEqual(["Create"]);
+      } else if (preset.id === "idle.look") {
+        // Starts from Create, which every scenario fires, and waits in "Standing
+        // still" for the unit to have been quiet long enough.
+        expect(filled).toContain("Create");
       } else {
         expect(
           fired.some((name) => filled.includes(name)),

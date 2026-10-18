@@ -22,7 +22,7 @@ import {
 } from "./animPresets";
 import { breakGroups } from "./breakApart";
 import { driveMotion, rates } from "./drive";
-import type { LegoPiece, LegoProject } from "./model";
+import { descendantIds, type LegoPiece, type LegoProject } from "./model";
 import {
   hasPieceCollision,
   pieceCollisionInclude,
@@ -106,6 +106,12 @@ function hookList(weapons: number): { hook: LuaHook; signature: string }[] {
     },
     { hook: "StopBuilding", signature: "script.StopBuilding()" },
     { hook: "QueryNanoPiece", signature: "script.QueryNanoPiece()" },
+    // Written only when a preset gives it a body: a script that defines it
+    // costs a call on every shot (`Weapon.cpp:606-608`).
+    {
+      hook: "RockUnit",
+      signature: "script.RockUnit(rockDir_x, rockDir_z)",
+    },
   ];
 }
 
@@ -261,6 +267,7 @@ export function buildLuaScript(project: LegoProject): string {
 
   const functions: string[] = [];
   const hooks = new Map<LuaHook, string[]>();
+  const firsts = new Map<LuaHook, string[]>();
   const signals: string[] = [];
 
   const applied = (project.animations ?? [])
@@ -359,6 +366,13 @@ export function buildLuaScript(project: LegoProject): string {
               ? use(weapon.carrier)
               : undefined;
           },
+          looseFlare() {
+            const { barrel, flare } = weapon;
+            if (!barrel || !flare) return undefined;
+            return descendantIds(project, barrel.id).includes(flare.id)
+              ? undefined
+              : use(flare);
+          },
           get signal() {
             return named(slot + 1);
           },
@@ -409,6 +423,12 @@ export function buildLuaScript(project: LegoProject): string {
     for (const [hook, lines] of Object.entries(result.hooks)) {
       hooks.set(hook as LuaHook, [
         ...(hooks.get(hook as LuaHook) ?? []),
+        ...(lines ?? []),
+      ]);
+    }
+    for (const [hook, lines] of Object.entries(result.first ?? {})) {
+      firsts.set(hook as LuaHook, [
+        ...(firsts.get(hook as LuaHook) ?? []),
         ...(lines ?? []),
       ]);
     }
@@ -475,9 +495,12 @@ export function buildLuaScript(project: LegoProject): string {
     const fallback =
       hook === "QueryNanoPiece" ? nanoFallback : hookFallback(hook);
     const preset = hooks.get(hook) ?? fallback;
+    // A call-in only some units want is left out when nothing writes it.
+    if (hook === "RockUnit" && preset.length === 0) continue;
     const stance = BUILD_STANCE[hook];
     const lines = [
       ...(stance?.before ? [stance.before] : []),
+      ...(firsts.get(hook) ?? []),
       ...preset,
       ...(stance?.after ? [stance.after] : []),
     ];
