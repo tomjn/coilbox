@@ -1038,9 +1038,10 @@ describe("preset parity fixture", () => {
   const cases = buildCases();
   const actions = actionCases();
 
-  it("covers all 23 presets", () => {
-    expect(new Set(cases.map((entry) => entry.preset.id)).size).toBe(23);
-    expect(PRESETS).toHaveLength(23);
+  it("covers every preset in PRESETS", () => {
+    expect(new Set(cases.map((entry) => entry.preset.id))).toEqual(
+      new Set(PRESETS.map((preset) => preset.id)),
+    );
   });
 
   it("matches what the presets generate today", () => {
