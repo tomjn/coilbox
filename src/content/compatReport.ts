@@ -88,8 +88,7 @@ export function buildReport(inputs: CompatReportInputs): Finding[] {
     });
 
   if (inputs.lua) {
-    const lua = luaFinding(inputs.lua, catalogue);
-    if (lua) out.push(lua);
+    out.push(...luaFindings(inputs.lua, catalogue));
   }
 
   if (inputs.defs) {
@@ -248,10 +247,28 @@ export function readErrorsFinding(errors: string[]): Finding | null {
   };
 }
 
+/**
+ * An engine version with the engine's name. Up to 105.0 the engine was Spring,
+ * from 105.1.1 on it is Recoil. The changelog heading "BAR105 1544" is engine
+ * build 105.1.1-1544, so it reads "Recoil 105.1.1-1544". A version that is none
+ * of these is shown as written.
+ */
+export function engineVersion(since: string): string {
+  const bar = /^BAR105 (\d+)$/.exec(since);
+  if (bar) return `Recoil 105.1.1-${bar[1]}`;
+  const parts = /^(\d+)\.(\d+)(?:\.(\d+))?$/.exec(since);
+  if (!parts) return since;
+  const [major, minor, patch] = [parts[1], parts[2], parts[3] ?? "0"].map(
+    Number,
+  );
+  const spring = major < 105 || (major === 105 && minor === 0 && patch === 0);
+  return `${spring ? "Spring" : "Recoil"} ${since}`;
+}
+
 /** What changed about one entry, in a few words. */
 function changeOf(entry: CompatEntry | undefined): string {
   if (!entry) return "changed";
-  const since = entry.since ? ` in ${entry.since}` : "";
+  const since = entry.since ? ` in ${engineVersion(entry.since)}` : "";
   switch (entry.kind) {
     case "renamed":
       return entry.replacement
@@ -274,41 +291,66 @@ function changeOf(entry: CompatEntry | undefined): string {
  * One hit per place in the source. The scanner reports a name once per
  * catalogue entry, so `Game.version`, both renamed and changed, comes back
  * twice from one line, and counting those would count the line twice.
+ *
+ * A removed or renamed function stops working, so those hits make a problem.
+ * A `signature` entry only changes some calls, such as one that leaves out an
+ * argument, so those hits go in a separate info finding (issue #4648).
  */
-function luaFinding(
+function luaFindings(
   lua: LuaCompatResult,
   catalogue: CompatEntry[],
-): Finding | null {
+): Finding[] {
   const byId = new Map(catalogue.map((e) => [e.id, e]));
   const primary = lua.archives[0];
-  let count = 0;
-  const details: FindingDetail[] = [];
-  for (const file of lua.files) {
-    const sites = new Map<string, { text: string; changes: string[] }>();
-    for (const hit of file.hits) {
-      const key = `${hit.line}:${hit.column}`;
-      const site = sites.get(key) ?? { text: hit.text, changes: [] };
-      site.changes.push(changeOf(byId.get(hit.entryId)));
-      sites.set(key, site);
+  const isSignature = (id: string) => byId.get(id)?.kind === "signature";
+
+  const build = (
+    keep: (entryId: string) => boolean,
+    kind: string,
+    label: string,
+    severity: FindingSeverity,
+  ): Finding | null => {
+    let count = 0;
+    const details: FindingDetail[] = [];
+    for (const file of lua.files) {
+      const sites = new Map<string, { text: string; changes: string[] }>();
+      for (const hit of file.hits) {
+        if (!keep(hit.entryId)) continue;
+        const key = `${hit.line}:${hit.column}`;
+        const site = sites.get(key) ?? { text: hit.text, changes: [] };
+        site.changes.push(changeOf(byId.get(hit.entryId)));
+        sites.set(key, site);
+      }
+      if (sites.size === 0) continue;
+      count += sites.size;
+      details.push({
+        heading:
+          file.archive === primary
+            ? file.path
+            : `${file.archive}: ${file.path}`,
+        lines: [...sites].map(
+          ([at, s]) => `${at} ${s.text}, ${s.changes.join(", ")}`,
+        ),
+      });
     }
-    if (sites.size === 0) continue;
-    count += sites.size;
-    details.push({
-      heading:
-        file.archive === primary ? file.path : `${file.archive}: ${file.path}`,
-      lines: [...sites].map(
-        ([at, s]) => `${at} ${s.text}, ${s.changes.join(", ")}`,
-      ),
-    });
-  }
-  if (count === 0) return null;
-  return {
-    kind: "lua-api",
-    label: "Lua calls to removed or changed APIs",
-    severity: "problem",
-    count,
-    details,
+    if (count === 0) return null;
+    return { kind, label, severity, count, details };
   };
+
+  return [
+    build(
+      (id) => !isSignature(id),
+      "lua-api",
+      "Lua calls to removed or changed APIs",
+      "problem",
+    ),
+    build(
+      isSignature,
+      "lua-signature",
+      "Lua calls to functions whose behaviour changed",
+      "info",
+    ),
+  ].filter((f): f is Finding => f !== null);
 }
 
 /** The value at a dotted path, matching each key without regard to case. */
