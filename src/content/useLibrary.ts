@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { errorText } from "@/lib/helpers";
 import { useContentRootPaths } from "../downloads/config";
 import {
   useDownloadComplete,
@@ -62,6 +63,12 @@ export interface LibraryOptions {
   rapidVersions?: LibraryInput["rapidVersions"];
 }
 
+/** A mirror index that could not be read, and why. */
+export interface CatalogueFailure {
+  request: CatalogueRequest;
+  reason: string;
+}
+
 /** The library record, and how far the disk listing behind it has got. */
 export interface LibraryRecord extends Library {
   /**
@@ -74,6 +81,10 @@ export interface LibraryRecord extends Library {
   filesAnswered: boolean;
   /** Read the disk listing again. */
   refresh: () => Promise<void>;
+  /** Every asked for mirror index has been read or has failed. */
+  cataloguesRead: boolean;
+  /** The mirror indexes that failed, which the merge leaves out. */
+  catalogueFailures: CatalogueFailure[];
 }
 
 /**
@@ -122,6 +133,10 @@ export function useLibrary({
   // biome-ignore lint/correctness/useExhaustiveDependencies: `wanted` stands for `catalogues`
   const requests = useMemo(() => catalogues, [wanted]);
   const [loaded, setLoaded] = useState<LoadedCatalogue[]>([]);
+  const [failures, setFailures] = useState<CatalogueFailure[]>([]);
+  const [readFor, setReadFor] = useState<readonly CatalogueRequest[] | null>(
+    null,
+  );
   useEffect(() => {
     let live = true;
     Promise.allSettled(requests.map(loadCatalogue)).then((results) => {
@@ -129,6 +144,14 @@ export function useLibrary({
       setLoaded(
         results.flatMap((r) => (r.status === "fulfilled" ? [r.value] : [])),
       );
+      setFailures(
+        results.flatMap((r, i) =>
+          r.status === "rejected"
+            ? [{ request: requests[i], reason: errorText(r.reason) }]
+            : [],
+        ),
+      );
+      setReadFor(requests);
     });
     return () => {
       live = false;
@@ -164,7 +187,9 @@ export function useLibrary({
       filesRead: files !== null,
       filesAnswered,
       refresh: readFiles,
+      cataloguesRead: readFor === requests,
+      catalogueFailures: failures,
     }),
-    [library, files, filesAnswered, readFiles],
+    [library, files, filesAnswered, readFiles, readFor, requests, failures],
   );
 }

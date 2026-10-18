@@ -55,8 +55,7 @@ use serde::Serialize;
 
 use crate::ffi::Unitsync;
 use crate::unitmodel::{
-    find_with_ext, read_palette, read_teamtex, MODEL_DIR, MODEL_READ_CAP, TATEX_DIR,
-    TEXTURE_READ_CAP,
+    find_with_ext, palette_in, teamtex_in, MODEL_DIR, MODEL_READ_CAP, TATEX_DIR, TEXTURE_READ_CAP,
 };
 
 /// Where the sheets go inside the output, under `unittextures/` so an `.s3o`'s
@@ -220,13 +219,62 @@ fn convert(us: &Unitsync, game_archive: &str, out_dir: &Path) -> Convert3doOutpu
         return out;
     };
 
-    let list: Vec<(String, String)> = us
-        .list_archive_files(handle)
+    convert_files(&Mounted { us, handle }, out_dir, &mut out);
+
+    us.close_archive(handle);
+    out.errors.extend(us.drain_errors());
+    us.remove_all_archives();
+    out
+}
+
+/// What a conversion reads out of a game. The run answers it from unitsync,
+/// and the tests from files in memory, so the code that decides the bytes is
+/// the same in both.
+pub(crate) trait GameFiles {
+    /// The paths in the game's own archive, as the archive spells them.
+    fn list(&self) -> Vec<String>;
+    /// One file of the game's own archive, up to `cap` bytes.
+    fn member(&self, path: &str, cap: usize) -> Option<Vec<u8>>;
+    /// A file anywhere the engine would look for it: the game, its
+    /// dependencies and the engine's base content.
+    fn vfs(&self, path: &str, cap: usize) -> Option<Vec<u8>>;
+}
+
+/// The game a unitsync session has mounted, and its own archive opened.
+struct Mounted<'a> {
+    us: &'a Unitsync,
+    handle: i32,
+}
+
+impl GameFiles for Mounted<'_> {
+    fn list(&self) -> Vec<String> {
+        self.us
+            .list_archive_files(self.handle)
+            .into_iter()
+            .map(|(path, _)| path)
+            .collect()
+    }
+
+    fn member(&self, path: &str, cap: usize) -> Option<Vec<u8>> {
+        self.us
+            .read_archive_member(self.handle, path, cap)
+            .map(|(_, bytes)| bytes)
+    }
+
+    fn vfs(&self, path: &str, cap: usize) -> Option<Vec<u8>> {
+        self.us.read_vfs_file(path, cap)
+    }
+}
+
+/// Convert every `.3do` in `files` into `out_dir`, adding to `out`.
+fn convert_files(files: &impl GameFiles, out_dir: &Path, out: &mut Convert3doOutput) {
+    let list: Vec<(String, String)> = files
+        .list()
         .into_iter()
-        .map(|(path, _)| (path.to_lowercase(), path))
+        .map(|path| (path.to_lowercase(), path))
         .collect();
-    let teamtex = read_teamtex(us, handle, &list);
-    let palette = read_palette(us);
+    let teamtex = teamtex_in(&list, |member, cap| files.member(member, cap));
+    let palette = palette_in(|path, cap| files.vfs(path, cap));
 
     let groups = plan(&list);
     out.models_found = groups.iter().map(|g| g.members.len()).sum();
@@ -241,8 +289,7 @@ fn convert(us: &Unitsync, game_archive: &str, out_dir: &Path) -> Convert3doOutpu
     let mut done = 0usize;
     for group in &groups {
         match convert_group(
-            us,
-            handle,
+            files,
             &list,
             &teamtex,
             palette.as_ref(),
@@ -261,11 +308,6 @@ fn convert(us: &Unitsync, game_archive: &str, out_dir: &Path) -> Convert3doOutpu
             Err(e) => out.errors.push(e),
         }
     }
-
-    us.close_archive(handle);
-    out.errors.extend(us.drain_errors());
-    us.remove_all_archives();
-    out
 }
 
 /// One folder of models and the sheet they will share.
@@ -375,8 +417,7 @@ fn sheet_names(folders: impl IntoIterator<Item = String>) -> BTreeMap<String, St
 /// Convert one folder's models against one sheet.
 #[allow(clippy::too_many_arguments)]
 fn convert_group(
-    us: &Unitsync,
-    handle: i32,
+    files: &impl GameFiles,
     list: &[(String, String)],
     teamtex: &[String],
     palette: Option<&coilbox_3do::Palette>,
@@ -406,7 +447,7 @@ fn convert_group(
     let mut entries: BTreeSet<i32> = BTreeSet::new();
     let mut readable: Vec<String> = Vec::new();
     for member in members {
-        let Some(model) = read_3do(us, handle, member, unreadable) else {
+        let Some(model) = read_3do(files, member, unreadable) else {
             *done += 1;
             continue;
         };
@@ -437,7 +478,7 @@ fn convert_group(
         } else {
             name.as_str()
         };
-        match load_tile(us, handle, list, teamtex, name) {
+        match load_tile(files, list, teamtex, name) {
             Ok(tile) => tiles.push(tile),
             Err(None) => {
                 group.missing_textures.insert(reported.to_string(), *uses);
@@ -504,7 +545,7 @@ fn convert_group(
             folder: &group.folder,
             member,
         });
-        let Some(model) = read_3do(us, handle, member, unreadable) else {
+        let Some(model) = read_3do(files, member, unreadable) else {
             continue;
         };
         let short = member.rsplit('/').next().unwrap_or(member).to_string();
@@ -571,12 +612,11 @@ fn out_member(member: &str) -> PathBuf {
 
 /// Read and parse one model, recording why not if it will not.
 fn read_3do(
-    us: &Unitsync,
-    handle: i32,
+    files: &impl GameFiles,
     member: &str,
     unreadable: &mut BTreeMap<String, String>,
 ) -> Option<coilbox_3do::Model> {
-    let Some((_, bytes)) = us.read_archive_member(handle, member, MODEL_READ_CAP) else {
+    let Some(bytes) = files.member(member, MODEL_READ_CAP) else {
         unreadable.insert(
             member.to_string(),
             "could not be read out of the archive".into(),
@@ -609,8 +649,7 @@ fn read_3do(
 /// when it holds it and the bytes would not decode. The two are different
 /// problems and the report keeps them apart.
 fn load_tile(
-    us: &Unitsync,
-    handle: i32,
+    files: &impl GameFiles,
     list: &[(String, String)],
     teamtex: &[String],
     name: &str,
@@ -631,8 +670,8 @@ fn load_tile(
     let member = find_with_ext(list, TATEX_DIR, &format!("{want}00"))
         .or_else(|| find_with_ext(list, TATEX_DIR, &want))
         .ok_or(None)?;
-    let (_, bytes) = us
-        .read_archive_member(handle, &member, TEXTURE_READ_CAP)
+    let bytes = files
+        .member(&member, TEXTURE_READ_CAP)
         .ok_or_else(|| Some(member.clone()))?;
     let ext = member.rsplit_once('.').map(|(_, e)| e).unwrap_or("");
     let mut image = crate::texture::decode_texture(&ext.to_lowercase(), &bytes)
@@ -936,6 +975,299 @@ mod tests {
             .expect("the fallback still packs")
             .rects
             .contains_key(coilbox_3do_convert::PALETTE_TILE));
+    }
+
+    /// A game held in memory, with the VFS answering only `palette.pal`.
+    struct InMemory {
+        files: Vec<(String, Vec<u8>)>,
+        palette: Vec<u8>,
+    }
+
+    impl GameFiles for InMemory {
+        fn list(&self) -> Vec<String> {
+            self.files.iter().map(|(path, _)| path.clone()).collect()
+        }
+
+        fn member(&self, path: &str, cap: usize) -> Option<Vec<u8>> {
+            let (_, bytes) = self.files.iter().find(|(p, _)| p == path)?;
+            Some(bytes[..bytes.len().min(cap)].to_vec())
+        }
+
+        fn vfs(&self, path: &str, cap: usize) -> Option<Vec<u8>> {
+            (path == "unittextures/tatex/palette.pal")
+                .then(|| self.palette[..self.palette.len().min(cap)].to_vec())
+        }
+    }
+
+    enum Face {
+        Named(&'static str),
+        Palette(i32),
+    }
+
+    /// A `.3do` whose root piece has one triangle per face, each on corners of
+    /// its own so none replaces another.
+    fn a_3do(faces: &[Face]) -> Vec<u8> {
+        const OBJECT: usize = 13 * 4;
+        let n = faces.len();
+        let vertices = OBJECT;
+        let indices = vertices + n * 3 * 12;
+        let primitives = indices + n * 3 * 2;
+        let mut strings = primitives + n * 8 * 4;
+        let mut names = Vec::new();
+        let mut name_at = |text: &str, names: &mut Vec<u8>| {
+            let at = strings;
+            names.extend_from_slice(text.as_bytes());
+            names.push(0);
+            strings += text.len() + 1;
+            at as i32
+        };
+        let piece_name = name_at("base", &mut names);
+        let mut out = Vec::new();
+        let put = |out: &mut Vec<u8>, values: &[i32]| {
+            for v in values {
+                out.extend_from_slice(&v.to_le_bytes());
+            }
+        };
+        put(
+            &mut out,
+            &[
+                1,
+                3 * n as i32,
+                n as i32,
+                -1,
+                0,
+                0,
+                0,
+                piece_name,
+                0,
+                vertices as i32,
+                primitives as i32,
+                0,
+                0,
+            ],
+        );
+        for f in 0..n as i32 {
+            let x = f * 65536;
+            put(
+                &mut out,
+                &[x, 0, 0, x + 65536, 0, 0, x, 0, 65536 + f * 4096],
+            );
+        }
+        for i in 0..(3 * n) as u16 {
+            out.extend_from_slice(&i.to_le_bytes());
+        }
+        for (f, face) in faces.iter().enumerate() {
+            let (entry, name) = match face {
+                Face::Named(text) => (0, name_at(text, &mut names)),
+                Face::Palette(entry) => (*entry, 0),
+            };
+            put(
+                &mut out,
+                &[entry, 3, 0, (indices + f * 6) as i32, name, 0, 0, 0],
+            );
+        }
+        out.extend_from_slice(&names);
+        out
+    }
+
+    fn encoded(image: &image::RgbaImage, format: image::ImageFormat) -> Vec<u8> {
+        let mut out = std::io::Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgba8(image.clone())
+            .write_to(&mut out, format)
+            .unwrap();
+        out.into_inner()
+    }
+
+    fn gradient(side: u32, seed: u8) -> image::RgbaImage {
+        image::RgbaImage::from_fn(side, side, |x, y| {
+            image::Rgba([(x * 7) as u8 ^ seed, (y * 5) as u8, seed, (x + y) as u8])
+        })
+    }
+
+    /// A small game with something for each rule the conversion follows: the
+    /// `00` suffix and the bare name, a team colour tile, a tile that is not
+    /// there, a format the probe does not try, resolved and unresolved palette
+    /// entries, an empty tile name, a model that will not read, two folders
+    /// whose sheet names collide, and a folder whose tiles do not all fit.
+    fn a_game() -> InMemory {
+        use image::ImageFormat::{Bmp, Png, Tga};
+        use Face::{Named, Palette};
+        let cap = coilbox_3do_convert::MAX_SIDE;
+        let big = image::RgbaImage::from_pixel(cap, cap, image::Rgba([9, 9, 9, 255]));
+        let files = vec![
+            (
+                "objects3d/ArmCom.3do",
+                a_3do(&[
+                    Named("ArmTex"),
+                    Named("core"),
+                    Palette(3),
+                    Palette(300),
+                    Named("nothere"),
+                    Named("pcxonly"),
+                ]),
+            ),
+            (
+                "Objects3D/corthud.3do",
+                a_3do(&[Named("bare"), Named("TgaTex"), Named("")]),
+            ),
+            ("objects3d/broken.3do", b"not a model".to_vec()),
+            ("objects3d/arm/Mech.3do", a_3do(&[Named("pngtex")])),
+            (
+                "objects3d/arm/deep/flyer.3do",
+                a_3do(&[Named("armtex"), Palette(3)]),
+            ),
+            ("objects3d/a b/x.3do", a_3do(&[Named("armtex")])),
+            ("objects3d/a_b/y.3do", a_3do(&[Named("bare")])),
+            ("objects3d/huge/one.3do", a_3do(&[Named("big")])),
+            (
+                "objects3d/huge/two.3do",
+                a_3do(&[Named("small"), Named("shared")]),
+            ),
+            (
+                "objects3d/huge/three.3do",
+                a_3do(&[Named("shared"), Palette(7)]),
+            ),
+            (
+                "unittextures/tatex/ArmTex00.bmp",
+                encoded(&gradient(32, 1), Bmp),
+            ),
+            (
+                "unittextures/tatex/core00.png",
+                encoded(&gradient(16, 2), Png),
+            ),
+            ("unittextures/tatex/bare.bmp", encoded(&gradient(8, 3), Bmp)),
+            (
+                "UnitTextures/TATex/tgatex00.tga",
+                encoded(&gradient(24, 4), Tga),
+            ),
+            ("unittextures/tatex/00.png", encoded(&gradient(4, 5), Png)),
+            (
+                "unittextures/tatex/pngtex00.png",
+                encoded(&gradient(64, 6), Png),
+            ),
+            ("unittextures/tatex/pcxonly00.pcx", vec![0x0a; 200]),
+            ("unittextures/tatex/big00.tga", encoded(&big, Tga)),
+            (
+                "unittextures/tatex/small00.png",
+                encoded(&gradient(16, 7), Png),
+            ),
+            (
+                "unittextures/tatex/shared00.png",
+                encoded(&gradient(16, 8), Png),
+            ),
+            (
+                "unittextures/tatex/teamtex.txt",
+                b"Core\r\n\r\n  BigTeam \n".to_vec(),
+            ),
+        ];
+        let mut palette = vec![0u8; 256 * 4];
+        palette[3 * 4..3 * 4 + 3].copy_from_slice(&[10, 20, 30]);
+        palette[7 * 4..7 * 4 + 3].copy_from_slice(&[200, 100, 50]);
+        InMemory {
+            files: files
+                .into_iter()
+                .map(|(path, bytes)| (path.to_string(), bytes))
+                .collect(),
+            palette,
+        }
+    }
+
+    /// Every file under `dir`, relative, lower case and with forward slashes,
+    /// sorted. Lower case because a case-insensitive filesystem puts
+    /// `Objects3D/a.s3o` and `objects3d/b.s3o` in one folder and a sensitive
+    /// one in two, and the engine lowercases every name when it checksums an
+    /// archive, so the case is not part of what two players compare.
+    fn written(dir: &Path) -> Vec<(String, Vec<u8>)> {
+        fn walk(root: &Path, at: &Path, out: &mut Vec<(String, Vec<u8>)>) {
+            for entry in std::fs::read_dir(at).unwrap() {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    walk(root, &path, out);
+                } else {
+                    let rel = path.strip_prefix(root).unwrap();
+                    let rel: Vec<String> = rel
+                        .components()
+                        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+                        .collect();
+                    out.push((rel.join("/").to_lowercase(), std::fs::read(&path).unwrap()));
+                }
+            }
+        }
+        let mut out = Vec::new();
+        walk(dir, dir, &mut out);
+        out.sort();
+        out
+    }
+
+    /// The fixed game converted, as every file written.
+    fn convert_the_game(name: &str) -> (Convert3doOutput, Vec<(String, Vec<u8>)>) {
+        let dir = std::env::temp_dir().join(format!("cbx-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let mut out = Convert3doOutput::default();
+        convert_files(&a_game(), &dir, &mut out);
+        let files = written(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+        (out, files)
+    }
+
+    #[test]
+    fn the_fixed_game_exercises_each_rule() {
+        let (out, files) = convert_the_game("rules");
+        let paths: Vec<&str> = files.iter().map(|(p, _)| p.as_str()).collect();
+        assert!(out.errors.is_empty(), "{:?}", out.errors);
+        assert_eq!(out.models_found, 10);
+        assert!(out.unreadable.contains_key("objects3d/broken.3do"));
+        assert!(paths.contains(&"objects3d/armcom.s3o"), "{paths:?}");
+        assert!(
+            paths.contains(&"unittextures/3do/objects3d-a_b.png"),
+            "{paths:?}"
+        );
+        assert!(
+            paths.contains(&"unittextures/3do/objects3d-a_b-2.png"),
+            "{paths:?}"
+        );
+        let group = |name: &str| {
+            out.groups
+                .iter()
+                .find(|g| g.folder == name)
+                .unwrap_or_else(|| panic!("no group {name}"))
+        };
+        let top = group("objects3d");
+        assert_eq!(
+            top.missing_textures.keys().collect::<Vec<_>>(),
+            ["nothere", "pcxonly"]
+        );
+        assert_eq!(top.palette_faces, 1, "entry 300 resolves to nothing");
+        let huge = group("objects3d/huge");
+        assert!(huge.tiles_that_did_not_fit.contains(&"big".to_string()));
+        assert_eq!(huge.did_not_fit, ["one.3do (needs big, which did not fit)"]);
+        assert_eq!(huge.models_written, 2);
+    }
+
+    /// Every file one conversion of the fixed game writes, hashed. The models
+    /// and sheets go into a compat mutator, which two players have to build
+    /// byte for byte from one manifest (issue #4629). If this fails, the worker
+    /// writes different bytes than the compat writer a manifest pins: move
+    /// `coilbox_compat::WRITER`, add a compat manifest that names the new
+    /// writer, and only then record the new hash here.
+    #[test]
+    fn a_fixed_game_converts_to_the_same_bytes() {
+        use sha2::{Digest, Sha256};
+
+        let (_, files) = convert_the_game("golden");
+        let mut hash = Sha256::new();
+        for (path, bytes) in &files {
+            hash.update(path.as_bytes());
+            hash.update([0]);
+            hash.update((bytes.len() as u64).to_le_bytes());
+            hash.update(bytes);
+        }
+        let hex: String = hash.finalize().iter().map(|b| format!("{b:02x}")).collect();
+        assert_eq!(coilbox_compat::WRITER, 1);
+        assert_eq!(
+            hex, "1cb90a06ae50557d045180babf7177354f535bc188c8b45fe1a9b513061021e2",
+            "the worker's conversion changed, so coilbox_compat::WRITER has to move"
+        );
     }
 
     #[test]

@@ -1242,10 +1242,21 @@ fn find_unreadable_model(list: &[(String, String)], object_name: &str) -> Option
 /// without the `00` suffix the engine otherwise appends. Lower cased, because
 /// the file is written in the original mixed case and the models are not.
 pub(crate) fn read_teamtex(us: &Unitsync, handle: i32, list: &[(String, String)]) -> Vec<String> {
+    teamtex_in(list, |member, cap| {
+        us.read_archive_member(handle, member, cap)
+            .map(|(_, bytes)| bytes)
+    })
+}
+
+/// [`read_teamtex`], with `read` returning an archive member up to a cap.
+pub(crate) fn teamtex_in(
+    list: &[(String, String)],
+    read: impl FnOnce(&str, usize) -> Option<Vec<u8>>,
+) -> Vec<String> {
     let Some(actual) = find_member(list, TEAMTEX_LIST) else {
         return Vec::new();
     };
-    let Some((_, bytes)) = us.read_archive_member(handle, &actual, 64 * 1024) else {
+    let Some(bytes) = read(&actual, 64 * 1024) else {
         return Vec::new();
     };
     String::from_utf8_lossy(&bytes)
@@ -1272,7 +1283,14 @@ pub(crate) fn read_teamtex(us: &Unitsync, handle: i32, list: &[(String, String)]
 /// answers to the name, or answers with fewer than the 256 entries the engine
 /// expects: a face naming an entry is then drawn plain rather than guessed at.
 pub(crate) fn read_palette(us: &Unitsync) -> Option<coilbox_3do::Palette> {
-    let bytes = us.read_vfs_file(PALETTE_FILE, PALETTE_READ_CAP)?;
+    palette_in(|path, cap| us.read_vfs_file(path, cap))
+}
+
+/// [`read_palette`], with `read` returning a file from the VFS up to a cap.
+pub(crate) fn palette_in(
+    read: impl FnOnce(&str, usize) -> Option<Vec<u8>>,
+) -> Option<coilbox_3do::Palette> {
+    let bytes = read(PALETTE_FILE, PALETTE_READ_CAP)?;
     coilbox_3do::read_palette(&bytes)
 }
 
