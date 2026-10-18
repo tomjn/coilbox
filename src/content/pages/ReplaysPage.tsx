@@ -161,8 +161,7 @@ export function OriginBadge({ origin }: { origin: ReplayOrigin }) {
  * (map preview, players, winner).
  */
 export default function ReplaysPage() {
-  const { targets, selected, selectedKey, setSelectedKey } =
-    useScanTargetSelection();
+  const { targets, selected, selectedKey } = useScanTargetSelection();
   const replaysRoot = useReplaysRoot(selected?.rootPath);
   const { replays, loading, error, refresh, ready } = useReplays(replaysRoot);
   const { thumbs, loading: thumbsLoading } = useUnitsyncThumbnails(
@@ -443,7 +442,6 @@ export default function ReplaysPage() {
             <BrowserToolbar
               targets={targets}
               selectedKey={selectedKey}
-              onSelect={setSelectedKey}
               onRescan={refresh}
               scanning={loading}
             />

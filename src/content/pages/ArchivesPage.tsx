@@ -19,8 +19,7 @@ import {
  * to the archive's detail page (metadata, dependencies, contents).
  */
 export default function ArchivesPage() {
-  const { targets, selected, selectedKey, setSelectedKey } =
-    useScanTargetSelection();
+  const { targets, selected, selectedKey } = useScanTargetSelection();
   const { archives, data, loading, error, cancelled, run, cancel } =
     useArchives(selected?.enginePath, selected?.rootPath);
   const busy = loading || (!!selected && !data && !error && !cancelled);
@@ -38,7 +37,6 @@ export default function ArchivesPage() {
       <BrowserToolbar
         targets={targets}
         selectedKey={selectedKey}
-        onSelect={setSelectedKey}
         onRescan={() => run(true)}
         scanning={loading}
         onCancel={cancel}

@@ -47,7 +47,7 @@ import { EmptyState, ErrorBanner, ScanFailed } from "./components/states";
  * player's changes alone.
  */
 export default function KeybindsSection() {
-  const { targets, selected, selectedKey, setSelectedKey, loading, refresh } =
+  const { targets, selected, selectedKey, loading, refresh } =
     useScanTargetSelection();
   const enginePath = selected?.enginePath;
   const rootPath = selected?.rootPath;
@@ -153,7 +153,6 @@ export default function KeybindsSection() {
       <BrowserToolbar
         targets={targets}
         selectedKey={selectedKey}
-        onSelect={setSelectedKey}
         onRescan={refresh}
         scanning={loading}
       />
