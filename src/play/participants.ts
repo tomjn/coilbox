@@ -446,6 +446,12 @@ export function toBattleConfig(opts: {
   startRects?: Record<string, StartRect>;
   /** Units to disable entirely (rendered as `[RESTRICT]` limit 0). */
   disabledUnits?: string[];
+  /**
+   * The game the player picked, when `gameType` is its compatibility mode
+   * mutator (issue #4562). Written as the `coilbox_compat_base` mod option so
+   * the mutator's prelude can report the base game's name.
+   */
+  compatBase?: string;
 }): BattleConfig {
   const {
     participants,
@@ -457,7 +463,10 @@ export function toBattleConfig(opts: {
     startRects,
     disabledUnits,
   } = opts;
-  const modOptions = effectiveOptions(optionSchema, opts.modOptions);
+  const modOptions = effectiveOptions(optionSchema, {
+    ...opts.modOptions,
+    ...(opts.compatBase ? { coilbox_compat_base: opts.compatBase } : {}),
+  });
   const mapOptions = effectiveOptions(mapOptionSchema, opts.mapOptions ?? {});
   const you = participants[0];
   const active = participants.filter((p) => !(p.kind === "you" && p.spectator));
