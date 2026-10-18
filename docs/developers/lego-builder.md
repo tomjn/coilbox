@@ -247,6 +247,24 @@ Point at a module and press **Save to file** to write it to a `.coilbox-module.j
 
 The file holds the same text a copied piece puts on the clipboard, so you can also paste a file's contents into a unit.
 
+## Loadouts
+
+One chassis often becomes several units: the same hull with a cannon, with rockets or with a build arm. A unit can hold several named loadouts of one chassis, and you switch between them in the builder ([issue #3281](https://github.com/tomjn/coilbox/issues/3281)).
+
+The **Loadouts** button is under the game picker in the unit's card. Its popover adds, duplicates, renames and deletes loadouts. Once a unit has two, a switch beside the button picks the one you are editing.
+
+- **Add** makes a loadout of the bare chassis. It starts with the current loadout's presets, unit definition and build settings, but not its own pieces and not a script you took over, because that script names those pieces.
+- **Duplicate** copies the current loadout, pieces included.
+- **Delete** removes a loadout and its own pieces. Delete down to one and the unit has no loadouts again.
+
+Each piece is either part of the chassis, which every loadout shares, or the current loadout's own. An edit to the chassis shows in every loadout. A module you add while the unit has loadouts goes into the current one. A part you add goes on the chassis. To change which a piece is, select it and pick **Every loadout** or **Only** the current loadout in the popover. Making a shared piece a loadout's own leaves a copy in every other loadout, so nothing disappears from one you are not looking at. A piece under a loadout's own piece goes with its parent.
+
+Each loadout has its own presets, generated or hand written script, unit definition fields and build settings. Everything else, the export name included, belongs to the chassis. Export writes the loadout you are editing. Exporting each loadout as a unit of its own is [issue #3282](https://github.com/tomjn/coilbox/issues/3282).
+
+Switching, adding, duplicating, renaming and deleting are each one undo step. Undo past a switch and you are back on the loadout you were editing, as it was.
+
+A loadout you are not looking at keeps its pieces as they were. If you deleted the chassis piece one of them hung off, it goes on the root piece when you switch back. If the chassis took its name meanwhile, it gets a number on the end.
+
 ## Judging size
 
 A unit built from small parts can look substantial and be a fraction of a real one, so the builder gives you two readings.
