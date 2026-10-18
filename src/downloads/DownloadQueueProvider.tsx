@@ -585,13 +585,15 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
     const busy = new Set(busyLanesRef.current.keys());
     for (const next of startable(itemsRef.current, busy)) {
       busyLanesRef.current.set(laneOf(next), next.id);
-      patch(next.id, {
+      const meta = {
         status: "active",
         progress: null,
         rate: IDLE_RATE,
         startedAt: Date.now(),
-      });
-      void run(next);
+      } as const;
+      patch(next.id, meta);
+      // The started item, so what it records knows how long it ran.
+      void run({ ...next, ...meta } as QueueItem);
     }
   }, [patch, run]);
 
