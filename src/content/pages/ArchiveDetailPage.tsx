@@ -1,4 +1,4 @@
-import { Button, useDrawer } from "@picoframe/frame";
+import { Button, buttonVariants, cn, useDrawer } from "@picoframe/frame";
 import { save } from "@tauri-apps/plugin-dialog";
 import { ArrowLeft, Boxes, FolderOpen, Terminal } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -178,15 +178,32 @@ export default function ArchiveDetailPage() {
           {archive.primary && <PrimaryBadge />}
           <ArchiveTypeBadge kind={archive.kind} />
           <div className="ml-auto flex max-w-full shrink-0 flex-wrap gap-2">
-            {selected?.enginePath && selected?.rootPath && legacyModels > 0 && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5"
-                onClick={openConvert}
+            {/* A game's models are one finding of its compatibility report
+                (issue #4554), which converts them too. Any other archive has
+                no report, so it keeps the drawer. */}
+            {legacyModels > 0 && archive.kind === "game" && archive.gameName ? (
+              <Link
+                to={`/library/games/${encodeURIComponent(archive.gameName)}?section=compat`}
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "sm" }),
+                  "gap-1.5",
+                )}
               >
                 <Boxes className="size-4" /> Convert models
-              </Button>
+              </Link>
+            ) : (
+              selected?.enginePath &&
+              selected?.rootPath &&
+              legacyModels > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={openConvert}
+                >
+                  <Boxes className="size-4" /> Convert models
+                </Button>
+              )
             )}
             {selected?.enginePath && selected?.rootPath && (
               <Button
