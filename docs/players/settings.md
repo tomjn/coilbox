@@ -6,7 +6,7 @@ To open Settings, select Settings at the bottom of the sidebar. The list on the 
 
 Some sections have their own guides:
 
-- Library, which holds Content folders, Engines, Downloads, Storage and Import, is in [Get games, maps and engines](downloads.md).
+- Library, which holds Content folders, Engines, Sources, Storage and Import, is in [The Library](library.md).
 - Multiplayer, which holds Lobby servers, Chat highlights, Ignored users and Account, is in [Sign in and chat](lobby-and-chat.md).
 - Coilbox hub is in [The Coilbox hub](hub.md#settings).
 
@@ -28,7 +28,7 @@ The name at the top of each page is the engine whose settings you are changing. 
 
 Your player name is replaced by your lobby name when you play online.
 
-If the page says no engines were found, add one first. See [Engines](downloads.md#engines).
+If the page says no engines were found, add one first. See [Engines](library.md#engines).
 
 ## Keybinds
 
@@ -155,6 +155,7 @@ Advanced mode is under Advanced tools on the General page. It is off unless you 
 It adds the tools for making games, maps and missions to the sidebar and the home page:
 
 - Archives, under Library, to look inside game and map files.
+- Rapid repositories, under Library, to browse a rapid server and download any version it holds. See [Rapid repositories](#rapid-repositories).
 - uberstress, to load test a lobby server.
 - Campaign Builder, to make campaigns and scenarios.
 - Mapping Tools, to build and take apart maps.
@@ -162,6 +163,19 @@ It adds the tools for making games, maps and missions to the sidebar and the hom
 - animation, to convert unit animation scripts.
 
 These are covered in the [game developer guides](../developers/index.md). You do not need any of them to play.
+
+#### Rapid repositories
+
+Some games are not single files. They come as rapid packages, which download only the parts that changed since your last version. Beyond All Reason is one of them. The Games page and a game's Versions tab already list the rapid versions of the games coilbox knows. Rapid repositories lets you browse a whole rapid server.
+
+1. Open Library > Rapid repositories in the sidebar.
+2. Pick a server from Select a rapid repository…. Coilbox loads the repositories it holds. Load repos reads them again.
+3. Select a repository on the left. Its versions appear on the right.
+4. Select Download on the version you want.
+
+Type in Filter repositories… or Filter versions… to find one in a long list.
+
+Coilbox starts with one server, called Spring. To add another, open Settings, then Library > Sources. Select Add repository, then type its Name and its Master URL. The bin beside a server removes it.
 
 ## Updates
 

@@ -77,7 +77,7 @@ Start Game stays greyed out until all of these are true:
 
 If no engine is installed, the page says so and offers Download engine. Select it to download one and start playing.
 
-The game and map lists only show what you have installed. If a list is empty, get games from Downloads > Games and maps from Downloads > Maps in the sidebar, then come back.
+The game and map lists only show what you have installed. If a list is empty, get games from Library > Games and maps from Library > Maps in the sidebar, then come back.
 
 Some games need another archive to run. If that archive is missing, the page shows "This game is missing something it depends on" and names it. Open game downloads takes you to the page where you can get it.
 
