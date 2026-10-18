@@ -1,6 +1,9 @@
 /**
  * The builder's one inventory (issue #3306): the filter row and the grid.
  *
+ * The row is the same on the Lego Parts page and in the builder's drawer
+ * (#4538), where it has a Game units tab as well.
+ *
  * Shapes, parts and modules are drawn by one grid in sections (#4536), on the
  * Lego Parts page and in the builder's drawer alike. A section with nothing to
  * show is left out. Clicking a tile opens it in the detail panel beside the
@@ -20,8 +23,10 @@ import {
   useState,
 } from "react";
 
-import { ButtonGroup } from "@/components/ui/button-group";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { LegoAtlas } from "../../atlas";
+import { useColourwayColours } from "../../colourwayColours";
 import {
   type InventoryKind,
   type InventoryList,
@@ -29,14 +34,19 @@ import {
   type InventoryView,
   refKey,
 } from "../../inventory";
+import {
+  categoryFromValue,
+  categoryMenu,
+  categoryValue,
+} from "../../inventoryCategory";
 import type { LegoProject } from "../../model";
 import type { LegoPartInfo, LoadedPack } from "../../pack";
 import { SHAPE_KINDS, type ShapeKind } from "../../shapes";
 import { isBuiltInModule } from "../../starterModules";
+import { CategoryMenu } from "./CategoryMenu";
 import { DetailPanel } from "./DetailPanel";
 import { useRootHeight } from "./gridScroll";
-import { ModuleFilters } from "./ModuleFilters";
-import { PartFilters } from "./PartFilters";
+import { PackSelect } from "./PartFilters";
 import { type GridItem, type GridSection, TileGrid } from "./TileGrid";
 
 const KINDS: { value: InventoryKind; label: string }[] = [
@@ -50,11 +60,6 @@ const GAME_UNITS_KIND: { value: InventoryKind; label: string } = {
   value: "units",
   label: "Game units",
 };
-
-const LISTS: { value: Exclude<InventoryList, "all">; label: string }[] = [
-  { value: "recent", label: "Recent" },
-  { value: "favourites", label: "Favourites" },
-];
 
 interface FiltersProps {
   view: InventoryView;
@@ -71,9 +76,9 @@ interface FiltersProps {
 }
 
 /**
- * Kind, list and search. The category buttons and the pack menu belong to
- * parts, and the category menu to modules, so each shows only when its kind is
- * the one chosen. "All" has the search box alone.
+ * Kind, search, category and list, in one row that keeps its shape on every
+ * tab (#4538). What a tab has no use for is switched off rather than taken
+ * away. The counts are on the grid's section headings.
  */
 export function InventoryFilters({
   view,
@@ -84,105 +89,81 @@ export function InventoryFilters({
   showPacks = true,
   className,
 }: FiltersProps) {
-  const { partFilter, moduleFilter } = view;
-  // A shape is listed with the parts, so it counts as one.
-  const partCount = view.parts.length + view.shapes.length;
-  const loadButton = onLoadModuleFile ? (
-    // Its words go when the row is short of room, and its name stays.
-    <Button
-      size="sm"
-      variant="outline"
-      onClick={onLoadModuleFile}
-      aria-label="Load from file"
-      title="Load from file"
-      className="shrink-0"
-    >
-      <FileUp size={14} />
-      <span className="hidden @xl:inline">Load from file</span>
-    </Button>
-  ) : null;
+  const colours = useColourwayColours(pack);
+  const units = view.kind === "units";
+  const groups = categoryMenu({
+    kind: view.kind,
+    pack,
+    compounds,
+    current: view.category,
+    shapes: (pack.manifest.swatches?.length ?? 0) > 0,
+  });
   return (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
-      <ButtonGroup aria-label="Kind">
-        {(showGameUnits ? [...KINDS, GAME_UNITS_KIND] : KINDS).map(
-          ({ value, label }) => (
-            <Button
-              key={value}
-              size="sm"
-              variant={view.kind === value ? "default" : "outline"}
-              onClick={() => view.setKind(value)}
-              aria-pressed={view.kind === value}
-            >
-              {label}
-            </Button>
-          ),
-        )}
-      </ButtonGroup>
-      {view.kind === "units" ? null : (
-        <ButtonGroup aria-label="List">
-          {LISTS.map(({ value, label }) => (
-            <Button
-              key={value}
-              size="sm"
-              variant={view.list === value ? "default" : "outline"}
-              onClick={() => view.setList(view.list === value ? "all" : value)}
-              aria-pressed={view.list === value}
-            >
-              {label}
-            </Button>
-          ))}
-        </ButtonGroup>
-      )}
-      {view.kind === "units" ? (
-        <Input
-          value={view.query}
-          onChange={(event) => view.setQuery(event.target.value)}
-          placeholder="Search"
-          className="w-56"
-          aria-label="Search the game's units"
-        />
-      ) : view.kind === "parts" ? (
-        <PartFilters
+      <Tabs
+        value={view.kind}
+        onValueChange={(value) => view.setKind(value as InventoryKind)}
+      >
+        <TabsList aria-label="Kind">
+          {(showGameUnits ? [...KINDS, GAME_UNITS_KIND] : KINDS).map(
+            ({ value, label }) => (
+              <TabsTrigger key={value} value={value}>
+                {label}
+              </TabsTrigger>
+            ),
+          )}
+        </TabsList>
+      </Tabs>
+      <Input
+        value={view.query}
+        onChange={(event) => view.setQuery(event.target.value)}
+        placeholder="Search"
+        className="w-56 min-w-32 flex-1"
+        aria-label={units ? "Search the game's units" : "Search the inventory"}
+      />
+      <CategoryMenu
+        groups={groups}
+        value={categoryValue(view.category)}
+        onValueChange={(value) => view.setCategory(categoryFromValue(value))}
+        colours={colours}
+        disabled={units}
+      />
+      {showPacks ? (
+        <PackSelect
           pack={pack}
-          query={view.query}
-          onQuery={view.setQuery}
-          category={partFilter.category}
-          onCategory={partFilter.setCategory}
-          packId={partFilter.packId}
-          onPackId={partFilter.setPackId}
-          shown={view.parts.length + view.shapes.length}
-          showShapes={(pack.manifest.swatches?.length ?? 0) > 0}
-          showPacks={showPacks}
-          className="flex-1"
+          packId={view.partFilter.packId}
+          onPackId={view.partFilter.setPackId}
+          disabled={view.kind === "modules" || units}
+          className="w-44 shrink-0"
         />
-      ) : view.kind === "modules" ? (
-        <ModuleFilters
-          compounds={compounds}
-          query={view.query}
-          onQuery={view.setQuery}
-          category={moduleFilter.category}
-          onCategory={moduleFilter.setCategory}
-          shown={view.modules.length}
-          className="flex-1"
-          trailing={loadButton}
-        />
-      ) : (
-        <div className="@container flex min-w-88 flex-1 flex-nowrap items-center gap-2">
-          <Input
-            value={view.query}
-            onChange={(event) => view.setQuery(event.target.value)}
-            placeholder="Search"
-            className="w-56 min-w-32"
-            aria-label="Search the inventory"
-          />
-          <span className="ml-auto shrink-0 whitespace-nowrap text-sm text-muted-foreground">
-            {partCount} {partCount === 1 ? "part" : "parts"},{" "}
-            {view.modules.length}{" "}
-            {view.modules.length === 1 ? "module" : "modules"}
-          </span>
-          {loadButton}
-        </div>
-      )}
+      ) : null}
+      <ToggleGroup
+        type="single"
+        variant="outline"
+        size="sm"
+        value={view.list === "all" ? "" : view.list}
+        onValueChange={(value) =>
+          view.setList(value === "" ? "all" : (value as InventoryList))
+        }
+        disabled={units}
+        aria-label="List"
+        className="shrink-0"
+      >
+        <ToggleGroupItem value="recent">Recent</ToggleGroupItem>
+        <ToggleGroupItem value="favourites">Favourites</ToggleGroupItem>
+      </ToggleGroup>
+      {onLoadModuleFile ? (
+        <Button
+          size="icon"
+          variant="outline"
+          onClick={onLoadModuleFile}
+          aria-label="Load from file"
+          title="Load from file"
+          className="size-8 shrink-0"
+        >
+          <FileUp size={14} />
+        </Button>
+      ) : null}
     </div>
   );
 }

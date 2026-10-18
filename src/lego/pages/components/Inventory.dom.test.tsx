@@ -243,6 +243,25 @@ const names = (grid: string) =>
     li.firstChild?.textContent?.trim(),
   );
 
+/** Radix moves a tab on mouse down, not on click. */
+function pickTab(name: string) {
+  fireEvent.mouseDown(screen.getByRole("tab", { name }));
+}
+
+/** What the category menu lists, headings too, read by opening it. */
+function menuEntries() {
+  fireEvent.click(screen.getByRole("combobox", { name: "Category" }));
+  return [
+    ...document.querySelectorAll("[data-slot=select-label], [role=option]"),
+  ].map((node) => node.textContent);
+}
+
+/** Opens the category menu and picks the named entry. */
+function pickCategory(name: string) {
+  fireEvent.click(screen.getByRole("combobox", { name: "Category" }));
+  fireEvent.click(screen.getByRole("option", { name }));
+}
+
 beforeEach(() => store.values.clear());
 afterEach(cleanup);
 
@@ -255,11 +274,11 @@ describe("the kind filter", () => {
 
   it("shows only parts, then only modules", () => {
     render(<Harness />);
-    fireEvent.click(screen.getByRole("button", { name: "Parts" }));
+    pickTab("Parts");
     expect(screen.queryByLabelText("module grid")).toBeNull();
     expect(screen.getByLabelText("part grid")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Modules" }));
+    pickTab("Modules");
     expect(screen.queryByLabelText("part grid")).toBeNull();
     expect(names("module grid")).toEqual(["leg", "turret"]);
   });
@@ -279,20 +298,12 @@ describe("the kind filter", () => {
   });
 });
 
+/** The counts are on the section headings, so the row has none (#4538). */
 describe("the count", () => {
-  it("uses the plural for 2 or more and the singular for 1", () => {
-    render(<Harness />);
-    expect(
-      screen.getByText(`${3 + SHAPE_KINDS.length} parts, 2 modules`),
-    ).toBeTruthy();
-    fireEvent.change(screen.getByLabelText("Search the inventory"), {
-      target: { value: "tur" },
-    });
-    expect(screen.getByText("0 parts, 1 module")).toBeTruthy();
-    fireEvent.change(screen.getByLabelText("Search the inventory"), {
-      target: { value: "beam" },
-    });
-    expect(screen.getByText("1 part, 0 modules")).toBeTruthy();
+  it("is not in the filter row", () => {
+    const { container } = render(<Harness />);
+    const row = container.firstElementChild as HTMLElement;
+    expect(row.textContent).not.toMatch(/\d+ (parts?|modules?)/);
   });
 });
 
@@ -331,7 +342,7 @@ describe("the section headings", () => {
   it("count a list as a narrowing too", () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "use wedge" }));
-    fireEvent.click(screen.getByRole("button", { name: "Recent" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Recent" }));
     expect(headings()).toEqual(["Parts 1 of 3"]);
   });
 });
@@ -360,16 +371,16 @@ describe("shapes", () => {
 
   it("are the only cells under the Shapes category", () => {
     render(<Harness />);
-    fireEvent.click(screen.getByRole("button", { name: "Parts" }));
-    fireEvent.click(screen.getByRole("button", { name: "Shapes" }));
+    pickTab("Parts");
+    pickCategory("Shapes");
     expect(names("shape grid")).toEqual(ALL_SHAPES);
     expect(screen.queryByLabelText("part grid")).toBeNull();
   });
 
   it("are hidden by a colour", () => {
     render(<Harness />);
-    fireEvent.click(screen.getByRole("button", { name: "Parts" }));
-    fireEvent.click(screen.getByRole("button", { name: "Grey" }));
+    pickTab("Parts");
+    pickCategory("Grey");
     expect(screen.queryByLabelText("shape grid")).toBeNull();
     expect(names("part grid")).toEqual(["beam", "block", "wedge"]);
   });
@@ -391,26 +402,25 @@ describe("shapes", () => {
       return <InventoryFilters view={view} pack={bare} compounds={modules} />;
     }
     render(<Bare />);
-    expect(screen.getByText("3 parts, 2 modules")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Parts" }));
-    expect(screen.queryByRole("button", { name: "Shapes" })).toBeNull();
+    pickTab("Parts");
+    expect(menuEntries()).not.toContain("Shapes");
   });
 
   it("are left out of the modules kind", () => {
     render(<Harness />);
-    fireEvent.click(screen.getByRole("button", { name: "Modules" }));
+    pickTab("Modules");
     expect(screen.queryByLabelText("shape grid")).toBeNull();
   });
 
   it("join the recent list and the favourites", () => {
     render(<Harness />);
-    fireEvent.click(screen.getByRole("button", { name: "Recent" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Recent" }));
     expect(screen.getByText("Nothing used yet.")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Recent" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Recent" }));
     fireEvent.click(screen.getByRole("button", { name: "use cylinder" }));
-    fireEvent.click(screen.getByRole("button", { name: "Recent" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Recent" }));
     expect(names("shape grid")).toEqual(["Cylinder"]);
-    fireEvent.click(screen.getByRole("button", { name: "Recent" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Recent" }));
     fireEvent.click(screen.getByRole("button", { name: "star Cylinder" }));
     expect(store.values.get("lego.inventory.favourites")).toEqual([
       { kind: "shape", id: "cylinder" },
@@ -421,12 +431,12 @@ describe("shapes", () => {
 describe("game units", () => {
   it("are not offered where there is no unit to take from", () => {
     render(<Harness />);
-    expect(screen.queryByRole("button", { name: "Game units" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "Game units" })).toBeNull();
   });
 
   it("replace the parts and modules, and share the search box", () => {
     render(<Harness showGameUnits />);
-    fireEvent.click(screen.getByRole("button", { name: "Game units" }));
+    pickTab("Game units");
     expect(screen.queryByLabelText("part grid")).toBeNull();
     expect(screen.queryByLabelText("module grid")).toBeNull();
     fireEvent.change(screen.getByLabelText("Search the game's units"), {
@@ -444,7 +454,7 @@ describe("game units", () => {
 describe("recent items", () => {
   it("say nothing has been used before anything is", () => {
     render(<Harness />);
-    fireEvent.click(screen.getByRole("button", { name: "Recent" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Recent" }));
     expect(screen.getByText("Nothing used yet.")).toBeTruthy();
   });
 
@@ -452,7 +462,7 @@ describe("recent items", () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "use wedge" }));
     fireEvent.click(screen.getByRole("button", { name: "use leg" }));
-    fireEvent.click(screen.getByRole("button", { name: "Recent" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Recent" }));
     expect(names("part grid")).toEqual(["wedge"]);
     expect(names("module grid")).toEqual(["leg"]);
   });
@@ -464,14 +474,14 @@ describe("recent items", () => {
       { kind: "part", id: "no-such-part" },
     ] satisfies InventoryRef[]);
     render(<Harness />);
-    fireEvent.click(screen.getByRole("button", { name: "Recent" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Recent" }));
     expect(names("module grid")).toEqual(["turret"]);
     expect(screen.queryByLabelText("part grid")).toBeNull();
   });
 
   it("leave the list when Recent is clicked again", () => {
     render(<Harness />);
-    const recent = screen.getByRole("button", { name: "Recent" });
+    const recent = screen.getByRole("radio", { name: "Recent" });
     fireEvent.click(recent);
     fireEvent.click(recent);
     expect(names("part grid")).toEqual(["beam", "block", "wedge"]);
@@ -495,7 +505,7 @@ describe("favourites", () => {
       { kind: "module", id: "turret" },
     ]);
     render(<Harness />);
-    fireEvent.click(screen.getByRole("button", { name: "Favourites" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Favourites" }));
     expect(names("part grid")).toEqual(["block"]);
     expect(names("module grid")).toEqual(["turret"]);
   });
@@ -520,64 +530,239 @@ describe("favourites", () => {
   it("ignore a stored value that is not a list", () => {
     store.values.set("lego.inventory.favourites", "broken");
     render(<Harness />);
-    fireEvent.click(screen.getByRole("button", { name: "Favourites" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Favourites" }));
     expect(screen.getByText("No favourites yet.")).toBeTruthy();
   });
 });
 
 /**
- * The filter row stays one line in the builder's drawer and on the Lego Parts
- * page (#4464, #4467). happy-dom lays nothing out, so these check the classes
- * the layout rests on, not the layout itself.
+ * One row that keeps its shape on every tab (#4538): the same controls in the
+ * same order, with what a tab has no use for switched off. happy-dom lays
+ * nothing out, so this checks which controls are there and in what order.
  */
-describe("the filter row in a narrow space", () => {
-  function Filters() {
-    const view = useInventoryView(pack, modules);
+describe("the filter row", () => {
+  function Filters({ showGameUnits = false }: { showGameUnits?: boolean }) {
+    const view = useInventoryView(pack, known);
     return (
       <InventoryFilters
         view={view}
         pack={pack}
-        compounds={modules}
+        compounds={known}
         onLoadModuleFile={() => {}}
+        showGameUnits={showGameUnits}
       />
     );
   }
+  const known = [
+    { ...module("leg"), category: "Leg" },
+    { ...module("turret"), category: "Turret" },
+    module("plain"),
+  ];
 
-  it("keeps All's search, count and load button on one line that can shrink", () => {
-    render(<Filters />);
-    const search = screen.getByLabelText("Search the inventory");
-    const block = search.parentElement as HTMLElement;
-    expect(block.className).toContain("@container");
-    expect(block.className).toContain("flex-nowrap");
-    expect(block.className).not.toContain("flex-wrap");
-    expect(search.className).toContain("min-w-32");
-    expect(
-      screen.getByText(`${3 + SHAPE_KINDS.length} parts, 2 modules`).className,
-    ).toContain("whitespace-nowrap");
-  });
-
-  it("keeps Load from file's name, and shows its words only with room", () => {
-    render(<Filters />);
-    const load = screen.getByRole("button", { name: "Load from file" });
-    const words = [...load.querySelectorAll("span")].find(
-      (span) => span.textContent === "Load from file",
+  /** Each control's name, in the order the row has them. */
+  function controls(container: HTMLElement) {
+    const row = container.firstElementChild as HTMLElement;
+    return [...row.children].map(
+      (child) =>
+        child.getAttribute("aria-label") ??
+        child.querySelector("[aria-label]")?.getAttribute("aria-label"),
     );
-    expect(words?.className).toContain("hidden");
-    expect(words?.className).toContain("@xl:inline");
+  }
+
+  it("has the same controls in the same places on every tab", () => {
+    const { container } = render(<Filters showGameUnits />);
+    const expected = [
+      "Kind",
+      "Search the inventory",
+      "Category",
+      "List",
+      "Load from file",
+    ];
+    expect(controls(container)).toEqual(expected);
+    for (const tab of ["Parts", "Modules"]) {
+      pickTab(tab);
+      expect(controls(container)).toEqual(expected);
+    }
+    pickTab("Game units");
+    expect(controls(container)).toEqual(
+      expected.map((name) =>
+        name === "Search the inventory" ? "Search the game's units" : name,
+      ),
+    );
   });
 
-  it("does the same for the modules' search, menu and count", () => {
-    render(<Filters />);
-    fireEvent.click(screen.getByRole("button", { name: "Modules" }));
-    const search = screen.getByLabelText("Search modules");
-    const block = search.parentElement as HTMLElement;
-    expect(block.className).toContain("@container");
-    expect(block.className).toContain("flex-nowrap");
-    expect(search.className).toContain("min-w-32");
+  it("switches off the menu and the lists for game units, and back on", () => {
+    render(<Filters showGameUnits />);
+    pickTab("Game units");
+    const menu = screen.getByRole("combobox", { name: "Category" });
+    expect(menu.hasAttribute("disabled")).toBe(true);
     expect(
-      screen.getByRole("combobox", { name: "Module category" }).className,
-    ).toContain("min-w-32");
-    expect(screen.getByRole("button", { name: "Load from file" })).toBeTruthy();
+      screen.getByRole("radio", { name: "Recent" }).hasAttribute("disabled"),
+    ).toBe(true);
+    pickTab("Parts");
+    expect(menu.hasAttribute("disabled")).toBe(false);
+  });
+
+  it("marks the tab in force", () => {
+    render(<Filters />);
+    pickTab("Modules");
+    expect(
+      screen
+        .getByRole("tab", { name: "Modules" })
+        .getAttribute("aria-selected"),
+    ).toBe("true");
+    expect(
+      screen.getByRole("tab", { name: "All" }).getAttribute("aria-selected"),
+    ).toBe("false");
+  });
+
+  /** The container queries swapped controls in the frame they measured them,
+   *  which flooded the console with ResizeObserver errors. */
+  it("has no container query on any tab", () => {
+    const { container } = render(<Filters />);
+    for (const tab of ["All", "Parts", "Modules"]) {
+      pickTab(tab);
+      expect(container.innerHTML).not.toContain("@container");
+    }
+  });
+});
+
+describe("the category menu", () => {
+  const known = [
+    { ...module("leg"), category: "Leg" },
+    { ...module("turret"), category: "Turret" },
+    module("plain"),
+  ];
+
+  it("lists the colourways, then the module categories, under headings on All", () => {
+    render(<Harness known={known} />);
+    expect(menuEntries()).toEqual([
+      "All categories",
+      "Colourways",
+      "Grey",
+      "Module categories",
+      "Leg",
+      "Turret",
+    ]);
+  });
+
+  it("lists the colourways and Shapes on Parts", () => {
+    render(<Harness known={known} />);
+    pickTab("Parts");
+    expect(menuEntries()).toEqual(["All categories", "Grey", "Shapes"]);
+  });
+
+  it("lists the module categories and Uncategorised on Modules", () => {
+    render(<Harness known={known} />);
+    pickTab("Modules");
+    expect(menuEntries()).toEqual([
+      "All categories",
+      "Leg",
+      "Turret",
+      "Uncategorised",
+    ]);
+  });
+
+  it("leaves Uncategorised out while every module has a category", () => {
+    render(<Harness known={known.slice(0, 2)} />);
+    pickTab("Modules");
+    expect(menuEntries()).not.toContain("Uncategorised");
+  });
+
+  it("gives each colourway a chip", () => {
+    render(<Harness known={known} />);
+    fireEvent.click(screen.getByRole("combobox", { name: "Category" }));
+    const grey = screen.getByRole("option", { name: "Grey" });
+    expect(grey.querySelector("[data-colourway=grey]")).toBeTruthy();
+    const leg = screen.getByRole("option", { name: "Leg" });
+    expect(leg.querySelector("[data-colourway]")).toBeNull();
+  });
+
+  it("hides the modules on All when a colourway is chosen", () => {
+    render(<Harness known={known} />);
+    pickCategory("Grey");
+    expect(names("part grid")).toEqual(["beam", "block", "wedge"]);
+    expect(screen.queryByLabelText("module grid")).toBeNull();
+    expect(screen.queryByLabelText("shape grid")).toBeNull();
+  });
+
+  it("hides the parts and shapes on All when a module category is chosen", () => {
+    render(<Harness known={known} />);
+    pickCategory("Turret");
+    expect(names("module grid")).toEqual(["turret"]);
+    expect(screen.queryByLabelText("part grid")).toBeNull();
+    expect(screen.queryByLabelText("shape grid")).toBeNull();
+  });
+
+  it("lists only the uncategorised modules under Uncategorised", () => {
+    render(<Harness known={known} />);
+    pickTab("Modules");
+    pickCategory("Uncategorised");
+    expect(names("module grid")).toEqual(["plain"]);
+  });
+
+  it("keeps a colourway across All and Parts", () => {
+    render(<Harness known={known} />);
+    pickCategory("Grey");
+    pickTab("Parts");
+    expect(screen.getByRole("combobox", { name: "Category" }).textContent).toBe(
+      "Grey",
+    );
+    pickTab("All");
+    expect(screen.queryByLabelText("module grid")).toBeNull();
+  });
+
+  it("drops a choice the new tab does not offer", () => {
+    render(<Harness known={known} />);
+    pickTab("Parts");
+    pickCategory("Shapes");
+    pickTab("All");
+    expect(screen.getByRole("combobox", { name: "Category" }).textContent).toBe(
+      "All categories",
+    );
+    expect(screen.getByLabelText("part grid")).toBeTruthy();
+    expect(screen.getByLabelText("module grid")).toBeTruthy();
+    pickCategory("Leg");
+    pickTab("Parts");
+    expect(names("part grid")).toEqual(["beam", "block", "wedge"]);
+  });
+
+  it("clears the choice with All categories", () => {
+    render(<Harness known={known} />);
+    pickCategory("Grey");
+    pickCategory("All categories");
+    expect(names("module grid")).toEqual(["leg", "turret", "plain"]);
+  });
+});
+
+/** Neither or either of Recent and Favourites can be on (#4538). */
+describe("the Recent and Favourites toggle", () => {
+  const pressed = (name: string) =>
+    screen.getByRole("radio", { name }).getAttribute("aria-checked");
+
+  it("starts with neither on", () => {
+    render(<Harness />);
+    expect(pressed("Recent")).toBe("false");
+    expect(pressed("Favourites")).toBe("false");
+  });
+
+  it("turns one on, then moves to the other", () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("radio", { name: "Recent" }));
+    expect(pressed("Recent")).toBe("true");
+    expect(screen.getByText("Nothing used yet.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("radio", { name: "Favourites" }));
+    expect(pressed("Recent")).toBe("false");
+    expect(pressed("Favourites")).toBe("true");
+    expect(screen.getByText("No favourites yet.")).toBeTruthy();
+  });
+
+  it("turns off again, back to everything", () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("radio", { name: "Favourites" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Favourites" }));
+    expect(pressed("Favourites")).toBe("false");
+    expect(names("part grid")).toEqual(["beam", "block", "wedge"]);
   });
 });
 
