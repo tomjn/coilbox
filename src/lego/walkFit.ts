@@ -39,10 +39,17 @@
 import {
   type AnimPreset,
   type AppliedPreset,
+  presetById,
   WALK_BIPED,
+  WALK_DROP,
   WALK_FITTED,
+  WALK_SHIN,
+  WALK_SPEED,
+  WALK_THIGH,
+  walkSweep,
 } from "./animPresets";
-import type { LegoProject } from "./model";
+import type { LegoPiece, LegoProject } from "./model";
+import { type Problem, problem } from "./problems";
 
 /** Sim frames per second, the engine's `GAME_SPEED`. A period is a whole
  *  number of them, because `cycleThread` sleeps whole frames. */
@@ -56,6 +63,60 @@ export interface WalkBody {
   legLength: number;
   /** The unit's `speed`, in elmos a second. */
   speed: number;
+  /**
+   * Hip joint to knee joint and knee joint to ankle joint, in elmos, the mean
+   * over the unit's legs (#3350). Absent when the leg pieces do not give
+   * them, and then the knee stays straight on the ground as it did in #3349.
+   */
+  thighLength?: number;
+  shinLength?: number;
+}
+
+/** Where a piece's joint rests in the unit, its parents' positions added up. */
+function jointOf(project: LegoProject, piece: LegoPiece): number[] {
+  const at = [0, 0, 0];
+  const seen = new Set<string>();
+  let current: LegoPiece | undefined = piece;
+  while (current && !seen.has(current.id)) {
+    seen.add(current.id);
+    for (let axis = 0; axis < 3; axis++) at[axis] += current.position[axis];
+    const parentId: string | null = current.parentId;
+    current = parentId
+      ? project.pieces.find((other) => other.id === parentId)
+      : undefined;
+  }
+  return at;
+}
+
+/**
+ * The thigh's and the shin's lengths, the mean over every leg with all three
+ * of its pieces, or null when there is no such leg or one of them does not
+ * hang down. The solve takes a leg as hanging straight down from the hip at
+ * rest, as every body plan builds it, so a knee that is not below its hip or
+ * an ankle that is not below its knee has no length the solve can use.
+ */
+export function legLengths(
+  project: LegoProject,
+): { thighLength: number; shinLength: number } | null {
+  const thighs: number[] = [];
+  const shins: number[] = [];
+  for (const leg of ["l1", "r1", "l2", "r2"]) {
+    const joint = (segment: string) => {
+      const piece = project.pieces.find(
+        (entry) => entry.role === `leg.${leg}.${segment}`,
+      );
+      return piece ? jointOf(project, piece) : null;
+    };
+    const [hip, knee, ankle] = ["thigh", "shin", "foot"].map(joint);
+    if (!hip || !knee || !ankle) continue;
+    if (!(knee[1] < hip[1]) || !(ankle[1] < knee[1])) return null;
+    thighs.push(Math.hypot(...knee.map((n, axis) => n - hip[axis])));
+    shins.push(Math.hypot(...ankle.map((n, axis) => n - knee[axis])));
+  }
+  if (thighs.length === 0) return null;
+  const mean = (values: number[]) =>
+    values.reduce((sum, n) => sum + n, 0) / values.length;
+  return { thighLength: mean(thighs), shinLength: mean(shins) };
 }
 
 /**
@@ -67,7 +128,7 @@ export function walkBody(project: LegoProject): WalkBody | null {
   const speed = project.movement?.speed;
   if (typeof legLength !== "number" || !(legLength > 0)) return null;
   if (typeof speed !== "number" || !(speed > 0)) return null;
-  return { legLength, speed };
+  return { legLength, speed, ...legLengths(project) };
 }
 
 function given(params: Record<string, number>, id: string): number | undefined {
@@ -132,13 +193,50 @@ export function fitWalk(
   const period = frames / ENGINE_FPS;
   const duty = down / frames;
   const stride = ownSwing ?? swingFor(speed * period * duty, legLength);
+  const { thighLength, shinLength } = body;
   return {
     ...params,
     period,
     stride,
     duty: 100 * duty,
     [WALK_FITTED]: 1,
+    // What the legs are solved with (#3350). The body is lowered by as much
+    // as a straight leg swung the fitted angle either side of upright rises,
+    // so a foot reaches the ground at both ends of its time on it with the
+    // knee straight there and bent between.
+    ...(thighLength && shinLength
+      ? {
+          [WALK_THIGH]: thighLength,
+          [WALK_SHIN]: shinLength,
+          [WALK_SPEED]: speed,
+          [WALK_DROP]:
+            (thighLength + shinLength) *
+            (1 - Math.cos((stride * Math.PI) / 180)),
+        }
+      : {}),
   };
+}
+
+/**
+ * Whether a fitted walk's feet would have to reach further than the legs do,
+ * with the body lowered by `drop`: the stride is longer than a leg swung its
+ * angle either side of upright covers. That happens when the game maker sets
+ * both the period and the swing, or a period so long the swing it needs is
+ * past the slider's top. The solve then points the straight leg at a foot it
+ * cannot reach, and the foot slides at the ends of its time on the ground.
+ * The leeway is floating point's, since a fitted walk is exactly at full
+ * reach at both ends.
+ */
+export function pastReach(
+  params: Record<string, number>,
+  drop = params[WALK_DROP] ?? 0,
+): boolean {
+  const thigh = params[WALK_THIGH];
+  const shin = params[WALK_SHIN];
+  if (!(thigh > 0 && shin > 0)) return false;
+  const leg = thigh + shin;
+  const furthest = Math.hypot(walkSweep(params) / 2, leg - drop);
+  return furthest > leg * (1 + 1e-9);
 }
 
 /**
@@ -212,4 +310,52 @@ export function withoutFitOverrides(
     Object.keys(kept).length > 0 ? { ...others, [instance]: kept } : others;
   const { instances: _was, ...rest } = entry;
   return Object.keys(instances).length > 0 ? { ...rest, instances } : rest;
+}
+
+/**
+ * The walk's lines in the problems list (#3350): a walk whose stride is past
+ * the legs' reach, and a walker whose leg joints give the solve no lengths.
+ * Each set of legs is checked with the drop the shared walk lowers the body
+ * by, as `walkEmit` solves it.
+ */
+export function walkProblems(project: LegoProject): Problem[] {
+  const body = walkBody(project);
+  if (!body) return [];
+  const out: Problem[] = [];
+  for (const entry of project.animations ?? []) {
+    if (!WALK_PRESETS.has(entry.presetId)) continue;
+    const label = presetById(entry.presetId)?.label ?? entry.presetId;
+    const thighs = project.pieces
+      .filter((piece) => /^leg\.[lr][12]\.thigh$/.test(piece.role ?? ""))
+      .map((piece) => piece.id);
+    if (body.thighLength === undefined) {
+      out.push(
+        problem(
+          "skeleton",
+          "warning",
+          `The legs do not hang down from their joints, so "${label}" cannot keep the feet planted.`,
+          thighs,
+        ),
+      );
+      continue;
+    }
+    const shared = shownParams(project, entry, null);
+    const copies = [
+      shared,
+      ...Object.keys(entry.instances ?? {}).map((id) =>
+        shownParams(project, entry, id),
+      ),
+    ];
+    if (copies.some((params) => pastReach(params, shared[WALK_DROP]))) {
+      out.push(
+        problem(
+          "skeleton",
+          "warning",
+          `"${label}" strides further than the legs reach, so the feet slide.`,
+          thighs,
+        ),
+      );
+    }
+  }
+  return out;
 }
