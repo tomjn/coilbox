@@ -2124,6 +2124,16 @@ pub fn game_short_name_blocking(
     short_name_in_scan(&out, game)
 }
 
+/// The scan of `data_dir`, as the JSON the worker prints and `unitsync_scan`
+/// answers with. Blocking, and not a command of its own: the compat plugin's
+/// tests read it to check the mutator they wrote is listed (issue #4556).
+pub fn scan_blocking(engine_path: &str, data_dir: &str) -> Result<String, String> {
+    let (bin, libpath, engine_dir) = prepare(engine_path)?;
+    let args = build_args(&libpath.to_string_lossy(), data_dir);
+    let envs = loader_envs(&engine_dir, data_dir);
+    run_worker_blocking(bin, args, envs, SCAN_TIMEOUT, "scan".into(), None)
+}
+
 /// What the scan says about an installed game, for matching an adapter to it
 /// (issue #3799).
 #[derive(Clone, Debug, PartialEq, Eq)]
