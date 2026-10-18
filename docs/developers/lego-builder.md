@@ -259,7 +259,17 @@ The **Loadouts** button is under the game picker in the unit's card. Its popover
 
 Each piece is either part of the chassis, which every loadout shares, or the current loadout's own. An edit to the chassis shows in every loadout. A module you add while the unit has loadouts goes into the current one. A part you add goes on the chassis. To change which a piece is, select it and pick **Every loadout** or **Only** the current loadout in the popover. Making a shared piece a loadout's own leaves a copy in every other loadout, so nothing disappears from one you are not looking at. A piece under a loadout's own piece goes with its parent.
 
-Each loadout has its own presets, generated or hand written script, unit definition fields and build settings. Everything else, the export name included, belongs to the chassis. Export writes the loadout you are editing. Exporting each loadout as a unit of its own is [issue #3282](https://github.com/tomjn/coilbox/issues/3282).
+Each loadout has its own presets, generated or hand written script, unit definition fields and build settings. Everything else belongs to the chassis.
+
+### Exporting loadouts
+
+A unit with loadouts exports each loadout as a unit of its own ([issue #3282](https://github.com/tomjn/coilbox/issues/3282)). The export drawer lists the loadouts with the unit name each will get, and a choice of **This loadout** or **All loadouts**. A unit without loadouts exports exactly as before.
+
+The default unit name is the unit name and the loadout name joined by an underscore, lower case, with letters, digits and underscores only: **Light** on `armpw` is `armpw_light`. You can type a different name for any loadout in the drawer. Names are unique among the loadouts. A name that is already taken gets the smallest number after it, so a second `armpw_light` becomes `armpw_light2`.
+
+Each loadout is written by the same export as any unit, so it has its own model (its pieces differ), script, unit definition and collision script. Each also has its own receipt for every game folder. A re-export of one loadout updates its own files and no other loadout's, and a hand edit to one loadout's definition survives a re-export without touching the others. Every loadout's in game name is the unit name and the loadout name, such as "Pawn Light". The texture atlas is shared and written once. The build picture is one picture for the unit, so each loadout gets a copy of it under its own name.
+
+Rename a loadout and export again, or delete one, and the old name goes into the list the drawer shows under "Left behind by a rename", with an offer to remove the files coilbox can prove it wrote. The workshop lists each exported loadout as its own unit.
 
 Switching, adding, duplicating, renaming and deleting are each one undo step. Undo past a switch and you are back on the loadout you were editing, as it was.
 
