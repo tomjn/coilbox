@@ -263,11 +263,22 @@ export function deleteLoadout(project: LegoProject, id: string): LegoProject {
     id === project.activeLoadout
       ? switchLoadout(project, loadouts[at > 0 ? at - 1 : 1].id)
       : project;
-  const left = (switched.loadouts ?? []).filter((l) => l.id !== id);
+  // A loadout upgrading from the deleted one upgrades from what it did, so the
+  // chain closes up rather than breaking in two.
+  const gone = loadouts[at];
+  const left = (switched.loadouts ?? [])
+    .filter((l) => l.id !== id)
+    .map((l) => {
+      if (l.upgradesFrom !== id) return l;
+      const { upgradesFrom: _was, ...rest } = l;
+      return gone.upgradesFrom
+        ? { ...rest, upgradesFrom: gone.upgradesFrom }
+        : rest;
+    });
   // The files a loadout wrote stay in the game when it goes. Its receipts move
   // to the leftovers, where the export drawer offers to remove what coilbox
   // can prove it wrote.
-  const retired = left.length >= 2 ? [loadouts[at]] : [loadouts[at], ...left];
+  const retired = left.length >= 2 ? [gone] : [gone, ...left];
   const staleExports = retired.reduce(
     (list, loadout) =>
       withReceipts(list, [
