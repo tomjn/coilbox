@@ -176,7 +176,8 @@ function allWeapons(
  * A gadget decides for itself when the game loads, from the game's files, so
  * this repeats its check from what the page has read. The aircraft gadget also
  * leaves out a plane whose unit script sets CRASHING, and turns off for a game
- * whose LuaRules calls `Spring.SetUnitCrashing`. Neither is read here, so its
+ * whose LuaRules calls `Spring.SetUnitCrashing` or whose gadgets call a function
+ * engine 0.82 did not have (issue #4638). None of these is read here, so its
  * list can name planes it leaves alone.
  */
 function gadgetFinding(

@@ -59,10 +59,11 @@ local function load(file, opts)
 			local value = engine.files[path]
 			return type(value) == "string" and value or nil
 		end,
-		DirList = function(dir)
+		DirList = function(dir, _, _, recursive)
 			local found = {}
 			for path in pairs(engine.files) do
-				if path:sub(1, #dir) == dir and path:sub(-4) == ".lua" then
+				local rest = path:sub(#dir + 1)
+				if path:sub(1, #dir) == dir and path:sub(-4) == ".lua" and (recursive or not rest:find("/", 1, true)) then
 					found[#found + 1] = path
 				end
 			end
@@ -161,6 +162,7 @@ end
 
 for _, file in ipairs({
 	"gadget-aircraft-crash-83.lua",
+	"gadget-aircraft-crash-83-v2.lua",
 	"gadget-only-forward-aim-105.lua",
 	"gadget-messages-tdf-95.lua",
 }) do
@@ -178,7 +180,9 @@ end
 -- Aircraft crash
 --------------------------------------------------------------------------------
 
-local CRASH = "gadget-aircraft-crash-83.lua"
+-- The fix the latest manifest lists. gadget-aircraft-crash-83 is the same
+-- gadget without the check for a game made for a newer engine.
+local CRASH = "gadget-aircraft-crash-83-v2.lua"
 
 -- A COB script that does `set CRASHING to 1`, among other code.
 local function cob(sets)
@@ -256,6 +260,56 @@ end
 do
 	local engine = aircraft({ files = { ["scripts/plane.cob"] = false } })
 	check("crash: a plane whose script cannot be read is crashed", not engine.removed)
+end
+
+-- Lines from the games' own LuaRules, cut down to what the gadget reads.
+do
+	local engine = aircraft({
+		files = {
+			["luarules/gadgets/unit_airbase.lua"] = "local upitch, uyaw, uroll = Spring.GetUnitRotation(unitID)",
+			["luarules/gadgets/mex_spot_finder.lua"] =
+				'Spring.Log(gadget:GetInfo().name, LOG.INFO, "Mex Spot Finder Initialising")',
+		},
+	})
+	check("crash: turns off for Balanced Annihilation 15.9.8, whose gadgets call functions 0.82 did not have",
+		engine.removed)
+end
+
+do
+	local engine = aircraft({
+		files = {
+			["luarules/gadgets/unit_dynamic_collision_volume.lua"] = table.concat({
+				"--[[ unsupported by engine ATM, same as for 3DO units, but for features",
+				"function gadget:FeatureCreated(featureID, allyTeam)",
+				"\tlocal xs, ys, zs = Spring.GetFeatureCollisionVolumeData(featureID)",
+				"end",
+				"]]--",
+				"local xs, ys, zs = Spring.GetUnitCollisionVolumeData(unitID)",
+			}, "\n"),
+			["luarules/gadgets/unit_spawner.lua"] = "gameMode = 'normal' --Spring.GetModOption(\"gamemode\")",
+			["luarules/deploy/main.lua"] = 'if (Spring.GetModOption("gamemode")=="tactics") then end',
+		},
+	})
+	check("crash: stays on for XTA 9.65, whose gadgets call nothing newer outside comments and other folders",
+		not engine.removed)
+end
+
+do
+	local engine = aircraft({
+		files = {
+			["luarules/main.lua"] = "function Spring.GetModOption(s, bool, default) end",
+			["luarules/gadgets/start_unit_setup.lua"] =
+				'local startMode = Spring.GetModOption("startingresourcetype", false, "facplopboost")',
+		},
+	})
+	check("crash: stays on when the newer name is one the game defines itself", not engine.removed)
+end
+
+do
+	local engine = aircraft({
+		files = { ["luarules/gadgets/coilbox_compat_aircraft_crash.lua"] = "Spring.GetUnitRotation(1)" },
+	})
+	check("crash: does not count its own file as the game's", not engine.removed)
 end
 
 do
