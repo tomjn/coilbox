@@ -1,4 +1,5 @@
 import { dlDownloadFileRaw, dlDownloadMapRaw } from "./bindings";
+import { type DownloadAttempt, hostOf } from "./downloadHistory";
 import { withDownloadNotify } from "./downloadNotify";
 import { norm } from "./gameRepos";
 import { type MapSource, mapSourceOrder } from "./mapSources";
@@ -51,11 +52,22 @@ async function downloadMapAnySourceImpl(opts: {
   onProgress: ProgressSink;
   /** The `indexTick` when the download was asked for. Defaults to now. */
   askedAt?: number;
+  /** Told about each source tried, whether it worked or not (issue #4576). */
+  onAttempt?: (attempt: DownloadAttempt) => void;
 }): Promise<string> {
   const { mapName, writePath, opId, onProgress } = opts;
   const askedAt = opts.askedAt ?? indexTick();
   const target = norm(mapName);
   const errors: string[] = [];
+  /** What the source being tried is fetching, set just before it fetches. */
+  let fetching: Pick<DownloadAttempt, "reference" | "filename" | "mirror"> = {
+    reference: null,
+    filename: null,
+    mirror: null,
+  };
+
+  /** A failure the rapid step handled itself, for the loop to report. */
+  let handled: string | null = null;
 
   const attempt = async (source: MapSource): Promise<string | null> => {
     switch (source) {
@@ -71,6 +83,11 @@ async function downloadMapAnySourceImpl(opts: {
         );
         const url = hit?.mirrors?.[0];
         if (!hit || !url) return null;
+        fetching = {
+          reference: url,
+          filename: hit.filename,
+          mirror: hostOf(url),
+        };
         await dlDownloadFileRaw({
           url,
           destDir: `${writePath}/maps`,
@@ -88,6 +105,11 @@ async function downloadMapAnySourceImpl(opts: {
           askedAt,
         );
         if (!hit) return null;
+        fetching = {
+          reference: hit.url,
+          filename: hit.filename,
+          mirror: hostOf(hit.url),
+        };
         await dlDownloadFileRaw({
           url: hit.url,
           destDir: `${writePath}/maps`,
@@ -105,6 +127,11 @@ async function downloadMapAnySourceImpl(opts: {
           askedAt,
         );
         if (!hit) return null;
+        fetching = {
+          reference: hit.url,
+          filename: hit.filename,
+          mirror: hostOf(hit.url),
+        };
         await dlDownloadFileRaw({
           url: hit.url,
           destDir: `${writePath}/maps`,
@@ -116,6 +143,7 @@ async function downloadMapAnySourceImpl(opts: {
       }
       case "rapid": {
         const label = "springfiles (pr-downloader)";
+        fetching = { reference: mapName, filename: null, mirror: null };
         try {
           await dlDownloadMapRaw({
             springName: mapName,
@@ -126,6 +154,7 @@ async function downloadMapAnySourceImpl(opts: {
           return label;
         } catch (e) {
           errors.push(`${label}: ${msg(e)}`);
+          handled = msg(e);
         }
         return null;
       }
@@ -134,11 +163,29 @@ async function downloadMapAnySourceImpl(opts: {
 
   const order = mapSourceOrder({ hasWritePath: !!writePath });
   for (const source of order) {
+    const startedAt = Date.now();
+    handled = null;
+    fetching = { reference: null, filename: null, mirror: null };
+    const report = (outcome: "ok" | "failed", failure: string | null) =>
+      opts.onAttempt?.({
+        // The pr-downloader step fetches from springfiles too.
+        source: source === "rapid" ? "springfiles" : source,
+        outcome,
+        ...fetching,
+        md5: null,
+        failure,
+        durationMs: Date.now() - startedAt,
+      });
     try {
       const result = await attempt(source);
-      if (result) return result;
+      if (result) {
+        report("ok", null);
+        return result;
+      }
+      if (handled !== null) report("failed", handled);
     } catch (e) {
       errors.push(`${source}: ${msg(e)}`);
+      report("failed", msg(e));
     }
   }
 

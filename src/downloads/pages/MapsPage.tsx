@@ -14,17 +14,16 @@ import { OptionSelect } from "@/components/OptionSelect";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import { formatBytes } from "@/lib/format";
-import { installedContent } from "../../content/installedContent";
+import { type CatalogueRequest, useLibrary } from "../../content/useLibrary";
 import { useImportParam } from "../../deeplink/useImportParam";
 import { nextDrawerKey } from "../../general/drawerKey";
 import { useRecordHubImport } from "../../hub/imports";
 import { presetRoute } from "../../play/presets";
 import type { ReleaseArchive, SpringFile } from "../bindings";
-import { useContentRootPaths, useWriteRoot } from "../config";
+import { useWriteRoot } from "../config";
 import {
   type EnqueueInput,
   identityOf,
-  useDownloadComplete,
   useDownloadQueue,
 } from "../DownloadQueueProvider";
 import { loadGithubReleases } from "../githubReleases";
@@ -267,32 +266,15 @@ export default function MapsPage() {
     load(source);
   }, [source, load]);
 
-  // Lowercased map filenames already present in any detected content root.
-  const rootPaths = useContentRootPaths();
-  const [installed, setInstalled] = useState<Set<string>>(new Set());
-  const refreshInstalled = useCallback(async () => {
-    if (rootPaths.length === 0) {
-      setInstalled(new Set());
-      return;
-    }
-    try {
-      const { maps } = await installedContent({ paths: rootPaths });
-      setInstalled(new Set(maps));
-    } catch {
-      setInstalled(new Set());
-    }
-  }, [rootPaths]);
-
-  useEffect(() => {
-    refreshInstalled();
-  }, [refreshInstalled]);
-
-  // Re-scan installed content once the queue finishes a download so a freshly
-  // fetched map flips to "Already downloaded" without a manual reload. (The queue
-  // runner drops the stale unitsync scan cache itself.)
-  useDownloadComplete(() => {
-    refreshInstalled();
-  });
+  // Lowercased map filenames already installed. The library reads the disk
+  // again once the queue finishes a download, so a freshly fetched map flips
+  // to "Already downloaded" without a manual reload.
+  const catalogues = useMemo((): CatalogueRequest[] => {
+    if (source === "springfiles") return [{ source, kind: "map" }];
+    if (source === "hakora" || source === "evolutionrts") return [{ source }];
+    return [{ source: "github", kind: "map", repo: MAP_REPOS[source] }];
+  }, [source]);
+  const installed = useLibrary({ catalogues }).installedFiles.maps;
 
   // The queue request for a map. hakora rows carry a direct `url` and are fetched
   // into `<root>/maps` (no default destination, so a write root is required);

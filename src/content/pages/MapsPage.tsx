@@ -1,17 +1,17 @@
 import { Button } from "@picoframe/frame";
 import { Play } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router";
-import { useContentRootPaths, useWriteRoot } from "../../downloads/config";
+import { useWriteRoot } from "../../downloads/config";
 import { filterUninstalledMaps, useSuggestedMaps } from "../branding";
 import {
   useScanTargetSelection,
   useUnitsyncMapMeta,
   useUnitsyncThumbnails,
 } from "../config";
-import { installedContent } from "../installedContent";
 import { useScanWithLastKnown } from "../lastKnownScan";
 import { mergeMapTiers } from "../mapTiers";
+import { useLibrary } from "../useLibrary";
 import { usePlayMap } from "../usePlayMap";
 import { BrowserToolbar } from "./components/BrowserToolbar";
 import { FilterBar } from "./components/FilterBar";
@@ -87,15 +87,7 @@ export default function MapsPage() {
   // Curated download suggestions shown when this engine sees no maps.
   const writeRoot = useWriteRoot("maps");
   const suggested = useSuggestedMaps();
-  const rootPaths = useContentRootPaths();
-  const [installed, setInstalled] = useState<Set<string>>(new Set());
-  const wantInstalled = !busy && maps.length === 0;
-  useEffect(() => {
-    if (!wantInstalled || rootPaths.length === 0) return;
-    installedContent({ paths: rootPaths })
-      .then(({ maps }) => setInstalled(new Set(maps)))
-      .catch(() => setInstalled(new Set()));
-  }, [wantInstalled, rootPaths]);
+  const installed = useLibrary({ scan: result }).installedFiles.maps;
   const suggestions = useMemo(
     () => filterUninstalledMaps(suggested, installed, maps),
     [suggested, installed, maps],

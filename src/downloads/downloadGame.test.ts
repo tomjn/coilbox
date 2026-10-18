@@ -98,6 +98,40 @@ describe("downloadGameAnySource, github step", () => {
     );
   });
 
+  it("reports the github release it fetched, and the failure of one that failed (issue #4576)", async () => {
+    dlGithubReleaseArchives.mockResolvedValueOnce({
+      archives: [
+        {
+          filename: "metalfactions-v2.40.sdz",
+          url: "https://example.com/v2.40",
+          size: 1,
+          tag: "v2.40",
+        },
+      ],
+    });
+    dlDownloadFileRaw.mockRejectedValueOnce(new Error("connection reset"));
+    dlDownloadRaw.mockRejectedValue(new Error("no source could provide"));
+    const onAttempt = vi.fn();
+
+    await downloadGameAnySource({
+      gameName: "Metal Factions v2.40",
+      writePath: "/data",
+      onProgress: () => {},
+      onAttempt,
+    }).catch(() => {});
+
+    expect(onAttempt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: "github",
+        outcome: "failed",
+        reference: "v2.40",
+        filename: "metalfactions-v2.40.sdz",
+        mirror: "example.com",
+        failure: "connection reset",
+      }),
+    );
+  });
+
   it("fails rather than silently installing a different version when nothing matches (issue #2859)", async () => {
     // The requested version genuinely isn't on the fetched page. It may have
     // aged off, been renamed, or been deleted, since dl_github_release_archives

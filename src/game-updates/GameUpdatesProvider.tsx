@@ -10,8 +10,8 @@ import {
   useState,
 } from "react";
 import { primeScan, useScanTargetSelection } from "../content/config";
-import { installedContent } from "../content/installedContent";
-import { useContentRootPaths, useWriteRootPath } from "../downloads/config";
+import { useLibrary } from "../content/useLibrary";
+import { useWriteRootPath } from "../downloads/config";
 import { useDownloadQueue } from "../downloads/DownloadQueueProvider";
 import type { ProgressSource } from "../downloads/pages/components/ProgressBar";
 import { notify } from "../notify/notify";
@@ -62,13 +62,11 @@ export function useGameUpdates(): GameUpdatesContextValue {
 export function GameUpdatesProvider({ children }: { children: ReactNode }) {
   const repo = getProfile().release?.repo ?? null;
   const writePath = useWriteRootPath("games");
-  const rootPaths = useContentRootPaths();
   const { selected } = useScanTargetSelection();
 
   const [release, setRelease] = useState<ReleaseInfo | null>(null);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [installedGames, setInstalledGames] = useState<Set<string>>(new Set());
   const [installing, setInstalling] = useState(false);
   const [installed, setInstalled] = useState(false);
   const [profileUpdated, setProfileUpdated] = useState(false);
@@ -80,23 +78,12 @@ export function GameUpdatesProvider({ children }: { children: ReactNode }) {
   const download = items.find((i) => i.id === queueId) ?? null;
 
   // Lowercased game filenames present in any content root, for the "have we got
-  // this release?" check. Mirrors the Games download screen.
-  const refreshInstalled = useCallback(async () => {
-    if (!repo || rootPaths.length === 0) {
-      setInstalledGames(new Set());
-      return;
-    }
-    try {
-      const { games } = await installedContent({ paths: rootPaths });
-      setInstalledGames(new Set(games));
-    } catch {
-      setInstalledGames(new Set());
-    }
-  }, [repo, rootPaths]);
-
-  useEffect(() => {
-    refreshInstalled();
-  }, [refreshInstalled]);
+  // this release?" check. The same listing the Games download screen reads.
+  const {
+    installedFiles: { games: installedGames },
+    filesRead,
+    refresh: refreshInstalled,
+  } = useLibrary();
 
   const runCheck = useCallback(async () => {
     if (!repo) return;
@@ -117,12 +104,13 @@ export function GameUpdatesProvider({ children }: { children: ReactNode }) {
   }, [repo, runCheck]);
 
   // We have the release iff at least one of its game archives is already installed.
+  // An unread listing looks like no games at all, so it cannot say one is missing.
   const updateAvailable = useMemo(() => {
-    if (!release) return false;
+    if (!release || !filesRead) return false;
     const archives = release.assets.filter((a) => isArchive(a.name));
     if (archives.length === 0) return false;
     return !archives.some((a) => installedGames.has(a.name.toLowerCase()));
-  }, [release, installedGames]);
+  }, [release, filesRead, installedGames]);
 
   const notifiedRef = useRef(false);
   useEffect(() => {
