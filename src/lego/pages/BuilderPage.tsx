@@ -2699,6 +2699,11 @@ function Builder({ id }: { id: string | undefined }) {
                           : undefined
                       }
                       onSelectPart={startPlacing}
+                      onSwitchPlacingPart={(part) =>
+                        setPlacingPart((was) =>
+                          was && "part" in was ? { ...was, part } : was,
+                        )
+                      }
                       onSelectShape={addStripShape}
                       onInsertModule={startPlacingModule}
                       placingModuleId={

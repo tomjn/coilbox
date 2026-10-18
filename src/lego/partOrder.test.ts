@@ -2,8 +2,14 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import type { LegoPackManifest, LegoPartInfo } from "./pack";
-import { partTitles, shapeGroups, sortByShape, visibleTags } from "./partOrder";
+import type { LegoPackManifest, LegoPartInfo, LoadedPack } from "./pack";
+import {
+  partTitles,
+  shapeColourways,
+  shapeGroups,
+  sortByShape,
+  visibleTags,
+} from "./partOrder";
 
 function part(overrides: Partial<LegoPartInfo> & { id: string }): LegoPartInfo {
   return {
@@ -203,6 +209,16 @@ describe("the bundled pack", () => {
       if (sorted[i].colourway !== "green") continue;
       expect(sorted[i + 1].colourway).toBe("tan");
       expect(sorted[i + 2].colourway).toBe("grey");
+    }
+  });
+
+  it("offers every part of a shape its three colourways", () => {
+    const pack = { manifest, parts } as unknown as LoadedPack;
+    for (const p of parts) {
+      const colourways = shapeColourways(pack, p).map((x) => x.colourway);
+      expect(colourways).toEqual(
+        p.colourway === "mixed" ? ["mixed"] : ["green", "tan", "grey"],
+      );
     }
   });
 

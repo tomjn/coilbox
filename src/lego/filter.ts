@@ -8,7 +8,10 @@
  * A shape offered in grey, tan and green is three parts, not one shape with a
  * colour option: each has its own texture, so each is independent inventory.
  * Category narrows which of them match, and `null` means every category, a
- * genuine all rather than a stand-in for anything else.
+ * genuine all rather than a stand-in for anything else. A colourway holds one
+ * part per shape, so choosing one lists each shape once in that colourway
+ * (#4540), and a shape it does not have is left out rather than drawn in
+ * another.
  *
  * The result lists a shape's colourways side by side (`partOrder.ts`).
  *
@@ -33,6 +36,19 @@ import { SHAPE_KINDS, type ShapeKind } from "./shapes";
  */
 export const SHAPES_CATEGORY = "@shapes";
 
+/**
+ * The pack tool's category for a part that spans two colourways of the atlas
+ * (`scripts/legopack/categorise.mjs`). No colourway would list it, so every
+ * colourway does (#4540).
+ */
+export const MIXED_CATEGORY = "mixed";
+
+/** Whether a part belongs under a category, `null` being every category. */
+function inCategory(part: LegoPartInfo, category: string | null): boolean {
+  if (category === null || part.category === category) return true;
+  return category !== SHAPES_CATEGORY && part.category === MIXED_CATEGORY;
+}
+
 /** Shapes match a search by their name, kind and tags, as parts do. */
 export function filterShapes(
   kinds: ShapeKind[],
@@ -56,7 +72,7 @@ export function filterParts(
 ): LegoPartInfo[] {
   const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
   return parts.filter((part) => {
-    if (category && part.category !== category) return false;
+    if (!inCategory(part, category)) return false;
     if (packId && part.packId !== packId) return false;
     if (terms.length === 0) return true;
     const haystack =
@@ -75,6 +91,11 @@ export interface PartFilter {
   setPackId: (packId: string | null) => void;
   /** What is left after the search, the category and the pack. */
   parts: LegoPartInfo[];
+  /**
+   * How many parts the category holds before a search or a pack narrows it,
+   * so a colourway counts one part per shape.
+   */
+  total: number;
   /** The generated shapes left after the search and the category. */
   shapes: ShapeKind[];
 }
@@ -94,6 +115,10 @@ export function usePartFilter(pack: LoadedPack | null): PartFilter {
         : [],
     [pack, query, category, packId],
   );
+  const total = useMemo(
+    () => (pack ? pack.parts.filter((p) => inCategory(p, category)).length : 0),
+    [pack, category],
+  );
   // A pack that lists no swatches cannot give a shape its surface, so it
   // offers no shapes.
   const hasSwatches = (pack?.manifest.swatches?.length ?? 0) > 0;
@@ -109,6 +134,7 @@ export function usePartFilter(pack: LoadedPack | null): PartFilter {
     packId,
     setPackId,
     parts,
+    total,
     shapes,
   };
 }

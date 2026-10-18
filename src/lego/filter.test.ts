@@ -1,7 +1,15 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { filterParts, filterShapes, SHAPES_CATEGORY } from "./filter";
-import type { LegoPartInfo } from "./pack";
+import {
+  filterParts,
+  filterShapes,
+  MIXED_CATEGORY,
+  SHAPES_CATEGORY,
+} from "./filter";
+import type { LegoPackManifest, LegoPartInfo } from "./pack";
+import { shapeGroups } from "./partOrder";
 import type { ShapeKind } from "./shapes";
 
 function part(overrides: Partial<LegoPartInfo> & { id: string }): LegoPartInfo {
@@ -110,6 +118,69 @@ describe("filterParts", () => {
     ).toEqual(["beam_alien"]);
     // Every pack, which is what the picker starts on however many are loaded.
     expect(filterParts(parts, "", null, null)).toEqual(parts);
+  });
+});
+
+/** One tile per shape in the chosen colourway (#4540). */
+describe("a colourway", () => {
+  const mixed = part({
+    id: "panel_mixed",
+    category: MIXED_CATEGORY,
+    colourway: MIXED_CATEGORY,
+  });
+  const hull = part({ id: "hull_grey", shapeId: "hull" });
+
+  it("lists a part that spans colourways under every colourway", () => {
+    const parts = [...TRIO, hull, mixed];
+    expect(filterParts(parts, "", "grey").map((p) => p.id)).toEqual([
+      "beam_grey",
+      "hull_grey",
+      "panel_mixed",
+    ]);
+    expect(filterParts(parts, "", "tan").map((p) => p.id)).toEqual([
+      "beam_tan",
+      "panel_mixed",
+    ]);
+  });
+
+  it("leaves out a shape it does not have", () => {
+    expect(filterParts([...TRIO, hull], "", "green").map((p) => p.id)).toEqual([
+      "beam_green",
+    ]);
+  });
+
+  it("still searches the mixed part", () => {
+    expect(filterParts([...TRIO, mixed], "beam", "grey")).toEqual([TRIO[0]]);
+  });
+
+  it("leaves the mixed part out of Shapes", () => {
+    expect(filterParts([mixed], "", SHAPES_CATEGORY)).toEqual([]);
+  });
+
+  describe("on the bundled pack", () => {
+    const manifest = JSON.parse(
+      readFileSync(
+        fileURLToPath(
+          new URL("../../src-tauri/legoparts/pack.json", import.meta.url),
+        ),
+        "utf8",
+      ),
+    ) as LegoPackManifest;
+    const parts = manifest.parts.map((p) => ({ ...p, packId: "base" }));
+    const groups = shapeGroups(parts, manifest.categories);
+
+    for (const colourway of ["green", "tan", "grey"]) {
+      it(`lists every shape once in ${colourway}`, () => {
+        const shown = filterParts(parts, "", colourway);
+        // 124 shapes in the colourway and the mixed part.
+        expect(shown).toHaveLength(125);
+        for (const group of groups) {
+          const members = group.parts.filter((p) => shown.includes(p));
+          expect(members).toHaveLength(1);
+          expect([colourway, MIXED_CATEGORY]).toContain(members[0].colourway);
+        }
+      });
+    }
   });
 });
 
