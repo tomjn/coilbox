@@ -12,6 +12,15 @@
  */
 
 import { EVERY_CUT, WRECK_STAGES } from "./breakApart";
+import {
+  clampedHeading,
+  clampedPitch,
+  headingOutside,
+  pitchOutside,
+  pitchRange,
+  yawRange,
+} from "./jointLimits";
+import type { LegoPieceLimits } from "./model";
 
 export interface LegoRole {
   id: string;
@@ -291,6 +300,11 @@ export interface EmitContext {
    * single instance and the script it always had.
    */
   instances(): EmitInstance[];
+  /**
+   * How far a piece may turn (#3353), by the Lua name a piece method returned.
+   * Absent on a context built without a document, which then limits nothing.
+   */
+  limits?(piece: string): LegoPieceLimits | undefined;
   params: Record<string, number>;
   /** A signal number of this preset's own, for stopping its threads. */
   signal: string;
@@ -1246,6 +1260,29 @@ function aimSpeeds(
   return { turn: speed("sweep"), lift: speed("pitch") };
 }
 
+/**
+ * The lines that turn an aim away, for a turret held to a yaw range and a
+ * barrel held to a pitch range. `false` is the weapon not being ready to fire,
+ * which the engine's own arc test cannot do for a pitch, because a weapon
+ * definition has no key for one. Written before the first `Signal`, so a
+ * refused aim leaves a turn already under way alone.
+ */
+function refuseOutside(
+  yaw: LegoPieceLimits | undefined,
+  pitch: LegoPieceLimits | undefined,
+): string[] {
+  const heading = yawRange(yaw);
+  const elevation = pitchRange(pitch);
+  return [
+    ...(heading
+      ? [`  if ${headingOutside(heading)} then return false end`]
+      : []),
+    ...(elevation
+      ? [`  if ${pitchOutside(elevation)} then return false end`]
+      : []),
+  ];
+}
+
 export const TURRET_TRACK: AnimPreset = {
   id: "turret.track",
   label: "Turret sweep",
@@ -1313,6 +1350,10 @@ export const TURRET_TRACK: AnimPreset = {
       const flare = weapon.piece("flare");
       const n = weapon.number;
       hooks[`AimWeapon${n}`] = [
+        ...refuseOutside(
+          ctx.limits?.(turret),
+          barrel ? ctx.limits?.(barrel) : undefined,
+        ),
         `  Signal(${weapon.signal})`,
         `  SetSignalMask(${weapon.signal})`,
         ...(speed.turn
@@ -2124,11 +2165,19 @@ export const BUILD_AIM: AnimPreset = {
       const turn = lua(deg(value(this, instance.params, "turnSpeed")));
       const lift = lua(deg(value(this, instance.params, "liftSpeed")));
       const base = instance.pieces("buildarm.base")[0];
+      // A builder is told where to point and has no way to refuse, so an angle
+      // outside the piece's range is held to its nearest edge (#3353).
+      const yaw = base ? yawRange(ctx.limits?.(base)) : null;
+      const elevation = pitchRange(ctx.limits?.(arm));
       if (base) {
-        turns.push(`    Turn(${base}, y_axis, heading, ${turn})`);
+        turns.push(
+          `    Turn(${base}, y_axis, ${yaw ? clampedHeading(yaw) : "heading"}, ${turn})`,
+        );
         rest.push(`  Turn(${base}, y_axis, 0, ${turn})`);
       }
-      turns.push(`    Turn(${arm}, x_axis, -pitch, ${lift})`);
+      turns.push(
+        `    Turn(${arm}, x_axis, -${elevation ? `(${clampedPitch(elevation)})` : "pitch"}, ${lift})`,
+      );
       rest.push(`  Turn(${arm}, x_axis, 0, ${lift})`);
       if (base) waits.push(`    WaitForTurn(${base}, y_axis)`);
       waits.push(`    WaitForTurn(${arm}, x_axis)`);
@@ -2444,6 +2493,7 @@ export const AIM_TRACK: AnimPreset = {
       if (!aim) continue;
       const n = weapon.number;
       hooks[`AimWeapon${n}`] = [
+        ...refuseOutside(ctx.limits?.(aim), ctx.limits?.(aim)),
         `  Signal(${weapon.signal})`,
         `  SetSignalMask(${weapon.signal})`,
         ...(speed.turn

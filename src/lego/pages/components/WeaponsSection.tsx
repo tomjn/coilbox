@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { useUnitDefs } from "@/workshop/config";
 import { exportedInto } from "@/workshop/legoUnits";
 import { type ModProject, useModProjects } from "@/workshop/project";
+import { yawArc, yawRange } from "../../jointLimits";
 import type { LegoPieceWeapon, LegoProject, LegoWeaponRef } from "../../model";
 import { installedGameFor, unitGame } from "../../unitGame";
 import {
@@ -209,7 +210,11 @@ export function WeaponsSection({ project, onWeaponChange }: Props) {
               source.projects,
             )
           : null;
-        const arc = weapon.arc ?? 360;
+        // A turn range on the turret is the arc, so the fields show it and
+        // leave it to the piece panel (#3353).
+        const ranged = yawRange(piece.limits);
+        const derived = ranged ? yawArc(ranged) : null;
+        const arc = derived ? derived.arc : (weapon.arc ?? 360);
         const set = (next: LegoPieceWeapon) => onWeaponChange(piece.id, next);
         const setNumber = (key: "arc" | "heading", text: string) => {
           const { [key]: _old, ...rest } = weapon;
@@ -252,7 +257,8 @@ export function WeaponsSection({ project, onWeaponChange }: Props) {
                     min={1}
                     max={360}
                     placeholder="360"
-                    value={weapon.arc ?? ""}
+                    value={derived ? derived.arc : (weapon.arc ?? "")}
+                    disabled={derived !== null}
                     onChange={(event) => setNumber("arc", event.target.value)}
                   />
                 </Field>
@@ -263,7 +269,8 @@ export function WeaponsSection({ project, onWeaponChange }: Props) {
                       min={-180}
                       max={180}
                       placeholder="0"
-                      value={weapon.heading ?? ""}
+                      value={derived ? derived.heading : (weapon.heading ?? "")}
+                      disabled={derived !== null}
                       onChange={(event) =>
                         setNumber("heading", event.target.value)
                       }

@@ -322,7 +322,7 @@ export function unitReaches(
           number,
           name: slotTarget(project.unitName, fires).name,
           def,
-          slot: arcFields(weapon),
+          slot: arcFields(weapon, piece.limits),
           aimFrom: aimFromOf(number, piece.name),
         }),
       ];

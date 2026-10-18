@@ -32,8 +32,10 @@ import { type WeaponInput, weaponStats } from "@/workshop/derivedStats";
 import { EMPTY_EDITS, type ModProject } from "@/workshop/project";
 import { libraryWeaponDef } from "@/workshop/weaponLibrary";
 import { insertCompound } from "./compounds";
+import { yawArc, yawRange } from "./jointLimits";
 import {
   type LegoPiece,
+  type LegoPieceLimits,
   type LegoPieceWeapon,
   type LegoProject,
   type LegoWeaponRef,
@@ -151,11 +153,21 @@ export function slotTarget(
  * `UnitDef.cpp`). `mainDir` is in the unit's own space, x mapped onto
  * `rightdir` (`GetObjectSpaceVec`, `SolidObject.h:232`), so a positive heading
  * turns it to the unit's right.
+ *
+ * A yaw range on the weapon's turret (#3353) is the arc: its width and middle
+ * replace the weapon's own arc and facing, so the engine refuses the same
+ * targets the script does. A range of a full turn or more limits nothing and
+ * leaves the weapon's own fields in force.
  */
-export function arcFields(weapon: LegoPieceWeapon): Record<string, unknown> {
-  const arc = weapon.arc;
+export function arcFields(
+  weapon: LegoPieceWeapon,
+  limits?: LegoPieceLimits,
+): Record<string, unknown> {
+  const yaw = yawRange(limits);
+  const own = yaw ? yawArc(yaw) : { arc: weapon.arc, heading: weapon.heading };
+  const arc = own.arc;
   if (arc === undefined || arc >= 360) return {};
-  const radians = ((weapon.heading ?? 0) * Math.PI) / 180;
+  const radians = ((own.heading ?? 0) * Math.PI) / 180;
   const round = (n: number) => String(Number(n.toFixed(3)) || 0);
   return {
     maxangledif: Math.max(0, arc),
@@ -179,7 +191,7 @@ export function weaponExportPlan(
   projects: readonly ModProject[],
 ): WeaponExportPlan {
   const plan: WeaponExportPlan = { slots: [], files: [], missing: [] };
-  for (const { weapon, fires } of mountedWeapons(project)) {
+  for (const { piece, weapon, fires } of mountedWeapons(project)) {
     if (fires.from === "library") {
       const source = projects.find((p) => p.id === fires.projectId);
       if (!source) {
@@ -202,7 +214,7 @@ export function weaponExportPlan(
     }
     plan.slots.push({
       ...slotTarget(project.unitName, fires),
-      ...arcFields(weapon),
+      ...arcFields(weapon, piece.limits),
     });
   }
   return plan;

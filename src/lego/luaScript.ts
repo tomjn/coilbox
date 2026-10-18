@@ -282,6 +282,12 @@ export function buildLuaScript(project: LegoProject): string {
     (piece) => piece.id === project.rootPieceId,
   )?.name;
   const weapons = scriptWeapons(project);
+  // Keyed by the Lua name a preset is handed, which is what it asks with.
+  const limitsByLocal = new Map(
+    project.pieces.flatMap((piece) =>
+      piece.limits ? [[localName(piece.name), piece.limits] as const] : [],
+    ),
+  );
   const motion = rates(driveMotion(project).motion);
   const use = (piece: LegoPiece | null | undefined) => {
     if (!piece) return undefined;
@@ -317,6 +323,7 @@ export function buildLuaScript(project: LegoProject): string {
           },
         })),
       params,
+      limits: (piece) => limitsByLocal.get(piece),
       get signal() {
         presetSignal = true;
         return signal;
