@@ -124,17 +124,13 @@ export default defineConfig({
         {
           text: "Library",
           items: [
-            { text: "Maps, games and units", link: "/players/library" },
+            { text: "Games, maps and downloads", link: "/players/library" },
             { text: "Base blueprints", link: "/players/blueprints" },
           ],
         },
         {
           text: "Set up",
           items: [
-            {
-              text: "Get games, maps and engines",
-              link: "/players/downloads",
-            },
             { text: "Settings and keybinds", link: "/players/settings" },
             { text: "Portable mode", link: "/players/portable-mode" },
             {

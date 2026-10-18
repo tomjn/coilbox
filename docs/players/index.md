@@ -17,12 +17,11 @@ Guides for people who play games through coilbox. To install it, see [Install](.
 
 ## Library
 
-- [Maps, games and units](library.md). Look through the maps and games you have installed, see how a map is played, read and compare a game's units, and find a game or map that is not listed.
+- [The Library](library.md). Install and update games and maps, download map packs, follow and retry downloads, see how a map is played, read and compare a game's units, choose the folders coilbox reads and saves to, manage engines, and free up space.
 - [Base blueprints](blueprints.md). Draw a layout of buildings, place it in a match with the in-game widget, save a base you built, and share blueprints on the hub.
 
 ## Set up
 
-- [Get games, maps and engines](downloads.md). Download maps, map packs, games and engines, install a file you already have, choose the folders coilbox reads and saves to, and free up space.
 - [Settings and keybinds](settings.md). Change the game's graphics, sound and controls, edit keybinds, keep copies of your settings, find the engine log after a crash, and set up notifications and updates.
 - [Portable mode](portable-mode.md). Run coilbox from one folder, next to skylobby or another lobby, without touching your other settings.
 - [Compatibility mode](compatibility-mode.md). Play an old Spring game on a current engine, read what its report found, and what the fixes cannot do.
