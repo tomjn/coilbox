@@ -2,7 +2,9 @@
 //! def pipeline then carries what they put back (issue #4560): every unit with
 //! the `commander` tag has `customparams.iscommander`, a bomb that sets
 //! `manualBombSettings` keeps the burst its file gives, and a unit with no
-//! tag is as the base game has it.
+//! tag is as the base game has it. A game whose own def loading the mutator
+//! cannot reach, as Balanced Annihilation 15.9.8's, gets no def fixes, a note
+//! saying why, and defs unchanged.
 //!
 //! Like `converts_the_models`, it writes only into fresh content roots under
 //! the system's temporary folder, which `TMPDIR` moves, and reads the base game
@@ -80,7 +82,7 @@ fn is_commander_param(unit: &Value) -> Option<&Value> {
 
 #[test]
 #[ignore = "needs xta-9.65.sd7 (or COILBOX_COMPAT_GAME) in ~/.spring/games, an installed engine with libunitsync, a built coilbox-unitsync-worker in target/debug"]
-fn the_commanders_get_iscommander_and_the_bombs_keep_their_burst() {
+fn the_commanders_get_iscommander_and_the_bombs_keep_their_burst_where_the_game_allows() {
     let (engine, archive) = match setup() {
         Ok(v) => v,
         Err(why) => {
@@ -101,15 +103,35 @@ fn the_commanders_get_iscommander_and_the_bombs_keep_their_burst() {
     )
     .expect("build");
     eprintln!("{archive}: notes {:?}", built.notes);
-    for file in [
+    // Each def file is either written or named in a note that says why not.
+    let written = |file: &str| built.files.iter().any(|f| f == file);
+    let noted = |file: &str| {
+        built
+            .notes
+            .iter()
+            .any(|n| n.contains(file) && n.contains("def fixes that run there are not written"))
+    };
+    let (post, weapons_post) = (
         tauri_plugin_coilbox_compat::models::DEFS_POST,
         "gamedata/weapondefs_post.lua",
-    ] {
-        assert!(
-            built.files.iter().any(|f| f == file),
-            "{file}: {:?}",
-            built.notes
-        );
+    );
+    let fixes_in_post = !noted(post);
+    assert!(
+        written(weapons_post) != noted(weapons_post),
+        "{:?}",
+        built.notes
+    );
+    // defs_post.lua also carries the converted models, so it can be written
+    // with no def fixes in it, but never left out without a note.
+    assert!(written(post) || noted(post), "{:?}", built.notes);
+    match archive.as_str() {
+        "xta-9.65.sd7" => assert!(fixes_in_post && written(weapons_post), "{:?}", built.notes),
+        // Its own defs.lua never loads defs_post.lua, and it ships its own
+        // weapondefs_post.lua, so it gets no def fixes (#4628).
+        "balanced_annihilation-v15.9.8.sdz" => {
+            assert!(!fixes_in_post && noted(weapons_post), "{:?}", built.notes)
+        }
+        _ => {}
     }
 
     let (base_text, base) = defs_of(&engine, root.path(), &archive);
@@ -123,7 +145,7 @@ fn the_commanders_get_iscommander_and_the_bombs_keep_their_burst() {
     let mut commanders = Vec::new();
     for (key, unit) in units {
         let before = &base_units[key];
-        if commander(before) && is_commander_param(before).is_none() {
+        if fixes_in_post && commander(before) && is_commander_param(before).is_none() {
             assert_eq!(
                 is_commander_param(unit),
                 Some(&Value::String("1".into())),
@@ -144,6 +166,15 @@ fn the_commanders_get_iscommander_and_the_bombs_keep_their_burst() {
         );
     }
     eprintln!("{} commanders: {commanders:?}", commanders.len());
+    let manifest = coilbox_compat::manifest(coilbox_compat::latest()).unwrap();
+    let models = tauri_plugin_coilbox_compat::models::model_keys(&built.files).len();
+    if !fixes_in_post && !written(weapons_post) {
+        // Nothing to count, and every unit is as the base game has it, which
+        // the loop above checked for iscommander.
+        assert!(commanders.is_empty());
+        assert_eq!(built.def_overrides, models);
+        return;
+    }
     assert!(!commanders.is_empty());
 
     // XTA's bombers set manualBombSettings with a burst of their own, which
@@ -175,7 +206,6 @@ fn the_commanders_get_iscommander_and_the_bombs_keep_their_burst() {
     eprintln!("{with_area} weapons keep areaOfEffect in customparams");
     assert!(with_area > 0);
 
-    let manifest = coilbox_compat::manifest(coilbox_compat::latest()).unwrap();
     let counted = tauri_plugin_coilbox_compat::defs::changed(
         &manifest,
         &coilbox_compat::DefsFile::ALL,
@@ -187,6 +217,5 @@ fn the_commanders_get_iscommander_and_the_bombs_keep_their_burst() {
         built.def_overrides
     );
     assert!(counted >= commanders.len() + with_area);
-    let models = tauri_plugin_coilbox_compat::models::model_keys(&built.files).len();
     assert_eq!(built.def_overrides, models + counted);
 }
