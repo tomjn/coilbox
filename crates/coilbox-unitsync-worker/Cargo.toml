@@ -82,6 +82,9 @@ coilbox-assimp = { path = "../coilbox-assimp" }
 # the geometry rules are shared with the unit builder's single model import, so
 # a unit converted here and the same unit opened there cannot disagree.
 coilbox-3do-convert = { path = "../coilbox-3do-convert" }
+# The scanner behind `--lua-compat`, which finds the Lua calls a current engine
+# removed or changed (issue #4553).
+coilbox-luacompat = { path = "../coilbox-luacompat" }
 
 [dev-dependencies]
 # Stock Lua 5.1 used ONLY to unit-test the injected serializer + wrapper against a

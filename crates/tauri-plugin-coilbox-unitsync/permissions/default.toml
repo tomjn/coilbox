@@ -39,5 +39,6 @@ permissions = [
   "allow-unitsync-lua-repl-exec",
   "allow-unitsync-archive-extract",
   "allow-unitsync-convert-3do",
+  "allow-unitsync-lua-compat-scan",
   "allow-unitsync-cancel",
 ]
