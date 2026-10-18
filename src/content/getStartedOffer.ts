@@ -1,11 +1,4 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-} from "react";
-import { useContentRootPaths } from "../downloads/config";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { usePreferredTarget } from "../play/config";
 import { getGameMatcher } from "../profile/profile";
 import {
@@ -16,10 +9,10 @@ import {
   useSuggestedMaps,
 } from "./branding";
 import { useSetupStatus, useUnitsyncScan } from "./config";
-import { installedContent } from "./installedContent";
 import { getStartedCandidates } from "./pages/components/getStartedCandidates";
 import { scanSettled } from "./scanSettled";
 import { filterSuggestedGamesByFilter } from "./suggestedGames";
+import { useLibrary } from "./useLibrary";
 
 /** The downloads the get-started card is offering, by kind. */
 export interface GetStartedOffer {
@@ -107,37 +100,26 @@ const OFFERS_NOTHING: GetStartedOffer = { games: [], maps: [] };
  */
 export function useCollectGetStartedOffer(): GetStartedOfferState {
   const { complete, loading: setupLoading } = useSetupStatus();
-  const rootPaths = useContentRootPaths();
   const entries = useBrandingCatalog();
   const suggestedGames = useSuggestedGames();
   const suggestedMaps = useSuggestedMaps();
   const { target, loading: targetLoading } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
-  const [installed, setInstalled] = useState<InstalledContent | null>(null);
-  const [answered, setAnswered] = useState(false);
   const [snapshot, setSnapshot] = useState<GetStartedOffer | null>(null);
 
   // Only ever publishes a listing it actually read. Content roots load
-  // asynchronously, so writing empty sets while `rootPaths` is still empty (or
-  // after a failed listing) would let the snapshot below freeze a "user has
-  // nothing" verdict for a user who has everything. A failure still counts as
-  // answered, because the reader waiting on this is waiting on the call rather
-  // than on the listing.
-  const refresh = useCallback(async () => {
-    if (rootPaths.length === 0) return;
-    try {
-      const { games, maps } = await installedContent({ paths: rootPaths });
-      setInstalled({ games: new Set(games), maps: new Set(maps) });
-    } catch {
-      // Leave the last known listing (or nothing) in place.
-    } finally {
-      setAnswered(true);
-    }
-  }, [rootPaths]);
-
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+  // asynchronously, so empty sets before the first read (or after a failed
+  // one) would let the snapshot below freeze a "user has nothing" verdict for
+  // a user who has everything. A failure still counts as answered, because the
+  // reader waiting on this is waiting on the call rather than on the listing.
+  const { installedFiles, filesRead, filesAnswered, refresh } = useLibrary();
+  const installed = useMemo<InstalledContent | null>(
+    () =>
+      filesRead
+        ? { games: installedFiles.games, maps: installedFiles.maps }
+        : null,
+    [filesRead, installedFiles],
+  );
 
   // unitsync is the truth for both kinds: it sees rapid content, which never
   // lands as a file in `games/`. A scan that failed reports no games and no
@@ -175,7 +157,7 @@ export function useCollectGetStartedOffer(): GetStartedOfferState {
       // is the same list.
       candidates: snapshot ?? candidates,
       answered:
-        answered &&
+        filesAnswered &&
         scanSettled({
           targetLoading,
           hasTarget: !!(target?.enginePath && target?.dataDir),
