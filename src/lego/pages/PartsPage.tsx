@@ -100,6 +100,12 @@ export default function PartsPage() {
                 setSelected(null);
                 setSelectedShape(shape);
               }}
+              // Modules have no detail view yet, so choosing one closes whatever
+              // the panel was showing rather than leaving it up.
+              onSelectModule={() => {
+                setSelected(null);
+                setSelectedShape(null);
+              }}
               onDeleteModule={(id) => void deleteCompound(id)}
               onRenameModule={(compound, name) =>
                 void saveCompound({ ...compound, name })

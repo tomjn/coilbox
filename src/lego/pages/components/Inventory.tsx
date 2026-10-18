@@ -188,6 +188,8 @@ interface GridsProps {
   onSelectShape?: (shape: ShapeKind, alt: boolean) => void;
   /** Absent on the Lego Parts page, as `CompoundPicker` allows. */
   onInsertModule?: (module: LegoProject, now: boolean) => void;
+  /** The Lego Parts page's answer to a click on a module, which has no unit. */
+  onSelectModule?: (module: LegoProject) => void;
   placingModuleId?: string;
   onDeleteModule: (id: string) => void;
   onRenameModule: (module: LegoProject, name: string) => void;
@@ -227,6 +229,7 @@ export function InventoryGrids({
   selectedShape,
   onSelectShape,
   onInsertModule,
+  onSelectModule,
   placingModuleId,
   onDeleteModule,
   onRenameModule,
@@ -301,6 +304,7 @@ export function InventoryGrids({
               known={compounds}
               atlas={atlas}
               onInsert={onInsertModule}
+              onSelect={onSelectModule}
               placingId={placingModuleId}
               onDelete={onDeleteModule}
               onRename={onRenameModule}
