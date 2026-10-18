@@ -386,7 +386,7 @@ mod tests {
     #[test]
     fn the_gadgets_are_written_to_luarules_gadgets_as_they_are() {
         let m = coilbox_compat::manifest(3).unwrap();
-        let files = files(&m, "XTA 9.65", &marker(3, "abc"), no_file).unwrap();
+        let files = files(&m, "XTA 9.65", None, &marker(3, "abc"), no_file).unwrap();
         let paths: Vec<_> = files.iter().map(|f| f.path.as_str()).collect();
         assert_eq!(
             paths,
@@ -402,7 +402,7 @@ mod tests {
             files[1].contents,
             coilbox_compat::fix_source("gadget-messages-tdf-95").unwrap()
         );
-        let again = super::files(&m, "XTA 9.65", &marker(3, "abc"), no_file).unwrap();
+        let again = super::files(&m, "XTA 9.65", None, &marker(3, "abc"), no_file).unwrap();
         assert!(files
             .iter()
             .zip(&again)
