@@ -29,6 +29,7 @@ import { ButtonGroup } from "@/components/ui/button-group";
 import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
 import { baseAtlas, type LegoAtlas } from "../../atlas";
+import { useColourwayColours } from "../../colourwayColours";
 import { validateCompoundName } from "../../compounds";
 import { addStandardLights, partMaterial } from "../../geometry";
 import type { InventoryRef } from "../../inventory";
@@ -56,6 +57,7 @@ import {
 } from "../../rawGeometry";
 import { getShapeGeometry, SHAPE_KINDS, type ShapeKind } from "../../shapes";
 import { isBuiltInModule } from "../../starterModules";
+import { ColourwayChip } from "./ColourwayChip";
 import {
   type ModuleLabelsDraft,
   ModuleLabelsFields,
@@ -243,6 +245,7 @@ function PartBody({
   onSelect: (part: LegoPartInfo) => void;
 }) {
   const variants = shapeVariants(pack, part.shapeId);
+  const colours = useColourwayColours(pack);
   return (
     <Frame
       frame={frame}
@@ -268,8 +271,10 @@ function PartBody({
       <Facts>
         {variants.length > 1 ? (
           <>
-            <dt className="self-center">Colourway</dt>
-            <dd>
+            {/* A row of its own, as three names with chips are wider than
+                the column beside the labels. */}
+            <dt className="col-span-2">Colourway</dt>
+            <dd className="col-span-2 mb-1">
               <ButtonGroup aria-label="Colourway">
                 {variants.map((variant) => (
                   <Button
@@ -280,6 +285,10 @@ function PartBody({
                     onClick={() => onSelect(variant)}
                     aria-pressed={variant.id === part.id}
                   >
+                    <ColourwayChip
+                      colourway={variant.colourway}
+                      colours={colours}
+                    />
                     {colourwayLabel(pack, variant.colourway)}
                   </Button>
                 ))}

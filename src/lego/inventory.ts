@@ -16,9 +16,18 @@
 import { useSetting } from "@picoframe/frame";
 import { useMemo, useState } from "react";
 
-import { type PartFilter, usePartFilter } from "./filter";
+import { type PartFilter, SHAPES_CATEGORY, usePartFilter } from "./filter";
+import {
+  categoryOf,
+  type InventoryCategory,
+  offeredOn,
+} from "./inventoryCategory";
 import type { LegoProject } from "./model";
-import { type ModuleFilter, useModuleFilter } from "./moduleFilter";
+import {
+  type ModuleFilter,
+  UNCATEGORISED,
+  useModuleFilter,
+} from "./moduleFilter";
 import type { LegoPartInfo, LoadedPack } from "./pack";
 import type { ShapeKind } from "./shapes";
 
@@ -171,6 +180,9 @@ export interface InventoryView {
   /** One search box for both kinds. */
   query: string;
   setQuery: (query: string) => void;
+  /** The one category menu's choice, which hides the kind it does not name. */
+  category: InventoryCategory;
+  setCategory: (category: InventoryCategory) => void;
   partFilter: PartFilter;
   moduleFilter: ModuleFilter;
   inventory: Inventory;
@@ -185,7 +197,7 @@ export interface InventoryView {
  * The inventory's state and what it currently shows. Search runs through the
  * same rules the parts strip and the module list already had, then the list
  * (all, recent, favourites) narrows the result, then the kind filter hides a
- * whole kind.
+ * whole kind. A category of one kind hides the other kind too.
  */
 export function useInventoryView(
   pack: LoadedPack | null,
@@ -196,10 +208,37 @@ export function useInventoryView(
   const partFilter = usePartFilter(pack);
   const moduleFilter = useModuleFilter(compounds);
   const inventory = useInventory();
+  const category = categoryOf(partFilter.category, moduleFilter.category);
+  const setCategory = (next: InventoryCategory) => {
+    partFilter.setCategory(
+      next?.kind === "colourway"
+        ? next.id
+        : next?.kind === "shapes"
+          ? SHAPES_CATEGORY
+          : null,
+    );
+    moduleFilter.setCategory(
+      next?.kind === "module"
+        ? next.name
+        : next?.kind === "uncategorised"
+          ? UNCATEGORISED
+          : null,
+    );
+  };
+  const hideParts =
+    kind === "modules" ||
+    kind === "units" ||
+    category?.kind === "module" ||
+    category?.kind === "uncategorised";
+  const hideModules =
+    kind === "parts" ||
+    kind === "units" ||
+    category?.kind === "colourway" ||
+    category?.kind === "shapes";
 
   const parts = useMemo(
     () =>
-      kind === "modules" || kind === "units"
+      hideParts
         ? []
         : inList(
             partFilter.parts,
@@ -209,11 +248,11 @@ export function useInventoryView(
             inventory.recent,
             inventory.favourites,
           ),
-    [kind, list, partFilter.parts, inventory.recent, inventory.favourites],
+    [hideParts, list, partFilter.parts, inventory.recent, inventory.favourites],
   );
   const shapes = useMemo(
     () =>
-      kind === "modules" || kind === "units"
+      hideParts
         ? []
         : inList(
             partFilter.shapes,
@@ -223,11 +262,17 @@ export function useInventoryView(
             inventory.recent,
             inventory.favourites,
           ),
-    [kind, list, partFilter.shapes, inventory.recent, inventory.favourites],
+    [
+      hideParts,
+      list,
+      partFilter.shapes,
+      inventory.recent,
+      inventory.favourites,
+    ],
   );
   const modules = useMemo(
     () =>
-      kind === "parts" || kind === "units"
+      hideModules
         ? []
         : inList(
             moduleFilter.modules,
@@ -237,12 +282,21 @@ export function useInventoryView(
             inventory.recent,
             inventory.favourites,
           ),
-    [kind, list, moduleFilter.modules, inventory.recent, inventory.favourites],
+    [
+      hideModules,
+      list,
+      moduleFilter.modules,
+      inventory.recent,
+      inventory.favourites,
+    ],
   );
 
   return {
     kind,
-    setKind,
+    setKind: (next) => {
+      setKind(next);
+      if (!offeredOn(next, category)) setCategory(null);
+    },
     list,
     setList,
     query: partFilter.query,
@@ -250,6 +304,8 @@ export function useInventoryView(
       partFilter.setQuery(query);
       moduleFilter.setQuery(query);
     },
+    category,
+    setCategory,
     partFilter,
     moduleFilter,
     inventory,
