@@ -1,4 +1,5 @@
 import { i18n } from "@lingui/core";
+import { SOURCE_LOCALE } from "./locales";
 
 /**
  * The one translation runtime. It is Lingui's global instance, so the `t`
@@ -6,6 +7,15 @@ import { i18n } from "@lingui/core";
  * `<I18nProvider>` in `src/main.tsx` hands it to React.
  */
 export { i18n };
+
+/**
+ * The active locale code, for `Intl` and `toLocale*String` calls. It reads
+ * Lingui's instance, so it works in plain modules as well as components, and it
+ * is `en` until the first catalog has loaded.
+ */
+export function getLocale(): string {
+  return i18n.locale || SOURCE_LOCALE;
+}
 
 /** The locale most recently asked for, so a slow load cannot overwrite a later pick. */
 let requested: string | undefined;
