@@ -1,10 +1,42 @@
 import type { QueueItem } from "./DownloadQueueProvider";
 import { type DownloadAttempt, downloadKey, hostOf } from "./downloadHistory";
+import { describeFailure, type FailureContext } from "./failureReason";
 
 /** What the queue stores for a settled item, before it is dated. */
 export interface RecordToWrite {
   key: string;
   attempt: DownloadAttempt;
+}
+
+/** Which host and file a failure of this item should be put in terms of. */
+export function failureContextOf(item: QueueItem): FailureContext {
+  switch (item.kind) {
+    case "file":
+      return { host: hostOf(item.args.url), filename: item.args.filename };
+    case "rapid":
+      return {
+        host: item.args.masterUrl ? hostOf(item.args.masterUrl) : null,
+        filename: null,
+      };
+    case "map":
+      return {
+        host: item.args.searchUrl ? hostOf(item.args.searchUrl) : null,
+        filename: null,
+      };
+    default:
+      return { host: null, filename: null };
+  }
+}
+
+/**
+ * What to show for a download that failed with `raw` (issue #4577). A game or map
+ * fetched from any source has already put every source's reason in its error,
+ * so that stands. The other kinds name the one host they used.
+ */
+export function failureText(item: QueueItem, raw: string): string {
+  return item.kind === "game" || item.kind === "mapAnySource"
+    ? raw
+    : describeFailure(raw, failureContextOf(item));
 }
 
 const stem = (filename: string) => filename.replace(/\.(sd7|sdz)$/i, "");
@@ -41,7 +73,14 @@ export function attemptsToRecord(
         filename: from.filename,
         md5: null,
         mirror: from.url ? hostOf(from.url) : null,
-        failure,
+        failure:
+          failure === null
+            ? null
+            : describeFailure(failure, {
+                host: from.url ? hostOf(from.url) : null,
+                filename: from.filename,
+              }),
+        ...(failure === null ? {} : { detail: failure }),
         durationMs,
       },
     },

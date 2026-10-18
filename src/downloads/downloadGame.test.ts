@@ -39,6 +39,7 @@ import type { DownloadProgress } from "./bindings";
 import { downloadGameAnySource } from "./downloadGame";
 import { invalidateGithubReleases } from "./githubReleases";
 import { DEFAULT_RAPID_MASTERS } from "./rapidMasters";
+import type { SourceWalkError } from "./sourceWalk";
 
 /** A game with no GitHub repo and no springfiles entry, so only rapid is tried. */
 const BAR_GAME = "Beyond All Reason test-30922-8064a43";
@@ -127,7 +128,8 @@ describe("downloadGameAnySource, github step", () => {
         reference: "v2.40",
         filename: "metalfactions-v2.40.sdz",
         mirror: "example.com",
-        failure: "connection reset",
+        failure: "could not connect to example.com for metalfactions-v2.40.sdz",
+        detail: "connection reset",
       }),
     );
   });
@@ -237,6 +239,165 @@ describe("downloadGameAnySource, progress across sources", () => {
 
     const channels = dlDownloadFileRaw.mock.calls.map((c) => c[0].onProgress);
     expect(channels[0]).not.toBe(channels[1]);
+  });
+});
+
+describe("downloadGameAnySource, every springfiles mirror (issue #4577)", () => {
+  // A game with no GitHub repo, so the springfiles step comes first.
+  const GAME = "Mirror Game 1.0";
+  const FILE = "mirror_game_1.0.sdz";
+  const entry = (mirrors: string[], springname = GAME, filename = FILE) => ({
+    springname,
+    name: springname,
+    filename,
+    category: "game",
+    size: 1,
+    mirrors,
+    mapimages: [],
+    metadata: { author: "", width: 0, height: 0 },
+  });
+  const MF = "Metal Factions v2.40";
+  const MF_FILE = "metalfactions-v2.40.sdz";
+  const go = (extra: object = {}) => {
+    const onAttempt = vi.fn();
+    const result = downloadGameAnySource({
+      gameName: GAME,
+      writePath: "/data",
+      onProgress: () => {},
+      onAttempt,
+      ...extra,
+    });
+    return { result, onAttempt };
+  };
+
+  it("fetches the second mirror when the first fails, and records both attempts", async () => {
+    dlSpringfilesList.mockResolvedValue({
+      results: [
+        entry([
+          `https://mirror1.example.com/${FILE}`,
+          `https://mirror2.example.com/${FILE}`,
+        ]),
+      ],
+    });
+    dlDownloadFileRaw
+      .mockRejectedValueOnce(
+        new Error("HTTP status client error (404 Not Found) for url (x)"),
+      )
+      .mockResolvedValueOnce({ message: "ok", path: "" });
+
+    const { result, onAttempt } = go();
+
+    await expect(result).resolves.toBe("springfiles mirror");
+    expect(onAttempt.mock.calls.map((c) => c[0])).toEqual([
+      expect.objectContaining({
+        source: "springfiles",
+        outcome: "failed",
+        mirror: "mirror1.example.com",
+        failure: `mirror1.example.com answered 404 for ${FILE}`,
+      }),
+      expect.objectContaining({
+        source: "springfiles",
+        outcome: "ok",
+        mirror: "mirror2.example.com",
+      }),
+    ]);
+  });
+
+  it("tries every mirror before pr-downloader, and says why each failed", async () => {
+    dlSpringfilesList.mockResolvedValue({
+      results: [
+        entry([
+          `https://mirror1.example.com/${FILE}`,
+          `https://mirror2.example.com/${FILE}`,
+        ]),
+      ],
+    });
+    dlDownloadFileRaw
+      .mockRejectedValueOnce(new Error("The host took too long to respond."))
+      .mockRejectedValueOnce(
+        new Error("Download stalled — no data received for 2 minutes."),
+      );
+    dlDownloadRaw.mockRejectedValue(new Error("no source could provide"));
+
+    const err = await go().result.catch((e: Error) => e);
+
+    expect(dlDownloadFileRaw).toHaveBeenCalledTimes(2);
+    expect(dlDownloadRaw).toHaveBeenCalled();
+    expect(String(err)).toContain(
+      `mirror1.example.com did not answer in time for ${FILE}`,
+    );
+    expect(String(err)).toContain(
+      `mirror2.example.com stopped sending ${FILE} for 2 minutes`,
+    );
+  });
+
+  it("stops at a cancel and offers the mirror it had not reached", async () => {
+    dlSpringfilesList.mockResolvedValue({
+      results: [
+        entry([
+          `https://mirror1.example.com/${FILE}`,
+          `https://mirror2.example.com/${FILE}`,
+        ]),
+      ],
+    });
+    dlDownloadFileRaw.mockRejectedValueOnce(new Error("Download cancelled."));
+
+    const err = await go().result.catch((e: unknown) => e);
+
+    expect(dlDownloadFileRaw).toHaveBeenCalledTimes(1);
+    expect(dlDownloadRaw).not.toHaveBeenCalled();
+    expect((err as SourceWalkError).next).toEqual({
+      source: "springfiles",
+      mirror: "mirror2.example.com",
+    });
+  });
+
+  it("offers the springfiles mirrors after a cancel during a github download", async () => {
+    dlGithubReleaseArchives.mockResolvedValueOnce({
+      archives: [
+        {
+          filename: MF_FILE,
+          url: "https://example.com/v",
+          size: 1,
+          tag: "v2.40",
+        },
+      ],
+    });
+    dlDownloadFileRaw.mockRejectedValueOnce(new Error("Download cancelled."));
+
+    const err = await go({ gameName: MF }).result.catch((e: unknown) => e);
+
+    expect((err as SourceWalkError).next).toEqual({
+      source: "springfiles",
+      mirror: null,
+    });
+  });
+
+  it("starts at the github step skipped by startAt: springfiles", async () => {
+    dlGithubReleaseArchives.mockResolvedValue({
+      archives: [
+        {
+          filename: MF_FILE,
+          url: "https://example.com/v",
+          size: 1,
+          tag: "v2.40",
+        },
+      ],
+    });
+    dlSpringfilesList.mockResolvedValue({
+      results: [entry([`https://mirror1.example.com/${MF_FILE}`], MF, MF_FILE)],
+    });
+    dlDownloadFileRaw.mockResolvedValueOnce({ message: "ok", path: "" });
+
+    const { result } = go({
+      gameName: MF,
+      startAt: { source: "springfiles", mirror: null },
+    });
+
+    await expect(result).resolves.toBe("springfiles mirror");
+    expect(dlDownloadFileRaw.mock.calls[0][0].url).toBe(
+      `https://mirror1.example.com/${MF_FILE}`,
+    );
   });
 });
 
