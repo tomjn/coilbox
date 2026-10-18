@@ -21,6 +21,7 @@ import {
   transformOf,
 } from "./connectors";
 import { liftedModuleRefusal } from "./liftPiece";
+import { claimForLoadout } from "./loadouts";
 import {
   type LegoMount,
   type LegoPiece,
@@ -28,6 +29,7 @@ import {
   orderedPieces,
   pieceById,
 } from "./model";
+import { isMount, mountRefusal } from "./mountPoints";
 import type { LoadedPack } from "./pack";
 import { type FaceTarget, freeFace, type PlaceOptions } from "./placePart";
 import { worldMatrix } from "./reparent";
@@ -290,6 +292,10 @@ export function insertModule(
  * missing, the module has no connector to join by, or the module holds pieces
  * from a game this unit is not for (`liftedModuleRefusal`). Only a module from the
  * library is placed this way, so its pieces record the instance.
+ *
+ * Also null when the face is a mount point (#3279) whose categories do not
+ * include the module's (`mountRefusal` says why). On a mount the module joins
+ * the active loadout.
  */
 export function placeModule(
   project: LegoProject,
@@ -302,9 +308,10 @@ export function placeModule(
   if (liftedModuleRefusal(project, module)) return null;
   const parent = pieceById(project, target.parentId);
   if (!parent) return null;
+  if (mountRefusal(project, parent.id, target.to, module)) return null;
   const theirs = pieceConnectors(pack, parent).find((c) => c.id === target.to);
   if (!theirs || !chooseMount(module, pack, theirs, options.cycle)) return null;
-  return insertModule(
+  const inserted = insertModule(
     project,
     module,
     parent.id,
@@ -313,4 +320,10 @@ export function placeModule(
     { ...options, to: target.to },
     true,
   );
+  return isMount(project, parent.id, target.to)
+    ? {
+        ...inserted,
+        project: claimForLoadout(inserted.project, inserted.rootPieceIds),
+      }
+    : inserted;
 }
