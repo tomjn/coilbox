@@ -3,7 +3,8 @@
  *
  * Shapes, parts and modules are drawn by one grid in sections (#4536), on the
  * Lego Parts page and in the builder's drawer alike. A section with nothing to
- * show is left out.
+ * show is left out. Clicking a tile opens it in the detail panel beside the
+ * grid (#4537), which holds a module's actions.
  *
  * State lives in `useInventoryView`, because the caller records what a unit
  * took from the inventory and so needs the same recent and favourite lists.
@@ -11,7 +12,13 @@
 
 import { Button, cn, Input } from "@picoframe/frame";
 import { FileUp } from "lucide-react";
-import { type ReactNode, type RefObject, useMemo } from "react";
+import {
+  type ReactNode,
+  type RefObject,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import { ButtonGroup } from "@/components/ui/button-group";
 import type { LegoAtlas } from "../../atlas";
@@ -26,6 +33,8 @@ import type { LegoProject } from "../../model";
 import type { LegoPartInfo, LoadedPack } from "../../pack";
 import { SHAPE_KINDS, type ShapeKind } from "../../shapes";
 import { isBuiltInModule } from "../../starterModules";
+import { DetailPanel } from "./DetailPanel";
+import { useRootHeight } from "./gridScroll";
 import { ModuleFilters } from "./ModuleFilters";
 import { PartFilters } from "./PartFilters";
 import { type GridItem, type GridSection, TileGrid } from "./TileGrid";
@@ -184,25 +193,22 @@ interface GridsProps {
   /** Every module, filtered or not. */
   compounds: LegoProject[];
   atlas?: LegoAtlas;
+  /** The part being placed in the builder, drawn as chosen. */
   selectedPartId?: string;
   /** Absent on the Lego Parts page, which has no unit to take a part. */
   onSelectPart?: (part: LegoPartInfo, alt: boolean) => void;
-  selectedShape?: string;
-  /** The builder adds the shape. The Lego Parts page shows its detail. */
+  /** The builder adds the shape. Absent on the Lego Parts page. */
   onSelectShape?: (shape: ShapeKind, alt: boolean) => void;
   /** Absent on the Lego Parts page, which has no unit to place a module in. */
   onInsertModule?: (module: LegoProject, now: boolean) => void;
-  /** The Lego Parts page's answer to a click on a module, which has no unit. */
-  onSelectModule?: (module: LegoProject) => void;
-  /** The module the Lego Parts page has chosen, drawn as chosen. */
-  selectedModuleId?: string;
   placingModuleId?: string;
   onDeleteModule: (id: string) => void;
   onRenameModule: (module: LegoProject, name: string) => void;
-  onCopyModule: (module: LegoProject) => void;
-  /** Absent leaves Save to file out of each module's menu. */
+  /** Saves the user's own copy of a built in module, and hands it back. */
+  onCopyModule: (module: LegoProject) => Promise<LegoProject>;
+  /** Absent leaves Save to file out of the panel. */
   onSaveModuleFile?: (module: LegoProject) => void;
-  /** Absent leaves Share out of each module's menu. */
+  /** Absent leaves Share out of the panel. */
   onShareModule?: (module: LegoProject) => void;
   onLabelsModule?: (
     module: LegoProject,
@@ -210,13 +216,18 @@ interface GridsProps {
   ) => void;
   /** Drawn instead of the grid when the kind is "Game units". */
   gameUnits?: ReactNode;
-  /** Beside the grid, such as the Lego Parts page's part detail. */
-  aside?: ReactNode;
   /**
    * The page's scroller, for a page that scrolls the grid with everything
-   * else on it (#4468). Absent, the grid scrolls in a box of its own.
+   * else on it (#4468). Absent, the grid scrolls in a box of its own. The
+   * detail panel stays in view while it scrolls.
    */
   scrollRoot?: RefObject<HTMLElement | null>;
+  /**
+   * Whether Escape closes the detail panel wherever focus is. The Lego Parts
+   * page has nothing else Escape could mean. In the builder it closes the
+   * panel only from inside the grid or the panel.
+   */
+  escapeAnywhere?: boolean;
 }
 
 function emptyText(list: InventoryList): string {
@@ -232,11 +243,8 @@ export function InventoryGrids({
   atlas,
   selectedPartId,
   onSelectPart,
-  selectedShape,
   onSelectShape,
   onInsertModule,
-  onSelectModule,
-  selectedModuleId,
   placingModuleId,
   onDeleteModule,
   onRenameModule,
@@ -245,10 +253,26 @@ export function InventoryGrids({
   onShareModule,
   onLabelsModule,
   gameUnits,
-  aside,
   scrollRoot,
+  escapeAnywhere = false,
 }: GridsProps) {
   const { inventory } = view;
+  // One choice for every kind, so a click on any tile replaces what the panel
+  // was showing.
+  const [selected, setSelected] = useState<InventoryRef | null>(null);
+  const rootHeight = useRootHeight(scrollRoot);
+
+  useEffect(() => {
+    if (!escapeAnywhere || !selected) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      // A field that gave up an edit, or a menu that closed, has used it.
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      event.preventDefault();
+      setSelected(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [escapeAnywhere, selected]);
   const favourites = useMemo(
     () => new Set(inventory.favourites.map(refKey)),
     [inventory.favourites],
@@ -272,18 +296,51 @@ export function InventoryGrids({
     );
   }
 
+  // What the builder is placing, else what the panel shows.
   const selectedKey = placingModuleId
     ? refKey({ kind: "module", id: placingModuleId })
-    : selectedShape
-      ? refKey({ kind: "shape", id: selectedShape })
-      : selectedPartId
-        ? refKey({ kind: "part", id: selectedPartId })
-        : selectedModuleId
-          ? refKey({ kind: "module", id: selectedModuleId })
-          : undefined;
+    : selectedPartId
+      ? refKey({ kind: "part", id: selectedPartId })
+      : selected
+        ? refKey(selected)
+        : undefined;
+
+  const panel = selected ? (
+    <DetailPanel
+      pack={pack}
+      atlas={atlas}
+      selected={selected}
+      compounds={compounds}
+      moduleActions={{
+        onDelete: onDeleteModule,
+        onRename: onRenameModule,
+        onCopy: onCopyModule,
+        onSaveFile: onSaveModuleFile,
+        onShare: onShareModule,
+        onLabels: onLabelsModule,
+      }}
+      onSelect={setSelected}
+      onClose={() => setSelected(null)}
+      onAddShape={onSelectShape && ((shape) => onSelectShape(shape, false))}
+      onPlaceModule={
+        onInsertModule && ((module) => onInsertModule(module, false))
+      }
+      compact={!scrollRoot}
+      className={scrollRoot ? undefined : "pr-3 pt-2"}
+    />
+  ) : null;
 
   return (
-    <div className="flex min-h-0 flex-1">
+    // biome-ignore lint/a11y/noStaticElementInteractions: Escape is caught on its way up from the grid and the panel
+    <div
+      className="flex min-h-0 flex-1"
+      onKeyDown={(event) => {
+        if (event.key !== "Escape" || event.defaultPrevented || !selected)
+          return;
+        event.preventDefault();
+        setSelected(null);
+      }}
+    >
       {/* No width of its own beyond its share of the row, so the canvas inside
           can never size it (#4520). The page pads its own content, the drawer
           needs this to keep the headings off its edges. */}
@@ -305,30 +362,27 @@ export function InventoryGrids({
             selectedKey={selectedKey}
             placesModules={onInsertModule !== undefined}
             onPick={(item, alt) => {
+              setSelected(refOf(item));
               if (item.kind === "part") onSelectPart?.(item.part, alt);
               else if (item.kind === "shape") onSelectShape?.(item.shape, alt);
-              else if (onInsertModule) onInsertModule(item.module, alt);
-              else onSelectModule?.(item.module);
+              else onInsertModule?.(item.module, alt);
             }}
             favourites={favourites}
             onFavourite={(item) => inventory.toggleFavourite(refOf(item))}
-            knownModules={compounds}
-            moduleActions={{
-              onDelete: onDeleteModule,
-              onRename: onRenameModule,
-              onCopy: onCopyModule,
-              onSaveFile: onSaveModuleFile,
-              onShare: onShareModule,
-              onLabels: onLabelsModule,
-            }}
             scrollRoot={scrollRoot}
           />
         )}
       </div>
-      {scrollRoot && aside ? (
-        <div className="sticky top-0 self-start">{aside}</div>
+      {scrollRoot && panel ? (
+        // Held in view while the page scrolls, and no taller than the page.
+        <div
+          className="sticky top-0 flex self-start"
+          style={rootHeight > 0 ? { maxHeight: rootHeight } : undefined}
+        >
+          {panel}
+        </div>
       ) : (
-        aside
+        panel
       )}
     </div>
   );

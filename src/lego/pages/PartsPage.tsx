@@ -8,13 +8,11 @@ import { ErrorBanner } from "@/content/pages/components/states";
 
 import { useInventoryView } from "../inventory";
 import { withLabels } from "../moduleFilter";
-import { type LegoPartInfo, type LoadedPack, loadPack } from "../pack";
+import { type LoadedPack, loadPack } from "../pack";
 import { deleteCompound, saveCompound, useModules } from "../projects";
-import type { ShapeKind } from "../shapes";
 import { useModuleFiles } from "../useModuleFiles";
 import { useSharedModuleImport, useShareModule } from "../useModuleShare";
 import { InventoryFilters, InventoryGrids } from "./components/Inventory";
-import { PartDetail, ShapeDetail } from "./components/PartDetail";
 import {
   PackAtlases,
   PackProblems,
@@ -36,9 +34,6 @@ type Status =
  */
 export default function PartsPage() {
   const [status, setStatus] = useState<Status>({ state: "loading" });
-  const [selected, setSelected] = useState<LegoPartInfo | null>(null);
-  const [selectedShape, setSelectedShape] = useState<ShapeKind | null>(null);
-  const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -112,53 +107,18 @@ export default function PartsPage() {
               view={view}
               pack={pack}
               compounds={compounds}
-              selectedPartId={selected?.id}
-              onSelectPart={(part) => {
-                setSelectedShape(null);
-                setSelectedModuleId(null);
-                setSelected(part);
-              }}
-              selectedShape={selectedShape?.id}
-              onSelectShape={(shape) => {
-                setSelected(null);
-                setSelectedModuleId(null);
-                setSelectedShape(shape);
-              }}
-              // Modules have no detail view yet, so choosing one closes whatever
-              // the panel was showing rather than leaving it up.
-              onSelectModule={(module) => {
-                setSelected(null);
-                setSelectedShape(null);
-                setSelectedModuleId(module.id);
-              }}
-              selectedModuleId={selectedModuleId ?? undefined}
               onDeleteModule={(id) => void deleteCompound(id)}
               onRenameModule={(compound, name) =>
                 void saveCompound({ ...compound, name })
               }
-              onCopyModule={(compound) => void saveCompound(compound)}
+              onCopyModule={saveCompound}
               onSaveModuleFile={moduleFiles.saveFile}
               onShareModule={shareModule}
               onLabelsModule={(compound, labels) =>
                 void saveCompound(withLabels(compound, labels))
               }
-              aside={
-                selectedShape ? (
-                  <ShapeDetail
-                    pack={pack}
-                    shape={selectedShape}
-                    onClose={() => setSelectedShape(null)}
-                  />
-                ) : selected ? (
-                  <PartDetail
-                    pack={pack}
-                    part={selected}
-                    onSelect={setSelected}
-                    onClose={() => setSelected(null)}
-                  />
-                ) : null
-              }
               scrollRoot={scrollRef}
+              escapeAnywhere
             />
           </>
         ) : null}

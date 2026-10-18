@@ -21,7 +21,7 @@
  * and it is marked with the game's name.
  */
 
-import { Button, cn, Input } from "@picoframe/frame";
+import { Button, cn } from "@picoframe/frame";
 import { Star } from "lucide-react";
 import {
   type RefObject,
@@ -37,7 +37,6 @@ import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
 import { baseAtlas, type LegoAtlas } from "../../atlas";
 import { buildCompoundHolder } from "../../compoundPreview";
-import { validateCompoundName } from "../../compounds";
 import {
   addStandardLights,
   importedMaterial,
@@ -59,9 +58,7 @@ import {
   type RawGeometry,
 } from "../../rawGeometry";
 import { getShapeGeometry, type ShapeKind } from "../../shapes";
-import { isBuiltInModule } from "../../starterModules";
 import { type GridWindow, gridScroll, useRootHeight } from "./gridScroll";
-import { type ModuleActions, ModuleTileMenu } from "./ModuleTileMenu";
 import {
   type GridMetrics,
   sectionCount,
@@ -150,24 +147,11 @@ interface Props {
   /** `itemKey`s of the favourites. With `onFavourite`, each tile gets a star. */
   favourites?: ReadonlySet<string>;
   onFavourite?: (item: GridItem) => void;
-  /** Every module, filtered or not. A name must be unique among all of them. */
-  knownModules?: LegoProject[];
-  /** Absent leaves module tiles with no actions menu. */
-  moduleActions?: Omit<ModuleActions, "onStartRename"> & {
-    onRename: (module: LegoProject, name: string) => void;
-  };
   /**
    * A scroller further out to scroll with, in place of one of the grid's own,
    * as `./gridScroll` describes. Given or not for the life of the grid.
    */
   scrollRoot?: RefObject<HTMLElement | null>;
-}
-
-/** The name field being edited, and why it cannot be saved yet, if at all. */
-interface Renaming {
-  id: string;
-  draft: string;
-  error: string | null;
 }
 
 interface Visible {
@@ -184,8 +168,6 @@ export function TileGrid({
   placesModules = false,
   favourites,
   onFavourite,
-  knownModules,
-  moduleActions,
   scrollRoot,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -198,7 +180,6 @@ export function TileGrid({
   const [view, setView] = useState<Visible>({ columns: 1, indices: [] });
   const [focusIndex, setFocusIndex] = useState(0);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
-  const [renaming, setRenaming] = useState<Renaming | null>(null);
   /** A lifted module's geometry by its id, or null when it would not load. */
   const [raws, setRaws] = useState<ReadonlyMap<string, RawGeometry | null>>(
     () => new Map(),
@@ -222,30 +203,6 @@ export function TileGrid({
   // same tile, so it keeps the scroll and the focus where a new filter does not.
   const itemsKey = useMemo(() => items.map(itemKey).join("\n"), [items]);
   const grid = sectionLayout(counts, view.columns, METRICS);
-  const known = useMemo(
-    () =>
-      knownModules ??
-      items.flatMap((item) => (item.kind === "module" ? [item.module] : [])),
-    [knownModules, items],
-  );
-
-  /**
-   * Enter and blur both land here. An empty or clashing name keeps the field
-   * open with a reason rather than reverting, so a mistyped name does not
-   * quietly vanish: the fix is to correct it or press Escape to give up.
-   */
-  function commitRename() {
-    setRenaming((current) => {
-      if (!current) return current;
-      const error = validateCompoundName(known, current.id, current.draft);
-      if (error) return { ...current, error };
-      const trimmed = current.draft.trim();
-      const module = known.find((m) => m.id === current.id);
-      if (module && trimmed !== module.name)
-        moduleActions?.onRename(module, trimmed);
-      return null;
-    });
-  }
 
   const scrolling = useCallback(
     () =>
@@ -456,7 +413,6 @@ export function TileGrid({
       const module = item.kind === "module" ? item.module : undefined;
       const liftedFrom =
         module && holdsLiftedPieces(module) ? module.game?.name : undefined;
-      const isRenaming = module !== undefined && renaming?.id === module.id;
       const title =
         item.kind === "shape"
           ? `${name}, ${item.shape.size.join(" x ")}`
@@ -517,7 +473,7 @@ export function TileGrid({
             className="peer absolute inset-0 flex flex-col justify-end rounded-md focus-visible:outline-none"
           >
             <span className="block truncate px-0.5 text-center text-[11px] leading-[14px]">
-              {isRenaming ? "" : name}
+              {name}
             </span>
           </button>
           {/* The frame sits under the canvas, so a model is drawn on it, and after
@@ -537,53 +493,6 @@ export function TileGrid({
             <span className="pointer-events-none absolute inset-x-6 top-1 truncate text-center text-[10px] text-muted-foreground">
               {liftedFrom}
             </span>
-          ) : null}
-          {isRenaming && renaming ? (
-            <div className="absolute inset-x-0 bottom-0">
-              <Input
-                autoFocus
-                value={renaming.draft}
-                onChange={(event) =>
-                  setRenaming({
-                    id: renaming.id,
-                    draft: event.target.value,
-                    error: null,
-                  })
-                }
-                onFocus={(event) => event.target.select()}
-                onBlur={commitRename}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    commitRename();
-                  } else if (event.key === "Escape") {
-                    event.preventDefault();
-                    setRenaming(null);
-                  }
-                }}
-                aria-label={`Rename the ${name} module`}
-                aria-invalid={renaming.error ? true : undefined}
-                title={renaming.error ?? undefined}
-                className="h-[18px] bg-background px-1 text-[11px]"
-              />
-            </div>
-          ) : null}
-          {module && moduleActions ? (
-            <ModuleTileMenu
-              module={module}
-              known={known}
-              builtIn={isBuiltInModule(module)}
-              lifted={liftedFrom !== undefined}
-              onDelete={moduleActions.onDelete}
-              onCopy={moduleActions.onCopy}
-              onSaveFile={moduleActions.onSaveFile}
-              onShare={moduleActions.onShare}
-              onLabels={moduleActions.onLabels}
-              onStartRename={(m) =>
-                setRenaming({ id: m.id, draft: m.name, error: null })
-              }
-              className="size-6 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
-            />
           ) : null}
           {onStar ? (
             <Button
@@ -642,7 +551,7 @@ export function TileGrid({
 }
 
 /** A module's assembly, kept while the module is listed. */
-interface Holder {
+export interface Holder {
   group: THREE.Group;
   /** What it was built from, so an edited module is built again. */
   module: LegoProject;
@@ -678,16 +587,17 @@ interface GridState {
 }
 
 /**
- * A module's assembly in its resting pose, sized to a tile, or null for a
- * lifted module whose geometry has not arrived or would not load.
+ * A module's assembly, `fit` across, or null for a lifted module whose
+ * geometry has not arrived or would not load. The grid sizes it to a tile and
+ * the detail panel to its preview.
  */
-function buildModule(
+export function buildModule(
   module: LegoProject,
   pack: LoadedPack,
   raw: RawGeometry | null | undefined,
   material: THREE.Material,
+  fit: number,
 ): Holder | null {
-  const fit = CELL * MODULE_FIT;
   if (!holdsLiftedPieces(module)) {
     const group = buildCompoundHolder(
       module,
@@ -762,7 +672,7 @@ function holderFor(
     holder = undefined;
   }
   if (!holder) {
-    const built = buildModule(module, pack, raw, material);
+    const built = buildModule(module, pack, raw, material, CELL * MODULE_FIT);
     if (!built) return null;
     holder = built;
     state.scene.add(holder.group);

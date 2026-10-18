@@ -127,6 +127,8 @@ vi.mock("./components/TileGrid", () => ({
           : [],
       ),
 }));
+// Opens beside the grid on a pick, with a preview this DOM cannot draw.
+vi.mock("./components/DetailPanel", () => ({ DetailPanel: () => null }));
 // Reads the unit's file in its game through unitsync, for a factory's yardmap.
 vi.mock("./components/useBuiltUnitDef", () => ({
   useBuiltUnitDef: () => ({ game: undefined, key: null, def: undefined }),

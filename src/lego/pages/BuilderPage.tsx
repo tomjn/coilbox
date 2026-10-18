@@ -2712,7 +2712,7 @@ function Builder({ id }: { id: string | undefined }) {
                       onRenameModule={(compound, name) =>
                         void saveCompound({ ...compound, name })
                       }
-                      onCopyModule={(compound) => void saveCompound(compound)}
+                      onCopyModule={saveCompound}
                       onSaveModuleFile={moduleFiles.saveFile}
                       onShareModule={shareModule}
                       onLabelsModule={(compound, labels) =>
