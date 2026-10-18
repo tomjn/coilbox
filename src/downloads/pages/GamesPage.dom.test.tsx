@@ -67,6 +67,8 @@ const SCAN = vi.hoisted(() => ({
       games: [
         {
           name: "Splinter Faction 0.1.86",
+          primaryArchive: { name: "splinterfaction-0.1.86.sdz" },
+          dependencyArchives: [],
           info: { shortname: "sf", version: "0.1.86" },
         },
       ],
@@ -155,7 +157,7 @@ async function pickHubSource() {
 
 describe("the Games page's hub source", () => {
   it("lists the games and lets you drill into a hub game's own downloads", async () => {
-    fetchHubGames.mockResolvedValueOnce({
+    fetchHubGames.mockResolvedValue({
       ok: true,
       value: [
         {
@@ -188,7 +190,7 @@ describe("the Games page's hub source", () => {
   it("offers no download for a hub game the hub lists no source for", async () => {
     // An empty list, not a missing one: it is what the hub sends for a game it
     // knows about and cannot point at, and an empty array is truthy.
-    fetchHubGames.mockResolvedValueOnce({
+    fetchHubGames.mockResolvedValue({
       ok: true,
       value: [
         {
@@ -308,7 +310,7 @@ describe("the Games page's hub source", () => {
   });
 
   it("shows the hub's own reason when the catalog could not be read", async () => {
-    fetchHubGames.mockResolvedValueOnce({
+    fetchHubGames.mockResolvedValue({
       ok: false,
       reason: "The hub may be waking up after a quiet spell.",
     });
@@ -327,7 +329,7 @@ describe("the Games page's hub source", () => {
   });
 
   it("queues the hub game's rapid source when the download button is pressed", async () => {
-    fetchHubGames.mockResolvedValueOnce({
+    fetchHubGames.mockResolvedValue({
       ok: true,
       value: [
         {
