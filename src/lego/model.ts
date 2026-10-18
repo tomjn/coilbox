@@ -895,6 +895,13 @@ export interface LegoProject {
    * `pose.ts`.
    */
   poses?: LegoPose[];
+  /**
+   * Custom motions made of saved poses (#3356), in the order the panel lists
+   * them. Written into the unit's script beside the presets. Absent means none,
+   * which is every unit saved before this existed, and its script is then
+   * byte for byte what it was. See `actions.ts`.
+   */
+  actions?: LegoAction[];
 }
 
 /**
@@ -921,6 +928,31 @@ export interface LegoPose {
   id: string;
   name: string;
   pieces: Record<string, LegoPoseOffset>;
+}
+
+/** One key of an action: a saved pose, reached `seconds` after the key before. */
+export interface LegoActionKey {
+  /** The id of a pose in `LegoProject.poses`. A pose since deleted is skipped. */
+  pose: string;
+  /** Seconds from the previous key. The first key's is from rest, or from the
+   *  last key when the action loops. */
+  seconds: number;
+}
+
+/**
+ * A named motion: its keys in order, what starts it and whether it repeats.
+ * Written as a thread of `Turn` and `Move` calls (`actions.ts`).
+ */
+export interface LegoAction {
+  id: string;
+  name: string;
+  /** The call-in that starts it, such as `StartMoving` or `Shot1`, or the name
+   *  of a function of its own that anything can call. */
+  trigger: string;
+  /** Repeats until the call-in that ends the trigger. A trigger with none
+   *  repeats until the unit is told to start it again. */
+  loop: boolean;
+  keys: LegoActionKey[];
 }
 
 /**
@@ -1065,6 +1097,44 @@ function parsePoses(value: unknown): LegoPose[] | null {
     poses.push({ id: e.id, name: e.name.trim(), pieces });
   }
   return poses.length > 0 ? poses : null;
+}
+
+/** The actions that can be read, or null when there are none. */
+function parseActions(value: unknown): LegoAction[] | null {
+  if (!Array.isArray(value)) return null;
+  const actions: LegoAction[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const e = entry as Record<string, unknown>;
+    if (typeof e.id !== "string" || e.id === "") continue;
+    if (actions.some((action) => action.id === e.id)) continue;
+    if (typeof e.name !== "string" || e.name.trim() === "") continue;
+    if (typeof e.trigger !== "string" || e.trigger === "") continue;
+    const keys: LegoActionKey[] = [];
+    if (Array.isArray(e.keys)) {
+      for (const raw of e.keys) {
+        if (typeof raw !== "object" || raw === null) continue;
+        const k = raw as Record<string, unknown>;
+        if (typeof k.pose !== "string" || k.pose === "") continue;
+        if (
+          typeof k.seconds !== "number" ||
+          !Number.isFinite(k.seconds) ||
+          k.seconds < 0
+        ) {
+          continue;
+        }
+        keys.push({ pose: k.pose, seconds: k.seconds });
+      }
+    }
+    actions.push({
+      id: e.id,
+      name: e.name.trim(),
+      trigger: e.trigger,
+      loop: e.loop === true,
+      keys,
+    });
+  }
+  return actions.length > 0 ? actions : null;
 }
 
 /** The module ids a stored lock list holds: non-empty strings, once each. */
@@ -1711,6 +1781,10 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
     ...(() => {
       const poses = parsePoses(d.poses);
       return poses ? { poses } : {};
+    })(),
+    ...(() => {
+      const actions = parseActions(d.actions);
+      return actions ? { actions } : {};
     })(),
   };
   // A document saved before pieces were written in save order, or hand-edited,

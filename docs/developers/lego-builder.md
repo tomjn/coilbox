@@ -381,6 +381,16 @@ Undo and redo step through the pose you are holding first. When it has nothing l
 
 A pose stores only the pieces you changed. For each piece it holds a turn in radians about x, y and z, in the order the engine applies a script's turns, and a move in elmos. These are the numbers a `Turn` and a `Move` take. A pose that names a piece you have since deleted keeps the entry, skips it when shown, and says how many pieces are gone.
 
+### Actions
+
+An action is a motion made of saved poses in time. In the **Animation** panel, press the plus beside **Actions**. The timeline opens beside the view. Add poses as keys, give each the seconds to reach it from the key before, and pick the call-in that starts it: `Create`, `StartMoving`, `StopMoving`, `Activate`, `Deactivate`, `StartBuilding`, `StopBuilding`, a `Shot` call-in, or a function of its own name. The first key's time is from rest, or from the last key when the action loops.
+
+A looping action stops on the matching call-in (`StopMoving` for `StartMoving`, `Deactivate` for `Activate`, `StopBuilding` for `StartBuilding`) and the pieces return to rest. Any other trigger loops until it is started again. A function of its own gets a `<name>Stop` function. An action that does not loop plays once and holds its last pose.
+
+The script writes each action as a thread. Each `Turn` and `Move` has the speed that reaches the key on time, worked out per axis as the distance divided by the seconds, and a `Sleep` waits for the key. Times are rounded to whole frames. A key whose pose was deleted is skipped and its time goes to the next key. Pieces a pose names that the unit no longer has are skipped. Each action has a signal of its own, written as a string, so presets and actions together are not limited by the bits of one number.
+
+The preview plays an action by running this script, so what you see is what the game runs. Actions and presets that move the same piece fight, and the one called last wins. The panel and the problems list name those pieces. Blending them is a separate piece of work.
+
 ### Units that build
 
 The engine asks a builder and a factory different questions, so they get different presets.
