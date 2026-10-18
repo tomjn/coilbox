@@ -85,6 +85,8 @@ interface Props {
   atlas?: LegoAtlas;
   /** Absent on the parts browser, which has no unit to insert into. */
   onInsert?: (compound: LegoProject, now: boolean) => void;
+  /** Clicking a cell with no `onInsert`, such as the parts browser opening it. */
+  onSelect?: (compound: LegoProject) => void;
   /** The module waiting for a connector to be clicked, drawn as chosen. */
   placingId?: string;
   onDelete: (id: string) => void;
@@ -123,6 +125,7 @@ export function CompoundPicker({
   known = compounds,
   atlas,
   onInsert,
+  onSelect,
   placingId,
   onDelete,
   onRename,
@@ -437,14 +440,16 @@ export function CompoundPicker({
               {/* A button whether or not it inserts: pointing at a cell or
                       tabbing to it turns the compound, which is how its far side
                       gets seen. The parts browser has no unit to insert into, so
-                      there it only turns. Renaming covers its label with a field
+                      there it turns and selects. Renaming covers its label with a field
                       but leaves it in place, so hover and spin still work. */}
               <button
                 type="button"
                 onClick={
                   onInsert
                     ? (event) => onInsert(compound, event.altKey)
-                    : undefined
+                    : onSelect
+                      ? () => onSelect(compound)
+                      : undefined
                 }
                 onMouseEnter={() => setHovered(compound.id)}
                 onMouseLeave={() =>

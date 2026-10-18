@@ -7,7 +7,7 @@
  * a renderer that records the camera it is asked to draw with.
  */
 
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import { useRef } from "react";
 import * as THREE from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -115,5 +115,42 @@ describe("scrolling with the page", () => {
     expect(content.className).toContain("w-full");
     expect(content.className).toContain("min-w-0");
     expect(content.className).toContain("shrink-0");
+  });
+});
+
+describe("clicking a module", () => {
+  it("selects it where there is no unit to insert into", () => {
+    const onSelect = vi.fn();
+    const { getByTitle } = render(
+      <CompoundPicker
+        pack={pack}
+        compounds={[module("a"), module("b")]}
+        onDelete={noop}
+        onRename={noop}
+        onCopy={noop}
+        onSelect={onSelect}
+      />,
+    );
+    fireEvent.click(getByTitle("Module b, 0 pieces"));
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: "b" }));
+  });
+
+  it("inserts it, not selects it, where there is a unit", () => {
+    const onSelect = vi.fn();
+    const onInsert = vi.fn();
+    const { container } = render(
+      <CompoundPicker
+        pack={pack}
+        compounds={[module("a")]}
+        onDelete={noop}
+        onRename={noop}
+        onCopy={noop}
+        onInsert={onInsert}
+        onSelect={onSelect}
+      />,
+    );
+    fireEvent.click(container.querySelector("button[title^='Place']") as Element);
+    expect(onInsert).toHaveBeenCalledOnce();
+    expect(onSelect).not.toHaveBeenCalled();
   });
 });
