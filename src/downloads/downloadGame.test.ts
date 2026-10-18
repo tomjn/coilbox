@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   dlDownloadRaw,
@@ -35,8 +35,15 @@ vi.mock("@tauri-apps/api/core", () => ({
   },
 }));
 
+import {
+  installSettingsStorage,
+  memorySettingsStorage,
+  writeStoredSetting,
+} from "../lib/storedSetting";
 import type { DownloadProgress } from "./bindings";
 import { downloadGameAnySource } from "./downloadGame";
+import { downloadKey } from "./downloadHistory";
+import { GAME_PREFS_KEY } from "./gamePrefs";
 import { invalidateGithubReleases } from "./githubReleases";
 import { DEFAULT_RAPID_MASTERS } from "./rapidMasters";
 import type { SourceWalkError } from "./sourceWalk";
@@ -434,5 +441,71 @@ describe("downloadGameAnySource, rapid step", () => {
       expect(String(err)).toContain(master.name);
     }
     expect(dlDownloadRaw).toHaveBeenCalledTimes(DEFAULT_RAPID_MASTERS.length);
+  });
+});
+
+describe("downloadGameAnySource, a pinned source (issue #4580)", () => {
+  const MF = "Metal Factions v2.40";
+  const archives = {
+    archives: [
+      {
+        filename: "metalfactions-v2.40.sdz",
+        url: "https://example.com/v2.40",
+        size: 1,
+        tag: "v2.40",
+      },
+    ],
+  };
+  const fetchMf = () =>
+    downloadGameAnySource({
+      gameName: MF,
+      writePath: "/data",
+      onProgress: () => {},
+    });
+
+  beforeEach(() => {
+    installSettingsStorage(memorySettingsStorage());
+    dlGithubReleaseArchives.mockResolvedValue(archives);
+    dlDownloadFileRaw.mockResolvedValue({ message: "ok", path: "/x" });
+    dlDownloadRaw.mockResolvedValue({ message: "ok" });
+  });
+  afterEach(() => installSettingsStorage(null));
+
+  it("walks GitHub first when nothing is pinned", async () => {
+    await expect(fetchMf()).resolves.toBe("github release");
+    expect(dlDownloadRaw).not.toHaveBeenCalled();
+  });
+
+  it("walks the pinned rapid source ahead of GitHub", async () => {
+    writeStoredSetting(GAME_PREFS_KEY, {
+      [downloadKey("game", MF)]: {
+        pin: { source: "rapid", mirror: null },
+      },
+    });
+    const onAttempt = vi.fn();
+    await expect(
+      downloadGameAnySource({
+        gameName: MF,
+        writePath: "/data",
+        onProgress: () => {},
+        onAttempt,
+      }),
+    ).resolves.toBe("rapid");
+    expect(dlGithubReleaseArchives).not.toHaveBeenCalled();
+    expect(dlDownloadFileRaw).not.toHaveBeenCalled();
+    expect(onAttempt.mock.calls[0][0].source).toBe("rapid");
+  });
+
+  it("falls back to the rest of the order when the pinned source fails", async () => {
+    writeStoredSetting(GAME_PREFS_KEY, {
+      [downloadKey("game", MF)]: {
+        pin: { source: "rapid", mirror: null },
+      },
+    });
+    dlDownloadRaw.mockRejectedValue(new Error("no source could provide"));
+    await expect(fetchMf()).resolves.toBe("github release");
+    expect(dlDownloadRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      dlGithubReleaseArchives.mock.invocationCallOrder[0],
+    );
   });
 });

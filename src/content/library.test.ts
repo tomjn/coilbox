@@ -417,6 +417,15 @@ describe("buildLibrary update state", () => {
     expect(sf?.state).toBe("installed");
     expect(sf?.update).toBeUndefined();
   });
+
+  it("keeps the update but shows no update state once the player turns updates off (issue #4580)", () => {
+    const sf = buildLibrary({
+      ...input,
+      updatesOff: new Set(["game:splinterfaction"]),
+    }).games.find((g) => g.id === "sf");
+    expect(sf?.state).toBe("installed");
+    expect(sf?.update?.tag).toBe("v0.1.87");
+  });
 });
 
 describe("buildLibrary installed files", () => {

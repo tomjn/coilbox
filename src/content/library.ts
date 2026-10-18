@@ -141,6 +141,8 @@ export interface LibraryInput {
   history?: DownloadHistory;
   /** What each rapid tag points at now, for the tags the history names. */
   rapidVersions?: Readonly<Record<string, RapidTagState>>;
+  /** Download keys of games whose updates the player turned off (issue #4580). */
+  updatesOff?: ReadonlySet<string>;
 }
 
 export interface Library {
@@ -393,11 +395,12 @@ function buildGames(
       }
     }
     if (!r.title) r.title = r.installed[0]?.name ?? r.id;
+    const updatesOff = [...keys].some((k) => input.updatesOff?.has(k));
     r.state = stateOf(
       r.installed.length > 0 || onDisk.has(r.id),
       !!r.hub || r.sources.length > 0,
       r.download,
-      !!r.update || !!r.rapidUpdate,
+      !updatesOff && (!!r.update || !!r.rapidUpdate),
       r.sources.length === 0 && r.hub?.downloads.length === 0,
     );
   }

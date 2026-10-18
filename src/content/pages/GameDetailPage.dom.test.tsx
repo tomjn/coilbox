@@ -56,6 +56,27 @@ vi.mock("@/blueprint/pages/components/GameEquivalents", () => ({
 }));
 
 vi.mock("../branding", () => ({ useBrandingEntry: () => null }));
+// The library facts and the Versions and Sources tabs (#4580) have tests of
+// their own. Here they only need to stay out of the way.
+vi.mock("../useGameLibrary", () => ({
+  useGameLibrary: () => ({
+    record: undefined,
+    versions: { rows: [], snapshots: [] },
+    indexAge: null,
+    rapidLoading: false,
+    rapidErrors: [],
+    sources: [],
+    installedFrom: null,
+    prefKey: "game:test",
+    updatesOn: true,
+    writePath: "/data",
+    statusOf: () => null,
+    install: () => {},
+    update: async () => {},
+    updating: false,
+    updateFailure: null,
+  }),
+}));
 vi.mock("@/factions/logos", () => ({ useFactionLogos: () => ({}) }));
 vi.mock("@/profile/hidden", () => ({ isProfileHidden: () => true }));
 vi.mock("../usePlayGame", () => ({ usePlayGame: () => () => {} }));
