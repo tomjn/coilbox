@@ -800,6 +800,10 @@ mod tests {
             3,
             "7a0f8a84911b5cac4f21313e9a1490f9e19299c0a71e4e2d0f264f87a656d3cf",
         ),
+        (
+            4,
+            "fc84ec81f4a375d31b5f9797580e141b6da9ba60cfcf98871ed38fde6da5f693",
+        ),
     ];
 
     #[test]
