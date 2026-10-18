@@ -33,8 +33,9 @@
  */
 
 import type { TextHome } from "@/workshop/unitText";
+import { bankingKeys } from "./banking";
 import { effectiveCollisionVolume } from "./collisionVolume";
-import { DEFAULT_BUILDER, type LegoProject } from "./model";
+import { DEFAULT_BUILDER, type LegoMovement, type LegoProject } from "./model";
 import { movesInGame } from "./movement";
 import type { UnitBounds } from "./s3oBuild";
 import type { WorthTotals } from "./worth";
@@ -144,6 +145,22 @@ const DEFAULT_BUILD_COST_METAL = DEFAULT_BUILD_TIME;
  * Annihilation write, and likewise only when set, so the engine's own defaults
  * (0.5, and a brake rate equal to the acceleration) apply otherwise.
  */
+/**
+ * The banking keys a flier states, each only when set so the engine's own
+ * default applies otherwise. A gunship's move type reads `bankingAllowed` and a
+ * plane's the other five, so a key the style does not read is not written
+ * (`banking.ts`). A key is written under the spelling the engine reads.
+ */
+function bankingFields(movement: LegoMovement): Record<string, unknown> {
+  if (!movement.flies) return {};
+  const out: Record<string, unknown> = {};
+  for (const { key } of bankingKeys(movement.flies)) {
+    const value = movement[key];
+    if (value !== undefined) out[key] = value;
+  }
+  return out;
+}
+
 function movementFields(project: LegoProject): Record<string, unknown> {
   const movement = project.movement;
   if (!movesInGame(movement)) {
@@ -161,6 +178,7 @@ function movementFields(project: LegoProject): Record<string, unknown> {
         ...(typeof movement.cruiseAltitude === "number"
           ? { cruisealtitude: movement.cruiseAltitude }
           : {}),
+        ...bankingFields(movement),
       }
     : { movementclass: movement.moveClass };
   return {
@@ -401,6 +419,12 @@ export const DERIVED_FIELDS: readonly string[] = [
   "canfly",
   "hoverattack",
   "cruisealtitude",
+  "bankingAllowed",
+  "maxBank",
+  "maxPitch",
+  "maxAileron",
+  "maxElevator",
+  "maxRudder",
   "speed",
   "turnrate",
   "rSpeed",

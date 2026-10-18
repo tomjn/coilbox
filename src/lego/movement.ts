@@ -30,6 +30,7 @@ import {
   unitSpeedOf,
   unitTurnRateOf,
 } from "@/workshop/moveClasses";
+import { type BankingValues, bankingKeys, withEngineBanking } from "./banking";
 import type { FlightStyle, LegoMovement, LegoProject } from "./model";
 import { type Problem, problem } from "./problems";
 
@@ -394,7 +395,49 @@ export function suggestFlight(
     movement.brakeRate = value;
     movement.brakeRateFrom = from;
   });
-  return movement;
+  for (const { key } of bankingKeys(style)) {
+    if (key === "bankingAllowed") {
+      setBankingAllowed(movement, pools, gameName);
+      continue;
+    }
+    set(
+      (def) => {
+        const value = Number(field(def, key.toLowerCase()));
+        return field(def, key.toLowerCase()) !== undefined &&
+          Number.isFinite(value)
+          ? value
+          : undefined;
+      },
+      significant,
+      (value, from) => {
+        movement[key] = value;
+        movement[`${key}From`] = from;
+      },
+    );
+  }
+  return withEngineBanking(movement);
+}
+
+/**
+ * `bankingAllowed` is the value most of the game's gunships state, the engine's
+ * true on a tie, and absent when none states it.
+ */
+function setBankingAllowed(
+  movement: LegoMovement,
+  pools: { units: Record<string, unknown>[]; label: string }[],
+  gameName: string,
+) {
+  for (const pool of pools) {
+    const stated = pool.units
+      .map((def) => field(def, "bankingallowed"))
+      .filter((value) => value !== undefined)
+      .map(flag);
+    if (stated.length === 0) continue;
+    const yes = stated.filter(Boolean).length;
+    movement.bankingAllowed = yes * 2 >= stated.length;
+    movement.bankingAllowedFrom = `Majority of ${stated.length} ${gameName} ${pool.label}`;
+    return;
+  }
 }
 
 /** The kinds in words, for the picker and for where a number came from. */

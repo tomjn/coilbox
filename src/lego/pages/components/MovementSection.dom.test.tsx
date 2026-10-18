@@ -365,6 +365,65 @@ describe("MovementSection", () => {
     expect(cleared).not.toHaveProperty("accelerationFrom");
   });
 
+  it("shows a plane's banking keys with the engine default beside an unset one", () => {
+    const onMovementChange = vi.fn();
+    render(
+      <MovementSection
+        project={project("", {
+          movement: {
+            moveClass: "",
+            flies: "plane",
+            speed: 280,
+            maxBank: 0.6,
+            maxBankFrom: "Median of 2 SF planes",
+          },
+        })}
+        bounds={BOUNDS}
+        onMovementChange={onMovementChange}
+      />,
+    );
+    expect(
+      screen.getByText(/engine banks aircraft, not the script/),
+    ).toBeTruthy();
+    expect(screen.getByText("Median of 2 SF planes")).toBeTruthy();
+    expect(screen.getByText("Not set, the engine uses 0.45")).toBeTruthy();
+    expect(screen.queryByText("Banking allowed")).toBeNull();
+    fireEvent.change(screen.getByLabelText(/^Max pitch/), {
+      target: { value: "0.3" },
+    });
+    expect(onMovementChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ maxPitch: 0.3, maxBank: 0.6 }),
+    );
+  });
+
+  it("shows a gunship only bankingAllowed", () => {
+    render(
+      <MovementSection
+        project={project("", {
+          movement: { moveClass: "", flies: "gunship", speed: 150 },
+        })}
+        bounds={BOUNDS}
+        onMovementChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Banking allowed")).toBeTruthy();
+    expect(screen.queryByText("Max bank")).toBeNull();
+  });
+
+  it("shows a ground unit no banking", () => {
+    render(
+      <MovementSection
+        project={project("wheel", {
+          movement: { moveClass: "WHEELEDTANK2", speed: 120 },
+        })}
+        bounds={BOUNDS}
+        onMovementChange={vi.fn()}
+      />,
+    );
+    expect(screen.queryByText(/banks aircraft/)).toBeNull();
+    expect(screen.queryByText("Banking allowed")).toBeNull();
+  });
+
   it("says when the classes come off the unit table instead", () => {
     haveDefs([]);
     render(
