@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
 import type { GameItem } from "@/content/bindings";
 import { useUnitsyncScan } from "@/content/config";
+import { formatDateTime } from "@/lib/format";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { usePreferredTarget } from "@/play/config";
 import {
@@ -136,7 +137,7 @@ export function GamePicturesControl({
       )}
       {swept !== null && !running && (
         <p className="text-sm text-muted-foreground">
-          Last run {new Date(swept).toLocaleString()}.
+          Last run {formatDateTime(new Date(swept))}.
         </p>
       )}
       {report && (

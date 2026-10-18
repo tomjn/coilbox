@@ -16,6 +16,7 @@ import { History, RotateCcw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Field } from "@/components/Field";
 import { Textarea } from "@/components/ui/textarea";
+import { formatDateTime } from "@/lib/format";
 import type { Checkpoint } from "../../checkpoints";
 import { describeEdits } from "../../project";
 
@@ -198,7 +199,7 @@ function CheckpointRow({
               </p>
             )}
             <p className="text-xs text-muted-foreground">
-              {new Date(checkpoint.createdAt).toLocaleString()} ·{" "}
+              {formatDateTime(new Date(checkpoint.createdAt))} ·{" "}
               {describeEdits(checkpoint.edits)}
             </p>
           </button>

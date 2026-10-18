@@ -1,6 +1,7 @@
 import { Input } from "@picoframe/frame";
 import { Hash, MessageSquare, Search, Swords, User } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { formatDateTime } from "@/lib/format";
 import {
   type ChatLogAccount,
   type ChatLogThread,
@@ -21,7 +22,7 @@ interface Selection {
 
 function fmtTime(ms: number): string {
   if (!ms) return "";
-  return new Date(ms).toLocaleString();
+  return formatDateTime(new Date(ms));
 }
 
 /**

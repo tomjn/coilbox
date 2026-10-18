@@ -1,5 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { useState } from "react";
+import { formatDateTime } from "@/lib/format";
 import { usePreferredTarget } from "@/play/config";
 import {
   lastMapSweptAt,
@@ -115,7 +116,7 @@ export function MapPicturesControl({
       )}
       {swept !== null && !running && (
         <p className="text-sm text-muted-foreground">
-          Last run {new Date(swept).toLocaleString()}.
+          Last run {formatDateTime(new Date(swept))}.
         </p>
       )}
       {report && (
