@@ -1,11 +1,15 @@
 import { Button, useSetting } from "@picoframe/frame";
 import { Loader2, Swords } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { StartingUnits } from "@/campaign/pages/components/StartingUnits";
+import { carryUnits, discardUnits } from "@/campaign/units";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { FactionLogo } from "@/factions/FactionLogo";
 import { useFactionLogos } from "@/factions/logos";
+import { withBuiltUnits } from "@/lego/buildList";
+import type { LegoProject } from "@/lego/model";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import {
   hidesGeneratedStyles,
@@ -235,9 +239,26 @@ export function RunSetupForm({
 
   const side = sides.find((s) => s.name === sideName);
 
+  // Units from the unit builder the run begins with (issue #4518). They join
+  // the build graph on their builders' lists, as the mutator puts them there,
+  // so the rewards can unlock them like any other unit.
+  const [units, setUnits] = useState<LegoProject[]>([]);
   const build: GenBuildGraph | undefined = useMemo(
-    () => (dataset ? buildGraphFor(side?.startUnit, dataset.units) : undefined),
-    [dataset, side?.startUnit],
+    () =>
+      dataset
+        ? buildGraphFor(
+            side?.startUnit,
+            withBuiltUnits(
+              dataset.units,
+              units.map((u) => ({
+                unitName: u.unitName,
+                builtBy: u.builtBy ?? [],
+                fullName: u.name,
+              })),
+            ),
+          )
+        : undefined,
+    [dataset, side?.startUnit, units],
   );
 
   // Said before the run starts, so the player knows when no unit limit applies.
@@ -318,16 +339,25 @@ export function RunSetupForm({
     };
     const id = `run-${crypto.randomUUID()}`;
     try {
+      let run: ReturnType<typeof generateStyledRun>;
       if (handmadeMap) {
         // Read now, so a map changed since it was listed is the one played.
         const loaded = await loadHandmadeRunMap(handmadeMap.id);
         if (!loaded.ok) throw new Error(loaded.message);
+        run = generateMapRun({ ...opts, skin: "theatre", ...loaded.source });
+      } else {
+        run = generateStyledRun(opts);
+      }
+      const ref = { scope: "warpath", id } as const;
+      const carried = units.length > 0 ? await carryUnits(ref, units) : [];
+      try {
         await saveRun(
           id,
-          generateMapRun({ ...opts, skin: "theatre", ...loaded.source }),
+          carried.length > 0 ? { ...run, units: carried } : run,
         );
-      } else {
-        await saveRun(id, generateStyledRun(opts));
+      } catch (e) {
+        if (carried.length > 0) await discardUnits(ref).catch(() => {});
+        throw e;
       }
     } catch (e) {
       setStartError(
@@ -515,6 +545,16 @@ export function RunSetupForm({
           </Field>
         )}
       </div>
+
+      <StartingUnits
+        label={
+          <span className="text-xs font-medium text-muted-foreground">
+            Units from the builder
+          </span>
+        }
+        picked={units}
+        onChange={setUnits}
+      />
 
       {handmadeError && (
         <ErrorBanner
