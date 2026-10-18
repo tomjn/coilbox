@@ -9,6 +9,7 @@ import {
   YAxis,
 } from "recharts";
 import { OptionSelect } from "@/components/OptionSelect";
+import { formatDate } from "@/lib/format";
 import type { Metric, MetricRatio, StatRecord } from "../../bindings";
 import { formatRate } from "../../matchStats";
 import {
@@ -38,7 +39,7 @@ import { SectionHelp } from "./SectionHelp";
 const axisTick = { fontSize: 11, fill: "currentColor", opacity: 0.65 };
 
 const shortDate = (ms: number) =>
-  new Date(ms).toLocaleDateString(undefined, { dateStyle: "medium" });
+  formatDate(new Date(ms), { dateStyle: "medium" });
 
 function games(n: number): string {
   return `${n} ${n === 1 ? "game" : "games"}`;

@@ -8,12 +8,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatDate } from "@/lib/format";
 import type { DownloadRecord } from "../../../downloads/downloadHistory";
 import type { SourceStep } from "../../../downloads/sourceWalk";
 import type { GameSourceRow } from "../../gameSourceRows";
 
 const dateOf = (iso: string) =>
-  new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" });
+  formatDate(new Date(iso), { dateStyle: "medium" });
 
 /** "2 min 10 s" for a download that took `ms`. */
 export function tookLabel(ms: number): string {

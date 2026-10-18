@@ -1,5 +1,6 @@
 import { CheckCircle2, Lock, Trophy } from "lucide-react";
 import { useMemo } from "react";
+import { formatDate } from "@/lib/format";
 import {
   type AchievementCategory,
   type AchievementResult,
@@ -21,7 +22,7 @@ const CATEGORY_ORDER: AchievementCategory[] = [
 
 function earnedAt(ms: number | undefined): string | null {
   if (!ms) return null;
-  return new Date(ms).toLocaleDateString(undefined, { dateStyle: "medium" });
+  return formatDate(new Date(ms), { dateStyle: "medium" });
 }
 
 /**

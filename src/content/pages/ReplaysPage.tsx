@@ -24,7 +24,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { formatBytes, formatDuration } from "@/lib/format";
+import { formatBytes, formatDateTime, formatDuration } from "@/lib/format";
 import { mostRecentOpen } from "@/lib/recency";
 import { isProfileHidden } from "../../profile/hidden";
 import type { StatRecord } from "../bindings";
@@ -125,7 +125,7 @@ const ORIGIN_BADGE: Record<
 /** Played date, e.g. `27 Apr 2026, 20:14`. */
 function playedAt(ms: number): string {
   if (!ms) return "";
-  return new Date(ms).toLocaleString(undefined, {
+  return formatDateTime(new Date(ms), {
     dateStyle: "medium",
     timeStyle: "short",
   });

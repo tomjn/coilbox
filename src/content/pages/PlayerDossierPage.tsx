@@ -13,6 +13,7 @@ import {
 import { useMemo } from "react";
 import { Link, useParams } from "react-router";
 import { Badge } from "@/components/ui/badge";
+import { formatDate } from "@/lib/format";
 import { isProfileHidden } from "../../profile/hidden";
 import {
   useContentState,
@@ -37,7 +38,7 @@ import { EmptyState, ErrorBanner, SkeletonList } from "./components/states";
 
 function playedAt(ms: number): string {
   if (!ms) return "never";
-  return new Date(ms).toLocaleDateString(undefined, { dateStyle: "medium" });
+  return formatDate(new Date(ms), { dateStyle: "medium" });
 }
 
 function outcomeLabel(won: boolean | undefined): string {

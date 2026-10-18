@@ -20,7 +20,12 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Progress } from "@/components/ui/progress";
-import { formatBytes, formatDuration, formatNumber } from "@/lib/format";
+import {
+  formatBytes,
+  formatDateTime,
+  formatDuration,
+  formatNumber,
+} from "@/lib/format";
 import {
   contentAnalysisCheck,
   type DemoInfo,
@@ -78,7 +83,7 @@ function errMessage(e: unknown): string {
 }
 
 function when(ms: number): string {
-  return new Date(ms).toLocaleString(undefined, {
+  return formatDateTime(new Date(ms), {
     dateStyle: "medium",
     timeStyle: "short",
   });

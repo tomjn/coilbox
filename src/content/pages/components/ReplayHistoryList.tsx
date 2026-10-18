@@ -1,5 +1,6 @@
 import { History } from "lucide-react";
 import { Link } from "react-router";
+import { formatDateTime } from "@/lib/format";
 import { useReplays } from "../../config";
 import type { ReplayProvenance } from "../../replayUserState";
 import { useReplayUserState } from "../../replayUserState";
@@ -7,7 +8,7 @@ import { useReplayUserState } from "../../replayUserState";
 /** Played date, short form for a compact history row. */
 function playedAt(ms: number): string {
   if (!ms) return "";
-  return new Date(ms).toLocaleString(undefined, {
+  return formatDateTime(new Date(ms), {
     dateStyle: "medium",
     timeStyle: "short",
   });
