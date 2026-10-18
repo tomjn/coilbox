@@ -1,3 +1,4 @@
+import { getLocale } from "@/i18n";
 import type { ChatMsg, LobbyState, User } from "../bindings";
 
 /** Which conversation a chat surface is bound to. A `battle` is backed by its
@@ -70,7 +71,8 @@ export function backfilledCounts(state: LobbyState): Record<string, number> {
 }
 
 /** Names compared the way a reader would sort them, ignoring case. */
-const byName = new Intl.Collator(undefined, { sensitivity: "base" });
+const nameCollator = () =>
+  new Intl.Collator(getLocale(), { sensitivity: "base" });
 
 /**
  * Resolve members of a conversation from the snapshot (empty for DMs), sorted
@@ -85,13 +87,14 @@ export function conversationMembers(
   if (channel == null) return [];
   const ch = state.channels[channel];
   if (!ch) return [];
+  const collate = nameCollator();
   return ch.users
     .map((u) => state.users[u])
     .filter((u): u is User => Boolean(u))
     .sort(
       (a, b) =>
         Number(a.status.ingame) - Number(b.status.ingame) ||
-        byName.compare(a.name, b.name),
+        collate.compare(a.name, b.name),
     );
 }
 
