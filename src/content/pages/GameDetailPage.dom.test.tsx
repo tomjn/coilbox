@@ -17,11 +17,22 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ConfigOption, UnitDatasetEntry } from "../bindings";
+import type { Finding } from "../compatReport";
 
+const drawerOpen = vi.fn();
 vi.mock("@picoframe/frame", async () => ({
   ...(await vi.importActual<Record<string, unknown>>("@picoframe/frame")),
   useSetting: () => ["", () => {}],
-  useDrawer: () => ({ open: () => {}, close: () => {}, isOpen: false }),
+  useDrawer: () => ({ open: drawerOpen, close: () => {}, isOpen: false }),
+}));
+
+let mockFindings: Finding[] = [];
+const scrolledTo: string[] = [];
+vi.mock("../useCompatReport", () => ({
+  useCompatReport: () => ({ findings: mockFindings, archivePath: undefined }),
+}));
+vi.mock("./components/Convert3doDrawer", () => ({
+  Convert3doDrawer: () => null,
 }));
 
 // The drawer never opens in this test (no button is clicked), so its own
@@ -108,7 +119,12 @@ vi.mock("../config", () => ({
 
 const { default: GameDetailPage } = await import("./GameDetailPage");
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  mockFindings = [];
+  drawerOpen.mockClear();
+  scrolledTo.length = 0;
+});
 
 function unit(name: string, buildOptions: string[] = []): UnitDatasetEntry {
   return { name, buildOptions } as UnitDatasetEntry;
@@ -120,12 +136,14 @@ function renderPage({
   datasetStatus,
   errors = [],
   options = [],
+  search = "",
 }: {
   sides: { name: string; startUnit?: string }[];
   units: UnitDatasetEntry[];
   datasetStatus: "ready" | "unsyncable" | "error" | "loading";
   errors?: string[];
   options?: ConfigOption[];
+  search?: string;
 }) {
   mockGameInfo = {
     sides,
@@ -139,7 +157,9 @@ function renderPage({
   mockDatasetStatus = datasetStatus;
   return render(
     <MemoryRouter
-      initialEntries={[`/library/games/${encodeURIComponent(GAME_NAME)}`]}
+      initialEntries={[
+        `/library/games/${encodeURIComponent(GAME_NAME)}${search}`,
+      ]}
     >
       <Routes>
         <Route path="/library/games/:name" element={<GameDetailPage />} />
@@ -247,5 +267,77 @@ describe("GameDetailPage's Game options section", () => {
     expect(
       await screen.findByText("Allies are set before the game starts."),
     ).toBeTruthy();
+  });
+});
+
+describe("GameDetailPage's Compatibility section", () => {
+  const FINDINGS: Finding[] = [
+    {
+      kind: "models-3do",
+      label: ".3do models",
+      severity: "problem",
+      count: 765,
+    },
+    {
+      kind: "lua-api",
+      label: "Lua calls to removed or changed APIs",
+      severity: "problem",
+      count: 1,
+      details: [
+        {
+          heading: "LuaUI/modfonts.lua",
+          lines: ["3:9 Spring.MakeFont, removed in 95.0"],
+        },
+      ],
+    },
+  ];
+
+  it("is absent when the report finds nothing", async () => {
+    renderPage({ sides: [], units: [], datasetStatus: "ready" });
+    await screen.findByText("Primary archive");
+    expect(screen.queryByText("Compatibility")).toBeNull();
+  });
+
+  it("lists each finding with its count and expands the Lua hits", async () => {
+    mockFindings = FINDINGS;
+    renderPage({ sides: [], units: [], datasetStatus: "ready" });
+    expect(await screen.findByText("Compatibility")).toBeTruthy();
+    expect(screen.getByText(".3do models")).toBeTruthy();
+    expect(screen.getByText("765")).toBeTruthy();
+    expect(screen.queryByText("LuaUI/modfonts.lua")).toBeNull();
+    fireEvent.click(screen.getByText("Lua calls to removed or changed APIs"));
+    expect(await screen.findByText("LuaUI/modfonts.lua")).toBeTruthy();
+    expect(
+      screen.getByText("3:9 Spring.MakeFont, removed in 95.0"),
+    ).toBeTruthy();
+  });
+
+  it("opens the model converter from the .3do row", async () => {
+    mockFindings = FINDINGS;
+    renderPage({ sides: [], units: [], datasetStatus: "ready" });
+    fireEvent.click(await screen.findByText("Convert models"));
+    expect(drawerOpen).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Convert .3do models" }),
+    );
+  });
+
+  it("scrolls to the section when a link asks for it", async () => {
+    mockFindings = FINDINGS;
+    const original = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) {
+      scrolledTo.push(this.id);
+    };
+    try {
+      renderPage({
+        sides: [],
+        units: [],
+        datasetStatus: "ready",
+        search: "?section=compat",
+      });
+      await screen.findByText("Compatibility");
+      expect(scrolledTo).toEqual(["compat"]);
+    } finally {
+      HTMLElement.prototype.scrollIntoView = original;
+    }
   });
 });

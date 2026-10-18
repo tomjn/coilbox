@@ -1,11 +1,18 @@
-import { Button, buttonVariants, cn, useSetting } from "@picoframe/frame";
-import { FolderOpen, Loader2, Trophy } from "lucide-react";
-import { useMemo } from "react";
-import { Link, useNavigate, useParams } from "react-router";
+import {
+  Button,
+  buttonVariants,
+  cn,
+  useDrawer,
+  useSetting,
+} from "@picoframe/frame";
+import { Boxes, FolderOpen, Loader2, Trophy } from "lucide-react";
+import { useEffect, useMemo } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { GameEquivalents } from "@/blueprint/pages/components/GameEquivalents";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFactionLogos } from "@/factions/logos";
+import { nextDrawerKey } from "@/general/drawerKey";
 import { generatedGameNote } from "@/lib/generatedGames";
 import { isProfileHidden } from "@/profile/hidden";
 import { type Archive, contentOpenPath } from "../bindings";
@@ -24,10 +31,13 @@ import { isDeletableArchive, isSdd } from "../format";
 import { missingDependencyNotes } from "../gameDependencies";
 import { refightFilenames, useReplayUserState } from "../replayUserState";
 import { allPlayers, factionRecordsFor, guessPrimaryPlayer } from "../stats";
+import { useCompatReport } from "../useCompatReport";
 import { usePlayGame } from "../usePlayGame";
 import { ArchiveRow } from "./components/ArchiveRow";
 import { BrandingLinks } from "./components/BrandingLinks";
 import { BrandingScreenshots } from "./components/BrandingScreenshots";
+import { FindingList } from "./components/CompatFindings";
+import { Convert3doDrawer } from "./components/Convert3doDrawer";
 import { DeleteArchiveButton } from "./components/DeleteArchiveButton";
 import {
   FactionBuildList,
@@ -104,6 +114,22 @@ export default function GameDetailPage() {
     gameInfo?.sides ?? [],
     dataset?.units ?? [],
   );
+  const compat = useCompatReport(
+    selected?.enginePath,
+    selected?.rootPath,
+    game?.primaryArchive.name,
+  );
+  const drawer = useDrawer();
+  // The archive page's Convert models link lands here (issue #4554).
+  const [params] = useSearchParams();
+  const wantsCompat = params.get("section") === "compat";
+  const hasFindings = compat.findings.length > 0;
+  useEffect(() => {
+    if (wantsCompat && hasFindings)
+      document
+        .getElementById("compat")
+        ?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+  }, [wantsCompat, hasFindings]);
   const brand = useBrandingEntry(game);
   const factionNames = useMemo(
     () => gameInfo?.sides.map((s) => s.name) ?? [],
@@ -168,6 +194,29 @@ export default function GameDetailPage() {
   // the one place they are shown. Saying what wrote it is what keeps a folder in
   // `games/` that appears in no picker from reading as a bug (issue #810).
   const generated = generatedGameNote(game.primaryArchive.name);
+
+  const models = compat.findings.find((f) => f.kind === "models-3do")?.count;
+  const gameDir = isSdd(game.primaryArchive)
+    ? (compat.archivePath ?? game.primaryArchive.path ?? null)
+    : null;
+  const openConvert = () => {
+    if (!selected?.enginePath || !selected?.rootPath || !models) return;
+    drawer.open({
+      title: "Convert .3do models",
+      description: `Turn ${game.primaryArchive.name}'s ${models} legacy models into .s3o, one shared texture per folder.`,
+      width: "44rem",
+      content: (
+        <Convert3doDrawer
+          key={nextDrawerKey()}
+          enginePath={selected.enginePath}
+          dataDir={selected.rootPath}
+          archive={game.primaryArchive.name}
+          models={models}
+          gameDir={gameDir}
+        />
+      ),
+    });
+  };
 
   const openFolder = (a: Archive) => {
     if (!a.path) return;
@@ -250,6 +299,27 @@ export default function GameDetailPage() {
       {game.warnings?.length ? (
         <WarningBanner warnings={game.warnings} noun="game" />
       ) : null}
+
+      {hasFindings && (
+        <section id="compat" className="flex scroll-mt-4 flex-col gap-2">
+          <h2 className="text-sm font-medium">Compatibility</h2>
+          <FindingList
+            findings={compat.findings}
+            actions={{
+              "models-3do": selected && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={openConvert}
+                >
+                  <Boxes className="size-4" /> Convert models
+                </Button>
+              ),
+            }}
+          />
+        </section>
+      )}
 
       {(gameInfoLoading ||
         (gameInfo &&
