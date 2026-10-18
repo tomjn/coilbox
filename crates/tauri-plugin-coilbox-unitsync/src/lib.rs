@@ -2124,6 +2124,27 @@ pub fn game_short_name_blocking(
     short_name_in_scan(&out, game)
 }
 
+/// [`game_short_name_blocking`], with `None` for a game that declares no short
+/// name. The compat mutator copies it into its own modinfo (issue #4620).
+pub fn game_declared_short_name_blocking(
+    engine_path: &str,
+    data_dir: &str,
+    game: &str,
+) -> Result<Option<String>, String> {
+    let (bin, libpath, engine_dir) = prepare(engine_path)?;
+    let args = build_args(&libpath.to_string_lossy(), data_dir);
+    let envs = loader_envs(&engine_dir, data_dir);
+    let out = run_worker_blocking(
+        bin,
+        args,
+        envs,
+        SCAN_TIMEOUT,
+        "game short name".into(),
+        None,
+    )?;
+    declared_short_name_in_scan(&out, game)
+}
+
 /// The scan of `data_dir`, as the JSON the worker prints and `unitsync_scan`
 /// answers with. Blocking, and not a command of its own: the compat plugin's
 /// tests read it to check the mutator they wrote is listed (issue #4556).
@@ -2299,19 +2320,25 @@ fn text_in_archive_output(out: &str, archive: &str, file: &str) -> Result<Option
     ))
 }
 
-/// The `shortname` in the scan's entry for the game named `game`.
-fn short_name_in_scan(scan: &str, game: &str) -> Result<String, String> {
+/// The `shortname` in the scan's entry for the game named `game`, or `None`
+/// when the game declares none.
+fn declared_short_name_in_scan(scan: &str, game: &str) -> Result<Option<String>, String> {
     let scan: serde_json::Value =
         serde_json::from_str(scan).map_err(|e| format!("the scan did not read as JSON: {e}"))?;
     let entry = scan["games"]
         .as_array()
         .and_then(|games| games.iter().find(|g| g["name"].as_str() == Some(game)))
         .ok_or_else(|| format!("no installed game is named {game:?}"))?;
-    entry["info"]["shortname"]
+    Ok(entry["info"]["shortname"]
         .as_str()
         .map(str::trim)
         .filter(|name| !name.is_empty())
-        .map(str::to_string)
+        .map(str::to_string))
+}
+
+/// The `shortname` in the scan's entry for the game named `game`.
+fn short_name_in_scan(scan: &str, game: &str) -> Result<String, String> {
+    declared_short_name_in_scan(scan, game)?
         .ok_or_else(|| format!("the game {game:?} declares no short name in its modinfo"))
 }
 
@@ -2619,6 +2646,16 @@ mod tests {
         let none = short_name_in_scan(SCAN, "No Short 1").unwrap_err();
         assert!(none.contains("no short name"), "{none}");
         assert!(short_name_in_scan("not json", "x").is_err());
+    }
+
+    #[test]
+    fn a_game_that_declares_no_short_name_has_none_and_not_an_error() {
+        assert_eq!(declared_short_name_in_scan(SCAN, "No Short 1"), Ok(None));
+        assert_eq!(
+            declared_short_name_in_scan(SCAN, "Beyond All Reason test-1"),
+            Ok(Some("BYAR".to_string()))
+        );
+        assert!(declared_short_name_in_scan(SCAN, "Absent 1").is_err());
     }
 
     #[test]
