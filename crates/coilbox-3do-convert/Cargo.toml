@@ -10,9 +10,10 @@ license = "MIT"
 # `coilbox-s3o` carries the writer this hands its output to.
 coilbox-3do = { path = "../coilbox-3do" }
 coilbox-s3o = { path = "../coilbox-s3o" }
-# The sheet is drawn pixel by pixel. No format features: a caller decodes its own
-# tiles and encodes the finished sheet, so nothing here reads or writes a file.
-image = { workspace = true }
+# The sheet is drawn pixel by pixel. A caller decodes its own tiles, so nothing
+# here reads or writes a file. PNG only to encode the finished sheet, whose bytes
+# a compat manifest's pin on this crate covers (issue #4557).
+image = { workspace = true, features = ["png"] }
 # The sidecar that records where every tile landed.
 serde = { workspace = true }
 serde_json = { workspace = true }

@@ -34,6 +34,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 import { downloadMapAnySource } from "./downloadMap";
 import { indexTick, invalidateMirrorIndexes } from "./mirrorIndex";
+import { SourceWalkError } from "./sourceWalk";
 
 const run = (mapName: string) =>
   downloadMapAnySource({
@@ -162,6 +163,196 @@ describe("downloadMapAnySource, attempts reported (issue #4576)", () => {
         outcome: "failed",
         failure: "no source could provide",
       }),
+    );
+  });
+});
+
+describe("downloadMapAnySource, every springfiles mirror (issue #4577)", () => {
+  const FILE = "Supreme_Isthmus_v2.sd7";
+  const MIRROR_1 = `https://mirror1.example.com/${FILE}`;
+  const MIRROR_2 = `https://mirror2.example.com/${FILE}`;
+  const listOn = (mirrors: string[]) =>
+    dlSpringfilesList.mockResolvedValue({
+      results: [
+        {
+          springname: "Supreme Isthmus v2",
+          name: "Supreme Isthmus v2",
+          filename: FILE,
+          category: "map",
+          size: 1,
+          mirrors,
+          mapimages: [],
+          metadata: { author: "", width: 0, height: 0 },
+        },
+      ],
+    });
+  const notFound = (host: string) =>
+    new Error(
+      `HTTP status client error (404 Not Found) for url (https://${host}/${FILE})`,
+    );
+  const go = (extra: object = {}) => {
+    const onAttempt = vi.fn();
+    const result = downloadMapAnySource({
+      mapName: "Supreme Isthmus v2",
+      writePath: "/data",
+      onProgress: () => {},
+      onAttempt,
+      ...extra,
+    });
+    return { result, onAttempt };
+  };
+
+  it("fetches the second mirror when the first fails, and records both attempts", async () => {
+    listOn([MIRROR_1, MIRROR_2]);
+    dlDownloadFileRaw
+      .mockRejectedValueOnce(notFound("mirror1.example.com"))
+      .mockResolvedValueOnce({ message: "ok", path: "" });
+
+    const { result, onAttempt } = go();
+
+    await expect(result).resolves.toBe("springfiles mirror");
+    expect(dlDownloadFileRaw.mock.calls.map((c) => c[0].url)).toEqual([
+      MIRROR_1,
+      MIRROR_2,
+    ]);
+    expect(dlDownloadMapRaw).not.toHaveBeenCalled();
+    expect(onAttempt.mock.calls.map((c) => c[0])).toEqual([
+      expect.objectContaining({
+        source: "springfiles",
+        outcome: "failed",
+        mirror: "mirror1.example.com",
+        filename: FILE,
+        failure: `mirror1.example.com answered 404 for ${FILE}`,
+      }),
+      expect.objectContaining({
+        source: "springfiles",
+        outcome: "ok",
+        mirror: "mirror2.example.com",
+        failure: null,
+      }),
+    ]);
+  });
+
+  it("keeps the raw error text beside the plain reason", async () => {
+    listOn([MIRROR_1, MIRROR_2]);
+    dlDownloadFileRaw
+      .mockRejectedValueOnce(notFound("mirror1.example.com"))
+      .mockResolvedValueOnce({ message: "ok", path: "" });
+
+    const { result, onAttempt } = go();
+    await result;
+
+    expect(onAttempt.mock.calls[0][0].detail).toContain("404 Not Found");
+  });
+
+  it("tries every mirror before the next kind of source", async () => {
+    listOn([MIRROR_1, MIRROR_2]);
+    dlDownloadFileRaw.mockRejectedValue(notFound("mirror.example.com"));
+    dlDownloadMapRaw.mockRejectedValue(new Error("no source could provide"));
+
+    const { result } = go();
+    const err = await result.catch((e: Error) => e);
+
+    expect(dlDownloadFileRaw).toHaveBeenCalledTimes(2);
+    expect(dlDownloadMapRaw).toHaveBeenCalledTimes(1);
+    expect(String(err)).toContain(
+      `mirror1.example.com answered 404 for ${FILE}`,
+    );
+    expect(String(err)).not.toContain("HTTP status client error");
+  });
+
+  it("names the host for a timeout and for a stall", async () => {
+    listOn([MIRROR_1, MIRROR_2]);
+    dlDownloadFileRaw
+      .mockRejectedValueOnce(new Error("The host took too long to respond."))
+      .mockRejectedValueOnce(
+        new Error(
+          "Download stalled — no data received for 2 minutes. Check your connection or try a different mirror, then retry.",
+        ),
+      );
+    dlDownloadMapRaw.mockRejectedValue(new Error("no source could provide"));
+
+    const { result, onAttempt } = go();
+    await result.catch(() => {});
+
+    const failures = onAttempt.mock.calls
+      .map((c) => c[0])
+      .filter((a) => a.mirror?.startsWith("mirror"))
+      .map((a) => a.failure);
+    expect(failures).toEqual([
+      `mirror1.example.com did not answer in time for ${FILE}`,
+      `mirror2.example.com stopped sending ${FILE} for 2 minutes`,
+    ]);
+  });
+
+  it("stops at a cancel and offers the mirror it had not reached", async () => {
+    listOn([MIRROR_1, MIRROR_2]);
+    dlDownloadFileRaw.mockRejectedValueOnce(new Error("Download cancelled."));
+
+    const { result } = go();
+    const err = await result.catch((e: unknown) => e);
+
+    expect(dlDownloadFileRaw).toHaveBeenCalledTimes(1);
+    expect(dlDownloadMapRaw).not.toHaveBeenCalled();
+    expect(err).toBeInstanceOf(SourceWalkError);
+    expect((err as SourceWalkError).next).toEqual({
+      source: "springfiles",
+      mirror: "mirror2.example.com",
+    });
+    expect(String(err)).toMatch(/cancel/i);
+  });
+
+  it("offers the next kind of source when a cancel lands on the last mirror", async () => {
+    listOn([MIRROR_1]);
+    dlDownloadFileRaw.mockRejectedValueOnce(new Error("Download cancelled."));
+
+    const err = await go().result.catch((e: unknown) => e);
+
+    expect((err as SourceWalkError).next).toEqual({
+      source: "hakora",
+      mirror: null,
+    });
+  });
+
+  it("offers nothing when every source failed", async () => {
+    listOn([MIRROR_1]);
+    dlDownloadFileRaw.mockRejectedValue(notFound("mirror1.example.com"));
+    dlDownloadMapRaw.mockRejectedValue(new Error("no source could provide"));
+
+    const err = await go().result.catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(SourceWalkError);
+    expect((err as SourceWalkError).next).toBeNull();
+  });
+
+  it("starts at the mirror it is told to, skipping the ones before it", async () => {
+    listOn([MIRROR_1, MIRROR_2]);
+    dlDownloadFileRaw.mockResolvedValueOnce({ message: "ok", path: "" });
+
+    const { result } = go({
+      startAt: { source: "springfiles", mirror: "mirror2.example.com" },
+    });
+
+    await expect(result).resolves.toBe("springfiles mirror");
+    expect(dlDownloadFileRaw.mock.calls.map((c) => c[0].url)).toEqual([
+      MIRROR_2,
+    ]);
+  });
+
+  it("starts at a later kind of source, skipping the ones before it", async () => {
+    listOn([MIRROR_1]);
+    dlHakoraMaps.mockResolvedValue({
+      maps: [
+        { filename: FILE, url: `https://hakora.test/${FILE}`, size: "1M" },
+      ],
+    });
+    dlDownloadFileRaw.mockResolvedValueOnce({ message: "ok", path: "" });
+
+    const { result } = go({ startAt: { source: "hakora", mirror: null } });
+
+    await expect(result).resolves.toBe("hakora");
+    expect(dlDownloadFileRaw.mock.calls[0][0].url).toBe(
+      `https://hakora.test/${FILE}`,
     );
   });
 });
