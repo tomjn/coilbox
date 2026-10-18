@@ -42,8 +42,8 @@ fn build(
     name: &str,
 ) -> tauri_plugin_coilbox_compat::Built {
     tauri_plugin_coilbox_compat::build(
-        &engine.to_string_lossy(),
         &root.to_string_lossy(),
+        &engine.to_string_lossy(),
         archive,
         name,
         "0",

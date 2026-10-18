@@ -24,6 +24,7 @@ import {
   dlDownloadMap,
 } from "./bindings";
 import { downloadGameAnySource } from "./downloadGame";
+import { type DownloadAttempt, recordDownload } from "./downloadHistory";
 import { downloadMapAnySource } from "./downloadMap";
 import {
   addSample,
@@ -32,6 +33,7 @@ import {
   type RateSample,
   rateFrom,
 } from "./downloadRate";
+import { attemptsToRecord } from "./downloadRecording";
 import { indexTick } from "./mirrorIndex";
 import { errMessage } from "./pages/components/states";
 import { type ProgressSink, progressChannel } from "./progressChannel";
@@ -381,7 +383,11 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
   // effects. Every backend call gets a channel of its own from the sink, since a
   // channel serves one command and no more (see `progressChannel`).
   const start = useCallback(
-    async (item: QueueItem, onProgress: ProgressSink) => {
+    async (
+      item: QueueItem,
+      onProgress: ProgressSink,
+      onAttempt: (attempt: DownloadAttempt) => void,
+    ) => {
       switch (item.kind) {
         case "rapid":
           await dlDownload({
@@ -403,6 +409,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
             opId: item.id,
             askedAt: item.queuedAt,
             onProgress,
+            onAttempt,
           });
           libraryChanged(item);
           warmAllRoots().catch(() => {});
@@ -421,6 +428,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
             opId: item.id,
             askedAt: item.queuedAt,
             onProgress,
+            onAttempt,
           });
           libraryChanged(item);
           return;
@@ -499,8 +507,26 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
         });
       };
       let settled = { ...item, status: "done", progress: null } as QueueItem;
+      const attempts: DownloadAttempt[] = [];
+      // Remember where it came from, and what went wrong if it did. Storage
+      // trouble must never turn a finished download into a failed one.
+      const remember = (failure: string | null) => {
+        try {
+          for (const { key, attempt } of attemptsToRecord(
+            item,
+            attempts,
+            failure,
+            Date.now(),
+          )) {
+            recordDownload(key, attempt);
+          }
+        } catch (e) {
+          console.error("downloads: could not record where it came from", e);
+        }
+      };
       try {
-        await start(item, onProgress);
+        await start(item, onProgress, (a) => attempts.push(a));
+        remember(null);
         patch(item.id, { status: "done", progress: null, rate: IDLE_RATE });
         setCompletions((c) => ({ ...c, [item.identity]: true }));
         for (const fn of completeListeners.current) fn(settled);
@@ -514,7 +540,10 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
           rate: IDLE_RATE,
         } as const;
         patch(item.id, meta);
-        if (!canceled) setFailures((f) => ({ ...f, [item.identity]: msg }));
+        if (!canceled) {
+          setFailures((f) => ({ ...f, [item.identity]: msg }));
+          remember(msg);
+        }
         settled = { ...item, ...meta } as QueueItem;
       } finally {
         busyLanesRef.current.delete(laneOf(item));

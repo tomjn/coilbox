@@ -51,8 +51,8 @@ fn the_scan_lists_a_built_mutator_as_a_game_on_top_of_its_base() {
     let checksum = "0";
 
     let built = tauri_plugin_coilbox_compat::build(
-        &engine.to_string_lossy(),
         &root.path().to_string_lossy(),
+        &engine.to_string_lossy(),
         &archive,
         name,
         checksum,

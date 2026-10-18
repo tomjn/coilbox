@@ -6,12 +6,14 @@ import {
   FolderOpen,
   Loader2,
   Package,
+  RefreshCw,
   Search,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import {
   dlRepos,
   dlVersion,
@@ -21,6 +23,7 @@ import {
 } from "../../bindings";
 import { useDownloadsConfig } from "../../config";
 import { identityOf, useDownloadQueue } from "../../DownloadQueueProvider";
+import { refreshedLabel } from "../../rapidAge";
 import { orderRapidVersions } from "../../rapidVersionOrder";
 import { QueueProgress } from "./ProgressBar";
 import { EmptyState, errMessage } from "./states";
@@ -83,26 +86,31 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
   const [repos, setRepos] = useState<Repo[] | null>(null);
   const [reposLoading, setReposLoading] = useState(false);
   const [reposError, setReposError] = useState<string | null>(null);
+  const [reposAge, setReposAge] = useState<number | null>(null);
   const [repoFilter, setRepoFilter] = useState("");
 
   const [selected, setSelected] = useState<Repo | null>(null);
   const [versions, setVersions] = useState<Version[] | null>(null);
   const [versionsLoading, setVersionsLoading] = useState(false);
   const [versionsError, setVersionsError] = useState<string | null>(null);
+  const [versionsAge, setVersionsAge] = useState<number | null>(null);
   const [versionFilter, setVersionFilter] = useState("");
 
-  const loadRepos = useCallback(async (url: string) => {
+  const loadRepos = useCallback(async (url: string, refresh = false) => {
     setReposLoading(true);
     setReposError(null);
     setSelected(null);
     setVersions(null);
     try {
-      const { repos } = await dlRepos({
+      const { repos, ageSecs } = await dlRepos({
         masterUrl: url.trim() || DEFAULT_MASTER,
+        refresh,
       });
       setRepos(repos);
+      setReposAge(ageSecs);
     } catch (e) {
       setRepos(null);
+      setReposAge(null);
       setReposError(errMessage(e));
     } finally {
       setReposLoading(false);
@@ -117,15 +125,21 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
     loadRepos(masterUrl);
   }, [cfg.rapidRepos, masterUrl, loadRepos]);
 
-  async function selectRepo(repo: Repo) {
+  async function selectRepo(repo: Repo, refresh = false) {
     setSelected(repo);
     setVersions(null);
+    setVersionsAge(null);
     setVersionsError(null);
     setVersionsLoading(true);
-    setVersionFilter("");
+    if (!refresh) setVersionFilter("");
     try {
-      const { versions } = await dlVersions({ repoUrl: repo.url });
+      const { versions, ageSecs } = await dlVersions({
+        repoUrl: repo.url,
+        dataDir: writePath,
+        refresh,
+      });
       setVersions(orderRapidVersions(versions));
+      setVersionsAge(ageSecs);
     } catch (e) {
       setVersionsError(errMessage(e));
     } finally {
@@ -180,12 +194,17 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
               }))}
             />
             <Button
-              onClick={() => loadRepos(masterUrl)}
+              onClick={() => loadRepos(masterUrl, true)}
               disabled={reposLoading}
             >
               {reposLoading && <Loader2 className="animate-spin" />}
               {reposLoading ? "Loading…" : "Load repos"}
             </Button>
+            {reposAge !== null && (
+              <span className="text-xs text-muted-foreground">
+                {refreshedLabel(reposAge)}
+              </span>
+            )}
           </>
         )}
       </div>
@@ -281,6 +300,22 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
                     versions
                   </span>
                 )}
+                {versionsAge !== null && (
+                  <span className="text-xs text-muted-foreground">
+                    {refreshedLabel(versionsAge)}
+                  </span>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => selectRepo(selected, true)}
+                  disabled={versionsLoading}
+                  aria-label={`Refresh ${selected.name} versions`}
+                  className={versions && versions.length > 0 ? "" : "ml-auto"}
+                >
+                  <RefreshCw />
+                  Refresh
+                </Button>
                 {versions && versions.length > 0 && (
                   <div className="relative ml-auto">
                     <Search
@@ -334,6 +369,7 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
                     };
                     const item = itemFor(identityOf(input));
                     const status = item?.status ?? null;
+                    const installed = v.installed || status === "done";
                     return (
                       <li
                         key={v.tag}
@@ -341,12 +377,36 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-medium">
-                              {v.name}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className="truncate text-sm font-medium">
+                                {v.name}
+                              </p>
+                              <Badge variant="outline">
+                                {v.kind === "snapshot" ? "Snapshot" : "Release"}
+                              </Badge>
+                              {installed && (
+                                <Badge variant="secondary">
+                                  <CheckCircle2 className="text-emerald-500" />
+                                  Installed
+                                </Badge>
+                              )}
+                            </div>
                             <p className="truncate font-mono text-xs text-muted-foreground">
                               {v.tag}
                             </p>
+                            {v.md5 && (
+                              <p
+                                className="truncate font-mono text-xs text-muted-foreground"
+                                title={v.md5}
+                              >
+                                md5 {v.md5}
+                              </p>
+                            )}
+                            {v.depends.length > 0 && (
+                              <p className="truncate text-xs text-muted-foreground">
+                                Depends on {v.depends.join(", ")}
+                              </p>
+                            )}
                           </div>
                           <Button
                             variant="outline"
