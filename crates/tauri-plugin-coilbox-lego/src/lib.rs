@@ -4730,9 +4730,7 @@ mod tests {
         )
         .expect("link");
 
-        assert!(
-            remove_units_scratch_game(data.path(), "coilbox-lego-campaign-one.sdd").is_err()
-        );
+        assert!(remove_units_scratch_game(data.path(), "coilbox-lego-campaign-one.sdd").is_err());
         assert!(elsewhere.path().join("keep.txt").is_file());
     }
 
