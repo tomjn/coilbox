@@ -83,13 +83,15 @@ const requests = new Map<string, Promise<HubGame[]>>();
 /** The same answers once they have landed, so a page that opens later reads
  * one straight away instead of waiting a render for a promise. */
 const answers = new Map<string, HubGame[]>();
+/** Why the last read of each hub's list failed, cleared when one succeeds. */
+const failures = new Map<string, string>();
 
 /**
  * The hub's game list, read once per hub for the session and shared by every
  * caller. A failure is remembered as an empty list for the rest of the session,
  * so a hub that is down is asked once rather than on every page that opens.
- * Never rejects, and says nothing about a failure: the pages that use this have
- * a picture to show without it. The launch-time read passes `rememberFailure`
+ * Never rejects. A failure's reason is kept for {@link useHubGamesFailure}, and
+ * the list comes back empty. The launch-time read passes `rememberFailure`
  * false, so a failure it meets, such as no network, is dropped and the first
  * page that needs the list asks again.
  */
@@ -100,10 +102,18 @@ export function loadHubGames(
   let request = requests.get(hubUrl);
   if (!request) {
     const started: Promise<HubGame[]> = fetchHubGames(hubUrl)
-      .then((result) => (result.ok ? result.value : null))
-      .catch(() => null)
+      .then((result) => {
+        if (result.ok) return result.value;
+        failures.set(hubUrl, result.reason);
+        return null;
+      })
+      .catch((e: unknown) => {
+        failures.set(hubUrl, e instanceof Error ? e.message : String(e));
+        return null;
+      })
       .then((games) => {
         if (games) {
+          failures.delete(hubUrl);
           answers.set(hubUrl, games);
           return games;
         }
@@ -124,6 +134,7 @@ export function loadHubGames(
 export function resetHubGames(): void {
   requests.clear();
   answers.clear();
+  failures.clear();
 }
 
 /**
@@ -171,4 +182,15 @@ export function useHubGameLogoUrl(
   if (!hubUrl) return undefined;
   const match = matchHubGame(games, name, installed);
   return hubIconUrl(match?.logo, hubUrl, assetCdnBase()) ?? undefined;
+}
+
+/**
+ * Why the trusted hub's game list could not be read, or null when it was read,
+ * is still being read, or there is no trusted hub. The reason is the hub
+ * client's own, cold-start sentence included.
+ */
+export function useHubGamesFailure(): string | null {
+  const hubUrl = useTrustedHubUrl();
+  const games = useHubGames();
+  return hubUrl && games ? (failures.get(hubUrl) ?? null) : null;
 }
