@@ -205,7 +205,12 @@ function Row({ row }: { row: FamilyRow }) {
         // Columns never reorder, so the position names the cell.
         // biome-ignore lint/suspicious/noArrayIndexKey: see above
         <td key={index} className="p-1.5 text-center">
-          <span className={cn(row.differs && "font-medium")}>
+          <span
+            className={cn(
+              row.differs && "font-medium",
+              row.over?.includes(index) && "text-destructive",
+            )}
+          >
             {cell ?? <span className="text-muted-foreground">None</span>}
           </span>
           {row.highest?.includes(index) ? (

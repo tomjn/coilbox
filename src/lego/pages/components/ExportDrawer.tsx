@@ -61,6 +61,7 @@ import {
   legoSaveGlb,
   legoTexturePng,
 } from "../../bindings";
+import { overBudgetLoadouts, unitCost } from "../../budget";
 import { pictureDigest } from "../../buildPicture";
 import { buildCombinedSheet, type CombinedSheet } from "../../combinedSheet";
 import { exportGlb } from "../../exportGlb";
@@ -431,6 +432,9 @@ export function ExportDrawer({
     (whole.activeLoadout ? loadoutUnit(whole, whole.activeLoadout) : null) ??
     whole;
   const loadoutNames = loadoutUnitNames(whole);
+  const overBudget = overBudgetLoadouts(whole, (unit) =>
+    unitCost(unit, pack, raw),
+  );
   const [scope, setScope] = useState<"active" | "all">("active");
   const [batch, setBatch] = useState<BatchLine[] | null>(null);
   const [dir, setDir] = useState(project.exportDir ?? "");
@@ -1099,6 +1103,11 @@ export function ExportDrawer({
                         <span className="w-28 shrink-0 truncate">
                           {loadout.name}
                         </span>
+                        {overBudget.has(loadout.id) ? (
+                          <span className="shrink-0 text-destructive">
+                            Over budget
+                          </span>
+                        ) : null}
                         <Input
                           key={`${loadout.id}:${name}`}
                           aria-label={`Unit name for ${loadout.name}`}
