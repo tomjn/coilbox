@@ -437,6 +437,35 @@ async function writeUnmatchedStamp(
 }
 
 /**
+ * The parts a unit was written with that its next write no longer has (issue
+ * #4528): a weapon file whose name the new payload does not send, and the wreck
+ * when the new payload has none.
+ */
+function droppedParts(
+  earlier: WrittenUnit,
+  next: ExportPayload,
+): ("weapons" | "wreck")[] {
+  const paths = earlier.files.map((file) => file.path.replaceAll("\\", "/"));
+  const sent = new Set((next.weapons ?? []).map((file) => file.name));
+  const prefix = `/weapons/coilbox_${earlier.unitName}_`;
+  const lostWeapon = paths.some((path) => {
+    const at = path.lastIndexOf("/weapons/");
+    return (
+      at >= 0 &&
+      path.slice(at).startsWith(prefix) &&
+      !sent.has(path.slice(at + "/weapons/".length))
+    );
+  });
+  const hadWreck = paths.some((path) =>
+    path.endsWith(`/objects3d/coilbox/${earlier.unitName}_dead.s3o`),
+  );
+  return [
+    ...(lostWeapon ? (["weapons"] as const) : []),
+    ...(hadWreck && !next.wreck ? (["wreck"] as const) : []),
+  ];
+}
+
+/**
  * Forget what the folder was last written as. Anything that changes the folder
  * without going through `writeMutator` has to call this first, or a later launch
  * could find a stamp that matches and skip a folder that has since changed.
@@ -504,7 +533,7 @@ export async function writeMutator(args: MutatorArgs): Promise<MutatorResult> {
   const { folder, units, extras, onWritten, onScanning, ...context } = args;
   const { target, baseGame } = context;
 
-  const prepared = [];
+  const prepared: PreparedUnit[] = [];
   for (const unit of units) prepared.push(await prepareUnit(context, unit));
   const files = await folderFiles({ ...context, folder, extras });
 
@@ -540,14 +569,27 @@ export async function writeMutator(args: MutatorArgs): Promise<MutatorResult> {
   const textures = [
     ...new Set(earlier.flatMap((unit) => unit.textureFiles)),
   ].filter((texture) => !usedTextures.has(texture));
-  if (leaving.length > 0 || textures.length > 0) {
+  // A unit that stays but no longer has a weapon or its wreck loses just those.
+  const trimmed = earlier.flatMap((unit) => {
+    const next = prepared.find((p) => p.payload.unitName === unit.unitName);
+    const only = next ? droppedParts(unit, next.payload) : [];
+    return only.length > 0 ? [{ unit, only }] : [];
+  });
+  if (leaving.length > 0 || trimmed.length > 0 || textures.length > 0) {
     await legoScratchPrune({
       dataDir: target.dataDir,
       folder,
-      units: leaving.map((unit) => ({
-        unitName: unit.unitName,
-        digests: unit.files.map((file) => file.sha256),
-      })),
+      units: [
+        ...leaving.map((unit) => ({
+          unitName: unit.unitName,
+          digests: unit.files.map((file) => file.sha256),
+        })),
+        ...trimmed.map(({ unit, only }) => ({
+          unitName: unit.unitName,
+          digests: unit.files.map((file) => file.sha256),
+          only,
+        })),
+      ],
       textures,
     });
   }
