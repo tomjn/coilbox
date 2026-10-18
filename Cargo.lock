@@ -783,13 +783,14 @@ version = "0.0.0"
 
 [[package]]
 name = "coilbox-3do-convert"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "coilbox-3do",
  "coilbox-s3o",
  "image 0.25.10",
  "serde",
  "serde_json",
+ "sha2 0.11.0",
 ]
 
 [[package]]
