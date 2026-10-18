@@ -807,8 +807,10 @@ function actionCase(
   action: LegoAction,
   events: ScriptEvent[],
   seconds: number,
+  unit: LegoProject = actionUnit(action),
+  valueAt: (piece: string, t: number) => number[] = (piece, t) =>
+    scheduled(action, piece, t),
 ) {
-  const unit = actionUnit(action);
   const frames = CALLIN + Math.round(seconds * FPS) + 1;
   const growth = LUA_ROUNDING * (1 + frames / FPS);
   const checks: Check[] = [];
@@ -817,7 +819,7 @@ function actionCase(
       const values: number[] = [];
       for (let frame = CALLIN; frame < frames; frame++) {
         values.push(
-          round(scheduled(action, piece.name, (frame - CALLIN) / FPS)[channel]),
+          round(valueAt(piece.name, (frame - CALLIN) / FPS)[channel]),
         );
       }
       let travel = 0;
@@ -846,6 +848,84 @@ function actionCase(
     ],
     checks,
   };
+}
+
+/** A value `share` of the way from `from` to `to`, held at either end. */
+function ease(from: number, to: number, share: number): number {
+  return from + (to - from) * Math.min(1, Math.max(0, share));
+}
+
+const WALK: LegoAction = {
+  id: "walk",
+  name: "Walk",
+  trigger: "StartMoving",
+  loop: true,
+  keys: [
+    { pose: "up", seconds: 1 },
+    { pose: "out", seconds: 2 },
+  ],
+};
+
+/**
+ * Blending (#3358). Walk is 2 s in, between its keys, when Aim fires. Aim
+ * moves the arm's turn, so it takes the arm's turn over: those channels leave
+ * from where the walk had them and reach Aim's pose in its blend in time. The
+ * walk's thread ends, but the moves it had already issued carry on to where
+ * they were headed, which is its next key at 3 s.
+ */
+function switchCase() {
+  const aim: LegoAction = {
+    id: "aim",
+    name: "Aim",
+    trigger: "Shot1",
+    loop: false,
+    keys: [{ pose: "out", seconds: 9 }],
+    blendIn: 0.5,
+  };
+  const unit = { ...actionUnit(WALK), actions: [WALK, aim] };
+  const switchAt = 2;
+  const headed = 3;
+  const target = poseChannels(ACTION_POSES[1], "arm");
+  return actionCase(
+    "action, blend in, Shot1 over a walk",
+    WALK,
+    [
+      { frame: CALLIN, callin: "StartMoving" },
+      { frame: CALLIN + switchAt * FPS, callin: "Shot1" },
+    ],
+    6,
+    unit,
+    (piece, t) => {
+      if (t <= switchAt) return scheduled(WALK, piece, t);
+      const held = scheduled(WALK, piece, Math.min(t, headed));
+      if (piece !== "arm") return held;
+      const from = scheduled(WALK, piece, switchAt);
+      return held.map((v, c) =>
+        c < 3 ? v : ease(from[c], target[c], (t - switchAt) / 0.5),
+      );
+    },
+  );
+}
+
+/** A walk stopped 2 s in returns every axis it moved to rest over its blend out. */
+function stopCase() {
+  const walk = { ...WALK, blendOut: 1 };
+  const stopAt = 2;
+  return actionCase(
+    "action, blend out, StopMoving",
+    walk,
+    [
+      { frame: CALLIN, callin: "StartMoving" },
+      { frame: CALLIN + stopAt * FPS, callin: "StopMoving" },
+    ],
+    5,
+    actionUnit(walk),
+    (piece, t) => {
+      if (t <= stopAt) return scheduled(walk, piece, t);
+      const from = scheduled(walk, piece, stopAt);
+      return from.map((v) => ease(v, 0, (t - stopAt) / 1));
+    },
+  );
 }
 
 function actionCases() {
@@ -880,6 +960,8 @@ function actionCases() {
       [{ frame: CALLIN, callin: "Shot1" }],
       4,
     ),
+    switchCase(),
+    stopCase(),
   ];
 }
 
