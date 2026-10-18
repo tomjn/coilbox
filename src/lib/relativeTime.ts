@@ -33,13 +33,21 @@ export function relativeTime(
 const SECONDS_PER_DAY = 86_400;
 
 /**
- * `seconds` ago as a sentence fragment in the app language: "now", "2 minutes
+ * `seconds` ago as a sentence fragment in the app language: "just now", "2m
  * ago", "vor 3 Tagen". Counts in the largest unit that has a whole number in
  * it and rounds down, so a unit is only claimed once it has passed.
+ *
+ * English uses the narrow style ("3d ago"), which is what list rows have always
+ * shown. Other languages use the short style, because ICU's narrow French
+ * drops the "il y a" and reads "-5 min".
  */
 export function agoFromSeconds(seconds: number): string {
-  const rtf = new Intl.RelativeTimeFormat(getLocale(), { numeric: "auto" });
-  if (seconds < 60) return rtf.format(0, "second");
+  if (seconds < 60) return t`just now`;
+  const locale = getLocale();
+  const rtf = new Intl.RelativeTimeFormat(locale, {
+    numeric: "auto",
+    style: locale === "en" ? "narrow" : "short",
+  });
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return rtf.format(-minutes, "minute");
   const hours = Math.floor(minutes / 60);

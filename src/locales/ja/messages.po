@@ -59,6 +59,10 @@ msgstr ""
 msgid "Installing…"
 msgstr ""
 
+#: src/lib/relativeTime.ts
+msgid "just now"
+msgstr ""
+
 #: src/general/pages/SettingsSection.tsx
 msgid "Language"
 msgstr ""
