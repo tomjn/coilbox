@@ -119,7 +119,7 @@ vi.mock("./components/TileGrid", () => ({
     ) => void;
     selectedKey?: string;
   }) => (
-    <div aria-label="tiles" data-selected={selectedKey ?? ""}>
+    <section aria-label="tiles" data-selected={selectedKey ?? ""}>
       {sections
         .flatMap((section) => section.items)
         .flatMap((item) =>
@@ -145,7 +145,7 @@ vi.mock("./components/TileGrid", () => ({
                 ]
               : [],
         )}
-    </div>
+    </section>
   ),
 }));
 // Opens beside the grid on a pick, with a preview this DOM cannot draw. Its
