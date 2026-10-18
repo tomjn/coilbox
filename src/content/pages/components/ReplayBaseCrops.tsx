@@ -1,6 +1,6 @@
 import { cn } from "@picoframe/frame";
 import { useMemo } from "react";
-import { formatDuration } from "@/lib/format";
+import { formatDuration, formatNumber } from "@/lib/format";
 import type { BuildOrder, DemoInfo, UnitDatasetEntry } from "../../bindings";
 import {
   type BaseCrop,
@@ -146,10 +146,10 @@ function CropCard({
             ? windowed
               ? "None ordered in this window"
               : "None ordered"
-            : `${crop.ordered.toLocaleString()} ordered`}
+            : `${formatNumber(crop.ordered)} ordered`}
           {crop.outside > 0 && (
             <span data-crop-outside>
-              , {crop.outside.toLocaleString()} outside this view
+              , {formatNumber(crop.outside)} outside this view
             </span>
           )}
         </span>
@@ -206,10 +206,10 @@ export function BaseCropsHelp({
   return (
     <p>
       Each base view shows the buildings a player ordered, not the buildings
-      that were built. {windowText} Every view is {side.toLocaleString()} elmos
+      that were built. {windowText} Every view is {formatNumber(side)} elmos
       across, the same for every player, and is centred on that player's start
       unless the start is near the edge of the map. The bar at the bottom left
-      of a view is {Math.round(side / 4).toLocaleString()} elmos. A mark is one
+      of a view is {formatNumber(Math.round(side / 4))} elmos. A mark is one
       order to place a building, in its player's colour, and the dot with a
       white edge is the player's start. An order that was cancelled or never
       carried out is drawn like any other. Under each view is how many buildings

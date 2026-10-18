@@ -7,6 +7,7 @@
  * a unit dataset, and the check that says whether a list fits a replay at all.
  */
 
+import { formatDate } from "@/lib/format";
 import type {
   BuildOrder,
   ReplayUnitDefSets,
@@ -174,7 +175,7 @@ export function misfits(fit: OrderFit): number {
 
 /** A stored list's date as the page writes it. */
 export function listDate(link: Pick<UnitDefLink, "takenAtMs">): string {
-  return new Date(link.takenAtMs).toLocaleDateString(undefined, {
+  return formatDate(new Date(link.takenAtMs), {
     year: "numeric",
     month: "long",
     day: "numeric",

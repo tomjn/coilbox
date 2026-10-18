@@ -1,6 +1,6 @@
 import { cn } from "@picoframe/frame";
 import { useEffect, useMemo, useRef } from "react";
-import { formatDuration } from "@/lib/format";
+import { formatDuration, formatNumber } from "@/lib/format";
 import type { DemoInfo } from "../../bindings";
 import { FRAMES_PER_SECOND } from "../../chatClock";
 import { playerLabels, teamLabel } from "../../replayAnalysisEvents";
@@ -235,7 +235,7 @@ export function StartUnitCanvas({
 }
 
 const plural = (n: number, one: string, many: string) =>
-  `${n.toLocaleString()} ${n === 1 ? one : many}`;
+  `${formatNumber(n)} ${n === 1 ? one : many}`;
 
 function endInWords(
   end: StartUnitEnd,
@@ -393,7 +393,7 @@ export function StartUnitHelp({ ev }: { ev: EventLayers }) {
           colour. The dot is where the line begins and the name is where it
           ends.
           {still > 0 &&
-            ` ${still.toLocaleString()} did not move${inWindow} and ${still === 1 ? "shows" : "show"} as a dot alone.`}
+            ` ${formatNumber(still)} did not move${inWindow} and ${still === 1 ? "shows" : "show"} as a dot alone.`}
         </p>
       )}
       {ev.startPathsOn && ev.replacementsRecorded && (

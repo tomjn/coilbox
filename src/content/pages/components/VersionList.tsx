@@ -1,4 +1,5 @@
 import { CheckField } from "@/components/Field";
+import { formatNumber } from "@/lib/format";
 import { matchCount } from "../../mapAggregate";
 
 export interface VersionItem {
@@ -60,7 +61,7 @@ export function VersionSpan({
   if (versions < 2) return null;
   return (
     <p className="text-xs font-medium" data-testid={testId}>
-      Across {versions.toLocaleString()} versions of this map
+      Across {formatNumber(versions)} versions of this map
     </p>
   );
 }

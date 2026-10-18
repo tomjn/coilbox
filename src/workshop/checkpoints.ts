@@ -48,6 +48,7 @@
  * do as a side effect of putting `edits` back.
  */
 import { useSetting } from "@picoframe/frame";
+import { formatDateTime } from "@/lib/format";
 import { updateStoredSetting } from "../lib/storedSetting";
 import type { GameEdits } from "./project";
 
@@ -193,7 +194,7 @@ export function autosaveCheckpoint(
     return all;
   return addCheckpoint(all, projectId, {
     kind: "autosave",
-    name: `Autosave ${new Date().toLocaleString()}`,
+    name: `Autosave ${formatDateTime(new Date())}`,
     edits,
   });
 }

@@ -24,7 +24,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { formatBytes, formatDuration } from "@/lib/format";
+import {
+  formatBytes,
+  formatDateTime,
+  formatDuration,
+  formatFixed,
+} from "@/lib/format";
 import { mostRecentOpen } from "@/lib/recency";
 import { isProfileHidden } from "../../profile/hidden";
 import type { StatRecord } from "../bindings";
@@ -125,7 +130,7 @@ const ORIGIN_BADGE: Record<
 /** Played date, e.g. `27 Apr 2026, 20:14`. */
 function playedAt(ms: number): string {
   if (!ms) return "";
-  return new Date(ms).toLocaleString(undefined, {
+  return formatDateTime(new Date(ms), {
     dateStyle: "medium",
     timeStyle: "short",
   });
@@ -136,7 +141,7 @@ const dateOf = (r: { startTimeMs?: number; modifiedMs: number }) =>
   r.startTimeMs || r.modifiedMs;
 
 /** A skill value for a column, rounded to one decimal (or `—`). */
-const fmtSkill = (v?: number) => (v == null ? "—" : v.toFixed(1));
+const fmtSkill = (v?: number) => (v == null ? "—" : formatFixed(v, 1));
 
 /** The mode badge for a replay's row/detail header, when its origin is known. */
 export function OriginBadge({ origin }: { origin: ReplayOrigin }) {

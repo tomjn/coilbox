@@ -15,6 +15,7 @@ import { useState } from "react";
 import { RENDER_VERSION, renderUnit } from "@/hub/assets/renderTop";
 import { RENDER_ANGLES, renderFrame } from "@/hub/assets/vocabulary";
 import { toBase64 } from "@/lib/base64";
+import { formatFixed, formatNumber } from "@/lib/format";
 import type {
   RenderSkip,
   UnitDatasetEntry,
@@ -192,8 +193,8 @@ function Body({
 
         <dt className="text-muted-foreground">Size</dt>
         <dd>
-          {triangles.toLocaleString()} triangles in{" "}
-          {countPieces(model.root).toLocaleString()} pieces
+          {formatNumber(triangles)} triangles in{" "}
+          {formatNumber(countPieces(model.root))} pieces
         </dd>
 
         <dt className="text-muted-foreground">Textures</dt>
@@ -323,7 +324,7 @@ function HubRender({
           <dt className="text-muted-foreground">Size</dt>
           <dd>
             {result.asset.width} by {result.asset.height},{" "}
-            {(result.asset.bytes / 1024).toFixed(1)} KB,{" "}
+            {formatFixed(result.asset.bytes / 1024, 1)} KB,{" "}
             {result.asset.encodeProfile}
           </dd>
 

@@ -12,7 +12,7 @@
 import { useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-
+import { formatNumber } from "@/lib/format";
 import { useCanvas3D } from "@/lib/useCanvas3D";
 import type { UnitModelResult } from "../../bindings";
 import { buildModel, missingTextures } from "../../unitModel";
@@ -67,7 +67,7 @@ export function ModelNotes({
       )}
       {model.paletteFaces > 0 && (
         <Note>
-          {model.paletteFaces.toLocaleString()}{" "}
+          {formatNumber(model.paletteFaces)}{" "}
           {model.paletteFaces === 1 ? "face names" : "faces name"} a Total
           Annihilation palette entry this could not resolve to a colour, so{" "}
           {model.paletteFaces === 1 ? "it is" : "they are"} drawn plain grey.

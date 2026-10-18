@@ -1,5 +1,11 @@
-import { describe, expect, it } from "vitest";
-import { relativeTime } from "./relativeTime";
+import { afterEach, describe, expect, it } from "vitest";
+import { i18n } from "../i18n";
+import { refreshedLabel, relativeTime } from "./relativeTime";
+
+const activate = (locale: string) =>
+  i18n.loadAndActivate({ locale, messages: {} });
+
+afterEach(() => activate("en"));
 
 const now = Date.parse("2026-09-01T12:00:00.000Z");
 const agoMs = (ms: number) => new Date(now - ms).toISOString();
@@ -32,9 +38,32 @@ describe("relativeTime", () => {
     expect(relativeTime(agoMs(-5 * MINUTE), now)).toBe("just now");
   });
 
+  it("follows the app language: vor 3 Tagen under de", () => {
+    activate("de");
+    expect(relativeTime(agoMs(3 * DAY), now)).toBe("vor 3 Tagen");
+    expect(relativeTime(agoMs(2 * HOUR), now)).toBe("vor 2 Std.");
+  });
+
   it("gives a date once the relative form stops meaning anything", () => {
     const stamp = relativeTime(agoMs(400 * DAY), now);
     expect(stamp).not.toMatch(/ago/);
     expect(stamp).toMatch(/2025/);
+  });
+});
+
+describe("refreshedLabel", () => {
+  it("says just now under a minute", () => {
+    expect(refreshedLabel(0)).toBe("refreshed just now");
+    expect(refreshedLabel(59)).toBe("refreshed just now");
+  });
+
+  it("counts whole minutes, hours and days", () => {
+    expect(refreshedLabel(180)).toBe("refreshed 3m ago");
+    expect(refreshedLabel(3600)).toBe("refreshed 1h ago");
+    expect(refreshedLabel(86_400 * 2 + 5)).toBe("refreshed 2d ago");
+  });
+
+  it("keeps counting days rather than switching to a date", () => {
+    expect(refreshedLabel(86_400 * 90)).toBe("refreshed 90d ago");
   });
 });

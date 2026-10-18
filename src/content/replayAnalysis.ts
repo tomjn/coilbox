@@ -1,5 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useSyncExternalStore } from "react";
+import { formatNumber } from "@/lib/format";
 import { isProfileHidden } from "../profile/hidden";
 import {
   ANALYSIS_QUEUE_EVENT,
@@ -341,7 +342,7 @@ export function analysisProgressLabel(job: ReplayAnalysisRunningJob): string {
   if (job.phase === "loading") return "Loading the match";
   // The header holds whole seconds, so the last event can land past it.
   const frame = Math.min(job.frame, job.lastFrame);
-  return `Frame ${frame.toLocaleString()} of ${job.lastFrame.toLocaleString()}`;
+  return `Frame ${formatNumber(frame)} of ${formatNumber(job.lastFrame)}`;
 }
 
 const FIGURE_WORDS: Record<string, string> = {

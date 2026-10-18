@@ -9,13 +9,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatBytes } from "@/lib/format";
+import { formatBytes, formatDate } from "@/lib/format";
 import { isDeletableArchive } from "../../format";
 import type { GameVersionRow, GameVersionTable } from "../../gameVersionRows";
 import { DeleteArchiveButton } from "./DeleteArchiveButton";
 
 const dateOf = (iso: string) =>
-  new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" });
+  formatDate(new Date(iso), { dateStyle: "medium" });
 
 /** Where a row's download stands in the queue, or null when it has none. */
 export type RowStatus = "queued" | "active" | "done" | "error" | null;

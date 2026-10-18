@@ -15,6 +15,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useAdvancedMode } from "@/general/advanced";
+import { formatDate } from "@/lib/format";
 import type { MapScene3D } from "@/lib/mapScene";
 import { notify } from "@/notify/notify";
 import { isProfileHidden } from "@/profile/hidden";
@@ -64,7 +65,7 @@ import {
 
 function playedAt(ms: number): string {
   if (!ms) return "never";
-  return new Date(ms).toLocaleDateString(undefined, { dateStyle: "medium" });
+  return formatDate(new Date(ms), { dateStyle: "medium" });
 }
 
 /** Keys shown in the headline; everything else goes in the metadata table. */

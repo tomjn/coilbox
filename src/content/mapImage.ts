@@ -1,3 +1,4 @@
+import { formatNumber } from "@/lib/format";
 import {
   HEAT_ALPHA_MAX,
   HEAT_ALPHA_MIN,
@@ -220,7 +221,7 @@ export function imageBlocks(w: ImageWords): TextBlock[] {
     { role: "body", text: `Brightest spot: ${w.legend}.` },
     {
       role: "body",
-      text: `Replays: ${matchCount(info.matches)} of this map. ${w.contributing.toLocaleString()} ${some} something on this layer, ${layerEvents(w.layer, w.events)}${inWindow}.`,
+      text: `Replays: ${matchCount(info.matches)} of this map. ${formatNumber(w.contributing)} ${some} something on this layer, ${layerEvents(w.layer, w.events)}${inWindow}.`,
     },
     {
       role: "body",

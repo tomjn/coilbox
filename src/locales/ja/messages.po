@@ -7,6 +7,34 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Language: ja\n"
 
+#: src/downloads/downloadRate.ts
+msgid "{hours}h"
+msgstr ""
+
+#: src/downloads/downloadRate.ts
+msgid "{hours}h {mins}m"
+msgstr ""
+
+#: src/downloads/downloadRate.ts
+msgid "{mins}m"
+msgstr ""
+
+#: src/downloads/downloadRate.ts
+msgid "{mins}m {rest}s"
+msgstr ""
+
+#: src/downloads/downloadRate.ts
+msgid "{next}h"
+msgstr ""
+
+#: src/downloads/downloadRate.ts
+msgid "{next}m"
+msgstr ""
+
+#: src/downloads/downloadRate.ts
+msgid "{total}s"
+msgstr ""
+
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Check for updates"
 msgstr ""
@@ -31,12 +59,20 @@ msgstr ""
 msgid "Installing…"
 msgstr ""
 
+#: src/lib/relativeTime.ts
+msgid "just now"
+msgstr ""
+
 #: src/general/pages/SettingsSection.tsx
 msgid "Language"
 msgstr ""
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Last checked {lastCheckedTime}"
+msgstr ""
+
+#: src/lib/relativeTime.ts
+msgid "refreshed {ago}"
 msgstr ""
 
 #: src/updater/pages/UpdatesSettingsSection.tsx

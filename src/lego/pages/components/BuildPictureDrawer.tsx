@@ -18,6 +18,7 @@ import { Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { formatDateTime } from "@/lib/format";
 import { legoPictureSurvey, type PictureSurvey } from "../../bindings";
 import {
   clampPictureSize,
@@ -248,9 +249,7 @@ export function BuildPictureDrawer({
               {taken ? (
                 <p className="text-xs text-muted-foreground">
                   Taken{" "}
-                  {taken.takenAt
-                    ? new Date(taken.takenAt).toLocaleString()
-                    : ""}
+                  {taken.takenAt ? formatDateTime(new Date(taken.takenAt)) : ""}
                   , {taken.size} by {taken.size} pixels.
                   {stale ? " The unit has changed since." : ""}
                 </p>

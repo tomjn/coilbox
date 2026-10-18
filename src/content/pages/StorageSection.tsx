@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatBytes } from "@/lib/format";
+import { formatBytes, formatNumber } from "@/lib/format";
 import { useDownloadQueue } from "../../downloads/DownloadQueueProvider";
 import {
   type ContentRoot,
@@ -251,7 +251,7 @@ function ReplayUnitLists() {
       <p className="text-xs text-muted-foreground">
         {usage.sets === 0
           ? "No unit lists are kept yet. One is kept the first time a replay's build orders are read against its installed game, or when a replay is analysed."
-          : `${usage.sets.toLocaleString()} unit ${usage.sets === 1 ? "list is" : "lists are"} kept for ${usage.replays.toLocaleString()} ${usage.replays === 1 ? "replay" : "replays"}, using ${formatBytes(usage.bytes)}. They let a replay name its units after its game is updated or removed, and each goes when the last replay that uses it is deleted.`}
+          : `${formatNumber(usage.sets)} unit ${usage.sets === 1 ? "list is" : "lists are"} kept for ${formatNumber(usage.replays)} ${usage.replays === 1 ? "replay" : "replays"}, using ${formatBytes(usage.bytes)}. They let a replay name its units after its game is updated or removed, and each goes when the last replay that uses it is deleted.`}
       </p>
     </section>
   );

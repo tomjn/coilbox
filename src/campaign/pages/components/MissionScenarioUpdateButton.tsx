@@ -6,6 +6,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { formatDateTime } from "@/lib/format";
 import { scenarioContents } from "@/scenario/listing";
 import { attachScenario, type ScenarioAttachment } from "../../missionScenario";
 import type { CampaignMission } from "../../model";
@@ -18,7 +19,7 @@ export function editedAt(iso: string): string {
   if (!iso) return "";
   const at = new Date(iso);
   if (Number.isNaN(at.getTime())) return "";
-  return at.toLocaleString(undefined, {
+  return formatDateTime(at, {
     dateStyle: "medium",
     timeStyle: "short",
   });

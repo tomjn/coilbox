@@ -31,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { formatNumber } from "@/lib/format";
 import { basename } from "@/lib/helpers";
 import { isAssimpModel } from "../../archiveOpen";
 import type { LegoAtlas } from "../../atlas";
@@ -658,8 +659,8 @@ function Imported({
         </dd>
         <dt className="text-muted-foreground">Size</dt>
         <dd>
-          {triangles.toLocaleString()} triangles, {vertices.toLocaleString()}{" "}
-          vertices, {Math.max(1, Math.round(bytes / 1024)).toLocaleString()} KiB
+          {formatNumber(triangles)} triangles, {formatNumber(vertices)}{" "}
+          vertices, {formatNumber(Math.max(1, Math.round(bytes / 1024)))} KiB
         </dd>
         <dt className="text-muted-foreground">Texture</dt>
         <dd className="min-w-0">

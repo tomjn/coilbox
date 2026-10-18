@@ -48,6 +48,7 @@ import { importContainerFile } from "@/deeplink/bindings";
 import { useImportParam } from "@/deeplink/useImportParam";
 import { nextDrawerKey } from "@/general/drawerKey";
 import { useRecordHubImport } from "@/hub/imports";
+import { formatDate } from "@/lib/format";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { useCheckpoints } from "../checkpoints";
 import { forgetEditHistory } from "../history";
@@ -71,7 +72,7 @@ import { RandomModDrawer } from "./components/RandomModDrawer";
 /** When a project was last written to, in words a person reads at a glance. */
 function when(iso: string): string {
   const at = new Date(iso);
-  return Number.isNaN(at.getTime()) ? "" : at.toLocaleDateString();
+  return Number.isNaN(at.getTime()) ? "" : formatDate(at);
 }
 
 /** Where the chosen sort order is remembered, beside the project list itself. */

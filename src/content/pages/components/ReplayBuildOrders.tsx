@@ -7,6 +7,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { formatNumber } from "@/lib/format";
 import type {
   DemoInfo,
   UnitBuildpicsResult,
@@ -184,8 +185,8 @@ function SeatOpening({
       )}
       {cost && (
         <p className="text-xs text-muted-foreground">
-          Ordered cost: {cost.metal.toLocaleString()} metal and{" "}
-          {cost.energy.toLocaleString()} energy.
+          Ordered cost: {formatNumber(cost.metal)} metal and{" "}
+          {formatNumber(cost.energy)} energy.
           {cost.unpriced > 0 &&
             ` ${cost.unpriced} ${cost.unpriced === 1 ? "unit" : "units"} could not be priced and ${cost.unpriced === 1 ? "is" : "are"} left out.`}
           {differentBuild && (

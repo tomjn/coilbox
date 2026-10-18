@@ -8,7 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatDuration } from "@/lib/format";
+import { formatDuration, formatNumber } from "@/lib/format";
 import { type AggregateMatch, matchCount } from "../../mapAggregate";
 import {
   type Count,
@@ -25,13 +25,13 @@ import { PlaceNameInput } from "./PlaceNameInput";
 import { VersionSpan } from "./VersionList";
 
 const plural = (n: number, one: string, many: string) =>
-  `${n.toLocaleString()} ${n === 1 ? one : many}`;
+  `${formatNumber(n)} ${n === 1 ? one : many}`;
 
 /** A record as a count and never a rate: "won 3 of 5". */
 export const wonOf = (won: number, known: number) =>
   known === 0 ? "no result" : `won ${won} of ${known}`;
 
-const elmos = (n: number) => `${Math.round(n).toLocaleString()} elmos`;
+const elmos = (n: number) => `${formatNumber(Math.round(n))} elmos`;
 
 /** The number drawn on the minimap, drawn the same way in the table. */
 export function PlaceNumber({ n }: { n: number }) {
@@ -45,11 +45,11 @@ export function PlaceNumber({ n }: { n: number }) {
 /** Where a row's position or positions are. */
 function describeRow(row: StartRow): string {
   if (row.places.length > 1)
-    return `${row.places.length.toLocaleString()} places with this name`;
+    return `${formatNumber(row.places.length)} places with this name`;
   const place = row.places[0];
   return place.kind === "declared"
     ? "Declared by the map"
-    : `Around ${Math.round(place.x).toLocaleString()}, ${Math.round(place.z).toLocaleString()}${place.radius > 0 ? `, within ${elmos(place.radius)}` : ""}`;
+    : `Around ${formatNumber(Math.round(place.x))}, ${formatNumber(Math.round(place.z))}${place.radius > 0 ? `, within ${elmos(place.radius)}` : ""}`;
 }
 
 /** What a position's record means in the arrangement the matches share. */
@@ -118,7 +118,7 @@ export function MapRecords({
           className="text-xs text-muted-foreground"
           data-testid="records-played"
         >
-          {matchCount(shown.length)} played, {decided.toLocaleString()} with a
+          {matchCount(shown.length)} played, {formatNumber(decided)} with a
           recorded result.
         </p>
       </div>
@@ -134,7 +134,7 @@ export function MapRecords({
           <p className="text-xs text-muted-foreground">
             {teams.twoSides === 1
               ? "The one match of two teams has no recorded result"
-              : `None of the ${teams.twoSides.toLocaleString()} matches of two teams has a recorded result`}
+              : `None of the ${formatNumber(teams.twoSides)} matches of two teams has a recorded result`}
             , so neither team has a record.
           </p>
         ) : (
@@ -172,7 +172,7 @@ export function MapRecords({
               >
                 <TableCell>{label}</TableCell>
                 <TableCell className="text-right">
-                  {s.matches.toLocaleString()}
+                  {formatNumber(s.matches)}
                 </TableCell>
                 <TableCell className="text-right">
                   {s.median === null ? "none" : formatDuration(s.median)}
@@ -265,8 +265,8 @@ export function MapRecords({
                 >
                   <span>{o.name}</span>
                   <span className="text-muted-foreground">
-                    was around {Math.round(o.x).toLocaleString()},{" "}
-                    {Math.round(o.z).toLocaleString()}
+                    was around {formatNumber(Math.round(o.x))},{" "}
+                    {formatNumber(Math.round(o.z))}
                   </span>
                   <Button
                     size="sm"

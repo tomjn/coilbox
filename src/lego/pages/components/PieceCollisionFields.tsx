@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { formatNumber } from "@/lib/format";
 import {
   COLLISION_VOLUME_LABELS,
   MIN_PIECE_COLLISION_SIZE,
@@ -267,8 +268,10 @@ export function PieceCollisionFields({
       ) : (
         <p className="text-xs text-muted-foreground">
           {picked.name} is on the box the engine measures round its vertices,{" "}
-          {derived.scales.map((n) => Number(n.toFixed(1))).join(" by ")} elmos.
-          Changing anything above takes it over.
+          {derived.scales
+            .map((n) => formatNumber(n, { maximumFractionDigits: 1 }))
+            .join(" by ")}{" "}
+          elmos. Changing anything above takes it over.
         </p>
       )}
 

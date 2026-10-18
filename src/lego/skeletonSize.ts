@@ -35,6 +35,7 @@
  * is held to it, and the size that results is what `skeletonSize` then reports.
  */
 
+import { formatNumber } from "@/lib/format";
 import { type BodyPlan, planProportions, projectFromPlan } from "./bodyPlans";
 import type { LegoProject, SkeletonTarget } from "./model";
 import { applyProportions } from "./skeletonEdit";
@@ -332,7 +333,7 @@ export function currentTarget(
 
 /** The size in words: steps first, then elmos, then the height. */
 export function describeSize(size: SkeletonSize): string {
-  const round = (n: number) => Number(n.toFixed(1));
+  const round = (n: number) => formatNumber(n, { maximumFractionDigits: 1 });
   const parts: string[] = [];
   if (size.x !== null && size.z !== null) {
     parts.push(

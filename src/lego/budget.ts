@@ -12,6 +12,7 @@ import { type LegoProject, parseBudget } from "./model";
 
 export { parseBudget };
 
+import { formatNumber } from "@/lib/format";
 import type { LoadedPack } from "./pack";
 import { type Problem, problem } from "./problems";
 import type { RawGeometry } from "./rawGeometry";
@@ -40,7 +41,7 @@ export function budgetStanding(
 }
 
 function figure(value: number): string {
-  return Number(value.toFixed(1)).toLocaleString();
+  return formatNumber(value, { maximumFractionDigits: 1 });
 }
 
 /** The warning for a unit over budget, or null when it is not. */

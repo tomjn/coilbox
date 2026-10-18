@@ -1,3 +1,7 @@
+import { t } from "@lingui/core/macro";
+import { getLocale } from "../i18n";
+import { formatDate } from "./format";
+
 /**
  * How long ago a stored ISO timestamp was, in the shortest form that still says
  * it. Written for list rows (issue #2187), where the job is separating two
@@ -7,8 +11,8 @@
  * segment rather than printing "Invalid Date". A campaign or scenario that was
  * written by an older build, or hand-edited, can carry an empty `updatedAt`.
  *
- * Past a month the relative form stops helping ("412d ago" is not a fact anyone
- * reads), so it becomes a plain date in the user's locale.
+ * Past a month the relative form stops helping ("412 days ago" is not a fact
+ * anyone reads), so it becomes a plain date in the app language.
  */
 export function relativeTime(
   iso: string | undefined,
@@ -22,12 +26,37 @@ export function relativeTime(
   // of this clock. "in 3 minutes" would be a second vocabulary for what is
   // really just now, so a future time is clamped to now.
   const seconds = Math.max(0, Math.round((now - then) / 1000));
-  if (seconds < 60) return "just now";
+  if (seconds < SECONDS_PER_DAY * 30) return agoFromSeconds(seconds);
+  return formatDate(then, { dateStyle: "medium" });
+}
+
+const SECONDS_PER_DAY = 86_400;
+
+/**
+ * `seconds` ago as a sentence fragment in the app language: "just now", "2m
+ * ago", "vor 3 Tagen". Counts in the largest unit that has a whole number in
+ * it and rounds down, so a unit is only claimed once it has passed.
+ *
+ * English uses the narrow style ("3d ago"), which is what list rows have always
+ * shown. Other languages use the short style, because ICU's narrow French
+ * drops the "il y a" and reads "-5 min".
+ */
+export function agoFromSeconds(seconds: number): string {
+  if (seconds < 60) return t`just now`;
+  const locale = getLocale();
+  const rtf = new Intl.RelativeTimeFormat(locale, {
+    numeric: "auto",
+    style: locale === "en" ? "narrow" : "short",
+  });
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 60) return rtf.format(-minutes, "minute");
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(then).toLocaleDateString(undefined, { dateStyle: "medium" });
+  if (hours < 24) return rtf.format(-hours, "hour");
+  return rtf.format(-Math.floor(hours / 24), "day");
+}
+
+/** "refreshed 3 minutes ago" for a rapid index fetched `ageSecs` seconds ago. */
+export function refreshedLabel(ageSecs: number): string {
+  const ago = agoFromSeconds(ageSecs);
+  return t`refreshed ${ago}`;
 }

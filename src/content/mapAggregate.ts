@@ -12,6 +12,7 @@
  * matches.
  */
 
+import { formatFixed, formatNumber } from "@/lib/format";
 import {
   buildHeatFieldFromCounts,
   DEFAULT_RESOLUTION,
@@ -676,19 +677,19 @@ export const LAYER_LABEL: Record<HeatLayerId, string> = {
 
 /** A count of matches in words. */
 export const matchCount = (n: number) =>
-  `${n.toLocaleString()} ${n === 1 ? "match" : "matches"}`;
+  `${formatNumber(n)} ${n === 1 ? "match" : "matches"}`;
 
 /** How many events a layer holds, in its own noun: "172 orders to place a
  *  building". */
 export function layerEvents(layer: HeatLayerId, events: number): string {
   const [one, many] = NOUN[layer];
-  return `${events.toLocaleString()} ${events === 1 ? one : many}`;
+  return `${formatNumber(events)} ${events === 1 ? one : many}`;
 }
 
 /** A fraction as a percentage a person can read: one decimal under ten. */
 function percent(fraction: number): string {
   const p = fraction * 100;
-  return `${p < 10 ? p.toFixed(1) : Math.round(p)}%`;
+  return `${p < 10 ? formatFixed(p, 1) : Math.round(p)}%`;
 }
 
 /**
@@ -704,7 +705,7 @@ export function layerLegend(
   const { field, contributing } = aggregate;
   if (!field) return "";
   const [one, many] = NOUN[layer];
-  const reach = `${Math.round(field.radius).toLocaleString()} elmos`;
+  const reach = `${formatNumber(Math.round(field.radius))} elmos`;
   const during = window.kind === "whole" ? "" : ` in ${windowLabel(window)}`;
   const over = `across ${matchCount(contributing)}`;
   if (normalise === "share")
@@ -712,7 +713,7 @@ export function layerLegend(
   if (normalise === "rate") {
     const rate = aggregate.atPeak ?? 0;
     const shown =
-      rate < 10 ? rate.toFixed(1) : Math.round(rate).toLocaleString();
+      rate < 10 ? formatFixed(rate, 1) : formatNumber(Math.round(rate));
     return `on average ${shown} ${rate === 1 ? one : many} a minute${during} within ${reach} of one spot, ${over}`;
   }
   return `where the most matches were at their own busiest${during}, ${over}. Each match is scaled to its busiest spot, so this is not a count`;

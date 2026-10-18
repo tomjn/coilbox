@@ -1,6 +1,7 @@
 import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import type { ReactNode } from "react";
+import { formatTime } from "@/lib/format";
 import { QueueProgress } from "../../downloads/pages/components/ProgressBar";
 import { isUpdaterEnabled } from "../../profile/profile";
 import { useUpdater } from "../UpdaterProvider";
@@ -40,7 +41,7 @@ export default function UpdatesSettingsSection() {
   const inert = inertReason();
   const newVersion = update?.version;
   const lastCheckedTime = lastChecked
-    ? new Date(lastChecked).toLocaleTimeString()
+    ? formatTime(new Date(lastChecked))
     : null;
 
   return (

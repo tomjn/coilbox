@@ -14,7 +14,7 @@ import {
   ErrorBanner,
   SkeletonList,
 } from "@/content/pages/components/states";
-import { formatBytes } from "@/lib/format";
+import { formatBytes, formatDateTime } from "@/lib/format";
 import { usePlay } from "../PlayProvider";
 
 type SortKey = "date-desc" | "date-asc" | "name-asc" | "name-desc";
@@ -28,7 +28,7 @@ const SORT_OPTIONS = [
 
 function savedAt(ms: number): string {
   if (!ms) return "";
-  return new Date(ms).toLocaleString(undefined, {
+  return formatDateTime(new Date(ms), {
     dateStyle: "medium",
     timeStyle: "short",
   });

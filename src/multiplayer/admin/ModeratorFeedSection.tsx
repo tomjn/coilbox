@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
+import { formatTime } from "@/lib/format";
 import type { ChatMsg } from "../bindings";
 import { conversationHref } from "../chat/conversation";
 import { useConnection } from "../store";
@@ -13,7 +14,7 @@ import { ToolHeader } from "./ToolHeader";
 
 function fmtTime(ms: number): string {
   if (!ms) return "";
-  return new Date(ms).toLocaleTimeString([], {
+  return formatTime(new Date(ms), {
     hour: "2-digit",
     minute: "2-digit",
   });

@@ -14,6 +14,7 @@ import { Link } from "react-router";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { refreshedLabel } from "../../../lib/relativeTime";
 import {
   dlRepos,
   dlVersion,
@@ -23,7 +24,6 @@ import {
 } from "../../bindings";
 import { useDownloadsConfig } from "../../config";
 import { identityOf, useDownloadQueue } from "../../DownloadQueueProvider";
-import { refreshedLabel } from "../../rapidAge";
 import { orderRapidVersions } from "../../rapidVersionOrder";
 import { QueueProgress } from "./ProgressBar";
 import { EmptyState, errMessage } from "./states";

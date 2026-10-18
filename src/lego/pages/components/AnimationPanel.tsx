@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { formatFixed, formatNumber } from "@/lib/format";
 import { animCobProbe, animCobRun } from "../../../animation/bindings";
 import { OptionSelect } from "../../../components/OptionSelect";
 import { useReduceMotion } from "../../../general/display";
@@ -1425,7 +1426,7 @@ export function AnimationPanel({
             <p className="text-xs text-destructive">{stopped}</p>
             <p className="text-xs text-muted-foreground">
               {timeline && timeline.frames.length > 0
-                ? `Playing the ${(timeline.frames.length / timeline.fps).toFixed(1)} seconds it managed first.`
+                ? `Playing the ${formatFixed(timeline.frames.length / timeline.fps, 1)} seconds it managed first.`
                 : "It got no further than that, so there is nothing to play."}
             </p>
           </div>
@@ -2203,7 +2204,9 @@ export function AnimationPanel({
                           <div className="flex items-center justify-between text-xs">
                             <span>{param.label}</span>
                             <span className="text-muted-foreground">
-                              {Number(shown.toFixed(2))}
+                              {formatNumber(shown, {
+                                maximumFractionDigits: 2,
+                              })}
                               {PARAM_SUFFIX[param.unit]}
                             </span>
                           </div>

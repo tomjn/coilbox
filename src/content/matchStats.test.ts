@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import { i18n } from "@/i18n";
 import { PALETTE, rgbToHex } from "@/play/participants";
 import type {
   DemoInfo,
@@ -184,7 +185,15 @@ describe("a match total", () => {
   });
 });
 
+afterEach(() => i18n.loadAndActivate({ locale: "en", messages: {} }));
+
 describe("formatTotal", () => {
+  it("follows the app language", () => {
+    i18n.loadAndActivate({ locale: "de", messages: {} });
+    expect(formatTotal(9999.4)).toBe("9.999");
+    expect(formatTotal(1_234_567)).toBe("1,2\u00a0Mio.");
+  });
+
   it("leaves a figure small enough to read", () => {
     expect(formatTotal(0)).toBe("0");
     expect(formatTotal(512)).toBe("512");
@@ -192,8 +201,8 @@ describe("formatTotal", () => {
   });
 
   it("shortens thousands and millions", () => {
-    expect(formatTotal(12_345)).toBe("12.3k");
-    expect(formatTotal(150_000)).toBe("150k");
+    expect(formatTotal(12_345)).toBe("12.3K");
+    expect(formatTotal(150_000)).toBe("150K");
     expect(formatTotal(1_234_567)).toBe("1.2M");
   });
 
@@ -1035,16 +1044,16 @@ describe("formatChartValue", () => {
 
   it("shortens one axis the same way all the way up it", () => {
     expect([8_000, 16_000, 24_000, 32_000].map(formatChartValue)).toEqual([
-      "8k",
-      "16k",
-      "24k",
-      "32k",
+      "8K",
+      "16K",
+      "24K",
+      "32K",
     ]);
   });
 
   it("drops a trailing zero decimal", () => {
     expect(formatChartValue(1_400_000)).toBe("1.4M");
-    expect(formatChartValue(350_000)).toBe("350k");
+    expect(formatChartValue(350_000)).toBe("350K");
     expect(formatChartValue(12_000_000)).toBe("12M");
   });
 
@@ -1079,7 +1088,7 @@ describe("formatRate", () => {
 
   it("reads a big rate the way the rest of the chart does", () => {
     expect(formatRate(360)).toBe("360");
-    expect(formatRate(5_900.4)).toBe("5.9k");
+    expect(formatRate(5_900.4)).toBe("5.9K");
     expect(formatRate(1_050_000)).toBe("1.05M");
   });
 });

@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Progress } from "@/components/ui/progress";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { formatFixed, formatNumber } from "@/lib/format";
 import {
   type LogLine,
   type Report,
@@ -56,7 +57,7 @@ function ResultSummary({ report, file }: { report: Report; file: string }) {
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h3 className="text-sm font-semibold">Run complete</h3>
         <span className="text-xs text-muted-foreground">
-          {report.duration_sec.toFixed(1)}s · saved to history ({file})
+          {formatFixed(report.duration_sec, 1)}s · saved to history ({file})
         </span>
       </div>
       <div className="flex flex-wrap gap-4 text-sm">
@@ -66,7 +67,7 @@ function ResultSummary({ report, file }: { report: Report; file: string }) {
               <p className="text-xs uppercase tracking-wide text-muted-foreground">
                 {c.command} p99
               </p>
-              <p className="font-mono">{c.p99_ms.toFixed(2)} ms</p>
+              <p className="font-mono">{formatFixed(c.p99_ms, 2)} ms</p>
             </div>
           ),
         )}
@@ -132,7 +133,8 @@ function RunProgress({
           <Loader2 size={14} className="animate-spin" /> {phase}
         </span>
         <span className="font-mono text-xs text-muted-foreground">
-          {elapsed.toFixed(0)}s{windowSec ? ` / ~${windowSec.toFixed(0)}s` : ""}
+          {formatFixed(elapsed, 0)}s
+          {windowSec ? ` / ~${formatFixed(windowSec, 0)}s` : ""}
         </span>
       </div>
       {pct === null ? (
@@ -147,11 +149,11 @@ function RunProgress({
       )}
       {live ? (
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-          <LiveStat label="Sent" value={live.sent.toLocaleString()} />
-          <LiveStat label="Rate" value={`${live.rate.toFixed(0)}/s`} />
+          <LiveStat label="Sent" value={formatNumber(live.sent)} />
+          <LiveStat label="Rate" value={`${formatFixed(live.rate, 0)}/s`} />
           <LiveStat
             label="Errors"
-            value={live.errors.toLocaleString()}
+            value={formatNumber(live.errors)}
             emphasis={live.errors > 0}
           />
         </div>

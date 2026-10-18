@@ -26,6 +26,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 import { Field } from "@/components/Field";
 import { ButtonGroup } from "@/components/ui/button-group";
+import { formatFixed } from "@/lib/format";
 import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
 import { baseAtlas, type LegoAtlas } from "../../atlas";
@@ -251,7 +252,7 @@ function PartBody({
       frame={frame}
       name={partTitle(pack, part)}
       size={partDimensions(part)
-        .map((n) => n.toFixed(2))
+        .map((n) => formatFixed(n, 2))
         .join(" x ")}
     >
       <Preview
@@ -310,8 +311,8 @@ function PartBody({
 
         <dt>Atlas</dt>
         <dd>
-          {part.uvBox.min.map((n) => n.toFixed(2)).join(", ")} to{" "}
-          {part.uvBox.max.map((n) => n.toFixed(2)).join(", ")}
+          {part.uvBox.min.map((n) => formatFixed(n, 2)).join(", ")} to{" "}
+          {part.uvBox.max.map((n) => formatFixed(n, 2)).join(", ")}
         </dd>
 
         {pack.library.packs.length > 1 ? (

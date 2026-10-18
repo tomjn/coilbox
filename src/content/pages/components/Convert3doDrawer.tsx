@@ -9,6 +9,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Progress } from "@/components/ui/progress";
+import { formatNumber } from "@/lib/format";
 import { notify } from "@/notify/notify";
 import {
   type Convert3doGroup,
@@ -502,8 +503,8 @@ function GroupReport({ group }: { group: Convert3doGroup }) {
         {group.reusedAtlas
           ? ", kept from an earlier run so the models it already wrote stay correct"
           : ""}
-        . {group.triangles.toLocaleString()} triangles,{" "}
-        {group.vertices.toLocaleString()} vertices.
+        . {formatNumber(group.triangles)} triangles,{" "}
+        {formatNumber(group.vertices)} vertices.
       </p>
 
       {group.didNotFit.length > 0 && (

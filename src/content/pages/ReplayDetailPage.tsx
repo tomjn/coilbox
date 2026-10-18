@@ -17,7 +17,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { formatBytes, formatDuration } from "@/lib/format";
+import { formatBytes, formatDateTime, formatDuration } from "@/lib/format";
 import { notify } from "@/notify/notify";
 import { useWriteRoot, useWriteRootPath } from "../../downloads/config";
 import { QueueProgress } from "../../downloads/pages/components/ProgressBar";
@@ -80,7 +80,7 @@ const errMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 function playedAt(ms: number): string {
   if (!ms) return "";
-  return new Date(ms).toLocaleString(undefined, {
+  return formatDateTime(new Date(ms), {
     dateStyle: "medium",
     timeStyle: "short",
   });

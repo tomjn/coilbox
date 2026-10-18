@@ -9,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatNumber } from "@/lib/format";
 import type { StatRecord } from "../../bindings";
 import { SPLIT_BUCKETS, type SplitBucket } from "../../replayOpening";
 import { SPLIT_COLOURS } from "../../splitColours";
@@ -54,14 +55,14 @@ const BUCKET: Record<SplitBucket, string> = {
   unclassified: "Unclassified",
 };
 
-const whole = (n: number) => Math.round(n).toLocaleString();
+const whole = (n: number) => formatNumber(Math.round(n));
 
 function games(n: number): string {
-  return `${n.toLocaleString()} ${n === 1 ? "game" : "games"}`;
+  return `${formatNumber(n)} ${n === 1 ? "game" : "games"}`;
 }
 
 function orders(n: number): string {
-  return `${n.toLocaleString()} ${n === 1 ? "order" : "orders"}`;
+  return `${formatNumber(n)} ${n === 1 ? "order" : "orders"}`;
 }
 
 /** How many of the player's games are in no row, for any reason. */
@@ -182,7 +183,7 @@ function Help({ usage, name }: { usage: UnitUsage; name: string }) {
       )}
       {usage.unpriced > 0 && (
         <p>
-          {usage.unpriced.toLocaleString()} units ordered have no metal cost in
+          {formatNumber(usage.unpriced)} units ordered have no metal cost in
           their list and add nothing to the metal.
         </p>
       )}
@@ -322,10 +323,10 @@ export function PlayerUnitUsage({
                       </TableHead>
                       <TableCell>{KIND[row.category]}</TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {row.matches.toLocaleString()}
+                        {formatNumber(row.matches)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {row.units.toLocaleString()}
+                        {formatNumber(row.units)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
                         {row.unpriced < row.units ? whole(row.metal) : ""}
@@ -336,16 +337,16 @@ export function PlayerUnitUsage({
                       <TableCell className="text-right tabular-nums">
                         {row.analysed && (
                           <>
-                            <div>{row.analysed.finished.toLocaleString()}</div>
+                            <div>{formatNumber(row.analysed.finished)}</div>
                             <div className="text-[11px] text-muted-foreground">
-                              {row.analysed.ordered.toLocaleString()} ordered in{" "}
+                              {formatNumber(row.analysed.ordered)} ordered in{" "}
                               {games(row.analysed.replays)}
                             </div>
                           </>
                         )}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {row.analysed?.died.toLocaleString() ?? ""}
+                        {row.analysed ? formatNumber(row.analysed.died) : ""}
                       </TableCell>
                     </TableRow>
                   ))}

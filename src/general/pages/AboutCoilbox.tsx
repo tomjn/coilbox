@@ -2,11 +2,14 @@ import { Button } from "@picoframe/frame";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Bug, ExternalLink, Info, Star } from "lucide-react";
 import { useEffect, useState } from "react";
+import { formatCompact, formatNumber } from "@/lib/format";
 import { API_URL, ISSUE_URL, REPO_URL } from "../errorReport";
 
-/** Compact star count: 1234 -> "1.2k", below 1000 shown as-is. */
+/** Compact star count: 1234 -> "1.2K" under en, below 1000 shown as-is. */
 function formatStars(n: number): string {
-  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+  return n >= 1000
+    ? formatCompact(n, { maximumFractionDigits: 1 })
+    : formatNumber(n);
 }
 
 /**

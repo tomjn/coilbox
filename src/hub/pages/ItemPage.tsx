@@ -29,6 +29,7 @@ import type { ImportPlan } from "@/deeplink/actions";
 import { ConfirmDialog, type Pending } from "@/deeplink/ConfirmDialog";
 import { fetchImportPlan } from "@/deeplink/fetchImport";
 import { fetchImportText } from "@/deeplink/fetchText";
+import { formatDate as formatLocaleDate } from "@/lib/format";
 import { getGameMatcher, getProfile } from "@/profile/profile";
 import { describeItem, fetchHubItem, type HubItemDetail } from "../api";
 import { MapPictureCard } from "../assets/MapPicture";
@@ -89,7 +90,7 @@ function formatDate(iso: string): string {
   const date = new Date(iso);
   return Number.isNaN(date.getTime())
     ? ""
-    : date.toLocaleDateString(undefined, { dateStyle: "long" });
+    : formatLocaleDate(date, { dateStyle: "long" });
 }
 
 /** The hub's host, for saying where an import comes from. */

@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import { i18n } from "@/i18n";
 import type { DownloadProgress } from "./bindings";
 import type { DownloadRate } from "./downloadRate";
 import { IDLE_RATE } from "./downloadRate";
@@ -21,6 +22,8 @@ function rate(r: Partial<DownloadRate> = {}): DownloadRate {
   return { ...IDLE_RATE, ...r };
 }
 
+afterEach(() => i18n.loadAndActivate({ locale: "en", messages: {} }));
+
 describe("progressCaption", () => {
   it("reads size, speed and time left when the source knows the total", () => {
     const caption = progressCaption(
@@ -29,6 +32,16 @@ describe("progressCaption", () => {
       4,
     );
     expect(caption).toBe("12 MB of 48 MB · 3.5 MB/s · 10s left");
+  });
+
+  it("writes the speed with the app language's decimal separator", () => {
+    i18n.loadAndActivate({ locale: "de", messages: {} });
+    const caption = progressCaption(
+      sample({ downloadedBytes: 12 * MB, totalBytes: 48 * MB, percent: 25 }),
+      rate({ bytesPerSec: 3.5 * MB, secondsLeft: 10 }),
+      4,
+    );
+    expect(caption).toContain("3,5 MB/s");
   });
 
   it("leaves the percentage out when the byte total says the same thing", () => {

@@ -16,6 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatNumber } from "@/lib/format";
 import { notify } from "@/notify/notify";
 import {
   contentWriteFile,
@@ -256,8 +257,8 @@ function EventsTable({
       )}
       <p className="text-xs text-muted-foreground">
         {matching.length === events.length
-          ? `${events.length.toLocaleString()} events.`
-          : `${matching.length.toLocaleString()} of ${events.length.toLocaleString()} events match.`}
+          ? `${formatNumber(events.length)} events.`
+          : `${formatNumber(matching.length)} of ${formatNumber(events.length)} events match.`}
       </p>
       {matching.length === 0 ? (
         <p className="text-sm text-muted-foreground">
@@ -326,8 +327,7 @@ function EventsTable({
             size="sm"
             onClick={() => setShown((n) => n + PAGE)}
           >
-            Show {Math.min(PAGE, left)} more of{" "}
-            {matching.length.toLocaleString()}
+            Show {Math.min(PAGE, left)} more of {formatNumber(matching.length)}
           </Button>
         </div>
       )}
@@ -401,7 +401,7 @@ export function ReplayAnalysisEvents({
               <ChevronRight className="size-4 transition-transform group-data-[state=open]:rotate-90" />
               <span className="font-medium">Recorded events</span>
               <span className="text-xs text-muted-foreground">
-                {total.toLocaleString()} {total === 1 ? "event" : "events"}
+                {formatNumber(total)} {total === 1 ? "event" : "events"}
               </span>
             </Button>
           </CollapsibleTrigger>

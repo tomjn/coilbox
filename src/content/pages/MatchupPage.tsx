@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { useMemo } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
-import { formatDuration } from "@/lib/format";
+import { formatDate, formatDuration } from "@/lib/format";
 import {
   useContentState,
   useReplayStats,
@@ -28,7 +28,7 @@ import { EmptyState, ErrorBanner, SkeletonList } from "./components/states";
 
 function playedAt(ms: number): string {
   if (!ms) return "never";
-  return new Date(ms).toLocaleDateString(undefined, { dateStyle: "medium" });
+  return formatDate(new Date(ms), { dateStyle: "medium" });
 }
 
 function outcomeLabel(won: boolean | undefined): string {

@@ -2,6 +2,7 @@ import { Button } from "@picoframe/frame";
 import { Download, Loader2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { formatDate } from "@/lib/format";
 import { versionLabel } from "@/lib/utils";
 import type { DownloadRecord } from "../../../downloads/downloadHistory";
 import type { GameItem } from "../../bindings";
@@ -19,7 +20,7 @@ const SOURCE_LABEL: Record<DownloadRecord["source"], string> = {
 };
 
 const dateOf = (iso: string) =>
-  new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" });
+  formatDate(new Date(iso), { dateStyle: "medium" });
 
 /** What the newest successful download fetched, in a few words. */
 function fetchedOf(r: DownloadRecord): string | null {

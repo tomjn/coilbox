@@ -12,6 +12,7 @@ import { Input } from "@picoframe/frame";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { Label } from "@/components/ui/label";
+import { formatNumber } from "@/lib/format";
 import { normaliseCloneKey } from "@/workshop/clones";
 import { useUnitDefs } from "@/workshop/config";
 import { DPS_HELP, type WeaponInput } from "@/workshop/derivedStats";
@@ -67,7 +68,7 @@ const STAT_FIELDS: Partial<Record<StatId, string[]>> = {
 };
 
 function figure(value: number): string {
-  return Number(value.toFixed(1)).toLocaleString();
+  return formatNumber(value, { maximumFractionDigits: 1 });
 }
 
 export function StatsSection({

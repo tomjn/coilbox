@@ -6,6 +6,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatNumber } from "@/lib/format";
 import {
   type OrderedSplit,
   SPLIT_BUCKETS,
@@ -89,15 +90,15 @@ export function ReplayOpeningSplit({
                   data-bucket={bucket}
                 >
                   <div>
-                    {row.split.buckets[bucket].metal.toLocaleString()} metal
+                    {formatNumber(row.split.buckets[bucket].metal)} metal
                   </div>
                   <div className="text-muted-foreground">
-                    {row.split.buckets[bucket].energy.toLocaleString()} energy
+                    {formatNumber(row.split.buckets[bucket].energy)} energy
                   </div>
                 </TableCell>
               ))}
               <TableCell className="text-right tabular-nums">
-                {row.split.unpriced.toLocaleString()}{" "}
+                {formatNumber(row.split.unpriced)}{" "}
                 {row.split.unpriced === 1 ? "unit" : "units"}
               </TableCell>
             </TableRow>

@@ -39,6 +39,7 @@ import { useOneShotParam } from "@/deeplink/useOneShotParam";
 import { EmptyState } from "@/downloads/pages/components/states";
 import { resolveHome } from "@/home/config";
 import { useHomeBackdropStyle } from "@/home/useHomeBackdropStyle";
+import { formatDate as formatLocaleDate } from "@/lib/format";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { isTypingTarget } from "@/lib/scenarioEditing/history";
 import { getGameMatcher, getProfile } from "@/profile/profile";
@@ -162,7 +163,7 @@ function formatDate(iso: string): string {
   const date = new Date(iso);
   return Number.isNaN(date.getTime())
     ? ""
-    : date.toLocaleDateString(undefined, { dateStyle: "medium" });
+    : formatLocaleDate(date, { dateStyle: "medium" });
 }
 
 export default function BrowsePage() {

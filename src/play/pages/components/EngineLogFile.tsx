@@ -3,11 +3,12 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { ExternalLink, FolderSearch } from "lucide-react";
 import type { ReactNode } from "react";
 import { contentOpenPath } from "@/content/bindings";
+import { formatDateTime } from "@/lib/format";
 import type { InfologTail } from "@/play/bindings";
 
 /** A log's timestamp, in the reader's own locale. */
 function when(ms: number): string {
-  return new Date(ms).toLocaleString();
+  return formatDateTime(new Date(ms));
 }
 
 /**
