@@ -2,8 +2,8 @@
  * The games coilbox writes for itself.
  *
  * Five flows need a game the engine can launch that the player never
- * installed. A campaign with units from the builder launches its missions in
- * one too (issue #4516). The unit builder tests a built unit in one
+ * installed. A campaign, conquest or warpath with units from the builder
+ * launches its battles in one too (issues #4516 and #4518). The unit builder tests a built unit in one
  * (`src/lego/scratchGame.ts`), a scenario is tested in one when the real game
  * cannot play missions (`src/scenario/mutator.ts`), a workshop project is
  * tested in one on every game, since a mutator archive is the one route that
@@ -49,30 +49,58 @@ export const WORKSHOP_MUTATOR_FOLDER = "coilbox-workshop-test.sdd";
 export const PLAYBACK_FOLDER = "coilbox-replay-playback.sdd";
 
 /**
- * The start of every campaign's units mutator (issue #4516). The Rust side
- * waives its write-once rule for any lower-case `coilbox-lego-*.sdd`, so this
- * needs nothing of its own there.
+ * The start of every campaign's (issue #4516), conquest's and warpath run's
+ * (issue #4518) units mutator. The Rust side waives its write-once rule for any
+ * lower-case `coilbox-lego-*.sdd`, and removes only these.
  */
-const CAMPAIGN_UNITS_PREFIX = "coilbox-lego-campaign-";
+const UNITS_PREFIXES = {
+  campaign: "coilbox-lego-campaign-",
+  conquest: "coilbox-lego-conquest-",
+  warpath: "coilbox-lego-run-",
+} as const;
 
-/**
- * The folder a campaign's built units are written into at launch, or null for
- * a campaign id that cannot name one: the folder name is held to lower case
- * letters, digits and hyphens, 64 characters at most.
- */
-export function campaignUnitsFolder(campaignId: string): string | null {
-  const folder = `${CAMPAIGN_UNITS_PREFIX}${campaignId.toLowerCase()}.sdd`;
-  return /^[a-z0-9.-]+$/.test(folder) &&
-    folder.length <= 64 &&
-    !folder.includes("..")
-    ? folder
-    : null;
+/** Whose units a units mutator carries. Matches `UnitsScope` in the bindings. */
+export type UnitsFolderScope = keyof typeof UNITS_PREFIXES;
+
+/** The longest folder name the Rust side accepts. */
+const MAX_FOLDER = 64;
+
+/** A short stable name for an id too long to fit a folder name (FNV-1a). */
+function shortId(id: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < id.length; i++) {
+    hash ^= id.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
-/** Whether a scanned archive is one campaign's units mutator. */
-export function isCampaignUnitsArchive(archiveName: string): boolean {
+/**
+ * The folder a campaign's, conquest's or run's built units are written into at
+ * launch, or null for an id that cannot name one. The folder name is held to
+ * lower case letters, digits and hyphens, 64 characters at most, so an id too
+ * long for that is named by a hash of it instead.
+ */
+export function unitsFolder(
+  scope: UnitsFolderScope,
+  id: string,
+): string | null {
+  const lower = id.toLowerCase();
+  if (!/^[a-z0-9-]+$/.test(lower)) return null;
+  const prefix = UNITS_PREFIXES[scope];
+  const folder = `${prefix}${lower}.sdd`;
+  return folder.length <= MAX_FOLDER
+    ? folder
+    : `${prefix}${shortId(lower)}.sdd`;
+}
+
+/** Whether a scanned archive is one campaign's, conquest's or run's units mutator. */
+export function isUnitsArchive(archiveName: string): boolean {
   const name = archiveName.toLowerCase();
-  return name.startsWith(CAMPAIGN_UNITS_PREFIX) && name.endsWith(".sdd");
+  return (
+    Object.values(UNITS_PREFIXES).some((prefix) => name.startsWith(prefix)) &&
+    name.endsWith(".sdd")
+  );
 }
 
 /** Whether a scanned archive is the unit builder's scratch game. */
@@ -111,8 +139,8 @@ export function generatedGameNote(archiveName: string): string | null {
     return `Coilbox writes this game to test a scenario in when the real game cannot play one, and rewrites it on every test launch. It is not a game to play. ${UNDO}`;
   if (isWorkshopMutatorArchive(archiveName))
     return `Coilbox writes this game to test a workshop project in, and rewrites it on every test launch. It is not a game to play. ${UNDO}`;
-  if (isCampaignUnitsArchive(archiveName))
-    return `Coilbox writes this game to put a campaign's units from the builder in, and rewrites it when one of that campaign's missions launches. It is not a game to play. ${UNDO}`;
+  if (isUnitsArchive(archiveName))
+    return `Coilbox writes this game to put the units from the builder that a campaign, conquest or warpath carries in, and rewrites it when one of its battles launches. It is not a game to play. ${UNDO}`;
   if (isPlaybackArchive(archiveName))
     return `Coilbox writes this game to play a recorded replay back in, and rewrites it on every playback. It is not a game to play. ${UNDO}`;
   return null;

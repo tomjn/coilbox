@@ -1,8 +1,10 @@
 import { useCallback, useMemo } from "react";
+import type { UnitsOwner } from "../campaign/units";
 import type { NodeScenario } from "../conquest/model";
 import type { SkirmishAi } from "../content/bindings";
 import { useUnitsyncScan, useUnitsyncUnitDataset } from "../content/config";
 import type { ReplayProvenance } from "../content/replayUserState";
+import { withBuiltUnits } from "../lego/buildList";
 import { usePreferredTarget } from "../play/config";
 import type { SkirmishDraft } from "../play/drafts";
 import type { GameAiConfig } from "../play/gameAi";
@@ -79,9 +81,26 @@ export function useRunEncounter(
     target?.dataDir,
     launchGame?.primaryArchive.name,
   );
+  // The run's builder units join the game's on their builders' lists, as the
+  // mutator puts them there, so the limit locks each until it is unlocked
+  // (issue #4518).
   const limit = useMemo(
-    () => limitReadiness(run, { status: datasetStatus, units: dataset?.units }),
+    () =>
+      limitReadiness(run, {
+        status: datasetStatus,
+        units:
+          dataset?.units && run.units
+            ? withBuiltUnits(dataset.units, run.units)
+            : dataset?.units,
+      }),
     [run, datasetStatus, dataset],
+  );
+  const units = useMemo(
+    (): UnitsOwner | undefined =>
+      runId && run.units
+        ? { scope: "warpath", id: runId, units: run.units }
+        : undefined,
+    [runId, run.units],
   );
 
   // The encounter as a launchable skirmish snapshot: the synthesized roster plus
@@ -171,6 +190,7 @@ export function useRunEncounter(
     provenance,
     scenario,
     scenarioDifficulty,
+    units,
   });
 
   return {

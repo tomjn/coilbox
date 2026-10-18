@@ -48,9 +48,8 @@ import {
   type LoadedPack,
   partDimensions,
   partSize,
-  shapeVariants,
 } from "../../pack";
-import { partTitle, visibleTags } from "../../partOrder";
+import { partTitle, shapeColourways, visibleTags } from "../../partOrder";
 import {
   disposeRawGeometry,
   loadRawGeometry,
@@ -245,7 +244,7 @@ function PartBody({
   part: LegoPartInfo;
   onSelect: (part: LegoPartInfo) => void;
 }) {
-  const variants = shapeVariants(pack, part.shapeId);
+  const variants = shapeColourways(pack, part);
   const colours = useColourwayColours(pack);
   return (
     <Frame

@@ -1,5 +1,7 @@
 /**
- * Units from the unit builder, attached to a campaign (issue #4516).
+ * Units from the unit builder, attached to a campaign (issue #4516), a
+ * conquest or a warpath run (issue #4518). Everything here works on a
+ * {@link UnitsOwner}, which a campaign already is.
  *
  * Attaching a unit takes a copy, the way a mission snapshots its preset, so
  * editing the unit in the builder does not change the campaign. The copy is
@@ -20,6 +22,7 @@
  * lobby.
  */
 
+import { loadContentState } from "../content/contentState";
 import { legoScratchRemove } from "../lego/bindings";
 import type { BuiltBy } from "../lego/buildList";
 import type { LegoProject } from "../lego/model";
@@ -33,19 +36,37 @@ import {
   prepareUnit,
   writePreparedMutator,
 } from "../lego/mutator";
-import type { LoadedPack } from "../lego/pack";
-import type { RawGeometry } from "../lego/rawGeometry";
+import { type LoadedPack, loadPack } from "../lego/pack";
+import { loadRawGeometryIfAny, type RawGeometry } from "../lego/rawGeometry";
 import { footprintSteps, movedUnitDef, renderUnitDef } from "../lego/unitDef";
-import { campaignUnitsFolder } from "../lib/generatedGames";
+import { unitsFolder } from "../lib/generatedGames";
+import { readStoredSetting } from "../lib/storedSetting";
 import type { PlayTarget } from "../play/config";
 import { loadUnitDefs } from "../workshop/config";
-import type { ModProject } from "../workshop/project";
+import { type ModProject, PROJECTS_KEY } from "../workshop/project";
 import {
   campaignUnitDelete,
   campaignUnitList,
   campaignUnitSave,
+  campaignUnitsDelete,
+  type UnitsScope,
 } from "./bindings";
-import type { Campaign, CampaignUnit } from "./model";
+import type { CampaignUnit } from "./model";
+
+/** Where a set of unit copies is kept: whose they are, and its id. */
+export interface UnitsRef {
+  /** Absent for a campaign. */
+  scope?: UnitsScope;
+  id: string;
+}
+
+/**
+ * Something units are attached to: a campaign, a conquest (by galaxy id) or a
+ * warpath run (by run id), with the entries it keeps for its copies.
+ */
+export interface UnitsOwner extends UnitsRef {
+  units?: readonly CampaignUnit[];
+}
 
 /** What a campaign stores on disk as its copy of a unit. */
 export interface CampaignUnitCopy {
@@ -80,13 +101,13 @@ export interface UnitSource {
  * have its copy overwrite the first.
  */
 export function attachRefusal(
-  campaign: Campaign,
+  owner: Pick<UnitsOwner, "units">,
   project: LegoProject,
 ): string | null {
   if (!/^[a-z0-9_]{1,64}$/.test(project.unitName)) {
     return `${project.name} has no unit name a game can load. Give it one in the unit builder first.`;
   }
-  const taken = (campaign.units ?? []).find(
+  const taken = (owner.units ?? []).find(
     (u) => u.unitName === project.unitName && u.projectId !== project.id,
   );
   return taken
@@ -106,11 +127,11 @@ function entryFor(project: LegoProject, copiedAt: string): CampaignUnit {
 }
 
 /**
- * Build the unit and store the campaign's copy of it, replacing an earlier copy
- * of the same unit. Answers the entry for the campaign document.
+ * Build the unit and store the owner's copy of it, replacing an earlier copy
+ * of the same unit. Answers the entry for the owner's document.
  */
 export async function copyUnit(
-  campaignId: string,
+  owner: UnitsRef,
   { project, pack, raw, workshopProjects }: UnitSource,
   now: string = new Date().toISOString(),
 ): Promise<CampaignUnit> {
@@ -136,7 +157,8 @@ export async function copyUnit(
     carriesTextures: atlas !== null || stored.length > 0,
   };
   await campaignUnitSave({
-    campaignId,
+    campaignId: owner.id,
+    ...(owner.scope ? { scope: owner.scope } : {}),
     unitName: project.unitName,
     json: JSON.stringify(copy),
     atlas,
@@ -146,35 +168,41 @@ export async function copyUnit(
 }
 
 /**
- * The campaign with this unit attached, or its entry replaced when it is
+ * The document with this unit attached, or its entry replaced when it is
  * already attached. An update keeps the unit where it was in the list.
  */
-export function withUnit(campaign: Campaign, unit: CampaignUnit): Campaign {
-  const units = campaign.units ?? [];
+export function withUnit<T extends { units?: CampaignUnit[] }>(
+  doc: T,
+  unit: CampaignUnit,
+): T {
+  const units = doc.units ?? [];
   const at = units.findIndex((u) => u.projectId === unit.projectId);
   const next =
     at === -1 ? [...units, unit] : units.map((u, i) => (i === at ? unit : u));
-  return { ...campaign, units: next };
+  return { ...doc, units: next };
 }
 
-/** The campaign without this unit's entry. */
-export function withoutUnit(campaign: Campaign, unitName: string): Campaign {
-  const units = (campaign.units ?? []).filter((u) => u.unitName !== unitName);
-  return { ...campaign, units: units.length > 0 ? units : undefined };
+/** The document without this unit's entry. */
+export function withoutUnit<T extends { units?: CampaignUnit[] }>(
+  doc: T,
+  unitName: string,
+): T {
+  const units = (doc.units ?? []).filter((u) => u.unitName !== unitName);
+  return { ...doc, units: units.length > 0 ? units : undefined };
 }
 
 /**
- * Copy a unit into the campaign. Answers the entry to add to the document,
- * which the caller saves.
+ * Copy a unit into the owner. Answers the entry to add to the document, which
+ * the caller saves.
  */
 export async function attachUnit(
-  campaign: Campaign,
+  owner: UnitsOwner,
   source: UnitSource,
   now?: string,
 ): Promise<CampaignUnit> {
-  const refusal = attachRefusal(campaign, source.project);
+  const refusal = attachRefusal(owner, source.project);
   if (refusal) throw new Error(refusal);
-  return copyUnit(campaign.id, source, now);
+  return copyUnit(owner, source, now);
 }
 
 /**
@@ -186,17 +214,17 @@ export async function attachUnit(
  * with `detachCopy` once the document naming the new one is saved.
  */
 export async function updateUnit(
-  campaign: Campaign,
+  owner: UnitsOwner,
   source: UnitSource,
   now?: string,
 ): Promise<{ unit: CampaignUnit; replaces: string | null }> {
-  const earlier = (campaign.units ?? []).find(
+  const earlier = (owner.units ?? []).find(
     (u) => u.projectId === source.project.id,
   );
   if (!earlier) throw new Error(`${source.project.name} is not attached.`);
-  const refusal = attachRefusal(campaign, source.project);
+  const refusal = attachRefusal(owner, source.project);
   if (refusal) throw new Error(refusal);
-  const unit = await copyUnit(campaign.id, source, now);
+  const unit = await copyUnit(owner, source, now);
   return {
     unit,
     replaces: earlier.unitName !== unit.unitName ? earlier.unitName : null,
@@ -210,8 +238,13 @@ export async function updateUnit(
 export async function detachCopy(
   campaignId: string,
   unitName: string,
+  scope?: UnitsScope,
 ): Promise<void> {
-  await campaignUnitDelete({ campaignId, unitName });
+  await campaignUnitDelete({
+    campaignId,
+    ...(scope ? { scope } : {}),
+    unitName,
+  });
 }
 
 /**
@@ -222,10 +255,67 @@ export async function detachCopy(
 export async function removeUnitsGame(
   campaignId: string,
   dataDir: string,
+  scope: UnitsScope = "campaign",
 ): Promise<void> {
-  const folder = campaignUnitsFolder(campaignId);
+  const folder = unitsFolder(scope, campaignId);
   if (!folder) return;
   await legoScratchRemove({ dataDir, folder });
+}
+
+/**
+ * Remove everything a conquest or run holds for its units (issue #4518): its
+ * copies, and the units game in every content root, since a launch writes it
+ * into whichever root the engine of the day uses. Throws when either could not
+ * be removed, before the caller deletes the conquest or run, so it can retry.
+ */
+export async function discardUnits(ref: Required<UnitsRef>): Promise<void> {
+  const state = await loadContentState();
+  for (const root of state.roots) {
+    if (root.exists) await removeUnitsGame(ref.id, root.path, ref.scope);
+  }
+  await campaignUnitsDelete({ campaignId: ref.id, scope: ref.scope });
+}
+
+/** What a library unit is copied from: the document, its pack and meshes. */
+export async function unitSourceFor(
+  project: LegoProject,
+  workshopProjects: readonly ModProject[],
+): Promise<UnitSource> {
+  return {
+    project,
+    pack: await loadPack(),
+    raw: await loadRawGeometryIfAny(project.id),
+    workshopProjects,
+  };
+}
+
+/**
+ * Copy the units a conquest or run begins with (issue #4518), and answer the
+ * entries for its document. Any copies an earlier conquest of the same galaxy
+ * left are removed first. When one copy fails, those already made are removed
+ * too, so a start that fails leaves nothing behind.
+ */
+export async function carryUnits(
+  ref: Required<UnitsRef>,
+  projects: readonly LegoProject[],
+  now?: string,
+): Promise<CampaignUnit[]> {
+  const workshopProjects = readStoredSetting<ModProject[]>(PROJECTS_KEY, []);
+  await campaignUnitsDelete({ campaignId: ref.id, scope: ref.scope });
+  let doc: { units?: CampaignUnit[] } = {};
+  try {
+    for (const project of projects) {
+      const source = await unitSourceFor(project, workshopProjects);
+      const unit = await attachUnit({ ...ref, units: doc.units }, source, now);
+      doc = withUnit(doc, unit);
+    }
+  } catch (e) {
+    await campaignUnitsDelete({ campaignId: ref.id, scope: ref.scope }).catch(
+      () => {},
+    );
+    throw e;
+  }
+  return doc.units ?? [];
 }
 
 /** Whether the library's document has changed since the campaign copied it. */
@@ -264,8 +354,12 @@ export interface StoredCopy {
 /** Every copy a campaign holds that will read, with the folder it is in. */
 export async function loadUnitCopies(
   campaignId: string,
+  scope?: UnitsScope,
 ): Promise<Map<string, StoredCopy>> {
-  const { units } = await campaignUnitList({ campaignId });
+  const { units } = await campaignUnitList({
+    campaignId,
+    ...(scope ? { scope } : {}),
+  });
   const copies = new Map<string, StoredCopy>();
   for (const stored of units) {
     const copy = parseUnitCopy(stored.json);
@@ -419,25 +513,34 @@ function withGameMovement(
   };
 }
 
+/** What a player calls each kind of owner, in an error. */
+const OWNER_NOUN: Record<UnitsScope, string> = {
+  campaign: "campaign",
+  conquest: "conquest",
+  warpath: "warpath",
+};
+
 /**
- * Write the campaign's units mutator against this base game and have unitsync
- * find it. Null for a campaign with no units, which launches as it always did.
+ * Write the owner's units mutator against this base game and have unitsync
+ * find it. Null for an owner with no units, which launches as it always did.
  * Throws with a reason a player can act on.
  */
-export async function composeCampaignUnits(
-  campaign: Campaign,
+export async function composeUnits(
+  owner: UnitsOwner,
   target: PlayTarget,
   base: UnitsBaseGame,
 ): Promise<ComposedUnits | null> {
-  const units = campaign.units ?? [];
+  const units = owner.units ?? [];
   if (units.length === 0) return null;
-  const folder = campaignUnitsFolder(campaign.id);
+  const scope = owner.scope ?? "campaign";
+  const noun = OWNER_NOUN[scope];
+  const folder = unitsFolder(scope, owner.id);
   if (!folder) {
     throw new Error(
-      `This campaign's id, ${campaign.id}, cannot name a game folder, so its units cannot be loaded.`,
+      `This ${noun}'s id, ${owner.id}, cannot name a game folder, so its units cannot be loaded.`,
     );
   }
-  const copies = await loadUnitCopies(campaign.id);
+  const copies = await loadUnitCopies(owner.id, owner.scope);
   const game = await gameMovement(target, base.archive);
   const prepared: PreparedUnit[] = [];
   const movementLeftOut: string[] = [];
@@ -446,7 +549,7 @@ export async function composeCampaignUnits(
     const stored = copies.get(unit.unitName);
     if (!stored) {
       throw new Error(
-        `This campaign's copy of ${unit.name} is missing. Attach it again from the unit builder.`,
+        `This ${noun}'s copy of ${unit.name} is missing. Attach it again from the unit builder.`,
       );
     }
     const moving = withGameMovement(

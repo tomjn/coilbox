@@ -225,7 +225,9 @@ The Inventory tab lists parts and modules in one place. The **All**, **Parts** a
 
 Everything is in one grid, under the headings Shapes, Parts, Built in modules and Saved modules. Each heading counts its section, as in "Parts 373", and says "Parts 12 of 373" while a search, a category or a list narrows it. A section with nothing to show is left out. The arrow keys move through every section as one list.
 
-Clicking a tile also opens it in the panel beside the grid, in place of whatever the panel showed before. A part shows its size, its colourways, its tags and where it came from in the source file. A shape shows its kind and default size, with **Add** in the builder. A module shows its pieces and, when it was lifted from a game, the game and units it came from, with **Place** in the builder. The panel closes with its X or Escape. On the Lego Parts page it stays in view while the grid scrolls.
+**All categories** lists every part, with each shape's colourways side by side. Choose a colourway in the category menu and the Parts section shows each shape once, in that colourway, so clicking a tile adds that colourway. A shape the colourway does not have is left out. The bundled pack's one mixed part spans two colourways, so it is listed under every colourway. The heading then counts the colourway, as in "Parts 125" for the bundled pack's 124 shapes and the mixed part. The Change part drawer narrows the same way.
+
+Clicking a tile also opens it in the panel beside the grid, in place of whatever the panel showed before. A part shows its size, its colourways, its tags and where it came from in the source file. Click another colourway to show that part instead. In the builder, when the part is the one being placed, the new colourway is placed instead. A shape shows its kind and default size, with **Add** in the builder. A module shows its pieces and, when it was lifted from a game, the game and units it came from, with **Place** in the builder. The panel closes with its X or Escape. On the Lego Parts page it stays in view while the grid scrolls.
 
 With **Modules** chosen there is a category menu beside the search box. Search needs every term to appear in a module's name, category or tags. Click one of your own modules to rename it, change its category and tags, save it to a file, share it or delete it from the panel. The name, category and tags save when you press Enter or leave the field, and Escape gives up an edit. A module lifted from a game cannot be saved to a file.
 
@@ -922,6 +924,18 @@ To put the exported loadouts of a chassis on a factory's build menu, open Compar
 Some games load their units with their own `gamedata/unitdefs.lua` and never read `download/`. Beyond All Reason and Zero-K do that. Spring 1944 replaces `download_builds.lua` with its own. Coilbox asks the game which kind it is before it launches. If the game will not read the list, the Test drawer says so under the launch buttons, and the unit can still be spawned with `/cheat` and `/give`. A campaign mission that launches with the unit says so on its briefing ([Units from the unit builder](campaigns.md#units-from-the-unit-builder)). A builder that is not in the game being tested is left off and named there too.
 
 **Test in game** starts you as the unit itself, so to see the list, use **Launch sandbox with targets**. It starts you on the game's own start unit, or give yourself a factory from the list.
+
+### In a conquest or a warpath
+
+A conquest or a warpath run can begin with units from the builder, the same way a [campaign](campaigns.md#units-from-the-unit-builder) carries them. On the setup screen, under **Units from the builder**, press **Add unit** and pick from your saved units. The field only shows when you have saved a unit.
+
+Each unit is copied when the conquest or run begins, so editing it in the builder afterwards changes nothing. A conquest keeps its copies under `conquest/units/<galaxy id>/` in coilbox's data folder, and a run under `runlite/units/<run id>/`. Abandoning the conquest, starting it again or deleting the run removes them, and the game coilbox wrote for them.
+
+Every battle launches through a game coilbox writes at launch, `coilbox-lego-conquest-<galaxy id>.sdd` or `coilbox-lego-run-<run id>.sdd`. It depends on the exact game the conquest or run resolved for that battle, so a move to a newer version of the game rewrites it. A location that plays a scenario plays it on top of the same game. What was left out shows under the launch button, as it does in the Test drawer.
+
+In a warpath the units join the build tree under their builders before the run is generated. So a reward can offer one, and the unit limit locks it until a reward unlocks it or its builder, as for any other unit that builder builds.
+
+A shared challenge code does not carry the units. Somebody who imports it plays on the game's own units. Because the rewards of a warpath are drawn from its build tree, a run with builder units can offer different rewards from a run of the same code without them.
 
 ### Movement
 

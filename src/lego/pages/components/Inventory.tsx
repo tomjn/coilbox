@@ -178,6 +178,11 @@ interface GridsProps {
   selectedPartId?: string;
   /** Absent on the Lego Parts page, which has no unit to take a part. */
   onSelectPart?: (part: LegoPartInfo, alt: boolean) => void;
+  /**
+   * The panel's Colourway control chose another colourway of the part being
+   * placed, which the builder then places instead (#4540).
+   */
+  onSwitchPlacingPart?: (part: LegoPartInfo) => void;
   /** The builder adds the shape. Absent on the Lego Parts page. */
   onSelectShape?: (shape: ShapeKind, alt: boolean) => void;
   /** Absent on the Lego Parts page, which has no unit to place a module in. */
@@ -224,6 +229,7 @@ export function InventoryGrids({
   atlas,
   selectedPartId,
   onSelectPart,
+  onSwitchPlacingPart,
   onSelectShape,
   onInsertModule,
   placingModuleId,
@@ -261,11 +267,15 @@ export function InventoryGrids({
   const sections = useMemo(
     () =>
       inventorySections(
-        { shapes: view.shapes, parts: view.parts, modules: view.modules },
-        pack,
+        {
+          shapes: view.shapes,
+          parts: view.parts,
+          partTotal: view.partFilter.total,
+          modules: view.modules,
+        },
         compounds,
       ),
-    [view.shapes, view.parts, view.modules, pack, compounds],
+    [view.shapes, view.parts, view.partFilter.total, view.modules, compounds],
   );
   const empty = sections.every((section) => section.items.length === 0);
 
@@ -300,7 +310,17 @@ export function InventoryGrids({
         onShare: onShareModule,
         onLabels: onLabelsModule,
       }}
-      onSelect={setSelected}
+      onSelect={(next) => {
+        const part = next.kind === "part" ? pack.byId.get(next.id) : undefined;
+        if (
+          part &&
+          selected.kind === "part" &&
+          selected.id === selectedPartId
+        ) {
+          onSwitchPlacingPart?.(part);
+        }
+        setSelected(next);
+      }}
       onClose={() => setSelected(null)}
       onAddShape={onSelectShape && ((shape) => onSelectShape(shape, false))}
       onPlaceModule={
@@ -373,10 +393,14 @@ export function InventoryGrids({
  * The grid's sections, in the order they are drawn: Shapes, Parts, Built in
  * modules, Saved modules. Each carries its count before any filter, so its
  * heading can say "12 of 373" while a search, a category or a list narrows it.
+ * Parts count from the chosen colourway's parts instead, as a colourway lists
+ * each shape once (#4540): "Parts 125", not "125 of 373".
  */
 export function inventorySections(
-  view: Pick<InventoryView, "shapes" | "parts" | "modules">,
-  pack: LoadedPack,
+  view: Pick<InventoryView, "shapes" | "parts" | "modules"> & {
+    /** The parts the category holds, `PartFilter.total`. */
+    partTotal: number;
+  },
   compounds: LegoProject[],
 ): GridSection[] {
   const builtInTotal = compounds.filter(isBuiltInModule).length;
@@ -392,7 +416,7 @@ export function inventorySections(
     {
       id: "parts",
       label: "Parts",
-      total: pack.parts.length,
+      total: view.partTotal,
       items: view.parts.map((part) => ({ kind: "part", part })),
     },
     {

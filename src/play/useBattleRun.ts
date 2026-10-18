@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { composeUnits, type UnitsOwner } from "../campaign/units";
 import type { GameRef, NodeScenario } from "../conquest/model";
 import type { SkirmishAi } from "../content/bindings";
 import { useBrandingEntry } from "../content/branding";
@@ -129,6 +130,13 @@ export interface UseBattleRunOptions<TResolved> {
    * scenario that does not vary by difficulty, which then launches as before.
    */
   scenarioDifficulty?: Difficulty;
+  /**
+   * The conquest or run that carries units from the unit builder (issue
+   * #4518). Given with units, every battle launches as a mutator written now
+   * over the game `decideLaunchGame` resolved, so the mutator always names the
+   * game that runs.
+   */
+  units?: UnitsOwner;
 }
 
 /**
@@ -153,6 +161,7 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
     provenance,
     scenario,
     scenarioDifficulty,
+    units,
   } = opts;
 
   const { target, loading: targetLoading } = usePreferredTarget();
@@ -171,6 +180,10 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
   // screen captures the fight as fought rather than a fresh (already
   // advanced) `snapshot()`.
   const [lastSnapshot, setLastSnapshot] = useState<SkirmishDraft | null>(null);
+  // What the last launch left out of the builder units: weapons it could not
+  // carry, movers with no class, and builders the game lacks. Kept after the
+  // game closes, the way a campaign mission keeps them.
+  const [leftOut, setLeftOut] = useState<string[]>([]);
 
   const games = scan.data?.games ?? [];
   const maps = scan.data?.maps ?? [];
@@ -303,6 +316,18 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
         executable: target.executable,
         dataDir: target.dataDir,
       });
+    // The builder units go in a mutator over the game this battle runs, made
+    // now because its `depend` names that game exactly. Undefined when there
+    // are none, so the battle launches the game itself as it always did.
+    const unitsGame = async (): Promise<string | undefined> => {
+      if (!units) return undefined;
+      const composed = await composeUnits(units, target, {
+        name: installedGame.name,
+        archive: installedGame.primaryArchive.name,
+      });
+      setLeftOut(composed?.leftOut ?? []);
+      return composed?.name;
+    };
     // What starts the engine, and the name the replay will record the player
     // under. A refusal comes back as a message and nothing has run.
     let run: () => Promise<
@@ -324,6 +349,7 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
           games,
           launch: startEngine,
           difficulty: scenarioDifficulty,
+          unitsGame: await unitsGame(),
         });
         if (!result.ok) return { refused: result.message };
         // The scenario's own setup names the player, not this hook.
@@ -353,12 +379,17 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
         }),
         draft.restrictions,
       );
-      run = async () => ({
-        exitCode: (await startEngine(config)).exitCode,
-        playerName: PLAYER_NAME,
-      });
+      run = async () => {
+        const mutator = await unitsGame();
+        const launched = mutator ? { ...config, gameType: mutator } : config;
+        return {
+          exitCode: (await startEngine(launched)).exitCode,
+          playerName: PLAYER_NAME,
+        };
+      };
     }
     setError(null);
+    setLeftOut([]);
     // Snapshot the replays that exist before the engine runs. A failure here
     // only disables detection, never the launch.
     let beforePaths: Set<string> | null = null;
@@ -435,6 +466,7 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
     scenario,
     scenarioDifficulty,
     games,
+    units,
   ]);
 
   const recordVictory = useCallback(
@@ -469,6 +501,8 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
     start,
     snapshot,
     lastSnapshot,
+    /** What the builder units lost on the last launch, as lines. */
+    leftOut,
     recordVictory,
     recordDefeat,
     /** Force a rescan so a just-installed game/map clears `missing`. */

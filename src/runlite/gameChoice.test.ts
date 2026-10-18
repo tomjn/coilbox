@@ -65,6 +65,25 @@ describe("unitsMissingFrom", () => {
     ]);
   });
 
+  // Issue #4518. The mutator carries it to whichever version the run plays.
+  it("never counts a unit from the unit builder the run carries as missing", () => {
+    const carrying: RogueliteRun = {
+      ...run(),
+      units: [
+        {
+          unitName: "gone",
+          projectId: "p-gone",
+          name: "Gone",
+          builtBy: [],
+          copiedAt: "t",
+        },
+      ],
+    };
+    expect(unitsMissingFrom(carrying, ["zk_commander", "cloakraid"])).toEqual(
+      [],
+    );
+  });
+
   it("is empty when everything moves over", () => {
     expect(
       unitsMissingFrom(run(), ["ZK_Commander", "Cloakraid", "gone"]),

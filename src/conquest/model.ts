@@ -1,5 +1,10 @@
-import type { ImageRef, MapDownloadHint, MediaRef } from "../campaign/model";
-import { parseImageRef, parseMapDownload } from "../campaign/model";
+import type {
+  CampaignUnit,
+  ImageRef,
+  MapDownloadHint,
+  MediaRef,
+} from "../campaign/model";
+import { parseImageRef, parseMapDownload, parseUnits } from "../campaign/model";
 import { clamp } from "../lib/helpers";
 import type { MapRunKind } from "../runlite/mapRun";
 import type { Scenario } from "../scenario/model";
@@ -400,6 +405,13 @@ export interface ConquestState {
   lastRound?: TurnEvent[];
   /** Set when the conquest is played on a hand-made map. */
   handmade?: HandmadeRun;
+  /**
+   * Units from the unit builder this conquest carries, each a copy taken when
+   * the conquest began (issue #4518). Kept on the conquest rather than the
+   * galaxy, as `pinnedGame` is, so a bundled or hand-made galaxy can carry them
+   * too. A shared challenge never carries them.
+   */
+  units?: CampaignUnit[];
   updatedAt: string;
 }
 
@@ -1092,5 +1104,13 @@ export function reconcileState(
   // The recap names each capture's node, so one that is gone has no line.
   const lastRound = state.lastRound?.filter((e) => owners[e.nodeId]);
   const { incursion: _legacy, ...rest } = legacy;
-  return { ...rest, owners, playerFactionId, revealed, incursions, lastRound };
+  return {
+    ...rest,
+    owners,
+    playerFactionId,
+    revealed,
+    incursions,
+    lastRound,
+    units: parseUnits(state.units),
+  };
 }

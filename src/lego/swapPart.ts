@@ -28,7 +28,8 @@ import {
   resolveConnections,
 } from "./connectors";
 import type { LegoPiece, LegoProject } from "./model";
-import { type LegoPartInfo, type LoadedPack, shapeVariants } from "./pack";
+import type { LegoPartInfo, LoadedPack } from "./pack";
+import { shapeColourways } from "./partOrder";
 import { currentPivot, pivotChoices } from "./pivot";
 import type { Vec3 } from "./snapping";
 
@@ -176,7 +177,7 @@ export function variantsFirst(
   parts: readonly LegoPartInfo[],
 ): LegoPartInfo[] {
   const variants = new Set(
-    shapeVariants(pack, current.shapeId).map((part) => part.id),
+    shapeColourways(pack, current).map((part) => part.id),
   );
   const others = parts.filter((part) => part.id !== current.id);
   return [

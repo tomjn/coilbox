@@ -63,7 +63,7 @@ function pack(): LoadedPack {
     }),
   ];
   return {
-    manifest: {} as LoadedPack["manifest"],
+    manifest: { categories: [] } as unknown as LoadedPack["manifest"],
     library: { packs: [], atlases: [], dir: "", problems: [] },
     parts,
     byId: new Map(parts.map((p) => [p.id, p])),
@@ -299,5 +299,41 @@ describe("variantsFirst", () => {
     expect(ids.slice(0, 1)).toEqual(["hull-green"]);
     expect(ids).not.toContain("hull");
     expect(ids).toHaveLength(p.parts.length - 1);
+  });
+
+  it("counts a colourway with a mesh of its own as the same shape", () => {
+    const p = pack();
+    const tan = part("hull-tan", [-1, -0.5, -2], [1, 0.5, 2], {
+      shapeId: "hull-tan-mesh",
+      name: "tan hull",
+      colourway: "tan",
+    });
+    const named = p.parts.map((x) =>
+      x.shapeId === "hull" ? { ...x, name: `${x.colourway} hull` } : x,
+    );
+    // A shape in all three colourways, as most of the bundled pack's are.
+    const bars = ["green", "tan", "grey"].map((colourway) =>
+      part(`bar-${colourway}`, [0, 0, 0], [1, 1, 4], {
+        shapeId: "bar",
+        name: `${colourway} bar`,
+        colourway,
+      }),
+    );
+    const parts = [...named, tan, ...bars];
+    const withTan = {
+      ...p,
+      manifest: {
+        categories: [
+          { id: "green", label: "Team colour" },
+          { id: "tan", label: "Tan" },
+          { id: "grey", label: "Grey" },
+        ],
+      },
+      parts,
+      byId: new Map(parts.map((x) => [x.id, x])),
+    } as unknown as LoadedPack;
+    const current = withTan.byId.get("hull") as LegoPartInfo;
+    const ids = variantsFirst(withTan, current, parts).map((x) => x.id);
+    expect(ids.slice(0, 2)).toEqual(["hull-green", "hull-tan"]);
   });
 });
