@@ -3,6 +3,7 @@
  * the first half of both Test in game and the load check.
  */
 
+import { unitsyncLuaExec } from "@/content/bindings";
 import { primeScan } from "@/content/config";
 import { isScratchArchive, SCRATCH_FOLDER } from "@/lib/generatedGames";
 import type { PlayTarget } from "@/play/config";
@@ -21,10 +22,13 @@ import type { RawGeometry } from "./rawGeometry";
 import { importedTextures } from "./rawImport";
 import { bakedPieces, buildS3o, unitBounds } from "./s3oBuild";
 import {
+  buildLuaRulesEntry,
   buildModInfo,
   buildSideData,
   buildStartUnitGadget,
   buildUnitScriptGadget,
+  LUARULES_ENTRIES_LUA,
+  missingLuaRulesEntries,
 } from "./scratchGame";
 import { sheetSources } from "./textureSheet";
 import { buildUnitDef, footprintSteps, legoUnitDef } from "./unitDef";
@@ -36,6 +40,8 @@ export interface ScratchGameArgs {
   target: PlayTarget;
   /** The base game's name, as unitsync reports it. */
   baseGame: string;
+  /** The base game's archive, which unitsync is asked about its files by. */
+  baseArchive: string;
   project: LegoProject;
   pack: LoadedPack;
   raw: RawGeometry | null;
@@ -104,6 +110,34 @@ export async function writeScratchGame(
 }
 
 /**
+ * The LuaRules entry files the base game lacks, for the scratch game to supply,
+ * so its gadgets run at all (issue #4475). Throws when unitsync cannot say,
+ * because guessing either way breaks a game: a missing file leaves the unit
+ * unspawned, and a needless one hides the game's own.
+ */
+export async function luaRulesEntries(
+  target: PlayTarget,
+  baseGame: string,
+  baseArchive: string,
+): Promise<{ luaRulesMain?: string; luaRulesDraw?: string }> {
+  const res = await unitsyncLuaExec({
+    enginePath: target.enginePath,
+    dataDir: target.dataDir,
+    archive: baseArchive,
+    source: LUARULES_ENTRIES_LUA,
+  });
+  if (res.error) {
+    throw new Error(`Could not read ${baseGame}'s LuaRules: ${res.error}`);
+  }
+  const missing = missingLuaRulesEntries(res.result);
+  const entry = buildLuaRulesEntry();
+  return {
+    ...(missing.includes("LuaRules/main.lua") ? { luaRulesMain: entry } : {}),
+    ...(missing.includes("LuaRules/draw.lua") ? { luaRulesDraw: entry } : {}),
+  };
+}
+
+/**
  * Write the scratch game and the unit into it, with no rescan. A game already
  * running from the scratch game reads the files again from here, which is what
  * the sandbox's reload needs (issue #3346).
@@ -111,6 +145,7 @@ export async function writeScratchGame(
 export async function writeScratchUnit({
   target,
   baseGame,
+  baseArchive,
   project: unit,
   pack,
   raw,
@@ -175,6 +210,7 @@ export async function writeScratchUnit({
     sidedata: buildSideData(project.unitName),
     gadget: buildStartUnitGadget(project.unitName),
     unitScriptGadget: buildUnitScriptGadget(),
+    ...(await luaRulesEntries(target, baseGame, baseArchive)),
     ...(sandbox ? { sandbox } : {}),
   });
   onWritten?.(dir);

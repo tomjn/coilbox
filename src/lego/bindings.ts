@@ -399,6 +399,12 @@ export const legoScratchGame = defineCommand<
     sidedata: string;
     gadget: string;
     unitScriptGadget: string;
+    /**
+     * `LuaRules/main.lua` and `LuaRules/draw.lua`, each only for a base game
+     * that lacks it. One left out is removed from the folder (issue #4475).
+     */
+    luaRulesMain?: string;
+    luaRulesDraw?: string;
     /** What "Play with this unit" adds on top (issue #3341). */
     sandbox?: ScratchSandbox;
   },
