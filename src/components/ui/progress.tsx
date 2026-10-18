@@ -26,7 +26,9 @@ function Progress({
       <ProgressPrimitive.Indicator
         data-slot="progress-indicator"
         className="h-full w-full flex-1 bg-primary transition-all"
-        style={{ transform: `translateX(${dir === "rtl" ? "" : "-"}${offset}%)` }}
+        style={{
+          transform: `translateX(${dir === "rtl" ? "" : "-"}${offset}%)`,
+        }}
       />
     </ProgressPrimitive.Root>
   );
