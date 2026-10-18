@@ -1,6 +1,7 @@
 import { loadGithubGameRepos } from "../content/branding";
 import { dlDownloadFileRaw, dlDownloadRaw } from "./bindings";
 import { type DownloadAttempt, hostOf } from "./downloadHistory";
+import { downloadFromMirrors } from "./downloadMirrors";
 import { withDownloadNotify } from "./downloadNotify";
 import {
   GAME_REPOS,
@@ -13,6 +14,14 @@ import { loadGithubReleases } from "./githubReleases";
 import { findInIndex, indexTick, loadSpringfilesList } from "./mirrorIndex";
 import { type ProgressSink, progressChannel } from "./progressChannel";
 import { DEFAULT_RAPID_MASTERS } from "./rapidMasters";
+import {
+  AttemptLog,
+  isCancel,
+  nextKind,
+  orderFrom,
+  type SourceStep,
+  SourceWalkError,
+} from "./sourceWalk";
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -24,7 +33,8 @@ const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
  *
  * 1. curated GitHub releases. Some games such as SplinterFaction ship only via
  *    GitHub release archives, which pr-downloader cannot reach at all.
- * 2. springfiles catalog mirror. A direct mirror download for non-rapid games.
+ * 2. springfiles catalog mirror. A direct mirror download for non-rapid games,
+ *    trying each of the entry's mirrors in turn until one delivers (issue #4577).
  * 3. rapid via pr-downloader. The download-game flag resolves the long name to a
  *    tag against the master index (this is how BAR ships), so we pass the game
  *    modname straight through.
@@ -53,21 +63,43 @@ async function downloadGameAnySourceImpl(opts: {
   askedAt?: number;
   /** Told about each source tried, whether it worked or not (issue #4576). */
   onAttempt?: (attempt: DownloadAttempt) => void;
+  /** Skip the sources before this one, for a retry on the next (issue #4577). */
+  startAt?: SourceStep;
 }): Promise<string> {
-  const { gameName, writePath, opId, onProgress } = opts;
+  const { gameName, writePath, opId, onProgress, startAt } = opts;
   const askedAt = opts.askedAt ?? indexTick();
   const target = norm(gameName);
-  const errors: string[] = [];
-  /** What the source being tried is fetching, set just before it fetches. */
-  let fetching: Pick<DownloadAttempt, "reference" | "filename" | "mirror"> = {
-    reference: null,
-    filename: null,
-    mirror: null,
-  };
+  const log = new AttemptLog(opts.onAttempt);
 
   // The unified GitHub game-repo registry (issue #512): the catalog is
   // authoritative once loaded, the in-code GAME_REPOS list is the fallback seed.
   const repos = mergeGameRepos(await loadGithubGameRepos(), GAME_REPOS);
+
+  const order = gameSourceOrder({
+    hasGithubRepo: !!githubRepoForGame(repos, gameName),
+    hasWritePath: !!writePath,
+  });
+
+  /** Fetch a file from its mirrors, and say which kind of source it was. */
+  const fetchFile = async (
+    source: GameSource,
+    urls: readonly string[],
+    filename: string,
+    label: string,
+  ): Promise<string | null> =>
+    (await downloadFromMirrors({
+      source,
+      urls,
+      destDir: `${writePath}/games`,
+      filename,
+      opId,
+      onProgress,
+      log,
+      startAt,
+      afterSource: nextKind(order, source),
+    }))
+      ? label
+      : null;
 
   const attempt = async (source: GameSource): Promise<string | null> => {
     switch (source) {
@@ -94,11 +126,11 @@ async function downloadGameAnySourceImpl(opts: {
             `${repo} has no release matching "${gameName}" in its latest ${archives.length} release(s) (newest: ${archives[0].filename})`,
           );
         }
-        fetching = {
+        log.begin("github", {
           reference: hit.tag,
           filename: hit.filename,
           mirror: hostOf(hit.url),
-        };
+        });
         await dlDownloadFileRaw({
           url: hit.url,
           destDir: `${writePath}/games`,
@@ -108,7 +140,7 @@ async function downloadGameAnySourceImpl(opts: {
         });
         return "github release";
       }
-      // springfiles catalog: match by springname or name, fetch the first mirror.
+      // springfiles catalog: match by springname or name, then try each mirror.
       case "springfiles": {
         if (!writePath) return null;
         const found = await findInIndex(
@@ -119,21 +151,13 @@ async function downloadGameAnySourceImpl(opts: {
             ),
           askedAt,
         );
-        const url = found?.mirrors?.[0];
-        if (!found || !url) return null;
-        fetching = {
-          reference: url,
-          filename: found.filename,
-          mirror: hostOf(url),
-        };
-        await dlDownloadFileRaw({
-          url,
-          destDir: `${writePath}/games`,
-          filename: found.filename,
-          opId,
-          onProgress: progressChannel(onProgress),
-        });
-        return "springfiles mirror";
+        if (!found?.mirrors?.length) return null;
+        return fetchFile(
+          source,
+          found.mirrors,
+          found.filename,
+          "springfiles mirror",
+        );
       }
       // rapid: pr-downloader resolves the long name to a tag via the master
       // index. The last resort.
@@ -144,13 +168,12 @@ async function downloadGameAnySourceImpl(opts: {
       // `rapidMasters.ts`), so BAR itself now comes back as "no source could
       // provide" here.
       case "rapid": {
-        const rapidErrors: string[] = [];
         for (const master of DEFAULT_RAPID_MASTERS) {
-          fetching = {
-            reference: gameName,
-            filename: null,
-            mirror: hostOf(master.url),
-          };
+          log.begin(
+            source,
+            { reference: gameName, mirror: hostOf(master.url) },
+            { label: master.name },
+          );
           try {
             await dlDownloadRaw({
               tag: gameName,
@@ -161,44 +184,34 @@ async function downloadGameAnySourceImpl(opts: {
             });
             return "rapid";
           } catch (e) {
-            rapidErrors.push(`${master.name}: ${msg(e)}`);
+            if (isCancel(e)) throw e;
+            log.fail(e);
           }
         }
-        throw new Error(rapidErrors.join("; "));
+        return null;
       }
     }
   };
 
-  const order = gameSourceOrder({
-    hasGithubRepo: !!githubRepoForGame(repos, gameName),
-    hasWritePath: !!writePath,
-  });
-  for (const source of order) {
-    const startedAt = Date.now();
-    fetching = { reference: null, filename: null, mirror: null };
-    const report = (outcome: "ok" | "failed", failure: string | null) =>
-      opts.onAttempt?.({
-        source,
-        outcome,
-        ...fetching,
-        md5: null,
-        failure,
-        durationMs: Date.now() - startedAt,
-      });
+  for (const source of orderFrom(order, startAt)) {
+    log.begin(source);
     try {
       const result = await attempt(source);
       if (result) {
-        report("ok", null);
+        log.ok();
         return result;
       }
     } catch (e) {
-      errors.push(`${source}: ${msg(e)}`);
-      report("failed", msg(e));
+      if (e instanceof SourceWalkError) throw e;
+      if (isCancel(e))
+        throw new SourceWalkError(msg(e), nextKind(order, source));
+      log.fail(e);
     }
   }
 
-  throw new Error(
-    `No source could provide "${gameName}". ${errors.join("; ")}`,
+  throw new SourceWalkError(
+    `No source could provide "${gameName}". ${log.errors.join("; ")}`,
+    null,
   );
 }
 
