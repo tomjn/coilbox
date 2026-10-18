@@ -1480,3 +1480,60 @@ describe("settings for one copy of a module (#4315)", () => {
     expect(period().getAttribute("aria-valuenow")).toBe("9");
   });
 });
+
+describe("converting a preset to an action (#4512)", () => {
+  function withRole(role: string, presetId: string): LegoProject {
+    const base = project();
+    return {
+      ...base,
+      pieces: [
+        ...base.pieces,
+        {
+          id: "p1",
+          name: "door",
+          parentId: "p0",
+          partId: null,
+          position: [0, 0, 0],
+          rotation: [0, 0, 0],
+          scale: [1, 1, 1],
+          role,
+        },
+      ],
+      animations: [{ presetId, params: {} }],
+    };
+  }
+
+  it("replaces the preset with an action in one edit", () => {
+    const onActionsEdit = vi.fn();
+    const unit = withRole("door", "open.close");
+    show(unit, { onActionsEdit });
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Convert Doors to an action",
+      }),
+    );
+    expect(onActionsEdit).toHaveBeenCalledTimes(1);
+    const [change] = onActionsEdit.mock.calls[0];
+    const next = change(unit) as LegoProject;
+    expect(next.animations).toEqual([]);
+    expect(next.actions?.[0]).toMatchObject({
+      name: "Doors",
+      trigger: "Activate",
+      loop: true,
+    });
+  });
+
+  it("says why a preset that follows the unit cannot convert, and does nothing", () => {
+    const onActionsEdit = vi.fn();
+    show(withRole("base", "wreck.pose"), { onActionsEdit });
+    const button = screen.getByRole("button", {
+      name: "Convert Wreck pose to an action",
+    });
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    expect(button.getAttribute("title")).toBe(
+      "Plays on Killed, which no action can start from.",
+    );
+    fireEvent.click(button);
+    expect(onActionsEdit).not.toHaveBeenCalled();
+  });
+});
