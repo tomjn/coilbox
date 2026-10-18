@@ -18,6 +18,8 @@
  * nobody knows) are decided in one place and tested rather than eyeballed.
  */
 
+import { t } from "@lingui/core/macro";
+
 /** One progress sample, as it arrived. */
 export interface RateSample {
   /** Millisecond timestamp, from the same clock throughout a download. */
@@ -208,16 +210,22 @@ function secondsLeftFrom(x: {
  */
 export function formatDuration(seconds: number): string {
   const total = Math.max(0, Math.round(seconds));
-  if (total < 60) return `${total}s`;
+  if (total < 60) return t`${total}s`;
   if (total < 3600) {
     const mins = Math.floor(total / 60);
     const rest = Math.round((total - mins * 60) / 10) * 10;
     // Rounding 3m 57s up lands on 60s, which would read as "3m 60s".
-    if (rest >= 60) return `${mins + 1}m`;
-    return rest === 0 ? `${mins}m` : `${mins}m ${rest}s`;
+    if (rest >= 60) {
+      const next = mins + 1;
+      return t`${next}m`;
+    }
+    return rest === 0 ? t`${mins}m` : t`${mins}m ${rest}s`;
   }
   const hours = Math.floor(total / 3600);
   const mins = Math.round((total - hours * 3600) / 60);
-  if (mins >= 60) return `${hours + 1}h`;
-  return mins === 0 ? `${hours}h` : `${hours}h ${mins}m`;
+  if (mins >= 60) {
+    const next = hours + 1;
+    return t`${next}h`;
+  }
+  return mins === 0 ? t`${hours}h` : t`${hours}h ${mins}m`;
 }

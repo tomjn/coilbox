@@ -1,5 +1,9 @@
 import { CHART_PALETTE, pairsStayApart } from "@/lib/chartPalette";
-import { formatDuration } from "@/lib/format";
+import {
+  formatCompact,
+  formatDuration,
+  formatNumber,
+} from "@/lib/format";
 import {
   isBlackHex,
   NON_TEXT_CONTRAST,
@@ -59,20 +63,11 @@ export function matchTotal(trailer: DemoTrailer, key: MetricKey): number {
   return trailer.teams.reduce((sum, t) => sum + teamTotal(t.samples, key), 0);
 }
 
-/** `1234567` becomes `1.2M`. A figure this size is read at a glance, not counted. */
+/** `1234567` becomes `1.2M` under `en`. A figure this size is read at a glance, not counted. */
 export function formatTotal(value: number): string {
   const v = Math.round(value);
-  const abs = Math.abs(v);
-  const short = (divisor: number, suffix: string) => {
-    const n = v / divisor;
-    // One decimal, and no bare `.0`, so it reads as `12M` rather than `12.0M`.
-    const text =
-      Math.abs(n) >= 100 ? n.toFixed(0) : n.toFixed(1).replace(/\.0$/, "");
-    return `${text}${suffix}`;
-  };
-  if (abs >= 1_000_000) return short(1_000_000, "M");
-  if (abs >= 10_000) return short(1_000, "k");
-  return v.toLocaleString();
+  if (Math.abs(v) < 10_000) return formatNumber(v);
+  return formatCompact(v, { maximumFractionDigits: 1 });
 }
 
 /**
@@ -86,12 +81,8 @@ export function formatTotal(value: number): string {
 export function formatChartValue(value: number): string {
   const v = Math.round(value);
   const abs = Math.abs(v);
-  if (abs < 1_000) return v.toLocaleString();
-  const million = abs >= 1_000_000;
-  const n = v / (million ? 1_000_000 : 1_000);
-  // `toFixed` always leaves a point, so trimming zeros can't eat a whole number.
-  const text = n.toFixed(2).replace(/\.?0+$/, "");
-  return `${text}${million ? "M" : "k"}`;
+  if (abs < 1_000) return formatNumber(v);
+  return formatCompact(v, { maximumFractionDigits: 2 });
 }
 
 /**
@@ -107,8 +98,7 @@ export function formatChartValue(value: number): string {
 export function formatRate(value: number): string {
   const abs = Math.abs(value);
   if (abs >= 100 || value === 0) return formatChartValue(value);
-  // `toFixed` always leaves a point, so trimming zeros can't eat a whole number.
-  return value.toFixed(abs < 10 ? 2 : 1).replace(/\.?0+$/, "");
+  return formatNumber(value, { maximumFractionDigits: abs < 10 ? 2 : 1 });
 }
 
 /** A headline tile: one registry metric, totalled across the match. */
@@ -995,7 +985,7 @@ export function spreadLabels<T extends { y: number }>(
  * sixteen are counted otherwise.
  */
 export function formatTableValue(value: number): string {
-  return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  return formatNumber(value, { maximumFractionDigits: 2 });
 }
 
 /** One column of the table: a series, in the order the chart draws it. */

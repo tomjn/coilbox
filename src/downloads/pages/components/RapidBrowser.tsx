@@ -23,7 +23,7 @@ import {
 } from "../../bindings";
 import { useDownloadsConfig } from "../../config";
 import { identityOf, useDownloadQueue } from "../../DownloadQueueProvider";
-import { refreshedLabel } from "../../rapidAge";
+import { refreshedLabel } from "../../../lib/relativeTime";
 import { orderRapidVersions } from "../../rapidVersionOrder";
 import { QueueProgress } from "./ProgressBar";
 import { EmptyState, errMessage } from "./states";

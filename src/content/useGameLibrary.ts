@@ -17,7 +17,7 @@ import {
   githubRepoForGame,
   mergeGameRepos,
 } from "../downloads/gameRepos";
-import { refreshedLabel } from "../downloads/rapidAge";
+import { refreshedLabel } from "../lib/relativeTime";
 import { DEFAULT_RAPID_MASTERS } from "../downloads/rapidMasters";
 import type { ScanResult } from "./bindings";
 import { useGithubGameRepos } from "./branding";
