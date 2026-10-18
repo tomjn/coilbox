@@ -356,7 +356,7 @@ export interface Profile {
   hub?: boolean;
   /**
    * Base URL of the Coilbox hub a distributor runs themselves, in place of the
-   * built-in `https://coilbox-hub.vercel.app`. A separate concern from {@link
+   * built-in `DEFAULT_HUB_URL`. A separate concern from {@link
    * Profile.hub}, which only turns the feature on or off. Read through
    * `useHubUrl` (see `../hub/config`), which layers a user setting on top of this.
    */
