@@ -9,12 +9,15 @@ vi.mock("../lego/mutator", () => ({
   prepareUnit: vi.fn(),
   writePreparedMutator: vi.fn(),
 }));
+vi.mock("../lego/bindings", () => ({
+  legoScratchRemove: vi.fn(),
+}));
 vi.mock("../content/config", () => ({
   loadUnitsyncUnitDataset: vi.fn(),
 }));
 
 import { loadUnitsyncUnitDataset } from "../content/config";
-import type { ExportTextures } from "../lego/bindings";
+import { type ExportTextures, legoScratchRemove } from "../lego/bindings";
 import { type LegoProject, newProject } from "../lego/model";
 import {
   type PreparedUnit,
@@ -35,6 +38,7 @@ import {
   type CampaignUnitCopy,
   composeCampaignUnits,
   libraryChanged,
+  removeUnitsGame,
   updateUnit,
   withoutUnit,
   withUnit,
@@ -423,5 +427,38 @@ describe("composing a mission's mutator", () => {
     expect(vi.mocked(writePreparedMutator).mock.calls[0][0].gameMovement).toBe(
       null,
     );
+  });
+});
+
+describe("deleting a campaign's units game", () => {
+  beforeEach(() => {
+    vi.mocked(legoScratchRemove).mockResolvedValue({ removed: true });
+  });
+
+  it("removes that campaign's folder from the content root", async () => {
+    await removeUnitsGame("c1", "/data");
+    expect(legoScratchRemove).toHaveBeenCalledTimes(1);
+    expect(legoScratchRemove).toHaveBeenCalledWith({
+      dataDir: "/data",
+      folder: "coilbox-lego-campaign-c1.sdd",
+    });
+  });
+
+  it("asks the guard about no other campaign's folder", async () => {
+    await removeUnitsGame("c2", "/data");
+    expect(legoScratchRemove).toHaveBeenCalledWith({
+      dataDir: "/data",
+      folder: "coilbox-lego-campaign-c2.sdd",
+    });
+  });
+
+  it("does nothing for an id that cannot name a folder, so none was ever written", async () => {
+    await removeUnitsGame("not/a/folder", "/data");
+    expect(legoScratchRemove).not.toHaveBeenCalled();
+  });
+
+  it("lets a refusal through, so the campaign is not deleted over a folder that stayed", async () => {
+    vi.mocked(legoScratchRemove).mockRejectedValue(new Error("refused"));
+    await expect(removeUnitsGame("c1", "/data")).rejects.toThrow("refused");
   });
 });

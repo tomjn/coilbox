@@ -20,6 +20,7 @@
  */
 
 import { loadUnitsyncUnitDataset } from "../content/config";
+import { legoScratchRemove } from "../lego/bindings";
 import type { BuiltBy } from "../lego/buildList";
 import type { LegoProject } from "../lego/model";
 import {
@@ -204,6 +205,20 @@ export async function detachCopy(
   unitName: string,
 ): Promise<void> {
   await campaignUnitDelete({ campaignId, unitName });
+}
+
+/**
+ * Remove the units game a campaign's missions were launched with, from the
+ * content root (issue #4543). A campaign that never launched with units has no
+ * folder, which is not an error. Throws when the folder could not be removed.
+ */
+export async function removeUnitsGame(
+  campaignId: string,
+  dataDir: string,
+): Promise<void> {
+  const folder = campaignUnitsFolder(campaignId);
+  if (!folder) return;
+  await legoScratchRemove({ dataDir, folder });
 }
 
 /** Whether the library's document has changed since the campaign copied it. */
