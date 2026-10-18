@@ -78,8 +78,8 @@ export interface PresetParam {
   id: string;
   label: string;
   /**
-   * Degrees, seconds, turns per second, metres, or degrees per second.
-   * Converted inside `track`.
+   * Degrees, seconds, turns per second, metres, degrees per second, or a
+   * percentage of a cycle. Converted inside `track`.
    *
    * `deg/s` is a rate rather than an angle. A preset using it hands the angle
    * itself straight to the engine, which works it out from the build target,
@@ -87,7 +87,7 @@ export interface PresetParam {
    * the preview's swing, so the slider changes what you watch as well as what
    * is exported.
    */
-  unit: "deg" | "s" | "hz" | "m" | "deg/s";
+  unit: "deg" | "s" | "hz" | "m" | "deg/s" | "%";
   min: number;
   max: number;
   step: number;
@@ -255,6 +255,12 @@ export interface AnimPreset {
   ): TrackDelta | null;
   /** Lua for a unit script. Null when the unit has none of its pieces. */
   emit(ctx: EmitContext): EmitResult | null;
+  /**
+   * Frames of a cycle `frames` long that a generated thread must have a pose
+   * on, where the motion turns a corner a straight Turn would cut. Absent, or
+   * empty, for a cycle whose poses can fall anywhere.
+   */
+  poses?(params: Record<string, number>, frames: number): number[];
 }
 
 /** A preset as applied to a unit, which is what the document stores. */
@@ -327,6 +333,7 @@ export function cycleSteps(
   period: number,
 ): number[] {
   const frames = Math.max(1, Math.round(period * ENGINE_FPS));
+  const fixed = preset.poses?.(params, frames) ?? [];
   const curves: number[][] = [];
   for (const role of preset.animates) {
     const samples = Array.from({ length: frames + 1 }, (_, frame) =>
@@ -341,12 +348,13 @@ export function cycleSteps(
 
   for (let steps = Math.min(CYCLE_STEPS, frames); ; steps++) {
     const bounds = [
-      ...new Set(
-        Array.from({ length: steps + 1 }, (_, step) =>
+      ...new Set([
+        ...Array.from({ length: steps + 1 }, (_, step) =>
           Math.round((step * frames) / steps),
         ),
-      ),
-    ];
+        ...fixed,
+      ]),
+    ].sort((a, b) => a - b);
     if (steps >= frames) return bounds;
     const close = curves.every((curve) => {
       let travel = 0;
@@ -567,6 +575,49 @@ function legPhase(leg: LegRole, gait: "biped" | "quad"): number {
   return diagonal ? 0 : Math.PI;
 }
 
+/**
+ * The param `walkFit.ts` sets to 1 on a walk it has fitted to the unit's body
+ * and speed. It is not a slider and is never saved: it is laid over the
+ * saved params when the script is written. A fitted walk keeps the ankle on
+ * a straight line at one speed while the foot is down and the knee straight,
+ * where the walk it replaces swings the thigh along a sine all the way round.
+ */
+export const WALK_FITTED = "fitted";
+
+/**
+ * How far round its stride a leg is, from 0 to 1. The first half is the foot
+ * on the ground, moving back, and the second half the foot in the air, coming
+ * forward. `duty` is the share of the time the foot spends on the ground, so
+ * the first half takes that share of the period and the second the rest.
+ *
+ * `turn` is how many cycles it is since the leg last put its foot down.
+ */
+function strideShare(turn: number, duty: number): number {
+  const time = turn - Math.floor(turn);
+  return time < duty
+    ? (0.5 * time) / duty
+    : 0.5 + (0.5 * (time - duty)) / (1 - duty);
+}
+
+/**
+ * The frames of a fitted walk's cycle on which a foot comes down or lifts, so
+ * the thread has a pose on each and holds the knee straight from one to the
+ * other. `walkFit.ts` makes the period an even number of frames and the time
+ * on the ground a whole number, so each of these is a whole frame. A fitted
+ * leg puts its foot down at the start of its cycle, half a cycle apart for
+ * legs that move against each other.
+ */
+function walkPoses(
+  preset: AnimPreset,
+  params: Record<string, number>,
+  frames: number,
+): number[] {
+  if (value(preset, params, WALK_FITTED) !== 1) return [];
+  const down = Math.round((value(preset, params, "duty") / 100) * frames);
+  const half = Math.round(frames / 2);
+  return [0, down, half, half + down].map((frame) => frame % frames);
+}
+
 function walkTrack(
   preset: AnimPreset,
   t: number,
@@ -580,11 +631,49 @@ function walkTrack(
 
   const period = Math.max(value(preset, params, "period"), 0.05);
   const phase = (t / period) * TAU + legPhase(leg, gait);
+  const swing = deg(value(preset, params, "stride"));
+  const knee = deg(value(preset, params, "knee"));
+  const duty = Math.min(
+    Math.max(value(preset, params, "duty") / 100, 0.05),
+    0.95,
+  );
+  const fitted = value(preset, params, WALK_FITTED) === 1;
 
-  // The thigh swings, the knee folds only as the leg comes forward, and the
-  // foot undoes both so it stays flat to the ground.
-  const thigh = deg(value(preset, params, "stride")) * Math.sin(phase);
-  const shin = deg(value(preset, params, "knee")) * (1 - Math.cos(phase)) * 0.5;
+  let thigh: number;
+  let shin: number;
+  if (!fitted && duty === 0.5) {
+    // The thigh swings, the knee folds only as the leg comes forward, and the
+    // foot undoes both so it stays flat to the ground. Kept exactly as it was,
+    // so a walk nobody has fitted writes the script it always did.
+    thigh = swing * Math.sin(phase);
+    shin = knee * (1 - Math.cos(phase)) * 0.5;
+  } else {
+    // An unfitted walk's foot is down from -90 to 90 degrees of its phase. A
+    // fitted one comes down at 0, so its poses fall on whole frames.
+    const share = strideShare(
+      (fitted ? phase : phase + Math.PI / 2) / TAU,
+      duty,
+    );
+    if (!fitted) {
+      const warped = share * TAU - Math.PI / 2;
+      thigh = swing * Math.sin(warped);
+      shin = knee * (1 - Math.cos(warped)) * 0.5;
+    } else if (share < 0.5) {
+      // On the ground. The ankle moves back in a straight line at one speed,
+      // from as far forward as the swing reaches to as far back, which is what
+      // the unit's speed asks of it. A straight leg of length `l` puts the
+      // ankle `-l * sin(thigh)` ahead of the hip, so the thigh angle that does
+      // that is an arcsine, and the leg's length cancels out of it.
+      thigh = -Math.asin(Math.sin(swing) * (1 - 4 * share));
+      shin = 0;
+    } else {
+      // In the air. The thigh swings forward again and the knee folds and
+      // unfolds once, most at the middle of the swing, where it lifts the
+      // foot highest.
+      thigh = swing * Math.sin(share * TAU - Math.PI / 2);
+      shin = knee * (1 - Math.cos((share - 0.5) * 2 * TAU)) * 0.5;
+    }
+  }
 
   const angle: Record<LegSegment, number> = {
     thigh,
@@ -622,6 +711,17 @@ const WALK_PARAMS: PresetParam[] = [
     step: 1,
     fallback: 30,
   },
+  {
+    // A walk keeps each foot down for more than half the time and a run for
+    // less. Half is the walk this preset always made.
+    id: "duty",
+    label: "Time on the ground",
+    unit: "%",
+    min: 30,
+    max: 80,
+    step: 5,
+    fallback: 50,
+  },
 ];
 
 function legRoles(pairs: (1 | 2)[]): string[] {
@@ -653,6 +753,9 @@ export const WALK_BIPED: AnimPreset = {
   track(t, params, role) {
     return walkTrack(this, t, params, role, "biped");
   },
+  poses(params, frames) {
+    return walkPoses(this, params, frames);
+  },
   emit(ctx) {
     return walkEmit(this, ctx);
   },
@@ -675,6 +778,9 @@ export const WALK_QUAD: AnimPreset = {
   track(t, params, role) {
     return walkTrack(this, t, params, role, "quad");
   },
+  poses(params, frames) {
+    return walkPoses(this, params, frames);
+  },
   emit(ctx) {
     return walkEmit(this, ctx);
   },
@@ -684,13 +790,27 @@ export const WALK_QUAD: AnimPreset = {
  * Walking starts and stops with the unit, so it hangs off the move callins.
  * Each module instance of legs walks in a thread of its own, all started by
  * the same `StartMoving`, so a leg's phase still comes from its role alone.
+ *
+ * A walk fitted to the unit says so above its thread, with the numbers it was
+ * fitted to, so whoever edits the script knows the timing is not arbitrary.
  */
 function walkEmit(preset: AnimPreset, ctx: EmitContext): EmitResult | null {
-  return cycleThreads(preset, ctx, {
+  const result = cycleThreads(preset, ctx, {
     name: "walk",
     start: "StartMoving",
     stop: "StopMoving",
   });
+  if (!result || value(preset, ctx.params, WALK_FITTED) !== 1) return result;
+  const period = Math.max(value(preset, ctx.params, "period"), 0.05);
+  const frames = Math.round(period * ENGINE_FPS);
+  const down = Math.round((value(preset, ctx.params, "duty") / 100) * frames);
+  return {
+    ...result,
+    functions: [
+      `-- Fitted to the unit's legs and speed: a stride every ${frames} frames, each foot down for ${down} of them.`,
+      ...result.functions,
+    ],
+  };
 }
 
 /**

@@ -14,6 +14,7 @@ import {
 import { buildLuaScript } from "./luaScript";
 import { type LegoPiece, type LegoProject, newProject } from "./model";
 import { at, CREATED, type ScriptEvent } from "./scriptPlayback";
+import { fitWalk } from "./walkFit";
 
 /**
  * Every preset moves the same in the Lua it writes as in its own `track()`
@@ -577,8 +578,26 @@ function paramSets(
         preset.params.map((entry) => [entry.id, entry.max]),
       ),
     },
+    // A walk fitted to a body (#3349) moves in a shape of its own, so it is
+    // run as `buildLuaScript` writes it for the default legs at a walker's
+    // speed, and again for a run.
+    ...(preset.id.startsWith("walk.")
+      ? [
+          {
+            label: "fitted",
+            params: fitWalk(FITTED_BODY, {}),
+          },
+          {
+            label: "fitted, running",
+            params: fitWalk(FITTED_BODY, { duty: 35 }),
+          },
+        ]
+      : []),
   ];
 }
+
+/** The plans' default leg length and a walker's speed, for the fitted walks. */
+const FITTED_BODY = { legLength: 18.8, speed: 45 };
 
 function buildCases() {
   return PRESETS.flatMap((preset) =>
