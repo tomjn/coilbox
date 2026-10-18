@@ -155,7 +155,7 @@ export function useHubItemPresence(): (item: HubItem) => HubItemPresence {
               ? undefined
               : presetRoute;
       const contentRoute =
-        item.kind === "setup-pack" ? "/downloads/maps" : undefined;
+        item.kind === "setup-pack" ? "/library/maps" : undefined;
       return presenceOf(
         byId.get(item.id),
         local,

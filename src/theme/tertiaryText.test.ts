@@ -218,7 +218,6 @@ const DECORATIVE_EXEMPTIONS: Record<string, string> = {
     "placeholder glyph for a map with no minimap",
   "campaign/pages/components/CampaignImage.tsx":
     "placeholder glyph for a campaign with no icon",
-  "downloads/pages/MapsPage.tsx": "placeholder glyph for a map with no minimap",
 };
 
 describe("the tier stays deleted", () => {

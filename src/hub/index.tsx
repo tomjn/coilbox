@@ -11,10 +11,11 @@ import HubSettings from "./pages/SettingsSection";
  * The Coilbox hub plugin (issue #1347): one screen listing what other players
  * have shared, with the same filters the website's gallery has.
  *
- * First in the Downloads group. It shipped as a group of one with no label,
- * which the frame draws as a stray top-level item with nothing saying what it
- * belongs to. Downloads is where things come from, and other people's containers
- * are things that come from somewhere, so it goes at the head of that list.
+ * In the Library group as Community (issue #4584). It shipped as a group of one
+ * with no label, which the frame draws as a stray top-level item with nothing
+ * saying what it belongs to, and then sat first in a Downloads group. Other
+ * people's containers are things the library can hold, so they are listed beside
+ * the maps and games they come with.
  *
  * The nav item deliberately has no `end`, so an item's own page (`/hub/<id>`)
  * keeps it lit rather than leaving the sidebar looking like nowhere is open.
@@ -72,17 +73,16 @@ const hubPlugin: FramePlugin = {
   ],
   nav: [
     {
-      // First in Downloads, above Browse Rapid: the hub is another place things
-      // come from, and a group of one with no label read as a stray item.
-      id: "downloads",
-      label: "Downloads",
-      order: 20,
+      // Groups merge by id across plugins.
+      id: "library",
+      label: "Library",
+      order: 15,
       items: [
         {
           id: "hub.browse",
-          label: "Coilbox hub",
+          label: "Community",
           to: "/hub",
-          order: -1,
+          order: 1.25,
           icon: CoilboxGlyph,
           useVisible: visible,
         },

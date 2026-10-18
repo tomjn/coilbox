@@ -96,7 +96,7 @@ export function DependencyBlocked({ reason }: { reason: string }) {
       <AlertTitle>This game is missing something it depends on</AlertTitle>
       <AlertDescription className="break-words">
         {reason}{" "}
-        <Link className="underline underline-offset-4" to="/downloads/games">
+        <Link className="underline underline-offset-4" to="/library/games">
           Open game downloads
         </Link>
       </AlertDescription>

@@ -96,6 +96,12 @@ vi.mock("../../downloads/config", () => ({
 vi.mock("../../hub/maps/useMapFacts", () => ({
   useMapFactsBatch: () => ({ facts: new Map(), answered: true }),
 }));
+// Importing a setup pack from a deep link is the page's, not these tests'.
+vi.mock("../../hub/imports", () => ({ useRecordHubImport: () => vi.fn() }));
+vi.mock("@picoframe/frame", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@picoframe/frame")>()),
+  useDrawer: () => ({ open: vi.fn(), close: vi.fn() }),
+}));
 vi.mock("../../downloads/pages/components/MapPacksBanner", () => ({
   MapPacksBanner: () => null,
 }));

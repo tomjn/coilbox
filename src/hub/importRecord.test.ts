@@ -137,7 +137,7 @@ describe("a pack that left only content behind", () => {
   const record = {
     id: "item-1",
     refs: [],
-    route: "/downloads/maps",
+    route: "/library/maps",
     at: "2026-01-01T00:00:00.000Z",
     content: { games: ["Game A"], maps: ["Map One", "Map Two"] },
   };
@@ -148,7 +148,7 @@ describe("a pack that left only content behind", () => {
         games: new Set(["Game A"]),
         maps: new Set(["Map One", "Map Two"]),
       }),
-    ).toEqual({ state: "here", route: "/downloads/maps" });
+    ).toEqual({ state: "here", route: "/library/maps" });
   });
 
   it("is gone when one of its maps is missing", () => {
@@ -174,7 +174,7 @@ describe("a pack that left only content behind", () => {
         undefined,
         { games: new Set(), maps: new Set() },
       ),
-    ).toEqual({ state: "here", route: "/downloads/maps" });
+    ).toEqual({ state: "here", route: "/library/maps" });
   });
 
   it("uses the given content route once its own preset is gone, not the stale recorded one", () => {
@@ -189,8 +189,8 @@ describe("a pack that left only content behind", () => {
         new Set(), // preset-1 no longer exists locally
         undefined,
         { games: new Set(["Game A"]), maps: new Set(["Map One", "Map Two"]) },
-        "/downloads/maps",
+        "/library/maps",
       ),
-    ).toEqual({ state: "here", route: "/downloads/maps" });
+    ).toEqual({ state: "here", route: "/library/maps" });
   });
 });

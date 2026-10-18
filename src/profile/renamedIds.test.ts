@@ -49,7 +49,6 @@ describe("canonicalProfileId", () => {
   });
 
   it("passes an id it does not know straight through", () => {
-    expect(canonicalProfileId("downloads.games")).toBe("downloads.games");
     expect(canonicalProfileId("nonsense")).toBe("nonsense");
   });
 
@@ -58,6 +57,13 @@ describe("canonicalProfileId", () => {
     // Object property and hand a non-string back to the caller.
     expect(canonicalProfileId("__proto__")).toBe("__proto__");
     expect(canonicalProfileId("constructor")).toBe("constructor");
+  });
+
+  it("sends the retired Downloads ids to the Library pages that replaced them", () => {
+    expect(canonicalProfileId("downloads.games")).toBe("library.games");
+    expect(canonicalProfileId("downloads.maps")).toBe("library.maps");
+    expect(canonicalProfileId("downloads.browse")).toBe("library.rapid");
+    expect(canonicalProfileId("downloads")).toBe("sources");
   });
 
   it("kept content.setupPacks, which never named a nav item", () => {

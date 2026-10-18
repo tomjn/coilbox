@@ -30,11 +30,8 @@ These appear in the sidebar for every user (unless hidden). The **nav id** colum
 | Library       | Maps          | `#/library/maps`     | `library.maps`     | no       |
 | Library       | Games         | `#/library/games`    | `library.games`    | **yes**  |
 | Library       | Blueprints    | `#/library/blueprints` | `library.blueprints` | no    |
+| Library       | Community     | `#/hub`              | `hub.browse`       | **yes**  |
 | Library       | Downloads     | `#/library/downloads` | `library.downloads` | no      |
-| Downloads     | Coilbox hub   | `#/hub`              | `hub.browse`       | **yes**  |
-| Downloads     | Browse Rapid  | `#/downloads`        | `downloads.browse` | **yes**  |
-| Downloads     | Maps          | `#/downloads/maps`   | `downloads.maps`   | no       |
-| Downloads     | Games         | `#/downloads/games`  | `downloads.games`  | **yes**  |
 | Settings⁴     | Appearance    | `#/settings/frame.appearance` | `settings.appearance` | no³ |
 | Settings⁴     | Engine settings | `#/settings/engine-settings` | `settings.engine` | no³ |
 | Settings⁴     | Accounts      | `#/settings/lobby-servers` | `settings.accounts` | no³ |
@@ -50,15 +47,17 @@ These appear in the sidebar for every user (unless hidden). The **nav id** colum
 
 ² **Multiplayer** items appear contextually, not via the profile. **Login** shows only while logged out. **Chat** appears after the first connect, then stays for the session. **Matchmaking** shows only while connected to a Tachyon server, because TASServer has no matchmaking. **Battle Room** shows only while you're in a battle. **Battles** is not contextual, it stays visible even logged out, because a direct room can be hosted from that page with no server and no login (issue #1580). It is profile-hideable instead. **Server admin** shows only while a connected account is a moderator or admin on an uberserver lobby (never on Teiserver or Zero-K), and is also on the profile's `hide` list, so a distribution can turn it off outright.
 
-> Want a nav item hideable that isn't yet? It's a one-line change per item in the plugin. Ask and the list can grow. Today `campaign.builder`, `career.overview`, `conquest.list`, `library.games`, `downloads.browse`, `downloads.games`, `hub.browse`, `multiplayer.admin`, `multiplayer.battles`, `multiplayer.stats` and `runlite.list` are wired for hiding (the authoritative set is `HIDEABLE_NAV_IDS` in `src/profile/hidden.tsx`). `content.setupPacks` is also on the same `hide` list. It no longer names a nav item. It hides the Coilbox hub screen's "Share a pack" button instead.
+> Want a nav item hideable that isn't yet? It's a one-line change per item in the plugin. Ask and the list can grow. Today `campaign.builder`, `career.overview`, `conquest.list`, `library.games`, `library.rapid`, `hub.browse`, `multiplayer.admin`, `multiplayer.battles`, `multiplayer.stats` and `runlite.list` are wired for hiding (the authoritative set is `HIDEABLE_NAV_IDS` in `src/profile/hidden.tsx`). `content.setupPacks` is also on the same `hide` list. It no longer names a nav item. It hides the Coilbox hub screen's "Share a pack" button instead.
 >
 > The `analytics.*` ids are on the same list too and also name no nav item. `analytics.matchStats` hides the match statistics on a replay's page, the Replays page figures and the player dossier's match figures. `analytics.run` hides the button that runs the engine analysis, the one part with a cost, and an analysis already stored still shows. `analytics.spatialLayers` hides the layers on a replay's map (start positions, buildings ordered, building density and order density) and their toggles, and leaves the start boxes. `analytics.mapInsight` hides the "How this map is played" section on a map's page, the picture of every match on that map. That section has no route of its own, and is reached from a map's page at `#/library/maps/:name`. See [Where a replay's numbers come from](replay-data-sources.md).
 
-> **Old paths**: `#/content/replays(/:name)` and `#/content/stats(/:name)` redirect to `#/play/replays(/:name)` and `#/stats(/:name)` respectively, so existing bookmarks and links keep working (#467). `#/content/setup-packs` redirects to `#/downloads/maps`, since the Setup packs page is gone and sharing a pack now happens from the Coilbox hub screen instead.
+> **Old paths**: `#/content/replays(/:name)` and `#/content/stats(/:name)` redirect to `#/play/replays(/:name)` and `#/stats(/:name)` respectively, so existing bookmarks and links keep working (#467). `#/content/setup-packs` redirects to `#/library/maps`, since the Setup packs page is gone and sharing a pack now happens from the Coilbox hub screen instead.
+>
+> The Downloads group went into the Library. `#/downloads` redirects to `#/library/downloads`, `#/downloads/maps` to `#/library/maps` and `#/downloads/games` to `#/library/games`, and any query string is kept, so a `coilbox://import` link for a setup pack still opens the import drawer on the Maps page. Rapid repositories moved to `#/library/rapid` (advanced mode).
 >
 > Content became Library, so every browser path moved from `#/content/` to `#/library/`. The old ones redirect: `#/content/maps`, `#/content/maps/:name`, `#/content/games`, `#/content/games/:name`, `#/content/games/:name/units`, `#/content/games/:name/units/:unit`, `#/content/blueprints`, `#/content/blueprints/:id`, `#/content/archives`, `#/content/archives/:name` and `#/content/archives/:name/repl`.
 >
-> The nav ids moved with them. A distribution profile written against `content.maps`, `content.games`, `content.blueprints`, `content.archives` or the `content` settings section keeps working, in `hide`, `hideSettings` and the home page `art` map alike. The old names are mapped in `src/profile/renamedIds.ts`. `content.setupPacks` did not move, because it never named a nav item.
+> The nav ids moved with them. A distribution profile written against `content.maps`, `content.games`, `content.blueprints`, `content.archives` or the `content` settings section keeps working, in `hide`, `hideSettings` and the home page `art` map alike. The old names are mapped in `src/profile/renamedIds.ts`. `content.setupPacks` did not move, because it never named a nav item. The Downloads group's ids moved too: `downloads.games` and `downloads.maps` are now `library.games` and `library.maps`, `downloads.browse` is `library.rapid`, and the `downloads` settings section is `sources`.
 
 ## Advanced-mode pages
 
@@ -67,6 +66,7 @@ These are hidden unless **Advanced mode** is on (Settings > General). They're mo
 | Sidebar group    | Item        | Link (`href`)          | Nav id                 |
 | ---------------- | ----------- | ----------------------- | ----------------------- |
 | Library          | Archives    | `#/library/archives`   | `library.archives`     |
+| Library          | Rapid repositories | `#/library/rapid` | `library.rapid`      |
 | uberstress       | Run         | `#/uberstress`         | `uberstress.run`       |
 | uberstress       | History     | `#/uberstress/history` | `uberstress.history`   |
 | Campaign Builder | Campaigns   | `#/campaign-builder`   | `campaign.builder`     |
@@ -146,7 +146,7 @@ Each settings section lives at `#/settings/<id>`. **Any** of these ids can be hi
 | Library                   | `library`          | `#/settings/library`           |
 | → Content folders         | `content-folders`  | `#/settings/content-folders`   |
 | → Engines                  | `engines`          | `#/settings/engines`           |
-| → Downloads                 | `downloads`        | `#/settings/downloads`         |
+| → Sources                   | `sources`          | `#/settings/sources`           |
 | → Storage                    | `storage`          | `#/settings/storage`           |
 | → Import                      | `import`           | `#/settings/import`            |
 | Advanced                  | `advanced`         | `#/settings/advanced`          |

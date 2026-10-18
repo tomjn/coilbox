@@ -36,7 +36,7 @@ import LinkCard from "./LinkCard";
  * own.
  *
  * `suggested` is the suggested map's card, handed over by the layout. A map
- * suggestion is a download, so it belongs in the Downloads group rather than in a
+ * suggestion is a download, so it belongs in the Library group rather than in a
  * section of its own at the foot of the page (issue #1037). The grid places it
  * and never builds it: what it is, and whether there is one at all, stays the
  * suggested map zone's business.
@@ -119,14 +119,14 @@ export default function ToolCards({ suggested }: { suggested?: ReactNode }) {
 /**
  * The nav group the suggested map's card joins.
  *
- * The downloads plugin's group id. It is always there: plugins are registered in
- * `app.plugins.ts` rather than configured, and of its three items a profile can
- * hide Browse Rapid and Games but not Maps, so the group never empties.
+ * The Library group's id. It is always there: plugins are registered in
+ * `app.plugins.ts` rather than configured, and a profile can hide the Games
+ * page but not Maps, so the group never empties.
  *
  * After the tools and before the shared links card. Links leave the app, so they
  * stay last, which is the order {@link LinkCard} already argues for.
  */
-const SUGGESTED_MAP_GROUP = "downloads";
+const SUGGESTED_MAP_GROUP = "library";
 
 /**
  * What a tool card adds to the shared shell in both rendering modes. Sizing, the
@@ -232,7 +232,13 @@ export function ToolCard({
   // this grid included. Resolved unconditionally (per-item component, so
   // hook-safe) before the early return. A card that stands down leaves neither
   // marker, which is what makes both of them mean "drawn" rather than "listed".
-  const { visible, label, icon: Icon, description } = useResolvedNavItem(item);
+  const {
+    visible,
+    label,
+    icon: Icon,
+    description,
+    href,
+  } = useResolvedNavItem(item);
   // The URL that failed, not a flag, so art arriving later (a source whose cache
   // warms mid-session) gets its own chance rather than inheriting the verdict on
   // a URL it has replaced.
@@ -275,7 +281,7 @@ export function ToolCard({
           </span>
         )}
       </span>
-      {item.href && (
+      {href && (
         <ExternalLink size={16} className={`shrink-0 ${ART_DIM_CLASS}`} />
       )}
     </span>
@@ -320,7 +326,7 @@ export function ToolCard({
             </span>
           )}
         </span>
-        {item.href && (
+        {href && (
           <ExternalLink size={16} className="shrink-0 text-muted-foreground" />
         )}
       </>
@@ -338,8 +344,7 @@ export function ToolCard({
   }
 
   const cardClass = art || !compact ? ART_CARD_CLASS : ICON_CARD_CLASS;
-  if (item.href) {
-    const href = item.href;
+  if (href) {
     return (
       <button
         type="button"

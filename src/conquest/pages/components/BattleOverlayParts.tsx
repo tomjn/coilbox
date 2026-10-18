@@ -193,7 +193,7 @@ function MissingContentGate({
           className="w-full"
         />
       ) : (
-        <Link to="/downloads/games">
+        <Link to="/library/games">
           <Button variant="outline" className="w-full">
             <Download className="mr-1.5 size-4" aria-hidden /> Open game
             downloads
