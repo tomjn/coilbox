@@ -5,6 +5,7 @@ import {
   useDownloadQueue,
 } from "../downloads/DownloadQueueProvider";
 import { useDownloadHistory } from "../downloads/downloadHistory";
+import { updatesOffKeys, useGamePrefs } from "../downloads/gamePrefs";
 import { loadGithubReleases } from "../downloads/githubReleases";
 import {
   loadEvolutionRtsMaps,
@@ -90,6 +91,8 @@ export function useLibrary({
   rapidVersions,
 }: LibraryOptions = {}): LibraryRecord {
   const history = useDownloadHistory();
+  const prefs = useGamePrefs();
+  const updatesOff = useMemo(() => updatesOffKeys(prefs), [prefs]);
   const rootPaths = useContentRootPaths();
   const [files, setFiles] = useState<LibraryInput["files"]>(null);
   const [filesAnswered, setFilesAnswered] = useState(false);
@@ -151,8 +154,9 @@ export function useLibrary({
         queue,
         history,
         rapidVersions,
+        updatesOff,
       }),
-    [scan, files, hubGames, loaded, queue, history, rapidVersions],
+    [scan, files, hubGames, loaded, queue, history, rapidVersions, updatesOff],
   );
   return useMemo(
     () => ({
