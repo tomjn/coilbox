@@ -11,6 +11,8 @@
 
 pub mod defs;
 mod handlers;
+#[cfg(test)]
+mod identical_builds;
 pub mod models;
 pub mod mutator;
 
