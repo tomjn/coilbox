@@ -30,7 +30,7 @@ import {
   unitSpeedOf,
   unitTurnRateOf,
 } from "@/workshop/moveClasses";
-import { type BankingValues, bankingKeys, withEngineBanking } from "./banking";
+import { bankingKeys, withEngineBanking } from "./banking";
 import type { FlightStyle, LegoMovement, LegoProject } from "./model";
 import { type Problem, problem } from "./problems";
 
