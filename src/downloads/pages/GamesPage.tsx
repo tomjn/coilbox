@@ -21,6 +21,7 @@ import { fetchHubGames, type HubGameDownload } from "@/hub/api";
 import { useHubUrl } from "@/hub/config";
 import { hubGameIconName } from "@/hub/gameIcons";
 import { hubGameDownloadRequest } from "@/hub/games/download";
+import { formatDate } from "@/lib/format";
 import { type CatalogueRequest, useLibrary } from "../../content/useLibrary";
 import { useWriteRoot } from "../config";
 import { identityOf, useDownloadQueue } from "../DownloadQueueProvider";
@@ -525,7 +526,7 @@ export default function GamesPage() {
                               ? `via ${g.downloads.map((d) => d.kind).join(" → ")}`
                               : g.filename}
                             {g.date !== undefined &&
-                              ` · ${new Date(g.date).toLocaleDateString(undefined, { dateStyle: "medium" })}`}
+                              ` · ${formatDate(new Date(g.date), { dateStyle: "medium" })}`}
                           </p>
                         )}
                       </div>

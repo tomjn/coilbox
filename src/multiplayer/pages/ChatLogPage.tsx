@@ -1,7 +1,7 @@
 import { Input } from "@picoframe/frame";
 import { Hash, MessageSquare, Search, Swords, User } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatTime } from "@/lib/format";
 import {
   type ChatLogAccount,
   type ChatLogThread,
@@ -214,7 +214,7 @@ export default function ChatLogPage() {
                             className="whitespace-nowrap font-mono text-xs text-muted-foreground"
                             title={fmtTime(m.at)}
                           >
-                            {new Date(m.at).toLocaleTimeString()}
+                            {formatTime(new Date(m.at))}
                           </span>
                           <span className="min-w-0 break-words">
                             <span className="mr-1.5 font-semibold">

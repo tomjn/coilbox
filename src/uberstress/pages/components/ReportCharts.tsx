@@ -10,6 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { formatDateTime } from "@/lib/format";
 import type { Report, ReportSummary } from "../../bindings";
 
 // recharts renders to SVG and can't read CSS custom properties via `fill`, so the
@@ -28,7 +29,7 @@ function shortTime(iso: string): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime())
     ? iso
-    : d.toLocaleString(undefined, {
+    : formatDateTime(d, {
         month: "short",
         day: "numeric",
         hour: "2-digit",

@@ -27,6 +27,7 @@ import {
   useMessageScroller,
 } from "@/components/ui/message-scroller";
 import { Textarea } from "@/components/ui/textarea";
+import { formatDate, formatTime as formatLocaleTime } from "@/lib/format";
 import { readableTeamTextColor } from "@/lib/teamColor";
 import type { ChatMsg } from "../bindings";
 import { NameMarkIcon } from "../NameMarkIcon";
@@ -50,7 +51,7 @@ import { completeNick, type TabCycle } from "./tabComplete";
 /** Format a unix-millis timestamp as a short local time (blank when absent). */
 function formatTime(at: number): string {
   if (!at) return "";
-  return new Date(at).toLocaleTimeString([], {
+  return formatLocaleTime(new Date(at), {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -70,7 +71,7 @@ function formatDay(at: number): string {
   yesterday.setDate(today.getDate() - 1);
   if (sameDay(d, today)) return "Today";
   if (sameDay(d, yesterday)) return "Yesterday";
-  return d.toLocaleDateString([], {
+  return formatDate(d, {
     weekday: "short",
     year: "numeric",
     month: "short",

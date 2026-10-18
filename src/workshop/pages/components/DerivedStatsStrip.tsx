@@ -20,6 +20,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { formatNumber as formatLocaleNumber } from "@/lib/format";
 import {
   ALPHA_DAMAGE_HELP,
   COST_PER_HIT_POINT_HELP,
@@ -104,7 +105,7 @@ function formatNumber(value: number): string {
   if (value === 0) return "0";
   const abs = Math.abs(value);
   const digits = abs >= 100 ? 0 : abs >= 10 ? 1 : 2;
-  return value.toLocaleString(undefined, {
+  return formatLocaleNumber(value, {
     maximumFractionDigits: digits,
     minimumFractionDigits: 0,
   });

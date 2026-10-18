@@ -43,6 +43,7 @@ import { useGameUnits } from "@/content/useGameUnits";
 import { nextDrawerKey } from "@/general/drawerKey";
 import { useBlueprintBackfill } from "@/hub/assets/useBlueprintBackfill";
 import { hubItemRoute, isHubItemPageReachable } from "@/hub/config";
+import { formatDate } from "@/lib/format";
 import { notify } from "@/notify/notify";
 import { BlueprintEditor } from "@/placement/BlueprintEditor";
 import { BlueprintOnMap } from "@/placement/BlueprintOnMap";
@@ -218,7 +219,7 @@ export default function BlueprintDetailPage() {
             <p className="break-all text-xs text-muted-foreground">
               {sourceSummary(record.source)}
               {record.source.at
-                ? ` Taken on ${new Date(record.source.at).toLocaleDateString()}.`
+                ? ` Taken on ${formatDate(new Date(record.source.at))}.`
                 : ""}
               {/* The recorded item id is the key back into the hub, so it is
                   worth a door rather than a number nothing opens (issue

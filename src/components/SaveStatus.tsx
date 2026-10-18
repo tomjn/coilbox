@@ -1,5 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { Check, Loader2, TriangleAlert } from "lucide-react";
+import { formatTime } from "@/lib/format";
 
 /**
  * Where an editor's last write got to. Shared by the campaign editor (issue
@@ -40,7 +41,7 @@ export type SaveState =
 
 /** The time of a save, in the reader's own locale. */
 function savedTime(at: Date): string {
-  return at.toLocaleTimeString(undefined, {
+  return formatTime(at, {
     hour: "2-digit",
     minute: "2-digit",
   });

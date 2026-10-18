@@ -15,6 +15,8 @@
  * (issue #2640, #3081), absent outside a project, in which case a slot's own
  * definition is what fires, the same as before that feature existed.
  */
+
+import { formatNumber } from "@/lib/format";
 import {
   ALPHA_DAMAGE_HELP,
   COST_PER_HIT_POINT_HELP,
@@ -236,7 +238,7 @@ export function differingColumns(rows: UnitReferenceRow[]): ReferenceColumn[] {
  *  and nothing at all for a unit the column has no honest answer for. */
 export function formatReferenceValue(value: number | undefined): string {
   if (value === undefined) return "—";
-  return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  return formatNumber(value, { maximumFractionDigits: 2 });
 }
 
 /** A game-to-project difference, with the sign written out (issue #3114): a
