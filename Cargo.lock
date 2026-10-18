@@ -817,6 +817,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "coilbox-compat"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+]
+
+[[package]]
 name = "coilbox-gamebackup"
 version = "0.0.0"
 dependencies = [

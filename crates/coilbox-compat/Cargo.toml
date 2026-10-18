@@ -1,0 +1,11 @@
+[package]
+name = "coilbox-compat"
+version = "0.0.0"
+description = "The compatibility fixes and the manifests that say which of them make up each compat version, embedded so a build needs no files at run time."
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }

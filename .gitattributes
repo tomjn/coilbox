@@ -33,3 +33,7 @@ crates/tauri-plugin-coilbox-workshop/tests/fixtures/saved-project.json text eol=
 # survives, so the fixtures have to keep the bytes the games have.
 crates/coilbox-unitpatch/tests/fixtures/**/*.lua -text
 crates/coilbox-unitpatch/tests/fixtures/**/*.fbi -text
+
+# The compatibility fixes and manifests are hashed, and a mutator built from them
+# must be byte identical on every machine (issue #4555). CRLF would change both.
+lua/compat/** text eol=lf
