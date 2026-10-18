@@ -56,6 +56,8 @@ interface FiltersProps {
   onLoadModuleFile?: () => void;
   /** Adds the "Game units" kind, for a page that has a unit to take from. */
   showGameUnits?: boolean;
+  /** False for a page that puts the pack menu in its header instead. */
+  showPacks?: boolean;
   className?: string;
 }
 
@@ -70,6 +72,7 @@ export function InventoryFilters({
   compounds,
   onLoadModuleFile,
   showGameUnits = false,
+  showPacks = true,
   className,
 }: FiltersProps) {
   const { partFilter, moduleFilter } = view;
@@ -140,6 +143,7 @@ export function InventoryFilters({
           onPackId={partFilter.setPackId}
           shown={view.parts.length + view.shapes.length}
           showShapes={(pack.manifest.swatches?.length ?? 0) > 0}
+          showPacks={showPacks}
           className="flex-1"
         />
       ) : view.kind === "modules" ? (
@@ -215,8 +219,8 @@ interface GridsProps {
 
 function emptyText(list: InventoryList): string {
   if (list === "recent") return "Nothing used yet.";
-  if (list === "favourites") return "No favourites yet. Click a star.";
-  return "Nothing matches. Clear the search or pick another filter.";
+  if (list === "favourites") return "No favourites yet.";
+  return "Nothing matches.";
 }
 
 export function InventoryGrids({

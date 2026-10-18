@@ -421,11 +421,19 @@ describe("favourites", () => {
     expect(store.values.get("lego.inventory.favourites")).toEqual([]);
   });
 
+  it("say so in one line when a search matches nothing", () => {
+    render(<Harness />);
+    fireEvent.change(screen.getByLabelText("Search the inventory"), {
+      target: { value: "nothing is called this" },
+    });
+    expect(screen.getByText("Nothing matches.")).toBeTruthy();
+  });
+
   it("ignore a stored value that is not a list", () => {
     store.values.set("lego.inventory.favourites", "broken");
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "Favourites" }));
-    expect(screen.getByText("No favourites yet. Click a star.")).toBeTruthy();
+    expect(screen.getByText("No favourites yet.")).toBeTruthy();
   });
 });
 
