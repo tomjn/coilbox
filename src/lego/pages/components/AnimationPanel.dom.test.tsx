@@ -20,6 +20,7 @@ import {
 } from "@testing-library/react";
 import type * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { importScript } from "../../importScript";
 import { unitScript } from "../../luaScript";
 import { type LegoProject, newProject } from "../../model";
 import type { LoadedPack } from "../../pack";
@@ -243,6 +244,55 @@ describe("a unit that owns its script", () => {
         /presets no longer write it\. Edit it on the Script tab/,
       ),
     ).toBeTruthy();
+  });
+});
+
+/** An imported script plays through the same runtime as any other (#643). */
+describe("a unit with an imported script", () => {
+  const ids = () => {
+    let n = 0;
+    return () => `id-${++n}`;
+  };
+
+  it("plays a script kept as its own, with what it came with", async () => {
+    const lua =
+      'local base = piece("base")\nfunction script.Create()\n  Spin(base, y_axis, 1)\nend\n';
+    const { project: value } = importScript(project(), lua, {
+      newId: ids(),
+      includes: { "lib.lua": "return {}" },
+      unitDef: { name: "armcom" },
+    });
+    show(value);
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+
+    await waitFor(() => expect(runLua).toHaveBeenCalled());
+    expect(runLua.mock.calls[0][0]).toMatchObject({
+      script: lua,
+      pieces: ["base"],
+      includes: { "lib.lua": "return {}" },
+      unitDef: { name: "armcom" },
+    });
+  });
+
+  it("plays a script read back as actions through the script they write", async () => {
+    const lua = [
+      'local base = piece("base")',
+      "local function sway()",
+      "  Turn(base, y_axis, 0.5, 1)",
+      "end",
+      "function script.Create()",
+      "  StartThread(sway)",
+      "end",
+    ].join("\n");
+    const result = importScript(project(), lua, { newId: ids() });
+    expect(result.as).toBe("actions");
+    show(result.project);
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+
+    await waitFor(() => expect(runLua).toHaveBeenCalled());
+    const sent = runLua.mock.calls[0][0] as { script: string };
+    expect(sent.script).toBe(unitScript(result.project));
+    expect(sent.script).toContain("Turn(base, y_axis, 0.5, 1)");
   });
 });
 

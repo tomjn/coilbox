@@ -25,10 +25,16 @@
  * reached are shown at reduced opacity, so a glance at the editor says what a
  * preview actually exercised. Rebuilt BOS gets no such marks: a run reports
  * the instructions it reached, and one line of BOS is many of those.
+ *
+ * A Lua script can be imported from a file (#643). The page decides what it
+ * becomes (`importScript.ts`). Once a unit owns a script, the piece names it
+ * asks for that the unit lacks are listed in one line, with a way to match
+ * each to one of the unit's pieces.
  */
 
 import { Button, Drawer } from "@picoframe/frame";
-import { Check, Copy, FileCode2, RefreshCw } from "lucide-react";
+import { open } from "@tauri-apps/plugin-dialog";
+import { Check, Copy, FileCode2, FileUp, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { LintDiagnostic } from "@/animation/bindings";
 import { animCobDecompileBytes } from "@/animation/bindings";
@@ -38,6 +44,7 @@ import {
   SEVERITY_COLOR,
   worstSeverity,
 } from "@/components/CheckItem";
+import { OptionSelect } from "@/components/OptionSelect";
 import { SourceEditor } from "@/components/SourceEditor";
 import { Label } from "@/components/ui/label";
 import {
@@ -56,9 +63,14 @@ import { errorText } from "@/lib/helpers";
 import { usePreferredTarget } from "@/play/config";
 import type { LuaMatch } from "@/scenario/pages/components/missionLuaSearch";
 import { adoptGameScript } from "../../adoptGameScript";
+import { legoReadTextFile } from "../../bindings";
 import { hasOldPieceNumbering, isBosConversion } from "../../bosConversion";
 import { lintLuaCallins } from "../../luaCallinLint";
-import { lineNamingPiece, missingPieces } from "../../luaPieces";
+import {
+  lineNamingPiece,
+  missingPieces,
+  renameScriptPieces,
+} from "../../luaPieces";
 import { buildLuaScript, unitScript } from "../../luaScript";
 import type { LegoCompiledScript, LegoProject } from "../../model";
 import type { ScriptTimeline } from "../../scriptPlayback";
@@ -102,6 +114,8 @@ interface Props {
   /** Takes the game's compiled script again, after it has been read back out
    *  of the archive it came from. */
   onCompiledReload: (compiled: LegoCompiledScript) => void;
+  /** Imports a Lua script read from a file into the unit. */
+  onScriptImport: (lua: string) => void;
 }
 
 export function ScriptTab({
@@ -110,6 +124,7 @@ export function ScriptTab({
   onScriptRelease,
   lastRun,
   onCompiledReload,
+  onScriptImport,
 }: Props) {
   const [copied, setCopied] = useState(false);
   const [checksOpen, setChecksOpen] = useState(false);
@@ -118,6 +133,8 @@ export function ScriptTab({
   const [reloading, setReloading] = useState(false);
   const [reloadNote, setReloadNote] = useState<string | null>(null);
   const [confirmConvert, setConfirmConvert] = useState(false);
+  const [matchOpen, setMatchOpen] = useState(false);
+  const [mapping, setMapping] = useState<Record<string, string>>({});
   const { target } = usePreferredTarget();
   const owned = project.script !== undefined;
   const compiled = owned ? undefined : project.compiledScript;
@@ -181,12 +198,21 @@ export function ScriptTab({
   // and the generated script names `trunk`. An imported unit keeps the file's
   // spelling on `originalName`, and a unit opened out of a game is usually
   // carrying that game's script rather than a generated one.
+  const pieceNames = useMemo(
+    () =>
+      project.pieces.flatMap((piece) =>
+        piece.originalName ? [piece.name, piece.originalName] : [piece.name],
+      ),
+    [project.pieces],
+  );
+  const unmatched = useMemo(
+    () => (owned ? missingPieces(draft, pieceNames) : []),
+    [owned, draft, pieceNames],
+  );
+
   const diagnostics = useMemo(() => {
     const found: LintDiagnostic[] = [];
     if (shownLua !== null) {
-      const pieceNames = project.pieces.flatMap((piece) =>
-        piece.originalName ? [piece.name, piece.originalName] : [piece.name],
-      );
       for (const name of missingPieces(shownLua, pieceNames)) {
         found.push({
           rule: "missing-piece",
@@ -216,7 +242,7 @@ export function ScriptTab({
     return found;
   }, [
     shownLua,
-    project.pieces,
+    pieceNames,
     project.unitName,
     project.script,
     owned,
@@ -319,6 +345,37 @@ export function ScriptTab({
     } finally {
       setReloading(false);
     }
+  }
+
+  /** Ask for a `.lua` file and hand its text to the page to import. */
+  async function importFile() {
+    const picked = await open({
+      title: "Import a unit script",
+      multiple: false,
+      directory: false,
+      filters: [{ name: "Lua unit script", extensions: ["lua"] }],
+    });
+    if (typeof picked !== "string") return;
+    setReloadNote(null);
+    try {
+      const { text } = await legoReadTextFile({ path: picked });
+      onScriptImport(text);
+    } catch (error) {
+      setReloadNote(`Could not read ${picked}: ${errorText(error)}`);
+    }
+  }
+
+  /** Rename the unmatched names picked so far, and keep the result. */
+  function applyMapping() {
+    const chosen = Object.fromEntries(
+      Object.entries(mapping).filter(([from]) => unmatched.includes(from)),
+    );
+    setMatchOpen(false);
+    setMapping({});
+    if (Object.keys(chosen).length === 0) return;
+    const next = renameScriptPieces(draft, chosen);
+    setDraft(next);
+    onScriptChange(next);
   }
 
   async function copy() {
@@ -443,6 +500,15 @@ export function ScriptTab({
               </PopoverContent>
             </Popover>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={reloading}
+            onClick={() => void importFile()}
+          >
+            <FileUp className="size-4" />
+            Import
+          </Button>
           <Button variant="outline" size="sm" onClick={() => void copy()}>
             {copied ? (
               <Check className="size-4" />
@@ -486,6 +552,48 @@ export function ScriptTab({
         <p className="border-b border-border/60 px-3 py-2 text-xs text-amber-500">
           Converted before piece numbers were fixed. Convert again.
         </p>
+      )}
+
+      {unmatched.length > 0 && (
+        <div className="flex items-center gap-2 border-b border-border/60 px-3 py-2 text-xs text-amber-500">
+          <span className="min-w-0 flex-1 truncate">
+            Not on this unit: {unmatched.join(", ")}.
+          </span>
+          <Popover open={matchOpen} onOpenChange={setMatchOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm">
+                Match pieces
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="flex w-80 flex-col gap-3">
+              {unmatched.map((name) => (
+                <div key={name} className="flex items-center gap-2">
+                  <span className="w-28 truncate font-mono text-xs">
+                    {name}
+                  </span>
+                  <OptionSelect
+                    size="sm"
+                    ariaLabel={`Piece for ${name}`}
+                    placeholder="Leave it"
+                    value={mapping[name] ?? ""}
+                    onValueChange={(to) =>
+                      setMapping((was) => ({ ...was, [name]: to }))
+                    }
+                    options={project.pieces.map((piece) => ({
+                      value: piece.name,
+                      label: piece.name,
+                    }))}
+                  />
+                </div>
+              ))}
+              <div className="flex justify-end">
+                <Button type="button" size="sm" onClick={applyMapping}>
+                  Rename
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
       )}
 
       {reloadNote && (
