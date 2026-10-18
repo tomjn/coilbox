@@ -342,7 +342,15 @@ function swapOne(
     };
   });
 
-  const merged = { ...inserted.project, pieces };
+  // A copy that was a loadout's own is replaced by one in the same loadout.
+  const merged = {
+    ...inserted.project,
+    pieces: top.inLoadout
+      ? pieces.map((p) =>
+          roots.has(p.id) ? { ...p, inLoadout: true as const } : p,
+        )
+      : pieces,
+  };
   const removedPresets = (merged.animations ?? [])
     .map((applied) => applied.presetId)
     .filter((id) => {

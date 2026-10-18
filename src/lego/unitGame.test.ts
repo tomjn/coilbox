@@ -280,6 +280,32 @@ describe("gameChangeRefusal", () => {
     );
   });
 
+  it("counts a lifted piece parked in another loadout", () => {
+    const sf = gameRecordFor(sf86, installed);
+    const base = project({ game: sf });
+    const turret = {
+      ...base.pieces[0],
+      id: "t",
+      name: "turret",
+      parentId: base.rootPieceId,
+      partId: null,
+      meshId: "m1",
+      lifted: { game: sf, member: "objects3d/a.s3o" },
+      inLoadout: true as const,
+    };
+    const unit: LegoProject = {
+      ...base,
+      loadouts: [
+        { id: "a", name: "Bare" },
+        { id: "b", name: "Turret", content: { pieces: [turret] } },
+      ],
+      activeLoadout: "a",
+    };
+    expect(gameChangeRefusal(unit, null)).toBe(
+      "Remove the pieces from Splinter Faction 0.1.86 first: turret.",
+    );
+  });
+
   it("counts a piece lifted onto a unit of parts as one from its game", () => {
     const sf = gameRecordFor(sf86, installed);
     const base = project({ game: sf });
