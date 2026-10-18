@@ -25,6 +25,7 @@ import {
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type DownloadProgress, dlDownloadEngineRecoil } from "./bindings";
+import { MemoryRouter } from "react-router";
 import DownloadQueueBadge from "./DownloadQueueBadge";
 import {
   DownloadQueueProvider,
@@ -750,10 +751,12 @@ describe("the indicator's popover", () => {
       return null;
     }
     render(
-      <DownloadQueueProvider>
-        <Grab />
-        <DownloadQueueBadge />
-      </DownloadQueueProvider>,
+      <MemoryRouter>
+        <DownloadQueueProvider>
+          <Grab />
+          <DownloadQueueBadge />
+        </DownloadQueueProvider>
+      </MemoryRouter>,
     );
 
     act(() => {
