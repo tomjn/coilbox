@@ -265,7 +265,16 @@ mod tests {
         )
         .unwrap();
         assert_eq!(built.folder, format!("coilbox-compat-xta-9.65-{n}.sdd"));
-        assert_eq!(built.files, ["modinfo.lua", mutator::MARKER]);
+        let gadgets: Vec<String> =
+            coilbox_compat::gadget_files(&coilbox_compat::manifest(n).unwrap())
+                .into_iter()
+                .map(|(path, _)| path)
+                .collect();
+        let expected: Vec<String> = gadgets
+            .into_iter()
+            .chain(["modinfo.lua".to_string(), mutator::MARKER.to_string()])
+            .collect();
+        assert_eq!(built.files, expected);
         let dir = std::path::Path::new(&built.dir);
         assert!(dir.join("modinfo.lua").is_file());
         assert_eq!(
