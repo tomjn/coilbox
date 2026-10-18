@@ -496,3 +496,112 @@ describe("buildLibrary stray files (#4646)", () => {
     expect(maps.find((m) => m.id === "Folder Map")?.state).toBe("local");
   });
 });
+
+describe("buildLibrary maps named by different archives (#4657)", () => {
+  const bare: LibraryInput = {
+    scan: { games: [], maps: [] },
+    files: { games: [], maps: [] },
+    hubGames: [],
+    catalogues: [],
+    queue: [],
+  };
+
+  it("joins mirror entries to a scanned map whose archive is the other copy", () => {
+    const { maps } = buildLibrary({
+      ...bare,
+      scan: { games: [], maps: [scannedMap("X 1.0", "x_1.0.sdd")] },
+      files: { games: [], maps: ["x_1.0.sd7", "x_1.0.sdd"] },
+      catalogues: [
+        { source: "evolutionrts", entries: [evolutionRtsFile("x_1.0.sd7")] },
+        { source: "hakora", entries: [hakoraFile("X_1.0.SD7")] },
+        {
+          source: "github",
+          kind: "map",
+          repo: "a/maps",
+          entries: [release("x_1.0.sd7", "v1")],
+        },
+      ],
+    });
+    expect(maps.map((m) => m.id)).toEqual(["X 1.0"]);
+    expect(maps[0].installed?.name).toBe("X 1.0");
+    expect(maps[0].state).toBe("installed");
+    expect(maps[0].sources.map((s) => s.kind)).toEqual([
+      "evolutionrts",
+      "hakora",
+      "github",
+    ]);
+  });
+
+  it("leaves an unlisted second copy on disk with the scanned map", () => {
+    const { maps } = buildLibrary({
+      ...bare,
+      scan: { games: [], maps: [scannedMap("X 1.0", "x_1.0.sdd")] },
+      files: { games: [], maps: ["x_1.0.sd7", "x_1.0.sdd"] },
+    });
+    expect(maps.map((m) => [m.id, m.state])).toEqual([["X 1.0", "local"]]);
+  });
+
+  it("joins a file-only mirror to the springfiles entry that differs by a v before the version", () => {
+    // beyond-all-reason/Maps has all_that_glitters_1.2.sd7 where springfiles
+    // has all_that_glitters_v1.2.sd7.
+    const { maps } = buildLibrary({
+      ...bare,
+      catalogues: [
+        {
+          source: "github",
+          kind: "map",
+          repo: "beyond-all-reason/Maps",
+          entries: [release("all_that_glitters_1.2.sd7", "v1")],
+        },
+        {
+          source: "springfiles",
+          kind: "map",
+          entries: [
+            springFile(
+              "All That Glitters v1.2",
+              "all_that_glitters_v1.2.sd7",
+              "map",
+            ),
+          ],
+        },
+      ],
+    });
+    expect(maps.map((m) => m.id)).toEqual(["All That Glitters v1.2"]);
+    expect(maps[0].sources.map((s) => s.kind)).toEqual([
+      "springfiles",
+      "github",
+    ]);
+  });
+
+  it("keeps maps whose stems differ as separate records", () => {
+    const { maps } = buildLibrary({
+      ...bare,
+      scan: { games: [], maps: [scannedMap("X 1.0", "x_1.0.sdd")] },
+      files: { games: [], maps: ["x_1.0.sdd"] },
+      catalogues: [
+        {
+          source: "evolutionrts",
+          entries: [
+            evolutionRtsFile("x_1.1.sd7"),
+            evolutionRtsFile("y_1.0.sd7"),
+          ],
+        },
+        {
+          source: "springfiles",
+          kind: "map",
+          entries: [
+            springFile("Bridge v1", "bridge_v1.sd7", "map"),
+            springFile("Bridge 1", "bridge_1.sd7", "map"),
+          ],
+        },
+      ],
+    });
+    expect(maps.map((m) => m.id).sort()).toEqual([
+      "Bridge 1",
+      "Bridge v1",
+      "X 1.0",
+      "x_1.1",
+      "y_1.0",
+    ]);
+  });
+});
