@@ -67,6 +67,7 @@ function show(
     category?: string | null;
     shown?: number;
     showShapes?: boolean;
+    showPacks?: boolean;
   } = {},
 ) {
   return render(
@@ -80,6 +81,7 @@ function show(
       onPackId={onPackId}
       shown={over.shown ?? 7}
       showShapes={over.showShapes}
+      showPacks={over.showPacks}
     />,
   );
 }
@@ -247,6 +249,14 @@ describe("the pack picker", () => {
     show(pack({ packs: [manifest("lego"), manifest("extras")] }));
     expect(screen.getByLabelText("Parts pack")).toBeTruthy();
   });
+
+  /** The Lego Parts page puts it in its header instead (#4535). */
+  it("stays out of the row for a page that shows it elsewhere", () => {
+    show(pack({ packs: [manifest("lego"), manifest("extras")] }), {
+      showPacks: false,
+    });
+    expect(screen.queryByLabelText("Parts pack")).toBeNull();
+  });
 });
 
 describe("what the library itself has to say", () => {
@@ -259,6 +269,22 @@ describe("what the library itself has to say", () => {
     );
     expect(screen.getByText("extras: no pack.json")).toBeTruthy();
     expect(container.textContent).toContain("/packs");
+  });
+
+  it("gives each problem a line of its own in one alert", () => {
+    render(
+      <PackProblems
+        pack={pack({ problems: ["extras: no pack.json", "rust: bad atlas"] })}
+      />,
+    );
+    const alert = screen.getByRole("alert");
+    expect(
+      [...alert.querySelectorAll("li")].map((li) => li.textContent),
+    ).toEqual([
+      "extras: no pack.json",
+      "rust: bad atlas",
+      "Extension packs live in /packs, one folder each.",
+    ]);
   });
 
   it("says nothing when every pack loaded", () => {
