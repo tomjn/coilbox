@@ -85,6 +85,27 @@ describe("attemptsToRecord", () => {
     });
   });
 
+  it("writes a plain reason naming the host and file, and keeps the raw text", () => {
+    const raw =
+      "HTTP status client error (404 Not Found) for url (https://x.test/a.sd7)";
+    const [only] = attemptsToRecord(
+      item({
+        kind: "file",
+        label: "f",
+        args: {
+          url: "https://x.test/a.sd7",
+          destDir: "/root/maps",
+          filename: "a.sd7",
+        },
+      }),
+      [],
+      raw,
+      5000,
+    );
+    expect(only.attempt.failure).toBe("x.test answered 404 for a.sd7");
+    expect(only.attempt.detail).toBe(raw);
+  });
+
   it("keys a file in the games folder like the library keys an archive", () => {
     const [only] = attemptsToRecord(
       item({
