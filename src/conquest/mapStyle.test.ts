@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { conquestIdentity, galaxyIdentity } from "../challenge/identity";
 import {
   challengeSettingsFromGalaxy,
@@ -29,6 +29,17 @@ import {
   generatedTerrain,
   generateTerritories,
 } from "./territories";
+
+// Wrap the land generators so one test can see the dispatch. Every other test
+// gets the real generator.
+vi.mock("./cities", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./cities")>();
+  return { ...actual, generateCities: vi.fn(actual.generateCities) };
+});
+vi.mock("./territories", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./territories")>();
+  return { ...actual, generateTerritories: vi.fn(actual.generateTerritories) };
+});
 
 const maps = Array.from({ length: 12 }, (_, i) => ({
   name: `Map ${i}`,
@@ -65,12 +76,24 @@ describe("generateMap", () => {
   });
 
   it("builds each land style with its own generator", () => {
-    const { skin: _s, layout: _l, radiusLy: _r, ...rest } = base;
-    expect(generateMap({ ...base, skin: "cities" }, NOW)).toEqual(
-      generateCities({ ...rest, layout: "ring" }, NOW),
+    // Each generator hands back a marker, so this checks the dispatch without
+    // generating a map.
+    const marker = { id: "marker" } as GalaxyDoc;
+    vi.mocked(generateCities).mockReturnValueOnce(marker);
+    expect(generateMap({ ...base, skin: "cities" }, NOW)).toBe(marker);
+    expect(generateCities).toHaveBeenLastCalledWith(
+      expect.objectContaining({ seed: 77, skin: "cities", layout: "ring" }),
+      NOW,
     );
-    expect(generateMap({ ...base, skin: "territories" }, NOW)).toEqual(
-      generateTerritories({ ...rest, layout: "ring" }, NOW),
+    vi.mocked(generateTerritories).mockReturnValueOnce(marker);
+    expect(generateMap({ ...base, skin: "territories" }, NOW)).toBe(marker);
+    expect(generateTerritories).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        seed: 77,
+        skin: "territories",
+        layout: "ring",
+      }),
+      NOW,
     );
   });
 
