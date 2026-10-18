@@ -13,6 +13,7 @@
 
 import { useSetting } from "@picoframe/frame";
 import { type ReactNode, useEffect } from "react";
+import { useApplyLanguage } from "../i18n/language";
 import { showFrameRates } from "../lib/frameRate";
 import {
   applyUiZoom,
@@ -31,7 +32,8 @@ export function useUiZoomSetting() {
 /**
  * The general plugin's Provider: keeps the webview at the stored zoom, listens
  * for the zoom keys, closes the drawer on a navigation, and shows the frame
- * rate on 3D views when that is switched on.
+ * rate on 3D views when that is switched on, and keeps the catalog on the
+ * chosen language.
  *
  * Composed here rather than in `index.ts` because that file has no JSX, and
  * because both halves are the same kind of thing: app-wide behaviour with no UI
@@ -39,6 +41,7 @@ export function useUiZoomSetting() {
  */
 export function GeneralProvider({ children }: { children: ReactNode }) {
   const [zoom, setZoom] = useUiZoomSetting();
+  useApplyLanguage();
 
   // Keep the webview at whatever the setting says, whichever surface changed it.
   useEffect(() => {

@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { notify } from "@/notify/notify";
+import { useResolvedLocale } from "../../../i18n/language";
 import type { Side, UnitDatasetEntry } from "../../bindings";
 import type { BrandingEntry } from "../../branding";
 import { resolveBrandingDataUrl } from "../../branding";
@@ -57,6 +58,7 @@ export function BuildTreeExportButton({
   branding?: BrandingEntry | null;
 }) {
   const [open, setOpen] = useState(false);
+  const locale = useResolvedLocale();
   const [busy, setBusy] = useState(false);
   const [scope, setScope] = useState<ExportOptions["scope"]>("all");
   const [wrapper, setWrapper] = useState<ExportOptions["wrapper"]>(
@@ -68,7 +70,7 @@ export function BuildTreeExportButton({
     "rounded-md border border-border/60 px-3 py-1 text-xs data-[state=on]:border-primary data-[state=on]:bg-primary/10";
 
   const runExport = async () => {
-    const opts: ExportOptions = { scope, wrapper, format };
+    const opts: ExportOptions = { scope, wrapper, format, lang: locale };
     const scopeSides =
       scope === "all" ? sides : sides.filter((s) => s.name === activeSide);
     if (scopeSides.length === 0) {

@@ -11,6 +11,7 @@ import { loadContentArt } from "./home/contentArt";
 import HomeRoute from "./home/HomeRoute";
 import { loadHomeMarkup } from "./home/markup";
 import { i18n, loadLocale } from "./i18n";
+import { bootLocale, LANGUAGE_KEY } from "./i18n/language";
 import { applyUiZoom, DEFAULT_UI_ZOOM, UI_ZOOM_KEY } from "./lib/uiZoom";
 import { applyProfilePages } from "./profile/CustomPage";
 import { applyProfileSettingsHiding } from "./profile/hidden";
@@ -52,8 +53,8 @@ const { profile } = await loadProfile();
 if (import.meta.env.DEV) performance.mark("coilbox:boot:profile");
 
 // Load the catalog before first render, so the first frame is already in the
-// player's language. English until the Language setting exists (#4591).
-await loadLocale("en");
+// player's language: the Language setting, or the system's when it is unset.
+await loadLocale(bootLocale(settingsStorage.get(LANGUAGE_KEY)));
 if (import.meta.env.DEV) performance.mark("coilbox:boot:locale");
 const appTitle = profile.title ?? "Coilbox";
 

@@ -1,3 +1,5 @@
+// @vitest-environment happy-dom
+
 import { msg, t } from "@lingui/core/macro";
 import { describe, expect, it } from "vitest";
 import { i18n, loadLocale } from ".";

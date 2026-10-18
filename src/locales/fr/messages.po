@@ -9,48 +9,56 @@ msgstr ""
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Check for updates"
-msgstr ""
+msgstr "Vérifier les mises à jour"
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Checking…"
-msgstr ""
+msgstr "Vérification…"
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Current version"
-msgstr ""
+msgstr "Version actuelle"
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Download & install"
-msgstr ""
+msgstr "Télécharger et installer"
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Installed — restart to apply."
-msgstr ""
+msgstr "Installée. Redémarrez pour l'appliquer."
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Installing…"
-msgstr ""
+msgstr "Installation…"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "Language"
+msgstr "Langue"
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Last checked {lastCheckedTime}"
-msgstr ""
+msgstr "Dernière vérification : {lastCheckedTime}"
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Restart now"
-msgstr ""
+msgstr "Redémarrer maintenant"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "System"
+msgstr "Système"
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Updates are disabled in development builds."
-msgstr ""
+msgstr "Les mises à jour sont désactivées dans les versions de développement."
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Updates for this build are managed by its distributor."
-msgstr ""
+msgstr "Les mises à jour de cette version sont gérées par son distributeur."
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Version {newVersion} available"
-msgstr ""
+msgstr "Version {newVersion} disponible"
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "You're up to date."
-msgstr ""
+msgstr "Vous êtes à jour."

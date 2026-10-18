@@ -31,12 +31,20 @@ msgstr ""
 msgid "Installing…"
 msgstr ""
 
+#: src/general/pages/SettingsSection.tsx
+msgid "Language"
+msgstr ""
+
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Last checked {lastCheckedTime}"
 msgstr ""
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Restart now"
+msgstr ""
+
+#: src/general/pages/SettingsSection.tsx
+msgid "System"
 msgstr ""
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
