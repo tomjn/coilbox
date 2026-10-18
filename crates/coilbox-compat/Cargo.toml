@@ -9,3 +9,11 @@ license = "MIT"
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
+
+[dev-dependencies]
+# Loads the built prelude in the same sandboxed Lua 5.1 the app evaluates game
+# Lua in, to check it runs and defines what it says.
+coilbox-springlua = { path = "../coilbox-springlua" }
+tempfile = { workspace = true }
+# Reads a real game's entry files out of its archive for the ignored test.
+zip = { workspace = true }
