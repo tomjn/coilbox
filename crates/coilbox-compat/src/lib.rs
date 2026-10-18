@@ -331,17 +331,26 @@ pub fn wrap_entry(original: &str, state: LuaState) -> String {
     format!("VFS.Include(\"{}\") {original}", state.prelude_path())
 }
 
+/// Whether the fix `id` is part of the prelude, which [`prelude_files`] writes.
+pub fn is_prelude_fix(id: &str) -> bool {
+    fix_source(id)
+        .and_then(parse_header)
+        .is_some_and(|h| !h.states.is_empty())
+}
+
 /// Every Lua file the prelude adds to a compat mutator built from `manifest`:
 /// the prelude for each state that has fixes, and each entry file the base
 /// game has for that state, wrapped. `read` returns the base game's copy of a
-/// path, or `None` when it has none. The files are sorted by path.
+/// path, or `None` when it has none, and an error from it stops the build so a
+/// failed read never leaves a handle without its prelude. The files are sorted
+/// by path.
 ///
 /// A game with no file for a handle gets none written, so the engine runs
 /// nothing there, as it would for the game alone.
-pub fn prelude_files(
+pub fn prelude_files<E>(
     manifest: &Manifest,
-    mut read: impl FnMut(&str) -> Option<String>,
-) -> Vec<(String, String)> {
+    mut read: impl FnMut(&str) -> Result<Option<String>, E>,
+) -> Result<Vec<(String, String)>, E> {
     let mut files = Vec::new();
     for state in [LuaState::Synced, LuaState::Unsynced] {
         let Some(prelude) = prelude(manifest, state) else {
@@ -349,12 +358,12 @@ pub fn prelude_files(
         };
         let mut used = false;
         for (candidates, _) in ENTRY_FILES.iter().filter(|(_, s)| *s == state) {
-            if let Some((path, original)) = candidates
-                .iter()
-                .find_map(|path| read(path).map(|text| (*path, text)))
-            {
-                files.push((path.to_string(), wrap_entry(&original, state)));
-                used = true;
+            for path in candidates.iter() {
+                if let Some(original) = read(path)? {
+                    files.push((path.to_string(), wrap_entry(&original, state)));
+                    used = true;
+                    break;
+                }
             }
         }
         if used {
@@ -362,7 +371,7 @@ pub fn prelude_files(
         }
     }
     files.sort();
-    files
+    Ok(files)
 }
 
 #[cfg(test)]
@@ -385,6 +394,13 @@ mod tests {
                 version: "0.0.0".into(),
             },
         }
+    }
+
+    fn files_for(
+        m: &Manifest,
+        mut read: impl FnMut(&str) -> Option<String>,
+    ) -> Vec<(String, String)> {
+        prelude_files::<()>(m, |path| Ok(read(path))).unwrap()
     }
 
     fn all_manifests() -> Vec<Manifest> {
@@ -550,7 +566,7 @@ mod tests {
         let m = manifest(1).unwrap();
         assert!(prelude(&m, LuaState::Synced).is_none());
         assert!(prelude(&m, LuaState::Unsynced).is_none());
-        assert!(prelude_files(&m, |_| Some("x".into())).is_empty());
+        assert!(files_for(&m, |_| Some("x".into())).is_empty());
     }
 
     #[test]
@@ -609,7 +625,7 @@ mod tests {
     #[test]
     fn only_the_entry_files_a_game_has_are_written() {
         let m = manifest(2).unwrap();
-        let files = prelude_files(&m, |path| {
+        let files = files_for(&m, |path| {
             (path == "LuaRules/main.lua").then(|| "-- rules\n".to_string())
         });
         let paths: Vec<&str> = files.iter().map(|(p, _)| p.as_str()).collect();
@@ -618,26 +634,46 @@ mod tests {
             files[0].1,
             "VFS.Include(\"compat/prelude-synced.lua\") -- rules\n"
         );
-        assert!(prelude_files(&m, |_| None).is_empty());
+        assert!(files_for(&m, |_| None).is_empty());
+    }
+
+    #[test]
+    fn a_read_that_fails_stops_the_build() {
+        let m = manifest(2).unwrap();
+        let got = prelude_files(&m, |path| {
+            if path == "LuaRules/draw.lua" {
+                Err(format!("could not read {path}"))
+            } else {
+                Ok(Some(String::new()))
+            }
+        });
+        assert_eq!(got, Err("could not read LuaRules/draw.lua".to_string()));
+    }
+
+    #[test]
+    fn only_fixes_with_states_are_prelude_fixes() {
+        assert!(is_prelude_fix("spring-unit-travel"));
+        assert!(is_prelude_fix("compat-callin-hooks"));
+        assert!(!is_prelude_fix("no-such-fix"));
     }
 
     #[test]
     fn luaui_lua_is_taken_before_luaui_main_lua() {
         let m = manifest(2).unwrap();
-        let both = prelude_files(&m, |path| match path {
+        let both = files_for(&m, |path| match path {
             "luaui.lua" | "LuaUI/main.lua" => Some(path.to_string()),
             _ => None,
         });
         let paths: Vec<&str> = both.iter().map(|(p, _)| p.as_str()).collect();
         assert_eq!(paths, ["compat/prelude-unsynced.lua", "luaui.lua"]);
-        let main_only = prelude_files(&m, |path| (path == "LuaUI/main.lua").then(String::new));
+        let main_only = files_for(&m, |path| (path == "LuaUI/main.lua").then(String::new));
         assert_eq!(main_only[0].0, "LuaUI/main.lua");
     }
 
     #[test]
     fn every_entry_file_of_a_full_game_is_wrapped_for_its_state() {
         let m = manifest(2).unwrap();
-        let files = prelude_files(&m, |path| Some(format!("-- {path}\n")));
+        let files = files_for(&m, |path| Some(format!("-- {path}\n")));
         let paths: Vec<&str> = files.iter().map(|(p, _)| p.as_str()).collect();
         assert_eq!(
             paths,
