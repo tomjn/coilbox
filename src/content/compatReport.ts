@@ -120,6 +120,11 @@ export function buildReport(inputs: CompatReportInputs): Finding[] {
       severity: "problem",
     });
 
+  if (out.some((f) => f.severity === "problem")) {
+    const gadgets = gadgetFinding(has, inputs.defs ?? null);
+    if (gadgets) out.push(gadgets);
+  }
+
   const unresolved = inputs.lua?.unresolved ?? [];
   if (unresolved.length > 0)
     out.push({
@@ -137,6 +142,96 @@ export function buildReport(inputs: CompatReportInputs): Finding[] {
   if (errors) out.push(errors);
 
   return out;
+}
+
+/** A def flag as the def files write it: `true`, a number other than 0, or
+ *  a string other than `0`, `false` or nothing. */
+function flag(value: unknown): boolean {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string")
+    return !["", "0", "false"].includes(value.trim().toLowerCase());
+  return false;
+}
+
+/** Every weapon definition, top level and declared inside a unit. */
+function allWeapons(
+  defs: CompatDefs,
+): Array<[string, Record<string, unknown>]> {
+  const weapons: Array<[string, Record<string, unknown>]> = [
+    ...Object.entries(defs.weaponDefs),
+  ];
+  for (const [unit, def] of Object.entries(defs.units)) {
+    const own = lookup(def, ["weapondefs"]);
+    if (own && typeof own === "object" && !Array.isArray(own))
+      for (const [name, w] of Object.entries(own))
+        if (w && typeof w === "object")
+          weapons.push([`${unit}.${name}`, w as Record<string, unknown>]);
+  }
+  return weapons;
+}
+
+/**
+ * The compat gadgets (issue #4559) a build would turn on, and what each found.
+ * A gadget decides for itself when the game loads, from the game's files, so
+ * this repeats its check from what the page has read. The aircraft gadget also
+ * leaves out a plane whose unit script sets CRASHING, and turns off for a game
+ * whose LuaRules calls `Spring.SetUnitCrashing`. Neither is read here, so its
+ * list can name planes it leaves alone.
+ */
+function gadgetFinding(
+  has: (path: string) => boolean,
+  defs: CompatDefs | null,
+): Finding | null {
+  const details: FindingDetail[] = [];
+  if (defs) {
+    // A strafing air unit: it flies, and is not a builder, a transport or a
+    // gunship (`IsStrafingAirUnit` in the engine's rts/Sim/Units/UnitDef.h).
+    const planes = Object.entries(defs.units)
+      .filter(
+        ([, d]) =>
+          flag(lookup(d, ["canfly"])) &&
+          !flag(lookup(d, ["builder"])) &&
+          !flag(lookup(d, ["hoverattack"])) &&
+          !flag(lookup(d, ["transportcapacity"])),
+      )
+      .map(([name]) => name)
+      .sort();
+    if (planes.length > 0)
+      details.push({ heading: "coilbox_compat_aircraft_crash", lines: planes });
+
+    // A weapon that is not a turret and not a starburst launcher fires only
+    // forward (rts/Sim/Weapons/WeaponDef.cpp).
+    const forward = allWeapons(defs)
+      .filter(([, w]) => {
+        const type = String(lookup(w, ["weapontype"]) ?? "").toLowerCase();
+        return (
+          !flag(lookup(w, ["turret"])) &&
+          !flag(lookup(w, ["vlaunch"])) &&
+          type !== "starburstlauncher"
+        );
+      })
+      .map(([name]) => name)
+      .sort();
+    if (forward.length > 0)
+      details.push({
+        heading: "coilbox_compat_only_forward_aim",
+        lines: forward,
+      });
+  }
+  if (has("gamedata/messages.tdf"))
+    details.push({
+      heading: "coilbox_compat_messages_tdf",
+      lines: ["gamedata/messages.tdf"],
+    });
+  if (details.length === 0) return null;
+  return {
+    kind: "compat-gadgets",
+    label: "Compatibility gadgets a build turns on",
+    severity: "info",
+    count: details.length,
+    details,
+  };
 }
 
 /** The row for reads that failed, or null when none did. Shared with the map
@@ -238,16 +333,7 @@ function defTagFinding(
   defs: CompatDefs,
   catalogue: CompatEntry[],
 ): Finding | null {
-  const weapons: Array<[string, Record<string, unknown>]> = [
-    ...Object.entries(defs.weaponDefs),
-  ];
-  for (const [unit, def] of Object.entries(defs.units)) {
-    const own = lookup(def, ["weapondefs"]);
-    if (own && typeof own === "object" && !Array.isArray(own))
-      for (const [name, w] of Object.entries(own))
-        if (w && typeof w === "object")
-          weapons.push([`${unit}.${name}`, w as Record<string, unknown>]);
-  }
+  const weapons = allWeapons(defs);
   const tables: Record<string, Array<[string, Record<string, unknown>]>> = {
     unitdefs: Object.entries(defs.units),
     weapondefs: weapons,
