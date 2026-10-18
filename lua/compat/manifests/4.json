@@ -14,5 +14,6 @@
     "gadget-only-forward-aim-105",
     "gadget-messages-tdf-95"
   ],
-  "converter": { "crate": "coilbox-3do-convert", "version": "0.1.0" }
+  "converter": { "crate": "coilbox-3do-convert", "version": "0.1.0" },
+  "writer": 1
 }

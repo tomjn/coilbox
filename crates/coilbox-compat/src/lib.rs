@@ -112,12 +112,36 @@ pub struct Converter {
     pub version: String,
 }
 
-/// One compat version: the fixes that make it up and the converter it pins.
+/// The version of the code that turns a manifest and a game into a mutator's
+/// bytes (issue #4629). The fixes are pinned by their hashes, but the code
+/// around them decides the bytes too: how the prelude wraps the fixes and the
+/// entry files, which call-in adapters a game's handlers pick, how the scan
+/// reads those handlers, the `modinfo.lua` and `defs_post.lua` text, and how
+/// the worker loads the tiles and converts the models.
+///
+/// Every manifest names the writer it was built with, and a build refuses a
+/// manifest that names another. The marker records it, so a mutator built by
+/// another writer is stale. Golden tests in the compat plugin and in the worker
+/// hash a fixed build and fail when the bytes change. When one fails, move
+/// this, add a manifest that names the new writer, and only then record the
+/// new hashes.
+pub const WRITER: u32 = 1;
+
+/// The writer of manifests 1 and 2, which predate the `writer` field.
+fn first_writer() -> u32 {
+    1
+}
+
+/// One compat version: the fixes that make it up and the converter and writer
+/// it pins.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct Manifest {
     pub version: u32,
     pub fixes: Vec<String>,
     pub converter: Converter,
+    /// The [`WRITER`] this manifest is built with.
+    #[serde(default = "first_writer")]
+    pub writer: u32,
 }
 
 /// The manifest for compat version `n`, or `None` if there is no such version.
@@ -553,6 +577,7 @@ mod tests {
                 name: "coilbox-3do-convert".into(),
                 version: "0.0.0".into(),
             },
+            writer: WRITER,
         }
     }
 
@@ -593,6 +618,27 @@ mod tests {
         for (n, json) in MANIFESTS {
             assert_eq!(parse_manifest(json).version, *n);
         }
+    }
+
+    #[test]
+    fn manifests_1_and_2_predate_the_writer_field_and_mean_the_first_writer() {
+        assert_eq!(manifest(1).unwrap().writer, 1);
+        assert_eq!(manifest(2).unwrap().writer, 1);
+    }
+
+    /// A manifest that left the field out would read as writer 1 whatever
+    /// writer it was built with.
+    #[test]
+    fn every_manifest_after_2_names_its_writer() {
+        for (n, json) in MANIFESTS.iter().filter(|(n, _)| *n > 2) {
+            let raw: serde_json::Value = serde_json::from_str(json).unwrap();
+            assert!(raw["writer"].is_u64(), "manifest {n} has no writer");
+        }
+    }
+
+    #[test]
+    fn the_latest_manifest_names_the_writer_this_build_carries() {
+        assert_eq!(manifest(latest()).unwrap().writer, WRITER);
     }
 
     #[test]
