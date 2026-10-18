@@ -69,11 +69,13 @@ async function downloadGameAnySourceImpl(opts: {
   onAttempt?: (attempt: DownloadAttempt) => void;
   /** Skip the sources before this one, for a retry on the next (issue #4577). */
   startAt?: SourceStep;
+  /** Told which source each attempt is on as it starts (issue #4583). */
+  onSource?: (step: SourceStep) => void;
 }): Promise<string> {
   const { gameName, writePath, opId, onProgress, startAt } = opts;
   const askedAt = opts.askedAt ?? indexTick();
   const target = norm(gameName);
-  const log = new AttemptLog(opts.onAttempt);
+  const log = new AttemptLog(opts.onAttempt, opts.onSource);
 
   // The unified GitHub game-repo registry (issue #512): the catalog is
   // authoritative once loaded, the in-code GAME_REPOS list is the fallback seed.

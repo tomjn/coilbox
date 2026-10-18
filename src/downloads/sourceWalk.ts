@@ -19,7 +19,11 @@ export class AttemptLog {
   private recordAs: DownloadSourceKind = "url";
   private label = "";
 
-  constructor(private readonly onAttempt?: (a: DownloadAttempt) => void) {}
+  constructor(
+    private readonly onAttempt?: (a: DownloadAttempt) => void,
+    /** Told which source and host each attempt is on as it starts. */
+    private readonly onBegin?: (step: SourceStep) => void,
+  ) {}
 
   /**
    * Start an attempt. `recordAs` is the source the history names when that
@@ -34,6 +38,7 @@ export class AttemptLog {
     this.fetching = { ...NOTHING, ...fetching };
     this.recordAs = opts.recordAs ?? source;
     this.label = opts.label ?? source;
+    this.onBegin?.({ source: this.recordAs, mirror: this.fetching.mirror });
   }
 
   ok(): void {
