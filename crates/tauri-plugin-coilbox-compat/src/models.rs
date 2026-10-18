@@ -100,7 +100,8 @@ pub fn hook_problem(defs: Option<&str>, defs_post: Option<&str>) -> Option<Strin
     None
 }
 
-/// Convert the `.3do` models in `archive` into `staging`, through the worker.
+/// Convert the `.3do` models in `archive` into `staging`, through the worker,
+/// as compat writer `writer` does.
 ///
 /// Reads the base game's two def entry points first, and converts nothing when
 /// [`hook_problem`] says the converted models could not be used.
@@ -109,6 +110,7 @@ pub fn convert(
     data_dir: &str,
     archive: &str,
     staging: &Path,
+    writer: u32,
 ) -> Result<Models, String> {
     convert_reading(
         |file| {
@@ -125,6 +127,7 @@ pub fn convert(
                 data_dir,
                 archive,
                 &staging.to_string_lossy(),
+                writer,
             )
         },
         staging,

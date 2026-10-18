@@ -67,6 +67,10 @@ pub fn build(
     manifest_version: u32,
     coilbox_version: &str,
 ) -> Result<Built, String> {
+    // The models are converted as the writer the manifest names converts them.
+    let writer = coilbox_compat::manifest(manifest_version)
+        .ok_or_else(|| format!("there is no compat manifest {manifest_version}"))?
+        .writer;
     let scan = tauri_plugin_coilbox_unitsync::lua_compat_scan_blocking(
         engine_path,
         data_dir,
@@ -94,7 +98,7 @@ pub fn build(
                 file,
             )
         },
-        || models::convert(engine_path, data_dir, archive_name, staging.path()),
+        || models::convert(engine_path, data_dir, archive_name, staging.path(), writer),
         || tauri_plugin_coilbox_unitsync::unit_defs_blocking(engine_path, data_dir, archive_name),
     )
 }
@@ -465,7 +469,7 @@ mod tests {
             "XTA 9.65",
             &DeclaredGame::default(),
             "1234abcd",
-            1,
+            coilbox_compat::latest(),
             "1.2.3",
             &[],
             no_file,
@@ -995,6 +999,10 @@ mod tests {
         (
             7,
             "991aba4284bf08486778b34d436818176d6304d7c2828a349f976a11b363d33b",
+        ),
+        (
+            8,
+            "989268ce40bf5778182d3bd9bff7f52a9295ab593598973e02bdd4dc5c11a121",
         ),
     ];
 

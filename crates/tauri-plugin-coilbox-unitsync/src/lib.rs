@@ -2193,15 +2193,23 @@ pub fn lua_compat_scan_blocking(
 /// Convert every `.3do` in `archive` into `out_dir`, as `unitsync_convert_3do`
 /// does, and answer with the worker's result line. Blocking, with no progress
 /// and no cancel: the compat plugin calls it from a blocking task to put a
-/// game's models into its mutator (issue #4557).
+/// game's models into its mutator (issue #4557), as the compat writer `writer`
+/// its manifest names converts them.
 pub fn convert_3do_blocking(
     engine_path: &str,
     data_dir: &str,
     archive: &str,
     out_dir: &str,
+    writer: u32,
 ) -> Result<String, String> {
     let (bin, libpath, engine_dir) = prepare(engine_path)?;
-    let args = build_convert_3do_args(&libpath.to_string_lossy(), data_dir, archive, out_dir);
+    let args = build_convert_3do_args(
+        &libpath.to_string_lossy(),
+        data_dir,
+        archive,
+        out_dir,
+        Some(writer),
+    );
     let envs = loader_envs(&engine_dir, data_dir);
     let out = run_worker_blocking(
         bin,
@@ -2482,7 +2490,13 @@ async fn unitsync_convert_3do(
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
     };
-    let args = build_convert_3do_args(&libpath.to_string_lossy(), &data_dir, &archive, &out_dir);
+    let args = build_convert_3do_args(
+        &libpath.to_string_lossy(),
+        &data_dir,
+        &archive,
+        &out_dir,
+        None,
+    );
     let envs = loader_envs(&engine_dir, &data_dir);
     let cancel = op_id.as_deref().map(register_cancel);
 

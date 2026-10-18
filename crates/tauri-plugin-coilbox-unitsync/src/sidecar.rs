@@ -348,14 +348,22 @@ pub fn build_unit_models_args(
 }
 
 /// Build args for `--convert-3do` mode: the game whose `.3do` models are being
-/// turned into `.s3o`, and the folder the results go in.
+/// turned into `.s3o`, the folder the results go in, and the compat writer
+/// whose conversion it is, `None` for the newest.
 ///
 /// The mode's own fields and its rule that both are required live in the
 /// worker's `Convert3doArgs`, so this cannot send an argv the worker refuses.
-pub fn build_convert_3do_args(lib: &str, datadir: &str, game: &str, out_dir: &str) -> Vec<String> {
+pub fn build_convert_3do_args(
+    lib: &str,
+    datadir: &str,
+    game: &str,
+    out_dir: &str,
+    writer: Option<u32>,
+) -> Vec<String> {
     let mode = coilbox_unitsync_worker::Mode::Convert3do(coilbox_unitsync_worker::Convert3doArgs {
         game: game.into(),
         out_dir: out_dir.into(),
+        writer,
     });
     let mut args = build_args(lib, datadir);
     args.extend(mode.to_args());
@@ -1793,12 +1801,31 @@ mod tests {
     fn build_convert_3do_args_round_trips_through_the_worker_s_own_parser() {
         use coilbox_unitsync_worker::Convert3doArgs;
 
-        let args = build_convert_3do_args("/lib.so", "/data", "BA.sdz", "/out");
+        let args = build_convert_3do_args("/lib.so", "/data", "BA.sdz", "/out", None);
         let recovered = Convert3doArgs::from_args(&args).expect("the worker parses it back");
 
         assert_eq!(recovered.game, "BA.sdz");
         assert_eq!(recovered.out_dir, "/out");
+        assert_eq!(recovered.writer, None);
         assert!(args.contains(&"--convert-3do".to_string()));
+
+        let args = build_convert_3do_args("/lib.so", "/data", "BA.sdz", "/out", Some(1));
+        let recovered = Convert3doArgs::from_args(&args).expect("the worker parses it back");
+        assert_eq!(recovered.writer, Some(1));
+    }
+
+    /// A compat build names the writer of its manifest, and a worker that has
+    /// no such writer says so rather than converting as another.
+    #[test]
+    fn the_worker_refuses_a_compat_writer_it_does_not_have() {
+        use coilbox_unitsync_worker::Convert3doArgs;
+
+        for bad in ["0", "9999", "two"] {
+            let mut args = build_convert_3do_args("/lib.so", "/data", "BA.sdz", "/out", None);
+            args.extend(["--compat-writer".to_string(), bad.to_string()]);
+            let err = Convert3doArgs::from_args(&args).unwrap_err();
+            assert!(err.contains("--compat-writer"), "{bad}: {err}");
+        }
     }
 
     #[test]

@@ -177,8 +177,9 @@ pub fn emit_error(msg: String) {
     println!("{}", serde_json::to_string(&out).unwrap_or_default());
 }
 
-/// Convert every `.3do` in `game_archive` into `out_dir`.
-pub fn render(lib: &str, game_archive: &str, out_dir: &Path) -> Convert3doOutput {
+/// Convert every `.3do` in `game_archive` into `out_dir`, as compat writer
+/// `writer` does (see `coilbox_compat::WRITER`).
+pub fn render(lib: &str, game_archive: &str, out_dir: &Path, writer: u32) -> Convert3doOutput {
     let us = match unsafe { Unitsync::load(Path::new(lib)) } {
         Ok(u) => u,
         Err(e) => {
@@ -189,14 +190,14 @@ pub fn render(lib: &str, game_archive: &str, out_dir: &Path) -> Convert3doOutput
         }
     };
     us.init(false, 0);
-    let mut out = convert(&us, game_archive, out_dir);
+    let mut out = convert(&us, game_archive, out_dir, writer);
     out.out_dir = out_dir.display().to_string();
     us.uninit();
     out
 }
 
 /// The run itself, against a session the caller has initialised.
-fn convert(us: &Unitsync, game_archive: &str, out_dir: &Path) -> Convert3doOutput {
+fn convert(us: &Unitsync, game_archive: &str, out_dir: &Path, writer: u32) -> Convert3doOutput {
     let mut out = Convert3doOutput {
         errors: us.drain_errors(),
         ..Default::default()
@@ -219,7 +220,7 @@ fn convert(us: &Unitsync, game_archive: &str, out_dir: &Path) -> Convert3doOutpu
         return out;
     };
 
-    convert_files(&Mounted { us, handle }, out_dir, &mut out);
+    convert_files(&Mounted { us, handle }, out_dir, &mut out, writer);
 
     us.close_archive(handle);
     out.errors.extend(us.drain_errors());
@@ -266,8 +267,9 @@ impl GameFiles for Mounted<'_> {
     }
 }
 
-/// Convert every `.3do` in `files` into `out_dir`, adding to `out`.
-fn convert_files(files: &impl GameFiles, out_dir: &Path, out: &mut Convert3doOutput) {
+/// Convert every `.3do` in `files` into `out_dir`, adding to `out`, as compat
+/// writer `writer` does.
+fn convert_files(files: &impl GameFiles, out_dir: &Path, out: &mut Convert3doOutput, writer: u32) {
     let list: Vec<(String, String)> = files
         .list()
         .into_iter()
@@ -300,6 +302,7 @@ fn convert_files(files: &impl GameFiles, out_dir: &Path, out: &mut Convert3doOut
             &mut done,
             out.models_found,
             &mut out.unreadable,
+            writer,
         ) {
             Ok(group) => {
                 out.models_written += group.models_written;
@@ -428,6 +431,7 @@ fn convert_group(
     done: &mut usize,
     total: usize,
     unreadable: &mut BTreeMap<String, String>,
+    writer: u32,
 ) -> Result<Group, String> {
     let mut group = Group {
         folder: if folder.is_empty() {
@@ -512,7 +516,7 @@ fn convert_group(
             (sheet.rects(), side)
         }
         None => {
-            let (packed, dropped) = pack_what_fits(tiles, &wanted);
+            let (packed, dropped) = pack_what_fits(tiles, &wanted, writer);
             let packed =
                 packed.map_err(|e| format!("could not build a sheet for {folder}: {e}"))?;
             group.tiles_packed = packed.rects.len();
@@ -549,18 +553,8 @@ fn convert_group(
             continue;
         };
         let short = member.rsplit('/').next().unwrap_or(member).to_string();
-        if let Some(missing) = coilbox_3do_convert::tile_names(&model)
-            .into_iter()
-            .find(|name| group.tiles_that_did_not_fit.contains(name))
+        if let Some(missing) = tile_that_did_not_fit(&model, &group.tiles_that_did_not_fit, writer)
         {
-            // `tiles_that_did_not_fit` stays raw-keyed above, for the match
-            // against `tile_names`'s own raw output. Renamed here, since this
-            // is the point it turns into a message somebody reads.
-            let missing = if missing.is_empty() {
-                coilbox_3do::EMPTY_TEXTURE_NAME
-            } else {
-                missing.as_str()
-            };
             group
                 .did_not_fit
                 .push(format!("{short} (needs {missing}, which did not fit)"));
@@ -596,6 +590,39 @@ fn convert_group(
     }
 
     Ok(group)
+}
+
+/// The first tile `model` needs that is in `dropped`, as a message names it,
+/// or `None` when every tile it needs is on the sheet.
+///
+/// From writer 2 a flat colour tile counts, as a named one does (issue
+/// #4640). Writer 1 drew a face whose flat colour tile was dropped in the
+/// fallback grey and named nothing.
+fn tile_that_did_not_fit(
+    model: &coilbox_3do::Model,
+    dropped: &[String],
+    writer: u32,
+) -> Option<String> {
+    // `dropped` stays raw-keyed, for the match against `tile_names`'s own raw
+    // output. Renamed here, since this is the point it turns into a message
+    // somebody reads.
+    let named = coilbox_3do_convert::tile_names(model)
+        .into_iter()
+        .find(|name| dropped.contains(name))
+        .map(|name| {
+            if name.is_empty() {
+                coilbox_3do::EMPTY_TEXTURE_NAME.to_string()
+            } else {
+                name
+            }
+        });
+    if named.is_some() || !coilbox_compat::keeps_palette_tiles(writer) {
+        return named;
+    }
+    coilbox_3do_convert::palette_entries(model)
+        .into_iter()
+        .find(|entry| dropped.contains(&coilbox_3do_convert::palette_tile_name(*entry)))
+        .map(|entry| format!("palette entry {entry}"))
 }
 
 /// Where a converted model goes inside the output: the member's own path with
@@ -732,10 +759,12 @@ fn palette_tiles(
 /// then the largest of those, then whichever sorts last, so the choice does not
 /// depend on the order the archive happened to list its members. The fallback
 /// tile is never dropped: every face that resolves to nothing is drawn from it,
-/// so a sheet without it converts nothing.
+/// so a sheet without it converts nothing. See [`least_wanted`] for the flat
+/// colour tiles, which `writer` decides.
 fn pack_what_fits(
     mut tiles: Vec<coilbox_3do_convert::Tile>,
     uses: &BTreeMap<String, usize>,
+    writer: u32,
 ) -> (Result<coilbox_3do_convert::Packed, String>, Vec<String>) {
     let mut dropped = Vec::new();
     loop {
@@ -745,7 +774,7 @@ fn pack_what_fits(
                 return (Ok(packed), dropped);
             }
             Err(why) => {
-                let Some(at) = least_wanted(&tiles, uses) else {
+                let Some(at) = least_wanted(&tiles, uses, writer) else {
                     return (Err(why), dropped);
                 };
                 dropped.push(tiles.remove(at).name);
@@ -755,16 +784,23 @@ fn pack_what_fits(
 }
 
 /// Which tile to give up on: fewest models, then largest, then last by name.
+///
+/// `uses` counts only named tiles, so writer 1 ranked every flat colour tile as
+/// used by no model and gave those up first, for 8 by 8 pixels each (issue
+/// #4640). From writer 2 they go only once every named tile has.
 fn least_wanted(
     tiles: &[coilbox_3do_convert::Tile],
     uses: &BTreeMap<String, usize>,
+    writer: u32,
 ) -> Option<usize> {
+    let palette_last = coilbox_compat::keeps_palette_tiles(writer);
     tiles
         .iter()
         .enumerate()
         .filter(|(_, tile)| tile.name != coilbox_3do_convert::PALETTE_TILE)
         .min_by_key(|(_, tile)| {
             (
+                palette_last && tile.name.starts_with(coilbox_3do_convert::PALETTE_TILE),
                 uses.get(&tile.name).copied().unwrap_or(0),
                 std::cmp::Reverse(tile.image.width() * tile.image.height()),
                 std::cmp::Reverse(tile.name.clone()),
@@ -925,6 +961,7 @@ mod tests {
         let (packed, dropped) = pack_what_fits(
             vec![tile(coilbox_3do_convert::PALETTE_TILE, 8), tile("a", 64)],
             &BTreeMap::from([("a".to_string(), 3)]),
+            coilbox_compat::WRITER,
         );
 
         assert!(dropped.is_empty());
@@ -950,7 +987,7 @@ mod tests {
             ("d".to_string(), 1),
         ]);
 
-        let (packed, dropped) = pack_what_fits(tiles, &uses);
+        let (packed, dropped) = pack_what_fits(tiles, &uses, coilbox_compat::WRITER);
 
         assert_eq!(dropped, vec!["d".to_string()]);
         let packed = packed.expect("the rest still packs");
@@ -968,13 +1005,59 @@ mod tests {
             tile("huge", cap),
         ];
 
-        let (packed, dropped) = pack_what_fits(tiles, &BTreeMap::new());
+        let (packed, dropped) = pack_what_fits(tiles, &BTreeMap::new(), coilbox_compat::WRITER);
 
         assert_eq!(dropped, vec!["huge".to_string()]);
         assert!(packed
             .expect("the fallback still packs")
             .rects
             .contains_key(coilbox_3do_convert::PALETTE_TILE));
+    }
+
+    /// Issue #4640: a flat colour tile is 8 by 8, so giving it up frees almost
+    /// nothing and costs a model its colour. Writer 1 gave those up first, as
+    /// no model counted as using them, and writer 2 keeps them while a named
+    /// tile can go instead.
+    #[test]
+    fn a_full_sheet_keeps_its_palette_tiles_from_writer_2() {
+        let cap = coilbox_3do_convert::MAX_SIDE;
+        let tiles = || {
+            vec![
+                tile(coilbox_3do_convert::PALETTE_TILE, 8),
+                tile(&coilbox_3do_convert::palette_tile_name(7), 8),
+                tile("big", cap),
+                tile("shared", 16),
+            ]
+        };
+        let uses = BTreeMap::from([("big".to_string(), 1), ("shared".to_string(), 2)]);
+
+        let (packed, dropped) = pack_what_fits(tiles(), &uses, 2);
+        assert_eq!(dropped, ["big"]);
+        assert!(packed
+            .expect("the rest packs")
+            .rects
+            .contains_key(&coilbox_3do_convert::palette_tile_name(7)));
+
+        let (_, dropped) = pack_what_fits(tiles(), &uses, 1);
+        assert_eq!(dropped, ["/palette/7", "big"]);
+    }
+
+    /// From writer 2 a model whose flat colour tile did not fit is left
+    /// unconverted and named, as one whose named tile did not fit is.
+    #[test]
+    fn a_model_that_lost_a_palette_tile_is_named_from_writer_2() {
+        let model = coilbox_3do::read(&a_3do(&[Face::Named("shared"), Face::Palette(7)])).unwrap();
+        let dropped = vec![coilbox_3do_convert::palette_tile_name(7)];
+        assert_eq!(
+            tile_that_did_not_fit(&model, &dropped, 2).as_deref(),
+            Some("palette entry 7")
+        );
+        assert_eq!(tile_that_did_not_fit(&model, &dropped, 1), None);
+        let named = vec!["shared".to_string()];
+        assert_eq!(
+            tile_that_did_not_fit(&model, &named, 1).as_deref(),
+            Some("shared")
+        );
     }
 
     /// A game held in memory, with the VFS answering only `palette.pal`.
@@ -1199,20 +1282,28 @@ mod tests {
         out
     }
 
-    /// The fixed game converted, as every file written.
-    fn convert_the_game(name: &str) -> (Convert3doOutput, Vec<(String, Vec<u8>)>) {
-        let dir = std::env::temp_dir().join(format!("cbx-{name}-{}", std::process::id()));
+    /// The fixed game converted by compat writer `writer`, as every file
+    /// written.
+    fn convert_the_game(name: &str, writer: u32) -> (Convert3doOutput, Vec<(String, Vec<u8>)>) {
+        let dir = std::env::temp_dir().join(format!("cbx-{name}-{writer}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let mut out = Convert3doOutput::default();
-        convert_files(&a_game(), &dir, &mut out);
+        convert_files(&a_game(), &dir, &mut out, writer);
         let files = written(&dir);
         let _ = std::fs::remove_dir_all(&dir);
         (out, files)
     }
 
+    fn group<'a>(out: &'a Convert3doOutput, name: &str) -> &'a Group {
+        out.groups
+            .iter()
+            .find(|g| g.folder == name)
+            .unwrap_or_else(|| panic!("no group {name}"))
+    }
+
     #[test]
     fn the_fixed_game_exercises_each_rule() {
-        let (out, files) = convert_the_game("rules");
+        let (out, files) = convert_the_game("rules", coilbox_compat::WRITER);
         let paths: Vec<&str> = files.iter().map(|(p, _)| p.as_str()).collect();
         assert!(out.errors.is_empty(), "{:?}", out.errors);
         assert_eq!(out.models_found, 10);
@@ -1226,47 +1317,79 @@ mod tests {
             paths.contains(&"unittextures/3do/objects3d-a_b-2.png"),
             "{paths:?}"
         );
-        let group = |name: &str| {
-            out.groups
-                .iter()
-                .find(|g| g.folder == name)
-                .unwrap_or_else(|| panic!("no group {name}"))
-        };
-        let top = group("objects3d");
+        let top = group(&out, "objects3d");
         assert_eq!(
             top.missing_textures.keys().collect::<Vec<_>>(),
             ["nothere", "pcxonly"]
         );
         assert_eq!(top.palette_faces, 1, "entry 300 resolves to nothing");
-        let huge = group("objects3d/huge");
+        let huge = group(&out, "objects3d/huge");
         assert!(huge.tiles_that_did_not_fit.contains(&"big".to_string()));
         assert_eq!(huge.did_not_fit, ["one.3do (needs big, which did not fit)"]);
         assert_eq!(huge.models_written, 2);
     }
 
-    /// Every file one conversion of the fixed game writes, hashed. The models
-    /// and sheets go into a compat mutator, which two players have to build
-    /// byte for byte from one manifest (issue #4629). If this fails, the worker
-    /// writes different bytes than the compat writer a manifest pins: keep the
-    /// old bytes for that writer, and put the change behind a new
-    /// `coilbox_compat::WRITER` with a compat manifest that names it.
+    /// Issue #4640, through the whole conversion: the `huge` folder's `big`
+    /// tile is past the cap, and `three.3do` has a palette face. Writer 1 gave
+    /// up that face's tile as well and drew the face grey, and writer 2 keeps
+    /// it.
+    #[test]
+    fn an_overflowing_folder_keeps_its_palette_colours_from_writer_2() {
+        let (old, _) = convert_the_game("palette-old", 1);
+        let huge = group(&old, "objects3d/huge");
+        assert_eq!(huge.tiles_that_did_not_fit, ["/palette/7", "big"]);
+        assert_eq!(huge.palette_models, ["three.3do"]);
+
+        let (new, _) = convert_the_game("palette-new", 2);
+        let huge = group(&new, "objects3d/huge");
+        assert_eq!(huge.tiles_that_did_not_fit, ["big"]);
+        assert_eq!(huge.palette_faces, 0);
+        assert!(huge.palette_models.is_empty());
+        assert_eq!(huge.did_not_fit, ["one.3do (needs big, which did not fit)"]);
+        assert_eq!(huge.models_written, 2);
+    }
+
+    /// Every file one conversion of the fixed game writes, hashed, for each
+    /// compat writer. The models and sheets go into a compat mutator, which two
+    /// players have to build byte for byte from one manifest (issue #4629). A
+    /// manifest names its writer, so each writer's line has to stay as it is.
+    /// A new writer adds a line.
+    const GOLDEN: &[(u32, &str)] = &[
+        (
+            1,
+            "1cb90a06ae50557d045180babf7177354f535bc188c8b45fe1a9b513061021e2",
+        ),
+        (
+            2,
+            "9a3e39f798db4c265b252fb6acadab8653f81735544764d9ac0d4f9779c4bf02",
+        ),
+    ];
+
     #[test]
     fn a_fixed_game_converts_to_the_same_bytes() {
         use sha2::{Digest, Sha256};
 
-        let (_, files) = convert_the_game("golden");
-        let mut hash = Sha256::new();
-        for (path, bytes) in &files {
-            hash.update(path.as_bytes());
-            hash.update([0]);
-            hash.update((bytes.len() as u64).to_le_bytes());
-            hash.update(bytes);
-        }
-        let hex: String = hash.finalize().iter().map(|b| format!("{b:02x}")).collect();
-        assert_eq!(coilbox_compat::WRITER, 1);
-        assert_eq!(
-            hex, "1cb90a06ae50557d045180babf7177354f535bc188c8b45fe1a9b513061021e2",
-            "the worker's conversion changed, so coilbox_compat::WRITER has to move"
+        let built: Vec<(u32, String)> = (1..=coilbox_compat::WRITER)
+            .map(|writer| {
+                let (_, files) = convert_the_game("golden", writer);
+                let mut hash = Sha256::new();
+                for (path, bytes) in &files {
+                    hash.update(path.as_bytes());
+                    hash.update([0]);
+                    hash.update((bytes.len() as u64).to_le_bytes());
+                    hash.update(bytes);
+                }
+                let hex: String = hash.finalize().iter().map(|b| format!("{b:02x}")).collect();
+                (writer, hex)
+            })
+            .collect();
+        let recorded: Vec<(u32, String)> =
+            GOLDEN.iter().map(|(w, h)| (*w, h.to_string())).collect();
+        assert!(
+            recorded == built,
+            "the worker's conversion changed. If a line below is new, add it. If one \
+             moved, keep the old bytes for that writer and put the change behind a new \
+             coilbox_compat::WRITER:\n{built:#?}"
         );
     }
 

@@ -50,6 +50,7 @@ const MANIFESTS: &[(u32, &str)] = &[
     (5, include_str!("../../../lua/compat/manifests/5.json")),
     (6, include_str!("../../../lua/compat/manifests/6.json")),
     (7, include_str!("../../../lua/compat/manifests/7.json")),
+    (8, include_str!("../../../lua/compat/manifests/8.json")),
 ];
 
 /// Every fix file, by id.
@@ -174,11 +175,18 @@ pub struct Converter {
 /// the bytes keeps the old behaviour for the writers that had it and puts the
 /// new one behind a new writer: move this, add a manifest that names it, and
 /// record the new writer's hashes beside the old ones.
-pub const WRITER: u32 = 1;
+pub const WRITER: u32 = 2;
 
 /// Whether this build can write a manifest that names `writer`.
 pub fn knows_writer(writer: u32) -> bool {
     (1..=WRITER).contains(&writer)
+}
+
+/// Whether `writer` keeps a full 3do sheet's flat colour tiles until every
+/// named tile has gone, and names a model that lost one (issue #4640). Writer
+/// 1 gave them up first and drew those faces grey.
+pub fn keeps_palette_tiles(writer: u32) -> bool {
+    writer >= 2
 }
 
 /// The writer of manifests 1 and 2, which predate the `writer` field.
@@ -1043,6 +1051,18 @@ mod tests {
             .find(|(p, _)| p.ends_with("coilbox_compat_aircraft_crash.lua"))
             .unwrap();
         assert_eq!(src, fix_source("gadget-aircraft-crash-83-v3").unwrap());
+    }
+
+    /// Writer 2 changes how a build writes the bytes (issue #4640), and the
+    /// fixes stay those of manifest 7.
+    #[test]
+    fn manifest_8_is_manifest_7_built_by_writer_2() {
+        let (seven, eight) = (manifest(7).unwrap(), manifest(8).unwrap());
+        assert_eq!(eight.fixes, seven.fixes);
+        assert_eq!(eight.converter, seven.converter);
+        assert_eq!((seven.writer, eight.writer), (1, 2));
+        assert!(!keeps_palette_tiles(seven.writer));
+        assert!(keeps_palette_tiles(eight.writer));
     }
 
     #[test]
