@@ -532,6 +532,244 @@ mod tests {
         .is_err());
     }
 
+    /// A base game for the golden build: its archive and name, the text files
+    /// the build reads out of it, and the Lua the scan finds handlers in, by
+    /// archive.
+    struct Fixture {
+        archive: &'static str,
+        game: &'static str,
+        files: &'static [(&'static str, &'static str)],
+        lua: &'static [(&'static str, &'static str)],
+    }
+
+    const OLD_DAMAGED: &str = "function gadget:UnitDamaged(unitID, unitDefID, unitTeam, damage, paralyzer, weaponID, attackerID, attackerDefID, attackerTeam)\nend\n";
+    const NEW_DAMAGED: &str = "gadget.UnitDamaged = function(self, unitID, unitDefID, unitTeam, damage, paralyzer, weaponDefID, projectileID, attackerID)\nend\n";
+    const OLD_COMMAND: &str =
+        "function gadget:AllowCommand(u, d, t, cmdID, params, options, tag, synced)\nend\n";
+    const NEW_COMMAND: &str =
+        "function AllowCommand(u, d, t, cmdID, params, options, tag, playerID, fromSynced)\nend\n";
+
+    /// One game with every entry file, written for the old call-in orders,
+    /// with a dependency written for the new ones. One updated for one change
+    /// and both ways for the other, whose defs load `defs_post.lua`. One with
+    /// only LuaUI, updated, which ships its own `defs_post.lua`, so gets no
+    /// models.
+    const FIXTURES: &[Fixture] = &[
+        Fixture {
+            archive: "xta-9.65.sd7",
+            game: "XTA 9.65",
+            files: &[
+                ("LuaRules/main.lua", "-- rules\r\nreturn include('x')\n"),
+                ("LuaRules/draw.lua", "-- draw, caf\u{e9}\n"),
+                ("LuaGaia/main.lua", "-- gaia\n"),
+                ("LuaGaia/draw.lua", ""),
+                ("luaui.lua", "-- luaui.lua\n"),
+                ("LuaUI/main.lua", "-- LuaUI/main.lua, never read\n"),
+                ("LuaIntro/main.lua", "-- intro"),
+            ],
+            lua: &[
+                ("xta-9.65.sd7", OLD_DAMAGED),
+                ("xta-9.65.sd7", OLD_COMMAND),
+                ("otherdep.sdz", NEW_DAMAGED),
+                ("otherdep.sdz", NEW_COMMAND),
+            ],
+        },
+        Fixture {
+            archive: "BA-V9.79.SDZ",
+            game: "Balanced \"Annihilation\" \\ V9.79",
+            files: &[
+                ("LuaRules/main.lua", "-- rules\n"),
+                ("gamedata/defs.lua", "LoadDefs('defs_post')\n"),
+            ],
+            lua: &[
+                ("BA-V9.79.SDZ", NEW_DAMAGED),
+                ("BA-V9.79.SDZ", "function gadget:UnitDamaged(u, ...)\nend\n"),
+                ("BA-V9.79.SDZ", OLD_COMMAND),
+                ("BA-V9.79.SDZ", NEW_COMMAND),
+            ],
+        },
+        Fixture {
+            archive: "SplinterFaction.sdd",
+            game: "Splinter Faction 0.1.86",
+            files: &[
+                ("LuaUI/main.lua", "-- ui\n"),
+                ("gamedata/defs_post.lua", "return {}\n"),
+            ],
+            lua: &[("SplinterFaction.sdd", NEW_DAMAGED)],
+        },
+    ];
+
+    /// The Lua compat scan's answer for `fixture`, as the worker writes it.
+    fn scan_of(fixture: &Fixture) -> String {
+        let files: Vec<serde_json::Value> = fixture
+            .lua
+            .iter()
+            .enumerate()
+            .map(|(i, (archive, src))| {
+                let hits = coilbox_luacompat::scan(src, coilbox_luacompat::Catalogue::embedded());
+                serde_json::json!({
+                    "archive": archive,
+                    "path": format!("LuaRules/Gadgets/{i}.lua"),
+                    "hits": hits,
+                })
+            })
+            .collect();
+        let mut archives = vec![fixture.archive];
+        archives.extend(fixture.lua.iter().map(|(a, _)| *a));
+        archives.dedup();
+        serde_json::json!({ "files": files, "archives": archives, "errors": [] }).to_string()
+    }
+
+    /// What the worker's converter would write into `staging`, and its answer.
+    fn run_converter(staging: &std::path::Path) -> Result<String, String> {
+        for (path, bytes) in [
+            ("Objects3D/ArmCom.s3o", &[0u8, 1, 2, 255][..]),
+            ("objects3d/arm/Mech.s3o", &[3u8, 4][..]),
+            ("unittextures/3do/objects3d.png", &[5u8][..]),
+            ("unittextures/3do/objects3d.json", b"{}\n"),
+        ] {
+            let p = staging.join(path);
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(p, bytes).unwrap();
+        }
+        Ok(r#"{"modelsFound":3,"modelsWritten":2,"errors":[]}"#.into())
+    }
+
+    /// Every file but the marker of the mutator built for `fixture` from
+    /// manifest `n`, as lower case paths and bytes. Lower case because the
+    /// engine lowercases names when it checksums an archive, and a
+    /// case-insensitive filesystem merges `Objects3D/` and `objects3d/`.
+    fn golden_build(n: u32, fixture: &Fixture) -> Vec<(String, Vec<u8>)> {
+        let (_keep, data) = root();
+        let staging = tempfile::tempdir().unwrap();
+        let read = |file: &str| -> Result<Option<String>, String> {
+            Ok(fixture
+                .files
+                .iter()
+                .find(|(path, _)| *path == file)
+                .map(|(_, text)| text.to_string()))
+        };
+        let handlers = handlers::handlers_in(&scan_of(fixture), fixture.archive).unwrap();
+        let built = build_reading(
+            &data,
+            fixture.archive,
+            fixture.game,
+            "1234abcd",
+            n,
+            "1.2.3",
+            &handlers,
+            read,
+            || models::convert_reading(read, || run_converter(staging.path()), staging.path()),
+        )
+        .unwrap();
+        let dir = std::path::Path::new(&built.dir);
+        let mut out: Vec<(String, Vec<u8>)> = models::list(dir)
+            .unwrap()
+            .into_iter()
+            .filter(|path| path != mutator::MARKER)
+            .map(|path| (path.to_lowercase(), std::fs::read(dir.join(&path)).unwrap()))
+            .collect();
+        out.sort();
+        out
+    }
+
+    /// What the golden build's games are there to cover, so a change to the
+    /// fixtures that stops covering it fails here and not in silence.
+    #[test]
+    fn the_fixed_games_cover_each_rule() {
+        let text = |files: &[(String, Vec<u8>)], path: &str| {
+            files
+                .iter()
+                .find(|(p, _)| p == path)
+                .map(|(_, b)| String::from_utf8(b.clone()).unwrap())
+        };
+        let paths = |files: &[(String, Vec<u8>)]| -> Vec<String> {
+            files.iter().map(|(p, _)| p.clone()).collect()
+        };
+        let (damaged, command) = (
+            "-- fix: callin-unit-damaged-95\n",
+            "-- fix: callin-allow-command-105\n",
+        );
+
+        let full = golden_build(2, &FIXTURES[0]);
+        let synced = text(&full, "compat/prelude-synced.lua").unwrap();
+        assert!(synced.contains(damaged) && synced.contains(command));
+        for path in [
+            "luagaia/draw.lua",
+            "luaintro/main.lua",
+            "luarules/draw.lua",
+            "luaui.lua",
+            "objects3d/armcom.s3o",
+            models::DEFS_POST,
+        ] {
+            assert!(paths(&full).iter().any(|p| p == path), "{path}");
+        }
+        assert!(!paths(&full).iter().any(|p| p == "luaui/main.lua"));
+
+        let updated = golden_build(2, &FIXTURES[1]);
+        let synced = text(&updated, "compat/prelude-synced.lua").unwrap();
+        assert!(!synced.contains(damaged) && synced.contains(command));
+        assert!(text(&updated, models::DEFS_POST).is_some());
+
+        let ui_only = golden_build(2, &FIXTURES[2]);
+        let unsynced = text(&ui_only, "compat/prelude-unsynced.lua").unwrap();
+        assert!(!unsynced.contains(damaged));
+        assert!(text(&ui_only, models::DEFS_POST).is_none());
+        assert!(!paths(&ui_only).iter().any(|p| p.ends_with(".s3o")));
+    }
+
+    /// The hash of every fixed game built from manifest `n`.
+    fn golden_hash(n: u32) -> String {
+        use sha2::{Digest, Sha256};
+        let mut hash = Sha256::new();
+        for fixture in FIXTURES {
+            hash.update(fixture.archive.as_bytes());
+            hash.update([0]);
+            for (path, bytes) in golden_build(n, fixture) {
+                hash.update(path.as_bytes());
+                hash.update([0]);
+                hash.update((bytes.len() as u64).to_le_bytes());
+                hash.update(&bytes);
+            }
+        }
+        hash.finalize().iter().map(|b| format!("{b:02x}")).collect()
+    }
+
+    /// The hash of the fixed games built from each manifest this writer builds.
+    /// Adding a manifest adds a line. A line that changes means the plugin, the
+    /// prelude, the adapter choice or the handler scan writes different bytes
+    /// than before for a manifest players may already have built (issue
+    /// #4629).
+    const GOLDEN: &[(u32, &str)] = &[
+        (
+            1,
+            "6d8ef68bd3e9c61ee4ba13b6eac91d23c913b4fc4e3b6bbff2153d773a35f0b0",
+        ),
+        (
+            2,
+            "322f2bcdef54ba487afe64cb2624ca6987b655b89b22e964ef0519040ab01478",
+        ),
+    ];
+
+    #[test]
+    fn the_fixed_games_build_the_same_bytes_from_every_manifest() {
+        let built: Vec<(u32, String)> = (1..=coilbox_compat::latest())
+            .filter(|n| {
+                coilbox_compat::manifest(*n).is_some_and(|m| m.writer == coilbox_compat::WRITER)
+            })
+            .map(|n| (n, golden_hash(n)))
+            .collect();
+        let recorded: Vec<(u32, String)> =
+            GOLDEN.iter().map(|(n, h)| (*n, h.to_string())).collect();
+        assert_eq!(coilbox_compat::WRITER, 1);
+        assert!(
+            recorded == built,
+            "the mutator a manifest builds changed. If a line below is new, add it. \
+             If one moved, move coilbox_compat::WRITER, add a compat manifest that names \
+             the new writer, and only then record the hashes:\n{built:#?}"
+        );
+    }
+
     fn some_models(staging: &std::path::Path) -> Result<models::Models, String> {
         for f in ["Objects3D/armcom.s3o", "unittextures/3do/objects3d.png"] {
             let p = staging.join(f);
