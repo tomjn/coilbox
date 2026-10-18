@@ -27,6 +27,9 @@ tauri-plugin-coilbox-workshop = { path = "../tauri-plugin-coilbox-workshop" }
 # Reads the base game's Lua entry files to wrap them with the prelude, and runs
 # the worker scan the test that the mutator is listed reads.
 tauri-plugin-coilbox-unitsync = { path = "../tauri-plugin-coilbox-unitsync" }
+# The hits the Lua compat scan reports, which name the call-in handlers a game
+# defines, so the mutator gets only the call-in adapters the game needs.
+coilbox-luacompat = { path = "../coilbox-luacompat" }
 
 [dev-dependencies]
 tempfile = { workspace = true }

@@ -2134,6 +2134,28 @@ pub fn scan_blocking(engine_path: &str, data_dir: &str) -> Result<String, String
     run_worker_blocking(bin, args, envs, SCAN_TIMEOUT, "scan".into(), None)
 }
 
+/// The Lua compat scan of the game in `archive`, as the JSON the worker prints
+/// and `unitsync_lua_compat_scan` answers with. Blocking, and not a command of
+/// its own: the compat plugin reads the call-in handlers a game defines from
+/// it, to pick the call-in adapters its mutator gets (issue #4622).
+pub fn lua_compat_scan_blocking(
+    engine_path: &str,
+    data_dir: &str,
+    archive: &str,
+) -> Result<String, String> {
+    let (bin, libpath, engine_dir) = prepare(engine_path)?;
+    let args = build_lua_compat_args(&libpath.to_string_lossy(), data_dir, archive);
+    let envs = loader_envs(&engine_dir, data_dir);
+    run_worker_blocking(
+        bin,
+        args,
+        envs,
+        SCAN_TIMEOUT,
+        "lua compat scan".into(),
+        None,
+    )
+}
+
 /// What the scan says about an installed game, for matching an adapter to it
 /// (issue #3799).
 #[derive(Clone, Debug, PartialEq, Eq)]

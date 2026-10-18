@@ -8,6 +8,7 @@
 //! Registered as `"coilbox-compat"`. The frontend invokes
 //! `plugin:coilbox-compat|<cmd>`.
 
+mod handlers;
 pub mod mutator;
 
 use picoframe_core::CliResult;
@@ -35,7 +36,8 @@ pub struct Built {
 /// `games/`, from manifest `manifest_version`. Replaces whatever the folder
 /// held. `game_name` and `base_checksum` are the game's name and its archive's
 /// checksum as unitsync reports them. The game's Lua entry files are read
-/// through the unitsync worker of the engine at `engine_path`.
+/// through the unitsync worker of the engine at `engine_path`, which also scans
+/// the game's Lua for the call-in handlers that pick its call-in adapters.
 pub fn build(
     data_dir: &str,
     engine_path: &str,
@@ -45,6 +47,12 @@ pub fn build(
     manifest_version: u32,
     coilbox_version: &str,
 ) -> Result<Built, String> {
+    let scan = tauri_plugin_coilbox_unitsync::lua_compat_scan_blocking(
+        engine_path,
+        data_dir,
+        archive_name,
+    )?;
+    let handlers = handlers::handlers_in(&scan, archive_name)?;
     build_reading(
         data_dir,
         archive_name,
@@ -52,6 +60,7 @@ pub fn build(
         base_checksum,
         manifest_version,
         coilbox_version,
+        &handlers,
         |file| {
             tauri_plugin_coilbox_unitsync::archive_text_blocking(
                 engine_path,
@@ -63,7 +72,9 @@ pub fn build(
     )
 }
 
-/// [`build`], with `read` returning a file of the base game by path.
+/// [`build`], with `read` returning a file of the base game by path, and
+/// `handlers` the call-in handlers the base game's Lua defines.
+#[allow(clippy::too_many_arguments)]
 fn build_reading(
     data_dir: &str,
     archive_name: &str,
@@ -71,11 +82,13 @@ fn build_reading(
     base_checksum: &str,
     manifest_version: u32,
     coilbox_version: &str,
+    handlers: &[coilbox_compat::Handler],
     read: impl FnMut(&str) -> Result<Option<String>, String>,
 ) -> Result<Built, String> {
     let manifest = coilbox_compat::manifest(manifest_version)
         .ok_or_else(|| format!("there is no compat manifest {manifest_version}"))?;
     mutator::check_converter(&manifest)?;
+    let manifest = coilbox_compat::for_game(&manifest, handlers);
     if base_checksum.trim().is_empty() {
         return Err(format!(
             "unitsync gave no checksum for {archive_name}, so a change to it could not be noticed"
@@ -199,6 +212,7 @@ mod tests {
             "1234abcd",
             n,
             "1.2.3",
+            &[],
             no_file,
         )
         .unwrap();
@@ -234,6 +248,7 @@ mod tests {
             "1234abcd",
             coilbox_compat::latest(),
             "1.2.3",
+            &[],
             no_file,
         )
         .unwrap();
@@ -257,6 +272,7 @@ mod tests {
             "1234abcd",
             1,
             "1.2.3",
+            &[],
             no_file,
         )
         .unwrap();
@@ -296,6 +312,7 @@ mod tests {
             "1234abcd",
             2,
             "1.2.3",
+            &[],
             read,
         )
         .unwrap();
@@ -306,6 +323,52 @@ mod tests {
         );
         assert!(dir.join("compat/prelude-synced.lua").is_file());
         assert!(!dir.join("compat/prelude-unsynced.lua").exists());
+    }
+
+    #[test]
+    fn a_game_whose_handlers_take_the_new_order_gets_no_adapter_for_them() {
+        let read = |file: &str| -> Result<Option<String>, String> {
+            Ok((file == "LuaRules/main.lua").then(|| "-- rules\n".to_string()))
+        };
+        let new_order = coilbox_compat::Handler {
+            entry: "signature:UnitDamaged@95.0".into(),
+            params: [
+                "unitID",
+                "unitDefID",
+                "unitTeam",
+                "damage",
+                "paralyzer",
+                "weaponDefID",
+                "projectileID",
+                "attackerID",
+            ]
+            .map(String::from)
+            .to_vec(),
+        };
+        let prelude = |handlers: &[coilbox_compat::Handler]| {
+            let (_keep, data) = root();
+            let built = build_reading(
+                &data,
+                "xta-9.65.sd7",
+                "XTA 9.65",
+                "1234abcd",
+                2,
+                "1.2.3",
+                handlers,
+                read,
+            )
+            .unwrap();
+            std::fs::read_to_string(
+                std::path::Path::new(&built.dir).join("compat/prelude-synced.lua"),
+            )
+            .unwrap()
+        };
+        let adapter = "-- fix: callin-unit-damaged-95\n";
+        assert!(prelude(&[]).contains(adapter));
+        let picked = prelude(std::slice::from_ref(&new_order));
+        assert!(!picked.contains(adapter));
+        assert!(picked.contains("-- fix: callin-allow-command-105\n"));
+        assert_eq!(picked, prelude(&[new_order]));
     }
 
     #[test]
@@ -326,6 +389,7 @@ mod tests {
             "1234abcd",
             coilbox_compat::latest(),
             "1.2.3",
+            &[],
             no_file,
         )
         .unwrap();
@@ -338,6 +402,7 @@ mod tests {
             "5678",
             coilbox_compat::latest(),
             "1.2.3",
+            &[],
             no_file,
         )
         .unwrap();
@@ -351,9 +416,9 @@ mod tests {
     #[test]
     fn a_build_is_refused_without_a_checksum_a_manifest_or_a_content_root() {
         let (_keep, data) = root();
-        assert!(build_reading(&data, "xta.sd7", "XTA", "", 1, "1", no_file).is_err());
-        assert!(build_reading(&data, "xta.sd7", "XTA", "1", 9999, "1", no_file).is_err());
-        assert!(build_reading("relative", "xta.sd7", "XTA", "1", 1, "1", no_file).is_err());
-        assert!(build_reading(&data, "../xta.sd7", "XTA", "1", 1, "1", no_file).is_err());
+        assert!(build_reading(&data, "xta.sd7", "XTA", "", 1, "1", &[], no_file).is_err());
+        assert!(build_reading(&data, "xta.sd7", "XTA", "1", 9999, "1", &[], no_file).is_err());
+        assert!(build_reading("relative", "xta.sd7", "XTA", "1", 1, "1", &[], no_file).is_err());
+        assert!(build_reading(&data, "../xta.sd7", "XTA", "1", 1, "1", &[], no_file).is_err());
     }
 }
