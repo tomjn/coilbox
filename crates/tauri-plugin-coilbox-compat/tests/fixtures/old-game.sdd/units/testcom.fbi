@@ -1,0 +1,6 @@
+UnitName=Test commander;
+Name=Test commander;
+ObjectName=testcom.3do;
+Commander=1;
+MaxDamage=3000;
+BuildTime=1000;

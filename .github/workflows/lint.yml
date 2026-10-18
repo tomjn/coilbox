@@ -203,3 +203,63 @@ jobs:
       # --workspace` still runs any doctest that gets added.
       - name: Cargo nextest
         run: cargo nextest run --workspace
+
+  # Multiplayer on a compat mutator rests on every player writing the same
+  # files (issue #4563). This builds the checked-in fixture game into a mutator
+  # twice, from every manifest, compares the two builds file by file, and
+  # uploads a SHA-256 per file. compat-builds-match then compares the three
+  # lists, which catches an encoder or line ending difference between systems.
+  #
+  # It is a job of its own so a flaky platform shows as its own red check.
+  # Only the compat crate and what it links are built: the app crate and its
+  # sidecars are not, so there are no placeholder resource folders or sidecar
+  # builds here. The Linux libraries are what linking the Tauri crate needs.
+  # The cache has no entry from another job, so it cannot freeze on one.
+  compat-identical-builds:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libdevil-dev
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: profile-dev
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Build the fixture twice and hash the files
+        env:
+          COILBOX_COMPAT_HASH_LIST: ${{ runner.temp }}/compat-hashes.txt
+        run: cargo test -p tauri-plugin-coilbox-compat --lib identical_builds -- --nocapture
+      - uses: actions/upload-artifact@v7
+        with:
+          name: compat-hashes-${{ matrix.os }}
+          path: ${{ runner.temp }}/compat-hashes.txt
+          if-no-files-found: error
+
+  # Fails when the three lists differ, and names the lines that do.
+  compat-builds-match:
+    needs: compat-identical-builds
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: compat-hashes-*
+      - name: The lists match
+        run: |
+          set -eu
+          test "$(ls -d compat-hashes-* | wc -l)" -eq 3
+          test -s compat-hashes-ubuntu-22.04/compat-hashes.txt
+          status=0
+          for os in macos-latest windows-latest; do
+            diff -u compat-hashes-ubuntu-22.04/compat-hashes.txt "compat-hashes-$os/compat-hashes.txt" || status=1
+          done
+          exit "$status"
