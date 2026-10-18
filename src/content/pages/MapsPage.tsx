@@ -1,23 +1,42 @@
 import { Button } from "@picoframe/frame";
-import { Play } from "lucide-react";
+import { CloudOff, Loader2, Map as MapIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { useWriteRoot } from "../../downloads/config";
+import { useDownloadQueue } from "../../downloads/DownloadQueueProvider";
+import { MapPacksBanner } from "../../downloads/pages/components/MapPacksBanner";
+import { useMapFactsBatch } from "../../hub/maps/useMapFacts";
+import { isHubEnabled } from "../../profile/profile";
 import { filterUninstalledMaps, useSuggestedMaps } from "../branding";
-import {
-  useScanTargetSelection,
-  useUnitsyncMapMeta,
-  useUnitsyncThumbnails,
-} from "../config";
+import { useScanTargetSelection, useUnitsyncThumbnails } from "../config";
 import { useScanWithLastKnown } from "../lastKnownScan";
-import { mergeMapTiers } from "../mapTiers";
+import type { LibraryMap } from "../library";
+import {
+  catalogueLabel,
+  isMapOnDisk,
+  isPlayType,
+  MAP_CATALOGUES,
+  MAP_CHIPS,
+  MAP_SORT_OPTIONS,
+  type MapChip,
+  type MapSort,
+  mapCaption,
+  mapInstallRequest,
+  mapSquares,
+  matchesMapScope,
+  matchesMapSearch,
+  matchesPlayType,
+  type PlayType,
+  sortMaps,
+} from "../libraryMaps";
 import { useLibrary } from "../useLibrary";
 import { usePlayMap } from "../usePlayMap";
 import { BrowserToolbar } from "./components/BrowserToolbar";
 import { FilterBar } from "./components/FilterBar";
-import { MapThumb, mapSizeLabel } from "./components/MapThumb";
+import { LibraryMapCard } from "./components/LibraryMapCard";
 import { SuggestionsList } from "./components/SuggestionsList";
 import {
+  CARD_GRID,
   Diagnostics,
   EmptyState,
   ErrorBanner,
@@ -26,22 +45,31 @@ import {
   SkeletonList,
 } from "./components/states";
 
-type SortKey = "name-asc" | "name-desc" | "area-desc" | "area-asc";
+/** How many cards to draw at a time. The springfiles index has thousands. */
+const PAGE = 200;
 
-const SORT_OPTIONS = [
-  { value: "name-asc", label: "Name A–Z" },
-  { value: "name-desc", label: "Name Z–A" },
-  { value: "area-desc", label: "Largest" },
-  { value: "area-asc", label: "Smallest" },
-];
+/** What a chip with nothing in it says. */
+const EMPTY_CHIP: Record<MapChip, string> = {
+  all: "No maps.",
+  installed: "No maps installed.",
+  "1v1": "No 1v1 maps.",
+  team: "No team maps.",
+  water: "No water maps.",
+};
 
-const mapArea = (m: { width?: number; height?: number }) =>
-  (m.width ?? 0) * (m.height ?? 0);
+/** What a play type chip says when the cards checked so far hold none. */
+const NONE_CHECKED: Record<PlayType, string> = {
+  "1v1": "No 1v1 maps",
+  team: "No team maps",
+  water: "No water maps",
+};
 
 /**
- * A grid of map thumbnails for the selected engine's content. Names + metadata
- * come from the scan; the minimap thumbnails are rendered as a batch (one
- * unitsync session) and fill in as they arrive. Both are cached for the session.
+ * Every map the player has and every map the mirrors carry, in one grid. The
+ * mirror indexes are the catalogue, merged on spring name, and the selected
+ * engine's scan is the install state, so a map on disk no mirror lists stays,
+ * marked Local. The hub's facts for the cards on screen add the start count
+ * and the play type the 1v1, Team and Water chips filter on.
  */
 export default function MapsPage() {
   const { targets, selected, selectedKey, setSelectedKey } =
@@ -62,66 +90,108 @@ export default function MapsPage() {
     selected?.enginePath,
     selected?.rootPath,
   );
-  const { meta } = useUnitsyncMapMeta(selected?.enginePath, selected?.rootPath);
   const playMap = usePlayMap();
+  const writeRoot = useWriteRoot("maps");
+  const writePath = writeRoot?.path;
+  const { enqueue, cancel: cancelDownload, itemFor } = useDownloadQueue();
+  const hubOn = isHubEnabled();
 
-  const [filter, setFilter] = useState("");
-  const [sort, setSort] = useState<SortKey>("name-asc");
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<MapSort>("name-asc");
+  const [chip, setChip] = useState<MapChip>("all");
+  const [limit, setLimit] = useState(PAGE);
 
-  // A map can appear in more than one archive; show each name once.
-  // Proportions come from the thumbnail pass, which reads them while it already
-  // has the archive open, so the size label and the area sorts fill in alongside
-  // the minimaps rather than holding up the list.
   // A failed Init leaves data null and the engine's reason in error. The raw
   // result stays in unvouched, which this page still lists from, unless there
   // is a saved list to show instead (unchecked).
   const scanFailure = unvouched && !unchecked ? error : null;
-  const maps = useMemo(() => {
-    const unique = Array.from(
-      new Map((result?.maps ?? []).map((m) => [m.name, m])).values(),
-    );
-    return mergeMapTiers(unique, thumbs, meta);
-  }, [result, thumbs, meta]);
+  const scanned = result?.maps ?? [];
   const busy = loading || (!!selected && !data && !error && !cancelled);
 
-  // Curated download suggestions shown when this engine sees no maps.
-  const writeRoot = useWriteRoot("maps");
-  const suggested = useSuggestedMaps();
-  const installed = useLibrary({ scan: result }).installedFiles.maps;
-  const suggestions = useMemo(
-    () => filterUninstalledMaps(suggested, installed, maps),
-    [suggested, installed, maps],
+  const library = useLibrary({ scan: result, catalogues: MAP_CATALOGUES });
+  const records = library.maps;
+  const installedFiles = library.installedFiles.maps;
+  const thumbOf = (m: LibraryMap) => thumbs.get(m.installed?.name ?? m.id);
+
+  // Sorted by the sizes known without the hub, so the facts that arrive for
+  // the cards on screen never move which cards are on screen.
+  const scoped = useMemo(() => {
+    const area = (m: LibraryMap) => {
+      const s = mapSquares(m, thumbs.get(m.installed?.name ?? m.id), undefined);
+      return s ? s.width * s.height : 0;
+    };
+    return sortMaps(
+      records.filter(
+        (m) => matchesMapScope(m, chip) && matchesMapSearch(m, search),
+      ),
+      sort,
+      area,
+    );
+  }, [records, chip, search, sort, thumbs]);
+
+  // The hub is asked about the cards on screen, a page at a time. A play type
+  // chip checks the same page of every map and shows the ones that match.
+  const page = useMemo(() => scoped.slice(0, limit), [scoped, limit]);
+  const names = useMemo(() => page.map((m) => m.id), [page]);
+  const { facts, answered } = useMapFactsBatch(names);
+  const shown = isPlayType(chip)
+    ? page.filter((m) => matchesPlayType(facts.get(m.id), chip))
+    : page;
+  const remaining = scoped.length - page.length;
+
+  const counts = useMemo(
+    () => ({
+      all: records.length,
+      installed: records.filter(isMapOnDisk).length,
+    }),
+    [records],
+  );
+  const chips = MAP_CHIPS.filter((c) => hubOn || !isPlayType(c.value)).map(
+    (c) => ({
+      ...c,
+      count:
+        c.value === "all" || c.value === "installed"
+          ? counts[c.value]
+          : undefined,
+    }),
   );
 
-  const filtered = useMemo(() => {
-    const q = filter.trim().toLowerCase();
-    if (!q) return maps;
-    return maps.filter((m) => m.name.toLowerCase().includes(q));
-  }, [maps, filter]);
+  // Pack maps borrow the springfiles pictures for their thumbnails.
+  const packThumbs = useMemo(
+    () =>
+      records.flatMap((m) =>
+        m.sources.flatMap((s) =>
+          s.thumb ? [{ filename: s.filename, thumb: s.thumb }] : [],
+        ),
+      ),
+    [records],
+  );
 
-  const sorted = useMemo(() => {
-    const arr = [...filtered];
-    arr.sort((a, b) => {
-      switch (sort) {
-        case "name-desc":
-          return b.name.localeCompare(a.name);
-        case "area-desc":
-          return mapArea(b) - mapArea(a);
-        case "area-asc":
-          return mapArea(a) - mapArea(b);
-        default:
-          return a.name.localeCompare(b.name);
-      }
-    });
-    return arr;
-  }, [filtered, sort]);
+  // Curated download suggestions, for when nothing is installed and no mirror
+  // could be read either.
+  const suggested = useSuggestedMaps();
+  const suggestions = useMemo(
+    () => filterUninstalledMaps(suggested, installedFiles, scanned),
+    [suggested, installedFiles, scanned],
+  );
+
+  const resetPage = () => setLimit(PAGE);
+  const showMore = (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => setLimit((l) => l + PAGE)}
+    >
+      Show more ({remaining} remaining)
+    </Button>
+  );
 
   return (
     <div className="flex flex-col gap-4 p-4">
       <header className="flex flex-col gap-1">
         <h1 className="text-lg font-semibold">Maps</h1>
         <p className="text-sm text-muted-foreground">
-          Maps found in your content folders, read from their archives.
+          Every map you have, and every map the mirrors carry.
         </p>
       </header>
 
@@ -134,36 +204,95 @@ export default function MapsPage() {
         onCancel={cancel}
       />
 
+      <MapPacksBanner
+        writePath={writePath}
+        installed={installedFiles}
+        items={packThumbs}
+      />
+
       {unchecked && (
         <SavedListStatus checking={status === "checking"} reason={error} />
       )}
 
-      {(!busy || unchecked) && maps.length > 0 && (
+      {!library.cataloguesRead && (
+        <p
+          role="status"
+          className="flex items-center gap-1.5 text-xs text-muted-foreground"
+        >
+          <Loader2 className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none" />
+          Reading the mirror indexes…
+        </p>
+      )}
+      {library.catalogueFailures.map((f) => (
+        <p
+          key={catalogueLabel(f.request)}
+          role="status"
+          className="flex items-center gap-1.5 text-xs text-muted-foreground"
+        >
+          <CloudOff className="size-3.5 shrink-0" />
+          <span className="min-w-0 break-words">
+            {catalogueLabel(f.request)}: {f.reason}
+          </span>
+        </p>
+      ))}
+
+      {writeRoot && !writeRoot.loading && !writePath && records.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          Set a download folder in{" "}
+          <Link
+            className="underline underline-offset-4"
+            to="/settings/content-folders"
+          >
+            Content folders
+          </Link>{" "}
+          to install maps.
+        </p>
+      )}
+
+      {(!busy || unchecked) && records.length > 0 && (
         <FilterBar
-          search={filter}
-          onSearch={setFilter}
-          searchPlaceholder="Filter maps…"
-          searchLabel="Filter maps"
+          chips={chips}
+          chip={chip}
+          onChip={(v) => {
+            setChip(v as MapChip);
+            resetPage();
+          }}
+          chipsLabel="Show"
+          search={search}
+          onSearch={(v) => {
+            setSearch(v);
+            resetPage();
+          }}
+          searchPlaceholder="Search maps…"
+          searchLabel="Search maps"
           sort={sort}
-          onSort={(v) => setSort(v as SortKey)}
-          sortOptions={SORT_OPTIONS}
-          total={maps.length}
-          shown={sorted.length}
+          onSort={(v) => {
+            setSort(v as MapSort);
+            resetPage();
+          }}
+          sortOptions={MAP_SORT_OPTIONS}
+          total={isPlayType(chip) ? counts.all : counts[chip]}
+          shown={scoped.length}
           noun="maps"
         />
       )}
 
       {error && !scanFailure && !unchecked && <ErrorBanner message={error} />}
       {result?.errors?.length ? <Diagnostics errors={result.errors} /> : null}
+      {scanFailure && records.length > 0 && scanned.length === 0 && (
+        <ScanFailed noun="maps" reason={scanFailure} />
+      )}
 
       {targets.length === 0 ? null : busy && !unchecked ? (
-        <SkeletonList />
-      ) : cancelled && maps.length === 0 ? (
+        <SkeletonList grid />
+      ) : cancelled && records.length === 0 ? (
         <EmptyState label="Scan cancelled. Press Rescan to load maps." />
-      ) : maps.length === 0 && scanFailure ? (
+      ) : records.length === 0 && scanFailure ? (
         <ScanFailed noun="maps" reason={scanFailure} />
-      ) : maps.length === 0 ? (
-        suggestions.length > 0 ? (
+      ) : records.length === 0 ? (
+        !library.cataloguesRead ? (
+          <SkeletonList grid />
+        ) : suggestions.length > 0 ? (
           <SuggestionsList
             kind="map"
             heading="No maps yet — try one of these"
@@ -172,59 +301,62 @@ export default function MapsPage() {
             onComplete={() => run(true)}
           />
         ) : (
-          <EmptyState label="No maps found for this engine." />
+          <EmptyState icon={MapIcon} label="No maps found for this engine." />
         )
-      ) : sorted.length === 0 ? (
-        <EmptyState label={`No maps match “${filter.trim()}”.`} />
+      ) : shown.length === 0 ? (
+        isPlayType(chip) && !answered ? (
+          <SkeletonList grid />
+        ) : (
+          <EmptyState
+            icon={MapIcon}
+            label={
+              search.trim()
+                ? `No maps match “${search.trim()}”.`
+                : isPlayType(chip) && remaining > 0
+                  ? `${NONE_CHECKED[chip]} in the first ${page.length}.`
+                  : EMPTY_CHIP[chip]
+            }
+            action={remaining > 0 ? showMore : undefined}
+          />
+        )
       ) : (
-        <ul className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3">
-          {sorted.map((m) => {
-            const size = mapSizeLabel(m.width, m.height);
-            const thumb = thumbs.get(m.name);
-            const archiveLabel = `${m.archives.length} archive${
-              m.archives.length === 1 ? "" : "s"
-            }`;
-            return (
-              <li
-                key={m.name}
-                className="group relative overflow-hidden rounded-lg border border-border/50 bg-card transition-colors hover:border-border hover:bg-accent/50 hover:shadow-md [contain-intrinsic-size:13rem] [content-visibility:auto]"
-              >
-                <MapThumb
-                  url={thumb?.url}
-                  width={m.width}
-                  height={m.height}
-                  alt={`Minimap of ${m.name}`}
-                  loading={thumbsLoading && !thumb}
-                />
-                {/* Stretched link: anywhere but the Play button opens the map detail. */}
-                <Link
-                  to={`/library/maps/${encodeURIComponent(m.name)}`}
-                  aria-label={m.name}
-                  className="absolute inset-0 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
-                />
-                <div className="flex items-center justify-between gap-2 p-2">
-                  <div className="flex min-w-0 flex-col gap-0.5">
-                    <p className="truncate text-sm font-medium" title={m.name}>
-                      {m.name}
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {[size, archiveLabel].filter(Boolean).join(" · ")}
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    aria-label="Play"
-                    disabled={unchecked}
-                    className="pointer-events-auto relative z-10 shrink-0"
-                    onClick={() => playMap(m.name)}
-                  >
-                    <Play className="size-4 fill-current" />
-                  </Button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          <ul className={CARD_GRID}>
+            {shown.map((m) => {
+              const thumb = thumbOf(m);
+              const known = facts.get(m.id);
+              const squares = mapSquares(m, thumb, known);
+              return (
+                <li
+                  key={m.id}
+                  className="[contain-intrinsic-size:16rem] [content-visibility:auto]"
+                >
+                  <LibraryMapCard
+                    map={m}
+                    thumbUrl={thumb?.url}
+                    squares={squares}
+                    caption={mapCaption(m, squares, known)}
+                    loading={!!m.installed && thumbsLoading && !thumb}
+                    playDisabled={unchecked}
+                    canDownload={!!writePath}
+                    failure={m.download?.error}
+                    progress={m.download ? itemFor(m.download.identity) : null}
+                    onPlay={() => m.installed && playMap(m.installed.name)}
+                    onInstall={() => {
+                      const request =
+                        writePath && mapInstallRequest(m, writePath);
+                      if (request) enqueue(request);
+                    }}
+                    onCancel={() => m.download && cancelDownload(m.download.id)}
+                  />
+                </li>
+              );
+            })}
+          </ul>
+          {remaining > 0 && (
+            <div className="flex justify-center">{showMore}</div>
+          )}
+        </>
       )}
     </div>
   );

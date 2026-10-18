@@ -91,6 +91,14 @@ vi.mock("../../downloads/config", () => ({
   useContentRootPaths: () => [],
   useWriteRoot: () => null,
 }));
+// The Maps page asks the hub about the cards on screen and draws the map
+// packs banner, both of which read the hub address from settings.
+vi.mock("../../hub/maps/useMapFacts", () => ({
+  useMapFactsBatch: () => ({ facts: new Map(), answered: true }),
+}));
+vi.mock("../../downloads/pages/components/MapPacksBanner", () => ({
+  MapPacksBanner: () => null,
+}));
 vi.mock("./components/BrowserToolbar", () => ({
   BrowserToolbar: () => null,
 }));
@@ -160,9 +168,10 @@ describe("Maps page empty state", () => {
     expect(screen.queryByText(/scan failed/i)).toBeNull();
   });
 
-  it("still offers suggestions when a clean scan found no maps", () => {
+  it("still offers suggestions when a clean scan found no maps", async () => {
     renderPage(<MapsPage />);
-    expect(screen.getByText(/No maps yet/)).toBeTruthy();
+    // Once no mirror index could be read either, which is every read here.
+    expect(await screen.findByText(/No maps yet/)).toBeTruthy();
     expect(screen.queryByText(/scan failed/i)).toBeNull();
   });
 });
