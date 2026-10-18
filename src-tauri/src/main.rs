@@ -238,6 +238,7 @@ fn main() {
     builder = builder.plugin(tauri_plugin_coilbox_scenario::init());
     builder = builder.plugin(tauri_plugin_coilbox_lego::init());
     builder = builder.plugin(tauri_plugin_coilbox_workshop::init());
+    builder = builder.plugin(tauri_plugin_coilbox_compat::init());
     builder = builder.plugin(tauri_plugin_coilbox_conquest::init());
     builder = builder.plugin(tauri_plugin_coilbox_runlite::init());
     builder = builder.plugin(tauri_plugin_coilbox_profile::init());

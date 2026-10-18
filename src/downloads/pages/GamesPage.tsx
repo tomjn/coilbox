@@ -21,13 +21,9 @@ import { fetchHubGames, type HubGameDownload } from "@/hub/api";
 import { useHubUrl } from "@/hub/config";
 import { hubGameIconName } from "@/hub/gameIcons";
 import { hubGameDownloadRequest } from "@/hub/games/download";
-import { installedContent } from "../../content/installedContent";
-import { useContentRootPaths, useWriteRoot } from "../config";
-import {
-  identityOf,
-  useDownloadComplete,
-  useDownloadQueue,
-} from "../DownloadQueueProvider";
+import { type CatalogueRequest, useLibrary } from "../../content/useLibrary";
+import { useWriteRoot } from "../config";
+import { identityOf, useDownloadQueue } from "../DownloadQueueProvider";
 import { GAME_REPOS, mergeGameRepos, repoForKey } from "../gameRepos";
 import { loadGithubReleases } from "../githubReleases";
 import { heldSpringfilesList, loadSpringfilesList } from "../mirrorIndex";
@@ -232,32 +228,18 @@ export default function GamesPage() {
     load(source);
   }, [source, load]);
 
-  // Lowercased game filenames already present in any detected content root.
-  const rootPaths = useContentRootPaths();
-  const [installed, setInstalled] = useState<Set<string>>(new Set());
-  const refreshInstalled = useCallback(async () => {
-    if (rootPaths.length === 0) {
-      setInstalled(new Set());
-      return;
-    }
-    try {
-      const { games } = await installedContent({ paths: rootPaths });
-      setInstalled(new Set(games));
-    } catch {
-      setInstalled(new Set());
-    }
-  }, [rootPaths]);
-
-  useEffect(() => {
-    refreshInstalled();
-  }, [refreshInstalled]);
-
-  // Re-scan installed content once the queue finishes a download so a freshly
-  // fetched game flips to "Already downloaded" without a manual reload. (The
-  // queue runner drops the stale unitsync scan cache itself.)
-  useDownloadComplete(() => {
-    refreshInstalled();
-  });
+  // Lowercased game filenames already installed. The library reads the disk
+  // again once the queue finishes a download, so a freshly fetched game flips
+  // to "Already downloaded" without a manual reload.
+  const catalogues = useMemo((): CatalogueRequest[] => {
+    if (source === HUB_SOURCE) return [];
+    const repo =
+      source === "springfiles" ? undefined : repoForKey(repos, source);
+    return repo
+      ? [{ source: "github", kind: "game", repo }]
+      : [{ source: "springfiles", kind: "game" }];
+  }, [source, repos]);
+  const installed = useLibrary({ scan, catalogues }).installedFiles.games;
 
   // A hub row has no fixed identity until one of its sources resolves (issue
   // #2951): unlike every other source here, resolving it may itself involve a

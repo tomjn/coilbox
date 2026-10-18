@@ -748,6 +748,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-coilbox-anim",
  "tauri-plugin-coilbox-campaign",
+ "tauri-plugin-coilbox-compat",
  "tauri-plugin-coilbox-conquest",
  "tauri-plugin-coilbox-content",
  "tauri-plugin-coilbox-direct",
@@ -783,13 +784,14 @@ version = "0.0.0"
 
 [[package]]
 name = "coilbox-3do-convert"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "coilbox-3do",
  "coilbox-s3o",
  "image 0.25.10",
  "serde",
  "serde_json",
+ "sha2 0.11.0",
 ]
 
 [[package]]
@@ -842,6 +844,14 @@ version = "0.0.0"
 dependencies = [
  "base64 0.22.1",
  "md-5",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "coilbox-luacompat"
+version = "0.0.0"
+dependencies = [
  "serde",
  "serde_json",
 ]
@@ -1006,6 +1016,7 @@ dependencies = [
  "coilbox-assets",
  "coilbox-assimp",
  "coilbox-bos2lua",
+ "coilbox-luacompat",
  "coilbox-map-catalog",
  "coilbox-s3o",
  "coilbox-texture",
@@ -6365,6 +6376,24 @@ dependencies = [
  "tauri-plugin",
  "tempfile",
  "uuid",
+]
+
+[[package]]
+name = "tauri-plugin-coilbox-compat"
+version = "0.0.0"
+dependencies = [
+ "coilbox-3do-convert",
+ "coilbox-compat",
+ "coilbox-portable",
+ "coilbox-springlua",
+ "picoframe-core",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "tauri-plugin-coilbox-unitsync",
+ "tauri-plugin-coilbox-workshop",
+ "tempfile",
 ]
 
 [[package]]

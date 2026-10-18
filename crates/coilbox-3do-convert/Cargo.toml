@@ -1,6 +1,6 @@
 [package]
 name = "coilbox-3do-convert"
-version = "0.0.0"
+version = "0.1.0"
 description = "Turns a Total Annihilation `.3do` into a Spring `.s3o`: packs the tiles it names into one sheet, gives every face real coordinates onto it, and records where each tile landed so a later conversion can share the sheet."
 edition = "2021"
 license = "MIT"
@@ -16,3 +16,8 @@ image = { workspace = true }
 # The sidecar that records where every tile landed.
 serde = { workspace = true }
 serde_json = { workspace = true }
+
+[dev-dependencies]
+# Hashes the output of a fixed conversion, so a change to it fails a test and
+# the version above moves with it.
+sha2 = { workspace = true }

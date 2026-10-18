@@ -30,6 +30,12 @@ pub use atlas::{
 pub use convert::{corner_uv, is_dead_duplicate, to_s3o, Converted, Rects};
 pub use sheet::{Sheet, SheetTile, FIRST_TOP_ROWS_VERSION, SHEET_DIR, SHEET_KIND, SHEET_VERSION};
 
+/// This converter's version, from `Cargo.toml`. A compat manifest pins it
+/// (issue #4556), because two players only build the same mutator if they
+/// convert with the same code. Any change to what a conversion writes moves
+/// it, and `a_fixed_conversion_writes_the_same_bytes` fails until it does.
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 /// The tiles a model's flat-colour faces need: a fallback grey always, plus one
 /// small tile per distinct palette entry the model names that `palette`
 /// resolves.
@@ -260,6 +266,50 @@ mod tests {
             landed.into_iter().collect::<Vec<_>>(),
             vec!["/palette/3", "arm2", "arm3"],
             "each face landed on the tile it named"
+        );
+    }
+
+    /// The sheet's pixels, the `.s3o` and the sidecar of one fixed conversion,
+    /// hashed together. If this fails, the converter writes different bytes
+    /// than the version a compat manifest pins it at. Bump `version` in this
+    /// crate's `Cargo.toml`, add a compat manifest that pins the new version,
+    /// and only then record the new hash here.
+    #[test]
+    fn a_fixed_conversion_writes_the_same_bytes() {
+        use sha2::{Digest, Sha256};
+
+        let mut tiles = vec![
+            Tile {
+                name: "arm2".into(),
+                image: image::RgbaImage::from_fn(64, 64, |x, y| {
+                    image::Rgba([x as u8, y as u8, (x ^ y) as u8, 0])
+                }),
+            },
+            Tile {
+                name: "arm3".into(),
+                image: image::RgbaImage::from_pixel(32, 32, image::Rgba([4, 5, 6, 0])),
+            },
+        ];
+        let palette = a_palette();
+        let model = model_with(vec![
+            named_face("arm2"),
+            named_face("arm3"),
+            palette_face(3),
+        ]);
+        tiles.extend(palette_tiles(&model, Some(&palette)));
+        let packed = pack(&tiles).expect("pack");
+        let converted = to_s3o(&model, &packed.rects, "3do/objects3d.png").expect("convert");
+
+        let mut hash = Sha256::new();
+        hash.update(packed.image.as_raw());
+        hash.update(coilbox_s3o::write(&converted.model).expect("write"));
+        hash.update(Sheet::of(&packed, "objects3d.png").write().expect("record"));
+        let hex: String = hash.finalize().iter().map(|b| format!("{b:02x}")).collect();
+
+        assert_eq!(VERSION, "0.1.0");
+        assert_eq!(
+            hex, "1bca172f51de4114d1d1ee6a5abbc00959f14409daa6cff874c503277dbbe685",
+            "the converter's output changed, so its version has to move"
         );
     }
 

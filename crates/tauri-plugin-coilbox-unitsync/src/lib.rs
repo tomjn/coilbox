@@ -28,12 +28,12 @@ use sidecar::{
     build_archive_extract_args, build_archive_file_args, build_archive_tree_args, build_args,
     build_config_args, build_config_set_args, build_convert_3do_args, build_custom_params_args,
     build_defs_probe_args, build_faction_logos_args, build_game_args, build_game_headers_args,
-    build_height_field_args, build_heightmap_args, build_lua_args, build_lua_repl_args,
-    build_map_info_args, build_map_meta_args, build_map_skybox_args, build_metalmap_args,
-    build_minimap_args, build_skirmish_ai_args, build_thumbnails_args, build_unit_buildpics_args,
-    build_unit_dataset_args, build_unit_defs_args, build_unit_model_args, build_unit_models_args,
-    build_unit_render_args, build_unit_render_keys_args, build_unit_script_args, find_unitsync,
-    resolve_sidecar,
+    build_height_field_args, build_heightmap_args, build_lua_args, build_lua_compat_args,
+    build_lua_repl_args, build_map_info_args, build_map_meta_args, build_map_skybox_args,
+    build_metalmap_args, build_minimap_args, build_skirmish_ai_args, build_thumbnails_args,
+    build_unit_buildpics_args, build_unit_dataset_args, build_unit_defs_args,
+    build_unit_model_args, build_unit_models_args, build_unit_render_args,
+    build_unit_render_keys_args, build_unit_script_args, find_unitsync, resolve_sidecar,
 };
 use std::collections::HashMap;
 use std::io::{BufRead, Read};
@@ -2124,6 +2124,16 @@ pub fn game_short_name_blocking(
     short_name_in_scan(&out, game)
 }
 
+/// The scan of `data_dir`, as the JSON the worker prints and `unitsync_scan`
+/// answers with. Blocking, and not a command of its own: the compat plugin's
+/// tests read it to check the mutator they wrote is listed (issue #4556).
+pub fn scan_blocking(engine_path: &str, data_dir: &str) -> Result<String, String> {
+    let (bin, libpath, engine_dir) = prepare(engine_path)?;
+    let args = build_args(&libpath.to_string_lossy(), data_dir);
+    let envs = loader_envs(&engine_dir, data_dir);
+    run_worker_blocking(bin, args, envs, SCAN_TIMEOUT, "scan".into(), None)
+}
+
 /// What the scan says about an installed game, for matching an adapter to it
 /// (issue #3799).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -2374,6 +2384,24 @@ async fn unitsync_convert_3do(
     }
 }
 
+/// `unitsync_lua_compat_scan`: list each use of a Lua API the engine removed or
+/// changed in a game's Lua and the Lua of the archives it depends on, per file
+/// and line (issue #4553). `archive_name` is the game's primary archive.
+#[tauri::command]
+async fn unitsync_lua_compat_scan(
+    engine_path: String,
+    data_dir: String,
+    archive_name: String,
+) -> CliResult {
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return CliResult::err(e),
+    };
+    let args = build_lua_compat_args(&libpath.to_string_lossy(), &data_dir, &archive_name);
+    let envs = loader_envs(&engine_dir, &data_dir);
+    run_worker(bin, args, envs, SCAN_TIMEOUT, "lua compat scan", None).await
+}
+
 /// `unitsync_cancel` — signal the scan/thumbnail worker registered under `op_id`
 /// to stop. No-op if the id is unknown (already finished).
 #[tauri::command]
@@ -2438,6 +2466,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_lua_repl_exec,
             unitsync_archive_extract,
             unitsync_convert_3do,
+            unitsync_lua_compat_scan,
             unitsync_cancel
         ])
         .build()

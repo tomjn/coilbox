@@ -1,0 +1,364 @@
+//! The compat mutator's folder, its files, and whether it is stale (issue #4556).
+//!
+//! A compat mutator is a loose `coilbox-compat-<stem>-<n>.sdd` under the
+//! content root's `games/`, depending on the original game, which it never
+//! edits. `<stem>` is the base archive's file name, lowercased, without its
+//! extension, and `<n>` is the manifest version it was built from.
+//!
+//! Two machines on the same manifest have to write the same bytes, so a
+//! multiplayer game sees a version mismatch as a missing archive and not a
+//! desync. So nothing written depends on the machine: the files are sorted by
+//! path, every line ends in LF, and nothing carries a timestamp or a path.
+//!
+//! The one exception is [`MARKER`], which records the coilbox version that
+//! wrote the folder. Its name starts with a dot, and the engine leaves every
+//! such file out of an archive's checksum (`CreateIgnoreFilter` in
+//! `rts/System/FileSystem/ArchiveScanner.cpp` adds `^\..*$`), so it does not
+//! change what two players compare.
+
+use std::path::{Path, PathBuf};
+
+use serde::{Deserialize, Serialize};
+use tauri_plugin_coilbox_workshop::{lua_string, CompiledFile};
+
+/// The start of every compat mutator's folder name.
+pub const PREFIX: &str = "coilbox-compat-";
+
+/// The file in the folder that records what it was built from.
+pub const MARKER: &str = ".coilbox-compat.json";
+
+/// The archive extensions unitsync reports a game under.
+const ARCHIVE_EXTENSIONS: &[&str] = &["sd7", "sdz", "sdd", "sdp"];
+
+/// The base archive's file name, lowercased and without its extension, or an
+/// error for a name that is not a plain archive file name.
+pub fn stem(archive_name: &str) -> Result<String, String> {
+    let refuse = || format!("{archive_name:?} is not a game archive's file name");
+    if archive_name.contains(['/', '\\']) || archive_name.chars().any(char::is_control) {
+        return Err(refuse());
+    }
+    let (stem, ext) = archive_name.rsplit_once('.').ok_or_else(refuse)?;
+    let ext = ext.to_ascii_lowercase();
+    if stem.is_empty() || stem.ends_with('.') || !ARCHIVE_EXTENSIONS.contains(&ext.as_str()) {
+        return Err(refuse());
+    }
+    Ok(stem.to_lowercase())
+}
+
+/// The folder name of the compat mutator for `archive_name` at manifest `n`.
+pub fn folder(archive_name: &str, n: u32) -> Result<String, String> {
+    Ok(format!("{PREFIX}{}-{n}.sdd", stem(archive_name)?))
+}
+
+/// `games/` under `data_dir`, which has to be a content root that exists.
+pub fn games_dir(data_dir: &str) -> Result<PathBuf, String> {
+    let root = PathBuf::from(data_dir);
+    if !root.is_absolute() || !root.is_dir() {
+        return Err(format!("not a content root: {data_dir}"));
+    }
+    Ok(root.join("games"))
+}
+
+/// What [`MARKER`] records.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Marker {
+    pub manifest_version: u32,
+    /// The base archive's checksum as unitsync reports it.
+    pub base_checksum: String,
+    pub coilbox_version: String,
+}
+
+/// `modinfo.lua`. The engine appends `version` to `name` unless the name
+/// already contains it (`ArchiveData` in `ArchiveScanner.cpp`), and
+/// `(compat <n>)` always does, so the game is listed as exactly `name`.
+fn modinfo(game_name: &str, n: u32) -> String {
+    format!(
+        "-- Written by coilbox's compatibility mode. Rebuilt from compat manifest {n}, so do not edit it.\n\
+         return {{\n\
+         \x20 name = {name},\n\
+         \x20 version = {version},\n\
+         \x20 modtype = 1,\n\
+         \x20 depend = {{\n\
+         \x20   {depend},\n\
+         \x20 }},\n\
+         }}\n",
+        name = lua_string(&format!("{game_name} (compat {n})")),
+        version = lua_string(&n.to_string()),
+        depend = lua_string(game_name),
+    )
+}
+
+/// Every file of the mutator for `game_name` built from `manifest`, sorted by
+/// path, with the marker last so a write that stops part way leaves none.
+///
+/// The fixes and converted models a manifest selects are written by issues
+/// #4557 to #4560. Until they are, a manifest that lists a fix is refused
+/// rather than built without it.
+pub fn files(
+    manifest: &coilbox_compat::Manifest,
+    game_name: &str,
+    marker: &Marker,
+) -> Result<Vec<CompiledFile>, String> {
+    if game_name.trim().is_empty() {
+        return Err("the base game has no name to depend on".into());
+    }
+    if !manifest.fixes.is_empty() {
+        return Err(format!(
+            "compat {} lists fixes this coilbox cannot write yet",
+            manifest.version
+        ));
+    }
+    let mut files = vec![CompiledFile {
+        path: "modinfo.lua".into(),
+        contents: modinfo(game_name, manifest.version),
+    }];
+    files.sort_by(|a, b| a.path.cmp(&b.path));
+    let marker = serde_json::to_string_pretty(marker).map_err(|e| e.to_string())? + "\n";
+    files.push(CompiledFile {
+        path: MARKER.into(),
+        contents: marker,
+    });
+    Ok(files)
+}
+
+/// Refuse a manifest whose converter is not the one this build carries: its
+/// models could not be reproduced byte for byte.
+pub fn check_converter(manifest: &coilbox_compat::Manifest) -> Result<(), String> {
+    let pin = &manifest.converter;
+    if pin.name != "coilbox-3do-convert" || pin.version != coilbox_3do_convert::VERSION {
+        return Err(format!(
+            "compat {} needs {} {}, and this coilbox has coilbox-3do-convert {}",
+            manifest.version,
+            pin.name,
+            pin.version,
+            coilbox_3do_convert::VERSION
+        ));
+    }
+    Ok(())
+}
+
+/// Why a built mutator no longer matches what would be built now.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase", tag = "kind")]
+pub enum Stale {
+    /// Built from an older or newer manifest than the one coilbox builds now.
+    Manifest { built: u32, now: u32 },
+    /// The base archive has changed since.
+    BaseChecksum { built: String, now: String },
+    /// The folder has no marker coilbox can read.
+    NoMarker,
+}
+
+/// Why a mutator built as `marker` is stale against manifest `now` and the
+/// base archive's current checksum. Empty means it is current.
+pub fn staleness(marker: Option<&Marker>, now: u32, base_checksum: &str) -> Vec<Stale> {
+    let Some(marker) = marker else {
+        return vec![Stale::NoMarker];
+    };
+    let mut why = Vec::new();
+    if marker.manifest_version != now {
+        why.push(Stale::Manifest {
+            built: marker.manifest_version,
+            now,
+        });
+    }
+    if !marker.base_checksum.eq_ignore_ascii_case(base_checksum) {
+        why.push(Stale::BaseChecksum {
+            built: marker.base_checksum.clone(),
+            now: base_checksum.to_string(),
+        });
+    }
+    why
+}
+
+/// The marker in `dir`, or `None` when there is none or it does not parse.
+pub fn read_marker(dir: &Path) -> Option<Marker> {
+    let text = std::fs::read_to_string(dir.join(MARKER)).ok()?;
+    serde_json::from_str(&text).ok()
+}
+
+/// The newest compat mutator built for `archive_name` in `games`, as its folder
+/// name and manifest version, or `None` when there is none.
+pub fn newest_built(games: &Path, archive_name: &str) -> Result<Option<(String, u32)>, String> {
+    let start = format!("{PREFIX}{}-", stem(archive_name)?);
+    let Ok(entries) = std::fs::read_dir(games) else {
+        return Ok(None);
+    };
+    let newest = entries
+        .flatten()
+        .filter(|e| e.path().is_dir())
+        .filter_map(|e| e.file_name().into_string().ok())
+        .filter_map(|name| {
+            let n = name.strip_prefix(&start)?.strip_suffix(".sdd")?;
+            // Only the spelling `folder` writes, so `+2` and `02` are not 2.
+            let v = n.parse::<u32>().ok().filter(|v| v.to_string() == n)?;
+            Some((name, v))
+        })
+        .max_by_key(|(_, n)| *n);
+    Ok(newest)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn marker(n: u32, checksum: &str) -> Marker {
+        Marker {
+            manifest_version: n,
+            base_checksum: checksum.into(),
+            coilbox_version: "1.2.3".into(),
+        }
+    }
+
+    #[test]
+    fn a_packed_game_is_named_by_its_file_without_the_extension() {
+        assert_eq!(
+            folder("xta-9.65.sd7", 1).unwrap(),
+            "coilbox-compat-xta-9.65-1.sdd"
+        );
+        assert_eq!(
+            folder("Balanced_Annihilation-V15.9.8.SDZ", 3).unwrap(),
+            "coilbox-compat-balanced_annihilation-v15.9.8-3.sdd"
+        );
+    }
+
+    #[test]
+    fn a_loose_game_is_named_the_same_way() {
+        assert_eq!(
+            folder("SplinterFaction.sdd", 1).unwrap(),
+            "coilbox-compat-splinterfaction-1.sdd"
+        );
+    }
+
+    #[test]
+    fn a_name_that_is_not_an_archive_file_is_refused() {
+        for bad in [
+            "../xta.sd7",
+            "games/xta.sd7",
+            "a\\b.sdz",
+            "xta",
+            "xta.lua",
+            ".sd7",
+            "..sd7",
+            "xta\n.sd7",
+        ] {
+            assert!(folder(bad, 1).is_err(), "{bad:?}");
+        }
+    }
+
+    #[test]
+    fn the_modinfo_depends_on_the_base_game_and_names_the_version() {
+        let m = coilbox_compat::manifest(1).unwrap();
+        let files = files(&m, "XTA \"v\" 9.65", &marker(1, "abc")).unwrap();
+        let modinfo = &files[0];
+        assert_eq!(modinfo.path, "modinfo.lua");
+        assert!(modinfo
+            .contents
+            .contains(r#"name = "XTA \"v\" 9.65 (compat 1)","#));
+        assert!(modinfo.contents.contains(r#"version = "1","#));
+        assert!(modinfo.contents.contains("modtype = 1,"));
+        assert!(modinfo.contents.contains(r#"    "XTA \"v\" 9.65","#));
+        let lua = coilbox_springlua::SpringLua::new(tempfile::tempdir().unwrap().path())
+            .unwrap()
+            .eval_value(&modinfo.contents, "modinfo.lua")
+            .unwrap();
+        assert_eq!(lua["depend"][0], "XTA \"v\" 9.65");
+        assert_eq!(lua["modtype"], 1);
+    }
+
+    #[test]
+    fn the_files_are_sorted_with_lf_endings_and_the_marker_last() {
+        let m = coilbox_compat::manifest(1).unwrap();
+        let files = files(&m, "XTA 9.65", &marker(1, "abc")).unwrap();
+        let paths: Vec<_> = files.iter().map(|f| f.path.as_str()).collect();
+        assert_eq!(paths, ["modinfo.lua", MARKER]);
+        for f in &files {
+            assert!(!f.contents.contains('\r'), "{}", f.path);
+            assert!(f.contents.ends_with('\n'), "{}", f.path);
+        }
+        let back: Marker = serde_json::from_str(&files[1].contents).unwrap();
+        assert_eq!(back, marker(1, "abc"));
+    }
+
+    #[test]
+    fn two_builds_of_the_same_manifest_are_the_same_bytes() {
+        let m = coilbox_compat::manifest(1).unwrap();
+        let a = files(&m, "XTA 9.65", &marker(1, "abc")).unwrap();
+        let b = files(&m, "XTA 9.65", &marker(1, "abc")).unwrap();
+        let bytes = |fs: &[CompiledFile]| -> Vec<(String, String)> {
+            fs.iter()
+                .map(|f| (f.path.clone(), f.contents.clone()))
+                .collect()
+        };
+        assert_eq!(bytes(&a), bytes(&b));
+    }
+
+    #[test]
+    fn a_manifest_that_lists_a_fix_is_refused_until_fixes_are_written() {
+        let mut m = coilbox_compat::manifest(1).unwrap();
+        m.fixes.push("spring-set-unit-to-feature".into());
+        assert!(files(&m, "XTA 9.65", &marker(1, "abc")).is_err());
+    }
+
+    #[test]
+    fn the_latest_manifest_pins_the_converter_this_build_carries() {
+        let m = coilbox_compat::manifest(coilbox_compat::latest()).unwrap();
+        assert_eq!(check_converter(&m), Ok(()));
+        let mut other = m.clone();
+        other.converter.version = "0.0.0".into();
+        assert!(check_converter(&other).is_err());
+    }
+
+    #[test]
+    fn a_mutator_built_as_now_is_current() {
+        assert!(staleness(Some(&marker(1, "ABC")), 1, "abc").is_empty());
+    }
+
+    #[test]
+    fn a_new_manifest_makes_it_stale() {
+        assert_eq!(
+            staleness(Some(&marker(1, "abc")), 2, "abc"),
+            [Stale::Manifest { built: 1, now: 2 }]
+        );
+    }
+
+    #[test]
+    fn a_changed_base_archive_makes_it_stale() {
+        assert_eq!(
+            staleness(Some(&marker(1, "abc")), 1, "def"),
+            [Stale::BaseChecksum {
+                built: "abc".into(),
+                now: "def".into()
+            }]
+        );
+    }
+
+    #[test]
+    fn a_folder_without_a_marker_is_stale() {
+        assert_eq!(staleness(None, 1, "abc"), [Stale::NoMarker]);
+    }
+
+    #[test]
+    fn the_newest_built_folder_is_found_by_its_number() {
+        let root = tempfile::tempdir().unwrap();
+        let games = root.path();
+        for name in [
+            "coilbox-compat-xta-9.65-2.sdd",
+            "coilbox-compat-xta-9.65-10.sdd",
+            "coilbox-compat-xta-9.65-x.sdd",
+            "coilbox-compat-xta-9.65-+11.sdd",
+            "coilbox-compat-xta-9.65-011.sdd",
+            "coilbox-compat-other-12.sdd",
+        ] {
+            std::fs::create_dir(games.join(name)).unwrap();
+        }
+        std::fs::write(games.join("coilbox-compat-xta-9.65-20.sdd"), "a file").unwrap();
+        assert_eq!(
+            newest_built(games, "xta-9.65.sd7").unwrap(),
+            Some(("coilbox-compat-xta-9.65-10.sdd".into(), 10))
+        );
+        assert_eq!(newest_built(games, "ba.sdz").unwrap(), None);
+        assert_eq!(newest_built(&games.join("nope"), "ba.sdz").unwrap(), None);
+    }
+}

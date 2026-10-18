@@ -362,6 +362,20 @@ pub fn build_convert_3do_args(lib: &str, datadir: &str, game: &str, out_dir: &st
     args
 }
 
+/// Build args for `--lua-compat` mode: the game whose Lua, and whose
+/// dependencies' Lua, is scanned for calls the engine removed or changed.
+///
+/// The mode's field and its rule that the game is required live in the worker's
+/// `LuaCompatArgs`, so this cannot send an argv the worker refuses.
+pub fn build_lua_compat_args(lib: &str, datadir: &str, game: &str) -> Vec<String> {
+    let mode = coilbox_unitsync_worker::Mode::LuaCompat(coilbox_unitsync_worker::LuaCompatArgs {
+        game: game.into(),
+    });
+    let mut args = build_args(lib, datadir);
+    args.extend(mode.to_args());
+    args
+}
+
 /// Build args for `--unit-render` mode: the unit whose render this is, the frame
 /// it was taken in, the file the pixels are in, and where the encoded asset goes.
 ///
@@ -1785,6 +1799,17 @@ mod tests {
         assert_eq!(recovered.game, "BA.sdz");
         assert_eq!(recovered.out_dir, "/out");
         assert!(args.contains(&"--convert-3do".to_string()));
+    }
+
+    #[test]
+    fn build_lua_compat_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::LuaCompatArgs;
+
+        let args = build_lua_compat_args("/lib.so", "/data", "xta-9.65.sd7");
+        let recovered = LuaCompatArgs::from_args(&args).expect("the worker parses it back");
+
+        assert_eq!(recovered.game, "xta-9.65.sd7");
+        assert!(args.contains(&"--lua-compat".to_string()));
     }
 
     /// The whole point of sharing `UnitModelsArgs` with the worker: what

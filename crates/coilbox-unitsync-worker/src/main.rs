@@ -45,6 +45,7 @@ mod heightmap;
 mod infocache;
 mod initlock;
 mod lua;
+mod luacompat;
 mod mapcatalog;
 mod mapmeta;
 mod metalmap;
@@ -209,6 +210,11 @@ struct Args {
     /// `coilbox_unitsync_worker::Convert3doArgs`, shared with the sidecar
     /// plugin that builds this flag's argv.
     convert_3do: Option<Mode>,
+    /// `--lua-compat`: scan a game's Lua, and its dependencies', for calls to
+    /// APIs the engine removed or changed. Its field lives once in
+    /// `coilbox_unitsync_worker::LuaCompatArgs`, shared with the sidecar plugin
+    /// that builds this flag's argv.
+    lua_compat: Option<Mode>,
     /// `--unit-script`: find and read a unit's animation script inside a
     /// game, following the unit script framework's own resolution order. Its
     /// fields live once in `coilbox_unitsync_worker::UnitScriptArgs`, shared
@@ -607,6 +613,17 @@ fn dispatch(args: &Args) -> i32 {
             || convert3do::render(&args.lib, &mode.game, Path::new(&mode.out_dir)),
             print_ok,
             || convert3do::emit_error("worker panicked while converting .3do models".into()),
+        );
+    }
+
+    // Lua compatibility scan: find each use of a Lua API the engine removed or
+    // changed in a game and its dependencies (issue #4553). Keys off --game, so
+    // it is checked before the --game modes.
+    if let Some(Mode::LuaCompat(mode)) = &args.lua_compat {
+        return run_mode(
+            || luacompat::render(&args.lib, &mode.game),
+            print_ok,
+            || luacompat::emit_error("worker panicked while scanning Lua".into()),
         );
     }
 
@@ -1050,6 +1067,9 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
     // mode's fields and cross field rule are defined (issue #2448).
     let mut unit_models_flag = false;
     let mut convert_3do_flag = false;
+    // `--lua-compat`'s own field (game) is not collected into a local here:
+    // `Mode::LuaCompat`'s `from_args` below re-scans `raw` for it.
+    let mut lua_compat_flag = false;
     // `--unit-render`'s own flags (angle, footprint, pixels, dimensions, render
     // source) are not collected into locals here: `Mode::UnitRender`'s
     // `from_args` below re-scans `raw` for those, which is the single place
@@ -1141,6 +1161,7 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
             "--unit-script" => unit_script_flag = true,
             "--unit-models" => unit_models_flag = true,
             "--convert-3do" => convert_3do_flag = true,
+            "--lua-compat" => lua_compat_flag = true,
             "--out-dir" => {
                 it.next();
             }
@@ -1370,6 +1391,13 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
         convert_3do: if convert_3do_flag {
             Some(Mode::Convert3do(
                 coilbox_unitsync_worker::Convert3doArgs::from_args(raw)?,
+            ))
+        } else {
+            None
+        },
+        lua_compat: if lua_compat_flag {
+            Some(Mode::LuaCompat(
+                coilbox_unitsync_worker::LuaCompatArgs::from_args(raw)?,
             ))
         } else {
             None
@@ -2268,6 +2296,7 @@ mod tests {
             unit_model: None,
             unit_models: None,
             convert_3do: None,
+            lua_compat: None,
             unit_render: None,
             unit_render_keys: None,
             unit_script: None,
