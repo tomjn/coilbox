@@ -146,6 +146,7 @@ Lua functions it puts back:
 Call-ins whose arguments moved:
 
 - `UnitDamaged`, changed in Spring 95.0, and `AllowCommand`, changed in Spring 105.0. The game's handlers get the arguments in the old order. Coilbox reads the game's Lua first, and leaves this out for a game whose handlers already take the new order.
+- `Spring.GetTeamInfo`, changed in Spring 105.0. The game gets the team's custom keys 7th and its income multiplier 8th, as before. Coilbox leaves this out for a game whose Lua already reads them the new way round.
 
 Gadgets, which each decide when the game loads whether the game needs them:
 

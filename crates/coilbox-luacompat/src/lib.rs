@@ -117,6 +117,13 @@ pub struct Hit {
     /// for a call-in assigned something other than a function.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub params: Option<Vec<String>>,
+    /// For a member chain called as the whole right side of an assignment,
+    /// the names its results go to, in order. `local a, b = f()` gives `a, b`,
+    /// and `local c = select(3, f())` gives `_, _, c`. An operator after the
+    /// call keeps only the first. `None` for a call whose results go anywhere
+    /// else, and for anything that is not a call.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub results: Option<Vec<String>>,
 }
 
 /// Every use of a name in `catalogue` found in `source`, in source order.
@@ -209,7 +216,12 @@ fn chain_use(toks: &[Token], at: usize, catalogue: &Catalogue, hits: &mut Vec<Hi
     let joined: String = parts.iter().map(|t| t.text.as_str()).collect();
     // `parts` alternates names and dots, so joining it gives `a.b.c`.
     if catalogue.chains.contains_key(&joined) {
+        let from = hits.len();
         push(hits, &catalogue.chains, &joined, parts, None);
+        let taken = results(toks, at, end);
+        for hit in &mut hits[from..] {
+            hit.results = taken.clone();
+        }
     }
     let declared =
         toks.get(end).is_some_and(|t| t.is_sym("=")) || (at > 0 && toks[at - 1].is_ident("local"));
@@ -239,6 +251,81 @@ fn chain_use(toks: &[Token], at: usize, catalogue: &Catalogue, hits: &mut Vec<Hi
     end
 }
 
+/// The index of the `)` that closes the `(` at `open`.
+fn closing(toks: &[Token], open: usize) -> Option<usize> {
+    let mut depth = 0usize;
+    for (i, t) in toks.iter().enumerate().skip(open) {
+        if t.is_sym("(") {
+            depth += 1;
+        } else if t.is_sym(")") {
+            depth -= 1;
+            if depth == 0 {
+                return Some(i);
+            }
+        }
+    }
+    None
+}
+
+/// [`Hit::results`] for the chain at `at..end`.
+fn results(toks: &[Token], at: usize, end: usize) -> Option<Vec<String>> {
+    if !toks.get(end)?.is_sym("(") {
+        return None;
+    }
+    let close = closing(toks, end)?;
+    // `= f(...)`, or `= select(N, f(...))`, which skips N - 1 results.
+    let (eq, skipped, after) = if toks[at.checked_sub(1)?].is_sym("=") {
+        (at - 1, 0, close + 1)
+    } else {
+        let sel = at.checked_sub(4)?;
+        let n: usize = toks[at - 2].text.parse().ok()?;
+        let shape = toks[sel].is_ident("select")
+            && toks[sel + 1].is_sym("(")
+            && toks[at - 2].kind == Kind::Number
+            && toks[at - 1].is_sym(",")
+            && toks.get(close + 1)?.is_sym(")")
+            && n > 0;
+        if !shape || !toks[sel.checked_sub(1)?].is_sym("=") {
+            return None;
+        }
+        (sel - 1, n - 1, close + 2)
+    };
+    let mut names = Vec::new();
+    let mut i = eq;
+    loop {
+        let name = toks.get(i.checked_sub(1)?)?;
+        if name.kind != Kind::Ident {
+            return None;
+        }
+        names.push(name.text.clone());
+        i -= 1;
+        if i > 0 && toks[i - 1].is_sym(",") {
+            i -= 1;
+        } else {
+            break;
+        }
+    }
+    if i > 0 && (toks[i - 1].is_sym(".") || toks[i - 1].is_sym(":")) {
+        return None;
+    }
+    names.reverse();
+    let mut out = vec!["_".to_string(); skipped];
+    out.extend(names);
+    match toks.get(after) {
+        None => Some(out),
+        Some(t) if t.is_sym(";") => Some(out),
+        Some(t) if t.is_ident("and") || t.is_ident("or") => Some(out[..=skipped].to_vec()),
+        Some(t) if t.kind == Kind::Ident => Some(out),
+        Some(t)
+            if t.kind == Kind::Sym
+                && !["(", ")", ",", ".", ":", "[", "{"].contains(&t.text.as_str()) =>
+        {
+            Some(out[..=skipped].to_vec())
+        }
+        Some(_) => None,
+    }
+}
+
 /// Add a hit for each entry stored under `key`, with the source text of `parts`.
 fn push(
     hits: &mut Vec<Hit>,
@@ -257,6 +344,7 @@ fn push(
             column: first.column,
             text: text.clone(),
             params: params.clone(),
+            results: None,
         });
     }
 }
@@ -297,6 +385,7 @@ mod tests {
                 column: 11,
                 text: "Spring.GetUnitTravel".into(),
                 params: None,
+                results: Some(vec!["x".into()]),
             }]
         );
     }
@@ -502,6 +591,74 @@ mod tests {
         assert!(global_hits("local spairs = pairs").is_empty());
         assert!(global_hits("t.snext(x) t:spairs()").is_empty());
         assert!(global_hits("if snext == nil then end").len() == 1);
+    }
+
+    fn results(src: &str) -> Vec<Option<Vec<String>>> {
+        scan(src, &catalogue())
+            .into_iter()
+            .map(|h| h.results)
+            .collect()
+    }
+
+    /// Issue #4694: how a call site takes a function's results tells whether
+    /// it was written for the order they came in before a change.
+    #[test]
+    fn a_call_assigned_to_names_reports_them_as_its_results() {
+        assert_eq!(
+            results("local _, _, isDead = Spring.GetUnitTravel(team.id)"),
+            [names(&["_", "_", "isDead"])]
+        );
+        assert_eq!(
+            results("travel, period = Spring.GetUnitTravel(u);"),
+            [names(&["travel", "period"])]
+        );
+        assert_eq!(
+            results("local _,_,_,_,_,_,r,g,b = Spring.GetUnitTravel(t); return r,g,b"),
+            [names(&["_", "_", "_", "_", "_", "_", "r", "g", "b"])]
+        );
+    }
+
+    #[test]
+    fn a_call_inside_select_reports_the_results_select_skips() {
+        assert_eq!(
+            results("local teamOptions = select(7, Spring.GetUnitTravel(teamID))\nlocal m = 1"),
+            [names(&["_", "_", "_", "_", "_", "_", "teamOptions"])]
+        );
+        assert_eq!(
+            results("local a, b = select(2, Spring.GetUnitTravel(x))"),
+            [names(&["_", "a", "b"])]
+        );
+    }
+
+    #[test]
+    fn an_operator_after_the_call_keeps_only_the_first_result() {
+        assert_eq!(
+            results("local a, b = Spring.GetUnitTravel(x) or 0"),
+            [names(&["a"])]
+        );
+        assert_eq!(
+            results("local dead = select(3, Spring.GetUnitTravel(x)) == true"),
+            [names(&["_", "_", "dead"])]
+        );
+    }
+
+    #[test]
+    fn a_call_whose_results_go_anywhere_else_reports_none() {
+        for src in [
+            "Spring.GetUnitTravel(x)",
+            "return Spring.GetUnitTravel(x)",
+            "local f = Spring.GetUnitTravel",
+            "local a, b = Spring.GetUnitTravel(x), 1",
+            "local a = Spring.GetUnitTravel(x).y",
+            "local a = Spring.GetUnitTravel(x)[1]",
+            "obj.a, b = Spring.GetUnitTravel(x)",
+            "local n = g(select(2, Spring.GetUnitTravel(x)))",
+            "local n = select('#', Spring.GetUnitTravel(x))",
+            "local n = t.select(2, Spring.GetUnitTravel(x))",
+            "local a = Spring.GetUnitTravel{x}",
+        ] {
+            assert_eq!(results(src), [None], "{src}");
+        }
     }
 
     #[test]

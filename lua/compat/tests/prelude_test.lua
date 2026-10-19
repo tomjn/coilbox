@@ -516,4 +516,38 @@ do
 	check("unsynced: no lineage functions, as the table lives in the synced state", engine.env.Spring.SetUnitLineage == nil and engine.env.Spring.GetUnitLineage == nil)
 end
 
+--------------------------------------------------------------------------------
+-- Spring.GetTeamInfo's results (issue #4694)
+--------------------------------------------------------------------------------
+
+-- The engine's GetTeamInfo now: income multiplier 7th, custom keys 8th, and
+-- no keys at all when the second argument is false.
+local keys = { startmetal = "500" }
+local function currentGetTeamInfo(teamID, getTeamKeys)
+	if teamID ~= 0 then
+		return
+	end
+	if getTeamKeys == false then
+		return 0, 1, false, true, "arm", 0, 1.5
+	end
+	return 0, 1, false, true, "arm", 0, 1.5, keys
+end
+
+for _, synced in ipairs({ true, false }) do
+	local state = synced and "synced" or "unsynced"
+	local engine = newEngine({ synced = synced, manifest = 11, spring = { GetTeamInfo = currentGetTeamInfo } })
+	prelude(engine)
+	local GetTeamInfo = engine.env.Spring.GetTeamInfo
+	local got = { GetTeamInfo(0) }
+	check(state .. ": GetTeamInfo gives the custom keys 7th and the income multiplier 8th",
+		select("#", GetTeamInfo(0)) == 8 and got[7] == keys and got[8] == 1.5, tostring(got[7]) .. " " .. tostring(got[8]))
+	check(state .. ": the values before them are unchanged", got[1] == 0 and got[2] == 1 and got[3] == false and got[4] == true and got[5] == "arm" and got[6] == 0)
+	-- Expand and Exterminate's start_unit_spawn.lua, line 59.
+	local teamOptions = select(7, GetTeamInfo(0))
+	check(state .. ": select(7, ...) is the custom keys table", type(teamOptions) == "table" and teamOptions.startmetal == "500")
+	check(state .. ": a team that does not exist gives nothing", select("#", GetTeamInfo(5)) == 0)
+	check(state .. ": with no keys asked for, the seven values come back as they are", select("#", GetTeamInfo(0, false)) == 7 and select(7, GetTeamInfo(0, false)) == 1.5)
+	check(state .. ": no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
+end
+
 support.report()

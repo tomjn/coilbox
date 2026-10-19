@@ -1,6 +1,7 @@
 //! The call-in handlers a base game's own Lua defines, read from the worker's
 //! Lua compat scan (issue #4622), so its mutator gets only the call-in adapters
-//! the game needs. See [`coilbox_compat::for_game`].
+//! the game needs. See [`coilbox_compat::for_game`]. A call whose results the
+//! code takes into names counts too, by those names (issue #4694).
 //!
 //! Only the base archive's own files count. The scan also reads the archives
 //! the game depends on, but which of those a machine resolves depends on what
@@ -55,7 +56,7 @@ pub fn handlers_in(scan: &str, archive: &str) -> Result<Vec<Handler>, String> {
         .filter_map(|hit| {
             Some(Handler {
                 entry: hit.entry_id,
-                params: hit.params?,
+                params: hit.params.or(hit.results)?,
             })
         })
         .collect())
@@ -95,6 +96,29 @@ mod tests {
         assert_eq!(
             handlers_in(scan, "xta-9.65.sd7").unwrap(),
             [handler("signature:UnitDamaged@95.0", &["u", "d"])]
+        );
+    }
+
+    /// Issue #4694: a call whose results changed order is read by the names
+    /// it takes them into.
+    #[test]
+    fn a_call_s_results_count_as_its_handler_s_arguments() {
+        let scan = r#"{
+          "files": [
+            {"archive": "ee.sdz", "path": "LuaRules/Gadgets/a.lua", "hits": [
+              {"entryId": "signature:Spring.GetTeamInfo@105.0", "line": 59, "column": 28,
+               "text": "Spring.GetTeamInfo", "results": ["_", "keys"]}
+            ]}
+          ],
+          "archives": ["ee.sdz"],
+          "errors": []
+        }"#;
+        assert_eq!(
+            handlers_in(scan, "ee.sdz").unwrap(),
+            [handler(
+                "signature:Spring.GetTeamInfo@105.0",
+                &["_", "keys"]
+            )]
         );
     }
 

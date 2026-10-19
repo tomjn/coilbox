@@ -1091,6 +1091,9 @@ mod tests {
         "function gadget:AllowCommand(u, d, t, cmdID, params, options, tag, synced)\nend\n";
     const NEW_COMMAND: &str =
         "function AllowCommand(u, d, t, cmdID, params, options, tag, playerID, fromSynced)\nend\n";
+    const OLD_TEAM_INFO: &str = "local teamOptions = select(7, Spring.GetTeamInfo(teamID))\n";
+    const NEW_TEAM_INFO: &str =
+        "local _, _, _, _, _, _, incomeMultiplier = Spring.GetTeamInfo(teamID)\n";
 
     /// One game with every entry file, written for the old call-in orders,
     /// with a dependency written for the new ones. One updated for one change
@@ -1115,6 +1118,7 @@ mod tests {
             lua: &[
                 ("xta-9.65.sd7", OLD_DAMAGED),
                 ("xta-9.65.sd7", OLD_COMMAND),
+                ("xta-9.65.sd7", OLD_TEAM_INFO),
                 ("otherdep.sdz", NEW_DAMAGED),
                 ("otherdep.sdz", NEW_COMMAND),
             ],
@@ -1133,6 +1137,7 @@ mod tests {
                 ("BA-V9.79.SDZ", "function gadget:UnitDamaged(u, ...)\nend\n"),
                 ("BA-V9.79.SDZ", OLD_COMMAND),
                 ("BA-V9.79.SDZ", NEW_COMMAND),
+                ("BA-V9.79.SDZ", NEW_TEAM_INFO),
             ],
         },
         Fixture {
@@ -1334,6 +1339,17 @@ mod tests {
         assert!(!paths(&golden_build(10, &FIXTURES[2]))
             .iter()
             .any(|p| p.starts_with("compat/models/")));
+
+        // Issue #4694: a game that reads GetTeamInfo's custom keys 7th gets
+        // the old order, and one that reads the income multiplier there does
+        // not.
+        let team_info = "-- fix: spring-get-team-info-105\n";
+        let synced_of = |n: u32, fixture: &Fixture| {
+            text(&golden_build(n, fixture), "compat/prelude-synced.lua").unwrap()
+        };
+        assert!(synced_of(11, &FIXTURES[0]).contains(team_info));
+        assert!(!synced_of(11, &FIXTURES[1]).contains(team_info));
+        assert!(!synced_of(10, &FIXTURES[0]).contains(team_info));
     }
 
     /// The hash of every fixed game built from `manifest`.
@@ -1401,7 +1417,7 @@ mod tests {
         ),
         (
             11,
-            "e5efcd9a94e2be746ab58d360d28d02ce131ea52fe460ca190182b92f9f0aada",
+            "30f35afd625c4e02099a57468aa2ad6f2b0b68b06efc416be204b22ee129f3e1",
         ),
     ];
 

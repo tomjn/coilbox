@@ -22,7 +22,8 @@
     "defs-missing-model-standin",
     "game-identity",
     "snext-spairs-sipairs",
-    "spring-unit-lineage"
+    "spring-unit-lineage",
+    "spring-get-team-info-105"
   ],
   "converter": {
     "crate": "coilbox-3do-convert",

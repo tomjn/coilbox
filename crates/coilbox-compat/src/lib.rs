@@ -135,6 +135,10 @@ const FIXES: &[(&str, &str)] = &[
         include_str!("../../../lua/compat/snext-spairs-sipairs.lua"),
     ),
     (
+        "spring-get-team-info-105",
+        include_str!("../../../lua/compat/spring-get-team-info-105.lua"),
+    ),
+    (
         "spring-make-font",
         include_str!("../../../lua/compat/spring-make-font.lua"),
     ),
@@ -637,20 +641,29 @@ pub fn defs_block(manifest: &Manifest, file: DefsFile) -> Option<String> {
     Some(out)
 }
 
-/// A prelude fix that puts a call-in's arguments back in an older order, and
-/// how to tell a handler written for the current order.
+/// A prelude fix that puts a call-in's arguments, or a function's results,
+/// back in an older order, and how to tell Lua written for the current order.
 struct Adapter {
     fix: &'static str,
     /// The catalogue entry the fix addresses, which the scan of a game's Lua
-    /// names a handler's call-in by.
+    /// names a handler's call-in or a call's function by.
     entry: &'static str,
-    /// The 0-based position of the first argument the change moved.
+    /// The 0-based position of the first value the change moved.
     moved: usize,
-    /// How many arguments the old list had.
-    old_len: usize,
-    /// Part of the name of the argument the change added, lower case. The old
-    /// list has nothing by that name.
-    added: &'static str,
+    rule: Rule,
+}
+
+/// What marks a list of names as written for the current order.
+enum Rule {
+    /// The change added a value, so the old list had `old_len` and nothing
+    /// whose name contains `added`, lower case.
+    Added { old_len: usize, added: &'static str },
+    /// The change swapped values around, so a name at one of these 0-based
+    /// positions that contains one of its words, lower case, has the new
+    /// order's value there.
+    Swapped {
+        new: &'static [(usize, &'static [&'static str])],
+    },
 }
 
 /// Changing this changes the mutator two players build from the same manifest,
@@ -660,21 +673,35 @@ const ADAPTERS: &[Adapter] = &[
         fix: "callin-unit-damaged-95",
         entry: "signature:UnitDamaged@95.0",
         moved: 6,
-        old_len: 9,
-        added: "proj",
+        rule: Rule::Added {
+            old_len: 9,
+            added: "proj",
+        },
     },
     Adapter {
         fix: "callin-allow-command-105",
         entry: "signature:AllowCommand@105.0",
         moved: 7,
-        old_len: 8,
-        added: "player",
+        rule: Rule::Added {
+            old_len: 8,
+            added: "player",
+        },
+    },
+    Adapter {
+        fix: "spring-get-team-info-105",
+        entry: "signature:Spring.GetTeamInfo@105.0",
+        moved: 6,
+        rule: Rule::Swapped {
+            new: &[(6, &["income", "mult"]), (7, &["key", "custom", "opt"])],
+        },
     },
 ];
 
 /// A call-in handler a game's Lua defines, as the scan of it reports one: the
 /// catalogue entry of the call-in, such as `signature:UnitDamaged@95.0`, and
-/// the arguments the handler takes from the engine.
+/// the arguments the handler takes from the engine. For a function whose
+/// results changed order, such as `signature:Spring.GetTeamInfo@105.0`, it is
+/// a call instead, and `params` are the names the call's results go to.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Handler {
     pub entry: String,
@@ -695,7 +722,17 @@ fn order(adapter: &Adapter, params: &[String]) -> Order {
         .filter(|p| *p != "...")
         .map(|p| p.to_ascii_lowercase())
         .collect();
-    if named.len() > adapter.old_len || named.iter().any(|p| p.contains(adapter.added)) {
+    let new = match adapter.rule {
+        Rule::Added { old_len, added } => {
+            named.len() > old_len || named.iter().any(|p| p.contains(added))
+        }
+        Rule::Swapped { new } => new.iter().any(|(at, words)| {
+            named
+                .get(*at)
+                .is_some_and(|p| words.iter().any(|w| p.contains(w)))
+        }),
+    };
+    if new {
         Order::New
     } else if named.len() > adapter.moved {
         Order::Old
@@ -1228,16 +1265,21 @@ mod tests {
         );
     }
 
-    /// Issues #4692 and #4693: manifest 11 adds the unsynced fix that puts
-    /// back snext, spairs and sipairs and the synced one that keeps unit
-    /// lineage, and keeps the writer of manifest 10.
+    /// Issues #4692 to #4694: manifest 11 adds the unsynced fix that puts
+    /// back snext, spairs and sipairs, the synced one that keeps unit lineage
+    /// and the adapter for Spring.GetTeamInfo's results, and keeps the writer
+    /// of manifest 10.
     #[test]
     fn manifest_11_is_manifest_10_with_the_synced_iterators() {
         let (ten, eleven) = (manifest(10).unwrap(), manifest(11).unwrap());
         assert_eq!(eleven.fixes[..ten.fixes.len()], ten.fixes[..]);
         assert_eq!(
             eleven.fixes[ten.fixes.len()..],
-            ["snext-spairs-sipairs", "spring-unit-lineage"]
+            [
+                "snext-spairs-sipairs",
+                "spring-unit-lineage",
+                "spring-get-team-info-105"
+            ]
         );
         assert_eq!(
             (&eleven.converter, eleven.writer),
@@ -1249,6 +1291,9 @@ mod tests {
         assert!(!synced.contains("snext-spairs-sipairs"));
         assert!(synced.contains("-- fix: spring-unit-lineage\n"));
         assert!(!unsynced.contains("spring-unit-lineage"));
+        for p in [&synced, &unsynced] {
+            assert!(p.contains("-- fix: spring-get-team-info-105\n"));
+        }
     }
 
     #[test]
@@ -1553,6 +1598,51 @@ mod tests {
         let m = manifest(1).unwrap();
         let new = handler(DAMAGED, &["u", "d", "t", "dmg", "p", "w", "projectileID"]);
         assert_eq!(for_game(&m, &[new]), m);
+    }
+
+    const TEAM_INFO: &str = "signature:Spring.GetTeamInfo@105.0";
+
+    /// The fixes manifest 11 leaves out for a game whose Lua takes
+    /// `Spring.GetTeamInfo`'s results into these names.
+    fn team_info_left_out(sites: &[&[&str]]) -> Vec<String> {
+        let full = manifest(11).unwrap();
+        let handlers: Vec<Handler> = sites.iter().map(|s| handler(TEAM_INFO, s)).collect();
+        let picked = for_game(&full, &handlers);
+        full.fixes
+            .into_iter()
+            .filter(|id| !picked.fixes.contains(id))
+            .collect()
+    }
+
+    /// Issue #4694: XTA and Expand and Exterminate read the custom keys 7th.
+    #[test]
+    fn a_call_that_reads_the_custom_keys_seventh_keeps_the_team_info_adapter() {
+        let six = ["_"; 6];
+        let keys: Vec<&str> = six.iter().copied().chain(["teamOptions"]).collect();
+        assert!(team_info_left_out(&[&keys]).is_empty());
+        // The colours GetTeamInfo returned before Spring 0.76 read past the
+        // 7th, and are no sign of the new order.
+        let colours = ["_", "_", "_", "_", "_", "_", "r", "g", "b"];
+        assert!(team_info_left_out(&[&colours, &["_", "_", "_", "isDead"]]).is_empty());
+    }
+
+    #[test]
+    fn a_call_that_reads_the_new_order_leaves_the_team_info_adapter_out() {
+        let income = ["_", "_", "_", "_", "_", "_", "incomeMultiplier"];
+        assert_eq!(team_info_left_out(&[&income]), ["spring-get-team-info-105"]);
+        let keys = ["_", "_", "_", "_", "_", "_", "_", "customKeys"];
+        assert_eq!(team_info_left_out(&[&keys]), ["spring-get-team-info-105"]);
+        let opts = [
+            "id", "leader", "dead", "ai", "side", "ally", "mult", "teamOpts",
+        ];
+        assert_eq!(team_info_left_out(&[&opts]), ["spring-get-team-info-105"]);
+        let old = ["_", "_", "_", "_", "_", "_", "teamOptions"];
+        assert!(team_info_left_out(&[&income, &old]).is_empty());
+        // Reading no further than the side decides nothing.
+        assert_eq!(
+            team_info_left_out(&[&income, &["_", "_", "_", "_", "side"]]),
+            ["spring-get-team-info-105"]
+        );
     }
 
     #[test]
