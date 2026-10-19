@@ -51,6 +51,7 @@ const MANIFESTS: &[(u32, &str)] = &[
     (6, include_str!("../../../lua/compat/manifests/6.json")),
     (7, include_str!("../../../lua/compat/manifests/7.json")),
     (8, include_str!("../../../lua/compat/manifests/8.json")),
+    (10, include_str!("../../../lua/compat/manifests/10.json")),
 ];
 
 /// Every fix file, by id.
@@ -78,6 +79,10 @@ const FIXES: &[(&str, &str)] = &[
     (
         "defs-manual-bomb-settings-92",
         include_str!("../../../lua/compat/defs/defs-manual-bomb-settings-92.lua"),
+    ),
+    (
+        "defs-missing-model-standin",
+        include_str!("../../../lua/compat/defs/defs-missing-model-standin.lua"),
     ),
     (
         "defs-model-center-offset-89",
@@ -1138,6 +1143,22 @@ mod tests {
         assert!(keeps_palette_tiles(eight.writer));
         assert!(!copies_entry_bytes(seven.writer));
         assert!(copies_entry_bytes(eight.writer));
+    }
+
+    /// Issue #4686: manifest 10 adds the def fix that gives a def whose model
+    /// is missing a stand-in, and keeps the writer of manifest 9.
+    #[test]
+    fn manifest_10_is_manifest_9_with_the_missing_model_standin() {
+        let (nine, ten) = (manifest(9).unwrap(), manifest(10).unwrap());
+        let added: Vec<&String> = ten.fixes.iter().filter(|id| !nine.fixes.contains(id)).collect();
+        assert_eq!(added, ["defs-missing-model-standin"]);
+        let kept: Vec<&String> = ten.fixes.iter().filter(|id| nine.fixes.contains(id)).collect();
+        assert_eq!(kept, nine.fixes.iter().collect::<Vec<_>>());
+        assert_eq!((ten.converter, ten.writer), (nine.converter, nine.writer));
+        assert_eq!(
+            defs_fixes(&ten, DefsFile::DefsPost).last(),
+            Some(&"defs-missing-model-standin")
+        );
     }
 
     #[test]

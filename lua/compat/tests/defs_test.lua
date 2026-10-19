@@ -20,7 +20,19 @@ local function run(fixes, units, weapons, opts)
 	opts = opts or {}
 	local env = setmetatable({}, { __index = _G })
 	env._G = env
-	env.DEFS = { unitDefs = units or {}, weaponDefs = weapons or {} }
+	env.DEFS = { unitDefs = units or {}, weaponDefs = weapons or {}, featureDefs = opts.features or {} }
+	if opts.files then
+		-- VFS.FileExists over the game's files, by lower case path. A path the
+		-- engine refuses to look up answers with nothing, as LuaParser does.
+		env.VFS = {
+			FileExists = function(path)
+				if path:find("..", 1, true) then
+					return
+				end
+				return opts.files[path:lower()] == true
+			end,
+		}
+	end
 	if opts.weaponDefsGlobal then
 		env.WeaponDefs = env.DEFS.weaponDefs
 	end
@@ -51,6 +63,7 @@ for _, id in ipairs({
 	"defs-model-center-offset-89",
 	"defs-weapon-consts-87",
 	"defs-manual-bomb-settings-92",
+	"defs-missing-model-standin",
 }) do
 	local source = assert(io.open(DEFS_DIR .. id .. ".lua")):read("*a")
 	check(id .. ": its header names the file", source:match("^%-%- id: ([%w-]+)\n") == id)
@@ -205,6 +218,70 @@ do
 	local units = { armthud = { weapondefs = { bomb = inner } } }
 	run({ "defs-manual-bomb-settings-92" }, units, {}, { weaponDefsGlobal = true })
 	check("bomb: a bomb the unit declares inside itself is worked out too", inner.burst == 2)
+end
+
+--------------------------------------------------------------------------------
+-- Missing models
+--------------------------------------------------------------------------------
+
+do
+	local files = {
+		["objects3d/arm_infinite_dead.3do"] = true,
+		["objects3d/tree.3do"] = true,
+		["objects3d/rock.s3o"] = true,
+		["objects3d/ship.glb"] = true,
+		["objects3d/notes.txt"] = true,
+		["root.s3o"] = true,
+		["compat/models/standin-1x1.s3o"] = true,
+		["compat/models/standin-3x2.s3o"] = true,
+		["compat/models/standin-2x2.s3o"] = true,
+	}
+	local features = {
+		arm_infinity_dead = { object = "arm_infinity_dead", footprintX = 3, footprintZ = 2, metal = 120 },
+		atgun_destroyed = { Object = "atgun_destroyed.s3o", footprintx = "2.7", footprintz = 2 },
+		tree = { object = "Objects3D/Tree" },
+		rock = { object = "rock.s3o" },
+		ship = { object = "ship" },
+		root = { object = "root.s3o" },
+		notes = { object = "notes.txt" },
+		up = { object = "../escape" },
+		bare = { footprintx = 4 },
+		empty = { object = "" },
+		odd = { object = "big_dead", footprintx = 9, footprintz = 9 },
+		flat = { object = "flat_dead", footprintx = 0, footprintz = -3 },
+	}
+	local units = { armfoo = { objectName = "armfoo", footprintx = "2", footprintz = "2" } }
+	local weapons = { shell = { model = "shell.3do" }, beam = { range = 300 } }
+	local compat = run({ "defs-missing-model-standin" }, units, weapons, { features = features, files = files })
+
+	check("standin: a feature whose model is missing gets the box of its footprint", features.arm_infinity_dead.object == "compat/models/standin-3x2.s3o")
+	check("standin: its numbers are kept", features.arm_infinity_dead.metal == 120 and features.arm_infinity_dead.footprintX == 3)
+	check("standin: the key is written as the game spelled it", features.atgun_destroyed.Object == "compat/models/standin-2x2.s3o" and features.atgun_destroyed.object == nil)
+	check("standin: a near-miss spelling is not taken for the model", features.arm_infinity_dead.object ~= "arm_infinite_DEAD")
+	check("standin: a name with no extension found under objects3d is kept", features.tree.object == "Objects3D/Tree")
+	check("standin: a name with an extension found under objects3d is kept", features.rock.object == "rock.s3o")
+	check("standin: a glb is a model", features.ship.object == "ship")
+	check("standin: a model at the root is kept", features.root.object == "root.s3o")
+	check("standin: a file no parser reads is not a model", features.notes.object == "compat/models/standin-1x1.s3o")
+	check("standin: a name the VFS will not look up is left alone", features.up.object == "../escape")
+	check("standin: a feature with no model is unchanged", features.bare.object == nil and features.empty.object == "")
+	check("standin: a footprint with no box of its own gets the 1x1 one", features.odd.object == "compat/models/standin-1x1.s3o")
+	check("standin: a footprint under 1 is 1", features.flat.object == "compat/models/standin-1x1.s3o")
+	check("standin: a unit's objectName is a model", units.armfoo.objectName == "compat/models/standin-2x2.s3o")
+	check("standin: a weapon's model is a model", weapons.shell.model == "compat/models/standin-1x1.s3o")
+	check("standin: a weapon with no model is unchanged", weapons.beam.model == nil)
+	check("standin: seven defs changed", count(compat.changed) == 7, tostring(count(compat.changed)))
+
+	local listed = {}
+	for _, s in ipairs(compat.standins) do
+		listed[s.kind .. " " .. s.name] = s
+	end
+	check("standin: each change is listed", #compat.standins == 7)
+	local inf = listed["feature arm_infinity_dead"]
+	check("standin: a listing names the model the def asked for", inf and inf.model == "arm_infinity_dead" and inf.standin == "compat/models/standin-3x2.s3o")
+	local odd = listed["feature odd"]
+	check("standin: a listing names the box the footprint asks for, whether or not it is there", odd and odd.standin == "compat/models/standin-9x9.s3o")
+	check("standin: the unit and the weapon are listed by kind", listed["unit armfoo"] ~= nil and listed["weapon shell"] ~= nil)
 end
 
 support.report()
