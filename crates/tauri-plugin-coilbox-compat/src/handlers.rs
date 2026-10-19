@@ -52,11 +52,15 @@ pub fn handlers_in(scan: &str, archive: &str) -> Result<Vec<Handler>, String> {
         .into_iter()
         .filter(|f| f.archive == archive)
         .flat_map(|f| f.hits)
-        .filter_map(|hit| {
-            Some(Handler {
-                entry: hit.entry_id,
-                params: hit.params?,
-            })
+        .flat_map(|hit| {
+            let entry = hit.entry_id;
+            hit.params
+                .into_iter()
+                .chain(hit.results.into_iter().flatten())
+                .map(move |params| Handler {
+                    entry: entry.clone(),
+                    params,
+                })
         })
         .collect())
 }
@@ -95,6 +99,27 @@ mod tests {
         assert_eq!(
             handlers_in(scan, "xta-9.65.sd7").unwrap(),
             [handler("signature:UnitDamaged@95.0", &["u", "d"])]
+        );
+    }
+
+    #[test]
+    fn each_call_that_names_a_function_s_results_is_one_handler() {
+        let scan = r#"{
+          "files": [
+            {"archive": "s44.sdz", "path": "LuaRules/Gadgets/a.lua", "hits": [
+              {"entryId": "signature:Spring.GetGroundInfo@105.0", "line": 20, "column": 30,
+               "text": "Spring.GetGroundInfo", "results": [["_", "curMetal"], ["_", "metal"]]}
+            ]}
+          ],
+          "archives": ["s44.sdz"],
+          "errors": []
+        }"#;
+        assert_eq!(
+            handlers_in(scan, "s44.sdz").unwrap(),
+            [
+                handler("signature:Spring.GetGroundInfo@105.0", &["_", "curMetal"]),
+                handler("signature:Spring.GetGroundInfo@105.0", &["_", "metal"]),
+            ]
         );
     }
 
