@@ -1191,6 +1191,10 @@ mod tests {
             8,
             "989268ce40bf5778182d3bd9bff7f52a9295ab593598973e02bdd4dc5c11a121",
         ),
+        (
+            9,
+            "fe0773afdc7d89040e08cd849ad9456074ef00d43aa0d42c9dcfb5eba9744e79",
+        ),
     ];
 
     #[test]
