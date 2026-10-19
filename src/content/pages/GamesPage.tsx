@@ -48,7 +48,6 @@ import {
 
 /** What a chip with nothing in it says. */
 const EMPTY_CHIP: Record<GameChip, string> = {
-  all: "No games.",
   installed: "No games installed.",
   updates: "Every installed game is up to date.",
   featured: "The hub features no games.",
@@ -125,9 +124,9 @@ export default function GamesPage() {
     [library.games],
   );
   const counts = useMemo(() => chipCounts(records), [records]);
-  // The player's own games until they pick a chip, or every game when they
-  // have none yet.
-  const chip = picked ?? (counts.installed > 0 ? "installed" : "all");
+  // The player's own games until they pick a chip, or the games they could
+  // get when they have none yet.
+  const chip = picked ?? (counts.installed > 0 ? "installed" : "notInstalled");
   const shown = useMemo(
     () =>
       sortGames(

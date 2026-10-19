@@ -14,7 +14,6 @@ import type { LibraryGame, LibrarySource } from "./library";
 
 /** The Games page's filter chips, in the order they are shown. */
 export const GAME_CHIPS = [
-  { value: "all", label: "All" },
   { value: "installed", label: "My Games" },
   { value: "notInstalled", label: "New Games" },
   { value: "updates", label: "Updates" },
@@ -57,8 +56,6 @@ export function inGamesGrid(g: LibraryGame): boolean {
 
 export function matchesChip(g: LibraryGame, chip: GameChip): boolean {
   switch (chip) {
-    case "all":
-      return true;
     case "installed":
       return isOnDisk(g);
     case "updates":

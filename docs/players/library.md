@@ -54,7 +54,7 @@ Select anywhere else on an installed game to open its page. A warning icon on a 
 
 To narrow the grid:
 
-- Select a button at the top: All, My Games, New Games, Updates or Featured. Each one says how many games it holds. My Games is the games you have, and the page opens on it when you have any. New Games is the games you do not have. Featured is the games the hub features. Updates is the games with a newer version, and is hidden when there are none.
+- Select a button at the top: My Games, New Games, Updates or Featured. Each one says how many games it holds. My Games is the games you have, and the page opens on it when you have any. New Games is the games you do not have, and the page opens on it when you have none. Featured is the games the hub features. Updates is the games with a newer version, and is hidden when there are none.
 - Type in Search games… to match part of a game's name.
 - Pick a sort from the list beside it: Featured first, Name A–Z or Name Z–A. Featured first is the default.
 

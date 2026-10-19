@@ -119,15 +119,18 @@ const cardTitles = () =>
     .map((li) => li.querySelector("p[title]")?.getAttribute("title"));
 
 describe("Games page", () => {
-  it("lists every hub game and every installed game, featured first", () => {
-    renderPage("/library/games?filter=all");
+  it("splits the games between My Games and New Games, featured first", () => {
+    renderPage();
     expect(cardTitles()).toEqual([
       "SplinterFaction",
-      "Zero-K",
       "Balanced Annihilation",
+      "My Test Game",
+    ]);
+    fireEvent.click(screen.getByRole("radio", { name: /New Games/ }));
+    expect(cardTitles()).toEqual([
+      "Zero-K",
       "Evolution RTS",
       "Metal Factions",
-      "My Test Game",
       "Tech Annihilation",
     ]);
   });
@@ -142,7 +145,7 @@ describe("Games page", () => {
     expect(cardTitles()).toHaveLength(3);
   });
 
-  it("opens on every game when the player has none", () => {
+  it("opens on New Games when the player has none", () => {
     hoisted.input = {
       ...LIBRARY_GAMES_INPUT,
       scan: { games: [], maps: [] },
@@ -150,7 +153,9 @@ describe("Games page", () => {
     };
     renderPage();
     expect(
-      screen.getByRole("radio", { name: /All/ }).getAttribute("aria-checked"),
+      screen
+        .getByRole("radio", { name: /New Games/ })
+        .getAttribute("aria-checked"),
     ).toBe("true");
   });
 
@@ -161,7 +166,7 @@ describe("Games page", () => {
       within(chips)
         .getAllByRole("radio")
         .map((c) => c.textContent),
-    ).toEqual(["All7", "My Games3", "New Games4", "Updates1", "Featured2"]);
+    ).toEqual(["My Games3", "New Games4", "Updates1", "Featured2"]);
     fireEvent.click(within(chips).getByRole("radio", { name: /Updates/ }));
     expect(cardTitles()).toEqual(["SplinterFaction"]);
   });
@@ -194,7 +199,7 @@ describe("Games page", () => {
   });
 
   it("queues the hub's first source when Install is pressed", async () => {
-    renderPage("/library/games?filter=all");
+    renderPage("/library/games?filter=notInstalled");
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Install" }));
     });
@@ -206,7 +211,7 @@ describe("Games page", () => {
   });
 
   it("cancels the running download", () => {
-    renderPage("/library/games?filter=all");
+    renderPage("/library/games?filter=notInstalled");
     fireEvent.click(screen.getAllByRole("button", { name: "Cancel" })[0]);
     expect(hoisted.cancel).toHaveBeenCalledWith("q1");
   });
