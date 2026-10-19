@@ -52,6 +52,7 @@ describe("resolveCompatTarget", () => {
     });
     expect(compatStatus).toHaveBeenCalledWith({
       dataDir: "/data",
+      enginePath: "/engines/105",
       archiveName: "xta-9.65.sd7",
       baseChecksum: "1234abcd",
     });
@@ -87,6 +88,26 @@ describe("resolveCompatTarget", () => {
     expect(result.message).toContain("compatibility version 2, now 3");
     expect(result.message).toContain(
       "under Library > Games and choose Rebuild",
+    );
+  });
+
+  it("names a changed palette as the reason a mutator is stale", async () => {
+    compatStatus.mockResolvedValue({
+      latest: 3,
+      folder: MUTATOR.primaryArchive.name,
+      stale: [
+        {
+          kind: "palette",
+          built: { source: "springcontent.sdz", sha256: "aa" },
+          now: { source: null, sha256: null },
+        },
+      ],
+    });
+    const result = await resolve();
+    expect(result.kind).toBe("blocked");
+    if (result.kind !== "blocked") return;
+    expect(result.message).toContain(
+      "the palette its models take their colours from has changed",
     );
   });
 

@@ -233,6 +233,7 @@ describe("CompatMode", () => {
     );
     expect(exportSdz).toHaveBeenCalledWith({
       dataDir: "/data",
+      enginePath: "/engines/105",
       archiveName: "xta-9.65.sd7",
       baseChecksum: "1234abcd",
       dest: "/home/tom/xta-compat.sdz",

@@ -17,7 +17,7 @@ The folder holds:
 - `gamedata/defs_post.lua`, which points units, features and weapons at the converted models, runs the def fixes for that file, and then runs the engine's own copy.
 - `gamedata/weapondefs_post.lua`, which runs the weapon def fixes and then the engine's own copy.
 - The converted models under `objects3d/`, with their textures under `unittextures/3do/`.
-- `.coilbox-compat.json`, which records the manifest version, the writer, the old game's checksum and the coilbox version that built it.
+- `.coilbox-compat.json`, which records the manifest version, the writer, the old game's checksum, the coilbox version that built it, and the palette the converted models took their colours from.
 
 A game that ships its own `gamedata/defs_post.lua` or `gamedata/weapondefs_post.lua` would have it covered up by the generated one. So coilbox writes neither file for such a game, and the player's build result says so. The same happens when the game's own `gamedata/defs.lua` or `gamedata/weapondefs.lua` never loads the file.
 
@@ -26,6 +26,8 @@ A game that ships its own `gamedata/defs_post.lua` or `gamedata/weapondefs_post.
 Players in a multiplayer battle compare archive checksums. Coilbox writes the folder the same way on every computer from the same game and manifest: files sorted by path, LF line endings, and no timestamps or paths. A player on a different compatibility version then has a missing archive rather than a game that desyncs.
 
 The record file is the one file that differs, because it names the coilbox version. Its name starts with a dot, and the engine leaves such files out of an archive's checksum (`CreateIgnoreFilter` in `rts/System/FileSystem/ArchiveScanner.cpp`).
+
+One input of the build is not in the old game's archive. A `.3do` face that names no texture takes its colour from `unittextures/tatex/palette.pal`, which the worker reads through the engine's file system, so it can come from a dependency or the engine's own `springcontent.sdz`. The game's checksum does not cover it. So when a build converts any model, the record file names the archive the palette came from and the SHA-256 of its bytes, and coilbox reads the palette again each time it checks whether the build is current. Different bytes, or a palette that is no longer there, mark the build out of date. The same bytes from another archive do not, because they give the same colours.
 
 Nobody downloads a generated game. A player who joins a battle on `<game> (compat <n>)` has coilbox build manifest `<n>` from their own copy of the old game.
 

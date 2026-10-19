@@ -87,6 +87,7 @@ A Rebuild button appears beside the switch when the folder no longer matches wha
 - "built from compatibility version 4, now 5" means a newer coilbox has more fixes.
 - "written by an older coilbox" means a newer coilbox writes the files differently.
 - "the game has changed since it was built" means the old game's archive is not the one it was built from.
+- "the palette its models take their colours from has changed" means the Total Annihilation `palette.pal` the models were coloured from is different now, or has gone. That file can come from the engine or another archive rather than the game, so a new engine can cause it.
 - "its record of what it was built from is missing" means the folder's record file is gone or unreadable.
 
 So after you update coilbox, a game with the switch on may refuse to launch until you rebuild it.
@@ -121,7 +122,7 @@ Coilbox cannot host a compatibility mode battle yet. A battle you host uses the 
 - Maps.
 - A game that ships its own `gamedata/defs_post.lua`, or whose own `gamedata/defs.lua` never loads it, gets no converted models and none of the def fixes that run there. Issue #4628 covers converting those models.
 - A game that ships its own `gamedata/weapondefs_post.lua`, or whose own `gamedata/weapondefs.lua` never loads it, gets none of the weapon def fixes.
-- A `.3do` face that names a colour from the Total Annihilation palette is drawn flat grey when no `palette.pal` can be found. That file can come from the engine or another archive rather than the game, and a change to it does not mark the build out of date. Issue #4642 covers this.
+- A `.3do` face that names a colour from the Total Annihilation palette is drawn flat grey when no `palette.pal` can be found.
 
 When a model or def fix is skipped, the build result under the switch says which and why.
 

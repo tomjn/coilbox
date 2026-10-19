@@ -59,6 +59,7 @@ export function CompatMode({
     try {
       const next = await compatStatus({
         dataDir,
+        enginePath,
         archiveName,
         baseChecksum: checksum,
       });
@@ -68,7 +69,7 @@ export function CompatMode({
       setError(msg(e));
       return null;
     }
-  }, [dataDir, archiveName, checksum]);
+  }, [dataDir, enginePath, archiveName, checksum]);
 
   useEffect(() => {
     void refresh();
@@ -160,6 +161,7 @@ export function CompatMode({
       setExported(
         await compatExport({
           dataDir,
+          enginePath,
           archiveName,
           baseChecksum: checksum,
           dest,

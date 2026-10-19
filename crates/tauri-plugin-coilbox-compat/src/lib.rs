@@ -185,11 +185,12 @@ fn build_with(
     let folder = mutator::folder(archive_name, manifest_version)?;
     let dir = mutator::games_dir(data_dir)?.join(&folder);
     coilbox_portable::refuse_in_bundle(&dir)?;
-    let marker = Marker {
+    let mut marker = Marker {
         manifest_version,
         writer: manifest.writer,
         base_checksum: base_checksum.to_string(),
         coilbox_version: coilbox_version.to_string(),
+        palette: None,
     };
     let copies_bytes = coilbox_compat::copies_entry_bytes(manifest.writer);
     let entry = |file: &str| -> Result<Option<Vec<u8>>, String> {
@@ -202,6 +203,15 @@ fn build_with(
     let mut files = mutator::files(&manifest, game_name, declared, &marker, entry)?;
     let defs = defs::plan(&manifest, &mut read)?;
     let models = convert()?;
+    // The palette is known only once the models are converted, so the marker
+    // that ends `files` is written again with it.
+    if models.palette.is_some() {
+        marker.palette = models.palette.clone();
+        match files.last_mut() {
+            Some(last) if last.path == mutator::MARKER => *last = mutator::marker_file(&marker)?,
+            _ => return Err("the mutator's files do not end with its marker".into()),
+        }
+    }
     let prelude_fixes = manifest
         .fixes
         .iter()
@@ -306,9 +316,28 @@ pub struct Status {
 }
 
 /// Whether the newest compat mutator built for `archive_name` under
-/// `data_dir` matches the latest manifest, the writer this build carries, and
-/// the archive's current checksum.
-pub fn status(data_dir: &str, archive_name: &str, base_checksum: &str) -> Result<Status, String> {
+/// `data_dir` matches the latest manifest, the writer this build carries, the
+/// archive's current checksum, and the palette its models take their colours
+/// from, which the worker of the engine at `engine_path` reads.
+pub fn status(
+    data_dir: &str,
+    engine_path: &str,
+    archive_name: &str,
+    base_checksum: &str,
+) -> Result<Status, String> {
+    status_with(data_dir, archive_name, base_checksum, || {
+        models::current_palette(engine_path, data_dir, archive_name)
+    })
+}
+
+/// [`status`], with `palette_now` reading the palette a conversion would read
+/// now. It is only called for a mutator whose marker records one.
+fn status_with(
+    data_dir: &str,
+    archive_name: &str,
+    base_checksum: &str,
+    palette_now: impl FnOnce() -> Result<coilbox_compat::Palette, String>,
+) -> Result<Status, String> {
     let latest = coilbox_compat::latest();
     let games = mutator::games_dir(data_dir)?;
     let Some((folder, _)) = mutator::newest_built(&games, archive_name)? else {
@@ -326,7 +355,8 @@ pub fn status(data_dir: &str, archive_name: &str, base_checksum: &str) -> Result
             latest,
             coilbox_compat::WRITER,
             base_checksum,
-        ),
+            palette_now,
+        )?,
         folder: Some(folder),
     })
 }
@@ -362,7 +392,8 @@ pub struct Exported {
 }
 
 /// Pack the compat mutator built for `archive_name` under `data_dir` into a
-/// `.sdz` at `dest`, for somebody who does not run coilbox (issue #4568).
+/// `.sdz` at `dest`, for somebody who does not run coilbox (issue #4568). The
+/// worker of the engine at `engine_path` reads the palette [`status`] checks.
 ///
 /// Refused when there is no mutator, or when [`status`] says it is stale, since
 /// the export would hand out a mutator coilbox itself would rebuild. The folder
@@ -371,11 +402,25 @@ pub struct Exported {
 /// in, so two exports of one folder are the same bytes.
 pub fn export(
     data_dir: &str,
+    engine_path: &str,
     archive_name: &str,
     base_checksum: &str,
     dest: &str,
 ) -> Result<Exported, String> {
-    let current = status(data_dir, archive_name, base_checksum)?;
+    export_with(data_dir, archive_name, base_checksum, dest, || {
+        models::current_palette(engine_path, data_dir, archive_name)
+    })
+}
+
+/// [`export`], with `palette_now` as for [`status_with`].
+fn export_with(
+    data_dir: &str,
+    archive_name: &str,
+    base_checksum: &str,
+    dest: &str,
+    palette_now: impl FnOnce() -> Result<coilbox_compat::Palette, String>,
+) -> Result<Exported, String> {
+    let current = status_with(data_dir, archive_name, base_checksum, palette_now)?;
     let Some(folder) = current.folder else {
         return Err(format!(
             "there is no compat mutator built for {archive_name} to export"
@@ -446,10 +491,21 @@ async fn compat_build<R: Runtime>(
     envelope(result)
 }
 
-/// [`status`].
+/// [`status`]. On a blocking task, since a mutator with converted models has
+/// the worker read the palette.
 #[tauri::command]
-async fn compat_status(data_dir: String, archive_name: String, base_checksum: String) -> CliResult {
-    envelope(status(&data_dir, &archive_name, &base_checksum))
+async fn compat_status(
+    data_dir: String,
+    engine_path: String,
+    archive_name: String,
+    base_checksum: String,
+) -> CliResult {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        status(&data_dir, &engine_path, &archive_name, &base_checksum)
+    })
+    .await
+    .unwrap_or_else(|e| Err(format!("the compat status task failed: {e}")));
+    envelope(result)
 }
 
 /// [`remove`].
@@ -465,12 +521,19 @@ async fn compat_remove(data_dir: String, archive_name: String) -> CliResult {
 #[tauri::command]
 async fn compat_export(
     data_dir: String,
+    engine_path: String,
     archive_name: String,
     base_checksum: String,
     dest: String,
 ) -> CliResult {
     let result = tauri::async_runtime::spawn_blocking(move || {
-        export(&data_dir, &archive_name, &base_checksum, &dest)
+        export(
+            &data_dir,
+            &engine_path,
+            &archive_name,
+            &base_checksum,
+            &dest,
+        )
     })
     .await
     .unwrap_or_else(|e| Err(format!("the compat export task failed: {e}")));
@@ -504,6 +567,20 @@ mod tests {
 
     fn no_defs() -> Result<String, String> {
         Err("no defs in this test".into())
+    }
+
+    /// For a mutator whose marker records no palette, which must not read one.
+    fn unread() -> Result<coilbox_compat::Palette, String> {
+        panic!("read the palette for a mutator whose marker records none")
+    }
+
+    /// The palette the converted models in these tests were coloured from.
+    fn a_palette() -> coilbox_compat::Palette {
+        coilbox_compat::Palette::of(Some(b"the palette"), Some("springcontent.sdz".into()))
+    }
+
+    fn same_palette() -> Result<coilbox_compat::Palette, String> {
+        Ok(a_palette())
     }
 
     fn root() -> (tempfile::TempDir, String) {
@@ -572,10 +649,11 @@ mod tests {
                 writer: coilbox_compat::WRITER,
                 base_checksum: "1234abcd".into(),
                 coilbox_version: "1.2.3".into(),
+                palette: None,
             }
         );
         assert_eq!(
-            status(&data, "xta-9.65.sd7", "1234abcd").unwrap(),
+            status_with(&data, "xta-9.65.sd7", "1234abcd", unread).unwrap(),
             Status {
                 latest: coilbox_compat::latest(),
                 folder: Some(built.folder),
@@ -601,7 +679,7 @@ mod tests {
             no_defs,
         )
         .unwrap();
-        let s = status(&data, "xta-9.65.sd7", "99999999").unwrap();
+        let s = status_with(&data, "xta-9.65.sd7", "99999999", unread).unwrap();
         assert_eq!(
             s.stale,
             [Stale::BaseChecksum {
@@ -641,7 +719,7 @@ mod tests {
             serde_json::to_string(&marker).unwrap(),
         )
         .unwrap();
-        let s = status(&data, "xta-9.65.sd7", "1234abcd").unwrap();
+        let s = status_with(&data, "xta-9.65.sd7", "1234abcd", unread).unwrap();
         assert_eq!(
             s.stale,
             [Stale::Manifest {
@@ -795,7 +873,9 @@ mod tests {
         assert!(!std::path::Path::new(&second.dir).exists());
         assert!(std::path::Path::new(&other.dir).is_dir());
         assert_eq!(
-            status(&data, "xta-9.65.sd7", "1234abcd").unwrap().folder,
+            status_with(&data, "xta-9.65.sd7", "1234abcd", unread)
+                .unwrap()
+                .folder,
             None
         );
         assert!(remove(&data, "xta-9.65.sd7").unwrap().is_empty());
@@ -804,7 +884,7 @@ mod tests {
     #[test]
     fn nothing_built_is_not_stale() {
         let (_keep, data) = root();
-        let s = status(&data, "xta-9.65.sd7", "1234abcd").unwrap();
+        let s = status_with(&data, "xta-9.65.sd7", "1234abcd", unread).unwrap();
         assert_eq!(s.folder, None);
         assert!(s.stale.is_empty());
     }
@@ -843,7 +923,7 @@ mod tests {
         )
         .unwrap();
         assert!(!leftover.exists());
-        assert!(status(&data, "xta-9.65.sd7", "5678")
+        assert!(status_with(&data, "xta-9.65.sd7", "5678", unread)
             .unwrap()
             .stale
             .is_empty());
@@ -1020,7 +1100,7 @@ mod tests {
             std::fs::create_dir_all(p.parent().unwrap()).unwrap();
             std::fs::write(p, bytes).unwrap();
         }
-        Ok(r#"{"modelsFound":3,"modelsWritten":2,"errors":[]}"#.into())
+        Ok(r#"{"modelsFound":3,"modelsWritten":2,"palette":{"source":null,"sha256":null},"errors":[]}"#.into())
     }
 
     /// Every file but the marker of the mutator built for `fixture` from
@@ -1251,6 +1331,7 @@ mod tests {
                 models_written: 1,
                 ..Default::default()
             },
+            palette: Some(a_palette()),
             notes: Vec::new(),
         })
     }
@@ -1297,6 +1378,81 @@ mod tests {
         assert!(post.contains(r#"["armcom"] = true,"#), "{post}");
         assert_eq!(built.models.models_written, 1);
         assert!(mutator::read_marker(dir).is_some());
+    }
+
+    /// Issue #4642: a build records the palette its models were coloured
+    /// from, and is stale once a different `palette.pal` is reachable, as it
+    /// is when the engine or a dependency that holds it changes.
+    #[test]
+    fn a_different_reachable_palette_makes_the_earlier_build_stale() {
+        let (_keep, data) = root();
+        let built = build_with_models(&data);
+        let marker = mutator::read_marker(std::path::Path::new(&built.dir)).unwrap();
+        assert_eq!(marker.palette, Some(a_palette()));
+        let current = status_with(&data, "xta-9.65.sd7", "1234abcd", same_palette).unwrap();
+        assert!(current.stale.is_empty(), "{:?}", current.stale);
+
+        let other =
+            coilbox_compat::Palette::of(Some(b"another palette"), Some("ba-deps.sdz".into()));
+        let s = status_with(&data, "xta-9.65.sd7", "1234abcd", || Ok(other.clone())).unwrap();
+        assert_eq!(
+            s.stale,
+            [Stale::Palette {
+                built: a_palette(),
+                now: other.clone()
+            }]
+        );
+        let out = tempfile::tempdir().unwrap();
+        let dest = out.path().join("xta-compat.sdz");
+        let err = export_with(
+            &data,
+            "xta-9.65.sd7",
+            "1234abcd",
+            dest.to_str().unwrap(),
+            || Ok(other),
+        )
+        .unwrap_err();
+        assert!(err.contains("out of date"), "{err}");
+    }
+
+    /// The marker sits in the folder, so the palette it records must not
+    /// change what two players compare: the engine leaves dot files out of an
+    /// archive's checksum, and every other file is the same bytes.
+    #[test]
+    fn recording_the_palette_changes_no_file_but_the_marker() {
+        let files = |palette: Option<coilbox_compat::Palette>| {
+            let (_keep, data) = root();
+            let staging = tempfile::tempdir().unwrap();
+            let built = build_reading(
+                &data,
+                "xta-9.65.sd7",
+                "XTA 9.65",
+                &DeclaredGame::default(),
+                "1234abcd",
+                coilbox_compat::latest(),
+                "1.2.3",
+                &[],
+                no_file,
+                || {
+                    let mut models = some_models(staging.path())?;
+                    models.palette = palette;
+                    Ok(models)
+                },
+                no_defs,
+            )
+            .unwrap();
+            let dir = std::path::Path::new(&built.dir);
+            built
+                .files
+                .iter()
+                .map(|path| (path.clone(), std::fs::read(dir.join(path)).unwrap()))
+                .collect::<Vec<_>>()
+        };
+        let (with, without) = (files(Some(a_palette())), files(None));
+        let marker = |files: &[(String, Vec<u8>)]| files.last().unwrap().clone();
+        assert_eq!(marker(&with).0, mutator::MARKER);
+        assert_ne!(marker(&with).1, marker(&without).1);
+        assert_eq!(with[..with.len() - 1], without[..without.len() - 1]);
     }
 
     /// The prelude's wrapped entry files and the converted models land in the
@@ -1453,7 +1609,14 @@ mod tests {
         let out = tempfile::tempdir().unwrap();
         let dest = out.path().join("xta-compat.sdz");
 
-        let exported = export(&data, "xta-9.65.sd7", "1234abcd", dest.to_str().unwrap()).unwrap();
+        let exported = export_with(
+            &data,
+            "xta-9.65.sd7",
+            "1234abcd",
+            dest.to_str().unwrap(),
+            same_palette,
+        )
+        .unwrap();
 
         assert_eq!(exported.folder, built.folder);
         assert_eq!(exported.files, built.files);
@@ -1480,8 +1643,22 @@ mod tests {
         build_with_models(&data);
         let out = tempfile::tempdir().unwrap();
         let (a, b) = (out.path().join("a.sdz"), out.path().join("b.sdz"));
-        export(&data, "xta-9.65.sd7", "1234abcd", a.to_str().unwrap()).unwrap();
-        export(&data, "xta-9.65.sd7", "1234abcd", b.to_str().unwrap()).unwrap();
+        export_with(
+            &data,
+            "xta-9.65.sd7",
+            "1234abcd",
+            a.to_str().unwrap(),
+            same_palette,
+        )
+        .unwrap();
+        export_with(
+            &data,
+            "xta-9.65.sd7",
+            "1234abcd",
+            b.to_str().unwrap(),
+            same_palette,
+        )
+        .unwrap();
         assert_eq!(std::fs::read(a).unwrap(), std::fs::read(b).unwrap());
     }
 
@@ -1491,7 +1668,14 @@ mod tests {
         build_with_models(&data);
         let out = tempfile::tempdir().unwrap();
         let dest = out.path().join("xta-compat.sdz");
-        let err = export(&data, "xta-9.65.sd7", "99999999", dest.to_str().unwrap()).unwrap_err();
+        let err = export_with(
+            &data,
+            "xta-9.65.sd7",
+            "99999999",
+            dest.to_str().unwrap(),
+            same_palette,
+        )
+        .unwrap_err();
         assert!(err.contains("out of date"), "{err}");
         assert!(!dest.exists());
     }
@@ -1501,12 +1685,26 @@ mod tests {
         let (_keep, data) = root();
         let out = tempfile::tempdir().unwrap();
         let dest = out.path().join("xta-compat.sdz");
-        let err = export(&data, "xta-9.65.sd7", "1234abcd", dest.to_str().unwrap()).unwrap_err();
+        let err = export_with(
+            &data,
+            "xta-9.65.sd7",
+            "1234abcd",
+            dest.to_str().unwrap(),
+            same_palette,
+        )
+        .unwrap_err();
         assert!(err.contains("no compat mutator"), "{err}");
 
         build_with_models(&data);
         let wrong = out.path().join("xta-compat.zip");
-        let err = export(&data, "xta-9.65.sd7", "1234abcd", wrong.to_str().unwrap()).unwrap_err();
+        let err = export_with(
+            &data,
+            "xta-9.65.sd7",
+            "1234abcd",
+            wrong.to_str().unwrap(),
+            same_palette,
+        )
+        .unwrap_err();
         assert!(err.contains("does not end in .sdz"), "{err}");
         assert!(!dest.exists() && !wrong.exists());
     }

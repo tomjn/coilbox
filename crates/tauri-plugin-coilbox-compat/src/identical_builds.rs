@@ -59,7 +59,7 @@ fn scan_of(game: &[(String, Vec<u8>)]) -> String {
 
 /// What the worker's converter would write into `staging` for the fixture's
 /// models, and its answer. The sheet and the model go through the converter
-/// crates' encoders.
+/// crates' encoders, with no palette, which the answer says.
 fn convert_into(game: &[(String, Vec<u8>)], staging: &Path) -> Result<String, String> {
     let write = |path: &str, bytes: &[u8]| -> Result<(), String> {
         let at = staging.join(path);
@@ -88,7 +88,7 @@ fn convert_into(game: &[(String, Vec<u8>)], staging: &Path) -> Result<String, St
         written += 1;
     }
     Ok(format!(
-        r#"{{"modelsFound":{found},"modelsWritten":{written},"errors":[]}}"#
+        r#"{{"modelsFound":{found},"modelsWritten":{written},"palette":{{"source":null,"sha256":null}},"errors":[]}}"#
     ))
 }
 
