@@ -30,6 +30,10 @@ const GAMES = [
   },
 ];
 
+// No game has its compatibility switch on here (issue #4664).
+vi.mock("../content/compatSettings", () => ({
+  useCompatSettings: () => [{}],
+}));
 vi.mock("../scenario/launch", () => ({ launchScenario }));
 vi.mock("../scenario/bindings", () => ({
   scenarioMediaWrite: vi.fn(async () => ({})),
