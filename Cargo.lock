@@ -6483,6 +6483,7 @@ version = "0.0.0"
 dependencies = [
  "coilbox-portable",
  "coilbox-proc",
+ "coilbox-ui-error",
  "flate2",
  "picoframe-core",
  "reqwest 0.12.28",
@@ -6503,6 +6504,7 @@ dependencies = [
  "coilbox-map-catalog",
  "coilbox-oauth",
  "coilbox-portable",
+ "coilbox-ui-error",
  "picoframe-core",
  "reqwest 0.12.28",
  "serde",
@@ -6582,6 +6584,7 @@ dependencies = [
  "coilbox-proc",
  "coilbox-relay-protocol",
  "coilbox-tachyon-protocol",
+ "coilbox-ui-error",
  "coilbox-zerok-protocol",
  "futures-util",
  "picoframe-core",
@@ -6611,6 +6614,7 @@ version = "0.0.0"
 dependencies = [
  "coilbox-portable",
  "coilbox-proc",
+ "coilbox-ui-error",
  "objc2-app-kit",
  "picoframe-core",
  "serde",

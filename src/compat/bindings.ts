@@ -32,11 +32,22 @@ export interface CompatBuilt {
   defOverrides: number;
 }
 
+/**
+ * The palette a mutator's 3do models take their colours from: the archive in
+ * the game's set it came from and the SHA-256 of its bytes, each `null` when
+ * there was none.
+ */
+export interface CompatPalette {
+  source: string | null;
+  sha256: string | null;
+}
+
 /** Why a built mutator no longer matches what would be built now. */
 export type CompatStale =
   | { kind: "manifest"; built: number; now: number }
   | { kind: "writer"; built: number; now: number }
   | { kind: "baseChecksum"; built: string; now: string }
+  | { kind: "palette"; built: CompatPalette; now: CompatPalette }
   | { kind: "noMarker" };
 
 /** Where the compat mutator for a game stands. */
@@ -66,9 +77,17 @@ export const compatBuild = defineCommand<
   CompatBuilt
 >("coilbox-compat", "compat_build");
 
-/** Whether the newest mutator built for a game is stale. */
+/**
+ * Whether the newest mutator built for a game is stale. The engine's worker
+ * reads the palette its models take their colours from.
+ */
 export const compatStatus = defineCommand<
-  { dataDir: string; archiveName: string; baseChecksum: string },
+  {
+    dataDir: string;
+    enginePath: string;
+    archiveName: string;
+    baseChecksum: string;
+  },
   CompatStatus
 >("coilbox-compat", "compat_status");
 
@@ -91,6 +110,12 @@ export interface CompatExported {
  * when the mutator is stale or missing.
  */
 export const compatExport = defineCommand<
-  { dataDir: string; archiveName: string; baseChecksum: string; dest: string },
+  {
+    dataDir: string;
+    enginePath: string;
+    archiveName: string;
+    baseChecksum: string;
+    dest: string;
+  },
   CompatExported
 >("coilbox-compat", "compat_export");

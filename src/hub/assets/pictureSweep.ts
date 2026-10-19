@@ -9,6 +9,7 @@ import {
 } from "@/content/bindings";
 import { loadBrandingCatalog } from "@/content/branding";
 import { dlRapidReleaseArchives } from "@/downloads/bindings";
+import { describeError } from "@/i18n/uiError";
 import { publishGameFacts } from "../games/facts";
 import {
   factsFor,
@@ -376,7 +377,7 @@ export async function sweepGamePictures(
     } catch (e) {
       report.failed.push({
         game: name,
-        said: e instanceof Error ? e.message : String(e),
+        said: describeError(e),
       });
     }
   }
@@ -565,9 +566,7 @@ async function sendLogos(
     return pass.written;
   } catch (e) {
     errors.push(
-      `${entry.game.name}: faction logos were not sent. ${
-        e instanceof Error ? e.message : String(e)
-      }`,
+      `${entry.game.name}: faction logos were not sent. ${describeError(e)}`,
     );
     return 0;
   }

@@ -31,6 +31,7 @@ import {
   type UnitCheckReport,
 } from "../../../content/bindings";
 import { useUnitsyncGameHeaders } from "../../../content/config";
+import { describeError } from "../../../i18n/uiError";
 import { SCRATCH_FOLDER } from "../../../lib/generatedGames";
 import { playAskLuaRules } from "../../../play/bindings";
 import {
@@ -418,7 +419,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
     } catch (error) {
       setReload({
         state: "failed",
-        message: error instanceof Error ? error.message : String(error),
+        message: describeError(error),
       });
     }
   }

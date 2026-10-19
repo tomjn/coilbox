@@ -207,12 +207,12 @@ const TEAMTEX_LIST: &str = "unittextures/tatex/teamtex.txt";
 /// reads via `CTAPalette::Init` (`rts/Rendering/Textures/TAPalette.cpp`) and
 /// looks up per `.3do` face that names no texture. See
 /// [`coilbox_3do::read_palette`] for the exact byte layout.
-const PALETTE_FILE: &str = "unittextures/tatex/palette.pal";
+pub(crate) const PALETTE_FILE: &str = "unittextures/tatex/palette.pal";
 
 /// Comfortably more than the 1024 bytes a real palette is, so a slightly
 /// oversized file still reads whole rather than truncating into
 /// [`coilbox_3do::read_palette`] returning `None`.
-const PALETTE_READ_CAP: usize = 8192;
+pub(crate) const PALETTE_READ_CAP: usize = 8192;
 
 /// Extensions probed for a texture named without one. Ordered by how often the
 /// installed games use them for unit art.

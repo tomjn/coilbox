@@ -1,5 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import { formatDateTime } from "@/lib/format";
 import { usePreferredTarget } from "@/play/config";
 import {
@@ -68,7 +69,7 @@ export function MapPicturesControl({
       setReport(done);
       setSwept(lastMapSweptAt());
     } catch (e) {
-      setFailed(e instanceof Error ? e.message : String(e));
+      setFailed(describeError(e));
     } finally {
       setRunning(false);
       setProgress(null);

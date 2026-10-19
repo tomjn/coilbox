@@ -26,13 +26,13 @@ use coilbox_unitsync_worker::{cached, RenderSource};
 use picoframe_core::CliResult;
 use sidecar::{
     build_archive_extract_args, build_archive_file_args, build_archive_tree_args, build_args,
-    build_config_args, build_config_set_args, build_convert_3do_args, build_custom_params_args,
-    build_defs_probe_args, build_faction_logos_args, build_game_args, build_game_headers_args,
-    build_height_field_args, build_heightmap_args, build_lua_args, build_lua_compat_args,
-    build_lua_repl_args, build_map_info_args, build_map_meta_args, build_map_skybox_args,
-    build_metalmap_args, build_minimap_args, build_skirmish_ai_args, build_thumbnails_args,
-    build_unit_buildpics_args, build_unit_dataset_args, build_unit_defs_args,
-    build_unit_model_args, build_unit_models_args, build_unit_render_args,
+    build_compat_palette_args, build_config_args, build_config_set_args, build_convert_3do_args,
+    build_custom_params_args, build_defs_probe_args, build_faction_logos_args, build_game_args,
+    build_game_headers_args, build_height_field_args, build_heightmap_args, build_lua_args,
+    build_lua_compat_args, build_lua_repl_args, build_map_info_args, build_map_meta_args,
+    build_map_skybox_args, build_metalmap_args, build_minimap_args, build_skirmish_ai_args,
+    build_thumbnails_args, build_unit_buildpics_args, build_unit_dataset_args,
+    build_unit_defs_args, build_unit_model_args, build_unit_models_args, build_unit_render_args,
     build_unit_render_keys_args, build_unit_script_args, find_unitsync, resolve_sidecar,
 };
 use std::collections::HashMap;
@@ -2188,6 +2188,21 @@ pub fn lua_compat_scan_blocking(
         "lua compat scan".into(),
         None,
     )
+}
+
+/// The palette a 3do conversion of `archive` would read now, as the worker's
+/// `--compat-palette` answer. Blocking, and not a command of its own: the
+/// compat plugin compares it with the palette a mutator was built with
+/// (issue #4642).
+pub fn compat_palette_blocking(
+    engine_path: &str,
+    data_dir: &str,
+    archive: &str,
+) -> Result<String, String> {
+    let (bin, libpath, engine_dir) = prepare(engine_path)?;
+    let args = build_compat_palette_args(&libpath.to_string_lossy(), data_dir, archive);
+    let envs = loader_envs(&engine_dir, data_dir);
+    run_worker_blocking(bin, args, envs, SCAN_TIMEOUT, "compat palette".into(), None)
 }
 
 /// Convert every `.3do` in `archive` into `out_dir`, as `unitsync_convert_3do`

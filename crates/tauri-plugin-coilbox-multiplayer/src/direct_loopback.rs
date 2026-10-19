@@ -1631,8 +1631,9 @@ async fn a_login_that_never_finishes_is_reported_rather_than_waited_on() {
     let failure = wait_until_ready(&registry, &stuck.key, LONG_ENOUGH_TO_HANG)
         .await
         .expect_err("a login that never lands cannot be reported as ready");
-    assert!(
-        failure.contains("did not finish"),
+    assert_eq!(
+        coilbox_ui_error::UiError::parse(&failure).map(|e| e.code),
+        Some(std::borrow::Cow::Borrowed(crate::conn::LOGIN_TIMEOUT)),
         "the host has to be told what went wrong: {failure}"
     );
 }
@@ -1651,8 +1652,9 @@ async fn a_refused_login_ends_the_wait_with_the_refusal() {
     let failure = wait_until_ready(&registry, &twin.key, PATIENCE)
         .await
         .expect_err("a refused login is not ready");
-    assert!(
-        failure.contains("refused"),
+    assert_eq!(
+        coilbox_ui_error::UiError::parse(&failure).map(|e| e.code),
+        Some(std::borrow::Cow::Borrowed(crate::conn::LOGIN_REFUSED)),
         "the refusal has to be what comes back: {failure}"
     );
 

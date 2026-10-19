@@ -1,6 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { useState } from "react";
 import { Progress } from "@/components/ui/progress";
+import { describeError } from "@/i18n/uiError";
 import { usePreferredTarget } from "@/play/config";
 import {
   type SweepProgress,
@@ -57,7 +58,7 @@ export function MapCatalogControl({
       );
       setReport(done);
     } catch (e) {
-      setFailed(e instanceof Error ? e.message : String(e));
+      setFailed(describeError(e));
     } finally {
       setRunning(false);
       setProgress(null);

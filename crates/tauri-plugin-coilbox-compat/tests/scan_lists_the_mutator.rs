@@ -125,6 +125,7 @@ fn the_scan_lists_an_exported_mutator_as_a_game_on_top_of_its_base() {
         .join(built.folder.replace(".sdd", ".sdz"));
     tauri_plugin_coilbox_compat::export(
         &built_in.path().to_string_lossy(),
+        &engine.to_string_lossy(),
         &archive,
         checksum,
         &sdz.to_string_lossy(),

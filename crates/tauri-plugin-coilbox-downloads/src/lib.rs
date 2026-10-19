@@ -12,6 +12,7 @@ mod rapid_cache;
 mod sidecar;
 mod sources;
 
+use coilbox_ui_error::UiError;
 use picoframe_core::CliResult;
 use progress::DownloadProgress;
 use serde_json::json;
@@ -48,6 +49,29 @@ const DL_CONNECT_LIMIT: Duration = Duration::from_secs(30);
 const STALL_MSG: &str =
     "Download stalled — no data received for 2 minutes. Check your connection or try a different mirror, then retry.";
 const CANCELLED_MSG: &str = "Download cancelled.";
+
+/// Codes for the `dl_fetch_text` failures a player reads (issue #4596). The
+/// frontend's message table in `src/i18n/uiError.ts` has an entry for each.
+pub mod codes {
+    pub const FETCH_HTTPS_ONLY: &str = "downloads.fetch.https_only";
+    pub const FETCH_TIMEOUT: &str = "downloads.fetch.timeout";
+    pub const FETCH_UNREACHABLE: &str = "downloads.fetch.unreachable";
+    pub const FETCH_STATUS: &str = "downloads.fetch.status";
+    pub const FETCH_TOO_LARGE: &str = "downloads.fetch.too_large";
+    pub const FETCH_INTERRUPTED: &str = "downloads.fetch.interrupted";
+    pub const FETCH_NOT_AN_IMPORT: &str = "downloads.fetch.not_an_import";
+}
+
+fn fetch_timeout() -> UiError {
+    UiError::new(codes::FETCH_TIMEOUT, "The host took too long to respond.")
+}
+
+fn fetch_too_large() -> UiError {
+    UiError::new(
+        codes::FETCH_TOO_LARGE,
+        "That import is too large to be a coilbox import.",
+    )
+}
 
 /// Largest shared import payload `dl_fetch_text` will read. Import codes are a
 /// few KB, so a generous cap still rejects anything that is clearly not a
@@ -849,7 +873,10 @@ async fn dl_fetch_text(url: String) -> CliResult {
     }
     // Defence in depth: the frontend parser already enforced https.
     if !url.starts_with("https://") {
-        return CliResult::err("Import URLs must be https.");
+        return CliResult::err(UiError::new(
+            codes::FETCH_HTTPS_ONLY,
+            "Import URLs must be https.",
+        ));
     }
 
     let client = match timed_client() {
@@ -858,18 +885,27 @@ async fn dl_fetch_text(url: String) -> CliResult {
     };
     let mut resp = match client.get(url).send().await {
         Ok(r) => r,
-        Err(e) if e.is_timeout() => return CliResult::err("The host took too long to respond."),
-        Err(_) => return CliResult::err("Could not reach the host."),
+        Err(e) if e.is_timeout() => return CliResult::err(fetch_timeout()),
+        Err(_) => {
+            return CliResult::err(UiError::new(
+                codes::FETCH_UNREACHABLE,
+                "Could not reach the host.",
+            ))
+        }
     };
     if !resp.status().is_success() {
-        return CliResult::err(format!(
-            "The host returned an error ({}).",
-            resp.status().as_u16()
-        ));
+        let status = resp.status().as_u16();
+        return CliResult::err(
+            UiError::new(
+                codes::FETCH_STATUS,
+                format!("The host returned an error ({status})."),
+            )
+            .param("status", status),
+        );
     }
     if let Some(len) = resp.content_length() {
         if len > IMPORT_FETCH_LIMIT {
-            return CliResult::err("That import is too large to be a coilbox import.");
+            return CliResult::err(fetch_too_large());
         }
     }
 
@@ -880,21 +916,27 @@ async fn dl_fetch_text(url: String) -> CliResult {
         match resp.chunk().await {
             Ok(Some(chunk)) => {
                 if buf.len() as u64 + chunk.len() as u64 > IMPORT_FETCH_LIMIT {
-                    return CliResult::err("That import is too large to be a coilbox import.");
+                    return CliResult::err(fetch_too_large());
                 }
                 buf.extend_from_slice(&chunk);
             }
             Ok(None) => break,
-            Err(e) if e.is_timeout() => {
-                return CliResult::err("The host took too long to respond.")
+            Err(e) if e.is_timeout() => return CliResult::err(fetch_timeout()),
+            Err(_) => {
+                return CliResult::err(UiError::new(
+                    codes::FETCH_INTERRUPTED,
+                    "The download failed part way through.",
+                ))
             }
-            Err(_) => return CliResult::err("The download failed part way through."),
         }
     }
 
     match String::from_utf8(buf) {
         Ok(text) => CliResult::ok(json!({ "text": text })),
-        Err(_) => CliResult::err("That import is not a coilbox import."),
+        Err(_) => CliResult::err(UiError::new(
+            codes::FETCH_NOT_AN_IMPORT,
+            "That import is not a coilbox import.",
+        )),
     }
 }
 
@@ -1767,6 +1809,18 @@ mod writable_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A plain `http://` import is refused before anything is fetched, with a
+    /// code the frontend translates and not a sentence it has to match on.
+    #[test]
+    fn fetching_an_import_over_http_is_refused_with_a_code() {
+        let result = tauri::async_runtime::block_on(dl_fetch_text("http://example.test/a".into()));
+        let response = serde_json::to_value(&result).expect("the answer serialises");
+        let text = response["error"].as_str().expect("an error string");
+        let error = UiError::parse(text).expect("a UiError, not plain text");
+        assert_eq!(error.code, codes::FETCH_HTTPS_ONLY);
+        assert_eq!(error.fallback, "Import URLs must be https.");
+    }
 
     #[test]
     fn cancel_registers_signals_and_unregisters() {
