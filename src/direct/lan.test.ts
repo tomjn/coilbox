@@ -293,6 +293,29 @@ describe("joinRoomFailure", () => {
     );
   });
 
+  it("describes a coded login failure instead of guessing from its words", () => {
+    const refused = new Error(
+      JSON.stringify({
+        code: "multiplayer.login.refused",
+        params: {},
+        fallback: "the server refused the login",
+      }),
+    );
+    expect(joinRoomFailure(refused, "192.168.1.5", 8200)).toBe(
+      "the server refused the login",
+    );
+    const timeout = new Error(
+      JSON.stringify({
+        code: "multiplayer.login.timeout",
+        params: { seconds: "20" },
+        fallback: "the login did not finish within 20s",
+      }),
+    );
+    expect(joinRoomFailure(timeout, "192.168.1.5", 8200)).toBe(
+      "the login did not finish within 20s",
+    );
+  });
+
   it("still says something when the failure carried no words", () => {
     expect(joinRoomFailure(null, "192.168.1.5", 8200)).toBe(
       "Could not join 192.168.1.5:8200.",
