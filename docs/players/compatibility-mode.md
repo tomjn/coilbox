@@ -27,7 +27,7 @@ Engine versions in the details name the engine as it was called at the time. Up 
 
 | Row | What it means | What compatibility mode does |
 | --- | --- | --- |
-| .3do models | Models in Total Annihilation's format, with a count | Converts them to `.s3o` and points the game's units, features and weapons at the copies |
+| .3do models | Models in Total Annihilation's format, with a count | Converts them to `.s3o` and points the game's units, features and weapons at the copies. A model the game also ships as an `.s3o` of the same name is left as the game has it |
 | .fbi or .tdf unit definitions | Unit files in the old text formats | Leaves the files alone. The def fixes still run on the units they define |
 | Lua calls to removed or changed APIs | Calls to functions the engine removed or renamed. The details give each file, line and the change | Puts back the functions listed in [What it changes](#what-it-changes). Calls to anything else stay broken |
 | Removed def tags in use | Unit or weapon definitions that set a tag the engine stopped reading, with the units that set it | Puts back the tags listed in [What it changes](#what-it-changes) |
@@ -130,7 +130,7 @@ If one of the fixes fails while the game runs, the game still loads. The engine'
 
 ## What it changes
 
-This is compatibility version 12, the newest.
+This is compatibility version 13, the newest.
 
 Lua functions it puts back:
 
