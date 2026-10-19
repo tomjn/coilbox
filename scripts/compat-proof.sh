@@ -13,18 +13,27 @@
 #    a line the engine logged at the warning level. The engine warns that it
 #    cannot readlink() every folder archive, the mutator among them, and the
 #    warning quotes the system's "Error" text.
-# 4. Writes a table to docs/reports/compat-proof/<date>.md with the counts,
-#    whether each run reached the frame, the first three error lines on the
-#    mutator and the first three the base game did not log. Exits 1 if any game
-#    logged more errors on the mutator than without it.
+# 4. Writes a table to docs/reports/compat-proof/<date>-<time>.md with the
+#    counts, how each run ended, a verdict, the first three error lines on the
+#    mutator and the first three the base game did not log.
+#
+# The verdict, and the exit code, follow one rule. A run "plays" when it logs
+# the end gadget's line at the frame.
+#
+# - The base game plays: the mutator must play too, with at most as many
+#   errors. Anything else is worse.
+# - The base game does not play and the mutator does: better, whatever the
+#   counts. A game that dies while loading logs a few errors and stops, so its
+#   count says nothing about a mutator that plays on to the frame.
+# - Neither plays: the mutator must have at most as many errors.
+#
+# The script exits 1 if any game is worse.
 #
 # The match is ended by a gadget in a scratch map wrapped around a real one
 # (lua/compat/tests/headless/proof_end.lua), not by a scratch game, because a
 # game on top would change the name and version the game under test sees, and
 # some of the fixtures read them. A run that never logs the gadget's line did
-# not reach the frame, which the table says. A game that dies while loading
-# logs its errors and stops, so a base game that crashes can count fewer
-# errors than its mutator playing on.
+# not reach the frame, which the table says.
 #
 # Needs a headless engine with libunitsync beside it, the games and the map,
 # luajit, 7zz or unzip, and a built unitsync worker (cargo build -p
@@ -42,6 +51,13 @@
 #   COILBOX_COMPAT_PROOF_FRAMES  the frame to play to. Default 3000.
 #   COILBOX_COMPAT_PROOF_TIMEOUT the seconds one match may take before it is
 #                            stopped. Default 120.
+#   COILBOX_COMPAT_PROOF_ENGINE_LUAUI  1 links the engine's LuaUI/, luaui.lua
+#                            and fonts/ into the scratch data folder, as a
+#                            player's install can read them beside the binary.
+#                            0 leaves them out. Default 1, because the proof is
+#                            about what a player sees, and a game that includes
+#                            the engine's LuaUI files fails differently without
+#                            them.
 #   UNITSYNC_WORKER          the unitsync worker. Default
 #                            target/debug/coilbox-unitsync-worker.
 set -euo pipefail
@@ -72,6 +88,11 @@ FRAMES="${COILBOX_COMPAT_PROOF_FRAMES:-3000}"
 # The slowest run to reach frame 3000 on 19 October 2026 took 35s, Balanced
 # Annihilation on an Apple silicon Mac. This allows over three times that.
 RUN_TIMEOUT="${COILBOX_COMPAT_PROOF_TIMEOUT:-120}"
+ENGINE_LUAUI="${COILBOX_COMPAT_PROOF_ENGINE_LUAUI:-1}"
+case "$ENGINE_LUAUI" in
+  0 | 1) ;;
+  *) echo "COILBOX_COMPAT_PROOF_ENGINE_LUAUI must be 0 or 1, not $ENGINE_LUAUI" >&2; exit 2 ;;
+esac
 
 for needed in "${GAMES[@]/#/games/}" "maps/$MAP_ARCHIVE"; do
   if [ ! -e "$DATA_DIR/$needed" ]; then
@@ -132,6 +153,18 @@ done
 ln -s "$DATA_DIR/maps/$MAP_ARCHIVE" "$WORK/data/maps/$MAP_ARCHIVE"
 # The AI libraries live beside the binary, which an isolated engine never reads.
 ln -s "$ENGINE_DIR/AI" "$WORK/data/AI"
+ENGINE_UI="left out"
+if [ "$ENGINE_LUAUI" = 1 ]; then
+  ENGINE_UI="linked in"
+  for entry in LuaUI luaui.lua fonts; do
+    if [ -e "$ENGINE_DIR/$entry" ]; then
+      ln -s "$ENGINE_DIR/$entry" "$WORK/data/$entry"
+    else
+      echo "the engine has no $entry beside it, so the run cannot match an install. Set COILBOX_COMPAT_PROOF_ENGINE_LUAUI=0" >&2
+      exit 2
+    fi
+  done
+fi
 
 engine() {
   "$ENGINE" --isolation --isolation-dir "$WORK/data" --write-dir "$WORK/write" --only-local "$@"
@@ -269,9 +302,10 @@ play() { # game name, infolog to keep
   local last
   last="$(grep -oE '^\[t=[^]]*\]\[f=-?[0-9]+\]' "$2" | sed -E 's/.*\[f=(-?[0-9]+)\]/\1/' |
     awk 'BEGIN { m = -1 } { if ($1 + 0 > m) m = $1 + 0 } END { print m }')"
-  local reached
+  local reached played=no
   if grep -q "COMPAT PROOF reached frame $FRAMES" "$2"; then
-    reached="yes"
+    reached="yes, exit code $status"
+    played=yes
   elif [ "$status" -eq 124 ]; then
     # Nothing ended the match, which happens when the game's gadget handler
     # never loaded the end gadget, so how far it got is not known.
@@ -280,12 +314,14 @@ play() { # game name, infolog to keep
     reached="no, the engine quit with code $status at frame $last"
   fi
   echo "$reached" >"$2.reached"
+  echo "$played" >"$2.played"
   echo "    $(error_lines "$2" | wc -l | tr -d ' ') errors, reached frame $FRAMES: $reached, $((SECONDS - started))s"
 }
 
 DATE="$(date +%Y-%m-%d)"
+STAMP="$(date +%Y-%m-%d-%H%M%S)"
 REPORT_DIR="$ROOT/docs/reports/compat-proof"
-REPORT="$REPORT_DIR/$DATE.md"
+REPORT="$REPORT_DIR/$STAMP.md"
 mkdir -p "$REPORT_DIR"
 ROWS=""
 worse=0
@@ -300,10 +336,21 @@ for archive in "${GAMES[@]}"; do
   play "${MUTATOR_NAME[$archive]}" "$after"
   n_before="$(error_lines "$before" | wc -l | tr -d ' ')"
   n_after="$(error_lines "$after" | wc -l | tr -d ' ')"
-  if [ "$n_after" -gt "$n_before" ]; then
-    echo "  fail more errors on the mutator than without it"
-    worse=$((worse + 1))
+  played_before="$(cat "$before.played")"
+  played_after="$(cat "$after.played")"
+  if [ "$played_before" = yes ] && [ "$played_after" = no ]; then
+    verdict="worse, the base game plays and the mutator does not"
+  elif [ "$played_before" = no ] && [ "$played_after" = yes ]; then
+    verdict="better, only the mutator plays"
+  elif [ "$n_after" -gt "$n_before" ]; then
+    verdict="worse, more errors on the mutator"
+  elif [ "$played_before" = yes ]; then
+    verdict="ok, both play"
+  else
+    verdict="ok, neither plays"
   fi
+  echo "  $verdict"
+  case "$verdict" in worse*) worse=$((worse + 1)) ;; esac
   # The first three of the mutator's, and of those the base game did not log,
   # without the timestamps.
   error_lines "$before" | bare | sort -u >"$before.errors"
@@ -311,17 +358,19 @@ for archive in "${GAMES[@]}"; do
   only="$(error_lines "$after" | bare | awk -v seen="$before.errors" '
     BEGIN { while ((getline line < seen) > 0) had[line] = 1 }
     !($0 in had)' | sed -n 1,3p | cells)"
-  ROWS="$ROWS| ${BASE_NAME[$archive]} | $n_before | $(cat "$before.reached") | $n_after | $(cat "$after.reached") | $first | $only |
+  ROWS="$ROWS| ${BASE_NAME[$archive]} | $n_before | $(cat "$before.reached") | $n_after | $(cat "$after.reached") | $verdict | $first | $only |
 "
 done
 
 {
   echo "# Compat proof, $DATE"
   echo
-  echo "Engine \`$ENGINE\`, compat $MANIFEST, map $MAP_NAME, two NullAI teams, to frame $FRAMES. Made by \`scripts/compat-proof.sh\`."
+  echo "Engine \`$ENGINE\`, compat $MANIFEST, map $MAP_NAME, two NullAI teams, to frame $FRAMES. The engine's LuaUI, luaui.lua and fonts were $ENGINE_UI. Made by \`scripts/compat-proof.sh\`."
   echo
-  echo "| Game | Errors before | Reached frame before | Errors after | Reached frame after | First three error lines after | First three only after |"
-  echo "| --- | --- | --- | --- | --- | --- | --- |"
+  echo "A run plays when it reaches frame $FRAMES. If the base game plays, the mutator must play with at most as many errors. If only the mutator plays, it is better whatever the counts, because a game that dies while loading stops logging. If neither plays, the mutator must have at most as many errors."
+  echo
+  echo "| Game | Errors before | Reached frame before | Errors after | Reached frame after | Verdict | First three error lines after | First three only after |"
+  echo "| --- | --- | --- | --- | --- | --- | --- | --- |"
   printf '%s' "$ROWS"
 } >"$REPORT"
 
@@ -329,8 +378,8 @@ echo
 echo "report: $REPORT"
 if [ "$worse" -eq 0 ]; then
   rm -r "$WORK"
-  echo "no game logged more errors on its mutator"
+  echo "no game is worse on its mutator"
 else
-  echo "$worse games logged more errors on their mutator. The logs are in $WORK"
+  echo "$worse games are worse on their mutator. The logs are in $WORK"
   exit 1
 fi
