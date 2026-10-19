@@ -1091,6 +1091,9 @@ mod tests {
         "function gadget:AllowCommand(u, d, t, cmdID, params, options, tag, synced)\nend\n";
     const NEW_COMMAND: &str =
         "function AllowCommand(u, d, t, cmdID, params, options, tag, playerID, fromSynced)\nend\n";
+    const OLD_GROUND: &str =
+        "local GetGroundInfo = Spring.GetGroundInfo\nlocal _, metal = GetGroundInfo(x, z)\n";
+    const NEW_GROUND: &str = "local _, _, metal = Spring.GetGroundInfo(x, z)\n";
 
     /// One game with every entry file, written for the old call-in orders,
     /// with a dependency written for the new ones. One updated for one change
@@ -1115,6 +1118,7 @@ mod tests {
             lua: &[
                 ("xta-9.65.sd7", OLD_DAMAGED),
                 ("xta-9.65.sd7", OLD_COMMAND),
+                ("xta-9.65.sd7", OLD_GROUND),
                 ("otherdep.sdz", NEW_DAMAGED),
                 ("otherdep.sdz", NEW_COMMAND),
             ],
@@ -1133,6 +1137,7 @@ mod tests {
                 ("BA-V9.79.SDZ", "function gadget:UnitDamaged(u, ...)\nend\n"),
                 ("BA-V9.79.SDZ", OLD_COMMAND),
                 ("BA-V9.79.SDZ", NEW_COMMAND),
+                ("BA-V9.79.SDZ", NEW_GROUND),
             ],
         },
         Fixture {
@@ -1334,6 +1339,19 @@ mod tests {
         assert!(!paths(&golden_build(10, &FIXTURES[2]))
             .iter()
             .any(|p| p.starts_with("compat/models/")));
+
+        // A game that reads GetGroundInfo the old way keeps the adapter, and
+        // one that reads it the new way does not.
+        let ground = "-- fix: spring-ground-info-105\n";
+        let eleven = golden_build(11, &FIXTURES[0]);
+        for path in ["compat/prelude-synced.lua", "compat/prelude-unsynced.lua"] {
+            let prelude = text(&eleven, path).unwrap();
+            assert!(prelude.contains("-- fix: game-version-104\n"), "{path}");
+            assert!(prelude.contains(ground), "{path}");
+        }
+        let updated = golden_build(11, &FIXTURES[1]);
+        let synced = text(&updated, "compat/prelude-synced.lua").unwrap();
+        assert!(!synced.contains(ground) && synced.contains("-- fix: game-version-104\n"));
     }
 
     /// The hash of every fixed game built from `manifest`.
@@ -1398,6 +1416,10 @@ mod tests {
         (
             10,
             "a2e6d720dd4c31135410c9cb3e9a39a527bbb1e3d089cfc14cc41fe6464cbed3",
+        ),
+        (
+            11,
+            "e9e8dcfc7caf88da395188e572c100824ed837091fac9b15efbc8f680466ec5e",
         ),
     ];
 

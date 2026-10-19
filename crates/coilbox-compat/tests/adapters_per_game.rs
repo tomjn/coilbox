@@ -10,13 +10,43 @@ fn handlers(sources: &[&str]) -> Vec<Handler> {
     sources
         .iter()
         .flat_map(|src| scan(src, Catalogue::embedded()))
-        .filter_map(|hit| {
-            Some(Handler {
-                entry: hit.entry_id,
-                params: hit.params?,
-            })
+        .flat_map(|hit| {
+            let entry = hit.entry_id;
+            hit.params
+                .into_iter()
+                .chain(hit.results.into_iter().flatten())
+                .map(move |params| Handler {
+                    entry: entry.clone(),
+                    params,
+                })
         })
         .collect()
+}
+
+const GROUND_INFO: &str = "-- fix: spring-ground-info-105\n";
+
+fn prelude_11(sources: &[&str]) -> String {
+    let m = for_game(&manifest(11).unwrap(), &handlers(sources));
+    prelude(&m, LuaState::Synced).unwrap()
+}
+
+/// Spring 1944's game_flagManager.lua, which reads the metal second.
+const S44_FLAGS: &str = "local GetGroundInfo = Spring.GetGroundInfo\n\
+    local function AnalyzeMetalMap()\n\
+    \tlocal _, curMetal = GetGroundInfo(mx, mz)\n\
+    end\n";
+const NEW_GROUND: &str = "local _, _, metal = Spring.GetGroundInfo(x, z)\n";
+
+#[test]
+fn a_game_that_reads_the_old_ground_info_order_through_an_alias_keeps_the_adapter() {
+    assert!(prelude_11(&[S44_FLAGS]).contains(GROUND_INFO));
+    assert!(prelude_11(&[]).contains(GROUND_INFO));
+}
+
+#[test]
+fn a_game_that_reads_the_new_ground_info_order_gets_no_adapter_for_it() {
+    assert!(!prelude_11(&[NEW_GROUND]).contains(GROUND_INFO));
+    assert!(prelude_11(&[NEW_GROUND, S44_FLAGS]).contains(GROUND_INFO));
 }
 
 fn synced_prelude(sources: &[&str]) -> String {

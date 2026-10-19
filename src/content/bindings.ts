@@ -4366,6 +4366,9 @@ export interface LuaCompatHit {
   /** For a call-in defined as a function, the arguments it takes from the
    * engine, with `...` kept. Absent for a member chain. */
   params?: string[];
+  /** For a member chain, the names each call assigns its results to,
+   * including calls through a local alias. Absent when no call names them. */
+  results?: string[][];
 }
 
 /** The hits in one Lua file. */
