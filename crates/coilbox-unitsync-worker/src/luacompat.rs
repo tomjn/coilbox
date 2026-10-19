@@ -278,10 +278,11 @@ mod tests {
     /// The handlers one scan of the fixed game reports, hashed: the archive,
     /// the file, the call-in and the arguments, which pick the call-in adapters
     /// of a compat mutator (issue #4629). Where in the file a hit is does not
-    /// change what is built, so it is left out. If this fails, the handlers a
-    /// mutator is built from changed: move `coilbox_compat::WRITER`, add a
-    /// compat manifest that names the new writer, and only then record the new
-    /// hash here.
+    /// change what is built, so it is left out. Every compat writer so far
+    /// scans the same way. If this fails, the handlers a mutator is built from
+    /// changed for every manifest: keep the old scan for the writers that had
+    /// it, and put the change behind a new `coilbox_compat::WRITER` with a
+    /// compat manifest that names it.
     #[test]
     fn a_fixed_game_scans_to_the_same_handlers() {
         use sha2::{Digest, Sha256};
@@ -318,10 +319,9 @@ mod tests {
             .iter()
             .map(|b| format!("{b:02x}"))
             .collect();
-        assert_eq!(coilbox_compat::WRITER, 1);
         assert_eq!(
             hex, "3779c9c72d517a813808e3e4edc2600e275835b81b241b70db7ddf072804c48f",
-            "the handlers the scan reports changed, so coilbox_compat::WRITER has to move:\n{lines}"
+            "the handlers the scan reports changed, which changes every compat writer's bytes:\n{lines}"
         );
     }
 }

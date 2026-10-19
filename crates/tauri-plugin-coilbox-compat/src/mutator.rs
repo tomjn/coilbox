@@ -60,6 +60,24 @@ pub fn games_dir(data_dir: &str) -> Result<PathBuf, String> {
     Ok(root.join("games"))
 }
 
+/// One file of a compat mutator, as the path in the folder and its bytes. Bytes
+/// rather than text, because a game's own entry file is copied in as it is,
+/// and it need not be UTF-8 (issue #4641).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct File {
+    pub path: String,
+    pub contents: Vec<u8>,
+}
+
+impl From<CompiledFile> for File {
+    fn from(file: CompiledFile) -> Self {
+        File {
+            path: file.path,
+            contents: file.contents.into_bytes(),
+        }
+    }
+}
+
 /// What [`MARKER`] records.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -139,8 +157,8 @@ fn modinfo(
 /// path, with the marker last so a write that stops part way leaves none.
 ///
 /// The Lua prelude's fixes (#4558) are written with the base game's entry files
-/// wrapped to load it, which `read` returns by path, `None` for one the game
-/// does not have. The gadget fixes (#4559) are written to `LuaRules/Gadgets/`
+/// wrapped to load it, whose bytes `read` returns by path, `None` for one the
+/// game does not have. The gadget fixes (#4559) are written to `LuaRules/Gadgets/`
 /// as they are. The def fixes (#4560) go in the def files, which the build
 /// writes once it knows which the game can take (see `defs`). A manifest that
 /// lists a fix of no kind this coilbox knows is refused rather than built
@@ -150,8 +168,8 @@ pub fn files(
     game_name: &str,
     declared: &DeclaredGame,
     marker: &Marker,
-    read: impl FnMut(&str) -> Result<Option<String>, String>,
-) -> Result<Vec<CompiledFile>, String> {
+    read: impl FnMut(&str) -> Result<Option<Vec<u8>>, String>,
+) -> Result<Vec<File>, String> {
     if game_name.trim().is_empty() {
         return Err("the base game has no name to depend on".into());
     }
@@ -165,31 +183,35 @@ pub fn files(
             manifest.version
         ));
     }
-    let mut files = vec![CompiledFile {
+    let mut files = vec![File {
         path: "modinfo.lua".into(),
-        contents: modinfo(game_name, declared, manifest),
+        contents: modinfo(game_name, declared, manifest).into_bytes(),
     }];
-    for (path, contents) in coilbox_compat::prelude_files(manifest, read)?
-        .into_iter()
-        .chain(coilbox_compat::gadget_files(manifest))
-    {
-        files.push(CompiledFile { path, contents });
+    for (path, contents) in coilbox_compat::prelude_files(manifest, read)? {
+        files.push(File { path, contents });
+    }
+    for (path, contents) in coilbox_compat::gadget_files(manifest) {
+        files.push(File {
+            path,
+            contents: contents.into_bytes(),
+        });
     }
     files.sort_by(|a, b| a.path.cmp(&b.path));
     let marker = serde_json::to_string_pretty(marker).map_err(|e| e.to_string())? + "\n";
-    files.push(CompiledFile {
+    files.push(File {
         path: MARKER.into(),
-        contents: marker,
+        contents: marker.into_bytes(),
     });
     Ok(files)
 }
 
-/// Refuse a manifest whose converter or writer is not the one this build
-/// carries: its mutator could not be reproduced byte for byte.
+/// Refuse a manifest whose converter is not the one this build carries, or
+/// whose writer is newer than the newest this build keeps: its mutator could
+/// not be reproduced byte for byte.
 pub fn check_pins(manifest: &coilbox_compat::Manifest) -> Result<(), String> {
-    if manifest.writer != coilbox_compat::WRITER {
+    if !coilbox_compat::knows_writer(manifest.writer) {
         return Err(format!(
-            "compat {} needs compat writer {}, and this coilbox has writer {}",
+            "compat {} needs compat writer {}, and this coilbox has writers up to {}",
             manifest.version,
             manifest.writer,
             coilbox_compat::WRITER
@@ -294,8 +316,12 @@ pub fn newest_built(games: &Path, archive_name: &str) -> Result<Option<(String, 
 mod tests {
     use super::*;
 
-    fn no_file(_: &str) -> Result<Option<String>, String> {
+    fn no_file(_: &str) -> Result<Option<Vec<u8>>, String> {
         Ok(None)
+    }
+
+    fn text(file: &File) -> &str {
+        std::str::from_utf8(&file.contents).unwrap()
     }
 
     fn declared_short(short: &str) -> DeclaredGame {
@@ -313,13 +339,8 @@ mod tests {
         }
     }
 
-    fn modinfo_of(files: &[CompiledFile]) -> String {
-        files
-            .iter()
-            .find(|f| f.path == "modinfo.lua")
-            .unwrap()
-            .contents
-            .clone()
+    fn modinfo_of(files: &[File]) -> String {
+        text(files.iter().find(|f| f.path == "modinfo.lua").unwrap()).to_string()
     }
 
     fn eval(modinfo: &str) -> serde_json::Value {
@@ -385,17 +406,15 @@ mod tests {
             no_file,
         )
         .unwrap();
-        let modinfo = &files[0];
-        assert_eq!(modinfo.path, "modinfo.lua");
-        assert!(modinfo
-            .contents
-            .contains(r#"name = "XTA \"v\" 9.65 (compat 1)","#));
-        assert!(modinfo.contents.contains(r#"version = "1","#));
-        assert!(modinfo.contents.contains("modtype = 1,"));
-        assert!(modinfo.contents.contains(r#"    "XTA \"v\" 9.65","#));
+        assert_eq!(files[0].path, "modinfo.lua");
+        let modinfo = text(&files[0]);
+        assert!(modinfo.contains(r#"name = "XTA \"v\" 9.65 (compat 1)","#));
+        assert!(modinfo.contains(r#"version = "1","#));
+        assert!(modinfo.contains("modtype = 1,"));
+        assert!(modinfo.contains(r#"    "XTA \"v\" 9.65","#));
         let lua = coilbox_springlua::SpringLua::new(tempfile::tempdir().unwrap().path())
             .unwrap()
-            .eval_value(&modinfo.contents, "modinfo.lua")
+            .eval_value(modinfo, "modinfo.lua")
             .unwrap();
         assert_eq!(lua["depend"][0], "XTA \"v\" 9.65");
         assert_eq!(lua["modtype"], 1);
@@ -412,10 +431,7 @@ mod tests {
             no_file,
         )
         .unwrap();
-        let lua = coilbox_springlua::SpringLua::new(tempfile::tempdir().unwrap().path())
-            .unwrap()
-            .eval_value(&files[0].contents, "modinfo.lua")
-            .unwrap();
+        let lua = eval(&modinfo_of(&files));
         assert_eq!(lua["shortname"], "XTA");
     }
 
@@ -430,7 +446,7 @@ mod tests {
             no_file,
         )
         .unwrap();
-        assert!(!files[0].contents.contains("shortname"));
+        assert!(!modinfo_of(&files).contains("shortname"));
     }
 
     #[test]
@@ -444,10 +460,7 @@ mod tests {
             no_file,
         )
         .unwrap();
-        let lua = coilbox_springlua::SpringLua::new(tempfile::tempdir().unwrap().path())
-            .unwrap()
-            .eval_value(&files[0].contents, "modinfo.lua")
-            .unwrap();
+        let lua = eval(&modinfo_of(&files));
         assert_eq!(lua["shortname"], "X\"\\TA");
     }
 
@@ -527,10 +540,10 @@ mod tests {
         let paths: Vec<_> = files.iter().map(|f| f.path.as_str()).collect();
         assert_eq!(paths, ["modinfo.lua", MARKER]);
         for f in &files {
-            assert!(!f.contents.contains('\r'), "{}", f.path);
-            assert!(f.contents.ends_with('\n'), "{}", f.path);
+            assert!(!f.contents.contains(&b'\r'), "{}", f.path);
+            assert!(f.contents.ends_with(b"\n"), "{}", f.path);
         }
-        let back: Marker = serde_json::from_str(&files[1].contents).unwrap();
+        let back: Marker = serde_json::from_slice(&files[1].contents).unwrap();
         assert_eq!(back, marker(1, "abc"));
     }
 
@@ -553,12 +566,7 @@ mod tests {
             no_file,
         )
         .unwrap();
-        let bytes = |fs: &[CompiledFile]| -> Vec<(String, String)> {
-            fs.iter()
-                .map(|f| (f.path.clone(), f.contents.clone()))
-                .collect()
-        };
-        assert_eq!(bytes(&a), bytes(&b));
+        assert_eq!(a, b);
     }
 
     #[test]
@@ -578,8 +586,8 @@ mod tests {
     #[test]
     fn the_prelude_is_written_with_the_entry_files_the_game_has() {
         let m = coilbox_compat::manifest(2).unwrap();
-        let read = |path: &str| -> Result<Option<String>, String> {
-            Ok((path == "LuaRules/main.lua").then(|| "-- the game's rules\n".to_string()))
+        let read = |path: &str| -> Result<Option<Vec<u8>>, String> {
+            Ok((path == "LuaRules/main.lua").then(|| b"-- the game's rules\n".to_vec()))
         };
         let files = files(
             &m,
@@ -600,12 +608,12 @@ mod tests {
             ]
         );
         assert_eq!(
-            files[0].contents,
+            text(&files[0]),
             "VFS.Include(\"compat/prelude-synced.lua\") -- the game's rules\n"
         );
         for f in &files {
-            assert!(!f.contents.contains('\r'), "{}", f.path);
-            assert!(f.contents.ends_with('\n'), "{}", f.path);
+            assert!(!f.contents.contains(&b'\r'), "{}", f.path);
+            assert!(f.contents.ends_with(b"\n"), "{}", f.path);
         }
     }
 
@@ -632,7 +640,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            files[1].contents,
+            text(&files[1]),
             coilbox_compat::fix_source("gadget-messages-tdf-95").unwrap()
         );
         let again = super::files(
@@ -652,7 +660,7 @@ mod tests {
     #[test]
     fn a_failed_read_of_the_base_game_fails_the_build() {
         let m = coilbox_compat::manifest(2).unwrap();
-        let read = |_: &str| -> Result<Option<String>, String> { Err("no worker".into()) };
+        let read = |_: &str| -> Result<Option<Vec<u8>>, String> { Err("no worker".into()) };
         assert_eq!(
             files(
                 &m,
@@ -676,6 +684,18 @@ mod tests {
         let mut other = m.clone();
         other.writer = coilbox_compat::WRITER + 1;
         assert!(check_pins(&other).unwrap_err().contains("writer"));
+        other.writer = 0;
+        assert!(check_pins(&other).is_err());
+    }
+
+    /// A newer coilbox builds the older manifest a host is on (issue #4564),
+    /// with the writer that manifest names.
+    #[test]
+    fn every_manifest_passes_the_pins_whatever_writer_it_names() {
+        for n in 1..=coilbox_compat::latest() {
+            let m = coilbox_compat::manifest(n).unwrap();
+            assert_eq!(check_pins(&m), Ok(()), "manifest {n}");
+        }
     }
 
     #[test]

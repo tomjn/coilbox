@@ -29,6 +29,7 @@ members = [
   "crates/coilbox-relay-protocol",
   "crates/coilbox-relay-agent",
   "crates/coilbox-oauth",
+  "crates/coilbox-ui-error",
   "crates/tauri-plugin-coilbox-downloads",
   "crates/tauri-plugin-coilbox-uberstress",
   "crates/tauri-plugin-coilbox-mapconv",

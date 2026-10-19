@@ -16,6 +16,7 @@
  */
 import { defineCommand } from "@picoframe/plugin-sdk";
 import { useEffect, useRef, useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import type { ModProject } from "./project";
 
 /** What a preflight run found, kept in the same three lists Rust returns. */
@@ -91,7 +92,7 @@ export function usePreflightReport(
           setState({
             report: null,
             loading: false,
-            error: e instanceof Error ? e.message : String(e),
+            error: describeError(e),
           });
       });
     return () => {

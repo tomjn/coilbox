@@ -1,0 +1,10 @@
+[package]
+name = "coilbox-ui-error"
+version = "0.0.0"
+description = "The error a Rust command reports to the frontend as a stable code, its parameters and the English text, so the frontend can translate it."
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }

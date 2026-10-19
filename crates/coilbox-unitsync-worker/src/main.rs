@@ -610,7 +610,14 @@ fn dispatch(args: &Args) -> i32 {
     // everything at the end.
     if let Some(Mode::Convert3do(mode)) = &args.convert_3do {
         return run_mode(
-            || convert3do::render(&args.lib, &mode.game, Path::new(&mode.out_dir)),
+            || {
+                convert3do::render(
+                    &args.lib,
+                    &mode.game,
+                    Path::new(&mode.out_dir),
+                    mode.writer.unwrap_or(coilbox_compat::WRITER),
+                )
+            },
             print_ok,
             || convert3do::emit_error("worker panicked while converting .3do models".into()),
         );
@@ -1161,6 +1168,11 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
             "--unit-script" => unit_script_flag = true,
             "--unit-models" => unit_models_flag = true,
             "--convert-3do" => convert_3do_flag = true,
+            // Consumed by `Mode::Convert3do`'s `from_args` below, not stored
+            // here.
+            "--compat-writer" => {
+                it.next();
+            }
             "--lua-compat" => lua_compat_flag = true,
             "--out-dir" => {
                 it.next();

@@ -1013,7 +1013,8 @@ mod tests {
         assert!(refused
             .get("error")
             .and_then(Value::as_str)
-            .is_some_and(|e| e.contains("already exists")));
+            .and_then(coilbox_ui_error::UiError::parse)
+            .is_some_and(|e| e.code == package::TARGET_EXISTS));
 
         // Setting overwrite clears it and writes the newer version.
         let overwritten = unwrap_as_the_frontend_does(workshop_package_mutator(

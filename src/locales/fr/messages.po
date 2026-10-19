@@ -35,6 +35,10 @@ msgstr ""
 msgid "{op} failed"
 msgstr ""
 
+#: src/i18n/uiError.ts
+msgid "{path} already exists; confirm a replace before packaging over it"
+msgstr ""
+
 #: src/downloads/downloadRate.ts
 msgid "{total}s"
 msgstr ""

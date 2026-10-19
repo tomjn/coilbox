@@ -424,17 +424,25 @@ pub struct Convert3doArgs {
     /// Where the converted models, their sheets and the sheets' records are
     /// written. Required.
     pub out_dir: String,
+    /// The compat writer whose conversion this is (`coilbox_compat::WRITER`).
+    /// A compat build names the writer of its manifest, so an older manifest
+    /// gets the models it always did. `None` is the newest.
+    pub writer: Option<u32>,
 }
 
 impl Convert3doArgs {
     pub fn to_args(&self) -> Vec<String> {
-        vec![
+        let mut args = vec![
             "--convert-3do".to_string(),
             "--game".to_string(),
             self.game.clone(),
             "--out-dir".to_string(),
             self.out_dir.clone(),
-        ]
+        ];
+        if let Some(writer) = self.writer {
+            args.extend(["--compat-writer".to_string(), writer.to_string()]);
+        }
+        args
     }
 
     /// Recover a `--convert-3do` invocation from a worker argv. As with the
@@ -444,15 +452,28 @@ impl Convert3doArgs {
     pub fn from_args(args: &[String]) -> Result<Self, String> {
         let mut game = None;
         let mut out_dir = None;
+        let mut writer = None;
 
         let mut it = args.iter();
         while let Some(a) = it.next() {
             match a.as_str() {
                 "--game" => game = it.next().cloned(),
                 "--out-dir" => out_dir = it.next().cloned(),
+                "--compat-writer" => writer = Some(it.next().cloned().unwrap_or_default()),
                 _ => {}
             }
         }
+        let writer = match writer {
+            None => None,
+            Some(text) => Some(
+                text.parse::<u32>()
+                    .ok()
+                    .filter(|w| coilbox_compat::knows_writer(*w))
+                    .ok_or_else(|| {
+                        format!("--compat-writer {text:?} is not a compat writer this worker has")
+                    })?,
+            ),
+        };
 
         let Some(out_dir) = out_dir else {
             return Err("--convert-3do needs --out-dir <directory>".into());
@@ -464,6 +485,7 @@ impl Convert3doArgs {
         Ok(Convert3doArgs {
             game: game.unwrap_or_default(),
             out_dir,
+            writer,
         })
     }
 }

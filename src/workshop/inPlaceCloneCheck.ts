@@ -15,6 +15,7 @@
  * game does.
  */
 import { useEffect, useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import type { BuildMenuOp } from "./buildMenus";
 import type { UnitClone } from "./clones";
 import { type CloneCheck, workshopCheckCloneInPlace } from "./inPlace";
@@ -93,7 +94,7 @@ export function useCloneInPlaceCheck(
         setError(null);
       })
       .catch((e: unknown) => {
-        setError({ key, message: e instanceof Error ? e.message : String(e) });
+        setError({ key, message: describeError(e) });
       })
       .finally(() => {
         asking.delete(key);
