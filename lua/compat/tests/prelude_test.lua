@@ -996,4 +996,249 @@ do
 	check("synced: GetSelectedUnitsCounts is left alone", engine.env.Spring.GetSelectedUnitsCounts == counts)
 end
 
+--------------------------------------------------------------------------------
+-- Complete Annihilation's widgets (issue #4708)
+--------------------------------------------------------------------------------
+
+-- A def proxy as rts/Lua/LuaUtils.h PushObjectDefProxyTable builds one: a
+-- table with raw pairs and next, and a protected metatable. `params` are the
+-- names the engine knows, each a value or a function that builds one on every
+-- read. `removed` are the names it still knows but logs an error for. Writing a
+-- known name raises an error, as with editing defs off, and anything else is
+-- set raw.
+local function defProxy(engine, kind, params, removed)
+	local proxy = { pairs = pairs, next = next }
+	setmetatable(proxy, {
+		__index = function(t, key)
+			if removed[key] then
+				engine.logs[#engine.logs + 1] = "ERROR_TYPE for key \"" .. key .. "\" in " .. kind .. " __index"
+				return nil
+			end
+			local value = params[key]
+			if type(value) == "function" then
+				return value()
+			end
+			return value
+		end,
+		__newindex = function(t, key, value)
+			if params[key] ~= nil or removed[key] then
+				error("Attempt to write " .. kind .. "[1]." .. tostring(key), 2)
+			end
+			rawset(t, key, value)
+		end,
+		__metatable = function() end,
+	})
+	return proxy
+end
+
+local weaponRemoved = { areaOfEffect = true, maxVelocity = true, onlyTargetCategories = true }
+
+local function caEngine(synced, manifest)
+	local engine = newEngine({ synced = synced, manifest = manifest })
+	local env = engine.env
+	env.WeaponDefs = {
+		[0] = defProxy(engine, "WeaponDefs", { name = "flak", damageAreaOfEffect = 64, projectilespeed = 12 }, weaponRemoved),
+		[1] = defProxy(engine, "WeaponDefs", { name = "laser", damageAreaOfEffect = 4, projectilespeed = 0.5 }, weaponRemoved),
+	}
+	env.UnitDefs = {
+		[1] = defProxy(engine, "UnitDefs", {
+			name = "armcom",
+			weapons = function()
+				return { { weaponDef = 0 }, { weaponDef = 1 } }
+			end,
+		}, {}),
+		[2] = defProxy(engine, "UnitDefs", {
+			name = "armsolar",
+			weapons = function()
+				return {}
+			end,
+		}, {}),
+	}
+	-- rts/Lua/LuaConstCMD.cpp now: no AISELECT or SET_WANTED_MAX_SPEED.
+	env.CMD = { STOP = 0, [0] = "STOP", MOVE = 10, [10] = "MOVE", SELFD = 65, [65] = "SELFD" }
+	local Spring = env.Spring
+	Spring.GetTeamUnits = function(teamID)
+		if teamID == 0 then
+			return { 11, 12, 13 }
+		end
+	end
+	Spring.GetUnitsInCylinder = function()
+		return { 21 }, "second"
+	end
+	Spring.GetAllUnits = function()
+		return {}
+	end
+	if not synced then
+		Spring.GetSelectedUnits = function()
+			return { 31, 32 }
+		end
+		Spring.GetGameState = function(maxLatency)
+			engine.latency = maxLatency
+			return true, false, false, engine.lagging
+		end
+	end
+	return engine
+end
+
+for _, synced in ipairs({ true, false }) do
+	local state = synced and "synced" or "unsynced"
+
+	do
+		local before = caEngine(synced, 16)
+		prelude(before)
+		check(state .. ": manifest 16 has no CMD.AISELECT", before.env.CMD.AISELECT == nil)
+
+		local engine = caEngine(synced, 17)
+		prelude(engine)
+		local CMD = engine.env.CMD
+		check(state .. ": CMD.AISELECT is 30 both ways", CMD.AISELECT == 30 and CMD[30] == "AISELECT")
+		check(state .. ": CMD.SET_WANTED_MAX_SPEED is 70 both ways", CMD.SET_WANTED_MAX_SPEED == 70 and CMD[70] == "SET_WANTED_MAX_SPEED")
+		-- ca_layout.lua, line 75.
+		local ok, err = pcall(function()
+			return { [CMD.AISELECT] = true, [CMD.SELFD] = true }
+		end)
+		check(state .. ": ca_layout's hidden commands table builds", ok, tostring(err))
+		check(state .. ": the commands the engine has are unchanged", CMD.STOP == 0 and CMD.MOVE == 10 and CMD[65] == "SELFD")
+		check(state .. ": no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
+	end
+
+	do
+		local engine = caEngine(synced, 17)
+		engine.env.CMD.AISELECT = 99
+		engine.env.CMD[70] = "SOMETHING"
+		prelude(engine)
+		local CMD = engine.env.CMD
+		check(state .. ": a CMD.AISELECT the engine has is left alone", CMD.AISELECT == 99 and CMD[30] == nil)
+		check(state .. ": an ID the engine uses is not taken", CMD.SET_WANTED_MAX_SPEED == nil and CMD[70] == "SOMETHING")
+	end
+
+	do
+		local before = caEngine(synced, 16)
+		prelude(before)
+		check(state .. ": manifest 16 has no n on GetTeamUnits", before.env.Spring.GetTeamUnits(0).n == nil)
+
+		local engine = caEngine(synced, 17)
+		prelude(engine)
+		local Spring = engine.env.Spring
+		local units = Spring.GetTeamUnits(0)
+		check(state .. ": GetTeamUnits(teamID).n is the count", units.n == 3, tostring(units.n))
+		-- gui_buildbar.lua, line 653.
+		local seen = 0
+		for num = 1, units.n do
+			seen = seen + (units[num] and 1 or 0)
+		end
+		check(state .. ": gui_buildbar's loop runs over every unit", seen == 3)
+		local keys = 0
+		for _ in pairs(units) do
+			keys = keys + 1
+		end
+		check(state .. ": pairs sees only the unit IDs", keys == 3, tostring(keys))
+		check(state .. ": nothing for a team the engine gives nothing for", Spring.GetTeamUnits(5) == nil and select("#", Spring.GetTeamUnits(5)) == 1)
+		check(state .. ": an empty array has n 0", Spring.GetAllUnits().n == 0)
+		local cylinder, second = Spring.GetUnitsInCylinder(0, 0, 100)
+		check(state .. ": the other results are passed on", cylinder.n == 1 and second == "second")
+		units[4] = 14
+		check(state .. ": n follows the array", units.n == 4)
+		check(state .. ": a key n of the array's own wins", (function()
+			local t = Spring.GetTeamUnits(0)
+			t.n = "own"
+			return t.n == "own"
+		end)())
+		check(state .. ": no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
+	end
+
+	do
+		local mt = { __index = function() return "theirs" end }
+		local engine = caEngine(synced, 17)
+		engine.env.Spring.GetTeamUnits = function()
+			return setmetatable({ 1 }, mt)
+		end
+		prelude(engine)
+		check(state .. ": a table with a metatable of its own is left alone", getmetatable(engine.env.Spring.GetTeamUnits(0)) == mt)
+	end
+end
+
+do
+	local engine = caEngine(false, 17)
+	prelude(engine)
+	local selected = engine.env.Spring.GetSelectedUnits()
+	-- gui_transporting.lua, line 82.
+	check("unsynced: GetSelectedUnits().n is the count", selected.n == 2, tostring(selected.n))
+end
+
+do
+	-- gui_attack_aoe.lua, line 182, and gui_blastradius.lua, line 177.
+	local engine = caEngine(false, 17)
+	prelude(engine)
+	local flak, laser = engine.env.WeaponDefs[0], engine.env.WeaponDefs[1]
+	check("unsynced: areaOfEffect is damageAreaOfEffect", flak.areaOfEffect == 64 and laser.areaOfEffect == 4, tostring(flak.areaOfEffect))
+	check("unsynced: maxVelocity is projectilespeed times 30", flak.maxVelocity == 360 and laser.maxVelocity == 15, tostring(flak.maxVelocity) .. " " .. tostring(laser.maxVelocity))
+	check("unsynced: comparing areaOfEffect works", pcall(function()
+		return flak.areaOfEffect > 8
+	end))
+	check("unsynced: the other values are the engine's", flak.name == "flak" and flak.damageAreaOfEffect == 64)
+	check("unsynced: no ERROR_TYPE line is logged", #engine.logs == 0, table.concat(engine.logs, "; "))
+
+	local before = caEngine(false, 16)
+	prelude(before)
+	check("manifest 16: areaOfEffect is nil and logged", before.env.WeaponDefs[0].areaOfEffect == nil and #before.logs == 1)
+end
+
+do
+	-- The synced state has no rawset, so the fix stays out of it.
+	local engine = caEngine(true, 17)
+	prelude(engine)
+	check("synced: areaOfEffect is not put back", engine.env.WeaponDefs[0].areaOfEffect == nil)
+	check("synced: only the read of areaOfEffect is logged", #engine.logs == 1, table.concat(engine.logs, "; "))
+end
+
+do
+	-- unit_healthbars.lua, line 209.
+	local engine = caEngine(false, 17)
+	prelude(engine)
+	local ud = engine.env.UnitDefs[1]
+	check("unsynced: ud.weapons.n is the count", ud.weapons.n == 2, tostring(ud.weapons.n))
+	local seen = 0
+	for i = 1, ud.weapons.n do
+		seen = seen + (ud.weapons[i].weaponDef and 1 or 0)
+	end
+	check("unsynced: unit_healthbars' loop runs over every weapon", seen == 2)
+	check("unsynced: a unit def with no weapons has n 0", engine.env.UnitDefs[2].weapons.n == 0)
+	local keys = 0
+	for _ in pairs(ud.weapons) do
+		keys = keys + 1
+	end
+	check("unsynced: pairs sees only the weapons", keys == 2, tostring(keys))
+	ud.reloadTime = 0
+	check("unsynced: a widget can still add its own keys to a unit def", rawget(ud, "reloadTime") == 0)
+	check("unsynced: no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
+
+	local synced = caEngine(true, 17)
+	prelude(synced)
+	check("synced: ud.weapons has no n, as the state has no rawset", synced.env.UnitDefs[1].weapons.n == nil)
+end
+
+do
+	-- dbg_dcicon.lua, line 102.
+	local engine = caEngine(false, 17)
+	prelude(engine)
+	local Spring = engine.env.Spring
+	check("unsynced: Spring.GetHasLag is defined", type(Spring.GetHasLag) == "function")
+	engine.lagging = true
+	check("unsynced: GetHasLag is GetGameState's isSimLagging", Spring.GetHasLag() == true and engine.latency == nil)
+	engine.lagging = false
+	check("unsynced: GetHasLag passes on the latency", Spring.GetHasLag(250) == false and engine.latency == 250)
+	check("unsynced: GetHasLag gives one result", select("#", Spring.GetHasLag()) == 1)
+
+	local own = function() return "own" end
+	local mine = caEngine(false, 17)
+	mine.env.Spring.GetHasLag = own
+	prelude(mine)
+	check("unsynced: an existing Spring.GetHasLag is left alone", mine.env.Spring.GetHasLag == own)
+
+	local synced = caEngine(true, 17)
+	prelude(synced)
+	check("synced: no GetHasLag, as GetGameState is unsynced", synced.env.Spring.GetHasLag == nil)
+end
+
 support.report()
