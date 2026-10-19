@@ -18,7 +18,8 @@
 #    mutator and the first three the base game did not log.
 #
 # The verdict, and the exit code, follow one rule. A run "plays" when it logs
-# the end gadget's line at the frame.
+# the end gadget's line at the frame, or any line at or past it. The second
+# covers a game whose gadget handler fails, so the end gadget never runs.
 #
 # - The base game plays: the mutator must play too, with at most as many
 #   errors. Anything else is worse.
@@ -51,9 +52,13 @@
 #   COILBOX_COMPAT_PROOF_FRAMES  the frame to play to. Default 3000.
 #   COILBOX_COMPAT_PROOF_TIMEOUT the seconds one match may take before it is
 #                            stopped. Default 120.
-#   COILBOX_COMPAT_PROOF_ENGINE_LUAUI  1 links the engine's LuaUI/, luaui.lua
-#                            and fonts/ into the scratch data folder, as a
-#                            player's install can read them beside the binary.
+#   COILBOX_COMPAT_PROOF_ENGINE_LUAUI  1 links the engine's LuaUI/, luaui.lua,
+#                            fonts/, cmdcolors.txt and ctrlpanel.txt into the
+#                            scratch data folder, as a player's install can
+#                            read them beside the binary. They are what the
+#                            engine installs from its cont/ folder, apart from
+#                            base/, which is always linked, and examples/,
+#                            which no game reads.
 #                            0 leaves them out. Default 1, because the proof is
 #                            about what a player sees, and a game that includes
 #                            the engine's LuaUI files fails differently without
@@ -156,7 +161,7 @@ ln -s "$ENGINE_DIR/AI" "$WORK/data/AI"
 ENGINE_UI="left out"
 if [ "$ENGINE_LUAUI" = 1 ]; then
   ENGINE_UI="linked in"
-  for entry in LuaUI luaui.lua fonts; do
+  for entry in LuaUI luaui.lua fonts cmdcolors.txt ctrlpanel.txt; do
     if [ -e "$ENGINE_DIR/$entry" ]; then
       ln -s "$ENGINE_DIR/$entry" "$WORK/data/$entry"
     else
@@ -306,6 +311,11 @@ play() { # game name, infolog to keep
   if grep -q "COMPAT PROOF reached frame $FRAMES" "$2"; then
     reached="yes, exit code $status"
     played=yes
+  elif [ "$last" -ge "$FRAMES" ]; then
+    # The engine logged a line at or past the frame, but the end gadget never
+    # said so, which happens when the game's gadget handler fails to load.
+    reached="yes, frame $last logged, but nothing ended the match, so it was stopped after ${RUN_TIMEOUT}s"
+    played=yes
   elif [ "$status" -eq 124 ]; then
     # Nothing ended the match, which happens when the game's gadget handler
     # never loaded the end gadget, so how far it got is not known.
@@ -365,7 +375,7 @@ done
 {
   echo "# Compat proof, $DATE"
   echo
-  echo "Engine \`$ENGINE\`, compat $MANIFEST, map $MAP_NAME, two NullAI teams, to frame $FRAMES. The engine's LuaUI, luaui.lua and fonts were $ENGINE_UI. Made by \`scripts/compat-proof.sh\`."
+  echo "Engine \`$ENGINE\`, compat $MANIFEST, map $MAP_NAME, two NullAI teams, to frame $FRAMES. The engine's LuaUI, luaui.lua, fonts, cmdcolors.txt and ctrlpanel.txt were $ENGINE_UI. Made by \`scripts/compat-proof.sh\`."
   echo
   echo "A run plays when it reaches frame $FRAMES. If the base game plays, the mutator must play with at most as many errors. If only the mutator plays, it is better whatever the counts, because a game that dies while loading stops logging. If neither plays, the mutator must have at most as many errors."
   echo
