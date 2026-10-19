@@ -88,3 +88,68 @@ fn the_scan_lists_a_built_mutator_as_a_game_on_top_of_its_base() {
         compat["missingDependencies"]
     );
 }
+
+#[test]
+#[ignore = "needs xta-9.65.sd7 (or COILBOX_COMPAT_GAME) in ~/.spring/games, an installed engine with libunitsync, a built coilbox-unitsync-worker in target/debug"]
+fn the_scan_lists_an_exported_mutator_as_a_game_on_top_of_its_base() {
+    let (engine, archive) = match setup() {
+        Ok(v) => v,
+        Err(why) => {
+            eprintln!("{why}, so this checks nothing");
+            return;
+        }
+    };
+    let built_in = tempfile::tempdir().expect("tempdir");
+    let plain = tempfile::tempdir().expect("tempdir");
+    std::fs::create_dir(plain.path().join("games")).expect("games folder");
+
+    let before = scan(&engine, built_in.path());
+    let base = game_with_archive(&before, &archive).expect("the scan lists the base game");
+    let name = base["name"].as_str().expect("a name");
+    // Only the marker keeps a checksum, and the export compares the same value.
+    let checksum = "0";
+
+    let built = tauri_plugin_coilbox_compat::build(
+        &built_in.path().to_string_lossy(),
+        &engine.to_string_lossy(),
+        &archive,
+        name,
+        checksum,
+        coilbox_compat::latest(),
+        "0.0.0",
+    )
+    .expect("build");
+    let sdz = plain
+        .path()
+        .join("games")
+        .join(built.folder.replace(".sdd", ".sdz"));
+    tauri_plugin_coilbox_compat::export(
+        &built_in.path().to_string_lossy(),
+        &archive,
+        checksum,
+        &sdz.to_string_lossy(),
+    )
+    .expect("export");
+
+    let after = scan(&engine, plain.path());
+    let compat = game_with_archive(&after, &built.folder.replace(".sdd", ".sdz"))
+        .unwrap_or_else(|| panic!("the scan does not list the .sdz: {}", after["errors"]));
+    assert_eq!(
+        compat["name"],
+        format!("{name} (compat {})", coilbox_compat::latest())
+    );
+    let deps: Vec<&str> = compat["dependencyArchives"]
+        .as_array()
+        .expect("dependencies")
+        .iter()
+        .filter_map(|a| a["name"].as_str())
+        .collect();
+    assert!(deps.contains(&name), "{deps:?} does not include {name}");
+    assert!(
+        compat["missingDependencies"]
+            .as_array()
+            .is_none_or(|m| m.is_empty()),
+        "{}",
+        compat["missingDependencies"]
+    );
+}

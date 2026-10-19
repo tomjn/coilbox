@@ -52,21 +52,55 @@ pub fn versioned_files(
 /// should never have accepted is cheap insurance to keep in the writer that
 /// owns the archive's shape rather than trust upstream never to change.
 pub fn write_sdz(dest: &Path, files: &[CompiledFile]) -> Result<(), String> {
-    for file in files {
-        if !is_safe_rel(Path::new(&file.path)) {
-            return Err(format!("unsafe archive path: {}", file.path));
+    let paths: Vec<String> = files.iter().map(|f| f.path.clone()).collect();
+    write_sdz_entries(dest, &paths, |path| {
+        let file = files
+            .iter()
+            .find(|f| f.path == path)
+            .ok_or_else(|| format!("no contents for {path}"))?;
+        Ok(file.contents.clone().into_bytes())
+    })
+}
+
+/// [`write_sdz`] for entries that may be binary, such as a mutator folder
+/// holding converted models (issue #4568). The entries are written in the order
+/// of `paths`, so the caller decides the archive's file order, and `read`
+/// returns each one's bytes as it is reached. Nothing is left at `dest` when a
+/// write fails part way.
+pub fn write_sdz_entries(
+    dest: &Path,
+    paths: &[String],
+    mut read: impl FnMut(&str) -> Result<Vec<u8>, String>,
+) -> Result<(), String> {
+    for path in paths {
+        if !is_safe_rel(Path::new(path)) {
+            return Err(format!("unsafe archive path: {path}"));
         }
     }
+    let written = write_entries(dest, paths, &mut read);
+    if written.is_err() {
+        // Best effort: the write already failed, and this is its leftover.
+        let _ = std::fs::remove_file(dest);
+    }
+    written
+}
+
+fn write_entries(
+    dest: &Path,
+    paths: &[String],
+    read: &mut impl FnMut(&str) -> Result<Vec<u8>, String>,
+) -> Result<(), String> {
     let out = std::fs::File::create(dest)
         .map_err(|e| format!("could not create {}: {e}", dest.display()))?;
     let mut zip = zip::ZipWriter::new(out);
     let opts = zip::write::SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Deflated);
-    for file in files {
-        zip.start_file(&file.path, opts)
-            .map_err(|e| format!("could not add {} to the archive: {e}", file.path))?;
-        zip.write_all(file.contents.as_bytes())
-            .map_err(|e| format!("could not write {} to the archive: {e}", file.path))?;
+    for path in paths {
+        let bytes = read(path)?;
+        zip.start_file(path, opts)
+            .map_err(|e| format!("could not add {path} to the archive: {e}"))?;
+        zip.write_all(&bytes)
+            .map_err(|e| format!("could not write {path} to the archive: {e}"))?;
     }
     zip.finish()
         .map_err(|e| format!("could not finish the archive: {e}"))?;
@@ -217,6 +251,47 @@ mod tests {
         assert!(modinfo.contains("modtype = 1"));
         assert!(modinfo.contains("depend"));
         assert!(modinfo.contains("Balanced Annihilation V15.9.8"));
+    }
+
+    /// Issue #4568: entries go in as given, in the caller's order, and a read
+    /// that fails part way leaves no archive behind.
+    #[test]
+    fn entries_are_written_in_the_given_order_and_a_failed_read_leaves_nothing() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let dest = dir.path().join("out.sdz");
+        let paths = vec!["z.bin".to_string(), "a.lua".to_string()];
+
+        write_sdz_entries(&dest, &paths, |p| {
+            Ok(if p == "z.bin" {
+                vec![0, 255, 1]
+            } else {
+                b"return {}".to_vec()
+            })
+        })
+        .expect("write");
+
+        let mut zip = zip::ZipArchive::new(std::fs::File::open(&dest).expect("open")).expect("zip");
+        let names: Vec<String> = (0..zip.len())
+            .map(|i| zip.by_index(i).expect("entry").name().to_string())
+            .collect();
+        assert_eq!(names, ["z.bin", "a.lua"]);
+        let mut bytes = Vec::new();
+        zip.by_name("z.bin")
+            .expect("z.bin")
+            .read_to_end(&mut bytes)
+            .expect("read");
+        assert_eq!(bytes, [0, 255, 1]);
+
+        let failed = dir.path().join("failed.sdz");
+        let result = write_sdz_entries(&failed, &paths, |p| {
+            if p == "a.lua" {
+                Err("gone".to_string())
+            } else {
+                Ok(vec![1])
+            }
+        });
+        assert_eq!(result, Err("gone".to_string()));
+        assert!(!failed.exists());
     }
 
     #[test]

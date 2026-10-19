@@ -1,11 +1,14 @@
 import { Button } from "@picoframe/frame";
-import { Loader2, Trash2, Wrench } from "lucide-react";
+import { save } from "@tauri-apps/plugin-dialog";
+import { FileArchive, Loader2, Trash2, Wrench } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import {
   type CompatBuilt,
+  type CompatExported,
   type CompatStatus,
   compatBuild,
+  compatExport,
   compatRemove,
   compatStatus,
 } from "../../../compat/bindings";
@@ -47,7 +50,8 @@ export function CompatMode({
   settingsRef.current = settings;
   const [status, setStatus] = useState<CompatStatus | null>(null);
   const [built, setBuilt] = useState<CompatBuilt | null>(null);
-  const [busy, setBusy] = useState<"build" | "remove" | null>(null);
+  const [busy, setBusy] = useState<"build" | "remove" | "export" | null>(null);
+  const [exported, setExported] = useState<CompatExported | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -88,6 +92,7 @@ export function CompatMode({
         manifestVersion: status.latest,
       });
       setBuilt(result);
+      setExported(null);
       setSettings(
         withCompatEntry(settingsRef.current, archiveName, {
           enabled: enable,
@@ -131,8 +136,35 @@ export function CompatMode({
     try {
       await compatRemove({ dataDir, archiveName });
       setBuilt(null);
+      setExported(null);
       setSettings(withoutCompatEntry(settingsRef.current, archiveName));
       await refresh();
+    } catch (e) {
+      setError(msg(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const exportSdz = async () => {
+    if (!checksum || !status?.folder) return;
+    setError(null);
+    try {
+      const dest = await save({
+        title: "Export compatibility mutator",
+        defaultPath: status.folder.replace(/\.sdd$/i, ".sdz"),
+        filters: [{ name: "Mutator archive", extensions: ["sdz"] }],
+      });
+      if (!dest) return;
+      setBusy("export");
+      setExported(
+        await compatExport({
+          dataDir,
+          archiveName,
+          baseChecksum: checksum,
+          dest,
+        }),
+      );
     } catch (e) {
       setError(msg(e));
     } finally {
@@ -173,6 +205,23 @@ export function CompatMode({
             <Wrench className="size-4" /> Rebuild
           </Button>
         )}
+        {current && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            disabled={busy !== null}
+            onClick={() => void exportSdz()}
+          >
+            {busy === "export" ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <FileArchive className="size-4" />
+            )}
+            Export .sdz
+          </Button>
+        )}
         {status?.folder && (
           <Button
             type="button"
@@ -198,6 +247,13 @@ export function CompatMode({
           {stale.length > 0 && (
             <> is out of date: {stale.map(staleReason).join("; ")}.</>
           )}
+        </p>
+      )}
+
+      {exported && (
+        <p className="text-xs text-muted-foreground">
+          Exported {plural(exported.files.length, "file", "files")} to{" "}
+          <span className="font-mono">{exported.path}</span>
         </p>
       )}
 
