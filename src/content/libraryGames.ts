@@ -15,10 +15,10 @@ import type { LibraryGame, LibrarySource } from "./library";
 /** The Games page's filter chips, in the order they are shown. */
 export const GAME_CHIPS = [
   { value: "all", label: "All" },
-  { value: "installed", label: "Installed" },
+  { value: "installed", label: "My Games" },
+  { value: "notInstalled", label: "New Games" },
   { value: "updates", label: "Updates" },
   { value: "featured", label: "Featured" },
-  { value: "notInstalled", label: "Not installed" },
 ] as const;
 
 export type GameChip = (typeof GAME_CHIPS)[number]["value"];

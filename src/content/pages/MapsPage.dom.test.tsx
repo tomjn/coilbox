@@ -144,8 +144,19 @@ function pressChip(name: RegExp) {
 }
 
 describe("Maps page", () => {
+  it("opens on the player's own maps", () => {
+    renderPage();
+    expect(
+      screen
+        .getByRole("radio", { name: /Installed/ })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    expect(cards()).toHaveLength(2);
+  });
+
   it("draws an installed map on two mirrors once, installed, with both sources", () => {
     renderPage();
+    pressChip(/All/);
     expect(cardTitles()).toEqual([
       "Comet Catcher Redux",
       "Isis",
@@ -162,6 +173,7 @@ describe("Maps page", () => {
 
   it("gives each card the state the record holds", () => {
     renderPage();
+    pressChip(/All/);
     expect(within(card("Isis")).getByText("Queued")).toBeTruthy();
     expect(within(card("Isis")).getByRole("button", { name: "Cancel" }));
     expect(within(card("my_test_map v3")).getByText("Local")).toBeTruthy();

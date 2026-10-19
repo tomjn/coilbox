@@ -120,7 +120,7 @@ const cardTitles = () =>
 
 describe("Games page", () => {
   it("lists every hub game and every installed game, featured first", () => {
-    renderPage();
+    renderPage("/library/games?filter=all");
     expect(cardTitles()).toEqual([
       "SplinterFaction",
       "Zero-K",
@@ -132,6 +132,28 @@ describe("Games page", () => {
     ]);
   });
 
+  it("opens on the player's own games", () => {
+    renderPage();
+    expect(
+      screen
+        .getByRole("radio", { name: /My Games/ })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    expect(cardTitles()).toHaveLength(3);
+  });
+
+  it("opens on every game when the player has none", () => {
+    hoisted.input = {
+      ...LIBRARY_GAMES_INPUT,
+      scan: { games: [], maps: [] },
+      files: { games: [], maps: [] },
+    };
+    renderPage();
+    expect(
+      screen.getByRole("radio", { name: /All/ }).getAttribute("aria-checked"),
+    ).toBe("true");
+  });
+
   it("gives each chip its count and filters by it", () => {
     renderPage();
     const chips = screen.getByRole("radiogroup", { name: "Show" });
@@ -139,13 +161,7 @@ describe("Games page", () => {
       within(chips)
         .getAllByRole("radio")
         .map((c) => c.textContent),
-    ).toEqual([
-      "All7",
-      "Installed3",
-      "Updates1",
-      "Featured2",
-      "Not installed4",
-    ]);
+    ).toEqual(["All7", "My Games3", "New Games4", "Updates1", "Featured2"]);
     fireEvent.click(within(chips).getByRole("radio", { name: /Updates/ }));
     expect(cardTitles()).toEqual(["SplinterFaction"]);
   });
@@ -178,7 +194,7 @@ describe("Games page", () => {
   });
 
   it("queues the hub's first source when Install is pressed", async () => {
-    renderPage();
+    renderPage("/library/games?filter=all");
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Install" }));
     });
@@ -190,7 +206,7 @@ describe("Games page", () => {
   });
 
   it("cancels the running download", () => {
-    renderPage();
+    renderPage("/library/games?filter=all");
     fireEvent.click(screen.getAllByRole("button", { name: "Cancel" })[0]);
     expect(hoisted.cancel).toHaveBeenCalledWith("q1");
   });

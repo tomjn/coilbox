@@ -92,9 +92,9 @@ export default function GamesPage() {
   const [sort, setSort] = useState<GameSort>("featured");
   // The topbar's update badge links here with ?filter=updates.
   const [params] = useSearchParams();
-  const [chip, setChip] = useState<GameChip>(
+  const [picked, setChip] = useState<GameChip | null>(
     () =>
-      GAME_CHIPS.find((c) => c.value === params.get("filter"))?.value ?? "all",
+      GAME_CHIPS.find((c) => c.value === params.get("filter"))?.value ?? null,
   );
 
   // A failed Init leaves data null and the engine's reason in error. The raw
@@ -125,6 +125,9 @@ export default function GamesPage() {
     [library.games],
   );
   const counts = useMemo(() => chipCounts(records), [records]);
+  // The player's own games until they pick a chip, or every game when they
+  // have none yet.
+  const chip = picked ?? (counts.installed > 0 ? "installed" : "all");
   const shown = useMemo(
     () =>
       sortGames(
