@@ -779,4 +779,125 @@ for _, name in ipairs({ "LuaRules", "LuaGaia", "LuaIntro" }) do
 	check(name .. ": include \"LuaUI/main.lua\" is left alone", engine.env.included == true)
 end
 
+--------------------------------------------------------------------------------
+-- fontHandler and widgetHandler:InTweakMode under LuaHandler (issue #4705)
+--------------------------------------------------------------------------------
+
+-- A stand-in for the engine's LuaHandler/handler.lua, with only what the fixes
+-- meet: it copies the globals as it starts, makes the handler global, defines
+-- NewAddon, includes the game's config.lua, and then loads one revision 1 and
+-- one revision 2 widget. A revision 1 widget gets a widgetHandler table of its
+-- own, and a revision 2 widget gets the handler.
+local luaHandler = [[
+local EG = {}
+for k, v in pairs(_G) do EG[k] = v end
+handler = { name = "widgetHandler", addons = {} }
+setmetatable(handler, { __index = function() end })
+function handler:NewAddon(rev)
+	local env = {}
+	for k, v in pairs(EG) do env[k] = v end
+	env.widget = env
+	env.widgetHandler = rev > 1 and handler or { RemoveWidget = function() end }
+	return env
+end
+include("config.lua")
+for rev, file in ipairs({ "LuaUI/Widgets/rev1.lua", "LuaUI/Widgets/rev2.lua" }) do
+	local env = handler:NewAddon(rev)
+	VFS.Include(file, env)
+	handler.addons[rev] = env
+end
+]]
+
+-- What gui_flagIncome.lua and gui_buildbar.lua do, in one widget.
+local s44Widget = 'function widget:DrawWorld() fontHandler.UseDefaultFont() return widgetHandler:InTweakMode() end'
+
+local s44Handler = 'VFS.Include("compat/prelude-unsynced.lua") '
+	.. 'function include(filename, envTable, mode) return VFS.Include(filename, envTable, mode) end '
+	.. 'include "LuaHandler/handler.lua"'
+
+local function luaHandlerGame(manifest, name, entry, files)
+	local all = {
+		["LuaHandler/handler.lua"] = luaHandler,
+		["config.lua"] = "configured = true",
+		["LuaUI/Widgets/rev1.lua"] = s44Widget,
+		["LuaUI/Widgets/rev2.lua"] = s44Widget,
+	}
+	for path, source in pairs(files or {}) do
+		all[path] = source
+	end
+	local engine = newEngine({ synced = false, manifest = manifest, name = name or "LuaUI", files = all })
+	support.load(engine, entry or s44Handler)
+	return engine
+end
+
+local function drawWorld(engine, rev)
+	local widget = engine.env.handler.addons[rev]
+	return pcall(widget.DrawWorld, widget)
+end
+
+do
+	local before = luaHandlerGame(15)
+	local ok, err = drawWorld(before, 1)
+	check("manifest 15: the widget fails on fontHandler", not ok and tostring(err):find("fontHandler") ~= nil, tostring(err))
+
+	local engine = luaHandlerGame(16)
+	check("the handler's config.lua still runs", engine.env.configured == true)
+	for rev = 1, 2 do
+		local ran, inTweak = drawWorld(engine, rev)
+		check("revision " .. rev .. ": the widget draws", ran, tostring(inTweak))
+		check("revision " .. rev .. ": InTweakMode says false", inTweak == false, tostring(inTweak))
+	end
+	check("UseDefaultFont returns nothing", select("#", engine.env.fontHandler.UseDefaultFont()) == 0)
+	local own = engine.env.handler.addons[1].widgetHandler
+	check("a revision 1 widget keeps its own widgetHandler", own ~= engine.env.handler and own.RemoveWidget ~= nil)
+	check("no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
+end
+
+do
+	-- A widget made after the handler has started gets InTweakMode too.
+	local engine = luaHandlerGame(16)
+	local env = engine.env.handler:NewAddon(1)
+	check("a widget loaded later gets InTweakMode", env.widgetHandler:InTweakMode() == false)
+end
+
+do
+	-- What the game or the engine already has is left alone.
+	local fonts = { UseDefaultFont = function() return "own" end }
+	local own = function() return "own" end
+	local handlerWithTweak = luaHandler:gsub("RemoveWidget = function%(%) end", "InTweakMode = OWN_TWEAK")
+	local mine = newEngine({
+		synced = false,
+		manifest = 16,
+		name = "LuaUI",
+		files = {
+			["LuaHandler/handler.lua"] = handlerWithTweak,
+			["config.lua"] = "",
+			["LuaUI/Widgets/rev1.lua"] = s44Widget,
+			["LuaUI/Widgets/rev2.lua"] = s44Widget,
+		},
+	})
+	mine.env.OWN_TWEAK = own
+	mine.env.OWN_FONTS = fonts
+	support.load(mine, 'VFS.Include("compat/prelude-unsynced.lua") fontHandler = OWN_FONTS ' .. s44Handler:gsub("^[^ ]+ ", ""))
+	check("a fontHandler set before the handler starts is kept", mine.env.fontHandler == fonts)
+	check("a widgetHandler's own InTweakMode is kept", mine.env.handler.addons[1].widgetHandler.InTweakMode == own)
+end
+
+do
+	-- The engine's basic widget handler defines fontHandler in its fonts.lua,
+	-- which returns early when one is there. A game that runs it never
+	-- includes LuaHandler/handler.lua, so the fix sets nothing.
+	local basicFonts = 'if fontHandler ~= nil then return fontHandler end fontHandler = { basic = true }'
+	local engine = luaHandlerGame(16, "LuaUI", 'VFS.Include("compat/prelude-unsynced.lua") '
+		.. 'function include(filename, envTable, mode) return VFS.Include(filename, envTable, mode) end '
+		.. 'include "fonts.lua"', { ["fonts.lua"] = basicFonts })
+	check("the basic handler's fontHandler is its own", engine.env.fontHandler and engine.env.fontHandler.basic == true)
+end
+
+for _, name in ipairs({ "LuaRules", "LuaGaia", "LuaIntro" }) do
+	local engine = luaHandlerGame(16, name)
+	check(name .. ": no fontHandler is defined", engine.env.fontHandler == nil)
+	check(name .. ": no InTweakMode is given", engine.env.handler.addons[1].widgetHandler.InTweakMode == nil)
+end
+
 support.report()

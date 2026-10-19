@@ -130,7 +130,7 @@ If one of the fixes fails while the game runs, the game still loads. The engine'
 
 ## What it changes
 
-This is compatibility version 15, the newest.
+This is compatibility version 16, the newest.
 
 Lua functions it puts back:
 
@@ -155,6 +155,7 @@ Values the engine now keeps differently:
 Files the engine no longer installs as they were:
 
 - `LuaUI/main.lua`, the basic widget handler beside the engine, which Recoil 2025.01.1 changed. A game whose own `LuaUI/main.lua` includes that file, as Spring 1944 does, skips the include, so the game's own widget handler runs on its own.
+- `fontHandler` and `widgetHandler:InTweakMode`, which that basic widget handler gave widgets on Spring 104.0. Widgets run by a game's own `LuaHandler` handler get them back. `fontHandler.UseDefaultFont` does nothing, and `InTweakMode` returns false, as that handler has no tweak mode.
 
 Gadgets, which each decide when the game loads whether the game needs them:
 

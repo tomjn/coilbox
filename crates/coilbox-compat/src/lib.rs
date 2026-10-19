@@ -58,6 +58,7 @@ const MANIFESTS: &[(u32, &str)] = &[
     (13, include_str!("../../../lua/compat/manifests/13.json")),
     (14, include_str!("../../../lua/compat/manifests/14.json")),
     (15, include_str!("../../../lua/compat/manifests/15.json")),
+    (16, include_str!("../../../lua/compat/manifests/16.json")),
 ];
 
 /// Every fix file, by id.
@@ -137,6 +138,14 @@ const FIXES: &[(&str, &str)] = &[
     (
         "game-version-104",
         include_str!("../../../lua/compat/game-version-104.lua"),
+    ),
+    (
+        "luaui-font-handler-104",
+        include_str!("../../../lua/compat/luaui-font-handler-104.lua"),
+    ),
+    (
+        "luaui-in-tweak-mode-104",
+        include_str!("../../../lua/compat/luaui-in-tweak-mode-104.lua"),
     ),
     (
         "luaui-main-include",
@@ -1754,6 +1763,34 @@ mod tests {
         }
     }
 
+    /// Issue #4705: manifest 16 adds the unsynced fixes that give widgets run by
+    /// LuaHandler the `fontHandler` and `widgetHandler:InTweakMode` of 104's
+    /// basic widget handler, and keeps the writer of manifest 15.
+    #[test]
+    fn manifest_16_is_manifest_15_with_the_basic_widget_handler_shims() {
+        let (fifteen, sixteen) = (manifest(15).unwrap(), manifest(16).unwrap());
+        let mut expected = fifteen.fixes.clone();
+        expected.extend([
+            "luaui-font-handler-104".into(),
+            "luaui-in-tweak-mode-104".into(),
+        ]);
+        assert_eq!(sixteen.fixes, expected);
+        assert_eq!(
+            (&sixteen.converter, sixteen.writer),
+            (&fifteen.converter, fifteen.writer)
+        );
+        let ids = |state| -> Vec<&str> {
+            prelude_fixes(&sixteen, state)
+                .iter()
+                .map(|(id, _)| *id)
+                .collect()
+        };
+        for id in ["luaui-font-handler-104", "luaui-in-tweak-mode-104"] {
+            assert!(ids(LuaState::Unsynced).contains(&id), "{id}");
+            assert!(!ids(LuaState::Synced).contains(&id), "{id}");
+        }
+    }
+
     /// Issue #4698: manifest 15 adds the unsynced fix that skips LuaUI's
     /// include of its own entry file, and keeps the writer of manifest 14.
     #[test]
@@ -1947,14 +1984,14 @@ mod tests {
         }
     }
 
-    /// The preludes for manifests 9, 11, 12, 14 and 15, as the Lua tests in
+    /// The preludes for manifests 9, 11, 12, 14, 15 and 16, as the Lua tests in
     /// `lua/compat/tests/` load them. Earlier manifests' synced preludes call
     /// `rawget`, which the tests' synced state lacks, so they are not kept.
     /// `COILBOX_WRITE_FIXTURE=1` writes them again after a deliberate change to
     /// how a prelude is built.
     #[test]
     fn the_lua_tests_load_the_preludes_this_crate_builds() {
-        for n in [9, 11, 12, 14, 15] {
+        for n in [9, 11, 12, 14, 15, 16] {
             let m = manifest(n).unwrap();
             for state in [LuaState::Synced, LuaState::Unsynced] {
                 let built = prelude(&m, state).unwrap();
