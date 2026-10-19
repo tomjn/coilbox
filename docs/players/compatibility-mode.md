@@ -130,7 +130,7 @@ If one of the fixes fails while the game runs, the game still loads. The engine'
 
 ## What it changes
 
-This is compatibility version 15, the newest.
+This is compatibility version 16, the newest.
 
 Lua functions it puts back:
 
@@ -147,6 +147,7 @@ Call-ins whose arguments moved:
 
 - `UnitDamaged`, changed in Spring 95.0, and `AllowCommand`, changed in Spring 105.0. The game's handlers get the arguments in the old order. Coilbox reads the game's Lua first, and leaves this out for a game whose handlers already take the new order.
 - `Spring.GetTeamInfo`, changed in Spring 105.0. The game gets the team's custom keys 7th and its income multiplier 8th, as before. Coilbox leaves this out for a game whose Lua already reads them the new way round.
+- `Spring.GetSelectedUnitsCounts` and `Spring.GetSelectedUnitsSorted`, whose tables lost their `n` key in BAR105 1544. The tables have it again, holding the number of unit types selected, and are all the functions return, as before. Coilbox leaves this out for a game whose Lua already takes that number as the second result.
 
 Values the engine now keeps differently:
 
@@ -155,6 +156,7 @@ Values the engine now keeps differently:
 Files the engine no longer installs as they were:
 
 - `LuaUI/main.lua`, the basic widget handler beside the engine, which Recoil 2025.01.1 changed. A game whose own `LuaUI/main.lua` includes that file, as Spring 1944 does, skips the include, so the game's own widget handler runs on its own.
+- `fontHandler` and `widgetHandler:InTweakMode`, which that basic widget handler gave widgets on Spring 104.0. Widgets run by a game's own `LuaHandler` handler get them back. `fontHandler.UseDefaultFont` does nothing, and `InTweakMode` returns false, as that handler has no tweak mode.
 
 Gadgets, which each decide when the game loads whether the game needs them:
 
