@@ -78,7 +78,8 @@ pub struct Convert3doOutput {
     /// the same problem: this one is a file coilbox cannot read, and that one is
     /// a file it read fine and had nowhere to paint.
     pub unreadable: BTreeMap<String, String>,
-    /// Every `.3do` found under `objects3d/`.
+    /// Every `.3do` found under `objects3d/`, less those left for the game's
+    /// own `.s3o` of the same name (see `coilbox_compat::keeps_game_s3o`).
     pub models_found: usize,
     /// How many became an `.s3o`.
     pub models_written: usize,
@@ -381,7 +382,7 @@ fn convert_files(files: &impl GameFiles, out_dir: &Path, out: &mut Convert3doOut
     let (palette, record) = read_palette(files);
     out.palette = Some(record);
 
-    let groups = plan(&list);
+    let groups = plan(&list, writer);
     out.models_found = groups.iter().map(|g| g.members.len()).sum();
     report(Progress {
         phase: "scan",
@@ -431,8 +432,8 @@ struct Planned {
 /// The naming happens here rather than inside the loop because telling two
 /// folders apart is a question about the whole set of them, and a folder
 /// considered on its own has nothing to be told apart from.
-fn plan(list: &[(String, String)]) -> Vec<Planned> {
-    let groups = group_models(list);
+fn plan(list: &[(String, String)], writer: u32) -> Vec<Planned> {
+    let groups = group_models(list, writer);
     let mut names = sheet_names(groups.keys().cloned());
     groups
         .into_iter()
@@ -452,14 +453,25 @@ fn plan(list: &[(String, String)]) -> Vec<Planned> {
 /// its top folder's sheet and keeps its own path on the way out, because "one
 /// atlas per subfolder" is about how a game groups a faction and a game that
 /// nests further has not made a second faction by doing so.
-fn group_models(list: &[(String, String)]) -> BTreeMap<String, Vec<String>> {
+///
+/// From writer 3 a `.3do` is left out when the game ships an `.s3o` at the same
+/// path in lower case (see `coilbox_compat::keeps_game_s3o`).
+fn group_models(list: &[(String, String)], writer: u32) -> BTreeMap<String, Vec<String>> {
     let prefix = format!("{MODEL_DIR}/");
+    let keeps_s3o = coilbox_compat::keeps_game_s3o(writer);
+    let s3o: BTreeSet<&str> = list
+        .iter()
+        .filter_map(|(lower, _)| lower.strip_suffix(".s3o"))
+        .collect();
     let mut groups: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for (lower, real) in list {
         let Some(rest) = lower.strip_prefix(&prefix) else {
             continue;
         };
-        if !rest.ends_with(".3do") {
+        let Some(stem) = lower.strip_suffix(".3do") else {
+            continue;
+        };
+        if keeps_s3o && s3o.contains(stem) {
             continue;
         }
         let folder = match rest.split_once('/') {
@@ -960,15 +972,18 @@ mod tests {
     /// and shares one sheet, and the models at the top level share one more.
     #[test]
     fn groups_by_the_first_folder_below_objects3d() {
-        let groups = group_models(&listing(&[
-            "Objects3D/armcom.3do",
-            "objects3d/corcom.3do",
-            "objects3d/arm/mech.3do",
-            "objects3d/arm/deep/deeper.3do",
-            "objects3d/core/tank.3do",
-            "objects3d/armcom.s3o",
-            "scripts/armcom.3do",
-        ]));
+        let groups = group_models(
+            &listing(&[
+                "Objects3D/armcom.3do",
+                "objects3d/corcom.3do",
+                "objects3d/arm/mech.3do",
+                "objects3d/arm/deep/deeper.3do",
+                "objects3d/core/tank.3do",
+                "objects3d/other.s3o",
+                "scripts/armcom.3do",
+            ]),
+            coilbox_compat::WRITER,
+        );
 
         assert_eq!(
             groups.keys().collect::<Vec<_>>(),
@@ -991,9 +1006,44 @@ mod tests {
     /// a unit model, so neither is picked up.
     #[test]
     fn takes_only_the_3do_files_under_objects3d() {
-        let groups = group_models(&listing(&["objects3d/a.s3o", "features/b.3do"]));
+        let groups = group_models(
+            &listing(&["objects3d/a.s3o", "features/b.3do"]),
+            coilbox_compat::WRITER,
+        );
 
         assert!(groups.is_empty(), "{groups:?}");
+    }
+
+    /// Issue #4697: from writer 3 a `.3do` is left alone when the game ships an
+    /// `.s3o` at the same path, compared in lower case as the engine does, so
+    /// the game's own model is the one in use. Writer 2 converted it, and the
+    /// converted file covered up the game's.
+    #[test]
+    fn leaves_a_3do_with_a_same_named_s3o_from_writer_3() {
+        let list = listing(&[
+            "objects3d/core_commander.3do",
+            "Objects3D/CORE_COMMANDER.s3o",
+            "objects3d/arm/Mech.3do",
+            "objects3d/arm/mech.s3o",
+            "objects3d/arm/other.3do",
+            "objects3d/tank.3do",
+            "objects3d/arm/tank.s3o",
+        ]);
+
+        let old = group_models(&list, 2);
+        assert_eq!(
+            old[""],
+            ["objects3d/core_commander.3do", "objects3d/tank.3do"]
+        );
+        assert_eq!(
+            old["arm"],
+            ["objects3d/arm/Mech.3do", "objects3d/arm/other.3do"]
+        );
+
+        // tank.3do stays, because the tank.s3o is in another folder.
+        let new = group_models(&list, 3);
+        assert_eq!(new[""], ["objects3d/tank.3do"]);
+        assert_eq!(new["arm"], ["objects3d/arm/other.3do"]);
     }
 
     #[test]
@@ -1012,11 +1062,14 @@ mod tests {
     /// without anything failing.
     #[test]
     fn gives_two_folders_different_sheets_when_their_names_sanitise_the_same() {
-        let planned = plan(&listing(&[
-            "objects3d/a b/one.3do",
-            "objects3d/a_b/two.3do",
-            "objects3d/top.3do",
-        ]));
+        let planned = plan(
+            &listing(&[
+                "objects3d/a b/one.3do",
+                "objects3d/a_b/two.3do",
+                "objects3d/top.3do",
+            ]),
+            coilbox_compat::WRITER,
+        );
 
         let stems: Vec<&str> = planned.iter().map(|g| g.stem.as_str()).collect();
         assert_eq!(stems.len(), 3);
@@ -1029,11 +1082,14 @@ mod tests {
     /// is converted twice and nothing is dropped before the run starts.
     #[test]
     fn the_plan_covers_every_model_once() {
-        let planned = plan(&listing(&[
-            "objects3d/top.3do",
-            "objects3d/arm/one.3do",
-            "objects3d/arm/two.3do",
-        ]));
+        let planned = plan(
+            &listing(&[
+                "objects3d/top.3do",
+                "objects3d/arm/one.3do",
+                "objects3d/arm/two.3do",
+            ]),
+            coilbox_compat::WRITER,
+        );
 
         let all: Vec<&String> = planned.iter().flat_map(|g| g.members.iter()).collect();
         assert_eq!(all.len(), 3);
@@ -1311,6 +1367,8 @@ mod tests {
                 "objects3d/arm/deep/flyer.3do",
                 a_3do(&[Named("armtex"), Palette(3)]),
             ),
+            // The game's own model of flyer.3do's name (issue #4697).
+            ("Objects3D/Arm/Deep/FLYER.s3o", b"the game's own".to_vec()),
             ("objects3d/a b/x.3do", a_3do(&[Named("armtex")])),
             ("objects3d/a_b/y.3do", a_3do(&[Named("bare")])),
             ("objects3d/huge/one.3do", a_3do(&[Named("big")])),
@@ -1427,7 +1485,10 @@ mod tests {
         let (out, files) = convert_the_game("rules", coilbox_compat::WRITER);
         let paths: Vec<&str> = files.iter().map(|(p, _)| p.as_str()).collect();
         assert!(out.errors.is_empty(), "{:?}", out.errors);
-        assert_eq!(out.models_found, 10);
+        assert_eq!(
+            out.models_found, 9,
+            "flyer.3do is left for the game's own .s3o"
+        );
         assert!(out.unreadable.contains_key("objects3d/broken.3do"));
         assert!(paths.contains(&"objects3d/armcom.s3o"), "{paths:?}");
         assert!(
@@ -1468,6 +1529,25 @@ mod tests {
         assert!(huge.palette_models.is_empty());
         assert_eq!(huge.did_not_fit, ["one.3do (needs big, which did not fit)"]);
         assert_eq!(huge.models_written, 2);
+    }
+
+    /// Issue #4697, through the whole conversion: the game ships its own
+    /// `flyer.s3o`, so writer 3 writes none of its own over it, and the rest of
+    /// the `arm` folder is still converted.
+    #[test]
+    fn a_model_the_game_ships_as_an_s3o_is_not_written_from_writer_3() {
+        let flyer = "objects3d/arm/deep/flyer.s3o";
+        let (old, files) = convert_the_game("keep-old", 2);
+        assert!(files.iter().any(|(p, _)| p == flyer));
+        assert_eq!(old.models_found, 10);
+
+        let (new, files) = convert_the_game("keep-new", 3);
+        let paths: Vec<&str> = files.iter().map(|(p, _)| p.as_str()).collect();
+        assert!(!paths.contains(&flyer), "{paths:?}");
+        assert!(paths.contains(&"objects3d/arm/mech.s3o"), "{paths:?}");
+        assert_eq!(new.models_found, 9);
+        assert_eq!(group(&new, "objects3d/arm").models_written, 1);
+        assert_eq!(new.models_written, old.models_written - 1);
     }
 
     /// Issue #4642: the conversion says which palette it read and where from,
@@ -1521,6 +1601,10 @@ mod tests {
         (
             2,
             "9a3e39f798db4c265b252fb6acadab8653f81735544764d9ac0d4f9779c4bf02",
+        ),
+        (
+            3,
+            "438e539e2546638f9a29237044b9f3d99a779f14f9dbdbc7fae5dddc4475bc09",
         ),
     ];
 

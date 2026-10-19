@@ -55,6 +55,7 @@ const MANIFESTS: &[(u32, &str)] = &[
     (10, include_str!("../../../lua/compat/manifests/10.json")),
     (11, include_str!("../../../lua/compat/manifests/11.json")),
     (12, include_str!("../../../lua/compat/manifests/12.json")),
+    (13, include_str!("../../../lua/compat/manifests/13.json")),
 ];
 
 /// Every fix file, by id.
@@ -207,7 +208,7 @@ pub struct Converter {
 /// the bytes keeps the old behaviour for the writers that had it and puts the
 /// new one behind a new writer: move this, add a manifest that names it, and
 /// record the new writer's hashes beside the old ones.
-pub const WRITER: u32 = 2;
+pub const WRITER: u32 = 3;
 
 /// Whether this build can write a manifest that names `writer`.
 pub fn knows_writer(writer: u32) -> bool {
@@ -226,6 +227,13 @@ pub fn keeps_palette_tiles(writer: u32) -> bool {
 /// with U+FFFD.
 pub fn copies_entry_bytes(writer: u32) -> bool {
     writer >= 2
+}
+
+/// Whether `writer` leaves a `.3do` unconverted when the game ships an `.s3o`
+/// at the same path, compared in lower case (issue #4697). Writer 2 converted
+/// it, and the converted file covered up the game's own model.
+pub fn keeps_game_s3o(writer: u32) -> bool {
+    writer >= 3
 }
 
 /// The writer of manifests 1 and 2, which predate the `writer` field.
@@ -1265,6 +1273,19 @@ mod tests {
         assert!(keeps_palette_tiles(eight.writer));
         assert!(!copies_entry_bytes(seven.writer));
         assert!(copies_entry_bytes(eight.writer));
+    }
+
+    /// Writer 3 leaves a `.3do` unconverted when the game has an `.s3o` of the
+    /// same name (issue #4697), and the fixes stay those of manifest 12.
+    #[test]
+    fn manifest_13_is_manifest_12_built_by_writer_3() {
+        let (twelve, thirteen) = (manifest(12).unwrap(), manifest(13).unwrap());
+        assert_eq!(thirteen.fixes, twelve.fixes);
+        assert_eq!(thirteen.converter, twelve.converter);
+        assert_eq!((twelve.writer, thirteen.writer), (2, 3));
+        assert!(!keeps_game_s3o(twelve.writer));
+        assert!(keeps_game_s3o(thirteen.writer));
+        assert!(keeps_palette_tiles(thirteen.writer) && copies_entry_bytes(thirteen.writer));
     }
 
     /// Manifests 2 to 8 hook call-ins with `rawget` and `rawset`, which a
