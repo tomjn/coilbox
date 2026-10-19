@@ -5,7 +5,7 @@
 --
 --   luajit lua/compat/tests/prelude_test.lua
 --
--- It loads the preludes coilbox-compat builds for manifest 9, kept in
+-- It loads the preludes coilbox-compat builds for manifests 9, 11 and 12, kept in
 -- tests/fixtures/. After changing a fix or how a prelude is built, write them
 -- again with:
 --
@@ -429,7 +429,7 @@ end
 
 do
 	local spring, params = rulesEngine()
-	local engine = newEngine({ manifest = 12, spring = spring })
+	local engine = newEngine({ manifest = 13, spring = spring })
 	prelude(engine)
 	local S = engine.env.Spring
 	-- Spring 1944's game_ammo.lua, lines 252 and 178.
@@ -464,17 +464,233 @@ do
 end
 
 do
-	local engine = newEngine({ manifest = 12 })
+	local engine = newEngine({ manifest = 13 })
 	prelude(engine)
 	check("without the rules param functions none is defined", engine.env.Spring.SetUnitRulesParam == nil and engine.env.Spring.SetGameRulesParam == nil)
 	check("without the rules param functions no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
 	local player = function() end
-	local only = newEngine({ manifest = 12, spring = { SetPlayerRulesParam = player } })
+	local only = newEngine({ manifest = 13, spring = { SetPlayerRulesParam = player } })
 	prelude(only)
 	check("SetPlayerRulesParam, which 104.0 did not have, is left alone", only.env.Spring.SetPlayerRulesParam == player)
-	local unsynced = newEngine({ synced = false, manifest = 12, spring = { SetUnitRulesParam = player } })
+	local unsynced = newEngine({ synced = false, manifest = 13, spring = { SetUnitRulesParam = player } })
 	prelude(unsynced)
 	check("the unsynced state is left alone", unsynced.env.Spring.SetUnitRulesParam == player)
+end
+
+--------------------------------------------------------------------------------
+-- snext, spairs and sipairs (issue #4692)
+--------------------------------------------------------------------------------
+
+-- The unsynced half of LuaRules or LuaGaia, which has the SYNCED proxy.
+local function splitUnsynced(opts)
+	opts = opts or {}
+	opts.synced, opts.manifest = false, 12
+	local engine = newEngine(opts)
+	engine.env.SYNCED = {}
+	return engine
+end
+
+do
+	local engine = splitUnsynced()
+	prelude(engine)
+	local env = engine.env
+	check("unsynced rules: snext is next", env.snext == next)
+	check("unsynced rules: spairs is pairs", env.spairs == pairs)
+	check("unsynced rules: sipairs is ipairs", env.sipairs == ipairs)
+	check("unsynced rules: no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
+
+	-- The engine's LuaGadgets/system.lua builds System, and its gadget handler
+	-- gives each gadget a copy of it rather than the globals.
+	support.load(engine, "System = { pairs = pairs, SYNCED = SYNCED }")
+	local System = env.System
+	check("System gets snext, spairs and sipairs", System.snext == next and System.spairs == pairs and System.sipairs == ipairs)
+	check("System keeps what system.lua put in it", System.pairs == pairs and System.SYNCED == env.SYNCED)
+
+	local seen = {}
+	support.load(engine, "for k, v in System.spairs({ a = 1 }) do SEEN = k end for i, v in System.sipairs({ 7 }) do SEEN2 = v end")
+	check("spairs and sipairs iterate as pairs and ipairs", env.SEEN == "a" and env.SEEN2 == 7)
+	support.load(engine, "OTHER = 1")
+	check("other globals are set as normal", rawget(env, "OTHER") == 1)
+end
+
+do
+	-- A game's own system.lua that lists them reads the globals.
+	local engine = splitUnsynced()
+	prelude(engine)
+	support.load(engine, "System = { snext = snext, spairs = spairs }")
+	check("a system.lua that lists them gets the globals", engine.env.System.snext == next and engine.env.System.spairs == pairs)
+end
+
+do
+	local own = function() return "own" end
+	local engine = splitUnsynced()
+	engine.env.snext = own
+	prelude(engine)
+	support.load(engine, "System = { snext = MINE }")
+	engine.env.MINE = nil
+	check("a game's own snext is left alone", engine.env.snext == own)
+end
+
+do
+	-- The call-in hooks still see a call-in set once the iterators are in.
+	local engine = splitUnsynced()
+	prelude(engine)
+	local got
+	support.load(engine, "System = {}")
+	handler(engine, { UnitDamaged = function(...) got = { ... } end })
+	call(engine, "UnitDamaged", 1, 2, 3, 4, false, 5, 6, 7, 8, 9)
+	check("the hooks still work after System is set", got ~= nil and got[7] == 7)
+end
+
+for _, case in ipairs({
+	{ name = "LuaUI", engine = function() return newEngine({ synced = false, manifest = 12 }) end },
+	{ name = "synced", engine = function() return newEngine({ manifest = 12 }) end },
+}) do
+	local engine = case.engine()
+	prelude(engine)
+	support.load(engine, "System = {}")
+	check(case.name .. ": no snext, spairs or sipairs, as the engine never gave it them",
+		engine.env.snext == nil and engine.env.spairs == nil and engine.env.sipairs == nil and engine.env.System.snext == nil)
+	check(case.name .. ": no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
+end
+
+--------------------------------------------------------------------------------
+-- Unit lineage (issue #4693)
+--------------------------------------------------------------------------------
+
+-- A synced state whose units have teams, and teams 0 to 3.
+local function lineageEngine(opts)
+	opts = opts or {}
+	opts.manifest = 12
+	local engine = newEngine(opts)
+	local Spring = engine.env.Spring
+	Spring.GetUnitTeam = function(unitID)
+		local unit = engine.units[unitID]
+		return unit and unit.team
+	end
+	Spring.GetTeamInfo = function(teamID)
+		if teamID >= 0 and teamID < 4 then
+			return teamID
+		end
+	end
+	return engine
+end
+
+do
+	local engine = lineageEngine()
+	prelude(engine)
+	support.load(engine, "")
+	local Spring = engine.env.Spring
+	check("synced: Spring.SetUnitLineage and GetUnitLineage are defined", type(Spring.SetUnitLineage) == "function" and type(Spring.GetUnitLineage) == "function")
+	check("the call-ins lineage needs are registered when the game has none", engine.registered.UnitCreated and engine.registered.UnitDestroyed)
+
+	-- XTA's CommOption.lua: the start unit is its team's lineage root.
+	engine.units[10] = { team = 1 }
+	call(engine, "UnitCreated", 10, 5, 1)
+	local lineage, root = Spring.GetUnitLineage(10)
+	check("a new unit's lineage is its team", lineage == 1 and root == false, tostring(lineage) .. " " .. tostring(root))
+	Spring.SetUnitLineage(10, 1, true)
+	lineage, root = Spring.GetUnitLineage(10)
+	check("SetUnitLineage with true makes the unit its team's root", lineage == 1 and root == true)
+
+	-- unit_morph.lua: the new unit takes the old one's lineage and is the root.
+	engine.units[12] = { team = 1 }
+	call(engine, "UnitCreated", 12, 7, 1)
+	Spring.SetUnitLineage(12, (Spring.GetUnitLineage(10)), true)
+	lineage, root = Spring.GetUnitLineage(12)
+	check("a morphed unit takes the old one's lineage and becomes the root", lineage == 1 and root == true)
+	check("a team has one root", select(2, Spring.GetUnitLineage(10)) == false)
+
+	-- A unit built by a unit takes its builder's lineage.
+	Spring.SetUnitLineage(12, 2)
+	check("SetUnitLineage without true keeps the root", select(2, Spring.GetUnitLineage(12)) == true)
+	engine.units[11] = { team = 1 }
+	call(engine, "UnitCreated", 11, 6, 1, 12)
+	lineage, root = Spring.GetUnitLineage(11)
+	check("a built unit takes its builder's lineage", lineage == 2 and root == false, tostring(lineage))
+
+	-- As in 0.82, true makes the unit the root of the team it is given, and
+	-- GetUnitLineage asks whether it is the root of its own team.
+	Spring.SetUnitLineage(11, 3, true)
+	lineage, root = Spring.GetUnitLineage(11)
+	check("a unit made root of another team is not its own team's root", lineage == 3 and root == false)
+
+	check("a unit that does not exist has no lineage", select("#", Spring.GetUnitLineage(99)) == 0)
+	check("SetUnitLineage on a unit that does not exist does nothing", select("#", Spring.SetUnitLineage(99, 1, true)) == 0 and select(2, Spring.GetUnitLineage(12)) == true)
+	check("SetUnitLineage wants a unit ID", not pcall(Spring.SetUnitLineage, "a", 1))
+	check("SetUnitLineage wants a team ID", not pcall(Spring.SetUnitLineage, 12, nil))
+	check("SetUnitLineage wants a team that exists", not pcall(Spring.SetUnitLineage, 12, 9))
+	check("GetUnitLineage wants a unit ID", not pcall(Spring.GetUnitLineage, {}))
+
+	local seen
+	handler(engine, {
+		UnitDestroyed = function(unitID)
+			seen = { Spring.GetUnitLineage(unitID) }
+		end,
+	})
+	call(engine, "UnitDestroyed", 12, 7, 1)
+	check("the game's UnitDestroyed still reads a dying unit's lineage", seen[1] == 2 and seen[2] == true)
+	engine.units[12] = { team = 3 }
+	call(engine, "UnitCreated", 12, 7, 3)
+	lineage, root = Spring.GetUnitLineage(12)
+	check("a destroyed unit's ID starts again as a unit of its new team", lineage == 3 and root == false, tostring(lineage))
+	check("synced: no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
+end
+
+do
+	-- A unit made before the call-in was registered reads as its team's.
+	local engine = lineageEngine()
+	prelude(engine)
+	engine.units[4] = { team = 2 }
+	local lineage, root = engine.env.Spring.GetUnitLineage(4)
+	check("a unit the fix never saw made has its team's lineage", lineage == 2 and root == false)
+end
+
+do
+	local own = function() end
+	local engine = lineageEngine({ spring = { SetUnitLineage = own } })
+	prelude(engine)
+	check("an existing Spring.SetUnitLineage is left alone", engine.env.Spring.SetUnitLineage == own)
+end
+
+do
+	local engine = newEngine({ synced = false, manifest = 12 })
+	prelude(engine)
+	check("unsynced: no lineage functions, as the table lives in the synced state", engine.env.Spring.SetUnitLineage == nil and engine.env.Spring.GetUnitLineage == nil)
+end
+
+--------------------------------------------------------------------------------
+-- Spring.GetTeamInfo's results (issue #4694)
+--------------------------------------------------------------------------------
+
+-- The engine's GetTeamInfo now: income multiplier 7th, custom keys 8th, and
+-- no keys at all when the second argument is false.
+local keys = { startmetal = "500" }
+local function currentGetTeamInfo(teamID, getTeamKeys)
+	if teamID ~= 0 then
+		return
+	end
+	if getTeamKeys == false then
+		return 0, 1, false, true, "arm", 0, 1.5
+	end
+	return 0, 1, false, true, "arm", 0, 1.5, keys
+end
+
+for _, synced in ipairs({ true, false }) do
+	local state = synced and "synced" or "unsynced"
+	local engine = newEngine({ synced = synced, manifest = 12, spring = { GetTeamInfo = currentGetTeamInfo } })
+	prelude(engine)
+	local GetTeamInfo = engine.env.Spring.GetTeamInfo
+	local got = { GetTeamInfo(0) }
+	check(state .. ": GetTeamInfo gives the custom keys 7th and the income multiplier 8th",
+		select("#", GetTeamInfo(0)) == 8 and got[7] == keys and got[8] == 1.5, tostring(got[7]) .. " " .. tostring(got[8]))
+	check(state .. ": the values before them are unchanged", got[1] == 0 and got[2] == 1 and got[3] == false and got[4] == true and got[5] == "arm" and got[6] == 0)
+	-- Expand and Exterminate's start_unit_spawn.lua, line 59.
+	local teamOptions = select(7, GetTeamInfo(0))
+	check(state .. ": select(7, ...) is the custom keys table", type(teamOptions) == "table" and teamOptions.startmetal == "500")
+	check(state .. ": a team that does not exist gives nothing", select("#", GetTeamInfo(5)) == 0)
+	check(state .. ": with no keys asked for, the seven values come back as they are", select("#", GetTeamInfo(0, false)) == 7 and select(7, GetTeamInfo(0, false)) == 1.5)
+	check(state .. ": no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
 end
 
 support.report()

@@ -55,6 +55,7 @@ const MANIFESTS: &[(u32, &str)] = &[
     (10, include_str!("../../../lua/compat/manifests/10.json")),
     (11, include_str!("../../../lua/compat/manifests/11.json")),
     (12, include_str!("../../../lua/compat/manifests/12.json")),
+    (13, include_str!("../../../lua/compat/manifests/13.json")),
 ];
 
 /// Every fix file, by id.
@@ -136,6 +137,14 @@ const FIXES: &[(&str, &str)] = &[
         include_str!("../../../lua/compat/gl-smoothing.lua"),
     ),
     (
+        "snext-spairs-sipairs",
+        include_str!("../../../lua/compat/snext-spairs-sipairs.lua"),
+    ),
+    (
+        "spring-get-team-info-105",
+        include_str!("../../../lua/compat/spring-get-team-info-105.lua"),
+    ),
+    (
         "spring-ground-info-105",
         include_str!("../../../lua/compat/spring-ground-info-105.lua"),
     ),
@@ -154,6 +163,10 @@ const FIXES: &[(&str, &str)] = &[
     (
         "spring-sun-parameters",
         include_str!("../../../lua/compat/spring-sun-parameters.lua"),
+    ),
+    (
+        "spring-unit-lineage",
+        include_str!("../../../lua/compat/spring-unit-lineage.lua"),
     ),
     (
         "spring-unit-travel",
@@ -671,6 +684,15 @@ enum Change {
         /// Part of the name of the result the change put first.
         added: &'static str,
     },
+    /// A function's results, which a call names by assigning them, where the
+    /// change swapped results around and the list kept its length.
+    Swapped {
+        /// The 0-based position of the first result the change moved.
+        moved: usize,
+        /// 0-based positions, each with words whose presence in the name
+        /// there, lower case, means the call reads the new order.
+        new: &'static [(usize, &'static [&'static str])],
+    },
 }
 
 /// Changing this changes the mutator two players build from the same manifest,
@@ -702,6 +724,17 @@ const ADAPTERS: &[Adapter] = &[
                 "name", "metal", "hard", "tank", "kbot", "hover", "ship", "track",
             ],
             added: "index",
+        },
+    },
+    // A count does not decide this one: XTA and Expand and Exterminate take
+    // nine results, the team colours GetTeamInfo returned before Spring 0.76,
+    // and read the old order.
+    Adapter {
+        fix: "spring-get-team-info-105",
+        entry: "signature:Spring.GetTeamInfo@105.0",
+        change: Change::Swapped {
+            moved: 6,
+            new: &[(6, &["income", "mult"]), (7, &["key", "custom", "opt"])],
         },
     },
 ];
@@ -765,6 +798,20 @@ fn order(adapter: &Adapter, params: &[String]) -> Order {
                 (true, false) => Order::Old,
                 (false, true) => Order::New,
                 _ => Order::Either,
+            }
+        }
+        Change::Swapped { moved, new } => {
+            let reads_new = new.iter().any(|(at, words)| {
+                named
+                    .get(*at)
+                    .is_some_and(|p| words.iter().any(|w| p.contains(w)))
+            });
+            if reads_new {
+                Order::New
+            } else if named.len() > moved {
+                Order::Old
+            } else {
+                Order::Either
             }
         }
     }
@@ -1677,23 +1724,53 @@ mod tests {
         }
     }
 
-    /// Issue #4700: manifest 12 stores a numeric string given to a rules param
-    /// as a number, as 104.0 did, and keeps the writer of manifest 11.
+    /// Issue #4700: manifest 13 stores a numeric string given to a rules param
+    /// as a number, as 104.0 did, and keeps the writer of manifest 12.
     #[test]
-    fn manifest_12_is_manifest_11_with_the_old_rules_params() {
-        let (eleven, twelve) = (manifest(11).unwrap(), manifest(12).unwrap());
-        let added: Vec<&String> = twelve
+    fn manifest_13_is_manifest_12_with_the_old_rules_params() {
+        let (twelve, thirteen) = (manifest(12).unwrap(), manifest(13).unwrap());
+        let added: Vec<&String> = thirteen
             .fixes
             .iter()
-            .filter(|id| !eleven.fixes.contains(id))
+            .filter(|id| !twelve.fixes.contains(id))
             .collect();
         assert_eq!(added, ["spring-rules-param-105"]);
-        let kept: Vec<&String> = twelve
+        let kept: Vec<&String> = thirteen
             .fixes
             .iter()
-            .filter(|id| eleven.fixes.contains(id))
+            .filter(|id| twelve.fixes.contains(id))
             .collect();
-        assert_eq!(kept, eleven.fixes.iter().collect::<Vec<_>>());
+        assert_eq!(kept, twelve.fixes.iter().collect::<Vec<_>>());
+        assert_eq!(
+            (&thirteen.converter, thirteen.writer),
+            (&twelve.converter, twelve.writer)
+        );
+        let ids = |state| -> Vec<&str> {
+            prelude_fixes(&thirteen, state)
+                .iter()
+                .map(|(id, _)| *id)
+                .collect()
+        };
+        assert!(ids(LuaState::Synced).contains(&"spring-rules-param-105"));
+        assert!(!ids(LuaState::Unsynced).contains(&"spring-rules-param-105"));
+    }
+
+    /// Issues #4692 to #4694: manifest 12 adds the unsynced fix that puts
+    /// back snext, spairs and sipairs, the synced one that keeps unit lineage
+    /// and the adapter for Spring.GetTeamInfo's results, and keeps the writer
+    /// of manifest 11.
+    #[test]
+    fn manifest_12_is_manifest_11_with_the_iterators_lineage_and_team_info() {
+        let (eleven, twelve) = (manifest(11).unwrap(), manifest(12).unwrap());
+        assert_eq!(twelve.fixes[..eleven.fixes.len()], eleven.fixes[..]);
+        assert_eq!(
+            twelve.fixes[eleven.fixes.len()..],
+            [
+                "snext-spairs-sipairs",
+                "spring-unit-lineage",
+                "spring-get-team-info-105"
+            ]
+        );
         assert_eq!(
             (&twelve.converter, twelve.writer),
             (&eleven.converter, eleven.writer)
@@ -1704,8 +1781,60 @@ mod tests {
                 .map(|(id, _)| *id)
                 .collect()
         };
-        assert!(ids(LuaState::Synced).contains(&"spring-rules-param-105"));
-        assert!(!ids(LuaState::Unsynced).contains(&"spring-rules-param-105"));
+        let (synced, unsynced) = (ids(LuaState::Synced), ids(LuaState::Unsynced));
+        assert!(
+            unsynced.contains(&"snext-spairs-sipairs") && !synced.contains(&"snext-spairs-sipairs")
+        );
+        assert!(
+            synced.contains(&"spring-unit-lineage") && !unsynced.contains(&"spring-unit-lineage")
+        );
+        for ids in [&synced, &unsynced] {
+            assert!(ids.contains(&"spring-get-team-info-105"));
+        }
+    }
+
+    const TEAM_INFO: &str = "signature:Spring.GetTeamInfo@105.0";
+
+    /// The fixes manifest 12 leaves out for a game whose Lua takes
+    /// `Spring.GetTeamInfo`'s results into these names.
+    fn team_info_left_out(sites: &[&[&str]]) -> Vec<String> {
+        let full = manifest(12).unwrap();
+        let handlers: Vec<Handler> = sites.iter().map(|s| handler(TEAM_INFO, s)).collect();
+        let picked = for_game(&full, &handlers);
+        full.fixes
+            .into_iter()
+            .filter(|id| !picked.fixes.contains(id))
+            .collect()
+    }
+
+    /// Issue #4694: XTA and Expand and Exterminate read the custom keys 7th.
+    #[test]
+    fn a_call_that_reads_the_custom_keys_seventh_keeps_the_team_info_adapter() {
+        let keys = ["_", "_", "_", "_", "_", "_", "teamOptions"];
+        assert!(team_info_left_out(&[&keys]).is_empty());
+        // The colours GetTeamInfo returned before Spring 0.76 read past the
+        // 7th, and are no sign of the new order.
+        let colours = ["_", "_", "_", "_", "_", "_", "r", "g", "b"];
+        assert!(team_info_left_out(&[&colours, &["_", "_", "_", "isDead"]]).is_empty());
+    }
+
+    #[test]
+    fn a_call_that_reads_the_new_order_leaves_the_team_info_adapter_out() {
+        let income = ["_", "_", "_", "_", "_", "_", "incomeMultiplier"];
+        assert_eq!(team_info_left_out(&[&income]), ["spring-get-team-info-105"]);
+        let keys = ["_", "_", "_", "_", "_", "_", "_", "customKeys"];
+        assert_eq!(team_info_left_out(&[&keys]), ["spring-get-team-info-105"]);
+        let opts = [
+            "id", "leader", "dead", "ai", "side", "ally", "mult", "teamOpts",
+        ];
+        assert_eq!(team_info_left_out(&[&opts]), ["spring-get-team-info-105"]);
+        let old = ["_", "_", "_", "_", "_", "_", "teamOptions"];
+        assert!(team_info_left_out(&[&income, &old]).is_empty());
+        // Reading no further than the side decides nothing.
+        assert_eq!(
+            team_info_left_out(&[&income, &["_", "_", "_", "_", "side"]]),
+            ["spring-get-team-info-105"]
+        );
     }
 
     #[test]
@@ -1760,14 +1889,14 @@ mod tests {
         }
     }
 
-    /// The preludes for manifests 9, 11 and 12, as the Lua tests in
+    /// The preludes for manifests 9, 11, 12 and 13, as the Lua tests in
     /// `lua/compat/tests/` load them. Earlier manifests' synced preludes call
     /// `rawget`, which the tests' synced state lacks, so they are not kept.
     /// `COILBOX_WRITE_FIXTURE=1` writes them again after a deliberate change to
     /// how a prelude is built.
     #[test]
     fn the_lua_tests_load_the_preludes_this_crate_builds() {
-        for n in [9, 11, 12] {
+        for n in [9, 11, 12, 13] {
             let m = manifest(n).unwrap();
             for state in [LuaState::Synced, LuaState::Unsynced] {
                 let built = prelude(&m, state).unwrap();

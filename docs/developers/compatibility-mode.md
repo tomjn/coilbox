@@ -101,7 +101,7 @@ To change a fix, add a new fix with a new id, and a new manifest that lists it i
 
 `hashes.txt` is what holds this in place. The test `recorded_hashes_match_the_embedded_fixes` in `coilbox-compat` fails for a listed fix whose file no longer matches its recorded hash, with "changed after it was listed. Add a new fix with a new id instead".
 
-The call-in adapters in `ADAPTERS` in `crates/coilbox-compat/src/lib.rs` follow the same rule. They decide which of the `UnitDamaged` and `AllowCommand` fixes a game gets, so changing one needs a new manifest too.
+The call-in adapters in `ADAPTERS` in `crates/coilbox-compat/src/lib.rs` follow the same rule. They decide which of the `UnitDamaged`, `AllowCommand` and `Spring.GetTeamInfo` fixes a game gets, so changing one needs a new manifest too. A call-in adapter reads the arguments a game's handlers take. The `Spring.GetTeamInfo` one reads the names a game's calls put the results in, such as `teamOptions` in `local _, _, _, _, _, _, teamOptions = Spring.GetTeamInfo(teamID)`. A call inside `select` is not read, so it decides nothing.
 
 ## Add a fix
 
@@ -138,7 +138,7 @@ A line that moves for a manifest that already shipped is a bug, never a hash to 
 
 The 3do converter follows the same rule. A manifest's `converter` records the `coilbox-3do-convert` version it was made with, but coilbox does not check that version when it builds, so raising the crate's version leaves every manifest buildable. A change to what the converter writes for a model or a sheet is a writer change like any other. Keep the old output for the older writers by passing the writer down to the converter, and put the new output behind a check beside `WRITER`. Two more golden tests fail when the converter's output moves, `a_fixed_conversion_writes_the_same_bytes` and `the_sheet_png_is_the_same_bytes` in `crates/coilbox-3do-convert/src/lib.rs`.
 
-The test `the_lua_tests_load_the_preludes_this_crate_builds` checks the preludes for manifest 2 that the Lua tests load from `lua/compat/tests/fixtures/`. After a deliberate change to how a prelude is built, run it with `COILBOX_WRITE_FIXTURE=1` to write them again.
+The test `the_lua_tests_load_the_preludes_this_crate_builds` checks the preludes for manifests 9, 11, 12 and 13 that the Lua tests load from `lua/compat/tests/fixtures/`. After a deliberate change to how a prelude is built, run it with `COILBOX_WRITE_FIXTURE=1` to write them again.
 
 ## Run the tests
 

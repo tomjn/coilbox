@@ -24,6 +24,30 @@
     "changelog": "make Spring.Get{Unit,Factory}Commands always expect a second argument"
   },
   {
+    "id": "removed:snext",
+    "kind": "removed",
+    "name": "snext",
+    "since": "2025.01.1",
+    "note": "From 97.0 the unsynced half of LuaRules and LuaGaia had snext as the same function as next (rts/Lua/LuaSyncedTable.cpp), and the engine's LuaGadgets/system.lua put it in every gadget's System table. Removed in commit d083766c74.",
+    "changelog": "removed `snext`, `spairs` and `sipairs`. These functions can be replaced by the regular `next`, `pairs`, and `ipairs` respectively with no change in behaviour."
+  },
+  {
+    "id": "removed:spairs",
+    "kind": "removed",
+    "name": "spairs",
+    "since": "2025.01.1",
+    "note": "From 97.0 the unsynced half of LuaRules and LuaGaia had spairs as the same function as pairs (rts/Lua/LuaSyncedTable.cpp), and the engine's LuaGadgets/system.lua put it in every gadget's System table. Removed in commit d083766c74.",
+    "changelog": "removed `snext`, `spairs` and `sipairs`. These functions can be replaced by the regular `next`, `pairs`, and `ipairs` respectively with no change in behaviour."
+  },
+  {
+    "id": "removed:sipairs",
+    "kind": "removed",
+    "name": "sipairs",
+    "since": "2025.01.1",
+    "note": "From 97.0 the unsynced half of LuaRules and LuaGaia had sipairs as the same function as ipairs (rts/Lua/LuaSyncedTable.cpp), and the engine's LuaGadgets/system.lua put it in every gadget's System table. Removed in commit d083766c74.",
+    "changelog": "removed `snext`, `spairs` and `sipairs`. These functions can be replaced by the regular `next`, `pairs`, and `ipairs` respectively with no change in behaviour."
+  },
+  {
     "id": "defTag:UnitDefs.commander",
     "kind": "defTag",
     "name": "UnitDefs.commander",
