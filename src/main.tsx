@@ -1,5 +1,5 @@
 import { I18nProvider } from "@lingui/react";
-import { AppFrame, type HomeOverride } from "@picoframe/frame";
+import type { HomeOverride } from "@picoframe/frame";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
@@ -11,6 +11,7 @@ import { loadContentArt } from "./home/contentArt";
 import HomeRoute from "./home/HomeRoute";
 import { loadHomeMarkup } from "./home/markup";
 import { i18n, loadLocale } from "./i18n";
+import { LocalisedAppFrame } from "./i18n/LocalisedAppFrame";
 import { bootLocale, LANGUAGE_KEY } from "./i18n/language";
 import { applyUiZoom, DEFAULT_UI_ZOOM, UI_ZOOM_KEY } from "./lib/uiZoom";
 import { applyProfilePages } from "./profile/CustomPage";
@@ -210,7 +211,7 @@ createRoot(root).render(
   <StrictMode>
     <I18nProvider i18n={i18n}>
       <ErrorBoundary>
-        <AppFrame
+        <LocalisedAppFrame
           plugins={appPlugins}
           title={appTitle}
           home={home}

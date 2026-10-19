@@ -5,6 +5,7 @@
  * handler without this sheet knowing about it.
  */
 
+import { t } from "@lingui/core/macro";
 import {
   Dialog,
   DialogContent,
@@ -31,7 +32,7 @@ export function ShortcutSheet({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" closeLabel={t`Close`}>
         <DialogHeader>
           <DialogTitle>Keyboard shortcuts</DialogTitle>
         </DialogHeader>
