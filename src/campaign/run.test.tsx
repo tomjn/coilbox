@@ -27,6 +27,7 @@ const {
   loadUnitCopies,
   playLaunch,
   progressState,
+  resolveCompatTarget,
   saved,
   scanState,
 } = vi.hoisted(() => ({
@@ -36,6 +37,7 @@ const {
   launchScenario: vi.fn(),
   loadUnitCopies: vi.fn(),
   playLaunch: vi.fn(),
+  resolveCompatTarget: vi.fn(),
   // Dependency archives the scanned game lacks, set per test.
   scanState: { missingDependencies: undefined as string[] | undefined },
   // The stored progress document each render starts from, set per test.
@@ -44,6 +46,10 @@ const {
 }));
 
 vi.mock("../scenario/launch", () => ({ launchScenario }));
+vi.mock("../content/compatSettings", () => ({
+  useCompatSettings: () => [{}],
+}));
+vi.mock("../play/compatTarget", () => ({ resolveCompatTarget }));
 vi.mock("./units", async (importActual) => ({
   ...(await importActual<typeof import("./units")>()),
   composeUnits,
@@ -238,6 +244,8 @@ beforeEach(() => {
   installedAtlases.folders = [];
   playLaunch.mockReset();
   playLaunch.mockResolvedValue({ exitCode: null });
+  resolveCompatTarget.mockReset();
+  resolveCompatTarget.mockResolvedValue({ kind: "off" });
 });
 
 afterEach(() => {
@@ -439,6 +447,110 @@ describe("a campaign with units from the unit builder", () => {
     });
 
     expect(vi.mocked(toBattleConfig).mock.calls[0][0].gameType).toBe("BA");
+  });
+});
+
+// Issue #4664. A game with its compatibility switch on plays over its mutator,
+// and the campaign's units mutator depends on that mutator.
+describe("a mission on a game with compatibility mode", () => {
+  const USE = {
+    kind: "use",
+    gameType: "BA (compat 1)",
+    gameArchive: "coilbox-compat-ba-1.sdd",
+    baseName: "BA",
+  };
+  const tank = {
+    unitName: "tank",
+    projectId: "p-tank",
+    name: "Tank",
+    builtBy: ["armlab"],
+    copiedAt: "",
+  };
+
+  async function start(withUnits: boolean, scenario = false) {
+    const { campaign, mission } = campaignWith(flat());
+    const played = scenario ? mission : { ...mission, scenario: undefined };
+    const withUnitsCampaign = {
+      ...campaign,
+      ...(withUnits ? { units: [tank] } : {}),
+      missions: [played],
+    };
+    const { result } = renderHook(() =>
+      useMissionRun(withUnitsCampaign, played),
+    );
+    await act(async () => {
+      await result.current.start();
+    });
+    return { result, campaign: withUnitsCampaign };
+  }
+
+  it("resolves the game the mission plays", async () => {
+    await start(false);
+
+    expect(resolveCompatTarget.mock.calls[0][0].game.name).toBe("BA");
+  });
+
+  it("launches a preset mission as the mutator and names the base game", async () => {
+    resolveCompatTarget.mockResolvedValue(USE);
+    await start(false);
+
+    const config = vi.mocked(toBattleConfig).mock.calls[0][0];
+    expect(config.gameType).toBe("BA (compat 1)");
+    expect(config.compatBase).toBe("BA");
+  });
+
+  it("writes the units mutator over the compat mutator, not the game", async () => {
+    resolveCompatTarget.mockResolvedValue(USE);
+    composeUnits.mockResolvedValue({
+      name: "Coilbox campaign c1",
+      leftOut: [],
+    });
+    await start(true);
+
+    expect(composeUnits.mock.calls[0][2]).toEqual({
+      name: "BA (compat 1)",
+      archive: "coilbox-compat-ba-1.sdd",
+    });
+    const config = vi.mocked(toBattleConfig).mock.calls[0][0];
+    expect(config.gameType).toBe("Coilbox campaign c1");
+    expect(config.compatBase).toBe("BA");
+  });
+
+  it("hands a scenario mission the mutator", async () => {
+    resolveCompatTarget.mockResolvedValue(USE);
+    await start(false, true);
+
+    expect(launchScenario.mock.calls[0][0].compat).toEqual(USE);
+  });
+
+  it("launches the game itself and reads nothing more when the switch is off", async () => {
+    composeUnits.mockResolvedValue({
+      name: "Coilbox campaign c1",
+      leftOut: [],
+    });
+    await start(true);
+
+    expect(composeUnits.mock.calls[0][2]).toEqual({
+      name: "BA",
+      archive: "ba.sdz",
+    });
+    expect(
+      vi.mocked(toBattleConfig).mock.calls[0][0].compatBase,
+    ).toBeUndefined();
+  });
+
+  it.each([
+    "its mutator has not been built.",
+    "its mutator is out of date: the fixes changed.",
+  ])("launches nothing and says why when %s", async (why) => {
+    const message = `Compatibility mode is on for BA, but ${why} Open BA under Library > Games and choose Rebuild.`;
+    resolveCompatTarget.mockResolvedValue({ kind: "blocked", message });
+    const { result } = await start(true, true);
+
+    expect(result.current.error).toBe(message);
+    expect(composeUnits).not.toHaveBeenCalled();
+    expect(launchScenario).not.toHaveBeenCalled();
+    expect(playLaunch).not.toHaveBeenCalled();
   });
 });
 
