@@ -53,13 +53,15 @@ describe("chip filters", () => {
     expect(matchesPlayType(undefined, "1v1")).toBe(false);
   });
 
-  it("narrow to what is on disk under Installed", () => {
+  it("narrow to what is on disk under My Maps, and the rest under New Maps", () => {
     const installed = maps.filter((m) => matchesMapScope(m, "installed"));
     expect(installed.map((m) => m.id)).toEqual([
       "Comet Catcher Redux",
       "my_test_map v3",
     ]);
-    expect(maps.filter((m) => matchesMapScope(m, "all"))).toHaveLength(4);
+    expect(
+      maps.filter((m) => matchesMapScope(m, "notInstalled")).map((m) => m.id),
+    ).toEqual(["Isis", "Supreme Isthmus v2"]);
     expect(isMapOnDisk(byId("Isis"))).toBe(false);
   });
 

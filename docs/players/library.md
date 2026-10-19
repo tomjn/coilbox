@@ -205,7 +205,7 @@ Select anywhere else on an installed map to open its page.
 
 To narrow the grid:
 
-- Select a button at the top: All, Installed, 1v1, Team or Water. All and Installed say how many maps they hold. The page opens on Installed when you have any maps.
+- Select a button at the top: My Maps, New Maps, 1v1, Team or Water. My Maps is the maps you have and New Maps is the maps you do not, and each says how many it holds. The page opens on My Maps when you have any maps, and on New Maps when you have none. 1v1, Team and Water look through every map.
 - Type in Search maps… to match part of a map's name.
 - Pick a sort from the list beside it: Name A–Z, Name Z–A, Largest or Smallest. Name A–Z is the default.
 

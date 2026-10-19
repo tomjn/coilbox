@@ -148,21 +148,21 @@ describe("Maps page", () => {
     renderPage();
     expect(
       screen
-        .getByRole("radio", { name: /Installed/ })
+        .getByRole("radio", { name: /My Maps/ })
         .getAttribute("aria-checked"),
     ).toBe("true");
     expect(cards()).toHaveLength(2);
   });
 
+  it("splits the maps between My Maps and New Maps", () => {
+    renderPage();
+    expect(cardTitles()).toEqual(["Comet Catcher Redux", "my_test_map v3"]);
+    pressChip(/New Maps/);
+    expect(cardTitles()).toEqual(["Isis", "Supreme Isthmus v2"]);
+  });
+
   it("draws an installed map on two mirrors once, installed, with both sources", () => {
     renderPage();
-    pressChip(/All/);
-    expect(cardTitles()).toEqual([
-      "Comet Catcher Redux",
-      "Isis",
-      "my_test_map v3",
-      "Supreme Isthmus v2",
-    ]);
     const comet = card("Comet Catcher Redux");
     expect(within(comet).getByText("Installed")).toBeTruthy();
     expect(
@@ -173,13 +173,13 @@ describe("Maps page", () => {
 
   it("gives each card the state the record holds", () => {
     renderPage();
-    pressChip(/All/);
-    expect(within(card("Isis")).getByText("Queued")).toBeTruthy();
-    expect(within(card("Isis")).getByRole("button", { name: "Cancel" }));
     expect(within(card("my_test_map v3")).getByText("Local")).toBeTruthy();
     expect(
       within(card("my_test_map v3")).getByText("12 × 12 · not on any mirror"),
     ).toBeTruthy();
+    pressChip(/New Maps/);
+    expect(within(card("Isis")).getByText("Queued")).toBeTruthy();
+    expect(within(card("Isis")).getByRole("button", { name: "Cancel" }));
     const isthmus = card("Supreme Isthmus v2");
     expect(within(isthmus).queryByText("Installed")).toBeNull();
     fireEvent.click(within(isthmus).getByRole("button", { name: "Install" }));
@@ -196,12 +196,12 @@ describe("Maps page", () => {
     const chips = within(screen.getByRole("radiogroup", { name: "Show" }))
       .getAllByRole("radio")
       .map((c) => c.textContent);
-    expect(chips).toEqual(["All4", "Installed2", "1v1", "Team", "Water"]);
+    expect(chips).toEqual(["My Maps2", "New Maps2", "1v1", "Team", "Water"]);
   });
 
   it("filters by start count and tag through the play type chips", () => {
     renderPage();
-    pressChip(/^Installed/);
+    pressChip(/^My Maps/);
     expect(cardTitles()).toEqual(["Comet Catcher Redux", "my_test_map v3"]);
     pressChip(/^1v1/);
     expect(cardTitles()).toEqual(["Supreme Isthmus v2"]);
@@ -225,7 +225,7 @@ describe("Maps page", () => {
     const chips = within(screen.getByRole("radiogroup", { name: "Show" }))
       .getAllByRole("radio")
       .map((c) => c.textContent);
-    expect(chips).toEqual(["All4", "Installed2"]);
+    expect(chips).toEqual(["My Maps2", "New Maps2"]);
   });
 
   it("names a mirror index that could not be read", () => {

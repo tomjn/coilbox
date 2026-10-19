@@ -54,8 +54,8 @@ const PAGE = 200;
 
 /** What a chip with nothing in it says. */
 const EMPTY_CHIP: Record<MapChip, string> = {
-  all: "No maps.",
   installed: "No maps installed.",
+  notInstalled: "Every map is installed.",
   "1v1": "No 1v1 maps.",
   team: "No team maps.",
   water: "No water maps.",
@@ -120,12 +120,13 @@ export default function MapsPage() {
     () => ({
       all: records.length,
       installed: records.filter(isMapOnDisk).length,
+      notInstalled: records.filter((m) => !isMapOnDisk(m)).length,
     }),
     [records],
   );
-  // The player's own maps until they pick a chip, or every map when they have
-  // none yet.
-  const chip = picked ?? (counts.installed > 0 ? "installed" : "all");
+  // The player's own maps until they pick a chip, or the maps they could get
+  // when they have none yet.
+  const chip = picked ?? (counts.installed > 0 ? "installed" : "notInstalled");
 
   // Sorted by the sizes known without the hub, so the facts that arrive for
   // the cards on screen never move which cards are on screen.
@@ -156,10 +157,7 @@ export default function MapsPage() {
   const chips = MAP_CHIPS.filter((c) => hubOn || !isPlayType(c.value)).map(
     (c) => ({
       ...c,
-      count:
-        c.value === "all" || c.value === "installed"
-          ? counts[c.value]
-          : undefined,
+      count: isPlayType(c.value) ? undefined : counts[c.value],
     }),
   );
 
