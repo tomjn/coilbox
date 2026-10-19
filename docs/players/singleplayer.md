@@ -116,7 +116,7 @@ You save a game from inside the game, not from coilbox. Type /save and a name in
 To carry on from a save:
 
 1. Open Play > Save Games in the sidebar.
-2. If you have more than one engine, pick the one you played with from the list at the top.
+2. The page lists the saves of your preferred engine. If you played on another engine, make that one your preferred engine in Settings, then Library > Engines. See [Engines](library.md#engines).
 3. Find the save. Each one shows the map, the date it was saved and the game. Use the filter box and the sort list to find it in a long list.
 4. Select Resume.
 
