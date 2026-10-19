@@ -988,6 +988,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "coilbox-ui-error"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "coilbox-unitpatch"
 version = "0.0.0"
 dependencies = [
@@ -6700,6 +6708,7 @@ dependencies = [
  "coilbox-portable",
  "coilbox-springlua",
  "coilbox-tdf",
+ "coilbox-ui-error",
  "coilbox-unitpatch",
  "filetime",
  "picoframe-core",

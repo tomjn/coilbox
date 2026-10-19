@@ -37,6 +37,9 @@ zip = { workspace = true }
 # `is_safe_rel`, the path-traversal guard the packaged archive's writer shares
 # with the profile/campaign plugins and the scenario archive reader.
 coilbox-portable = { path = "../coilbox-portable" }
+# The error a command reports as a code and parameters the frontend translates
+# (issue #4595). Used for the "already exists" refusal when packaging an `.sdd`.
+coilbox-ui-error = { path = "../coilbox-ui-error" }
 # The edit-in-place route (issue #2635): the patcher that changes one field in
 # a unit file, and the backup-before-write helpers the .3do installer shares.
 coilbox-unitpatch = { path = "../coilbox-unitpatch" }

@@ -48,6 +48,7 @@ import { OptionSelect } from "@/components/OptionSelect";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { ConfigOption } from "@/content/bindings";
 import { useUnitsyncScan } from "@/content/config";
+import { describeError, parseUiError, UI_ERROR_CODES } from "@/i18n/uiError";
 import { usePreferredTarget } from "@/play/config";
 import type { UnitClones } from "../../clones";
 import {
@@ -231,7 +232,7 @@ function TweakSlotExportSection({
     } catch (error) {
       setPhase({
         state: "failed",
-        message: error instanceof Error ? error.message : String(error),
+        message: describeError(error),
       });
     }
   }
@@ -458,7 +459,8 @@ export function PackagePanel({
         if (
           shape === "sdd" &&
           error instanceof Error &&
-          error.message.includes("already exists")
+          parseUiError(error.message).code ===
+            UI_ERROR_CODES.packageTargetExists
         ) {
           const replace = await ask(
             `${dest} already exists. Replace it? Anything already there will be deleted first.`,
@@ -488,7 +490,7 @@ export function PackagePanel({
     } catch (error) {
       setPhase({
         state: "failed",
-        message: error instanceof Error ? error.message : String(error),
+        message: describeError(error),
       });
     }
   }

@@ -48,6 +48,7 @@ import { importContainerFile } from "@/deeplink/bindings";
 import { useImportParam } from "@/deeplink/useImportParam";
 import { nextDrawerKey } from "@/general/drawerKey";
 import { useRecordHubImport } from "@/hub/imports";
+import { describeError } from "@/i18n/uiError";
 import { formatDate } from "@/lib/format";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { useCheckpoints } from "../checkpoints";
@@ -326,7 +327,7 @@ export default function ProjectsPage() {
       }
       navigate(projectPath(createProject(imported).id));
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     }
   }
 
