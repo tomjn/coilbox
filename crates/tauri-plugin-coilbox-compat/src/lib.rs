@@ -69,10 +69,10 @@ pub fn build(
     manifest_version: u32,
     coilbox_version: &str,
 ) -> Result<Built, String> {
+    let manifest = coilbox_compat::manifest(manifest_version)
+        .ok_or_else(|| format!("there is no compat manifest {manifest_version}"))?;
     // The models are converted as the writer the manifest names converts them.
-    let writer = coilbox_compat::manifest(manifest_version)
-        .ok_or_else(|| format!("there is no compat manifest {manifest_version}"))?
-        .writer;
+    let writer = manifest.writer;
     let scan = tauri_plugin_coilbox_unitsync::lua_compat_scan_blocking(
         engine_path,
         data_dir,
@@ -89,7 +89,7 @@ pub fn build(
         game_name,
         &declared,
         base_checksum,
-        manifest_version,
+        &manifest,
         coilbox_version,
         &handlers,
         |file| {
@@ -130,13 +130,15 @@ fn build_reading(
     convert: impl FnOnce() -> Result<models::Models, String>,
     read_defs: impl FnOnce() -> Result<String, String>,
 ) -> Result<Built, String> {
+    let manifest = coilbox_compat::manifest(manifest_version)
+        .ok_or_else(|| format!("there is no compat manifest {manifest_version}"))?;
     build_with(
         data_dir,
         archive_name,
         game_name,
         declared,
         base_checksum,
-        manifest_version,
+        &manifest,
         coilbox_version,
         handlers,
         &read,
@@ -146,7 +148,7 @@ fn build_reading(
     )
 }
 
-/// [`build`], with `read` returning a file of the base game by path as the
+/// [`build`] from `manifest`, with `read` returning a file of the base game by path as the
 /// worker's text read gives it, `read_bytes` the same file's bytes, `handlers`
 /// the call-in handlers the base game's Lua defines, `convert` its converted
 /// models, and `read_defs` its defs as `unitsync_unit_defs` reads them.
@@ -164,7 +166,7 @@ fn build_with(
     game_name: &str,
     declared: &DeclaredGame,
     base_checksum: &str,
-    manifest_version: u32,
+    manifest: &coilbox_compat::Manifest,
     coilbox_version: &str,
     handlers: &[coilbox_compat::Handler],
     mut read: impl FnMut(&str) -> Result<Option<String>, String>,
@@ -172,10 +174,9 @@ fn build_with(
     convert: impl FnOnce() -> Result<models::Models, String>,
     read_defs: impl FnOnce() -> Result<String, String>,
 ) -> Result<Built, String> {
-    let manifest = coilbox_compat::manifest(manifest_version)
-        .ok_or_else(|| format!("there is no compat manifest {manifest_version}"))?;
-    mutator::check_pins(&manifest)?;
-    let manifest = coilbox_compat::for_game(&manifest, handlers);
+    let manifest_version = manifest.version;
+    mutator::check_pins(manifest)?;
+    let manifest = coilbox_compat::for_game(manifest, handlers);
     if base_checksum.trim().is_empty() {
         return Err(format!(
             "unitsync gave no checksum for {archive_name}, so a change to it could not be noticed"
@@ -694,7 +695,7 @@ mod tests {
                 "XTA 9.65",
                 &DeclaredGame::default(),
                 "1234abcd",
-                n,
+                &coilbox_compat::manifest(n).unwrap(),
                 "1.2.3",
                 &[],
                 |file| Ok((file == main).then(|| String::from_utf8_lossy(raw).into_owned())),
@@ -1027,6 +1028,14 @@ mod tests {
     /// engine lowercases names when it checksums an archive, and a
     /// case-insensitive filesystem merges `Objects3D/` and `objects3d/`.
     fn golden_build(n: u32, fixture: &Fixture) -> Vec<(String, Vec<u8>)> {
+        golden_build_of(&coilbox_compat::manifest(n).unwrap(), fixture)
+    }
+
+    /// [`golden_build`] from `manifest` as given.
+    fn golden_build_of(
+        manifest: &coilbox_compat::Manifest,
+        fixture: &Fixture,
+    ) -> Vec<(String, Vec<u8>)> {
         let (_keep, data) = root();
         let staging = tempfile::tempdir().unwrap();
         let read = |file: &str| -> Result<Option<String>, String> {
@@ -1037,7 +1046,7 @@ mod tests {
                 .map(|(_, text)| text.to_string()))
         };
         let handlers = handlers::handlers_in(&scan_of(fixture), fixture.archive).unwrap();
-        let built = build_reading(
+        let built = build_with(
             &data,
             fixture.archive,
             fixture.game,
@@ -1047,10 +1056,11 @@ mod tests {
                 version: fixture.declared.1.map(String::from),
             },
             "1234abcd",
-            n,
+            manifest,
             "1.2.3",
             &handlers,
             read,
+            |file| Ok(read(file)?.map(String::into_bytes)),
             || models::convert_reading(read, || run_converter(staging.path()), staging.path()),
             no_defs,
         )
@@ -1136,14 +1146,14 @@ mod tests {
         assert!(text(&defs_only, weapons).unwrap().contains(bombs));
     }
 
-    /// The hash of every fixed game built from manifest `n`.
-    fn golden_hash(n: u32) -> String {
+    /// The hash of every fixed game built from `manifest`.
+    fn golden_hash(manifest: &coilbox_compat::Manifest) -> String {
         use sha2::{Digest, Sha256};
         let mut hash = Sha256::new();
         for fixture in FIXTURES {
             hash.update(fixture.archive.as_bytes());
             hash.update([0]);
-            for (path, bytes) in golden_build(n, fixture) {
+            for (path, bytes) in golden_build_of(manifest, fixture) {
                 hash.update(path.as_bytes());
                 hash.update([0]);
                 hash.update((bytes.len() as u64).to_le_bytes());
@@ -1196,7 +1206,7 @@ mod tests {
     #[test]
     fn the_fixed_games_build_the_same_bytes_from_every_manifest() {
         let built: Vec<(u32, String)> = (1..=coilbox_compat::latest())
-            .map(|n| (n, golden_hash(n)))
+            .map(|n| (n, golden_hash(&coilbox_compat::manifest(n).unwrap())))
             .collect();
         let recorded: Vec<(u32, String)> =
             GOLDEN.iter().map(|(n, h)| (*n, h.to_string())).collect();
@@ -1207,6 +1217,25 @@ mod tests {
              the change behind a new coilbox_compat::WRITER and add a compat manifest \
              that names it:\n{built:#?}"
         );
+    }
+
+    /// Issue #4678: once `coilbox-3do-convert` moves past the version a manifest
+    /// names, the build still takes that manifest and writes the bytes its
+    /// golden line records. A changed pin stands in for the raised crate, since
+    /// either way the two versions differ.
+    #[test]
+    fn a_raised_converter_version_still_builds_every_manifest_to_its_golden_bytes() {
+        let raised = {
+            let (major, rest) = coilbox_3do_convert::VERSION.split_once('.').unwrap();
+            let minor: u32 = rest.split('.').next().unwrap().parse().unwrap();
+            format!("{major}.{}.0", minor + 1)
+        };
+        for (n, golden) in GOLDEN {
+            let mut manifest = coilbox_compat::manifest(*n).unwrap();
+            assert_ne!(manifest.converter.version, raised);
+            manifest.converter.version = raised.clone();
+            assert_eq!(golden_hash(&manifest), *golden, "manifest {n}");
+        }
     }
 
     fn some_models(staging: &std::path::Path) -> Result<models::Models, String> {

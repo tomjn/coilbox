@@ -133,7 +133,7 @@ A line that moves for a manifest that already shipped is a bug, never a hash to 
 3. Add a manifest that names the new writer.
 4. Add the new manifest's golden line, and the new writer's hash where a worker test keeps one per writer. Every older line stays the same.
 
-A coilbox also refuses a manifest whose `converter` does not match its own `coilbox-3do-convert` version. That pin has one version per coilbox, so moving it makes every older manifest one the new coilbox cannot build.
+The 3do converter follows the same rule. A manifest's `converter` records the `coilbox-3do-convert` version it was made with, but coilbox does not check that version when it builds, so raising the crate's version leaves every manifest buildable. A change to what the converter writes for a model or a sheet is a writer change like any other. Keep the old output for the older writers by passing the writer down to the converter, and put the new output behind a check beside `WRITER`. Two more golden tests fail when the converter's output moves, `a_fixed_conversion_writes_the_same_bytes` and `the_sheet_png_is_the_same_bytes` in `crates/coilbox-3do-convert/src/lib.rs`.
 
 The test `the_lua_tests_load_the_preludes_this_crate_builds` checks the preludes for manifest 2 that the Lua tests load from `lua/compat/tests/fixtures/`. After a deliberate change to how a prelude is built, run it with `COILBOX_WRITE_FIXTURE=1` to write them again.
 

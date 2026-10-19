@@ -30,10 +30,12 @@ pub use atlas::{
 pub use convert::{corner_uv, is_dead_duplicate, to_s3o, Converted, Rects};
 pub use sheet::{Sheet, SheetTile, FIRST_TOP_ROWS_VERSION, SHEET_DIR, SHEET_KIND, SHEET_VERSION};
 
-/// This converter's version, from `Cargo.toml`. A compat manifest pins it
-/// (issue #4556), because two players only build the same mutator if they
-/// convert with the same code. Any change to what a conversion writes moves
-/// it, and `a_fixed_conversion_writes_the_same_bytes` fails until it does.
+/// This converter's version, from `Cargo.toml`. A compat manifest records the
+/// version it was made with, but a build does not check it (issue #4678), so
+/// moving it leaves every manifest buildable. What decides a compat mutator's
+/// bytes is the compat writer its manifest names, so a change to what a
+/// conversion writes keeps the old output for the writers that had it and
+/// goes behind a new one (see `coilbox_compat::WRITER`).
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// A finished sheet as PNG bytes, or `None` if the encoder refuses it.
@@ -290,10 +292,11 @@ mod tests {
     }
 
     /// The sheet's pixels, the `.s3o` and the sidecar of one fixed conversion,
-    /// hashed together. If this fails, the converter writes different bytes
-    /// than the version a compat manifest pins it at. Bump `version` in this
-    /// crate's `Cargo.toml`, add a compat manifest that pins the new version,
-    /// and only then record the new hash here.
+    /// hashed together. If this fails, the converter writes different bytes,
+    /// and a compat mutator built from a manifest players may already have
+    /// would change. Keep the old output for the compat writers that had it,
+    /// put the change behind a new `coilbox_compat::WRITER` and add a compat
+    /// manifest that names it, and only then record the new hash here.
     #[test]
     fn a_fixed_conversion_writes_the_same_bytes() {
         use sha2::{Digest, Sha256};
@@ -326,10 +329,9 @@ mod tests {
         hash.update(Sheet::of(&packed, "objects3d.png").write().expect("record"));
         let hex: String = hash.finalize().iter().map(|b| format!("{b:02x}")).collect();
 
-        assert_eq!(VERSION, "0.1.0");
         assert_eq!(
             hex, "1bca172f51de4114d1d1ee6a5abbc00959f14409daa6cff874c503277dbbe685",
-            "the converter's output changed, so its version has to move"
+            "the converter's output changed, so it needs a new compat writer"
         );
     }
 
@@ -428,8 +430,8 @@ mod tests {
     /// The sheet's PNG bytes, which [`a_fixed_conversion_writes_the_same_bytes`]
     /// does not cover because it hashes the pixels. If this fails, the PNG
     /// writer changed what it writes for the same pixels. That changes the
-    /// mutator two players build, so it needs the same version bump and new
-    /// compat manifest that test asks for.
+    /// mutator two players build, so it needs the same new compat writer and
+    /// manifest that test asks for.
     #[test]
     fn the_sheet_png_is_the_same_bytes() {
         use sha2::{Digest, Sha256};
@@ -439,7 +441,6 @@ mod tests {
             .iter()
             .map(|b| format!("{b:02x}"))
             .collect();
-        assert_eq!(VERSION, "0.1.0");
         assert_eq!(
             hex, "a96f7118a61f79b7b8df3bfc781862f00e14217f858a1b40522bf1827994101d",
             "the sheet's PNG bytes changed"

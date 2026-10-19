@@ -201,8 +201,8 @@ fn first_writer() -> u32 {
     1
 }
 
-/// One compat version: the fixes that make it up and the converter and writer
-/// it pins.
+/// One compat version: the fixes that make it up, the converter it was made
+/// with and the writer it pins.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct Manifest {
     pub version: u32,

@@ -205,9 +205,14 @@ pub fn files(
     Ok(files)
 }
 
-/// Refuse a manifest whose converter is not the one this build carries, or
-/// whose writer is newer than the newest this build keeps: its mutator could
-/// not be reproduced byte for byte.
+/// Refuse a manifest whose writer is newer than the newest this build keeps,
+/// or whose converter is not `coilbox-3do-convert`: its mutator could not be
+/// reproduced byte for byte.
+///
+/// The converter's version is not checked (issue #4678). This build carries
+/// one converter, and a version check would stop it building every manifest
+/// made with an older one. A change to what the converter writes goes behind a
+/// compat writer instead, so the writer the manifest names decides the bytes.
 pub fn check_pins(manifest: &coilbox_compat::Manifest) -> Result<(), String> {
     if !coilbox_compat::knows_writer(manifest.writer) {
         return Err(format!(
@@ -218,13 +223,10 @@ pub fn check_pins(manifest: &coilbox_compat::Manifest) -> Result<(), String> {
         ));
     }
     let pin = &manifest.converter;
-    if pin.name != "coilbox-3do-convert" || pin.version != coilbox_3do_convert::VERSION {
+    if pin.name != "coilbox-3do-convert" {
         return Err(format!(
-            "compat {} needs {} {}, and this coilbox has coilbox-3do-convert {}",
-            manifest.version,
-            pin.name,
-            pin.version,
-            coilbox_3do_convert::VERSION
+            "compat {} needs the converter {}, and this coilbox has coilbox-3do-convert",
+            manifest.version, pin.name
         ));
     }
     Ok(())
@@ -679,8 +681,10 @@ mod tests {
         let m = coilbox_compat::manifest(coilbox_compat::latest()).unwrap();
         assert_eq!(check_pins(&m), Ok(()));
         let mut other = m.clone();
-        other.converter.version = "0.0.0".into();
-        assert!(check_pins(&other).is_err());
+        other.converter.name = "another-3do-convert".into();
+        assert!(check_pins(&other)
+            .unwrap_err()
+            .contains("another-3do-convert"));
         let mut other = m.clone();
         other.writer = coilbox_compat::WRITER + 1;
         assert!(check_pins(&other).unwrap_err().contains("writer"));
@@ -695,6 +699,17 @@ mod tests {
         for n in 1..=coilbox_compat::latest() {
             let m = coilbox_compat::manifest(n).unwrap();
             assert_eq!(check_pins(&m), Ok(()), "manifest {n}");
+        }
+    }
+
+    /// Issue #4678: a manifest made with another version of the converter
+    /// still passes, older or newer.
+    #[test]
+    fn the_converter_version_a_manifest_names_is_not_a_pin() {
+        for version in ["0.0.1", "0.2.0", "1.0.0"] {
+            let mut m = coilbox_compat::manifest(1).unwrap();
+            m.converter.version = version.into();
+            assert_eq!(check_pins(&m), Ok(()), "{version}");
         }
     }
 

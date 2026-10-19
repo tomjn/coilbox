@@ -18,8 +18,6 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 # The manifests that say what each compat version holds.
 coilbox-compat = { path = "../coilbox-compat" }
-# Its version, which a manifest pins.
-coilbox-3do-convert = { path = "../coilbox-3do-convert" }
 # `refuse_in_bundle`, so a distribution's bundled content is never written into.
 coilbox-portable = { path = "../coilbox-portable" }
 # `write_mutator` and `lua_string`, the writers the workshop test mutator uses.
@@ -35,6 +33,9 @@ coilbox-luacompat = { path = "../coilbox-luacompat" }
 tempfile = { workspace = true }
 
 [dev-dependencies]
+# Its encoders build the fixture's models, and its version stands for a raised
+# one in the test that the version is not a pin (issue #4678).
+coilbox-3do-convert = { path = "../coilbox-3do-convert" }
 # Evaluates the written modinfo.lua the way the engine reads it.
 coilbox-springlua = { path = "../coilbox-springlua" }
 # Hashes the files a fixed build writes, so a change to them fails a test until
