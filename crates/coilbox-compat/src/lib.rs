@@ -58,6 +58,7 @@ const MANIFESTS: &[(u32, &str)] = &[
     (13, include_str!("../../../lua/compat/manifests/13.json")),
     (14, include_str!("../../../lua/compat/manifests/14.json")),
     (15, include_str!("../../../lua/compat/manifests/15.json")),
+    (16, include_str!("../../../lua/compat/manifests/16.json")),
 ];
 
 /// Every fix file, by id.
@@ -69,6 +70,10 @@ const FIXES: &[(&str, &str)] = &[
     (
         "callin-unit-damaged-95",
         include_str!("../../../lua/compat/callin-unit-damaged-95.lua"),
+    ),
+    (
+        "cmd-removed-ids",
+        include_str!("../../../lua/compat/cmd-removed-ids.lua"),
     ),
     (
         "compat-callin-hooks",
@@ -151,6 +156,14 @@ const FIXES: &[(&str, &str)] = &[
         include_str!("../../../lua/compat/snext-spairs-sipairs.lua"),
     ),
     (
+        "spring-array-n-83",
+        include_str!("../../../lua/compat/spring-array-n-83.lua"),
+    ),
+    (
+        "spring-get-has-lag",
+        include_str!("../../../lua/compat/spring-get-has-lag.lua"),
+    ),
+    (
         "spring-get-team-info-105",
         include_str!("../../../lua/compat/spring-get-team-info-105.lua"),
     ),
@@ -185,6 +198,14 @@ const FIXES: &[(&str, &str)] = &[
     (
         "spring-update-info-texture",
         include_str!("../../../lua/compat/spring-update-info-texture.lua"),
+    ),
+    (
+        "unit-defs-weapons-n-83",
+        include_str!("../../../lua/compat/unit-defs-weapons-n-83.lua"),
+    ),
+    (
+        "weapon-defs-lua-consts-87",
+        include_str!("../../../lua/compat/weapon-defs-lua-consts-87.lua"),
     ),
 ];
 
@@ -1776,6 +1797,48 @@ mod tests {
         assert!(!ids(LuaState::Synced).contains(&"luaui-main-include"));
     }
 
+    /// Issue #4708: manifest 16 adds the fixes Complete Annihilation's widgets
+    /// need, and keeps the writer of manifest 15. The two that write to def
+    /// proxies with rawset run only in the unsynced state, which has it.
+    #[test]
+    fn manifest_16_is_manifest_15_with_complete_annihilations_widget_fixes() {
+        let (fifteen, sixteen) = (manifest(15).unwrap(), manifest(16).unwrap());
+        let added = [
+            "cmd-removed-ids",
+            "spring-array-n-83",
+            "spring-get-has-lag",
+            "unit-defs-weapons-n-83",
+            "weapon-defs-lua-consts-87",
+        ];
+        let mut expected = fifteen.fixes.clone();
+        expected.extend(added.iter().map(|id| id.to_string()));
+        assert_eq!(sixteen.fixes, expected);
+        assert_eq!(
+            (&sixteen.converter, sixteen.writer),
+            (&fifteen.converter, fifteen.writer)
+        );
+        let ids = |state| -> Vec<&str> {
+            prelude_fixes(&sixteen, state)
+                .iter()
+                .map(|(id, _)| *id)
+                .collect()
+        };
+        let (synced, unsynced) = (ids(LuaState::Synced), ids(LuaState::Unsynced));
+        for id in added {
+            assert!(unsynced.contains(&id), "{id} runs unsynced");
+        }
+        for id in ["cmd-removed-ids", "spring-array-n-83"] {
+            assert!(synced.contains(&id), "{id} runs synced");
+        }
+        for id in [
+            "spring-get-has-lag",
+            "unit-defs-weapons-n-83",
+            "weapon-defs-lua-consts-87",
+        ] {
+            assert!(!synced.contains(&id), "{id} stays out of synced");
+        }
+    }
+
     /// Issues #4700 and #4699: manifest 14 stores a numeric string given to a
     /// rules param as a number, and reads an icon type the game does not
     /// define as "default", as 104.0 did, and keeps the writer of manifest 13.
@@ -1947,14 +2010,14 @@ mod tests {
         }
     }
 
-    /// The preludes for manifests 9, 11, 12, 14 and 15, as the Lua tests in
+    /// The preludes for manifests 9, 11, 12, 14, 15 and 16, as the Lua tests in
     /// `lua/compat/tests/` load them. Earlier manifests' synced preludes call
     /// `rawget`, which the tests' synced state lacks, so they are not kept.
     /// `COILBOX_WRITE_FIXTURE=1` writes them again after a deliberate change to
     /// how a prelude is built.
     #[test]
     fn the_lua_tests_load_the_preludes_this_crate_builds() {
-        for n in [9, 11, 12, 14, 15] {
+        for n in [9, 11, 12, 14, 15, 16] {
             let m = manifest(n).unwrap();
             for state in [LuaState::Synced, LuaState::Unsynced] {
                 let built = prelude(&m, state).unwrap();

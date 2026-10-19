@@ -1498,6 +1498,10 @@ mod tests {
             15,
             "960100bc92a0aa92aa72ab30c0b49b630b4068f274d04210ff677e8683d4627f",
         ),
+        (
+            16,
+            "092e344173a6ec98ab1bafcccc0d1ffb7257c9400cbbd0704aa4e7859061dbec",
+        ),
     ];
 
     #[test]
