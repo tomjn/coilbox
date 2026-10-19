@@ -56,6 +56,7 @@ const MANIFESTS: &[(u32, &str)] = &[
     (11, include_str!("../../../lua/compat/manifests/11.json")),
     (12, include_str!("../../../lua/compat/manifests/12.json")),
     (13, include_str!("../../../lua/compat/manifests/13.json")),
+    (14, include_str!("../../../lua/compat/manifests/14.json")),
 ];
 
 /// Every fix file, by id.
@@ -83,6 +84,10 @@ const FIXES: &[(&str, &str)] = &[
     (
         "defs-helpers",
         include_str!("../../../lua/compat/defs/defs-helpers.lua"),
+    ),
+    (
+        "defs-icon-type-2025",
+        include_str!("../../../lua/compat/defs/defs-icon-type-2025.lua"),
     ),
     (
         "defs-manual-bomb-settings-92",
@@ -151,6 +156,10 @@ const FIXES: &[(&str, &str)] = &[
     (
         "spring-make-font",
         include_str!("../../../lua/compat/spring-make-font.lua"),
+    ),
+    (
+        "spring-rules-param-105",
+        include_str!("../../../lua/compat/spring-rules-param-105.lua"),
     ),
     (
         "spring-set-unit-to-feature",
@@ -1740,6 +1749,43 @@ mod tests {
         }
     }
 
+    /// Issues #4700 and #4699: manifest 14 stores a numeric string given to a
+    /// rules param as a number, and reads an icon type the game does not
+    /// define as "default", as 104.0 did, and keeps the writer of manifest 13.
+    #[test]
+    fn manifest_14_is_manifest_13_with_the_old_rules_params_and_icon_types() {
+        let (thirteen, fourteen) = (manifest(13).unwrap(), manifest(14).unwrap());
+        let added: Vec<&String> = fourteen
+            .fixes
+            .iter()
+            .filter(|id| !thirteen.fixes.contains(id))
+            .collect();
+        assert_eq!(added, ["spring-rules-param-105", "defs-icon-type-2025"]);
+        assert_eq!(
+            defs_fixes(&fourteen, DefsFile::DefsPost).last(),
+            Some(&"defs-icon-type-2025")
+        );
+        assert!(!defs_fixes(&fourteen, DefsFile::WeaponDefsPost).contains(&"defs-icon-type-2025"));
+        let kept: Vec<&String> = fourteen
+            .fixes
+            .iter()
+            .filter(|id| thirteen.fixes.contains(id))
+            .collect();
+        assert_eq!(kept, thirteen.fixes.iter().collect::<Vec<_>>());
+        assert_eq!(
+            (&fourteen.converter, fourteen.writer),
+            (&thirteen.converter, thirteen.writer)
+        );
+        let ids = |state| -> Vec<&str> {
+            prelude_fixes(&fourteen, state)
+                .iter()
+                .map(|(id, _)| *id)
+                .collect()
+        };
+        assert!(ids(LuaState::Synced).contains(&"spring-rules-param-105"));
+        assert!(!ids(LuaState::Unsynced).contains(&"spring-rules-param-105"));
+    }
+
     /// Issues #4692 to #4694: manifest 12 adds the unsynced fix that puts
     /// back snext, spairs and sipairs, the synced one that keeps unit lineage
     /// and the adapter for Spring.GetTeamInfo's results, and keeps the writer
@@ -1874,14 +1920,14 @@ mod tests {
         }
     }
 
-    /// The preludes for manifests 9, 11 and 12, as the Lua tests in
+    /// The preludes for manifests 9, 11, 12 and 14, as the Lua tests in
     /// `lua/compat/tests/` load them. Earlier manifests' synced preludes call
     /// `rawget`, which the tests' synced state lacks, so they are not kept.
     /// `COILBOX_WRITE_FIXTURE=1` writes them again after a deliberate change to
     /// how a prelude is built.
     #[test]
     fn the_lua_tests_load_the_preludes_this_crate_builds() {
-        for n in [9, 11, 12] {
+        for n in [9, 11, 12, 14] {
             let m = manifest(n).unwrap();
             for state in [LuaState::Synced, LuaState::Unsynced] {
                 let built = prelude(&m, state).unwrap();

@@ -33,6 +33,23 @@ local function run(fixes, units, weapons, opts)
 			end,
 		}
 	end
+	if opts.sources then
+		-- VFS.Include over Lua sources by path, run in the environment it is
+		-- given, as LuaParser's Include runs a file. It raises for a file that
+		-- is not there, as the engine's does.
+		env.VFS = env.VFS or {}
+		env.VFS.MOD, env.VFS.BASE = "M", "b"
+		env.VFS.Include = function(path, fenv, mode)
+			opts.included = { path = path, mode = mode }
+			local source = opts.sources[path]
+			if source == nil then
+				error("Include() file missing '" .. path .. "'")
+			end
+			local chunk = assert(loadstring(source, path))
+			setfenv(chunk, fenv or env)
+			return chunk()
+		end
+	end
 	if opts.weaponDefsGlobal then
 		env.WeaponDefs = env.DEFS.weaponDefs
 	end
@@ -64,6 +81,7 @@ for _, id in ipairs({
 	"defs-weapon-consts-87",
 	"defs-manual-bomb-settings-92",
 	"defs-missing-model-standin",
+	"defs-icon-type-2025",
 }) do
 	local source = assert(io.open(DEFS_DIR .. id .. ".lua")):read("*a")
 	check(id .. ": its header names the file", source:match("^%-%- id: ([%w-]+)\n") == id)
@@ -282,6 +300,69 @@ do
 	local odd = listed["feature odd"]
 	check("standin: a listing names the box the footprint asks for, whether or not it is there", odd and odd.standin == "compat/models/standin-9x9.s3o")
 	check("standin: the unit and the weapon are listed by kind", listed["unit armfoo"] ~= nil and listed["weapon shell"] ~= nil)
+end
+
+--------------------------------------------------------------------------------
+-- An icon type icontypes.lua does not define, which 104.0 read as "default"
+-- (issue #4699)
+--------------------------------------------------------------------------------
+
+do
+	-- Spring 1944's icontypes.lua is a local table it returns. The engine
+	-- lowers its keys, so "Tank" defines "tank".
+	local icontypes = [[
+		local iconTypes = {
+			default = { bitmap = "icons/alert.tga" },
+			rifle = { bitmap = "icons/rifle.tga" },
+			Tank = { bitmap = "icons/tank.tga" },
+			[5] = { bitmap = "icons/five.tga" },
+			["7"] = { bitmap = "icons/seven.tga" },
+		}
+		leaked = true
+		return iconTypes
+	]]
+	local units = {
+		gersiebelfahre = { iconType = "pontoon", buildCostMetal = 300 },
+		rifleman = { iconType = "rifle" },
+		panzer = { IconType = "tank" },
+		tiger = { iconType = "Tank" },
+		bare = {},
+		plain = { iconType = "default" },
+		numbered = { iconType = 5 },
+		seven = { iconType = 7 },
+		odd = { iconType = true },
+	}
+	local opts = { sources = { ["gamedata/icontypes.lua"] = icontypes } }
+	local compat = run({ "defs-icon-type-2025" }, units, {}, opts)
+	check("icon: a type icontypes.lua does not define reads default", units.gersiebelfahre.iconType == "default")
+	check("icon: the def keeps its other tags", units.gersiebelfahre.buildCostMetal == 300)
+	check("icon: a type it defines is kept", units.rifleman.iconType == "rifle")
+	check("icon: a lower case key matches the def's tag in any spelling of the key", units.panzer.IconType == "tank" and units.panzer.iconType == nil)
+	check("icon: a type that is not lower case matches no key, as in 104.0", units.tiger.iconType == "default")
+	check("icon: a def with no type is unchanged", units.bare.iconType == nil)
+	check("icon: default is kept", units.plain.iconType == "default")
+	check("icon: a number key defines no type, as the engine reads only string keys", units.numbered.iconType == "default")
+	check("icon: a number type matches its string key", units.seven.iconType == 7)
+	check("icon: a type that is not text is left to the engine", units.odd.iconType == true)
+	check("icon: three defs changed", count(compat.changed) == 3, tostring(count(compat.changed)))
+	table.sort(compat.icons)
+	check("icon: each change is listed by name", table.concat(compat.icons, ",") == "gersiebelfahre,numbered,tiger", table.concat(compat.icons, ","))
+	check("icon: the file is read from the game, then the base content", opts.included.path == "gamedata/icontypes.lua" and opts.included.mode == "Mb", tostring(opts.included.mode))
+	check("icon: the file sets no global of the defs", leaked == nil and rawget(_G, "leaked") == nil)
+end
+
+do
+	local units = { gersiebelfahre = { iconType = "pontoon" } }
+	local compat = run({ "defs-icon-type-2025" }, units, {}, { sources = {} })
+	check("icon: without icontypes.lua the defs are left alone", units.gersiebelfahre.iconType == "pontoon")
+	check("icon: and none is listed", #compat.icons == 0)
+	local broken = { sources = { ["gamedata/icontypes.lua"] = "error('broken')" } }
+	units = { a = { iconType = "pontoon" } }
+	run({ "defs-icon-type-2025" }, units, {}, broken)
+	check("icon: an icontypes.lua that raises leaves the defs alone", units.a.iconType == "pontoon")
+	broken = { sources = { ["gamedata/icontypes.lua"] = "return 5" } }
+	run({ "defs-icon-type-2025" }, units, {}, broken)
+	check("icon: an icontypes.lua that returns no table leaves the defs alone", units.a.iconType == "pontoon")
 end
 
 support.report()

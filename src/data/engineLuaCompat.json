@@ -1317,6 +1317,20 @@
       "note": "LuaSynced*: make {S,G}et{Unit,Feature}Blocking signatures match Get{Unit,Feature}Blocking(number objectID) --> boolean isBlocking, boolean isSolidObjectCollidable, boolean isProjectileCollidable, boolean isRaySegmentCollidable, boolean crushable, boolean blockEnemyPushing, boolean blockHeightChanges"
     },
     {
+      "id": "signature:Spring.SetFeatureRulesParam@105.0",
+      "kind": "signature",
+      "name": "Spring.SetFeatureRulesParam",
+      "since": "105.0",
+      "note": "A string that reads as a number, such as \"30\", is stored and read back as a string. Before 105.0 it was stored as a number, so Lua that sets a param from a def's custom parameter and then compares it with a number fails."
+    },
+    {
+      "id": "signature:Spring.SetGameRulesParam@105.0",
+      "kind": "signature",
+      "name": "Spring.SetGameRulesParam",
+      "since": "105.0",
+      "note": "A string that reads as a number, such as \"30\", is stored and read back as a string. Before 105.0 it was stored as a number, so Lua that sets a param from a def's custom parameter and then compares it with a number fails."
+    },
+    {
       "id": "signature:Spring.SetLosViewColors@100.0",
       "kind": "signature",
       "name": "Spring.SetLosViewColors",
@@ -1331,6 +1345,13 @@
       "note": "LuaSynced*: slightly change {Get,Set}ProjectileTarget signatures GetProjectileTarget now returns a number instead of a string to indicate target-type GetProjectileTarget now always returns two arguments (if given projectileID is valid) GetProjectileTarget now always returns a target position if projectile has no target object SetProjectileTarget now takes a number instead of a string to indicate target-type"
     },
     {
+      "id": "signature:Spring.SetTeamRulesParam@105.0",
+      "kind": "signature",
+      "name": "Spring.SetTeamRulesParam",
+      "since": "105.0",
+      "note": "A string that reads as a number, such as \"30\", is stored and read back as a string. Before 105.0 it was stored as a number, so Lua that sets a param from a def's custom parameter and then compares it with a number fails."
+    },
+    {
       "id": "signature:Spring.SetUnitBlocking@95.0",
       "kind": "signature",
       "name": "Spring.SetUnitBlocking",
@@ -1343,6 +1364,13 @@
       "name": "Spring.SetUnitPieceCollisionVolumeData",
       "since": "101.0",
       "note": "{Set,Get}UnitPieceCollisionVolumeData now receive 1-based piece index argument (was 0-based)."
+    },
+    {
+      "id": "signature:Spring.SetUnitRulesParam@105.0",
+      "kind": "signature",
+      "name": "Spring.SetUnitRulesParam",
+      "since": "105.0",
+      "note": "A string that reads as a number, such as \"30\", is stored and read back as a string. Before 105.0 it was stored as a number, so Lua that sets a param from a def's custom parameter and then compares it with a number fails."
     },
     {
       "id": "signature:StockpileChanged@101.0",
@@ -1371,6 +1399,13 @@
       "name": "UnitDamaged",
       "since": "95.0",
       "note": "projectileID is passed after weaponDefID, so attackerID, attackerDefID and attackerTeam each arrive one place later than in 0.81. The arguments are now unitID, unitDefID, unitTeam, damage, paralyzer, weaponDefID, projectileID, attackerID, attackerDefID, attackerTeam."
+    },
+    {
+      "id": "signature:UnitDefs.iconType@2025.06.07",
+      "kind": "signature",
+      "name": "UnitDefs.iconType",
+      "since": "2025.06.07",
+      "note": "A unit def's iconType is returned as the def gave it, even when gamedata/icontypes.lua does not define that icon. Before 2025.06.07 such a def read \"default\", so Lua that looks up every icon type other than \"default\" in icontypes.lua indexes nil."
     },
     {
       "id": "signature:UnitMoveFailed@85.0",

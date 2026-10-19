@@ -293,7 +293,8 @@ fn build_with(
     notes.extend(defs.notes.iter().cloned());
     notes.extend(standins::note(&standins));
     let files = write_with_models(&dir, &mut files, &models, &defs, manifest_version)?;
-    let mut def_overrides = models::model_keys(&files).len() + standins.standins.len();
+    let mut def_overrides =
+        models::model_keys(&files).len() + standins.standins.len() + standins.icons.len();
     if !defs.written.is_empty() {
         match read_defs().and_then(|read| defs::changed(&manifest, &defs.written, &read)) {
             Ok(n) => def_overrides += n,
@@ -652,6 +653,33 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().to_string_lossy().into_owned();
         (dir, path)
+    }
+
+    /// Issue #4699: a unit def the icon type fix gives "default" is a def
+    /// override, counted from the same run of the def fixes as the boxes.
+    #[test]
+    fn the_unit_defs_given_the_default_icon_are_counted() {
+        let (_keep, data) = root();
+        let json = r#"{"loaded":true,"ran":true,"standins":[],"icons":["gersiebelfahre","usbarge"],"failed":[]}"#;
+        let quoted = format!("\"{}\"", json.replace('\\', "\\\\").replace('"', "\\\""));
+        let answer = serde_json::json!({ "result": quoted, "errors": [] }).to_string();
+        let built = build_reading_with_lua(
+            &data,
+            "spring_1944-2.31.sdz",
+            "Spring: 1944 2.31",
+            &DeclaredGame::default(),
+            "1234abcd",
+            coilbox_compat::latest(),
+            "1.2.3",
+            &[],
+            no_file,
+            no_models,
+            || Ok(r#"{"units":{"gersiebelfahre":{},"usbarge":{}},"weaponDefs":{}}"#.into()),
+            move |_| Ok(answer),
+        )
+        .unwrap();
+        assert_eq!(built.def_overrides, 2);
+        assert!(built.notes.is_empty(), "{:?}", built.notes);
     }
 
     #[test]
@@ -1359,6 +1387,22 @@ mod tests {
         let synced = text(&updated, "compat/prelude-synced.lua").unwrap();
         assert!(!synced.contains(ground) && synced.contains("-- fix: game-version-104\n"));
 
+        // Every game built from 14 stores a numeric string as a number, in the
+        // synced state, where the rules params are set.
+        let rules = "-- fix: spring-rules-param-105\n";
+        for fixture in &FIXTURES[..2] {
+            let fourteen = golden_build(14, fixture);
+            let synced = text(&fourteen, "compat/prelude-synced.lua").unwrap();
+            assert!(synced.contains(rules), "{}", fixture.archive);
+            if let Some(unsynced) = text(&fourteen, "compat/prelude-unsynced.lua") {
+                assert!(!unsynced.contains(rules), "{}", fixture.archive);
+            }
+        }
+        assert!(
+            !text(&golden_build(13, &FIXTURES[0]), "compat/prelude-synced.lua")
+                .unwrap()
+                .contains(rules)
+        );
         // Issue #4694: a game that reads GetTeamInfo's custom keys 7th gets
         // the old order, and one that reads the income multiplier there does
         // not.
@@ -1445,6 +1489,10 @@ mod tests {
         (
             13,
             "1e30d5f81d9a4fc76655ade256635e9b281973aecfeeb2448f8019ba3b51ab07",
+        ),
+        (
+            14,
+            "60ac951dea79f66e71caabbd77c24cc1ef9b3aa8ac8311f7bf473ff556b9efb9",
         ),
     ];
 

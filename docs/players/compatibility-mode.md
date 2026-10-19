@@ -130,7 +130,7 @@ If one of the fixes fails while the game runs, the game still loads. The engine'
 
 ## What it changes
 
-This is compatibility version 13, the newest.
+This is compatibility version 14, the newest.
 
 Lua functions it puts back:
 
@@ -148,6 +148,10 @@ Call-ins whose arguments moved:
 - `UnitDamaged`, changed in Spring 95.0, and `AllowCommand`, changed in Spring 105.0. The game's handlers get the arguments in the old order. Coilbox reads the game's Lua first, and leaves this out for a game whose handlers already take the new order.
 - `Spring.GetTeamInfo`, changed in Spring 105.0. The game gets the team's custom keys 7th and its income multiplier 8th, as before. Coilbox leaves this out for a game whose Lua already reads them the new way round.
 
+Values the engine now keeps differently:
+
+- `Spring.SetUnitRulesParam`, and the game, team and feature versions, changed in Spring 105.0. A number written as text, such as `"30"`, is stored as a number again, so the game reads back a number it can compare.
+
 Gadgets, which each decide when the game loads whether the game needs them:
 
 - `coilbox_compat_aircraft_crash`. A plane that is shot down falls out of the sky, as it did before Spring 83.0, instead of exploding where it was hit. It does nothing for a plane whose script crashes it. It also does nothing in a game that crashes planes itself, or whose own gadgets call a function that engines before Spring 83.0 did not have.
@@ -161,6 +165,7 @@ Unit and weapon definitions:
 - `modelCenterOffset`, removed in Spring 89.0, is copied to the unit's custom parameters for the gadget above.
 - A bomb's burst is worked out from its reload time as it was before Spring 92.0, unless the weapon sets `manualBombSettings` to true.
 - `areaOfEffect` and `maxVelocity`, which Lua lost in Spring 87.0, are kept in each weapon's custom parameters under those names in lower case.
+- A unit whose `iconType` names an icon the game's `gamedata/icontypes.lua` does not have reads as `default` in Lua, as it did before Recoil 2025.06.07. The engine draws it with the default icon either way.
 - A unit, feature or weapon whose model is not in the game is drawn as a plain grey box the size of its footprint, because the engine stops loading a game on any model it cannot find. A wreck keeps its metal and still blocks the ground it covers. The build result names each one. A name close to a model the game has is not taken for it, so XTA's `arm_infinity_dead` gets a box even though the game has `arm_infinite_DEAD`.
 
 For how fixes are added and why a fix never changes once it ships, see [Compatibility mode fixes](../developers/compatibility-mode.md).
