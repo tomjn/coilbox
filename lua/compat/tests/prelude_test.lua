@@ -693,4 +693,90 @@ for _, synced in ipairs({ true, false }) do
 	check(state .. ": no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
 end
 
+--------------------------------------------------------------------------------
+-- LuaUI/main.lua including LuaUI/main.lua (issue #4698)
+--------------------------------------------------------------------------------
+
+-- Spring 1944 2.31's LuaUI/main.lua as the mutator wraps it: the prelude, then
+-- the include function the engine's LuaHandler/Utilities/utils.lua defines,
+-- then line 56's include "LuaUI/main.lua". `runs` counts how often the game's
+-- code ran, and the count stops a manifest without the fix from including
+-- itself for ever.
+local s44Entry = 'VFS.Include("compat/prelude-unsynced.lua") '
+	.. 'function include(filename, envTable, mode) return VFS.Include(filename, envTable, mode) end '
+	.. 'runs = (runs or 0) + 1 '
+	.. 'if runs < 3 then include "LuaUI/main.lua" end '
+	.. 'loaded = true'
+
+local function luaui(manifest, files, name)
+	local all = { ["LuaUI/main.lua"] = s44Entry }
+	for path, source in pairs(files or {}) do
+		all[path] = source
+	end
+	return newEngine({ synced = false, manifest = manifest, name = name or "LuaUI", files = all })
+end
+
+do
+	-- No loose LuaUI/ beside the engine, so the include finds the game's own
+	-- entry again.
+	local before = luaui(14)
+	support.load(before, s44Entry)
+	check("manifest 14: the game's entry runs again", before.env.runs == 3, tostring(before.env.runs))
+
+	local engine = luaui(15)
+	support.load(engine, s44Entry)
+	check("the game's entry runs once", engine.env.runs == 1, tostring(engine.env.runs))
+	check("the rest of the entry still runs", engine.env.loaded == true)
+	check("no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
+end
+
+do
+	-- The engine's LuaUI/main.lua beside it, which stops on rml_setup.lua.
+	local engineFile = { ["LuaUI/main.lua"] = 'error("LuaUI/rml_setup.lua: File not seen by VFS")' }
+	local engine = luaui(15, engineFile)
+	local ok, err = pcall(support.load, engine, s44Entry)
+	check("the engine's own LuaUI/main.lua is not run", ok, tostring(err))
+	check("the game's entry finishes", engine.env.runs == 1 and engine.env.loaded == true)
+end
+
+do
+	local engine = luaui(15, {
+		["LuaUI/Widgets/gui_x.lua"] = "return ..., 'x'",
+		["LuaUI/Widgets/main.lua"] = "return 'w'",
+		["LuaUI/Widgets/api_x.lua"] = "return widget",
+	})
+	local VFS = engine.env.VFS
+	local include = VFS.Include
+	support.load(engine, s44Entry)
+	check("VFS.Include is left alone", VFS.Include == include)
+	local a, b = engine.env.include("LuaUI/Widgets/gui_x.lua", { y = 1 }, "rM")
+	check("another include passes on its results", a == nil and b == "x", tostring(a) .. " " .. tostring(b))
+	for _, path in ipairs({ "luaui/MAIN.lua", "LuaUI\\main.lua", "LUAUI/MAIN.LUA" }) do
+		check("the entry under another spelling is skipped: " .. path, engine.env.include(path) == nil and engine.env.runs == 1)
+	end
+	check("a main.lua in another folder still loads", engine.env.include("LuaUI/Widgets/main.lua") == "w")
+
+	-- Spring 1944's LuaUI/Widgets/api_vector.lua includes a file with no
+	-- environment, which then reads the widget's own `widget`.
+	local widgetEnv = setmetatable({ widget = "the widget" }, { __index = engine.env })
+	local load = setfenv(function()
+		local result = VFS.Include("LuaUI/Widgets/api_x.lua")
+		return result
+	end, widgetEnv)
+	check("a widget's include without an environment runs in the widget's", load() == "the widget", tostring(load()))
+end
+
+do
+	-- A game whose entry is luaui.lua means to include its LuaUI/main.lua.
+	local engine = luaui(15, { ["luaui.lua"] = "", ["LuaUI/main.lua"] = "included = true" })
+	support.load(engine, (s44Entry:gsub("if runs < 3 then", "if true then")))
+	check("with luaui.lua, LuaUI/main.lua is included", engine.env.included == true)
+end
+
+for _, name in ipairs({ "LuaRules", "LuaGaia", "LuaIntro" }) do
+	local engine = luaui(15, { ["LuaUI/main.lua"] = "included = true" }, name)
+	support.load(engine, (s44Entry:gsub("if runs < 3 then", "if true then")))
+	check(name .. ": include \"LuaUI/main.lua\" is left alone", engine.env.included == true)
+end
+
 support.report()
