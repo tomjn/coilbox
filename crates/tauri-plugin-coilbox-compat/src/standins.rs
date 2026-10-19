@@ -4,9 +4,11 @@
 //! The fix decides at load time which defs need one, and names the box by the
 //! def's footprint, `compat/models/standin-<x>x<z>.s3o`. The build has to write
 //! those boxes before the game loads, so it runs the same fix over the game's
-//! defs through the unitsync worker, with every def fix of `defs_post.lua` in
-//! front of it as the mutator runs them, and reads back the list the fix keeps
-//! of what it changed. That list is the build's note too.
+//! defs through the unitsync worker, with every other def fix of
+//! `defs_post.lua` around it as the mutator runs them, and reads back the list
+//! the fix keeps of what it changed. That list is the build's note too. The
+//! same run reads back the unit defs `defs-icon-type-2025` changes, which the
+//! build counts.
 //!
 //! Running the fix itself, rather than a Rust copy of it, matters here: the fix
 //! asks the engine's VFS whether a model is there, across the game, its
@@ -25,6 +27,11 @@ use coilbox_compat::{DefsFile, Manifest};
 
 /// The fix's id.
 pub const FIX: &str = "defs-missing-model-standin";
+
+/// The def fix that gives a unit def whose icon type the game does not define
+/// the type "default" (issue #4699). It needs the game's VFS too, so the build
+/// counts what it changes from the same run.
+pub const ICONS_FIX: &str = "defs-icon-type-2025";
 
 /// The box a def gets when the one for its footprint is not there, which every
 /// build with the fix writes. Matches `FALLBACK` in the fix.
@@ -110,10 +117,13 @@ for _, s in ipairs(compat.standins or {}) do
   __cb_out[#__cb_out + 1] = '{"kind":' .. __cb_json(s.kind) .. ',"name":' .. __cb_json(s.name)
     .. ',"model":' .. __cb_json(s.model) .. ',"standin":' .. __cb_json(s.standin) .. '}'
 end
+local __cb_icons = {}
+for _, name in ipairs(compat.icons or {}) do __cb_icons[#__cb_icons + 1] = __cb_json(name) end
 local __cb_fails = {}
 for _, m in ipairs(__cb_failed) do __cb_fails[#__cb_fails + 1] = __cb_json(m) end
 return '{"loaded":true,"ran":' .. tostring(compat.standins ~= nil) .. ',"standins":['
-  .. table.concat(__cb_out, ',') .. '],"failed":[' .. table.concat(__cb_fails, ',') .. ']}'
+  .. table.concat(__cb_out, ',') .. '],"icons":[' .. table.concat(__cb_icons, ',')
+  .. '],"failed":[' .. table.concat(__cb_fails, ',') .. ']}'
 "#;
 
 /// The worker's answer to `--lua`.
@@ -133,6 +143,8 @@ struct Ran {
     #[serde(default)]
     standins: Vec<Standin>,
     #[serde(default)]
+    icons: Vec<String>,
+    #[serde(default)]
     failed: Vec<String>,
 }
 
@@ -141,6 +153,9 @@ struct Ran {
 pub struct Found {
     /// The defs the fix changed, sorted.
     pub standins: Vec<Standin>,
+    /// The unit defs `defs-icon-type-2025`, which runs in the same block,
+    /// gave the icon type "default" (issue #4699), sorted.
+    pub icons: Vec<String>,
     /// Why the game's defs did not load under unitsync, when they did not.
     /// The fix then still gives every def whose model is missing the 1x1 box
     /// when the game loads, and only the boxes for other footprints are lost.
@@ -186,8 +201,8 @@ pub fn parse(answer: &str) -> Result<Found, String> {
     let ran: Ran = serde_json::from_str(&json).map_err(|e| fail(format!("{e}: {json}")))?;
     if !ran.loaded {
         return Ok(Found {
-            standins: Vec::new(),
             unread: Some(ran.why),
+            ..Found::default()
         });
     }
     if let Some(m) = ran.failed.iter().find(|m| m.contains(FIX)) {
@@ -196,10 +211,12 @@ pub fn parse(answer: &str) -> Result<Found, String> {
     if !ran.ran {
         return Err(fail(format!("{FIX} did not run")));
     }
-    let mut standins = ran.standins;
+    let (mut standins, mut icons) = (ran.standins, ran.icons);
     standins.sort();
+    icons.sort();
     Ok(Found {
         standins,
+        icons,
         unread: None,
     })
 }
@@ -420,6 +437,20 @@ mod tests {
         );
     }
 
+    #[test]
+    fn the_unit_defs_whose_icon_type_reads_default_are_read_back_sorted() {
+        let got = parse(&answer(
+            r#"{"loaded":true,"ran":true,"standins":[],"icons":["usbarge","gersiebelfahre"],"failed":[]}"#,
+        ))
+        .unwrap();
+        assert_eq!(got.icons, ["gersiebelfahre", "usbarge"]);
+        // A run from before the icon fix lists none.
+        let old = parse(&answer(
+            r#"{"loaded":true,"ran":true,"standins":[],"failed":[]}"#,
+        ));
+        assert!(old.unwrap().icons.is_empty());
+    }
+
     /// The game's own defs raising is the same on every computer, so the
     /// build goes on with the 1x1 box and says why.
     #[test]
@@ -541,13 +572,13 @@ mod tests {
                 standin("feature", "gdakula2_dead", "gdakula2_dead", FALLBACK),
                 standin("weapon", "shell", "shell.3do", FALLBACK),
             ],
-            unread: None,
+            ..Found::default()
         })
         .unwrap();
         assert!(n.starts_with("2 defs name a model"), "{n}");
         let one = note(&Found {
             standins: vec![standin("feature", "a", "a", FALLBACK)],
-            unread: None,
+            ..Found::default()
         })
         .unwrap();
         assert!(
@@ -587,5 +618,35 @@ mod tests {
                 "compat/models/standin-3x2.s3o"
             )]
         );
+    }
+
+    /// Issue #4699: the same run lists the unit defs the icon type fix gives
+    /// "default", which the build counts.
+    #[test]
+    fn the_script_lists_the_unit_defs_whose_icon_type_reads_default() {
+        let m = coilbox_compat::manifest(coilbox_compat::latest()).unwrap();
+        let source = script(&m).unwrap();
+        let root = tempfile::tempdir().unwrap();
+        let defs = "return { unitdefs = {\n\
+                    gersiebelfahre = { objectName = 'boat', iconType = 'pontoon' },\n\
+                    rifle = { objectName = 'boat', iconType = 'rifle' } },\n\
+                    featuredefs = {}, weapondefs = {}, armordefs = {}, movedefs = {} }\n";
+        let files = std::collections::BTreeMap::from([
+            (root.path().join("gamedata/defs.lua"), defs.to_string()),
+            (
+                root.path().join("gamedata/icontypes.lua"),
+                "return { default = {}, rifle = {} }\n".to_string(),
+            ),
+            (root.path().join("objects3d/boat.s3o"), String::new()),
+        ]);
+        let lua = coilbox_springlua::SpringLua::with_files(root.path(), files).unwrap();
+        let got = lua
+            .eval_value_raw(&format!("return (function()\n{source}\nend)()"), "icons")
+            .unwrap();
+        let json = got.as_str().expect("a string").to_string();
+        let quoted = format!("\"{}\"", json.replace('\\', "\\\\").replace('"', "\\\""));
+        let read = parse(&serde_json::json!({ "result": quoted }).to_string()).unwrap();
+        assert_eq!(read.icons, ["gersiebelfahre"]);
+        assert!(read.standins.is_empty());
     }
 }

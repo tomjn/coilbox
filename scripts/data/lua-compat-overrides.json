@@ -102,5 +102,13 @@
     "since": "105.0",
     "note": "A string that reads as a number, such as \"30\", is stored and read back as a string. Before 105.0 it was stored as a number, so Lua that sets a param from a def's custom parameter and then compares it with a number fails.",
     "commit": "ffafcbc51a0d74cdf957798002e0d4ee979c7c1c"
+  },
+  {
+    "id": "signature:UnitDefs.iconType@2025.06.07",
+    "kind": "signature",
+    "name": "UnitDefs.iconType",
+    "since": "2025.06.07",
+    "note": "A unit def's iconType is returned as the def gave it, even when gamedata/icontypes.lua does not define that icon. Before 2025.06.07 such a def read \"default\", so Lua that looks up every icon type other than \"default\" in icontypes.lua indexes nil.",
+    "commit": "24ae98356d4f52b38d7745ae9c184f2ba4db9f6e"
   }
 ]

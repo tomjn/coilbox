@@ -85,6 +85,10 @@ const FIXES: &[(&str, &str)] = &[
         include_str!("../../../lua/compat/defs/defs-helpers.lua"),
     ),
     (
+        "defs-icon-type-2025",
+        include_str!("../../../lua/compat/defs/defs-icon-type-2025.lua"),
+    ),
+    (
         "defs-manual-bomb-settings-92",
         include_str!("../../../lua/compat/defs/defs-manual-bomb-settings-92.lua"),
     ),
@@ -1724,17 +1728,23 @@ mod tests {
         }
     }
 
-    /// Issue #4700: manifest 13 stores a numeric string given to a rules param
-    /// as a number, as 104.0 did, and keeps the writer of manifest 12.
+    /// Issues #4700 and #4699: manifest 13 stores a numeric string given to a
+    /// rules param as a number, and reads an icon type the game does not
+    /// define as "default", as 104.0 did, and keeps the writer of manifest 12.
     #[test]
-    fn manifest_13_is_manifest_12_with_the_old_rules_params() {
+    fn manifest_13_is_manifest_12_with_the_old_rules_params_and_icon_types() {
         let (twelve, thirteen) = (manifest(12).unwrap(), manifest(13).unwrap());
         let added: Vec<&String> = thirteen
             .fixes
             .iter()
             .filter(|id| !twelve.fixes.contains(id))
             .collect();
-        assert_eq!(added, ["spring-rules-param-105"]);
+        assert_eq!(added, ["spring-rules-param-105", "defs-icon-type-2025"]);
+        assert_eq!(
+            defs_fixes(&thirteen, DefsFile::DefsPost).last(),
+            Some(&"defs-icon-type-2025")
+        );
+        assert!(!defs_fixes(&thirteen, DefsFile::WeaponDefsPost).contains(&"defs-icon-type-2025"));
         let kept: Vec<&String> = thirteen
             .fixes
             .iter()

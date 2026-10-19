@@ -293,7 +293,8 @@ fn build_with(
     notes.extend(defs.notes.iter().cloned());
     notes.extend(standins::note(&standins));
     let files = write_with_models(&dir, &mut files, &models, &defs, manifest_version)?;
-    let mut def_overrides = models::model_keys(&files).len() + standins.standins.len();
+    let mut def_overrides =
+        models::model_keys(&files).len() + standins.standins.len() + standins.icons.len();
     if !defs.written.is_empty() {
         match read_defs().and_then(|read| defs::changed(&manifest, &defs.written, &read)) {
             Ok(n) => def_overrides += n,
@@ -652,6 +653,33 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().to_string_lossy().into_owned();
         (dir, path)
+    }
+
+    /// Issue #4699: a unit def the icon type fix gives "default" is a def
+    /// override, counted from the same run of the def fixes as the boxes.
+    #[test]
+    fn the_unit_defs_given_the_default_icon_are_counted() {
+        let (_keep, data) = root();
+        let json = r#"{"loaded":true,"ran":true,"standins":[],"icons":["gersiebelfahre","usbarge"],"failed":[]}"#;
+        let quoted = format!("\"{}\"", json.replace('\\', "\\\\").replace('"', "\\\""));
+        let answer = serde_json::json!({ "result": quoted, "errors": [] }).to_string();
+        let built = build_reading_with_lua(
+            &data,
+            "spring_1944-2.31.sdz",
+            "Spring: 1944 2.31",
+            &DeclaredGame::default(),
+            "1234abcd",
+            coilbox_compat::latest(),
+            "1.2.3",
+            &[],
+            no_file,
+            no_models,
+            || Ok(r#"{"units":{"gersiebelfahre":{},"usbarge":{}},"weaponDefs":{}}"#.into()),
+            move |_| Ok(answer),
+        )
+        .unwrap();
+        assert_eq!(built.def_overrides, 2);
+        assert!(built.notes.is_empty(), "{:?}", built.notes);
     }
 
     #[test]
@@ -1460,7 +1488,7 @@ mod tests {
         ),
         (
             13,
-            "d01ade006ec832b12e2f33d24007c18ceb87e413950460bf506d6c318f0d59b4",
+            "e57963b986e61c2e7a449bd802ef25527dbc449e4439e45fa39fcb97ba2acb99",
         ),
     ];
 

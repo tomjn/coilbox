@@ -1401,6 +1401,13 @@
       "note": "projectileID is passed after weaponDefID, so attackerID, attackerDefID and attackerTeam each arrive one place later than in 0.81. The arguments are now unitID, unitDefID, unitTeam, damage, paralyzer, weaponDefID, projectileID, attackerID, attackerDefID, attackerTeam."
     },
     {
+      "id": "signature:UnitDefs.iconType@2025.06.07",
+      "kind": "signature",
+      "name": "UnitDefs.iconType",
+      "since": "2025.06.07",
+      "note": "A unit def's iconType is returned as the def gave it, even when gamedata/icontypes.lua does not define that icon. Before 2025.06.07 such a def read \"default\", so Lua that looks up every icon type other than \"default\" in icontypes.lua indexes nil."
+    },
+    {
       "id": "signature:UnitMoveFailed@85.0",
       "kind": "signature",
       "name": "UnitMoveFailed",

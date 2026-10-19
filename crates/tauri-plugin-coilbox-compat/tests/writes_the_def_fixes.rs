@@ -220,7 +220,9 @@ fn the_commanders_get_iscommander_and_the_bombs_keep_their_burst_where_the_game_
 
     // The defs whose model the game does not have get a box (issue #4686),
     // and the build counts them from its own run of the fix.
-    let standins = if fixes_in_post {
+    // The same run lists the unit defs whose icon type reads "default" (issue
+    // #4699).
+    let (standins, icons) = if fixes_in_post {
         let source = tauri_plugin_coilbox_compat::standins::script(&manifest).unwrap();
         let answer = tauri_plugin_coilbox_unitsync::lua_exec_blocking(
             &engine.to_string_lossy(),
@@ -229,13 +231,13 @@ fn the_commanders_get_iscommander_and_the_bombs_keep_their_burst_where_the_game_
             &source,
         )
         .expect("the stand-in run");
-        tauri_plugin_coilbox_compat::standins::parse(&answer)
-            .unwrap()
-            .standins
+        let found = tauri_plugin_coilbox_compat::standins::parse(&answer).unwrap();
+        (found.standins, found.icons)
     } else {
-        Vec::new()
+        (Vec::new(), Vec::new())
     };
     eprintln!("{} defs get a box: {standins:?}", standins.len());
+    eprintln!("{} unit defs read the default icon: {icons:?}", icons.len());
     if archive == "xta-9.65.sd7" {
         let names: Vec<(&str, &str)> = standins
             .iter()
@@ -251,5 +253,8 @@ fn the_commanders_get_iscommander_and_the_bombs_keep_their_burst_where_the_game_
         }
         assert!(built.notes.iter().any(|n| n.contains("arm_infinity_dead")));
     }
-    assert_eq!(built.def_overrides, models + counted + standins.len());
+    assert_eq!(
+        built.def_overrides,
+        models + counted + standins.len() + icons.len()
+    );
 }
