@@ -105,9 +105,9 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-function renderPage() {
+function renderPage(path = "/library/games") {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[path]}>
       <GamesPage />
     </MemoryRouter>,
   );
@@ -150,13 +150,28 @@ describe("Games page", () => {
     expect(cardTitles()).toEqual(["SplinterFaction"]);
   });
 
+  it("opens on the chip the link names", () => {
+    renderPage("/library/games?filter=updates");
+    expect(
+      screen
+        .getByRole("radio", { name: /Updates/ })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    expect(cardTitles()).toEqual(["SplinterFaction"]);
+  });
+
+  it("hides the Updates chip when nothing has an update", () => {
+    hoisted.input = { ...LIBRARY_GAMES_INPUT, catalogues: [] };
+    renderPage();
+    expect(screen.queryByRole("radio", { name: /Updates/ })).toBeNull();
+  });
+
   it("says when a chip has nothing in it", () => {
     hoisted.input = {
       ...LIBRARY_GAMES_INPUT,
       catalogues: [],
     };
-    renderPage();
-    fireEvent.click(screen.getByRole("radio", { name: /Updates/ }));
+    renderPage("/library/games?filter=updates");
     expect(
       screen.getByText("Every installed game is up to date."),
     ).toBeTruthy();
