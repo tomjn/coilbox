@@ -18,7 +18,7 @@ To find one:
 - Remixed shows only your remixes. It only appears once you have one.
 - Watched shows only the replays you have marked watched. It only appears once you have marked one.
 
-The list at the top left picks which engine's content folder to read. Rescan reads the folder again, for example after you copy a replay in.
+The page reads the replays in your preferred engine's content folder. The line beside Rescan names the engine. To use another engine, make it your preferred one in Settings, then Library > Engines. See [Engines](library.md#engines). Rescan reads the folder again, for example after you copy a replay in.
 
 The page remembers your filters and sort, so they are still there next time.
 
