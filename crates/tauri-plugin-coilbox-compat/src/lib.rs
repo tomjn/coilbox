@@ -15,6 +15,7 @@ mod handlers;
 mod identical_builds;
 pub mod models;
 pub mod mutator;
+pub mod standins;
 
 use picoframe_core::CliResult;
 use serde::Serialize;
@@ -110,6 +111,14 @@ pub fn build(
         },
         || models::convert(engine_path, data_dir, archive_name, staging.path(), writer),
         || tauri_plugin_coilbox_unitsync::unit_defs_blocking(engine_path, data_dir, archive_name),
+        |source| {
+            tauri_plugin_coilbox_unitsync::lua_exec_blocking(
+                engine_path,
+                data_dir,
+                archive_name,
+                source,
+            )
+        },
     )
 }
 
@@ -130,6 +139,49 @@ fn build_reading(
     convert: impl FnOnce() -> Result<models::Models, String>,
     read_defs: impl FnOnce() -> Result<String, String>,
 ) -> Result<Built, String> {
+    build_reading_with_lua(
+        data_dir,
+        archive_name,
+        game_name,
+        declared,
+        base_checksum,
+        manifest_version,
+        coilbox_version,
+        handlers,
+        read,
+        convert,
+        read_defs,
+        |_| Ok(standins_answer("[]")),
+    )
+}
+
+/// The worker's answer to the stand-in script (see `standins`) for a game
+/// whose defs the fix changes as the JSON list `standins` says.
+#[cfg(test)]
+fn standins_answer(standins: &str) -> String {
+    let json = format!(r#"{{"loaded":true,"ran":true,"standins":{standins},"failed":[]}}"#);
+    let quoted = format!("\"{}\"", json.replace('\\', "\\\\").replace('"', "\\\""));
+    serde_json::json!({ "result": quoted, "errors": [] }).to_string()
+}
+
+/// [`build_reading`], with `run_lua` answering for the worker that runs the
+/// stand-in script.
+#[cfg(test)]
+#[allow(clippy::too_many_arguments)]
+fn build_reading_with_lua(
+    data_dir: &str,
+    archive_name: &str,
+    game_name: &str,
+    declared: &DeclaredGame,
+    base_checksum: &str,
+    manifest_version: u32,
+    coilbox_version: &str,
+    handlers: &[coilbox_compat::Handler],
+    read: impl Fn(&str) -> Result<Option<String>, String>,
+    convert: impl FnOnce() -> Result<models::Models, String>,
+    read_defs: impl FnOnce() -> Result<String, String>,
+    run_lua: impl FnOnce(&str) -> Result<String, String>,
+) -> Result<Built, String> {
     let manifest = coilbox_compat::manifest(manifest_version)
         .ok_or_else(|| format!("there is no compat manifest {manifest_version}"))?;
     build_with(
@@ -145,6 +197,7 @@ fn build_reading(
         |file| Ok(read(file)?.map(String::into_bytes)),
         convert,
         read_defs,
+        run_lua,
     )
 }
 
@@ -154,7 +207,9 @@ fn build_reading(
 /// models, and `read_defs` its defs as `unitsync_unit_defs` reads them.
 /// `convert` runs once the request is known to be sound, and before anything is
 /// written. `read_defs` runs only when def fixes were written, to count the
-/// defs they change.
+/// defs they change. `run_lua` runs a script through the worker with the game
+/// mounted, and only when the def fix for missing models is written, to find
+/// the defs it changes (see `standins`).
 ///
 /// The entry files the prelude wraps come from `read_bytes` for a manifest
 /// whose writer copies them byte for byte, and from `read` for one whose
@@ -173,6 +228,7 @@ fn build_with(
     mut read_bytes: impl FnMut(&str) -> Result<Option<Vec<u8>>, String>,
     convert: impl FnOnce() -> Result<models::Models, String>,
     read_defs: impl FnOnce() -> Result<String, String>,
+    run_lua: impl FnOnce(&str) -> Result<String, String>,
 ) -> Result<Built, String> {
     let manifest_version = manifest.version;
     mutator::check_pins(manifest)?;
@@ -202,6 +258,14 @@ fn build_with(
     };
     let mut files = mutator::files(&manifest, game_name, declared, &marker, entry)?;
     let defs = defs::plan(&manifest, &mut read)?;
+    let standins = if standins::wanted(&manifest, &defs) {
+        let found = standins::parse(&run_lua(&standins::script(&manifest)?)?)?;
+        let at = files.len().saturating_sub(1);
+        files.splice(at..at, standins::files(&found.standins)?);
+        found
+    } else {
+        standins::Found::default()
+    };
     let models = convert()?;
     // The palette is known only once the models are converted, so the marker
     // that ends `files` is written again with it.
@@ -227,8 +291,9 @@ fn build_with(
         .collect();
     let mut notes = models.notes.clone();
     notes.extend(defs.notes.iter().cloned());
+    notes.extend(standins::note(&standins));
     let files = write_with_models(&dir, &mut files, &models, &defs, manifest_version)?;
-    let mut def_overrides = models::model_keys(&files).len();
+    let mut def_overrides = models::model_keys(&files).len() + standins.standins.len();
     if !defs.written.is_empty() {
         match read_defs().and_then(|read| defs::changed(&manifest, &defs.written, &read)) {
             Ok(n) => def_overrides += n,
@@ -593,7 +658,8 @@ mod tests {
     fn a_build_writes_the_folder_and_status_finds_it_current() {
         let (_keep, data) = root();
         let n = coilbox_compat::latest();
-        let built = build_reading(
+        let asked = std::cell::RefCell::new(String::new());
+        let built = build_reading_with_lua(
             &data,
             "xta-9.65.sd7",
             "XTA 9.65",
@@ -605,8 +671,17 @@ mod tests {
             no_file,
             no_models,
             || Ok(r#"{"units":{"armcom":{"commander":1},"armpw":{}},"weaponDefs":{}}"#.into()),
+            |source| {
+                *asked.borrow_mut() = source.to_string();
+                Ok(standins_answer(
+                    r#"[{"kind":"feature","name":"arm_infinity_dead","model":"arm_infinity_dead","standin":"compat/models/standin-3x2.s3o"}]"#,
+                ))
+            },
         )
         .unwrap();
+        assert!(asked
+            .borrow()
+            .contains("-- fix: defs-missing-model-standin\n"));
         assert_eq!(built.folder, format!("coilbox-compat-xta-9.65-{n}.sdd"));
         let gadgets: Vec<String> =
             coilbox_compat::gadget_files(&coilbox_compat::manifest(n).unwrap())
@@ -616,6 +691,9 @@ mod tests {
         let expected: Vec<String> = gadgets
             .into_iter()
             .chain([
+                "compat/models/standin-1x1.s3o".to_string(),
+                "compat/models/standin-3x2.s3o".to_string(),
+                "compat/models/standin.tga".to_string(),
                 models::DEFS_POST.to_string(),
                 "gamedata/weapondefs_post.lua".to_string(),
                 "modinfo.lua".to_string(),
@@ -623,9 +701,11 @@ mod tests {
             ])
             .collect();
         assert_eq!(built.files, expected);
-        // The commander the def fixes give customparams.iscommander.
-        assert_eq!(built.def_overrides, 1);
-        assert!(built.notes.is_empty(), "{:?}", built.notes);
+        // The commander the def fixes give customparams.iscommander, and the
+        // wreck whose model is missing (issue #4686).
+        assert_eq!(built.def_overrides, 2);
+        assert_eq!(built.notes.len(), 1, "{:?}", built.notes);
+        assert!(built.notes[0].contains("feature arm_infinity_dead (arm_infinity_dead)"));
         let manifest = coilbox_compat::manifest(n).unwrap();
         let def_fixes = manifest
             .fixes
@@ -780,6 +860,7 @@ mod tests {
                 |file| Ok((file == main).then(|| raw.to_vec())),
                 no_models,
                 no_defs,
+                |_| Ok(standins_answer("[]")),
             )
             .unwrap();
             std::fs::read(std::path::Path::new(&built.dir).join(main)).unwrap()
@@ -1143,6 +1224,7 @@ mod tests {
             |file| Ok(read(file)?.map(String::into_bytes)),
             || models::convert_reading(read, || run_converter(staging.path()), staging.path()),
             no_defs,
+            |_| Ok(standins_answer(GOLDEN_STANDINS)),
         )
         .unwrap();
         let dir = std::path::Path::new(&built.dir);
@@ -1155,6 +1237,13 @@ mod tests {
         out.sort();
         out
     }
+
+    /// The defs the golden build's games give a stand-in, as the worker would
+    /// find them: a wreck with a footprint and a weapon without one.
+    const GOLDEN_STANDINS: &str = r#"[
+        {"kind":"feature","name":"arm_infinity_dead","model":"arm_infinity_dead","standin":"compat/models/standin-3x2.s3o"},
+        {"kind":"weapon","name":"shell","model":"shell.3do","standin":"compat/models/standin-1x1.s3o"}
+    ]"#;
 
     /// What the golden build's games are there to cover, so a change to the
     /// fixtures that stops covering it fails here and not in silence.
@@ -1224,6 +1313,27 @@ mod tests {
         let defs_only = golden_build(5, &FIXTURES[2]);
         assert!(text(&defs_only, models::DEFS_POST).is_none());
         assert!(text(&defs_only, weapons).unwrap().contains(bombs));
+
+        let boxes = [
+            "compat/models/standin-1x1.s3o",
+            "compat/models/standin-3x2.s3o",
+            "compat/models/standin.tga",
+        ];
+        let with_boxes = golden_build(10, &FIXTURES[0]);
+        for path in boxes {
+            assert!(paths(&with_boxes).iter().any(|p| p == path), "{path}");
+        }
+        assert!(text(&with_boxes, models::DEFS_POST)
+            .unwrap()
+            .contains("-- fix: defs-missing-model-standin\n"));
+        assert!(!paths(&golden_build(9, &FIXTURES[0]))
+            .iter()
+            .any(|p| p.starts_with("compat/models/")));
+        // A game with its own defs_post.lua runs no def fix there, so it gets
+        // no boxes.
+        assert!(!paths(&golden_build(10, &FIXTURES[2]))
+            .iter()
+            .any(|p| p.starts_with("compat/models/")));
     }
 
     /// The hash of every fixed game built from `manifest`.
@@ -1284,6 +1394,10 @@ mod tests {
         (
             9,
             "fe0773afdc7d89040e08cd849ad9456074ef00d43aa0d42c9dcfb5eba9744e79",
+        ),
+        (
+            10,
+            "a2e6d720dd4c31135410c9cb3e9a39a527bbb1e3d089cfc14cc41fe6464cbed3",
         ),
     ];
 
@@ -1366,6 +1480,8 @@ mod tests {
                 "LuaRules/Gadgets/coilbox_compat_model_center_offset.lua",
                 "LuaRules/Gadgets/coilbox_compat_only_forward_aim.lua",
                 "Objects3D/armcom.s3o",
+                "compat/models/standin-1x1.s3o",
+                "compat/models/standin.tga",
                 models::DEFS_POST,
                 "gamedata/weapondefs_post.lua",
                 "modinfo.lua",
@@ -1570,6 +1686,33 @@ mod tests {
             no_defs,
         );
         assert!(failed.is_err());
+        assert!(!std::path::Path::new(&data).join("games").exists());
+    }
+
+    /// Issue #4686: the boxes are part of the mutator's bytes, so a build that
+    /// could not find which defs need one stops, rather than write a mutator
+    /// another player's build would not match.
+    #[test]
+    fn a_failed_search_for_missing_models_writes_nothing() {
+        let (_keep, data) = root();
+        let failed = build_reading_with_lua(
+            &data,
+            "xta.sd7",
+            "XTA",
+            &DeclaredGame::default(),
+            "1",
+            coilbox_compat::latest(),
+            "1",
+            &[],
+            no_file,
+            no_models,
+            no_defs,
+            |_| Err("unitsync lua exec timed out after 300s".into()),
+        );
+        assert_eq!(
+            failed.err(),
+            Some("unitsync lua exec timed out after 300s".into())
+        );
         assert!(!std::path::Path::new(&data).join("games").exists());
     }
 

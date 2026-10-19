@@ -226,7 +226,8 @@ fn changes_weapon(id: &str, wd: &Map<String, Value>) -> bool {
 }
 
 /// The def fixes this build knows how to count, which a test checks is every
-/// def fix but the helpers.
+/// def fix but the helpers and the one for missing models, which the build
+/// counts from its own run of the fix (see `standins`).
 pub const COUNTED: &[&str] = &[
     "defs-commander-85",
     "defs-model-center-offset-89",
@@ -515,7 +516,7 @@ mod tests {
         let listed: Vec<&str> = DefsFile::ALL
             .iter()
             .flat_map(|f| coilbox_compat::defs_fixes(&m, *f))
-            .filter(|id| *id != "defs-helpers")
+            .filter(|id| *id != "defs-helpers" && *id != crate::standins::FIX)
             .collect();
         let mut listed = listed;
         listed.dedup();

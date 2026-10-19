@@ -2325,6 +2325,35 @@ pub fn unit_defs_blocking(
     run_worker_blocking(bin, args, envs, SCAN_TIMEOUT, "unit defs".into(), None)
 }
 
+/// The game environment a def script expects under unitsync, for a script
+/// [`lua_exec_blocking`] runs that loads the game's defs.
+pub use coilbox_unitsync_worker::defsenv::DEFS_ENV_SHIM;
+
+/// [`unitsync_lua_exec`], blocking, for a script that loads the game's defs:
+/// the worker's `{ result?, error?, errors }` answer for `source` run with
+/// `archive` mounted. It has the time a read of the defs has, as
+/// [`unit_defs_blocking`] does. The compat build runs its def fixes over the
+/// game's defs this way (issue #4686).
+pub fn lua_exec_blocking(
+    engine_path: &str,
+    data_dir: &str,
+    archive: &str,
+    source: &str,
+) -> Result<String, String> {
+    let (bin, libpath, engine_dir) = prepare(engine_path)?;
+    let script = write_temp_script(source)?;
+    let args = build_lua_args(
+        &libpath.to_string_lossy(),
+        data_dir,
+        archive,
+        &script.to_string_lossy(),
+    );
+    let envs = loader_envs(&engine_dir, data_dir);
+    let out = run_worker_blocking(bin, args, envs, SCAN_TIMEOUT, "lua exec".into(), None);
+    let _ = std::fs::remove_file(&script);
+    out
+}
+
 /// What the scan says about an installed game, for matching an adapter to it
 /// (issue #3799).
 #[derive(Clone, Debug, PartialEq, Eq)]
