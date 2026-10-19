@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { Button } from "@picoframe/frame";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { Bookmark, Play, Swords } from "lucide-react";
@@ -1124,7 +1125,7 @@ export default function SkirmishPage() {
             if (!open) setHostPick(null);
           }}
         >
-          <DialogContent className="sm:max-w-sm">
+          <DialogContent className="sm:max-w-sm" closeLabel={t`Close`}>
             <DialogHeader>
               <DialogTitle>Where do you want to host this?</DialogTitle>
             </DialogHeader>

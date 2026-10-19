@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { Button } from "@picoframe/frame";
 import { AlertTriangle, ExternalLink } from "lucide-react";
 import type { ComponentType } from "react";
@@ -54,14 +55,14 @@ export function ConfirmDialog({
       onOpenChange={(open) => !open && setPending(null)}
     >
       {pending && (
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" closeLabel={t`Close`}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Icon className="size-4 text-muted-foreground" />
               {pending.title}
             </DialogTitle>
             <DialogDescription className="sr-only">
-              Confirm this before it runs.
+              {t`Confirm this before it runs.`}
             </DialogDescription>
           </DialogHeader>
 

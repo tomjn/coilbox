@@ -31,6 +31,7 @@
  * #3118 extends `unitFieldView`'s and `weaponSlots.ts`'s own `always` field
  * for exactly this).
  */
+import { t } from "@lingui/core/macro";
 import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import {
@@ -341,8 +342,9 @@ export function CommandPalette({
         onOpenChange(next);
         if (!next) setQuery("");
       }}
-      title="Command palette"
-      description="Jump to a unit, a field, a section or an action"
+      title={t`Command palette`}
+      description={t`Jump to a unit, a field, a section or an action`}
+      closeLabel={t`Close`}
       // `shouldFilter={false}`: `buildResults` has already decided what
       // matches the query, so cmdk's own fuzzy filter, which would score
       // against each item's `value` rather than the label on screen, would
